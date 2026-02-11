@@ -1,9 +1,11 @@
 import { ActionIcon, Menu, Tooltip } from "@mantine/core";
 import { Camera, ClipboardText, Minus, PushPinSimple } from "@phosphor-icons/react";
-import { invoke } from "@tauri-apps/api";
-import { appWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { Fragment, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+
+const appWindow = getCurrentWebviewWindow();
 
 import getVersion from "@/hooks/getVersion";
 import { EncounterState, PlayerData, SortDirection, SortType } from "@/types";

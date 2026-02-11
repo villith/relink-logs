@@ -17,7 +17,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { Calculator, ClipboardText } from "@phosphor-icons/react";
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import { t } from "i18next";
 import { useCallback, useEffect, useState } from "react";
 import toast from "react-hot-toast";

@@ -1,5 +1,5 @@
-import { readTextFile } from "@tauri-apps/api/fs";
 import { resolveResource } from "@tauri-apps/api/path";
+import { readTextFile } from "@tauri-apps/plugin-fs";
 
 type SkillGroupMapping = {
   [key: string]: {

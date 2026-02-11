@@ -8,7 +8,7 @@ use protocol::{
 };
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, Window};
+use tauri::{AppHandle, Emitter, WebviewWindow};
 
 use super::{
     constants::{CharacterType, EnemyType},
@@ -421,7 +421,7 @@ pub struct Parser {
 
     /// The window handle for the parser, used to send messages to the front-end
     #[serde(skip)]
-    window_handle: Option<Window>,
+    window_handle: Option<WebviewWindow>,
 
     /// The database connection for the parser, used to save the encounter
     #[serde(skip)]
@@ -429,7 +429,7 @@ pub struct Parser {
 }
 
 impl Parser {
-    pub fn new(app: AppHandle, window: Window, db: Connection) -> Self {
+    pub fn new(app: AppHandle, window: WebviewWindow, db: Connection) -> Self {
         Self {
             app: Some(app),
             db: Some(db),
@@ -598,12 +598,12 @@ impl Parser {
                 match self.save_encounter_to_db() {
                     Ok(id) => {
                         if let Some(app) = &self.app {
-                            let _ = app.emit_all("encounter-saved", id);
+                            let _ = app.emit("encounter-saved", id);
                         }
                     }
                     Err(e) => {
                         if let Some(app) = &self.app {
-                            let _ = app.emit_all("encounter-saved-error", e.to_string());
+                            let _ = app.emit("encounter-saved-error", e.to_string());
                         }
                     }
                 }

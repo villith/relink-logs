@@ -16,7 +16,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { DotsSixVertical } from "@phosphor-icons/react";
-import { invoke } from "@tauri-apps/api";
+import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import useSettings from "./useSettings";

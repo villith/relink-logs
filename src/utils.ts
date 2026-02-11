@@ -1,4 +1,4 @@
-import { open } from "@tauri-apps/api/shell";
+import { open } from "@tauri-apps/plugin-shell";
 import html2canvas from "html2canvas";
 import * as jsurl from "jsurl";
 import toast from "react-hot-toast";
