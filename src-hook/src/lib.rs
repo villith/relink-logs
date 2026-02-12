@@ -3,7 +3,7 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use futures::sink::SinkExt;
-use interprocess::os::windows::named_pipe::tokio::{PipeListenerOptionsExt, SendPipeStream};
+use interprocess::os::windows::named_pipe::tokio::SendPipeStream;
 use interprocess::os::windows::named_pipe::{pipe_mode, PipeListenerOptions, PipeMode};
 use log::{info, warn};
 use tokio::sync::broadcast;

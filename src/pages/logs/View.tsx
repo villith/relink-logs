@@ -186,22 +186,24 @@ export const ViewPage = () => {
     playerData,
     setSelectedTargets,
     loadFromResponse,
-  } = useEncounterStore((state) => ({
-    encounter: state.encounterState,
-    dpsChart: state.dpsChart,
-    sbaChart: state.sbaChart,
-    sbaEvents: state.sbaEvents,
-    chartLen: state.chartLen,
-    sbaChartLen: state.sbaChartLen,
-    targets: state.targets,
-    selectedTargets: state.selectedTargets,
-    playerData: state.players,
-    questId: state.questId,
-    questTimer: state.questTimer,
-    questCompleted: state.questCompleted,
-    setSelectedTargets: state.setSelectedTargets,
-    loadFromResponse: state.loadFromResponse,
-  }));
+  } = useEncounterStore(
+    useShallow((state) => ({
+      encounter: state.encounterState,
+      dpsChart: state.dpsChart,
+      sbaChart: state.sbaChart,
+      sbaEvents: state.sbaEvents,
+      chartLen: state.chartLen,
+      sbaChartLen: state.sbaChartLen,
+      targets: state.targets,
+      selectedTargets: state.selectedTargets,
+      playerData: state.players,
+      questId: state.questId,
+      questTimer: state.questTimer,
+      questCompleted: state.questCompleted,
+      setSelectedTargets: state.setSelectedTargets,
+      loadFromResponse: state.loadFromResponse,
+    }))
+  );
   const [sortType, setSortType] = useState<SortType>(MeterColumns.TotalDamage);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 

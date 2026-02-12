@@ -1,3 +1,4 @@
+import "@/i18n";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import "./Logs.css";
 
@@ -12,7 +13,7 @@ import { Link, Outlet, useNavigate } from "react-router-dom";
 const Layout = () => {
   const [mobileOpened, { toggle: toggleMobile }] = useDisclosure();
   const [desktopOpened, { toggle: toggleDesktop }] = useDisclosure(false);
-  const { open_log_on_save } = useMeterSettingsStore((state) => ({ open_log_on_save: state.open_log_on_save }));
+  const open_log_on_save = useMeterSettingsStore((state) => state.open_log_on_save);
 
   const navigate = useNavigate();
 

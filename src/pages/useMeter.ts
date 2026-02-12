@@ -57,7 +57,7 @@ export default function useMeter() {
       setEncounterState(event.payload);
 
       if (event.payload.status === "InProgress" && encounterState.status === "Waiting") {
-        encounterState.startTime == Date.now();
+        encounterState.startTime = Date.now();
       }
     });
 

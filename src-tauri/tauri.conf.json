@@ -63,7 +63,7 @@
     "resources": [
       "hook.dll",
       "assets/*",
-      "lang/*"
+      "lang/**/*"
     ],
     "windows": {
       "webviewInstallMode": {

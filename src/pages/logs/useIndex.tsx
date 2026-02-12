@@ -7,6 +7,7 @@ import { modals } from "@mantine/modals";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 
 export default function useIndex() {
   const { t } = useTranslation();
@@ -22,22 +23,22 @@ export default function useIndex() {
     deleteSelectedLogs,
     deleteAllLogs,
     fetchLogs,
-  } = useLogIndexStore((state) => ({
-    currentPage: state.currentPage,
-    setCurrentPage: state.setCurrentPage,
-    searchResult: state.searchResult,
-    filters: state.filters,
-    setFilters: state.setFilters,
-    selectedLogIds: state.selectedLogIds,
-    setSelectedLogIds: state.setSelectedLogIds,
-    deleteSelectedLogs: state.deleteSelectedLogs,
-    deleteAllLogs: state.deleteAllLogs,
-    fetchLogs: state.fetchLogs,
-  }));
+  } = useLogIndexStore(
+    useShallow((state) => ({
+      currentPage: state.currentPage,
+      setCurrentPage: state.setCurrentPage,
+      searchResult: state.searchResult,
+      filters: state.filters,
+      setFilters: state.setFilters,
+      selectedLogIds: state.selectedLogIds,
+      setSelectedLogIds: state.setSelectedLogIds,
+      deleteSelectedLogs: state.deleteSelectedLogs,
+      deleteAllLogs: state.deleteAllLogs,
+      fetchLogs: state.fetchLogs,
+    }))
+  );
 
-  const { setSelectedTargets } = useEncounterStore((state) => ({
-    setSelectedTargets: state.setSelectedTargets,
-  }));
+  const setSelectedTargets = useEncounterStore((state) => state.setSelectedTargets);
 
   useEffect(() => {
     fetchLogs();

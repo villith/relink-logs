@@ -117,10 +117,6 @@ This project is split up into a few subprojects:
 - `protocol/` - Defines the message protocol used by hook + back-end.
 - `src/` - The JS front-end used by the Tauri web app
 
-# Supporting the Project
-
-GBFR Logs will always be kept free and open-source (MIT). However, if you want to support me directly, [you can buy me a coffee!](https://www.buymeacoffee.com/false.spring) 🙇
-
 ## Credits
 
 This project would not have been possible without the following folks:

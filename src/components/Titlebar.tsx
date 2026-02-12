@@ -1,12 +1,3 @@
-import { ActionIcon, Menu, Tooltip } from "@mantine/core";
-import { Camera, ClipboardText, Minus, PushPinSimple } from "@phosphor-icons/react";
-import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { Fragment, useCallback } from "react";
-import { useTranslation } from "react-i18next";
-
-const appWindow = getCurrentWebviewWindow();
-
 import getVersion from "@/hooks/getVersion";
 import { EncounterState, PlayerData, SortDirection, SortType } from "@/types";
 import {
@@ -16,6 +7,12 @@ import {
   humanizeNumbers,
   millisecondsToElapsedFormat,
 } from "@/utils";
+import { ActionIcon, Menu, Tooltip } from "@mantine/core";
+import { Camera, ClipboardText, Minus, PushPinSimple } from "@phosphor-icons/react";
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { Fragment, useCallback } from "react";
+import { useTranslation } from "react-i18next";
 
 const TeamDamageStats = ({ encounterState }: { encounterState: EncounterState }) => {
   const [teamDps, dpsUnit] = humanizeNumbers(encounterState.dps);
@@ -78,7 +75,7 @@ export const Titlebar = ({
   const { version } = getVersion();
 
   const onMinimize = () => {
-    appWindow.minimize();
+    getCurrentWebviewWindow().minimize();
   };
   const onPin = () => {
     invoke("toggle_always_on_top");

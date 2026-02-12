@@ -241,7 +241,7 @@ function LogEntry({
   primaryTarget: string;
   names: string;
   resetSelectedTargets: () => void;
-}): JSX.Element {
+}): React.ReactElement {
   return (
     <Table.Tr key={log.id}>
       <Table.Td>

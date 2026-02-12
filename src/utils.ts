@@ -403,7 +403,7 @@ export const toHashString = (num: number | undefined): string => (num ? num.toSt
 
 /// Hook that returns the previous value of a variable.
 export const usePrevious = <T>(value: T): T | undefined => {
-  const ref = useRef<T>();
+  const ref = useRef<T | undefined>(undefined);
 
   useEffect(() => {
     ref.current = value;

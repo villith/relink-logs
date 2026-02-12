@@ -3,6 +3,7 @@ import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { MeterColumns } from "@/types";
 import { DropResult } from "@hello-pangea/dnd";
 import { useTranslation } from "react-i18next";
+import { useShallow } from "zustand/react/shallow";
 
 const reorder = <TList extends unknown[]>(list: TList, startIndex: number, endIndex: number): TList => {
   const result = Array.from(list) as TList;
@@ -26,20 +27,22 @@ export default function useSettings() {
     overlay_columns,
     open_log_on_save,
     setMeterSettings,
-  } = useMeterSettingsStore((state) => ({
-    color_1: state.color_1,
-    color_2: state.color_2,
-    color_3: state.color_3,
-    color_4: state.color_4,
-    transparency: state.transparency,
-    show_display_names: state.show_display_names,
-    streamer_mode: state.streamer_mode,
-    show_full_values: state.show_full_values,
-    use_condensed_skills: state.use_condensed_skills,
-    open_log_on_save: state.open_log_on_save,
-    setMeterSettings: state.set,
-    overlay_columns: state.overlay_columns,
-  }));
+  } = useMeterSettingsStore(
+    useShallow((state) => ({
+      color_1: state.color_1,
+      color_2: state.color_2,
+      color_3: state.color_3,
+      color_4: state.color_4,
+      transparency: state.transparency,
+      show_display_names: state.show_display_names,
+      streamer_mode: state.streamer_mode,
+      show_full_values: state.show_full_values,
+      use_condensed_skills: state.use_condensed_skills,
+      open_log_on_save: state.open_log_on_save,
+      setMeterSettings: state.set,
+      overlay_columns: state.overlay_columns,
+    }))
+  );
 
   const { i18n } = useTranslation();
 
