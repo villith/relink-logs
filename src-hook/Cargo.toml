@@ -16,7 +16,7 @@ LegalCopyright = "Copyright (C) False Spring"
 
 [dependencies]
 anyhow = "1.0"
-ctor = "0.2.6"
+ctor = "0.6.3"
 dirs = "5.0"
 fern = { version = "0.6" }
 interprocess = { version = "^2.0", features = ["tokio"] }

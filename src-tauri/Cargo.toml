@@ -40,7 +40,7 @@ num_enum = "0.7.2"
 chrono = "0.4"
 rusqlite = { version = "0.30.0", features = ["bundled"] }
 rusqlite_migration = "1.1.0"
-zstd = "0.13.0"
+zstd = "0.13.3"
 strum = "0.26"
 strum_macros = "0.26"
 cbor4ii = { version = "0.3.2", features = ["use_std", "serde1"] }

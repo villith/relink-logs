@@ -55,28 +55,29 @@ impl OnProcessDamageHook {
     fn run(&self, a1: *const usize, a2: *const usize, a3: *const usize, a4: u8) -> usize {
         // Target is the instance of the actor being damaged.
         // For example: Instance of the Em2700 class.
-        let target_specified_instance_ptr: usize = unsafe { *(*a1.byte_add(0x08) as *const usize) };
+        // Validate the intermediate pointer before dereferencing to avoid null dereference.
+        let target_entity_ptr = unsafe { *a1.byte_add(0x08) as *const usize };
+        let target_specified_instance_ptr: Option<usize> =
+            NonNull::new(target_entity_ptr as *mut usize).map(|p| unsafe { p.as_ptr().read() });
 
-        let previous_stun_value = unsafe {
-            (target_specified_instance_ptr as *const f32)
-                .byte_add(0xA70)
-                .read()
-        };
+        let previous_stun_value = target_specified_instance_ptr.map(|ptr| unsafe {
+            (ptr as *const f32).byte_add(0xA70).read()
+        });
 
         let original_value = unsafe { ProcessDamageEvent.call(a1, a2, a3, a4) };
 
-        let current_stun_value = unsafe {
-            (target_specified_instance_ptr as *const f32)
-                .byte_add(0xA70)
-                .read()
+        let current_stun_value = target_specified_instance_ptr.map(|ptr| unsafe {
+            (ptr as *const f32).byte_add(0xA70).read()
+        });
+        let added_stun_value = match (previous_stun_value, current_stun_value) {
+            (Some(prev), Some(curr)) => (curr - prev).max(0.0),
+            _ => 0.0,
         };
-        let added_stun_value = (current_stun_value - previous_stun_value).max(0.0);
 
         // This points to the first Entity instance in the 'a2' entity list.
         let source_entity_ptr = unsafe { (a2.byte_add(0x18) as *const *const usize).read() };
 
-        // @TODO(false): For some reason, online + Ferry's Umlauf skill pet can return a null pointer here.
-        // Possible data race with online?
+        // For some reason, online + Ferry's Umlauf skill pet can return a null pointer here.
         if source_entity_ptr.is_null() {
             return original_value;
         }
@@ -91,6 +92,11 @@ impl OnProcessDamageHook {
         if original_value == 0 || damage <= 0 {
             return original_value;
         }
+
+        let target_specified_instance_ptr = match target_specified_instance_ptr {
+            Some(ptr) => ptr,
+            None => return original_value,
+        };
 
         let flags: u64 = damage_instance.flags;
 

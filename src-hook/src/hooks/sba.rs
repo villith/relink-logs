@@ -258,6 +258,10 @@ impl OnContinueSBAChainHook {
 
         let ret = unsafe { OnContinueSBAChain.call(player_entity, a2) };
 
+        if player_entity.is_null() {
+            return ret;
+        }
+
         let source_idx = actor_idx(player_entity);
         let source_type_id = actor_type_id(player_entity);
         let (_, source_parent_idx) = get_source_parent(source_type_id, player_entity)

@@ -47,6 +47,9 @@ impl OnDeathHook {
         let ret = unsafe { OnDeathEvent.call(a1) };
 
         let entity_ptr = unsafe { a1.byte_add(0x10).read() as *const usize };
+        if entity_ptr.is_null() {
+            return ret;
+        }
         let actor_index = unsafe { entity_ptr.byte_add(0x170).read() } as u32;
         let death_counter = unsafe { a1.byte_add(0xEC).read() } as u32;
 

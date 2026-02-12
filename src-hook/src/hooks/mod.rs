@@ -126,6 +126,11 @@ fn parent_specified_instance_at(actor_ptr: *const usize, offset: usize) -> Optio
             return None;
         }
 
-        Some(info.byte_add(0x70).read())
+        let result = info.byte_add(0x70).read();
+        if result.is_null() {
+            return None;
+        }
+
+        Some(result)
     }
 }

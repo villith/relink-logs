@@ -59,7 +59,7 @@ impl Process {
                             };
 
                             if Module32FirstW(module_snapshot, &mut module_entry).is_ok() {
-                                let module_name = String::from_utf16_lossy(&process.szExeFile)
+                                let module_name = String::from_utf16_lossy(&module_entry.szModule)
                                     .trim_end_matches('\u{0}')
                                     .to_string();
 
