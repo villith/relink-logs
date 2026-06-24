@@ -1,4 +1,4 @@
-import { CaretDown, CaretUp } from "@phosphor-icons/react";
+import { CaretDown, CaretUp, Warning } from "@phosphor-icons/react";
 import { Fragment } from "react";
 
 import { ComputedPlayerState, PlayerData } from "@/types";
@@ -32,6 +32,12 @@ export const PlayerRow = ({
       <tr className={`player-row ${isOpen ? "transparent-bg" : ""}`} onClick={() => setIsOpen(!isOpen)}>
         <td className="text-left row-data">
           {translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player, showDisplayNames)}
+          {player.cappedHits > 0 && (
+            <span className="capped" title={`${player.cappedHits} capped hits`}>
+              {" "}
+              <Warning size={12} weight="fill" />
+            </span>
+          )}
         </td>
         {columns.map((column) => {
           const columnValue = matchColumnTypeToValue(showFullValues, column);
