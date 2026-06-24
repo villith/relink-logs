@@ -45,7 +45,29 @@ damage_cap == Some(cap) && cap > 0 && damage >= cap
 is **never** counted as capped. `>=` is used (not `==`) to be robust to any
 off-by-one between the reported final damage and cap.
 
-This rule lives in exactly one place: `AdjustedDamageInstance` (see below).
+This is the **live** rule, computed in `AdjustedDamageInstance::from_damage_event`.
+
+### Revision (2026-06-24): crit-aware detection in reparse
+
+Investigation of ~158k real damage events showed the game model is
+`final_damage = min(raw_base, damage_cap) × crit_multiplier`. So `damage > cap` is
+normal (a capped base that then crit), and the simple `damage >= cap` rule misfires
+(~0.75%) on uncapped near-cap hits whose `base × crit` slightly exceeds the cap.
+
+The **reparse/derive path** (what the frontend consumes after every update and on
+save) therefore uses crit-aware detection (`parser/v1/cap_detection.rs`):
+
+1. Learn the encounter's crit multipliers = the recurring `damage/cap` ratios of
+   hits with `damage >= cap` (fine 0.002 bucketing; a multiplier must hold ≥1% of
+   such hits).
+2. A hit is capped iff `damage >= cap > 0` AND `damage ≈ cap × m` (relative
+   tolerance) for a learned multiplier `m`. With no multipliers learned, it falls
+   back to the simple rule.
+
+The **live** single-pass path keeps the simple `damage >= cap` rule (the crit set
+isn't known yet); the next re-derive corrects the counts. The spreadsheet
+cross-validation originally considered here was abandoned — the sheets cannot
+tightly validate scaled in-game caps (see the `gbfr-damage-calculator-csvs` note).
 
 ## Back-compat
 

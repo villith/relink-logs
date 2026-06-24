@@ -15,6 +15,7 @@ use super::{
     v0,
 };
 
+mod cap_detection;
 mod player_state;
 mod skill_state;
 
@@ -318,6 +319,11 @@ pub struct DerivedEncounterState {
     pub party: HashMap<u32, PlayerState>,
     /// Derived target stats, damage done to each target.
     targets: HashMap<u32, EnemyState>,
+    /// Crit multipliers learned for this encounter, used for crit-aware cap
+    /// detection during reparse. Empty during live single-pass updates (which fall
+    /// back to the simple `damage >= cap` rule until the next re-derive).
+    #[serde(skip)]
+    crit_multipliers: Vec<f64>,
 }
 
 impl Default for DerivedEncounterState {
@@ -332,6 +338,7 @@ impl Default for DerivedEncounterState {
             status: ParserStatus::Waiting,
             party: HashMap::new(),
             targets: HashMap::new(),
+            crit_multipliers: Vec::new(),
         }
     }
 }
@@ -471,10 +478,24 @@ impl Parser {
         Ok(Self::from_encounter(encounter))
     }
 
+    /// Learn the encounter's crit multipliers from all damage events (used for
+    /// crit-aware cap detection during reparse).
+    fn learn_crit_multipliers(&self) -> Vec<f64> {
+        let at_or_over = self.encounter.event_log().filter_map(|(_, event)| {
+            if let Message::DamageEvent(e) = event {
+                e.damage_cap.map(|cap| (e.damage, cap))
+            } else {
+                None
+            }
+        });
+        cap_detection::learn_crit_multipliers(at_or_over)
+    }
+
     /// Reparses derived state from the current encounter.
     pub fn reparse(&mut self) {
         self.derived_state = Default::default();
         self.derived_state.start(self.start_time());
+        self.derived_state.crit_multipliers = self.learn_crit_multipliers();
 
         for (timestamp, event) in self.encounter.event_log() {
             self.derived_state.end_time = *timestamp;
@@ -488,8 +509,13 @@ impl Parser {
                         .flatten()
                         .find(|player| player.actor_index == event.source.parent_index);
 
-                    let damage_instance =
+                    let mut damage_instance =
                         AdjustedDamageInstance::from_damage_event(event, player_data);
+                    damage_instance.is_capped = cap_detection::is_capped(
+                        event.damage,
+                        event.damage_cap,
+                        &self.derived_state.crit_multipliers,
+                    );
 
                     self.derived_state
                         .process_damage_event(*timestamp, &damage_instance);
@@ -503,6 +529,7 @@ impl Parser {
     pub fn reparse_with_options(&mut self, targets: &[EnemyType]) {
         self.derived_state = Default::default();
         self.derived_state.start(self.start_time());
+        self.derived_state.crit_multipliers = self.learn_crit_multipliers();
 
         for (timestamp, event) in self.encounter.event_log() {
             self.derived_state.end_time = *timestamp;
@@ -521,8 +548,13 @@ impl Parser {
                             .flatten()
                             .find(|player| player.actor_index == event.source.parent_index);
 
-                        let damage_instance =
+                        let mut damage_instance =
                             AdjustedDamageInstance::from_damage_event(event, player_data);
+                        damage_instance.is_capped = cap_detection::is_capped(
+                            event.damage,
+                            event.damage_cap,
+                            &self.derived_state.crit_multipliers,
+                        );
 
                         self.derived_state
                             .process_damage_event(*timestamp, &damage_instance);
@@ -1122,5 +1154,63 @@ mod tests {
         assert_eq!(player.skill_breakdown.len(), 1);
         assert_eq!(player.skill_breakdown[0].capped_hits, 1);
         assert_eq!(player.skill_breakdown[0].hits, 2);
+    }
+
+    #[test]
+    fn reparse_uses_crit_aware_cap_detection() {
+        fn dmg_event(damage: i32, cap: i32) -> DamageEvent {
+            DamageEvent {
+                source: Actor {
+                    index: 0,
+                    actor_type: 0,
+                    parent_actor_type: 0,
+                    parent_index: 0,
+                },
+                target: Actor {
+                    index: 0,
+                    actor_type: 0,
+                    parent_actor_type: 0,
+                    parent_index: 0,
+                },
+                damage,
+                flags: 0,
+                action_id: ActionType::Normal(1),
+                attack_rate: None,
+                stun_value: None,
+                damage_cap: Some(cap),
+            }
+        }
+
+        let mut parser = Parser::default();
+        let cap = 1000;
+        let mut ts = 0i64;
+        let mut push = |parser: &mut Parser, damage: i32| {
+            ts += 1;
+            parser
+                .encounter
+                .raw_event_log
+                .push((ts, Message::DamageEvent(dmg_event(damage, cap))));
+        };
+
+        // Establish two clear crit multipliers: x1.0 (exactly capped) and x1.2.
+        for _ in 0..50 {
+            push(&mut parser, 1000); // x1.0  -> capped
+            push(&mut parser, 1200); // x1.2  -> capped (crit on capped base)
+        }
+        // One hit that exceeds the cap but lands BETWEEN the learned peaks (x1.1):
+        // an uncapped near-cap crit. The simple `damage >= cap` rule would count it;
+        // the crit-aware rule must NOT.
+        push(&mut parser, 1100);
+
+        parser.reparse();
+
+        let player = parser.derived_state.party.get(&0).expect("player present");
+        // 100 capped hits (50 at x1.0 + 50 at x1.2); the lone x1.1 hit is excluded.
+        assert_eq!(player.skill_breakdown[0].hits, 101);
+        assert_eq!(player.capped_hits, 100);
+
+        // Sanity: the simple rule WOULD have counted the x1.1 hit (proving the
+        // crit-aware path changed the outcome).
+        assert!(super::cap_detection::is_capped(1100, Some(1000), &[]));
     }
 }
