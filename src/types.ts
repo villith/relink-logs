@@ -52,6 +52,8 @@ export type SkillState = {
   totalStunValue: number;
   /** Maximum recorded stun value of the skill */
   maxStunValue: number;
+  /** Number of hits that reached the game's damage cap */
+  cappedHits: number;
 };
 
 export type ComputedSkillState = SkillState & {
@@ -80,6 +82,8 @@ export type ComputedSkillGroup = {
   totalStunValue: number;
   /** Maximum recorded stun value of the skill */
   maxStunValue: number;
+  /** Number of hits that reached the game's damage cap (summed over grouped skills) */
+  cappedHits: number;
 };
 
 export type PlayerState = {
@@ -101,6 +105,8 @@ export type PlayerState = {
   lastDamageTime: number;
   /** Stats for individual skills logged */
   skillBreakdown: SkillState[];
+  /** Number of hits by this player that reached the game's damage cap */
+  cappedHits: number;
 };
 
 export type ComputedPlayerState = PlayerState & {
