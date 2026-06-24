@@ -383,6 +383,7 @@ impl DerivedEncounterState {
                 total_stun_value: 0.0,
                 skill_breakdown: Vec::new(),
                 last_known_pet_skill: None,
+                capped_hits: 0,
             });
 
         // Update player stats from damage event.

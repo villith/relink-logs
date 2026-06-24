@@ -18,6 +18,8 @@ pub struct PlayerState {
     pub sba: f64,
     pub total_stun_value: f64,
     pub stun_per_second: f64,
+    /// Number of hits by this player that reached the game's damage cap
+    pub capped_hits: u32,
 }
 
 impl PlayerState {
@@ -70,6 +72,9 @@ impl PlayerState {
     }
 
     pub fn update_from_damage_event(&mut self, damage_instance: &AdjustedDamageInstance) {
+        if damage_instance.is_capped {
+            self.capped_hits += 1;
+        }
         self.total_damage += damage_instance.event.damage as u64;
         self.total_stun_value += damage_instance.stun_damage;
 
@@ -135,6 +140,7 @@ mod tests {
             sba: 0.0,
             total_stun_value: 0.0,
             stun_per_second: 0.0,
+            capped_hits: 0,
         };
 
         player_state.update_dps(1000, 0);
@@ -154,6 +160,7 @@ mod tests {
             sba: 0.0,
             total_stun_value: 0.0,
             stun_per_second: 0.0,
+            capped_hits: 0,
         };
 
         let damage_event = DamageEvent {
@@ -199,6 +206,7 @@ mod tests {
             sba: 0.0,
             total_stun_value: 0.0,
             stun_per_second: 0.0,
+            capped_hits: 0,
         };
 
         let damage_event = DamageEvent {
@@ -252,6 +260,7 @@ mod tests {
             sba: 0.0,
             stun_per_second: 0.0,
             total_stun_value: 0.0,
+            capped_hits: 0,
         };
 
         let skill_one = DamageEvent {
@@ -321,6 +330,7 @@ mod tests {
             sba: 0.0,
             stun_per_second: 0.0,
             total_stun_value: 0.0,
+            capped_hits: 0,
         };
 
         let parent_skill = DamageEvent {
@@ -396,6 +406,7 @@ mod tests {
             sba: 0.0,
             total_stun_value: 0.0,
             stun_per_second: 0.0,
+            capped_hits: 0,
         };
 
         let damage_event = DamageEvent {
@@ -458,6 +469,7 @@ mod tests {
             sba: 0.0,
             total_stun_value: 0.0,
             stun_per_second: 0.0,
+            capped_hits: 0,
         };
 
         let damage_event = DamageEvent {
@@ -487,5 +499,87 @@ mod tests {
         ));
 
         assert_eq!(player_state.total_stun_value, 5.0);
+    }
+
+    fn capped_event() -> DamageEvent {
+        DamageEvent {
+            source: protocol::Actor {
+                index: 0,
+                actor_type: 0,
+                parent_actor_type: 0,
+                parent_index: 0,
+            },
+            target: protocol::Actor {
+                index: 0,
+                actor_type: 0,
+                parent_actor_type: 0,
+                parent_index: 0,
+            },
+            action_id: ActionType::Normal(1),
+            damage: 22_999,
+            flags: 0,
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: Some(22_999),
+        }
+    }
+
+    fn uncapped_event() -> DamageEvent {
+        DamageEvent {
+            source: protocol::Actor {
+                index: 0,
+                actor_type: 0,
+                parent_actor_type: 0,
+                parent_index: 0,
+            },
+            target: protocol::Actor {
+                index: 0,
+                actor_type: 0,
+                parent_actor_type: 0,
+                parent_index: 0,
+            },
+            action_id: ActionType::Normal(2),
+            damage: 100,
+            flags: 0,
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: Some(22_999),
+        }
+    }
+
+    #[test]
+    fn counts_player_capped_hits_across_skills() {
+        let mut player_state = PlayerState {
+            index: 0,
+            character_type: CharacterType::Pl0000,
+            total_damage: 0,
+            last_known_pet_skill: None,
+            dps: 0.0,
+            skill_breakdown: vec![],
+            sba: 0.0,
+            total_stun_value: 0.0,
+            stun_per_second: 0.0,
+            capped_hits: 0,
+        };
+
+        // Two capped hits on the same skill (exercises the early-return path),
+        // one uncapped hit on a different skill.
+        let capped = capped_event();
+        let uncapped = uncapped_event();
+        player_state
+            .update_from_damage_event(&AdjustedDamageInstance::from_damage_event(&capped, None));
+        player_state
+            .update_from_damage_event(&AdjustedDamageInstance::from_damage_event(&capped, None));
+        player_state
+            .update_from_damage_event(&AdjustedDamageInstance::from_damage_event(&uncapped, None));
+
+        assert_eq!(player_state.capped_hits, 2);
+        // Skill-level counts are still correct through the early-return path.
+        let normal_1 = player_state
+            .skill_breakdown
+            .iter()
+            .find(|s| s.action_type == ActionType::Normal(1))
+            .unwrap();
+        assert_eq!(normal_1.capped_hits, 2);
     }
 }
