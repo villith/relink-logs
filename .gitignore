@@ -32,3 +32,8 @@ src-tauri/hook.dll
 
 # Local reference data, not part of the app
 docs/damage-calculators/
+
+# Tauri updater signing keys — NEVER commit the private key
+.tauri/
+*.key
+*.key.pub
