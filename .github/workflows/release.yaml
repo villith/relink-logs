@@ -1,0 +1,59 @@
+name: Release
+
+# Builds + signs the MSI and drafts a GitHub Release on a version tag push.
+# Requires the TAURI_PRIVATE_KEY repo secret.
+
+on:
+  push:
+    tags:
+      - "[0-9]+.[0-9]+.[0-9]+"
+      - "[0-9]+.[0-9]+.[0-9]+-*"
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write # required to create the GitHub Release
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install nightly Rust
+        shell: bash
+        run: |
+          rustup set auto-self-update disable
+          rustup update nightly && rustup default nightly
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      # The release build bundles src-tauri/hook.dll as a Tauri resource, but
+      # nothing in `tauri build` produces it. Build the hook crate first and place
+      # the DLL where the resource glob expects it (mirrors scripts/build.ps1).
+      - name: Build hook DLL
+        run: cargo build --release --package hook
+
+      - name: Stage hook.dll
+        shell: bash
+        run: cp target/release/hook.dll src-tauri/hook.dll
+
+      - name: Build, sign, and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+        with:
+          # The tag that triggered the workflow becomes the release tag/name.
+          tagName: ${{ github.ref_name }}
+          releaseName: "GBFR Logs ${{ github.ref_name }}"
+          releaseBody: "See the assets below to download and install. Make sure to save and exit before updating."
+          releaseDraft: true
+          prerelease: false
