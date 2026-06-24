@@ -55,6 +55,7 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
               skills[skillGroupIndex] = {
                 ...skillGroup,
                 hits: skillGroup.hits + skill.hits,
+                cappedHits: skillGroup.cappedHits + skill.cappedHits,
                 percentage: skillGroup.percentage + skill.percentage,
                 totalDamage: skillGroup.totalDamage + skill.totalDamage,
                 minDamage: Math.min(skillGroup?.minDamage || 0, skill.minDamage || 0),
@@ -66,6 +67,7 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
                 actionType: groupActionType,
                 childCharacterType: skill.childCharacterType,
                 hits: skill.hits,
+                cappedHits: skill.cappedHits,
                 totalDamage: skill.totalDamage,
                 minDamage: skill.minDamage,
                 maxDamage: skill.maxDamage,
