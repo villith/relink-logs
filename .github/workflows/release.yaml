@@ -55,5 +55,9 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: "GBFR Logs ${{ github.ref_name }}"
           releaseBody: "See the assets below to download and install. Make sure to save and exit before updating."
-          releaseDraft: true
+          # Publish (not draft) so releases/latest/download/latest.json resolves —
+          # that auto-generated manifest is the updater endpoint. tauri-action
+          # uploads latest.json + the .sig by default.
+          releaseDraft: false
           prerelease: false
+          uploadUpdaterJson: true
