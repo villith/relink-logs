@@ -1,18 +1,37 @@
 use std::ffi::CString;
 
+// v2.0.2 (Endless Ragnarok) layout, re-derived from the Ghidra decompile of
+// process_damage (FUN_141fbd440) cross-checked against live dmgdiag dumps:
+//   0xD0  shared per-action damage value (i32) — the SAME number appears here on the
+//         main hit and its supplementary hit, and matches neither on-screen number.
+//         (Earlier session called this "final damage, live-verified" — that was wrong;
+//         the values merely coincided in that test.)
+//   0xD4  FINAL displayed damage (i32) — live-verified 2026-07-11: exactly matches the
+//         in-game hit numbers on both the main hit (111348 = cap 92790 × 1.2 crit) and
+//         its supplementary hit (44539), while 0xD0 read 212736 for both. Post-cap,
+//         post-crit. (Corroborates onelittlechildawa's independent 2.0.2 fix.)
+//   0xD8  f32 rate, 0xDC f32 rate — a pair of attack-rate floats (skill 212 shows 16.17
+//         at 0xDC, its known attack rate). The OLD code read `flags` here, so link/SBA
+//         classification was reading float bit patterns (usually 0 for the tested bits).
+//   0xE8  flags (u64) — the real bitfield; the game tests bits 55, 39, 24 here.
+//   0x16C action_id (was 0x154; confirmed live: IDs match ui.json)
+//   0x2B8 damage floor (i32, -1 = none)
+//   0x2BC damage cap (i32, was 0x264; -1 is normalized to 99,999,999 = "no cap");
+//         live values scale with skill strength (104k @ rate 1.0 … 2.0M @ rate 16.17)
+//   0x2D4 pre-cap base damage stored as f32 (uncapped damage IS recoverable in v2.0.2)
 #[derive(Debug)]
 #[repr(C)]
 pub struct DamageInstance {
-    padding_00: [u8; 0xD0],   // 0x00 - 0xD0
-    pub damage: i32,          // 0xD0
-    pub attack_rate: f32,     // 0xD4
-    pub flags: u64,           // 0xD8
-    padding_e0: [u8; 0x08],   // 0xE0
-    pub stun_value: f32,      // 0xE8
-    padding_ec: [u8; 0x68],   // 0xEC - 0x154
-    pub action_id: u32,       // 0x154
-    padding_158: [u8; 0x10C], // 0x158 - 0x264
-    pub damage_cap: i32,      // 0x264
+    padding_00: [u8; 0xD4],   // 0x00 - 0xD4 (0xD0 = shared per-action value, see above)
+    pub damage: i32,          // 0xD4 final displayed damage
+    padding_d8: [u8; 0x04],   // 0xD8 rate float
+    pub attack_rate: f32,     // 0xDC
+    padding_e0: [u8; 0x08],   // 0xE0 - 0xE8
+    pub flags: u64,           // 0xE8
+    padding_f0: [u8; 0x7C],   // 0xF0 - 0x16C
+    pub action_id: u32,       // 0x16C
+    padding_170: [u8; 0x14C], // 0x170 - 0x2BC
+    pub damage_cap: i32,      // 0x2BC
 }
 
 #[derive(Debug)]

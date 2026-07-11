@@ -8,7 +8,25 @@ use crate::{event, process::Process};
 
 use super::{actor_idx, actor_type_id, get_source_parent, globals::SBA_OFFSET};
 
-type OnSBAUpdateFunc = unsafe extern "system" fn(*const usize, f32, u32, u8, u32, u8) -> usize;
+// v2.0.2, decompiler-verified (FUN_140bb8840): the gauge-update function takes ELEVEN
+// arguments — rcx=SBA component*, xmm1=f32 gauge delta, r8d=u32, r9b=u8, then seven stack
+// args: u8, f32, u8, u8, u8, u8, u8. All of them are genuinely read in the body (param_6
+// is a float added into the gauge math; params 7-11 gate branches). The old 6-arg
+// declaration truncated param_6 (f32) to u8 and never marshalled params 7-11, so re-calling
+// the original corrupted the in-game gauge (it went negative). We pass all eleven through.
+type OnSBAUpdateFunc = unsafe extern "system" fn(
+    *const usize,
+    f32,
+    u32,
+    u8,
+    u8,
+    f32,
+    u8,
+    u8,
+    u8,
+    u8,
+    u8,
+) -> usize;
 type OnSBAAttemptFunc = unsafe extern "system" fn(*const usize, f32) -> usize;
 type OnCheckSBACollisionFunc = unsafe extern "system" fn(*const usize, f32) -> usize;
 type OnContinueSBAChainFunc = unsafe extern "system" fn(*const usize, *const usize) -> usize;
@@ -16,14 +34,17 @@ type OnRemoteSBAUpdateFunc =
     unsafe extern "system" fn(*const usize, *const usize, f32, f32) -> usize;
 
 static_detour! {
-    static OnSBAUpdate: unsafe extern "system" fn(*const usize, f32, u32, u8, u32, u8) -> usize;
+    static OnSBAUpdate: unsafe extern "system" fn(*const usize, f32, u32, u8, u8, f32, u8, u8, u8, u8, u8) -> usize;
     static OnSBAAttempt: unsafe extern "system" fn(*const usize, f32) -> usize;
     static OnCheckSBACollision: unsafe extern "system" fn(*const usize, f32) -> usize;
     static OnContinueSBAChain: unsafe extern "system" fn(*const usize, *const usize) -> usize;
     static OnRemoteSBAUpdate: unsafe extern "system" fn(*const usize, *const usize, f32, f32) -> usize;
 }
 
-const ON_HANDLE_SBA_UPDATE_SIG: &str = "e8 $ { ' } c5 fa 10 46 ? c5 f8 2e 86 80 00 00 00";
+// v2.0.2: call-follow sig at the unique gauge-update call site, resolving to the clean
+// entry 0xbb8840 (sigscan: 1 match). Arity fixed to the decompiler-verified 11 args (see
+// OnSBAUpdateFunc above) — the previous 6-arg declaration corrupted the in-game gauge.
+const ON_HANDLE_SBA_UPDATE_SIG: &str = "48 89 f1 c5 f8 28 ce 41 89 d8 e8 $ { ' } c4 c1 78 2e f8";
 const ON_ATTEMPT_SBA_SIG: &str = "e8 $ { ' } 48 8d 8e ? ? ff ff c7 44 24 38 00 00 80 3f";
 const ON_CHECK_SBA_COLLISION_SIG: &str = "e8 $ { ' } 84 c0 0f 85 f0 00 00 ? 8b 8e ? ? ff ff";
 const ON_CONTINUE_SBA_CHAIN_SIG: &str = "e8 $ { ' } 48 8b 53 ? 48 8d 82 ? ? ? ?";
@@ -50,8 +71,8 @@ impl OnHandleSBAUpdateHook {
 
             unsafe {
                 let func: OnSBAUpdateFunc = std::mem::transmute(on_sba_update_original);
-                OnSBAUpdate.initialize(func, move |a1, a2, a3, a4, a5, a6| {
-                    cloned_self.run(a1, a2, a3, a4, a5, a6)
+                OnSBAUpdate.initialize(func, move |a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11| {
+                    cloned_self.run(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11)
                 })?;
                 OnSBAUpdate.enable()?;
             }
@@ -62,10 +83,24 @@ impl OnHandleSBAUpdateHook {
         Ok(())
     }
 
-    fn run(&self, a1: *const usize, a2: f32, a3: u32, a4: u8, a5: u32, a6: u8) -> usize {
-        let sba_offset = SBA_OFFSET.load(Ordering::Relaxed);
-
-        let entity_ptr = unsafe { a1.byte_sub(sba_offset as usize) };
+    #[allow(clippy::too_many_arguments)]
+    fn run(
+        &self,
+        a1: *const usize,
+        a2: f32,
+        a3: u32,
+        a4: u8,
+        a5: u8,
+        a6: f32,
+        a7: u8,
+        a8: u8,
+        a9: u8,
+        a10: u8,
+        a11: u8,
+    ) -> usize {
+        // v2.0.2: [a1+0x10] is the actor's specified-instance pointer (decompiler-verified
+        // vtable object), so we no longer need the SBA_OFFSET global to recover the entity.
+        let entity_ptr = unsafe { a1.byte_add(0x10).read() } as *const usize;
 
         let source_idx = actor_idx(entity_ptr);
         let source_type_id = actor_type_id(entity_ptr);
@@ -75,7 +110,7 @@ impl OnHandleSBAUpdateHook {
         let sba_value_ptr = unsafe { a1.byte_add(0x7C) } as *const f32;
         let old_sba_value = unsafe { sba_value_ptr.read() };
 
-        let ret = unsafe { OnSBAUpdate.call(a1, a2, a3, a4, a5, a6) };
+        let ret = unsafe { OnSBAUpdate.call(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) };
 
         let new_sba_value = unsafe { sba_value_ptr.read() };
         let sba_added = f32::max(new_sba_value - old_sba_value, 0.0);
@@ -134,6 +169,12 @@ impl OnAttemptSBAHook {
     }
 
     fn run(&self, a1: *const usize, a2: f32) -> usize {
+        // hookdiag: sba_attempt still resolves on v2.0.2; timestamp + callers let us
+        // correlate the in-game SBA button press to the SBA manager code that also drives
+        // the (broken) sba_update/collision/continue handlers.
+        crate::hooks::diag::ev!("sba_attempt", "a2={a2}");
+        crate::hooks::diag::log_callers("sba_attempt");
+
         let ret = unsafe { OnSBAAttempt.call(a1, a2) };
 
         let entity_ptr = unsafe { a1.byte_add(0x10).read() } as *const usize;

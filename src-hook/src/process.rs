@@ -110,23 +110,40 @@ impl Process {
         ))
     }
 
-    /// Searches and returns the value of the type `T` that matches the given signature pattern.
-    pub fn search_slice<T>(&self, signature_pattern: &str) -> anyhow::Result<T> {
+    /// Runs the pelite code scan and returns the capture array (`addrs`) of the FIRST
+    /// match. Shared body of the first-match search methods below. (`search_address`
+    /// keeps its own loop: it returns the LAST match, and that behavior is preserved.)
+    fn first_match(&self, signature_pattern: &str) -> anyhow::Result<[u32; 8]> {
         let view = unsafe { PeView::module(self.module_handle.0 as *const u8) };
         let scanner = view.scanner();
         let pattern = pattern::parse(signature_pattern)?;
         let mut addrs = [0; 8];
-        let matches = scanner.matches_code(&pattern).next(&mut addrs);
-
-        if matches {
-            let addr = self.base_address + addrs[1] as usize;
-            let ptr = addr as *const T;
-            Ok(unsafe { ptr.read_unaligned() })
+        if scanner.matches_code(&pattern).next(&mut addrs) {
+            Ok(addrs)
         } else {
             Err(anyhow!(
                 "Could not find match for pattern: {}",
                 signature_pattern
             ))
         }
+    }
+
+    /// Searches and returns the module-relative RVA of the location where the pattern's
+    /// cursor (`'`) matched (`addrs[0]`), rather than a called function or an operand value.
+    ///
+    /// Used by the `hookdiag` re-derivation flow: a signature that still matches the current
+    /// binary (e.g. the `player_data_offset` type-hash site) pins a static point *inside* the
+    /// loading code path, which can be fed to Ghidra's FindEntry to recover the enclosing
+    /// function — the hook whose own signature no longer matches.
+    #[cfg(feature = "hookdiag")]
+    pub fn search_match_rva(&self, signature_pattern: &str) -> anyhow::Result<usize> {
+        Ok(self.first_match(signature_pattern)?[0] as usize)
+    }
+
+    /// Searches and returns the value of the type `T` that matches the given signature pattern.
+    pub fn search_slice<T>(&self, signature_pattern: &str) -> anyhow::Result<T> {
+        let addrs = self.first_match(signature_pattern)?;
+        let addr = self.base_address + addrs[1] as usize;
+        Ok(unsafe { (addr as *const T).read_unaligned() })
     }
 }

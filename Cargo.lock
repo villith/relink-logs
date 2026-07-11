@@ -1833,6 +1833,7 @@ name = "hook"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "backtrace",
  "ctor",
  "dirs",
  "fern",

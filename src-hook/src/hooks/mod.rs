@@ -17,38 +17,76 @@ use self::{
 mod area;
 mod damage;
 mod death;
+pub mod diag;
 mod ffi;
 mod globals;
+mod loadprobe;
 mod player;
 mod quest;
 mod sba;
 
 type GetEntityHashID0x58 = unsafe extern "system" fn(*const usize, *const u32) -> *const usize;
 
+/// Run one hook/global setup step, logging (and swallowing) any error so that a
+/// single broken signature does not prevent every other hook from installing.
+///
+/// A game patch (e.g. the 2.0.2 Endless Ragnarok expansion) breaks the
+/// reverse-engineered signatures one at a time; before this, `setup_hooks` bailed
+/// at the first failure, so a single stale signature disabled the entire overlay.
+/// Now each step is independent: whatever still resolves keeps working, and each
+/// failure is reported by name to guide re-derivation.
+fn try_step(name: &str, result: Result<()>) {
+    match result {
+        Ok(()) => {
+            #[cfg(feature = "console")]
+            println!("[hook ok] {name}");
+        }
+        Err(e) => {
+            log::warn!("Hook step '{name}' failed: {e:?}");
+            #[cfg(feature = "console")]
+            println!("[hook FAIL] {name}: {e:?}");
+        }
+    }
+}
+
 pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     let process = Process::with_name("granblue_fantasy_relink.exe")?;
 
-    globals::setup_globals(&process)?;
+    // Records the module base so the hookdiag caller-RVA logging can convert absolute
+    // return addresses to module-relative RVAs. Compiles out without `--features hookdiag`.
+    diag::set_module_base(process.base_address);
+
+    // Globals hold the memory offsets other hooks read; setup_globals is itself
+    // resilient (see globals::setup_globals) so partial failure still stores what
+    // it could find.
+    try_step("globals", globals::setup_globals(&process));
 
     /* Damage Events */
-    OnProcessDamageHook::new(tx.clone()).setup(&process)?;
-    OnProcessDotHook::new(tx.clone()).setup(&process)?;
-    OnDeathHook::new(tx.clone()).setup(&process)?;
+    try_step("process_damage", OnProcessDamageHook::new(tx.clone()).setup(&process));
+    try_step("process_dot", OnProcessDotHook::new(tx.clone()).setup(&process));
+    try_step("death", OnDeathHook::new(tx.clone()).setup(&process));
 
     /* Player Data */
-    OnLoadPlayerHook::new(tx.clone()).setup(&process)?;
+    try_step("player_load", OnLoadPlayerHook::new(tx.clone()).setup(&process));
+
+    // hookdiag-only: probe to re-derive the broken player_load address from a live stage
+    // load (see loadprobe.rs). No-op without the feature.
+    try_step(
+        "loadprobe",
+        loadprobe::OnComponentLookupProbe::new().setup(&process),
+    );
 
     /* Quest + Area Tracking */
-    OnAreaEnterHook::new(tx.clone()).setup(&process)?;
-    OnLoadQuestHook::new().setup(&process)?;
-    OnQuestCompleteHook::new(tx.clone()).setup(&process)?;
+    try_step("area_enter", OnAreaEnterHook::new(tx.clone()).setup(&process));
+    try_step("quest_load_state", OnLoadQuestHook::new().setup(&process));
+    try_step("quest_complete", OnQuestCompleteHook::new(tx.clone()).setup(&process));
 
     /* SBA */
-    OnHandleSBAUpdateHook::new(tx.clone()).setup(&process)?;
-    OnRemoteSBAUpdateHook::new(tx.clone()).setup(&process)?;
-    OnAttemptSBAHook::new(tx.clone()).setup(&process)?;
-    OnCheckSBACollisionHook::new(tx.clone()).setup(&process)?;
-    OnContinueSBAChainHook::new(tx.clone()).setup(&process)?;
+    try_step("sba_update", OnHandleSBAUpdateHook::new(tx.clone()).setup(&process));
+    try_step("sba_remote_update", OnRemoteSBAUpdateHook::new(tx.clone()).setup(&process));
+    try_step("sba_attempt", OnAttemptSBAHook::new(tx.clone()).setup(&process));
+    try_step("sba_collision", OnCheckSBACollisionHook::new(tx.clone()).setup(&process));
+    try_step("sba_continue_chain", OnContinueSBAChainHook::new(tx.clone()).setup(&process));
 
     Ok(())
 }

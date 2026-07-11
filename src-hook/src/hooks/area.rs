@@ -11,7 +11,14 @@ static_detour! {
     static OnEnterArea: unsafe extern "system" fn(u32, *const usize, u8, *const usize) -> usize;
 }
 
-const ON_ENTER_AREA_SIG: &str = "e8 $ { ' } c5 ? ? ? c5 f8 29 45 ? c7 45 ? ? ? ? ?";
+// v2.0.2: DISABLED (never-matching sentinel). The old pattern now matches 11 sites, ALL of
+// them `call +0xf` hash-loading stubs inside one type-hash switch at rva 0x3d0a5xx — none is
+// a real function entry. search_address picked the first stub, so the detour landed on
+// mid-function garbage whose relocated instructions write through the caller's RBP (silent
+// stack corruption inside the hook). Fail safe until a true area-transition function is
+// re-derived (needs Ghidra/live work; losing this hook only degrades meter auto-reset on
+// area change — see parser on_area_enter).
+const ON_ENTER_AREA_SIG: &str = "cc cc cc cc cc cc cc cc DISABLED_v202_matches_hash_stubs";
 
 /// Handles tracking whenever the player enters a new area.
 #[derive(Clone)]
