@@ -3,9 +3,9 @@ use std::{collections::HashMap, io::BufReader};
 use anyhow::Result;
 use chrono::Utc;
 use protocol::{
-    AreaEnterEvent, ConfluxBuffAcquiredEvent, ConfluxRoomEnterEvent, DamageEvent, Message,
-    OnAttemptSBAEvent, OnContinueSBAChainEvent, OnDeathEvent, OnPerformSBAEvent, OnUpdateSBAEvent,
-    PlayerIdentityEvent, PlayerLoadEvent, QuestCompleteEvent,
+    AreaEnterEvent, ConfluxBuffAcquiredEvent, ConfluxRoomEnterEvent, ConfluxRunEndEvent,
+    DamageEvent, Message, OnAttemptSBAEvent, OnContinueSBAChainEvent, OnDeathEvent,
+    OnPerformSBAEvent, OnUpdateSBAEvent, PlayerIdentityEvent, PlayerLoadEvent, QuestCompleteEvent,
 };
 
 use crate::db::runs::{finalize_run, insert_run, ConfluxBuffDelta};
@@ -451,6 +451,10 @@ pub struct Parser {
     /// Active Conflux run id (None when not in a run). Assigned on run-start.
     #[serde(skip)]
     active_run_id: Option<i64>,
+    /// `EndlessModeQuestManager` pointer identifying the active run (0 when none).
+    /// A room-enter with a different manager pointer opens a new run.
+    #[serde(skip)]
+    active_run_manager: u64,
     /// 0-based index of the room currently being recorded within the active run.
     #[serde(skip)]
     active_room_index: u32,
@@ -963,12 +967,14 @@ impl Parser {
         false
     }
 
-    /// Conflux run begins: open a runs row and reset per-run accumulators.
-    pub fn on_conflux_run_start(&mut self) {
+    /// Opens a new Conflux run: insert a runs row, reset per-run accumulators, and
+    /// remember the manager pointer that identifies this run.
+    fn start_conflux_run(&mut self, manager_ptr: u64) {
         let now = Utc::now().timestamp_millis();
         self.active_room_index = 0;
         self.active_run_buffs.clear();
         self.active_run_start = now;
+        self.active_run_manager = manager_ptr;
         if let Some(conn) = &self.db {
             match insert_run(conn, now) {
                 Ok(id) => self.active_run_id = Some(id),
@@ -977,24 +983,40 @@ impl Parser {
         }
     }
 
-    /// A new Conflux room loads: cut off + save the previous room (stamped with the
-    /// run id + room index), then advance to the next room. Mirrors on_area_enter_event.
+    /// A Conflux room loads. The reception dispatcher fires per ROOM, so this is the
+    /// room boundary: cut off + save the previous room (stamped with run id + room
+    /// index), then start the next room's encounter fresh (mirrors on_area_enter_event).
+    ///
+    /// Run identity comes from `manager_ptr`: the first room, or any room whose manager
+    /// differs from the active run's, OPENS a new run (the previous run, if any, is
+    /// finalized first — a run can end by the next run starting even if the dtor was
+    /// missed).
     pub fn on_conflux_room_enter(&mut self, event: ConfluxRoomEnterEvent) {
-        // Ignore if we somehow missed the run-start.
-        if self.active_run_id.is_none() {
-            return;
-        }
+        let is_new_run = self.active_run_id.is_none() || self.active_run_manager != event.manager_ptr;
 
-        self.encounter.quest_id = Some(event.quest_id);
-
-        if self.status == ParserStatus::InProgress {
-            self.update_status(ParserStatus::Stopped);
-            if self.has_damage() {
-                let _ = self.save_room_to_db();
-                self.active_room_index += 1;
+        if is_new_run {
+            // Close out any prior run before opening the new one (defensive: normally the
+            // manager dtor already finalized it).
+            if self.active_run_id.is_some() {
+                self.finalize_active_run();
+            }
+            self.start_conflux_run(event.manager_ptr);
+        } else {
+            // Same run, next room: save the room we were just recording and advance.
+            if self.status == ParserStatus::InProgress {
+                self.update_status(ParserStatus::Stopped);
+                if self.has_damage() {
+                    let _ = self.save_room_to_db();
+                    self.active_room_index += 1;
+                }
             }
         }
 
+        self.encounter.quest_id = if event.quest_id != 0 {
+            Some(event.quest_id)
+        } else {
+            None
+        };
         self.encounter.quest_completed = false;
         self.encounter.reset_player_data();
 
@@ -1026,9 +1048,24 @@ impl Parser {
         }
     }
 
-    /// The Conflux run ends: save the final room, finalize the runs row, clear state,
-    /// and notify the frontend.
-    pub fn on_conflux_run_end(&mut self) {
+    /// The Conflux run ends (manager destroyed). Only finalizes if the destroyed
+    /// manager matches the active run — a stray dtor for another manager is ignored.
+    pub fn on_conflux_run_end(&mut self, event: ConfluxRunEndEvent) {
+        if self.active_run_id.is_none() {
+            return;
+        }
+        // A manager_ptr of 0 means "unknown" (older/edge emit) — finalize the active run
+        // regardless; otherwise require the pointer to match this run.
+        if event.manager_ptr != 0 && event.manager_ptr != self.active_run_manager {
+            return;
+        }
+        self.finalize_active_run();
+    }
+
+    /// Saves the final in-progress room (if any) and finalizes the active run's row,
+    /// then clears run state and notifies the frontend. Shared by the dtor path and the
+    /// "next run started" defensive path.
+    fn finalize_active_run(&mut self) {
         let Some(run_id) = self.active_run_id else {
             return;
         };
@@ -1057,6 +1094,7 @@ impl Parser {
         }
 
         self.active_run_id = None;
+        self.active_run_manager = 0;
         self.active_run_buffs.clear();
         self.active_room_index = 0;
 
@@ -1219,36 +1257,45 @@ mod tests {
         }
     }
 
+    fn room_enter(quest_id: u32, manager_ptr: u64) -> protocol::ConfluxRoomEnterEvent {
+        protocol::ConfluxRoomEnterEvent {
+            quest_id,
+            manager_ptr,
+        }
+    }
+
     #[test]
     fn conflux_run_lifecycle_groups_rooms_and_buffs() {
         let mut parser = parser_with_memory_db();
+        const MGR: u64 = 0x2adb_30e0_100;
 
-        // Run starts -> a runs row exists and is active.
-        parser.on_conflux_run_start();
+        // First room-enter (same manager for the whole run) OPENS the run.
+        parser.on_conflux_room_enter(room_enter(10, MGR));
         assert!(parser.active_run_id.is_some());
+        assert_eq!(parser.active_run_manager, MGR);
 
-        // Room 0: some damage, then next room-enter cuts it off + saves it.
+        // Room 0: some damage + buffs.
         parser.on_damage_event(a_damage_event());
         parser.on_conflux_buff_acquired(protocol::ConfluxBuffAcquiredEvent { buff_id: 0xAA });
         parser.on_conflux_buff_acquired(protocol::ConfluxBuffAcquiredEvent { buff_id: 0xAA }); // dup
-        parser.on_conflux_room_enter(protocol::ConfluxRoomEnterEvent { quest_id: 11 });
 
-        // Room 1: more damage + a buff, then run ends (which saves the last room).
+        // Room 1 (same manager): saves room 0, advances.
+        parser.on_conflux_room_enter(room_enter(11, MGR));
         parser.on_damage_event(a_damage_event());
         parser.on_conflux_buff_acquired(protocol::ConfluxBuffAcquiredEvent { buff_id: 0xCC });
-        parser.on_conflux_run_end();
 
+        // Manager dtor ends the run (saves room 1).
+        parser.on_conflux_run_end(protocol::ConfluxRunEndEvent { manager_ptr: MGR });
         assert!(parser.active_run_id.is_none(), "run cleared after end");
 
         let conn = parser.db.as_ref().unwrap();
         let runs = crate::db::runs::get_runs(conn, 10, 0).unwrap();
-        assert_eq!(runs.len(), 1);
+        assert_eq!(runs.len(), 1, "exactly ONE run for the whole 2-room sequence");
         let run = &runs[0];
         assert_eq!(run.rooms.len(), 2, "two rooms saved and tagged to the run");
         assert_eq!(run.rooms[0].room_index, 0);
         assert_eq!(run.rooms[1].room_index, 1);
         assert_eq!(run.completed, Some(true));
-        // Buff deltas: room 0 has 0xAA (deduped to one), room 1 has 0xCC.
         let r0 = run.buffs.iter().find(|b| b.room_index == 0).unwrap();
         assert_eq!(r0.buff_ids, vec![0xAA]);
         let r1 = run.buffs.iter().find(|b| b.room_index == 1).unwrap();
@@ -1256,14 +1303,42 @@ mod tests {
     }
 
     #[test]
-    fn buff_and_room_without_active_run_are_ignored_for_runs() {
+    fn repeated_room_enter_same_manager_is_one_run_not_many() {
+        // Regression for the live bug: the reception dispatcher fires once PER ROOM, so
+        // four room-enters with the SAME manager must produce ONE run, not four.
         let mut parser = parser_with_memory_db();
-        // No run started.
-        parser.on_conflux_buff_acquired(protocol::ConfluxBuffAcquiredEvent { buff_id: 0x1 });
-        parser.on_conflux_room_enter(protocol::ConfluxRoomEnterEvent { quest_id: 5 });
-        assert!(parser.active_run_id.is_none());
+        const MGR: u64 = 0xABCD_0000_100;
+
+        for room in 0..4 {
+            parser.on_conflux_room_enter(room_enter(100 + room, MGR));
+            parser.on_damage_event(a_damage_event());
+        }
+        parser.on_conflux_run_end(protocol::ConfluxRunEndEvent { manager_ptr: MGR });
+
         let conn = parser.db.as_ref().unwrap();
-        assert_eq!(crate::db::runs::get_runs_count(conn).unwrap(), 0);
+        let runs = crate::db::runs::get_runs(conn, 10, 0).unwrap();
+        assert_eq!(runs.len(), 1, "one run");
+        assert_eq!(runs[0].rooms.len(), 4, "four rooms grouped under it");
+    }
+
+    #[test]
+    fn different_manager_opens_a_new_run() {
+        let mut parser = parser_with_memory_db();
+        const MGR_A: u64 = 0x1111_0000_100;
+        const MGR_B: u64 = 0x2222_0000_100;
+
+        // Run A: one room with damage.
+        parser.on_conflux_room_enter(room_enter(1, MGR_A));
+        parser.on_damage_event(a_damage_event());
+
+        // A new manager arrives WITHOUT a dtor — should finalize run A and open run B.
+        parser.on_conflux_room_enter(room_enter(2, MGR_B));
+        parser.on_damage_event(a_damage_event());
+        parser.on_conflux_run_end(protocol::ConfluxRunEndEvent { manager_ptr: MGR_B });
+
+        let conn = parser.db.as_ref().unwrap();
+        let runs = crate::db::runs::get_runs(conn, 10, 0).unwrap();
+        assert_eq!(runs.len(), 2, "two distinct runs");
     }
 
     #[test]

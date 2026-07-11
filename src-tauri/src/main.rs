@@ -13,7 +13,7 @@ use anyhow::Context;
 use db::logs::LogEntry;
 use dll_syringe::{process::OwnedProcess, Syringe};
 use interprocess::os::windows::named_pipe::tokio::RecvPipeStream;
-use log::{info, LevelFilter};
+use log::{info, warn, LevelFilter};
 use parser::{
     constants::{CharacterType, EnemyType},
     v1::{self, PlayerData},
@@ -531,27 +531,26 @@ fn connect_and_run_parser(app: AppHandle) {
                                 protocol::Message::OnDeathEvent(event) => {
                                     state.on_death_event(event);
                                 }
-                                protocol::Message::ConfluxRunStart(_) => {
-                                    info!("CONFLUX ingress: ConfluxRunStart");
-                                    state.on_conflux_run_start();
-                                }
                                 protocol::Message::ConfluxRoomEnter(event) => {
-                                    info!(
-                                        "CONFLUX ingress: ConfluxRoomEnter quest_id={:#x}",
-                                        event.quest_id
+                                    warn!(
+                                        "CONFLUX ingress: ConfluxRoomEnter quest_id={:#x} manager={:#x}",
+                                        event.quest_id, event.manager_ptr
                                     );
                                     state.on_conflux_room_enter(event);
                                 }
                                 protocol::Message::ConfluxBuffAcquired(event) => {
-                                    info!(
+                                    warn!(
                                         "CONFLUX ingress: ConfluxBuffAcquired buff_id={:#x}",
                                         event.buff_id
                                     );
                                     state.on_conflux_buff_acquired(event);
                                 }
-                                protocol::Message::ConfluxRunEnd(_) => {
-                                    info!("CONFLUX ingress: ConfluxRunEnd");
-                                    state.on_conflux_run_end();
+                                protocol::Message::ConfluxRunEnd(event) => {
+                                    warn!(
+                                        "CONFLUX ingress: ConfluxRunEnd manager={:#x}",
+                                        event.manager_ptr
+                                    );
+                                    state.on_conflux_run_end(event);
                                 }
                             }
                         }

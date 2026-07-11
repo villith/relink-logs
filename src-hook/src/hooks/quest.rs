@@ -44,13 +44,11 @@ const RESULT_TYPE_QUEST_COMPLETE: u32 = 5;
 
 /// Called while loading into a quest.
 #[derive(Clone)]
-pub struct OnLoadQuestHook {
-    tx: event::Tx,
-}
+pub struct OnLoadQuestHook {}
 
 impl OnLoadQuestHook {
-    pub fn new(tx: event::Tx) -> Self {
-        OnLoadQuestHook { tx }
+    pub fn new() -> Self {
+        OnLoadQuestHook {}
     }
 
     pub fn setup(&self, process: &Process) -> Result<()> {
@@ -89,25 +87,11 @@ impl OnLoadQuestHook {
         // flow is active, it's a ROOM enter. The reception-flow slot lives at manager+0x210;
         // its type-hash at flow+0x7c8 identifies EndlessMode. Emitting per-room lets the
         // parser cut off + save the previous room and group rooms under the run.
-        let reception_flow = unsafe { a1.byte_add(0x210).read() };
-        let flow_type = crate::hooks::diag::read_u32_guarded(reception_flow, 0x7c8);
-        let quest_id_dbg = unsafe { (*quest_state_ptr).quest_id };
-        // [CONFLUX-DIAG] logs EVERY quest load so we can see whether flow_type ever equals the
-        // EndlessMode hash 0x887ae0b0 (the room-enter gate). If it never matches, the gate/offset
-        // /timing is the bug for symptom 1 (rooms never save).
-        log::info!(
-            "CONFLUX hook: quest_load quest_id={:#x} reception_flow={:#x} flow_type={:#x} is_endless_room={}",
-            quest_id_dbg,
-            reception_flow,
-            flow_type,
-            flow_type == 0x887ae0b0
-        );
-        if flow_type == 0x887ae0b0 {
-            let quest_id = unsafe { (*quest_state_ptr).quest_id };
-            let _ = self.tx.send(Message::ConfluxRoomEnter(
-                protocol::ConfluxRoomEnterEvent { quest_id },
-            ));
-        }
+        // NOTE: the Conflux ROOM-ENTER signal is emitted by the reception-flow dispatcher
+        // (hooks/endless.rs), NOT here — that hook fires once per room with the manager
+        // pointer the parser needs for run identity. This hook only stores QUEST_STATE_PTR
+        // (above) for the quest-complete path. The `tx` field is retained for possible
+        // future use; the diagnostic below stays under `hookdiag`.
 
         // Conflux/EndlessMode instrumentation (hookdiag-only). `a1` is the stage-quest
         // manager: QuestState lives at +0x1D8 and the reception-flow singleton slot at

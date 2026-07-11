@@ -91,7 +91,7 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
 
     /* Quest + Area Tracking */
     try_step("area_enter", OnAreaEnterHook::new(tx.clone()).setup(&process));
-    try_step("quest_load_state", OnLoadQuestHook::new(tx.clone()).setup(&process));
+    try_step("quest_load_state", OnLoadQuestHook::new().setup(&process));
     try_step("quest_complete", OnQuestCompleteHook::new(tx.clone()).setup(&process));
 
     /* Conflux / EndlessMode — emits run-start / buff / run-end messages so the parser can

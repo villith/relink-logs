@@ -131,23 +131,33 @@ impl OnReceptionFlowDispatchHook {
         let flow_after = unsafe { a1.byte_add(0x210).read() };
         let flow_type_after = crate::hooks::diag::read_u32_guarded(flow_after, FLOW_TYPE_OFFSET);
 
-        // [CONFLUX-DIAG] Unconditional trace: this line proves the detour fired and shows the
-        // flow-type transition, so we can see whether the run-START edge is ever detected.
-        log::info!(
-            "CONFLUX hook: reception_dispatch a2={:#x} flow_before={:#x} type_before={:#x} flow_after={:#x} type_after={:#x} endless_edge={}",
-            a2,
-            flow_before,
+        // The reception dispatcher rebuilds the EndlessMode flow once PER ROOM (the slot at
+        // +0x210 resets to null each room), so a transition INTO an EndlessMode flow is a
+        // ROOM-ENTER — not a run-start. The parser derives run identity from the manager
+        // pointer (`a1`, stable across a run's rooms). quest_id lives at manager+0x1D8+... —
+        // read it guarded, 0 if unavailable at this point.
+        let is_room_enter =
+            flow_type_before != ENDLESS_FLOW_TYPE && flow_type_after == ENDLESS_FLOW_TYPE;
+
+        // QuestState is at manager+0x1D8; its quest_id is the first u32 (see quest.rs). Read
+        // guarded so a not-yet-populated state can never fault.
+        let quest_id = crate::hooks::diag::read_u32_guarded(a1 as usize, 0x1D8);
+
+        log::warn!(
+            "CONFLUX hook: reception_dispatch manager={:#x} type_before={:#x} type_after={:#x} room_enter={} quest_id={:#x}",
+            a1 as usize,
             flow_type_before,
-            flow_after,
             flow_type_after,
-            flow_type_before != ENDLESS_FLOW_TYPE && flow_type_after == ENDLESS_FLOW_TYPE
+            is_room_enter,
+            quest_id
         );
 
-        // Run START edge: transitioned INTO an EndlessMode flow.
-        if flow_type_before != ENDLESS_FLOW_TYPE && flow_type_after == ENDLESS_FLOW_TYPE {
-            log::info!("CONFLUX hook: emitting ConfluxRunStart");
-            let _ = self.tx.send(protocol::Message::ConfluxRunStart(
-                protocol::ConfluxRunStartEvent {},
+        if is_room_enter {
+            let _ = self.tx.send(protocol::Message::ConfluxRoomEnter(
+                protocol::ConfluxRoomEnterEvent {
+                    quest_id,
+                    manager_ptr: a1 as u64,
+                },
             ));
         }
 
@@ -248,11 +258,12 @@ impl OnEndlessMgrDtorHook {
     }
 
     fn run(&self, a1: *const usize) -> usize {
-        // [CONFLUX-DIAG] proves the manager-dtor detour fired = run-end signal.
-        log::info!("CONFLUX hook: mgr_dtor (run-end) manager={:#x}", a1 as usize);
+        log::warn!("CONFLUX hook: mgr_dtor (run-end) manager={:#x}", a1 as usize);
         let _ = self
             .tx
-            .send(protocol::Message::ConfluxRunEnd(protocol::ConfluxRunEndEvent {}));
+            .send(protocol::Message::ConfluxRunEnd(protocol::ConfluxRunEndEvent {
+                manager_ptr: a1 as u64,
+            }));
 
         #[cfg(feature = "hookdiag")]
         {

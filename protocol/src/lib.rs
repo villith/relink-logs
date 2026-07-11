@@ -184,16 +184,18 @@ pub struct PlayerIdentityEvent {
     pub is_online: bool,
 }
 
-/// Emitted when a Conflux (EndlessMode) run begins — the reception dispatcher
-/// builds an EndlessMode reception flow (quest_type 8). See src-hook endless.rs.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConfluxRunStartEvent {}
-
-/// Emitted on each Conflux room load while a run is active. `quest_id` is the
-/// room's quest identifier (each room is an isolated quest load).
+/// Emitted on each Conflux room load. The reception dispatcher rebuilds an
+/// EndlessMode flow once per ROOM (the flow slot resets to null each room), so
+/// this fires per room — NOT per run. Run identity is derived by the parser from
+/// `manager_ptr`: the `EndlessModeQuestManager` pointer is stable across a run's
+/// rooms and changes between runs, so a room whose `manager_ptr` differs from the
+/// active run's (or arrives with no active run) opens a new run.
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ConfluxRoomEnterEvent {
+    /// The room's quest identifier (0 if not resolvable at emit time).
     pub quest_id: u32,
+    /// `EndlessModeQuestManager` pointer — the stable per-run identity.
+    pub manager_ptr: u64,
 }
 
 /// Emitted when a Conflux upgrade/buff installs on the player. `buff_id` is the
@@ -204,8 +206,12 @@ pub struct ConfluxBuffAcquiredEvent {
 }
 
 /// Emitted when a Conflux run concludes (EndlessModeQuestManager destroyed).
+/// Carries the manager pointer so the parser only finalizes the matching run.
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConfluxRunEndEvent {}
+pub struct ConfluxRunEndEvent {
+    /// `EndlessModeQuestManager` pointer being destroyed (matches the run's identity).
+    pub manager_ptr: u64,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AreaEnterEvent {
@@ -264,9 +270,9 @@ pub enum Message {
     /// Player name + actor mapping without version-sensitive equipment data.
     /// Used in 2.0 compatibility mode where the full player-load layout is unresolved.
     PlayerIdentityEvent(PlayerIdentityEvent),
-    /// Conflux (EndlessMode) run lifecycle. Run identity is assigned by the parser,
-    /// not the hook — these carry only the raw signal.
-    ConfluxRunStart(ConfluxRunStartEvent),
+    /// Conflux (EndlessMode) lifecycle. The reception dispatcher fires per ROOM, so
+    /// run identity is derived by the parser from `ConfluxRoomEnterEvent::manager_ptr`
+    /// (stable across a run's rooms). Run-end is the manager destructor.
     ConfluxRoomEnter(ConfluxRoomEnterEvent),
     ConfluxBuffAcquired(ConfluxBuffAcquiredEvent),
     ConfluxRunEnd(ConfluxRunEndEvent),
