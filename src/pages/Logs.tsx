@@ -3,7 +3,7 @@ import "./Logs.css";
 
 import { AppShell, Burger, Group, NavLink, Text } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
-import { Gear, House } from "@phosphor-icons/react";
+import { Flag, Gear, House } from "@phosphor-icons/react";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect } from "react";
 import { Toaster } from "react-hot-toast";
@@ -54,6 +54,7 @@ const Layout = () => {
         <AppShell.Navbar p="sm">
           <AppShell.Section grow>
             <NavLink label="Logs" leftSection={<House size="1rem" />} component={Link} to="/logs" />
+            <NavLink label="Conflux" leftSection={<Flag size="1rem" />} component={Link} to="/logs/conflux" />
           </AppShell.Section>
           <AppShell.Section>
             <NavLink label="Settings" leftSection={<Gear size="1rem" />} component={Link} to="/logs/settings" />

@@ -255,6 +255,38 @@ export type Log = {
   questCompleted: boolean;
 };
 
+export type ConfluxBuffDelta = {
+  roomIndex: number;
+  buffIds: number[];
+};
+
+export type ConfluxRoom = {
+  logId: number;
+  roomIndex: number;
+  questId: number | null;
+  primaryTarget: number | null;
+  duration: number;
+  totalDamage: number | null;
+};
+
+export type ConfluxRun = {
+  id: number;
+  startTime: number;
+  endTime: number | null;
+  duration: number | null;
+  roomCount: number;
+  completed: boolean | null;
+  buffs: ConfluxBuffDelta[];
+  rooms: ConfluxRoom[];
+};
+
+export type ConfluxSearchResult = {
+  runs: ConfluxRun[];
+  page: number;
+  pageCount: number;
+  runCount: number;
+};
+
 export type SBAEvent = [
   number,
   (
