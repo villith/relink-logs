@@ -40,6 +40,7 @@ type GetEntityHashID0x58 = unsafe extern "system" fn(*const usize, *const u32) -
 fn try_step(name: &str, result: Result<()>) {
     match result {
         Ok(()) => {
+            log::info!("[hook ok] {name}");
             #[cfg(feature = "console")]
             println!("[hook ok] {name}");
         }

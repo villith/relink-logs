@@ -532,15 +532,25 @@ fn connect_and_run_parser(app: AppHandle) {
                                     state.on_death_event(event);
                                 }
                                 protocol::Message::ConfluxRunStart(_) => {
+                                    info!("CONFLUX ingress: ConfluxRunStart");
                                     state.on_conflux_run_start();
                                 }
                                 protocol::Message::ConfluxRoomEnter(event) => {
+                                    info!(
+                                        "CONFLUX ingress: ConfluxRoomEnter quest_id={:#x}",
+                                        event.quest_id
+                                    );
                                     state.on_conflux_room_enter(event);
                                 }
                                 protocol::Message::ConfluxBuffAcquired(event) => {
+                                    info!(
+                                        "CONFLUX ingress: ConfluxBuffAcquired buff_id={:#x}",
+                                        event.buff_id
+                                    );
                                     state.on_conflux_buff_acquired(event);
                                 }
                                 protocol::Message::ConfluxRunEnd(_) => {
+                                    info!("CONFLUX ingress: ConfluxRunEnd");
                                     state.on_conflux_run_end();
                                 }
                             }

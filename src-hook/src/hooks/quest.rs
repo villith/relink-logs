@@ -91,6 +91,17 @@ impl OnLoadQuestHook {
         // parser cut off + save the previous room and group rooms under the run.
         let reception_flow = unsafe { a1.byte_add(0x210).read() };
         let flow_type = crate::hooks::diag::read_u32_guarded(reception_flow, 0x7c8);
+        let quest_id_dbg = unsafe { (*quest_state_ptr).quest_id };
+        // [CONFLUX-DIAG] logs EVERY quest load so we can see whether flow_type ever equals the
+        // EndlessMode hash 0x887ae0b0 (the room-enter gate). If it never matches, the gate/offset
+        // /timing is the bug for symptom 1 (rooms never save).
+        log::info!(
+            "CONFLUX hook: quest_load quest_id={:#x} reception_flow={:#x} flow_type={:#x} is_endless_room={}",
+            quest_id_dbg,
+            reception_flow,
+            flow_type,
+            flow_type == 0x887ae0b0
+        );
         if flow_type == 0x887ae0b0 {
             let quest_id = unsafe { (*quest_state_ptr).quest_id };
             let _ = self.tx.send(Message::ConfluxRoomEnter(

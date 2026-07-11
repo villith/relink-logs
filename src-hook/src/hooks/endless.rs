@@ -131,8 +131,21 @@ impl OnReceptionFlowDispatchHook {
         let flow_after = unsafe { a1.byte_add(0x210).read() };
         let flow_type_after = crate::hooks::diag::read_u32_guarded(flow_after, FLOW_TYPE_OFFSET);
 
+        // [CONFLUX-DIAG] Unconditional trace: this line proves the detour fired and shows the
+        // flow-type transition, so we can see whether the run-START edge is ever detected.
+        log::info!(
+            "CONFLUX hook: reception_dispatch a2={:#x} flow_before={:#x} type_before={:#x} flow_after={:#x} type_after={:#x} endless_edge={}",
+            a2,
+            flow_before,
+            flow_type_before,
+            flow_after,
+            flow_type_after,
+            flow_type_before != ENDLESS_FLOW_TYPE && flow_type_after == ENDLESS_FLOW_TYPE
+        );
+
         // Run START edge: transitioned INTO an EndlessMode flow.
         if flow_type_before != ENDLESS_FLOW_TYPE && flow_type_after == ENDLESS_FLOW_TYPE {
+            log::info!("CONFLUX hook: emitting ConfluxRunStart");
             let _ = self.tx.send(protocol::Message::ConfluxRunStart(
                 protocol::ConfluxRunStartEvent {},
             ));
@@ -184,6 +197,12 @@ impl OnEndlessBuffInstallHook {
         // populated). onInstall may fire repeatedly during RNG init, so the parser dedups;
         // we simply skip a 0 id. THIS is the buff-id offset tuning point (see const doc).
         let buff_id = crate::hooks::diag::read_u32_guarded(a1 as usize, ENDLESS_BUFF_FIRST_SLOT);
+        // [CONFLUX-DIAG] proves buff_install fired + shows the id we read at +0xc0.
+        log::info!(
+            "CONFLUX hook: buff_install this={:#x} buff_id={:#x}",
+            a1 as usize,
+            buff_id
+        );
         if buff_id != 0 {
             let _ = self.tx.send(protocol::Message::ConfluxBuffAcquired(
                 protocol::ConfluxBuffAcquiredEvent { buff_id },
@@ -229,6 +248,8 @@ impl OnEndlessMgrDtorHook {
     }
 
     fn run(&self, a1: *const usize) -> usize {
+        // [CONFLUX-DIAG] proves the manager-dtor detour fired = run-end signal.
+        log::info!("CONFLUX hook: mgr_dtor (run-end) manager={:#x}", a1 as usize);
         let _ = self
             .tx
             .send(protocol::Message::ConfluxRunEnd(protocol::ConfluxRunEndEvent {}));
