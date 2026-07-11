@@ -3,9 +3,12 @@ use std::{collections::HashMap, io::BufReader};
 use anyhow::Result;
 use chrono::Utc;
 use protocol::{
-    AreaEnterEvent, DamageEvent, Message, OnAttemptSBAEvent, OnContinueSBAChainEvent, OnDeathEvent,
-    OnPerformSBAEvent, OnUpdateSBAEvent, PlayerIdentityEvent, PlayerLoadEvent, QuestCompleteEvent,
+    AreaEnterEvent, ConfluxBuffAcquiredEvent, ConfluxRoomEnterEvent, DamageEvent, Message,
+    OnAttemptSBAEvent, OnContinueSBAChainEvent, OnDeathEvent, OnPerformSBAEvent, OnUpdateSBAEvent,
+    PlayerIdentityEvent, PlayerLoadEvent, QuestCompleteEvent,
 };
+
+use crate::db::runs::{finalize_run, insert_run, ConfluxBuffDelta};
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Window};
@@ -444,6 +447,19 @@ pub struct Parser {
     /// The database connection for the parser, used to save the encounter
     #[serde(skip)]
     db: Option<Connection>,
+
+    /// Active Conflux run id (None when not in a run). Assigned on run-start.
+    #[serde(skip)]
+    active_run_id: Option<i64>,
+    /// 0-based index of the room currently being recorded within the active run.
+    #[serde(skip)]
+    active_room_index: u32,
+    /// Per-room buff deltas accumulated during the active run.
+    #[serde(skip)]
+    active_run_buffs: Vec<ConfluxBuffDelta>,
+    /// Start timestamp (ms) of the active run.
+    #[serde(skip)]
+    active_run_start: i64,
 }
 
 impl Parser {
@@ -947,9 +963,128 @@ impl Parser {
         false
     }
 
+    /// Conflux run begins: open a runs row and reset per-run accumulators.
+    pub fn on_conflux_run_start(&mut self) {
+        let now = Utc::now().timestamp_millis();
+        self.active_room_index = 0;
+        self.active_run_buffs.clear();
+        self.active_run_start = now;
+        if let Some(conn) = &self.db {
+            match insert_run(conn, now) {
+                Ok(id) => self.active_run_id = Some(id),
+                Err(_) => self.active_run_id = None,
+            }
+        }
+    }
+
+    /// A new Conflux room loads: cut off + save the previous room (stamped with the
+    /// run id + room index), then advance to the next room. Mirrors on_area_enter_event.
+    pub fn on_conflux_room_enter(&mut self, event: ConfluxRoomEnterEvent) {
+        // Ignore if we somehow missed the run-start.
+        if self.active_run_id.is_none() {
+            return;
+        }
+
+        self.encounter.quest_id = Some(event.quest_id);
+
+        if self.status == ParserStatus::InProgress {
+            self.update_status(ParserStatus::Stopped);
+            if self.has_damage() {
+                let _ = self.save_room_to_db();
+                self.active_room_index += 1;
+            }
+        }
+
+        self.encounter.quest_completed = false;
+        self.encounter.reset_player_data();
+
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("on-area-enter", &self.derived_state);
+        }
+    }
+
+    /// A Conflux buff installs. Accumulate under the active room index, deduped.
+    pub fn on_conflux_buff_acquired(&mut self, event: ConfluxBuffAcquiredEvent) {
+        if self.active_run_id.is_none() {
+            return;
+        }
+        let room = self.active_room_index;
+        let entry = self
+            .active_run_buffs
+            .iter_mut()
+            .find(|b| b.room_index == room);
+        match entry {
+            Some(delta) => {
+                if !delta.buff_ids.contains(&event.buff_id) {
+                    delta.buff_ids.push(event.buff_id);
+                }
+            }
+            None => self.active_run_buffs.push(ConfluxBuffDelta {
+                room_index: room,
+                buff_ids: vec![event.buff_id],
+            }),
+        }
+    }
+
+    /// The Conflux run ends: save the final room, finalize the runs row, clear state,
+    /// and notify the frontend.
+    pub fn on_conflux_run_end(&mut self) {
+        let Some(run_id) = self.active_run_id else {
+            return;
+        };
+
+        let mut room_count = self.active_room_index;
+        if self.status == ParserStatus::InProgress {
+            self.update_status(ParserStatus::Stopped);
+            if self.has_damage() {
+                let _ = self.save_room_to_db();
+                room_count += 1;
+            }
+        }
+
+        let now = Utc::now().timestamp_millis();
+        let duration = (now - self.active_run_start).max(1);
+        if let Some(conn) = &self.db {
+            let _ = finalize_run(
+                conn,
+                run_id,
+                now,
+                duration,
+                room_count,
+                true,
+                &self.active_run_buffs,
+            );
+        }
+
+        self.active_run_id = None;
+        self.active_run_buffs.clear();
+        self.active_room_index = 0;
+
+        if let Some(app) = &self.app {
+            let _ = app.emit_all("conflux-run-saved", run_id);
+        }
+    }
+
+    /// Saves the current encounter as a room row (like save_encounter_to_db, but
+    /// stamped with run_id/room_index/total_damage). Returns the inserted log id.
+    fn save_room_to_db(&mut self) -> Result<Option<i64>> {
+        let run_id = self.active_run_id;
+        let room_index = self.active_room_index;
+        self.save_encounter_to_db_inner(run_id, Some(room_index))
+    }
+
     fn save_encounter_to_db(&mut self) -> Result<Option<i64>> {
+        self.save_encounter_to_db_inner(None, None)
+    }
+
+    fn save_encounter_to_db_inner(
+        &mut self,
+        run_id: Option<i64>,
+        room_index: Option<u32>,
+    ) -> Result<Option<i64>> {
         let duration_in_millis = self.derived_state.duration();
         let start_datetime = self.derived_state.utc_start_time()?;
+        let total_damage = self.derived_state.total_damage as i64;
 
         let primary_target = self
             .derived_state
@@ -988,8 +1123,11 @@ impl Parser {
                         p4_type,
                         quest_id,
                         quest_elapsed_time,
-                        quest_completed
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+                        quest_completed,
+                        run_id,
+                        room_index,
+                        total_damage
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
                 params![
                     "",
                     start_datetime.timestamp_millis(),
@@ -1007,7 +1145,10 @@ impl Parser {
                     p4.map(|p| p.character_type.to_string()),
                     self.encounter.quest_id,
                     self.encounter.quest_timer,
-                    self.encounter.quest_completed
+                    self.encounter.quest_completed,
+                    run_id,
+                    room_index,
+                    total_damage
                 ],
             )?;
 
@@ -1041,6 +1182,89 @@ mod tests {
     use protocol::{ActionType, Actor};
 
     use super::*;
+
+    fn parser_with_memory_db() -> Parser {
+        let mut conn = rusqlite::Connection::open_in_memory().unwrap();
+        let migrations = rusqlite_migration::Migrations::new(vec![
+            rusqlite_migration::M::up("CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY, name TEXT NOT NULL, time INTEGER NOT NULL, duration INTEGER NOT NULL, data BLOB NOT NULL, version INTEGER NOT NULL DEFAULT 0, primary_target INTEGER, p1_name TEXT, p1_type TEXT, p2_name TEXT, p2_type TEXT, p3_name TEXT, p3_type TEXT, p4_name TEXT, p4_type TEXT, quest_id INTEGER, quest_elapsed_time INTEGER, quest_completed BOOLEAN, run_id INTEGER, room_index INTEGER, total_damage INTEGER)"),
+            rusqlite_migration::M::up("CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, start_time INTEGER NOT NULL, end_time INTEGER, duration INTEGER, room_count INTEGER NOT NULL DEFAULT 0, completed BOOLEAN, buffs TEXT)"),
+        ]);
+        migrations.to_latest(&mut conn).unwrap();
+        Parser {
+            db: Some(conn),
+            ..Default::default()
+        }
+    }
+
+    fn a_damage_event() -> DamageEvent {
+        DamageEvent {
+            source: Actor {
+                index: 0,
+                actor_type: 0x2AF6_78E8,
+                parent_actor_type: 0x2AF6_78E8,
+                parent_index: 0,
+            },
+            target: Actor {
+                index: 1,
+                actor_type: 0,
+                parent_actor_type: 0,
+                parent_index: 1,
+            },
+            damage: 500,
+            flags: 0,
+            action_id: ActionType::Normal(1),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+        }
+    }
+
+    #[test]
+    fn conflux_run_lifecycle_groups_rooms_and_buffs() {
+        let mut parser = parser_with_memory_db();
+
+        // Run starts -> a runs row exists and is active.
+        parser.on_conflux_run_start();
+        assert!(parser.active_run_id.is_some());
+
+        // Room 0: some damage, then next room-enter cuts it off + saves it.
+        parser.on_damage_event(a_damage_event());
+        parser.on_conflux_buff_acquired(protocol::ConfluxBuffAcquiredEvent { buff_id: 0xAA });
+        parser.on_conflux_buff_acquired(protocol::ConfluxBuffAcquiredEvent { buff_id: 0xAA }); // dup
+        parser.on_conflux_room_enter(protocol::ConfluxRoomEnterEvent { quest_id: 11 });
+
+        // Room 1: more damage + a buff, then run ends (which saves the last room).
+        parser.on_damage_event(a_damage_event());
+        parser.on_conflux_buff_acquired(protocol::ConfluxBuffAcquiredEvent { buff_id: 0xCC });
+        parser.on_conflux_run_end();
+
+        assert!(parser.active_run_id.is_none(), "run cleared after end");
+
+        let conn = parser.db.as_ref().unwrap();
+        let runs = crate::db::runs::get_runs(conn, 10, 0).unwrap();
+        assert_eq!(runs.len(), 1);
+        let run = &runs[0];
+        assert_eq!(run.rooms.len(), 2, "two rooms saved and tagged to the run");
+        assert_eq!(run.rooms[0].room_index, 0);
+        assert_eq!(run.rooms[1].room_index, 1);
+        assert_eq!(run.completed, Some(true));
+        // Buff deltas: room 0 has 0xAA (deduped to one), room 1 has 0xCC.
+        let r0 = run.buffs.iter().find(|b| b.room_index == 0).unwrap();
+        assert_eq!(r0.buff_ids, vec![0xAA]);
+        let r1 = run.buffs.iter().find(|b| b.room_index == 1).unwrap();
+        assert_eq!(r1.buff_ids, vec![0xCC]);
+    }
+
+    #[test]
+    fn buff_and_room_without_active_run_are_ignored_for_runs() {
+        let mut parser = parser_with_memory_db();
+        // No run started.
+        parser.on_conflux_buff_acquired(protocol::ConfluxBuffAcquiredEvent { buff_id: 0x1 });
+        parser.on_conflux_room_enter(protocol::ConfluxRoomEnterEvent { quest_id: 5 });
+        assert!(parser.active_run_id.is_none());
+        let conn = parser.db.as_ref().unwrap();
+        assert_eq!(crate::db::runs::get_runs_count(conn).unwrap(), 0);
+    }
 
     #[test]
     fn can_create_parser() {

@@ -4,6 +4,7 @@ use rusqlite::Connection;
 use rusqlite_migration::{Migrations, M};
 
 pub mod logs;
+pub mod runs;
 
 /// Setup database and run migrations.
 pub fn setup_db() -> Result<()> {
@@ -36,6 +37,20 @@ pub fn setup_db() -> Result<()> {
         M::up("ALTER TABLE logs ADD COLUMN quest_id INTEGER"),
         M::up("ALTER TABLE logs ADD COLUMN quest_elapsed_time INTEGER"),
         M::up("ALTER TABLE logs ADD COLUMN quest_completed BOOLEAN"),
+        M::up("ALTER TABLE logs ADD COLUMN run_id INTEGER"),
+        M::up("ALTER TABLE logs ADD COLUMN room_index INTEGER"),
+        M::up("ALTER TABLE logs ADD COLUMN total_damage INTEGER"),
+        M::up(
+            r#"CREATE TABLE IF NOT EXISTS runs (
+            id INTEGER PRIMARY KEY,
+            start_time INTEGER NOT NULL,
+            end_time INTEGER,
+            duration INTEGER,
+            room_count INTEGER NOT NULL DEFAULT 0,
+            completed BOOLEAN,
+            buffs TEXT
+        )"#,
+        ),
     ]);
 
     info!("Database found, running migrations..");
