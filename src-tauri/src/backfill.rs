@@ -4,7 +4,10 @@
 //! so we can tell, per damage event, which `skills.<char>.<id>` key a name would be
 //! looked up under. The ui.json differ then finds ids that resolve nowhere.
 
+use std::collections::BTreeSet;
+
 use protocol::{ActionType, DamageEvent};
+use serde_json::{Map, Value};
 
 use crate::parser::constants::CharacterType;
 
@@ -50,6 +53,47 @@ fn character_key(character: CharacterType) -> Option<String> {
         return None;
     }
     Some(character.to_string())
+}
+
+/// The placeholder written for an unmapped skill. Marked + greppable, distinct
+/// from the runtime `"Skill {{id}}"` fallback.
+pub fn placeholder_for(id: u32) -> String {
+    format!("TODO: Skill {id}")
+}
+
+/// True if `skills` already resolves a name for `key` via the getSkillName chain:
+/// child block, then parent block, then the `default` block.
+fn is_resolved(skills: &Map<String, Value>, key: &SkillKey) -> bool {
+    let id = key.id.to_string();
+    for block in [key.child_key.as_str(), key.parent_key.as_str(), "default"] {
+        if let Some(Value::Object(entries)) = skills.get(block) {
+            if entries.contains_key(&id) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Inserts `"TODO: Skill <id>"` placeholders into `skills` for every `key` that
+/// does not already resolve. Returns the number of placeholders added. Add-only:
+/// never overwrites or removes. Idempotent: an already-present placeholder counts
+/// as resolved. New entries land under the child block.
+pub fn insert_missing(skills: &mut Map<String, Value>, keys: &BTreeSet<SkillKey>) -> usize {
+    let mut added = 0;
+    for key in keys {
+        if is_resolved(skills, key) {
+            continue;
+        }
+        let block = skills
+            .entry(key.child_key.clone())
+            .or_insert_with(|| Value::Object(Map::new()));
+        if let Value::Object(entries) = block {
+            entries.insert(key.id.to_string(), Value::String(placeholder_for(key.id)));
+            added += 1;
+        }
+    }
+    added
 }
 
 #[cfg(test)]
@@ -131,5 +175,64 @@ mod tests {
         assert!(
             derive_skill_key(&event(0xDEAD_BEEF, 0xDEAD_BEEF, ActionType::Normal(1))).is_none()
         );
+    }
+
+    use serde_json::json;
+
+    fn key(child: &str, parent: &str, id: u32) -> SkillKey {
+        SkillKey {
+            child_key: child.to_string(),
+            parent_key: parent.to_string(),
+            id,
+        }
+    }
+
+    #[test]
+    fn missing_skill_is_inserted_under_child_block() {
+        let mut skills = json!({ "Pl0100": { "100": "Slice" } })
+            .as_object()
+            .unwrap()
+            .clone();
+        let mut keys = BTreeSet::new();
+        keys.insert(key("Pl0100", "Pl0100", 999));
+
+        let added = insert_missing(&mut skills, &keys);
+        assert_eq!(added, 1);
+        assert_eq!(skills["Pl0100"]["999"], json!("TODO: Skill 999"));
+        assert_eq!(skills["Pl0100"]["100"], json!("Slice"), "existing untouched");
+    }
+
+    #[test]
+    fn resolved_via_child_parent_or_default_is_skipped() {
+        let mut skills = json!({
+            "Pl0100": { "1": "Child" },
+            "Pl2200": { "2": "Parent" },
+            "default": { "3": "Default" }
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+        let mut keys = BTreeSet::new();
+        keys.insert(key("Pl0100", "Pl0100", 1)); // in child
+        keys.insert(key("PlXXXX", "Pl2200", 2)); // in parent
+        keys.insert(key("PlYYYY", "PlZZZZ", 3)); // in default
+
+        let added = insert_missing(&mut skills, &keys);
+        assert_eq!(added, 0, "all three already resolve");
+    }
+
+    #[test]
+    fn is_idempotent_on_rerun() {
+        let mut skills = Map::new();
+        let mut keys = BTreeSet::new();
+        keys.insert(key("Pl0100", "Pl0100", 42));
+
+        assert_eq!(insert_missing(&mut skills, &keys), 1);
+        assert_eq!(
+            insert_missing(&mut skills, &keys),
+            0,
+            "second run adds nothing"
+        );
+        assert_eq!(skills["Pl0100"]["42"], json!("TODO: Skill 42"));
     }
 }
