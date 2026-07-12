@@ -1,7 +1,7 @@
 {
-  "004557b8": {
-    "key": "GEEN_158_13",
-    "text": "Glass Cannon IV+"
+  "00277247": {
+    "key": "GEEN_327_01",
+    "text": "Divergence II"
   },
   "004cdeec": {
     "key": "GEEN_028_01",
@@ -19,9 +19,25 @@
     "key": "GEEN_119_04",
     "text": "Rose's Blooming"
   },
+  "0188e9e3": {
+    "key": "GEEN_001_11",
+    "text": "Health II+"
+  },
+  "01b49f0d": {
+    "key": "GEEN_111_21",
+    "text": "Quick Charge II+"
+  },
+  "01bb436b": {
+    "key": "GEEN_176_04",
+    "text": "Thunderwolf's Recharge"
+  },
   "01d1a6ce": {
     "key": "GEEN_119_91",
     "text": "Rose's Blooming+"
+  },
+  "02262975": {
+    "key": "GEEN_031_10",
+    "text": "Break Assassin I+"
   },
   "02472c43": {
     "key": "GEEN_123_90",
@@ -30,10 +46,6 @@
   "02b1f8c0": {
     "key": "GEEN_129_90",
     "text": "Founder's Awakening+"
-  },
-  "02ba37a3": {
-    "key": "GEEN_154_14",
-    "text": "Berserker V+"
   },
   "02c67f5e": {
     "key": "GEEN_008_24",
@@ -51,13 +63,25 @@
     "key": "GEEN_013_03",
     "text": "Critical Damage IV"
   },
+  "0523a202": {
+    "key": "GEEN_178_91",
+    "text": "The Black's Mark+"
+  },
   "0537ef0b": {
     "key": "GEEN_004_00",
     "text": "Stun Power I"
   },
+  "054f4ace": {
+    "key": "GEEN_113_00",
+    "text": "Sigil Booster I"
+  },
   "05aca892": {
     "key": "GEEN_118_92",
     "text": "Veteran's Vision+"
+  },
+  "05e72720": {
+    "key": "GEEN_321_21",
+    "text": "Celestial Lumen II+"
   },
   "06260d96": {
     "key": "GEEN_005_13",
@@ -79,9 +103,25 @@
     "key": "GEEN_114_93",
     "text": "Fearless Heart+"
   },
+  "0723f7ec": {
+    "key": "GEEN_178_92",
+    "text": "The Black's Impulse+"
+  },
   "07703a8a": {
     "key": "GEEN_072_02",
     "text": "Uplift III"
+  },
+  "07a3abd9": {
+    "key": "GEEN_322_22",
+    "text": "Celestial Terra III+"
+  },
+  "088829b8": {
+    "key": "GEEN_327_21",
+    "text": "Divergence II+"
+  },
+  "0890882f": {
+    "key": "GEEN_013_10",
+    "text": "Critical Damage I+"
   },
   "08da7279": {
     "key": "GEEN_000_14",
@@ -90,6 +130,10 @@
   "0952f945": {
     "key": "GEEN_111_04",
     "text": "Quick Charge V"
+  },
+  "0980b80f": {
+    "key": "GEEN_008_21",
+    "text": "Charged Attack II+"
   },
   "0a410bd8": {
     "key": "GEEN_114_04",
@@ -111,9 +155,9 @@
     "key": "GEEN_094_24",
     "text": "Steady Focus V+"
   },
-  "0bb4ccda": {
-    "key": "GEEN_153_14",
-    "text": "Head Start V+"
+  "0b55dd64": {
+    "key": "GEEN_006_10",
+    "text": "Stamina I+"
   },
   "0bb9c188": {
     "key": "GEEN_003_24",
@@ -151,9 +195,9 @@
     "key": "GEEN_083_04",
     "text": "Skilled Assault V"
   },
-  "0ea21045": {
-    "key": "GEEN_154_13",
-    "text": "Berserker IV+"
+  "0e87c8d2": {
+    "key": "GEEN_008_10",
+    "text": "Charged Attack I+"
   },
   "0ee1e9d7": {
     "key": "GEEN_157_04",
@@ -178,6 +222,10 @@
   "0f4a0a62": {
     "key": "GEEN_152_00",
     "text": "Less Is More I"
+  },
+  "0fc3e656": {
+    "key": "GEEN_004_10",
+    "text": "Stun Power I+"
   },
   "100e4b1d": {
     "key": "GEEN_079_03",
@@ -214,6 +262,10 @@
   "120c5d98": {
     "key": "GEEN_147_03",
     "text": "Path to Mastery IV"
+  },
+  "12789216": {
+    "key": "GEEN_321_02",
+    "text": "Celestial Lumen III"
   },
   "1291f7ca": {
     "key": "GEEN_031_22",
@@ -259,6 +311,18 @@
     "key": "GEEN_129_91",
     "text": "Founder's Strategy+"
   },
+  "158d506f": {
+    "key": "GEEN_111_20",
+    "text": "Quick Charge I+"
+  },
+  "15f618b1": {
+    "key": "GEEN_323_22",
+    "text": "Celestial Incendo III+"
+  },
+  "16199eae": {
+    "key": "GEEN_009_20",
+    "text": "Linked Together I+"
+  },
   "16216fdd": {
     "key": "GEEN_072_03",
     "text": "Uplift IV"
@@ -299,13 +363,17 @@
     "key": "GEEN_221_94",
     "text": "Damage Cap V+"
   },
-  "190c656d": {
-    "key": "GEEN_151_13",
-    "text": "Supplementary Damage IV+"
-  },
   "197818b7": {
     "key": "GEEN_055_03",
     "text": "Paralysis Resistance IV"
+  },
+  "19a4598e": {
+    "key": "GEEN_110_21",
+    "text": "Life on the Line II+"
+  },
+  "19c4348e": {
+    "key": "GEEN_324_01",
+    "text": "Celestial Aqua II"
   },
   "19cb4eb9": {
     "key": "GEEN_057_24",
@@ -319,9 +387,17 @@
     "key": "GEEN_104_04",
     "text": "Nimble Defense V"
   },
+  "1a359b67": {
+    "key": "GEEN_176_92",
+    "text": "Thunderwolf's Acuity+"
+  },
   "1a57aef1": {
     "key": "GEEN_127_90",
     "text": "Butterfly's Awakening+"
+  },
+  "1a743e14": {
+    "key": "GEEN_322_03",
+    "text": "Celestial Terra IV"
   },
   "1a94123d": {
     "key": "GEEN_006_13",
@@ -335,9 +411,17 @@
     "key": "GEEN_094_00",
     "text": "Steady Focus I"
   },
+  "1b813e10": {
+    "key": "GEEN_005_20",
+    "text": "Enmity I+"
+  },
   "1bbe919c": {
     "key": "GEEN_118_90",
     "text": "Veteran's Awakening+"
+  },
+  "1be87ead": {
+    "key": "GEEN_013_21",
+    "text": "Critical Damage II+"
   },
   "1bf76d02": {
     "key": "GEEN_106_00",
@@ -355,9 +439,9 @@
     "key": "GEEN_008_14",
     "text": "Charged Attack V+"
   },
-  "1cd1d367": {
-    "key": "GEEN_151_14",
-    "text": "Supplementary Damage V+"
+  "1caa06bd": {
+    "key": "GEEN_100_00",
+    "text": "Supplements I"
   },
   "1ceb58aa": {
     "key": "GEEN_144_02",
@@ -383,9 +467,13 @@
     "key": "GEEN_066_24",
     "text": "Regen V+"
   },
-  "1fc0c1a5": {
-    "key": "GEEN_085_94",
-    "text": "Aegis V+"
+  "1f372593": {
+    "key": "GEEN_223_94",
+    "text": "Tyranny V+"
+  },
+  "1ffb1aed": {
+    "key": "GEEN_030_21",
+    "text": "Overdrive Assassin II+"
   },
   "2014714c": {
     "key": "GEEN_009_00",
@@ -395,9 +483,17 @@
     "key": "GEEN_014_23",
     "text": "Exploiter IV+"
   },
+  "20492635": {
+    "key": "GEEN_321_24",
+    "text": "Celestial Lumen V+"
+  },
   "207559b9": {
     "key": "GEEN_028_14",
     "text": "Lucky Charge V+"
+  },
+  "207b67d1": {
+    "key": "GEEN_027_11",
+    "text": "Tyranny II+"
   },
   "208af595": {
     "key": "GEEN_063_04",
@@ -423,6 +519,14 @@
     "key": "GEEN_087_01",
     "text": "Firm Stance II"
   },
+  "22dc8701": {
+    "key": "GEEN_323_03",
+    "text": "Celestial Incendo IV"
+  },
+  "231ebaa2": {
+    "key": "GEEN_321_23",
+    "text": "Celestial Lumen IV+"
+  },
   "232147ad": {
     "key": "GEEN_152_23",
     "text": "Less Is More IV+"
@@ -431,13 +535,17 @@
     "key": "GEEN_136_00",
     "text": "Held Under Resistance I"
   },
+  "23953fd4": {
+    "key": "GEEN_176_90",
+    "text": "Thunderwolf's Awakening+"
+  },
   "23c84e82": {
     "key": "GEEN_073_24",
     "text": "Potion Hoarder V+"
   },
-  "23e7990d": {
-    "key": "GEEN_168_04",
-    "text": "Enhanced Damage V"
+  "247a41f3": {
+    "key": "GEEN_174_54",
+    "text": "Bladequeen's Circuit"
   },
   "248c0116": {
     "key": "GEEN_054_00",
@@ -459,6 +567,14 @@
     "key": "GEEN_044_24",
     "text": "Stout Heart+"
   },
+  "274973d7": {
+    "key": "GEEN_028_21",
+    "text": "Lucky Charge II+"
+  },
+  "2767b7e2": {
+    "key": "GEEN_325_22",
+    "text": "Fatebreaker III+"
+  },
   "27c62352": {
     "key": "GEEN_051_02",
     "text": "Sandtomb Resistance III"
@@ -470,6 +586,18 @@
   "28089a97": {
     "key": "GEEN_130_04",
     "text": "Versalis Foundation"
+  },
+  "280e1329": {
+    "key": "GEEN_145_20",
+    "text": "Power Hungry I+"
+  },
+  "282dbff0": {
+    "key": "GEEN_173_91",
+    "text": "Gladiator's Frenzy+"
+  },
+  "2835e81b": {
+    "key": "GEEN_029_21",
+    "text": "Injury to Insult II+"
   },
   "28a30205": {
     "key": "GEEN_017_12",
@@ -491,6 +619,10 @@
     "key": "GEEN_067_00",
     "text": "Drain I"
   },
+  "2b400faa": {
+    "key": "GEEN_005_21",
+    "text": "Enmity II+"
+  },
   "2b94d8d6": {
     "key": "GEEN_147_02",
     "text": "Path to Mastery III"
@@ -498,6 +630,14 @@
   "2bdfba94": {
     "key": "GEEN_054_04",
     "text": "Dizzy Resistance V"
+  },
+  "2c150c6a": {
+    "key": "GEEN_154_21",
+    "text": "Berserker II+"
+  },
+  "2c6f3453": {
+    "key": "GEEN_024_10",
+    "text": "Combo Booster I+"
   },
   "2c958609": {
     "key": "GEEN_057_00",
@@ -531,9 +671,21 @@
     "key": "GEEN_154_04",
     "text": "Berserker V"
   },
+  "2d70c37d": {
+    "key": "GEEN_177_93",
+    "text": "Enchantress's Warpath+"
+  },
   "2d7f2e70": {
     "key": "GEEN_000_24",
     "text": "Attack Power V+"
+  },
+  "2d8e0e4d": {
+    "key": "GEEN_003_11",
+    "text": "Critical Hit Rate II+"
+  },
+  "2e1bdb4a": {
+    "key": "GEEN_151_21",
+    "text": "Supplementary Damage II+"
   },
   "2e3351e3": {
     "key": "GEEN_147_24",
@@ -551,6 +703,10 @@
     "key": "GEEN_151_22",
     "text": "Supplementary Damage III+"
   },
+  "2ff84069": {
+    "key": "GEEN_100_01",
+    "text": "Supplements II"
+  },
   "3069c2fe": {
     "key": "GEEN_128_93",
     "text": "Eternal Rage's Warpath+"
@@ -563,10 +719,6 @@
     "key": "GEEN_031_03",
     "text": "Break Assassin IV"
   },
-  "31afd43a": {
-    "key": "GEEN_153_12",
-    "text": "Head Start III+"
-  },
   "31d241e4": {
     "key": "GEEN_003_22",
     "text": "Critical Hit Rate III+"
@@ -574,6 +726,10 @@
   "31f91fcf": {
     "key": "GEEN_124_54",
     "text": "Dragonslayer's Ingenuity"
+  },
+  "33006fc3": {
+    "key": "GEEN_326_04",
+    "text": "Celestial Ventus V"
   },
   "332e9b30": {
     "key": "GEEN_233_24",
@@ -619,10 +775,6 @@
     "key": "GEEN_110_12",
     "text": "Life on the Line III+"
   },
-  "3572645c": {
-    "key": "GEEN_145_12",
-    "text": "Power Hungry III+"
-  },
   "35a14fc3": {
     "key": "GEEN_004_03",
     "text": "Stun Power IV"
@@ -634,6 +786,10 @@
   "35accc3c": {
     "key": "GEEN_031_13",
     "text": "Break Assassin IV+"
+  },
+  "35ae024e": {
+    "key": "GEEN_324_22",
+    "text": "Celestial Aqua III+"
   },
   "35bd0f81": {
     "key": "GEEN_005_22",
@@ -654,6 +810,10 @@
   "36f4b48a": {
     "key": "GEEN_013_22",
     "text": "Critical Damage III+"
+  },
+  "3739db5e": {
+    "key": "GEEN_012_20",
+    "text": "Throw I+"
   },
   "37b0783c": {
     "key": "GEEN_170_54",
@@ -687,13 +847,13 @@
     "key": "GEEN_030_24",
     "text": "Overdrive Assassin V+"
   },
-  "3976136f": {
-    "key": "GEEN_152_12",
-    "text": "Less Is More III+"
-  },
   "397a3150": {
     "key": "GEEN_138_02",
     "text": "Attack Down Resistance III"
+  },
+  "39810c9e": {
+    "key": "GEEN_064_11",
+    "text": "Dodge Payback II+"
   },
   "39a38b2c": {
     "key": "GEEN_086_02",
@@ -723,9 +883,25 @@
     "key": "GEEN_117_04",
     "text": "Mage's Aspiration"
   },
+  "3beed064": {
+    "key": "GEEN_001_20",
+    "text": "Health I+"
+  },
+  "3c0d684d": {
+    "key": "GEEN_083_11",
+    "text": "Skilled Assault II+"
+  },
   "3c4e2fcf": {
     "key": "GEEN_003_12",
     "text": "Critical Hit Rate III+"
+  },
+  "3cb7e988": {
+    "key": "GEEN_061_10",
+    "text": "Guard Payback I+"
+  },
+  "3cc5e451": {
+    "key": "GEEN_000_20",
+    "text": "Attack Power I+"
   },
   "3d5e4678": {
     "key": "GEEN_171_04",
@@ -743,6 +919,10 @@
     "key": "GEEN_047_03",
     "text": "Burn Resistance IV"
   },
+  "3dd38511": {
+    "key": "GEEN_324_00",
+    "text": "Celestial Aqua I"
+  },
   "3ea4134b": {
     "key": "GEEN_172_91",
     "text": "Supreme Primarch's Awe+"
@@ -751,17 +931,25 @@
     "key": "GEEN_066_02",
     "text": "Regen III"
   },
+  "3ede3cc3": {
+    "key": "GEEN_144_21",
+    "text": "Stronghold II+"
+  },
   "3f45dbdc": {
     "key": "GEEN_054_02",
     "text": "Dizzy Resistance III"
   },
-  "3f5e8fd8": {
-    "key": "GEEN_151_12",
-    "text": "Supplementary Damage III+"
-  },
   "3f8fc674": {
     "key": "GEEN_139_00",
     "text": "Defense Down Resistance I"
+  },
+  "40049a6c": {
+    "key": "GEEN_324_21",
+    "text": "Celestial Aqua II+"
+  },
+  "4035d98a": {
+    "key": "GEEN_113_02",
+    "text": "Sigil Booster III"
   },
   "40738cdd": {
     "key": "GEEN_120_64",
@@ -771,13 +959,25 @@
     "key": "GEEN_110_14",
     "text": "Life on the Line V+"
   },
+  "4119f09b": {
+    "key": "GEEN_178_64",
+    "text": "The Black's Warpath"
+  },
+  "41ac1082": {
+    "key": "GEEN_173_93",
+    "text": "Gladiator's Warpath+"
+  },
+  "41cd7fa1": {
+    "key": "GEEN_061_20",
+    "text": "Guard Payback I+"
+  },
+  "426ad20e": {
+    "key": "GEEN_300_11",
+    "text": "Crabs Are Forever+"
+  },
   "42bb0c1c": {
     "key": "GEEN_151_04",
     "text": "Supplementary Damage V"
-  },
-  "43088191": {
-    "key": "GEEN_168_02",
-    "text": "Enhanced Damage III"
   },
   "430df884": {
     "key": "GEEN_028_00",
@@ -819,6 +1019,10 @@
     "key": "GEEN_158_22",
     "text": "Glass Cannon III+"
   },
+  "4597a8a8": {
+    "key": "GEEN_173_64",
+    "text": "Gladiator's Warpath"
+  },
   "459dd2c2": {
     "key": "GEEN_003_14",
     "text": "Critical Hit Rate V+"
@@ -826,6 +1030,10 @@
   "45b43024": {
     "key": "GEEN_005_01",
     "text": "Enmity II"
+  },
+  "45d92c1a": {
+    "key": "GEEN_008_11",
+    "text": "Charged Attack II+"
   },
   "462782d5": {
     "key": "GEEN_123_04",
@@ -855,25 +1063,33 @@
     "key": "GEEN_066_01",
     "text": "Regen II"
   },
+  "482fd699": {
+    "key": "GEEN_014_11",
+    "text": "Exploiter II+"
+  },
   "4840c322": {
     "key": "GEEN_008_03",
     "text": "Charged Attack IV"
   },
-  "4872d685": {
-    "key": "2DB5D969",
-    "text": "Enhanced Damage V"
+  "49434696": {
+    "key": "GEEN_301_00",
+    "text": "Immortal Shell"
   },
   "49651c89": {
     "key": "GEEN_126_92",
     "text": "Swordmaster's Art+"
   },
-  "4971e8fb": {
-    "key": "GEEN_158_14",
-    "text": "Glass Cannon V+"
-  },
   "49745934": {
     "key": "GEEN_150_24",
     "text": "Untouchable+"
+  },
+  "49d00caf": {
+    "key": "GEEN_003_21",
+    "text": "Critical Hit Rate II+"
+  },
+  "4a25d812": {
+    "key": "GEEN_326_23",
+    "text": "Celestial Ventus IV+"
   },
   "4a336d1e": {
     "key": "GEEN_104_02",
@@ -891,9 +1107,17 @@
     "key": "GEEN_156_24",
     "text": "Potent Greens+"
   },
+  "4b253ac6": {
+    "key": "GEEN_018_21",
+    "text": "Concentrated Fire II+"
+  },
   "4b754d3a": {
     "key": "GEEN_083_00",
     "text": "Skilled Assault I"
+  },
+  "4b86cc01": {
+    "key": "GEEN_321_00",
+    "text": "Celestial Lumen I"
   },
   "4b98f53a": {
     "key": "GEEN_085_02",
@@ -927,6 +1151,14 @@
     "key": "GEEN_123_93",
     "text": "Lord's Warpath+"
   },
+  "4d50d1fb": {
+    "key": "GEEN_031_21",
+    "text": "Break Assassin II+"
+  },
+  "4d52c35c": {
+    "key": "GEEN_327_23",
+    "text": "Divergence IV+"
+  },
   "4d7c8632": {
     "key": "GEEN_123_64",
     "text": "Lord's Warpath"
@@ -938,6 +1170,10 @@
   "4db1fdc1": {
     "key": "GEEN_061_14",
     "text": "Guard Payback V+"
+  },
+  "4e22352d": {
+    "key": "GEEN_013_20",
+    "text": "Critical Damage I+"
   },
   "4e4911fa": {
     "key": "GEEN_078_04",
@@ -963,17 +1199,33 @@
     "key": "GEEN_069_02",
     "text": "Quick Cooldown III"
   },
+  "4fde80ae": {
+    "key": "GEEN_017_20",
+    "text": "Combo Finisher I+"
+  },
   "4ffe62e5": {
     "key": "GEEN_027_12",
     "text": "Tyranny III+"
+  },
+  "501973ce": {
+    "key": "GEEN_325_04",
+    "text": "Fatebreaker V"
   },
   "5048c546": {
     "key": "GEEN_139_24",
     "text": "Defense Down Resistance V+"
   },
+  "50996321": {
+    "key": "GEEN_320_23",
+    "text": "Celestial Nyx IV+"
+  },
   "50b05700": {
     "key": "GEEN_077_04",
     "text": "Low Profile V"
+  },
+  "51163103": {
+    "key": "GEEN_012_10",
+    "text": "Throw I+"
   },
   "5144fe4d": {
     "key": "GEEN_031_14",
@@ -982,6 +1234,10 @@
   "515e693c": {
     "key": "GEEN_119_93",
     "text": "Rose's Warpath+"
+  },
+  "51e98a7c": {
+    "key": "GEEN_175_93",
+    "text": "Ultramarine's Warpath+"
   },
   "522004ab": {
     "key": "GEEN_115_91",
@@ -994,6 +1250,10 @@
   "524de21c": {
     "key": "GEEN_170_04",
     "text": "Spirit Edge's Rally"
+  },
+  "5252689f": {
+    "key": "GEEN_024_11",
+    "text": "Combo Booster II+"
   },
   "52a6e299": {
     "key": "GEEN_114_90",
@@ -1011,6 +1271,18 @@
     "key": "GEEN_005_12",
     "text": "Enmity III+"
   },
+  "53b1458d": {
+    "key": "GEEN_323_23",
+    "text": "Celestial Incendo IV+"
+  },
+  "53bc1f91": {
+    "key": "GEEN_321_20",
+    "text": "Celestial Lumen I+"
+  },
+  "53bd323f": {
+    "key": "GEEN_325_00",
+    "text": "Fatebreaker I"
+  },
   "54cefd1c": {
     "key": "GEEN_005_00",
     "text": "Enmity I"
@@ -1022,6 +1294,10 @@
   "54d8ea04": {
     "key": "GEEN_020_24",
     "text": "Damage Cap V+"
+  },
+  "5536ee62": {
+    "key": "GEEN_323_04",
+    "text": "Celestial Incendo V"
   },
   "5608ef7e": {
     "key": "GEEN_152_02",
@@ -1038,6 +1314,10 @@
   "56a668b1": {
     "key": "GEEN_134_02",
     "text": "Instilling Vigor"
+  },
+  "56d196c5": {
+    "key": "GEEN_320_04",
+    "text": "Celestial Nyx V"
   },
   "57b6d9a5": {
     "key": "GEEN_058_03",
@@ -1063,25 +1343,41 @@
     "key": "GEEN_001_02",
     "text": "Health III"
   },
+  "590715d9": {
+    "key": "GEEN_324_02",
+    "text": "Celestial Aqua III"
+  },
   "590c19c8": {
     "key": "GEEN_132_64",
     "text": "Ebony's Warpath"
+  },
+  "595ad681": {
+    "key": "GEEN_027_20",
+    "text": "Tyranny I+"
   },
   "59e5335b": {
     "key": "GEEN_009_24",
     "text": "Linked Together V+"
   },
+  "5a360ea8": {
+    "key": "GEEN_177_90",
+    "text": "Enchantress's Awakening+"
+  },
   "5b939637": {
     "key": "GEEN_139_03",
     "text": "Defense Down Resistance IV"
+  },
+  "5bf84fd1": {
+    "key": "GEEN_325_24",
+    "text": "Fatebreaker V+"
   },
   "5c19bbb0": {
     "key": "GEEN_046_04",
     "text": "Poison Resistance V"
   },
-  "5c569745": {
-    "key": "GEEN_145_13",
-    "text": "Power Hungry IV+"
+  "5cb2445f": {
+    "key": "GEEN_177_54",
+    "text": "Enchantress's Rhythm"
   },
   "5d592fdd": {
     "key": "GEEN_172_93",
@@ -1091,6 +1387,14 @@
     "key": "GEEN_004_22",
     "text": "Stun Power III+"
   },
+  "5df353c3": {
+    "key": "GEEN_014_10",
+    "text": "Exploiter I+"
+  },
+  "5e19150e": {
+    "key": "GEEN_004_11",
+    "text": "Stun Power II+"
+  },
   "5e7eeec4": {
     "key": "GEEN_001_04",
     "text": "Health V"
@@ -1098,6 +1402,10 @@
   "5eb282c6": {
     "key": "GEEN_068_04",
     "text": "Autorevive V"
+  },
+  "5f097193": {
+    "key": "GEEN_320_03",
+    "text": "Celestial Nyx IV"
   },
   "5f117445": {
     "key": "GEEN_013_13",
@@ -1123,10 +1431,6 @@
     "key": "GEEN_064_14",
     "text": "Dodge Payback V+"
   },
-  "60bd40a1": {
-    "key": "GEEN_145_14",
-    "text": "Power Hungry V+"
-  },
   "60cabddb": {
     "key": "GEEN_057_01",
     "text": "Skill Sealed Resistance II"
@@ -1143,6 +1447,10 @@
     "key": "GEEN_158_23",
     "text": "Glass Cannon IV+"
   },
+  "61a1a299": {
+    "key": "GEEN_176_64",
+    "text": "Thunderwolf's Warpath"
+  },
   "621a2a97": {
     "key": "GEEN_115_64",
     "text": "Guardian's Warpath"
@@ -1151,6 +1459,10 @@
     "key": "GEEN_018_00",
     "text": "Concentrated Fire I"
   },
+  "62e18d53": {
+    "key": "GEEN_031_11",
+    "text": "Break Assassin II+"
+  },
   "62fed4f1": {
     "key": "GEEN_086_03",
     "text": "Slow Resistance IV"
@@ -1158,6 +1470,18 @@
   "630de5dd": {
     "key": "GEEN_013_14",
     "text": "Critical Damage V+"
+  },
+  "634f82cb": {
+    "key": "GEEN_324_20",
+    "text": "Celestial Aqua I+"
+  },
+  "64245ea7": {
+    "key": "GEEN_028_11",
+    "text": "Lucky Charge II+"
+  },
+  "64301e91": {
+    "key": "GEEN_177_91",
+    "text": "Enchantress's Blessing+"
   },
   "645acee5": {
     "key": "GEEN_126_54",
@@ -1179,9 +1503,21 @@
     "key": "GEEN_222_94",
     "text": "Potion Hoarder V+"
   },
+  "65f0420a": {
+    "key": "GEEN_302_00",
+    "text": "In a Pinch"
+  },
+  "661b4d50": {
+    "key": "GEEN_006_11",
+    "text": "Stamina II+"
+  },
   "6674c639": {
     "key": "GEEN_131_64",
     "text": "Crimson's Warpath"
+  },
+  "66cb28ba": {
+    "key": "GEEN_301_10",
+    "text": "Immortal Shell+"
   },
   "66f1b128": {
     "key": "GEEN_129_93",
@@ -1247,6 +1583,14 @@
     "key": "GEEN_156_04",
     "text": "Potent Greens"
   },
+  "6b8224eb": {
+    "key": "GEEN_030_20",
+    "text": "Overdrive Assassin I+"
+  },
+  "6b920da2": {
+    "key": "GEEN_174_64",
+    "text": "Bladequeen's Warpath"
+  },
   "6ba991cd": {
     "key": "GEEN_079_00",
     "text": "Fast Learner I"
@@ -1255,9 +1599,17 @@
     "key": "GEEN_088_03",
     "text": "Blight Resistance IV"
   },
-  "6c85983c": {
-    "key": "GEEN_144_14",
-    "text": "Stronghold V+"
+  "6c788459": {
+    "key": "GEEN_000_11",
+    "text": "Attack Power II+"
+  },
+  "6c788db7": {
+    "key": "GEEN_110_10",
+    "text": "Life on the Line I+"
+  },
+  "6c943387": {
+    "key": "GEEN_005_11",
+    "text": "Enmity II+"
   },
   "6cca1ff7": {
     "key": "GEEN_128_92",
@@ -1266,6 +1618,10 @@
   "6d18e7dc": {
     "key": "GEEN_116_54",
     "text": "Helmsman's Tenacity"
+  },
+  "6def71c8": {
+    "key": "GEEN_064_10",
+    "text": "Dodge Payback I+"
   },
   "6ec9d6bb": {
     "key": "GEEN_028_23",
@@ -1286,6 +1642,10 @@
   "6fd12e61": {
     "key": "GEEN_070_24",
     "text": "Cascade V+"
+  },
+  "6ffc5452": {
+    "key": "GEEN_003_20",
+    "text": "Critical Hit Rate I+"
   },
   "70336d00": {
     "key": "GEEN_069_00",
@@ -1311,9 +1671,17 @@
     "key": "GEEN_061_23",
     "text": "Guard Payback IV+"
   },
+  "71b2da28": {
+    "key": "GEEN_017_21",
+    "text": "Combo Finisher II+"
+  },
   "71ff966a": {
     "key": "GEEN_024_12",
     "text": "Combo Booster III+"
+  },
+  "72118f86": {
+    "key": "GEEN_144_20",
+    "text": "Stronghold I+"
   },
   "72304799": {
     "key": "GEEN_119_54",
@@ -1339,6 +1707,10 @@
     "key": "GEEN_057_03",
     "text": "Skill Sealed Resistance IV"
   },
+  "72c5a23d": {
+    "key": "GEEN_320_02",
+    "text": "Celestial Nyx III"
+  },
   "72cba710": {
     "key": "GEEN_051_04",
     "text": "Sandtomb Resistance V"
@@ -1347,25 +1719,33 @@
     "key": "GEEN_152_22",
     "text": "Less Is More III+"
   },
+  "7300a967": {
+    "key": "GEEN_321_04",
+    "text": "Celestial Lumen V"
+  },
   "735769a7": {
     "key": "GEEN_069_01",
     "text": "Quick Cooldown II"
-  },
-  "73b77d4f": {
-    "key": "GEEN_168_03",
-    "text": "Enhanced Damage IV"
   },
   "73e5554f": {
     "key": "GEEN_036_00",
     "text": "Garrison I"
   },
-  "7428df74": {
-    "key": "GEEN_154_12",
-    "text": "Berserker III+"
+  "73f80160": {
+    "key": "GEEN_113_04",
+    "text": "Sigil Booster V"
+  },
+  "74061b0c": {
+    "key": "GEEN_323_24",
+    "text": "Celestial Incendo V+"
   },
   "7461bd6d": {
     "key": "GEEN_147_01",
     "text": "Path to Mastery II"
+  },
+  "74eedc99": {
+    "key": "GEEN_320_01",
+    "text": "Celestial Nyx II"
   },
   "751228a2": {
     "key": "GEEN_006_02",
@@ -1403,6 +1783,10 @@
     "key": "GEEN_078_01",
     "text": "Provoke II"
   },
+  "76786869": {
+    "key": "GEEN_302_10",
+    "text": "In a Pinch+"
+  },
   "76c7eb69": {
     "key": "GEEN_060_01",
     "text": "Improved Guard II"
@@ -1426,6 +1810,10 @@
   "77803875": {
     "key": "GEEN_012_02",
     "text": "Throw III"
+  },
+  "77fae8c2": {
+    "key": "GEEN_020_11",
+    "text": "Damage Cap II+"
   },
   "7885354a": {
     "key": "GEEN_077_01",
@@ -1455,21 +1843,41 @@
     "key": "GEEN_027_00",
     "text": "Tyranny I"
   },
-  "7a74e84c": {
-    "key": "GEEN_144_13",
-    "text": "Stronghold IV+"
+  "7a06c7fb": {
+    "key": "GEEN_177_04",
+    "text": "Enchantress's Blessing"
+  },
+  "7a65b8fb": {
+    "key": "GEEN_322_20",
+    "text": "Celestial Terra I+"
   },
   "7aa335b6": {
     "key": "GEEN_024_04",
     "text": "Combo Booster V"
   },
+  "7ac9dc94": {
+    "key": "GEEN_327_03",
+    "text": "Divergence IV"
+  },
   "7aebef91": {
     "key": "GEEN_012_00",
     "text": "Throw I"
   },
+  "7b4aab30": {
+    "key": "GEEN_327_24",
+    "text": "Divergence V+"
+  },
   "7b8c3e06": {
     "key": "GEEN_158_03",
     "text": "Glass Cannon IV"
+  },
+  "7b9bb801": {
+    "key": "GEEN_113_03",
+    "text": "Sigil Booster IV"
+  },
+  "7c5b7fae": {
+    "key": "GEEN_110_20",
+    "text": "Life on the Line I+"
   },
   "7c7ec053": {
     "key": "GEEN_118_64",
@@ -1490,6 +1898,14 @@
   "7d8ff2ee": {
     "key": "GEEN_094_02",
     "text": "Steady Focus III"
+  },
+  "7d9c105c": {
+    "key": "GEEN_006_20",
+    "text": "Stamina I+"
+  },
+  "7dc9da30": {
+    "key": "GEEN_323_21",
+    "text": "Celestial Incendo II+"
   },
   "7dea157b": {
     "key": "GEEN_073_04",
@@ -1515,6 +1931,10 @@
     "key": "GEEN_013_12",
     "text": "Critical Damage III+"
   },
+  "7f4f38ef": {
+    "key": "GEEN_326_03",
+    "text": "Celestial Ventus IV"
+  },
   "7f5dda19": {
     "key": "GEEN_004_23",
     "text": "Stun Power IV+"
@@ -1527,6 +1947,10 @@
     "key": "GEEN_088_02",
     "text": "Blight Resistance III"
   },
+  "7fccef02": {
+    "key": "GEEN_145_21",
+    "text": "Power Hungry II+"
+  },
   "803f64bd": {
     "key": "GEEN_132_54",
     "text": "Ebony's Poise"
@@ -1538,6 +1962,10 @@
   "80a6dd30": {
     "key": "GEEN_145_00",
     "text": "Power Hungry I"
+  },
+  "80ca66ed": {
+    "key": "GEEN_100_04",
+    "text": "Supplements V"
   },
   "80cccd83": {
     "key": "GEEN_129_54",
@@ -1554,6 +1982,10 @@
   "81742849": {
     "key": "GEEN_144_03",
     "text": "Stronghold IV"
+  },
+  "81b3962d": {
+    "key": "GEEN_326_22",
+    "text": "Celestial Ventus III+"
   },
   "81cb6c6b": {
     "key": "GEEN_106_03",
@@ -1591,13 +2023,21 @@
     "key": "GEEN_164_00",
     "text": "Crabmiration"
   },
-  "83111a4b": {
-    "key": "GEEN_168_01",
-    "text": "Enhanced Damage II"
+  "83b5463b": {
+    "key": "GEEN_326_00",
+    "text": "Celestial Ventus I"
   },
   "83e5006e": {
     "key": "GEEN_154_24",
     "text": "Berserker V+"
+  },
+  "83e94b0c": {
+    "key": "GEEN_009_21",
+    "text": "Linked Together II+"
+  },
+  "840c419a": {
+    "key": "GEEN_322_00",
+    "text": "Celestial Terra I"
   },
   "842abbeb": {
     "key": "GEEN_012_03",
@@ -1619,13 +2059,29 @@
     "key": "GEEN_121_91",
     "text": "White Dragon's Oath+"
   },
+  "85e85d91": {
+    "key": "GEEN_325_01",
+    "text": "Fatebreaker II"
+  },
   "867effed": {
     "key": "GEEN_000_22",
     "text": "Attack Power III+"
   },
+  "86e38bab": {
+    "key": "GEEN_028_10",
+    "text": "Lucky Charge I+"
+  },
   "872d3af9": {
     "key": "GEEN_171_54",
     "text": "Dark Huntress's Surge"
+  },
+  "87658a6f": {
+    "key": "GEEN_322_04",
+    "text": "Celestial Terra V"
+  },
+  "88131731": {
+    "key": "GEEN_303_10",
+    "text": "Sumo Force+"
   },
   "883380d4": {
     "key": "GEEN_072_04",
@@ -1634,6 +2090,10 @@
   "8856f755": {
     "key": "GEEN_111_01",
     "text": "Quick Charge II"
+  },
+  "895abbf6": {
+    "key": "GEEN_173_90",
+    "text": "Gladiator's Awakening+"
   },
   "89ca4db0": {
     "key": "GEEN_001_13",
@@ -1659,6 +2119,10 @@
     "key": "GEEN_154_02",
     "text": "Berserker III"
   },
+  "8b105fc8": {
+    "key": "GEEN_152_21",
+    "text": "Less Is More II+"
+  },
   "8b647510": {
     "key": "GEEN_003_13",
     "text": "Critical Hit Rate IV+"
@@ -1667,13 +2131,29 @@
     "key": "GEEN_061_02",
     "text": "Guard Payback III"
   },
-  "8bf28309": {
-    "key": "GEEN_168_23",
-    "text": "Enhanced Damage IV+"
+  "8b6c67f0": {
+    "key": "GEEN_020_20",
+    "text": "Damage Cap I+"
+  },
+  "8b8085c0": {
+    "key": "GEEN_320_24",
+    "text": "Celestial Nyx V+"
+  },
+  "8b9c3d0f": {
+    "key": "GEEN_322_23",
+    "text": "Celestial Terra IV+"
+  },
+  "8c4688e2": {
+    "key": "GEEN_009_10",
+    "text": "Linked Together I+"
   },
   "8ca7d9c1": {
     "key": "GEEN_012_14",
     "text": "Throw V+"
+  },
+  "8ce18579": {
+    "key": "GEEN_324_04",
+    "text": "Celestial Aqua V"
   },
   "8d639e0c": {
     "key": "GEEN_080_01",
@@ -1703,13 +2183,37 @@
     "key": "GEEN_018_03",
     "text": "Concentrated Fire IV"
   },
+  "8f2ffe00": {
+    "key": "GEEN_003_10",
+    "text": "Critical Hit Rate I+"
+  },
+  "8f519293": {
+    "key": "GEEN_320_21",
+    "text": "Celestial Nyx II+"
+  },
+  "8ff568f7": {
+    "key": "GEEN_322_02",
+    "text": "Celestial Terra III"
+  },
+  "90176d85": {
+    "key": "GEEN_321_03",
+    "text": "Celestial Lumen IV"
+  },
   "905c6d7f": {
     "key": "GEEN_024_00",
     "text": "Combo Booster I"
   },
+  "908d5612": {
+    "key": "GEEN_327_22",
+    "text": "Divergence III+"
+  },
   "909a3aeb": {
     "key": "GEEN_027_01",
     "text": "Tyranny II"
+  },
+  "90e42e35": {
+    "key": "GEEN_321_22",
+    "text": "Celestial Lumen III+"
   },
   "90fbb4bf": {
     "key": "GEEN_068_01",
@@ -1722,6 +2226,10 @@
   "9172d000": {
     "key": "GEEN_001_22",
     "text": "Health III+"
+  },
+  "9184f37b": {
+    "key": "GEEN_174_04",
+    "text": "Bladequeen's Serenade"
   },
   "91956b39": {
     "key": "GEEN_111_24",
@@ -1751,9 +2259,17 @@
     "key": "GEEN_000_13",
     "text": "Attack Power IV+"
   },
+  "92373af9": {
+    "key": "GEEN_009_11",
+    "text": "Linked Together II+"
+  },
   "92b2d85f": {
     "key": "GEEN_078_00",
     "text": "Provoke I"
+  },
+  "9300fadb": {
+    "key": "GEEN_326_24",
+    "text": "Celestial Ventus V+"
   },
   "936dfe00": {
     "key": "GEEN_114_54",
@@ -1783,9 +2299,25 @@
     "key": "GEEN_145_02",
     "text": "Power Hungry III"
   },
+  "94dc820e": {
+    "key": "GEEN_178_54",
+    "text": "The Black's Impulse"
+  },
+  "94dd2628": {
+    "key": "GEEN_083_20",
+    "text": "Skilled Assault I+"
+  },
   "94f7053c": {
     "key": "GEEN_014_12",
     "text": "Exploiter III+"
+  },
+  "9503691b": {
+    "key": "GEEN_018_20",
+    "text": "Concentrated Fire I+"
+  },
+  "9558f543": {
+    "key": "GEEN_325_21",
+    "text": "Fatebreaker II+"
   },
   "958588f6": {
     "key": "GEEN_087_03",
@@ -1807,9 +2339,17 @@
     "key": "GEEN_067_24",
     "text": "Drain V+"
   },
+  "95cc3cb8": {
+    "key": "GEEN_175_90",
+    "text": "Ultramarine's Awakening+"
+  },
   "961b274c": {
     "key": "GEEN_003_23",
     "text": "Critical Hit Rate IV+"
+  },
+  "96390ecf": {
+    "key": "GEEN_323_02",
+    "text": "Celestial Incendo III"
   },
   "96434c8d": {
     "key": "GEEN_046_01",
@@ -1819,13 +2359,21 @@
     "key": "GEEN_073_03",
     "text": "Potion Hoarder IV"
   },
+  "96c069d8": {
+    "key": "GEEN_020_21",
+    "text": "Damage Cap II+"
+  },
+  "96d6fe5e": {
+    "key": "GEEN_174_92",
+    "text": "Bladequeen's Circuit+"
+  },
   "978255ef": {
     "key": "GEEN_060_00",
     "text": "Improved Guard I"
   },
-  "97cf485d": {
-    "key": "GEEN_151_94",
-    "text": "Potent Greens+"
+  "97927f50": {
+    "key": "GEEN_153_21",
+    "text": "Head Start II+"
   },
   "9814e19b": {
     "key": "GEEN_012_22",
@@ -1867,6 +2415,14 @@
     "key": "GEEN_130_93",
     "text": "Versalis Heart+"
   },
+  "99194505": {
+    "key": "GEEN_176_54",
+    "text": "Thunderwolf's Acuity"
+  },
+  "9978c657": {
+    "key": "GEEN_178_04",
+    "text": "The Black's Mark"
+  },
   "99a4b2a7": {
     "key": "GEEN_080_00",
     "text": "Rupie Tycoon I"
@@ -1886,6 +2442,10 @@
   "9a753e01": {
     "key": "GEEN_028_04",
     "text": "Lucky Charge V"
+  },
+  "9abd2da5": {
+    "key": "GEEN_178_93",
+    "text": "The Black's Warpath+"
   },
   "9ada3e00": {
     "key": "GEEN_115_90",
@@ -1910,6 +2470,14 @@
   "9cb98cc1": {
     "key": "GEEN_036_02",
     "text": "Garrison III"
+  },
+  "9cbbcf0f": {
+    "key": "GEEN_326_20",
+    "text": "Celestial Ventus I+"
+  },
+  "9cd340a8": {
+    "key": "GEEN_325_20",
+    "text": "Fatebreaker I+"
   },
   "9d3093ae": {
     "key": "GEEN_013_24",
@@ -1947,6 +2515,10 @@
     "key": "GEEN_213_94",
     "text": "Improved Guard V+"
   },
+  "9ec6c56d": {
+    "key": "GEEN_175_91",
+    "text": "Ultramarine's Flash+"
+  },
   "9f08f697": {
     "key": "GEEN_116_91",
     "text": "Helmsman's Navigation+"
@@ -1963,6 +2535,14 @@
     "key": "GEEN_029_04",
     "text": "Injury to Insult V"
   },
+  "9ff30620": {
+    "key": "GEEN_064_21",
+    "text": "Dodge Payback II+"
+  },
+  "a07bdc96": {
+    "key": "GEEN_018_10",
+    "text": "Concentrated Fire I+"
+  },
   "a0f94f69": {
     "key": "GEEN_125_91",
     "text": "Holy Knight's Luster+"
@@ -1975,9 +2555,9 @@
     "key": "GEEN_061_04",
     "text": "Guard Payback V"
   },
-  "a1448db8": {
-    "key": "GEEN_144_12",
-    "text": "Stronghold III+"
+  "a14ba9ce": {
+    "key": "GEEN_326_01",
+    "text": "Celestial Ventus II"
   },
   "a1c947c2": {
     "key": "GEEN_020_23",
@@ -2059,9 +2639,17 @@
     "key": "GEEN_000_02",
     "text": "Attack Power III"
   },
+  "a6aac25f": {
+    "key": "GEEN_325_23",
+    "text": "Fatebreaker IV+"
+  },
   "a6ee588a": {
     "key": "GEEN_001_00",
     "text": "Health I"
+  },
+  "a6f5982e": {
+    "key": "GEEN_000_21",
+    "text": "Attack Power II+"
   },
   "a70daf5a": {
     "key": "GEEN_110_00",
@@ -2079,9 +2667,13 @@
     "key": "GEEN_065_01",
     "text": "Improved Healing II"
   },
-  "a7f84c3b": {
-    "key": "GEEN_159_14",
-    "text": "Flight over Fight+"
+  "a8533ce3": {
+    "key": "GEEN_327_04",
+    "text": "Divergence V"
+  },
+  "a86b5418": {
+    "key": "GEEN_158_21",
+    "text": "Glass Cannon II+"
   },
   "a879208f": {
     "key": "GEEN_127_92",
@@ -2090,6 +2682,10 @@
   "a89c98c9": {
     "key": "GEEN_024_14",
     "text": "Combo Booster V+"
+  },
+  "a8a0cbff": {
+    "key": "GEEN_178_90",
+    "text": "The Black's Awakening+"
   },
   "a8c67937": {
     "key": "GEEN_111_12",
@@ -2107,6 +2703,14 @@
     "key": "GEEN_006_22",
     "text": "Stamina III+"
   },
+  "a99085f7": {
+    "key": "GEEN_323_01",
+    "text": "Celestial Incendo II"
+  },
+  "a99e6b1a": {
+    "key": "GEEN_100_02",
+    "text": "Supplements III"
+  },
   "a9d804d4": {
     "key": "GEEN_130_64",
     "text": "Versalis Heart"
@@ -2123,6 +2727,10 @@
     "key": "GEEN_110_01",
     "text": "Life on the Line II"
   },
+  "aaab893b": {
+    "key": "GEEN_111_11",
+    "text": "Quick Charge II+"
+  },
   "aac7a219": {
     "key": "GEEN_151_03",
     "text": "Supplementary Damage IV"
@@ -2135,9 +2743,17 @@
     "key": "GEEN_124_90",
     "text": "Dragonslayer's Awakening+"
   },
+  "abaefe36": {
+    "key": "GEEN_324_23",
+    "text": "Celestial Aqua IV+"
+  },
   "abc07972": {
     "key": "GEEN_027_22",
     "text": "Tyranny III+"
+  },
+  "abf24655": {
+    "key": "GEEN_322_01",
+    "text": "Celestial Terra II"
   },
   "abfa79f2": {
     "key": "GEEN_133_02",
@@ -2155,13 +2771,17 @@
     "key": "GEEN_047_04",
     "text": "Burn Resistance V"
   },
-  "aca7fb5a": {
-    "key": "GEEN_168_00",
-    "text": "Enhanced Damage"
-  },
   "ad0a2ae1": {
     "key": "GEEN_070_01",
     "text": "Cascade II"
+  },
+  "ad2e0751": {
+    "key": "GEEN_017_10",
+    "text": "Combo Finisher I+"
+  },
+  "ad341007": {
+    "key": "GEEN_020_10",
+    "text": "Damage Cap I+"
   },
   "ad8caefb": {
     "key": "GEEN_171_93",
@@ -2199,6 +2819,10 @@
     "key": "GEEN_130_90",
     "text": "Versalis Soul+"
   },
+  "b0207b68": {
+    "key": "GEEN_153_20",
+    "text": "Head Start I+"
+  },
   "b0634504": {
     "key": "GEEN_171_64",
     "text": "Dark Huntress's Warpath"
@@ -2222,6 +2846,10 @@
   "b143dae6": {
     "key": "GEEN_127_91",
     "text": "Butterfly's Grace+"
+  },
+  "b1683add": {
+    "key": "GEEN_173_54",
+    "text": "Gladiator's Top"
   },
   "b17c7207": {
     "key": "GEEN_083_13",
@@ -2247,6 +2875,14 @@
     "key": "GEEN_125_54",
     "text": "Holy Knight's Grandeur"
   },
+  "b2420cbe": {
+    "key": "GEEN_326_02",
+    "text": "Celestial Ventus III"
+  },
+  "b289a9ad": {
+    "key": "GEEN_303_00",
+    "text": "Sumo Force"
+  },
   "b2b08f0d": {
     "key": "GEEN_077_02",
     "text": "Low Profile III"
@@ -2259,9 +2895,17 @@
     "key": "GEEN_069_03",
     "text": "Quick Cooldown IV"
   },
+  "b2dee2b6": {
+    "key": "GEEN_111_10",
+    "text": "Quick Charge I+"
+  },
   "b3ab43f3": {
     "key": "GEEN_132_93",
     "text": "Ebony's Warpath+"
+  },
+  "b3c0c93d": {
+    "key": "GEEN_321_01",
+    "text": "Celestial Lumen II"
   },
   "b441275d": {
     "key": "GEEN_120_90",
@@ -2271,9 +2915,9 @@
     "key": "GEEN_012_24",
     "text": "Throw V+"
   },
-  "b5170056": {
-    "key": "GEEN_168_24",
-    "text": "Enhanced Damage V+"
+  "b4ece7bc": {
+    "key": "GEEN_175_64",
+    "text": "Ultramarine's Warpath"
   },
   "b570d9ca": {
     "key": "GEEN_013_00",
@@ -2286,6 +2930,10 @@
   "b5b23f02": {
     "key": "GEEN_001_14",
     "text": "Health V+"
+  },
+  "b5d4581f": {
+    "key": "GEEN_083_21",
+    "text": "Skilled Assault II+"
   },
   "b5da3e80": {
     "key": "GEEN_121_92",
@@ -2306,6 +2954,14 @@
   "b694cdd6": {
     "key": "GEEN_158_01",
     "text": "Glass Cannon II"
+  },
+  "b6ada175": {
+    "key": "GEEN_001_10",
+    "text": "Health I+"
+  },
+  "b6e74772": {
+    "key": "GEEN_024_20",
+    "text": "Combo Booster I+"
   },
   "b71df666": {
     "key": "GEEN_086_00",
@@ -2335,6 +2991,14 @@
     "key": "GEEN_072_01",
     "text": "Uplift II"
   },
+  "b87b2777": {
+    "key": "GEEN_013_11",
+    "text": "Critical Damage II+"
+  },
+  "b87c64c5": {
+    "key": "GEEN_005_10",
+    "text": "Enmity I+"
+  },
   "b8a811ed": {
     "key": "GEEN_080_04",
     "text": "Rupie Tycoon V"
@@ -2343,17 +3007,25 @@
     "key": "GEEN_172_90",
     "text": "Supreme Primarch's Awakening+"
   },
+  "b9060498": {
+    "key": "GEEN_029_10",
+    "text": "Injury to Insult I+"
+  },
+  "b98343cd": {
+    "key": "GEEN_326_21",
+    "text": "Celestial Ventus II+"
+  },
   "b98a0f22": {
     "key": "GEEN_130_91",
     "text": "Versalis Foundation+"
   },
+  "ba28c81c": {
+    "key": "GEEN_177_92",
+    "text": "Enchantress's Rhythm+"
+  },
   "ba77b7f2": {
     "key": "GEEN_045_04",
     "text": "Guts V"
-  },
-  "ba8a0229": {
-    "key": "GEEN_152_13",
-    "text": "Less Is More IV+"
   },
   "bb86ef75": {
     "key": "GEEN_018_23",
@@ -2370,6 +3042,10 @@
   "bc445153": {
     "key": "GEEN_009_14",
     "text": "Linked Together V+"
+  },
+  "bc4a3c09": {
+    "key": "GEEN_018_11",
+    "text": "Concentrated Fire II+"
   },
   "bc53ce24": {
     "key": "GEEN_116_93",
@@ -2391,6 +3067,14 @@
     "key": "GEEN_006_03",
     "text": "Stamina IV"
   },
+  "bd8ba705": {
+    "key": "GEEN_327_02",
+    "text": "Divergence III"
+  },
+  "bda8ed0d": {
+    "key": "GEEN_061_21",
+    "text": "Guard Payback II+"
+  },
   "bdcc9a89": {
     "key": "GEEN_115_54",
     "text": "Guardian's Honor"
@@ -2403,6 +3087,10 @@
     "key": "GEEN_000_04",
     "text": "Attack Power V"
   },
+  "be4c13a6": {
+    "key": "GEEN_173_04",
+    "text": "Gladiator's Frenzy"
+  },
   "be6b6288": {
     "key": "GEEN_153_24",
     "text": "Head Start V+"
@@ -2410,10 +3098,6 @@
   "be799271": {
     "key": "GEEN_066_03",
     "text": "Regen IV"
-  },
-  "be8caf15": {
-    "key": "GEEN_158_12",
-    "text": "Glass Cannon III+"
   },
   "bf4d978a": {
     "key": "GEEN_111_00",
@@ -2450,6 +3134,10 @@
   "c0c92d64": {
     "key": "GEEN_083_23",
     "text": "Skilled Assault IV+"
+  },
+  "c122758c": {
+    "key": "GEEN_322_21",
+    "text": "Celestial Terra II+"
   },
   "c1377955": {
     "key": "GEEN_077_00",
@@ -2515,17 +3203,25 @@
     "key": "GEEN_009_02",
     "text": "Linked Together III"
   },
+  "c6b0616d": {
+    "key": "GEEN_004_21",
+    "text": "Stun Power II+"
+  },
   "c6b1bbe6": {
     "key": "GEEN_020_00",
     "text": "Damage Cap I"
   },
-  "c6b50fea": {
-    "key": "GEEN_168_22",
-    "text": "Enhanced Damage III+"
-  },
   "c6e71d09": {
     "key": "GEEN_111_13",
     "text": "Quick Charge IV+"
+  },
+  "c77aa05d": {
+    "key": "GEEN_006_21",
+    "text": "Stamina II+"
+  },
+  "c79bd47f": {
+    "key": "GEEN_027_10",
+    "text": "Tyranny I+"
   },
   "c7d124dd": {
     "key": "GEEN_073_02",
@@ -2547,6 +3243,10 @@
     "key": "GEEN_172_04",
     "text": "Supreme Primarch's Awe"
   },
+  "ca227740": {
+    "key": "GEEN_320_20",
+    "text": "Celestial Nyx I+"
+  },
   "caae3f9c": {
     "key": "GEEN_118_93",
     "text": "Veteran's Warpath+"
@@ -2559,6 +3259,10 @@
     "key": "GEEN_018_01",
     "text": "Concentrated Fire II"
   },
+  "cbe5dc36": {
+    "key": "GEEN_012_11",
+    "text": "Throw II+"
+  },
   "cc29955a": {
     "key": "GEEN_077_03",
     "text": "Low Profile IV"
@@ -2566,6 +3270,10 @@
   "cc5db833": {
     "key": "GEEN_008_02",
     "text": "Charged Attack III"
+  },
+  "cc7dde55": {
+    "key": "GEEN_323_00",
+    "text": "Celestial Incendo I"
   },
   "ccd29b2b": {
     "key": "GEEN_086_04",
@@ -2575,13 +3283,21 @@
     "key": "GEEN_172_64",
     "text": "Supreme Primarch's Warpath"
   },
+  "cd357780": {
+    "key": "GEEN_113_01",
+    "text": "Sigil Booster II"
+  },
   "cd4b83c7": {
     "key": "GEEN_136_04",
     "text": "Held Under Resistance V"
   },
-  "cdfeb37e": {
-    "key": "GEEN_153_13",
-    "text": "Head Start IV+"
+  "cd6bb486": {
+    "key": "GEEN_320_00",
+    "text": "Celestial Nyx I"
+  },
+  "cd77d1aa": {
+    "key": "GEEN_024_21",
+    "text": "Combo Booster II+"
   },
   "ce16d68b": {
     "key": "GEEN_128_90",
@@ -2615,6 +3331,10 @@
     "key": "GEEN_070_00",
     "text": "Cascade I"
   },
+  "d135e07d": {
+    "key": "GEEN_001_21",
+    "text": "Health II+"
+  },
   "d14aa754": {
     "key": "GEEN_029_12",
     "text": "Injury to Insult III+"
@@ -2630,6 +3350,14 @@
   "d2740e3b": {
     "key": "GEEN_055_00",
     "text": "Paralysis Resistance I"
+  },
+  "d28011a6": {
+    "key": "GEEN_324_03",
+    "text": "Celestial Aqua IV"
+  },
+  "d29cd8e0": {
+    "key": "GEEN_322_24",
+    "text": "Celestial Terra V+"
   },
   "d3071d85": {
     "key": "GEEN_137_24",
@@ -2667,6 +3395,10 @@
     "key": "GEEN_009_12",
     "text": "Linked Together III+"
   },
+  "d4117ff3": {
+    "key": "GEEN_175_92",
+    "text": "Ultramarine's Adversity+"
+  },
   "d42a2d77": {
     "key": "GEEN_109_00",
     "text": "Precise Wrath I"
@@ -2687,6 +3419,10 @@
     "key": "GEEN_087_02",
     "text": "Firm Stance III"
   },
+  "d4cb7d87": {
+    "key": "GEEN_061_11",
+    "text": "Guard Payback II+"
+  },
   "d4ebb836": {
     "key": "GEEN_144_24",
     "text": "Stronghold V+"
@@ -2695,9 +3431,21 @@
     "key": "GEEN_001_23",
     "text": "Health IV+"
   },
+  "d594d945": {
+    "key": "GEEN_175_04",
+    "text": "Ultramarine's Flash"
+  },
+  "d59e112b": {
+    "key": "GEEN_028_20",
+    "text": "Lucky Charge I+"
+  },
   "d5a23569": {
     "key": "GEEN_086_01",
     "text": "Slow Resistance II"
+  },
+  "d5b71062": {
+    "key": "GEEN_158_20",
+    "text": "Glass Cannon I+"
   },
   "d5ca277f": {
     "key": "GEEN_009_23",
@@ -2719,6 +3467,14 @@
     "key": "GEEN_060_04",
     "text": "Improved Guard V"
   },
+  "d6cdd98e": {
+    "key": "GEEN_017_11",
+    "text": "Combo Finisher II+"
+  },
+  "d77a4a3f": {
+    "key": "GEEN_110_11",
+    "text": "Life on the Line II+"
+  },
   "d77efbc6": {
     "key": "GEEN_046_02",
     "text": "Poison Resistance III"
@@ -2731,9 +3487,21 @@
     "key": "GEEN_052_01",
     "text": "Glaciate Resistance II"
   },
+  "d8a464f1": {
+    "key": "GEEN_174_90",
+    "text": "Bladequeen's Awakening+"
+  },
+  "d8c61507": {
+    "key": "GEEN_176_93",
+    "text": "Thunderwolf's Warpath+"
+  },
   "d8d6b380": {
     "key": "GEEN_045_01",
     "text": "Guts II"
+  },
+  "d9215e48": {
+    "key": "GEEN_014_21",
+    "text": "Exploiter II+"
   },
   "d959a6d2": {
     "key": "GEEN_017_02",
@@ -2747,6 +3515,10 @@
     "key": "GEEN_146_04",
     "text": "War Elemental"
   },
+  "db05a865": {
+    "key": "GEEN_177_64",
+    "text": "Enchantress's Warpath"
+  },
   "dbe503c7": {
     "key": "GEEN_171_92",
     "text": "Dark Huntress's Surge+"
@@ -2759,6 +3531,10 @@
     "key": "GEEN_030_14",
     "text": "Overdrive Assassin V+"
   },
+  "dce00ddb": {
+    "key": "GEEN_325_02",
+    "text": "Fatebreaker III"
+  },
   "dd12001e": {
     "key": "GEEN_096_02",
     "text": "Steel Nerves III"
@@ -2770,6 +3546,10 @@
   "dd5eff28": {
     "key": "GEEN_094_03",
     "text": "Steady Focus IV"
+  },
+  "ddbd7013": {
+    "key": "GEEN_014_20",
+    "text": "Exploiter I+"
   },
   "ded4e384": {
     "key": "GEEN_144_04",
@@ -2811,9 +3591,17 @@
     "key": "GEEN_083_03",
     "text": "Skilled Assault IV"
   },
+  "e14e1598": {
+    "key": "GEEN_324_24",
+    "text": "Celestial Aqua V+"
+  },
   "e16e4dd4": {
     "key": "GEEN_004_04",
     "text": "Stun Power V"
+  },
+  "e18cc78f": {
+    "key": "GEEN_327_00",
+    "text": "Divergence I"
   },
   "e19b1965": {
     "key": "GEEN_121_90",
@@ -2847,9 +3635,21 @@
     "key": "GEEN_013_04",
     "text": "Critical Damage V"
   },
+  "e3cd2935": {
+    "key": "GEEN_175_54",
+    "text": "Ultramarine's Adversity"
+  },
+  "e3ff2e6a": {
+    "key": "GEEN_152_20",
+    "text": "Less Is More I+"
+  },
   "e405aca0": {
     "key": "GEEN_107_02",
     "text": "Precise Resilience III"
+  },
+  "e4815918": {
+    "key": "GEEN_325_03",
+    "text": "Fatebreaker IV"
   },
   "e496d882": {
     "key": "GEEN_120_93",
@@ -2875,13 +3675,13 @@
     "key": "GEEN_045_03",
     "text": "Guts IV"
   },
-  "e546f899": {
-    "key": "GEEN_157_14",
-    "text": "Roll of the Die+"
-  },
   "e570a041": {
     "key": "GEEN_121_64",
     "text": "White Dragon's Warpath"
+  },
+  "e58bc7db": {
+    "key": "GEEN_012_21",
+    "text": "Throw II+"
   },
   "e5b58127": {
     "key": "GEEN_080_02",
@@ -2903,6 +3703,10 @@
     "key": "GEEN_085_04",
     "text": "Aegis V"
   },
+  "e7279480": {
+    "key": "GEEN_154_20",
+    "text": "Berserker I+"
+  },
   "e7624711": {
     "key": "GEEN_126_91",
     "text": "Swordmaster's Prowess+"
@@ -2910,6 +3714,10 @@
   "e7643634": {
     "key": "GEEN_004_12",
     "text": "Stun Power III+"
+  },
+  "e8257487": {
+    "key": "GEEN_008_20",
+    "text": "Charged Attack I+"
   },
   "e8454459": {
     "key": "GEEN_006_24",
@@ -2963,6 +3771,10 @@
     "key": "GEEN_070_02",
     "text": "Cascade III"
   },
+  "eb766d87": {
+    "key": "GEEN_174_93",
+    "text": "Bladequeen's Warpath+"
+  },
   "ebc1fe90": {
     "key": "GEEN_144_00",
     "text": "Stronghold I"
@@ -2970,6 +3782,10 @@
   "ebcc193c": {
     "key": "GEEN_096_00",
     "text": "Steel Nerves I"
+  },
+  "ec9ffe77": {
+    "key": "GEEN_174_91",
+    "text": "Bladequeen's Serenade+"
   },
   "ecd324c7": {
     "key": "GEEN_094_04",
@@ -2995,13 +3811,25 @@
     "key": "GEEN_030_04",
     "text": "Overdrive Assassin V"
   },
+  "ef08f02c": {
+    "key": "GEEN_000_10",
+    "text": "Attack Power I+"
+  },
   "ef5d0d16": {
     "key": "GEEN_136_24",
     "text": "Held Under Resistance V+"
   },
+  "ef60ed89": {
+    "key": "GEEN_083_10",
+    "text": "Skilled Assault I+"
+  },
   "ef70ca76": {
     "key": "GEEN_052_24",
     "text": "Glaciate Resistance V+"
+  },
+  "efeff6d1": {
+    "key": "GEEN_027_21",
+    "text": "Tyranny II+"
   },
   "f04c2cdc": {
     "key": "GEEN_024_23",
@@ -3017,7 +3845,7 @@
   },
   "f12b5464": {
     "key": "GEEN_166_00",
-    "text": "Greater Aegis"
+    "text": "Greater Aegis I"
   },
   "f142a66c": {
     "key": "GEEN_067_03",
@@ -3031,6 +3859,10 @@
     "key": "GEEN_000_12",
     "text": "Attack Power III+"
   },
+  "f1b56e13": {
+    "key": "GEEN_151_20",
+    "text": "Supplementary Damage I+"
+  },
   "f1caffa6": {
     "key": "GEEN_145_24",
     "text": "Power Hungry V+"
@@ -3043,9 +3875,17 @@
     "key": "GEEN_029_23",
     "text": "Injury to Insult IV+"
   },
+  "f21404b1": {
+    "key": "GEEN_173_92",
+    "text": "Gladiator's Top+"
+  },
   "f22290a6": {
     "key": "GEEN_005_14",
     "text": "Enmity V+"
+  },
+  "f27d1b15": {
+    "key": "GEEN_100_03",
+    "text": "Supplements IV"
   },
   "f2c84d4f": {
     "key": "GEEN_103_04",
@@ -3055,13 +3895,13 @@
     "key": "GEEN_068_03",
     "text": "Autorevive IV"
   },
+  "f2e371d3": {
+    "key": "GEEN_030_10",
+    "text": "Overdrive Assassin I+"
+  },
   "f30a86f6": {
     "key": "GEEN_109_03",
     "text": "Precise Wrath IV"
-  },
-  "f3220fd0": {
-    "key": "GEEN_150_14",
-    "text": "Untouchable+"
   },
   "f3336835": {
     "key": "GEEN_159_04",
@@ -3070,6 +3910,10 @@
   "f3c8c676": {
     "key": "GEEN_055_02",
     "text": "Paralysis Resistance III"
+  },
+  "f3f24c7f": {
+    "key": "GEEN_030_11",
+    "text": "Overdrive Assassin II+"
   },
   "f40082d6": {
     "key": "GEEN_030_12",
@@ -3091,13 +3935,25 @@
     "key": "GEEN_064_01",
     "text": "Dodge Payback II"
   },
+  "f4dd8a6b": {
+    "key": "GEEN_004_20",
+    "text": "Stun Power I+"
+  },
   "f50a5fe2": {
     "key": "GEEN_085_00",
     "text": "Aegis I"
   },
+  "f5171ca2": {
+    "key": "GEEN_029_11",
+    "text": "Injury to Insult II+"
+  },
   "f610e3b9": {
     "key": "GEEN_110_24",
     "text": "Life on the Line V+"
+  },
+  "f650d741": {
+    "key": "GEEN_327_20",
+    "text": "Divergence I+"
   },
   "f687b1bb": {
     "key": "GEEN_005_04",
@@ -3131,10 +3987,6 @@
     "key": "GEEN_079_02",
     "text": "Fast Learner III"
   },
-  "f8cf8814": {
-    "key": "GEEN_152_14",
-    "text": "Less Is More V+"
-  },
   "f8fef304": {
     "key": "GEEN_141_04",
     "text": "Crabvestment Returns"
@@ -3142,6 +3994,14 @@
   "f94b6319": {
     "key": "GEEN_029_14",
     "text": "Injury to Insult V+"
+  },
+  "f94e0066": {
+    "key": "GEEN_320_22",
+    "text": "Celestial Nyx III+"
+  },
+  "f964a4ca": {
+    "key": "GEEN_176_91",
+    "text": "Thunderwolf's Recharge+"
   },
   "f9870ad0": {
     "key": "GEEN_020_12",
@@ -3199,13 +4059,29 @@
     "key": "GEEN_120_04",
     "text": "Phantasm's Concord"
   },
+  "fde6479f": {
+    "key": "GEEN_323_20",
+    "text": "Celestial Incendo I+"
+  },
+  "fe7f1552": {
+    "key": "GEEN_031_20",
+    "text": "Break Assassin I+"
+  },
   "feee9198": {
     "key": "GEEN_153_23",
     "text": "Head Start IV+"
   },
+  "ff28d126": {
+    "key": "GEEN_029_20",
+    "text": "Injury to Insult I+"
+  },
   "ff2cbcd0": {
     "key": "GEEN_077_24",
     "text": "Low Profile V+"
+  },
+  "ff4fd22d": {
+    "key": "GEEN_064_20",
+    "text": "Dodge Payback I+"
   },
   "ff580af6": {
     "key": "GEEN_118_04",

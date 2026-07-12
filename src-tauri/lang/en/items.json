@@ -7,13 +7,25 @@
     "key": "ITEM_16_0001",
     "text": "Demigod Feather"
   },
-  "035c056d": {
-    "key": "ITEM_28_0010",
-    "text": "Sequestration Wrightstone"
+  "0311b2de": {
+    "key": "ITEM_18_0003",
+    "text": "Sparks of the Apocalypse"
+  },
+  "03a19196": {
+    "key": "ITEM_16_0013",
+    "text": "Era Core"
+  },
+  "04c18eec": {
+    "key": "ITEM_31_0077",
+    "text": "Carnage Pulse Unit"
   },
   "050c5228": {
     "key": "ITEM_01_0033",
     "text": "Electromagnetic Sand"
+  },
+  "05474649": {
+    "key": "ITEM_19_0022",
+    "text": "Provenance Crystal"
   },
   "05d2cf79": {
     "key": "ITEM_22_0020",
@@ -27,29 +39,41 @@
     "key": "ITEM_31_0011",
     "text": "Bleak Armguard"
   },
+  "06c0d0a1": {
+    "key": "ITEM_70_0019",
+    "text": "Golden Albacore Statue"
+  },
+  "06e5185f": {
+    "key": "ITEM_23_0007",
+    "text": "Crewmate Card: Fediel"
+  },
+  "076a9f41": {
+    "key": "ITEM_70_0018",
+    "text": "Jet-Black Crab Statue"
+  },
   "09370a3a": {
     "key": "ITEM_21_0000",
     "text": "Knickknack Voucher"
+  },
+  "0943913b": {
+    "key": "ITEM_70_0024",
+    "text": "Sky Memory: The Girl in Blue"
   },
   "09c7a73e": {
     "key": "ITEM_01_0053",
     "text": "Bloomsword Hilt"
   },
-  "09e6f629": {
-    "key": "ITEM_25_0131",
-    "text": "Dread Wrightstone"
-  },
   "09f9339e": {
     "key": "ITEM_32_0056",
     "text": "Abyssal Horn"
   },
-  "0b8d0865": {
-    "key": "ITEM_27_9999",
-    "text": "Fortification Wrightstone"
+  "0e7cbc8e": {
+    "key": "ITEM_31_0033",
+    "text": "Majestic Beak"
   },
-  "0bd373a4": {
-    "key": "ITEM_28_0130",
-    "text": "Sequestration Wrightstone"
+  "0eb683cd": {
+    "key": "ITEM_15_0010",
+    "text": "Grand Refinium I"
   },
   "0f34eabc": {
     "key": "ITEM_32_0042",
@@ -71,10 +95,6 @@
     "key": "ITEM_16_0010",
     "text": "Protocol Fiber"
   },
-  "11a1b6b3": {
-    "key": "ITEM_25_0011",
-    "text": "Dread Wrightstone"
-  },
   "131a4636": {
     "key": "ITEM_50_0008",
     "text": "Iridescent Effigy Shell"
@@ -91,10 +111,6 @@
     "key": "ITEM_34_3000",
     "text": "Glittercrystal"
   },
-  "1544fb8a": {
-    "key": "ITEM_27_1001",
-    "text": "Fortification Wrightstone"
-  },
   "15c3f606": {
     "key": "ITEM_02_0052",
     "text": "Shining Orb"
@@ -103,13 +119,17 @@
     "key": "ITEM_04_0002",
     "text": "Sequestered Mane"
   },
-  "176436f3": {
-    "key": "ITEM_28_1002",
-    "text": "Sequestration Wrightstone"
+  "17f349ba": {
+    "key": "ITEM_31_0003",
+    "text": "Vile Demon Eye"
   },
   "181381e5": {
     "key": "ITEM_16_0004",
     "text": "Divinity Shackle"
+  },
+  "19871bf3": {
+    "key": "ITEM_31_0023",
+    "text": "Excoriation War Axe"
   },
   "19b187d7": {
     "key": "ITEM_28_0001",
@@ -122,6 +142,10 @@
   "1aa4382d": {
     "key": "ITEM_02_0012",
     "text": "Frost Orb"
+  },
+  "1c195d33": {
+    "key": "ITEM_14_0066",
+    "text": "Ragnite (Terminus)"
   },
   "1c67e865": {
     "key": "ITEM_01_0011",
@@ -139,9 +163,9 @@
     "key": "ITEM_18_0000",
     "text": "Dark Residue"
   },
-  "202a0db9": {
-    "key": "ITEM_28_0131",
-    "text": "Sequestration Wrightstone"
+  "1f4bae8c": {
+    "key": "ITEM_14_0064",
+    "text": "Ragnite (Stinger)"
   },
   "20612b0a": {
     "key": "ITEM_31_0020",
@@ -155,13 +179,13 @@
     "key": "ITEM_02_0041",
     "text": "Dark Orb"
   },
+  "20c742de": {
+    "key": "ITEM_14_0001",
+    "text": "Azurite Shard"
+  },
   "21b32140": {
     "key": "ITEM_31_0042",
     "text": "Landbeast Horn"
-  },
-  "21dad920": {
-    "key": "ITEM_26_9999",
-    "text": "Vitality Wrightstone"
   },
   "23c59c51": {
     "key": "ITEM_31_0075",
@@ -175,13 +199,21 @@
     "key": "ITEM_15_0003",
     "text": "Exceptional Refinium"
   },
-  "2492ecc9": {
-    "key": "ITEM_27_1002",
-    "text": "Fortification Wrightstone"
-  },
   "24df54ee": {
     "key": "ITEM_10_0003",
     "text": "Fortitude Crystal (L)"
+  },
+  "25165316": {
+    "key": "ITEM_16_0902",
+    "text": "Primeval Aquashade Node"
+  },
+  "25289584": {
+    "key": "ITEM_31_0043",
+    "text": "Landbeast Grimspike"
+  },
+  "2657283e": {
+    "key": "ITEM_35_3000",
+    "text": "Resonance Point"
   },
   "26fa7da3": {
     "key": "ITEM_01_0042",
@@ -199,17 +231,13 @@
     "key": "ITEM_50_0001",
     "text": "Beast Warding Stick"
   },
-  "2a2ea603": {
-    "key": "ITEM_25_0030",
-    "text": "Dread Wrightstone"
+  "2a5548a9": {
+    "key": "ITEM_31_0086",
+    "text": "Fool's Fractured Jaw"
   },
-  "2c8fa06c": {
-    "key": "ITEM_25_9999",
-    "text": "Dread Wrightstone"
-  },
-  "2cdfa192": {
-    "key": "ITEM_26_0012",
-    "text": "Vitality Wrightstone"
+  "2c0b5a82": {
+    "key": "ITEM_70_0021",
+    "text": "Sky Memory: Manifestation"
   },
   "2d007309": {
     "key": "ITEM_32_0070",
@@ -239,10 +267,6 @@
     "key": "ITEM_70_0016",
     "text": "Color Pack 4"
   },
-  "33e663d0": {
-    "key": "ITEM_26_0010",
-    "text": "Vitality Wrightstone"
-  },
   "354d4683": {
     "key": "ITEM_31_0060",
     "text": "Flamebeast Claw"
@@ -250,6 +274,14 @@
   "35c7fba0": {
     "key": "ITEM_23_0000",
     "text": "Crewmate Card"
+  },
+  "35f709e3": {
+    "key": "ITEM_06_0003",
+    "text": "Dreaded Temper Tail"
+  },
+  "381526a4": {
+    "key": "ITEM_31_0095",
+    "text": "Blood-Soaked Helm"
   },
   "38d2ecd0": {
     "key": "ITEM_02_0032",
@@ -267,14 +299,6 @@
     "key": "ITEM_32_0041",
     "text": "Wing of Portent"
   },
-  "3e0269bd": {
-    "key": "ITEM_26_0030",
-    "text": "Vitality Wrightstone"
-  },
-  "3ef6def5": {
-    "key": "ITEM_26_0130",
-    "text": "Vitality Wrightstone"
-  },
   "3f8f4efd": {
     "key": "ITEM_16_0002",
     "text": "Terror Urn"
@@ -283,9 +307,17 @@
     "key": "ITEM_30_0000",
     "text": "Mirage Munition"
   },
+  "41e4c8ce": {
+    "key": "ITEM_23_0006",
+    "text": "Crewmate Card: Fraux"
+  },
   "41e92f0a": {
     "key": "ITEM_16_0003",
     "text": "Reality Thorn"
+  },
+  "4249436e": {
+    "key": "ITEM_70_0026",
+    "text": "Sky Memory: Sundered God"
   },
   "4325ab79": {
     "key": "ITEM_14_0011",
@@ -303,17 +335,21 @@
     "key": "ITEM_06_0000",
     "text": "Vulkan Bolla Anima"
   },
+  "456d2bb3": {
+    "key": "ITEM_09_0003",
+    "text": "Mortido"
+  },
   "463abc2d": {
     "key": "ITEM_28_0000",
     "text": "Sequestration Wrightstone"
   },
-  "4ac30d94": {
-    "key": "ITEM_19_0003",
-    "text": "Curio"
+  "4a41482c": {
+    "key": "ITEM_03_0003",
+    "text": "Vitality Lush Hoof"
   },
-  "4be41ec1": {
-    "key": "ITEM_26_1003",
-    "text": "Vitality Wrightstone"
+  "4c21dc42": {
+    "key": "ITEM_09_0023",
+    "text": "Fellowship Fang"
   },
   "4c4caa77": {
     "key": "ITEM_06_0002",
@@ -322,14 +358,6 @@
   "4c9be4de": {
     "key": "ITEM_31_0062",
     "text": "Flamebeast Horn"
-  },
-  "4d16fcab": {
-    "key": "ITEM_27_0020",
-    "text": "Fortification Wrightstone"
-  },
-  "4e3989b8": {
-    "key": "ITEM_25_0012",
-    "text": "Dread Wrightstone"
   },
   "4f1e4c13": {
     "key": "ITEM_03_0001",
@@ -347,9 +375,25 @@
     "key": "ITEM_31_0041",
     "text": "Landbeast Plate"
   },
+  "537cb6d9": {
+    "key": "ITEM_14_0061",
+    "text": "Ragnite (Defender)"
+  },
+  "5392dee6": {
+    "key": "ITEM_16_0005",
+    "text": "Divine Blightplume"
+  },
+  "53a9d491": {
+    "key": "ITEM_16_0904",
+    "text": "Primeval Landslide Node"
+  },
   "541d3800": {
     "key": "ITEM_15_0001",
     "text": "Standard Refinium"
+  },
+  "54732298": {
+    "key": "ITEM_14_0065",
+    "text": "Ragnite (Executioner)"
   },
   "54fc643a": {
     "key": "ITEM_17_0000",
@@ -359,13 +403,9 @@
     "key": "ITEM_26_0000",
     "text": "Vitality Wrightstone"
   },
-  "559e221d": {
-    "key": "ITEM_26_1002",
-    "text": "Vitality Wrightstone"
-  },
-  "55d1b23f": {
-    "key": "ITEM_25_1003",
-    "text": "Dread Wrightstone"
+  "58fc9b99": {
+    "key": "ITEM_21_0001",
+    "text": "Transmarvel Voucher"
   },
   "5942c5fb": {
     "key": "ITEM_70_0005",
@@ -407,14 +447,6 @@
     "key": "ITEM_14_0050",
     "text": "Revenant Medallion"
   },
-  "60fd93bd": {
-    "key": "ITEM_27_0030",
-    "text": "Fortification Wrightstone"
-  },
-  "6198f427": {
-    "key": "ITEM_19_0002",
-    "text": "Curio"
-  },
   "644536df": {
     "key": "ITEM_10_0001",
     "text": "Fortitude Crystal (S)"
@@ -426,6 +458,18 @@
   "648cda74": {
     "key": "ITEM_11_0001",
     "text": "Silver Spellbook"
+  },
+  "64a63fbc": {
+    "key": "ITEM_15_0012",
+    "text": "Grand Refinium III"
+  },
+  "65063e17": {
+    "key": "ITEM_14_0076",
+    "text": "Mythic Artifact"
+  },
+  "654fa095": {
+    "key": "ITEM_14_0063",
+    "text": "Ragnite (Ascension)"
   },
   "659230f4": {
     "key": "ITEM_14_0051",
@@ -439,25 +483,37 @@
     "key": "ITEM_31_0032",
     "text": "Giant Beak"
   },
-  "667ee1d3": {
-    "key": "ITEM_27_0131",
-    "text": "Fortification Wrightstone"
-  },
   "67e3f274": {
     "key": "ITEM_32_0030",
     "text": "Tayu'itar Head Unit"
+  },
+  "6837efc6": {
+    "key": "ITEM_31_0013",
+    "text": "Extinction War Axe"
+  },
+  "686f12ad": {
+    "key": "ITEM_16_0903",
+    "text": "Primeval Galewing Node"
   },
   "687733c4": {
     "key": "ITEM_10_0000",
     "text": "Fortitude Shard"
   },
-  "68b1ae43": {
-    "key": "ITEM_26_0020",
-    "text": "Vitality Wrightstone"
+  "68bafc37": {
+    "key": "ITEM_16_0105",
+    "text": "Forgotten Azureplume"
+  },
+  "68eadaa9": {
+    "key": "ITEM_35_2000",
+    "text": "Conflux Point"
   },
   "68ff3a08": {
     "key": "ITEM_31_0022",
     "text": "Searing War Axe"
+  },
+  "695ea716": {
+    "key": "ITEM_31_0063",
+    "text": "Flamebeast Grimspike"
   },
   "6b4e2182": {
     "key": "ITEM_09_0001",
@@ -467,9 +523,17 @@
     "key": "ITEM_02_0051",
     "text": "Light Orb"
   },
+  "6c375d99": {
+    "key": "ITEM_70_0020",
+    "text": "Sky Memory: Infinitesimal and Infinite"
+  },
   "6d876fab": {
     "key": "ITEM_32_0051",
     "text": "Crimson Horn"
+  },
+  "6e13e372": {
+    "key": "ITEM_09_0013",
+    "text": "Silver Wolf Trefoil"
   },
   "6e49a111": {
     "key": "ITEM_01_0063",
@@ -479,9 +543,9 @@
     "key": "ITEM_14_0021",
     "text": "Supreme Merit"
   },
-  "71173866": {
-    "key": "ITEM_26_0131",
-    "text": "Vitality Wrightstone"
+  "6f38afe1": {
+    "key": "ITEM_19_0010",
+    "text": "World Idean"
   },
   "71bc9232": {
     "key": "ITEM_70_0006",
@@ -495,17 +559,25 @@
     "key": "ITEM_03_0002",
     "text": "Vitality Hoof"
   },
+  "7388fe67": {
+    "key": "ITEM_33_0002",
+    "text": "Sephira Luster"
+  },
+  "74201317": {
+    "key": "ITEM_70_0027",
+    "text": "Sky Memory: Rebirthed Genesis"
+  },
   "745fd287": {
     "key": "ITEM_32_0054",
     "text": "Typhoon Horn"
   },
+  "7500c5d9": {
+    "key": "ITEM_31_0053",
+    "text": "Frostbeast Grimspike"
+  },
   "759850ca": {
     "key": "ITEM_01_0041",
     "text": "Salamander Egg"
-  },
-  "76079579": {
-    "key": "ITEM_19_0004",
-    "text": "Curio"
   },
   "771d9272": {
     "key": "ITEM_70_0009",
@@ -543,10 +615,6 @@
     "key": "ITEM_70_0015",
     "text": "Color Pack 3"
   },
-  "7a1cf760": {
-    "key": "ITEM_28_0020",
-    "text": "Sequestration Wrightstone"
-  },
   "7b600740": {
     "key": "ITEM_17_0001",
     "text": "Nihilla-Cast Sword"
@@ -571,10 +639,6 @@
     "key": "ITEM_04_0000",
     "text": "Managarmr Anima"
   },
-  "817a2cc1": {
-    "key": "ITEM_27_0011",
-    "text": "Fortification Wrightstone"
-  },
   "81bf605c": {
     "key": "ITEM_14_0031",
     "text": "Silver Dalia Badge"
@@ -587,9 +651,17 @@
     "key": "ITEM_32_0053",
     "text": "Terra Horn"
   },
+  "831f31ff": {
+    "key": "ITEM_16_0007",
+    "text": "Sown Emptiness"
+  },
   "8572b2ce": {
     "key": "ITEM_23_0001",
     "text": "Crewmate Card: Seofon"
+  },
+  "85f40d79": {
+    "key": "ITEM_19_0012",
+    "text": "Chaotic Signum"
   },
   "8682c2ac": {
     "key": "ITEM_80_0001",
@@ -599,9 +671,25 @@
     "key": "ITEM_80_0002",
     "text": "Whitewing Key"
   },
+  "86fb2ee1": {
+    "key": "ITEM_14_0062",
+    "text": "Ragnite (Stunner)"
+  },
   "8816adc5": {
     "key": "ITEM_14_0010",
     "text": "Prism Chip"
+  },
+  "882f94a7": {
+    "key": "ITEM_22_0062",
+    "text": "Primordial Light"
+  },
+  "89406db0": {
+    "key": "ITEM_22_0042",
+    "text": "Primordial Earth"
+  },
+  "8a08f64e": {
+    "key": "ITEM_19_0013",
+    "text": "Auroral Signum"
   },
   "8b75e58a": {
     "key": "ITEM_02_0011",
@@ -611,17 +699,17 @@
     "key": "ITEM_31_0012",
     "text": "Frosty War Axe"
   },
-  "8c44f0ab": {
-    "key": "ITEM_28_0030",
-    "text": "Sequestration Wrightstone"
+  "8bf58697": {
+    "key": "ITEM_90_0001",
+    "text": "Wings from the Boundary"
   },
-  "8d101b82": {
-    "key": "ITEM_25_1002",
-    "text": "Dread Wrightstone"
+  "8c4fc319": {
+    "key": "ITEM_14_0074",
+    "text": "Chaos Refinium"
   },
-  "8db0b117": {
-    "key": "ITEM_28_9999",
-    "text": "Sequestration Wrightstone"
+  "8d888638": {
+    "key": "ITEM_09_0030",
+    "text": "Blue-Sky Spirit"
   },
   "8e1cb52d": {
     "key": "ITEM_02_0020",
@@ -675,9 +763,9 @@
     "key": "ITEM_02_0000",
     "text": "Wind Shard"
   },
-  "95bf2c6f": {
-    "key": "ITEM_26_0011",
-    "text": "Vitality Wrightstone"
+  "96a00c42": {
+    "key": "ITEM_70_0022",
+    "text": "Sky Memory: Love's Legacy"
   },
   "9738c87a": {
     "key": "ITEM_14_0020",
@@ -686,6 +774,10 @@
   "981c29bd": {
     "key": "ITEM_70_0011",
     "text": "Evergreen Crystal Fragment"
+  },
+  "98cdb46f": {
+    "key": "ITEM_15_0011",
+    "text": "Grand Refinium II"
   },
   "98e75fcb": {
     "key": "ITEM_22_0061",
@@ -702,6 +794,10 @@
   "99f44080": {
     "key": "ITEM_31_0081",
     "text": "Golem Rockjaw"
+  },
+  "9a3dc719": {
+    "key": "ITEM_09_0050",
+    "text": "Blue-Sky Flare"
   },
   "9b442642": {
     "key": "ITEM_12_0000",
@@ -735,17 +831,21 @@
     "key": "ITEM_22_0070",
     "text": "Black Dragon Scale"
   },
+  "9fba96d1": {
+    "key": "ITEM_60_0001",
+    "text": "Dark Wee Pincer"
+  },
   "9fc6585e": {
     "key": "ITEM_50_0009",
     "text": "Midnight Sun's Amber"
   },
-  "a062b3e4": {
-    "key": "ITEM_26_1000",
-    "text": "Vitality Wrightstone"
+  "a1ead2c2": {
+    "key": "ITEM_22_0052",
+    "text": "Primordial Wind"
   },
-  "a23f4f46": {
-    "key": "ITEM_27_0010",
-    "text": "Fortification Wrightstone"
+  "a2452b7c": {
+    "key": "ITEM_22_0032",
+    "text": "Primordial Water"
   },
   "a7c72f41": {
     "key": "ITEM_34_1000",
@@ -755,25 +855,9 @@
     "key": "ITEM_13_0002",
     "text": "Blue Potion"
   },
-  "a90975b8": {
-    "key": "ITEM_25_1000",
-    "text": "Dread Wrightstone"
-  },
   "a9cbb5af": {
     "key": "ITEM_18_0002",
     "text": "Canaan Whitebloom"
-  },
-  "aa4626f6": {
-    "key": "ITEM_25_0020",
-    "text": "Dread Wrightstone"
-  },
-  "aab4c91a": {
-    "key": "ITEM_28_0012",
-    "text": "Sequestration Wrightstone"
-  },
-  "aae10c28": {
-    "key": "ITEM_25_0010",
-    "text": "Dread Wrightstone"
   },
   "aba63a29": {
     "key": "ITEM_02_0040",
@@ -783,9 +867,13 @@
     "key": "ITEM_11_0002",
     "text": "Gold Spellbook"
   },
-  "ad9737a9": {
-    "key": "ITEM_27_1000",
-    "text": "Fortification Wrightstone"
+  "adffe24e": {
+    "key": "ITEM_32_0046",
+    "text": "Bestial Ritual Stone"
+  },
+  "b0782428": {
+    "key": "ITEM_04_0003",
+    "text": "Sequestered Flood Mane"
   },
   "b2045655": {
     "key": "ITEM_14_0000",
@@ -799,10 +887,6 @@
     "key": "ITEM_09_0021",
     "text": "Maglielle Anamnesis"
   },
-  "b5eeea35": {
-    "key": "ITEM_50_0011",
-    "text": "Evergreen Crystal Fragment"
-  },
   "b763e7ac": {
     "key": "ITEM_31_0071",
     "text": "Condemnation Saw"
@@ -811,17 +895,9 @@
     "key": "ITEM_02_0030",
     "text": "Fire Shard"
   },
-  "b79139fb": {
-    "key": "ITEM_26_1001",
-    "text": "Vitality Wrightstone"
-  },
   "b83b6b1d": {
     "key": "ITEM_31_0010",
     "text": "Bleak Bone"
-  },
-  "ba78c0b2": {
-    "key": "ITEM_27_0012",
-    "text": "Fortification Wrightstone"
   },
   "ba799e24": {
     "key": "ITEM_05_0002",
@@ -839,13 +915,9 @@
     "key": "ITEM_05_0000",
     "text": "Excavallion Anima"
   },
-  "bcdbc4b6": {
-    "key": "ITEM_25_0130",
-    "text": "Dread Wrightstone"
-  },
-  "be6124ad": {
-    "key": "ITEM_27_0130",
-    "text": "Fortification Wrightstone"
+  "bdbf43ee": {
+    "key": "ITEM_32_0044",
+    "text": "Spiteband of Lament"
   },
   "bee8897d": {
     "key": "ITEM_22_0000",
@@ -855,6 +927,10 @@
     "key": "ITEM_32_0040",
     "text": "Death Nail"
   },
+  "c043bac9": {
+    "key": "ITEM_14_0023",
+    "text": "Daybreak Merit"
+  },
   "c05ca6a1": {
     "key": "ITEM_09_0000",
     "text": "Protector's Pride"
@@ -862,6 +938,10 @@
   "c1481583": {
     "key": "ITEM_25_0001",
     "text": "Dread Wrightstone"
+  },
+  "c1563862": {
+    "key": "ITEM_16_0106",
+    "text": "Divinity's Crimsonplume"
   },
   "c1dcb7ae": {
     "key": "ITEM_32_0081",
@@ -887,9 +967,21 @@
     "key": "ITEM_31_0074",
     "text": "Swivel Cannon"
   },
+  "c57a5fe9": {
+    "key": "ITEM_70_0025",
+    "text": "Sky Memory: Divided Skies"
+  },
   "c783f39d": {
     "key": "ITEM_09_0010",
     "text": "Alpha Wolf's Valor"
+  },
+  "c83f9e36": {
+    "key": "ITEM_22_0072",
+    "text": "Primordial Darkness"
+  },
+  "c93e2fdd": {
+    "key": "ITEM_90_0000",
+    "text": "Child of Darkness and Flames"
   },
   "c96755a7": {
     "key": "ITEM_31_0040",
@@ -923,6 +1015,22 @@
     "key": "ITEM_50_0010",
     "text": "Desert Oil"
   },
+  "cf24b2f6": {
+    "key": "ITEM_90_0002",
+    "text": "Colossus of Fortification"
+  },
+  "d0f04d9f": {
+    "key": "ITEM_22_0022",
+    "text": "Primordial Fire"
+  },
+  "d11baafc": {
+    "key": "ITEM_70_0028",
+    "text": "Concept Art Color Pack"
+  },
+  "d147a1ba": {
+    "key": "ITEM_19_0020",
+    "text": "Abyssal Wings"
+  },
   "d15091d9": {
     "key": "ITEM_03_0000",
     "text": "Furycane Anima"
@@ -935,10 +1043,6 @@
     "key": "ITEM_70_0012",
     "text": "Veil Armet"
   },
-  "d2c1330f": {
-    "key": "ITEM_28_1000",
-    "text": "Sequestration Wrightstone"
-  },
   "d465046a": {
     "key": "ITEM_31_0070",
     "text": "Mythril Wheel"
@@ -946,6 +1050,10 @@
   "d47f792a": {
     "key": "ITEM_31_0000",
     "text": "Bizarre Wing"
+  },
+  "d4ee7fc3": {
+    "key": "ITEM_31_0085",
+    "text": "Blood Ruby"
   },
   "d5af421a": {
     "key": "ITEM_31_0080",
@@ -995,6 +1103,10 @@
     "key": "ITEM_09_0020",
     "text": "Bladecaller's Gambit"
   },
+  "df713fa9": {
+    "key": "ITEM_16_0009",
+    "text": "Ultimate Memory"
+  },
   "e0937c5b": {
     "key": "ITEM_01_0020",
     "text": "Ice Spire"
@@ -1007,9 +1119,9 @@
     "key": "ITEM_11_0000",
     "text": "Copper Spellbook"
   },
-  "e3adb298": {
-    "key": "ITEM_25_1001",
-    "text": "Dread Wrightstone"
+  "e3abc397": {
+    "key": "ITEM_70_0023",
+    "text": "Sky Memory: The War"
   },
   "e4070e98": {
     "key": "ITEM_31_0002",
@@ -1039,6 +1151,10 @@
     "key": "ITEM_22_0050",
     "text": "Green Dragon Scale"
   },
+  "e8926145": {
+    "key": "ITEM_23_0005",
+    "text": "Crewmate Card: Maglielle"
+  },
   "e8c461ca": {
     "key": "ITEM_50_0004",
     "text": "Azure Gemstone"
@@ -1055,9 +1171,9 @@
     "key": "ITEM_01_0010",
     "text": "Charred Lumber"
   },
-  "eb9c99e5": {
-    "key": "ITEM_28_1001",
-    "text": "Sequestration Wrightstone"
+  "eb707ea7": {
+    "key": "ITEM_23_0004",
+    "text": "Crewmate Card: Gallanza"
   },
   "ed3b872d": {
     "key": "ITEM_07_0001",
@@ -1073,10 +1189,6 @@
   },
   "eeb19bec": {
     "key": "ITEM_27_0001",
-    "text": "Fortification Wrightstone"
-  },
-  "eed2f9d3": {
-    "key": "ITEM_27_1003",
     "text": "Fortification Wrightstone"
   },
   "eedfa4e4": {
@@ -1107,10 +1219,6 @@
     "key": "ITEM_70_0010",
     "text": "Rolan's Notes"
   },
-  "f6155395": {
-    "key": "ITEM_28_1003",
-    "text": "Sequestration Wrightstone"
-  },
   "f692f716": {
     "key": "ITEM_34_4000",
     "text": "Glittercrystal Cluster"
@@ -1118,6 +1226,18 @@
   "f6ee4068": {
     "key": "ITEM_02_0042",
     "text": "Abysm Orb"
+  },
+  "f74a6a4d": {
+    "key": "ITEM_32_1000",
+    "text": "Fan-Fave Crown"
+  },
+  "f7dc6ed9": {
+    "key": "ITEM_19_0023",
+    "text": "Hexachrome Quartz"
+  },
+  "f7f9a658": {
+    "key": "ITEM_31_0078",
+    "text": "Sinister Prongs"
   },
   "f82726d9": {
     "key": "ITEM_31_0061",
@@ -1131,10 +1251,6 @@
     "key": "ITEM_22_0030",
     "text": "Blue Dragon Scale"
   },
-  "f9d46ad2": {
-    "key": "ITEM_28_0011",
-    "text": "Sequestration Wrightstone"
-  },
   "fa674fbd": {
     "key": "ITEM_70_0004",
     "text": "Rolan's Transceiver"
@@ -1142,6 +1258,14 @@
   "fa737b89": {
     "key": "ITEM_02_0050",
     "text": "Light Shard"
+  },
+  "faf93bcc": {
+    "key": "ITEM_22_0121",
+    "text": "Blaze of the Wedges"
+  },
+  "fd1dc09a": {
+    "key": "ITEM_16_0901",
+    "text": "Primeval Firestorm Node"
   },
   "fe52f7cb": {
     "key": "ITEM_23_0002",
