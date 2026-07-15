@@ -20,6 +20,11 @@ pub struct PlayerState {
     pub stun_per_second: f64,
     /// Number of hits by this player that reached the game's damage cap
     pub capped_hits: u32,
+    /// Number of hits that were subject to a damage cap at all — the denominator
+    /// for the cap percentage. Cap-less sources (supplementary damage, DoT) are
+    /// excluded so they can't dilute the percentage.
+    #[serde(default)]
+    pub cappable_hits: u32,
 }
 
 impl PlayerState {
@@ -72,6 +77,9 @@ impl PlayerState {
     }
 
     pub fn update_from_damage_event(&mut self, damage_instance: &AdjustedDamageInstance) {
+        if damage_instance.is_cappable {
+            self.cappable_hits += 1;
+        }
         if damage_instance.is_capped {
             self.capped_hits += 1;
         }
@@ -120,6 +128,18 @@ impl PlayerState {
         skill.update_from_damage_event(damage_instance);
         self.skill_breakdown.push(skill);
     }
+
+    /// Recount capped hits against newly-learned crit multipliers. Every damage
+    /// event increments the player counters and exactly one skill row, so the
+    /// player total is the sum of its skills.
+    pub fn reclassify_caps(&mut self, crit_multipliers: &[f64]) {
+        let mut capped = 0;
+        for skill in self.skill_breakdown.iter_mut() {
+            skill.reclassify_caps(crit_multipliers);
+            capped += skill.capped_hits;
+        }
+        self.capped_hits = capped;
+    }
 }
 
 #[cfg(test)]
@@ -141,6 +161,7 @@ mod tests {
             total_stun_value: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
+            cappable_hits: 0,
         };
 
         player_state.update_dps(1000, 0);
@@ -161,6 +182,7 @@ mod tests {
             total_stun_value: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
+            cappable_hits: 0,
         };
 
         let damage_event = DamageEvent {
@@ -207,6 +229,7 @@ mod tests {
             total_stun_value: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
+            cappable_hits: 0,
         };
 
         let damage_event = DamageEvent {
@@ -261,6 +284,7 @@ mod tests {
             stun_per_second: 0.0,
             total_stun_value: 0.0,
             capped_hits: 0,
+            cappable_hits: 0,
         };
 
         let skill_one = DamageEvent {
@@ -331,6 +355,7 @@ mod tests {
             stun_per_second: 0.0,
             total_stun_value: 0.0,
             capped_hits: 0,
+            cappable_hits: 0,
         };
 
         let parent_skill = DamageEvent {
@@ -407,6 +432,7 @@ mod tests {
             total_stun_value: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
+            cappable_hits: 0,
         };
 
         let damage_event = DamageEvent {
@@ -470,6 +496,7 @@ mod tests {
             total_stun_value: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
+            cappable_hits: 0,
         };
 
         let damage_event = DamageEvent {
@@ -560,6 +587,7 @@ mod tests {
             total_stun_value: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
+            cappable_hits: 0,
         };
 
         // Two capped hits on the same skill (exercises the early-return path),

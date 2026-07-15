@@ -17,9 +17,11 @@ static_detour! {
 // first stub, so the detour landed on mid-function garbage whose relocated instructions write
 // through the caller's RBP (silent stack corruption inside the hook). We fail safe by feeding a
 // never-matching sentinel to search_address, so setup returns Err and try_step logs the hook as
-// unavailable. Losing this hook only degrades meter auto-reset on area change (see parser
-// on_area_enter). Re-enable by re-deriving a true area-transition function entry (Ghidra/live
-// work) and restoring a real ON_ENTER_AREA_SIG.
+// unavailable. The between-quest boundary this hook used to provide is now emitted by
+// OnLoadQuestHook (quest.rs) on every non-Conflux quest load; what's still lost is the cut on
+// NON-quest transitions (e.g. quest -> town), which only matters for a failed/retired quest
+// followed by quitting the game before another quest load. Re-enable by re-deriving a true
+// area-transition function entry (Ghidra/live work) and restoring a real ON_ENTER_AREA_SIG.
 const ON_ENTER_AREA_SIG: &str = "cc cc cc cc cc cc cc cc DISABLED_v202_matches_hash_stubs";
 
 /// Handles tracking whenever the player enters a new area.

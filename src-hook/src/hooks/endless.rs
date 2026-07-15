@@ -54,12 +54,14 @@ const ON_ENDLESS_MGR_DTOR_SIG: &str =
 const QUEST_TYPE_ENDLESS_MODE: u32 = 8;
 
 /// Type-hash stamped at reception-flow+0x7c8 that identifies a `ReceptionEndlessModeFlow`.
-/// Used to detect the run-START edge (flow slot transitions INTO an EndlessMode flow).
-const ENDLESS_FLOW_TYPE: u32 = 0x887ae0b0;
+/// Used to detect the run-START edge (flow slot transitions INTO an EndlessMode flow), and
+/// by the quest-load hook (quest.rs) to suppress the between-quest boundary cut on Conflux
+/// room loads.
+pub(crate) const ENDLESS_FLOW_TYPE: u32 = 0x887ae0b0;
 
 /// Offset of the reception-flow type-hash within a flow object (`puVar5[0xf9]` in the
 /// dispatcher: 0xf9*8 = 0x7c8).
-const FLOW_TYPE_OFFSET: usize = 0x7c8;
+pub(crate) const FLOW_TYPE_OFFSET: usize = 0x7c8;
 
 /// Offset of the first ability/buff slot within an `ExPlayerEndlessModeBuff` (slots stride
 /// 0x80: +0xc0, +0x140, …). We emit the value at the first slot as the representative buff

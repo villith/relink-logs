@@ -80,9 +80,9 @@ export const SkillRow = ({ characterType, skill, color, nested }: SkillRowProps)
         )}
       </td>
       <td className="text-center row-data">
-        {skill.cappedHits > 0 ? (
+        {skill.cappedHits > 0 && skill.cappableHits > 0 ? (
           <span className="capped">
-            {((skill.cappedHits / skill.hits) * 100).toFixed(0)}
+            {((skill.cappedHits / skill.cappableHits) * 100).toFixed(0)}
             <span className="font-sm">%</span>
           </span>
         ) : (

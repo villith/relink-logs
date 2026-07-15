@@ -36,6 +36,18 @@ struct AlwaysOnTop(AtomicBool);
 struct ClickThrough(AtomicBool);
 struct DebugMode(AtomicBool);
 
+/// Sender half of the live parser's reset channel. `None` until a parser is
+/// connected; replaced on every reconnect (the parser is owned by the
+/// pipe-reading task, so commands reach it through this channel).
+struct ResetChannel(std::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<()>>>);
+
+#[tauri::command]
+fn reset_encounter(state: State<ResetChannel>) {
+    if let Some(tx) = state.0.lock().unwrap().as_ref() {
+        let _ = tx.send(());
+    }
+}
+
 #[tauri::command]
 fn set_debug_mode(app: AppHandle, state: State<DebugMode>, enabled: bool) {
     if let Some(window) = app.get_window("logs") {
@@ -479,6 +491,9 @@ fn connect_and_run_parser(app: AppHandle) {
     let database = db::connect_to_db().expect("Could not connect to database");
     let mut state = v1::Parser::new(app.clone(), window.clone(), database);
 
+    let (reset_tx, mut reset_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+    *app.state::<ResetChannel>().0.lock().unwrap() = Some(reset_tx);
+
     tauri::async_runtime::spawn(async move {
         loop {
             match RecvPipeStream::connect_by_path(protocol::PIPE_NAME).await {
@@ -490,7 +505,19 @@ fn connect_and_run_parser(app: AppHandle) {
                     let decoder = tokio_util::codec::LengthDelimitedCodec::new();
                     let mut reader = FramedRead::new(stream, decoder);
 
-                    while let Some(Ok(msg)) = reader.next().await {
+                    loop {
+                        let msg = tokio::select! {
+                            next = reader.next() => match next {
+                                Some(Ok(msg)) => msg,
+                                // Pipe closed or read error: the game is gone.
+                                _ => break,
+                            },
+                            Some(()) = reset_rx.recv() => {
+                                state.on_manual_reset();
+                                continue;
+                            }
+                        };
+
                         // Handle EOF when the game closes.
                         if msg.is_empty() {
                             break;
@@ -560,6 +587,11 @@ fn connect_and_run_parser(app: AppHandle) {
                     }
 
                     info!("Game has closed.");
+
+                    // Last chance to persist anything still in progress (abandoned quest →
+                    // quit emits no result screen; mid-quest/mid-run quit likewise) — this
+                    // parser instance is gone once we go back to waiting for the game.
+                    state.on_game_disconnect();
 
                     // The game has closed, so we should go back to waiting for the game to reopen.
                     let _ = app.emit_all("error-alert", "Game has closed!");
@@ -725,6 +757,7 @@ fn main() {
         .manage(AlwaysOnTop(AtomicBool::new(true)))
         .manage(ClickThrough(AtomicBool::new(false)))
         .manage(DebugMode(AtomicBool::new(false)))
+        .manage(ResetChannel(std::sync::Mutex::new(None)))
         .system_tray(system_tray_with_menu())
         .on_system_tray_event(menu_tray_handler)
         .on_window_event(|event| {
@@ -742,6 +775,7 @@ fn main() {
             toggle_always_on_top,
             export_damage_log_to_file,
             set_debug_mode,
+            reset_encounter,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.

@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     ffi::{c_void, CStr, CString},
     sync::{Mutex, OnceLock},
 };
@@ -264,39 +263,72 @@ struct StoredPlayerIdentity {
     is_online: bool,
 }
 
-/// Player identities keyed by their game player-key, plus a party-slot index so a
-/// slot's owner can be replaced (e.g. an offline placeholder giving way to the
-/// real remote player as an online lobby fills in).
+/// One party slot's identity, paired with the id its record most recently carried
+/// at [`PLAYER_KEY_OFFSET`].
+struct SlotIdentity {
+    id: u32,
+    identity: StoredPlayerIdentity,
+}
+
+/// Player identities keyed by PARTY SLOT — the game's own addressing for player
+/// records (they're fetched per slot 0..=3 internally).
+///
+/// v2.0.2: the id at record+0x5EA8 is RECYCLED, not a stable player key — the same
+/// value moves between players/slots, and even the local player's id changes
+/// between contexts within one session (confirmed live). So the id is only a
+/// transient correlator: it's matched at the instant a damage event arrives against
+/// the LATEST value each slot's record announced, and is never cached per actor.
+/// A stale pairing therefore cannot outlive the next identity refresh, which is
+/// what made names flip between players and stick wrong before.
 #[derive(Default)]
 struct IdentityStore {
-    by_key: HashMap<u32, StoredPlayerIdentity>,
-    active_key_by_party: HashMap<u8, u32>,
+    by_slot: [Option<SlotIdentity>; 4],
 }
 
 impl IdentityStore {
-    /// Records an identity for `player_key`. Returns true if this changed which
-    /// key owns the party slot (so cached actor→key mappings must be invalidated).
-    fn insert(&mut self, player_key: u32, identity: StoredPlayerIdentity) -> bool {
-        let party_index = identity.party_index;
-        let previous_key = self.active_key_by_party.insert(party_index, player_key);
-        if let Some(previous_key) = previous_key.filter(|key| *key != player_key) {
-            self.by_key.remove(&previous_key);
-        }
-        self.by_key.insert(player_key, identity);
+    /// Records that party slot `identity.party_index` currently carries `id`.
+    /// Latest claim wins: an id can belong to at most one slot at a time, so any
+    /// other slot still holding it is evicted.
+    fn claim(&mut self, id: u32, identity: StoredPlayerIdentity) {
+        let slot = identity.party_index.min(3) as usize;
 
-        previous_key != Some(player_key)
+        for (index, entry) in self.by_slot.iter_mut().enumerate() {
+            if index != slot && entry.as_ref().is_some_and(|e| e.id == id) {
+                #[cfg(feature = "hookdiag")]
+                log::info!("IDDIAG id {id:#010x} moved slot {index} -> {slot}");
+                *entry = None;
+            }
+        }
+
+        #[cfg(feature = "hookdiag")]
+        if let Some(previous) = &self.by_slot[slot] {
+            if previous.identity.display_name != identity.display_name || previous.id != id {
+                log::info!(
+                    "IDDIAG slot {slot} update {:?}/{:#010x} -> {:?}/{id:#010x}",
+                    previous.identity.display_name,
+                    previous.id,
+                    identity.display_name,
+                );
+            }
+        }
+
+        self.by_slot[slot] = Some(SlotIdentity { id, identity });
+    }
+
+    /// Finds the slot whose record most recently carried `id`.
+    fn find_by_id(&self, id: u32) -> Option<&StoredPlayerIdentity> {
+        self.by_slot
+            .iter()
+            .flatten()
+            .find(|entry| entry.id == id)
+            .map(|entry| &entry.identity)
     }
 }
 
 static IDENTITIES: OnceLock<Mutex<IdentityStore>> = OnceLock::new();
-static ACTOR_KEYS: OnceLock<Mutex<HashMap<usize, u32>>> = OnceLock::new();
 
 fn identities() -> &'static Mutex<IdentityStore> {
     IDENTITIES.get_or_init(|| Mutex::new(IdentityStore::default()))
-}
-
-fn actor_keys() -> &'static Mutex<HashMap<usize, u32>> {
-    ACTOR_KEYS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
 #[derive(Clone)]
@@ -348,19 +380,32 @@ impl OnLoadPlayerIdentityHook {
                 .read_unaligned()
         };
 
+        // v2.0.2 identity diagnosis: log every record refresh with its mode enum and id
+        // neighborhood. Ghidra shows record+0x5EAC is a small mode enum (0..=5) and
+        // +0x5EA8 an id the game itself re-resolves live — the mode is the missing piece
+        // to know WHICH records are authoritative. Guarded reads, hookdiag builds only.
+        #[cfg(feature = "hookdiag")]
+        log_identity_record(record, snapshot, player_key);
+
         if player_key == 0 || player_key == INVALID_PLAYER_KEY {
             return;
         }
 
-        let Some(identity) = (unsafe { read_player_identity(snapshot) }) else {
+        let Some(mut identity) = (unsafe { read_player_identity(snapshot) }) else {
             return;
         };
 
-        // Before an online party is fully populated, the game creates placeholder
-        // records for slots 1-3 using the local profile name. They are AI/offline
-        // slots, not real remote identities — don't let them shadow real players.
-        if !should_cache_identity(&identity) {
-            return;
+        // Offline non-slot-0 records are the AI companions (and, transiently, the
+        // pre-population placeholders of an online lobby). Their snapshot carries the
+        // LOCAL profile's name (confirmed live: all four records announce the local
+        // name with distinct keys), which is not the AI's own name — so cache them
+        // with the names BLANKED. This lets AI damage resolve to its party slot (the
+        // meter then shows "[N] <character>" instead of "[Guest] <character>"), while
+        // a real remote player joining the slot re-claims it with their real name on
+        // the next identity refresh (latest claim wins).
+        if is_ai_placeholder(&identity) {
+            identity.display_name = CString::new("").expect("empty CString is valid");
+            identity.character_name = CString::new("").expect("empty CString is valid");
         }
 
         #[cfg(feature = "console")]
@@ -371,35 +416,32 @@ impl OnLoadPlayerIdentityHook {
             identity.display_name.to_string_lossy()
         );
 
-        let mapping_changed = identities()
+        identities()
             .lock()
             .expect("identity map lock poisoned")
-            .insert(player_key, identity);
-
-        // Actor allocations get reused as a lobby swaps offline placeholders for
-        // the real online party. Force the next hit to re-read the actor's key
-        // after any slot mapping change so stale actor→key entries can't persist.
-        if mapping_changed {
-            actor_keys()
-                .lock()
-                .expect("actor key map lock poisoned")
-                .clear();
-        }
+            .claim(player_key, identity);
     }
 }
 
-/// Slot 0 is always the local player and is always kept. Any other slot is only a
-/// real player if it is flagged online — offline non-zero slots are placeholders.
-fn should_cache_identity(identity: &StoredPlayerIdentity) -> bool {
-    identity.party_index == 0 || identity.is_online
+/// Slot 0 is always the local player. Any other slot that is not flagged online is
+/// an AI companion (or a not-yet-populated lobby placeholder) whose snapshot name is
+/// the local profile's, not its own.
+fn is_ai_placeholder(identity: &StoredPlayerIdentity) -> bool {
+    identity.party_index != 0 && !identity.is_online
 }
 
 /// Resolves the concrete combat actor (as seen by the damage hook) to a cached
 /// identity, emitting a [`PlayerIdentityEvent`] if one is known.
 ///
-/// Returns `None` when the actor has no resolvable player-key or no identity has
-/// been cached for it yet (e.g. an NPC/enemy, or a player whose snapshot has not
-/// refreshed). Safe to call for every damage source.
+/// The actor's id is read FRESH on every call and matched against the latest id
+/// each party slot's record announced — deliberately no per-actor caching, because
+/// v2.0.2 ids are recycled between players/contexts and a cached pairing goes
+/// stale (that was the wrong/flip-flopping-names bug). One guarded 4-byte read per
+/// damage event is negligible.
+///
+/// Returns `None` when the actor has no resolvable player-key or no slot currently
+/// claims it (e.g. an NPC/enemy, or a player whose snapshot has not refreshed).
+/// Safe to call for every damage source.
 pub fn identity_event_for_actor(
     actor: *const usize,
     character_type: u32,
@@ -409,30 +451,53 @@ pub fn identity_event_for_actor(
         return None;
     }
 
+    #[cfg(feature = "hookdiag")]
     let actor_address = actor as usize;
-    let cached_key = actor_keys()
-        .lock()
-        .expect("actor key map lock poisoned")
-        .get(&actor_address)
-        .copied();
-
-    let player_key = match cached_key {
-        Some(player_key) => player_key,
-        None => {
-            let player_key = read_actor_player_key(actor)?;
-            actor_keys()
-                .lock()
-                .expect("actor key map lock poisoned")
-                .insert(actor_address, player_key);
-            player_key
+    let Some(player_key) = read_actor_player_key(actor) else {
+        // Bounded: log the first N actors whose key read comes back
+        // empty/sentinel so "player shows as [Guest]" cases are visible.
+        #[cfg(feature = "hookdiag")]
+        {
+            use std::sync::atomic::AtomicU32;
+            static N: AtomicU32 = AtomicU32::new(0);
+            if crate::hooks::diag::first_n(&N, 60) {
+                let raw =
+                    crate::hooks::diag::read_u32_guarded(actor_address, ACTOR_PLAYER_KEY_OFFSET);
+                log::info!(
+                    "IDDIAG actor={actor_address:#x} type={character_type:#010x} idx={actor_index} key read FAILED raw@1AB40={raw:#010x}"
+                );
+            }
         }
+        return None;
     };
+
+    // First sight of this actor: log the id pair around 0x1AB40 — Ghidra shows
+    // [+0x1AB40]=id passed to the record manager and [+0x1AB44] compared against
+    // the 0x887AE0B0 sentinel. Logging only; resolution never caches.
+    #[cfg(feature = "hookdiag")]
+    {
+        use std::collections::HashSet;
+        use std::sync::{Mutex as DiagMutex, OnceLock as DiagOnceLock};
+        static SEEN: DiagOnceLock<DiagMutex<HashSet<usize>>> = DiagOnceLock::new();
+        let seen = SEEN.get_or_init(|| DiagMutex::new(HashSet::new()));
+        let mut seen = seen.lock().expect("iddiag seen lock poisoned");
+        if seen.len() < 256 && seen.insert(actor_address) {
+            let k44 =
+                crate::hooks::diag::read_u32_guarded(actor_address, ACTOR_PLAYER_KEY_OFFSET + 4);
+            let k64 = crate::hooks::diag::read_u32_guarded(
+                actor_address,
+                ACTOR_PLAYER_KEY_OFFSET + 0x24,
+            );
+            log::info!(
+                "IDDIAG actor={actor_address:#x} type={character_type:#010x} idx={actor_index} id@1AB40={player_key:#010x} @1AB44={k44:#010x} @1AB64={k64:#010x}"
+            );
+        }
+    }
 
     let identity = identities()
         .lock()
         .expect("identity map lock poisoned")
-        .by_key
-        .get(&player_key)
+        .find_by_id(player_key)
         .cloned()?;
 
     Some(PlayerIdentityEvent {
@@ -510,4 +575,29 @@ unsafe fn read_player_identity(snapshot: *const u8) -> Option<StoredPlayerIdenti
         party_index: party_index as u8,
         is_online: is_online != 0,
     })
+}
+
+/// hookdiag: one line per RefreshPlayerIdentity fire — the record's mode enum
+/// (+0x5EAC, values 0..=5 per the v2.0.2 decompile of FUN_140a2b600), the id at
+/// +0x5EA8 the hook currently keys identities by, its u32 neighbors, and the
+/// snapshot's name/party/online. All reads guarded; never faults.
+#[cfg(feature = "hookdiag")]
+fn log_identity_record(record: *const usize, snapshot: *const u8, player_key: u32) {
+    use crate::hooks::diag::read_u32_guarded;
+
+    let base = record as usize;
+    let mode = read_u32_guarded(base, 0x5EAC);
+    let n_a4 = read_u32_guarded(base, 0x5EA4);
+    let n_b0 = read_u32_guarded(base, 0x5EB0);
+    let (name, party, online) = match unsafe { read_player_identity(snapshot) } {
+        Some(identity) => (
+            identity.display_name.to_string_lossy().into_owned(),
+            identity.party_index as i32,
+            identity.is_online as i32,
+        ),
+        None => ("<unreadable>".to_string(), -1, -1),
+    };
+    log::info!(
+        "IDDIAG record={base:#x} mode@5EAC={mode} id@5EA8={player_key:#010x} n@5EA4={n_a4:#010x} n@5EB0={n_b0:#010x} party={party} online={online} name={name}"
+    );
 }

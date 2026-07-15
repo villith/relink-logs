@@ -320,7 +320,12 @@ export const ViewPage = () => {
 
   const labels: Label = players.map((player) => {
     const partySlotIndex = playerData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-    const color = partySlotIndex !== -1 ? playerColors[partySlotIndex] : playerColors[player.partyIndex];
+    // Same rule as usePlayerRow: a filled slot's color belongs to its matched row;
+    // unmatched rows pick from the empty slots' colors first, then overflow, so
+    // colors 1-4 still get used without ever duplicating a matched row's color.
+    const freeColors = playerColors.filter((_, i) => i >= 4 || !playerData[i]);
+    const color =
+      partySlotIndex !== -1 ? playerColors[partySlotIndex] : freeColors[player.partyIndex % freeColors.length];
 
     return {
       name: translatedPlayerName(
@@ -335,7 +340,12 @@ export const ViewPage = () => {
     };
   });
 
-  const sbaLabels = labels.slice().filter((label) => label.partySlotIndex !== -1);
+  // Chart every actor that actually has SBA gauge data (AI companions have no
+  // playerData slot match, but their OnUpdateSBA events are recorded all the same).
+  const sbaLabels = labels.filter((_, index) => {
+    const player = players[index];
+    return player !== undefined && sbaChart[player.index] !== undefined;
+  });
 
   labels.push({
     name: "party",
@@ -404,7 +414,7 @@ export const ViewPage = () => {
               </Text>
             </Box>
           )}
-          {questId && roomIndex === null && (
+          {!!questId && roomIndex === null && (
             <Box display="flex">
               <Text size="sm" fw={800}>
                 {t("ui.logs.quest-name")}:
@@ -414,7 +424,7 @@ export const ViewPage = () => {
               </Text>
             </Box>
           )}
-          {questId && roomIndex === null && (
+          {!!questId && roomIndex === null && (
             <Box display="flex">
               <Text size="sm" fw={800}>
                 {t("ui.logs.quest-status")}:
@@ -440,7 +450,7 @@ export const ViewPage = () => {
               {millisecondsToElapsedFormat(encounter.endTime - encounter.startTime)}
             </Text>
           </Box>
-          {questTimer && roomIndex === null && (
+          {!!questTimer && roomIndex === null && (
             <Box display="flex">
               <Text size="sm" fw={800}>
                 {t("ui.logs.quest-elapsed-time")}:

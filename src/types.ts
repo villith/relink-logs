@@ -54,6 +54,8 @@ export type SkillState = {
   maxStunValue: number;
   /** Number of hits that reached the game's damage cap */
   cappedHits: number;
+  /** Number of hits that were subject to a damage cap at all (cap-less sources like supplementary damage excluded) */
+  cappableHits: number;
 };
 
 export type ComputedSkillState = SkillState & {
@@ -84,6 +86,8 @@ export type ComputedSkillGroup = {
   maxStunValue: number;
   /** Number of hits that reached the game's damage cap (summed over grouped skills) */
   cappedHits: number;
+  /** Number of cappable hits (summed over grouped skills) */
+  cappableHits: number;
 };
 
 export type PlayerState = {
@@ -107,6 +111,8 @@ export type PlayerState = {
   skillBreakdown: SkillState[];
   /** Number of hits by this player that reached the game's damage cap */
   cappedHits: number;
+  /** Number of hits by this player that were subject to a damage cap at all */
+  cappableHits: number;
 };
 
 export type ComputedPlayerState = PlayerState & {

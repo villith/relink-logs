@@ -27,6 +27,16 @@ pub struct SkillState {
     pub total_stun_value: f64,
     /// Number of hits that reached the game's damage cap for this skill
     pub capped_hits: u32,
+    /// Number of hits that were subject to a damage cap at all — the denominator
+    /// for the cap percentage (cap-less sources like supplementary damage excluded).
+    #[serde(default)]
+    pub cappable_hits: u32,
+    /// `(damage, cap)` of every cappable hit, kept so `capped_hits` can be
+    /// recounted once the encounter's crit multipliers are learned mid-run
+    /// (see `reclassify_caps`). Never serialized — it grows with hit count and
+    /// the frontend only needs the counters.
+    #[serde(skip)]
+    pub cappable_samples: Vec<(i32, i32)>,
 }
 
 impl SkillState {
@@ -41,10 +51,18 @@ impl SkillState {
             max_stun_value: 0.0,
             total_stun_value: 0.0,
             capped_hits: 0,
+            cappable_hits: 0,
+            cappable_samples: Vec::new(),
         }
     }
 
     pub fn update_from_damage_event(&mut self, damage_instance: &AdjustedDamageInstance) {
+        if damage_instance.is_cappable {
+            self.cappable_hits += 1;
+            if let Some(cap) = damage_instance.event.damage_cap {
+                self.cappable_samples.push((damage_instance.event.damage, cap));
+            }
+        }
         if damage_instance.is_capped {
             self.capped_hits += 1;
         }
@@ -64,6 +82,19 @@ impl SkillState {
         } else {
             self.max_damage = Some(damage_instance.event.damage as u64);
         }
+    }
+
+    /// Recount `capped_hits` against newly-learned crit multipliers (the live path
+    /// classifies hits with the simple rule as they arrive; this converges the
+    /// running counts to what a full crit-aware reparse would produce).
+    pub fn reclassify_caps(&mut self, crit_multipliers: &[f64]) {
+        self.capped_hits = self
+            .cappable_samples
+            .iter()
+            .filter(|(damage, cap)| {
+                super::cap_detection::is_capped(*damage, Some(*cap), crit_multipliers)
+            })
+            .count() as u32;
     }
 }
 
@@ -181,5 +212,28 @@ mod tests {
 
         assert_eq!(skill_state.hits, 5);
         assert_eq!(skill_state.capped_hits, 2);
+        // e1..e3 carried a real cap; e4 (no cap info) and e5 (zero cap) did not.
+        assert_eq!(skill_state.cappable_hits, 3);
+    }
+
+    #[test]
+    fn supplementary_damage_is_never_capped_nor_cappable() {
+        use crate::parser::v1::AdjustedDamageInstance;
+
+        let mut skill_state =
+            SkillState::new(ActionType::SupplementaryDamage(1), CharacterType::Pl0000);
+
+        // A supplementary event that recorded its trigger's cap (as old logs did):
+        // damage at the cap must NOT count as capped, and the hit must not count
+        // toward the cappable denominator either.
+        let mut event = make_event(22_999, Some(22_999));
+        event.action_id = ActionType::SupplementaryDamage(1);
+
+        skill_state
+            .update_from_damage_event(&AdjustedDamageInstance::from_damage_event(&event, None));
+
+        assert_eq!(skill_state.hits, 1);
+        assert_eq!(skill_state.capped_hits, 0);
+        assert_eq!(skill_state.cappable_hits, 0);
     }
 }

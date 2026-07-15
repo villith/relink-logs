@@ -3,6 +3,7 @@
     "successful-save": "Saved encounter to logs",
     "unsuccessful-save": "Failed to save encounter to logs: {{error}}",
     "on-area-enter": "Entered area..",
+    "session-reset": "Session reset",
     "on-pin-enabled": "Always on top: On",
     "on-pin-disabled": "Always on top: Off",
     "on-clickthrough-enabled": "Clickthrough: On",
@@ -97,7 +98,8 @@
       "sba-chart": "Skybound Arts Gauge",
       "quest-status": "Status",
       "overview": "Overview",
-      "equipment": "Equipment"
+      "equipment": "Equipment",
+      "ai-companion": "AI"
     }
   },
   "characters": {

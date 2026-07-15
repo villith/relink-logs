@@ -28,6 +28,30 @@ pub fn first_n(counter: &AtomicU32, n: u32) -> bool {
     counter.fetch_add(1, Ordering::Relaxed) < n
 }
 
+/// Per-key variant of `first_n`: true for the first `n` calls per distinct `key`
+/// (e.g. per target actor base), so one early actor can't burn the whole probe
+/// budget before the interesting one (a boss) ever appears. Tracks at most 64
+/// keys; calls with later keys return false. `try_lock` so a hook hot path can
+/// never block on (or cascade a poison from) another thread.
+#[allow(dead_code)] // unused in builds with no diagnostic feature enabled
+pub fn first_n_per_key(map: &std::sync::Mutex<Vec<(usize, u32)>>, key: usize, n: u32) -> bool {
+    let Ok(mut entries) = map.try_lock() else {
+        return false;
+    };
+    if let Some(entry) = entries.iter_mut().find(|e| e.0 == key) {
+        if entry.1 >= n {
+            return false;
+        }
+        entry.1 += 1;
+        true
+    } else if entries.len() < 64 {
+        entries.push((key, 1));
+        true
+    } else {
+        false
+    }
+}
+
 /// Log a labelled event with a timestamp and a formatted value string:
 /// `diag::ev!("sba_attempt", "a2={a2}")`. A macro (not a fn) so the `format!`
 /// arguments are never evaluated unless `hookdiag` is enabled — a no-op fn shim
@@ -117,45 +141,39 @@ pub fn log_callers_depth(label: &str, max: usize) {
     log::info!("HOOKDIAG t={} callers[{label}] rvas: {}", ms(), frames.join(" "));
 }
 
-/// Returns true only if `[addr, addr+len)` is committed, readable memory (guards every deref
-/// so the probe can NEVER fault the game). Uses VirtualQuery — a bad "plausible pointer" that
-/// points at unmapped/guard memory is rejected before we touch it.
+/// Returns true only if `[addr, addr+len)` is readable memory (guards every deref so the
+/// probe can NEVER fault the game). SEH-probed via `IsBadReadPtr`: kernel32 touches one
+/// byte per page in the span and catches any access violation internally, so a bad
+/// "plausible pointer" is rejected without an exception ever reaching our frame.
+///
+/// Deliberately NOT VirtualQuery: VirtualQuery takes the process address-space (VAD)
+/// lock, which the game's own allocator hammers while spawning actors. Measured on this
+/// machine: ~200 ns/call idle but ~7,900 ns/call under allocation churn, vs a flat ~2 ns
+/// for the SEH probe. At ~7 guarded reads per damage event that lock contention was the
+/// v1.9.2 in-combat slowdown (worst at combat start / new enemy waves, fading as
+/// spawning settles).
+///
+/// Caveat inherited from `IsBadReadPtr`: probing a PAGE_GUARD page reports "bad" but
+/// consumes the page's guard status. Our callers probe heap actor/flow structs, never
+/// stack addresses, so this doesn't arise in practice — do not point this at stacks.
 ///
 /// Compiled in all builds: the real Conflux emitters (endless.rs / quest.rs) use
 /// `read_u32_guarded` at runtime to read the reception-flow type-hash and buff ids,
 /// so this guard must exist without `hookdiag`.
 #[allow(dead_code)] // only reached via read_u32_guarded, which some builds don't call
 fn readable(addr: usize, len: usize) -> bool {
-    use windows::Win32::System::Memory::{
-        VirtualQuery, MEMORY_BASIC_INFORMATION, MEM_COMMIT, PAGE_GUARD, PAGE_NOACCESS,
-    };
-    if addr == 0 {
+    // Deprecated-but-ubiquitous kernel32 export; not exposed by the `windows` crate.
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn IsBadReadPtr(lp: *const std::ffi::c_void, ucb: usize) -> i32;
+    }
+    // Reject null and any addr+len that would wrap past the top of the address space
+    // (upholds the "can NEVER fault" contract for arbitrary inputs, not just the
+    // pre-filtered pointers today's callers pass).
+    if addr == 0 || addr.checked_add(len).is_none() {
         return false;
     }
-    let mut mbi = MEMORY_BASIC_INFORMATION::default();
-    let got = unsafe {
-        VirtualQuery(
-            Some(addr as *const _),
-            &mut mbi,
-            std::mem::size_of::<MEMORY_BASIC_INFORMATION>(),
-        )
-    };
-    if got == 0 || mbi.State != MEM_COMMIT {
-        return false;
-    }
-    // Reject no-access / guard pages.
-    if (mbi.Protect & (PAGE_NOACCESS | PAGE_GUARD)).0 != 0 {
-        return false;
-    }
-    // Ensure the whole [addr, addr+len) span stays within this committed region. Use checked
-    // arithmetic so an addr+len that would wrap past the top of the address space is rejected
-    // (upholds the "can NEVER fault" contract for arbitrary inputs, not just the pre-filtered
-    // pointers today's callers pass).
-    let region_end = (mbi.BaseAddress as usize).saturating_add(mbi.RegionSize);
-    match addr.checked_add(len) {
-        Some(end) => end <= region_end,
-        None => false,
-    }
+    unsafe { IsBadReadPtr(addr as *const _, len) == 0 }
 }
 
 /// Read a single `u32` at `base + offset`, returning 0 if `base` is null or the location
@@ -352,6 +370,69 @@ pub fn probe_u32_window_delta(label: &str, base: usize, len: usize) {
     }
 }
 
+/// Snapshot the f32 window `[base+start, base+start+len)` for [`log_f32_increases`].
+/// Unreadable slots become NAN so they can never masquerade as a delta. Guarded —
+/// can NEVER fault the game.
+///
+/// Perf: guard the WHOLE window with ONE VirtualQuery, not one per slot. This runs
+/// twice per sampled damage event; per-slot guarding was ~768 VirtualQuery syscalls
+/// per hit, which dropped the game to single-digit fps once the per-target budget
+/// made sampling sustained through combat (2026-07-15). Only if the single-region
+/// check fails (window straddles a region boundary) fall back to per-slot guarding.
+#[cfg(feature = "hookdiag")]
+pub fn snapshot_f32_window(base: usize, start: usize, len: usize) -> Vec<f32> {
+    let mut out = Vec::with_capacity(len / 4);
+    let win = base.wrapping_add(start);
+    if readable(win, len) {
+        let mut off = 0usize;
+        while off + 4 <= len {
+            out.push(unsafe { ((win + off) as *const f32).read_unaligned() });
+            off += 4;
+        }
+        return out;
+    }
+    let mut off = 0usize;
+    while off + 4 <= len {
+        let addr = win.wrapping_add(off);
+        if readable(addr, 4) {
+            out.push(unsafe { (addr as *const f32).read_unaligned() });
+        } else {
+            out.push(f32::NAN);
+        }
+        off += 4;
+    }
+    out
+}
+
+/// Log every offset in a pre/post f32 window pair whose value INCREASED across the
+/// hooked call — for re-deriving accumulator fields (the v2.0.2 stun gauge: the old
+/// read at target+0xA70 deltas 0.0 on every hit, so the field moved). The true stun
+/// field is the one whose increase correlates with hits landing; decoded offline from
+/// the log. Output capped so a churning instance can't flood a line.
+#[cfg(feature = "hookdiag")]
+pub fn log_f32_increases(label: &str, base: usize, start: usize, pre: &[f32], post: &[f32]) {
+    // A gauge-like accumulator lives in a small range; pointer/counter bits
+    // reinterpreted as f32 produce e26+ garbage that only spams the log.
+    const PLAUSIBLE_MAX: f32 = 1.0e7;
+    let mut out = String::new();
+    let mut shown = 0usize;
+    for (i, (a, b)) in pre.iter().zip(post.iter()).enumerate() {
+        if a.is_finite() && b.is_finite() && *b > *a && *a >= 0.0 && *b < PLAUSIBLE_MAX {
+            out.push_str(&format!("+{:#x}:{a:.2}->{b:.2} ", start + i * 4));
+            shown += 1;
+            if shown >= 48 {
+                out.push_str("(capped)");
+                break;
+            }
+        }
+    }
+    // Hits with nothing plausible to report log NOTHING: this fires per sampled
+    // damage event, and a synchronous "(no increases)" line per hit is pure cost.
+    if !out.is_empty() {
+        log::info!("HOOKDIAG t={} f32_up[{label}] base={base:#x} {}", ms(), out);
+    }
+}
+
 /// Scan a player-instance pointer for the display/character name and party data that
 /// `player_load` used to publish. `player_load` reached these via a pointer field to a
 /// SigilList (name at +0x1E8/+0x208, party_index at +0x22C, is_online at +0x1C8), so we:
@@ -488,7 +569,97 @@ pub fn probe_player_instance(instance: usize) {
     );
 }
 
+/// Remember a confirmed PLAYER combat-instance address (a source the identity path
+/// resolved). [`probe_pl2000_parent`] searches a dragon-form instance for pointers back
+/// to one of these to re-derive the Pl2000→Pl1900 parent-link offset on v2.0.2.
+#[cfg(feature = "hookdiag")]
+pub fn note_player_instance(instance: usize) {
+    use std::collections::HashSet;
+    use std::sync::{Mutex, OnceLock};
+    static KNOWN: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();
+    let known = KNOWN.get_or_init(|| Mutex::new(HashSet::new()));
+    let mut known = known.lock().expect("player instance set lock poisoned");
+    if known.len() < 128 && known.insert(instance) {
+        log::info!("IDDIAG player instance noted: {instance:#x} ({} known)", known.len());
+        // Publish an updated snapshot for the probe (rebuilt only when the set grows,
+        // so the per-damage-event fast path is one lock + one HashSet probe).
+        let snapshot: Vec<usize> = known.iter().copied().collect();
+        *PLAYER_INSTANCES_SNAPSHOT
+            .get_or_init(|| Mutex::new(Vec::new()))
+            .lock()
+            .expect("player instance snapshot lock poisoned") = snapshot;
+    }
+}
+
+#[cfg(feature = "hookdiag")]
+static PLAYER_INSTANCES_SNAPSHOT: std::sync::OnceLock<std::sync::Mutex<Vec<usize>>> =
+    std::sync::OnceLock::new();
+
+/// ONE-SHOT per distinct Pl2000 (Id dragon-form) instance: scan its first 0xE000 bytes
+/// for a pointer that leads back to a known player instance, either directly or via the
+/// entity indirection (`*(candidate + 0x70)` — the m_pSpecifiedInstance hop the other
+/// parent links use). Purely guarded READS (VirtualQuery per access, no vtable calls),
+/// so it can never fault; runs once per actor address so it can't lag repeated hits.
+///
+/// Why: the old parent offset 0xD488 is stale on v2.0.2, which splits Id's dragon-form
+/// damage into its own party row. A `hit` line here is the new offset.
+#[cfg(feature = "hookdiag")]
+pub fn probe_pl2000_parent(instance: usize) {
+    use std::collections::HashSet;
+    use std::sync::{Mutex, OnceLock};
+    static SEEN: OnceLock<Mutex<HashSet<usize>>> = OnceLock::new();
+    {
+        let seen = SEEN.get_or_init(|| Mutex::new(HashSet::new()));
+        let mut seen = seen.lock().expect("pl2000 probe seen lock poisoned");
+        if seen.len() >= 16 || !seen.insert(instance) {
+            return;
+        }
+    }
+
+    let known: Vec<usize> = PLAYER_INSTANCES_SNAPSHOT
+        .get_or_init(|| Mutex::new(Vec::new()))
+        .lock()
+        .expect("player instance snapshot lock poisoned")
+        .clone();
+
+    // Old-offset check first so the log always answers "is 0xD488 still right?".
+    let old_entity = read_ptr_guarded(instance, 0xD488);
+    let old_inst = old_entity.and_then(|p| read_ptr_guarded(p, 0x70));
+
+    let mut hits = String::new();
+    for off in (0usize..0xE000).step_by(8) {
+        let Some(p) = read_ptr_guarded(instance, off) else {
+            continue;
+        };
+        if p == 0 {
+            continue;
+        }
+        if known.contains(&p) {
+            hits.push_str(&format!("+{off:#x}=direct({p:#x}) "));
+            continue;
+        }
+        if let Some(behind) = read_ptr_guarded(p, 0x70) {
+            if known.contains(&behind) {
+                hits.push_str(&format!("+{off:#x}=entity->{behind:#x} "));
+            }
+        }
+    }
+    log::info!(
+        "IDDIAG pl2000 parent scan instance={instance:#x} known_players={} old@0xD488={old_entity:?}->{old_inst:?} hits: {}",
+        known.len(),
+        if hits.is_empty() { "(none)".into() } else { hits }
+    );
+}
+
 // No-op shims so call sites don't need their own cfg guards.
+#[cfg(not(feature = "hookdiag"))]
+#[inline(always)]
+#[allow(dead_code)]
+pub fn note_player_instance(_instance: usize) {}
+#[cfg(not(feature = "hookdiag"))]
+#[inline(always)]
+#[allow(dead_code)]
+pub fn probe_pl2000_parent(_instance: usize) {}
 #[cfg(not(feature = "hookdiag"))]
 #[inline(always)]
 #[allow(dead_code)]

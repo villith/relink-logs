@@ -72,11 +72,13 @@ export const IndexPage = () => {
       ]
         .filter((player) => player.name || player.type)
         .map((player) => {
-          if (!player.name) return t(`characters:${player.type}`, `ui:characters.${player.type}`);
-          if (!show_display_names) return t(`characters:${player.type}`, `ui:characters.${player.type}`);
-          if (streamer_mode) return t(`characters:${player.type}`, `ui:characters.${player.type}`);
+          const characterName = t(`characters:${player.type}`, `ui:characters.${player.type}`);
 
-          return `${player.name} (${t(`characters:${player.type}`, `ui:characters.${player.type}`)})`;
+          // A slot with a character but no player name is an AI companion.
+          if (!player.name) return `${characterName} (${t("ui.logs.ai-companion")})`;
+          if (!show_display_names || streamer_mode) return characterName;
+
+          return `${characterName} (${player.name})`;
         })
         .join(", ");
     }

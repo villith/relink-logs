@@ -28,15 +28,23 @@ export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyDa
 
   const playerColors = [color_1, color_2, color_3, color_4, "#9BCF53", "#380E7F", "#416D19", "#2C568D"];
   const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-  const color = partySlotIndex !== -1 ? playerColors[partySlotIndex] : playerColors[player.partyIndex];
+  // A filled party slot's color belongs to the row matched to it. A row that doesn't
+  // resolve to a slot picks, by its sort position, from the remaining colors: first
+  // the EMPTY slots' colors (so four characters still use colors 1-4 even when some
+  // identities are missing), then the overflow colors. Indexing the slot palette by
+  // partyIndex (an arbitrary sort position) collided with matched rows' colors.
+  const freeColors = playerColors.filter((_, i) => i >= 4 || !partyData[i]);
+  const color =
+    partySlotIndex !== -1 ? playerColors[partySlotIndex] : freeColors[player.partyIndex % freeColors.length];
 
   const [totalDamage, totalDamageUnit] = humanizeNumbers(player.totalDamage);
   const [dps, dpsUnit] = humanizeNumbers(player.dps);
   const [totalStunValue, totalStunValueUnit] = humanizeNumbers(player.totalStunValue);
 
-  // Percentage of this player's hits that reached the game's damage cap.
-  const totalHits = player.skillBreakdown.reduce((acc, skill) => acc + skill.hits, 0);
-  const damageCapPercentage = totalHits > 0 ? (player.cappedHits / totalHits) * 100 : 0;
+  // Percentage of this player's cap-eligible hits that reached the game's damage cap.
+  // Cap-less sources (e.g. supplementary damage) are excluded from the denominator so
+  // they don't dilute the percentage.
+  const damageCapPercentage = player.cappableHits > 0 ? (player.cappedHits / player.cappableHits) * 100 : 0;
 
   // Function for matching the column type to the value to display in the table.
   const matchColumnTypeToValue = (showFullValues: boolean, column: MeterColumns): ColumnValue => {

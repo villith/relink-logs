@@ -88,15 +88,60 @@ impl OnProcessDamageHook {
             _ => return unsafe { ProcessDamageEvent.call(a1, a2, a3, a4) },
         };
 
-        let previous_stun_value = read_f32_guarded(target_specified_instance_ptr, 0xA70);
+        // v2.0.2: the stun accumulator moved target+0xA70 -> +0xB90. Live-derived via
+        // the stun_scan probe (2026-07-15, three targets across three sessions): +0xB90
+        // is strictly monotonic across hits with old-scale increments (repeated attacks
+        // add identical amounts, e.g. +12.72 per hit), while the old 0xA70 deltas 0.0
+        // on every hit. Nearby look-alikes rejected: +0xB3C refreshes to a 2.50 cap and
+        // decays (flinch timer), +0xA44 moves <0.01/hit.
+        const STUN_ACCUMULATOR_OFFSET: usize = 0xB90;
+
+        let previous_stun_value =
+            read_f32_guarded(target_specified_instance_ptr, STUN_ACCUMULATOR_OFFSET);
+
+        // Stun re-derivation probe (kept for the next patch): snapshot a float window
+        // across the original call and log offsets that INCREASED; the accumulator is
+        // the offset whose growth tracks hits landing.
+        // Budgeted PER TARGET (a global first-48 burned the whole budget on the
+        // opening trash mobs of the 2026-07-15 session and never sampled the boss),
+        // hookdiag builds only.
+        #[cfg(feature = "hookdiag")]
+        let stun_probe_pre = {
+            static PER_TARGET: std::sync::Mutex<Vec<(usize, u32)>> =
+                std::sync::Mutex::new(Vec::new());
+            crate::hooks::diag::first_n_per_key(&PER_TARGET, target_specified_instance_ptr, 24)
+                .then(|| {
+                    crate::hooks::diag::snapshot_f32_window(
+                        target_specified_instance_ptr,
+                        0x800,
+                        0x600,
+                    )
+                })
+        };
 
         let original_value = unsafe { ProcessDamageEvent.call(a1, a2, a3, a4) };
+
+        #[cfg(feature = "hookdiag")]
+        if let Some(pre) = stun_probe_pre {
+            let post = crate::hooks::diag::snapshot_f32_window(
+                target_specified_instance_ptr,
+                0x800,
+                0x600,
+            );
+            crate::hooks::diag::log_f32_increases(
+                "stun_scan",
+                target_specified_instance_ptr,
+                0x800,
+                &pre,
+                &post,
+            );
+        }
 
         // Stun is a delta across the original call; if either read is unavailable we simply
         // report no stun rather than faulting.
         let added_stun_value = match (
             previous_stun_value,
-            read_f32_guarded(target_specified_instance_ptr, 0xA70),
+            read_f32_guarded(target_specified_instance_ptr, STUN_ACCUMULATOR_OFFSET),
         ) {
             (Some(prev), Some(cur)) => (cur - prev).max(0.0),
             _ => 0.0,
@@ -207,7 +252,19 @@ impl OnProcessDamageHook {
             source_type_id,
             source_idx,
         ) {
+            // This instance resolved to a player identity — remember it so the
+            // Pl2000 parent scan below has real player instances to search for.
+            #[cfg(feature = "hookdiag")]
+            crate::hooks::diag::note_player_instance(source_specified_instance_ptr);
+
             let _ = self.tx.send(Message::PlayerIdentityEvent(identity));
+        }
+
+        // Id's dragon form: one-shot scan for the new Pl2000->Pl1900 parent-link
+        // offset (0xD488 is stale on v2.0.2, which splits Id into two meter rows).
+        #[cfg(feature = "hookdiag")]
+        if source_type_id == 0xF5755C0E {
+            crate::hooks::diag::probe_pl2000_parent(source_specified_instance_ptr);
         }
 
         // If the source_type is any of the following, then we need to get their parent entity.
@@ -224,6 +281,20 @@ impl OnProcessDamageHook {
             None
         } else {
             Some(added_stun_value)
+        };
+
+        // Supplementary damage is never subject to the damage cap; the cap value on
+        // its instance belongs to the hit that TRIGGERED it. Send no cap so it can
+        // never count as a capped hit. (The parser enforces the same rule for events
+        // already recorded in old logs.)
+        let damage_cap = if matches!(action_type, ActionType::SupplementaryDamage(_)) {
+            None
+        } else {
+            // v2.0.2: "no cap" now arrives as the 99,999,999 sentinel (the game normalizes
+            // a -1 cap to it) rather than 0 — send None for both so cap detection stays off
+            // for uncapped hits.
+            (damage_instance.damage_cap > 0 && damage_instance.damage_cap < 99_999_999)
+                .then_some(damage_instance.damage_cap)
         };
 
         let event = Message::DamageEvent(DamageEvent {
@@ -243,12 +314,7 @@ impl OnProcessDamageHook {
             flags,
             action_id: action_type,
             attack_rate: Some(damage_instance.attack_rate),
-            // v2.0.2: "no cap" now arrives as the 99,999,999 sentinel (the game normalizes
-            // a -1 cap to it) rather than 0 — send None for both so cap detection stays off
-            // for uncapped hits.
-            damage_cap: (damage_instance.damage_cap > 0
-                && damage_instance.damage_cap < 99_999_999)
-                .then_some(damage_instance.damage_cap),
+            damage_cap,
             stun_value,
         });
 

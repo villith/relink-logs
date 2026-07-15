@@ -84,9 +84,9 @@ export const SkillGroupRow = ({ characterType, group, color }: SkillRowProps) =>
           )}
         </td>
         <td className="text-center row-data">
-          {group.cappedHits > 0 ? (
+          {group.cappedHits > 0 && group.cappableHits > 0 ? (
             <span className="capped">
-              {((group.cappedHits / group.hits) * 100).toFixed(0)}
+              {((group.cappedHits / group.cappableHits) * 100).toFixed(0)}
               <span className="font-sm">%</span>
             </span>
           ) : (

@@ -29,6 +29,10 @@ pub struct AdjustedDamageInstance<'a> {
     pub player_data: Option<&'a PlayerData>,
     pub stun_damage: f64,
     pub is_capped: bool,
+    /// Whether this hit is subject to a damage cap at all. Cap-less sources
+    /// (supplementary damage, DoT, hits with no cap info) must count toward
+    /// neither the capped-hit tallies nor their denominators.
+    pub is_cappable: bool,
 }
 
 impl<'a> AdjustedDamageInstance<'a> {
@@ -47,13 +51,24 @@ impl<'a> AdjustedDamageInstance<'a> {
         crit_multipliers: &[f64],
     ) -> Self {
         let stun_damage = event.stun_value.unwrap_or(0.0) as f64;
-        let is_capped = cap_detection::is_capped(event.damage, event.damage_cap, crit_multipliers);
+
+        // Supplementary damage is never subject to the damage cap — the cap value it
+        // carries belongs to the hit that triggered it. Newer hooks already strip the
+        // cap at the source, but old logs recorded it, so it must be enforced here too.
+        let is_supplementary = matches!(
+            event.action_id,
+            protocol::ActionType::SupplementaryDamage(_)
+        );
+        let is_cappable = !is_supplementary && event.damage_cap.is_some_and(|cap| cap > 0);
+        let is_capped = is_cappable
+            && cap_detection::is_capped(event.damage, event.damage_cap, crit_multipliers);
 
         Self {
             event,
             player_data,
             stun_damage,
             is_capped,
+            is_cappable,
         }
     }
 }
@@ -375,6 +390,15 @@ impl DerivedEncounterState {
             .max_by_key(|target| target.total_damage)
     }
 
+    /// Recount every player's capped hits against newly-learned crit multipliers,
+    /// converging the live single-pass counts to what the log-history reparse
+    /// computes from the same events.
+    fn reclassify_caps(&mut self, crit_multipliers: &[f64]) {
+        for player in self.party.values_mut() {
+            player.reclassify_caps(crit_multipliers);
+        }
+    }
+
     fn process_damage_event(&mut self, now: i64, damage_instance: &AdjustedDamageInstance) {
         self.end_time = now;
         self.total_damage += damage_instance.event.damage as u64;
@@ -401,6 +425,7 @@ impl DerivedEncounterState {
                 skill_breakdown: Vec::new(),
                 last_known_pet_skill: None,
                 capped_hits: 0,
+                cappable_hits: 0,
             });
 
         // Update player stats from damage event.
@@ -424,6 +449,31 @@ impl DerivedEncounterState {
             player.update_dps(now, self.start_time);
         }
     }
+}
+
+/// v2.0.2: the hook can no longer resolve Id's dragon form (Pl2000) to its Pl1900
+/// owner — the parent-link offset vanished in the patch — so dragon events arrive
+/// parented to themselves and would open a separate party row. Remap them onto the
+/// party's Id (Pl1900) player at derive time. The raw event log keeps the original
+/// event, so a future hook-side parent fix reparses history cleanly.
+///
+/// Falls back to the unmapped event when no Pl1900 player is known (e.g. an AI Id,
+/// which has no identity on v2.0.2) — same split behavior as before, never lost damage.
+fn remap_dragon_form(player_data: &[Option<PlayerData>; 4], event: &DamageEvent) -> DamageEvent {
+    let mut event = event.clone();
+
+    if CharacterType::from_hash(event.source.parent_actor_type) == CharacterType::Pl2000 {
+        if let Some(owner) = player_data
+            .iter()
+            .flatten()
+            .find(|player| player.character_type == CharacterType::Pl1900)
+        {
+            event.source.parent_index = owner.actor_index;
+            event.source.parent_actor_type = 0x8056ABCD; // Pl1900
+        }
+    }
+
+    event
 }
 
 /// The parser for the encounter.
@@ -464,6 +514,10 @@ pub struct Parser {
     /// Start timestamp (ms) of the active run.
     #[serde(skip)]
     active_run_start: i64,
+    /// Last time (ms) the live cap counters were recounted against freshly-learned
+    /// crit multipliers (see `on_damage_event` / `update_status`).
+    #[serde(skip)]
+    last_cap_reclassify: i64,
 }
 
 impl Parser {
@@ -510,6 +564,11 @@ impl Parser {
     fn learn_crit_multipliers(&self) -> Vec<f64> {
         let at_or_over = self.encounter.event_log().filter_map(|(_, event)| {
             if let Message::DamageEvent(e) = event {
+                // Supplementary damage carries its trigger's cap but is itself uncapped;
+                // its damage/cap ratios are noise, not crit peaks (old logs recorded it).
+                if matches!(e.action_id, protocol::ActionType::SupplementaryDamage(_)) {
+                    return None;
+                }
                 e.damage_cap.map(|cap| (e.damage, cap))
             } else {
                 None
@@ -529,6 +588,8 @@ impl Parser {
 
             match event {
                 Message::DamageEvent(event) => {
+                    let event = remap_dragon_form(&self.encounter.player_data, event);
+
                     let player_data = self
                         .encounter
                         .player_data
@@ -537,7 +598,7 @@ impl Parser {
                         .find(|player| player.actor_index == event.source.parent_index);
 
                     let damage_instance = AdjustedDamageInstance::from_damage_event_with_multipliers(
-                        event,
+                        &event,
                         player_data,
                         &crit_multipliers,
                     );
@@ -566,6 +627,8 @@ impl Parser {
                     let target_type = EnemyType::from_hash(event.target.parent_actor_type);
 
                     if targets.is_empty() || targets.contains(&target_type) {
+                        let event = remap_dragon_form(&self.encounter.player_data, event);
+
                         let player_data = self
                             .encounter
                             .player_data
@@ -575,7 +638,7 @@ impl Parser {
 
                         let damage_instance =
                             AdjustedDamageInstance::from_damage_event_with_multipliers(
-                                event,
+                                &event,
                                 player_data,
                                 &crit_multipliers,
                             );
@@ -644,10 +707,14 @@ impl Parser {
         chart_values
     }
 
-    /// Handles the event when an area is entered.
-    /// If the current encounter was in progress, then stop it as we've left the instance.
-    /// If there was damage in that stopped instance, then save it as a new log.
-    /// Otherwise, we're waiting for the encounter to start.
+    /// Handles the quest-load boundary (v2.0.2: fired by OnLoadQuestHook when the NEXT
+    /// quest loads). If the current encounter was in progress — a quest that failed or
+    /// was retired emits no result screen, so it is still open here — stop it and save
+    /// it under the quest id it was stamped with at ITS OWN load. Only afterwards stamp
+    /// the event's quest id, which is the INCOMING quest's (the hooked loader reads
+    /// mgr+0xDC8 to look up the quest being loaded, so the slot is already repopulated
+    /// when the hook reads it) — stamping first labeled a failed quest's log with the
+    /// quest that was just started.
     pub fn on_area_enter_event(&mut self, event: AreaEnterEvent) {
         // Leaving to a normal area ends any active Conflux run (the common case the manager
         // dtor misses: finish a run, exit to town). finalize_active_run saves the final room
@@ -656,18 +723,7 @@ impl Parser {
         if self.active_run_id.is_some() {
             // Left Conflux for a normal area → run ended, but not via the reward path.
             self.finalize_active_run(false);
-            self.encounter.quest_id = Some(event.last_known_quest_id);
-            self.encounter.quest_completed = false;
-            self.encounter.reset_player_data();
-            if let Some(window) = &self.window_handle {
-                let _ = window.emit("on-area-enter", &self.derived_state);
-            }
-            return;
-        }
-
-        self.encounter.quest_id = Some(event.last_known_quest_id);
-
-        if self.status == ParserStatus::InProgress {
+        } else if self.status == ParserStatus::InProgress {
             self.update_status(ParserStatus::Stopped);
 
             if self.has_damage() {
@@ -688,6 +744,12 @@ impl Parser {
             self.update_status(ParserStatus::Waiting);
         }
 
+        // Fresh encounter: stamp the incoming quest (0 = guarded read failed, keep it
+        // unknown rather than storing a bogus id). quest_timer is only ever written by
+        // the completion path — clear it so a later failed quest can't inherit it.
+        self.encounter.quest_id =
+            (event.last_known_quest_id != 0).then_some(event.last_known_quest_id);
+        self.encounter.quest_timer = None;
         self.encounter.quest_completed = false;
         self.encounter.reset_player_data();
 
@@ -697,8 +759,20 @@ impl Parser {
     }
 
     pub fn on_quest_complete_event(&mut self, event: QuestCompleteEvent) {
-        self.encounter.quest_id = Some(event.quest_id);
-        self.encounter.quest_timer = Some(event.elapsed_time_in_secs);
+        // A result screen can also fire mid-Conflux (the type-7 variant). Rooms and
+        // runs have their own save path (on_conflux_room_enter / finalize_active_run),
+        // so a completion during an active run must not save the room as a normal
+        // quest log — that would double-count it.
+        if self.active_run_id.is_some() {
+            return;
+        }
+
+        // quest_id 0 means the hook had no quest state (injected mid-quest); keep
+        // whatever id we already know instead of overwriting it with "unknown".
+        if event.quest_id != 0 {
+            self.encounter.quest_id = Some(event.quest_id);
+            self.encounter.quest_timer = Some(event.elapsed_time_in_secs);
+        }
         self.encounter.quest_completed = true;
 
         if self.status == ParserStatus::InProgress {
@@ -723,6 +797,14 @@ impl Parser {
                 let _ = window.emit("encounter-update", &self.derived_state);
             }
         }
+
+        // v2.0.2: the area-enter hook (the old between-quest wipe point) no longer
+        // installs, so the quest boundary is where stale identities must die — actor
+        // indices get reused across quests, and entries carried over would attach the
+        // previous quest's names to the next quest's actors. Cleared AFTER the save
+        // above (the save reads player_data for the p1..p4 columns); every player's
+        // identity is re-announced with their damage, so the next quest repopulates.
+        self.encounter.reset_player_data();
     }
 
     // Called when a damage event is received from the game.
@@ -743,6 +825,8 @@ impl Parser {
         self.encounter
             .push_event(now, Message::DamageEvent(event.clone()));
 
+        let event = remap_dragon_form(&self.encounter.player_data, &event);
+
         let player_data = self
             .encounter
             .player_data
@@ -754,6 +838,19 @@ impl Parser {
 
         self.derived_state
             .process_damage_event(now, &damage_instance);
+
+        // Converge the live cap counters: the per-hit classification above used the
+        // simple damage>=cap rule, so periodically re-learn the encounter's crit
+        // multipliers and recount — otherwise the meter's Cap% disagrees with the
+        // log-history reparse of the same events. Throttled; update_status does a
+        // final pass when the encounter stops.
+        if now - self.last_cap_reclassify >= 1000 {
+            self.last_cap_reclassify = now;
+            let crit_multipliers = self.learn_crit_multipliers();
+            if !crit_multipliers.is_empty() {
+                self.derived_state.reclassify_caps(&crit_multipliers);
+            }
+        }
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -839,34 +936,20 @@ impl Parser {
         self.insert_player_data(player_data, event.party_index);
     }
 
-    /// Inserts or updates a player in the encounter's 4-slot array, keyed by
-    /// actor_index. Shared by the full player_load path and the identity-only path.
+    /// Inserts or updates a player in the encounter's 4-slot array at its party slot.
+    /// Shared by the full player_load path and the identity-only path.
+    ///
+    /// v2.0.2: `actor_index` is a pointer-like value (no meaningful order) and the
+    /// LOCAL player is flagged `is_online` inside a lobby, so the old actor-index
+    /// ordering heuristics mis-slotted or dropped players. The identity snapshot's
+    /// party slot (0..=3, a verified surviving field) is the stable position: array
+    /// position == party slot.
     fn insert_player_data(&mut self, player_data: PlayerData, party_index: u8) {
-        // Insert into encounter player data array, using actor_index.
-        if !player_data.is_online && party_index == 0 {
-            self.encounter.player_data[0] = Some(player_data);
-        } else {
-            for i in 1..=3 {
-                if let Some(player) = &self.encounter.player_data[i] {
-                    // If this is the same player, update it.
-                    if player.actor_index == player_data.actor_index {
-                        self.encounter.player_data[i] = Some(player_data);
-                        break;
-                    }
-
-                    // If the actor index we're trying to insert is lower than the current slot's actor index,
-                    // then we need to shift the rest of the array to the right.
-                    if player_data.actor_index < player.actor_index {
-                        self.encounter.player_data[i..].rotate_right(1);
-                        self.encounter.player_data[i] = Some(player_data);
-                        break;
-                    }
-                } else {
-                    self.encounter.player_data[i] = Some(player_data);
-                    break;
-                }
-            }
-        }
+        let Some(slot) = self.encounter.player_data.get_mut(party_index as usize) else {
+            // 0xFF placeholder or corrupt slot — never clobber a real slot with it.
+            return;
+        };
+        *slot = Some(player_data);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-party-update", &self.encounter.player_data);
@@ -946,13 +1029,36 @@ impl Parser {
         );
     }
 
+    /// Manual reset requested from the meter UI: discard the current encounter
+    /// without saving it and go back to waiting for the next damage event.
+    pub fn on_manual_reset(&mut self) {
+        self.reset();
+        self.update_status(ParserStatus::Waiting);
+
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
+        }
+    }
+
     fn reset(&mut self) {
+        // player_data deliberately survives this reset: the hook emits each player's
+        // identity BEFORE their damage event, so wiping here would drop the identity
+        // that accompanies the encounter's opening hit. Stale identities are cleared
+        // at the quest boundary instead (on_quest_complete_event / on_area_enter_event).
         self.encounter.raw_event_log.clear();
         self.encounter.raw_event_log.shrink_to_fit();
         self.derived_state = Default::default();
     }
 
     fn update_status(&mut self, new_status: ParserStatus) {
+        // Encounter ending: final crit-aware recount so the frozen end-of-quest
+        // meter shows the same Cap% the log-history reparse will compute.
+        if new_status == ParserStatus::Stopped && self.status == ParserStatus::InProgress {
+            let crit_multipliers = self.learn_crit_multipliers();
+            if !crit_multipliers.is_empty() {
+                self.derived_state.reclassify_caps(&crit_multipliers);
+            }
+        }
         self.status = new_status;
         self.derived_state.status = new_status;
     }
@@ -983,6 +1089,36 @@ impl Parser {
         false
     }
 
+    /// The game process closed (named pipe disconnected). The parser instance is
+    /// dropped right after, so anything unsaved here is lost. An abandoned quest
+    /// (retire → town → quit) emits NO result screen and never reaches another
+    /// quest-load boundary — this is its only save point.
+    pub fn on_game_disconnect(&mut self) {
+        if self.active_run_id.is_some() {
+            // Mid-Conflux quit: saves the in-progress room and closes the run row.
+            self.finalize_active_run(false);
+            return;
+        }
+
+        if self.status == ParserStatus::InProgress {
+            self.update_status(ParserStatus::Stopped);
+            if self.has_damage() {
+                match self.save_encounter_to_db() {
+                    Ok(id) => {
+                        if let Some(app) = &self.app {
+                            let _ = app.emit_all("encounter-saved", id);
+                        }
+                    }
+                    Err(e) => {
+                        if let Some(app) = &self.app {
+                            let _ = app.emit_all("encounter-saved-error", e.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Opens a new Conflux run: insert a runs row, reset per-run accumulators, and
     /// remember the manager pointer that identifies this run.
     fn start_conflux_run(&mut self, manager_ptr: u64) {
@@ -1011,6 +1147,29 @@ impl Parser {
         let is_new_run = self.active_run_id.is_none() || self.active_run_manager != event.manager_ptr;
 
         if is_new_run {
+            // A leftover NORMAL encounter can still be in progress here: a quest that
+            // ended with no result screen (fail/retire) followed straight by a Conflux
+            // run. The hook's quest-load boundary cut is deliberately suppressed on
+            // room loads (it would finalize the run every room), so save the leftover
+            // as a normal log now — otherwise its damage merges into room 1.
+            if self.active_run_id.is_none() && self.status == ParserStatus::InProgress {
+                self.update_status(ParserStatus::Stopped);
+                if self.has_damage() {
+                    match self.save_encounter_to_db() {
+                        Ok(id) => {
+                            if let Some(app) = &self.app {
+                                let _ = app.emit_all("encounter-saved", id);
+                            }
+                        }
+                        Err(e) => {
+                            if let Some(app) = &self.app {
+                                let _ = app.emit_all("encounter-saved-error", e.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+
             // Close out any prior run before opening the new one (defensive: normally the
             // manager dtor already finalized it). Superseded by a new run → not "completed".
             if self.active_run_id.is_some() {
@@ -1287,6 +1446,79 @@ mod tests {
         }
     }
 
+    fn area_enter(quest_id: u32) -> protocol::AreaEnterEvent {
+        protocol::AreaEnterEvent {
+            last_known_quest_id: quest_id,
+            last_known_elapsed_time_in_secs: 0,
+        }
+    }
+
+    #[test]
+    fn failed_quest_log_keeps_the_quest_it_was_fought_in() {
+        // A failed/retired quest emits no result screen; its encounter is cut at the
+        // NEXT quest's load. The boundary event's quest id is the INCOMING quest's
+        // (the hooked loader reads mgr+0xDC8 to look up the quest being loaded), so
+        // stamping it before the save labeled the failed log with the quest that was
+        // just started.
+        let mut parser = parser_with_memory_db();
+
+        // Quest A loads, takes damage, then fails (nothing emitted).
+        parser.on_area_enter_event(area_enter(0xAAAA));
+        parser.on_damage_event(a_damage_event());
+        // Quest B's load fires the boundary cut.
+        parser.on_area_enter_event(area_enter(0xBBBB));
+
+        let conn = parser.db.as_ref().unwrap();
+        let (quest_id, completed): (Option<u32>, bool) = conn
+            .query_row("SELECT quest_id, quest_completed FROM logs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(
+            quest_id,
+            Some(0xAAAA),
+            "failed log carries the quest it was fought in, not the one just started"
+        );
+        assert!(!completed, "no result screen -> not completed");
+        assert_eq!(
+            parser.encounter.quest_id,
+            Some(0xBBBB),
+            "fresh encounter stamped with the incoming quest"
+        );
+    }
+
+    #[test]
+    fn failed_quest_log_does_not_inherit_previous_completions_timer() {
+        // quest_timer is only ever written by the type-5 completion path; a later
+        // failed quest (saved at the next quest load) must not carry the previous
+        // completion's elapsed time.
+        let mut parser = parser_with_memory_db();
+
+        // Quest A completes normally with a timer.
+        parser.on_area_enter_event(area_enter(0xAAAA));
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 0xAAAA,
+            elapsed_time_in_secs: 213,
+        });
+
+        // Quest B loads, takes damage, fails; quest C's load cuts it.
+        parser.on_area_enter_event(area_enter(0xBBBB));
+        parser.on_damage_event(a_damage_event());
+        parser.on_area_enter_event(area_enter(0xCCCC));
+
+        let conn = parser.db.as_ref().unwrap();
+        let (quest_id, timer): (Option<u32>, Option<u32>) = conn
+            .query_row(
+                "SELECT quest_id, quest_elapsed_time FROM logs ORDER BY id DESC LIMIT 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(quest_id, Some(0xBBBB));
+        assert_eq!(timer, None, "failed quest must not inherit quest A's 213s timer");
+    }
+
     #[test]
     fn conflux_run_lifecycle_groups_rooms_and_buffs() {
         let mut parser = parser_with_memory_db();
@@ -1323,6 +1555,175 @@ mod tests {
         assert_eq!(r0.buff_ids, vec![0xAA]);
         let r1 = run.buffs.iter().find(|b| b.room_index == 1).unwrap();
         assert_eq!(r1.buff_ids, vec![0xCC]);
+    }
+
+    fn identity_event(
+        name: &str,
+        character_type: u32,
+        party_index: u8,
+        actor_index: u32,
+        is_online: bool,
+    ) -> PlayerIdentityEvent {
+        let name = std::ffi::CString::new(name).unwrap();
+        PlayerIdentityEvent {
+            character_name: name.clone(),
+            display_name: name,
+            character_type,
+            party_index,
+            actor_index,
+            is_online,
+        }
+    }
+
+    #[test]
+    fn ai_companion_identities_are_saved_to_player_columns() {
+        // Single-player + 3 AI companions: the hook claims the AI slot records with
+        // BLANKED names (their snapshots carry the local profile's name) and emits an
+        // identity event before each actor's damage. The saved log row must carry all
+        // four slots' character types — this is the logs-table "Name" column showing
+        // one entry instead of four.
+        let mut parser = parser_with_memory_db();
+
+        // (character hash, party slot, actor index, display name) — hashes as captured
+        // live on v2.0.2: Eustace local + Zeta/Ferry/Cagliostro-style AI companions.
+        let party: [(u32, u8, u32, &str); 4] = [
+            (0x91418145, 0, 4_217_578_216, "Manmoth"),
+            (0x6FDD6932, 1, 4_214_090_008, ""),
+            (0x443D46BB, 2, 4_215_158_024, ""),
+            (0xC3155079, 3, 4_217_362_552, ""),
+        ];
+
+        for (character_type, party_index, actor_index, name) in party {
+            parser.on_player_identity_event(identity_event(
+                name,
+                character_type,
+                party_index,
+                actor_index,
+                false,
+            ));
+
+            let mut event = a_damage_event();
+            event.source = Actor {
+                index: actor_index,
+                actor_type: character_type,
+                parent_actor_type: character_type,
+                parent_index: actor_index,
+            };
+            parser.on_damage_event(event);
+        }
+
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 0x22A060,
+            elapsed_time_in_secs: 213,
+        });
+
+        let conn = parser.db.as_ref().unwrap();
+        let row = conn
+            .query_row(
+                "SELECT p1_name, p1_type, p2_name, p2_type, p3_type, p4_type,
+                        quest_id, quest_elapsed_time
+                 FROM logs ORDER BY id DESC LIMIT 1",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, Option<String>>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                        row.get::<_, Option<String>>(4)?,
+                        row.get::<_, Option<String>>(5)?,
+                        row.get::<_, Option<u32>>(6)?,
+                        row.get::<_, Option<u32>>(7)?,
+                    ))
+                },
+            )
+            .unwrap();
+
+        assert_eq!(row.0.as_deref(), Some("Manmoth"));
+        assert_eq!(row.1.as_deref(), Some("Pl2700"));
+        // AI slots: blank name (frontend renders "(AI)"), character type present.
+        assert_eq!(row.2.as_deref(), Some(""));
+        assert_eq!(row.3.as_deref(), Some("Pl1800"));
+        assert_eq!(row.4.as_deref(), Some("Pl0500"));
+        assert_eq!(row.5.as_deref(), Some("Pl1600"));
+        assert_eq!(row.6, Some(0x22A060));
+        assert_eq!(row.7, Some(213));
+    }
+
+    #[test]
+    fn identity_events_slot_players_by_party_index() {
+        // v2.0.2: actor_index is a pointer-like value with no meaningful order, and the
+        // LOCAL player is flagged is_online in a lobby. The party slot from the identity
+        // snapshot is the only stable position — player_data[N] must be party slot N.
+        let mut parser = Parser::default();
+
+        parser.on_player_identity_event(identity_event("Alice", 0x8056ABCD, 2, 4_215_158_024, true));
+        parser.on_player_identity_event(identity_event("Bob", 0x2AF678E8, 0, 4_208_915_704, true));
+
+        let slot0 = parser.encounter.player_data[0]
+            .as_ref()
+            .expect("online local player still lands in slot 0");
+        assert_eq!(slot0.display_name, "Bob");
+        let slot2 = parser.encounter.player_data[2]
+            .as_ref()
+            .expect("party slot 2 player lands in slot 2");
+        assert_eq!(slot2.display_name, "Alice");
+        assert!(parser.encounter.player_data[1].is_none());
+        assert!(parser.encounter.player_data[3].is_none());
+
+        // Same slot re-announced under a new actor index (id churn between quests)
+        // replaces the entry instead of duplicating the player into another slot.
+        parser.on_player_identity_event(identity_event("Alice", 0x8056ABCD, 2, 999, true));
+        let slot2 = parser.encounter.player_data[2].as_ref().unwrap();
+        assert_eq!(slot2.actor_index, 999);
+        assert_eq!(parser.encounter.player_data.iter().flatten().count(), 2);
+    }
+
+    #[test]
+    fn encounter_reset_clears_stale_player_data() {
+        // v2.0.2: the area-enter hook is dead, so nothing wiped player_data between
+        // quests — stale names attached to reused actor indices. The encounter reset
+        // (first damage after Stopped/Waiting) must clear it; live identity events
+        // repopulate it immediately.
+        let mut parser = parser_with_memory_db();
+
+        parser.on_player_identity_event(identity_event("Old", 0x8056ABCD, 1, 111, true));
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 1,
+            elapsed_time_in_secs: 10,
+        });
+
+        parser.on_damage_event(a_damage_event());
+        assert!(
+            parser.encounter.player_data.iter().all(Option::is_none),
+            "player_data cleared when a new encounter starts"
+        );
+    }
+
+    #[test]
+    fn dragon_form_damage_attributes_to_the_id_player() {
+        // v2.0.2: the Pl2000->Pl1900 parent link is unrecoverable in the hook, so
+        // dragon-form events arrive parented to themselves. The parser must merge
+        // them into the party's Id (Pl1900) player instead of a separate row.
+        let mut parser = parser_with_memory_db();
+
+        parser.on_player_identity_event(identity_event("IdPlayer", 0x8056ABCD, 0, 100, false));
+
+        let mut event = a_damage_event();
+        event.source = Actor {
+            index: 200,
+            actor_type: 0xF5755C0E,
+            parent_actor_type: 0xF5755C0E,
+            parent_index: 200,
+        };
+        parser.on_damage_event(event);
+
+        let party = &parser.derived_state.party;
+        assert_eq!(party.len(), 1, "dragon form must not get its own row");
+        let player = party.get(&100).expect("damage attributed to the Id player");
+        assert_eq!(player.character_type, CharacterType::Pl1900);
+        assert_eq!(player.total_damage, 500);
     }
 
     #[test]
@@ -1370,6 +1771,120 @@ mod tests {
         assert_eq!(runs[0].rooms.len(), 3);
         assert!(runs[0].duration.is_some(), "duration written");
         assert_eq!(runs[0].completed, Some(false), "left, not reward-completed");
+    }
+
+    #[test]
+    fn live_cap_counts_converge_to_crit_aware_reparse() {
+        // The live meter classifies each hit with the simple damage>=cap rule (it
+        // can't know the encounter's crit multipliers up front), which over-counts
+        // uncapped crits landing between crit peaks. The log-history view reparses
+        // crit-aware, so the two disagreed (live 85% vs history 76% on the same
+        // rows). By quest end the live state must be recounted to match.
+        let mut parser = parser_with_memory_db();
+
+        let cap_event = |damage: i32| {
+            let mut e = a_damage_event();
+            e.damage = damage;
+            e.damage_cap = Some(1000);
+            e
+        };
+
+        // 50 hits exactly at the cap (x1.0 peak) + 50 capped crits (x1.2 peak).
+        for _ in 0..50 {
+            parser.on_damage_event(cap_event(1000));
+            parser.on_damage_event(cap_event(1200));
+        }
+        // 10 uncapped crits over the cap but BETWEEN the peaks, each with a
+        // distinct ratio so none forms a learnable peak of its own. The simple
+        // rule counts these as capped; crit-aware detection must not.
+        for i in 0..10 {
+            parser.on_damage_event(cap_event(1015 + i * 17));
+        }
+
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 1,
+            elapsed_time_in_secs: 10,
+        });
+
+        let player = parser.derived_state.party.get(&0).unwrap();
+        assert_eq!(player.cappable_hits, 110, "denominator counts all capped-capable hits");
+        assert_eq!(
+            player.capped_hits, 100,
+            "between-peak uncapped crits recounted as not capped by quest end"
+        );
+        let skill = &player.skill_breakdown[0];
+        assert_eq!(skill.cappable_hits, 110);
+        assert_eq!(skill.capped_hits, 100);
+    }
+
+    #[test]
+    fn game_disconnect_saves_in_progress_encounter() {
+        // Abandoning a quest emits NO result screen, and quitting the game right
+        // after means no next quest load ever fires the boundary cut. The pipe
+        // disconnect is the last chance to save — the parser is dropped after it.
+        let mut parser = parser_with_memory_db();
+
+        parser.on_damage_event(a_damage_event());
+        parser.on_game_disconnect();
+
+        let conn = parser.db.as_ref().unwrap();
+        let (count, completed): (i64, i64) = conn
+            .query_row(
+                "SELECT COUNT(*), COALESCE(SUM(quest_completed), 0) FROM logs",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(count, 1, "in-progress encounter saved on game close");
+        assert_eq!(completed, 0, "not marked completed");
+    }
+
+    #[test]
+    fn game_disconnect_finalizes_active_conflux_run() {
+        let mut parser = parser_with_memory_db();
+        const MGR: u64 = 0x4444_0000_100;
+
+        parser.on_conflux_room_enter(room_enter(1, MGR));
+        parser.on_damage_event(a_damage_event());
+        parser.on_game_disconnect();
+
+        assert!(parser.active_run_id.is_none(), "run closed out");
+        let conn = parser.db.as_ref().unwrap();
+        let runs = crate::db::runs::get_runs(conn, 10, 0).unwrap();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].rooms.len(), 1, "in-progress room saved");
+        assert_eq!(runs[0].completed, Some(false), "quit, not reward-completed");
+    }
+
+    #[test]
+    fn leftover_normal_encounter_saved_before_conflux_run_starts() {
+        // A normal quest that ends with no result screen (fail/retire) leaves an
+        // InProgress encounter behind, and the hook's quest-load boundary cut is
+        // deliberately suppressed on Conflux room loads. Entering a run must
+        // therefore save the leftover as a normal log itself — otherwise its
+        // damage merges into room 1.
+        let mut parser = parser_with_memory_db();
+        const MGR: u64 = 0x3333_0000_100;
+
+        parser.on_damage_event(a_damage_event());
+
+        parser.on_conflux_room_enter(room_enter(1, MGR));
+        parser.on_damage_event(a_damage_event());
+        parser.on_conflux_run_end(protocol::ConfluxRunEndEvent { manager_ptr: MGR });
+
+        let conn = parser.db.as_ref().unwrap();
+        let (normal_logs, normal_damage): (i64, i64) = conn
+            .query_row(
+                "SELECT COUNT(*), COALESCE(SUM(total_damage), 0) FROM logs WHERE run_id IS NULL",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(normal_logs, 1, "leftover normal encounter saved as its own log");
+        assert_eq!(normal_damage, 500, "room damage not merged into it");
+        let runs = crate::db::runs::get_runs(conn, 10, 0).unwrap();
+        assert_eq!(runs.len(), 1);
+        assert_eq!(runs[0].rooms.len(), 1, "room 1 saved separately under the run");
     }
 
     #[test]

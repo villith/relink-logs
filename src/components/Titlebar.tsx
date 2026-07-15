@@ -1,8 +1,9 @@
 import { ActionIcon, Menu, Tooltip } from "@mantine/core";
-import { Camera, ClipboardText, Minus, PushPinSimple } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, Camera, ClipboardText, Minus, PushPinSimple } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
 import { appWindow } from "@tauri-apps/api/window";
 import { Fragment, useCallback } from "react";
+import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
 import getVersion from "@/hooks/getVersion";
@@ -81,6 +82,10 @@ export const Titlebar = ({
   const onPin = () => {
     invoke("toggle_always_on_top");
   };
+  const onResetSession = () => {
+    invoke("reset_encounter");
+    toast.success(t("ui.session-reset"));
+  };
 
   const handleSimpleEncounterCopy = useCallback(() => {
     exportSimpleEncounterToClipboard(sortType, sortDirection, encounterState, partyData);
@@ -119,6 +124,11 @@ export const Titlebar = ({
         <Tooltip label="Copy screenshot to clipboard" color="dark">
           <div className="titlebar-button" id="titlebar-snapshot" onClick={() => exportScreenshotToClipboard(".app")}>
             <Camera size={16} />
+          </div>
+        </Tooltip>
+        <Tooltip label="Reset session" color="dark">
+          <div className="titlebar-button" id="titlebar-reset" onClick={onResetSession}>
+            <ArrowCounterClockwise size={16} />
           </div>
         </Tooltip>
         <div className="titlebar-button" id="titlebar-minimize" onClick={onMinimize}>
