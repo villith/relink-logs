@@ -67,6 +67,8 @@ This order matches `.github/workflows/ci.yaml`:
 - **Treating the `TAURI_PRIVATE_KEY` error as a build failure.** The build ends with `A public key has been found, but no private key... TAURI_PRIVATE_KEY`. This is **only** the auto-updater *signing* step (needs the maintainer's private key) and does **not** affect the produced exe or MSI. Because of this, `tauri build` itself **exits non-zero even on success** — judge success by whether `target/release/GBFR Logs.exe` was produced (which is what `scripts/build.ps1` does), not by the exit code.
 - **Editing `scripts/build.ps1` and setting `$ErrorActionPreference = 'Stop'`.** In Windows PowerShell 5.1 that turns cargo/npm *stderr progress lines* (e.g. cargo's `Finished release` banner) into terminating `NativeCommandError`s, aborting the script mid-build even on exit code 0. Check `$LASTEXITCODE` per step instead.
 
+- **Adding dev/debug binaries under `src-tauri/src/bin/`.** Tauri v1 bundles EVERY cargo bin target into the MSI (and can mis-pick the main binary, naming the MSI after the wrong exe). Gating bins with `required-features` does NOT help — the bundler still lists them and packs stale exes from `target/release`. Put one-off tools in `src-tauri/examples/` instead (`cargo build --release -p gbfr-logs --example <name>`); examples are never bundled.
+
 ## Artifacts
 
 - `target/release/GBFR Logs.exe` — the app binary (named from `productName`, not the crate).
