@@ -12,6 +12,7 @@ interface MeterSettings {
   streamer_mode: boolean;
   show_full_values: boolean;
   use_condensed_skills: boolean;
+  merge_supplementary: boolean;
   open_log_on_save: boolean;
   overlay_columns: MeterColumns[];
 }
@@ -30,6 +31,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   streamer_mode: false,
   show_full_values: false,
   use_condensed_skills: true,
+  merge_supplementary: false,
   open_log_on_save: true,
   overlay_columns: [MeterColumns.TotalDamage, MeterColumns.DPS, MeterColumns.DamageCap, MeterColumns.DamagePercentage],
 };

@@ -24,13 +24,13 @@ export type EnemyType = string | { Unknown: number };
  * Examples:
  * - `"LinkAttack"` - Link Attack
  * - `"SBA"` - Skybound Art
- * - `{ SupplementaryAttack: 113 }` (as its key, object with a number representing the skill number)
+ * - `{ SupplementaryDamage: 113 }` (as its key, object with a number representing the skill number)
  * - `{ Normal: 113 }` (as its key, object with a number representing the skill number)
  */
 export type ActionType =
   | "LinkAttack"
   | "SBA"
-  | { SupplementaryAttack: number }
+  | { SupplementaryDamage: number }
   | { DamageOverTime: number }
   | { Normal: number }
   | { Group: string };
@@ -56,11 +56,25 @@ export type SkillState = {
   cappedHits: number;
   /** Number of hits that were subject to a damage cap at all (cap-less sources like supplementary damage excluded) */
   cappableHits: number;
+  /** Procs classified as Supplementary (~0.2x their trigger hit) */
+  suppHits: number;
+  /** Procs classified as Echo (~0.4x their trigger hit) */
+  echoHits: number;
+  /** Damage from Supplementary procs attributed to this skill */
+  suppDamage: number;
+  /** Damage from Echo procs attributed to this skill */
+  echoDamage: number;
 };
 
 export type ComputedSkillState = SkillState & {
   /** Damage contribution as a percentage of the total */
   percentage: number;
+  /** Damage shown in the Total column — own damage, plus proc damage when the merge toggle is on */
+  totalDisplayDamage: number;
+  /** Supp proc damage as a percentage of the player total (0 when merge is off) */
+  suppPercentage: number;
+  /** Echo proc damage as a percentage of the player total (0 when merge is off) */
+  echoPercentage: number;
 };
 
 export type ComputedSkillGroup = {
@@ -88,6 +102,20 @@ export type ComputedSkillGroup = {
   cappedHits: number;
   /** Number of cappable hits (summed over grouped skills) */
   cappableHits: number;
+  /** Procs classified as Supplementary across the group */
+  suppHits: number;
+  /** Procs classified as Echo across the group */
+  echoHits: number;
+  /** Supplementary proc damage across the group */
+  suppDamage: number;
+  /** Echo proc damage across the group */
+  echoDamage: number;
+  /** Damage shown in the Total column — own + proc damage when the merge toggle is on */
+  totalDisplayDamage: number;
+  /** Supp proc damage as a percentage of the player total (0 when merge is off) */
+  suppPercentage: number;
+  /** Echo proc damage as a percentage of the player total (0 when merge is off) */
+  echoPercentage: number;
 };
 
 export type PlayerState = {
