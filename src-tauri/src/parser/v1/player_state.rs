@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::parser::constants::{CharacterType, FerrySkillId};
 
-use super::{skill_state::SkillState, AdjustedDamageInstance};
+use super::{skill_state::ProcKind, skill_state::SkillState, AdjustedDamageInstance};
 
 /// Derived stat breakdown for a player
 #[derive(Debug, Serialize, Deserialize)]
@@ -103,18 +103,46 @@ impl PlayerState {
             damage_instance.event.action_id
         };
 
-        // If the skill is already being tracked, update it.
-        for skill in self.skill_breakdown.iter_mut() {
-            // Aggregate all supplementary damage events into the same skill instance.
-            if matches!(
-                skill.action_type,
-                protocol::ActionType::SupplementaryDamage(_)
-            ) && matches!(action, protocol::ActionType::SupplementaryDamage(_))
-            {
-                skill.update_from_damage_event(damage_instance);
-                return;
+        // Supplementary-type procs: attribute to the skill row that triggered
+        // them (the proc carries the trigger's action id), then merge into the
+        // shared Supplementary Damage row as before. Classification is by
+        // damage ratio — the event stream has no other discriminator.
+        if let protocol::ActionType::SupplementaryDamage(trigger_aid) = action {
+            let event = damage_instance.event;
+            if let Some(idx) = self.skill_breakdown.iter().position(|s| {
+                s.action_type == ActionType::Normal(trigger_aid)
+                    && s.child_character_type == child_character_type
+            }) {
+                let row = &mut self.skill_breakdown[idx];
+                match row.classify_proc(event.damage, event.target.index, event.target.actor_type)
+                {
+                    ProcKind::Supplementary => {
+                        row.supp_hits += 1;
+                        row.supp_damage += event.damage as u64;
+                    }
+                    ProcKind::Echo => {
+                        row.echo_hits += 1;
+                        row.echo_damage += event.damage as u64;
+                    }
+                }
             }
 
+            if let Some(merged) = self
+                .skill_breakdown
+                .iter_mut()
+                .find(|s| matches!(s.action_type, protocol::ActionType::SupplementaryDamage(_)))
+            {
+                merged.update_from_damage_event(damage_instance);
+            } else {
+                let mut skill = SkillState::new(action, child_character_type);
+                skill.update_from_damage_event(damage_instance);
+                self.skill_breakdown.push(skill);
+            }
+            return;
+        }
+
+        // If the skill is already being tracked, update it.
+        for skill in self.skill_breakdown.iter_mut() {
             // If the skill is already being tracked, update it.
             if skill.action_type == action && skill.child_character_type == child_character_type {
                 skill.update_from_damage_event(damage_instance);
@@ -609,5 +637,153 @@ mod tests {
             .find(|s| s.action_type == ActionType::Normal(1))
             .unwrap();
         assert_eq!(normal_1.capped_hits, 2);
+    }
+
+    fn empty_player() -> PlayerState {
+        PlayerState {
+            index: 0,
+            character_type: CharacterType::Pl0000,
+            total_damage: 0,
+            last_known_pet_skill: None,
+            dps: 0.0,
+            skill_breakdown: vec![],
+            sba: 0.0,
+            total_stun_value: 0.0,
+            stun_per_second: 0.0,
+            capped_hits: 0,
+            cappable_hits: 0,
+        }
+    }
+
+    fn plain_event(action_id: ActionType, damage: i32) -> DamageEvent {
+        DamageEvent {
+            source: protocol::Actor {
+                index: 0,
+                actor_type: 0,
+                parent_actor_type: 0,
+                parent_index: 0,
+            },
+            target: protocol::Actor {
+                index: 0,
+                actor_type: 0,
+                parent_actor_type: 0,
+                parent_index: 0,
+            },
+            action_id,
+            damage,
+            flags: 0,
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+        }
+    }
+
+    fn apply(player: &mut PlayerState, event: &DamageEvent) {
+        player.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(event, None));
+    }
+
+    #[test]
+    fn supplementary_proc_attributes_to_trigger_skill() {
+        let mut player = empty_player();
+        apply(&mut player, &plain_event(ActionType::Normal(1), 1000));
+        apply(
+            &mut player,
+            &plain_event(ActionType::SupplementaryDamage(1), 200),
+        );
+
+        let trigger = player
+            .skill_breakdown
+            .iter()
+            .find(|s| s.action_type == ActionType::Normal(1))
+            .unwrap();
+        assert_eq!(trigger.supp_hits, 1);
+        assert_eq!(trigger.supp_damage, 200);
+        assert_eq!(trigger.echo_hits, 0);
+        // The trigger row's own hit stats are untouched by the proc.
+        assert_eq!(trigger.hits, 1);
+        assert_eq!(trigger.total_damage, 1000);
+
+        // The merged Supplementary Damage row still aggregates as before.
+        let merged = player
+            .skill_breakdown
+            .iter()
+            .find(|s| matches!(s.action_type, ActionType::SupplementaryDamage(_)))
+            .unwrap();
+        assert_eq!(merged.hits, 1);
+        assert_eq!(merged.total_damage, 200);
+        assert_eq!(player.total_damage, 1200);
+    }
+
+    #[test]
+    fn echo_proc_classified_by_ratio() {
+        let mut player = empty_player();
+        apply(&mut player, &plain_event(ActionType::Normal(1), 1000));
+        apply(
+            &mut player,
+            &plain_event(ActionType::SupplementaryDamage(1), 400),
+        );
+
+        let trigger = player
+            .skill_breakdown
+            .iter()
+            .find(|s| s.action_type == ActionType::Normal(1))
+            .unwrap();
+        assert_eq!(trigger.echo_hits, 1);
+        assert_eq!(trigger.echo_damage, 400);
+        assert_eq!(trigger.supp_hits, 0);
+    }
+
+    #[test]
+    fn proc_without_matching_skill_row_only_merges() {
+        let mut player = empty_player();
+        apply(
+            &mut player,
+            &plain_event(ActionType::SupplementaryDamage(99), 200),
+        );
+
+        // Only the merged row exists; nothing was attributed anywhere.
+        assert_eq!(player.skill_breakdown.len(), 1);
+        let merged = &player.skill_breakdown[0];
+        assert!(matches!(
+            merged.action_type,
+            ActionType::SupplementaryDamage(_)
+        ));
+        assert_eq!(merged.total_damage, 200);
+        assert_eq!(merged.supp_hits, 0);
+        assert_eq!(merged.echo_hits, 0);
+    }
+
+    #[test]
+    fn multiple_procs_accumulate() {
+        let mut player = empty_player();
+        apply(&mut player, &plain_event(ActionType::Normal(1), 1000));
+        apply(
+            &mut player,
+            &plain_event(ActionType::SupplementaryDamage(1), 200),
+        );
+        apply(&mut player, &plain_event(ActionType::Normal(1), 2000));
+        apply(
+            &mut player,
+            &plain_event(ActionType::SupplementaryDamage(1), 800),
+        );
+
+        let trigger = player
+            .skill_breakdown
+            .iter()
+            .find(|s| s.action_type == ActionType::Normal(1))
+            .unwrap();
+        // 200/1000 = 0.2 -> supp; 800/2000 = 0.4 -> echo.
+        assert_eq!(trigger.supp_hits, 1);
+        assert_eq!(trigger.supp_damage, 200);
+        assert_eq!(trigger.echo_hits, 1);
+        assert_eq!(trigger.echo_damage, 800);
+        // Merged row got both procs.
+        let merged = player
+            .skill_breakdown
+            .iter()
+            .find(|s| matches!(s.action_type, ActionType::SupplementaryDamage(_)))
+            .unwrap();
+        assert_eq!(merged.hits, 2);
+        assert_eq!(merged.total_damage, 1000);
     }
 }
