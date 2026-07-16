@@ -1,9 +1,31 @@
+use std::collections::VecDeque;
+
 use protocol::ActionType;
 use serde::{Deserialize, Serialize};
 
 use crate::parser::constants::CharacterType;
 
 use super::AdjustedDamageInstance;
+
+/// Which proc mechanic produced a supplementary-type damage event.
+/// The event stream carries no discriminator — flags are identical for both —
+/// so classification divides the proc's damage by its trigger hit's damage:
+/// Supplementary procs deal 0.2x, Echo procs 0.4x (spec 2026-07-16).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcKind {
+    Supplementary,
+    Echo,
+}
+
+const SUPP_RATIO: f64 = 0.2;
+const ECHO_RATIO: f64 = 0.4;
+/// Geometric mean of 0.2 and 0.4 — the classification boundary.
+const RATIO_MIDPOINT: f64 = 0.283;
+/// A ratio this close to 0.2/0.4 is an exact match; nothing can beat it.
+const EXACT_TOLERANCE: f64 = 0.002;
+/// Window size measured on logs 244-247: accuracy plateaus at 8, larger
+/// windows only add ambiguous 2x pairs.
+const RECENT_HITS_WINDOW: usize = 8;
 
 /// Derived stat breakdown of a particular skill
 #[derive(Debug, Serialize, Deserialize)]
@@ -37,6 +59,22 @@ pub struct SkillState {
     /// the frontend only needs the counters.
     #[serde(skip)]
     pub cappable_samples: Vec<(i32, i32)>,
+    /// Procs classified as Supplementary (≈0.2× their trigger hit)
+    #[serde(default)]
+    pub supp_hits: u32,
+    /// Procs classified as Echo (≈0.4× their trigger hit)
+    #[serde(default)]
+    pub echo_hits: u32,
+    /// Damage from Supplementary procs attributed to this skill
+    #[serde(default)]
+    pub supp_damage: u64,
+    /// Damage from Echo procs attributed to this skill
+    #[serde(default)]
+    pub echo_damage: u64,
+    /// `(damage, target_index, target_actor_type)` of the last 8 hits, used to
+    /// classify proc events by ratio. Never serialized — rebuilt on re-parse.
+    #[serde(skip)]
+    pub recent_hits: VecDeque<(i32, u32, u32)>,
 }
 
 impl SkillState {
@@ -53,6 +91,11 @@ impl SkillState {
             capped_hits: 0,
             cappable_hits: 0,
             cappable_samples: Vec::new(),
+            supp_hits: 0,
+            echo_hits: 0,
+            supp_damage: 0,
+            echo_damage: 0,
+            recent_hits: VecDeque::new(),
         }
     }
 
@@ -82,6 +125,62 @@ impl SkillState {
         } else {
             self.max_damage = Some(damage_instance.event.damage as u64);
         }
+
+        self.recent_hits.push_back((
+            damage_instance.event.damage,
+            damage_instance.event.target.index,
+            damage_instance.event.target.actor_type,
+        ));
+        if self.recent_hits.len() > RECENT_HITS_WINDOW {
+            self.recent_hits.pop_front();
+        }
+    }
+
+    /// Classify a supplementary-type proc against this skill's recent hits.
+    /// Search order (spec): exact ratio match on the proc's own target, then
+    /// exact match on any target, then nearest ratio overall. Iteration is
+    /// newest-first so ties break toward the most recent hit. An empty buffer
+    /// defaults to Supplementary.
+    pub fn classify_proc(
+        &self,
+        proc_damage: i32,
+        target_index: u32,
+        target_actor_type: u32,
+    ) -> ProcKind {
+        let dist = |r: f64| (r - SUPP_RATIO).abs().min((r - ECHO_RATIO).abs());
+        let kind_of = |r: f64| {
+            if r < RATIO_MIDPOINT {
+                ProcKind::Supplementary
+            } else {
+                ProcKind::Echo
+            }
+        };
+        let ratios = |same_target_only: bool| {
+            self.recent_hits
+                .iter()
+                .rev()
+                .filter(move |(damage, t_idx, t_type)| {
+                    *damage > 0
+                        && (!same_target_only
+                            || (*t_idx == target_index && *t_type == target_actor_type))
+                })
+                .map(move |(damage, _, _)| proc_damage as f64 / *damage as f64)
+        };
+
+        if let Some(r) = ratios(true).find(|r| dist(*r) < EXACT_TOLERANCE) {
+            return kind_of(r);
+        }
+        if let Some(r) = ratios(false).find(|r| dist(*r) < EXACT_TOLERANCE) {
+            return kind_of(r);
+        }
+        // Nearest bucket. Strict `<` keeps the first (newest) of equal candidates.
+        let mut best: Option<f64> = None;
+        for r in ratios(false) {
+            if best.map_or(true, |b| dist(r) < dist(b)) {
+                best = Some(r);
+            }
+        }
+        best.map(kind_of).unwrap_or(ProcKind::Supplementary)
     }
 
     /// Recount `capped_hits` against newly-learned crit multipliers (the live path
@@ -235,5 +334,96 @@ mod tests {
         assert_eq!(skill_state.hits, 1);
         assert_eq!(skill_state.capped_hits, 0);
         assert_eq!(skill_state.cappable_hits, 0);
+    }
+
+    fn make_event_on_target(damage: i32, target_index: u32) -> DamageEvent {
+        let mut event = make_event(damage, None);
+        event.target.index = target_index;
+        event
+    }
+
+    fn record_hit(skill: &mut SkillState, damage: i32, target_index: u32) {
+        let event = make_event_on_target(damage, target_index);
+        skill.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(&event, None));
+    }
+
+    #[test]
+    fn classifies_supplementary_ratio() {
+        let mut skill = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+        record_hit(&mut skill, 1000, 0);
+        assert_eq!(skill.classify_proc(200, 0, 0), ProcKind::Supplementary);
+    }
+
+    #[test]
+    fn classifies_echo_ratio() {
+        let mut skill = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+        record_hit(&mut skill, 1000, 0);
+        assert_eq!(skill.classify_proc(400, 0, 0), ProcKind::Echo);
+    }
+
+    #[test]
+    fn picks_best_hit_across_window_not_newest() {
+        let mut skill = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+        // Older hit is the true trigger (ratio 0.2); newest gives a garbage 0.5.
+        record_hit(&mut skill, 1_000_000, 0);
+        record_hit(&mut skill, 400_000, 0);
+        assert_eq!(skill.classify_proc(200_000, 0, 0), ProcKind::Supplementary);
+    }
+
+    #[test]
+    fn empty_buffer_defaults_to_supplementary() {
+        let skill = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+        assert_eq!(skill.classify_proc(12345, 0, 0), ProcKind::Supplementary);
+    }
+
+    #[test]
+    fn ambiguous_two_x_pair_prefers_same_target() {
+        let mut skill = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+        // 2,000,000 on target 1 and 1,000,000 on target 2: a 400,000 proc is
+        // exactly 0.2x the first AND 0.4x the second. Same-target must win.
+        record_hit(&mut skill, 2_000_000, 1);
+        record_hit(&mut skill, 1_000_000, 2);
+        assert_eq!(skill.classify_proc(400_000, 2, 0), ProcKind::Echo);
+        assert_eq!(skill.classify_proc(400_000, 1, 0), ProcKind::Supplementary);
+    }
+
+    #[test]
+    fn nearest_bucket_when_no_exact_match() {
+        let mut skill = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+        record_hit(&mut skill, 1000, 0);
+        // 0.27 -> below the 0.283 midpoint -> Supplementary
+        assert_eq!(skill.classify_proc(270, 0, 0), ProcKind::Supplementary);
+        // 0.30 -> above the midpoint -> Echo
+        assert_eq!(skill.classify_proc(300, 0, 0), ProcKind::Echo);
+    }
+
+    #[test]
+    fn old_serialized_state_defaults_proc_fields_to_zero() {
+        // Old logs' derived state lacks the proc fields; serde(default) must
+        // fill zeros and the skip'd ring buffer must come back empty.
+        let skill = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+        let mut json: serde_json::Value = serde_json::to_value(&skill).unwrap();
+        let obj = json.as_object_mut().unwrap();
+        obj.remove("suppHits");
+        obj.remove("echoHits");
+        obj.remove("suppDamage");
+        obj.remove("echoDamage");
+        let revived: SkillState = serde_json::from_value(json).unwrap();
+        assert_eq!(revived.supp_hits, 0);
+        assert_eq!(revived.echo_hits, 0);
+        assert_eq!(revived.supp_damage, 0);
+        assert_eq!(revived.echo_damage, 0);
+        assert!(revived.recent_hits.is_empty());
+    }
+
+    #[test]
+    fn ring_buffer_caps_at_window_size() {
+        let mut skill = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+        for i in 0..10 {
+            record_hit(&mut skill, 1000 + i, 0);
+        }
+        assert_eq!(skill.recent_hits.len(), 8);
+        // Oldest entries (1000, 1001) evicted.
+        assert_eq!(skill.recent_hits.front().copied(), Some((1002, 0, 0)));
     }
 }
