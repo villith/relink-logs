@@ -1,6 +1,8 @@
 import { CharacterType, ComputedPlayerState, ComputedSkillGroup, ComputedSkillState } from "@/types";
 
+import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { getSkillName } from "@/utils";
+import { useShallow } from "zustand/react/shallow";
 import { SkillGroupRow } from "./SkillGroupRow";
 import { SkillRow } from "./SkillRow";
 import { useSkillBreakdown } from "./useSkillBreakdown";
@@ -44,6 +46,9 @@ const renderSkillRow = (
 
 export const SkillBreakdown = ({ player, color }: SkillBreakdownProps) => {
   const { skills } = useSkillBreakdown(player);
+  const { mergeSupplementary } = useMeterSettingsStore(
+    useShallow((state) => ({ mergeSupplementary: state.merge_supplementary }))
+  );
 
   return (
     <tr className="skill-table">
@@ -57,6 +62,10 @@ export const SkillBreakdown = ({ player, color }: SkillBreakdownProps) => {
               <th className="header-column text-center">Min</th>
               <th className="header-column text-center">Max</th>
               <th className="header-column text-center">Avg</th>
+              {mergeSupplementary && <th className="header-column text-center">Supp</th>}
+              <th className="header-column text-center">Supp%</th>
+              {mergeSupplementary && <th className="header-column text-center">Echo</th>}
+              <th className="header-column text-center">Echo%</th>
               <th className="header-column text-center">Cap</th>
               <th className="header-column text-center">%</th>
             </tr>

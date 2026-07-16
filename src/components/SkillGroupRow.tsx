@@ -13,6 +13,8 @@ export type SkillRowProps = {
 export const SkillGroupRow = ({ characterType, group, color }: SkillRowProps) => {
   const {
     showFullValues,
+    mergeSupplementary,
+    rawTotalDamage,
     totalDamage,
     totalDamageUnit,
     minDmg,
@@ -22,6 +24,11 @@ export const SkillGroupRow = ({ characterType, group, color }: SkillRowProps) =>
     rawAverageDmg,
     averageDmg,
     averageDmgUnit,
+    suppDmg,
+    suppDmgUnit,
+    echoDmg,
+    echoDmgUnit,
+    ownPercentage,
     expanded,
     setExpanded,
     sortedSkills,
@@ -37,7 +44,7 @@ export const SkillGroupRow = ({ characterType, group, color }: SkillRowProps) =>
         <td className="text-center row-data">{group.hits}</td>
         <td className="text-center row-data">
           {showFullValues ? (
-            group.totalDamage.toLocaleString()
+            rawTotalDamage.toLocaleString()
           ) : (
             <>
               {totalDamage}
@@ -83,6 +90,46 @@ export const SkillGroupRow = ({ characterType, group, color }: SkillRowProps) =>
             </>
           )}
         </td>
+        {mergeSupplementary && (
+          <td className="text-center row-data">
+            {group.suppDamage > 0 ? (
+              showFullValues ? (
+                group.suppDamage.toLocaleString()
+              ) : (
+                <>
+                  {suppDmg}
+                  <span className="unit font-sm">{suppDmgUnit}</span>
+                </>
+              )
+            ) : (
+              ""
+            )}
+          </td>
+        )}
+        <td className="text-center row-data">
+          {group.hits > 0 ? ((group.suppHits / group.hits) * 100).toFixed(0) : 0}
+          <span className="font-sm">%</span>
+        </td>
+        {mergeSupplementary && (
+          <td className="text-center row-data">
+            {group.echoDamage > 0 ? (
+              showFullValues ? (
+                group.echoDamage.toLocaleString()
+              ) : (
+                <>
+                  {echoDmg}
+                  <span className="unit font-sm">{echoDmgUnit}</span>
+                </>
+              )
+            ) : (
+              ""
+            )}
+          </td>
+        )}
+        <td className="text-center row-data">
+          {group.hits > 0 ? ((group.echoHits / group.hits) * 100).toFixed(0) : 0}
+          <span className="font-sm">%</span>
+        </td>
         <td className="text-center row-data">
           {group.cappedHits > 0 && group.cappableHits > 0 ? (
             <span className="capped">
@@ -99,7 +146,23 @@ export const SkillGroupRow = ({ characterType, group, color }: SkillRowProps) =>
           {group.percentage.toFixed(0)}
           <span className="unit font-sm">%</span>
         </td>
-        <div className="damage-bar" style={{ backgroundColor: color, width: `${group.percentage}%` }} />
+        <div className="damage-bar" style={{ backgroundColor: color, width: `${ownPercentage}%` }} />
+        {(group.suppPercentage ?? 0) > 0 && (
+          <div
+            className="damage-bar damage-bar-supp"
+            style={{ backgroundColor: color, left: `${ownPercentage}%`, width: `${group.suppPercentage}%` }}
+          />
+        )}
+        {(group.echoPercentage ?? 0) > 0 && (
+          <div
+            className="damage-bar damage-bar-echo"
+            style={{
+              backgroundColor: color,
+              left: `${ownPercentage + (group.suppPercentage ?? 0)}%`,
+              width: `${group.echoPercentage}%`,
+            }}
+          />
+        )}
       </tr>
       {expanded &&
         sortedSkills.map((skill) => (

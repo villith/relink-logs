@@ -160,6 +160,14 @@
   transition: width 0.1s ease-in-out;
 }
 
+.table .damage-bar-supp {
+  opacity: 0.55;
+}
+
+.table .damage-bar-echo {
+  opacity: 0.3;
+}
+
 .skill-row .row-data,
 .player-row .row-data,
 .row-button {

@@ -1,5 +1,6 @@
 import { CharacterType, ComputedSkillState } from "@/types";
 import { getSkillName } from "@/utils";
+import { isDotAction, isSupplementaryAction } from "./mergeSupplementary";
 import { useSkillRow } from "./useSkillRow";
 
 export type SkillRowProps = {
@@ -12,6 +13,8 @@ export type SkillRowProps = {
 export const SkillRow = ({ characterType, skill, color, nested }: SkillRowProps) => {
   const {
     showFullValues,
+    mergeSupplementary,
+    rawTotalDamage,
     totalDamage,
     totalDamageUnit,
     minDmg,
@@ -21,7 +24,15 @@ export const SkillRow = ({ characterType, skill, color, nested }: SkillRowProps)
     rawAverageDmg,
     averageDmg,
     averageDmgUnit,
+    suppDmg,
+    suppDmgUnit,
+    echoDmg,
+    echoDmgUnit,
+    ownPercentage,
   } = useSkillRow(skill);
+
+  // Proc columns are meaningless on rows that are themselves procs or DoT.
+  const isProcSource = !isSupplementaryAction(skill.actionType) && !isDotAction(skill.actionType);
 
   return (
     <tr className={`skill-row ${nested ? "nested" : ""}`}>
@@ -33,7 +44,7 @@ export const SkillRow = ({ characterType, skill, color, nested }: SkillRowProps)
       <td className="text-center row-data">{skill.hits}</td>
       <td className="text-center row-data">
         {showFullValues ? (
-          skill.totalDamage.toLocaleString()
+          rawTotalDamage.toLocaleString()
         ) : (
           <>
             {totalDamage}
@@ -79,6 +90,58 @@ export const SkillRow = ({ characterType, skill, color, nested }: SkillRowProps)
           </>
         )}
       </td>
+      {mergeSupplementary && (
+        <td className="text-center row-data">
+          {isProcSource && skill.suppDamage > 0 ? (
+            showFullValues ? (
+              skill.suppDamage.toLocaleString()
+            ) : (
+              <>
+                {suppDmg}
+                <span className="unit font-sm">{suppDmgUnit}</span>
+              </>
+            )
+          ) : (
+            ""
+          )}
+        </td>
+      )}
+      <td className="text-center row-data">
+        {isProcSource ? (
+          <>
+            {skill.hits > 0 ? ((skill.suppHits / skill.hits) * 100).toFixed(0) : 0}
+            <span className="font-sm">%</span>
+          </>
+        ) : (
+          ""
+        )}
+      </td>
+      {mergeSupplementary && (
+        <td className="text-center row-data">
+          {isProcSource && skill.echoDamage > 0 ? (
+            showFullValues ? (
+              skill.echoDamage.toLocaleString()
+            ) : (
+              <>
+                {echoDmg}
+                <span className="unit font-sm">{echoDmgUnit}</span>
+              </>
+            )
+          ) : (
+            ""
+          )}
+        </td>
+      )}
+      <td className="text-center row-data">
+        {isProcSource ? (
+          <>
+            {skill.hits > 0 ? ((skill.echoHits / skill.hits) * 100).toFixed(0) : 0}
+            <span className="font-sm">%</span>
+          </>
+        ) : (
+          ""
+        )}
+      </td>
       <td className="text-center row-data">
         {skill.cappedHits > 0 && skill.cappableHits > 0 ? (
           <span className="capped">
@@ -95,7 +158,23 @@ export const SkillRow = ({ characterType, skill, color, nested }: SkillRowProps)
         {skill.percentage.toFixed(0)}
         <span className="unit font-sm">%</span>
       </td>
-      <div className="damage-bar" style={{ backgroundColor: color, width: `${skill.percentage}%` }} />
+      <div className="damage-bar" style={{ backgroundColor: color, width: `${ownPercentage}%` }} />
+      {(skill.suppPercentage ?? 0) > 0 && (
+        <div
+          className="damage-bar damage-bar-supp"
+          style={{ backgroundColor: color, left: `${ownPercentage}%`, width: `${skill.suppPercentage}%` }}
+        />
+      )}
+      {(skill.echoPercentage ?? 0) > 0 && (
+        <div
+          className="damage-bar damage-bar-echo"
+          style={{
+            backgroundColor: color,
+            left: `${ownPercentage + (skill.suppPercentage ?? 0)}%`,
+            width: `${skill.echoPercentage}%`,
+          }}
+        />
+      )}
     </tr>
   );
 };
