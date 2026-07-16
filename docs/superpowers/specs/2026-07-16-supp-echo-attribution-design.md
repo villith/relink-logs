@@ -62,6 +62,10 @@ In `PlayerState::update_from_damage_event`, a `SupplementaryDamage(aid)` event:
    - Ambiguous procs (window contains both a clean 0.2 and a clean 0.4
      candidate — hits in a 2× ratio; measured at 0–1% per encounter)
      tie-break to the same-target candidate, then to the most recent.
+   - Window size 8 comes from a sweep on logs 244–247: clean-rate rises
+     steeply to K=4, plateaus by K=8 (95.4–98.2%), and stays flat through
+     K=16 while the ambiguity rate roughly doubles. Larger windows add only
+     coin-flip cases.
 4. Increments the chosen counters on that skill row.
 
 Ferry's remapped pet action_ids keep their existing behavior; attribution for
