@@ -175,6 +175,7 @@ The injected DLL is **locked while the game runs** — close the game to swap it
 - `ghidra/InspectFunc.java` — entry RVA(s) → callers, callees, string refs, prologue disasm (lean DB).
 - `ghidra/FindByBytes.java` — byte pattern → containing-function entry for each hit (lean DB).
 - `ghidra/FindStringRefs.java` — ASCII substring → enclosing C-strings → code xrefs + containing-function entries (needs the **analyzed** DB for xrefs).
+- `ghidra/XrefsTo.java` — RVA(s) → every referencing site, deduped by containing function with per-function counts. THE query for "who touches this global/vtable/function" (needs the **analyzed** DB).
 - `ghidra/ListSymbols.java` — case-insensitive substring search over the symbol table (RTTI class/vtable names) (needs the **analyzed** DB).
 - `ghidra/Decompile.java` — RVA(s) → decompiled C of the containing function (needs the **analyzed** `gbfr202fast` DB).
 - `ghidra/FastAnalysisOptions.java` — pre-script that disables slow analyzers for the fast full-analysis build.

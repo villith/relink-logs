@@ -11,10 +11,8 @@
 //!
 //! Everything here compiles to nothing unless `--features hookdiag` is set.
 
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicUsize, Ordering};
 
-#[cfg(feature = "hookdiag")]
-use std::sync::atomic::AtomicUsize;
 #[cfg(feature = "hookdiag")]
 use std::sync::OnceLock;
 #[cfg(feature = "hookdiag")]
@@ -64,9 +62,10 @@ macro_rules! ev {
 }
 pub(crate) use ev;
 
-/// The game module base, captured once at hook setup, so logged absolute addresses can
-/// be converted to RVAs (subtract this) for use with the sigscan/Ghidra tooling.
-#[cfg(feature = "hookdiag")]
+/// The game module base, captured once at hook setup. Diagnostics use it to convert
+/// logged absolute addresses to RVAs; production readers use it to resolve global
+/// singletons as `module_base + RVA` (e.g. the equipped-state save root the weapon
+/// identity walk starts from), so it is compiled in ALL builds.
 pub static MODULE_BASE: AtomicUsize = AtomicUsize::new(0);
 
 /// Monotonic start instant, so every diagnostic line carries an elapsed-milliseconds
@@ -80,11 +79,13 @@ fn ms() -> u128 {
     START.get_or_init(Instant::now).elapsed().as_millis()
 }
 
-#[cfg(feature = "hookdiag")]
 pub fn set_module_base(base: usize) {
     MODULE_BASE.store(base, Ordering::Relaxed);
-    START.get_or_init(Instant::now);
-    log::info!("HOOKDIAG t=0 module_base={:#x}", base);
+    #[cfg(feature = "hookdiag")]
+    {
+        START.get_or_init(Instant::now);
+        log::info!("HOOKDIAG t=0 module_base={:#x}", base);
+    }
 }
 
 /// Log a labelled event with a timestamp and a free-form value string. This is the
@@ -208,6 +209,23 @@ pub fn read_ptr_guarded(base: usize, offset: usize) -> Option<usize> {
         return None;
     }
     Some(unsafe { (addr as *const usize).read_unaligned() })
+}
+
+/// Read `len` raw bytes at `base + offset`, returning `None` if `base` is null or any part
+/// of the range isn't committed/readable. Guarded like the other readers — can NEVER fault
+/// the game. Used by the weapon-identity walk to read the equipped-weapon id, which the
+/// save stores as inline ASCII rather than a hash.
+pub fn read_bytes_guarded(base: usize, offset: usize, len: usize) -> Option<Vec<u8>> {
+    if base == 0 || len == 0 {
+        return None;
+    }
+    let addr = base.wrapping_add(offset);
+    if !readable(addr, len) {
+        return None;
+    }
+    let mut out = vec![0u8; len];
+    unsafe { std::ptr::copy_nonoverlapping(addr as *const u8, out.as_mut_ptr(), len) };
+    Some(out)
 }
 
 /// Read an `f32` at `base + offset`, returning `None` if `base` is null or the location isn't
@@ -664,9 +682,6 @@ pub fn probe_pl2000_parent(_instance: usize) {}
 #[inline(always)]
 #[allow(dead_code)]
 pub fn probe_player_instance(_instance: usize) {}
-#[cfg(not(feature = "hookdiag"))]
-#[inline(always)]
-pub fn set_module_base(_base: usize) {}
 #[cfg(not(feature = "hookdiag"))]
 #[inline(always)]
 #[allow(dead_code)]

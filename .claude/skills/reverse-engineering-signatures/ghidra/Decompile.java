@@ -10,6 +10,7 @@ import ghidra.app.script.GhidraScript;
 import ghidra.program.model.address.Address;
 import ghidra.program.model.listing.Function;
 import ghidra.app.decompiler.DecompInterface;
+import ghidra.app.decompiler.DecompileOptions;
 import ghidra.app.decompiler.DecompileResults;
 
 public class Decompile extends GhidraScript {
@@ -19,6 +20,11 @@ public class Decompile extends GhidraScript {
         long base = currentProgram.getImageBase().getOffset();
 
         DecompInterface dec = new DecompInterface();
+        // Huge UI/setup functions overflow the default 50 MB response buffer
+        // ("Response buffer size exceeded"); raise it before opening the program.
+        DecompileOptions opts = new DecompileOptions();
+        opts.setMaxPayloadMBytes(512);
+        dec.setOptions(opts);
         dec.openProgram(currentProgram);
 
         for (String a : args) {
@@ -40,7 +46,7 @@ public class Decompile extends GhidraScript {
                     + "' entry=0x" + Long.toHexString(entryRva)
                     + " params=" + fn.getParameterCount() + " ===");
 
-            DecompileResults res = dec.decompileFunction(fn, 60, monitor);
+            DecompileResults res = dec.decompileFunction(fn, 300, monitor);
             if (res == null || !res.decompileCompleted()) {
                 println("Decompile: FAILED (" + (res == null ? "null" : res.getErrorMessage()) + ")");
                 continue;
