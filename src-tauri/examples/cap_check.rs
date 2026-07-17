@@ -75,7 +75,7 @@ fn main() -> Result<()> {
         }
     }
 
-    let conn = Connection::open(&db_path)?;
+    let conn = Connection::open(db_path)?;
     let mut stmt = conn.prepare(
         "SELECT id, data FROM logs WHERE version = 1 ORDER BY id DESC LIMIT ?",
     )?;

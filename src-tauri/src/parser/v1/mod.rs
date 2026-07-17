@@ -598,8 +598,39 @@ impl Parser {
         for (timestamp, event) in self.encounter.event_log() {
             self.derived_state.end_time = *timestamp;
 
-            match event {
-                Message::DamageEvent(event) => {
+            if let Message::DamageEvent(event) = event {
+                let event = remap_dragon_form(&self.encounter.player_data, event);
+
+                let player_data = self
+                    .encounter
+                    .player_data
+                    .iter()
+                    .flatten()
+                    .find(|player| player.actor_index == event.source.parent_index);
+
+                let damage_instance =
+                    AdjustedDamageInstance::from_damage_event(&event, player_data);
+
+                self.derived_state
+                    .process_damage_event(*timestamp, &damage_instance);
+            }
+        }
+    }
+
+    // Re-analyzes the encounter with the given targets.
+    pub fn reparse_with_options(&mut self, targets: &[EnemyType]) {
+        self.derived_state = Default::default();
+        self.derived_state.start(self.start_time());
+
+        for (timestamp, event) in self.encounter.event_log() {
+            self.derived_state.end_time = *timestamp;
+
+            if let Message::DamageEvent(event) = event {
+                // If the target list is empty, then we're not filtering by target.
+                // Otherwise, we only process damage events that match the target list.
+                let target_type = EnemyType::from_hash(event.target.parent_actor_type);
+
+                if targets.is_empty() || targets.contains(&target_type) {
                     let event = remap_dragon_form(&self.encounter.player_data, event);
 
                     let player_data = self
@@ -615,43 +646,6 @@ impl Parser {
                     self.derived_state
                         .process_damage_event(*timestamp, &damage_instance);
                 }
-                _ => {}
-            }
-        }
-    }
-
-    // Re-analyzes the encounter with the given targets.
-    pub fn reparse_with_options(&mut self, targets: &[EnemyType]) {
-        self.derived_state = Default::default();
-        self.derived_state.start(self.start_time());
-
-        for (timestamp, event) in self.encounter.event_log() {
-            self.derived_state.end_time = *timestamp;
-
-            match event {
-                Message::DamageEvent(event) => {
-                    // If the target list is empty, then we're not filtering by target.
-                    // Otherwise, we only process damage events that match the target list.
-                    let target_type = EnemyType::from_hash(event.target.parent_actor_type);
-
-                    if targets.is_empty() || targets.contains(&target_type) {
-                        let event = remap_dragon_form(&self.encounter.player_data, event);
-
-                        let player_data = self
-                            .encounter
-                            .player_data
-                            .iter()
-                            .flatten()
-                            .find(|player| player.actor_index == event.source.parent_index);
-
-                        let damage_instance =
-                            AdjustedDamageInstance::from_damage_event(&event, player_data);
-
-                        self.derived_state
-                            .process_damage_event(*timestamp, &damage_instance);
-                    }
-                }
-                _ => {}
             }
         }
     }

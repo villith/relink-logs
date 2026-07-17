@@ -20,7 +20,7 @@ fn main() -> Result<()> {
         }
     }
 
-    let conn = Connection::open(&db_path)?;
+    let conn = Connection::open(db_path)?;
     let mut stmt = conn.prepare("SELECT id, data FROM logs WHERE id >= ? ORDER BY id")?;
     let rows = stmt.query_map([since_id], |row| {
         Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?))

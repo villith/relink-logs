@@ -255,7 +255,9 @@ fn main() -> Result<()> {
                 "    at-or-over-cap hits missed by learner (physically capped, counted UNCAPPED): {}",
                 a.missed_at_cap
             );
-            if false && !a.unlearned_at_cap_buckets.is_empty() {
+            // Flip to true to dump the per-bucket ratio histogram for debugging.
+            const VERBOSE_BUCKETS: bool = false;
+            if VERBOSE_BUCKETS && !a.unlearned_at_cap_buckets.is_empty() {
                 let mut b: Vec<_> = a.unlearned_at_cap_buckets.iter().collect();
                 b.sort();
                 println!("      unlearned >=cap ratio buckets (ratio -> hits, <{MIN_PEAK_HITS} => never learnable):");

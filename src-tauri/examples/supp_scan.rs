@@ -84,7 +84,6 @@ fn main() -> Result<()> {
                     ActionType::SupplementaryDamage(_) => "supp",
                     ActionType::DamageOverTime(_) => "dot",
                     ActionType::Normal(_) => "normal",
-                    _ => "other",
                 };
                 per_class.entry(class).or_default().add(e.damage as i64);
                 match e.action_id {
