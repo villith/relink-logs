@@ -239,6 +239,13 @@ export const translatedPlayerName = (
 };
 
 export const sortPlayers = (players: ComputedPlayerState[], sortType: SortType, sortDirection: SortDirection) => {
+  // Precompute the sort key once per player when it isn't a plain field on the state,
+  // so the comparator doesn't re-derive it for every comparison (O(n log n) scans).
+  const supEligible =
+    sortType === MeterColumns.SupPercentage
+      ? new Map(players.map((p) => [p, computeSupPercentage(p).eligible]))
+      : null;
+
   players.sort((a, b) => {
     if (sortType === MeterColumns.Name) {
       return sortDirection === "asc" ? a.partyIndex - b.partyIndex : b.partyIndex - a.partyIndex;
@@ -255,9 +262,9 @@ export const sortPlayers = (players: ComputedPlayerState[], sortType: SortType, 
     } else if (sortType === MeterColumns.StunPerSecond) {
       return sortDirection === "asc" ? a?.stunPerSecond - b?.stunPerSecond : b?.stunPerSecond - a?.stunPerSecond;
     } else if (sortType === MeterColumns.SupPercentage) {
-      return sortDirection === "asc"
-        ? computeSupPercentage(a).eligible - computeSupPercentage(b).eligible
-        : computeSupPercentage(b).eligible - computeSupPercentage(a).eligible;
+      const ea = supEligible!.get(a)!;
+      const eb = supEligible!.get(b)!;
+      return sortDirection === "asc" ? ea - eb : eb - ea;
     }
 
     return 0;
@@ -416,6 +423,25 @@ export const exportFullEncounterToClipboard = (
 };
 
 export const PLAYER_COLORS = ["#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#9BCF53", "#380E7F", "#416D19", "#2C568D"];
+
+/// Resolves a player row's chart/overlay color. A filled party slot's color belongs
+/// to the row matched to it. A row that doesn't resolve to a slot picks, by its sort
+/// position, from the remaining colors: first the EMPTY slots' colors (so four
+/// characters still use colors 1-4 even when some identities are missing), then the
+/// overflow colors. Indexing the slot palette by sort position would collide with
+/// matched rows' colors, so unmatched rows draw from `freeColors` instead.
+///
+/// `colors` is the 8-entry palette (the four user colors + `PLAYER_COLORS.slice(4)`).
+export const resolvePlayerColor = (
+  colors: string[],
+  partyData: Array<PlayerData | null>,
+  partySlotIndex: number,
+  sortIndex: number
+): string => {
+  if (partySlotIndex !== -1) return colors[partySlotIndex];
+  const freeColors = colors.filter((_, i) => i >= 4 || !partyData[i]);
+  return freeColors[sortIndex % freeColors.length];
+};
 
 /// Translates the enemy type to a human-readable string.
 export const translateEnemyType = (type: EnemyType | null): string => {

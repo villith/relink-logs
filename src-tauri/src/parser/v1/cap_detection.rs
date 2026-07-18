@@ -25,6 +25,19 @@ pub fn is_capped(base: Option<f32>, cap: Option<i32>) -> bool {
     base > cap as f32
 }
 
+/// The valid `(base, cap)` pair for one hit's overcap accumulation, in `f64`.
+///
+/// Returns `None` for the same non-usable inputs as [`is_capped`]/
+/// [`overcap_display_percent`] (missing base/cap, non-finite/non-positive base,
+/// non-positive cap sentinel), so all three share one validity rule.
+pub fn overcap_contribution(base: Option<f32>, cap: Option<i32>) -> Option<(f64, f64)> {
+    let (base, cap) = (base?, cap?);
+    if cap <= 0 || !base.is_finite() || base <= 0.0 {
+        return None;
+    }
+    Some((base as f64, cap as f64))
+}
+
 /// The game's overcap-display percentage for one hit: `(base / cap) * 100`.
 ///
 /// Matches the value the in-game damage-cap display shows (a hit at the cap reads

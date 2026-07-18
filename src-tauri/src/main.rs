@@ -15,7 +15,7 @@ use gbfr_logs::{db, parser};
 use db::logs::LogEntry;
 use dll_syringe::{process::OwnedProcess, Syringe};
 use interprocess::os::windows::named_pipe::tokio::RecvPipeStream;
-use log::{info, warn, LevelFilter};
+use log::{info, LevelFilter};
 use parser::{
     constants::{CharacterType, EnemyType},
     v1::{self, PlayerData},
@@ -65,6 +65,10 @@ fn set_debug_mode(app: AppHandle, state: State<DebugMode>, enabled: bool) {
 async fn delete_all_logs() -> Result<(), String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM logs", [])
+        .map_err(|e| e.to_string())?;
+    // Deleting every log leaves every Conflux run roomless — drop them too so the
+    // Conflux tab doesn't keep showing ghost "×0 rooms" runs.
+    conn.execute("DELETE FROM runs", [])
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -379,6 +383,12 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     for (timestamp, event) in parser.encounter.event_log() {
         match event {
             Message::DamageEvent(damage_event) => {
+                // Attribute dragon-form (Id/Pl2000) damage to the Id player, matching the
+                // remap the party table uses — otherwise `derived_state.party` (keyed by the
+                // remapped index) has no bucket for the raw Pl2000 index and the chart drops it.
+                let damage_event = v1::remap_dragon_form(&parser.encounter.player_data, damage_event);
+                let damage_event = &damage_event;
+
                 let index = ((timestamp - start_time) / DPS_INTERVAL) as usize;
                 let target_type = EnemyType::from_hash(damage_event.target.parent_actor_type);
 
@@ -445,10 +455,17 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
     let param = id_params.join(",");
 
     let sql = format!("DELETE FROM logs WHERE id IN ({})", param);
-    let mut statement = conn.prepare_cached(&sql).map_err(|e| e.to_string())?;
-    statement
-        .execute(params_from_iter(ids))
-        .map_err(|e| e.to_string())?;
+    {
+        let mut statement = conn.prepare_cached(&sql).map_err(|e| e.to_string())?;
+        statement
+            .execute(params_from_iter(ids))
+            .map_err(|e| e.to_string())?;
+    }
+
+    // A deleted log may have been a Conflux room; reap any run left with no rooms so it
+    // doesn't linger as a ghost "×0 rooms" row (the startup sweep only reaps in-progress
+    // runs).
+    db::runs::delete_runs_without_rooms(&conn).map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -561,21 +578,21 @@ fn connect_and_run_parser(app: AppHandle) {
                                     state.on_death_event(event);
                                 }
                                 protocol::Message::ConfluxRoomEnter(event) => {
-                                    warn!(
+                                    info!(
                                         "CONFLUX ingress: ConfluxRoomEnter quest_id={:#x} manager={:#x}",
                                         event.quest_id, event.manager_ptr
                                     );
                                     state.on_conflux_room_enter(event);
                                 }
                                 protocol::Message::ConfluxBuffAcquired(event) => {
-                                    warn!(
+                                    info!(
                                         "CONFLUX ingress: ConfluxBuffAcquired buff_id={:#x}",
                                         event.buff_id
                                     );
                                     state.on_conflux_buff_acquired(event);
                                 }
                                 protocol::Message::ConfluxRunEnd(event) => {
-                                    warn!(
+                                    info!(
                                         "CONFLUX ingress: ConfluxRunEnd manager={:#x}",
                                         event.manager_ptr
                                     );

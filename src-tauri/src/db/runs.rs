@@ -53,6 +53,18 @@ pub fn sweep_orphaned_runs(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Deletes any run that has no remaining room logs. Unlike [`sweep_orphaned_runs`]
+/// (which only reaps still-in-progress runs at startup), this also removes finalized
+/// runs, so deleting a run's logs from the Logs page can't leave a permanent
+/// zero-room ghost row in the Conflux tab.
+pub fn delete_runs_without_rooms(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "DELETE FROM runs WHERE NOT EXISTS (SELECT 1 FROM logs WHERE logs.run_id = runs.id)",
+        [],
+    )?;
+    Ok(())
+}
+
 /// Inserts a new in-progress run, returning its id.
 pub fn insert_run(conn: &Connection, start_time: i64) -> Result<i64> {
     conn.execute(

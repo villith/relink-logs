@@ -62,16 +62,11 @@ impl SkillState {
     pub fn update_from_damage_event(&mut self, damage_instance: &AdjustedDamageInstance) {
         if damage_instance.is_cappable {
             self.cappable_hits += 1;
-            // Accumulate base/cap for the overcap % when the game gave us a pre-cap base.
-            if let (Some(base), Some(cap)) = (
-                damage_instance.event.base_damage,
-                damage_instance.event.damage_cap,
-            ) {
-                if base.is_finite() && base > 0.0 && cap > 0 {
-                    self.overcap_base_sum += base as f64;
-                    self.overcap_cap_sum += cap as f64;
-                }
-            }
+        }
+        // Accumulate base/cap for the overcap % when the game gave us a pre-cap base.
+        if let Some((base, cap)) = damage_instance.overcap_contribution() {
+            self.overcap_base_sum += base;
+            self.overcap_cap_sum += cap;
         }
         if damage_instance.is_capped {
             self.capped_hits += 1;

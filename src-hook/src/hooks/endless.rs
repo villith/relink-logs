@@ -111,7 +111,10 @@ impl OnReceptionFlowDispatchHook {
         // The dispatcher REPLACES the reception-flow slot (+0x210); read it BEFORE calling
         // the original so the pre-call pointer is the OUTGOING flow. A run STARTS when the
         // slot goes (null/other) -> EndlessMode-flow.
-        let flow_before = unsafe { a1.byte_add(0x210).read() };
+        // Guarded like every other read here: a layout shift or unexpected `this` must never
+        // hard-fault the game thread. `None` (unreadable) maps to 0, which the downstream
+        // `read_u32_guarded`/`!= 0` checks already treat as "no flow".
+        let flow_before = crate::hooks::diag::read_ptr_guarded(a1 as usize, 0x210).unwrap_or(0);
         let flow_type_before = crate::hooks::diag::read_u32_guarded(flow_before, FLOW_TYPE_OFFSET);
 
         #[cfg(feature = "hookdiag")]
@@ -130,7 +133,7 @@ impl OnReceptionFlowDispatchHook {
 
         let ret = unsafe { OnReceptionFlowDispatch.call(a1, a2) };
 
-        let flow_after = unsafe { a1.byte_add(0x210).read() };
+        let flow_after = crate::hooks::diag::read_ptr_guarded(a1 as usize, 0x210).unwrap_or(0);
         let flow_type_after = crate::hooks::diag::read_u32_guarded(flow_after, FLOW_TYPE_OFFSET);
 
         // The reception dispatcher rebuilds the EndlessMode flow once PER ROOM (the slot at

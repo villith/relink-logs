@@ -48,6 +48,7 @@ import {
   humanizeNumbers,
   millisecondsToElapsedFormat,
   openDamageCalculator,
+  resolvePlayerColor,
   toHash,
   toHashString,
   translateItemId,
@@ -66,7 +67,10 @@ import { useShallow } from "zustand/react/shallow";
 type Label = { name: string; partySlotIndex: number; label?: string; color: string; strokeDasharray?: string }[];
 
 // The single-bit level flag (bit N → level N+1) → a 1-based level, or 0 if unset.
-const overmasteryLevel = (flags: number): number => (flags === 0 ? 0 : Math.log2(flags & -flags) + 1);
+// `>>> 0` forces the isolated bit to an unsigned value so a set bit 31 can't make
+// `flags & -flags` negative and yield `Math.log2(negative) === NaN`.
+const overmasteryLevel = (flags: number): number =>
+  flags === 0 ? 0 : Math.log2((flags & -flags) >>> 0) + 1;
 
 const formatOvermastery = (overmastery: Overmastery | undefined): string => {
   if (!overmastery) return "";
@@ -322,12 +326,7 @@ export const ViewPage = () => {
 
   const labels: Label = players.map((player) => {
     const partySlotIndex = playerData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-    // Same rule as usePlayerRow: a filled slot's color belongs to its matched row;
-    // unmatched rows pick from the empty slots' colors first, then overflow, so
-    // colors 1-4 still get used without ever duplicating a matched row's color.
-    const freeColors = playerColors.filter((_, i) => i >= 4 || !playerData[i]);
-    const color =
-      partySlotIndex !== -1 ? playerColors[partySlotIndex] : freeColors[player.partyIndex % freeColors.length];
+    const color = resolvePlayerColor(playerColors, playerData, partySlotIndex, player.partyIndex);
 
     return {
       name: translatedPlayerName(

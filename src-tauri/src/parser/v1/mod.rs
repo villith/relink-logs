@@ -60,6 +60,15 @@ impl<'a> AdjustedDamageInstance<'a> {
             is_cappable,
         }
     }
+
+    /// The `(base, cap)` pair to add to the overcap-% denominators for this hit,
+    /// or `None` if the hit isn't cappable or carries no usable base/cap.
+    pub fn overcap_contribution(&self) -> Option<(f64, f64)> {
+        if !self.is_cappable {
+            return None;
+        }
+        cap_detection::overcap_contribution(self.event.base_damage, self.event.damage_cap)
+    }
 }
 
 /// Equippable sigil for a character
@@ -490,7 +499,10 @@ impl DerivedEncounterState {
 ///
 /// Falls back to the unmapped event when no Pl1900 player is known (e.g. an AI Id,
 /// which has no identity on v2.0.2) — same split behavior as before, never lost damage.
-fn remap_dragon_form(player_data: &[Option<PlayerData>; 4], event: &DamageEvent) -> DamageEvent {
+pub fn remap_dragon_form(
+    player_data: &[Option<PlayerData>; 4],
+    event: &DamageEvent,
+) -> DamageEvent {
     let mut event = event.clone();
 
     if CharacterType::from_hash(event.source.parent_actor_type) == CharacterType::Pl2000 {
@@ -723,21 +735,7 @@ impl Parser {
             self.finalize_active_run(false);
         } else if self.status == ParserStatus::InProgress {
             self.update_status(ParserStatus::Stopped);
-
-            if self.has_damage() {
-                match self.save_encounter_to_db() {
-                    Ok(id) => {
-                        if let Some(app) = &self.app {
-                            let _ = app.emit_all("encounter-saved", id);
-                        }
-                    }
-                    Err(e) => {
-                        if let Some(app) = &self.app {
-                            let _ = app.emit_all("encounter-saved-error", e.to_string());
-                        }
-                    }
-                }
-            }
+            self.save_and_emit_encounter();
         } else {
             self.update_status(ParserStatus::Waiting);
         }
@@ -1127,6 +1125,28 @@ impl Parser {
         self.derived_state.total_damage > 0
     }
 
+    /// Persist the current encounter (if it has damage) and notify the frontend of
+    /// the result via the `app` handle. Shared by the normal-area, game-disconnect,
+    /// and Conflux-room-enter save points, which all end an in-progress normal
+    /// encounter the same way. Does not touch parser status — callers own that.
+    fn save_and_emit_encounter(&mut self) {
+        if !self.has_damage() {
+            return;
+        }
+        match self.save_encounter_to_db() {
+            Ok(id) => {
+                if let Some(app) = &self.app {
+                    let _ = app.emit_all("encounter-saved", id);
+                }
+            }
+            Err(e) => {
+                if let Some(app) = &self.app {
+                    let _ = app.emit_all("encounter-saved-error", e.to_string());
+                }
+            }
+        }
+    }
+
     // Checks if the damage event should be ignored for the purposes of parsing.
     fn should_ignore_damage_event(event: &DamageEvent) -> bool {
         let character_type = CharacterType::from_hash(event.source.parent_actor_type);
@@ -1162,20 +1182,7 @@ impl Parser {
 
         if self.status == ParserStatus::InProgress {
             self.update_status(ParserStatus::Stopped);
-            if self.has_damage() {
-                match self.save_encounter_to_db() {
-                    Ok(id) => {
-                        if let Some(app) = &self.app {
-                            let _ = app.emit_all("encounter-saved", id);
-                        }
-                    }
-                    Err(e) => {
-                        if let Some(app) = &self.app {
-                            let _ = app.emit_all("encounter-saved-error", e.to_string());
-                        }
-                    }
-                }
-            }
+            self.save_and_emit_encounter();
         }
     }
 
@@ -1219,20 +1226,7 @@ impl Parser {
             // as a normal log now — otherwise its damage merges into room 1.
             if self.active_run_id.is_none() && self.status == ParserStatus::InProgress {
                 self.update_status(ParserStatus::Stopped);
-                if self.has_damage() {
-                    match self.save_encounter_to_db() {
-                        Ok(id) => {
-                            if let Some(app) = &self.app {
-                                let _ = app.emit_all("encounter-saved", id);
-                            }
-                        }
-                        Err(e) => {
-                            if let Some(app) = &self.app {
-                                let _ = app.emit_all("encounter-saved-error", e.to_string());
-                            }
-                        }
-                    }
-                }
+                self.save_and_emit_encounter();
             }
 
             // Close out any prior run before opening the new one (defensive: normally the
@@ -1242,12 +1236,16 @@ impl Parser {
             }
             self.start_conflux_run(event.manager_ptr);
         } else {
-            // Same run, next room: save the room we were just recording and advance.
+            // Same run, next room: save the room we were just recording, then advance the
+            // index. The index advances for EVERY room transition, not only damage-bearing
+            // ones — a room where the player dealt no recorded damage (shop/rest/skipped)
+            // produces no saved room row, but must still consume its own index so its
+            // buffs (tagged with `active_room_index` in on_conflux_buff_acquired) don't
+            // bleed onto the next room that DOES get saved.
             if self.status == ParserStatus::InProgress {
                 self.update_status(ParserStatus::Stopped);
                 if self.has_damage() {
                     let saved = self.save_room_to_db();
-                    self.active_room_index += 1;
                     // Refresh an open Conflux tab so the room shows up mid-run, not
                     // only at run end.
                     if saved.is_ok() {
@@ -1256,6 +1254,7 @@ impl Parser {
                         }
                     }
                 }
+                self.active_room_index += 1;
             }
         }
 

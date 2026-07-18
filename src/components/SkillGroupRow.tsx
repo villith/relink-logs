@@ -1,6 +1,7 @@
 import { CharacterType, ComputedSkillGroup } from "@/types";
 import { computeOvercapPercentage, getSkillName } from "@/utils";
 import { CaretDown, CaretUp } from "@phosphor-icons/react";
+import { OvercapCell } from "./OvercapCell";
 import { SkillRow } from "./SkillRow";
 import { useSkillGroupRow } from "./useSkillGroupRow";
 
@@ -85,16 +86,7 @@ export const SkillGroupRow = ({ characterType, group, color }: SkillRowProps) =>
             </>
           )}
         </td>
-        <td className="text-center row-data">
-          {overcapPercentage === null ? (
-            <>-</>
-          ) : (
-            <span className="capped">
-              {overcapPercentage.toFixed(0)}
-              <span className="font-sm">%</span>
-            </span>
-          )}
-        </td>
+        <OvercapCell percentage={overcapPercentage} />
         <td className="text-center row-data">
           {group.percentage.toFixed(0)}
           <span className="unit font-sm">%</span>

@@ -1,9 +1,10 @@
 import { FilterState } from "@/stores/useLogIndexStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
-import { Log, LogSortType, SortDirection } from "@/types";
+import { CharacterType, Log, LogSortType, SortDirection } from "@/types";
 import {
   epochToLocalTime,
   millisecondsToElapsedFormat,
+  translateCharacterType,
   translateEnemyType,
   translateEnemyTypeId,
   translateQuestId,
@@ -72,7 +73,7 @@ export const IndexPage = () => {
       ]
         .filter((player) => player.name || player.type)
         .map((player) => {
-          const characterName = t(`characters:${player.type}`, `ui:characters.${player.type}`);
+          const characterName = translateCharacterType(player.type as CharacterType);
 
           // A slot with a character but no player name is an AI companion.
           if (!player.name) return `${characterName} (${t("ui.logs.ai-companion")})`;
