@@ -380,3 +380,40 @@ export type SBAEvent = [
 ];
 
 export type DeathEvent = [number, { OnDeathEvent: { actor_index: number; death_counter: number } }];
+
+/** Toolbox / Synthesis Helper — mirrors src-tauri/src/synthesis/mod.rs. */
+export type SynthesisSigil = {
+  uid: number;
+  sigilId: number;
+  trait1: number;
+  trait1Level: number;
+  trait2: number;
+  trait2Level: number;
+};
+
+export type SynthesisPrediction = {
+  trait1: number;
+  trait2: number | null;
+  lucky: boolean;
+};
+
+export type SynthesisMatch = {
+  sigilA: SynthesisSigil;
+  sigilB: SynthesisSigil;
+  prediction: SynthesisPrediction;
+  resultSigilId: number | null;
+};
+
+export type SynthesisStatus = {
+  gameRunning: boolean;
+  sigilCount: number;
+  rngUnpredictable: boolean;
+};
+
+export type SynthesisSearchResponse = {
+  matches: SynthesisMatch[];
+  pairsTested: number;
+  totalMatches: number;
+  sigilCount: number;
+  rngUnpredictable: boolean;
+};

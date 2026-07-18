@@ -134,6 +134,28 @@
       "builds": "Builds",
       "ai-companion": "AI"
     },
+    "toolbox": {
+      "title": "Toolbox",
+      "synthesis-helper": "Synthesis Helper",
+      "trait-1": "Trait 1 (first slot)",
+      "trait-2": "Trait 2 (second slot)",
+      "any-order": "Match either slot order",
+      "require-lucky": "High roll only (higher-level result)",
+      "search": "Search",
+      "searching": "Searching...",
+      "game-not-running": "Game is not running. Start Granblue Fantasy: Relink first — the helper reads your sigil box and the synthesis seed from the game.",
+      "invalid-trait": "Pick a real trait (the empty-slot placeholder can't be searched).",
+      "rng-unpredictable": "The synthesis RNG has no seed yet. Perform one synthesis or complete a quest, then search again.",
+      "results-caveat": "Predictions are for your next synthesis only. Completing a quest or synthesizing anything changes the seed — search again after either.",
+      "pairs-summary": "{{sigils}} sigils, {{tested}} pairs simulated, {{matches}} matching",
+      "no-results": "No pair in your sigil box produces this result with the current seed. Try again after the next quest.",
+      "truncated": "Showing the first {{shown}} of {{total}} matches.",
+      "col-sigil-a": "Sigil A",
+      "col-sigil-b": "Sigil B",
+      "col-result": "Result",
+      "high-roll": "high roll",
+      "select-trait": "Select a trait..."
+    },
     "weapon-awakening": "Awakening",
     "wrightstone": "Wrightstone"
   },
