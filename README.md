@@ -49,6 +49,15 @@ Overlay DPS parser/meter for Granblue Fantasy: Relink, based initially on the re
 
 ![Settings](./docs/screenshots/settings.png)
 
+## Found a translation problem or a bug?
+
+You don't need any coding knowledge to help — just a GitHub account:
+
+- [Report a wrong or missing translation](https://github.com/villith/gbfr-logs/issues/new?template=translation.yml) — fill in the form and we'll apply the fix.
+- [Report a bug](https://github.com/villith/gbfr-logs/issues/new?template=bug.yml)
+
+Note: item / weapon / skill names come from the game's own data files and can't be hand-edited — only the app's interface text can be changed.
+
 ## Frequently Asked Questions
 
 > Q: I closed the meter, but it's still running?
