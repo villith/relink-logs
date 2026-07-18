@@ -11,6 +11,10 @@
     "key": "ITEM_18_0003",
     "text": "Sparks of the Apocalypse"
   },
+  "035c056d": {
+    "key": "ITEM_28_0010",
+    "text": "Sequestration Wrightstone"
+  },
   "03a19196": {
     "key": "ITEM_16_0013",
     "text": "Era Core"
@@ -63,9 +67,21 @@
     "key": "ITEM_01_0053",
     "text": "Bloomsword Hilt"
   },
+  "09e6f629": {
+    "key": "ITEM_25_0131",
+    "text": "Dread Wrightstone"
+  },
   "09f9339e": {
     "key": "ITEM_32_0056",
     "text": "Abyssal Horn"
+  },
+  "0b8d0865": {
+    "key": "ITEM_27_9999",
+    "text": "Fortification Wrightstone"
+  },
+  "0bd373a4": {
+    "key": "ITEM_28_0130",
+    "text": "Sequestration Wrightstone"
   },
   "0e7cbc8e": {
     "key": "ITEM_31_0033",
@@ -95,6 +111,10 @@
     "key": "ITEM_16_0010",
     "text": "Protocol Fiber"
   },
+  "11a1b6b3": {
+    "key": "ITEM_25_0011",
+    "text": "Dread Wrightstone"
+  },
   "131a4636": {
     "key": "ITEM_50_0008",
     "text": "Iridescent Effigy Shell"
@@ -111,6 +131,10 @@
     "key": "ITEM_34_3000",
     "text": "Glittercrystal"
   },
+  "1544fb8a": {
+    "key": "ITEM_27_1001",
+    "text": "Fortification Wrightstone"
+  },
   "15c3f606": {
     "key": "ITEM_02_0052",
     "text": "Shining Orb"
@@ -118,6 +142,10 @@
   "173851d4": {
     "key": "ITEM_04_0002",
     "text": "Sequestered Mane"
+  },
+  "176436f3": {
+    "key": "ITEM_28_1002",
+    "text": "Sequestration Wrightstone"
   },
   "17f349ba": {
     "key": "ITEM_31_0003",
@@ -167,6 +195,14 @@
     "key": "ITEM_14_0064",
     "text": "Ragnite (Stinger)"
   },
+  "1fce9159": {
+    "key": "1fce9159",
+    "text": "Carnage Pulse Unit"
+  },
+  "202a0db9": {
+    "key": "ITEM_28_0131",
+    "text": "Sequestration Wrightstone"
+  },
   "20612b0a": {
     "key": "ITEM_31_0020",
     "text": "Purgatory Bone"
@@ -187,6 +223,14 @@
     "key": "ITEM_31_0042",
     "text": "Landbeast Horn"
   },
+  "21dad920": {
+    "key": "ITEM_26_9999",
+    "text": "Vitality Wrightstone"
+  },
+  "22acc7bf": {
+    "key": "22acc7bf",
+    "text": "Vitality Wrightstone"
+  },
   "23c59c51": {
     "key": "ITEM_31_0075",
     "text": "Judgment Prongs"
@@ -198,6 +242,10 @@
   "24725515": {
     "key": "ITEM_15_0003",
     "text": "Exceptional Refinium"
+  },
+  "2492ecc9": {
+    "key": "ITEM_27_1002",
+    "text": "Fortification Wrightstone"
   },
   "24df54ee": {
     "key": "ITEM_10_0003",
@@ -223,6 +271,10 @@
     "key": "ITEM_02_0022",
     "text": "Rumbling Orb"
   },
+  "29748bf8": {
+    "key": "29748bf8",
+    "text": "Sky Memory: Rebirthed Genesis"
+  },
   "29a7eec9": {
     "key": "ITEM_16_0011",
     "text": "Mana Circuit"
@@ -231,6 +283,10 @@
     "key": "ITEM_50_0001",
     "text": "Beast Warding Stick"
   },
+  "2a2ea603": {
+    "key": "ITEM_25_0030",
+    "text": "Dread Wrightstone"
+  },
   "2a5548a9": {
     "key": "ITEM_31_0086",
     "text": "Fool's Fractured Jaw"
@@ -238,6 +294,14 @@
   "2c0b5a82": {
     "key": "ITEM_70_0021",
     "text": "Sky Memory: Manifestation"
+  },
+  "2c8fa06c": {
+    "key": "ITEM_25_9999",
+    "text": "Dread Wrightstone"
+  },
+  "2cdfa192": {
+    "key": "ITEM_26_0012",
+    "text": "Vitality Wrightstone"
   },
   "2d007309": {
     "key": "ITEM_32_0070",
@@ -263,9 +327,17 @@
     "key": "ITEM_34_2000",
     "text": "Glitterstone (L)"
   },
+  "31291925": {
+    "key": "31291925",
+    "text": "Vitality Wrightstone"
+  },
   "32dc23f3": {
     "key": "ITEM_70_0016",
     "text": "Color Pack 4"
+  },
+  "33e663d0": {
+    "key": "ITEM_26_0010",
+    "text": "Vitality Wrightstone"
   },
   "354d4683": {
     "key": "ITEM_31_0060",
@@ -298,6 +370,18 @@
   "3c3b449f": {
     "key": "ITEM_32_0041",
     "text": "Wing of Portent"
+  },
+  "3cb3eb94": {
+    "key": "3cb3eb94",
+    "text": "Dread Wrightstone"
+  },
+  "3e0269bd": {
+    "key": "ITEM_26_0030",
+    "text": "Vitality Wrightstone"
+  },
+  "3ef6def5": {
+    "key": "ITEM_26_0130",
+    "text": "Vitality Wrightstone"
   },
   "3f8f4efd": {
     "key": "ITEM_16_0002",
@@ -347,6 +431,14 @@
     "key": "ITEM_03_0003",
     "text": "Vitality Lush Hoof"
   },
+  "4ac30d94": {
+    "key": "ITEM_19_0003",
+    "text": "Curio"
+  },
+  "4be41ec1": {
+    "key": "ITEM_26_1003",
+    "text": "Vitality Wrightstone"
+  },
   "4c21dc42": {
     "key": "ITEM_09_0023",
     "text": "Fellowship Fang"
@@ -359,9 +451,21 @@
     "key": "ITEM_31_0062",
     "text": "Flamebeast Horn"
   },
+  "4d16fcab": {
+    "key": "ITEM_27_0020",
+    "text": "Fortification Wrightstone"
+  },
+  "4e3989b8": {
+    "key": "ITEM_25_0012",
+    "text": "Dread Wrightstone"
+  },
   "4f1e4c13": {
     "key": "ITEM_03_0001",
     "text": "Furycane Omega Anima"
+  },
+  "5030beba": {
+    "key": "5030beba",
+    "text": "Sky Memory: Divided Skies"
   },
   "51355c28": {
     "key": "ITEM_22_0031",
@@ -395,6 +499,10 @@
     "key": "ITEM_14_0065",
     "text": "Ragnite (Executioner)"
   },
+  "54ae4c95": {
+    "key": "54ae4c95",
+    "text": "Sky Memory: Manifestation"
+  },
   "54fc643a": {
     "key": "ITEM_17_0000",
     "text": "Furycane Nihilla Core"
@@ -402,6 +510,14 @@
   "552d70ed": {
     "key": "ITEM_26_0000",
     "text": "Vitality Wrightstone"
+  },
+  "559e221d": {
+    "key": "ITEM_26_1002",
+    "text": "Vitality Wrightstone"
+  },
+  "55d1b23f": {
+    "key": "ITEM_25_1003",
+    "text": "Dread Wrightstone"
   },
   "58fc9b99": {
     "key": "ITEM_21_0001",
@@ -447,6 +563,14 @@
     "key": "ITEM_14_0050",
     "text": "Revenant Medallion"
   },
+  "60fd93bd": {
+    "key": "ITEM_27_0030",
+    "text": "Fortification Wrightstone"
+  },
+  "6198f427": {
+    "key": "ITEM_19_0002",
+    "text": "Curio"
+  },
   "644536df": {
     "key": "ITEM_10_0001",
     "text": "Fortitude Crystal (S)"
@@ -483,6 +607,10 @@
     "key": "ITEM_31_0032",
     "text": "Giant Beak"
   },
+  "667ee1d3": {
+    "key": "ITEM_27_0131",
+    "text": "Fortification Wrightstone"
+  },
   "67e3f274": {
     "key": "ITEM_32_0030",
     "text": "Tayu'itar Head Unit"
@@ -498,6 +626,10 @@
   "687733c4": {
     "key": "ITEM_10_0000",
     "text": "Fortitude Shard"
+  },
+  "68b1ae43": {
+    "key": "ITEM_26_0020",
+    "text": "Vitality Wrightstone"
   },
   "68bafc37": {
     "key": "ITEM_16_0105",
@@ -531,6 +663,10 @@
     "key": "ITEM_32_0051",
     "text": "Crimson Horn"
   },
+  "6dd50a91": {
+    "key": "6dd50a91",
+    "text": "Sky Memory: Sundered God"
+  },
   "6e13e372": {
     "key": "ITEM_09_0013",
     "text": "Silver Wolf Trefoil"
@@ -539,6 +675,10 @@
     "key": "ITEM_01_0063",
     "text": "Astral Matter"
   },
+  "6e81c3ac": {
+    "key": "6e81c3ac",
+    "text": "Sequestration Wrightstone"
+  },
   "6f1fabe6": {
     "key": "ITEM_14_0021",
     "text": "Supreme Merit"
@@ -546,6 +686,10 @@
   "6f38afe1": {
     "key": "ITEM_19_0010",
     "text": "World Idean"
+  },
+  "71173866": {
+    "key": "ITEM_26_0131",
+    "text": "Vitality Wrightstone"
   },
   "71bc9232": {
     "key": "ITEM_70_0006",
@@ -578,6 +722,14 @@
   "759850ca": {
     "key": "ITEM_01_0041",
     "text": "Salamander Egg"
+  },
+  "75a25fb1": {
+    "key": "75a25fb1",
+    "text": "Sky Memory: Love's Legacy"
+  },
+  "76079579": {
+    "key": "ITEM_19_0004",
+    "text": "Curio"
   },
   "771d9272": {
     "key": "ITEM_70_0009",
@@ -615,9 +767,17 @@
     "key": "ITEM_70_0015",
     "text": "Color Pack 3"
   },
+  "7a1cf760": {
+    "key": "ITEM_28_0020",
+    "text": "Sequestration Wrightstone"
+  },
   "7b600740": {
     "key": "ITEM_17_0001",
     "text": "Nihilla-Cast Sword"
+  },
+  "7bcdaa54": {
+    "key": "7bcdaa54",
+    "text": "Sky Memory: The War"
   },
   "7cfa41fc": {
     "key": "ITEM_14_0012",
@@ -639,6 +799,10 @@
     "key": "ITEM_04_0000",
     "text": "Managarmr Anima"
   },
+  "817a2cc1": {
+    "key": "ITEM_27_0011",
+    "text": "Fortification Wrightstone"
+  },
   "81bf605c": {
     "key": "ITEM_14_0031",
     "text": "Silver Dalia Badge"
@@ -654,6 +818,14 @@
   "831f31ff": {
     "key": "ITEM_16_0007",
     "text": "Sown Emptiness"
+  },
+  "833afc6d": {
+    "key": "833afc6d",
+    "text": "Vitality Wrightstone"
+  },
+  "84292d6a": {
+    "key": "84292d6a",
+    "text": "Sky Memory: Infinitesimal and Infinite"
   },
   "8572b2ce": {
     "key": "ITEM_23_0001",
@@ -703,13 +875,29 @@
     "key": "ITEM_90_0001",
     "text": "Wings from the Boundary"
   },
+  "8c44f0ab": {
+    "key": "ITEM_28_0030",
+    "text": "Sequestration Wrightstone"
+  },
   "8c4fc319": {
     "key": "ITEM_14_0074",
     "text": "Chaos Refinium"
   },
+  "8cf738ab": {
+    "key": "8cf738ab",
+    "text": "Fortification Wrightstone"
+  },
+  "8d101b82": {
+    "key": "ITEM_25_1002",
+    "text": "Dread Wrightstone"
+  },
   "8d888638": {
     "key": "ITEM_09_0030",
     "text": "Blue-Sky Spirit"
+  },
+  "8db0b117": {
+    "key": "ITEM_28_9999",
+    "text": "Sequestration Wrightstone"
   },
   "8e1cb52d": {
     "key": "ITEM_02_0020",
@@ -755,6 +943,10 @@
     "key": "ITEM_13_0001",
     "text": "Mega Potion"
   },
+  "946b78ee": {
+    "key": "946b78ee",
+    "text": "Sky Memory: The Girl in Blue"
+  },
   "94dd261d": {
     "key": "ITEM_22_0021",
     "text": "Firewyrm's Jewel"
@@ -762,6 +954,10 @@
   "9519f56a": {
     "key": "ITEM_02_0000",
     "text": "Wind Shard"
+  },
+  "95bf2c6f": {
+    "key": "ITEM_26_0011",
+    "text": "Vitality Wrightstone"
   },
   "96a00c42": {
     "key": "ITEM_70_0022",
@@ -839,9 +1035,17 @@
     "key": "ITEM_50_0009",
     "text": "Midnight Sun's Amber"
   },
+  "a062b3e4": {
+    "key": "ITEM_26_1000",
+    "text": "Vitality Wrightstone"
+  },
   "a1ead2c2": {
     "key": "ITEM_22_0052",
     "text": "Primordial Wind"
+  },
+  "a23f4f46": {
+    "key": "ITEM_27_0010",
+    "text": "Fortification Wrightstone"
   },
   "a2452b7c": {
     "key": "ITEM_22_0032",
@@ -855,9 +1059,25 @@
     "key": "ITEM_13_0002",
     "text": "Blue Potion"
   },
+  "a90975b8": {
+    "key": "ITEM_25_1000",
+    "text": "Dread Wrightstone"
+  },
   "a9cbb5af": {
     "key": "ITEM_18_0002",
     "text": "Canaan Whitebloom"
+  },
+  "aa4626f6": {
+    "key": "ITEM_25_0020",
+    "text": "Dread Wrightstone"
+  },
+  "aab4c91a": {
+    "key": "ITEM_28_0012",
+    "text": "Sequestration Wrightstone"
+  },
+  "aae10c28": {
+    "key": "ITEM_25_0010",
+    "text": "Dread Wrightstone"
   },
   "aba63a29": {
     "key": "ITEM_02_0040",
@@ -866,6 +1086,10 @@
   "ad856c0c": {
     "key": "ITEM_11_0002",
     "text": "Gold Spellbook"
+  },
+  "ad9737a9": {
+    "key": "ITEM_27_1000",
+    "text": "Fortification Wrightstone"
   },
   "adffe24e": {
     "key": "ITEM_32_0046",
@@ -879,6 +1103,14 @@
     "key": "ITEM_14_0000",
     "text": "Azurite's Splendor"
   },
+  "b359b5b2": {
+    "key": "b359b5b2",
+    "text": "Fortification Wrightstone"
+  },
+  "b3b624ba": {
+    "key": "b3b624ba",
+    "text": "Fortification Wrightstone"
+  },
   "b451e459": {
     "key": "ITEM_01_0003",
     "text": "Valley Bloom"
@@ -886,6 +1118,10 @@
   "b4693222": {
     "key": "ITEM_09_0021",
     "text": "Maglielle Anamnesis"
+  },
+  "b5eeea35": {
+    "key": "ITEM_50_0011",
+    "text": "Evergreen Crystal Fragment"
   },
   "b763e7ac": {
     "key": "ITEM_31_0071",
@@ -895,9 +1131,17 @@
     "key": "ITEM_02_0030",
     "text": "Fire Shard"
   },
+  "b79139fb": {
+    "key": "ITEM_26_1001",
+    "text": "Vitality Wrightstone"
+  },
   "b83b6b1d": {
     "key": "ITEM_31_0010",
     "text": "Bleak Bone"
+  },
+  "ba78c0b2": {
+    "key": "ITEM_27_0012",
+    "text": "Fortification Wrightstone"
   },
   "ba799e24": {
     "key": "ITEM_05_0002",
@@ -915,9 +1159,17 @@
     "key": "ITEM_05_0000",
     "text": "Excavallion Anima"
   },
+  "bcdbc4b6": {
+    "key": "ITEM_25_0130",
+    "text": "Dread Wrightstone"
+  },
   "bdbf43ee": {
     "key": "ITEM_32_0044",
     "text": "Spiteband of Lament"
+  },
+  "be6124ad": {
+    "key": "ITEM_27_0130",
+    "text": "Fortification Wrightstone"
   },
   "bee8897d": {
     "key": "ITEM_22_0000",
@@ -1043,6 +1295,14 @@
     "key": "ITEM_70_0012",
     "text": "Veil Armet"
   },
+  "d2c1330f": {
+    "key": "ITEM_28_1000",
+    "text": "Sequestration Wrightstone"
+  },
+  "d3a6a16a": {
+    "key": "d3a6a16a",
+    "text": "Dread Wrightstone"
+  },
   "d465046a": {
     "key": "ITEM_31_0070",
     "text": "Mythril Wheel"
@@ -1123,6 +1383,10 @@
     "key": "ITEM_70_0023",
     "text": "Sky Memory: The War"
   },
+  "e3adb298": {
+    "key": "ITEM_25_1001",
+    "text": "Dread Wrightstone"
+  },
   "e4070e98": {
     "key": "ITEM_31_0002",
     "text": "Chilling Demon Eye"
@@ -1175,6 +1439,14 @@
     "key": "ITEM_23_0004",
     "text": "Crewmate Card: Gallanza"
   },
+  "eb9c99e5": {
+    "key": "ITEM_28_1001",
+    "text": "Sequestration Wrightstone"
+  },
+  "ec480443": {
+    "key": "ec480443",
+    "text": "Dread Wrightstone"
+  },
   "ed3b872d": {
     "key": "ITEM_07_0001",
     "text": "Angra Mainyu Omega Anima"
@@ -1191,9 +1463,17 @@
     "key": "ITEM_27_0001",
     "text": "Fortification Wrightstone"
   },
+  "eed2f9d3": {
+    "key": "ITEM_27_1003",
+    "text": "Fortification Wrightstone"
+  },
   "eedfa4e4": {
     "key": "ITEM_70_0013",
     "text": "Color Pack 1"
+  },
+  "ef56c64b": {
+    "key": "ef56c64b",
+    "text": "Sequestration Wrightstone"
   },
   "f147229b": {
     "key": "ITEM_70_0002",
@@ -1219,9 +1499,17 @@
     "key": "ITEM_70_0010",
     "text": "Rolan's Notes"
   },
+  "f6155395": {
+    "key": "ITEM_28_1003",
+    "text": "Sequestration Wrightstone"
+  },
   "f692f716": {
     "key": "ITEM_34_4000",
     "text": "Glittercrystal Cluster"
+  },
+  "f6e684fa": {
+    "key": "f6e684fa",
+    "text": "Sequestration Wrightstone"
   },
   "f6ee4068": {
     "key": "ITEM_02_0042",
@@ -1250,6 +1538,10 @@
   "f90a5398": {
     "key": "ITEM_22_0030",
     "text": "Blue Dragon Scale"
+  },
+  "f9d46ad2": {
+    "key": "ITEM_28_0011",
+    "text": "Sequestration Wrightstone"
   },
   "fa674fbd": {
     "key": "ITEM_70_0004",

@@ -20,7 +20,9 @@ import checklistDefault from "@/assets/checklist-default.json";
 import sigilTraitCategories from "@/assets/sigil-trait-categories.json";
 import skillboardLayout from "@/assets/skillboard-layout.json";
 import summonBonusValues from "@/assets/summon-bonus-values.json";
+import traitMaxLevels from "@/assets/trait-max-levels.json";
 import weaponTraitsData from "@/assets/weapon-traits.json";
+import weaponTranscendenceData from "@/assets/weapon-transcendence.json";
 import i18next, { t } from "i18next";
 import { useEffect, useRef } from "react";
 
@@ -183,8 +185,9 @@ export type CombinedTrait = { id: number; level: number };
 
 /**
  * Per-trait level totals across the wrightstone (weapon-state traits, or the
- * legacy weaponInfo trait slots), summon main traits, and sigil traits. Weapon
- * innate skills are excluded. Sorted by total level descending, then id.
+ * legacy weaponInfo trait slots), summon main traits, sigil traits, and the
+ * weapon's innate skills (weapon-state only — the legacy weaponInfo shape has
+ * no innate data). Sorted by total level descending, then id.
  */
 type TraitSourcesInput = Pick<PlayerData, "sigils" | "summons" | "weaponState" | "weaponInfo">;
 
@@ -218,13 +221,16 @@ export const computeCombinedTraits = (player: TraitSourcesInput): CombinedTrait[
   for (const trait of wrightstoneTraitPairs(player)) {
     add(trait.id, trait.level);
   }
+  for (const trait of player.weaponState?.innateTraits ?? []) {
+    add(trait.id, trait.level);
+  }
 
   return [...totals.entries()].map(([id, level]) => ({ id, level })).sort((a, b) => b.level - a.level || a.id - b.id);
 };
 
 export type TraitSource = {
-  kind: "sigil" | "summon" | "wrightstone";
-  /** Sigil id / summon id / wrightstone item id — what to translate for display. */
+  kind: "sigil" | "summon" | "wrightstone" | "weapon";
+  /** Sigil id / summon id / wrightstone item id / weapon id — what to translate for display. */
   sourceId: number;
   level: number;
 };
@@ -256,6 +262,11 @@ export const collectTraitSources = (player: TraitSourcesInput, traitIds: number[
   for (const trait of wrightstoneTraitPairs(player)) {
     if (matches(trait.id, trait.level)) {
       sources.push({ kind: "wrightstone", sourceId: wrightstoneId, level: trait.level });
+    }
+  }
+  for (const trait of player.weaponState?.innateTraits ?? []) {
+    if (matches(trait.id, trait.level)) {
+      sources.push({ kind: "weapon", sourceId: player.weaponState!.weaponId, level: trait.level });
     }
   }
 
@@ -317,6 +328,14 @@ export const sigilTraitCategory = (traitId: number): SigilCategory | null => {
   const category = (sigilTraitCategories as Record<string, number>)[toHashString(traitId)];
   return category === undefined ? null : SIGIL_CATEGORIES[category];
 };
+
+/**
+ * A trait's maximum effective level — its effect stops scaling past this
+ * (from the game's skill_status table, see scripts/gen-trait-max-levels.py).
+ * Null for ids the table doesn't know.
+ */
+export const traitMaxLevel = (traitId: number): number | null =>
+  (traitMaxLevels as Record<string, number>)[toHashString(traitId)] ?? null;
 
 /** The Computed checklist rows all target 5 sigils of their type. */
 export const SIGIL_CATEGORY_TARGET = 5;
@@ -785,6 +804,15 @@ export const translateOvermasteryId = (id: number | null): string => {
   return t([`overmasteries:${hash}.text`, "ui.unknown-id"], { id: hash });
 };
 
+/// Translates a numeric weapon ID (weapon table key hash) to a human-readable string.
+export const translateWeaponId = (id: number | null): string => {
+  if (id === null) return "";
+  if (id === EMPTY_ID) return "";
+
+  const hash = id.toString(16).padStart(8, "0");
+  return t([`weapons:${hash}.text`, "ui.unknown-id"], { id: hash });
+};
+
 /// Translates the summon ID (summon table key) to a human-readable string.
 export const translateSummonId = (id: number | null): string => {
   if (id === null) return "";
@@ -887,6 +915,46 @@ export const weaponInnateTraits = (key: string): WeaponTraitDef[] => {
   const hash = weaponEntryForKey(key)?.hash;
   if (!hash) return [];
   return (weaponTraitsData as Record<string, WeaponTraitDef[]>)[hash] ?? [];
+};
+
+type TranscendenceSlot = {
+  /// Skill id hash of the slot's BASE skill — live innate ids can be the
+  /// upgrade-resolved variant instead, hence the positional fallback below.
+  id: string;
+  /// The skill's level per transcendence stage, right-aligned to the 10-stage
+  /// display scale: a curve whose last nonzero value sits at index N covers
+  /// display stages (10-N)..10. 0 = stage not defined for this weapon.
+  levels: number[];
+};
+
+/**
+ * The weapon's transcendence ("rebuild"/Transcension) stage on the in-game
+ * 0-10 scale, derived by locating each live innate-skill level inside the
+ * weapon's per-stage level curves (weapon-transcendence.json, see
+ * scripts/gen-weapon-transcendence.py) and intersecting the candidates.
+ * Null when the weapon has no curves, no trait carries a level (pre-fix
+ * logs), or the levels don't pin a unique stage (e.g. only flat curves).
+ */
+export const deriveTranscendence = (weaponId: number, innateTraits: { id: number; level: number }[]): number | null => {
+  const slots = (weaponTranscendenceData as Record<string, TranscendenceSlot[]>)[toHashString(weaponId)];
+  if (!slots) return null;
+
+  let candidates: Set<number> | null = null;
+  innateTraits.forEach((trait, index) => {
+    if (trait.level <= 0) return;
+    const slot = slots.find((s) => s.id === toHashString(trait.id)) ?? slots[index];
+    if (!slot) return;
+    const lastDefined = slot.levels.reduce((acc, level, i) => (level > 0 ? i : acc), -1);
+    if (lastDefined < 0) return;
+    const offset = 10 - lastDefined;
+    const stages = new Set(
+      slot.levels.flatMap((level, i) => (level === trait.level && i <= lastDefined ? [i + offset] : []))
+    );
+    if (stages.size === 0) return; // level not on this curve — data drift, don't poison the intersection
+    candidates = candidates === null ? stages : new Set([...candidates].filter((stage) => stages.has(stage)));
+  });
+
+  return candidates !== null && (candidates as Set<number>).size === 1 ? [...(candidates as Set<number>)][0] : null;
 };
 
 /// Converts a number to a hexadecimal string.

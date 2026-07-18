@@ -34,8 +34,8 @@ import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 
 import { Table as MeterTable } from "@/components/Table";
-import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
 import { useChecklistStore } from "@/stores/useChecklistStore";
+import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import {
   MeterColumns,
@@ -56,6 +56,7 @@ import {
   collectSigilsByCategory,
   collectTraitSources,
   computeCombinedTraits,
+  deriveTranscendence,
   epochToLocalTime,
   exportCharacterDataToClipboard,
   exportFullEncounterToClipboard,
@@ -1011,6 +1012,19 @@ export const ViewPage = () => {
                               <Text size="xs" fs="italic" fw={300}>
                                 Awakening {player.weaponState.awakeningLevel}/10
                               </Text>
+                              {(() => {
+                                /* Derived from the innate skill levels vs the per-stage
+                                   curves — needs a log recorded with level data. */
+                                const stage = deriveTranscendence(
+                                  player.weaponState.weaponId,
+                                  player.weaponState.innateTraits
+                                );
+                                return stage !== null ? (
+                                  <Text size="xs" fs="italic" fw={300}>
+                                    Transcendence {stage}/10
+                                  </Text>
+                                ) : null;
+                              })()}
                               {player.weaponState.innateTraits.map((trait) => (
                                 <Text size="xs" fs="italic" fw={300} key={trait.id}>
                                   - {translateTraitId(trait.id)}

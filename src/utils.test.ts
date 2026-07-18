@@ -11,6 +11,7 @@ import {
   computeOvercapPercentage,
   computeSupPercentage,
   defaultChecklist,
+  deriveTranscendence,
   fillBonusGroups,
   formatSummonBonusValue,
   groupBonuses,
@@ -534,6 +535,47 @@ describe("utils", () => {
 
     it("is null when there are no cappable hits (no cap sum)", () => {
       expect(computeOvercapPercentage({ overcapBaseSum: 0, overcapCapSum: 0 })).toBeNull();
+    });
+  });
+
+  describe("deriveTranscendence", () => {
+    // Real live data (2026-07-18 WSDIAG): Hraesvelgr (WEP_PL2700_06_03,
+    // 0xded16fcf) at in-game Transcendence 9/10. Slot 1's live id
+    // (0xa8a3163b, the upgrade-resolved variant) differs from the asset's
+    // base id (0xf17850b9) — exercises the positional fallback.
+    const hraesvelgr = 0xded16fcf;
+    const stage9Traits = [
+      { id: 0x1e1cecce, level: 32 },
+      { id: 0xa8a3163b, level: 22 },
+      { id: 0xdc584f60, level: 12 },
+      { id: 0x57e8a93f, level: 1 },
+    ];
+
+    it("derives stage 9/10 from the live innate levels of a transcended weapon", () => {
+      expect(deriveTranscendence(hraesvelgr, stage9Traits)).toBe(9);
+    });
+
+    it("derives the max stage when levels sit at each curve's final value", () => {
+      const traits = [
+        { id: 0x1e1cecce, level: 35 },
+        { id: 0xa8a3163b, level: 25 },
+        { id: 0xdc584f60, level: 15 },
+        { id: 0x57e8a93f, level: 1 },
+      ];
+      expect(deriveTranscendence(hraesvelgr, traits)).toBe(10);
+    });
+
+    it("is null when only a flat curve constrains the stage (ambiguous)", () => {
+      expect(deriveTranscendence(hraesvelgr, [{ id: 0x57e8a93f, level: 1 }])).toBeNull();
+    });
+
+    it("is null for level-0 traits (pre-fix logs never recorded levels)", () => {
+      const traits = stage9Traits.map((trait) => ({ ...trait, level: 0 }));
+      expect(deriveTranscendence(hraesvelgr, traits)).toBeNull();
+    });
+
+    it("is null for weapons without transcendence curves", () => {
+      expect(deriveTranscendence(0x12345678, stage9Traits)).toBeNull();
     });
   });
 });

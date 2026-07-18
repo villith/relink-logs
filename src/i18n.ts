@@ -37,6 +37,7 @@ i18n
   .init({
     ns: [
       "ui",
+      "abilities",
       "characters",
       "items",
       "overmasteries",
@@ -47,6 +48,7 @@ i18n
       "enemies",
       "summons",
       "summon-bonuses",
+      "skillboard",
     ],
     defaultNS: "ui",
     fallbackLng: {
