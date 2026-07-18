@@ -1,10 +1,14 @@
 import { type ChecklistGroup } from "@/stores/useChecklistStore";
 import { MantineProvider } from "@mantine/core";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { ChecklistSection } from "./Settings";
 import type useChecklistSettings from "./useChecklistSettings";
+
+// Explicit even though vitest's `globals: true` config restores
+// testing-library's auto-cleanup — keeps this file safe on its own.
+afterEach(cleanup);
 
 // jsdom is missing these browser APIs; Mantine's components probe them.
 beforeAll(() => {
