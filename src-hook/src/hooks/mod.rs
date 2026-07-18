@@ -26,6 +26,7 @@ mod loadprobe;
 mod player;
 mod quest;
 mod sba;
+mod stunnet;
 
 type GetEntityHashID0x58 = unsafe extern "system" fn(*const usize, *const u32) -> *const usize;
 
@@ -100,6 +101,15 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     try_step(
         "loadprobe",
         loadprobe::OnComponentLookupProbe::new().setup(&process),
+    );
+
+    // Network stun-apply message handler — the ONLY path online stun accrual takes
+    // (host-authoritative; see stunnet.rs). Emits per-hit OnPlayerStun events with
+    // slot-keyed source attribution; the parser prefers them over the (online-dead)
+    // accumulator-delta path.
+    try_step(
+        "stun_net",
+        stunnet::OnNetworkStunHook::new(tx.clone()).setup(&process),
     );
 
     /* Quest + Area Tracking */

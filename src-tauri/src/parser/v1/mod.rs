@@ -5,7 +5,8 @@ use chrono::Utc;
 use protocol::{
     AreaEnterEvent, ConfluxBuffAcquiredEvent, ConfluxRoomEnterEvent, ConfluxRunEndEvent,
     DamageEvent, Message, OnAttemptSBAEvent, OnContinueSBAChainEvent, OnDeathEvent,
-    OnPerformSBAEvent, OnUpdateSBAEvent, PlayerIdentityEvent, PlayerLoadEvent, QuestCompleteEvent,
+    OnPerformSBAEvent, OnPlayerStunEvent, OnUpdateSBAEvent, PlayerIdentityEvent, PlayerLoadEvent,
+    QuestCompleteEvent,
 };
 
 use crate::db::runs::{finalize_run, insert_run, ConfluxBuffDelta};
@@ -487,6 +488,18 @@ pub struct DerivedEncounterState {
     total_stun_value: f64,
     /// The total stun value per second done in the encounter
     stun_per_second: f64,
+    /// Encounter-wide stun via accumulator deltas (solo path; 0 online).
+    #[serde(default)]
+    stun_delta_sum: f64,
+    /// Encounter-wide stun via network stun messages (online path; may also
+    /// fire solo, where it duplicates the delta path — `total_stun_value` is
+    /// max(delta, messages) so the paths can never double-count).
+    #[serde(default)]
+    stun_message_sum: f64,
+    /// Stun messages that arrived before the player's first damage event
+    /// created their party row; folded in on row creation.
+    #[serde(skip)]
+    pending_player_stun: HashMap<u32, f64>,
     /// Status of the parser
     status: ParserStatus,
     /// Derived party stats
@@ -504,6 +517,9 @@ impl Default for DerivedEncounterState {
             dps: 0.0,
             total_stun_value: 0.0,
             stun_per_second: 0.0,
+            stun_delta_sum: 0.0,
+            stun_message_sum: 0.0,
+            pending_player_stun: HashMap::new(),
             status: ParserStatus::Waiting,
             party: HashMap::new(),
             targets: HashMap::new(),
@@ -538,9 +554,16 @@ impl DerivedEncounterState {
         self.total_damage += damage_instance.event.damage as u64;
         self.dps = self.total_damage as f64 / ((self.duration()) as f64 / 1000.0);
 
-        // Update stun value
-        self.total_stun_value += damage_instance.stun_damage;
+        // Update stun value (delta path; total = max(delta, messages), see the
+        // field docs — the two capture paths observe the same accrual).
+        self.stun_delta_sum += damage_instance.stun_damage;
+        self.total_stun_value = self.stun_delta_sum.max(self.stun_message_sum);
         self.stun_per_second = self.total_stun_value / ((self.duration()) as f64 / 1000.0);
+
+        // Stun messages that arrived before this player's first damage event.
+        let pending_stun = self
+            .pending_player_stun
+            .remove(&damage_instance.event.source.parent_index);
 
         // Add actor to party if not already present.
         let source_player = self
@@ -556,6 +579,8 @@ impl DerivedEncounterState {
                 sba: 0.0,
                 stun_per_second: 0.0,
                 total_stun_value: 0.0,
+                stun_delta_sum: 0.0,
+                stun_message_sum: 0.0,
                 skill_breakdown: Vec::new(),
                 last_known_pet_skill: None,
                 capped_hits: 0,
@@ -563,6 +588,10 @@ impl DerivedEncounterState {
                 overcap_base_sum: 0.0,
                 overcap_cap_sum: 0.0,
             });
+
+        if let Some(pending) = pending_stun {
+            source_player.add_stun_message(pending);
+        }
 
         // Update player stats from damage event.
         source_player.update_from_damage_event(damage_instance);
@@ -583,6 +612,27 @@ impl DerivedEncounterState {
         // Update everyone's DPS
         for player in self.party.values_mut() {
             player.update_dps(now, self.start_time);
+        }
+    }
+
+    /// Folds one network stun-apply message (`OnPlayerStun`) into the encounter.
+    /// This is the ONLINE stun source — the accumulator-delta path reads 0 there
+    /// because enemy stun is host-authoritative and lands asynchronously.
+    /// Totals are max(delta, messages) at both encounter and player level, so a
+    /// mode where both paths fire (solo loopback) can never double-count.
+    fn process_stun_message(&mut self, actor_index: u32, amount: f64) {
+        self.stun_message_sum += amount;
+        self.total_stun_value = self.stun_delta_sum.max(self.stun_message_sum);
+        let duration_secs = (self.duration()) as f64 / 1000.0;
+        self.stun_per_second = self.total_stun_value / duration_secs;
+
+        if let Some(player) = self.party.get_mut(&actor_index) {
+            player.add_stun_message(amount);
+            player.stun_per_second = player.total_stun_value / duration_secs;
+        } else {
+            // Player row not created yet (no damage event seen); hold the stun
+            // until their first damage event creates it.
+            *self.pending_player_stun.entry(actor_index).or_insert(0.0) += amount;
         }
     }
 }
@@ -706,39 +756,8 @@ impl Parser {
         for (timestamp, event) in self.encounter.event_log() {
             self.derived_state.end_time = *timestamp;
 
-            if let Message::DamageEvent(event) = event {
-                let event = remap_dragon_form(&self.encounter.player_data, event);
-
-                let player_data = self
-                    .encounter
-                    .player_data
-                    .iter()
-                    .flatten()
-                    .find(|player| player.actor_index == event.source.parent_index);
-
-                let damage_instance =
-                    AdjustedDamageInstance::from_damage_event(&event, player_data);
-
-                self.derived_state
-                    .process_damage_event(*timestamp, &damage_instance);
-            }
-        }
-    }
-
-    // Re-analyzes the encounter with the given targets.
-    pub fn reparse_with_options(&mut self, targets: &[EnemyType]) {
-        self.derived_state = Default::default();
-        self.derived_state.start(self.start_time());
-
-        for (timestamp, event) in self.encounter.event_log() {
-            self.derived_state.end_time = *timestamp;
-
-            if let Message::DamageEvent(event) = event {
-                // If the target list is empty, then we're not filtering by target.
-                // Otherwise, we only process damage events that match the target list.
-                let target_type = EnemyType::from_hash(event.target.parent_actor_type);
-
-                if targets.is_empty() || targets.contains(&target_type) {
+            match event {
+                Message::DamageEvent(event) => {
                     let event = remap_dragon_form(&self.encounter.player_data, event);
 
                     let player_data = self
@@ -754,6 +773,53 @@ impl Parser {
                     self.derived_state
                         .process_damage_event(*timestamp, &damage_instance);
                 }
+                Message::OnPlayerStun(event) => {
+                    self.derived_state
+                        .process_stun_message(event.actor_index, event.stun_amount as f64);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // Re-analyzes the encounter with the given targets.
+    pub fn reparse_with_options(&mut self, targets: &[EnemyType]) {
+        self.derived_state = Default::default();
+        self.derived_state.start(self.start_time());
+
+        for (timestamp, event) in self.encounter.event_log() {
+            self.derived_state.end_time = *timestamp;
+
+            match event {
+                Message::DamageEvent(event) => {
+                    // If the target list is empty, then we're not filtering by target.
+                    // Otherwise, we only process damage events that match the target list.
+                    let target_type = EnemyType::from_hash(event.target.parent_actor_type);
+
+                    if targets.is_empty() || targets.contains(&target_type) {
+                        let event = remap_dragon_form(&self.encounter.player_data, event);
+
+                        let player_data = self
+                            .encounter
+                            .player_data
+                            .iter()
+                            .flatten()
+                            .find(|player| player.actor_index == event.source.parent_index);
+
+                        let damage_instance =
+                            AdjustedDamageInstance::from_damage_event(&event, player_data);
+
+                        self.derived_state
+                            .process_damage_event(*timestamp, &damage_instance);
+                    }
+                }
+                // Stun messages carry no target, so target filtering doesn't
+                // apply (enemy stun is effectively boss-wide anyway).
+                Message::OnPlayerStun(event) => {
+                    self.derived_state
+                        .process_stun_message(event.actor_index, event.stun_amount as f64);
+                }
+                _ => {}
             }
         }
     }
@@ -1125,6 +1191,22 @@ impl Parser {
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-party-update", &self.encounter.player_data);
+        }
+    }
+
+    /// Handles one per-hit stun message from the network stun-apply hook — the
+    /// online stun source (the damage-event delta path reads 0 in lobbies).
+    pub fn on_player_stun(&mut self, event: OnPlayerStunEvent) {
+        self.encounter.push_event(
+            Utc::now().timestamp_millis(),
+            Message::OnPlayerStun(event.clone()),
+        );
+
+        self.derived_state
+            .process_stun_message(event.actor_index, event.stun_amount as f64);
+
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
         }
     }
 
@@ -1621,6 +1703,37 @@ mod tests {
             damage_cap: None,
             base_damage: None,
         }
+    }
+
+    /// Stun totals must be max(delta, messages) at both player and encounter
+    /// level: the two capture paths (accumulator delta solo, network messages
+    /// online) observe the SAME accrual, so if both fire the totals must not
+    /// double, and if only one fires it must win outright.
+    #[test]
+    fn stun_message_and_delta_paths_never_double_count() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        // Stun message arriving BEFORE the player's first damage event is held
+        // and folded in when the row is created.
+        state.process_stun_message(0xF000_0000, 30.0);
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        event.stun_value = Some(30.0); // the delta path saw the same 30 stun
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(1_000, &instance);
+
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        assert_eq!(player.total_stun_value, 30.0); // max(30, 30), not 60
+        assert_eq!(state.total_stun_value, 30.0);
+
+        // Online shape: delta dead (0), messages carry everything.
+        state.process_stun_message(0xF000_0000, 20.0);
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        assert_eq!(player.stun_message_sum, 50.0);
+        assert_eq!(player.total_stun_value, 50.0); // max(30 delta, 50 messages)
+        assert_eq!(state.total_stun_value, 50.0);
     }
 
     fn room_enter(quest_id: u32, manager_ptr: u64) -> protocol::ConfluxRoomEnterEvent {

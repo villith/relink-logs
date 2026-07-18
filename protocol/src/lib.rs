@@ -419,6 +419,19 @@ pub struct OnDeathEvent {
     pub death_counter: u32,
 }
 
+/// Per-hit stun applied to an enemy, captured from the game's network stun-apply
+/// message handler (v2.0.2 `FUN_140b43b40`). Online, enemy stun is
+/// host-authoritative and lands via these messages asynchronously — the damage
+/// hook's accumulator-delta method structurally reads 0 there — so this event is
+/// the online stun source. `actor_index` is the per-player slot key of the source
+/// (resolved through the message's entity handle); `stun_amount` is the measured
+/// accumulator delta (ramp bonus and stun-cap clamping included).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OnPlayerStunEvent {
+    pub actor_index: u32,
+    pub stun_amount: f32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
     OnAreaEnter(AreaEnterEvent),
@@ -439,4 +452,7 @@ pub enum Message {
     ConfluxRoomEnter(ConfluxRoomEnterEvent),
     ConfluxBuffAcquired(ConfluxBuffAcquiredEvent),
     ConfluxRunEnd(ConfluxRunEndEvent),
+    /// Appended last (bincode encodes the variant index — see the crate doc
+    /// comment's append-only rule).
+    OnPlayerStun(OnPlayerStunEvent),
 }

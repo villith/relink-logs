@@ -113,6 +113,10 @@ export type PlayerState = {
   totalStunValue: number;
   /** Stun per second over the encounter time */
   stunPerSecond: number;
+  /** Stun captured via accumulator deltas (solo path; 0 in online lobbies) */
+  stunDeltaSum?: number;
+  /** Stun captured via network stun messages (online path); totalStunValue = max of both */
+  stunMessageSum?: number;
   /** Time of the last damage dealt */
   lastDamageTime: number;
   /** Stats for individual skills logged */
@@ -150,6 +154,10 @@ export type EncounterState = {
   totalDamage: number;
   /** Total DPS dealt over the encounter time */
   dps: number;
+  /** Encounter-wide stun via accumulator deltas (solo path; 0 online) */
+  stunDeltaSum?: number;
+  /** Encounter-wide stun via network stun messages (online path); the served totals are max of both */
+  stunMessageSum?: number;
   /** The time of the encounter's first damage instance (UTC milliseconds since epoch) */
   startTime: number;
   /** The time of the encounter's last known damage instance (UTC milliseconds since epoch) */

@@ -598,6 +598,9 @@ fn connect_and_run_parser(app: AppHandle) {
                                     );
                                     state.on_conflux_run_end(event);
                                 }
+                                protocol::Message::OnPlayerStun(event) => {
+                                    state.on_player_stun(event);
+                                }
                             }
                         }
                     }

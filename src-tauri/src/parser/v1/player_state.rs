@@ -18,6 +18,18 @@ pub struct PlayerState {
     pub sba: f64,
     pub total_stun_value: f64,
     pub stun_per_second: f64,
+    /// Stun measured as accumulator deltas across ProcessDamageEvent (the solo
+    /// path; reads 0 online where stun is host-authoritative).
+    #[serde(default)]
+    pub stun_delta_sum: f64,
+    /// Stun from the network stun-apply messages (`OnPlayerStun`; the online
+    /// path — may also fire solo, where it duplicates the delta path).
+    ///
+    /// `total_stun_value` = max(delta, messages): the two paths observe the
+    /// SAME accrual, so whichever captured it wins and double-counting is
+    /// impossible in either mode.
+    #[serde(default)]
+    pub stun_message_sum: f64,
     /// Number of hits by this player that reached the game's damage cap (base > cap)
     pub capped_hits: u32,
     /// Number of hits that were subject to a damage cap at all — the denominator
@@ -36,6 +48,18 @@ pub struct PlayerState {
 impl PlayerState {
     pub fn set_sba(&mut self, sba: f64) {
         self.sba = sba;
+    }
+
+    /// Folds one network stun message into this player's totals.
+    pub fn add_stun_message(&mut self, amount: f64) {
+        self.stun_message_sum += amount;
+        self.refresh_total_stun();
+    }
+
+    /// `total_stun_value` = whichever capture path saw the accrual (they
+    /// measure the same accumulator, so max() dedupes them).
+    fn refresh_total_stun(&mut self) {
+        self.total_stun_value = self.stun_delta_sum.max(self.stun_message_sum);
     }
 
     pub fn update_dps(&mut self, now: i64, start_time: i64) {
@@ -94,7 +118,8 @@ impl PlayerState {
             self.capped_hits += 1;
         }
         self.total_damage += damage_instance.event.damage as u64;
-        self.total_stun_value += damage_instance.stun_damage;
+        self.stun_delta_sum += damage_instance.stun_damage;
+        self.refresh_total_stun();
 
         let parent_character_type =
             CharacterType::from_hash(damage_instance.event.source.parent_actor_type);
@@ -157,6 +182,8 @@ mod tests {
             skill_breakdown: vec![],
             sba: 0.0,
             total_stun_value: 0.0,
+                stun_delta_sum: 0.0,
+                stun_message_sum: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
             cappable_hits: 0,
@@ -180,6 +207,8 @@ mod tests {
             skill_breakdown: vec![],
             sba: 0.0,
             total_stun_value: 0.0,
+                stun_delta_sum: 0.0,
+                stun_message_sum: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
             cappable_hits: 0,
@@ -230,6 +259,8 @@ mod tests {
             skill_breakdown: vec![],
             sba: 0.0,
             total_stun_value: 0.0,
+                stun_delta_sum: 0.0,
+                stun_message_sum: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
             cappable_hits: 0,
@@ -289,6 +320,8 @@ mod tests {
             sba: 0.0,
             stun_per_second: 0.0,
             total_stun_value: 0.0,
+                stun_delta_sum: 0.0,
+                stun_message_sum: 0.0,
             capped_hits: 0,
             cappable_hits: 0,
             overcap_base_sum: 0.0,
@@ -364,6 +397,8 @@ mod tests {
             sba: 0.0,
             stun_per_second: 0.0,
             total_stun_value: 0.0,
+                stun_delta_sum: 0.0,
+                stun_message_sum: 0.0,
             capped_hits: 0,
             cappable_hits: 0,
             overcap_base_sum: 0.0,
@@ -444,6 +479,8 @@ mod tests {
             skill_breakdown: vec![],
             sba: 0.0,
             total_stun_value: 0.0,
+                stun_delta_sum: 0.0,
+                stun_message_sum: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
             cappable_hits: 0,
@@ -518,6 +555,8 @@ mod tests {
             skill_breakdown: vec![],
             sba: 0.0,
             total_stun_value: 0.0,
+                stun_delta_sum: 0.0,
+                stun_message_sum: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
             cappable_hits: 0,
@@ -614,6 +653,8 @@ mod tests {
             skill_breakdown: vec![],
             sba: 0.0,
             total_stun_value: 0.0,
+                stun_delta_sum: 0.0,
+                stun_message_sum: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
             cappable_hits: 0,
@@ -652,6 +693,8 @@ mod tests {
             skill_breakdown: vec![],
             sba: 0.0,
             total_stun_value: 0.0,
+                stun_delta_sum: 0.0,
+                stun_message_sum: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
             cappable_hits: 0,
