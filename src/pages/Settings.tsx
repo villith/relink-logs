@@ -25,7 +25,7 @@ import { useTranslation } from "react-i18next";
 import useChecklistSettings from "./useChecklistSettings";
 import useSettings from "./useSettings";
 
-const ChecklistSection = ({
+export const ChecklistSection = ({
   group,
   legend,
   addPlaceholder,
@@ -37,7 +37,6 @@ const ChecklistSection = ({
   checklist: ReturnType<typeof useChecklistSettings>;
 }) => {
   const entries = group === "build" ? checklist.build : checklist.ai;
-  const [search, setSearch] = useState("");
 
   return (
     <Box>
@@ -68,17 +67,13 @@ const ChecklistSection = ({
         </Flex>
       ))}
       <Select
+        key={entries.length}
         mt="xs"
         searchable
         placeholder={addPlaceholder}
         data={checklist.traitOptions(group)}
         value={null}
-        searchValue={search}
-        onSearchChange={setSearch}
-        onChange={(hex) => {
-          checklist.addTrait(group, hex);
-          setSearch("");
-        }}
+        onChange={(hex) => checklist.addTrait(group, hex)}
       />
     </Box>
   );
