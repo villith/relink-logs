@@ -1420,6 +1420,7 @@ dependencies = [
  "interprocess",
  "log",
  "num_enum 0.7.2",
+ "pelite",
  "protocol",
  "rusqlite",
  "rusqlite_migration",
@@ -1437,6 +1438,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
+ "windows 0.52.0",
  "zstd",
 ]
 

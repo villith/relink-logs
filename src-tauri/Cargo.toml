@@ -53,6 +53,13 @@ strum = "0.26"
 strum_macros = "0.26"
 cbor4ii = { version = "0.3.2", features = ["use_std", "serde1"] }
 log = "^0.4"
+pelite = "0.10.0"
+windows = { version = "0.52.0", features = [
+  "Win32_Foundation",
+  "Win32_System_Diagnostics_Debug",
+  "Win32_System_Diagnostics_ToolHelp",
+  "Win32_System_Threading",
+] }
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]
