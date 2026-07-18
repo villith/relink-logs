@@ -1,0 +1,35 @@
+name: Bug report
+description: Something broken or not working?
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us what you expected to happen. You can paste screenshots directly into this box.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the game, then GBFR Logs
+        2. ...
+  - type: input
+    id: app-version
+    attributes:
+      label: GBFR Logs version
+      description: Shown in the title bar of the meter window.
+    validations:
+      required: true
+  - type: input
+    id: game-version
+    attributes:
+      label: Game version
+  - type: textarea
+    id: log-file
+    attributes:
+      label: Log file (optional)
+      description: If the app crashed or misbehaved, drag & drop the log file here. It lives at `%APPDATA%\gbfr-logs\gbfr-logs.txt`.
