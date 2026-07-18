@@ -167,14 +167,29 @@ pub struct SynthesisSearchResponse {
     pub rng_unpredictable: bool,
 }
 
+/// Item ids of "special" sigils the game refuses as synthesis material
+/// (character sigils, single-trait uniques). Baked from gem.tbl's special
+/// flag by scripts/gen-synthesis-excluded-sigils.py.
+fn excluded_sigils() -> &'static std::collections::HashSet<u32> {
+    static SET: std::sync::OnceLock<std::collections::HashSet<u32>> = std::sync::OnceLock::new();
+    SET.get_or_init(|| {
+        serde_json::from_str::<Vec<String>>(include_str!("../../assets/synthesis-excluded-sigils.json"))
+            .expect("synthesis-excluded-sigils.json is a JSON string array")
+            .into_iter()
+            .map(|s| u32::from_str_radix(&s, 16).expect("synthesis-excluded-sigils.json entries are hex ids"))
+            .collect()
+    })
+}
+
 /// A sigil can be used in synthesis iff it has two real traits, both at level
-/// 11 or higher. Confirmed live (2026-07-18): this is exactly the game's
-/// selectable pool — there is no separate "legendary" rarity gate.
+/// 11 or higher, and it is not a "special" sigil (gem.tbl flag; see
+/// `excluded_sigils`). Level rule confirmed live (2026-07-18).
 pub fn is_eligible(s: &SynthesisSigil) -> bool {
     s.trait1 != EMPTY_TRAIT
         && s.trait2 != EMPTY_TRAIT
         && s.trait1_level >= 11
         && s.trait2_level >= 11
+        && !excluded_sigils().contains(&s.sigil_id)
 }
 
 /// The prediction-relevant identity of a sigil. Two sigils with the same key
@@ -184,14 +199,18 @@ fn dedup_key(s: &SynthesisSigil) -> (u32, u32, u32, u32, i32) {
     (s.trait1, s.trait1_level, s.trait2, s.trait2_level, s.record_level)
 }
 
+/// A sigil's display level: eligible sigils have two real traits, whose
+/// levels are equal in practice; take the max so a mixed pair still sorts
+/// sensibly. Feeds the cheapest-materials-first result order.
+fn sigil_level(s: &SynthesisSigil) -> u32 {
+    s.trait1_level.max(s.trait2_level)
+}
+
 /// Test every unordered pair of ELIGIBLE, distinct-identity sigils whose
-/// combined traits could contain the queried ones; return (matches up to
-/// `cap`, pairs actually predicted, total matches).
-pub fn search(
-    snap: &SynthesisSnapshot,
-    q: &SynthesisQuery,
-    cap: usize,
-) -> (Vec<SynthesisMatch>, u64, u64) {
+/// combined traits could contain the queried ones; return (all matches,
+/// sorted by lowest input sigil levels first, and the pair count actually
+/// predicted).
+pub fn search(snap: &SynthesisSnapshot, q: &SynthesisQuery) -> (Vec<SynthesisMatch>, u64) {
     let has = |s: &SynthesisSigil, t: u32| s.trait1 == t || s.trait2 == t;
     let wanted = |p: &Prediction| -> bool {
         if q.require_lucky && !p.lucky {
@@ -218,7 +237,7 @@ pub fn search(
         .collect();
 
     let mut matches = Vec::new();
-    let (mut tested, mut total) = (0u64, 0u64);
+    let mut tested = 0u64;
     for i in 0..pool.len() {
         for j in (i + 1)..pool.len() {
             let (a, b) = (pool[i], pool[j]);
@@ -233,19 +252,22 @@ pub fn search(
             tested += 1;
             let p = predict(snap, a, b);
             if wanted(&p) {
-                total += 1;
-                if matches.len() < cap {
-                    matches.push(SynthesisMatch {
-                        sigil_a: a.clone(),
-                        sigil_b: b.clone(),
-                        prediction: p,
-                        result_sigil_id: snap.trait_to_item.get(&p.trait1).copied(),
-                    });
-                }
+                matches.push(SynthesisMatch {
+                    sigil_a: a.clone(),
+                    sigil_b: b.clone(),
+                    prediction: p,
+                    result_sigil_id: snap.trait_to_item.get(&p.trait1).copied(),
+                });
             }
         }
     }
-    (matches, tested, total)
+    // Cheapest materials first: (11,11) pairs, then (11,15), then (15,15).
+    // Stable, so equal-level pairs keep discovery order.
+    matches.sort_by_key(|m| {
+        let (la, lb) = (sigil_level(&m.sigil_a), sigil_level(&m.sigil_b));
+        (la.min(lb), la.max(lb))
+    });
+    (matches, tested)
 }
 
 #[cfg(test)]
@@ -376,13 +398,42 @@ mod tests {
             any_order: false,
             require_lucky: false,
         };
-        let (matches, tested, total) = search(&snap, &q, 100);
+        let (matches, tested) = search(&snap, &q);
         assert_eq!(tested, 1);
-        assert_eq!(total, 1);
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].sigil_a.uid, 1);
         assert_eq!(matches[0].sigil_b.uid, 2);
         assert_eq!(matches[0].result_sigil_id, Some(0x9999));
+    }
+
+    /// "Special" sigils (character sigils, single-trait uniques — flagged in
+    /// gem.tbl, baked into synthesis-excluded-sigils.json) can never be
+    /// synthesis material, even with two level-11+ traits. 0xDA9136A1 is
+    /// War Elemental; 0x936DFE00 is Fearless Spirit.
+    #[test]
+    fn special_sigils_are_not_eligible() {
+        let mut s = sigil(1, 0x100, 11, 0x300, 11, 5);
+        assert!(is_eligible(&s));
+        s.sigil_id = 0xDA9136A1;
+        assert!(!is_eligible(&s));
+        s.sigil_id = 0x936DFE00;
+        assert!(!is_eligible(&s));
+    }
+
+    /// A special sigil in the box is never paired by search().
+    #[test]
+    fn search_skips_special_sigils() {
+        let mut snap = search_snap();
+        // Same traits as eligible sigil 1, but carrying War Elemental's item id.
+        let mut special = sigil(3, 0x100, 11, 0x300, 11, 5);
+        special.sigil_id = 0xDA9136A1;
+        // Distinct record_level so dedup can't be what hides it.
+        special.record_level = 6;
+        snap.sigils.push(special);
+        let q = SynthesisQuery { trait1: 0x200, trait2: None, any_order: true, require_lucky: false };
+        let (_m, tested) = search(&snap, &q);
+        // Only the (1,2) pair — the special sigil joins no pair.
+        assert_eq!(tested, 1);
     }
 
     /// Ineligible sigils (1-trait or below level 11) are never paired.
@@ -393,7 +444,7 @@ mod tests {
         snap.sigils.push(sigil(3, 0x200, 15, EMPTY_TRAIT, 0, 9));
         snap.sigils.push(sigil(4, 0x100, 10, 0x400, 11, 9)); // trait1 below 11
         let q = SynthesisQuery { trait1: 0x200, trait2: None, any_order: true, require_lucky: false };
-        let (_m, tested, _total) = search(&snap, &q, 100);
+        let (_m, tested) = search(&snap, &q);
         // Only the single eligible pair (1,2) is ever predicted.
         assert_eq!(tested, 1);
     }
@@ -407,10 +458,9 @@ mod tests {
         snap.sigils.push(sigil(11, 0x100, 11, 0x300, 11, 5));
         snap.sigils.push(sigil(12, 0x100, 11, 0x300, 11, 5));
         let q = SynthesisQuery { trait1: 0x200, trait2: Some(0x300), any_order: false, require_lucky: false };
-        let (matches, tested, total) = search(&snap, &q, 100);
+        let (matches, tested) = search(&snap, &q);
         // Still just one distinct pair, one match — not four.
         assert_eq!(tested, 1);
-        assert_eq!(total, 1);
         assert_eq!(matches.len(), 1);
     }
 
@@ -419,12 +469,10 @@ mod tests {
     fn search_order_toggle() {
         let snap = search_snap();
         let exact = SynthesisQuery { trait1: 0x300, trait2: Some(0x200), any_order: false, require_lucky: false };
-        let (m, _, total) = search(&snap, &exact, 100);
-        assert_eq!(total, 0);
+        let (m, _) = search(&snap, &exact);
         assert!(m.is_empty());
         let any = SynthesisQuery { trait1: 0x300, trait2: Some(0x200), any_order: true, require_lucky: false };
-        let (m, _, total) = search(&snap, &any, 100);
-        assert_eq!(total, 1);
+        let (m, _) = search(&snap, &any);
         assert_eq!(m.len(), 1);
     }
 
@@ -433,8 +481,7 @@ mod tests {
     fn search_require_lucky() {
         let snap = search_snap();
         let q = SynthesisQuery { trait1: 0x200, trait2: Some(0x300), any_order: false, require_lucky: true };
-        let (m, _, total) = search(&snap, &q, 100);
-        assert_eq!(total, 0);
+        let (m, _) = search(&snap, &q);
         assert!(m.is_empty());
     }
 
@@ -459,32 +506,28 @@ mod tests {
         assert!(p.lucky);
     }
 
-    /// cap bounds the returned matches but `total` keeps counting.
+    /// Matches are sorted cheapest-materials-first: by the pair's input sigil
+    /// levels, (11,11) before (11,15) before (15,15). Levels don't feed the
+    /// warm-up (only trait sums + record levels do), so this reuses the
+    /// all-three-pairs-match fixture with levels varied.
     #[test]
-    fn search_cap_truncates_matches_not_total() {
-        // Three ELIGIBLE sigils sharing trait 0x100 with distinct second traits
-        // (so dedup keeps all three) -> pairs (1,2),(1,3),(2,3) all feed
-        // predict(); at rng 555 every pair leads with 0x100, so a trait2=None
-        // query on 0x100 matches all three (Python reference).
+    fn search_sorts_matches_by_input_levels() {
         let mut snap = SynthesisSnapshot {
             rng_state: 3,
             seed_counter: 1,
             ..Default::default()
         };
         snap.sigils = vec![
-            sigil(1, 0x100, 11, 0x110, 11, 1),
+            sigil(1, 0x100, 15, 0x110, 15, 1),
             sigil(2, 0x100, 11, 0x120, 11, 1),
-            sigil(3, 0x100, 11, 0x130, 11, 1),
+            sigil(3, 0x100, 15, 0x130, 15, 1),
         ];
         let q = SynthesisQuery { trait1: 0x100, trait2: None, any_order: false, require_lucky: false };
-        let (all, tested, total) = search(&snap, &q, 100);
-        assert_eq!(tested, 3);
-        assert_eq!(total, 3);
-        assert_eq!(all.len(), 3);
-        // Now cap at 1: still 3 tested / 3 total, but only 1 returned.
-        let (capped, tested, total) = search(&snap, &q, 1);
-        assert_eq!(tested, 3);
-        assert_eq!(total, 3);
-        assert_eq!(capped.len(), 1);
+        let (matches, _) = search(&snap, &q);
+        assert_eq!(matches.len(), 3);
+        // Discovery order is (1,2),(1,3),(2,3); level keys (11,15),(15,15),(11,15).
+        // Sorted: (1,2) then (2,3) then (1,3).
+        let uids: Vec<(u32, u32)> = matches.iter().map(|m| (m.sigil_a.uid, m.sigil_b.uid)).collect();
+        assert_eq!(uids, vec![(1, 2), (2, 3), (1, 3)]);
     }
 }

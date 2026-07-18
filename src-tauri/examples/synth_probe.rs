@@ -62,12 +62,12 @@ fn main() -> anyhow::Result<()> {
         let any_order = args.iter().any(|a| a == "any");
         let require_lucky = args.iter().any(|a| a == "lucky");
         let q = SynthesisQuery { trait1, trait2, any_order, require_lucky };
-        let (matches, tested, total) = synthesis::search(&snap, &q, 20);
+        let (matches, tested) = synthesis::search(&snap, &q);
         println!(
             "query trait1={trait1:#010x} trait2={trait2:x?} any_order={any_order} lucky={require_lucky}"
         );
-        println!("pairs_tested={tested}  total_matches={total}  (showing {})", matches.len());
-        for m in &matches {
+        println!("pairs_tested={tested}  total_matches={}  (showing 20)", matches.len());
+        for m in matches.iter().take(20) {
             println!(
                 "  {:#010x}({:#010x}/{:#010x}) + {:#010x}({:#010x}/{:#010x}) -> {:#010x} {:x?} lucky={}",
                 m.sigil_a.uid, m.sigil_a.trait1, m.sigil_a.trait2,

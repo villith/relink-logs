@@ -18,19 +18,25 @@ const SigilCell = ({ sigil }: { sigil: SynthesisSigil }) => (
 );
 
 const ResultCell = ({ match }: { match: SynthesisMatch }) => {
-  const { t } = useTranslation();
   const { prediction, resultSigilId } = match;
   return (
-    <Group gap="xs">
-      <Stack gap={0}>
-        {resultSigilId !== null && <Text size="sm">{translateSigilId(resultSigilId)}</Text>}
-        <Text size="xs" c="dimmed">
-          {translateTraitId(prediction.trait1)}
-          {prediction.trait2 !== null && ` / ${translateTraitId(prediction.trait2)}`}
-        </Text>
-      </Stack>
-      {prediction.lucky && <Badge color="yellow">{t("ui.toolbox.high-roll", "high roll")}</Badge>}
-    </Group>
+    <Stack gap={0}>
+      {resultSigilId !== null && <Text size="sm">{translateSigilId(resultSigilId)}</Text>}
+      <Text size="xs" c="dimmed">
+        {translateTraitId(prediction.trait1)}
+        {prediction.trait2 !== null && ` / ${translateTraitId(prediction.trait2)}`}
+      </Text>
+    </Stack>
+  );
+};
+
+/** The predicted result level: the lucky roll is 15, the normal one 11. */
+const LevelCell = ({ lucky }: { lucky: boolean }) => {
+  const { t } = useTranslation();
+  return lucky ? (
+    <Badge color="yellow">{t("ui.toolbox.lvl-15", "Lvl 15")}</Badge>
+  ) : (
+    <Badge color="gray">{t("ui.toolbox.lvl-11", "Lvl 11")}</Badge>
   );
 };
 
@@ -78,20 +84,22 @@ const SynthesisHelper = () => {
           onChange={(value) => setForm({ ...form, trait2: value })}
           w={260}
         />
+        <Button onClick={search} loading={searching} disabled={!form.trait1}>
+          {t("ui.toolbox.search", "Search")}
+        </Button>
+      </Group>
+      <Stack gap="xs">
+        <Checkbox
+          label={t("ui.toolbox.require-lucky", "Lvl 15 only")}
+          checked={form.requireLucky}
+          onChange={(e) => setForm({ ...form, requireLucky: e.currentTarget.checked })}
+        />
         <Checkbox
           label={t("ui.toolbox.any-order", "Match either slot order")}
           checked={form.anyOrder}
           onChange={(e) => setForm({ ...form, anyOrder: e.currentTarget.checked })}
         />
-        <Checkbox
-          label={t("ui.toolbox.require-lucky", "High roll only (higher-level result)")}
-          checked={form.requireLucky}
-          onChange={(e) => setForm({ ...form, requireLucky: e.currentTarget.checked })}
-        />
-        <Button onClick={search} loading={searching} disabled={!form.trait1}>
-          {t("ui.toolbox.search", "Search")}
-        </Button>
-      </Group>
+      </Stack>
       {response && (
         <Stack gap="xs">
           <Text size="sm" c="dimmed">
@@ -105,11 +113,6 @@ const SynthesisHelper = () => {
             {t("ui.toolbox.results-caveat")}
           </Text>
           {response.totalMatches === 0 && <Text>{t("ui.toolbox.no-results")}</Text>}
-          {response.totalMatches > response.matches.length && (
-            <Text size="xs" c="dimmed">
-              {t("ui.toolbox.truncated", { shown: response.matches.length, total: response.totalMatches })}
-            </Text>
-          )}
           {response.matches.length > 0 && (
             <Table striped highlightOnHover>
               <Table.Thead>
@@ -117,6 +120,7 @@ const SynthesisHelper = () => {
                   <Table.Th>{t("ui.toolbox.col-sigil-a", "Sigil A")}</Table.Th>
                   <Table.Th>{t("ui.toolbox.col-sigil-b", "Sigil B")}</Table.Th>
                   <Table.Th>{t("ui.toolbox.col-result", "Result")}</Table.Th>
+                  <Table.Th>{t("ui.toolbox.col-level", "Level")}</Table.Th>
                 </Table.Tr>
               </Table.Thead>
               <Table.Tbody>
@@ -130,6 +134,9 @@ const SynthesisHelper = () => {
                     </Table.Td>
                     <Table.Td>
                       <ResultCell match={match} />
+                    </Table.Td>
+                    <Table.Td>
+                      <LevelCell lucky={match.prediction.lucky} />
                     </Table.Td>
                   </Table.Tr>
                 ))}
