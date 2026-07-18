@@ -20,6 +20,7 @@ import {
   summonBonusValue,
   toHash,
   toHashString,
+  traitMaxLevel,
   type BonusSource,
 } from "./utils";
 
@@ -160,7 +161,7 @@ describe("utils", () => {
       innateTraits: [{ id: 0xaaaa, level: 10 }],
     });
 
-    it("sums the same trait across sigils, summons, and the wrightstone", () => {
+    it("sums the same trait across sigils, summons, the wrightstone, and weapon innate skills", () => {
       const traits = computeCombinedTraits({
         sigils: [
           makeSigil({ firstTraitId: 0x100, firstTraitLevel: 15 }),
@@ -174,10 +175,11 @@ describe("utils", () => {
       expect(traits).toEqual([
         { id: 0x100, level: 37 },
         { id: 0x200, level: 12 },
+        { id: 0xaaaa, level: 10 },
       ]);
     });
 
-    it("ignores empty ids, empty sigil slots, zero levels, and weapon innate traits", () => {
+    it("ignores empty ids, empty sigil slots, and zero levels", () => {
       const traits = computeCombinedTraits({
         sigils: [
           makeSigil({ sigilId: EMPTY_ID, firstTraitId: 0x300, firstTraitLevel: 15 }),
@@ -188,7 +190,8 @@ describe("utils", () => {
         weaponInfo: null,
       });
 
-      expect(traits).toEqual([]);
+      // The weapon's innate skill (from the shared fixture) still counts.
+      expect(traits).toEqual([{ id: 0xaaaa, level: 10 }]);
     });
 
     it("falls back to legacy weaponInfo wrightstone traits", () => {
@@ -270,7 +273,7 @@ describe("utils", () => {
           ],
           summons: [{ summonId: 0xdef, mainTraitId: 0x100, mainTraitLevel: 10, bonusId: EMPTY_ID, bonusLevel: 0 }],
           weaponState: {
-            weaponId: 1,
+            weaponId: 0x456,
             exp: 0,
             starLevel: 0,
             plusMarks: 0,
@@ -288,6 +291,7 @@ describe("utils", () => {
         { kind: "sigil", sourceId: 0xabc, level: 15 },
         { kind: "summon", sourceId: 0xdef, level: 10 },
         { kind: "wrightstone", sourceId: 0x123, level: 7 },
+        { kind: "weapon", sourceId: 0x456, level: 10 },
       ]);
     });
 
@@ -345,6 +349,18 @@ describe("utils", () => {
     });
   });
 
+  describe("traitMaxLevel", () => {
+    it("returns the trait's effect cap from the extracted table", () => {
+      expect(traitMaxLevel(0xdc584f60)).toBe(65); // DMG Cap
+      expect(traitMaxLevel(0xceb700ee)).toBe(45); // Stun Power
+      expect(traitMaxLevel(0x4c588c27)).toBe(15); // War Elemental
+    });
+
+    it("is null for ids the table doesn't know", () => {
+      expect(traitMaxLevel(0xdeadbeef)).toBeNull();
+    });
+  });
+
   describe("collectSigilsByCategory", () => {
     const makeSigil = (overrides: Partial<Sigil>): Sigil => ({
       firstTraitId: EMPTY_ID,
@@ -395,7 +411,7 @@ describe("utils", () => {
   describe("defaultChecklist", () => {
     it("parses the bundled JSON, converting hex ids to numbers", () => {
       const { build, ai } = defaultChecklist();
-      expect(build).toHaveLength(12);
+      expect(build).toHaveLength(13);
       expect(ai).toEqual([{ ids: [0xa8a3163b], level: 15 }]);
       const dmgCap = build.find((entry) => entry.ids.length > 1)!;
       expect(dmgCap).toEqual({ ids: [0xdc584f60, 0x0151cf9e, 0x3b71af12, 0xaefeb1bc, 0xfff8cf64], level: 65 });

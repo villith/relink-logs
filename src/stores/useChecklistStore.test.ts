@@ -9,7 +9,8 @@ describe("useChecklistStore", () => {
 
   it("seeds from the bundled defaults with every entry enabled", () => {
     const { build, ai } = useChecklistStore.getState();
-    expect(build).toHaveLength(12);
+    expect(build).toHaveLength(13);
+    expect(build.find((entry) => entry.ids[0] === 0x57ab5b10)!.level).toBe(45);
     expect(build.every((entry) => entry.enabled)).toBe(true);
     expect(ai).toEqual([{ ids: [0xa8a3163b], level: 15, enabled: true }]);
     const dmgCap = build.find((entry) => entry.ids[0] === 0xdc584f60)!;
@@ -33,27 +34,27 @@ describe("useChecklistStore", () => {
 
   it("remove drops the entry", () => {
     useChecklistStore.getState().remove("build", 0x4c588c27);
-    expect(useChecklistStore.getState().build).toHaveLength(11);
+    expect(useChecklistStore.getState().build).toHaveLength(12);
     expect(useChecklistStore.getState().build.some((entry) => entry.ids[0] === 0x4c588c27)).toBe(false);
   });
 
   it("add appends a single-id enabled entry and rejects duplicates", () => {
     useChecklistStore.getState().add("build", 0x12345678, 20);
     let { build } = useChecklistStore.getState();
-    expect(build).toHaveLength(13);
+    expect(build).toHaveLength(14);
     expect(build[build.length - 1]).toEqual({ ids: [0x12345678], level: 20, enabled: true });
 
     // Duplicate of a new entry and of a default entry: both rejected.
     useChecklistStore.getState().add("build", 0x12345678, 30);
     useChecklistStore.getState().add("build", 0x4c588c27, 30);
     build = useChecklistStore.getState().build;
-    expect(build).toHaveLength(13);
+    expect(build).toHaveLength(14);
     expect(build[build.length - 1].level).toBe(20);
 
     // Duplicate of a secondary id within a multi-id entry (DMG Cap group): rejected.
     useChecklistStore.getState().add("build", 0x0151cf9e, 30);
     build = useChecklistStore.getState().build;
-    expect(build).toHaveLength(13);
+    expect(build).toHaveLength(14);
   });
 
   it("reset restores the bundled defaults", () => {
@@ -62,7 +63,7 @@ describe("useChecklistStore", () => {
     useChecklistStore.getState().add("ai", 0x12345678, 20);
     useChecklistStore.getState().reset();
     const { build, ai } = useChecklistStore.getState();
-    expect(build).toHaveLength(12);
+    expect(build).toHaveLength(13);
     expect(build.find((entry) => entry.ids[0] === 0xdc584f60)!.level).toBe(65);
     expect(ai).toHaveLength(1);
   });
