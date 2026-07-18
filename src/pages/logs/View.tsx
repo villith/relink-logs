@@ -69,8 +69,7 @@ type Label = { name: string; partySlotIndex: number; label?: string; color: stri
 // The single-bit level flag (bit N → level N+1) → a 1-based level, or 0 if unset.
 // `>>> 0` forces the isolated bit to an unsigned value so a set bit 31 can't make
 // `flags & -flags` negative and yield `Math.log2(negative) === NaN`.
-const overmasteryLevel = (flags: number): number =>
-  flags === 0 ? 0 : Math.log2((flags & -flags) >>> 0) + 1;
+const overmasteryLevel = (flags: number): number => (flags === 0 ? 0 : Math.log2((flags & -flags) >>> 0) + 1);
 
 const formatOvermastery = (overmastery: Overmastery | undefined): string => {
   if (!overmastery) return "";

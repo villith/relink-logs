@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, MeterColumns, PlayerData } from "@/types";
-import { computeSupPercentage, humanizeNumbers, PLAYER_COLORS, resolvePlayerColor } from "@/utils";
+import { PLAYER_COLORS, computeSupPercentage, humanizeNumbers, resolvePlayerColor } from "@/utils";
 
 export type ColumnValue = {
   value: string | number;

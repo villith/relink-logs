@@ -42,8 +42,7 @@ export const isSupplementaryAction = (actionType: SkillState["actionType"]): boo
  * Arts and damage-over-time cannot. (Groups are frontend merges of Normal skills.)
  */
 export const isSupEligibleAction = (actionType: SkillState["actionType"]): boolean =>
-  typeof actionType === "object" &&
-  (Object.hasOwn(actionType, "Normal") || Object.hasOwn(actionType, "Group"));
+  typeof actionType === "object" && (Object.hasOwn(actionType, "Normal") || Object.hasOwn(actionType, "Group"));
 
 export type SupPercentages = {
   /** Supp damage relative to supp-eligible (Normal skill) damage — the proc-quality
@@ -242,9 +241,7 @@ export const sortPlayers = (players: ComputedPlayerState[], sortType: SortType, 
   // Precompute the sort key once per player when it isn't a plain field on the state,
   // so the comparator doesn't re-derive it for every comparison (O(n log n) scans).
   const supEligible =
-    sortType === MeterColumns.SupPercentage
-      ? new Map(players.map((p) => [p, computeSupPercentage(p).eligible]))
-      : null;
+    sortType === MeterColumns.SupPercentage ? new Map(players.map((p) => [p, computeSupPercentage(p).eligible])) : null;
 
   players.sort((a, b) => {
     if (sortType === MeterColumns.Name) {
