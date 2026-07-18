@@ -47,13 +47,12 @@ export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyDa
         return { value: (player.percentage || 0).toFixed(0), unit: "%" };
       case MeterColumns.SupPercentage: {
         // Extra damage gained from supplementary-type procs (sigil + echoes): +0% to
-        // +60% of supp-eligible damage, with the share of total damage as the secondary
-        // figure. Computed lazily so the skill-breakdown scan only runs when the column
-        // is actually shown.
+        // +60% of supp-eligible damage. Computed lazily so the skill-breakdown scan
+        // only runs when the column is actually shown.
         const supPercentage = computeSupPercentage(player);
         return {
           value: `+${supPercentage.eligible.toFixed(0)}`,
-          unit: `% (+${supPercentage.overall.toFixed(0)}%)`,
+          unit: "%",
         };
       }
       case MeterColumns.SBA:
