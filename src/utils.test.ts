@@ -11,6 +11,7 @@ import {
   computeOvercapPercentage,
   computeSupPercentage,
   defaultChecklist,
+  deriveNavState,
   deriveTranscendence,
   fillBonusGroups,
   formatSummonBonusValue,
@@ -576,6 +577,36 @@ describe("utils", () => {
 
     it("is null for weapons without transcendence curves", () => {
       expect(deriveTranscendence(0x12345678, stage9Traits)).toBeNull();
+    });
+  });
+
+  describe("deriveNavState", () => {
+    it("marks the Logs tab active on the list, detail, and conflux pages", () => {
+      for (const pathname of ["/logs", "/logs/123", "/logs/conflux", "/logs/conflux/run/5"]) {
+        const nav = deriveNavState(pathname);
+        expect(nav.logsActive, pathname).toBe(true);
+        expect(nav.toolboxActive, pathname).toBe(false);
+        expect(nav.settingsActive, pathname).toBe(false);
+      }
+    });
+
+    it("marks toolbox and settings tabs active on their pages only", () => {
+      const toolbox = deriveNavState("/logs/toolbox");
+      expect(toolbox).toMatchObject({ logsActive: false, toolboxActive: true, settingsActive: false });
+
+      const settings = deriveNavState("/logs/settings");
+      expect(settings).toMatchObject({ logsActive: false, toolboxActive: false, settingsActive: true });
+    });
+
+    it("keeps the quests/conflux sub-tab split and list-page detection", () => {
+      expect(deriveNavState("/logs")).toMatchObject({ questsActive: true, confluxActive: false, onListPage: true });
+      expect(deriveNavState("/logs/conflux")).toMatchObject({
+        questsActive: false,
+        confluxActive: true,
+        onListPage: true,
+      });
+      expect(deriveNavState("/logs/123")).toMatchObject({ questsActive: true, onListPage: false });
+      expect(deriveNavState("/logs/settings")).toMatchObject({ questsActive: false, onListPage: false });
     });
   });
 });

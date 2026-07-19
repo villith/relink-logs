@@ -971,6 +971,20 @@ export const toHash = (num: number): string => num.toString(16);
 /// Converts a number to a hexadecimal string and pads it to 8 characters.
 export const toHashString = (num: number | undefined): string => (num ? num.toString(16).padStart(8, "0") : "");
 
+/** Active/highlight state for the logs-window navigation, derived from the router
+ * pathname. The header tabs (Logs / Toolbox / Settings) are mutually exclusive;
+ * "Logs" covers everything that isn't toolbox/settings (list, detail, conflux).
+ * Quests/Conflux are the body sub-tabs shown only on the two list pages. */
+export const deriveNavState = (pathname: string) => {
+  const toolboxActive = pathname.startsWith("/logs/toolbox");
+  const settingsActive = pathname.startsWith("/logs/settings");
+  const logsActive = !toolboxActive && !settingsActive;
+  const confluxActive = pathname.startsWith("/logs/conflux");
+  const questsActive = logsActive && !confluxActive;
+  const onListPage = pathname === "/logs" || confluxActive;
+  return { logsActive, toolboxActive, settingsActive, confluxActive, questsActive, onListPage };
+};
+
 /// Hook that returns the previous value of a variable.
 export const usePrevious = <T>(value: T): T | undefined => {
   const ref = useRef<T>();

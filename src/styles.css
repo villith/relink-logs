@@ -15,6 +15,12 @@ body,
   height: 100%;
 }
 
+/* Reserve the scrollbar's space up front so content doesn't jump sideways
+   when navigating between pages that do/don't overflow vertically. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background-color: transparent;

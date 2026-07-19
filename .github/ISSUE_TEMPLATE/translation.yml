@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for helping improve GBFR Logs translations!
 
-        **Note:** item / weapon / skill **names** come directly from the game's own data files and cannot be hand-edited. Only the app's own interface text (buttons, labels, settings, messages) can be changed here.
+        **Note:** most item / weapon / skill **names** come directly from the game's own data files. But some labels (skills, sigils, traits, abilities the game data doesn't name) are maintained by hand — if you see a missing one (e.g. `Skill 3aa04f2a` or `Unknown (…)`) or a wrong one, report it here with the "Missing or wrong skill / sigil / trait / item label" type.
   - type: dropdown
     id: language
     attributes:
@@ -35,6 +35,7 @@ body:
         - Wrong translation
         - Typo
         - Text shows in English (untranslated)
+        - Missing or wrong skill / sigil / trait / item label (game data)
         - Request a new language
     validations:
       required: true
@@ -49,7 +50,7 @@ body:
     id: current-text
     attributes:
       label: Current text
-      description: The text exactly as the app shows it now. Leave empty for new-language requests.
+      description: "The text exactly as the app shows it now — for missing labels include the placeholder id, e.g. `Skill 3aa04f2a`. Leave empty for new-language requests."
   - type: input
     id: suggested-text
     attributes:

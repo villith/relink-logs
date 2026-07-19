@@ -609,6 +609,10 @@ fn connect_and_run_parser(app: AppHandle) {
                                 protocol::Message::OnQuestComplete(event) => {
                                     state.on_quest_complete_event(event);
                                 }
+                                protocol::Message::OnQuestFail(event) => {
+                                    info!("quest retire/fail boundary: quest_id={:#x}", event.quest_id);
+                                    state.on_quest_fail_event(event);
+                                }
                                 protocol::Message::OnUpdateSBA(event) => {
                                     state.on_sba_update(event);
                                 }
