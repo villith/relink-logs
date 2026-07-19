@@ -15,12 +15,12 @@ body:
     attributes:
       label: Steps to reproduce
       placeholder: |
-        1. Start the game, then GBFR Logs
+        1. Start the game, then Relink Logs
         2. ...
   - type: input
     id: app-version
     attributes:
-      label: GBFR Logs version
+      label: Relink Logs version
       description: Shown in the title bar of the meter window.
     validations:
       required: true

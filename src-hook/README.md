@@ -1,4 +1,4 @@
-# gbfr-logs-hook
+# relink-logs-hook
 
 This contains the library that is injected into the running game process.
 

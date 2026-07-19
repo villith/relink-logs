@@ -1,7 +1,7 @@
 {
-  "name": "gbfr-logs",
+  "name": "relink-logs",
   "private": true,
-  "version": "1.9.5",
+  "version": "1.9.6",
   "type": "module",
   "scripts": {
     "dev": "cargo build --release --package hook --features hook/console,hook/hookdiag,hook/dmgdiag && node scripts/refresh-dbg-hook.mjs && vite",
@@ -12,7 +12,8 @@
     "format": "prettier --write --ignore-unknown --ext js,jsx,ts,tsx src ./src",
     "format-check": "prettier --check --ignore-unknown --ext js,jsx,ts,tsx src ./src",
     "tauri": "tauri",
-    "test": "vitest"
+    "test": "vitest",
+    "bump": "node scripts/bump-version.mjs"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans": "^5.0.1",

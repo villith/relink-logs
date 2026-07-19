@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "GBFR Logs",
-    "version": "1.9.5"
+    "version": "1.9.6"
   },
   "tauri": {
     "allowlist": {
@@ -112,7 +112,7 @@
       "dialog": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZCMDMyNUExMDc3MTkwNzkKUldSNWtIRUhvU1VEKzdNQzdqMzBPdk1INExKVEVRa2NhYkp5MVgyQVA5aU05RlFWaXV0b1VSdjAK",
       "endpoints": [
-        "https://github.com/villith/gbfr-logs/releases/latest/download/latest.json"
+        "https://github.com/villith/relink-logs/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "basicUi"

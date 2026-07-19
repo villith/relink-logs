@@ -1,6 +1,6 @@
 /*!
 This library crate provides the event protocol that is emitted by the "hook"
-injected into the game process and consumed by the GBFR Logs parser.
+injected into the game process and consumed by the Relink Logs parser.
 
 Keep in mind that the serialization protocol is not defined here, only the
 serializable message types.

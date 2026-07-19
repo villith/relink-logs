@@ -12,7 +12,7 @@ import { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-const GITHUB_URL = "https://github.com/villith/gbfr-logs";
+const GITHUB_URL = "https://github.com/villith/relink-logs";
 
 const NavTab = ({
   to,
@@ -80,7 +80,7 @@ const Layout = () => {
         <AppShell.Header>
           <Group h="100%" px="sm" gap="xs" wrap="nowrap">
             <Group h="100%" gap="sm" wrap="nowrap" style={{ flex: 1 }}>
-              <Text style={{ whiteSpace: "nowrap" }}>GBFR Logs{version && ` - v${version}`}</Text>
+              <Text style={{ whiteSpace: "nowrap" }}>Relink Logs{version && ` - v${version}`}</Text>
             </Group>
             <Group h="100%" gap="xs" wrap="nowrap" justify="center">
               <NavTab to="/logs" icon={<ListDashes size="1rem" />} active={logsActive}>

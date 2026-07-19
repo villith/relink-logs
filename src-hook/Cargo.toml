@@ -19,8 +19,8 @@ hookdiag = ["dep:backtrace"]
 
 [package.metadata.winres]
 OriginalFilename = "hook.dll"
-CompanyName = "False Spring"
-LegalCopyright = "Copyright (C) False Spring"
+CompanyName = "Relink Logs"
+LegalCopyright = "Copyright (C) Relink Logs contributors"
 
 [dependencies]
 anyhow = "1.0"

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-GBFR Logs is a DPS parser/overlay for Granblue Fantasy: Relink. It works by DLL-injecting a hook into the running game process, reading game memory + hooking damage functions, and broadcasting events over a named pipe to a Tauri desktop app that parses and displays them. Windows-only; requires running as admin against a live game process.
+Relink Logs (formerly GBFR Logs; built upon the now-unmaintained [false-spring/gbfr-logs](https://github.com/false-spring/gbfr-logs), no longer affiliated with it) is a DPS parser/overlay for Granblue Fantasy: Relink. It works by DLL-injecting a hook into the running game process, reading game memory + hooking damage functions, and broadcasting events over a named pipe to a Tauri desktop app that parses and displays them. Windows-only; requires running as admin against a live game process.
 
 ## Development commands
 

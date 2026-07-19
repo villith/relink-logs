@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for helping improve GBFR Logs translations!
+        Thanks for helping improve Relink Logs translations!
 
         **Note:** most item / weapon / skill **names** come directly from the game's own data files. But some labels (skills, sigils, traits, abilities the game data doesn't name) are maintained by hand — if you see a missing one (e.g. `Skill 3aa04f2a` or `Unknown (…)`) or a wrong one, report it here with the "Missing or wrong skill / sigil / trait / item label" type.
   - type: dropdown

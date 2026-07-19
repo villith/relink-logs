@@ -89,7 +89,7 @@ jobs:
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
         with:
           tagName: ${{ needs.tag.outputs.version }}
-          releaseName: "GBFR Logs ${{ needs.tag.outputs.version }}"
+          releaseName: "Relink Logs ${{ needs.tag.outputs.version }}"
           releaseBody: "See the assets below to download and install. Make sure to save and exit before updating."
           # Publish (not draft) so releases/latest/download/latest.json resolves —
           # that auto-generated manifest is the updater endpoint. tauri-action
