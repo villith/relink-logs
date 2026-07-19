@@ -1,0 +1,18 @@
+{
+  "build": [
+    { "ids": ["4c588c27"], "level": 15 },
+    { "ids": ["3d8153a1"], "level": 15 },
+    { "ids": ["ee85cd1f"], "level": 15 },
+    { "ids": ["57ab5b10"], "level": 45 },
+    { "ids": ["d2c8e10a"], "level": 30 },
+    { "ids": ["8b3bf60c"], "level": 15 },
+    { "ids": ["dc584f60", "0151cf9e", "3b71af12", "aefeb1bc", "fff8cf64"], "level": 65 },
+    { "ids": ["ceb700ee"], "level": 45 },
+    { "ids": ["95f3fa86"], "level": 15 },
+    { "ids": ["e69a4694"], "level": 15 },
+    { "ids": ["9232dc17"], "level": 15 },
+    { "ids": ["a7726190"], "level": 15 },
+    { "ids": ["d029fe08"], "level": 15 }
+  ],
+  "ai": [{ "ids": ["a8a3163b"], "level": 15 }]
+}

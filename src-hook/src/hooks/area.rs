@@ -11,7 +11,18 @@ static_detour! {
     static OnEnterArea: unsafe extern "system" fn(u32, *const usize, u8, *const usize) -> usize;
 }
 
-const ON_ENTER_AREA_SIG: &str = "e8 $ { ' } c5 ? ? ? c5 f8 29 45 ? c7 45 ? ? ? ? ?";
+// v2.0.2: DISABLED pending re-derivation. The old pattern (`e8 $ { ' } c5 ? ? ? c5 f8 29 45 ?
+// c7 45 ? ? ? ? ?`) now matches 11 sites, ALL of them `call +0xf` hash-loading stubs inside one
+// type-hash switch at rva 0x3d0a5xx — none is a real function entry. search_address picked the
+// first stub, so the detour landed on mid-function garbage whose relocated instructions write
+// through the caller's RBP (silent stack corruption inside the hook). We fail safe by feeding a
+// never-matching sentinel to search_address, so setup returns Err and try_step logs the hook as
+// unavailable. The between-quest boundary this hook used to provide is now emitted by
+// OnLoadQuestHook (quest.rs) on every non-Conflux quest load; what's still lost is the cut on
+// NON-quest transitions (e.g. quest -> town), which only matters for a failed/retired quest
+// followed by quitting the game before another quest load. Re-enable by re-deriving a true
+// area-transition function entry (Ghidra/live work) and restoring a real ON_ENTER_AREA_SIG.
+const ON_ENTER_AREA_SIG: &str = "cc cc cc cc cc cc cc cc DISABLED_v202_matches_hash_stubs";
 
 /// Handles tracking whenever the player enters a new area.
 #[derive(Clone)]

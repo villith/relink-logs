@@ -1,0 +1,90 @@
+{
+  "00d171e0": {
+    "key": "TXT_LBP_EFF_TITLE_CRITICAL01",
+    "text": "Critical Hit Rate Up"
+  },
+  "2270bc40": {
+    "key": "TXT_LBP_EFF_TITLE_REC_LIMIT_SUM",
+    "text": "Healing Cap Up"
+  },
+  "2ea9ca80": {
+    "key": "TXT_LBP_EFF_TITLE_REC_LIMIT_SUM",
+    "text": "Healing Cap Up"
+  },
+  "2ffb509f": {
+    "key": "TXT_LBP_EFF_TITLE_AB_LIMIT01",
+    "text": "Skill Damage Cap Up"
+  },
+  "33c0d50c": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_DMG01",
+    "text": "Skybound Art Damage Up"
+  },
+  "54b09a37": {
+    "key": "TXT_LBP_EFF_TITLE_BURST_DMG01",
+    "text": "Chain Burst Damage Up"
+  },
+  "5a1d2c89": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_LIMIT01",
+    "text": "Skybound Art Damage Cap Up"
+  },
+  "5a39d81b": {
+    "key": "TXT_LBP_EFF_TITLE_BURST_DMG01",
+    "text": "Chain Burst Damage Up"
+  },
+  "664e8e32": {
+    "key": "TXT_LBP_EFF_TITLE_AB_DMG01",
+    "text": "Skill Damage Up"
+  },
+  "75138d21": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_DMG01",
+    "text": "Skybound Art Damage Up"
+  },
+  "9245dfa4": {
+    "key": "TXT_LBP_EFF_TITLE_ATK_LIMIT01",
+    "text": "Normal Attack Damage Cap Up"
+  },
+  "a074a967": {
+    "key": "TXT_LBP_EFF_TITLE_CRITICAL01",
+    "text": "Critical Hit Rate Up"
+  },
+  "a3539fbb": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_LIMIT01",
+    "text": "Skybound Art Damage Cap Up"
+  },
+  "a3e537b1": {
+    "key": "TXT_LBP_EFF_TITLE_ATK01",
+    "text": "Attack Power Up"
+  },
+  "a66241c9": {
+    "key": "TXT_LBP_EFF_TITLE_ATK_LIMIT01",
+    "text": "Normal Attack Damage Cap Up"
+  },
+  "a8900c80": {
+    "key": "TXT_LBP_EFF_TITLE_ATK01",
+    "text": "Attack Power Up"
+  },
+  "af39a3fb": {
+    "key": "TXT_LBP_EFF_TITLE_AB_DMG01",
+    "text": "Skill Damage Up"
+  },
+  "bc4e92cb": {
+    "key": "TXT_LBP_EFF_TITLE_HP01",
+    "text": "Health Up"
+  },
+  "ce70c58a": {
+    "key": "TXT_LBP_EFF_TITLE_AB_LIMIT01",
+    "text": "Skill Damage Cap Up"
+  },
+  "f0f77bc1": {
+    "key": "TXT_LBP_EFF_TITLE_BREAK01",
+    "text": "Stun Power Up"
+  },
+  "f2256e44": {
+    "key": "TXT_LBP_EFF_TITLE_HP01",
+    "text": "Health Up"
+  },
+  "f7b0316f": {
+    "key": "TXT_LBP_EFF_TITLE_BREAK01",
+    "text": "Stun Power Up"
+  }
+}

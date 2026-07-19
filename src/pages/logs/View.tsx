@@ -15,15 +15,26 @@ import {
   Tabs,
   Text,
   Tooltip,
+  UnstyledButton,
 } from "@mantine/core";
-import { Calculator, ClipboardText } from "@phosphor-icons/react";
+import {
+  Calculator,
+  Check,
+  ClipboardText,
+  Minus,
+  Plus,
+  Warning,
+  X,
+  type Icon as PhosphorIcon,
+} from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
 import { t } from "i18next";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 
 import { Table as MeterTable } from "@/components/Table";
+import { useChecklistStore } from "@/stores/useChecklistStore";
 import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import {
@@ -37,84 +48,121 @@ import {
 } from "@/types";
 import {
   EMPTY_ID,
+  OVERMASTERY_EFFECT_IDS,
   PLAYER_COLORS,
+  SIGIL_CATEGORY_TARGET,
+  checklistLevel,
+  checklistStatus,
+  collectSigilsByCategory,
+  collectTraitSources,
+  computeCombinedTraits,
+  deriveTranscendence,
   epochToLocalTime,
   exportCharacterDataToClipboard,
   exportFullEncounterToClipboard,
   exportScreenshotToClipboard,
   exportSimpleEncounterToClipboard,
+  fillBonusGroups,
+  formatCharacterLabel,
   formatInPartyOrder,
+  formatSummonBonusValue,
+  groupBonuses,
   humanizeNumbers,
   millisecondsToElapsedFormat,
   openDamageCalculator,
+  resolvePlayerColor,
+  skillboardLayoutFor,
+  skillboardNodeMeta,
+  summonBonusValue,
   toHash,
   toHashString,
+  traitMaxLevel,
+  translateAbilityId,
   translateItemId,
   translateOvermasteryId,
   translateQuestId,
   translateSigilId,
+  translateSkillboardNode,
+  translateSummonBonusId,
+  translateSummonId,
   translateTraitId,
+  translateWeaponId,
+  translateWeaponKey,
   translatedPlayerName,
+  weaponInnateTraits,
+  type BonusAmount,
+  type BonusSource,
+  type ChecklistEntry,
+  type ChecklistStatus,
+  type CombinedBonus,
+  type CombinedTrait,
+  type SigilCategory,
+  type TraitSource,
+  type WeaponTraitDef,
 } from "@/utils";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 
 type Label = { name: string; partySlotIndex: number; label?: string; color: string; strokeDasharray?: string }[];
 
+// The single-bit level flag (bit N → level N+1) → a 1-based level, or 0 if unset.
+// `>>> 0` forces the isolated bit to an unsigned value so a set bit 31 can't make
+// `flags & -flags` negative and yield `Math.log2(negative) === NaN`.
+const overmasteryLevel = (flags: number): number => (flags === 0 ? 0 : Math.log2((flags & -flags) >>> 0) + 1);
+
+// Overmastery ids whose value is a flat stat amount; all others display as percentages.
+const OVERMASTERY_FLAT_VALUE_IDS = [
+  0x032a5217, 0x0781c7a2, 0x0b134a7f, 0x0cf5d0f3, 0x0db88f30, 0x0f25b474, 0x0febc993, 0x11023c6f, 0x124db819,
+  0x1268b903, 0x13c9452a, 0x155c25c3, 0x1cc2f730, 0x1e2b3db5, 0x24499a25, 0x254a08d4, 0x2d6c03eb, 0x2ea457f3,
+  0x303becc0, 0x3526fecb, 0x38f656e7, 0x394083bd, 0x3ac53494, 0x3ca4c8d5, 0x3d6600d9, 0x403be586, 0x409df671,
+  0x427b5e26, 0x437c055d, 0x44f04a7a, 0x49089d4f, 0x4ab91ea7, 0x4c0cbd32, 0x4ce64874, 0x4e2513df, 0x52a207b5,
+  0x5382923d, 0x53d358e0, 0x5767dd9f, 0x57bbc478, 0x59dce1e8, 0x5a51f0cb, 0x5a57dc07, 0x60835d4f, 0x60926b53,
+  0x61d4efa0, 0x6564c02b, 0x66092bc7, 0x67bde89b, 0x6e4f2f5e, 0x6fb47781, 0x7125942e, 0x7cbbb4e0, 0x7ccf98c5,
+  0x7e870ebe, 0x807e9e58, 0x829b8b5c, 0x834892b4, 0x85f0f318, 0x871d12cc, 0x874353d7, 0x8af65803, 0x8e66b68c,
+  0x8fe7fb0a, 0x911d4f18, 0x91265f66, 0x93572974, 0x937efb96, 0x95567556, 0x9a0988df, 0x9a29aa64, 0x9b6f164c,
+  0x9bfd4548, 0x9c6375cf, 0xa1dc63b3, 0xa257dac1, 0xa2bcf523, 0xa3460028, 0xa85b4af5, 0xaac23948, 0xab56bde3,
+  0xaccbece1, 0xaf0d8b97, 0xb83aa115, 0xbbe7992a, 0xbd488071, 0xbe8c17d4, 0xbf44c20b, 0xc1360291, 0xc265b03b,
+  0xc2d708c1, 0xc4925bd7, 0xc52d2245, 0xc5d68c62, 0xc6bdc7a6, 0xcb43ff8e, 0xcb63be55, 0xcb6bb434, 0xccef4492,
+  0xcd5d6315, 0xcf24e1a2, 0xcf6b267a, 0xd51958d1, 0xda546dfe, 0xdcbd8423, 0xddc29837, 0xde6a367a, 0xdf2cab83,
+  0xdf2eef09, 0xdfb00115, 0xe056ba80, 0xe7710898, 0xea5eaafc, 0xea99fa76, 0xee6100ca, 0xeefb4ade, 0xf004e9f2,
+  0xf203bb15, 0xf2111b99, 0xf5514f81, 0xf80e3310, 0xfa230938, 0xfa9bcf64, 0xfb276afd, 0xfe71865d, 0x2676f9d2,
+  0x2c1c933d, 0x3356dd03, 0x36f068fd, 0x3dae6494, 0x455d6a1c, 0x59fbb7d8, 0x6837e60c, 0x6cb38ef3, 0x7b05e679,
+  0x7b498c32, 0x9bf7878a, 0xa3545ca1, 0xa85495ba, 0xa901e065, 0xc11fdfbd, 0xd5169339, 0xd63dd12b, 0xf5c314a0,
+];
+
+// v2.0.2: overmasteries recovered from the town loadout carry only id + level
+// (in `flags`), not the computed in-game magnitude (`value` is 0) — fall back
+// to the level, matching the "(Lvl. N)" style used for sigils and summons.
+const overmasteryAmount = (overmastery: Overmastery): BonusAmount =>
+  overmastery.value === 0
+    ? { kind: "level", amount: overmasteryLevel(overmastery.flags) }
+    : {
+        kind: OVERMASTERY_FLAT_VALUE_IDS.includes(overmastery.id) ? "flat" : "percent",
+        amount: overmastery.value,
+      };
+
 const formatOvermastery = (overmastery: Overmastery | undefined): string => {
   if (!overmastery) return "";
-
-  const value = overmastery.value.toFixed(0);
   const translation = translateOvermasteryId(overmastery.id);
-  const regularNumbers = [
-    0x032a5217, 0x0781c7a2, 0x0b134a7f, 0x0cf5d0f3, 0x0db88f30, 0x0f25b474, 0x0febc993, 0x11023c6f, 0x124db819,
-    0x1268b903, 0x13c9452a, 0x155c25c3, 0x1cc2f730, 0x1e2b3db5, 0x24499a25, 0x254a08d4, 0x2d6c03eb, 0x2ea457f3,
-    0x303becc0, 0x3526fecb, 0x38f656e7, 0x394083bd, 0x3ac53494, 0x3ca4c8d5, 0x3d6600d9, 0x403be586, 0x409df671,
-    0x427b5e26, 0x437c055d, 0x44f04a7a, 0x49089d4f, 0x4ab91ea7, 0x4c0cbd32, 0x4ce64874, 0x4e2513df, 0x52a207b5,
-    0x5382923d, 0x53d358e0, 0x5767dd9f, 0x57bbc478, 0x59dce1e8, 0x5a51f0cb, 0x5a57dc07, 0x60835d4f, 0x60926b53,
-    0x61d4efa0, 0x6564c02b, 0x66092bc7, 0x67bde89b, 0x6e4f2f5e, 0x6fb47781, 0x7125942e, 0x7cbbb4e0, 0x7ccf98c5,
-    0x7e870ebe, 0x807e9e58, 0x829b8b5c, 0x834892b4, 0x85f0f318, 0x871d12cc, 0x874353d7, 0x8af65803, 0x8e66b68c,
-    0x8fe7fb0a, 0x911d4f18, 0x91265f66, 0x93572974, 0x937efb96, 0x95567556, 0x9a0988df, 0x9a29aa64, 0x9b6f164c,
-    0x9bfd4548, 0x9c6375cf, 0xa1dc63b3, 0xa257dac1, 0xa2bcf523, 0xa3460028, 0xa85b4af5, 0xaac23948, 0xab56bde3,
-    0xaccbece1, 0xaf0d8b97, 0xb83aa115, 0xbbe7992a, 0xbd488071, 0xbe8c17d4, 0xbf44c20b, 0xc1360291, 0xc265b03b,
-    0xc2d708c1, 0xc4925bd7, 0xc52d2245, 0xc5d68c62, 0xc6bdc7a6, 0xcb43ff8e, 0xcb63be55, 0xcb6bb434, 0xccef4492,
-    0xcd5d6315, 0xcf24e1a2, 0xcf6b267a, 0xd51958d1, 0xda546dfe, 0xdcbd8423, 0xddc29837, 0xde6a367a, 0xdf2cab83,
-    0xdf2eef09, 0xdfb00115, 0xe056ba80, 0xe7710898, 0xea5eaafc, 0xea99fa76, 0xee6100ca, 0xeefb4ade, 0xf004e9f2,
-    0xf203bb15, 0xf2111b99, 0xf5514f81, 0xf80e3310, 0xfa230938, 0xfa9bcf64, 0xfb276afd, 0xfe71865d, 0x2676f9d2,
-    0x2c1c933d, 0x3356dd03, 0x36f068fd, 0x3dae6494, 0x455d6a1c, 0x59fbb7d8, 0x6837e60c, 0x6cb38ef3, 0x7b05e679,
-    0x7b498c32, 0x9bf7878a, 0xa3545ca1, 0xa85495ba, 0xa901e065, 0xc11fdfbd, 0xd5169339, 0xd63dd12b, 0xf5c314a0,
-  ];
-
-  let isRegularNumber = false;
-
-  if (regularNumbers.includes(overmastery.id)) {
-    isRegularNumber = true;
-  }
-
-  if (isRegularNumber) {
-    return `${translation}: +${value}`;
-  } else {
-    return `${translation}: +${value}%`;
-  }
+  const amount = overmasteryAmount(overmastery);
+  return amount.kind === "level"
+    ? `${translation} ${formatBonusAmount(amount)}`
+    : `${translation}: ${formatBonusAmount(amount)}`;
 };
 
+const formatBonusAmount = (value: BonusAmount): string =>
+  value.kind === "level"
+    ? `(Lvl. ${value.amount})`
+    : `+${Number(value.amount.toFixed(2))}${value.kind === "percent" ? "%" : ""}`;
+
+// "+1800 (Lvl. 3)" — numeric totals first, with any magnitude-unknown
+// (level-only) contributions trailing. Totals arrive in that order already.
+const formatBonusTotals = (totals: BonusAmount[]): string => totals.map(formatBonusAmount).join(" ");
+
 const formatPlayerDisplayName = (player: PlayerData, showName: boolean, showLevel: boolean = true): string => {
-  const displayName = player.displayName;
-  const characterType = t(`characters:${player.characterType}`, `ui:characters.${player.characterType}`);
+  const label = formatCharacterLabel(player.characterType, player.displayName, showName);
 
-  if (showLevel) {
-    if (displayName === "" || !showName) {
-      return `${characterType} Lvl. ${player.playerStats?.level || 1}`;
-    } else {
-      return `${displayName} (${characterType}) Lvl. ${player.playerStats?.level || 1}`;
-    }
-  }
-
-  if (displayName === "" || !showName) {
-    return `${characterType}`;
-  } else {
-    return `${displayName} (${characterType})`;
-  }
+  return showLevel ? `${label} Lvl. ${player.playerStats?.level || 1}` : label;
 };
 
 // Returns a string of stars based on the star level.
@@ -122,6 +170,13 @@ const formatPlayerDisplayName = (player: PlayerData, showName: boolean, showLeve
 // ★★★★★★ (6 stars)
 const createWeaponStars = (starLevel: number): string => {
   return "★".repeat(starLevel) + "☆".repeat(6 - starLevel);
+};
+
+// Awakening rows repeat the base skill id for most weapons — keep the first
+// (non-awakening) occurrence of each trait.
+const dedupeWeaponTraits = (traits: WeaponTraitDef[]): WeaponTraitDef[] => {
+  const seen = new Set<string>();
+  return traits.filter((trait) => !seen.has(trait.id) && (seen.add(trait.id), true));
 };
 
 interface ChartTooltipProps {
@@ -155,6 +210,227 @@ export const ChartTooltip = ({ label, payload }: ChartTooltipProps) => {
 
 const DPS_INTERVAL = 3;
 
+// Tooltip grouping for the checklist source breakdown, in display order.
+const CHECKLIST_SOURCE_KINDS: { key: TraitSource["kind"]; label: string; translate: (id: number) => string }[] = [
+  { key: "sigil", label: "ui.player-sigils", translate: translateSigilId },
+  { key: "summon", label: "ui.player-summons", translate: translateSummonId },
+  { key: "wrightstone", label: "ui.wrightstone", translate: translateItemId },
+  { key: "weapon", label: "ui.weapon", translate: translateWeaponId },
+];
+
+// missing = none, partial = under target, met = exact, over = wasted levels.
+const CHECKLIST_DISPLAY: Record<ChecklistStatus, { Icon: PhosphorIcon; color: string }> = {
+  missing: { Icon: X, color: "red" },
+  partial: { Icon: Warning, color: "orange" },
+  met: { Icon: Check, color: "teal" },
+  over: { Icon: Warning, color: "yellow" },
+};
+
+// One checklist requirement with its status icon and the per-source tooltip
+// breakdown; shared by the Sigils and AI checklist groups.
+const ChecklistEntryRow = ({
+  player,
+  traits,
+  entry,
+}: {
+  player: PlayerData;
+  traits: CombinedTrait[];
+  entry: ChecklistEntry;
+}) => {
+  const { t } = useTranslation();
+  const level = checklistLevel(traits, entry);
+  const { Icon, color } = CHECKLIST_DISPLAY[checklistStatus(level, entry.level)];
+  const sources = collectTraitSources(player, entry.ids);
+
+  return (
+    <Tooltip
+      disabled={sources.length === 0}
+      color="dark"
+      position="top-start"
+      label={CHECKLIST_SOURCE_KINDS.filter((kind) => sources.some((source) => source.kind === kind.key)).map((kind) => (
+        <Box key={kind.key}>
+          <Text size="xs" fw={600}>
+            {t(kind.label)}
+          </Text>
+          {sources
+            .filter((source) => source.kind === kind.key)
+            .map((source, index) => (
+              <Text key={index} size="xs" pl={8}>
+                - {kind.translate(source.sourceId)} (Lvl. {source.level})
+              </Text>
+            ))}
+        </Box>
+      ))}
+    >
+      <Text size="xs" fw={300} c={color} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <Icon size="0.9rem" weight="bold" /> {translateTraitId(entry.ids[0])}
+        <Text span size="xs" ml="auto">
+          ({level}/{entry.level})
+        </Text>
+      </Text>
+    </Tooltip>
+  );
+};
+
+// Tooltip grouping for the combined-bonus source breakdown, in display order.
+const BONUS_SOURCE_KINDS: { key: BonusSource["kind"]; label: string }[] = [
+  { key: "overmastery", label: "ui.player-overmasteries" },
+  { key: "summon", label: "ui.player-summons" },
+];
+
+// One combined Builds-tab bonus line (same-effect overmasteries and summon
+// bonuses merged), with the per-source breakdown in a tooltip. Effects the
+// player has nothing toward render grayed out, without a tooltip.
+const BonusRow = ({ bonus }: { bonus: CombinedBonus }) => {
+  const { t } = useTranslation();
+
+  if (bonus.sources.length === 0) {
+    return (
+      <Text size="xs" fs="italic" fw={300} c="dimmed">
+        {bonus.name}
+      </Text>
+    );
+  }
+
+  return (
+    <Tooltip
+      color="dark"
+      position="top-start"
+      label={BONUS_SOURCE_KINDS.filter((kind) => bonus.sources.some((source) => source.kind === kind.key)).map(
+        (kind) => (
+          <Box key={kind.key}>
+            <Text size="xs" fw={600}>
+              {t(kind.label)}
+            </Text>
+            {bonus.sources
+              .filter((source) => source.kind === kind.key)
+              .map((source, index) => (
+                <Text key={index} size="xs" pl={8}>
+                  - {source.kind === "summon" ? `${translateSummonId(source.sourceId)} ` : ""}
+                  {formatBonusAmount(source.value)}
+                </Text>
+              ))}
+          </Box>
+        )
+      )}
+    >
+      <Text size="xs" fs="italic" fw={300} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        {bonus.name}
+        <Text span size="xs" ml="auto">
+          {formatBonusTotals(bonus.totals)}
+        </Text>
+      </Text>
+    </Tooltip>
+  );
+};
+
+// A Computed group line: how many equipped sigils are of the given in-game
+// types (a sigil's type is its FIRST trait's type), out of the 5 each check
+// targets — e.g. the DMG Cap skillboard node counts 5 Basic Stats-type sigils.
+const SigilCategoryRow = ({
+  player,
+  categories,
+  label,
+}: {
+  player: PlayerData;
+  categories: SigilCategory[];
+  label: string;
+}) => {
+  const { t } = useTranslation();
+  const matches = collectSigilsByCategory(player, categories);
+  const { Icon, color } = CHECKLIST_DISPLAY[checklistStatus(matches.length, SIGIL_CATEGORY_TARGET)];
+
+  return (
+    <Tooltip
+      disabled={matches.length === 0}
+      color="dark"
+      position="top-start"
+      label={
+        <Box>
+          <Text size="xs" fw={600}>
+            {t("ui.player-sigils")}
+          </Text>
+          {matches.map((sigil, index) => (
+            <Text key={index} size="xs" pl={8}>
+              - {translateSigilId(sigil.sigilId)} (Lvl. {sigil.sigilLevel})
+            </Text>
+          ))}
+        </Box>
+      }
+    >
+      <Text size="xs" fw={300} c={color} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <Icon size="0.9rem" weight="bold" /> {t(label)}
+        <Text span size="xs" ml="auto">
+          ({matches.length}/{SIGIL_CATEGORY_TARGET})
+        </Text>
+      </Text>
+    </Tooltip>
+  );
+};
+
+// A Sigil Traits line: name left, level/cap right (checklist-style layout).
+// The status icon/color only appears past the trait's effect cap — levels
+// beyond it are wasted; anything at or under the cap is unremarkable. Traits
+// whose cap the game table doesn't know keep the plain "(Lvl. N)" form.
+const SigilTraitRow = ({ trait }: { trait: CombinedTrait & { name: string } }) => {
+  const max = traitMaxLevel(trait.id);
+  const over = max !== null && trait.level > max;
+  const { Icon, color } = CHECKLIST_DISPLAY.over;
+
+  return (
+    <Text
+      size="xs"
+      fs="italic"
+      fw={300}
+      c={over ? color : undefined}
+      style={{ display: "flex", alignItems: "center", gap: 4 }}
+    >
+      {over && <Icon size="0.9rem" weight="bold" />}
+      {trait.name}
+      <Text span size="xs" ml="auto">
+        {max === null ? `(Lvl. ${trait.level})` : `(${trait.level}/${max})`}
+      </Text>
+    </Text>
+  );
+};
+
+/** The 4 equipped skills (v2.0.2 identity path), one column per player —
+ * shared by the Equipment and Builds tabs. The hook drops empty slots, so the
+ * array holds only real ability ids. */
+const AbilitiesRow = ({ playerData }: { playerData: PlayerData[] }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Table.Tr>
+      {playerData.map((player) => {
+        const abilities = player.abilities || [];
+
+        return (
+          <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
+            <Text size="xs" fw={700}>
+              {t("ui.player-abilities")}
+            </Text>
+            {Array.from(Array(4).keys()).map((abilityIndex) => {
+              const ability = abilities[abilityIndex];
+
+              return (
+                <Placeholder key={abilityIndex} empty={!ability}>
+                  <Text size="xs" fs="italic" fw={300}>
+                    {translateAbilityId(ability ?? null)}
+                  </Text>
+                </Placeholder>
+              );
+            })}
+          </Table.Td>
+        );
+      })}
+    </Table.Tr>
+  );
+};
+
+const byTraitName = (a: ChecklistEntry, b: ChecklistEntry) =>
+  translateTraitId(a.ids[0]).localeCompare(translateTraitId(b.ids[0]));
+
 export const ViewPage = () => {
   const { color_1, color_2, color_3, color_4, show_display_names, streamer_mode } = useMeterSettingsStore(
     useShallow((state) => ({
@@ -165,6 +441,9 @@ export const ViewPage = () => {
       show_display_names: state.show_display_names,
       streamer_mode: state.streamer_mode,
     }))
+  );
+  const { checklistBuild, checklistAi } = useChecklistStore(
+    useShallow((state) => ({ checklistBuild: state.build, checklistAi: state.ai }))
   );
   const playerColors = [color_1, color_2, color_3, color_4, ...PLAYER_COLORS.slice(4)];
 
@@ -181,8 +460,8 @@ export const ViewPage = () => {
     targets,
     selectedTargets,
     questId,
-    questTimer,
     questCompleted,
+    roomIndex,
     playerData,
     setSelectedTargets,
     loadFromResponse,
@@ -197,13 +476,40 @@ export const ViewPage = () => {
     selectedTargets: state.selectedTargets,
     playerData: state.players,
     questId: state.questId,
-    questTimer: state.questTimer,
     questCompleted: state.questCompleted,
+    roomIndex: state.roomIndex,
     setSelectedTargets: state.setSelectedTargets,
     loadFromResponse: state.loadFromResponse,
   }));
+  // Builds tab: the combined traits scan all of a player's equipment, and two
+  // rows (checklist + sigil traits) need them — computed once per player here.
+  const combinedTraitsByPlayer = useMemo(
+    () => new Map(playerData.map((player) => [player.actorIndex, computeCombinedTraits(player)])),
+    [playerData]
+  );
+  // The enabled checklist entries are the same for every player column — filter
+  // and sort them once per render instead of once per player.
+  const buildEntries = checklistBuild.filter((entry) => entry.enabled).sort(byTraitName);
+  const aiEntries = checklistAi.filter((entry) => entry.enabled).sort(byTraitName);
+
   const [sortType, setSortType] = useState<SortType>(MeterColumns.TotalDamage);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  // Shared so toggling a master-trait tier expands/collapses it for every player column.
+  const [expandedMasterTraitTiers, setExpandedMasterTraitTiers] = useState<Set<number | "ex">>(new Set());
+  const toggleMasterTraitTier = useCallback((tierKey: number | "ex") => {
+    setExpandedMasterTraitTiers((previous) => {
+      const next = new Set(previous);
+      if (next.has(tierKey)) {
+        next.delete(tierKey);
+      } else {
+        next.add(tierKey);
+      }
+      return next;
+    });
+  }, []);
+  const setAllMasterTraitTiers = useCallback((tierKeys: (number | "ex")[], expand: boolean) => {
+    setExpandedMasterTraitTiers(expand ? new Set(tierKeys) : new Set());
+  }, []);
 
   useEffect(() => {
     invoke("fetch_encounter_state", { id: Number(id), options: { targets: selectedTargets } })
@@ -318,7 +624,7 @@ export const ViewPage = () => {
 
   const labels: Label = players.map((player) => {
     const partySlotIndex = playerData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-    const color = partySlotIndex !== -1 ? playerColors[partySlotIndex] : playerColors[player.partyIndex];
+    const color = resolvePlayerColor(playerColors, playerData, partySlotIndex, player.partyIndex);
 
     return {
       name: translatedPlayerName(
@@ -333,7 +639,12 @@ export const ViewPage = () => {
     };
   });
 
-  const sbaLabels = labels.slice().filter((label) => label.partySlotIndex !== -1);
+  // Chart every actor that actually has SBA gauge data (AI companions have no
+  // playerData slot match, but their OnUpdateSBA events are recorded all the same).
+  const sbaLabels = labels.filter((_, index) => {
+    const player = players[index];
+    return player !== undefined && sbaChart[player.index] !== undefined;
+  });
 
   labels.push({
     name: "party",
@@ -392,7 +703,17 @@ export const ViewPage = () => {
 
       <Box id="log-view-page">
         <Box>
-          {questId && (
+          {roomIndex !== null && (
+            <Box display="flex">
+              <Text size="sm" fw={800}>
+                {t("ui.logs.conflux-room", "Conflux Room")}:
+              </Text>
+              <Text size="sm" ml={4}>
+                #{roomIndex + 1}
+              </Text>
+            </Box>
+          )}
+          {!!questId && roomIndex === null && (
             <Box display="flex">
               <Text size="sm" fw={800}>
                 {t("ui.logs.quest-name")}:
@@ -402,7 +723,7 @@ export const ViewPage = () => {
               </Text>
             </Box>
           )}
-          {questId && (
+          {!!questId && roomIndex === null && (
             <Box display="flex">
               <Text size="sm" fw={800}>
                 {t("ui.logs.quest-status")}:
@@ -428,16 +749,6 @@ export const ViewPage = () => {
               {millisecondsToElapsedFormat(encounter.endTime - encounter.startTime)}
             </Text>
           </Box>
-          {questTimer && (
-            <Box display="flex">
-              <Text size="sm" fw={800}>
-                {t("ui.logs.quest-elapsed-time")}:
-              </Text>
-              <Text size="sm" fs="italic" ml={4}>
-                {millisecondsToElapsedFormat(questTimer * 1000)}
-              </Text>
-            </Box>
-          )}
           <Box display="flex">
             <Text size="sm" fw={800}>
               {t("ui.logs.total-damage")}:
@@ -456,6 +767,9 @@ export const ViewPage = () => {
             <Tabs.Tab value="sba">{t("ui.logs.sba-chart")}</Tabs.Tab>
             <Tabs.Tab value="equipment" disabled={playerData.length === 0}>
               {t("ui.logs.equipment")}
+            </Tabs.Tab>
+            <Tabs.Tab value="builds" disabled={playerData.length === 0}>
+              {t("ui.logs.builds")}
             </Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="overview">
@@ -582,6 +896,7 @@ export const ViewPage = () => {
                                 aria-label="Open build"
                                 variant="filled"
                                 color="light"
+                                disabled
                                 onClick={() => handleOpenDamageCalculator(player)}
                               >
                                 <Calculator size={16} />
@@ -602,21 +917,62 @@ export const ViewPage = () => {
                           <Text size="xs" fs="italic" fw={300}>
                             {t("ui.stats.level")}: {player.playerStats?.level || 1}
                           </Text>
-                          <Text size="xs" fs="italic" fw={300}>
-                            {t("ui.stats.total-hp")}: {player.playerStats?.totalHp || 1}
-                          </Text>
-                          <Text size="xs" fs="italic" fw={300}>
-                            {t("ui.stats.total-attack")}: {player.playerStats?.totalAttack || 1}
-                          </Text>
-                          <Text size="xs" fs="italic" fw={300}>
-                            {t("ui.stats.critical-rate")}: {(player.playerStats?.criticalRate || 0).toFixed(0)}%
-                          </Text>
-                          <Text size="xs" fs="italic" fw={300}>
-                            {t("ui.stats.stun-power")}: {((player.playerStats?.stunPower || 0) * 10).toFixed(0)}
-                          </Text>
-                          <Text size="xs" fs="italic" fw={300}>
-                            {t("ui.stats.total-power")}: {player.playerStats?.totalPower || 1}
-                          </Text>
+                          {(player.masterLevel || 0) > 0 && (
+                            <Text size="xs" fs="italic" fw={300}>
+                              {/* The game stores level+stars combined (cap 50, then stars). */}
+                              {t("ui.stats.master-level")}:{" "}
+                              {player.masterLevel > 50 ? `50 (+${player.masterLevel - 50}★)` : player.masterLevel}
+                            </Text>
+                          )}
+                          {/* v2.0.2 record-inline stat block (identity-path recovery). Each row
+                              gates on its own value so a partially-populated record (the
+                              in-quest fill skips two slots) shows what it has. */}
+                          {player.stats && (
+                            <>
+                              {player.stats.hp > 0 && (
+                                <Text size="xs" fs="italic" fw={300}>
+                                  {t("ui.stats.total-hp")}: {player.stats.hp.toLocaleString()}
+                                </Text>
+                              )}
+                              {player.stats.attack > 0 && (
+                                <Text size="xs" fs="italic" fw={300}>
+                                  {t("ui.stats.total-attack")}: {player.stats.attack.toLocaleString()}
+                                </Text>
+                              )}
+                              {player.stats.stunPower > 0 && (
+                                <Text size="xs" fs="italic" fw={300}>
+                                  {t("ui.stats.stun-power")}: {player.stats.stunPower.toFixed(0)}
+                                </Text>
+                              )}
+                              {player.stats.power > 0 && (
+                                <Text size="xs" fs="italic" fw={300}>
+                                  {t("ui.stats.total-power")}: {player.stats.power.toLocaleString()}
+                                </Text>
+                              )}
+                            </>
+                          )}
+                          {/* HP/ATK/crit/stun/power from the legacy (pre-2.0) PlayerLoadEvent;
+                              `totalPower` is set only by that event, so it gates the whole
+                              block. Kept for logs recorded before the record-stat recovery. */}
+                          {!player.stats && (player.playerStats?.totalPower || 0) > 0 && (
+                            <>
+                              <Text size="xs" fs="italic" fw={300}>
+                                {t("ui.stats.total-hp")}: {player.playerStats?.totalHp || 1}
+                              </Text>
+                              <Text size="xs" fs="italic" fw={300}>
+                                {t("ui.stats.total-attack")}: {player.playerStats?.totalAttack || 1}
+                              </Text>
+                              <Text size="xs" fs="italic" fw={300}>
+                                {t("ui.stats.critical-rate")}: {(player.playerStats?.criticalRate || 0).toFixed(0)}%
+                              </Text>
+                              <Text size="xs" fs="italic" fw={300}>
+                                {t("ui.stats.stun-power")}: {((player.playerStats?.stunPower || 0) * 10).toFixed(0)}
+                              </Text>
+                              <Text size="xs" fs="italic" fw={300}>
+                                {t("ui.stats.total-power")}: {player.playerStats?.totalPower || 1}
+                              </Text>
+                            </>
+                          )}
                         </Table.Td>
                       );
                     })}
@@ -634,7 +990,10 @@ export const ViewPage = () => {
                             const overmastery = overmasteries[overmasteryIndex];
 
                             return (
-                              <Placeholder key={overmasteryIndex} empty={!overmastery || overmastery.value === 0}>
+                              <Placeholder
+                                key={overmasteryIndex}
+                                empty={!overmastery || (overmastery.value === 0 && overmastery.flags === 0)}
+                              >
                                 <Text size="xs" fs="italic" fw={300}>
                                   {formatOvermastery(overmastery)}
                                 </Text>
@@ -645,6 +1004,7 @@ export const ViewPage = () => {
                       );
                     })}
                   </Table.Tr>
+                  <AbilitiesRow playerData={playerData} />
                   <Table.Tr>
                     {playerData.map((player) => {
                       return (
@@ -652,73 +1012,343 @@ export const ViewPage = () => {
                           <Text size="xs" fw={700}>
                             {t("ui.weapon")}
                           </Text>
-                          <Text size="xs" fs="italic" fw={300}>
-                            {createWeaponStars(player.weaponInfo?.starLevel || 0)}
-                          </Text>
-                          <Text size="xs" fs="italic" fw={300}>
-                            {t([`weapons:${toHashString(player.weaponInfo?.weaponId)}.text`, "unknown"])} +
-                            {player.weaponInfo?.plusMarks}
-                          </Text>
-                          <Text size="xs" fs="italic" fw={300}>
-                            Awakening {player.weaponInfo?.awakeningLevel || 0}/10
-                          </Text>
-                          <Text size="xs" fs="italic" fw={300}>
-                            Lvl {player.weaponInfo?.weaponLevel || 0} / ATK {player.weaponInfo?.weaponAttack || 0} / HP{" "}
-                            {player.weaponInfo?.weaponHp || 0}
-                          </Text>
+                          {/* The full stat block comes only from the legacy PlayerLoadEvent; on
+                              v2.0.2 the identity path recovers the weapon IDENTITY (key name) via
+                              the save-side charid map, so show at least the weapon name when the
+                              full info is absent. */}
+                          {player.weaponState ? (
+                            /* v2.0.2 identity-path recovery: the equipped weapon's save
+                               state — id (hash keys the weapons bundle directly), uncap
+                               stars, plus marks, awakening, the ACTIVE innate skills
+                               (levels shown once located in the save data) and the
+                               wrightstone with its trait levels. */
+                            <>
+                              <Text size="xs" fs="italic" fw={300}>
+                                {createWeaponStars(player.weaponState.starLevel)}
+                              </Text>
+                              <Text size="xs" fs="italic" fw={300}>
+                                {t([`weapons:${toHashString(player.weaponState.weaponId)}.text`, "ui.unknown-id"], {
+                                  id: toHashString(player.weaponState.weaponId),
+                                })}{" "}
+                                +{player.weaponState.plusMarks}
+                              </Text>
+                              <Text size="xs" fs="italic" fw={300}>
+                                Awakening {player.weaponState.awakeningLevel}/10
+                              </Text>
+                              {(() => {
+                                /* Derived from the innate skill levels vs the per-stage
+                                   curves — needs a log recorded with level data. */
+                                const stage = deriveTranscendence(
+                                  player.weaponState.weaponId,
+                                  player.weaponState.innateTraits
+                                );
+                                return stage !== null ? (
+                                  <Text size="xs" fs="italic" fw={300}>
+                                    Transcendence {stage}/10
+                                  </Text>
+                                ) : null;
+                              })()}
+                              {player.weaponState.innateTraits.map((trait) => (
+                                <Text size="xs" fs="italic" fw={300} key={trait.id}>
+                                  - {translateTraitId(trait.id)}
+                                  {trait.level > 0 ? ` (Lvl. ${trait.level})` : ""}
+                                </Text>
+                              ))}
+                              {player.weaponState.wrightstoneId > 0 && (
+                                <>
+                                  <Text size="xs" fw={700}>
+                                    {t([
+                                      `items:${toHashString(player.weaponState.wrightstoneId)}.text`,
+                                      "ui.wrightstone",
+                                    ])}
+                                  </Text>
+                                  {player.weaponState.wrightstoneTraits.map((trait) => (
+                                    <Text size="xs" fs="italic" fw={300} key={trait.id}>
+                                      - {translateTraitId(trait.id)}
+                                      {trait.level > 0 ? ` (Lvl. ${trait.level})` : ""}
+                                    </Text>
+                                  ))}
+                                </>
+                              )}
+                            </>
+                          ) : !player.weaponInfo ? (
+                            player.weaponKey ? (
+                              /* Identity-only fallback: the equipped-state map's ASCII key.
+                                 NOTE: live-disproven as the equipped weapon (it lags/points
+                                 at another loadout's weapon) — kept only as a last resort
+                                 when the save rows are unreadable. Static innate skills
+                                 shown without levels (they can also lag behind awakening
+                                 upgrades). */
+                              <>
+                                <Text size="xs" fs="italic" fw={300}>
+                                  {translateWeaponKey(player.weaponKey)}
+                                </Text>
+                                {dedupeWeaponTraits(weaponInnateTraits(player.weaponKey)).map((trait) => (
+                                  <Text size="xs" fs="italic" fw={300} key={trait.id}>
+                                    - {translateTraitId(parseInt(trait.id, 16))}
+                                    {trait.isAwakening ? ` (${t("ui.weapon-awakening")})` : ""}
+                                  </Text>
+                                ))}
+                              </>
+                            ) : (
+                              <Placeholder empty />
+                            )
+                          ) : (
+                            <>
+                              <Text size="xs" fs="italic" fw={300}>
+                                {createWeaponStars(player.weaponInfo?.starLevel || 0)}
+                              </Text>
+                              <Text size="xs" fs="italic" fw={300}>
+                                {t([`weapons:${toHashString(player.weaponInfo?.weaponId)}.text`, "ui.unknown-id"], {
+                                  id: toHashString(player.weaponInfo?.weaponId),
+                                })}{" "}
+                                +{player.weaponInfo?.plusMarks}
+                              </Text>
+                              <Text size="xs" fs="italic" fw={300}>
+                                Awakening {player.weaponInfo?.awakeningLevel || 0}/10
+                              </Text>
+                              <Text size="xs" fs="italic" fw={300}>
+                                Lvl {player.weaponInfo?.weaponLevel || 0} / ATK {player.weaponInfo?.weaponAttack || 0} /
+                                HP {player.weaponInfo?.weaponHp || 0}
+                              </Text>
+                              <Text size="xs" fw={700}>
+                                {translateItemId(player.weaponInfo?.wrightstoneId || EMPTY_ID)}
+                              </Text>
+                              <Placeholder empty={!player.weaponInfo?.trait1Id || player.weaponInfo?.trait1Level == 0}>
+                                <Text size="xs" fs="italic" fw={300}>
+                                  - {translateTraitId(player.weaponInfo?.trait1Id || EMPTY_ID)} (Lvl.{" "}
+                                  {player.weaponInfo?.trait1Level})
+                                </Text>
+                              </Placeholder>
+                              <Placeholder empty={!player.weaponInfo?.trait2Id || player.weaponInfo?.trait2Level == 0}>
+                                <Text size="xs" fs="italic" fw={300}>
+                                  - {translateTraitId(player.weaponInfo?.trait2Id || EMPTY_ID)} (Lvl.{" "}
+                                  {player.weaponInfo?.trait2Level})
+                                </Text>
+                              </Placeholder>
+                              <Placeholder empty={!player.weaponInfo?.trait3Id || player.weaponInfo?.trait3Level == 0}>
+                                <Text size="xs" fs="italic" fw={300}>
+                                  - {translateTraitId(player.weaponInfo?.trait3Id || EMPTY_ID)} (Lvl.{" "}
+                                  {player.weaponInfo?.trait3Level})
+                                </Text>
+                              </Placeholder>
+                            </>
+                          )}
+                        </Table.Td>
+                      );
+                    })}
+                  </Table.Tr>
+                  <Table.Tr>
+                    {playerData.map((player) => {
+                      const summons = player.summons ?? [];
+
+                      return (
+                        <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
                           <Text size="xs" fw={700}>
-                            {translateItemId(player.weaponInfo?.wrightstoneId || EMPTY_ID)}
+                            {t("ui.player-summons")}
                           </Text>
-                          <Placeholder empty={!player.weaponInfo?.trait1Id || player.weaponInfo?.trait1Level == 0}>
-                            <Text size="xs" fs="italic" fw={300}>
-                              - {translateTraitId(player.weaponInfo?.trait1Id || EMPTY_ID)} (Lvl.{" "}
-                              {player.weaponInfo?.trait1Level})
-                            </Text>
-                          </Placeholder>
-                          <Placeholder empty={!player.weaponInfo?.trait2Id || player.weaponInfo?.trait2Level == 0}>
-                            <Text size="xs" fs="italic" fw={300}>
-                              - {translateTraitId(player.weaponInfo?.trait2Id || EMPTY_ID)} (Lvl.{" "}
-                              {player.weaponInfo?.trait2Level})
-                            </Text>
-                          </Placeholder>
-                          <Placeholder empty={!player.weaponInfo?.trait3Id || player.weaponInfo?.trait3Level == 0}>
-                            <Text size="xs" fs="italic" fw={300}>
-                              - {translateTraitId(player.weaponInfo?.trait3Id || EMPTY_ID)} (Lvl.{" "}
-                              {player.weaponInfo?.trait3Level})
-                            </Text>
+                          <Placeholder empty={summons.length === 0}>
+                            {summons.map((summon, summonIndex) => (
+                              <Box key={summonIndex} mt={summonIndex > 0 ? 4 : 0}>
+                                <Text size="xs" fw={600}>
+                                  {translateSummonId(summon.summonId)}
+                                </Text>
+                                <Text size="xs" fs="italic" fw={300} pl={8}>
+                                  - {translateTraitId(summon.mainTraitId)} (Lvl. {summon.mainTraitLevel})
+                                </Text>
+                                <Text size="xs" fs="italic" fw={300} pl={8}>
+                                  - {translateSummonBonusId(summon.bonusId)}{" "}
+                                  {formatSummonBonusValue(summon.bonusId, summon.bonusLevel) ??
+                                    `(Lvl. ${summon.bonusLevel + 1})`}
+                                </Text>
+                              </Box>
+                            ))}
                           </Placeholder>
                         </Table.Td>
                       );
                     })}
                   </Table.Tr>
-                  {Array.from(Array(12).keys()).map((sigilIndex) => (
-                    <Table.Tr key={sigilIndex}>
-                      {playerData.map((player) => {
-                        const sigil = player.sigils[sigilIndex];
+                  <MasterTraitsRows
+                    playerData={playerData}
+                    expandedTiers={expandedMasterTraitTiers}
+                    onToggleTier={toggleMasterTraitTier}
+                    onToggleAll={setAllMasterTraitTiers}
+                  />
+                  <Table.Tr>
+                    {playerData.map((player) => {
+                      const sigils = (player.sigils ?? []).filter((sigil) => sigil.sigilId !== EMPTY_ID);
 
-                        if (!sigil || sigil.sigilId === EMPTY_ID) {
-                          return (
-                            <Table.Td key={player.actorIndex}>
-                              <Placeholder empty />
-                            </Table.Td>
-                          );
-                        }
+                      return (
+                        <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
+                          <Text size="xs" fw={700}>
+                            {t("ui.player-sigils")}
+                            {sigils.length > 0 && ` (${sigils.length})`}
+                          </Text>
+                          <Placeholder empty={sigils.length === 0}>
+                            {sigils.map((sigil, sigilIndex) => (
+                              <Box key={sigilIndex} mt={sigilIndex > 0 ? 4 : 0}>
+                                <Text size="xs" fw={600}>
+                                  {translateSigilId(sigil.sigilId)} (Lvl. {sigil.sigilLevel})
+                                </Text>
+                                <Text size="xs" fs="italic" fw={300} pl={8}>
+                                  - {translateTraitId(sigil.firstTraitId)} (Lvl. {sigil.firstTraitLevel})
+                                </Text>
+                                {sigil.secondTraitId !== EMPTY_ID && (
+                                  <Text size="xs" fs="italic" fw={300} pl={8}>
+                                    - {translateTraitId(sigil.secondTraitId)} (Lvl. {sigil.secondTraitLevel})
+                                  </Text>
+                                )}
+                              </Box>
+                            ))}
+                          </Placeholder>
+                        </Table.Td>
+                      );
+                    })}
+                  </Table.Tr>
+                </Table.Tbody>
+              </Table>
+            </Group>
+          </Tabs.Panel>
+          <Tabs.Panel value="builds">
+            <Group mt="20" gap="xs">
+              <Table striped layout="fixed">
+                <Table.Tbody>
+                  <Table.Tr>
+                    {playerData.map((player) => (
+                      <Table.Td key={player.actorIndex} flex={1}>
+                        <Text fw={700} size="xl">
+                          {formatPlayerDisplayName(player, show_display_names && !streamer_mode, false)}
+                        </Text>
+                      </Table.Td>
+                    ))}
+                  </Table.Tr>
+                  <AbilitiesRow playerData={playerData} />
+                  <Table.Tr>
+                    {playerData.map((player) => {
+                      const traits = combinedTraitsByPlayer.get(player.actorIndex) ?? [];
 
-                        return (
-                          <Table.Td key={player.actorIndex}>
-                            <Text size="xs" fw={700}>
-                              {translateSigilId(sigil.sigilId)} (Lvl. {sigil.sigilLevel})
-                            </Text>
-                            <Text size="xs" fs="italic" fw={300}>
-                              {translateTraitId(sigil.firstTraitId)} (Lvl. {sigil.firstTraitLevel})
-                              {sigil.secondTraitId !== EMPTY_ID &&
-                                ` / ${translateTraitId(sigil.secondTraitId)} (Lvl. ${sigil.secondTraitLevel})`}
-                            </Text>
-                          </Table.Td>
+                      return (
+                        <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
+                          <Text size="xs" fw={700}>
+                            {t("ui.player-checklist")}
+                          </Text>
+                          {buildEntries.length > 0 && (
+                            <>
+                              <Text size="xs" fw={600} c="dimmed">
+                                {t("ui.checklist.sigils")}
+                              </Text>
+                              {buildEntries.map((entry) => (
+                                <ChecklistEntryRow key={entry.ids[0]} player={player} traits={traits} entry={entry} />
+                              ))}
+                            </>
+                          )}
+                          <Text size="xs" fw={600} c="dimmed" mt={4}>
+                            {t("ui.checklist.computed")}
+                          </Text>
+                          <SigilCategoryRow player={player} categories={["basic"]} label="ui.checklist.basic-sigils" />
+                          <SigilCategoryRow
+                            player={player}
+                            categories={["attack"]}
+                            label="ui.checklist.attack-sigils"
+                          />
+                          <SigilCategoryRow
+                            player={player}
+                            categories={["defense", "support"]}
+                            label="ui.checklist.defense-support-sigils"
+                          />
+                          {aiEntries.length > 0 && (
+                            <>
+                              <Text size="xs" fw={600} c="dimmed" mt={4}>
+                                {t("ui.checklist.ai")}
+                              </Text>
+                              {aiEntries.map((entry) => (
+                                <ChecklistEntryRow key={entry.ids[0]} player={player} traits={traits} entry={entry} />
+                              ))}
+                            </>
+                          )}
+                        </Table.Td>
+                      );
+                    })}
+                  </Table.Tr>
+                  <Table.Tr>
+                    {playerData.map((player) => {
+                      const overmasteries = (player.overmasteryInfo?.overmasteries || []).filter(
+                        (overmastery) => overmastery.value !== 0 || overmastery.flags !== 0
+                      );
+                      const summonBonuses = (player.summons ?? [])
+                        .filter((summon) => summon.bonusId !== EMPTY_ID)
+                        .sort((a, b) =>
+                          translateSummonBonusId(a.bonusId).localeCompare(translateSummonBonusId(b.bonusId))
                         );
-                      })}
-                    </Table.Tr>
-                  ))}
+                      // Same-effect bonuses merged into one line each (an effect
+                      // spans many ids across overmasteries and summon bonuses).
+                      const combined = groupBonuses([
+                        ...overmasteries.map((overmastery) => ({
+                          name: translateOvermasteryId(overmastery.id),
+                          source: {
+                            kind: "overmastery" as const,
+                            sourceId: overmastery.id,
+                            value: overmasteryAmount(overmastery),
+                          },
+                        })),
+                        ...summonBonuses.map((summon) => ({
+                          name: translateSummonBonusId(summon.bonusId),
+                          source: {
+                            kind: "summon" as const,
+                            sourceId: summon.summonId,
+                            value: summonBonusValue(summon.bonusId, summon.bonusLevel) ?? {
+                              kind: "level" as const,
+                              amount: summon.bonusLevel + 1,
+                            },
+                          },
+                        })),
+                      ]);
+
+                      // Every known effect, canonical order, so builds are easy to
+                      // compare across players; effects at 0 render grayed out.
+                      const allEffects = fillBonusGroups(combined, OVERMASTERY_EFFECT_IDS.map(translateOvermasteryId));
+
+                      return (
+                        <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
+                          <Text size="xs" fw={700}>
+                            {t("ui.player-overmasteries")}
+                          </Text>
+                          <Placeholder empty={combined.length === 0}>
+                            {allEffects.map((bonus) => (
+                              <BonusRow key={bonus.name} bonus={bonus} />
+                            ))}
+                          </Placeholder>
+                        </Table.Td>
+                      );
+                    })}
+                  </Table.Tr>
+                  <Table.Tr>
+                    {playerData.map((player) => {
+                      const traits = (combinedTraitsByPlayer.get(player.actorIndex) ?? [])
+                        .map((trait) => ({ ...trait, name: translateTraitId(trait.id) }))
+                        .sort((a, b) => a.name.localeCompare(b.name));
+
+                      return (
+                        <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
+                          <Text size="xs" fw={700}>
+                            {t("ui.player-sigil-traits")}
+                            {traits.length > 0 && ` (${traits.length})`}
+                          </Text>
+                          <Placeholder empty={traits.length === 0}>
+                            {traits.map((trait) => (
+                              <SigilTraitRow key={trait.id} trait={trait} />
+                            ))}
+                          </Placeholder>
+                        </Table.Td>
+                      );
+                    })}
+                  </Table.Tr>
+                  <MasterTraitsRows
+                    playerData={playerData}
+                    expandedTiers={expandedMasterTraitTiers}
+                    onToggleTier={toggleMasterTraitTier}
+                    onToggleAll={setAllMasterTraitTiers}
+                  />
                 </Table.Tbody>
               </Table>
             </Group>
@@ -728,6 +1358,196 @@ export const ViewPage = () => {
     </Box>
   );
 };
+
+type SkillboardTier = {
+  key: number | "ex";
+  nodes: { text: string; unlocked: boolean; warn: boolean }[];
+};
+
+/// The character's full master-trait board grouped by tier (Chaos 1-3, then
+/// EX) with the player's unlocked nodes flagged, each tier sorted unlocked
+/// first, then unselected DMG Cap warnings, then alphabetically within each
+/// group. Placement comes from the
+/// game's skillboard_layout table (skillboard-layout.json) — the node id does
+/// not encode the tier. Empty when the player has no skillboard data at all
+/// (older logs, companions) so the cell falls back to a placeholder instead
+/// of an all-unselected board.
+function groupSkillboardNodes(player: PlayerData): { total: number; tiers: SkillboardTier[] } {
+  const unlocked = player.skillboard ?? [];
+  if (unlocked.length === 0) return { total: 0, tiers: [] };
+
+  const unlockedIds = new Set(unlocked);
+  const tiers = new Map<number | "ex", SkillboardTier["nodes"]>();
+  let total = 0;
+  const push = (tierKey: number | "ex", id: number, isUnlocked: boolean) => {
+    if (isUnlocked) total += 1;
+    let tier = tiers.get(tierKey);
+    if (!tier) tiers.set(tierKey, (tier = []));
+    const text = translateSkillboardNode(player.characterType, id);
+    // Unselected DMG Cap nodes are almost always a build mistake — flag them
+    // like the checklist's warning state.
+    tier.push({ text, unlocked: isUnlocked, warn: !isUnlocked && text.includes("DMG Cap") });
+  };
+
+  const placed = new Set<number>();
+  for (const layoutTier of skillboardLayoutFor(player.characterType)) {
+    for (const id of layoutTier.ids) {
+      placed.add(id);
+      push(layoutTier.key, id, unlockedIds.has(id));
+    }
+  }
+  // Unlocked ids the layout asset doesn't know (game-patch drift): place them
+  // by the legacy id-band heuristic rather than dropping them.
+  for (const id of unlockedIds) {
+    if (placed.has(id)) continue;
+    const meta = skillboardNodeMeta(id);
+    if (!meta) continue;
+    push(meta.tier, id, true);
+  }
+
+  const order = (key: number | "ex") => (key === "ex" ? Number.MAX_SAFE_INTEGER : key);
+  return {
+    total,
+    tiers: [...tiers.entries()]
+      .sort((a, b) => order(a[0]) - order(b[0]))
+      .map(([key, nodes]) => ({
+        key,
+        nodes: nodes.sort(
+          (a, b) =>
+            Number(b.unlocked) - Number(a.unlocked) || Number(b.warn) - Number(a.warn) || a.text.localeCompare(b.text)
+        ),
+      })),
+  };
+}
+
+/** Kills the table's zebra striping on a row — the master-traits rows read as
+ * one section, not alternating table entries. */
+const UNSTRIPED = { backgroundColor: "transparent" } as const;
+
+/** The master-traits table rows, shared by the Equipment and Builds tabs.
+ * Tiers render as their own rows spanning every player column so "Tier 2"
+ * (and each trait line under it) starts at the same height for all players,
+ * regardless of text wrapping or per-player trait counts. Each tier is
+ * collapsible via the +/- toggle in its header row, and the section header's
+ * own +/- expands or collapses every tier at once; the expanded set lives in
+ * the page so toggling a tier expands/collapses it for every player at once. */
+function MasterTraitsRows({
+  playerData,
+  expandedTiers,
+  onToggleTier,
+  onToggleAll,
+}: {
+  playerData: PlayerData[];
+  expandedTiers: Set<number | "ex">;
+  onToggleTier: (tierKey: number | "ex") => void;
+  onToggleAll: (tierKeys: (number | "ex")[], expand: boolean) => void;
+}) {
+  const { i18n } = useTranslation();
+  // Grouping walks every layout node through i18next per player — cache it so
+  // tier expand/collapse and sort clicks don't redo it (node text is
+  // language-dependent, hence the language dep).
+  const grouped = useMemo(() => playerData.map((player) => groupSkillboardNodes(player)), [playerData, i18n.language]);
+  const anyTraits = grouped.some((skillboard) => skillboard.total > 0);
+
+  // Union of the players' tiers, in board order (Chaos 1-3, then EX).
+  const tierOrder = (key: number | "ex") => (key === "ex" ? Number.MAX_SAFE_INTEGER : key);
+  const tierKeys = [...new Set(grouped.flatMap((skillboard) => skillboard.tiers.map((tier) => tier.key)))].sort(
+    (a, b) => tierOrder(a) - tierOrder(b)
+  );
+  const allExpanded = tierKeys.length > 0 && tierKeys.every((tierKey) => expandedTiers.has(tierKey));
+
+  const rows: JSX.Element[] = [];
+  for (const tierKey of tierKeys) {
+    const perPlayerTier = grouped.map((skillboard) => skillboard.tiers.find((tier) => tier.key === tierKey));
+    const expanded = expandedTiers.has(tierKey);
+
+    rows.push(
+      <Table.Tr key={`tier-${tierKey}`} style={UNSTRIPED}>
+        {perPlayerTier.map((tier, playerIndex) => (
+          <Table.Td key={playerData[playerIndex].actorIndex} style={{ verticalAlign: "top" }}>
+            {tier && (
+              <UnstyledButton onClick={() => onToggleTier(tierKey)}>
+                <Text size="xs" fw={600} c="dimmed" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  {expanded ? <Minus size="0.7rem" weight="bold" /> : <Plus size="0.7rem" weight="bold" />}
+                  {tierKey === "ex" ? t("ui.master-traits.ex") : t("ui.master-traits.tier", { tier: tierKey })} (
+                  {tier.nodes.filter((node) => node.unlocked).length})
+                </Text>
+              </UnstyledButton>
+            )}
+          </Table.Td>
+        ))}
+      </Table.Tr>
+    );
+
+    if (!expanded) continue;
+
+    const maxNodes = Math.max(...perPlayerTier.map((tier) => tier?.nodes.length ?? 0));
+    for (let nodeIndex = 0; nodeIndex < maxNodes; nodeIndex++) {
+      rows.push(
+        <Table.Tr key={`tier-${tierKey}-node-${nodeIndex}`} style={UNSTRIPED}>
+          {perPlayerTier.map((tier, playerIndex) => {
+            const node = tier?.nodes[nodeIndex];
+
+            return (
+              <Table.Td key={playerData[playerIndex].actorIndex} style={{ verticalAlign: "top" }}>
+                <Placeholder empty={!node}>
+                  {node && (
+                    <Text
+                      size="xs"
+                      fw={300}
+                      c={node.unlocked ? "teal" : node.warn ? "orange" : undefined}
+                      style={{ display: "flex", alignItems: "center", gap: 4 }}
+                    >
+                      {node.warn ? (
+                        <Warning size="0.7rem" weight="bold" style={{ flexShrink: 0 }} />
+                      ) : (
+                        // Kept invisible when locked so the text stays aligned.
+                        <Check size="0.7rem" weight="bold" style={{ opacity: node.unlocked ? 1 : 0, flexShrink: 0 }} />
+                      )}
+                      {node.text}
+                    </Text>
+                  )}
+                </Placeholder>
+              </Table.Td>
+            );
+          })}
+        </Table.Tr>
+      );
+    }
+  }
+
+  return (
+    <>
+      <Table.Tr style={UNSTRIPED}>
+        {playerData.map((player, playerIndex) => {
+          const label =
+            t("ui.player-master-traits") + (grouped[playerIndex].total > 0 ? ` (${grouped[playerIndex].total})` : "");
+
+          return (
+            <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
+              {anyTraits ? (
+                <UnstyledButton onClick={() => onToggleAll(tierKeys, !allExpanded)}>
+                  <Text size="xs" fw={700} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                    {allExpanded ? <Minus size="0.7rem" weight="bold" /> : <Plus size="0.7rem" weight="bold" />}
+                    {label}
+                  </Text>
+                </UnstyledButton>
+              ) : (
+                <>
+                  <Text size="xs" fw={700}>
+                    {label}
+                  </Text>
+                  <Placeholder empty />
+                </>
+              )}
+            </Table.Td>
+          );
+        })}
+      </Table.Tr>
+      {rows}
+    </>
+  );
+}
 
 function Placeholder({ empty, children }: { empty: boolean; children?: React.ReactNode }) {
   return empty ? (

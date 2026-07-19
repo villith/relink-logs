@@ -68,7 +68,7 @@ export const Table = ({
         MeterColumns.DPS,
         MeterColumns.TotalStunValue,
         MeterColumns.StunPerSecond,
-        MeterColumns.DamageCap,
+        MeterColumns.SupPercentage,
         MeterColumns.DamagePercentage,
       ];
 
@@ -80,7 +80,11 @@ export const Table = ({
             Name
           </th>
           {columns.map((column) => (
-            <th key={column} className="header-column text-center" onClick={() => toggleSort(column)}>
+            <th
+              key={column}
+              className={`header-column header-column-${column} text-center`}
+              onClick={() => toggleSort(column)}
+            >
               {t(`ui.meter-columns.${column}`)}
             </th>
           ))}

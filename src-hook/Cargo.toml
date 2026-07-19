@@ -8,6 +8,14 @@ crate-type = ["cdylib"]
 
 [features]
 console = []
+# Verbose per-hit dump of the DamageInstance struct (a2) to the fern log, used to
+# re-derive shifted field offsets (action_id, damage_cap, ...) after a game patch.
+dmgdiag = []
+# Runtime-address logger for re-deriving broken FUNCTION hooks after a game patch.
+# Logs the module base + the return address (caller RVA) and key pointers from the
+# hooks that still work, so triggering an in-game event (death, SBA, player load)
+# reveals the RVA of the nearby broken target. See hooks/diag.rs.
+hookdiag = ["dep:backtrace"]
 
 [package.metadata.winres]
 OriginalFilename = "hook.dll"
@@ -16,6 +24,7 @@ LegalCopyright = "Copyright (C) False Spring"
 
 [dependencies]
 anyhow = "1.0"
+backtrace = { version = "0.3", optional = true }
 ctor = "0.2.6"
 dirs = "5.0"
 fern = { version = "0.6" }
@@ -25,7 +34,7 @@ pelite = "0.10.0"
 retour = { version = "0.3.1", features = ["static-detour"] }
 thiserror = "1.0"
 tokio = { version = "1.0", features = ["full"] }
-windows = { version = "0.52.0", features = ["Win32_Foundation", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Console"] }
+windows = { version = "0.52.0", features = ["Win32_Foundation", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Console", "Win32_System_Memory"] }
 futures = "0.3"
 protocol = { path = "../protocol" }
 tokio-util = { version = "0.7.11", features = ["codec"] }

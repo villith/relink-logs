@@ -1,9 +1,10 @@
 import { FilterState } from "@/stores/useLogIndexStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
-import { Log, LogSortType, SortDirection } from "@/types";
+import { CharacterType, Log, LogSortType, SortDirection } from "@/types";
 import {
   epochToLocalTime,
   millisecondsToElapsedFormat,
+  translateCharacterType,
   translateEnemyType,
   translateEnemyTypeId,
   translateQuestId,
@@ -37,7 +38,6 @@ export const IndexPage = () => {
     setSelectedLogIds,
     setSelectedTargets,
     confirmDeleteSelected,
-    confirmDeleteAll,
     handleSetPage,
     currentPage,
     toggleSort,
@@ -72,11 +72,13 @@ export const IndexPage = () => {
       ]
         .filter((player) => player.name || player.type)
         .map((player) => {
-          if (!player.name) return t(`characters:${player.type}`, `ui:characters.${player.type}`);
-          if (!show_display_names) return t(`characters:${player.type}`, `ui:characters.${player.type}`);
-          if (streamer_mode) return t(`characters:${player.type}`, `ui:characters.${player.type}`);
+          const characterName = translateCharacterType(player.type as CharacterType);
 
-          return `${player.name} (${t(`characters:${player.type}`, `ui:characters.${player.type}`)})`;
+          // A slot with a character but no player name is an AI companion.
+          if (!player.name) return `${characterName} (${t("ui.logs.ai-companion")})`;
+          if (!show_display_names || streamer_mode) return characterName;
+
+          return `${characterName} (${player.name})`;
         })
         .join(", ");
     }
@@ -100,22 +102,6 @@ export const IndexPage = () => {
 
   return (
     <Box>
-      <Group>
-        <Box style={{ display: "flex" }}>
-          <Text>{t("ui.logs.saved-count", { count: searchResult.logCount })}</Text>
-        </Box>
-        <Box style={{ display: "flex", flexDirection: "row-reverse", flex: 1 }}>
-          {selectedLogIds.length > 0 ? (
-            <Button size="xs" variant="default" onClick={confirmDeleteSelected} disabled={selectedLogIds.length === 0}>
-              {t("ui.logs.delete-selected-btn", { count: selectedLogIds.length })}
-            </Button>
-          ) : (
-            <Button size="xs" variant="default" onClick={confirmDeleteAll}>
-              {t("ui.logs.delete-all-btn")}
-            </Button>
-          )}
-        </Box>
-      </Group>
       <Box py={"xs"}>
         <Group>
           <SelectableEnemy targetIds={searchResult.enemyIds} setFilters={setFilters} filters={filters} />
@@ -124,6 +110,11 @@ export const IndexPage = () => {
           <Button size="s" variant="default" onClick={toggleAdvancedFilters}>
             {filters.showAdvancedFilters ? t("ui.logs.hide-advanced-filters") : t("ui.logs.show-advanced-filters")}
           </Button>
+          {selectedLogIds.length > 0 && (
+            <Button size="xs" variant="default" ml="auto" onClick={confirmDeleteSelected}>
+              {t("ui.logs.delete-selected-btn", { count: selectedLogIds.length })}
+            </Button>
+          )}
         </Group>
       </Box>
       <Box>
@@ -174,16 +165,6 @@ export const IndexPage = () => {
                     {t("ui.logs.duration")}
                   </SortableColumn>
                 </Table.Th>
-                <Table.Th>
-                  <SortableColumn
-                    column="quest-elapsed-time"
-                    sortType={filters.sortType}
-                    sortDirection={filters.sortDirection}
-                    onClick={() => toggleSort("quest-elapsed-time")}
-                  >
-                    {t("ui.logs.quest-elapsed-time")}
-                  </SortableColumn>
-                </Table.Th>
                 <Table.Th>{t("ui.logs.name")}</Table.Th>
                 <Table.Th></Table.Th>
               </Table.Tr>
@@ -191,7 +172,12 @@ export const IndexPage = () => {
             <Table.Tbody>{rows}</Table.Tbody>
           </Table>
           <Divider my="sm" />
-          <Pagination total={searchResult.pageCount} value={currentPage} onChange={handleSetPage} />
+          <Group justify="space-between">
+            <Pagination total={searchResult.pageCount} value={currentPage} onChange={handleSetPage} />
+            <Text size="sm" c="dimmed">
+              {t("ui.logs.saved-count", { count: searchResult.logCount })}
+            </Text>
+          </Group>
         </Box>
       )}
     </Box>
@@ -267,9 +253,6 @@ function LogEntry({
       </Table.Td>
       <Table.Td>
         <Text size="xs">{millisecondsToElapsedFormat(log.duration)}</Text>
-      </Table.Td>
-      <Table.Td>
-        <Text size="xs">{log.questElapsedTime ? millisecondsToElapsedFormat(log.questElapsedTime * 1000) : ""}</Text>
       </Table.Td>
       <Table.Td>
         <Text size="xs">{names}</Text>

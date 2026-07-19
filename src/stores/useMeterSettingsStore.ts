@@ -31,7 +31,14 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   show_full_values: false,
   use_condensed_skills: true,
   open_log_on_save: true,
-  overlay_columns: [MeterColumns.TotalDamage, MeterColumns.DPS, MeterColumns.DamageCap, MeterColumns.DamagePercentage],
+  overlay_columns: [
+    MeterColumns.TotalDamage,
+    MeterColumns.DPS,
+    MeterColumns.TotalStunValue,
+    MeterColumns.StunPerSecond,
+    MeterColumns.SupPercentage,
+    MeterColumns.DamagePercentage,
+  ],
 };
 
 export type StoreWithPersist<T> = Mutate<StoreApi<T>, [["zustand/persist", T]]>;
@@ -62,6 +69,17 @@ export const useMeterSettingsStore = create<MeterSettings & MeterStateFunctions>
     }),
     {
       name: "meter-settings",
+      version: 1,
+      // v1 removed the "damage-cap" and (player-row) "overcap" columns. Strip them
+      // from any persisted overlay_columns so old users don't get blank columns.
+      migrate: (persisted) => {
+        const state = persisted as MeterSettings & MeterStateFunctions;
+        const removed: string[] = ["damage-cap", "overcap"];
+        if (Array.isArray(state?.overlay_columns)) {
+          state.overlay_columns = state.overlay_columns.filter((column) => !removed.includes(column));
+        }
+        return state;
+      },
     }
   )
 );

@@ -20,7 +20,6 @@ export default function useIndex() {
     selectedLogIds,
     setSelectedLogIds,
     deleteSelectedLogs,
-    deleteAllLogs,
     fetchLogs,
   } = useLogIndexStore((state) => ({
     currentPage: state.currentPage,
@@ -31,7 +30,6 @@ export default function useIndex() {
     selectedLogIds: state.selectedLogIds,
     setSelectedLogIds: state.setSelectedLogIds,
     deleteSelectedLogs: state.deleteSelectedLogs,
-    deleteAllLogs: state.deleteAllLogs,
     fetchLogs: state.fetchLogs,
   }));
 
@@ -64,15 +62,6 @@ export default function useIndex() {
       onConfirm: () => deleteSelectedLogs(),
     });
 
-  const confirmDeleteAll = () =>
-    modals.openConfirmModal({
-      title: "Delete logs",
-      children: <Text size="sm">{t("ui.logs.delete-all-logs-confirmation")}</Text>,
-      labels: { confirm: t("ui.delete-btn"), cancel: t("ui.cancel-btn") },
-      confirmProps: { color: "red" },
-      onConfirm: () => deleteAllLogs(),
-    });
-
   const handleSetPage = (page: number) => {
     setCurrentPage(page);
     setSelectedLogIds([]);
@@ -99,7 +88,6 @@ export default function useIndex() {
     setSelectedLogIds,
     setSelectedTargets,
     confirmDeleteSelected,
-    confirmDeleteAll,
     handleSetPage,
     currentPage,
     filters,

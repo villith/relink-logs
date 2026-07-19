@@ -3,14 +3,19 @@
     "successful-save": "Saved encounter to logs",
     "unsuccessful-save": "Failed to save encounter to logs: {{error}}",
     "on-area-enter": "Entered area..",
+    "session-reset": "Session reset",
     "on-pin-enabled": "Always on top: On",
     "on-pin-disabled": "Always on top: Off",
     "on-clickthrough-enabled": "Clickthrough: On",
     "on-clickthrough-disabled": "Clickthrough: Off",
     "unknown": "Unknown",
+    "unknown-id": "Unknown ({{id}})",
     "language": "Language",
     "meter-settings": "Meter Settings",
     "settings": "Settings",
+    "github": "GitHub",
+    "report-bug": "Report a Bug",
+    "submit-missing-label": "Submit Missing Label",
     "back-btn": "Back",
     "delete-btn": "Delete",
     "cancel-btn": "Cancel",
@@ -40,6 +45,33 @@
     "weapon": "Weapon",
     "player-stats": "Player Stats",
     "player-overmasteries": "Overmasteries",
+    "player-abilities": "Skills",
+    "player-summons": "Summons",
+    "player-master-traits": "Master Traits",
+    "player-sigils": "Sigils",
+    "player-sigil-traits": "Sigil Traits",
+    "player-checklist": "Checklist",
+    "checklist": {
+      "sigils": "Sigils",
+      "computed": "Computed",
+      "ai": "AI",
+      "basic-sigils": "Basic Sigils",
+      "attack-sigils": "Attack Sigils",
+      "defense-support-sigils": "Defense/Support Sigils"
+    },
+    "checklist-settings": {
+      "title": "Checklist",
+      "sigils-section": "Sigils checklist",
+      "ai-section": "AI checklist",
+      "add-trait": "Add trait...",
+      "reset": "Reset to defaults"
+    },
+    "master-traits": {
+      "tier": "Tier {{tier}}",
+      "ex": "EX"
+    },
+    "show-all": "Show all",
+    "show-less": "Show less",
     "select-enemy": "Select Enemy",
     "select-quest": "Select Quest",
     "select-player": "Select Player",
@@ -57,8 +89,8 @@
       "damage-description": "Total Damage",
       "damage-percentage": "%",
       "damage-percentage-description": "Total Damage in Percentage",
-      "damage-cap": "Cap",
-      "damage-cap-description": "Percentage of Hits at Damage Cap",
+      "sup-percentage": "Sup",
+      "sup-percentage-description": "Extra Damage from Supplementary/Echo Procs",
       "sba": "SBA",
       "sba-description": "Skybound Arts Gauge",
       "total-stun-value": "Stun",
@@ -68,6 +100,7 @@
     },
     "stats": {
       "level": "Level",
+      "master-level": "Master Level",
       "total-hp": "Total HP",
       "total-attack": "Total Attack",
       "critical-rate": "Critical Rate",
@@ -92,12 +125,40 @@
       "delete-selected-logs-confirmation_one": "This will delete {{count}} log from the database. This action cannot be undone.",
       "delete-selected-logs-confirmation_other": "This will delete {{count}} logs from the database. This action cannot be undone.",
       "quest-name": "Quest",
+      "conflux-room": "Conflux Room",
       "quest-elapsed-time": "IGT",
       "sba-chart": "Skybound Arts Gauge",
       "quest-status": "Status",
       "overview": "Overview",
-      "equipment": "Equipment"
-    }
+      "equipment": "Equipment",
+      "builds": "Builds",
+      "ai-companion": "AI"
+    },
+    "toolbox": {
+      "title": "Toolbox",
+      "synthesis-helper": "Synthesis Helper",
+      "trait-1": "Trait 1 (first slot)",
+      "trait-2": "Trait 2 (second slot)",
+      "any-order": "Match either slot order",
+      "require-lucky": "Lvl 15 only",
+      "search": "Search",
+      "searching": "Searching...",
+      "game-not-running": "Game is not running. Start Granblue Fantasy: Relink first — the helper reads your sigil box and the synthesis seed from the game.",
+      "invalid-trait": "Pick a real trait (the empty-slot placeholder can't be searched).",
+      "rng-unpredictable": "The synthesis RNG has no seed yet. Perform one synthesis or complete a quest, then search again.",
+      "results-caveat": "Predictions are for your next synthesis only. Completing a quest or synthesizing anything changes the seed — search again after either.",
+      "pairs-summary": "{{sigils}} sigils, {{tested}} pairs simulated, {{matches}} matching",
+      "no-results": "No pair in your sigil box produces this result with the current seed. Try again after the next quest.",
+      "col-sigil-a": "Sigil A",
+      "col-sigil-b": "Sigil B",
+      "col-result": "Result",
+      "col-level": "Level",
+      "lvl-11": "Lvl 11",
+      "lvl-15": "Lvl 15",
+      "select-trait": "Select a trait..."
+    },
+    "weapon-awakening": "Awakening",
+    "wrightstone": "Wrightstone"
   },
   "characters": {
     "Pl0000": "Gran",
@@ -124,7 +185,14 @@
     "Pl2100": "Sandalphon",
     "Pl2200": "Seofon",
     "Pl2300": "Tweyen",
-    "Unknown": "Unknown"
+    "Pl2400": "Gallanza",
+    "Pl2500": "Maglielle",
+    "Pl2600": "Beatrix",
+    "Pl2700": "Eustace",
+    "Pl2800": "Fraux",
+    "Pl2900": "Fediel",
+    "Unknown": "Unknown",
+    "ai": "AI"
   },
   "skills": {
     "Pl0000": {
@@ -385,7 +453,9 @@
         "aerial-attack": "Aerial Attack",
         "detonator": "Detonator",
         "grenade": "Grenade"
-      }
+      },
+      "0": "Skill 0",
+      "800": "Skill 800"
     },
     "Pl0600": {
       "0": "Rose Palace",
@@ -422,7 +492,8 @@
         "rose-attack": "Rose Attack",
         "spiral-rose": "Spiral Rose",
         "lost-love": "Lost Love"
-      }
+      },
+      "100006": "Skill 100006"
     },
     "Pl0700": {
       "65": "Pets",
@@ -513,7 +584,8 @@
         "finisher": "Finisher",
         "heavy-swing": "Beatdown Combo",
         "aerial-attack": "Aerial Attack"
-      }
+      },
+      "301": "Skill 301"
     },
     "Pl1000": {
       "1": "Feuerangriff",
@@ -611,7 +683,8 @@
         "power-strike": "Power Strike",
         "aerial-attack": "Aerial Attack",
         "sword-of-lumiel": "Sword of Lumiel"
-      }
+      },
+      "800": "Skill 800"
     },
     "Pl1300": {
       "1": "Awakening",
@@ -700,7 +773,8 @@
         "dawnfly-charged-attack": "Dawnfly/Pink Charged Attack",
         "apex": "Apex of Nothingness",
         "transient": "Transient"
-      }
+      },
+      "3000": "Skill 3000"
     },
     "Pl1500": {
       "100": "Attack 1",
@@ -764,7 +838,9 @@
         "loop-combo": "Loop Combo",
         "aerial-attack": "Aerial Attack",
         "realms-majesty": "Realm's Majesty"
-      }
+      },
+      "0": "Skill 0",
+      "800": "Skill 800"
     },
     "Pl1700": {
       "100": "Attack 1",
@@ -834,7 +910,10 @@
         "finisher": "Finisher",
         "enhanced-collapse": "Enhanced Collapse",
         "aerial-attack": "Aerial Attack"
-      }
+      },
+      "0": "Skill 0",
+      "800": "Skill 800",
+      "1100": "Skill 1100"
     },
     "Pl1900": {
       "1": "Reginleiv Recidiv",
@@ -878,7 +957,8 @@
         "lunge": "Lunge",
         "power-strike": "Power Strike",
         "aerial-attack": "Aerial Attack"
-      }
+      },
+      "0": "Skill 0"
     },
     "Pl2000": {
       "0": "Light Blast (Enter Dragonform)",
@@ -910,7 +990,9 @@
       "skill-groups": {
         "normal-attack": "Normal Attack (Dragonform)",
         "aerial-attack": "Aerial Attack (Dragonform)"
-      }
+      },
+      "1010": "Skill 1010",
+      "1500": "Skill 1500"
     },
     "Pl2100": {
       "100": "Attack 1",
@@ -968,7 +1050,9 @@
         "finisher": "Finisher",
         "finisher-wings": "Finisher (Chromatic Wings)",
         "talviyo": "Talviyö"
-      }
+      },
+      "800": "Skill 800",
+      "1000": "Skill 1000"
     },
     "Pl2200": {
       "100": "Attack 1",
@@ -1061,6 +1145,43 @@
         "power-finisher": "Power Finisher",
         "aerial-attack": "Aerial Attack",
         "two-crown-strife": "Two-Crown's Strife"
+      },
+      "0": "Skill 0",
+      "800": "Skill 800"
+    },
+    "Pl2700": {
+      "120": "Grade 1 Shot",
+      "121": "Grade 2 Shot",
+      "122": "Grade 2 Shot",
+      "125": "Grade 3 Shot",
+      "130": "Grade 4 Shot",
+      "1700": "Heaven Comes Down",
+      "1110": "Forever Yours",
+      "110": "Strafe Shot",
+      "400": "Launch",
+      "300": "Aerial Grade 1 Shot",
+      "301": "Aerial Grade 2 Shot",
+      "304": "Aerial Grade 3 Shot",
+      "1601": "Flamek Thunder (Partially Charged)",
+      "1602": "Flamek Thunder (Charged)",
+      "1300": "Acidrage Howl (Missed Counter)",
+      "1310": "Acidrage Howl",
+      "1000": "Slow Kill (Uncharged - Melee)",
+      "1010": "Slow Kill (Uncharged)",
+      "1011": "Slow Kill (Charged)",
+      "111": "Skill 111",
+      "112": "Skill 112",
+      "115": "Skill 115",
+      "140": "Skill 140",
+      "100003": "Skill 100003",
+      "100006": "Skill 100006",
+      "100008": "Skill 100008",
+      "skill-groups": {
+        "normal-attack": "Normal Attack",
+        "aerial-attack": "Aerial Attack",
+        "flamek-thunder": "Flamek Thunder",
+        "acidrage-howl": "Acidrage Howl",
+        "slow-kill": "Slow Kill"
       }
     },
     "default": {
@@ -1073,6 +1194,228 @@
       "skybound-arts": "Skybound Arts",
       "damage-over-time": "Damage Over Time",
       "unknown-skill": "Skill {{id}}"
+    },
+    "Pl2400": {
+      "0": "Skill 0",
+      "100": "Attack 1",
+      "101": "Attack 2",
+      "102": "Attack 3",
+      "103": "Attack 4",
+      "104": "Combo Finisher 3",
+      "110": "Power Strike 1",
+      "111": "Combo Finisher 1",
+      "115": "Skill 115",
+      "116": "Skill 116",
+      "120": "Power Strike 2",
+      "121": "Combo Finisher 2",
+      "125": "Skill 125",
+      "130": "Power Strike 3",
+      "140": "Opening Attack (Deathmatch Finale)",
+      "141": "Imperfect Attack (Deathmatch Finale)",
+      "142": "Perfect Attack (Deathmatch Finale)",
+      "150": "Skill 150",
+      "200": "Turbine (Start)",
+      "201": "Skill 201",
+      "202": "Turbine (Start) (Deathmatch Finale)",
+      "210": "Turbine",
+      "211": "Skill 211",
+      "212": "Skill 212",
+      "220": "Turbine+",
+      "230": "Turbine++",
+      "232": "Perfect Finisher",
+      "233": "Perfect Finisher (Deathmatch Finale)",
+      "300": "Aerial Attack 1",
+      "301": "Aerial Attack 2",
+      "302": "Aerial Attack 3",
+      "310": "Aerial Combo Finisher",
+      "400": "Launch",
+      "410": "Aerial Barrage",
+      "1200": "Explosive Plunge",
+      "1300": "Impale",
+      "1400": "Martial Spear",
+      "1410": "Martial Spear Finisher",
+      "1500": "Eye of the Storm",
+      "1600": "Dashing Lancer",
+      "1700": "Cyclone Skullsplitter",
+      "99999": "Skill 99999",
+      "100001": "Skill 100001",
+      "100003": "Skill 100003",
+      "100008": "Skill 100008",
+      "100009": "Skill 100009",
+      "100010": "Skill 100010",
+      "skill-groups": {
+        "normal-attack": "Normal Attack",
+        "combo-finisher": "Combo Finisher",
+        "aerial-attack": "Aerial Attack",
+        "power-strike": "Power Strike",
+        "martial-spear": "Martial Spear",
+        "perfect-finisher": "Perfect Finisher",
+        "turbine": "Turbine"
+      }
+    },
+    "Pl0700Ghost": {
+      "200": "Skill 200",
+      "1100": "Skill 1100",
+      "1400": "Skill 1400",
+      "9995": "Skill 9995"
+    },
+    "Pl2500": {
+      "100": "Attack 1",
+      "101": "Attack 2",
+      "102": "Attack 3",
+      "103": "Attack 4",
+      "200": "Blade Dance",
+      "210": "Combo Finisher 1",
+      "220": "Combo Finisher 2",
+      "230": "Combo Finisher 3",
+      "300": "Aerial Attack 1",
+      "301": "Aerial Attack 2",
+      "302": "Aerial Attack 3",
+      "400": "Launch",
+      "410": "Aerial Barrage",
+      "1100": "Hammer of Thunder",
+      "1200": "Pistol of Demons",
+      "1300": "Spear of Legends",
+      "1400": "Paeanic Aegis",
+      "1500": "Nachtmusik",
+      "9999": "Skill 9999",
+      "skill-groups": {
+        "normal-attack": "Normal Attack",
+        "combo-finisher": "Combo Finisher",
+        "aerial-attack": "Aerial Attack"
+      }
+    },
+    "Pl2600": {
+      "100": "Attack 1",
+      "101": "Attack 2",
+      "102": "Attack 3",
+      "103": "Attack 4",
+      "110": "Power Strike 1",
+      "111": "Combo Finisher 1",
+      "120": "Power Strike 2",
+      "121": "Combo Finisher 2",
+      "130": "Power Strike 3",
+      "131": "Combo Finisher 3",
+      "140": "Combo Finisher 4",
+      "300":"Aerial Attack 1",
+      "301":"Aerial Attack 2",
+      "302":"Aerial Attack 3",
+      "310":"Aerial Combo Finisher",
+      "400": "Launch",
+      "410": "Aerial Barrage",
+      "900": "Attack 1 (Empowered)",
+      "901": "Attack 2 (Empowered)",
+      "902": "Attack 3 (Empowered)",
+      "903": "Attack 4 (Empowered)",
+      "910": "Power Strike 1 (Empowered)",
+      "911": "Combo Finisher 1 (Empowered)",
+      "920": "Power Strike 2 (Empowered)",
+      "921": "Combo Finisher 2 (Empowered)",
+      "930": "Power Strike 3 (Empowered)",
+      "931": "Combo Finisher 3 (Empowered)",
+      "940": "Combo Finisher 4 (Empowered)",
+      "960": "Power Finisher 1",
+      "980": "Power Finisher 2",
+      "1000": "Riding Free",
+      "2000": "Star Chaser",
+      "3000": "Embrasque Sword",
+      "4000": "Eternity Loop",
+      "5000": "Hearts on Fire",
+      "6000": "Thunderbird",
+      "skill-groups": {
+        "normal-attack": "Normal Attack",
+        "combo-finisher": "Combo Finisher",
+        "power-finisher":"Power Finisher",
+        "power-strike": "Power Strike",
+        "aerial-attack": "Aerial Attack"
+      }
+    },
+    "Pl2800": {
+      "100": "Attack 1 (Upright)",
+      "101": "Attack 2 (Upright)",
+      "102": "Attack 3 (Upright)",
+      "111": "Attack 4 (Upright)",
+      "116": "Attack 5 (Upright)",
+      "150": "Skill 150",
+      "900": "Attack 1 (Reversed)",
+      "901": "Attack 2 (Reversed)",
+      "902": "Attack 3 (Reversed)",
+      "910": "Attack 4 (Reversed)",
+      "930": "Skill 930",
+      "931": "Reversed Finisher",
+      "941": "Skill 941",
+      "1000": "All Fall Down",
+      "2000": "Crimson Nightmare",
+      "4000": "Opportunity Knocks",
+      "5000": "Dead Lands",
+      "5010": "Dead Lands Finisher",
+      "120": "Skill 120",
+      "121": "Skill 121",
+      "130": "Power Strike (Upright)",
+      "131": "Flipkick (Reversed)",
+      "140": "Skill 140",
+      "141": "Skill 141",
+      "151": "Skill 151",
+      "170": "Flipkick (Upright)",
+      "200": "Stance Flip (Upright)",
+      "201": "Stance Flip (Reversed)",
+      "920": "Skill 920",
+      "940": "Skill 940",
+      "950": "Skill 950",
+      "951": "Skill 951",
+      "970": "Upright Finisher",
+      "3000": "Indominus",
+      "6000": "Kick Face (No Counter)",
+      "6002": "Kick Face",
+      "7000": "Splendor",
+      "8000": "Power Plant",
+      "skill-groups": {
+        "normal-attack": "Normal Attack",
+        "aerial-attack": "Aerial Attack",
+        "kick-face": "Kick Face",
+        "stance-flip": "Stance Flip",
+        "flipkick": "Flipkick"
+      }
+    },
+    "Pl2900": {
+      "100": "Attack 1",
+      "101": "Attack 2",
+      "102": "Attack 3",
+      "103": "Attack 4",
+      "110": "Stomp 1",
+      "111": "Stomp 2",
+      "112": "Stomp 3",
+      "113": "Stomp 4",
+      "120": "Skill 120",
+      "150": "Miasma Hands 1",
+      "151": "Miasma Hands 2",
+      "152": "Miasma Hands 3",
+      "153": "Miasma Hands 4",
+      "220": "Backflash",
+      "250": "Skill 250",
+      "260": "Skill 260",
+      "300": "Aerial Attack 1",
+      "301": "Aerial Attack 2",
+      "302": "Aerial Attack 3",
+      "310": "Aerial Attack 4 (Stomp)",
+      "400": "Launch",
+      "410": "Aerial Barrage",
+      "950": "Combo Finisher 1",
+      "1000": "Soul Breaker",
+      "2010": "Skill 2010",
+      "2020": "Claws of Reversal (No Counter)",
+      "7000": "Miasmic Abyss",
+      "8010": "Sphere of Reversal",
+      "951": "Skill 951",
+      "952": "Skill 952",
+      "953": "Skill 953",
+      "954": "Skill 954",
+      "skill-groups": {
+        "normal-attack": "Normal Attack",
+        "stomp": "Stomp",
+        "miasma-hands": "Miasma Hands",
+        "aerial-attack": "Aerial Attack"
+      }
     }
   },
   "enemies": {

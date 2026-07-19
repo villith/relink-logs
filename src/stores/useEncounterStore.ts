@@ -17,6 +17,8 @@ interface EncounterStore {
   questId: number | null;
   questTimer: number | null;
   questCompleted: boolean;
+  /** 0-based room index when this log is a Conflux room, else null. */
+  roomIndex: number | null;
   setSelectedTargets: (targets: EnemyType[]) => void;
   setSelectedPlayers: (playerNames: string[]) => void;
   setSelectedPlayerTypes: (playerTypes: CharacterType[]) => void;
@@ -36,6 +38,7 @@ export interface EncounterStateResponse {
   questId: number | null;
   questTimer: number | null;
   questCompleted: boolean | null;
+  roomIndex: number | null;
 }
 
 export const useEncounterStore = create<EncounterStore>((set) => ({
@@ -54,6 +57,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   questId: null,
   questTimer: null,
   questCompleted: false,
+  roomIndex: null,
   setSelectedTargets: (targets: EnemyType[]) => set({ selectedTargets: targets }),
   setSelectedPlayers: (playerNames: string[]) => set({ selectedPlayers: playerNames }),
   setSelectedPlayerTypes: (playerTypes: CharacterType[]) => set({ selectedPlayerTypes: playerTypes }),
@@ -73,6 +77,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       questId: response.questId,
       questTimer: response.questTimer,
       questCompleted: response.questCompleted || false,
+      roomIndex: response.roomIndex,
     });
   },
 }));

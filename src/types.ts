@@ -24,13 +24,13 @@ export type EnemyType = string | { Unknown: number };
  * Examples:
  * - `"LinkAttack"` - Link Attack
  * - `"SBA"` - Skybound Art
- * - `{ SupplementaryAttack: 113 }` (as its key, object with a number representing the skill number)
+ * - `{ SupplementaryDamage: 113 }` (as its key, object with a number representing the skill number)
  * - `{ Normal: 113 }` (as its key, object with a number representing the skill number)
  */
 export type ActionType =
   | "LinkAttack"
   | "SBA"
-  | { SupplementaryAttack: number }
+  | { SupplementaryDamage: number }
   | { DamageOverTime: number }
   | { Normal: number }
   | { Group: string };
@@ -54,6 +54,12 @@ export type SkillState = {
   maxStunValue: number;
   /** Number of hits that reached the game's damage cap */
   cappedHits: number;
+  /** Number of hits that were subject to a damage cap at all (cap-less sources like supplementary damage excluded) */
+  cappableHits: number;
+  /** Sum of pre-cap base damage over cappable hits (for overcap %: baseSum/capSum*100) */
+  overcapBaseSum: number;
+  /** Sum of damage caps over cappable hits */
+  overcapCapSum: number;
 };
 
 export type ComputedSkillState = SkillState & {
@@ -84,6 +90,12 @@ export type ComputedSkillGroup = {
   maxStunValue: number;
   /** Number of hits that reached the game's damage cap (summed over grouped skills) */
   cappedHits: number;
+  /** Number of cappable hits (summed over grouped skills) */
+  cappableHits: number;
+  /** Sum of pre-cap base damage over cappable hits (summed over grouped skills) */
+  overcapBaseSum: number;
+  /** Sum of damage caps over cappable hits (summed over grouped skills) */
+  overcapCapSum: number;
 };
 
 export type PlayerState = {
@@ -101,12 +113,22 @@ export type PlayerState = {
   totalStunValue: number;
   /** Stun per second over the encounter time */
   stunPerSecond: number;
+  /** Stun captured via accumulator deltas (solo path; 0 in online lobbies) */
+  stunDeltaSum?: number;
+  /** Stun captured via network stun messages (online path); totalStunValue = max of both */
+  stunMessageSum?: number;
   /** Time of the last damage dealt */
   lastDamageTime: number;
   /** Stats for individual skills logged */
   skillBreakdown: SkillState[];
   /** Number of hits by this player that reached the game's damage cap */
   cappedHits: number;
+  /** Number of hits by this player that were subject to a damage cap at all */
+  cappableHits: number;
+  /** Sum of pre-cap base damage over cappable hits (for overcap %: baseSum/capSum*100) */
+  overcapBaseSum: number;
+  /** Sum of damage caps over cappable hits */
+  overcapCapSum: number;
 };
 
 export type ComputedPlayerState = PlayerState & {
@@ -132,6 +154,10 @@ export type EncounterState = {
   totalDamage: number;
   /** Total DPS dealt over the encounter time */
   dps: number;
+  /** Encounter-wide stun via accumulator deltas (solo path; 0 online) */
+  stunDeltaSum?: number;
+  /** Encounter-wide stun via network stun messages (online path); the served totals are max of both */
+  stunMessageSum?: number;
   /** The time of the encounter's first damage instance (UTC milliseconds since epoch) */
   startTime: number;
   /** The time of the encounter's last known damage instance (UTC milliseconds since epoch) */
@@ -189,6 +215,41 @@ export type Overmastery = {
   value: number;
 };
 
+/** The v2.0.2 record-inline stat block. Labels for hp/attack/stunPower/power
+ * follow the pre-2.0 PlayerStats layout the block mirrors; unk50/unk58 are
+ * still-unconfirmed slots. */
+export type RecordStats = {
+  level: number;
+  hp: number;
+  attack: number;
+  unk50: number;
+  stunPower: number;
+  unk58: number;
+  power: number;
+};
+
+/** One trait id/level pair (wrightstone or innate weapon skill); level 0 =
+ * not yet known. */
+export type WeaponTraitPair = {
+  id: number;
+  level: number;
+};
+
+/** The equipped weapon's state (live-labeled). weaponId is the weapon.tbl Key
+ * hash of the equipped (transcendence-variant) row — the `weapons:` bundle's
+ * map key. innateTraits are the ACTIVE skills (awakening/transcendence
+ * upgrades applied by the game). */
+export type WeaponState = {
+  weaponId: number;
+  exp: number;
+  starLevel: number;
+  plusMarks: number;
+  awakeningLevel: number;
+  wrightstoneId: number;
+  wrightstoneTraits: WeaponTraitPair[];
+  innateTraits: WeaponTraitPair[];
+};
+
 export type OvermasteryInfo = {
   overmasteries: Overmastery[];
 };
@@ -202,12 +263,34 @@ export type PlayerStats = {
   totalPower: number;
 };
 
+export type EquippedSummon = {
+  summonId: number;
+  mainTraitId: number;
+  mainTraitLevel: number;
+  bonusId: number;
+  bonusLevel: number;
+};
+
 export type PlayerData = {
   actorIndex: number;
   displayName: string;
   characterName: string;
   characterType: CharacterType;
   sigils: Sigil[];
+  summons: EquippedSummon[];
+  /** The 4 equipped ability (skill) id hashes; empty on logs from older versions. */
+  abilities: number[];
+  /** Equipped weapon as its game key name (e.g. "WEP_PL2700_02_01"); "" when unknown. */
+  weaponKey: string;
+  /** Master level, level+stars combined (55 = 50 + 5 stars); 0 when unknown. */
+  masterLevel: number;
+  /** Unlocked skillboard (master trait) node effect ids; empty on older logs. */
+  skillboard: number[];
+  /** Record-inline stat block (v2.0.2 identity recovery); null on older logs.
+   * `unk50`/`unk58` are still-unlabeled slots (see the Rust-side docs). */
+  stats: RecordStats | null;
+  /** Equipped weapon save-row snapshot (v2.0.2 identity recovery); null on older logs. */
+  weaponState: WeaponState | null;
   isOnline: boolean;
   weaponInfo: WeaponInfo | null;
   overmasteryInfo: OvermasteryInfo | null;
@@ -223,7 +306,7 @@ export enum MeterColumns {
   Name = "name",
   DPS = "dps",
   TotalDamage = "damage",
-  DamageCap = "damage-cap",
+  SupPercentage = "sup-percentage",
   DamagePercentage = "damage-percentage",
   SBA = "sba",
   TotalStunValue = "total-stun-value",
@@ -255,6 +338,38 @@ export type Log = {
   questCompleted: boolean;
 };
 
+export type ConfluxBuffDelta = {
+  roomIndex: number;
+  buffIds: number[];
+};
+
+export type ConfluxRoom = {
+  logId: number;
+  roomIndex: number;
+  questId: number | null;
+  primaryTarget: number | null;
+  duration: number;
+  totalDamage: number | null;
+};
+
+export type ConfluxRun = {
+  id: number;
+  startTime: number;
+  endTime: number | null;
+  duration: number | null;
+  roomCount: number;
+  completed: boolean | null;
+  buffs: ConfluxBuffDelta[];
+  rooms: ConfluxRoom[];
+};
+
+export type ConfluxSearchResult = {
+  runs: ConfluxRun[];
+  page: number;
+  pageCount: number;
+  runCount: number;
+};
+
 export type SBAEvent = [
   number,
   (
@@ -265,3 +380,39 @@ export type SBAEvent = [
 ];
 
 export type DeathEvent = [number, { OnDeathEvent: { actor_index: number; death_counter: number } }];
+
+/** Toolbox / Synthesis Helper — mirrors src-tauri/src/synthesis/mod.rs. */
+export type SynthesisSigil = {
+  uid: number;
+  sigilId: number;
+  trait1: number;
+  trait1Level: number;
+  trait2: number;
+  trait2Level: number;
+};
+
+export type SynthesisPrediction = {
+  trait1: number;
+  trait2: number | null;
+  lucky: boolean;
+};
+
+export type SynthesisMatch = {
+  sigilA: SynthesisSigil;
+  sigilB: SynthesisSigil;
+  prediction: SynthesisPrediction;
+  resultSigilId: number | null;
+};
+
+export type SynthesisStatus = {
+  gameRunning: boolean;
+  sigilCount: number;
+  rngUnpredictable: boolean;
+};
+
+export type SynthesisSearchResponse = {
+  matches: SynthesisMatch[];
+  pairsTested: number;
+  sigilCount: number;
+  rngUnpredictable: boolean;
+};

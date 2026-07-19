@@ -18,13 +18,48 @@ pub struct PlayerState {
     pub sba: f64,
     pub total_stun_value: f64,
     pub stun_per_second: f64,
-    /// Number of hits by this player that reached the game's damage cap
+    /// Stun measured as accumulator deltas across ProcessDamageEvent (the solo
+    /// path; reads 0 online where stun is host-authoritative).
+    #[serde(default)]
+    pub stun_delta_sum: f64,
+    /// Stun from the network stun-apply messages (`OnPlayerStun`; the online
+    /// path — may also fire solo, where it duplicates the delta path).
+    ///
+    /// `total_stun_value` = max(delta, messages): the two paths observe the
+    /// SAME accrual, so whichever captured it wins and double-counting is
+    /// impossible in either mode.
+    #[serde(default)]
+    pub stun_message_sum: f64,
+    /// Number of hits by this player that reached the game's damage cap (base > cap)
     pub capped_hits: u32,
+    /// Number of hits that were subject to a damage cap at all — the denominator
+    /// for the cap percentage. Cap-less sources (supplementary damage, DoT) are
+    /// excluded so they can't dilute the percentage.
+    #[serde(default)]
+    pub cappable_hits: u32,
+    /// Sums over cappable hits that carried a pre-cap base, for the overcap %:
+    /// `(overcap_base_sum / overcap_cap_sum) * 100` (the game's own display value).
+    #[serde(default)]
+    pub overcap_base_sum: f64,
+    #[serde(default)]
+    pub overcap_cap_sum: f64,
 }
 
 impl PlayerState {
     pub fn set_sba(&mut self, sba: f64) {
         self.sba = sba;
+    }
+
+    /// Folds one network stun message into this player's totals.
+    pub fn add_stun_message(&mut self, amount: f64) {
+        self.stun_message_sum += amount;
+        self.refresh_total_stun();
+    }
+
+    /// `total_stun_value` = whichever capture path saw the accrual (they
+    /// measure the same accumulator, so max() dedupes them).
+    fn refresh_total_stun(&mut self) {
+        self.total_stun_value = self.stun_delta_sum.max(self.stun_message_sum);
     }
 
     pub fn update_dps(&mut self, now: i64, start_time: i64) {
@@ -72,11 +107,19 @@ impl PlayerState {
     }
 
     pub fn update_from_damage_event(&mut self, damage_instance: &AdjustedDamageInstance) {
+        if damage_instance.is_cappable {
+            self.cappable_hits += 1;
+        }
+        if let Some((base, cap)) = damage_instance.overcap_contribution() {
+            self.overcap_base_sum += base;
+            self.overcap_cap_sum += cap;
+        }
         if damage_instance.is_capped {
             self.capped_hits += 1;
         }
         self.total_damage += damage_instance.event.damage as u64;
-        self.total_stun_value += damage_instance.stun_damage;
+        self.stun_delta_sum += damage_instance.stun_damage;
+        self.refresh_total_stun();
 
         let parent_character_type =
             CharacterType::from_hash(damage_instance.event.source.parent_actor_type);
@@ -130,18 +173,8 @@ mod tests {
 
     #[test]
     fn calculates_dps() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 100,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-        };
+        let mut player_state = empty_player();
+        player_state.total_damage = 100;
 
         player_state.update_dps(1000, 0);
 
@@ -150,18 +183,7 @@ mod tests {
 
     #[test]
     fn updates_from_damage_event() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-        };
+        let mut player_state = empty_player();
 
         let damage_event = DamageEvent {
             source: protocol::Actor {
@@ -182,6 +204,7 @@ mod tests {
             attack_rate: None,
             stun_value: None,
             damage_cap: None,
+            base_damage: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -196,18 +219,7 @@ mod tests {
 
     #[test]
     fn same_skill_updates_from_multiple_damage_events() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-        };
+        let mut player_state = empty_player();
 
         let damage_event = DamageEvent {
             source: protocol::Actor {
@@ -228,6 +240,7 @@ mod tests {
             attack_rate: None,
             stun_value: None,
             damage_cap: None,
+            base_damage: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -250,18 +263,7 @@ mod tests {
 
     #[test]
     fn new_skills_are_tracked_separately() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            stun_per_second: 0.0,
-            total_stun_value: 0.0,
-            capped_hits: 0,
-        };
+        let mut player_state = empty_player();
 
         let skill_one = DamageEvent {
             source: protocol::Actor {
@@ -282,6 +284,7 @@ mod tests {
             attack_rate: None,
             stun_value: None,
             damage_cap: None,
+            base_damage: None,
         };
 
         let skill_two = DamageEvent {
@@ -303,6 +306,7 @@ mod tests {
             attack_rate: None,
             stun_value: None,
             damage_cap: None,
+            base_damage: None,
         };
 
         player_state
@@ -320,18 +324,7 @@ mod tests {
 
     #[test]
     fn skills_from_children_are_tracked_separately() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            stun_per_second: 0.0,
-            total_stun_value: 0.0,
-            capped_hits: 0,
-        };
+        let mut player_state = empty_player();
 
         let parent_skill = DamageEvent {
             source: protocol::Actor {
@@ -352,6 +345,7 @@ mod tests {
             attack_rate: None,
             stun_value: None,
             damage_cap: None,
+            base_damage: None,
         };
 
         let child_skill = DamageEvent {
@@ -373,6 +367,7 @@ mod tests {
             attack_rate: None,
             stun_value: None,
             damage_cap: None,
+            base_damage: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -396,18 +391,7 @@ mod tests {
 
     #[test]
     fn stun_is_tracked_with_player_stats() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-        };
+        let mut player_state = empty_player();
 
         let damage_event = DamageEvent {
             source: protocol::Actor {
@@ -428,6 +412,7 @@ mod tests {
             attack_rate: None,
             stun_value: Some(5.0),
             damage_cap: None,
+            base_damage: None,
         };
 
         let player_data = PlayerData {
@@ -436,6 +421,13 @@ mod tests {
             display_name: "Test".to_string(),
             character_name: "Test".to_string(),
             sigils: Vec::new(),
+            summons: Vec::new(),
+            abilities: Vec::new(),
+            weapon_key: String::new(),
+            master_level: 0,
+            skillboard: Vec::new(),
+            stats: None,
+            weapon_state: None,
             is_online: false,
             weapon_info: None,
             overmastery_info: None,
@@ -459,18 +451,7 @@ mod tests {
 
     #[test]
     fn stun_value_without_player_stats() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-        };
+        let mut player_state = empty_player();
 
         let damage_event = DamageEvent {
             source: protocol::Actor {
@@ -491,6 +472,7 @@ mod tests {
             attack_rate: None,
             stun_value: Some(5.0),
             damage_cap: None,
+            base_damage: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -521,6 +503,7 @@ mod tests {
             attack_rate: None,
             stun_value: None,
             damage_cap: Some(22_999),
+            base_damage: Some(40_000.0), // base > cap -> capped
         }
     }
 
@@ -544,23 +527,13 @@ mod tests {
             attack_rate: None,
             stun_value: None,
             damage_cap: Some(22_999),
+            base_damage: Some(100.0), // base < cap -> not capped
         }
     }
 
     #[test]
     fn counts_player_capped_hits_across_skills() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-        };
+        let mut player_state = empty_player();
 
         // Two capped hits on the same skill (exercises the early-return path),
         // one uncapped hit on a different skill.
@@ -581,5 +554,78 @@ mod tests {
             .find(|s| s.action_type == ActionType::Normal(1))
             .unwrap();
         assert_eq!(normal_1.capped_hits, 2);
+    }
+
+    fn empty_player() -> PlayerState {
+        PlayerState {
+            index: 0,
+            character_type: CharacterType::Pl0000,
+            total_damage: 0,
+            last_known_pet_skill: None,
+            dps: 0.0,
+            skill_breakdown: vec![],
+            sba: 0.0,
+            total_stun_value: 0.0,
+            stun_delta_sum: 0.0,
+            stun_message_sum: 0.0,
+            stun_per_second: 0.0,
+            capped_hits: 0,
+            cappable_hits: 0,
+            overcap_base_sum: 0.0,
+            overcap_cap_sum: 0.0,
+        }
+    }
+
+    fn plain_event(action_id: ActionType, damage: i32) -> DamageEvent {
+        DamageEvent {
+            source: protocol::Actor {
+                index: 0,
+                actor_type: 0,
+                parent_actor_type: 0,
+                parent_index: 0,
+            },
+            target: protocol::Actor {
+                index: 0,
+                actor_type: 0,
+                parent_actor_type: 0,
+                parent_index: 0,
+            },
+            action_id,
+            damage,
+            flags: 0,
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+            base_damage: None,
+        }
+    }
+
+    fn apply(player: &mut PlayerState, event: &DamageEvent) {
+        player.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(event, None));
+    }
+
+    #[test]
+    fn supplementary_events_merge_into_single_row() {
+        let mut player = empty_player();
+        apply(&mut player, &plain_event(ActionType::Normal(1), 1000));
+        // Different trigger action ids, same merged row.
+        apply(
+            &mut player,
+            &plain_event(ActionType::SupplementaryDamage(1), 200),
+        );
+        apply(
+            &mut player,
+            &plain_event(ActionType::SupplementaryDamage(99), 800),
+        );
+
+        assert_eq!(player.skill_breakdown.len(), 2);
+        let merged = player
+            .skill_breakdown
+            .iter()
+            .find(|s| matches!(s.action_type, ActionType::SupplementaryDamage(_)))
+            .unwrap();
+        assert_eq!(merged.hits, 2);
+        assert_eq!(merged.total_damage, 1000);
+        assert_eq!(player.total_damage, 2000);
     }
 }

@@ -1,3 +1,6 @@
+import { type ChecklistGroup } from "@/stores/useChecklistStore";
+import { useLogIndexStore } from "@/stores/useLogIndexStore";
+import { translateTraitId } from "@/utils";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 import {
   ActionIcon,
@@ -9,17 +12,74 @@ import {
   Fieldset,
   Flex,
   Menu,
+  NumberInput,
   Select,
   Slider,
   Stack,
   Text,
   Tooltip,
 } from "@mantine/core";
+import { modals } from "@mantine/modals";
 import { DotsSixVertical } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import useChecklistSettings from "./useChecklistSettings";
 import useSettings from "./useSettings";
+
+export const ChecklistSection = ({
+  group,
+  legend,
+  addPlaceholder,
+  checklist,
+}: {
+  group: ChecklistGroup;
+  legend: string;
+  addPlaceholder: string;
+  checklist: ReturnType<typeof useChecklistSettings>;
+}) => {
+  const entries = group === "build" ? checklist.build : checklist.ai;
+
+  return (
+    <Box>
+      <Text size="sm" fw={600}>
+        {legend}
+      </Text>
+      {entries.map((entry) => (
+        <Flex key={entry.ids[0]} align="center" gap="xs" mt={4}>
+          <Checkbox checked={entry.enabled} onChange={() => checklist.toggle(group, entry.ids[0])} />
+          <Text size="sm" flex={1}>
+            {translateTraitId(entry.ids[0])}
+          </Text>
+          <NumberInput
+            value={entry.level}
+            min={1}
+            step={1}
+            w={90}
+            onChange={(value) => checklist.setEntryLevel(group, entry.ids[0], value)}
+          />
+          <ActionIcon
+            aria-label="Remove entry"
+            variant="transparent"
+            color="gray"
+            onClick={() => checklist.remove(group, entry.ids[0])}
+          >
+            x
+          </ActionIcon>
+        </Flex>
+      ))}
+      <Select
+        key={entries.length}
+        mt="xs"
+        searchable
+        placeholder={addPlaceholder}
+        data={checklist.traitOptions(group)}
+        value={null}
+        onChange={(hex) => checklist.addTrait(group, hex)}
+      />
+    </Box>
+  );
+};
 
 const SettingsPage = () => {
   const { t, i18n } = useTranslation();
@@ -45,6 +105,19 @@ const SettingsPage = () => {
     removeOverlayColumn,
     open_log_on_save,
   } = useSettings();
+
+  const checklist = useChecklistSettings();
+
+  const { deleteAllLogs } = useLogIndexStore((state) => ({ deleteAllLogs: state.deleteAllLogs }));
+
+  const confirmDeleteAll = () =>
+    modals.openConfirmModal({
+      title: "Delete logs",
+      children: <Text size="sm">{t("ui.logs.delete-all-logs-confirmation")}</Text>,
+      labels: { confirm: t("ui.delete-btn"), cancel: t("ui.cancel-btn") },
+      confirmProps: { color: "red" },
+      onConfirm: () => deleteAllLogs(),
+    });
 
   const toggleDebugMode = () => {
     const enabled = !debugMode;
@@ -189,6 +262,32 @@ const SettingsPage = () => {
             </Droppable>
           </DragDropContext>
         </Stack>
+      </Fieldset>
+      <Fieldset legend={t("ui.checklist-settings.title")} mt="md">
+        <Stack>
+          <ChecklistSection
+            group="build"
+            legend={t("ui.checklist-settings.sigils-section")}
+            addPlaceholder={t("ui.checklist-settings.add-trait")}
+            checklist={checklist}
+          />
+          <ChecklistSection
+            group="ai"
+            legend={t("ui.checklist-settings.ai-section")}
+            addPlaceholder={t("ui.checklist-settings.add-trait")}
+            checklist={checklist}
+          />
+          <Button variant="default" onClick={checklist.reset}>
+            {t("ui.checklist-settings.reset")}
+          </Button>
+        </Stack>
+      </Fieldset>
+      <Fieldset legend="Logs" mt="md">
+        <Box>
+          <Button variant="default" onClick={confirmDeleteAll}>
+            {t("ui.logs.delete-all-btn")}
+          </Button>
+        </Box>
       </Fieldset>
     </Box>
   );

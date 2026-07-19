@@ -37,6 +37,7 @@ enum Logs {
     QuestId,
     QuestElapsedTime,
     QuestCompleted,
+    RunId,
 }
 
 #[derive(Debug, Serialize)]
@@ -122,6 +123,9 @@ pub fn get_logs(
             Logs::QuestElapsedTime,
             Logs::QuestCompleted,
         ])
+        // Exclude Conflux rooms: they are `logs` rows tagged with a run_id and belong to the
+        // Conflux tab, not the normal quest list.
+        .and_where(Expr::col(Logs::RunId).is_null())
         .conditions(
             filter_by_enemy_id.is_some(),
             |q| {
@@ -240,6 +244,8 @@ pub fn get_logs_count(
     let (sql, values) = Query::select()
         .expr(Expr::col(Logs::Id).count())
         .from(Logs::Table)
+        // Exclude Conflux rooms (see get_logs) so the count matches the filtered list.
+        .and_where(Expr::col(Logs::RunId).is_null())
         .conditions(
             filter_by_enemy_id.is_some(),
             |q| {

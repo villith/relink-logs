@@ -1,0 +1,1918 @@
+{
+  "0026ab65": {
+    "key": "AB_PL2700_06",
+    "text": "Never Surrender"
+  },
+  "00667f3e": {
+    "key": "AB_PL0400_01_CG",
+    "text": "Healing Winds"
+  },
+  "00aace55": {
+    "key": "AB_PL1100_02",
+    "text": "L'Ombre d'Hier"
+  },
+  "00f6213e": {
+    "key": "AB_PL0600_01",
+    "text": "Sillage"
+  },
+  "01051e0b": {
+    "key": "AB_PL1000_07",
+    "text": "Royal Authority"
+  },
+  "01439452": {
+    "key": "AB_PL1000_03",
+    "text": "X-Seele"
+  },
+  "01449bb2": {
+    "key": "AB_PL1200_08_CG",
+    "text": "Holy Ladder"
+  },
+  "017117e8": {
+    "key": "AB_PL2700_01",
+    "text": "Slow Kill"
+  },
+  "026e43b2": {
+    "key": "AB_PL0900_03_CG",
+    "text": "Breakthrough"
+  },
+  "02aee83e": {
+    "key": "AB_PL2100_08_CG",
+    "text": "Ethereal Prison"
+  },
+  "02f9b06a": {
+    "key": "AB_PL2800_03_CG",
+    "text": "Indominus"
+  },
+  "0352fa56": {
+    "key": "AB_PL2500_06_CG",
+    "text": "Nachtmusik"
+  },
+  "038bf7b3": {
+    "key": "AB_PL1500_06_CG",
+    "text": "Infernal Stomp"
+  },
+  "03bd9249": {
+    "key": "AB_PL1200_03_CG",
+    "text": "Rising Cut"
+  },
+  "03e4d1bc": {
+    "key": "AB_PL0700_03",
+    "text": "Sic 'Em, Geegee!"
+  },
+  "050ddce6": {
+    "key": "AB_PL0900_04",
+    "text": "Arm Destruction"
+  },
+  "05359b18": {
+    "key": "AB_PL0800_07",
+    "text": "Schwertgeist"
+  },
+  "05ce9ce6": {
+    "key": "AB_PL1200_04",
+    "text": "Valiant Stance"
+  },
+  "05e3941c": {
+    "key": "AB_PL0200_07_CG",
+    "text": "Frozen Blade"
+  },
+  "06e91fc3": {
+    "key": "AB_PL2900_01_CG",
+    "text": "Soul Breaker"
+  },
+  "07692e4d": {
+    "key": "AB_PL1300_01_CG",
+    "text": "Awakening"
+  },
+  "07a7ec0f": {
+    "key": "AB_PL0400_02_CG",
+    "text": "Freeze"
+  },
+  "088a1d08": {
+    "key": "AB_PL1500_03",
+    "text": "Iron Shoulder"
+  },
+  "0954d8f1": {
+    "key": "AB_PL0900_01_CG",
+    "text": "Rampart"
+  },
+  "096fb0b5": {
+    "key": "AB_PL0000_02_CG",
+    "text": "Armor Break"
+  },
+  "099abf09": {
+    "key": "AB_PL0300_05",
+    "text": "Coffinmaker"
+  },
+  "09c256cf": {
+    "key": "AB_PL1000_05_CG",
+    "text": "Träumerei"
+  },
+  "09fa329e": {
+    "key": "AB_PL1600_03_CG",
+    "text": "Spear of Arvess"
+  },
+  "0a487f81": {
+    "key": "AB_PL2500_07_CG",
+    "text": "Sostenuto"
+  },
+  "0a87f009": {
+    "key": "AB_PL2900_03_CG",
+    "text": "Sign of Calamity"
+  },
+  "0adac47b": {
+    "key": "AB_PL1400_04",
+    "text": "Crescent Moon"
+  },
+  "0af90b6d": {
+    "key": "AB_PL1900_03",
+    "text": "Atonement"
+  },
+  "0b04fd2a": {
+    "key": "AB_NP0000_01",
+    "text": "Healing Water"
+  },
+  "0b1bb3fb": {
+    "key": "AB_PL2100_06",
+    "text": "Alone in Heaven"
+  },
+  "0b84f88d": {
+    "key": "AB_PL2800_08",
+    "text": "Power Plant"
+  },
+  "0bd7b2e1": {
+    "key": "AB_PL2200_05",
+    "text": "Prisión de Armas"
+  },
+  "0c33610c": {
+    "key": "AB_PL1900_06_CG",
+    "text": "Fourfold Vengeance"
+  },
+  "0c722622": {
+    "key": "AB_PL2700_06_CG",
+    "text": "Never Surrender"
+  },
+  "0d78aa71": {
+    "key": "AB_PL2400_06_CG",
+    "text": "Dashing Lancer"
+  },
+  "0d88c2f5": {
+    "key": "AB_PL2300_07_CG",
+    "text": "Peerless Eye"
+  },
+  "0e0872ae": {
+    "key": "AB_PL1300_05_CG",
+    "text": "Tit for Tat"
+  },
+  "0e63035b": {
+    "key": "AB_PL2200_06_CG",
+    "text": "Despedazar"
+  },
+  "0f41d9b0": {
+    "key": "AB_PL1500_06",
+    "text": "Infernal Stomp"
+  },
+  "0fa608e7": {
+    "key": "AB_PL1700_04_CG",
+    "text": "Immortal Pain"
+  },
+  "1031dbd0": {
+    "key": "AB_PL2100_07",
+    "text": "Talviyö"
+  },
+  "10ee82bb": {
+    "key": "AB_PL1800_05_CG",
+    "text": "Disruption"
+  },
+  "10fae6ab": {
+    "key": "AB_PL2800_06",
+    "text": "Kick Face"
+  },
+  "1263f6c4": {
+    "key": "AB_PL0000_16_CG",
+    "text": "Substitute"
+  },
+  "12a18828": {
+    "key": "AB_PL1800_02",
+    "text": "Mehen"
+  },
+  "12f12cac": {
+    "key": "AB_PL0900_01",
+    "text": "Rampart"
+  },
+  "1333a09a": {
+    "key": "AB_PL1100_06_CG",
+    "text": "Mirage"
+  },
+  "147b60f6": {
+    "key": "AB_PL0700_08_CG",
+    "text": "Umlauf"
+  },
+  "14dcdbb1": {
+    "key": "AB_PL2200_04_CG",
+    "text": "Ispirazione"
+  },
+  "16301075": {
+    "key": "AB_PL1100_03_CG",
+    "text": "Manigance"
+  },
+  "167179d2": {
+    "key": "AB_PL1300_05",
+    "text": "Tit for Tat"
+  },
+  "174fec8f": {
+    "key": "AB_PL0300_05_CG",
+    "text": "Coffinmaker"
+  },
+  "18784cf8": {
+    "key": "AB_PL2000_01",
+    "text": "Reginleiv Recidive"
+  },
+  "18ec0290": {
+    "key": "AB_PL1500_04_CG",
+    "text": "True Avidya"
+  },
+  "198e6910": {
+    "key": "AB_PL2500_05_CG",
+    "text": "Paeanic Aegis"
+  },
+  "19a55d74": {
+    "key": "AB_PL1300_03",
+    "text": "Trice Blade"
+  },
+  "1a1b320c": {
+    "key": "AB_PL1500_05_CG",
+    "text": "Lion Stance"
+  },
+  "1a4a8013": {
+    "key": "AB_PL2300_05_CG",
+    "text": "Wheel of Death"
+  },
+  "1c7aa5cc": {
+    "key": "AB_PL0400_02",
+    "text": "Freeze"
+  },
+  "1ca55616": {
+    "key": "AB_PL2300_08_CG",
+    "text": "Two-Crown's Strife"
+  },
+  "1d6f5c2d": {
+    "key": "AB_PL1400_01",
+    "text": "Kyokasuigetsu"
+  },
+  "1d756c75": {
+    "key": "AB_PL1100_02_CG",
+    "text": "L'Ombre d'Hier"
+  },
+  "1dd6b65d": {
+    "key": "AB_PL0900_03",
+    "text": "Breakthrough"
+  },
+  "1deeb111": {
+    "key": "AB_PL1300_01",
+    "text": "Awakening"
+  },
+  "1e4c06ec": {
+    "key": "AB_PL0000_09",
+    "text": "Clarity"
+  },
+  "1eaffc34": {
+    "key": "AB_PL2200_08_CG",
+    "text": "Seven-Star's Brilliance"
+  },
+  "1edd396e": {
+    "key": "AB_PL0300_03_CG",
+    "text": "Double Tap"
+  },
+  "1f66f295": {
+    "key": "AB_PL2400_03_CG",
+    "text": "Impale"
+  },
+  "200663cb": {
+    "key": "AB_PL0400_04",
+    "text": "Gravity Well"
+  },
+  "204e6f6a": {
+    "key": "AB_PL2100_01_CG",
+    "text": "Breath of Life"
+  },
+  "2121698e": {
+    "key": "AB_PL0000_12_CG",
+    "text": "Revive"
+  },
+  "2189f8ba": {
+    "key": "AB_PL2300_08",
+    "text": "Two-Crown's Strife"
+  },
+  "2229a8fa": {
+    "key": "AB_PL0800_03_CG",
+    "text": "Lawinensturm"
+  },
+  "2246eec2": {
+    "key": "AB_PL0500_07",
+    "text": "Healing Bullet"
+  },
+  "239d49c4": {
+    "key": "AB_PL0800_01_CG",
+    "text": "Blade Impulse"
+  },
+  "23b4d574": {
+    "key": "AB_PL1900_04_CG",
+    "text": "Ragnarok Form"
+  },
+  "23f204b0": {
+    "key": "AB_PL0600_05_CG",
+    "text": "Iron Maiden"
+  },
+  "241e1792": {
+    "key": "AB_PL1000_08",
+    "text": "Roter Wirbel"
+  },
+  "243ecbfc": {
+    "key": "AB_PL0300_06",
+    "text": "Wild Gunsmoke"
+  },
+  "246a5485": {
+    "key": "AB_PL1700_01_CG",
+    "text": "Battalions of Fear"
+  },
+  "24b19804": {
+    "key": "AB_PL1200_03",
+    "text": "Rising Cut"
+  },
+  "24b49fe8": {
+    "key": "AB_PL2600_04",
+    "text": "Eternity Loop"
+  },
+  "258b17c2": {
+    "key": "AB_PL2500_01_CG",
+    "text": "Stave of Divinity"
+  },
+  "267ff179": {
+    "key": "AB_PL2600_03",
+    "text": "Embrasque Sword"
+  },
+  "282fd588": {
+    "key": "AB_PL0800_03",
+    "text": "Lawinensturm"
+  },
+  "2a282e10": {
+    "key": "AB_PL1200_02_CG",
+    "text": "Shining Onslaught"
+  },
+  "2a60f8ca": {
+    "key": "AB_PL2600_08",
+    "text": "Rising Nova"
+  },
+  "2ae2fa9d": {
+    "key": "AB_PL1600_05",
+    "text": "Wingclipper"
+  },
+  "2bd2830c": {
+    "key": "AB_PL0700_04_CG",
+    "text": "Benediction"
+  },
+  "2ce998d1": {
+    "key": "AB_PL1100_04_CG",
+    "text": "Nelah Nav"
+  },
+  "2cf1038c": {
+    "key": "AB_PL0000_05_CG",
+    "text": "Rain of Arrows"
+  },
+  "2e064364": {
+    "key": "AB_PL1800_03",
+    "text": "Phantasmagoria"
+  },
+  "2ea1b3db": {
+    "key": "AB_PL0500_05",
+    "text": "Venom Grenade"
+  },
+  "2ecb1f0b": {
+    "key": "AB_PL0800_06",
+    "text": "Southern Cross"
+  },
+  "31e089b9": {
+    "key": "AB_PL2100_05",
+    "text": "Revontulet"
+  },
+  "32b4a16e": {
+    "key": "AB_PL0400_03",
+    "text": "Lightning"
+  },
+  "33028d0b": {
+    "key": "AB_PL1600_07",
+    "text": "Thousand Flames"
+  },
+  "3339d71e": {
+    "key": "AB_PL2400_02_CG",
+    "text": "Explosive Plunge"
+  },
+  "34050fc6": {
+    "key": "AB_PL0500_03_CG",
+    "text": "Intercept"
+  },
+  "34222ea5": {
+    "key": "AB_PL2100_03",
+    "text": "Ecliptica"
+  },
+  "355b0df9": {
+    "key": "AB_PL2800_01",
+    "text": "All Fall Down"
+  },
+  "35e894c3": {
+    "key": "AB_PL0600_04_CG",
+    "text": "Spiral Rose"
+  },
+  "3614971b": {
+    "key": "AB_PL1400_07",
+    "text": "Dance of Blue Petals"
+  },
+  "367d13fd": {
+    "key": "AB_PL1900_08_CG",
+    "text": "Arcadia"
+  },
+  "38145c67": {
+    "key": "AB_PL0900_06_CG",
+    "text": "Soul Eruption"
+  },
+  "38278041": {
+    "key": "AB_PL2700_04_CG",
+    "text": "Acidrage Howl"
+  },
+  "38b12f6a": {
+    "key": "AB_PL1900_05",
+    "text": "Scourge"
+  },
+  "390a6ec6": {
+    "key": "AB_PL1400_05",
+    "text": "Transient"
+  },
+  "393db908": {
+    "key": "AB_PL2900_04_CG",
+    "text": "The Black's Blessing"
+  },
+  "395e4823": {
+    "key": "AB_PL0600_06",
+    "text": "Lost Love"
+  },
+  "3a23b561": {
+    "key": "AB_PL2200_03_CG",
+    "text": "Rotura"
+  },
+  "3a6c7767": {
+    "key": "AB_PL1700_04",
+    "text": "Immortal Pain"
+  },
+  "3ab14269": {
+    "key": "AB_PL2700_03_CG",
+    "text": "Play with Fire"
+  },
+  "3b5c9f6d": {
+    "key": "AB_PL1700_01",
+    "text": "Battalions of Fear"
+  },
+  "3b6fa972": {
+    "key": "AB_PL0500_01_CG",
+    "text": "Sumrak"
+  },
+  "3bb98b51": {
+    "key": "AB_PL2200_08",
+    "text": "Seven-Star's Brilliance"
+  },
+  "3bc21501": {
+    "key": "AB_PL1100_08_CG",
+    "text": "Draconic Release"
+  },
+  "3c111db7": {
+    "key": "AB_PL0000_04_CG",
+    "text": "Panacea"
+  },
+  "3cad2dd9": {
+    "key": "AB_PL1400_08",
+    "text": "Utter Devotion"
+  },
+  "3cf50957": {
+    "key": "AB_PL0500_02",
+    "text": "Detonator"
+  },
+  "3d4193db": {
+    "key": "AB_PL0400_01",
+    "text": "Healing Winds"
+  },
+  "3e0e9aff": {
+    "key": "AB_PL0700_07_CG",
+    "text": "Hinrichten"
+  },
+  "3eb33877": {
+    "key": "AB_PL0600_02",
+    "text": "Rose Tycoon"
+  },
+  "3f4b5c9e": {
+    "key": "AB_PL2000_04",
+    "text": "Arcadia"
+  },
+  "3fe66b9d": {
+    "key": "AB_PL0500_04_CG",
+    "text": "Armor-Piercing Round"
+  },
+  "40193580": {
+    "key": "AB_PL2600_03_CG",
+    "text": "Embrasque Sword"
+  },
+  "41e3c434": {
+    "key": "AB_PL1400_06",
+    "text": "Dance of Pink Petals"
+  },
+  "42a43df8": {
+    "key": "AB_PL1400_08_CG",
+    "text": "Utter Devotion"
+  },
+  "42d185d5": {
+    "key": "AB_PL0000_06",
+    "text": "Miserable Mist"
+  },
+  "42dec04d": {
+    "key": "AB_PL2800_05_CG",
+    "text": "Dead Lands"
+  },
+  "430aecc1": {
+    "key": "AB_PL0500_02_CG",
+    "text": "Detonator"
+  },
+  "430f5db4": {
+    "key": "AB_PL2400_02",
+    "text": "Explosive Plunge"
+  },
+  "4347ae3a": {
+    "key": "AB_PL1400_05_CG",
+    "text": "Transient"
+  },
+  "436c3066": {
+    "key": "AB_PL0300_06_CG",
+    "text": "Wild Gunsmoke"
+  },
+  "44f5c74f": {
+    "key": "AB_PL2800_05",
+    "text": "Dead Lands"
+  },
+  "47baeea5": {
+    "key": "AB_PL2400_05_CG",
+    "text": "Eye of the Storm"
+  },
+  "47ef96a1": {
+    "key": "AB_PL0500_08_CG",
+    "text": "Disruptor"
+  },
+  "48016ff5": {
+    "key": "AB_PL2000_01_CG",
+    "text": "Reginleiv Recidive"
+  },
+  "484b29f5": {
+    "key": "AB_PL2800_03",
+    "text": "Indominus"
+  },
+  "496b938b": {
+    "key": "AB_PL1700_07_CG",
+    "text": "Umbral Eclipse"
+  },
+  "49c924a2": {
+    "key": "AB_PL0000_01_CG",
+    "text": "Decimate"
+  },
+  "4a821f93": {
+    "key": "AB_PL2400_08_CG",
+    "text": "Deathmatch Finale"
+  },
+  "4acd4edd": {
+    "key": "AB_PL2800_06_CG",
+    "text": "Kick Face"
+  },
+  "4ba37b99": {
+    "key": "AB_PL0200_05_CG",
+    "text": "Azure Sword"
+  },
+  "4bc55ee0": {
+    "key": "AB_PL2400_07",
+    "text": "Cyclone Skullsplitter"
+  },
+  "4c13102e": {
+    "key": "AB_PL2400_06",
+    "text": "Dashing Lancer"
+  },
+  "4d081111": {
+    "key": "AB_PL2900_08_CG",
+    "text": "Sphere of Reversal"
+  },
+  "4d598bbd": {
+    "key": "AB_PL0300_07",
+    "text": "Slag Shot"
+  },
+  "4e665c18": {
+    "key": "AB_PL0700_05_CG",
+    "text": "Pendel"
+  },
+  "4f634ad4": {
+    "key": "AB_PL0000_16",
+    "text": "Substitute"
+  },
+  "4fc77dcb": {
+    "key": "AB_PL1700_06_CG",
+    "text": "Damnation"
+  },
+  "5099cf81": {
+    "key": "AB_PL1800_07_CG",
+    "text": "Alexandria"
+  },
+  "511571ee": {
+    "key": "AB_PL0800_05",
+    "text": "Turbulenz"
+  },
+  "512cba53": {
+    "key": "AB_PL0700_04",
+    "text": "Benediction"
+  },
+  "512ddb88": {
+    "key": "AB_PL1300_08",
+    "text": "Sky Shatter"
+  },
+  "51978338": {
+    "key": "AB_PL1400_04_CG",
+    "text": "Crescent Moon"
+  },
+  "52e3eed1": {
+    "key": "AB_PL1600_04",
+    "text": "Signo Drive"
+  },
+  "530600d2": {
+    "key": "AB_PL2800_04",
+    "text": "Opportunity Knocks"
+  },
+  "531e8994": {
+    "key": "AB_PL2100_03_CG",
+    "text": "Ecliptica"
+  },
+  "5349f8ae": {
+    "key": "AB_PL1400_06_CG",
+    "text": "Dance of Pink Petals"
+  },
+  "53705c60": {
+    "key": "AB_PL2700_08_CG",
+    "text": "Heaven Comes Down"
+  },
+  "538572d0": {
+    "key": "AB_PL0000_02",
+    "text": "Armor Break"
+  },
+  "542f400f": {
+    "key": "AB_PL2100_01",
+    "text": "Breath of Life"
+  },
+  "547c38ae": {
+    "key": "AB_PL2500_05",
+    "text": "Paeanic Aegis"
+  },
+  "552650d3": {
+    "key": "AB_PL0800_02_CG",
+    "text": "Kaltzwinger"
+  },
+  "55289dfa": {
+    "key": "AB_PL2800_08_CG",
+    "text": "Power Plant"
+  },
+  "55aedf7b": {
+    "key": "AB_PL2500_03",
+    "text": "Pistol of Demons"
+  },
+  "5611a30e": {
+    "key": "AB_PL1100_01_CG",
+    "text": "Uwe"
+  },
+  "586a0bff": {
+    "key": "AB_PL1000_07_CG",
+    "text": "Royal Authority"
+  },
+  "58e10372": {
+    "key": "AB_PL1200_08",
+    "text": "Holy Ladder"
+  },
+  "5a02a6c9": {
+    "key": "AB_PL2600_02_CG",
+    "text": "Star Chaser"
+  },
+  "5a356634": {
+    "key": "AB_PL1100_07",
+    "text": "Verdrängen"
+  },
+  "5acc7a93": {
+    "key": "AB_PL1300_06",
+    "text": "Hymn of the Hundreds"
+  },
+  "5b0fb261": {
+    "key": "AB_PL2300_06_CG",
+    "text": "Lethal Rain"
+  },
+  "5b42826c": {
+    "key": "AB_PL1800_08",
+    "text": "Pain Train"
+  },
+  "5b4d43df": {
+    "key": "AB_PL1700_03_CG",
+    "text": "Great Scythe Grynoth"
+  },
+  "5c1519f8": {
+    "key": "AB_PL0300_01",
+    "text": "Spitfire"
+  },
+  "5ccca979": {
+    "key": "AB_PL0700_01_CG",
+    "text": "Purge Spirits"
+  },
+  "5ce11765": {
+    "key": "AB_PL0700_08",
+    "text": "Umlauf"
+  },
+  "5d19bbe2": {
+    "key": "AB_PL0800_04",
+    "text": "Blauer Dolch"
+  },
+  "5d39ff76": {
+    "key": "AB_PL1300_02",
+    "text": "Empty Mist"
+  },
+  "5f4c5757": {
+    "key": "AB_PL2000_03",
+    "text": "Never Enough"
+  },
+  "609208dc": {
+    "key": "AB_PL0500_07_CG",
+    "text": "Healing Bullet"
+  },
+  "62aab75d": {
+    "key": "AB_PL1100_01",
+    "text": "Uwe"
+  },
+  "642b9935": {
+    "key": "AB_PL2400_05",
+    "text": "Eye of the Storm"
+  },
+  "64a6c124": {
+    "key": "AB_PL0400_05",
+    "text": "Fire"
+  },
+  "65083f2d": {
+    "key": "AB_PL0400_06",
+    "text": "Concentration"
+  },
+  "6570a2d5": {
+    "key": "AB_PL0600_01_CG",
+    "text": "Sillage"
+  },
+  "657b3a08": {
+    "key": "AB_PL1800_08_CG",
+    "text": "Pain Train"
+  },
+  "66b7cf9c": {
+    "key": "AB_PL0000_12",
+    "text": "Revive"
+  },
+  "66e797cc": {
+    "key": "AB_PL0200_03",
+    "text": "Heal"
+  },
+  "67270513": {
+    "key": "AB_PL1600_02",
+    "text": "Rain of Fury"
+  },
+  "6848b8fc": {
+    "key": "AB_PL1300_08_CG",
+    "text": "Sky Shatter"
+  },
+  "6891463e": {
+    "key": "AB_PL1000_05",
+    "text": "Träumerei"
+  },
+  "69ddef59": {
+    "key": "AB_PL1800_06_CG",
+    "text": "Rhizomata"
+  },
+  "69fcecc3": {
+    "key": "AB_PL1200_06",
+    "text": "Invincible"
+  },
+  "6a068d8c": {
+    "key": "AB_PL1800_03_CG",
+    "text": "Phantasmagoria"
+  },
+  "6aa831f7": {
+    "key": "AB_PL2400_08",
+    "text": "Deathmatch Finale"
+  },
+  "6b21afbb": {
+    "key": "AB_PL2500_07",
+    "text": "Sostenuto"
+  },
+  "6b4f3e86": {
+    "key": "AB_PL2200_05_CG",
+    "text": "Prisión de Armas"
+  },
+  "6b54f359": {
+    "key": "AB_PL1500_05",
+    "text": "Lion Stance"
+  },
+  "6b96ca56": {
+    "key": "AB_PL2600_04_CG",
+    "text": "Eternity Loop"
+  },
+  "6cfcc852": {
+    "key": "AB_PL0800_07_CG",
+    "text": "Schwertgeist"
+  },
+  "6dc4e1e2": {
+    "key": "AB_PL1800_01_CG",
+    "text": "Mimic Doll"
+  },
+  "6e8e210a": {
+    "key": "AB_PL2200_03",
+    "text": "Rotura"
+  },
+  "6fb5fbda": {
+    "key": "AB_PL2800_02",
+    "text": "Crimson Nightmare"
+  },
+  "6fd0843a": {
+    "key": "AB_PL0000_10",
+    "text": "Reginleiv"
+  },
+  "705a6a63": {
+    "key": "AB_PL2200_04",
+    "text": "Ispirazione"
+  },
+  "70b2eb23": {
+    "key": "AB_PL1000_03_CG",
+    "text": "X-Seele"
+  },
+  "70fe4df6": {
+    "key": "AB_PL1000_04",
+    "text": "Zerreissen"
+  },
+  "71b81b9c": {
+    "key": "AB_PL0200_06",
+    "text": "Light Wall"
+  },
+  "71f1824e": {
+    "key": "AB_PL1700_08_CG",
+    "text": "Netherwrath"
+  },
+  "724636a8": {
+    "key": "AB_PL2900_05",
+    "text": "Primordial Fear"
+  },
+  "74085f2c": {
+    "key": "AB_PL0900_07_CG",
+    "text": "Energy Destruction"
+  },
+  "746f18a4": {
+    "key": "AB_PL2600_05",
+    "text": "Hearts on Fire"
+  },
+  "74a1fadd": {
+    "key": "AB_PL1200_01_CG",
+    "text": "Königsschild"
+  },
+  "75043b52": {
+    "key": "AB_PL1800_01",
+    "text": "Mimic Doll"
+  },
+  "7590b485": {
+    "key": "AB_PL0700_02_CG",
+    "text": "Blaues Gespenst"
+  },
+  "75d65667": {
+    "key": "AB_PL1100_08",
+    "text": "Draconic Release"
+  },
+  "761b6e0d": {
+    "key": "AB_PL0200_08_CG",
+    "text": "Emerald Shield"
+  },
+  "772fa1d5": {
+    "key": "AB_PL0500_03",
+    "text": "Intercept"
+  },
+  "775825fc": {
+    "key": "AB_PL2700_05_CG",
+    "text": "Fast Lane"
+  },
+  "78483cac": {
+    "key": "AB_PL0000_03_CG",
+    "text": "Phalanx"
+  },
+  "798047ba": {
+    "key": "AB_PL0200_02_CG",
+    "text": "Winter's Rain"
+  },
+  "79a07d8e": {
+    "key": "AB_PL0200_04",
+    "text": "Sacred Winds"
+  },
+  "7c0f49fb": {
+    "key": "AB_PL2300_02",
+    "text": "Depravity"
+  },
+  "7c63d77a": {
+    "key": "AB_PL0300_02",
+    "text": "Bullet Hail"
+  },
+  "7d60a4be": {
+    "key": "AB_PL2800_04_CG",
+    "text": "Opportunity Knocks"
+  },
+  "7da113ff": {
+    "key": "AB_PL1600_08_CG",
+    "text": "Realm's Majesty"
+  },
+  "7dc36a6f": {
+    "key": "AB_PL1200_05_CG",
+    "text": "Sacred Charge"
+  },
+  "7ea722fc": {
+    "key": "AB_PL1700_06",
+    "text": "Damnation"
+  },
+  "7eb5a896": {
+    "key": "AB_PL0800_01",
+    "text": "Blade Impulse"
+  },
+  "7f0888f3": {
+    "key": "AB_PL0400_07_CG",
+    "text": "Flowery Seven"
+  },
+  "7f3b7770": {
+    "key": "AB_PL2400_07_CG",
+    "text": "Cyclone Skullsplitter"
+  },
+  "7f66d413": {
+    "key": "AB_PL0600_08_CG",
+    "text": "Bouquet"
+  },
+  "7f683594": {
+    "key": "AB_PL2300_01",
+    "text": "Merculight"
+  },
+  "7f7e4a32": {
+    "key": "AB_PL2400_09_CG",
+    "text": "Flashpoint"
+  },
+  "802b537f": {
+    "key": "AB_PL1900_03_CG",
+    "text": "Atonement"
+  },
+  "810c11e9": {
+    "key": "AB_PL2100_06_CG",
+    "text": "Alone in Heaven"
+  },
+  "8121f2bf": {
+    "key": "AB_PL1700_03",
+    "text": "Great Scythe Grynoth"
+  },
+  "81541335": {
+    "key": "AB_PL1800_02_CG",
+    "text": "Mehen"
+  },
+  "8172bd0a": {
+    "key": "AB_PL2000_04_CG",
+    "text": "Arcadia"
+  },
+  "82695b1e": {
+    "key": "AB_PL0700_07",
+    "text": "Hinrichten"
+  },
+  "84174bdd": {
+    "key": "AB_PL1500_08",
+    "text": "Dhyana"
+  },
+  "847f91ee": {
+    "key": "AB_PL2500_08_CG",
+    "text": "Battle Hymn"
+  },
+  "84e6c459": {
+    "key": "AB_PL1000_06_CG",
+    "text": "Macht"
+  },
+  "85c06563": {
+    "key": "AB_PL1800_04",
+    "text": "Reinforce"
+  },
+  "869bd124": {
+    "key": "AB_NP0000_02",
+    "text": "Enduring Earth"
+  },
+  "87288538": {
+    "key": "AB_PL0200_05",
+    "text": "Azure Sword"
+  },
+  "87d51ba4": {
+    "key": "AB_PL2800_07",
+    "text": "Splendor"
+  },
+  "88156149": {
+    "key": "AB_PL2700_01_CG",
+    "text": "Slow Kill"
+  },
+  "88bcd098": {
+    "key": "AB_PL0900_08",
+    "text": "Drachenstolz"
+  },
+  "88d0f523": {
+    "key": "AB_PL0000_13_CG",
+    "text": "Veil"
+  },
+  "8abdf3d7": {
+    "key": "AB_PL0400_05_CG",
+    "text": "Fire"
+  },
+  "8ae4a7a0": {
+    "key": "AB_PL1400_07_CG",
+    "text": "Dance of Blue Petals"
+  },
+  "8aea1313": {
+    "key": "AB_NP0300_02",
+    "text": "Holy Geyser"
+  },
+  "8b70dd12": {
+    "key": "AB_PL1000_06",
+    "text": "Macht"
+  },
+  "8c3c7ddc": {
+    "key": "AB_PL1600_06",
+    "text": "Vengeful Flames"
+  },
+  "8c4d811c": {
+    "key": "AB_PL0600_04",
+    "text": "Spiral Rose"
+  },
+  "8cbe0423": {
+    "key": "AB_PL0700_05",
+    "text": "Pendel"
+  },
+  "8dc8a58f": {
+    "key": "AB_PL1800_04_CG",
+    "text": "Reinforce"
+  },
+  "8e7cd4ac": {
+    "key": "AB_PL2100_02_CG",
+    "text": "No Way Out"
+  },
+  "8ef93263": {
+    "key": "AB_PL0200_03_CG",
+    "text": "Heal"
+  },
+  "8efe9bbb": {
+    "key": "AB_PL2600_06_CG",
+    "text": "Thunderbird"
+  },
+  "8f187f08": {
+    "key": "AB_PL0600_08",
+    "text": "Bouquet"
+  },
+  "8f4e9d6f": {
+    "key": "AB_PL2900_01",
+    "text": "Soul Breaker"
+  },
+  "8ffd7823": {
+    "key": "AB_PL1300_03_CG",
+    "text": "Trice Blade"
+  },
+  "900b11f1": {
+    "key": "AB_PL2700_02_CG",
+    "text": "Forever Yours"
+  },
+  "90534c5b": {
+    "key": "AB_PL0400_06_CG",
+    "text": "Concentration"
+  },
+  "90c49270": {
+    "key": "AB_PL1700_08",
+    "text": "Netherwrath"
+  },
+  "90e19c7d": {
+    "key": "AB_PL1200_07_CG",
+    "text": "Sword of Lumiel"
+  },
+  "910c4eef": {
+    "key": "AB_PL1900_05_CG",
+    "text": "Scourge"
+  },
+  "915b5131": {
+    "key": "AB_PL2400_03",
+    "text": "Impale"
+  },
+  "916f100f": {
+    "key": "AB_PL0600_07_CG",
+    "text": "Rose Barrier"
+  },
+  "91d8e40b": {
+    "key": "AB_PL2500_02",
+    "text": "Hammer of Thunder"
+  },
+  "920dd8b3": {
+    "key": "AB_PL0800_02",
+    "text": "Kaltzwinger"
+  },
+  "92214b36": {
+    "key": "AB_PL0400_04_CG",
+    "text": "Gravity Well"
+  },
+  "94b29689": {
+    "key": "AB_PL1100_03",
+    "text": "Manigance"
+  },
+  "94da6b12": {
+    "key": "AB_PL0700_06",
+    "text": "Strafe"
+  },
+  "9571317d": {
+    "key": "AB_PL1300_06_CG",
+    "text": "Hymn of  the Hundreds"
+  },
+  "95ae7091": {
+    "key": "AB_PL2800_01_CG",
+    "text": "All Fall Down"
+  },
+  "95e40e12": {
+    "key": "AB_PL1600_01",
+    "text": "Infinite Wonders"
+  },
+  "962506f1": {
+    "key": "AB_PL0300_01_CG",
+    "text": "Spitfire"
+  },
+  "966f4a6f": {
+    "key": "AB_PL2400_01",
+    "text": "Tip of the Spear"
+  },
+  "967964c1": {
+    "key": "AB_PL0000_05",
+    "text": "Rain of Arrows"
+  },
+  "967c9abc": {
+    "key": "AB_PL1500_07",
+    "text": "Eternal Rage"
+  },
+  "968220fa": {
+    "key": "AB_PL1900_07",
+    "text": "Never Enough"
+  },
+  "974342aa": {
+    "key": "AB_PL1600_03",
+    "text": "Spear of Arvess"
+  },
+  "97fe7dc9": {
+    "key": "AB_PL2600_01_CG",
+    "text": "Riding Free"
+  },
+  "981a10bc": {
+    "key": "AB_PL2900_02",
+    "text": "Claws of Reversal"
+  },
+  "98309953": {
+    "key": "AB_PL1900_04",
+    "text": "Ragnarok Form"
+  },
+  "9887f9a4": {
+    "key": "AB_PL2600_01",
+    "text": "Riding Free"
+  },
+  "98e1b356": {
+    "key": "AB_PL1000_02",
+    "text": "Flammenmarsch"
+  },
+  "995f3cb4": {
+    "key": "AB_PL2800_07_CG",
+    "text": "Splendor"
+  },
+  "9abfc62c": {
+    "key": "AB_PL2700_04",
+    "text": "Acidrage Howl"
+  },
+  "9ac21d84": {
+    "key": "AB_PL2700_05",
+    "text": "Fast Lane"
+  },
+  "9b1826be": {
+    "key": "AB_PL0000_14_CG",
+    "text": "Dispel"
+  },
+  "9b9eef73": {
+    "key": "AB_PL1500_08_CG",
+    "text": "Dhyana"
+  },
+  "9bd470fc": {
+    "key": "AB_PL0900_02_CG",
+    "text": "Rift Divider"
+  },
+  "9cb7fa23": {
+    "key": "AB_PL1600_04_CG",
+    "text": "Signo Drive"
+  },
+  "9dee4d38": {
+    "key": "AB_PL0000_10_CG",
+    "text": "Reginleiv"
+  },
+  "9e6f273b": {
+    "key": "AB_PL2500_02_CG",
+    "text": "Hammer of Thunder"
+  },
+  "9e8a1562": {
+    "key": "AB_PL2900_07_CG",
+    "text": "Miasmic Abyss"
+  },
+  "9ed935a6": {
+    "key": "AB_PL2600_08_CG",
+    "text": "Rising Nova"
+  },
+  "9f1539d2": {
+    "key": "AB_PL0200_07",
+    "text": "Frozen Blade"
+  },
+  "9fed6cf3": {
+    "key": "AB_PL0200_01",
+    "text": "Enchanted Lands"
+  },
+  "a0ebb136": {
+    "key": "AB_PL0000_08_CG",
+    "text": "Overdrive Surge"
+  },
+  "a3b52f17": {
+    "key": "AB_PL1300_04_CG",
+    "text": "Perpetual Rotation"
+  },
+  "a44b77a1": {
+    "key": "AB_PL0700_01",
+    "text": "Purge Spirits"
+  },
+  "a4d546ab": {
+    "key": "AB_PL0800_08",
+    "text": "Luftspiegelung"
+  },
+  "a5391991": {
+    "key": "AB_PL2700_07",
+    "text": "Flamek Thunder"
+  },
+  "a5f5e86c": {
+    "key": "AB_PL0300_04",
+    "text": "Duration"
+  },
+  "a662c045": {
+    "key": "AB_PL1100_04",
+    "text": "Nelah Nav"
+  },
+  "a6776518": {
+    "key": "AB_PL0000_15_CG",
+    "text": "Conduction"
+  },
+  "a6b54953": {
+    "key": "AB_PL2300_06",
+    "text": "Lethal Rain"
+  },
+  "a75a4c15": {
+    "key": "AB_PL1500_02_CG",
+    "text": "Branding Palm"
+  },
+  "a7c5a324": {
+    "key": "AB_PL2100_08",
+    "text": "Ethereal Prison"
+  },
+  "a7eb9e69": {
+    "key": "AB_PL2200_02",
+    "text": "Infinito Creare"
+  },
+  "a8dd5b10": {
+    "key": "AB_PL1600_08",
+    "text": "Realm's Majesty"
+  },
+  "a8fe63f7": {
+    "key": "AB_PL0300_04_CG",
+    "text": "Duration"
+  },
+  "aa6e61e5": {
+    "key": "AB_PL2700_02",
+    "text": "Forever Yours"
+  },
+  "abab2642": {
+    "key": "AB_PL2200_06",
+    "text": "Despedazar"
+  },
+  "abd5990a": {
+    "key": "AB_PL1500_02",
+    "text": "Branding Palm"
+  },
+  "abfe9091": {
+    "key": "AB_PL0000_15",
+    "text": "Conduction"
+  },
+  "ac89b2c5": {
+    "key": "AB_PL1100_05_CG",
+    "text": "Salvator"
+  },
+  "ad1eb226": {
+    "key": "AB_PL0300_07_CG",
+    "text": "Slag Shot"
+  },
+  "aea6d151": {
+    "key": "AB_PL2700_08",
+    "text": "Heaven Comes Down"
+  },
+  "b09eac4c": {
+    "key": "AB_PL2900_06",
+    "text": "Cursed Funeral"
+  },
+  "b116a81b": {
+    "key": "AB_PL2700_07_CG",
+    "text": "Flamek Thunder"
+  },
+  "b132100b": {
+    "key": "AB_PL1900_06",
+    "text": "Fourfold Vengeance"
+  },
+  "b1c60cab": {
+    "key": "AB_PL2900_08",
+    "text": "Sphere of Reversal"
+  },
+  "b2795ca0": {
+    "key": "AB_PL2900_03",
+    "text": "Sign of Calamity"
+  },
+  "b28d2735": {
+    "key": "AB_PL1400_03",
+    "text": "Apex of Nothingness"
+  },
+  "b2f74994": {
+    "key": "AB_PL0000_08",
+    "text": "Overdrive Surge"
+  },
+  "b3f51b27": {
+    "key": "AB_PL0400_03_CG",
+    "text": "Lightning"
+  },
+  "b40ccd9c": {
+    "key": "AB_PL0400_08",
+    "text": "Mystic Vortex"
+  },
+  "b5225a30": {
+    "key": "AB_PL2300_02_CG",
+    "text": "Depravity"
+  },
+  "b54c90e4": {
+    "key": "AB_PL0500_04",
+    "text": "Armor-Piercing Round"
+  },
+  "b63c6cf3": {
+    "key": "AB_PL0900_08_CG",
+    "text": "Drachenstolz"
+  },
+  "b777aade": {
+    "key": "AB_PL2000_03_CG",
+    "text": "Never Enough"
+  },
+  "b83b43a3": {
+    "key": "AB_PL2300_03_CG",
+    "text": "Clincher"
+  },
+  "b85aa34f": {
+    "key": "AB_PL2600_06",
+    "text": "Thunderbird"
+  },
+  "b924b87b": {
+    "key": "AB_PL2900_02_CG",
+    "text": "Claws of Reversal"
+  },
+  "b97bd8d4": {
+    "key": "AB_PL1800_06",
+    "text": "Rhizomata"
+  },
+  "b9c0abb5": {
+    "key": "AB_PL2400_01_CG",
+    "text": "Tip of the Spear"
+  },
+  "b9c33c89": {
+    "key": "AB_PL2500_01",
+    "text": "Stave of Divinity"
+  },
+  "b9e9ed9f": {
+    "key": "AB_PL0900_05",
+    "text": "Heroic Beat"
+  },
+  "bad9baa3": {
+    "key": "AB_PL0000_01",
+    "text": "Decimate"
+  },
+  "bb425ac9": {
+    "key": "AB_PL2300_05",
+    "text": "Wheel of Death"
+  },
+  "bba467c0": {
+    "key": "AB_PL2300_03",
+    "text": "Clincher"
+  },
+  "bbe2476b": {
+    "key": "AB_PL2000_02_CG",
+    "text": "Scourge"
+  },
+  "bbfb2829": {
+    "key": "AB_PL2500_03_CG",
+    "text": "Pistol of Demons"
+  },
+  "bc2ef1d8": {
+    "key": "AB_PL2400_09",
+    "text": "Flashpoint"
+  },
+  "bc4ebf36": {
+    "key": "AB_PL0900_07",
+    "text": "Energy Destruction"
+  },
+  "bcb4c311": {
+    "key": "AB_PL1500_01",
+    "text": "Arhat Skybreaker"
+  },
+  "bcc01262": {
+    "key": "AB_PL2400_04",
+    "text": "Martial Spear"
+  },
+  "bce7d1a7": {
+    "key": "AB_PL0500_05_CG",
+    "text": "Venom Grenade"
+  },
+  "bd038b68": {
+    "key": "AB_PL1200_02",
+    "text": "Shining Onslaught"
+  },
+  "bd38e05b": {
+    "key": "AB_PL0900_06",
+    "text": "Soul Eruption"
+  },
+  "be054910": {
+    "key": "AB_PL1500_01_CG",
+    "text": "Arhat Skybreaker"
+  },
+  "be851bb6": {
+    "key": "AB_PL2200_01_CG",
+    "text": "Barrido"
+  },
+  "bec27092": {
+    "key": "AB_PL0600_02_CG",
+    "text": "Rose Tycoon"
+  },
+  "c02cf1f8": {
+    "key": "AB_PL0000_09_CG",
+    "text": "Clarity"
+  },
+  "c07a8e90": {
+    "key": "AB_PL1200_05",
+    "text": "Sacred Charge"
+  },
+  "c0fc8194": {
+    "key": "AB_PL2900_05_CG",
+    "text": "Primordial Fear"
+  },
+  "c145162b": {
+    "key": "AB_PL1000_08_CG",
+    "text": "Roter Wirbel"
+  },
+  "c1974605": {
+    "key": "AB_PL0600_06_CG",
+    "text": "Lost Love"
+  },
+  "c1d7660c": {
+    "key": "AB_PL1900_02",
+    "text": "Unbound"
+  },
+  "c3c3d59a": {
+    "key": "AB_PL2900_04",
+    "text": "The Black's Blessing"
+  },
+  "c3ccadf8": {
+    "key": "AB_PL0500_06",
+    "text": "Paralyzing Bullet"
+  },
+  "c3d7cd9d": {
+    "key": "AB_PL0700_06_CG",
+    "text": "Strafe"
+  },
+  "c3ed239e": {
+    "key": "AB_PL0300_08_CG",
+    "text": "Collateral Damage"
+  },
+  "c516d104": {
+    "key": "AB_PL1900_08",
+    "text": "Arcadia"
+  },
+  "c6629ae0": {
+    "key": "AB_PL2200_07",
+    "text": "Tempesta"
+  },
+  "c6b7a81b": {
+    "key": "AB_PL1000_04_CG",
+    "text": "Zerreissen"
+  },
+  "c6f4ccb1": {
+    "key": "AB_PL1100_05",
+    "text": "Salvator"
+  },
+  "c7db192c": {
+    "key": "AB_PL0600_03",
+    "text": "Mesmerize"
+  },
+  "c89937f2": {
+    "key": "AB_PL1600_05_CG",
+    "text": "Wingclipper"
+  },
+  "caeeda5d": {
+    "key": "AB_PL1000_01",
+    "text": "Feuerangriff"
+  },
+  "cd6940de": {
+    "key": "AB_PL0600_05",
+    "text": "Iron Maiden"
+  },
+  "cda2c9c8": {
+    "key": "AB_PL0900_05_CG",
+    "text": "Heroic Beat"
+  },
+  "ce6a60cf": {
+    "key": "AB_PL1700_07",
+    "text": "Umbral Eclipse"
+  },
+  "ceebae4a": {
+    "key": "AB_PL0700_02",
+    "text": "Blaues Gespenst"
+  },
+  "cf0b171b": {
+    "key": "AB_PL0600_07",
+    "text": "Rose Barrier"
+  },
+  "cfc77cc3": {
+    "key": "AB_PL2900_06_CG",
+    "text": "Cursed Funeral"
+  },
+  "d0768c6b": {
+    "key": "AB_PL0500_01",
+    "text": "Sumrak"
+  },
+  "d08a0a37": {
+    "key": "AB_NP0000_03",
+    "text": "Blue Barrier"
+  },
+  "d0cc4740": {
+    "key": "AB_PL0800_05_CG",
+    "text": "Turbulenz"
+  },
+  "d113989a": {
+    "key": "AB_PL2900_07",
+    "text": "Miasmic Abyss"
+  },
+  "d16eeeea": {
+    "key": "AB_PL2600_07",
+    "text": "Unchained"
+  },
+  "d27ee773": {
+    "key": "AB_PL1600_02_CG",
+    "text": "Rain of Fury"
+  },
+  "d457585d": {
+    "key": "AB_PL0500_08",
+    "text": "Disruptor"
+  },
+  "d4698778": {
+    "key": "AB_PL1300_02_CG",
+    "text": "Empty Mist"
+  },
+  "d4c45d64": {
+    "key": "AB_PL0400_07",
+    "text": "Flowery Seven"
+  },
+  "d58eee51": {
+    "key": "AB_PL2600_05_CG",
+    "text": "Hearts on Fire"
+  },
+  "d59612b8": {
+    "key": "AB_PL0800_04_CG",
+    "text": "Blauer Dolch"
+  },
+  "d5d1bd18": {
+    "key": "AB_PL2500_08",
+    "text": "Battle Hymn"
+  },
+  "d6403105": {
+    "key": "AB_PL2500_06",
+    "text": "Nachtmusik"
+  },
+  "d696964e": {
+    "key": "AB_PL1200_07",
+    "text": "Sword of Lumiel"
+  },
+  "d69b0b80": {
+    "key": "AB_PL0000_11_CG",
+    "text": "Stall"
+  },
+  "d6ac18a7": {
+    "key": "AB_PL1600_06_CG",
+    "text": "Vengeful Flames"
+  },
+  "d6d6bcfb": {
+    "key": "AB_PL1700_02_CG",
+    "text": "Violent Shadows"
+  },
+  "d712d990": {
+    "key": "AB_PL0300_03",
+    "text": "Double Tap"
+  },
+  "d716d50b": {
+    "key": "AB_PL0000_07_CG",
+    "text": "Rage"
+  },
+  "d71a616c": {
+    "key": "AB_PL1700_05",
+    "text": "Forgotten Tales"
+  },
+  "d7cc0564": {
+    "key": "AB_PL1300_07",
+    "text": "Flashing Void"
+  },
+  "d7e5a4fd": {
+    "key": "AB_PL2300_01_CG",
+    "text": "Merculight"
+  },
+  "d87e05cf": {
+    "key": "AB_PL2400_04_CG",
+    "text": "Martial Spear"
+  },
+  "d8b2584c": {
+    "key": "AB_PL2100_07_CG",
+    "text": "Talviyö"
+  },
+  "d95b6aba": {
+    "key": "AB_PL2300_07",
+    "text": "Peerless Eye"
+  },
+  "d99ad2ad": {
+    "key": "AB_PL2200_01",
+    "text": "Barrido"
+  },
+  "da7e9324": {
+    "key": "AB_PL0800_06_CG",
+    "text": "Southern Cross"
+  },
+  "da802603": {
+    "key": "AB_PL2100_04_CG",
+    "text": "The Power of One"
+  },
+  "da816022": {
+    "key": "AB_PL2300_04",
+    "text": "Valiant Weave"
+  },
+  "da860bd8": {
+    "key": "AB_PL2100_02",
+    "text": "No Way Out"
+  },
+  "da9a0dfd": {
+    "key": "AB_PL0500_06_CG",
+    "text": "Paralyzing Bullet"
+  },
+  "dbbf87c1": {
+    "key": "AB_PL1200_04_CG",
+    "text": "Valiant Stance"
+  },
+  "dbe960dd": {
+    "key": "AB_PL0000_03",
+    "text": "Phalanx"
+  },
+  "dcedaf5e": {
+    "key": "AB_PL1100_07_CG",
+    "text": "Verdrängen"
+  },
+  "dd0e7f22": {
+    "key": "AB_PL0900_04_CG",
+    "text": "Arm Destruction"
+  },
+  "ddf7a53e": {
+    "key": "AB_PL2600_07_CG",
+    "text": "Unchained"
+  },
+  "deb86f71": {
+    "key": "AB_PL2300_04_CG",
+    "text": "Valiant Weave"
+  },
+  "e024a4d3": {
+    "key": "AB_PL0800_08_CG",
+    "text": "Luftspiegelung"
+  },
+  "e065d980": {
+    "key": "AB_PL1300_07_CG",
+    "text": "Flashing Void"
+  },
+  "e1410c7b": {
+    "key": "AB_PL2700_03",
+    "text": "Play with Fire"
+  },
+  "e224a3d2": {
+    "key": "AB_PL0200_02",
+    "text": "Winter's Rain"
+  },
+  "e277f47a": {
+    "key": "AB_PL1500_07_CG",
+    "text": "Eternal Rage"
+  },
+  "e2dc99d9": {
+    "key": "AB_PL1900_01",
+    "text": "Reginleiv Recidive"
+  },
+  "e37aa176": {
+    "key": "AB_PL1200_06_CG",
+    "text": "Invincible"
+  },
+  "e5598482": {
+    "key": "AB_PL0000_04",
+    "text": "Panacea"
+  },
+  "e6489b22": {
+    "key": "AB_PL2200_02_CG",
+    "text": "Infinito Creare"
+  },
+  "e69d5c9c": {
+    "key": "AB_PL2500_04",
+    "text": "Spear of Legends"
+  },
+  "e7697668": {
+    "key": "AB_PL0300_02_CG",
+    "text": "Bullet Hail"
+  },
+  "ea2dfaa8": {
+    "key": "AB_PL1000_01_CG",
+    "text": "Feuerangriff"
+  },
+  "eaf3191c": {
+    "key": "AB_PL0200_06_CG",
+    "text": "Light Wall"
+  },
+  "eb3e3386": {
+    "key": "AB_PL0200_01_CG",
+    "text": "Enchanted Lands"
+  },
+  "eb5b5f91": {
+    "key": "AB_PL1700_05_CG",
+    "text": "Forgotten Tales"
+  },
+  "eb81f079": {
+    "key": "AB_PL2100_04",
+    "text": "The Power of One"
+  },
+  "ec775337": {
+    "key": "AB_PL1700_02",
+    "text": "Violent Shadows"
+  },
+  "ed00c663": {
+    "key": "AB_PL1200_01",
+    "text": "Königsschild"
+  },
+  "ed04d44b": {
+    "key": "AB_PL0200_08",
+    "text": "Emerald Shield"
+  },
+  "ed1219cc": {
+    "key": "AB_PL1800_07",
+    "text": "Alexandria"
+  },
+  "ee1ed3e4": {
+    "key": "AB_PL1500_04",
+    "text": "True Avidya"
+  },
+  "ee45b7ef": {
+    "key": "AB_PL1800_05",
+    "text": "Disruption"
+  },
+  "ee866a53": {
+    "key": "AB_PL0200_04_CG",
+    "text": "Sacred Winds"
+  },
+  "ef560e15": {
+    "key": "AB_PL1500_03_CG",
+    "text": "Iron Shoulder"
+  },
+  "ef6b0959": {
+    "key": "AB_PL1400_01_CG",
+    "text": "Kyokasuigetsu"
+  },
+  "ef8a4c83": {
+    "key": "AB_PL2200_07_CG",
+    "text": "Tempesta"
+  },
+  "eff4746c": {
+    "key": "AB_PL1100_06",
+    "text": "Mirage"
+  },
+  "f07b5a9d": {
+    "key": "AB_PL0300_08",
+    "text": "Collateral Damage"
+  },
+  "f1e56fb1": {
+    "key": "AB_PL2600_02",
+    "text": "Star Chaser"
+  },
+  "f1e89657": {
+    "key": "AB_PL1600_01_CG",
+    "text": "Infinite Wonders"
+  },
+  "f34b48c1": {
+    "key": "AB_PL0600_03_CG",
+    "text": "Mesmerize"
+  },
+  "f3aa6c59": {
+    "key": "AB_PL1600_07_CG",
+    "text": "Thousand Flames"
+  },
+  "f474ddc0": {
+    "key": "AB_PL1900_07_CG",
+    "text": "Never Enough"
+  },
+  "f4bb441f": {
+    "key": "AB_PL0000_14",
+    "text": "Dispel"
+  },
+  "f4f5c45c": {
+    "key": "AB_PL2800_02_CG",
+    "text": "Crimson Nightmare"
+  },
+  "f74b3c5b": {
+    "key": "AB_PL1400_02",
+    "text": "Setsuna"
+  },
+  "f78f1601": {
+    "key": "AB_PL0400_08_CG",
+    "text": "Mystic Vortex"
+  },
+  "f7e68cb9": {
+    "key": "AB_PL1400_02_CG",
+    "text": "Setsuna"
+  },
+  "f8b69c6b": {
+    "key": "AB_PL1900_02_CG",
+    "text": "Unbound"
+  },
+  "f8cf236b": {
+    "key": "AB_PL1000_02_CG",
+    "text": "Flammenmarsch"
+  },
+  "f8f512dc": {
+    "key": "AB_PL2000_02",
+    "text": "Scourge"
+  },
+  "f9492778": {
+    "key": "AB_PL0000_13",
+    "text": "Veil"
+  },
+  "fb1526c3": {
+    "key": "AB_PL0000_07",
+    "text": "Rage"
+  },
+  "fb52815e": {
+    "key": "AB_NP0300_01",
+    "text": "Divine Bind"
+  },
+  "fbef06f2": {
+    "key": "AB_PL0900_02",
+    "text": "Rift Divider"
+  },
+  "fc016c9a": {
+    "key": "AB_PL2500_04_CG",
+    "text": "Spear of Legends"
+  },
+  "fc0562ec": {
+    "key": "AB_PL0000_11",
+    "text": "Stall"
+  },
+  "fc8b3658": {
+    "key": "AB_PL0700_03_CG",
+    "text": "Sic 'Em, Geegee!"
+  },
+  "fe554ce1": {
+    "key": "AB_PL1300_04",
+    "text": "Perpetual Rotation"
+  },
+  "fea055a2": {
+    "key": "AB_PL1400_03_CG",
+    "text": "Apex of Nothingness"
+  },
+  "feae39dd": {
+    "key": "AB_PL2100_05_CG",
+    "text": "Revontulet"
+  },
+  "ffc630ad": {
+    "key": "AB_PL1900_01_CG",
+    "text": "Reginleiv Recidive"
+  },
+  "ffed57b6": {
+    "key": "AB_PL0000_06_CG",
+    "text": "Miserable Mist"
+  }
+}

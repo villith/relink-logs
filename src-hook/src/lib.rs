@@ -113,6 +113,32 @@ fn initialize_logger() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Log any panic (location + message) to the fern log before it unwinds. A panic inside a
+/// detour would otherwise unwind across the FFI boundary into game code (UB) and typically
+/// manifests as a silent game freeze with NO record — the log just stops mid-stream. With
+/// this hook a future fault that IS a Rust panic leaves a `[ERROR] hook panic: ...` line
+/// pointing at the exact file:line, turning a silent freeze into a diagnosable event.
+fn install_panic_hook() {
+    std::panic::set_hook(Box::new(|info| {
+        let location = info
+            .location()
+            .map(|l| format!("{}:{}:{}", l.file(), l.line(), l.column()))
+            .unwrap_or_else(|| "<unknown>".to_string());
+
+        let message = info
+            .payload()
+            .downcast_ref::<&str>()
+            .map(|s| s.to_string())
+            .or_else(|| info.payload().downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "<non-string panic payload>".to_string());
+
+        log::error!("hook panic at {location}: {message}");
+    }));
+}
+
+// Not in test builds: the ctor would run inside the test process — sigscanning
+// the test binary and creating the app's named pipe are both unwanted there.
+#[cfg(not(test))]
 #[ctor::ctor]
 fn entry() {
     #[cfg(feature = "console")]
@@ -121,5 +147,6 @@ fn entry() {
     }
 
     let _ = initialize_logger();
+    install_panic_hook();
     std::thread::spawn(setup);
 }

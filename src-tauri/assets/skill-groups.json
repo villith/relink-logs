@@ -415,5 +415,104 @@
     "two-crown-strife": {
       "skills": [1700, 1701]
     }
+  },
+  "Pl2400": {
+    "normal-attack": {
+      "skills": [100, 101, 102, 103, 140, 141, 142]
+    },
+    "turbine": {
+      "skills": [200, 202, 210, 220, 230]
+    },
+    "combo-finisher": {
+      "skills": [104,111,121]
+    },
+    "aerial-attack": {
+      "skills": [300, 301, 302]
+    },
+    "power-strike": {
+      "skills": [110,120,130]
+    },
+    "martial-spear": {
+      "skills": [1400,1410]
+    },
+    "perfect-finisher": {
+      "skills": [232,233]
+    }
+  },
+  "Pl2500": {
+    "normal-attack": {
+      "skills": [100, 101, 102, 103]
+    },
+    "combo-finisher": {
+      "skills": [210, 220, 230]
+    },
+    "aerial-attack": {
+      "skills": [300, 301, 302]
+    }
+  },
+  "Pl2600": {
+    "normal-attack": {
+      "skills": [100,101,102,103,900,901,902,903]
+    },
+    "power-strike": {
+      "skills": [110,120,130,910,920,930]
+    },
+    "combo-finisher": {
+      "skills": [111,121,131,140,911,921,933,940]
+    },
+    "aerial-attack": {
+      "skills": [300,301,302,310]
+    },
+    "power-finisher": {
+      "skills": [960,980]
+    }
+  },
+  "Pl2700": {
+    "normal-attack": {
+      "skills": [120,121,122,125,130]
+    },
+    "aerial-attack": {
+      "skills": [300,301,304]
+    },
+    "flamek-thunder": {
+      "skills": [1601,1602]
+    },
+    "acidrage-howl": {
+      "skills": [1300,1310]
+    },
+    "slow-kill": {
+      "skills": [1000,1010,1011]
+    }
+  },
+  "Pl2800": {
+    "normal-attack": {
+      "skills": [100,101,102,111,116,900,901,902,910]
+    },
+    "dead-lands": {
+      "skills": [5000,5010]
+    },
+    "kick-face": {
+      "skills": [6000,6002]
+    },
+    "stance-flip": {
+      "skills": [200,201]
+    },
+    "flipkick": {
+      "skills": [130,170]
+    }
+  },
+  "Pl2900": {
+    "normal-attack": {
+      "skills": [100,101,102,103]
+    },
+    "stomp": {
+      "skills": [110,111,112,113]
+    },
+    "miasma-hands": {
+      "skills": [150,151,152,153]
+    },
+    "aerial-attack": {
+      "skills": [300,301,302,310]
+    }
   }
 }

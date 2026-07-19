@@ -1,5 +1,6 @@
 import { CharacterType, ComputedSkillState } from "@/types";
-import { getSkillName } from "@/utils";
+import { computeOvercapPercentage, getSkillName } from "@/utils";
+import { OvercapCell } from "./OvercapCell";
 import { useSkillRow } from "./useSkillRow";
 
 export type SkillRowProps = {
@@ -22,6 +23,8 @@ export const SkillRow = ({ characterType, skill, color, nested }: SkillRowProps)
     averageDmg,
     averageDmgUnit,
   } = useSkillRow(skill);
+
+  const overcapPercentage = computeOvercapPercentage(skill);
 
   return (
     <tr className={`skill-row ${nested ? "nested" : ""}`}>
@@ -79,18 +82,7 @@ export const SkillRow = ({ characterType, skill, color, nested }: SkillRowProps)
           </>
         )}
       </td>
-      <td className="text-center row-data">
-        {skill.cappedHits > 0 ? (
-          <span className="capped">
-            {((skill.cappedHits / skill.hits) * 100).toFixed(0)}
-            <span className="font-sm">%</span>
-          </span>
-        ) : (
-          <>
-            0<span className="font-sm">%</span>
-          </>
-        )}
-      </td>
+      <OvercapCell percentage={overcapPercentage} />
       <td className="text-center row-data">
         {skill.percentage.toFixed(0)}
         <span className="unit font-sm">%</span>

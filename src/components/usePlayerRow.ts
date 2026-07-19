@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, MeterColumns, PlayerData } from "@/types";
-import { humanizeNumbers } from "@/utils";
+import { PLAYER_COLORS, computeSupPercentage, humanizeNumbers, resolvePlayerColor } from "@/utils";
 
 export type ColumnValue = {
   value: string | number;
@@ -26,17 +26,13 @@ export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyDa
 
   const [isOpen, setIsOpen] = useState(false);
 
-  const playerColors = [color_1, color_2, color_3, color_4, "#9BCF53", "#380E7F", "#416D19", "#2C568D"];
+  const playerColors = [color_1, color_2, color_3, color_4, ...PLAYER_COLORS.slice(4)];
   const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-  const color = partySlotIndex !== -1 ? playerColors[partySlotIndex] : playerColors[player.partyIndex];
+  const color = resolvePlayerColor(playerColors, partyData, partySlotIndex, player.partyIndex);
 
   const [totalDamage, totalDamageUnit] = humanizeNumbers(player.totalDamage);
   const [dps, dpsUnit] = humanizeNumbers(player.dps);
   const [totalStunValue, totalStunValueUnit] = humanizeNumbers(player.totalStunValue);
-
-  // Percentage of this player's hits that reached the game's damage cap.
-  const totalHits = player.skillBreakdown.reduce((acc, skill) => acc + skill.hits, 0);
-  const damageCapPercentage = totalHits > 0 ? (player.cappedHits / totalHits) * 100 : 0;
 
   // Function for matching the column type to the value to display in the table.
   const matchColumnTypeToValue = (showFullValues: boolean, column: MeterColumns): ColumnValue => {
@@ -49,8 +45,16 @@ export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyDa
         return showFullValues ? { value: (player.dps || 0).toLocaleString() } : { value: dps, unit: dpsUnit };
       case MeterColumns.DamagePercentage:
         return { value: (player.percentage || 0).toFixed(0), unit: "%" };
-      case MeterColumns.DamageCap:
-        return { value: damageCapPercentage.toFixed(0), unit: "%" };
+      case MeterColumns.SupPercentage: {
+        // Extra damage gained from supplementary-type procs (sigil + echoes): +0% to
+        // +60% of supp-eligible damage. Computed lazily so the skill-breakdown scan
+        // only runs when the column is actually shown.
+        const supPercentage = computeSupPercentage(player);
+        return {
+          value: `+${supPercentage.eligible.toFixed(0)}`,
+          unit: "%",
+        };
+      }
       case MeterColumns.SBA:
         return showFullValues
           ? { value: (player.sba / 10).toFixed(2) }
@@ -74,7 +78,7 @@ export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyDa
         MeterColumns.DPS,
         MeterColumns.TotalStunValue,
         MeterColumns.StunPerSecond,
-        MeterColumns.DamageCap,
+        MeterColumns.SupPercentage,
         MeterColumns.DamagePercentage,
       ];
 

@@ -1410,7 +1410,7 @@ dependencies = [
 
 [[package]]
 name = "gbfr-logs"
-version = "1.9.1"
+version = "1.9.3"
 dependencies = [
  "anyhow",
  "cbor4ii",
@@ -1420,6 +1420,7 @@ dependencies = [
  "interprocess",
  "log",
  "num_enum 0.7.2",
+ "pelite",
  "protocol",
  "rusqlite",
  "rusqlite_migration",
@@ -1437,6 +1438,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
+ "windows 0.52.0",
  "zstd",
 ]
 
@@ -1833,6 +1835,7 @@ name = "hook"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "backtrace",
  "ctor",
  "dirs",
  "fern",

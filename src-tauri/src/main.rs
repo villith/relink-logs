@@ -10,6 +10,8 @@ use std::{
 };
 
 use anyhow::Context;
+use gbfr_logs::{db, parser, synthesis};
+
 use db::logs::LogEntry;
 use dll_syringe::{process::OwnedProcess, Syringe};
 use interprocess::os::windows::named_pipe::tokio::RecvPipeStream;
@@ -30,12 +32,68 @@ use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 use tokio_stream::StreamExt;
 use tokio_util::codec::FramedRead;
 
-mod db;
-mod parser;
-
 struct AlwaysOnTop(AtomicBool);
 struct ClickThrough(AtomicBool);
 struct DebugMode(AtomicBool);
+
+/// Sender half of the live parser's reset channel. `None` until a parser is
+/// connected; replaced on every reconnect (the parser is owned by the
+/// pipe-reading task, so commands reach it through this channel).
+struct ResetChannel(std::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<()>>>);
+
+#[tauri::command]
+fn reset_encounter(state: State<ResetChannel>) {
+    if let Some(tx) = state.0.lock().unwrap().as_ref() {
+        let _ = tx.send(());
+    }
+}
+
+/// Toolbox / Synthesis Helper: snapshot the game's synthesis state and report
+/// whether predictions are currently possible.
+#[tauri::command(async)]
+async fn fetch_synthesis_status() -> Result<synthesis::SynthesisStatus, String> {
+    tokio::task::spawn_blocking(|| match synthesis::snapshot::take_snapshot() {
+        Ok(None) => Ok(synthesis::SynthesisStatus {
+            game_running: false,
+            sigil_count: 0,
+            rng_unpredictable: false,
+        }),
+        Ok(Some(snap)) => Ok(synthesis::SynthesisStatus {
+            game_running: true,
+            sigil_count: snap.sigils.len() as u32,
+            rng_unpredictable: snap.rng_state == 0,
+        }),
+        Err(e) => Err(e.to_string()),
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Toolbox / Synthesis Helper: fresh snapshot + exhaustive pair search.
+#[tauri::command(async)]
+async fn search_synthesis(
+    query: synthesis::SynthesisQuery,
+) -> Result<synthesis::SynthesisSearchResponse, String> {
+    if query.trait1 == synthesis::EMPTY_TRAIT
+        || query.trait2 == Some(synthesis::EMPTY_TRAIT)
+    {
+        return Err("invalid-trait".to_string());
+    }
+    tokio::task::spawn_blocking(move || {
+        let snap = synthesis::snapshot::take_snapshot()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "game-not-running".to_string())?;
+        let (matches, pairs_tested) = synthesis::search(&snap, &query);
+        Ok(synthesis::SynthesisSearchResponse {
+            matches,
+            pairs_tested,
+            sigil_count: snap.sigils.len() as u32,
+            rng_unpredictable: snap.rng_state == 0,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
 
 #[tauri::command]
 fn set_debug_mode(app: AppHandle, state: State<DebugMode>, enabled: bool) {
@@ -54,6 +112,10 @@ fn set_debug_mode(app: AppHandle, state: State<DebugMode>, enabled: bool) {
 async fn delete_all_logs() -> Result<(), String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM logs", [])
+        .map_err(|e| e.to_string())?;
+    // Deleting every log leaves every Conflux run roomless — drop them too so the
+    // Conflux tab doesn't keep showing ghost "×0 rooms" runs.
+    conn.execute("DELETE FROM runs", [])
         .map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -204,7 +266,7 @@ fn fetch_logs(
     let mut player_types = Vec::new();
 
     let mut query = conn
-        .prepare("SELECT primary_target, quest_id, p1_name, p1_type, p2_name, p2_type, p3_name, p3_type, p4_name, p4_type from logs")
+        .prepare("SELECT primary_target, quest_id, p1_name, p1_type, p2_name, p2_type, p3_name, p3_type, p4_name, p4_type from logs WHERE run_id IS NULL")
         .map_err(|e| e.to_string())?;
 
     let rows = query
@@ -281,12 +343,43 @@ fn fetch_logs(
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
+struct ConfluxSearchResult {
+    runs: Vec<db::runs::ConfluxRun>,
+    page: u32,
+    page_count: u32,
+    run_count: i32,
+}
+
+#[tauri::command]
+fn fetch_conflux_runs(page: Option<u32>) -> Result<ConfluxSearchResult, String> {
+    let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+    let page = page.unwrap_or(1);
+    let per_page = 10u32;
+    let offset = page.saturating_sub(1) * per_page;
+
+    let runs = db::runs::get_runs(&conn, per_page, offset).map_err(|e| e.to_string())?;
+    let run_count = db::runs::get_runs_count(&conn).map_err(|e| e.to_string())?;
+    let page_count = (run_count as f64 / per_page as f64).ceil() as u32;
+
+    Ok(ConfluxSearchResult {
+        runs,
+        page,
+        page_count,
+        run_count,
+    })
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct EncounterStateResponse {
     encounter_state: v1::DerivedEncounterState,
     players: [Option<PlayerData>; 4],
     quest_id: Option<u32>,
     quest_timer: Option<u32>,
     quest_completed: bool,
+    /// 0-based room index when this log is a Conflux room, else None. Lets the
+    /// detail view suppress quest-status/elapsed-time (meaningless for a room).
+    room_index: Option<u32>,
     targets: Vec<EnemyType>,
     dps_chart: HashMap<u32, Vec<i32>>,
     sba_chart: HashMap<u32, Vec<f32>>,
@@ -305,11 +398,11 @@ struct ParseOptions {
 fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStateResponse, String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT data, version FROM logs WHERE id = ?")
+        .prepare("SELECT data, version, room_index FROM logs WHERE id = ?")
         .map_err(|e| e.to_string())?;
 
-    let (blob, version): (Vec<u8>, u8) = stmt
-        .query_row([id], |row| Ok((row.get(0)?, row.get(1)?)))
+    let (blob, version, room_index): (Vec<u8>, u8, Option<u32>) = stmt
+        .query_row([id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
         .map_err(|e| e.to_string())?;
 
     // @TODO(false): If we deserialize from an older version, we should save it back into the DB as the newer format.
@@ -337,6 +430,12 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     for (timestamp, event) in parser.encounter.event_log() {
         match event {
             Message::DamageEvent(damage_event) => {
+                // Attribute dragon-form (Id/Pl2000) damage to the Id player, matching the
+                // remap the party table uses — otherwise `derived_state.party` (keyed by the
+                // remapped index) has no bucket for the raw Pl2000 index and the chart drops it.
+                let damage_event = v1::remap_dragon_form(&parser.encounter.player_data, damage_event);
+                let damage_event = &damage_event;
+
                 let index = ((timestamp - start_time) / DPS_INTERVAL) as usize;
                 let target_type = EnemyType::from_hash(damage_event.target.parent_actor_type);
 
@@ -384,6 +483,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         quest_id: parser.encounter.quest_id,
         quest_timer: parser.encounter.quest_timer,
         quest_completed: parser.encounter.quest_completed,
+        room_index,
         dps_chart: player_dps,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
         sba_chart_len: (duration / SBA_INTERVAL) as usize + 1,
@@ -402,10 +502,17 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
     let param = id_params.join(",");
 
     let sql = format!("DELETE FROM logs WHERE id IN ({})", param);
-    let mut statement = conn.prepare_cached(&sql).map_err(|e| e.to_string())?;
-    statement
-        .execute(params_from_iter(ids))
-        .map_err(|e| e.to_string())?;
+    {
+        let mut statement = conn.prepare_cached(&sql).map_err(|e| e.to_string())?;
+        statement
+            .execute(params_from_iter(ids))
+            .map_err(|e| e.to_string())?;
+    }
+
+    // A deleted log may have been a Conflux room; reap any run left with no rooms so it
+    // doesn't linger as a ghost "×0 rooms" row (the startup sweep only reaps in-progress
+    // runs).
+    db::runs::delete_runs_without_rooms(&conn).map_err(|e| e.to_string())?;
 
     Ok(())
 }
@@ -419,8 +526,7 @@ async fn check_and_perform_hook(app: AppHandle) {
                 let debug_dll_path = Path::new("hook-dbg.dll");
                 let mut dll_path = Path::new("hook.dll");
 
-                // If the debug DLL is present, use it instead.
-                if debug_dll_path.exists() {
+                if cfg!(debug_assertions) && debug_dll_path.exists() {
                     dll_path = debug_dll_path;
                 }
 
@@ -448,6 +554,9 @@ fn connect_and_run_parser(app: AppHandle) {
     let database = db::connect_to_db().expect("Could not connect to database");
     let mut state = v1::Parser::new(app.clone(), window.clone(), database);
 
+    let (reset_tx, mut reset_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+    *app.state::<ResetChannel>().0.lock().unwrap() = Some(reset_tx);
+
     tauri::async_runtime::spawn(async move {
         loop {
             match RecvPipeStream::connect_by_path(protocol::PIPE_NAME).await {
@@ -459,7 +568,19 @@ fn connect_and_run_parser(app: AppHandle) {
                     let decoder = tokio_util::codec::LengthDelimitedCodec::new();
                     let mut reader = FramedRead::new(stream, decoder);
 
-                    while let Some(Ok(msg)) = reader.next().await {
+                    loop {
+                        let msg = tokio::select! {
+                            next = reader.next() => match next {
+                                Some(Ok(msg)) => msg,
+                                // Pipe closed or read error: the game is gone.
+                                _ => break,
+                            },
+                            Some(()) = reset_rx.recv() => {
+                                state.on_manual_reset();
+                                continue;
+                            }
+                        };
+
                         // Handle EOF when the game closes.
                         if msg.is_empty() {
                             break;
@@ -482,6 +603,9 @@ fn connect_and_run_parser(app: AppHandle) {
                                 protocol::Message::PlayerLoadEvent(event) => {
                                     state.on_player_load_event(event);
                                 }
+                                protocol::Message::PlayerIdentityEvent(event) => {
+                                    state.on_player_identity_event(event);
+                                }
                                 protocol::Message::OnQuestComplete(event) => {
                                     state.on_quest_complete_event(event);
                                 }
@@ -500,11 +624,40 @@ fn connect_and_run_parser(app: AppHandle) {
                                 protocol::Message::OnDeathEvent(event) => {
                                     state.on_death_event(event);
                                 }
+                                protocol::Message::ConfluxRoomEnter(event) => {
+                                    info!(
+                                        "CONFLUX ingress: ConfluxRoomEnter quest_id={:#x} manager={:#x}",
+                                        event.quest_id, event.manager_ptr
+                                    );
+                                    state.on_conflux_room_enter(event);
+                                }
+                                protocol::Message::ConfluxBuffAcquired(event) => {
+                                    info!(
+                                        "CONFLUX ingress: ConfluxBuffAcquired buff_id={:#x}",
+                                        event.buff_id
+                                    );
+                                    state.on_conflux_buff_acquired(event);
+                                }
+                                protocol::Message::ConfluxRunEnd(event) => {
+                                    info!(
+                                        "CONFLUX ingress: ConfluxRunEnd manager={:#x}",
+                                        event.manager_ptr
+                                    );
+                                    state.on_conflux_run_end(event);
+                                }
+                                protocol::Message::OnPlayerStun(event) => {
+                                    state.on_player_stun(event);
+                                }
                             }
                         }
                     }
 
                     info!("Game has closed.");
+
+                    // Last chance to persist anything still in progress (abandoned quest →
+                    // quit emits no result screen; mid-quest/mid-run quit likewise) — this
+                    // parser instance is gone once we go back to waiting for the game.
+                    state.on_game_disconnect();
 
                     // The game has closed, so we should go back to waiting for the game to reopen.
                     let _ = app.emit_all("error-alert", "Game has closed!");
@@ -670,6 +823,7 @@ fn main() {
         .manage(AlwaysOnTop(AtomicBool::new(true)))
         .manage(ClickThrough(AtomicBool::new(false)))
         .manage(DebugMode(AtomicBool::new(false)))
+        .manage(ResetChannel(std::sync::Mutex::new(None)))
         .system_tray(system_tray_with_menu())
         .on_system_tray_event(menu_tray_handler)
         .on_window_event(|event| {
@@ -681,11 +835,15 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             fetch_encounter_state,
             fetch_logs,
+            fetch_conflux_runs,
             delete_logs,
             delete_all_logs,
             toggle_always_on_top,
             export_damage_log_to_file,
             set_debug_mode,
+            reset_encounter,
+            fetch_synthesis_status,
+            search_synthesis,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.

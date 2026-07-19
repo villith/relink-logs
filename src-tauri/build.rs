@@ -3,10 +3,11 @@ use std::fs;
 use tauri_build::{Attributes, WindowsAttributes};
 
 fn main() {
-    if cfg!(debug_assertions) {
-        // Copy the built library to the tauri app directory
-        let _ = fs::copy("../target/release/hook.dll", "hook.dll");
+    println!("cargo:rerun-if-changed=../target/release/hook.dll");
 
+    let _ = fs::copy("../target/release/hook.dll", "hook.dll");
+
+    if cfg!(debug_assertions) {
         tauri_build::build();
     } else {
         let windows = WindowsAttributes::new().app_manifest(include_str!("manifest.xml"));

@@ -1,18 +1,39 @@
 use std::ffi::CString;
 
+// v2.0.2 (Endless Ragnarok) layout, re-derived from the Ghidra decompile of
+// process_damage (FUN_141fbd440) cross-checked against live dmgdiag dumps:
+//   0xD0  shared per-action damage value (i32) — the SAME number appears here on the
+//         main hit and its supplementary hit, and matches neither on-screen number.
+//         (Earlier session called this "final damage, live-verified" — that was wrong;
+//         the values merely coincided in that test.)
+//   0xD4  FINAL displayed damage (i32) — live-verified 2026-07-11: exactly matches the
+//         in-game hit numbers on both the main hit (111348 = cap 92790 × 1.2 crit) and
+//         its supplementary hit (44539), while 0xD0 read 212736 for both. Post-cap,
+//         post-crit.
+//   0xD8  f32 rate, 0xDC f32 rate — a pair of attack-rate floats (skill 212 shows 16.17
+//         at 0xDC, its known attack rate). The OLD code read `flags` here, so link/SBA
+//         classification was reading float bit patterns (usually 0 for the tested bits).
+//   0xE8  flags (u64) — the real bitfield; the game tests bits 55, 39, 24 here.
+//   0x16C action_id (was 0x154; confirmed live: IDs match ui.json)
+//   0x2B8 damage floor (i32, -1 = none)
+//   0x2BC damage cap (i32, was 0x264; -1 is normalized to 99,999,999 = "no cap");
+//         live values scale with skill strength (104k @ rate 1.0 … 2.0M @ rate 16.17)
+//   0x2D4 pre-cap base damage stored as f32 (uncapped damage IS recoverable in v2.0.2)
 #[derive(Debug)]
 #[repr(C)]
 pub struct DamageInstance {
-    padding_00: [u8; 0xD0],   // 0x00 - 0xD0
-    pub damage: i32,          // 0xD0
-    pub attack_rate: f32,     // 0xD4
-    pub flags: u64,           // 0xD8
-    padding_e0: [u8; 0x08],   // 0xE0
-    pub stun_value: f32,      // 0xE8
-    padding_ec: [u8; 0x68],   // 0xEC - 0x154
-    pub action_id: u32,       // 0x154
-    padding_158: [u8; 0x10C], // 0x158 - 0x264
-    pub damage_cap: i32,      // 0x264
+    padding_00: [u8; 0xD4], // 0x00 - 0xD4 (0xD0 = shared per-action value, see above)
+    pub damage: i32,        // 0xD4 final displayed damage
+    padding_d8: [u8; 0x04], // 0xD8 rate float
+    pub attack_rate: f32,   // 0xDC
+    padding_e0: [u8; 0x08], // 0xE0 - 0xE8
+    pub flags: u64,         // 0xE8
+    padding_f0: [u8; 0x7C], // 0xF0 - 0x16C
+    pub action_id: u32,     // 0x16C
+    padding_170: [u8; 0x14C], // 0x170 - 0x2BC
+    pub damage_cap: i32,    // 0x2BC
+    padding_2c0: [u8; 0x14], // 0x2C0 - 0x2D4
+    pub base_damage: f32,   // 0x2D4 pre-cap base damage (uncapped); capped <=> base > cap
 }
 
 #[derive(Debug)]
@@ -155,5 +176,66 @@ impl VBuffer {
             unsafe { std::slice::from_raw_parts(self.ptr() as *const u8, self.used_size()) };
 
         unsafe { CString::from_vec_unchecked(bytes.to_vec()) }
+    }
+
+    /// Bounds-checked read for use on snapshots that come straight from game
+    /// memory (e.g. the 2.0.2 identity path), where a wrong offset could otherwise
+    /// hand `raw()` a garbage length/pointer. Rejects implausible sizes and any
+    /// non-UTF-8 / interior-NUL content, returning `None` instead of reading junk.
+    pub fn checked_raw(&self) -> Option<CString> {
+        const MAX_PLAYER_NAME_BYTES: usize = 0x100;
+
+        let used_size = self.used_size();
+        let max_size = self.max_size();
+
+        if used_size > MAX_PLAYER_NAME_BYTES || max_size < used_size || max_size > 0x1000 {
+            return None;
+        }
+
+        let bytes_ptr = self.ptr() as *const u8;
+        if bytes_ptr.is_null() {
+            return None;
+        }
+
+        // The out-of-line path follows a heap pointer embedded in game memory;
+        // plausible sizes don't make it a valid pointer, so probe before reading.
+        if used_size > 0 && !crate::hooks::diag::readable(bytes_ptr as usize, used_size) {
+            return None;
+        }
+
+        let bytes = unsafe { std::slice::from_raw_parts(bytes_ptr, used_size) };
+        std::str::from_utf8(bytes).ok()?;
+        CString::new(bytes).ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The exact non-pointer value the 2026-07-18 crash dump showed being
+    // dereferenced (two adjacent u32s 0x5b0/0x5b1 read as a "pointer");
+    // unmapped in any normal process.
+    const UNMAPPED_PTR: usize = 0x0000_05b1_0000_05b0;
+
+    #[test]
+    fn checked_raw_rejects_unmapped_heap_buffer() {
+        // A string header whose sizes pass the plausibility checks but whose
+        // heap pointer (max_size > 0xf selects the out-of-line path) is garbage.
+        let header: Box<[usize; 4]> = Box::new([UNMAPPED_PTR, 0, 8, 0x20]);
+        let vbuffer = VBuffer(header.as_ptr() as *const usize);
+        assert!(vbuffer.checked_raw().is_none());
+    }
+
+    #[test]
+    fn checked_raw_reads_inline_buffer() {
+        // max_size <= 0xf keeps the bytes inline in the header itself.
+        let mut header: Box<[usize; 4]> = Box::new([0, 0, 4, 0xf]);
+        header[0] = usize::from_le_bytes(*b"Gran\0\0\0\0");
+        let vbuffer = VBuffer(header.as_ptr() as *const usize);
+        assert_eq!(
+            vbuffer.checked_raw().expect("inline name must resolve").as_bytes(),
+            b"Gran"
+        );
     }
 }
