@@ -538,14 +538,19 @@ impl IdentityStore {
             .map(|entry| &entry.identity)
     }
 
-    /// The identity currently claimed by a party slot. Used to enrich the
-    /// embedded-record identity path with the fuller equipment payload the
-    /// RefreshPlayerIdentity hook read for that slot.
-    fn find_by_slot(&self, slot: u8) -> Option<&StoredPlayerIdentity> {
-        self.by_slot
-            .get(slot.min(3) as usize)?
-            .as_ref()
-            .map(|entry| &entry.identity)
+    /// The equipment-donor claim for a damage actor resolved through its
+    /// EMBEDDED record: only the claim carrying the actor's own record id
+    /// (`record+0x5EA8`) may donate equipment.
+    ///
+    /// A slot number alone is NOT a player identity — the local town-roster
+    /// records (AI companions) claim slots 1..=3 too and keep refreshing
+    /// during online play, so a slot-only join dressed remote players in a
+    /// local companion's build (2026-07-18: a remote Tweyen shipped with the
+    /// local AI Maglielle's weapon/abilities/master-level). On an id mismatch
+    /// the actor simply gets no enrichment; the parser keeps any equipment a
+    /// matching refresh taught it earlier.
+    fn equipment_donor(&self, record_id: Option<u32>) -> Option<&StoredPlayerIdentity> {
+        self.find_by_id(record_id?)
     }
 }
 
@@ -857,11 +862,17 @@ pub fn identity_event_for_actor(
         let party_index = identity.party_index.min(3);
         // The embedded snapshot carries identity + sigils; the RefreshPlayerIdentity
         // hook reads the fuller equipment payload (weapon, overmasteries, stats...)
-        // from the same records — enrich from its per-slot cache when present.
+        // from the same records — enrich from its cache, joined on the actor's own
+        // record id so a town-roster claim on the same slot can't donate a local
+        // AI companion's build to a remote player.
         let cached = identities()
             .lock()
             .ok()
-            .and_then(|store| store.find_by_slot(party_index).cloned());
+            .and_then(|store| {
+                store
+                    .equipment_donor(embedded_record_id(actor as usize))
+                    .cloned()
+            });
         let equip = cached.unwrap_or_else(|| identity.clone());
         return Some(PlayerIdentityEvent {
             character_name: identity.character_name,
@@ -1647,6 +1658,17 @@ fn embedded_identity_struct(actor: usize) -> Option<StoredPlayerIdentity> {
         return None;
     }
     unsafe { read_player_identity(snapshot as *const u8) }
+}
+
+/// The id the actor's own embedded record carries at [`PLAYER_KEY_OFFSET`] —
+/// the join key for equipment enrichment (see [`IdentityStore::equipment_donor`]).
+/// Refreshes fire on the embedded record itself in lobbies, and solo records
+/// share their id between the pool and embedded copies, so a player's claim and
+/// their damage actor always agree on it. `None` when unreadable or unset.
+fn embedded_record_id(actor: usize) -> Option<u32> {
+    let record = actor.checked_add(ACTOR_RECORD_OFFSET)?;
+    let id = crate::hooks::diag::read_u32_guarded(record, PLAYER_KEY_OFFSET);
+    (id != 0 && id != INVALID_PLAYER_KEY).then_some(id)
 }
 
 /// The per-player slot key for an actor, when its embedded record resolves.
@@ -2536,6 +2558,64 @@ mod tests {
         let traits = read_innate_traits(buf.as_ptr() as usize, 0x94);
         assert_eq!(traits.len(), 4);
         assert!(traits.iter().all(|t| t.level == 0));
+    }
+
+    /// A minimal claimable identity; only the fields the donor tests assert on.
+    fn identity(name: &str, party_index: u8, is_online: bool, master_level: u32) -> StoredPlayerIdentity {
+        StoredPlayerIdentity {
+            character_name: CString::new("").unwrap(),
+            display_name: CString::new(name).unwrap(),
+            party_index,
+            is_online,
+            sigils: Vec::new(),
+            summons: Vec::new(),
+            overmasteries: Vec::new(),
+            player_level: 0,
+            abilities: Vec::new(),
+            weapon_key: String::new(),
+            master_level,
+            skillboard: Vec::new(),
+            stats: None,
+            weapon_state: None,
+        }
+    }
+
+    // The 2026-07-18 "Tweyen wearing Maglielle's build" bug (installed-app log
+    // 238): the local town-roster AI Maglielle record (id 0x25d46f4b) claimed
+    // party slot 3 while the remote player "Sylmorn" (record id 0x718e1a14)
+    // occupied that slot in the lobby. Enrichment joined on slot alone, so
+    // Sylmorn's meter row shipped with Maglielle's weapon/abilities/master-level.
+    const TOWN_AI_ID: u32 = 0x25d4_6f4b;
+    const REMOTE_PLAYER_ID: u32 = 0x718e_1a14;
+
+    #[test]
+    fn equipment_donor_rejects_a_slot_claim_from_a_different_record() {
+        let mut store = IdentityStore::default();
+        store.claim(REMOTE_PLAYER_ID, identity("Sylmorn", 3, true, 42));
+        // The town AI record refreshes later and takes the slot (latest claim
+        // wins — correct for solo, but it must not dress the remote player).
+        store.claim(TOWN_AI_ID, identity("", 3, false, 1));
+
+        assert!(store.equipment_donor(Some(REMOTE_PLAYER_ID)).is_none());
+    }
+
+    #[test]
+    fn equipment_donor_returns_the_claim_carrying_the_actors_record_id() {
+        let mut store = IdentityStore::default();
+        store.claim(TOWN_AI_ID, identity("", 3, false, 1));
+
+        let donor = store
+            .equipment_donor(Some(TOWN_AI_ID))
+            .expect("an AI companion actor must still resolve its own claim");
+        assert_eq!(donor.master_level, 1);
+    }
+
+    #[test]
+    fn equipment_donor_rejects_an_unreadable_record_id() {
+        let mut store = IdentityStore::default();
+        store.claim(TOWN_AI_ID, identity("", 3, false, 1));
+
+        assert!(store.equipment_donor(None).is_none());
     }
 
     #[test]
