@@ -1,7 +1,7 @@
 {
   "name": "gbfr-logs",
   "private": true,
-  "version": "1.9.3",
+  "version": "1.9.4",
   "type": "module",
   "scripts": {
     "dev": "cargo build --release --package hook --features hook/console,hook/hookdiag,hook/dmgdiag && node scripts/refresh-dbg-hook.mjs && vite",
