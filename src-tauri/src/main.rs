@@ -85,7 +85,6 @@ async fn search_synthesis(
             .ok_or_else(|| "game-not-running".to_string())?;
         let (matches, pairs_tested) = synthesis::search(&snap, &query);
         Ok(synthesis::SynthesisSearchResponse {
-            total_matches: matches.len() as u64,
             matches,
             pairs_tested,
             sigil_count: snap.sigils.len() as u32,

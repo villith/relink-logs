@@ -413,7 +413,6 @@ export type SynthesisStatus = {
 export type SynthesisSearchResponse = {
   matches: SynthesisMatch[];
   pairsTested: number;
-  totalMatches: number;
   sigilCount: number;
   rngUnpredictable: boolean;
 };

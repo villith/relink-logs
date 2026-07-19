@@ -29,7 +29,7 @@ import {
 } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
 import { t } from "i18next";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 
@@ -394,6 +394,43 @@ const SigilTraitRow = ({ trait }: { trait: CombinedTrait & { name: string } }) =
   );
 };
 
+/** The 4 equipped skills (v2.0.2 identity path), one column per player —
+ * shared by the Equipment and Builds tabs. The hook drops empty slots, so the
+ * array holds only real ability ids. */
+const AbilitiesRow = ({ playerData }: { playerData: PlayerData[] }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Table.Tr>
+      {playerData.map((player) => {
+        const abilities = player.abilities || [];
+
+        return (
+          <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
+            <Text size="xs" fw={700}>
+              {t("ui.player-abilities")}
+            </Text>
+            {Array.from(Array(4).keys()).map((abilityIndex) => {
+              const ability = abilities[abilityIndex];
+
+              return (
+                <Placeholder key={abilityIndex} empty={!ability}>
+                  <Text size="xs" fs="italic" fw={300}>
+                    {translateAbilityId(ability ?? null)}
+                  </Text>
+                </Placeholder>
+              );
+            })}
+          </Table.Td>
+        );
+      })}
+    </Table.Tr>
+  );
+};
+
+const byTraitName = (a: ChecklistEntry, b: ChecklistEntry) =>
+  translateTraitId(a.ids[0]).localeCompare(translateTraitId(b.ids[0]));
+
 export const ViewPage = () => {
   const { color_1, color_2, color_3, color_4, show_display_names, streamer_mode } = useMeterSettingsStore(
     useShallow((state) => ({
@@ -444,6 +481,17 @@ export const ViewPage = () => {
     setSelectedTargets: state.setSelectedTargets,
     loadFromResponse: state.loadFromResponse,
   }));
+  // Builds tab: the combined traits scan all of a player's equipment, and two
+  // rows (checklist + sigil traits) need them — computed once per player here.
+  const combinedTraitsByPlayer = useMemo(
+    () => new Map(playerData.map((player) => [player.actorIndex, computeCombinedTraits(player)])),
+    [playerData]
+  );
+  // The enabled checklist entries are the same for every player column — filter
+  // and sort them once per render instead of once per player.
+  const buildEntries = checklistBuild.filter((entry) => entry.enabled).sort(byTraitName);
+  const aiEntries = checklistAi.filter((entry) => entry.enabled).sort(byTraitName);
+
   const [sortType, setSortType] = useState<SortType>(MeterColumns.TotalDamage);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   // Shared so toggling a master-trait tier expands/collapses it for every player column.
@@ -956,32 +1004,7 @@ export const ViewPage = () => {
                       );
                     })}
                   </Table.Tr>
-                  <Table.Tr>
-                    {playerData.map((player) => {
-                      /* The 4 equipped skills (v2.0.2 identity path). The hook drops
-                         empty slots, so the array holds only real ability ids. */
-                      const abilities = player.abilities || [];
-
-                      return (
-                        <Table.Td key={player.actorIndex}>
-                          <Text size="xs" fw={700}>
-                            {t("ui.player-abilities")}
-                          </Text>
-                          {Array.from(Array(4).keys()).map((abilityIndex) => {
-                            const ability = abilities[abilityIndex];
-
-                            return (
-                              <Placeholder key={abilityIndex} empty={!ability}>
-                                <Text size="xs" fs="italic" fw={300}>
-                                  {translateAbilityId(ability ?? null)}
-                                </Text>
-                              </Placeholder>
-                            );
-                          })}
-                        </Table.Td>
-                      );
-                    })}
-                  </Table.Tr>
+                  <AbilitiesRow playerData={playerData} />
                   <Table.Tr>
                     {playerData.map((player) => {
                       return (
@@ -1199,37 +1222,10 @@ export const ViewPage = () => {
                       </Table.Td>
                     ))}
                   </Table.Tr>
+                  <AbilitiesRow playerData={playerData} />
                   <Table.Tr>
                     {playerData.map((player) => {
-                      const abilities = player.abilities || [];
-
-                      return (
-                        <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
-                          <Text size="xs" fw={700}>
-                            {t("ui.player-abilities")}
-                          </Text>
-                          {Array.from(Array(4).keys()).map((abilityIndex) => {
-                            const ability = abilities[abilityIndex];
-
-                            return (
-                              <Placeholder key={abilityIndex} empty={!ability}>
-                                <Text size="xs" fs="italic" fw={300}>
-                                  {translateAbilityId(ability ?? null)}
-                                </Text>
-                              </Placeholder>
-                            );
-                          })}
-                        </Table.Td>
-                      );
-                    })}
-                  </Table.Tr>
-                  <Table.Tr>
-                    {playerData.map((player) => {
-                      const traits = computeCombinedTraits(player);
-                      const byName = (a: ChecklistEntry, b: ChecklistEntry) =>
-                        translateTraitId(a.ids[0]).localeCompare(translateTraitId(b.ids[0]));
-                      const buildEntries = checklistBuild.filter((entry) => entry.enabled).sort(byName);
-                      const aiEntries = checklistAi.filter((entry) => entry.enabled).sort(byName);
+                      const traits = combinedTraitsByPlayer.get(player.actorIndex) ?? [];
 
                       return (
                         <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
@@ -1328,7 +1324,7 @@ export const ViewPage = () => {
                   </Table.Tr>
                   <Table.Tr>
                     {playerData.map((player) => {
-                      const traits = computeCombinedTraits(player)
+                      const traits = (combinedTraitsByPlayer.get(player.actorIndex) ?? [])
                         .map((trait) => ({ ...trait, name: translateTraitId(trait.id) }))
                         .sort((a, b) => a.name.localeCompare(b.name));
 
@@ -1446,7 +1442,14 @@ function MasterTraitsRows({
   onToggleTier: (tierKey: number | "ex") => void;
   onToggleAll: (tierKeys: (number | "ex")[], expand: boolean) => void;
 }) {
-  const grouped = playerData.map((player) => groupSkillboardNodes(player));
+  const { i18n } = useTranslation();
+  // Grouping walks every layout node through i18next per player — cache it so
+  // tier expand/collapse and sort clicks don't redo it (node text is
+  // language-dependent, hence the language dep).
+  const grouped = useMemo(
+    () => playerData.map((player) => groupSkillboardNodes(player)),
+    [playerData, i18n.language]
+  );
   const anyTraits = grouped.some((skillboard) => skillboard.total > 0);
 
   // Union of the players' tiers, in board order (Chaos 1-3, then EX).

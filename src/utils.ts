@@ -1,4 +1,4 @@
-﻿import { open } from "@tauri-apps/api/shell";
+import { open } from "@tauri-apps/api/shell";
 import html2canvas from "html2canvas";
 import * as jsurl from "jsurl";
 import toast from "react-hot-toast";
@@ -46,14 +46,14 @@ export const isSupplementaryAction = (actionType: SkillState["actionType"]): boo
   typeof actionType === "object" && Object.hasOwn(actionType, "SupplementaryDamage");
 
 /**
- * Only Normal skill hits can trigger supplementary damage â€” Link Attacks, Skybound
+ * Only Normal skill hits can trigger supplementary damage — Link Attacks, Skybound
  * Arts and damage-over-time cannot. (Groups are frontend merges of Normal skills.)
  */
 export const isSupEligibleAction = (actionType: SkillState["actionType"]): boolean =>
   typeof actionType === "object" && (Object.hasOwn(actionType, "Normal") || Object.hasOwn(actionType, "Group"));
 
 export type SupPercentages = {
-  /** Supp damage relative to supp-eligible (Normal skill) damage â€” the proc-quality
+  /** Supp damage relative to supp-eligible (Normal skill) damage — the proc-quality
    * number. Each source procs at +20% of the trigger hit, so with all three equipped
    * and a 100% proc rate this tops out at +60%. */
   eligible: number;
@@ -368,7 +368,7 @@ export const checklistStatus = (level: number, required: number): ChecklistStatu
 };
 
 /**
- * The game's overcap-display percentage: `(Î£baseSum / Î£capSum) * 100`, aggregated
+ * The game's overcap-display percentage: `(ΣbaseSum / ΣcapSum) * 100`, aggregated
  * over cappable hits. A hit exactly at the cap contributes 100%, a hit twice the
  * cap contributes 200%. Returns `null` when there were no cappable hits (nothing to
  * divide by) so callers can render a placeholder instead of a bogus 0%.
@@ -496,7 +496,7 @@ export const translateCharacterType = (characterType: CharacterType): string =>
 ///
 /// AI companions have their `displayName` blanked by the hook (their identity
 /// snapshot carries the LOCAL player's name, which isn't theirs), so an empty name
-/// on a resolved slot means "AI" â€” rendered as `CharacterType (AI)`. Real players
+/// on a resolved slot means "AI" — rendered as `CharacterType (AI)`. Real players
 /// (local or remote) always carry a name. When `showName` is off (streamer mode) we
 /// hide real names but must NOT mislabel them as AI, so the marker keys on the empty
 /// name, not on the toggle.
@@ -757,6 +757,13 @@ export const translateQuestId = (id: number | null): string => {
   const hash = id.toString(16);
   return t([`quests:${hash}.text`, "quest.unknown"], { id: hash });
 };
+
+/** The loaded `traits` resource bundle: active language first, `en` filling in
+ * (matches i18next fallback), `{}` when neither is loaded yet. */
+export const getTraitsBundle = (): Record<string, { text?: string }> =>
+  (i18next.getResourceBundle(i18next.language, "traits") ??
+    i18next.getResourceBundle("en", "traits") ??
+    {}) as Record<string, { text?: string }>;
 
 /// Translates the trait ID to a human-readable string.
 export const translateTraitId = (id: number | null): string => {

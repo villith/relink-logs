@@ -135,9 +135,6 @@ static LOGS: AtomicU32 = AtomicU32::new(0);
 pub(crate) fn reset_budget() {
     LOGS.store(0, std::sync::atomic::Ordering::Relaxed);
 }
-#[cfg(not(feature = "hookdiag"))]
-#[allow(dead_code)]
-pub(crate) fn reset_budget() {}
 
 #[derive(Clone)]
 pub struct OnNetworkStunHook {

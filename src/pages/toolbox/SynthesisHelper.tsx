@@ -43,7 +43,6 @@ const LevelCell = ({ lucky }: { lucky: boolean }) => {
 const SynthesisHelper = () => {
   const { t } = useTranslation();
   const { form, setForm, status, response, error, searching, traitOptions, search } = useSynthesisHelper();
-  const options = traitOptions();
 
   // Map structured backend error strings to friendly copy; show anything else verbatim.
   const errorMessage =
@@ -69,7 +68,7 @@ const SynthesisHelper = () => {
           placeholder={t("ui.toolbox.select-trait", "Select a trait...")}
           searchable
           clearable
-          data={options}
+          data={traitOptions}
           value={form.trait1}
           onChange={(value) => setForm({ ...form, trait1: value })}
           w={260}
@@ -79,7 +78,7 @@ const SynthesisHelper = () => {
           placeholder={t("ui.toolbox.select-trait", "Select a trait...")}
           searchable
           clearable
-          data={options}
+          data={traitOptions}
           value={form.trait2}
           onChange={(value) => setForm({ ...form, trait2: value })}
           w={260}
@@ -106,13 +105,13 @@ const SynthesisHelper = () => {
             {t("ui.toolbox.pairs-summary", {
               sigils: response.sigilCount,
               tested: response.pairsTested,
-              matches: response.totalMatches,
+              matches: response.matches.length,
             })}
           </Text>
           <Text size="xs" c="dimmed">
             {t("ui.toolbox.results-caveat")}
           </Text>
-          {response.totalMatches === 0 && <Text>{t("ui.toolbox.no-results")}</Text>}
+          {response.matches.length === 0 && <Text>{t("ui.toolbox.no-results")}</Text>}
           {response.matches.length > 0 && (
             <Table striped highlightOnHover>
               <Table.Thead>

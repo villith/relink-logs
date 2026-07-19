@@ -1,7 +1,8 @@
 import synthesisTraits from "@/assets/synthesis-traits.json";
 import { SynthesisSearchResponse, SynthesisStatus } from "@/types";
+import { getTraitsBundle } from "@/utils";
 import { invoke } from "@tauri-apps/api";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 /** The traits that appear on synthesizable sigils — the only possible
@@ -85,12 +86,7 @@ export default function useSynthesisHelper() {
       .catch((e) => setError(String(e)));
   }, []);
 
-  const traitOptions = (): TraitOptions =>
-    buildTraitOptions(
-      (i18n.getResourceBundle(i18n.language, "traits") ??
-        i18n.getResourceBundle("en", "traits") ??
-        {}) as Record<string, { text?: string }>
-    );
+  const traitOptions = useMemo(() => buildTraitOptions(getTraitsBundle()), [i18n.language]);
 
   const search = async () => {
     const query = buildQuery(form);

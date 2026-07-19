@@ -162,7 +162,6 @@ pub struct SynthesisStatus {
 pub struct SynthesisSearchResponse {
     pub matches: Vec<SynthesisMatch>,
     pub pairs_tested: u64,
-    pub total_matches: u64,
     pub sigil_count: u32,
     pub rng_unpredictable: bool,
 }

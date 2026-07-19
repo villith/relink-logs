@@ -542,6 +542,13 @@ impl DerivedEncounterState {
         self.end_time = now;
     }
 
+    /// `total_stun_value` = whichever capture path saw the accrual (the two
+    /// paths observe the same accumulator, so max() dedupes them — the
+    /// encounter-level mirror of `PlayerState::refresh_total_stun`).
+    fn refresh_total_stun(&mut self) {
+        self.total_stun_value = self.stun_delta_sum.max(self.stun_message_sum);
+    }
+
     /// Gets the primary target of the encounter (the target that had the most damage done to it)
     fn get_primary_target(&self) -> Option<&EnemyState> {
         self.targets
@@ -554,10 +561,9 @@ impl DerivedEncounterState {
         self.total_damage += damage_instance.event.damage as u64;
         self.dps = self.total_damage as f64 / ((self.duration()) as f64 / 1000.0);
 
-        // Update stun value (delta path; total = max(delta, messages), see the
-        // field docs — the two capture paths observe the same accrual).
+        // Update stun value (delta path; see refresh_total_stun for the dedupe rule).
         self.stun_delta_sum += damage_instance.stun_damage;
-        self.total_stun_value = self.stun_delta_sum.max(self.stun_message_sum);
+        self.refresh_total_stun();
         self.stun_per_second = self.total_stun_value / ((self.duration()) as f64 / 1000.0);
 
         // Stun messages that arrived before this player's first damage event.
@@ -622,7 +628,7 @@ impl DerivedEncounterState {
     /// mode where both paths fire (solo loopback) can never double-count.
     fn process_stun_message(&mut self, actor_index: u32, amount: f64) {
         self.stun_message_sum += amount;
-        self.total_stun_value = self.stun_delta_sum.max(self.stun_message_sum);
+        self.refresh_total_stun();
         let duration_secs = (self.duration()) as f64 / 1000.0;
         self.stun_per_second = self.total_stun_value / duration_secs;
 
@@ -750,36 +756,7 @@ impl Parser {
 
     /// Reparses derived state from the current encounter.
     pub fn reparse(&mut self) {
-        self.derived_state = Default::default();
-        self.derived_state.start(self.start_time());
-
-        for (timestamp, event) in self.encounter.event_log() {
-            self.derived_state.end_time = *timestamp;
-
-            match event {
-                Message::DamageEvent(event) => {
-                    let event = remap_dragon_form(&self.encounter.player_data, event);
-
-                    let player_data = self
-                        .encounter
-                        .player_data
-                        .iter()
-                        .flatten()
-                        .find(|player| player.actor_index == event.source.parent_index);
-
-                    let damage_instance =
-                        AdjustedDamageInstance::from_damage_event(&event, player_data);
-
-                    self.derived_state
-                        .process_damage_event(*timestamp, &damage_instance);
-                }
-                Message::OnPlayerStun(event) => {
-                    self.derived_state
-                        .process_stun_message(event.actor_index, event.stun_amount as f64);
-                }
-                _ => {}
-            }
-        }
+        self.reparse_with_options(&[]);
     }
 
     // Re-analyzes the encounter with the given targets.

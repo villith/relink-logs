@@ -173,23 +173,8 @@ mod tests {
 
     #[test]
     fn calculates_dps() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 100,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-                stun_delta_sum: 0.0,
-                stun_message_sum: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-            cappable_hits: 0,
-            overcap_base_sum: 0.0,
-            overcap_cap_sum: 0.0,
-        };
+        let mut player_state = empty_player();
+        player_state.total_damage = 100;
 
         player_state.update_dps(1000, 0);
 
@@ -198,23 +183,7 @@ mod tests {
 
     #[test]
     fn updates_from_damage_event() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-                stun_delta_sum: 0.0,
-                stun_message_sum: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-            cappable_hits: 0,
-            overcap_base_sum: 0.0,
-            overcap_cap_sum: 0.0,
-        };
+        let mut player_state = empty_player();
 
         let damage_event = DamageEvent {
             source: protocol::Actor {
@@ -250,23 +219,7 @@ mod tests {
 
     #[test]
     fn same_skill_updates_from_multiple_damage_events() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-                stun_delta_sum: 0.0,
-                stun_message_sum: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-            cappable_hits: 0,
-            overcap_base_sum: 0.0,
-            overcap_cap_sum: 0.0,
-        };
+        let mut player_state = empty_player();
 
         let damage_event = DamageEvent {
             source: protocol::Actor {
@@ -310,23 +263,7 @@ mod tests {
 
     #[test]
     fn new_skills_are_tracked_separately() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            stun_per_second: 0.0,
-            total_stun_value: 0.0,
-                stun_delta_sum: 0.0,
-                stun_message_sum: 0.0,
-            capped_hits: 0,
-            cappable_hits: 0,
-            overcap_base_sum: 0.0,
-            overcap_cap_sum: 0.0,
-        };
+        let mut player_state = empty_player();
 
         let skill_one = DamageEvent {
             source: protocol::Actor {
@@ -387,23 +324,7 @@ mod tests {
 
     #[test]
     fn skills_from_children_are_tracked_separately() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            stun_per_second: 0.0,
-            total_stun_value: 0.0,
-                stun_delta_sum: 0.0,
-                stun_message_sum: 0.0,
-            capped_hits: 0,
-            cappable_hits: 0,
-            overcap_base_sum: 0.0,
-            overcap_cap_sum: 0.0,
-        };
+        let mut player_state = empty_player();
 
         let parent_skill = DamageEvent {
             source: protocol::Actor {
@@ -470,23 +391,7 @@ mod tests {
 
     #[test]
     fn stun_is_tracked_with_player_stats() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-                stun_delta_sum: 0.0,
-                stun_message_sum: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-            cappable_hits: 0,
-            overcap_base_sum: 0.0,
-            overcap_cap_sum: 0.0,
-        };
+        let mut player_state = empty_player();
 
         let damage_event = DamageEvent {
             source: protocol::Actor {
@@ -546,23 +451,7 @@ mod tests {
 
     #[test]
     fn stun_value_without_player_stats() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-                stun_delta_sum: 0.0,
-                stun_message_sum: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-            cappable_hits: 0,
-            overcap_base_sum: 0.0,
-            overcap_cap_sum: 0.0,
-        };
+        let mut player_state = empty_player();
 
         let damage_event = DamageEvent {
             source: protocol::Actor {
@@ -644,23 +533,7 @@ mod tests {
 
     #[test]
     fn counts_player_capped_hits_across_skills() {
-        let mut player_state = PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-                stun_delta_sum: 0.0,
-                stun_message_sum: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-            cappable_hits: 0,
-            overcap_base_sum: 0.0,
-            overcap_cap_sum: 0.0,
-        };
+        let mut player_state = empty_player();
 
         // Two capped hits on the same skill (exercises the early-return path),
         // one uncapped hit on a different skill.
@@ -693,8 +566,8 @@ mod tests {
             skill_breakdown: vec![],
             sba: 0.0,
             total_stun_value: 0.0,
-                stun_delta_sum: 0.0,
-                stun_message_sum: 0.0,
+            stun_delta_sum: 0.0,
+            stun_message_sum: 0.0,
             stun_per_second: 0.0,
             capped_hits: 0,
             cappable_hits: 0,

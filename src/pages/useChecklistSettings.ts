@@ -14,7 +14,7 @@ export default function useChecklistSettings() {
   // The `traits` namespace is already eagerly preloaded (src/i18n.ts `ns`
   // list); this call is kept so the component re-renders via bindI18nStore
   // when the bundle loads or the language changes.
-  const { i18n } = useTranslation("traits");
+  useTranslation("traits");
   const { build, ai, setLevel, toggle, remove, add, reset } = useChecklistStore(
     useShallow((state) => ({
       build: state.build,
@@ -33,9 +33,7 @@ export default function useChecklistSettings() {
   // members). Recomputed per render — the bundle only changes on language
   // switch and the lists are small.
   const traitOptions = (group: ChecklistGroup): { value: string; label: string }[] => {
-    const bundle = (i18n.getResourceBundle(i18n.language, "traits") ??
-      i18n.getResourceBundle("en", "traits") ??
-      {}) as Record<string, { text?: string }>;
+    const bundle = getTraitsBundle();
     const present = new Set((group === "build" ? build : ai).flatMap((entry) => entry.ids));
     return Object.entries(bundle)
       .filter(([hex, value]) => Boolean(value?.text) && !present.has(parseInt(hex, 16)))

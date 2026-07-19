@@ -118,6 +118,89 @@ fn game_stdmap_find(map: usize, key: u32) -> Option<usize> {
     }
 }
 
+/// Reads the poll preconditions shared by the diag probe and the production
+/// poll: module base, validated component-type id, and the entity table.
+///
+/// The component-type id is assigned by a C++ static-init counter at
+/// runtime. Ghidra (FUN_1406d2490 decompile, 2026-07-18): the guard dword at
+/// +0x54 follows the MSVC _Init_thread protocol — 0 = never initialized,
+/// -1 = initialization IN PROGRESS, and on completion _Init_thread_footer
+/// stamps it with the global init epoch (which STARTS at 0x80000000, so an
+/// initialized guard reads 0x8000xxxx, e.g. the live-observed 0x800016e8).
+/// The old `guard == -1` test was exactly backwards and made every poll bail.
+#[cfg_attr(not(feature = "hookdiag"), allow(unused_variables))]
+fn poll_context(log_failures: bool) -> Option<(usize, usize, u32)> {
+    use crate::hooks::diag::{read_ptr_guarded, read_u32_guarded, MODULE_BASE};
+
+    let base = MODULE_BASE.load(std::sync::atomic::Ordering::Relaxed);
+    if base == 0 {
+        return None;
+    }
+    let type_guard = read_u32_guarded(base, SBA_COMPONENT_TYPE_RVA + 4);
+    if type_guard == 0 || type_guard == 0xFFFF_FFFF {
+        #[cfg(feature = "hookdiag")]
+        if log_failures {
+            log::info!("SBAPOLL type-id not initialized (guard={type_guard:#x})");
+        }
+        return None;
+    }
+    let type_id = read_u32_guarded(base, SBA_COMPONENT_TYPE_RVA);
+    let entity_table = read_ptr_guarded(base, ENTITY_TABLE_RVA)?;
+    Some((base, entity_table, type_id))
+}
+
+/// Resolves one party slot's handle to its member's SBA component (the single
+/// slot walk shared by the diag probe and the production poll — these offsets
+/// break on game patches and MUST stay one implementation): read the
+/// slot-handle, validate it against the entity table like FUN_1406d2490 does,
+/// deref the entity's specified-actor (+0x70), then find the SBA component in
+/// its component map (+0xC0). Returns `(entity, id, specified, component)`.
+/// Every read is SEH-guarded; any failed step resolves the slot to `None`.
+#[cfg_attr(not(feature = "hookdiag"), allow(unused_variables))]
+fn resolve_slot_component(
+    base: usize,
+    entity_table: usize,
+    type_id: u32,
+    slot: usize,
+    log_failures: bool,
+) -> Option<(usize, usize, usize, usize)> {
+    use crate::hooks::diag::{read_ptr_guarded, read_u32_guarded};
+
+    let handle = base + SBA_SLOT_HANDLES_RVA + slot * SBA_SLOT_HANDLE_STRIDE;
+    let index_plus_1 = read_u32_guarded(handle, 0x00);
+    if index_plus_1 == 0 {
+        return None;
+    }
+    let entity = read_ptr_guarded(handle, 0x08)?;
+    let id = read_ptr_guarded(handle, 0x10).unwrap_or(0);
+
+    // Validate the handle against the entity table like FUN_1406d2490 does.
+    let idx = (index_plus_1 - 1) as usize;
+    let ids = read_ptr_guarded(entity_table, 0x48).unwrap_or(0);
+    let ents = read_ptr_guarded(entity_table, 0x20).unwrap_or(0);
+    let id_ok = ids != 0 && read_ptr_guarded(ids, idx * 8) == Some(id);
+    let ent_ok = ents != 0 && read_ptr_guarded(ents, idx * 8) == Some(entity);
+    if !id_ok || !ent_ok || entity == 0 {
+        #[cfg(feature = "hookdiag")]
+        if log_failures {
+            log::info!(
+                "SBAPOLL slot={slot} stale handle (idx={index_plus_1} id_ok={id_ok} ent_ok={ent_ok})"
+            );
+        }
+        return None;
+    }
+
+    let specified = read_ptr_guarded(entity, 0x70).filter(|p| *p != 0)?;
+    let Some(component) = game_stdmap_find(specified + 0xC0, type_id) else {
+        #[cfg(feature = "hookdiag")]
+        if log_failures {
+            log::info!("SBAPOLL slot={slot} specified={specified:#x} component MISS (type_id={type_id:#x})");
+        }
+        return None;
+    };
+    Some((entity, id, specified, component))
+}
+
 /// hookdiag: poll all four party slots' SBA gauges via the slot-handle table
 /// (see the module comment above) and log one `SBAPOLL` line per resolvable
 /// slot, including the actor's embedded-record identity so gauge values are
@@ -125,7 +208,7 @@ fn game_stdmap_find(map: usize, key: u32) -> Option<usize> {
 /// Called from the (working, local) gauge-update hook — rate-limited.
 #[cfg(feature = "hookdiag")]
 fn log_sba_slot_poll() {
-    use crate::hooks::diag::{read_f32_guarded, read_ptr_guarded, read_u32_guarded, MODULE_BASE};
+    use crate::hooks::diag::{read_f32_guarded, read_ptr_guarded, read_u32_guarded};
     use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
 
     static CALLS: AtomicU32 = AtomicU32::new(0);
@@ -134,56 +217,14 @@ fn log_sba_slot_poll() {
         return;
     }
 
-    let base = MODULE_BASE.load(AtomicOrdering::Relaxed);
-    if base == 0 {
-        return;
-    }
-
-    // The component-type id is assigned by a C++ static-init counter at
-    // runtime. Ghidra (FUN_1406d2490 decompile, 2026-07-18): the guard dword at
-    // +0x54 follows the MSVC _Init_thread protocol — 0 = never initialized,
-    // -1 = initialization IN PROGRESS, and on completion _Init_thread_footer
-    // stamps it with the global init epoch (which STARTS at 0x80000000, so an
-    // initialized guard reads 0x8000xxxx, e.g. the live-observed 0x800016e8).
-    // The old `guard == -1` test was exactly backwards and made every poll bail.
-    let type_guard = read_u32_guarded(base, SBA_COMPONENT_TYPE_RVA + 4);
-    let type_id = read_u32_guarded(base, SBA_COMPONENT_TYPE_RVA);
-    if type_guard == 0 || type_guard == 0xFFFF_FFFF {
-        log::info!("SBAPOLL type-id not initialized (guard={type_guard:#x})");
-        return;
-    }
-
-    let Some(entity_table) = read_ptr_guarded(base, ENTITY_TABLE_RVA) else {
+    let Some((base, entity_table, type_id)) = poll_context(true) else {
         return;
     };
 
     for slot in 0..4usize {
-        let handle = base + SBA_SLOT_HANDLES_RVA + slot * SBA_SLOT_HANDLE_STRIDE;
-        let index_plus_1 = read_u32_guarded(handle, 0x00);
-        if index_plus_1 == 0 {
-            continue;
-        }
-        let Some(entity) = read_ptr_guarded(handle, 0x08) else {
-            continue;
-        };
-        let id = read_ptr_guarded(handle, 0x10).unwrap_or(0);
-
-        // Validate the handle against the entity table like FUN_1406d2490 does.
-        let idx = (index_plus_1 - 1) as usize;
-        let ids = read_ptr_guarded(entity_table, 0x48).unwrap_or(0);
-        let ents = read_ptr_guarded(entity_table, 0x20).unwrap_or(0);
-        let id_ok = ids != 0 && read_ptr_guarded(ids, idx * 8) == Some(id);
-        let ent_ok = ents != 0 && read_ptr_guarded(ents, idx * 8) == Some(entity);
-        if !id_ok || !ent_ok || entity == 0 {
-            log::info!("SBAPOLL slot={slot} stale handle (idx={index_plus_1} id_ok={id_ok} ent_ok={ent_ok})");
-            continue;
-        }
-
-        let Some(specified) = read_ptr_guarded(entity, 0x70).filter(|p| *p != 0) else {
-            continue;
-        };
-        let Some(component) = game_stdmap_find(specified + 0xC0, type_id) else {
-            log::info!("SBAPOLL slot={slot} specified={specified:#x} component MISS (type_id={type_id:#x})");
+        let Some((entity, id, specified, component)) =
+            resolve_slot_component(base, entity_table, type_id, slot, true)
+        else {
             continue;
         };
         let gauge = read_f32_guarded(component, 0x7C).unwrap_or(f32::NAN);
@@ -222,23 +263,9 @@ static LAST_SLOT_GAUGE: std::sync::Mutex<[f32; 4]> = std::sync::Mutex::new([-1.0
 ///
 /// Every read is SEH-guarded; a failed step just skips that slot this tick.
 fn poll_slots_and_emit(tx: &event::Tx) {
-    use crate::hooks::diag::{read_f32_guarded, read_ptr_guarded, read_u32_guarded, MODULE_BASE};
-    use std::sync::atomic::Ordering as AtomicOrdering;
+    use crate::hooks::diag::read_f32_guarded;
 
-    let base = MODULE_BASE.load(AtomicOrdering::Relaxed);
-    if base == 0 {
-        return;
-    }
-
-    // Trust the component-type id only once its _Init_thread guard shows the
-    // init completed (0 = never ran, -1 = in progress, epoch stamp = done).
-    let type_guard = read_u32_guarded(base, SBA_COMPONENT_TYPE_RVA + 4);
-    if type_guard == 0 || type_guard == 0xFFFF_FFFF {
-        return;
-    }
-    let type_id = read_u32_guarded(base, SBA_COMPONENT_TYPE_RVA);
-
-    let Some(entity_table) = read_ptr_guarded(base, ENTITY_TABLE_RVA) else {
+    let Some((base, entity_table, type_id)) = poll_context(false) else {
         return;
     };
     // try_lock: the gauge hook can fire from the game thread only, but never
@@ -248,32 +275,9 @@ fn poll_slots_and_emit(tx: &event::Tx) {
     };
 
     for slot in 0..4usize {
-        let handle = base + SBA_SLOT_HANDLES_RVA + slot * SBA_SLOT_HANDLE_STRIDE;
-        let index_plus_1 = read_u32_guarded(handle, 0x00);
-        if index_plus_1 == 0 {
-            continue;
-        }
-        let Some(entity) = read_ptr_guarded(handle, 0x08).filter(|e| *e != 0) else {
-            continue;
-        };
-        let id = read_ptr_guarded(handle, 0x10).unwrap_or(0);
-
-        // Validate the handle against the entity table like FUN_1406d2490 does.
-        let idx = (index_plus_1 - 1) as usize;
-        let ids = read_ptr_guarded(entity_table, 0x48).unwrap_or(0);
-        let ents = read_ptr_guarded(entity_table, 0x20).unwrap_or(0);
-        if ids == 0
-            || ents == 0
-            || read_ptr_guarded(ids, idx * 8) != Some(id)
-            || read_ptr_guarded(ents, idx * 8) != Some(entity)
-        {
-            continue;
-        }
-
-        let Some(specified) = read_ptr_guarded(entity, 0x70).filter(|p| *p != 0) else {
-            continue;
-        };
-        let Some(component) = game_stdmap_find(specified + 0xC0, type_id) else {
+        let Some((_entity, _id, _specified, component)) =
+            resolve_slot_component(base, entity_table, type_id, slot, false)
+        else {
             continue;
         };
         let Some(gauge) = read_f32_guarded(component, 0x7C).filter(|g| g.is_finite()) else {
