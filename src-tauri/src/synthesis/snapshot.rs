@@ -13,9 +13,9 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
+use dll_syringe::process::{OwnedProcess, Process};
 use windows::Win32::System::Diagnostics::ToolHelp::{
-    CreateToolhelp32Snapshot, Module32FirstW, Process32FirstW, Process32NextW, MODULEENTRY32W,
-    PROCESSENTRY32W, TH32CS_SNAPMODULE, TH32CS_SNAPPROCESS,
+    CreateToolhelp32Snapshot, Module32FirstW, MODULEENTRY32W, TH32CS_SNAPMODULE,
 };
 use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
 
@@ -86,21 +86,13 @@ fn wide_to_string(w: &[u16]) -> String {
     String::from_utf16_lossy(&w[..end])
 }
 
-/// Find the game process id, or None if it isn't running.
+/// Find the game process id, or None if it isn't running. Uses the same
+/// dll_syringe lookup as the injector (`check_and_perform_hook` in main.rs).
 fn find_game_pid() -> Result<Option<u32>> {
-    let snap = Mem(unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }?);
-    let mut entry = PROCESSENTRY32W {
-        dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32,
-        ..Default::default()
+    let Some(process) = OwnedProcess::find_first_by_name(GAME_EXE) else {
+        return Ok(None);
     };
-    let mut ok = unsafe { Process32FirstW(snap.0, &mut entry) }.is_ok();
-    while ok {
-        if wide_to_string(&entry.szExeFile).eq_ignore_ascii_case(GAME_EXE) {
-            return Ok(Some(entry.th32ProcessID));
-        }
-        ok = unsafe { Process32NextW(snap.0, &mut entry) }.is_ok();
-    }
-    Ok(None)
+    Ok(Some(process.pid().context("query game pid")?.get()))
 }
 
 /// Main-module (exe) base address and on-disk path.
