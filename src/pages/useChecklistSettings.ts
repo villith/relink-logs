@@ -1,4 +1,5 @@
 import { useChecklistStore, type ChecklistGroup } from "@/stores/useChecklistStore";
+import { getTraitsBundle } from "@/utils";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 

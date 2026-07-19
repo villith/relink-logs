@@ -1446,10 +1446,7 @@ function MasterTraitsRows({
   // Grouping walks every layout node through i18next per player — cache it so
   // tier expand/collapse and sort clicks don't redo it (node text is
   // language-dependent, hence the language dep).
-  const grouped = useMemo(
-    () => playerData.map((player) => groupSkillboardNodes(player)),
-    [playerData, i18n.language]
-  );
+  const grouped = useMemo(() => playerData.map((player) => groupSkillboardNodes(player)), [playerData, i18n.language]);
   const anyTraits = grouped.some((skillboard) => skillboard.total > 0);
 
   // Union of the players' tiers, in board order (Chaos 1-3, then EX).

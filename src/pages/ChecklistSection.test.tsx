@@ -52,7 +52,8 @@ const Harness = ({ group }: { group: ChecklistGroup }) => {
     toggle: () => {},
     remove: () => {},
     reset: () => {},
-    traitOptions: () => FIXED_OPTIONS.filter((option) => !entries.some((entry) => entry.ids[0] === parseInt(option.value, 16))),
+    traitOptions: () =>
+      FIXED_OPTIONS.filter((option) => !entries.some((entry) => entry.ids[0] === parseInt(option.value, 16))),
     addTrait: (_group: ChecklistGroup, hex: string | null) => {
       if (!hex) return;
       setEntries((prev) => [...prev, { ids: [parseInt(hex, 16)], level: 15, enabled: true }]);

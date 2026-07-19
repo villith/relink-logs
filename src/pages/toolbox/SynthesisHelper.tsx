@@ -2,8 +2,8 @@ import { translateSigilId, translateTraitId } from "@/utils";
 import { Alert, Badge, Button, Checkbox, Group, Select, Stack, Table, Text, Title } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
-import { SynthesisMatch, SynthesisSigil } from "@/types";
 import { SYNTHESIS_ERR } from "@/synthesisErrors";
+import { SynthesisMatch, SynthesisSigil } from "@/types";
 
 import useSynthesisHelper from "./useSynthesisHelper";
 
@@ -55,9 +55,7 @@ const SynthesisHelper = () => {
   return (
     <Stack gap="md" pr="md">
       <Title order={4}>{t("ui.toolbox.synthesis-helper", "Synthesis Helper")}</Title>
-      {status && !status.gameRunning && (
-        <Alert color="yellow">{t("ui.toolbox.game-not-running")}</Alert>
-      )}
+      {status && !status.gameRunning && <Alert color="yellow">{t("ui.toolbox.game-not-running")}</Alert>}
       {(status?.rngUnpredictable || response?.rngUnpredictable) && (
         <Alert color="orange">{t("ui.toolbox.rng-unpredictable")}</Alert>
       )}

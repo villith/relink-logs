@@ -761,9 +761,10 @@ export const translateQuestId = (id: number | null): string => {
 /** The loaded `traits` resource bundle: active language first, `en` filling in
  * (matches i18next fallback), `{}` when neither is loaded yet. */
 export const getTraitsBundle = (): Record<string, { text?: string }> =>
-  (i18next.getResourceBundle(i18next.language, "traits") ??
-    i18next.getResourceBundle("en", "traits") ??
-    {}) as Record<string, { text?: string }>;
+  (i18next.getResourceBundle(i18next.language, "traits") ?? i18next.getResourceBundle("en", "traits") ?? {}) as Record<
+    string,
+    { text?: string }
+  >;
 
 /// Translates the trait ID to a human-readable string.
 export const translateTraitId = (id: number | null): string => {
