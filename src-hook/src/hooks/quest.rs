@@ -1,4 +1,4 @@
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use anyhow::{anyhow, Result};
 use protocol::Message;
@@ -7,7 +7,7 @@ use retour::static_detour;
 use crate::{
     event,
     hooks::{
-        diag::read_u32_guarded,
+        diag::{read_ptr_guarded, read_u32_guarded},
         endless::{ENDLESS_FLOW_TYPE, FLOW_TYPE_OFFSET},
         ffi::QuestState,
         globals::QUEST_STATE_PTR,
@@ -349,68 +349,95 @@ impl OnQuestRetireHook {
     }
 }
 
-// --- hookdiag-only fail-screen probes -------------------------------------------
-//
-// The retire hook above covers retire/abandon, but a party WIPE reaches the fail
-// screen without setting the retire flag (choosing "retry" never sets it), so the
-// wipe moment still needs its own boundary. Two statically-derived candidates are
-// probed as observers; one live fail decides which gets promoted to a production
-// OnQuestFail emitter:
-//  * `ui::fsm::action::ResultRetryDialog::execute` (FUN_141bc1a90) — opens the
-//    result retry dialog; expected to fire when the fail screen's retry prompt
-//    appears (but "Result" might mean the CLEAR screen's repeat dialog — hence
-//    probe first).
-//  * `ui::component::MenuGameOver` ctor (FUN_1441b35c0) — expected to fire when
-//    the game-over menu is created, IF menus are created on open rather than
-//    preloaded at quest start.
-// Until one is promoted, a wiped quest's log still saves at the next quest load
-// (the existing backstop), so production behavior does not regress.
-#[cfg(feature = "hookdiag")]
-pub mod failprobe {
-    use super::*;
+/// Fires the WIPE (party-death fail) boundary — the quest end the retire hook
+/// cannot see: a wiped quest never sets the retire flag, shows no result screen,
+/// and (2026-07-19 live capture) fires NO distinctive function-level event at the
+/// fail screen (the MenuGameOver UI is preloaded ~1.1s after every quest load;
+/// ResultRetryDialog::execute never runs).
+///
+/// Instead this hooks the quest sequence tick (FUN_14062bbc0, rva 0x62bbc0,
+/// 1-arg per Ghidra decompile — the per-frame driver that also reads the flow
+/// state at +0x2d8) and polls the quest-flow state machine for a TRANSITION into
+/// the end state. Live-captured lifecycle (both a wipe and an abandon):
+///   load 0x27→0x28→0x29→0x1→0x3→0x4→0x6, start 0x8→0x9→0xe→0xf,
+///   gameplay 0x2b→0xc, then 0xc→**0x1e**, then the flow is destroyed (town).
+/// 0x1e was entered on the wipe with no other signal, and 16ms AFTER the
+/// retire-select on the abandon — it is the shared "quest ending without a
+/// result screen" state. Emitting OnQuestFail on entry into 0x1e is safe even
+/// when redundant: after the retire hook (or a type-5 clear) already stopped the
+/// parser, the extra event is a no-op (the parser only saves when InProgress).
+pub struct OnQuestFlowEndHook {
+    tx: event::Tx,
+}
 
-    type ResultRetryDialogFunc = unsafe extern "system" fn(*const usize);
-    type MenuGameOverCtorFunc =
-        unsafe extern "system" fn(*const usize, *const usize) -> *const usize;
+type QuestSequenceTickFunc = unsafe extern "system" fn(*const usize) -> usize;
 
-    static_detour! {
-        static ResultRetryDialogExec: unsafe extern "system" fn(*const usize);
-        static MenuGameOverCtor: unsafe extern "system" fn(*const usize, *const usize) -> *const usize;
+static_detour! {
+    static QuestSequenceTick: unsafe extern "system" fn(*const usize) -> usize;
+}
+
+// Ret-padding + prologue with the distinguishing AVX spill bytes (1 sigscan match).
+const QUEST_SEQUENCE_TICK_SIG: &str =
+    "cc cc cc cc ' 55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec a8 03 00 00 48 8d ac 24 80 00 00 00 c5 78 29 bd 10 03 00 00 c5 78 29 b5 00 03 00 00";
+
+/// Flow state entered when a quest ends with no result screen (wipe/abandon).
+const FLOW_STATE_QUEST_END_UNSIGNALED: u32 = 0x1e;
+/// Sentinel for "no flow object" (in town / between quests).
+const NO_FLOW: u32 = 0xffff_ffff;
+static LAST_FLOW_STATE: AtomicU32 = AtomicU32::new(NO_FLOW);
+
+impl OnQuestFlowEndHook {
+    pub fn new(tx: event::Tx) -> Self {
+        OnQuestFlowEndHook { tx }
     }
 
-    // Entry sigs, both 1 sigscan match, cursor on the verified Ghidra entry.
-    const RESULT_RETRY_DIALOG_SIG: &str =
-        "c3 31 ff e9 ? ? ? ? ' 55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec 48 01 00 00";
-    const MENU_GAME_OVER_CTOR_SIG: &str =
-        "48 83 c4 28 c3 cc cc cc ' 56 57 48 83 ec 28 48 89 d6 8b 05 ? ? ? ? 65 48 8b 0c 25 58 00 00 00";
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        let tx = self.tx.clone();
 
-    pub struct FailScreenProbes;
-
-    impl FailScreenProbes {
-        pub fn setup(process: &Process) -> Result<()> {
-            let retry = process.search_address(RESULT_RETRY_DIALOG_SIG);
-            let ctor = process.search_address(MENU_GAME_OVER_CTOR_SIG);
+        if let Ok(quest_sequence_tick) = process.search_address(QUEST_SEQUENCE_TICK_SIG) {
+            #[cfg(feature = "console")]
+            println!("Found quest sequence tick");
 
             unsafe {
-                if let Ok(addr) = retry {
-                    let func: ResultRetryDialogFunc = std::mem::transmute(addr);
-                    ResultRetryDialogExec.initialize(func, |this| {
-                        crate::hooks::diag::ev!("result_retry_dialog", "this={:#x}", this as usize);
-                        ResultRetryDialogExec.call(this)
-                    })?;
-                    ResultRetryDialogExec.enable()?;
-                }
-                if let Ok(addr) = ctor {
-                    let func: MenuGameOverCtorFunc = std::mem::transmute(addr);
-                    MenuGameOverCtor.initialize(func, |a1, a2| {
-                        crate::hooks::diag::ev!("menu_game_over_ctor", "a1={:#x}", a1 as usize);
-                        MenuGameOverCtor.call(a1, a2)
-                    })?;
-                    MenuGameOverCtor.enable()?;
-                }
+                let func: QuestSequenceTickFunc = std::mem::transmute(quest_sequence_tick);
+                QuestSequenceTick.initialize(func, move |a1| {
+                    Self::poll_flow_state(&tx);
+                    QuestSequenceTick.call(a1)
+                })?;
+                QuestSequenceTick.enable()?;
             }
+        } else {
+            return Err(anyhow!("Could not find quest_sequence_tick"));
+        }
 
-            Ok(())
+        Ok(())
+    }
+
+    /// One guarded read per frame: mgr (QUEST_STATE_PTR - 0xDC8) → flow at +0x210
+    /// → state at +0x2d8; emit only on a transition into the end state from a
+    /// real in-quest state (NO_FLOW → anything is a (re)load, never an end).
+    fn poll_flow_state(tx: &event::Tx) {
+        let quest_state_ptr = QUEST_STATE_PTR.load(Ordering::Relaxed) as usize;
+        if quest_state_ptr == 0 {
+            return;
+        }
+        let mgr = quest_state_ptr - 0xDC8;
+        let state = match read_ptr_guarded(mgr, 0x210) {
+            Some(flow) if flow != 0 => read_u32_guarded(flow, 0x2d8),
+            _ => NO_FLOW,
+        };
+        let last = LAST_FLOW_STATE.swap(state, Ordering::Relaxed);
+        if last == state {
+            return;
+        }
+        crate::hooks::diag::ev!("flow_state", "old={last:#x} new={state:#x}");
+
+        if state == FLOW_STATE_QUEST_END_UNSIGNALED && last != NO_FLOW {
+            #[cfg(feature = "console")]
+            println!("quest flow entered end state 0x1e (fail/abandon boundary)");
+
+            let quest_id = read_u32_guarded(quest_state_ptr, 0);
+            let _ = tx.send(Message::OnQuestFail(protocol::OnQuestFailEvent { quest_id }));
         }
     }
 }
