@@ -125,6 +125,20 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         "quest_complete",
         OnQuestCompleteHook::new(tx.clone()).setup(&process),
     );
+    // Retire/abandon confirm — the immediate boundary for quests that end with no
+    // result screen (see OnQuestRetireHook). Wipes are still covered only by the
+    // next-quest-load backstop until a fail-screen probe below is promoted.
+    try_step(
+        "quest_retire",
+        quest::OnQuestRetireHook::new(tx.clone()).setup(&process),
+    );
+    // hookdiag-only: fail-screen candidates (ResultRetryDialog / MenuGameOver ctor)
+    // logged as observers to pick the wipe-moment boundary. No-op without the feature.
+    #[cfg(feature = "hookdiag")]
+    try_step(
+        "fail_screen_probes",
+        quest::failprobe::FailScreenProbes::setup(&process),
+    );
 
     /* Conflux / EndlessMode — emits run-start / buff / run-end messages so the parser can
     group a run's rooms + buffs (room-enter itself comes from quest_load_state above). The

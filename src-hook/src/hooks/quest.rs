@@ -276,3 +276,141 @@ impl OnQuestCompleteHook {
         unsafe { OnShowResultScreen.call(a1, a2) }
     }
 }
+
+/// Fires the retire/abandon boundary. Hooks the game's retire-select setter
+/// (FUN_1406fb2f0, rva 0x6fb2f0 in v2.0.2): `fn(cl = bool isRetire)`. It is the
+/// tail-call target of `ui::fsm::action::SetPlayerRetireSelect::execute`
+/// (vtable-confirmed) and, when called with true, itself performs the quit work —
+/// stores the retiring quest's id into the play-history block and requests the
+/// town transition — so a `true` call IS the player's confirmed "abandon quest".
+/// Quests ended this way show no result screen; without this cut the log sat open
+/// (invisible) until the next quest load. Ghidra decompile confirms the single
+/// byte-sized argument; the entry signature anchors on the unique
+/// `mov [rip+..], cl; test cl, cl` global-store prologue (1 sigscan match).
+pub struct OnQuestRetireHook {
+    tx: event::Tx,
+}
+
+type OnSetRetireSelectFunc = unsafe extern "system" fn(u8);
+
+static_detour! {
+    static OnSetRetireSelect: unsafe extern "system" fn(u8);
+}
+
+const ON_SET_RETIRE_SELECT_SIG: &str =
+    "cc cc ' 48 83 ec 28 88 0d ? ? ? ? 84 c9 0f 84 ? ? 00 00 b1 01 b2 01";
+
+impl OnQuestRetireHook {
+    pub fn new(tx: event::Tx) -> Self {
+        OnQuestRetireHook { tx }
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        let tx = self.tx.clone();
+
+        if let Ok(on_set_retire_select) = process.search_address(ON_SET_RETIRE_SELECT_SIG) {
+            #[cfg(feature = "console")]
+            println!("Found on set retire select");
+
+            unsafe {
+                let func: OnSetRetireSelectFunc = std::mem::transmute(on_set_retire_select);
+                OnSetRetireSelect.initialize(func, move |is_retire| {
+                    Self::run(&tx, is_retire)
+                })?;
+                OnSetRetireSelect.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find on_set_retire_select"));
+        }
+
+        Ok(())
+    }
+
+    fn run(tx: &event::Tx, is_retire: u8) {
+        #[cfg(feature = "console")]
+        println!("on set retire select (is_retire={is_retire})");
+        crate::hooks::diag::ev!("retire_select", "is_retire={is_retire}");
+
+        // false = the cancel/no branch of the same FSM — not a quest end.
+        if is_retire != 0 {
+            // Boundary before the original runs its teardown. quest_id is a
+            // fallback only (0 = unknown); the parser prefers the id stamped on
+            // the encounter at its own load.
+            let quest_state_ptr = QUEST_STATE_PTR.load(Ordering::Relaxed);
+            let quest_id = if quest_state_ptr.is_null() {
+                0
+            } else {
+                unsafe { (*quest_state_ptr).quest_id }
+            };
+            let _ = tx.send(Message::OnQuestFail(protocol::OnQuestFailEvent { quest_id }));
+        }
+
+        unsafe { OnSetRetireSelect.call(is_retire) }
+    }
+}
+
+// --- hookdiag-only fail-screen probes -------------------------------------------
+//
+// The retire hook above covers retire/abandon, but a party WIPE reaches the fail
+// screen without setting the retire flag (choosing "retry" never sets it), so the
+// wipe moment still needs its own boundary. Two statically-derived candidates are
+// probed as observers; one live fail decides which gets promoted to a production
+// OnQuestFail emitter:
+//  * `ui::fsm::action::ResultRetryDialog::execute` (FUN_141bc1a90) — opens the
+//    result retry dialog; expected to fire when the fail screen's retry prompt
+//    appears (but "Result" might mean the CLEAR screen's repeat dialog — hence
+//    probe first).
+//  * `ui::component::MenuGameOver` ctor (FUN_1441b35c0) — expected to fire when
+//    the game-over menu is created, IF menus are created on open rather than
+//    preloaded at quest start.
+// Until one is promoted, a wiped quest's log still saves at the next quest load
+// (the existing backstop), so production behavior does not regress.
+#[cfg(feature = "hookdiag")]
+pub mod failprobe {
+    use super::*;
+
+    type ResultRetryDialogFunc = unsafe extern "system" fn(*const usize);
+    type MenuGameOverCtorFunc =
+        unsafe extern "system" fn(*const usize, *const usize) -> *const usize;
+
+    static_detour! {
+        static ResultRetryDialogExec: unsafe extern "system" fn(*const usize);
+        static MenuGameOverCtor: unsafe extern "system" fn(*const usize, *const usize) -> *const usize;
+    }
+
+    // Entry sigs, both 1 sigscan match, cursor on the verified Ghidra entry.
+    const RESULT_RETRY_DIALOG_SIG: &str =
+        "c3 31 ff e9 ? ? ? ? ' 55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec 48 01 00 00";
+    const MENU_GAME_OVER_CTOR_SIG: &str =
+        "48 83 c4 28 c3 cc cc cc ' 56 57 48 83 ec 28 48 89 d6 8b 05 ? ? ? ? 65 48 8b 0c 25 58 00 00 00";
+
+    pub struct FailScreenProbes;
+
+    impl FailScreenProbes {
+        pub fn setup(process: &Process) -> Result<()> {
+            let retry = process.search_address(RESULT_RETRY_DIALOG_SIG);
+            let ctor = process.search_address(MENU_GAME_OVER_CTOR_SIG);
+
+            unsafe {
+                if let Ok(addr) = retry {
+                    let func: ResultRetryDialogFunc = std::mem::transmute(addr);
+                    ResultRetryDialogExec.initialize(func, |this| {
+                        crate::hooks::diag::ev!("result_retry_dialog", "this={:#x}", this as usize);
+                        ResultRetryDialogExec.call(this)
+                    })?;
+                    ResultRetryDialogExec.enable()?;
+                }
+                if let Ok(addr) = ctor {
+                    let func: MenuGameOverCtorFunc = std::mem::transmute(addr);
+                    MenuGameOverCtor.initialize(func, |a1, a2| {
+                        crate::hooks::diag::ev!("menu_game_over_ctor", "a1={:#x}", a1 as usize);
+                        MenuGameOverCtor.call(a1, a2)
+                    })?;
+                    MenuGameOverCtor.enable()?;
+                }
+            }
+
+            Ok(())
+        }
+    }
+}

@@ -945,6 +945,38 @@ impl Parser {
         self.encounter.reset_player_data();
     }
 
+    /// Handles the retire/fail boundary (v2.0.2): fired the moment the player
+    /// confirms retire/abandon (the game's retire-select flag hook) — quests that
+    /// end this way show no result screen, so without this the log sat open until
+    /// the next quest load. Saves the in-progress encounter as not-completed under
+    /// the quest id stamped at its own load (the event's id is only a fallback for
+    /// mid-quest injection). The quest-load boundary stays as the backstop and is
+    /// a no-op afterwards (status is already Stopped).
+    pub fn on_quest_fail_event(&mut self, event: protocol::OnQuestFailEvent) {
+        // Conflux rooms/runs have their own save boundaries (room-enter /
+        // finalize_active_run); a mid-run retire must not save a normal log too.
+        if self.active_run_id.is_some() {
+            return;
+        }
+
+        if self.encounter.quest_id.is_none() && event.quest_id != 0 {
+            self.encounter.quest_id = Some(event.quest_id);
+        }
+
+        if self.status == ParserStatus::InProgress {
+            self.update_status(ParserStatus::Stopped);
+            self.save_and_emit_encounter();
+
+            if let Some(window) = &self.window_handle {
+                let _ = window.emit("encounter-update", &self.derived_state);
+            }
+        }
+
+        // Same rationale as the quest-complete boundary: actor indices are reused
+        // across quests, so stale identities must die here (after the save above).
+        self.encounter.reset_player_data();
+    }
+
     // Called when a damage event is received from the game.
     pub fn on_damage_event(&mut self, event: DamageEvent) {
         let now = Utc::now().timestamp_millis();
@@ -1725,6 +1757,87 @@ mod tests {
             last_known_quest_id: quest_id,
             last_known_elapsed_time_in_secs: 0,
         }
+    }
+
+    #[test]
+    fn quest_fail_event_saves_the_encounter_immediately() {
+        // The retire/fail hook fires the moment the player confirms retire (or the
+        // fail screen shows) — the log must be saved right there, not deferred to
+        // the next quest load.
+        let mut parser = parser_with_memory_db();
+
+        parser.on_area_enter_event(area_enter(0xAAAA));
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_fail_event(protocol::OnQuestFailEvent { quest_id: 0xAAAA });
+
+        {
+            let conn = parser.db.as_ref().unwrap();
+            let (count, quest_id, completed): (u32, Option<u32>, bool) = conn
+                .query_row(
+                    "SELECT COUNT(*), quest_id, quest_completed FROM logs",
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+                )
+                .unwrap();
+            assert_eq!(count, 1, "failed encounter saved at the fail boundary");
+            assert_eq!(quest_id, Some(0xAAAA));
+            assert!(!completed);
+            assert_eq!(parser.status, ParserStatus::Stopped);
+        }
+
+        // The next quest load must NOT save the same encounter again.
+        parser.on_area_enter_event(area_enter(0xBBBB));
+        let conn = parser.db.as_ref().unwrap();
+        let count: u32 = conn
+            .query_row("SELECT COUNT(*) FROM logs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1, "boundary cut after a fail save is a no-op");
+    }
+
+    #[test]
+    fn quest_fail_event_falls_back_to_the_hooks_quest_id() {
+        // Injected mid-quest: the encounter never saw its own load, so it has no
+        // quest id. The fail event's last-known id fills in; a damage-less
+        // encounter saves nothing.
+        let mut parser = parser_with_memory_db();
+
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_fail_event(protocol::OnQuestFailEvent { quest_id: 0xCCCC });
+
+        {
+            let conn = parser.db.as_ref().unwrap();
+            let quest_id: Option<u32> = conn
+                .query_row("SELECT quest_id FROM logs", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(quest_id, Some(0xCCCC));
+        }
+
+        // No damage since -> a second fail event must not create an empty log.
+        parser.on_quest_fail_event(protocol::OnQuestFailEvent { quest_id: 0xCCCC });
+        let conn = parser.db.as_ref().unwrap();
+        let count: u32 = conn
+            .query_row("SELECT COUNT(*) FROM logs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn quest_fail_event_during_conflux_run_is_ignored() {
+        // Conflux rooms/runs have their own save boundaries (room-enter /
+        // finalize); a retire mid-run must not also save the room as a normal log.
+        let mut parser = parser_with_memory_db();
+        const MGR: u64 = 0x2adb_30e0_100;
+
+        parser.on_conflux_room_enter(room_enter(10, MGR));
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_fail_event(protocol::OnQuestFailEvent { quest_id: 0 });
+
+        assert!(parser.active_run_id.is_some(), "run stays active");
+        let conn = parser.db.as_ref().unwrap();
+        let count: u32 = conn
+            .query_row("SELECT COUNT(*) FROM logs WHERE run_id IS NULL", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "no normal log saved for a mid-run fail event");
     }
 
     #[test]

@@ -432,6 +432,16 @@ pub struct OnPlayerStunEvent {
     pub stun_amount: f32,
 }
 
+/// A quest ended without a result screen: the player confirmed retire/abandon
+/// (the in-game retire-select flag was set), or the fail screen was reached.
+/// `quest_id` is the hook's last-known quest id (0 = unknown, e.g. injected
+/// mid-quest); the parser prefers the id stamped on the encounter at its own
+/// load and uses this only as a fallback.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct OnQuestFailEvent {
+    pub quest_id: u32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
     OnAreaEnter(AreaEnterEvent),
@@ -452,7 +462,8 @@ pub enum Message {
     ConfluxRoomEnter(ConfluxRoomEnterEvent),
     ConfluxBuffAcquired(ConfluxBuffAcquiredEvent),
     ConfluxRunEnd(ConfluxRunEndEvent),
+    OnPlayerStun(OnPlayerStunEvent),
     /// Appended last (bincode encodes the variant index — see the crate doc
     /// comment's append-only rule).
-    OnPlayerStun(OnPlayerStunEvent),
+    OnQuestFail(OnQuestFailEvent),
 }
