@@ -1,10 +1,12 @@
-import { Text } from "@mantine/core";
+import { Divider, Group, ScrollArea, Stack, Text } from "@mantine/core";
 import { modals } from "@mantine/modals";
-import { checkUpdate, installUpdate, UpdateManifest } from "@tauri-apps/api/updater";
+import { DownloadSimple } from "@phosphor-icons/react";
+import { UpdateManifest, checkUpdate, installUpdate } from "@tauri-apps/api/updater";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
+import UpdateNotes from "@/components/UpdateNotes";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { useUpdateStatusStore } from "@/stores/useUpdateStatusStore";
 
@@ -20,13 +22,24 @@ type Translator = (key: string, options?: Record<string, unknown>) => string;
  * nothing happens after a successful install call. */
 const openUpdatePrompt = (t: Translator, manifest?: UpdateManifest) => {
   modals.openConfirmModal({
-    title: t("ui.update-available", { version: manifest?.version }),
+    centered: true,
+    title: (
+      <Group gap="xs" wrap="nowrap">
+        <DownloadSimple size="1.1rem" weight="bold" />
+        <Text fw={600}>{t("ui.update-available", { version: manifest?.version })}</Text>
+      </Group>
+    ),
     children: (
-      <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
-        {manifest?.body}
-      </Text>
+      <Stack gap="sm">
+        <Divider />
+        <ScrollArea.Autosize mah={320} type="auto" offsetScrollbars>
+          <UpdateNotes markdown={manifest?.body ?? ""} />
+        </ScrollArea.Autosize>
+        <Divider />
+      </Stack>
     ),
     labels: { confirm: t("ui.update-now"), cancel: t("ui.update-skip") },
+    confirmProps: { leftSection: <DownloadSimple size="1rem" /> },
     onConfirm: () => {
       installUpdate().catch(() => toast.error(t("ui.update-failed")));
     },
@@ -45,7 +58,7 @@ export const previewUpdatePrompt = (t: Translator) =>
   openUpdatePrompt(t, {
     version: "9.9.9-preview",
     date: "",
-    body: "- Example patch note\n- Another example note",
+    body: "## Highlights\n\n- Example **patch** note\n- Another example note\n- See [the full changelog](https://github.com/villith/relink-logs/blob/main/CHANGELOG.md)",
   });
 
 /**

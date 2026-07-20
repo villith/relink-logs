@@ -99,6 +99,13 @@ describe("useManualUpdateCheck", () => {
     expect(toast.success).not.toHaveBeenCalled();
   });
 
+  it("the prompt is a centered modal", async () => {
+    checkUpdateMock.mockResolvedValue(update(true));
+    const { result } = renderHook(() => useManualUpdateCheck());
+    await act(async () => result.current.checkNow());
+    expect(openConfirmModalMock.mock.calls[0][0].centered).toBe(true);
+  });
+
   it("toasts up-to-date when there is no newer release", async () => {
     checkUpdateMock.mockResolvedValue(update(false));
     const { result } = renderHook(() => useManualUpdateCheck());
