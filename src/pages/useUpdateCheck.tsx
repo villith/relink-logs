@@ -51,16 +51,6 @@ const openUpdatePrompt = (t: Translator, manifest?: UpdateManifest) => {
   });
 };
 
-/** Shows the prompt with a made-up release — a debug aid to see the dialog
- * without a newer release existing. Confirming runs a real installUpdate,
- * which fails into the update-failed toast (there is nothing to install). */
-export const previewUpdatePrompt = (t: Translator) =>
-  openUpdatePrompt(t, {
-    version: "9.9.9-preview",
-    date: "",
-    body: "## Highlights\n\n- Example **patch** note\n- Another example note\n- See [the full changelog](https://github.com/villith/relink-logs/blob/main/CHANGELOG.md)",
-  });
-
 /**
  * When `enabled`, asks the update endpoint once whether a newer release
  * exists and offers it via the update prompt. Requires `updater.dialog:

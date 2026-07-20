@@ -52,7 +52,6 @@
     "check-updates": "Check for Updates",
     "up-to-date": "You are on the latest version.",
     "update-check-failed": "Could not reach the update server.",
-    "preview-update-prompt": "Preview Update Prompt",
     "open-update-prompt": "Download the update",
     "version-latest": "latest",
     "version-update-available": "update available - v{{version}}",

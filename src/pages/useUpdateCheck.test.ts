@@ -17,7 +17,7 @@ import toast from "react-hot-toast";
 
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { useUpdateStatusStore } from "@/stores/useUpdateStatusStore";
-import useUpdateCheck, { previewUpdatePrompt, useManualUpdateCheck } from "./useUpdateCheck";
+import useUpdateCheck, { useManualUpdateCheck } from "./useUpdateCheck";
 
 const checkUpdateMock = vi.mocked(checkUpdate);
 const installUpdateMock = vi.mocked(installUpdate);
@@ -194,15 +194,5 @@ describe("update status recording (header indicator)", () => {
     renderHook(() => useUpdateCheck(true));
     await waitFor(() => expect(checkUpdateMock).toHaveBeenCalledTimes(1));
     expect(useUpdateStatusStore.getState().status).toBeNull();
-  });
-});
-
-describe("previewUpdatePrompt", () => {
-  it("opens the update modal with a sample manifest, no endpoint involved", () => {
-    openConfirmModalMock.mockReset();
-    checkUpdateMock.mockReset();
-    previewUpdatePrompt((key: string) => key);
-    expect(openConfirmModalMock).toHaveBeenCalledTimes(1);
-    expect(checkUpdateMock).not.toHaveBeenCalled();
   });
 });

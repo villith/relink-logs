@@ -27,7 +27,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import useChecklistSettings from "./useChecklistSettings";
 import useSettings from "./useSettings";
-import { previewUpdatePrompt, useManualUpdateCheck } from "./useUpdateCheck";
+import { useManualUpdateCheck } from "./useUpdateCheck";
 
 export const ChecklistSection = ({
   group,
@@ -220,10 +220,6 @@ const SettingsPage = () => {
             </Tooltip>
             <Button size="compact-sm" variant="light" onClick={checkNow} loading={checking}>
               {t("ui.check-updates")}
-            </Button>
-            {/* Temporary debug aid: preview the prompt as if an update existed. */}
-            <Button size="compact-sm" variant="subtle" onClick={() => previewUpdatePrompt(t)}>
-              {t("ui.preview-update-prompt")}
             </Button>
           </Group>
           <Tooltip label={t("ui.debug-mode-description")}>
