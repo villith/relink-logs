@@ -1,13 +1,15 @@
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import "./Logs.css";
 
+import NewChip from "@/components/NewChip";
 import { deriveNavState } from "@/utils";
-import { AppShell, Button, Group, Text } from "@mantine/core";
-import { Bug, Flag, Gear, House, ListDashes, Translate, Wrench } from "@phosphor-icons/react";
+import { ActionIcon, AppShell, Button, Group, Text } from "@mantine/core";
+import { ArrowsCounterClockwise, Bug, Flag, Gear, House, ListDashes, Translate, Wrench } from "@phosphor-icons/react";
+import { invoke } from "@tauri-apps/api";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/api/shell";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -52,6 +54,10 @@ const Layout = () => {
   const { pathname } = useLocation();
   const { logsActive, toolboxActive, settingsActive, confluxActive, questsActive, onListPage } =
     deriveNavState(pathname);
+  // Live pathname for the encounter-saved listener (its closure would
+  // otherwise hold the pathname from when the listener was attached).
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
 
   useEffect(() => {
     getVersion().then(setVersion);
@@ -63,7 +69,8 @@ const Layout = () => {
     });
 
     const saveListener = listen("encounter-saved", (event: { payload: number | null }) => {
-      if (event.payload && open_log_on_save) {
+      // Never yank the user out of the toolbox mid-task.
+      if (event.payload && open_log_on_save && !pathnameRef.current.startsWith("/logs/toolbox")) {
         navigate(`/logs/${event.payload}`);
       }
     });
@@ -87,7 +94,10 @@ const Layout = () => {
                 {t("ui.logs-tab")}
               </NavTab>
               <NavTab to="/logs/toolbox" icon={<Wrench size="1rem" />} active={toolboxActive}>
-                {t("ui.toolbox.title")}
+                <Group gap={6} wrap="nowrap">
+                  {t("ui.toolbox.title")}
+                  <NewChip id="toolbox" />
+                </Group>
               </NavTab>
               <NavTab to="/logs/settings" icon={<Gear size="1rem" />} active={settingsActive}>
                 {t("ui.settings")}
@@ -98,10 +108,10 @@ const Layout = () => {
                 variant="subtle"
                 color="gray"
                 size="compact-sm"
-                leftSection={<Bug size="1rem" />}
-                onClick={() => open(`${GITHUB_URL}/issues/new?template=bug.yml`)}
+                leftSection={<ArrowsCounterClockwise size="1rem" />}
+                onClick={() => invoke("reset_meter_window")}
               >
-                {t("ui.report-bug")}
+                {t("ui.reset-overlay")}
               </Button>
               <Button
                 variant="subtle"
@@ -112,6 +122,16 @@ const Layout = () => {
               >
                 {t("ui.submit-missing-label")}
               </Button>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="lg"
+                title={t("ui.report-bug")}
+                aria-label={t("ui.report-bug")}
+                onClick={() => open(`${GITHUB_URL}/issues/new?template=bug.yml`)}
+              >
+                <Bug size="1rem" />
+              </ActionIcon>
             </Group>
           </Group>
         </AppShell.Header>

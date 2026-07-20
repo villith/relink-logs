@@ -1,6 +1,84 @@
-import { describe, expect, it } from "vitest";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildQuery, buildTraitOptions, initialForm } from "./useSynthesisHelper";
+import { SynthesisStatus } from "@/types";
+
+vi.mock("@tauri-apps/api", () => ({ invoke: vi.fn() }));
+// The real bundle needs an initialized i18next (the app does this at startup;
+// this test env does not).
+vi.mock("@/utils", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  getTraitsBundle: () => ({}),
+}));
+vi.mock("react-i18next", () => ({
+  useTranslation: () => ({
+    t: (key: string, fallback?: unknown) => (typeof fallback === "string" ? fallback : key),
+    i18n: { language: "en" },
+  }),
+}));
+
+import { invoke } from "@tauri-apps/api";
+
+import useSynthesisHelper, {
+  buildQuery,
+  buildTraitOptions,
+  initialForm,
+  sanitizeSynthesisForm,
+} from "./useSynthesisHelper";
+
+const invokeMock = vi.mocked(invoke);
+
+describe("useSynthesisHelper loading", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+  });
+
+  it("is loading until the game status fetch resolves", async () => {
+    let resolveStatus!: (s: SynthesisStatus) => void;
+    invokeMock.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveStatus = resolve;
+        })
+    );
+    const { result } = renderHook(() => useSynthesisHelper());
+    expect(result.current.loading).toBe(true);
+    await act(async () => resolveStatus({ gameRunning: true, sigilCount: 3, rngUnpredictable: false }));
+    expect(result.current.loading).toBe(false);
+    expect(result.current.status?.gameRunning).toBe(true);
+  });
+
+  it("stops loading when the status fetch fails", async () => {
+    invokeMock.mockRejectedValue("game-not-running");
+    const { result } = renderHook(() => useSynthesisHelper());
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.error).toBe("game-not-running");
+  });
+});
+
+describe("sanitizeSynthesisForm", () => {
+  it("passes a valid saved form through unchanged", () => {
+    const saved = { trait1: "ceb700ee", trait2: "dc584f60", anyOrder: true, requireLucky: false };
+    expect(sanitizeSynthesisForm(saved)).toEqual(saved);
+  });
+
+  it("falls back to the initial form for garbage", () => {
+    expect(sanitizeSynthesisForm(null)).toEqual(initialForm);
+    expect(sanitizeSynthesisForm("x")).toEqual(initialForm);
+    expect(sanitizeSynthesisForm(undefined)).toEqual(initialForm);
+  });
+
+  it("nulls traits that are not synthesizable and defaults broken flags", () => {
+    expect(
+      sanitizeSynthesisForm({ trait1: "not-a-trait", trait2: "ceb700ee", anyOrder: "yes", requireLucky: 0 })
+    ).toEqual({
+      trait1: null,
+      trait2: "ceb700ee",
+      anyOrder: initialForm.anyOrder,
+      requireLucky: initialForm.requireLucky,
+    });
+  });
+});
 
 describe("initialForm", () => {
   it("defaults to lvl-15-only results in exact slot order", () => {

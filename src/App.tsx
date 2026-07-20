@@ -8,6 +8,7 @@ import ToolboxPage from "./pages/Toolbox";
 import { ConfluxIndexPage } from "./pages/logs/ConfluxIndex";
 import { IndexPage as LogIndexPage } from "./pages/logs/Index";
 import { ViewPage as LogViewPage } from "./pages/logs/View";
+import OvermasteryPredictor from "./pages/toolbox/OvermasteryPredictor";
 import SynthesisHelper from "./pages/toolbox/SynthesisHelper";
 
 import "./App.css";
@@ -23,6 +24,7 @@ export const App = () => {
           <Route path="toolbox" element={<ToolboxPage />}>
             <Route index element={<Navigate to="synthesis" replace />} />
             <Route path="synthesis" element={<SynthesisHelper />} />
+            <Route path="overmastery" element={<OvermasteryPredictor />} />
           </Route>
           <Route path=":id" element={<LogViewPage />} />
           <Route path="settings" element={<SettingsPage />} />

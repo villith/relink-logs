@@ -60,7 +60,7 @@ export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyDa
           ? { value: (player.sba / 10).toFixed(2) }
           : { value: (player.sba / 10).toFixed(2), unit: "%" };
       case MeterColumns.StunPerSecond:
-        return { value: (player.stunPerSecond || 0).toLocaleString() };
+        return { value: (player.stunPerSecond || 0).toFixed(2).toLocaleString() };
       case MeterColumns.TotalStunValue:
         return showFullValues
           ? { value: (player.totalStunValue || 0).toLocaleString() }

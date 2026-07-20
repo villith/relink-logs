@@ -164,6 +164,19 @@ pub struct SynthesisSearchResponse {
     pub pairs_tested: u64,
     pub sigil_count: u32,
     pub rng_unpredictable: bool,
+    /// Seed identity the search was computed from; when the live values move
+    /// off these, the result list is stale.
+    pub rng_state: u32,
+    pub seed_counter: u32,
+}
+
+/// The two live values every synthesis prediction depends on (beyond the
+/// sigil box itself); read cheaply for staleness polling.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SynthesisSeed {
+    pub rng_state: u32,
+    pub seed_counter: u32,
 }
 
 /// Item ids of "special" sigils the game refuses as synthesis material

@@ -10,7 +10,7 @@ use std::{
 };
 
 use anyhow::Context;
-use gbfr_logs::{db, parser, synthesis};
+use gbfr_logs::{db, overmastery, parser, synthesis};
 
 use db::logs::LogEntry;
 use dll_syringe::{process::OwnedProcess, Syringe};
@@ -89,7 +89,89 @@ async fn search_synthesis(
             pairs_tested,
             sigil_count: snap.sigils.len() as u32,
             rng_unpredictable: snap.rng_state == 0,
+            rng_state: snap.rng_state,
+            seed_counter: snap.seed_counter,
         })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Toolbox / Synthesis Helper: current seed identity for staleness polling.
+/// `None` = game not running (staleness unknowable, not stale).
+#[tauri::command(async)]
+async fn fetch_synthesis_seed() -> Result<Option<synthesis::SynthesisSeed>, String> {
+    tokio::task::spawn_blocking(|| synthesis::snapshot::take_seed_state().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Toolbox / Overmastery Predictor: is the game up, and which characters
+/// exist in the roster (for the character picker).
+#[tauri::command(async)]
+async fn fetch_overmastery_status() -> Result<overmastery::OvermasteryStatus, String> {
+    tokio::task::spawn_blocking(|| match overmastery::snapshot::take_snapshot() {
+        Ok(None) => Ok(overmastery::OvermasteryStatus { game_running: false, roster: Vec::new() }),
+        Ok(Some(snap)) => {
+            Ok(overmastery::OvermasteryStatus { game_running: true, roster: snap.roster })
+        }
+        Err(e) => Err(e.to_string()),
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Toolbox / Overmastery Predictor: fresh RNG snapshot + simulate the next N
+/// meditation rolls for one character and size.
+#[tauri::command(async)]
+async fn predict_overmastery(
+    query: overmastery::OvermasteryQuery,
+) -> Result<overmastery::OvermasteryPrediction, String> {
+    let tables = overmastery::stock_tables();
+    if query.tier >= tables.tiers.len() {
+        return Err("invalid-tier".to_string());
+    }
+    let rolls = query.rolls.min(500);
+    tokio::task::spawn_blocking(move || {
+        let snap = overmastery::snapshot::take_snapshot()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "game-not-running".to_string())?;
+        if snap.slot_override != u32::MAX {
+            return Err("rng-override-active".to_string());
+        }
+        let char_idx = overmastery::char_slot_index(&snap.roster, query.char_id)
+            .ok_or_else(|| "character-not-found".to_string())?;
+        let slot = overmastery::rng_slot(query.tier as u32, char_idx);
+        let slot_state = *snap
+            .slots
+            .get(slot as usize)
+            .ok_or_else(|| "slot-out-of-range".to_string())?;
+        Ok(overmastery::OvermasteryPrediction {
+            rolls: overmastery::simulate(slot_state, query.tier, tables, rolls),
+            slot,
+            slot_state,
+            unpredictable: slot_state == 0,
+            msp_cost: tables.tiers[query.tier].msp_cost,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Toolbox / Overmastery Predictor: current RNG state of one slot, for
+/// staleness polling against a prediction's `slot_state`. `None` = game not
+/// running (staleness unknowable, not stale).
+#[tauri::command(async)]
+async fn fetch_overmastery_seed(slot: u32) -> Result<Option<u32>, String> {
+    tokio::task::spawn_blocking(move || match overmastery::snapshot::take_snapshot() {
+        Ok(None) => Ok(None),
+        Ok(Some(snap)) => snap
+            .slots
+            .get(slot as usize)
+            .copied()
+            .map(Some)
+            .ok_or_else(|| "slot-out-of-range".to_string()),
+        Err(e) => Err(e.to_string()),
     })
     .await
     .map_err(|e| e.to_string())?
@@ -750,6 +832,19 @@ fn toggle_clickthrough(window: tauri::Window, state: State<ClickThrough>) {
         });
 }
 
+#[tauri::command]
+fn reset_meter_window(app_handle: AppHandle) {
+    if let Some(window) = app_handle.get_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_size(Size::Logical(LogicalSize {
+            width: 500.0,
+            height: 350.0,
+        }));
+        let _ = window.center();
+    }
+}
+
 fn menu_tray_handler(handle: &AppHandle, event: SystemTrayEvent) {
     let should_focus = true;
     match event {
@@ -843,10 +938,15 @@ fn main() {
             delete_logs,
             delete_all_logs,
             toggle_always_on_top,
+            reset_meter_window,
             export_damage_log_to_file,
             set_debug_mode,
             reset_encounter,
             fetch_synthesis_status,
+            fetch_synthesis_seed,
+            fetch_overmastery_status,
+            predict_overmastery,
+            fetch_overmastery_seed,
             search_synthesis,
         ])
         .setup(|app| {

@@ -1,5 +1,6 @@
 import synthesisTraits from "@/assets/synthesis-traits.json";
-import { SynthesisSearchResponse, SynthesisStatus } from "@/types";
+import { useSynthesisFormStore } from "@/stores/useSynthesisFormStore";
+import { SynthesisSearchResponse, SynthesisSeed, SynthesisStatus } from "@/types";
 import { getTraitsBundle } from "@/utils";
 import { invoke } from "@tauri-apps/api";
 import { useEffect, useMemo, useState } from "react";
@@ -55,6 +56,21 @@ export const initialForm: SynthesisForm = {
   requireLucky: true,
 };
 
+/** Validate a form loaded from localStorage: traits must still be
+ * synthesizable (game updates can change the set), flags must be booleans;
+ * anything broken falls back to the initial form's value. */
+export const sanitizeSynthesisForm = (value: unknown): SynthesisForm => {
+  if (typeof value !== "object" || value === null) return initialForm;
+  const v = value as Record<string, unknown>;
+  const trait = (raw: unknown): string | null => (typeof raw === "string" && SYNTHESIS_TRAITS.has(raw) ? raw : null);
+  return {
+    trait1: trait(v.trait1),
+    trait2: trait(v.trait2),
+    anyOrder: typeof v.anyOrder === "boolean" ? v.anyOrder : initialForm.anyOrder,
+    requireLucky: typeof v.requireLucky === "boolean" ? v.requireLucky : initialForm.requireLucky,
+  };
+};
+
 /** Form -> backend query; null when the form is incomplete (no first trait). */
 export const buildQuery = (form: SynthesisForm): SynthesisQueryPayload | null => {
   if (!form.trait1) return null;
@@ -74,16 +90,50 @@ export default function useSynthesisHelper() {
   // Re-render when the traits bundle loads / language changes (same pattern
   // as useChecklistSettings).
   const { i18n } = useTranslation("traits");
-  const [form, setForm] = useState<SynthesisForm>(initialForm);
+  const [form, setForm] = useState<SynthesisForm>(() => sanitizeSynthesisForm(useSynthesisFormStore.getState().saved));
   const [status, setStatus] = useState<SynthesisStatus | null>(null);
   const [response, setResponse] = useState<SynthesisSearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
+  const [stale, setStale] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const saveForm = useSynthesisFormStore((s) => s.save);
+
+  useEffect(() => {
+    saveForm(form);
+  }, [form, saveForm]);
+
+  /** While results are shown, watch the synthesis seed identity: any
+   * synthesis (or seed-counter bump) invalidates the predicted outcomes. */
+  useEffect(() => {
+    if (!response || response.rngUnpredictable || stale) return;
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const seed = await invoke<SynthesisSeed | null>("fetch_synthesis_seed");
+        if (
+          !cancelled &&
+          seed !== null &&
+          (seed.rngState !== response.rngState || seed.seedCounter !== response.seedCounter)
+        ) {
+          setStale(true);
+        }
+      } catch {
+        // Game gone or state unreadable — staleness unknowable; don't flag.
+      }
+    };
+    const id = setInterval(check, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [response, stale]);
 
   useEffect(() => {
     invoke<SynthesisStatus>("fetch_synthesis_status")
       .then(setStatus)
-      .catch((e) => setError(String(e)));
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
   }, []);
 
   const traitOptions = useMemo(() => buildTraitOptions(getTraitsBundle()), [i18n.language]);
@@ -93,6 +143,7 @@ export default function useSynthesisHelper() {
     if (!query) return;
     setSearching(true);
     setError(null);
+    setStale(false);
     try {
       setResponse(await invoke<SynthesisSearchResponse>("search_synthesis", { query }));
     } catch (e) {
@@ -103,5 +154,5 @@ export default function useSynthesisHelper() {
     }
   };
 
-  return { form, setForm, status, response, error, searching, traitOptions, search };
+  return { form, setForm, status, response, error, searching, stale, loading, traitOptions, search };
 }

@@ -23,7 +23,7 @@ const GAME_EXE: &str = "granblue_fantasy_relink.exe";
 
 // Cursor lands on the disp32 of `mov rdi/rcx, [rip+disp]`; global RVA = cursor + 4 + disp.
 const COMMIT_SIG: &str = "55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec ? ? 00 00 48 8d ac 24 80 00 00 00 48 c7 85 ? ? 00 00 fe ff ff ff 48 8b 3d ' ? ? ? ? 48 8b 05";
-const RNG_SIG: &str = "48 8b 0d ' ? ? ? ? ba 81 00 00 00 e8";
+pub(crate) const RNG_SIG: &str = "48 8b 0d ' ? ? ? ? ba 81 00 00 00 e8";
 
 // Sigil-manager struct offsets (v2.0.2 layout; see the plan's offset table).
 const MGR_ITEM_MAP: u64 = 0x0;
@@ -37,10 +37,10 @@ const RNG_SLOT_OVERRIDE: u64 = 0x20c;
 
 const MAX_MAP_ENTRIES: u64 = 500_000;
 
-struct Mem(HANDLE);
+pub(crate) struct Mem(pub(crate) HANDLE);
 
 impl Mem {
-    fn read(&self, addr: u64, buf: &mut [u8]) -> Result<()> {
+    pub(crate) fn read(&self, addr: u64, buf: &mut [u8]) -> Result<()> {
         let mut got = 0usize;
         unsafe {
             ReadProcessMemory(
@@ -58,12 +58,12 @@ impl Mem {
         }
         Ok(())
     }
-    fn u64(&self, addr: u64) -> Result<u64> {
+    pub(crate) fn u64(&self, addr: u64) -> Result<u64> {
         let mut b = [0u8; 8];
         self.read(addr, &mut b)?;
         Ok(u64::from_le_bytes(b))
     }
-    fn u32(&self, addr: u64) -> Result<u32> {
+    pub(crate) fn u32(&self, addr: u64) -> Result<u32> {
         let mut b = [0u8; 4];
         self.read(addr, &mut b)?;
         Ok(u32::from_le_bytes(b))
@@ -88,7 +88,7 @@ fn wide_to_string(w: &[u16]) -> String {
 
 /// Find the game process id, or None if it isn't running. Uses the same
 /// dll_syringe lookup as the injector (`check_and_perform_hook` in main.rs).
-fn find_game_pid() -> Result<Option<u32>> {
+pub(crate) fn find_game_pid() -> Result<Option<u32>> {
     let Some(process) = OwnedProcess::find_first_by_name(GAME_EXE) else {
         return Ok(None);
     };
@@ -96,7 +96,7 @@ fn find_game_pid() -> Result<Option<u32>> {
 }
 
 /// Main-module (exe) base address and on-disk path.
-fn module_base(pid: u32) -> Result<(u64, PathBuf)> {
+pub(crate) fn module_base(pid: u32) -> Result<(u64, PathBuf)> {
     let snap = Mem(unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, pid) }?);
     let mut entry = MODULEENTRY32W {
         dwSize: std::mem::size_of::<MODULEENTRY32W>() as u32,
@@ -187,6 +187,30 @@ fn walk_map(mem: &Mem, header: u64, mut f: impl FnMut(u64) -> Result<()>) -> Res
         node = mem.u64(node)?;
     }
     Ok(())
+}
+
+/// Light read of just the synthesis seed identity (RNG slot 0x81 state +
+/// manager seed counter) for staleness polling — no map walks. `Ok(None)` =
+/// game not running.
+pub fn take_seed_state() -> Result<Option<super::SynthesisSeed>> {
+    let Some(pid) = find_game_pid()? else {
+        return Ok(None);
+    };
+    let mem = Mem(
+        unsafe { OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid) }
+            .context("OpenProcess (run as admin?)")?,
+    );
+    let (base, exe) = module_base(pid)?;
+    let (mgr_rva, rng_rva) = resolve_globals(&exe)?;
+    let mgr = mem.u64(base + mgr_rva as u64)?;
+    let rng = mem.u64(base + rng_rva as u64)?;
+    if mgr == 0 || rng == 0 {
+        bail!("synthesis globals not initialized yet (still on title screen?)");
+    }
+    Ok(Some(super::SynthesisSeed {
+        rng_state: mem.u32(rng + RNG_SYNTH_STATE)?,
+        seed_counter: mem.u32(mgr + MGR_SEED_COUNTER)?,
+    }))
 }
 
 /// Take a full synthesis snapshot. `Ok(None)` = game not running.
