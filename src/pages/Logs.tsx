@@ -2,6 +2,7 @@ import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import "./Logs.css";
 
 import NewChip from "@/components/NewChip";
+import UpdateAvailableButton from "@/components/UpdateAvailableButton";
 import { deriveNavState } from "@/utils";
 import { ActionIcon, AppShell, Button, Group, Text } from "@mantine/core";
 import { ArrowsCounterClockwise, Bug, Flag, Gear, House, ListDashes, Translate, Wrench } from "@phosphor-icons/react";
@@ -110,6 +111,7 @@ const Layout = () => {
                   </Text>
                 )}
               </Text>
+              <UpdateAvailableButton />
             </Group>
             <Group h="100%" gap="xs" wrap="nowrap" justify="center">
               <NavTab to="/logs" icon={<ListDashes size="1rem" />} active={logsActive}>
