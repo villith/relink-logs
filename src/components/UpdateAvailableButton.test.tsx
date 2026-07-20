@@ -1,6 +1,6 @@
 import { MantineProvider } from "@mantine/core";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/updater", () => ({ checkUpdate: vi.fn(), installUpdate: vi.fn() }));
 vi.mock("@mantine/modals", () => ({ modals: { openConfirmModal: vi.fn() } }));
@@ -17,35 +17,6 @@ import { checkUpdate } from "@tauri-apps/api/updater";
 
 import { useUpdateStatusStore } from "@/stores/useUpdateStatusStore";
 import UpdateAvailableButton from "./UpdateAvailableButton";
-
-// Explicit even though vitest's `globals: true` config restores
-// testing-library's auto-cleanup — keeps this file safe on its own.
-afterEach(cleanup);
-
-// jsdom is missing these browser APIs; Mantine's components probe them.
-beforeAll(() => {
-  window.matchMedia =
-    window.matchMedia ||
-    ((query: string) =>
-      ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => {},
-        removeListener: () => {},
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList);
-
-  window.ResizeObserver =
-    window.ResizeObserver ||
-    class implements ResizeObserver {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    };
-});
 
 const renderButton = () =>
   render(

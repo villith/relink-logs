@@ -2,8 +2,8 @@ import { ActionIcon } from "@mantine/core";
 import { DownloadSimple } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
-import { useManualUpdateCheck } from "@/pages/useUpdateCheck";
 import { useUpdateStatusStore } from "@/stores/useUpdateStatusStore";
+import { useManualUpdateCheck } from "@/useUpdateCheck";
 
 /**
  * Header affordance shown only while an update is known to be available.

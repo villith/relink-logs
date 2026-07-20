@@ -58,26 +58,23 @@ const openUpdatePrompt = (t: Translator, manifest?: UpdateManifest) => {
  */
 export default function useUpdateCheck(enabled: boolean) {
   const { t } = useTranslation();
-  // One prompt per app run, across setting toggles and re-renders.
-  const prompted = useRef(false);
+  // One endpoint check (and so at most one prompt) per app run, across
+  // setting toggles, language changes, and re-renders.
+  const checked = useRef(false);
 
   useEffect(() => {
-    if (!enabled || prompted.current) return;
-    let cancelled = false;
+    if (!enabled || checked.current) return;
+    checked.current = true;
     checkUpdate()
       .then(({ shouldUpdate, manifest }) => {
         recordStatus(shouldUpdate, manifest);
-        if (cancelled || !shouldUpdate || prompted.current) return;
+        if (!shouldUpdate) return;
         if (manifest?.version && manifest.version === useMeterSettingsStore.getState().skipped_update_version) return;
-        prompted.current = true;
         openUpdatePrompt(t, manifest);
       })
       .catch(() => {
         // Offline or the endpoint is unreachable — try again next launch.
       });
-    return () => {
-      cancelled = true;
-    };
   }, [enabled, t]);
 }
 

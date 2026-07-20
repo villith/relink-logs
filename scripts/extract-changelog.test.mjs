@@ -41,4 +41,13 @@ describe("extractSection", () => {
     expect(extractSection(CHANGELOG, "1.9")).toBeNull();
     expect(extractSection(CHANGELOG, "1.10.0.1")).toBeNull();
   });
+
+  it("does not let a prerelease heading stand in for the release", () => {
+    const withRc = "## 1.10.0-rc.1\n\n- Prerelease only\n\n## 1.10.0\n\n- Real notes\n";
+    expect(extractSection(withRc, "1.10.0")).toBe("- Real notes");
+  });
+
+  it("escapes regex metacharacters in the version", () => {
+    expect(extractSection("## 1.2.0+1\n\n- Build note\n", "1.2.0+1")).toBe("- Build note");
+  });
 });

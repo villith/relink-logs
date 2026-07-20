@@ -348,4 +348,22 @@ describe("buildCharacterOptions", () => {
     expect(options).toContainEqual({ value: "079df0cc", label: "name:Pl0300" });
     expect(options.some((o) => o.value === "deadbeef")).toBe(false);
   });
+
+  it("offers nothing when the roster was never read (game not running)", () => {
+    expect(buildCharacterOptions([], (pl) => `name:${pl}`)).toEqual([]);
+  });
+
+  it("still offers the protagonist when the roster holds only unrecognised hashes", () => {
+    // A game patch can add characters the baked hash map doesn't know yet;
+    // that must not hide the protagonist, whose rolls are still predictable.
+    expect(buildCharacterOptions([0xdeadbeef, 0xfeedface], (pl) => `name:${pl}`)).toEqual([
+      { value: "2a26b1b2", label: "name:Pl0000" },
+    ]);
+  });
+
+  it("still offers the protagonist on a save where nobody else has joined", () => {
+    expect(buildCharacterOptions([0x2a26b1b2], (pl) => `name:${pl}`)).toEqual([
+      { value: "2a26b1b2", label: "name:Pl0000" },
+    ]);
+  });
 });

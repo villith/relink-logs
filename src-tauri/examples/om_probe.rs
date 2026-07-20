@@ -36,7 +36,7 @@ fn main() -> anyhow::Result<()> {
         println!("\nmeditation slot states (slot = 5 + tier*0x29 + charIdx):");
         for tier in 0..3 {
             let base = rng_slot(tier, 0) as usize;
-            let states: Vec<String> = (0..snap.roster.len().max(1).min(0x29))
+            let states: Vec<String> = (0..snap.roster.len().clamp(1, 0x29))
                 .map(|i| format!("{:08x}", snap.slots[base + i]))
                 .collect();
             println!("  tier {tier}: {}", states.join(" "));

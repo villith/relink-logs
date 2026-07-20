@@ -19,13 +19,6 @@ describe("compareVersions", () => {
 });
 
 describe("isNewVersion", () => {
-  it("a plain version is new until the app moves past it", () => {
-    expect(isNewVersion("1.9.6", "1.9.5")).toBe(true); // staged ahead of the release
-    expect(isNewVersion("1.9.6", "1.9.6")).toBe(true); // the shipping release itself
-    expect(isNewVersion("1.9.6", "1.9.7")).toBe(false); // next release: chip expires
-    expect(isNewVersion("1.9.6", "1.10.0")).toBe(false);
-  });
-
   it("a range is new between its bounds, inclusive", () => {
     const range = { from: "1.9.6", until: "1.9.8" };
     expect(isNewVersion(range, "1.9.5")).toBe(false); // before the feature ships

@@ -1,4 +1,5 @@
 import synthesisTraits from "@/assets/synthesis-traits.json";
+import useStalenessWatch from "@/pages/toolbox/useStalenessWatch";
 import { useSynthesisFormStore } from "@/stores/useSynthesisFormStore";
 import { SynthesisSearchResponse, SynthesisSeed, SynthesisStatus } from "@/types";
 import { getTraitsBundle } from "@/utils";
@@ -95,7 +96,6 @@ export default function useSynthesisHelper() {
   const [response, setResponse] = useState<SynthesisSearchResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
-  const [stale, setStale] = useState(false);
   const [loading, setLoading] = useState(true);
   const saveForm = useSynthesisFormStore((s) => s.save);
 
@@ -105,35 +105,28 @@ export default function useSynthesisHelper() {
 
   /** While results are shown, watch the synthesis seed identity: any
    * synthesis (or seed-counter bump) invalidates the predicted outcomes. */
-  useEffect(() => {
-    if (!response || response.rngUnpredictable || stale) return;
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const seed = await invoke<SynthesisSeed | null>("fetch_synthesis_seed");
-        if (
-          !cancelled &&
-          seed !== null &&
-          (seed.rngState !== response.rngState || seed.seedCounter !== response.seedCounter)
-        ) {
-          setStale(true);
-        }
-      } catch {
-        // Game gone or state unreadable — staleness unknowable; don't flag.
-      }
-    };
-    const id = setInterval(check, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [response, stale]);
+  const [stale, setStale] = useStalenessWatch(
+    response && !response.rngUnpredictable ? response : null,
+    async (watched) => {
+      const seed = await invoke<SynthesisSeed | null>("fetch_synthesis_seed");
+      return seed !== null && (seed.rngState !== watched.rngState || seed.seedCounter !== watched.seedCounter);
+    }
+  );
 
   useEffect(() => {
-    invoke<SynthesisStatus>("fetch_synthesis_status")
-      .then(setStatus)
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
+    const load = () =>
+      invoke<SynthesisStatus>("fetch_synthesis_status")
+        .then(setStatus)
+        .catch((e) => setError(String(e)))
+        .finally(() => setLoading(false));
+    load();
+    // Users routinely open the tool before launching the game; re-read when
+    // the window comes back so the "game not running" banner clears itself.
+    const onVisible = () => {
+      if (!document.hidden) load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   const traitOptions = useMemo(() => buildTraitOptions(getTraitsBundle()), [i18n.language]);

@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// The game's "no trait in this slot" sentinel.
-pub const EMPTY_TRAIT: u32 = 0x887a_e0b0;
+pub use crate::game_mem::EMPTY_KEY as EMPTY_TRAIT;
+pub use crate::game_mem::xorshift32;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,16 +52,6 @@ pub struct Prediction {
     pub trait2: Option<u32>,
     /// true = the weighted roll hit the upgraded (level-15) outcome.
     pub lucky: bool,
-}
-
-/// One step of the game's per-slot RNG. Returns the new state, which is also
-/// the drawn value.
-#[inline]
-pub fn xorshift32(mut s: u32) -> u32 {
-    s ^= s << 13;
-    s ^= s >> 17;
-    s ^= s << 15;
-    s
 }
 
 fn trait_sum(s: &SynthesisSigil) -> u64 {

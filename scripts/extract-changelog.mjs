@@ -13,8 +13,12 @@ import { fileURLToPath } from "node:url";
 /** The body of `version`'s `## <version>` section (trailing heading text such
  * as a date is allowed), trimmed; null when the changelog has no such section. */
 export const extractSection = (markdown, version) => {
-  const escaped = version.replaceAll(".", "\\.");
-  const heading = new RegExp(`^##\\s+\\[?${escaped}\\]?(?![\\d.])[^\\n]*$`, "m");
+  const escaped = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // The version must be the whole version, not a prefix of a longer one:
+  // `## 1.10.0-rc.1` must not satisfy 1.10.0 (it would ship prerelease notes
+  // as the release body). Trailing prose after a space — a date, a name — is
+  // still allowed.
+  const heading = new RegExp(`^##\\s+\\[?${escaped}\\]?(?![\\w.+-])[^\\n]*$`, "m");
   const match = heading.exec(markdown);
   if (!match) return null;
   const rest = markdown.slice(match.index + match[0].length);

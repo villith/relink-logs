@@ -2,7 +2,7 @@ import { translateSigilId, translateTraitId } from "@/utils";
 import { Alert, Badge, Button, Checkbox, Group, ScrollArea, Select, Stack, Table, Text, Title } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
-import { SYNTHESIS_ERR } from "@/synthesisErrors";
+import { backendErrorMessage } from "@/backendErrors";
 import { SynthesisMatch, SynthesisSigil } from "@/types";
 
 import useSynthesisHelper from "./useSynthesisHelper";
@@ -46,16 +46,14 @@ const SynthesisHelper = () => {
     useSynthesisHelper();
 
   // The form drives reads of live game memory: hold it while the initial
-  // status fetch or a search is talking to the game.
+  // status fetch or a search is talking to the game. Deliberately NOT gated
+  // on `status.gameRunning`: the status is a snapshot, and latching the whole
+  // form on it would strand anyone who opens the tool before launching the
+  // game. Search re-reads live state and reports `game-not-running` itself,
+  // and the hook re-reads the status when the window regains focus.
   const busy = loading || searching;
 
-  // Map structured backend error strings to friendly copy; show anything else verbatim.
-  const errorMessage =
-    error === SYNTHESIS_ERR.gameNotRunning
-      ? t("ui.toolbox.game-not-running")
-      : error === SYNTHESIS_ERR.invalidTrait
-        ? t("ui.toolbox.invalid-trait")
-        : error;
+  const errorMessage = backendErrorMessage(t, "synthesis", error);
 
   return (
     <Stack gap="md" pr="md">
@@ -103,7 +101,7 @@ const SynthesisHelper = () => {
             disabled={busy}
           />
           <Group>
-            <Button onClick={search} loading={searching} disabled={loading || !form.trait1}>
+            <Button onClick={search} loading={searching} disabled={busy || !form.trait1}>
               {t("ui.toolbox.search", "Search")}
             </Button>
           </Group>

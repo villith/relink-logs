@@ -1,5 +1,6 @@
 import { type ChecklistGroup } from "@/stores/useChecklistStore";
 import { useLogIndexStore } from "@/stores/useLogIndexStore";
+import { useManualUpdateCheck } from "@/useUpdateCheck";
 import { translateTraitId } from "@/utils";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 import {
@@ -27,7 +28,6 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import useChecklistSettings from "./useChecklistSettings";
 import useSettings from "./useSettings";
-import { useManualUpdateCheck } from "./useUpdateCheck";
 
 export const ChecklistSection = ({
   group,

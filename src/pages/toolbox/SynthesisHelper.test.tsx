@@ -1,6 +1,6 @@
 import { MantineProvider } from "@mantine/core";
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({
@@ -15,35 +15,6 @@ vi.mock("./useSynthesisHelper", async (importOriginal) => ({
 
 import SynthesisHelper from "./SynthesisHelper";
 import useSynthesisHelper from "./useSynthesisHelper";
-
-// Explicit even though vitest's `globals: true` config restores
-// testing-library's auto-cleanup — keeps this file safe on its own.
-afterEach(cleanup);
-
-// jsdom is missing these browser APIs; Mantine's components probe them.
-beforeAll(() => {
-  window.matchMedia =
-    window.matchMedia ||
-    ((query: string) =>
-      ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => {},
-        removeListener: () => {},
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList);
-
-  window.ResizeObserver =
-    window.ResizeObserver ||
-    class implements ResizeObserver {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    };
-});
 
 const hookState = (overrides: Partial<ReturnType<typeof useSynthesisHelper>> = {}) =>
   ({
@@ -91,6 +62,14 @@ describe("SynthesisHelper form availability", () => {
 
   it("enables the inputs once the status has arrived and nothing is in flight", () => {
     renderWith({ status: { gameRunning: true, sigilCount: 3, rngUnpredictable: false } });
+    for (const el of controls()) expect(el.disabled, `${el.tagName} should be enabled`).toBe(false);
+  });
+
+  it("keeps the inputs usable when the game was not running at mount", () => {
+    // The status is read once on mount and never refreshed, so disabling on
+    // it would strand anyone who opens the tool before launching the game.
+    // Search re-reads live state and reports game-not-running itself.
+    renderWith({ status: { gameRunning: false, sigilCount: 0, rngUnpredictable: false } });
     for (const el of controls()) expect(el.disabled, `${el.tagName} should be enabled`).toBe(false);
   });
 });

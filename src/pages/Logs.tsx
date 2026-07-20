@@ -17,7 +17,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { useUpdateStatusStore } from "@/stores/useUpdateStatusStore";
 
-import useUpdateCheck from "./useUpdateCheck";
+import useUpdateCheck from "@/useUpdateCheck";
 
 const GITHUB_URL = "https://github.com/villith/relink-logs";
 
@@ -51,10 +51,12 @@ const NavTab = ({
 );
 
 const Layout = () => {
-  const { open_log_on_save, auto_check_updates } = useMeterSettingsStore((state) => ({
-    open_log_on_save: state.open_log_on_save,
-    auto_check_updates: state.auto_check_updates,
-  }));
+  // Atomic selectors: a selector returning a fresh object literal fails
+  // zustand's Object.is check on every store write, so any meter-settings
+  // change (a transparency drag, the update prompt's Skip) would re-render
+  // this Layout and its whole Outlet subtree.
+  const open_log_on_save = useMeterSettingsStore((state) => state.open_log_on_save);
+  const auto_check_updates = useMeterSettingsStore((state) => state.auto_check_updates);
   const { t } = useTranslation();
   const [version, setVersion] = useState("");
   useUpdateCheck(auto_check_updates);
@@ -63,7 +65,11 @@ const Layout = () => {
     ? ""
     : updateStatus.upToDate
       ? ` (${t("ui.version-latest")})`
-      : ` (${t("ui.version-update-available", { version: updateStatus.latestVersion })})`;
+      : // No version means the endpoint didn't name one; "update available - v"
+        // would read as a bug, so fall back to the bare phrase.
+        updateStatus.latestVersion
+        ? ` (${t("ui.version-update-available", { version: updateStatus.latestVersion })})`
+        : ` (${t("ui.version-update-available-unknown")})`;
 
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -85,7 +91,7 @@ const Layout = () => {
 
     const saveListener = listen("encounter-saved", (event: { payload: number | null }) => {
       // Never yank the user out of the toolbox mid-task.
-      if (event.payload && open_log_on_save && !pathnameRef.current.startsWith("/logs/toolbox")) {
+      if (event.payload && open_log_on_save && !deriveNavState(pathnameRef.current).toolboxActive) {
         navigate(`/logs/${event.payload}`);
       }
     });

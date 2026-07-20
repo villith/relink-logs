@@ -3,6 +3,7 @@
 //! can share them. main.rs is a thin binary that `use`s this crate.
 pub mod backfill;
 pub mod db;
+pub mod game_mem;
 pub mod parser;
 pub mod overmastery;
 pub mod synthesis;

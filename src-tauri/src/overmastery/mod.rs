@@ -10,8 +10,9 @@ pub mod snapshot;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// The game's "empty" sentinel (same constant as synthesis' EMPTY_TRAIT).
-pub const EMPTY_KEY: u32 = 0x887a_e0b0;
+/// The game's "empty" sentinel (shared with synthesis, where it's the empty
+/// trait slot).
+pub use crate::game_mem::{xorshift32, EMPTY_KEY};
 
 /// RNG slot for a (character, meditation size) pair: `5 + tier*0x29 + char_idx`.
 /// Char index 0 is the protagonist (PL0000/PL0100); everyone else is their
@@ -31,15 +32,6 @@ pub fn char_slot_index(roster: &[u32], char_id: u32) -> Option<u32> {
         return Some(0);
     }
     roster.iter().position(|&id| id == char_id).map(|i| i as u32)
-}
-
-/// One step of the game's per-slot RNG (identical to synthesis).
-#[inline]
-pub fn xorshift32(mut s: u32) -> u32 {
-    s ^= s << 13;
-    s ^= s >> 17;
-    s ^= s << 15;
-    s
 }
 
 #[derive(Debug, Clone, Deserialize)]

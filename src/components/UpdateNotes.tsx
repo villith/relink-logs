@@ -1,6 +1,12 @@
 import { Anchor, TypographyStylesProvider } from "@mantine/core";
 import { open } from "@tauri-apps/api/shell";
-import Markdown from "react-markdown";
+import { Suspense, lazy } from "react";
+
+// Loaded on demand: react-markdown pulls in the whole unified/remark/micromark
+// stack, and both Tauri windows share one bundle — the always-on-top Meter
+// overlay would otherwise parse it at startup to render a prompt it can never
+// show.
+const Markdown = lazy(() => import("react-markdown"));
 
 /**
  * Release notes rendered from markdown (react-markdown; raw HTML stays
@@ -9,24 +15,26 @@ import Markdown from "react-markdown";
  */
 const UpdateNotes = ({ markdown }: { markdown: string }) => (
   <TypographyStylesProvider fz="sm" pl={0}>
-    <Markdown
-      components={{
-        a: ({ href, children }) => (
-          <Anchor
-            size="sm"
-            href={href}
-            onClick={(e) => {
-              e.preventDefault();
-              if (href) open(href);
-            }}
-          >
-            {children}
-          </Anchor>
-        ),
-      }}
-    >
-      {markdown}
-    </Markdown>
+    <Suspense fallback={null}>
+      <Markdown
+        components={{
+          a: ({ href, children }) => (
+            <Anchor
+              size="sm"
+              href={href}
+              onClick={(e) => {
+                e.preventDefault();
+                if (href) open(href);
+              }}
+            >
+              {children}
+            </Anchor>
+          ),
+        }}
+      >
+        {markdown}
+      </Markdown>
+    </Suspense>
   </TypographyStylesProvider>
 );
 

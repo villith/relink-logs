@@ -1,39 +1,10 @@
 import { type ChecklistGroup } from "@/stores/useChecklistStore";
 import { MantineProvider } from "@mantine/core";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { ChecklistSection } from "./Settings";
 import type useChecklistSettings from "./useChecklistSettings";
-
-// Explicit even though vitest's `globals: true` config restores
-// testing-library's auto-cleanup — keeps this file safe on its own.
-afterEach(cleanup);
-
-// jsdom is missing these browser APIs; Mantine's components probe them.
-beforeAll(() => {
-  window.matchMedia =
-    window.matchMedia ||
-    ((query: string) =>
-      ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => {},
-        removeListener: () => {},
-        addEventListener: () => {},
-        removeEventListener: () => {},
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList);
-
-  window.ResizeObserver =
-    window.ResizeObserver ||
-    class implements ResizeObserver {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    };
-});
 
 type Entry = { ids: number[]; level: number; enabled: boolean };
 

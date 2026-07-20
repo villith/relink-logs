@@ -1,7 +1,9 @@
 ﻿import { humanizeNumbers, translateOvermasteryId } from "@/utils";
 import { Alert, Button, Group, ScrollArea, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { backendErrorMessage } from "@/backendErrors";
 import { OvermasteryMastery } from "@/types";
 
 import useOvermasteryPredictor, {
@@ -12,13 +14,6 @@ import useOvermasteryPredictor, {
   sortRollForDisplay,
   wantedKindSet,
 } from "./useOvermasteryPredictor";
-
-/** Backend error strings mapped to friendly copy keys. */
-const OM_ERR: Record<string, string> = {
-  "game-not-running": "ui.toolbox.om-game-not-running",
-  "character-not-found": "ui.toolbox.om-character-not-found",
-  "rng-override-active": "ui.toolbox.om-rng-override-active",
-};
 
 /** Flat effects (ATK / HP) show bare values; everything else is a percent. */
 const formatValue = (m: OvermasteryMastery): string => `+${Math.round(m.value * 10) / 10}${m.kind >= 2 ? "%" : ""}`;
@@ -97,28 +92,32 @@ const OvermasteryPredictor = () => {
     predict,
   } = useOvermasteryPredictor();
 
-  const errorMessage = error && OM_ERR[error] ? t(OM_ERR[error]) : error;
+  const errorMessage = backendErrorMessage(t, "overmastery", error);
 
   // The form drives reads of live game memory: hold it while the initial
-  // status fetch or a prediction is talking to the game.
+  // status fetch or a prediction is talking to the game. Deliberately NOT
+  // gated on `status.gameRunning`: the status is a snapshot, and latching the
+  // whole form on it would strand anyone who opens the tool before launching
+  // the game. The hook re-reads the status when the window regains focus, so
+  // the roster and the banner recover on their own.
   const busy = loading || predicting;
 
   const setSlot = (index: number, patch: Partial<(typeof form.wanted)[number]>) =>
     setForm({ ...form, wanted: form.wanted.map((s, i) => (i === index ? { ...s, ...patch } : s)) });
 
-  const wanted = wantedKindSet(filters);
-  const forDisplay = (list: IndexedRoll[]): IndexedRoll[] =>
-    list.map(({ roll, index }) => ({ roll: sortRollForDisplay(roll, filters), index }));
-
-  const indexed: IndexedRoll[] = (prediction?.rolls ?? []).map((roll, index) => ({ roll, index }));
-  const fullMatches = forDisplay(
-    filters.length > 0 ? indexed.filter(({ roll }) => rollMatches(roll, filters)) : indexed
-  );
-  const belowLevel = forDisplay(
-    filters.length > 0
-      ? indexed.filter(({ roll }) => rollMatchesKinds(roll, filters) && !rollMatches(roll, filters))
-      : []
-  );
+  const wanted = useMemo(() => wantedKindSet(filters), [filters]);
+  // One pass: `rollMatches` is a backtracking search, so it runs once per
+  // roll and only displayed rolls get sorted. Empty filters accept every
+  // roll, so fullMatches = all and belowLevel = none.
+  const { fullMatches, belowLevel } = useMemo(() => {
+    const full: IndexedRoll[] = [];
+    const below: IndexedRoll[] = [];
+    (prediction?.rolls ?? []).forEach((roll, index) => {
+      if (rollMatches(roll, filters)) full.push({ roll: sortRollForDisplay(roll, filters, wanted), index });
+      else if (rollMatchesKinds(roll, filters)) below.push({ roll: sortRollForDisplay(roll, filters, wanted), index });
+    });
+    return { fullMatches: full, belowLevel: below };
+  }, [prediction, filters, wanted]);
 
   return (
     <Stack gap="md" pr="md">
@@ -187,7 +186,7 @@ const OvermasteryPredictor = () => {
               disabled={busy}
               w={130}
             />
-            <Button onClick={predict} loading={predicting} disabled={loading || !form.character || form.rolls < 1}>
+            <Button onClick={predict} loading={predicting} disabled={busy || !form.character || form.rolls < 1}>
               {t("ui.toolbox.om-predict", "Predict")}
             </Button>
           </Group>

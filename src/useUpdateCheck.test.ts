@@ -168,6 +168,10 @@ describe("update status recording (header indicator)", () => {
     checkUpdateMock.mockReset();
     openConfirmModalMock.mockReset();
     useUpdateStatusStore.setState({ status: null });
+    // The settings store is a module singleton: without this the previous
+    // describe leaves skipped_update_version at "1.11.0", which is the very
+    // version these tests offer — they would silently take the skip branch.
+    useMeterSettingsStore.getState().set({ skipped_update_version: null });
   });
 
   it("is unknown until a check has answered", () => {

@@ -1,7 +1,9 @@
 import characterIdHashes from "@/assets/character-id-hashes.json";
 import overmasteryCategories from "@/assets/overmastery-categories.json";
+import useStalenessWatch from "@/pages/toolbox/useStalenessWatch";
 import { useOvermasterySelectionsStore } from "@/stores/useOvermasterySelectionsStore";
-import { OvermasteryMastery, OvermasteryPrediction, OvermasteryStatus } from "@/types";
+import { CharacterType, OvermasteryMastery, OvermasteryPrediction, OvermasteryStatus } from "@/types";
+import { translateCharacterType, translateOvermasteryId } from "@/utils";
 import { invoke } from "@tauri-apps/api";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -89,8 +91,13 @@ export const wantedKindSet = (filters: WantedFilter[]): Set<number> =>
 
 /** Display order for one roll's effects: the wanted ones first, then the
  * rest, each group by level descending (matching itself is order-blind). */
-export const sortRollForDisplay = (roll: OvermasteryMastery[], filters: WantedFilter[]): OvermasteryMastery[] => {
-  const wanted = wantedKindSet(filters);
+export const sortRollForDisplay = (
+  roll: OvermasteryMastery[],
+  filters: WantedFilter[],
+  // Callers sorting many rolls under one filter set pass the set in rather
+  // than rebuilding it per roll.
+  wanted: Set<number> = wantedKindSet(filters)
+): OvermasteryMastery[] => {
   return [...roll].sort((a, b) => {
     const aWanted = wanted.has(a.kind) ? 0 : 1;
     const bWanted = wanted.has(b.kind) ? 0 : 1;
@@ -99,13 +106,14 @@ export const sortRollForDisplay = (roll: OvermasteryMastery[], filters: WantedFi
 };
 
 /** Options for slot `index`: a trait can only roll as often as it exists in
- * the tier's pool (`count`, default 1 — only the tier-1 pool has duplicates),
+ * the tier's pool (`count`, default 1 — only the tier-0 pool has duplicates:
+ * ATK x5, HP x5, Crit x3, Stun x3),
  * so it is hidden once that many other slots picked it. */
-export const slotOptions = <T extends { value: string; count?: number }>(
-  options: T[],
+export const slotOptions = (
+  options: { value: string; label: string; count?: number }[],
   slots: WantedSlot[],
   index: number
-): T[] => {
+) => {
   const taken = new Map<string, number>();
   for (const [i, s] of slots.entries()) {
     if (i !== index && s.kind !== null) taken.set(s.kind, (taken.get(s.kind) ?? 0) + 1);
@@ -159,6 +167,13 @@ export type CharacterOption = { value: string; label: string };
  * first (either protagonist id maps to roster index 0); hashes the baked map
  * doesn't know (future characters) are dropped rather than shown raw. */
 export const buildCharacterOptions = (roster: number[], translate: (plCode: string) => string): CharacterOption[] => {
+  // No roster read at all (game not running, or the status call failed):
+  // offer nothing rather than a protagonist we can't predict for. Keyed on
+  // the raw roster, not on how many entries survived the filter below — a
+  // roster of only-unrecognised hashes (characters added by a game patch)
+  // still means the protagonist is selectable.
+  if (roster.length === 0) return [];
+
   const options: CharacterOption[] = [{ value: PROTAGONIST_HEX, label: translate(CHARACTER_BY_HASH[PROTAGONIST_HEX]) }];
   for (const id of roster) {
     const hex = id.toString(16).padStart(8, "0");
@@ -174,7 +189,9 @@ export const buildCharacterOptions = (roster: number[], translate: (plCode: stri
  * form, live game status (roster), and the simulated upcoming rolls.
  */
 export default function useOvermasteryPredictor() {
-  const { t, i18n } = useTranslation();
+  // `i18n.language` only — labels go through the shared translate helpers,
+  // which read the module-level i18n instance.
+  const { i18n } = useTranslation();
   const [form, setForm] = useState<OvermasteryForm>(() => {
     const { lastCharacter, selections } = useOvermasterySelectionsStore.getState();
     return restoreForm(lastCharacter, selections);
@@ -183,10 +200,20 @@ export default function useOvermasteryPredictor() {
   const [prediction, setPrediction] = useState<OvermasteryPrediction | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [predicting, setPredicting] = useState(false);
-  const [stale, setStale] = useState(false);
   const [loading, setLoading] = useState(true);
   const selections = useOvermasterySelectionsStore((s) => s.selections);
   const saveSelection = useOvermasterySelectionsStore((s) => s.save);
+
+  /** While results are shown, watch the prediction's RNG slot: if the live
+   * state moves off the one the rolls were computed from (the character
+   * rolled, or a quest reshuffled the stream), the list is stale. */
+  const [stale, setStale] = useStalenessWatch(
+    prediction && !prediction.unpredictable ? prediction : null,
+    async (watched) => {
+      const current = await invoke<number | null>("fetch_overmastery_seed", { slot: watched.slot });
+      return current !== null && current !== watched.slotState;
+    }
+  );
 
   /** Selecting a character restores their saved tier + wanted slots (empty
    * slots when nothing usable is stored) and drops the previous character's
@@ -209,14 +236,25 @@ export default function useOvermasteryPredictor() {
   }, [form.character, form.tier, form.wanted, saveSelection]);
 
   useEffect(() => {
-    invoke<OvermasteryStatus>("fetch_overmastery_status")
-      .then(setStatus)
-      .catch((e) => setError(String(e)))
-      .finally(() => setLoading(false));
+    const load = () =>
+      invoke<OvermasteryStatus>("fetch_overmastery_status")
+        .then(setStatus)
+        .catch((e) => setError(String(e)))
+        .finally(() => setLoading(false));
+    load();
+    // The character picker is built from `status.roster`, so a status read
+    // taken before the game was up leaves the tool unusable. Users routinely
+    // open the tool first and launch the game after: re-read when the window
+    // comes back, so the roster and the banner recover on their own.
+    const onVisible = () => {
+      if (!document.hidden) load();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   const characterOptions = useMemo(
-    () => buildCharacterOptions(status?.roster ?? [], (plCode) => t(`characters:${plCode}`, plCode)),
+    () => buildCharacterOptions(status?.roster ?? [], (plCode) => translateCharacterType(plCode as CharacterType)),
     [status, i18n.language]
   );
 
@@ -224,32 +262,11 @@ export default function useOvermasteryPredictor() {
     () =>
       (CATEGORIES[form.tier] ?? []).map((c) => ({
         value: String(c.kind),
-        label: t(`overmasteries:${c.key}.text`, c.key),
+        label: translateOvermasteryId(parseInt(c.key, 16)),
         count: c.count,
       })),
     [form.tier, i18n.language]
   );
-
-  /** While results are shown, watch the prediction's RNG slot: if the live
-   * state moves off the one the rolls were computed from (the character
-   * rolled, or a quest reshuffled the stream), the list is stale. */
-  useEffect(() => {
-    if (!prediction || prediction.unpredictable || stale) return;
-    let cancelled = false;
-    const check = async () => {
-      try {
-        const current = await invoke<number | null>("fetch_overmastery_seed", { slot: prediction.slot });
-        if (!cancelled && current !== null && current !== prediction.slotState) setStale(true);
-      } catch {
-        // Game gone or state unreadable — staleness unknowable; don't flag.
-      }
-    };
-    const id = setInterval(check, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [prediction, stale]);
 
   const predict = async () => {
     if (!form.character) return;
@@ -274,7 +291,7 @@ export default function useOvermasteryPredictor() {
     }
   };
 
-  const filters = activeFilters(form.wanted);
+  const filters = useMemo(() => activeFilters(form.wanted), [form.wanted]);
 
   return {
     form,
