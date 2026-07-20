@@ -1410,7 +1410,7 @@ dependencies = [
 
 [[package]]
 name = "gbfr-logs"
-version = "1.9.6"
+version = "1.10.0"
 dependencies = [
  "anyhow",
  "cbor4ii",

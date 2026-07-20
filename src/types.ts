@@ -415,4 +415,38 @@ export type SynthesisSearchResponse = {
   pairsTested: number;
   sigilCount: number;
   rngUnpredictable: boolean;
+  /** Seed identity the search was computed from (staleness detection). */
+  rngState: number;
+  seedCounter: number;
+};
+
+/** Live synthesis seed identity (fetch_synthesis_seed; null = game not running). */
+export type SynthesisSeed = {
+  rngState: number;
+  seedCounter: number;
+};
+
+/** Toolbox / Overmastery Predictor — mirrors src-tauri/src/overmastery/mod.rs. */
+export type OvermasteryStatus = {
+  gameRunning: boolean;
+  /** Character id hashes (custom-XXHash32 of "PL####") in roster order. */
+  roster: number[];
+};
+
+export type OvermasteryMastery = {
+  /** MED_EFF_* key hash — translatable via overmasteries.json. */
+  category: number;
+  /** 1..10 as shown in game. */
+  level: number;
+  /** Effect id: 0=ATK, 1=HP, 2=Crit, 3=Stun, 100+ specials. */
+  kind: number;
+  value: number;
+};
+
+export type OvermasteryPrediction = {
+  rolls: OvermasteryMastery[][];
+  slot: number;
+  slotState: number;
+  unpredictable: boolean;
+  mspCost: number;
 };

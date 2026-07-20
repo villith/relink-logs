@@ -7,13 +7,29 @@
     "key": "ITEM_16_0001",
     "text": "Pena de Semideus"
   },
+  "0311b2de": {
+    "key": "ITEM_18_0003",
+    "text": "Faíscas do Apocalipse"
+  },
   "035c056d": {
     "key": "ITEM_28_0010",
     "text": "Pedra-artífice do Isolamento"
   },
+  "03a19196": {
+    "key": "ITEM_16_0013",
+    "text": "Núcleo da Era"
+  },
+  "04c18eec": {
+    "key": "ITEM_31_0077",
+    "text": "Un. Pulsação da Carnif."
+  },
   "050c5228": {
     "key": "ITEM_01_0033",
     "text": "Areia Eletromagnética"
+  },
+  "05474649": {
+    "key": "ITEM_19_0022",
+    "text": "Cristal da Origem"
   },
   "05d2cf79": {
     "key": "ITEM_22_0020",
@@ -27,9 +43,25 @@
     "key": "ITEM_31_0011",
     "text": "Braçadeira Lúgubre"
   },
+  "06c0d0a1": {
+    "key": "ITEM_70_0019",
+    "text": "Estátua Albacora Dourada"
+  },
+  "06e5185f": {
+    "key": "ITEM_23_0007",
+    "text": "Cartão de Trip: Fediel"
+  },
+  "076a9f41": {
+    "key": "ITEM_70_0018",
+    "text": "Estátua Caranguejo Negro"
+  },
   "09370a3a": {
     "key": "ITEM_21_0000",
     "text": "Vale-adereços"
+  },
+  "0943913b": {
+    "key": "ITEM_70_0024",
+    "text": "Memória Celeste: Garota Azul"
   },
   "09c7a73e": {
     "key": "ITEM_01_0053",
@@ -50,6 +82,14 @@
   "0bd373a4": {
     "key": "ITEM_28_0130",
     "text": "Pedra-artífice do Isolamento"
+  },
+  "0e7cbc8e": {
+    "key": "ITEM_31_0033",
+    "text": "Bico Majestoso"
+  },
+  "0eb683cd": {
+    "key": "ITEM_15_0010",
+    "text": "Grande Refínio I"
   },
   "0f34eabc": {
     "key": "ITEM_32_0042",
@@ -107,9 +147,17 @@
     "key": "ITEM_28_1002",
     "text": "Pedra-artífice do Isolamento"
   },
+  "17f349ba": {
+    "key": "ITEM_31_0003",
+    "text": "Olho de Demônio Vil"
+  },
   "181381e5": {
     "key": "ITEM_16_0004",
     "text": "Grilhão da Divindade"
+  },
+  "19871bf3": {
+    "key": "ITEM_31_0023",
+    "text": "Machado de G. Escoriação"
   },
   "19b187d7": {
     "key": "ITEM_28_0001",
@@ -122,6 +170,10 @@
   "1aa4382d": {
     "key": "ITEM_02_0012",
     "text": "Orbe de Gelo"
+  },
+  "1c195d33": {
+    "key": "ITEM_14_0066",
+    "text": "Ragnita (Terminus)"
   },
   "1c67e865": {
     "key": "ITEM_01_0011",
@@ -139,6 +191,14 @@
     "key": "ITEM_18_0000",
     "text": "Resíduo Sombrio"
   },
+  "1f4bae8c": {
+    "key": "ITEM_14_0064",
+    "text": "Ragnita (Ferrão)"
+  },
+  "1fce9159": {
+    "key": "1fce9159",
+    "text": "Un. Pulsação da Carnif."
+  },
   "202a0db9": {
     "key": "ITEM_28_0131",
     "text": "Pedra-artífice do Isolamento"
@@ -155,12 +215,20 @@
     "key": "ITEM_02_0041",
     "text": "Orbe Sombrio"
   },
+  "20c742de": {
+    "key": "ITEM_14_0001",
+    "text": "Fragmento de Azurita"
+  },
   "21b32140": {
     "key": "ITEM_31_0042",
     "text": "Chifre da Besta da Terra"
   },
   "21dad920": {
     "key": "ITEM_26_9999",
+    "text": "Pedra-artífice da Vitalidade"
+  },
+  "22acc7bf": {
+    "key": "22acc7bf",
     "text": "Pedra-artífice da Vitalidade"
   },
   "23c59c51": {
@@ -183,6 +251,18 @@
     "key": "ITEM_10_0003",
     "text": "Cristal da Coragem (G)"
   },
+  "25165316": {
+    "key": "ITEM_16_0902",
+    "text": "Nodo da Sombra d'Água Prim."
+  },
+  "25289584": {
+    "key": "ITEM_31_0043",
+    "text": "Lança Sinistra B. Terra"
+  },
+  "2657283e": {
+    "key": "ITEM_35_3000",
+    "text": "Ponto de Ressonância"
+  },
   "26fa7da3": {
     "key": "ITEM_01_0042",
     "text": "Pó Vermelhão"
@@ -190,6 +270,10 @@
   "28592cb2": {
     "key": "ITEM_02_0022",
     "text": "Orbe Estrondoso"
+  },
+  "29748bf8": {
+    "key": "29748bf8",
+    "text": "Memória Celeste: Gênese Renascida"
   },
   "29a7eec9": {
     "key": "ITEM_16_0011",
@@ -202,6 +286,14 @@
   "2a2ea603": {
     "key": "ITEM_25_0030",
     "text": "Pedra-artífice do Terror"
+  },
+  "2a5548a9": {
+    "key": "ITEM_31_0086",
+    "text": "Mandíbula Fraturada Tolo"
+  },
+  "2c0b5a82": {
+    "key": "ITEM_70_0021",
+    "text": "Memória Celeste: Manifestação"
   },
   "2c8fa06c": {
     "key": "ITEM_25_9999",
@@ -235,6 +327,10 @@
     "key": "ITEM_34_2000",
     "text": "Lumipedra (G)"
   },
+  "31291925": {
+    "key": "31291925",
+    "text": "Pedra-artífice da Vitalidade"
+  },
   "32dc23f3": {
     "key": "ITEM_70_0016",
     "text": "Pacote de Cor de Personagem 4"
@@ -250,6 +346,14 @@
   "35c7fba0": {
     "key": "ITEM_23_0000",
     "text": "Cartão de Tripulação"
+  },
+  "35f709e3": {
+    "key": "ITEM_06_0003",
+    "text": "Cauda do Gênio Temível"
+  },
+  "381526a4": {
+    "key": "ITEM_31_0095",
+    "text": "Elmo Ensanguentado"
   },
   "38d2ecd0": {
     "key": "ITEM_02_0032",
@@ -267,6 +371,10 @@
     "key": "ITEM_32_0041",
     "text": "Asa de Portento"
   },
+  "3cb3eb94": {
+    "key": "3cb3eb94",
+    "text": "Pedra-artífice do Terror"
+  },
   "3e0269bd": {
     "key": "ITEM_26_0030",
     "text": "Pedra-artífice da Vitalidade"
@@ -283,9 +391,17 @@
     "key": "ITEM_30_0000",
     "text": "Munição de Miragem"
   },
+  "41e4c8ce": {
+    "key": "ITEM_23_0006",
+    "text": "Cartão de Trip: Fraux"
+  },
   "41e92f0a": {
     "key": "ITEM_16_0003",
     "text": "Espinho da Realidade"
+  },
+  "4249436e": {
+    "key": "ITEM_70_0026",
+    "text": "Memória Celeste: Deus Partido"
   },
   "4325ab79": {
     "key": "ITEM_14_0011",
@@ -303,9 +419,17 @@
     "key": "ITEM_06_0000",
     "text": "Anima de Vulkan Bolla"
   },
+  "456d2bb3": {
+    "key": "ITEM_09_0003",
+    "text": "Mortido"
+  },
   "463abc2d": {
     "key": "ITEM_28_0000",
     "text": "Pedra-artífice do Isolamento"
+  },
+  "4a41482c": {
+    "key": "ITEM_03_0003",
+    "text": "Casco Luxo de Vitalidade"
   },
   "4ac30d94": {
     "key": "ITEM_19_0003",
@@ -314,6 +438,10 @@
   "4be41ec1": {
     "key": "ITEM_26_1003",
     "text": "Pedra-artífice da Vitalidade"
+  },
+  "4c21dc42": {
+    "key": "ITEM_09_0023",
+    "text": "Presa da Irmandade"
   },
   "4c4caa77": {
     "key": "ITEM_06_0002",
@@ -335,6 +463,10 @@
     "key": "ITEM_03_0001",
     "text": "Anima Ômega de Furycane"
   },
+  "5030beba": {
+    "key": "5030beba",
+    "text": "Memória Celeste: Céus Divididos"
+  },
   "51355c28": {
     "key": "ITEM_22_0031",
     "text": "Orbe de Serpe de Gelo"
@@ -347,9 +479,29 @@
     "key": "ITEM_31_0041",
     "text": "Placa da Besta da Terra"
   },
+  "537cb6d9": {
+    "key": "ITEM_14_0061",
+    "text": "Ragnita (Defensor)"
+  },
+  "5392dee6": {
+    "key": "ITEM_16_0005",
+    "text": "Pluma da Peste Divina"
+  },
+  "53a9d491": {
+    "key": "ITEM_16_0904",
+    "text": "Nodo da Avalanche Prim."
+  },
   "541d3800": {
     "key": "ITEM_15_0001",
     "text": "Refínio Padrão"
+  },
+  "54732298": {
+    "key": "ITEM_14_0065",
+    "text": "Ragnita (Carrasco)"
+  },
+  "54ae4c95": {
+    "key": "54ae4c95",
+    "text": "Memória Celeste: Manifestação"
   },
   "54fc643a": {
     "key": "ITEM_17_0000",
@@ -366,6 +518,10 @@
   "55d1b23f": {
     "key": "ITEM_25_1003",
     "text": "Pedra-artífice do Terror"
+  },
+  "58fc9b99": {
+    "key": "ITEM_21_0001",
+    "text": "Vale de Transmaravilha"
   },
   "5942c5fb": {
     "key": "ITEM_70_0005",
@@ -427,6 +583,18 @@
     "key": "ITEM_11_0001",
     "text": "Grimório de Prata"
   },
+  "64a63fbc": {
+    "key": "ITEM_15_0012",
+    "text": "Grande Refínio III"
+  },
+  "65063e17": {
+    "key": "ITEM_14_0076",
+    "text": "Artefato Místico"
+  },
+  "654fa095": {
+    "key": "ITEM_14_0063",
+    "text": "Ragnita (Ascensão)"
+  },
   "659230f4": {
     "key": "ITEM_14_0051",
     "text": "Essência da Arma Suprema"
@@ -447,6 +615,14 @@
     "key": "ITEM_32_0030",
     "text": "Cabeça de Tayu'itar"
   },
+  "6837efc6": {
+    "key": "ITEM_31_0013",
+    "text": "Machado de G. da Extinção"
+  },
+  "686f12ad": {
+    "key": "ITEM_16_0903",
+    "text": "Nodo da Asa de Vent. Prim."
+  },
   "687733c4": {
     "key": "ITEM_10_0000",
     "text": "Fragmento de Coragem"
@@ -455,9 +631,21 @@
     "key": "ITEM_26_0020",
     "text": "Pedra-artífice da Vitalidade"
   },
+  "68bafc37": {
+    "key": "ITEM_16_0105",
+    "text": "Pluma Azul-Cel. Esquecida"
+  },
+  "68eadaa9": {
+    "key": "ITEM_35_2000",
+    "text": "Ponto da Confluência"
+  },
   "68ff3a08": {
     "key": "ITEM_31_0022",
     "text": "Machado de Guerra Causticante"
+  },
+  "695ea716": {
+    "key": "ITEM_31_0063",
+    "text": "Lança Sinistra B. Chamas"
   },
   "6b4e2182": {
     "key": "ITEM_09_0001",
@@ -467,17 +655,37 @@
     "key": "ITEM_02_0051",
     "text": "Orbe de Luz"
   },
+  "6c375d99": {
+    "key": "ITEM_70_0020",
+    "text": "Memória Celeste: Infinitesimal e Infinito"
+  },
   "6d876fab": {
     "key": "ITEM_32_0051",
     "text": "Chifre Escarlate"
+  },
+  "6dd50a91": {
+    "key": "6dd50a91",
+    "text": "Memória Celeste: Deus Partido"
+  },
+  "6e13e372": {
+    "key": "ITEM_09_0013",
+    "text": "Trevo do Lobo Prateado"
   },
   "6e49a111": {
     "key": "ITEM_01_0063",
     "text": "Matéria Astral"
   },
+  "6e81c3ac": {
+    "key": "6e81c3ac",
+    "text": "Pedra-artífice do Isolamento"
+  },
   "6f1fabe6": {
     "key": "ITEM_14_0021",
     "text": "Prova de Campeão"
+  },
+  "6f38afe1": {
+    "key": "ITEM_19_0010",
+    "text": "Eidos do Mundo"
   },
   "71173866": {
     "key": "ITEM_26_0131",
@@ -495,13 +703,29 @@
     "key": "ITEM_03_0002",
     "text": "Casco de Vitalidade"
   },
+  "7388fe67": {
+    "key": "ITEM_33_0002",
+    "text": "Esplendor de Sephira"
+  },
+  "74201317": {
+    "key": "ITEM_70_0027",
+    "text": "Memória Celeste: Gênese Renascida"
+  },
   "745fd287": {
     "key": "ITEM_32_0054",
     "text": "Chifre de Tufão"
   },
+  "7500c5d9": {
+    "key": "ITEM_31_0053",
+    "text": "Lança Sinistra B. Gelo"
+  },
   "759850ca": {
     "key": "ITEM_01_0041",
     "text": "Ovo de Salamandra"
+  },
+  "75a25fb1": {
+    "key": "75a25fb1",
+    "text": "Memória Celeste: Legado do Amor"
   },
   "76079579": {
     "key": "ITEM_19_0004",
@@ -551,6 +775,10 @@
     "key": "ITEM_17_0001",
     "text": "Espada Forjada em Nihilla"
   },
+  "7bcdaa54": {
+    "key": "7bcdaa54",
+    "text": "Memória Celeste: Guerra dos Céus"
+  },
   "7cfa41fc": {
     "key": "ITEM_14_0012",
     "text": "Prisma Impecável"
@@ -587,9 +815,25 @@
     "key": "ITEM_32_0053",
     "text": "Chifre da Terra"
   },
+  "831f31ff": {
+    "key": "ITEM_16_0007",
+    "text": "Vazio Semeado"
+  },
+  "833afc6d": {
+    "key": "833afc6d",
+    "text": "Pedra-artífice da Vitalidade"
+  },
+  "84292d6a": {
+    "key": "84292d6a",
+    "text": "Memória Celeste: Infinitesimal e Infinito"
+  },
   "8572b2ce": {
     "key": "ITEM_23_0001",
     "text": "Cartão de Tripulação: Seofon"
+  },
+  "85f40d79": {
+    "key": "ITEM_19_0012",
+    "text": "Signum Caótico"
   },
   "8682c2ac": {
     "key": "ITEM_80_0001",
@@ -599,9 +843,25 @@
     "key": "ITEM_80_0002",
     "text": "Chave de Platina"
   },
+  "86fb2ee1": {
+    "key": "ITEM_14_0062",
+    "text": "Ragnita (Atordoante)"
+  },
   "8816adc5": {
     "key": "ITEM_14_0010",
     "text": "Lasca de Prisma"
+  },
+  "882f94a7": {
+    "key": "ITEM_22_0062",
+    "text": "Luz Primordial"
+  },
+  "89406db0": {
+    "key": "ITEM_22_0042",
+    "text": "Terra Primordial"
+  },
+  "8a08f64e": {
+    "key": "ITEM_19_0013",
+    "text": "Signum da Aurora"
   },
   "8b75e58a": {
     "key": "ITEM_02_0011",
@@ -611,13 +871,29 @@
     "key": "ITEM_31_0012",
     "text": "Machado de Guerra Glacial"
   },
+  "8bf58697": {
+    "key": "ITEM_90_0001",
+    "text": "Asas da Fronteira"
+  },
   "8c44f0ab": {
     "key": "ITEM_28_0030",
     "text": "Pedra-artífice do Isolamento"
   },
+  "8c4fc319": {
+    "key": "ITEM_14_0074",
+    "text": "Refínio do Caos"
+  },
+  "8cf738ab": {
+    "key": "8cf738ab",
+    "text": "Pedra-artífice da Fortificação"
+  },
   "8d101b82": {
     "key": "ITEM_25_1002",
     "text": "Pedra-artífice do Terror"
+  },
+  "8d888638": {
+    "key": "ITEM_09_0030",
+    "text": "Espírito do Céu Azul"
   },
   "8db0b117": {
     "key": "ITEM_28_9999",
@@ -667,6 +943,10 @@
     "key": "ITEM_13_0001",
     "text": "Megapoção"
   },
+  "946b78ee": {
+    "key": "946b78ee",
+    "text": "Memória Celeste: Garota Azul"
+  },
   "94dd261d": {
     "key": "ITEM_22_0021",
     "text": "Orbe de Serpe de Fogo"
@@ -679,6 +959,10 @@
     "key": "ITEM_26_0011",
     "text": "Pedra-artífice da Vitalidade"
   },
+  "96a00c42": {
+    "key": "ITEM_70_0022",
+    "text": "Memória Celeste: Legado do Amor"
+  },
   "9738c87a": {
     "key": "ITEM_14_0020",
     "text": "Prova de Glória"
@@ -686,6 +970,10 @@
   "981c29bd": {
     "key": "ITEM_70_0011",
     "text": "Fragmento de Cristal Perene"
+  },
+  "98cdb46f": {
+    "key": "ITEM_15_0011",
+    "text": "Grande Refínio II"
   },
   "98e75fcb": {
     "key": "ITEM_22_0061",
@@ -702,6 +990,10 @@
   "99f44080": {
     "key": "ITEM_31_0081",
     "text": "Mandíbula de Golem"
+  },
+  "9a3dc719": {
+    "key": "ITEM_09_0050",
+    "text": "Chama do Céu Azul"
   },
   "9b442642": {
     "key": "ITEM_12_0000",
@@ -735,6 +1027,10 @@
     "key": "ITEM_22_0070",
     "text": "Escama de Dragão Negro"
   },
+  "9fba96d1": {
+    "key": "ITEM_60_0001",
+    "text": "Pinça-Miúda Sombria"
+  },
   "9fc6585e": {
     "key": "ITEM_50_0009",
     "text": "Âmbar do Sol da Meia-noite"
@@ -743,9 +1039,17 @@
     "key": "ITEM_26_1000",
     "text": "Pedra-artífice da Vitalidade"
   },
+  "a1ead2c2": {
+    "key": "ITEM_22_0052",
+    "text": "Vento Primordial"
+  },
   "a23f4f46": {
     "key": "ITEM_27_0010",
     "text": "Pedra-artífice da Fortificação"
+  },
+  "a2452b7c": {
+    "key": "ITEM_22_0032",
+    "text": "Água Primordial"
   },
   "a7c72f41": {
     "key": "ITEM_34_1000",
@@ -787,9 +1091,25 @@
     "key": "ITEM_27_1000",
     "text": "Pedra-artífice da Fortificação"
   },
+  "adffe24e": {
+    "key": "ITEM_32_0046",
+    "text": "Pedra do Ritual Bestial"
+  },
+  "b0782428": {
+    "key": "ITEM_04_0003",
+    "text": "Crina de Tormenta Sequestrada"
+  },
   "b2045655": {
     "key": "ITEM_14_0000",
     "text": "Esplendor da Azurita"
+  },
+  "b359b5b2": {
+    "key": "b359b5b2",
+    "text": "Pedra-artífice da Fortificação"
+  },
+  "b3b624ba": {
+    "key": "b3b624ba",
+    "text": "Pedra-artífice da Fortificação"
   },
   "b451e459": {
     "key": "ITEM_01_0003",
@@ -843,6 +1163,10 @@
     "key": "ITEM_25_0130",
     "text": "Pedra-artífice do Terror"
   },
+  "bdbf43ee": {
+    "key": "ITEM_32_0044",
+    "text": "Faixa Lamento Rancoroso"
+  },
   "be6124ad": {
     "key": "ITEM_27_0130",
     "text": "Pedra-artífice da Fortificação"
@@ -855,6 +1179,10 @@
     "key": "ITEM_32_0040",
     "text": "Garra da Morte"
   },
+  "c043bac9": {
+    "key": "ITEM_14_0023",
+    "text": "Mérito da Alvorada"
+  },
   "c05ca6a1": {
     "key": "ITEM_09_0000",
     "text": "Orgulho do Protetor"
@@ -862,6 +1190,10 @@
   "c1481583": {
     "key": "ITEM_25_0001",
     "text": "Pedra-artífice do Terror"
+  },
+  "c1563862": {
+    "key": "ITEM_16_0106",
+    "text": "Pluma Carmesim da Divind."
   },
   "c1dcb7ae": {
     "key": "ITEM_32_0081",
@@ -887,9 +1219,21 @@
     "key": "ITEM_31_0074",
     "text": "Canhão Giratório"
   },
+  "c57a5fe9": {
+    "key": "ITEM_70_0025",
+    "text": "Memória Celeste: Céus Divididos"
+  },
   "c783f39d": {
     "key": "ITEM_09_0010",
     "text": "Coragem do Lobo-alfa"
+  },
+  "c83f9e36": {
+    "key": "ITEM_22_0072",
+    "text": "Escuridão Primordial"
+  },
+  "c93e2fdd": {
+    "key": "ITEM_90_0000",
+    "text": "Filho da Treva e do Fogo"
   },
   "c96755a7": {
     "key": "ITEM_31_0040",
@@ -923,6 +1267,22 @@
     "key": "ITEM_50_0010",
     "text": "Óleo do Deserto"
   },
+  "cf24b2f6": {
+    "key": "ITEM_90_0002",
+    "text": "Colossus da Fortificação"
+  },
+  "d0f04d9f": {
+    "key": "ITEM_22_0022",
+    "text": "Fogo Primordial"
+  },
+  "d11baafc": {
+    "key": "ITEM_70_0028",
+    "text": "Pacote de Cores de Arte Conceitual"
+  },
+  "d147a1ba": {
+    "key": "ITEM_19_0020",
+    "text": "Asas Abissais"
+  },
   "d15091d9": {
     "key": "ITEM_03_0000",
     "text": "Anima de Furycane"
@@ -939,6 +1299,10 @@
     "key": "ITEM_28_1000",
     "text": "Pedra-artífice do Isolamento"
   },
+  "d3a6a16a": {
+    "key": "d3a6a16a",
+    "text": "Pedra-artífice do Terror"
+  },
   "d465046a": {
     "key": "ITEM_31_0070",
     "text": "Roda Motriz"
@@ -946,6 +1310,10 @@
   "d47f792a": {
     "key": "ITEM_31_0000",
     "text": "Asa Bizarra"
+  },
+  "d4ee7fc3": {
+    "key": "ITEM_31_0085",
+    "text": "Rubi de Sangue"
   },
   "d5af421a": {
     "key": "ITEM_31_0080",
@@ -995,6 +1363,10 @@
     "key": "ITEM_09_0020",
     "text": "Estratagema Valente"
   },
+  "df713fa9": {
+    "key": "ITEM_16_0009",
+    "text": "Memória Extrema"
+  },
   "e0937c5b": {
     "key": "ITEM_01_0020",
     "text": "Pináculo de Gelo"
@@ -1006,6 +1378,10 @@
   "e379e863": {
     "key": "ITEM_11_0000",
     "text": "Grimório de Cobre"
+  },
+  "e3abc397": {
+    "key": "ITEM_70_0023",
+    "text": "Memória Celeste: Guerra dos Céus"
   },
   "e3adb298": {
     "key": "ITEM_25_1001",
@@ -1039,6 +1415,10 @@
     "key": "ITEM_22_0050",
     "text": "Escama de Dragão Verde"
   },
+  "e8926145": {
+    "key": "ITEM_23_0005",
+    "text": "Cartão de Trip: Maglielle"
+  },
   "e8c461ca": {
     "key": "ITEM_50_0004",
     "text": "Gema Azul-celeste"
@@ -1055,9 +1435,17 @@
     "key": "ITEM_01_0010",
     "text": "Madeira Chamuscada"
   },
+  "eb707ea7": {
+    "key": "ITEM_23_0004",
+    "text": "Cartão de Trip: Gallanza"
+  },
   "eb9c99e5": {
     "key": "ITEM_28_1001",
     "text": "Pedra-artífice do Isolamento"
+  },
+  "ec480443": {
+    "key": "ec480443",
+    "text": "Pedra-artífice do Terror"
   },
   "ed3b872d": {
     "key": "ITEM_07_0001",
@@ -1082,6 +1470,10 @@
   "eedfa4e4": {
     "key": "ITEM_70_0013",
     "text": "Pacote de Cor de Personagem 1"
+  },
+  "ef56c64b": {
+    "key": "ef56c64b",
+    "text": "Pedra-artífice do Isolamento"
   },
   "f147229b": {
     "key": "ITEM_70_0002",
@@ -1115,9 +1507,25 @@
     "key": "ITEM_34_4000",
     "text": "Aglomerado de Lumicristal"
   },
+  "f6e684fa": {
+    "key": "f6e684fa",
+    "text": "Pedra-artífice do Isolamento"
+  },
   "f6ee4068": {
     "key": "ITEM_02_0042",
     "text": "Orbe do Abismo"
+  },
+  "f74a6a4d": {
+    "key": "ITEM_32_1000",
+    "text": "Coroa Famosa"
+  },
+  "f7dc6ed9": {
+    "key": "ITEM_19_0023",
+    "text": "Quartzo de Hexacromo"
+  },
+  "f7f9a658": {
+    "key": "ITEM_31_0078",
+    "text": "Pontas Sinistras"
   },
   "f82726d9": {
     "key": "ITEM_31_0061",
@@ -1142,6 +1550,14 @@
   "fa737b89": {
     "key": "ITEM_02_0050",
     "text": "Fragmento de Luz"
+  },
+  "faf93bcc": {
+    "key": "ITEM_22_0121",
+    "text": "Chama das Cunhas"
+  },
+  "fd1dc09a": {
+    "key": "ITEM_16_0901",
+    "text": "Nodo da Temp. Ígnea Prim."
   },
   "fe52f7cb": {
     "key": "ITEM_23_0002",

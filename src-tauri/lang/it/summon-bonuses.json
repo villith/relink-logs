@@ -1,0 +1,90 @@
+{
+  "00d171e0": {
+    "key": "TXT_LBP_EFF_TITLE_CRITICAL01",
+    "text": "Incremento probabilità critico"
+  },
+  "2270bc40": {
+    "key": "TXT_LBP_EFF_TITLE_REC_LIMIT_SUM",
+    "text": "Incremento limite cure"
+  },
+  "2ea9ca80": {
+    "key": "TXT_LBP_EFF_TITLE_REC_LIMIT_SUM",
+    "text": "Incremento limite cure"
+  },
+  "2ffb509f": {
+    "key": "TXT_LBP_EFF_TITLE_AB_LIMIT01",
+    "text": "Incremento limite danni abilità"
+  },
+  "33c0d50c": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_DMG01",
+    "text": "Incremento danni arte celeste"
+  },
+  "54b09a37": {
+    "key": "TXT_LBP_EFF_TITLE_BURST_DMG01",
+    "text": "Incremento danni raffica a catena"
+  },
+  "5a1d2c89": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_LIMIT01",
+    "text": "Incremento limite danni arte celeste"
+  },
+  "5a39d81b": {
+    "key": "TXT_LBP_EFF_TITLE_BURST_DMG01",
+    "text": "Incremento danni raffica a catena"
+  },
+  "664e8e32": {
+    "key": "TXT_LBP_EFF_TITLE_AB_DMG01",
+    "text": "Incremento danni abilità"
+  },
+  "75138d21": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_DMG01",
+    "text": "Incremento danni arte celeste"
+  },
+  "9245dfa4": {
+    "key": "TXT_LBP_EFF_TITLE_ATK_LIMIT01",
+    "text": "Incremento limite danni att. standard"
+  },
+  "a074a967": {
+    "key": "TXT_LBP_EFF_TITLE_CRITICAL01",
+    "text": "Incremento probabilità critico"
+  },
+  "a3539fbb": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_LIMIT01",
+    "text": "Incremento limite danni arte celeste"
+  },
+  "a3e537b1": {
+    "key": "TXT_LBP_EFF_TITLE_ATK01",
+    "text": "Incremento potenza attacco"
+  },
+  "a66241c9": {
+    "key": "TXT_LBP_EFF_TITLE_ATK_LIMIT01",
+    "text": "Incremento limite danni att. standard"
+  },
+  "a8900c80": {
+    "key": "TXT_LBP_EFF_TITLE_ATK01",
+    "text": "Incremento potenza attacco"
+  },
+  "af39a3fb": {
+    "key": "TXT_LBP_EFF_TITLE_AB_DMG01",
+    "text": "Incremento danni abilità"
+  },
+  "bc4e92cb": {
+    "key": "TXT_LBP_EFF_TITLE_HP01",
+    "text": "Incremento salute"
+  },
+  "ce70c58a": {
+    "key": "TXT_LBP_EFF_TITLE_AB_LIMIT01",
+    "text": "Incremento limite danni abilità"
+  },
+  "f0f77bc1": {
+    "key": "TXT_LBP_EFF_TITLE_BREAK01",
+    "text": "Incremento forza stordente"
+  },
+  "f2256e44": {
+    "key": "TXT_LBP_EFF_TITLE_HP01",
+    "text": "Incremento salute"
+  },
+  "f7b0316f": {
+    "key": "TXT_LBP_EFF_TITLE_BREAK01",
+    "text": "Incremento forza stordente"
+  }
+}

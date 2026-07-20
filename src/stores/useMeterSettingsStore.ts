@@ -13,6 +13,10 @@ interface MeterSettings {
   show_full_values: boolean;
   use_condensed_skills: boolean;
   open_log_on_save: boolean;
+  auto_check_updates: boolean;
+  /** Version the user chose "Skip" for in the update prompt: the automatic
+   * check stays quiet about exactly this version (manual checks still ask). */
+  skipped_update_version: string | null;
   overlay_columns: MeterColumns[];
 }
 
@@ -31,6 +35,8 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   show_full_values: false,
   use_condensed_skills: true,
   open_log_on_save: true,
+  auto_check_updates: true,
+  skipped_update_version: null,
   overlay_columns: [
     MeterColumns.TotalDamage,
     MeterColumns.DPS,

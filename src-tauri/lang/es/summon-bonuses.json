@@ -1,0 +1,90 @@
+{
+  "00d171e0": {
+    "key": "TXT_LBP_EFF_TITLE_CRITICAL01",
+    "text": "Más prob. de crítico"
+  },
+  "2270bc40": {
+    "key": "TXT_LBP_EFF_TITLE_REC_LIMIT_SUM",
+    "text": "Más límite de curación"
+  },
+  "2ea9ca80": {
+    "key": "TXT_LBP_EFF_TITLE_REC_LIMIT_SUM",
+    "text": "Más límite de curación"
+  },
+  "2ffb509f": {
+    "key": "TXT_LBP_EFF_TITLE_AB_LIMIT01",
+    "text": "Más límite de daño de habilidades"
+  },
+  "33c0d50c": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_DMG01",
+    "text": "Más daño de arcanos"
+  },
+  "54b09a37": {
+    "key": "TXT_LBP_EFF_TITLE_BURST_DMG01",
+    "text": "Más daño de ráfagas en cadena"
+  },
+  "5a1d2c89": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_LIMIT01",
+    "text": "Más límite de daño de arcanos"
+  },
+  "5a39d81b": {
+    "key": "TXT_LBP_EFF_TITLE_BURST_DMG01",
+    "text": "Más daño de ráfagas en cadena"
+  },
+  "664e8e32": {
+    "key": "TXT_LBP_EFF_TITLE_AB_DMG01",
+    "text": "Más daño de habilidades"
+  },
+  "75138d21": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_DMG01",
+    "text": "Más daño de arcanos"
+  },
+  "9245dfa4": {
+    "key": "TXT_LBP_EFF_TITLE_ATK_LIMIT01",
+    "text": "Más límite daño ataques norm."
+  },
+  "a074a967": {
+    "key": "TXT_LBP_EFF_TITLE_CRITICAL01",
+    "text": "Más prob. de crítico"
+  },
+  "a3539fbb": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_LIMIT01",
+    "text": "Más límite de daño de arcanos"
+  },
+  "a3e537b1": {
+    "key": "TXT_LBP_EFF_TITLE_ATK01",
+    "text": "Más poder de ataque"
+  },
+  "a66241c9": {
+    "key": "TXT_LBP_EFF_TITLE_ATK_LIMIT01",
+    "text": "Más límite daño ataques norm."
+  },
+  "a8900c80": {
+    "key": "TXT_LBP_EFF_TITLE_ATK01",
+    "text": "Más poder de ataque"
+  },
+  "af39a3fb": {
+    "key": "TXT_LBP_EFF_TITLE_AB_DMG01",
+    "text": "Más daño de habilidades"
+  },
+  "bc4e92cb": {
+    "key": "TXT_LBP_EFF_TITLE_HP01",
+    "text": "Más vitalidad"
+  },
+  "ce70c58a": {
+    "key": "TXT_LBP_EFF_TITLE_AB_LIMIT01",
+    "text": "Más límite de daño de habilidades"
+  },
+  "f0f77bc1": {
+    "key": "TXT_LBP_EFF_TITLE_BREAK01",
+    "text": "Más prob. de aturdir"
+  },
+  "f2256e44": {
+    "key": "TXT_LBP_EFF_TITLE_HP01",
+    "text": "Más vitalidad"
+  },
+  "f7b0316f": {
+    "key": "TXT_LBP_EFF_TITLE_BREAK01",
+    "text": "Más prob. de aturdir"
+  }
+}

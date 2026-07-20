@@ -1,0 +1,758 @@
+{
+  "0033943a": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "Schwarzer Drache Evyl III"
+  },
+  "01b80951": {
+    "key": "TXT_SMN_So4000",
+    "text": "Finsterschleicher"
+  },
+  "03c8bf90": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "Reinkarniertes Orakel II"
+  },
+  "03c95420": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "Eisdil II"
+  },
+  "045efb5b": {
+    "key": "TXT_SMN_So4100_3",
+    "text": "Strafender Automat III"
+  },
+  "0525e77d": {
+    "key": "TXT_SMN_So6300_2",
+    "text": "Kleinzange II"
+  },
+  "099e1dd3": {
+    "key": "TXT_SMN_So4c00",
+    "text": "Managarmr Nihil"
+  },
+  "0b366ad9": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "Flammdil II"
+  },
+  "0be2a43a": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "Steindil II"
+  },
+  "0d94b89f": {
+    "key": "TXT_SMN_So2000_2",
+    "text": "Silberschleimchen II"
+  },
+  "0ee2670a": {
+    "key": "TXT_SMN_So1600_3",
+    "text": "Gerasene III"
+  },
+  "0f986ed9": {
+    "key": "TXT_SMN_So0200",
+    "text": "Rolan"
+  },
+  "109e2271": {
+    "key": "TXT_SMN_So5700_3",
+    "text": "Crew-Allianz Rafale III"
+  },
+  "15ec425e": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "Meuterer-Automat II"
+  },
+  "15ed6d77": {
+    "key": "TXT_SMN_So4f00_3",
+    "text": "Hoffnungsv. Himmelsbewohner III"
+  },
+  "16b702dc": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "Mellose-Mönch III"
+  },
+  "16ba3b8a": {
+    "key": "TXT_SMN_So1800_3",
+    "text": "Scarmiglione III"
+  },
+  "1ab77fdf": {
+    "key": "TXT_SMN_So5f00",
+    "text": "Katze"
+  },
+  "1abade1d": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "Cyaegha"
+  },
+  "1b5daebd": {
+    "key": "TXT_SMN_So1b00_1",
+    "text": "Wyvern"
+  },
+  "1b6a4024": {
+    "key": "TXT_SMN_So1f00_3",
+    "text": "Flammdil III"
+  },
+  "1b9de0fa": {
+    "key": "TXT_SMN_So5400_2",
+    "text": "Wächter von Saatholm II"
+  },
+  "1be16847": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "Cyaegha"
+  },
+  "1cc0e0ef": {
+    "key": "TXT_SMN_So2b00_1",
+    "text": "Wassergeist"
+  },
+  "1e6543a3": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "Feuerdrache Vrazarek II"
+  },
+  "239f769f": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "Behemoth III"
+  },
+  "23d839a3": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "Managarmr"
+  },
+  "2517c481": {
+    "key": "TXT_SMN_So3f00_2",
+    "text": "Schwarzer Drache Evyl II"
+  },
+  "26e7ccb1": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "Eisdrache Wilinus II"
+  },
+  "299c1a08": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "Erwartungsv. Himmelsbewohner"
+  },
+  "2e3ce3d9": {
+    "key": "TXT_SMN_So2900_2",
+    "text": "Dunkelwirbel II"
+  },
+  "2e657b01": {
+    "key": "TXT_SMN_So3100_1",
+    "text": "Droita-Mutter"
+  },
+  "2ea15d18": {
+    "key": "TXT_SMN_So2500_2",
+    "text": "Nazarbonju II"
+  },
+  "2eacd79c": {
+    "key": "TXT_SMN_So1a00_1",
+    "text": "Hornvogel"
+  },
+  "2f15455c": {
+    "key": "TXT_SMN_So9200",
+    "text": "Beelzebub"
+  },
+  "30f63214": {
+    "key": "TXT_SMN_So2800_1",
+    "text": "Lichtwirbel"
+  },
+  "315695ae": {
+    "key": "TXT_SMN_So3400",
+    "text": "Rubinpuppe "
+  },
+  "316641a4": {
+    "key": "TXT_SMN_So2100_2",
+    "text": "Goldschleimchen II"
+  },
+  "31ee9ba5": {
+    "key": "TXT_SMN_So0f00_2",
+    "text": "Azurhäuptling II"
+  },
+  "326dc2de": {
+    "key": "TXT_SMN_So1800_2",
+    "text": "Scarmiglione II"
+  },
+  "36cb5052": {
+    "key": "TXT_SMN_So5600_2",
+    "text": "Mellose-Mönch II"
+  },
+  "38348e1e": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "Urtümlicher Drache II"
+  },
+  "391c7857": {
+    "key": "TXT_SMN_So4d00_1",
+    "text": "Unheimliche Form"
+  },
+  "3bad1134": {
+    "key": "TXT_SMN_So3c00_3",
+    "text": "Erddrache Corvell III"
+  },
+  "3c381dcd": {
+    "key": "TXT_SMN_So0e00_1",
+    "text": "Goblin- Gladiator"
+  },
+  "3c4f2b7d": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "Hoffnungsv. Himmelsbewohner"
+  },
+  "3dd9ecee": {
+    "key": "TXT_SMN_So2600_1",
+    "text": "Flammenwirbel"
+  },
+  "3fd89c3a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "Pyet-A II"
+  },
+  "42465367": {
+    "key": "TXT_SMN_So5500_2",
+    "text": "Schwertschleier- Verbindung II"
+  },
+  "439cdb88": {
+    "key": "TXT_SMN_So2100_3",
+    "text": "Goldschleimchen III"
+  },
+  "44a5cab1": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "Die Familie Zathba"
+  },
+  "47e2ae71": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "Reinkarniertes Orakel III"
+  },
+  "48732d1f": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "Reinkarniertes Orakel III"
+  },
+  "4a65c97d": {
+    "key": "TXT_SMN_So2600_2",
+    "text": "Flammenwirbel II"
+  },
+  "4b3d1768": {
+    "key": "TXT_SMN_So1c00_1",
+    "text": "Wyvern-Ältester"
+  },
+  "4ba8ceba": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "Hoffnungsv. Himmelsbewohner"
+  },
+  "4c966e4f": {
+    "key": "TXT_SMN_So5300_3",
+    "text": "Die Familie Zathba III"
+  },
+  "4d84581f": {
+    "key": "TXT_SMN_So1000_1",
+    "text": "Scharlachvandale"
+  },
+  "4ea296fc": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "Silberschleimchen III"
+  },
+  "4f484bbb": {
+    "key": "TXT_SMN_So2800_2",
+    "text": "Lichtwirbel II"
+  },
+  "4fd78af8": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "Erddrache Corvell II"
+  },
+  "513d05cc": {
+    "key": "TXT_SMN_So5700_2",
+    "text": "Crew-Allianz Rafale II"
+  },
+  "514cf53b": {
+    "key": "TXT_SMN_So5200_2",
+    "text": "Korps der Silberwölfe II"
+  },
+  "524d1660": {
+    "key": "TXT_SMN_So1200_3",
+    "text": "Löwenklaue III"
+  },
+  "52b14b66": {
+    "key": "TXT_SMN_So4900_3",
+    "text": "Furkan III"
+  },
+  "52e21e37": {
+    "key": "TXT_SMN_So3400",
+    "text": "Rubinpuppe "
+  },
+  "5365294f": {
+    "key": "TXT_SMN_So3100_2",
+    "text": "Droita-Mutter II"
+  },
+  "547e7dfc": {
+    "key": "TXT_SMN_So4e00_1",
+    "text": "Albacore"
+  },
+  "551dc320": {
+    "key": "TXT_SMN_So4d00_2",
+    "text": "Unheimliche Form II"
+  },
+  "556da7b4": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "Urtümlicher Drache II"
+  },
+  "55815e99": {
+    "key": "TXT_SMN_So1200_2",
+    "text": "Löwenklaue II"
+  },
+  "576310df": {
+    "key": "TXT_SMN_So5000_3",
+    "text": "Erwartungsv. Himmelsbewohner III"
+  },
+  "58aa9cad": {
+    "key": "TXT_SMN_So5500_1",
+    "text": "Schwertschleier- Verbindung"
+  },
+  "59f8666f": {
+    "key": "TXT_SMN_So2900_1",
+    "text": "Dunkelwirbel"
+  },
+  "5c42d57c": {
+    "key": "TXT_SMN_So4a00",
+    "text": "Furkan Nihil"
+  },
+  "5ca9330a": {
+    "key": "TXT_SMN_So5200_3",
+    "text": "Korps der Silberwölfe III"
+  },
+  "5e29e993": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "Managarmr"
+  },
+  "5f3337b6": {
+    "key": "TXT_SMN_So0d00_1",
+    "text": "Goblin-Soldat"
+  },
+  "60a6d3a5": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "Eisdrache Wilinus II"
+  },
+  "61c79814": {
+    "key": "TXT_SMN_So0d00_2",
+    "text": "Goblin-Soldat II"
+  },
+  "6262979b": {
+    "key": "TXT_SMN_So2500_3",
+    "text": "Nazarbonju III"
+  },
+  "634a379d": {
+    "key": "TXT_SMN_So2400_1",
+    "text": "Ahriman"
+  },
+  "6368a53d": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "Mellose-Mönch III"
+  },
+  "65e658d9": {
+    "key": "TXT_SMN_So4700_2",
+    "text": "Volkan Bolla II"
+  },
+  "666947c2": {
+    "key": "TXT_SMN_So3e00_2",
+    "text": "Weißer Drache Radis II"
+  },
+  "67a73702": {
+    "key": "TXT_SMN_So4f00_2",
+    "text": "Hoffnungsv. Himmelsbewohner II"
+  },
+  "67c7e1ff": {
+    "key": "TXT_SMN_So3800_3",
+    "text": "Ennugi III"
+  },
+  "6b514309": {
+    "key": "TXT_SMN_So2400_2",
+    "text": "Ahriman II"
+  },
+  "6d6cb496": {
+    "key": "TXT_SMN_So4000",
+    "text": "Finsterschleicher"
+  },
+  "6e5968fc": {
+    "key": "TXT_SMN_So0000",
+    "text": "Lucilius"
+  },
+  "6ee91e7d": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "Meuterer-Automat II"
+  },
+  "6f6bbbe0": {
+    "key": "TXT_SMN_So4700_3",
+    "text": "Volkan Bolla III"
+  },
+  "730395dc": {
+    "key": "TXT_SMN_So5500_3",
+    "text": "Schwertschleier- Verbindung III"
+  },
+  "735dd55b": {
+    "key": "TXT_SMN_So1a00_2",
+    "text": "Hornvogel II"
+  },
+  "7996a856": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "Furkan"
+  },
+  "7a46e50e": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "Steindil II"
+  },
+  "7a7615d3": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "Kobra II"
+  },
+  "7e154422": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "Verteidigungskorps von Folca III"
+  },
+  "7e853e16": {
+    "key": "TXT_SMN_So6400_1",
+    "text": "Reinkarniertes Orakel"
+  },
+  "7e8a659a": {
+    "key": "TXT_SMN_So2300_2",
+    "text": "Stiller Beobachter II"
+  },
+  "7f8364e5": {
+    "key": "TXT_SMN_So3f00_1",
+    "text": "Schwarzer Drache Evyl"
+  },
+  "81ecec7f": {
+    "key": "TXT_SMN_So0200",
+    "text": "Rolan"
+  },
+  "847cf372": {
+    "key": "TXT_SMN_So4200_3",
+    "text": "Meuterer-Automat III"
+  },
+  "852287ba": {
+    "key": "TXT_SMN_So2700_1",
+    "text": "Wasserwirbel"
+  },
+  "855d018c": {
+    "key": "TXT_SMN_So4500",
+    "text": "Lilith"
+  },
+  "87c6c345": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "Steingolem"
+  },
+  "897ffaf0": {
+    "key": "TXT_SMN_So1000_2",
+    "text": "Scharlachvandale II"
+  },
+  "8b489804": {
+    "key": "TXT_SMN_So4300_1",
+    "text": "Kobra"
+  },
+  "8c607d26": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "Korps der Silberwölfe"
+  },
+  "8cf23b58": {
+    "key": "TXT_SMN_So3300_3",
+    "text": "Steingolem III"
+  },
+  "8d7fde58": {
+    "key": "TXT_SMN_So4100_2",
+    "text": "Strafender Automat II"
+  },
+  "8db272e5": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "Schwarzer Drache Evyl III"
+  },
+  "8e02e207": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "Gerasene II"
+  },
+  "90bd4ac0": {
+    "key": "TXT_SMN_So0000",
+    "text": "Lucilius"
+  },
+  "9118453a": {
+    "key": "TXT_SMN_So6300_1",
+    "text": "Kleinzange"
+  },
+  "9235fb9f": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "Kobra II"
+  },
+  "9360b2b5": {
+    "key": "TXT_SMN_So2b00_2",
+    "text": "Wassergeist II"
+  },
+  "9384a5d3": {
+    "key": "TXT_SMN_So3e00_3",
+    "text": "Weißer Drache Radis III"
+  },
+  "97e451a4": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "Erddrache Corvell II"
+  },
+  "99a68616": {
+    "key": "TXT_SMN_So0f00_1",
+    "text": "Azurhäuptling"
+  },
+  "99cf3e05": {
+    "key": "TXT_SMN_So1e00_3",
+    "text": "Eisdil III"
+  },
+  "9a6d89dc": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "Verteidigungskorps von Folca III"
+  },
+  "9bc09751": {
+    "key": "TXT_SMN_So1b00_2",
+    "text": "Wyvern II"
+  },
+  "9d5c27de": {
+    "key": "TXT_SMN_So3700_2",
+    "text": "Behemoth II"
+  },
+  "9f0ecf8b": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "Feuerdrache Vrazarek III"
+  },
+  "a062ec06": {
+    "key": "TXT_SMN_So1300",
+    "text": "Roter Tod"
+  },
+  "a0c96959": {
+    "key": "TXT_SMN_So5700_1",
+    "text": "Crew-Allianz Rafale"
+  },
+  "a34bdecb": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "Pyet-A III"
+  },
+  "a40e64f4": {
+    "key": "TXT_SMN_So2700_2",
+    "text": "Wasserwirbel II"
+  },
+  "a4f63a8f": {
+    "key": "TXT_SMN_So5400_3",
+    "text": "Wächter von Saatholm III"
+  },
+  "a608aecd": {
+    "key": "TXT_SMN_So5900",
+    "text": "Schiedsrichter"
+  },
+  "a6bb6299": {
+    "key": "TXT_SMN_So1d00_3",
+    "text": "Steindil III"
+  },
+  "a7eff558": {
+    "key": "TXT_SMN_So9200",
+    "text": "Beelzebub"
+  },
+  "aa2bbdbf": {
+    "key": "TXT_SMN_So1c00_2",
+    "text": "Wyvern-Ältester II"
+  },
+  "ac20c821": {
+    "key": "TXT_SMN_So3800_2",
+    "text": "Ennugi II"
+  },
+  "ad15d880": {
+    "key": "TXT_SMN_So4800",
+    "text": "Volkan Bolla Nihil"
+  },
+  "ae52556d": {
+    "key": "TXT_SMN_So3200_2",
+    "text": "Droita-Mutter (Überfall) II"
+  },
+  "b360dd8d": {
+    "key": "TXT_SMN_So4400_1",
+    "text": "Sandschnitter"
+  },
+  "b3c2f3a4": {
+    "key": "TXT_SMN_So3200_1",
+    "text": "Droita-Mutter (Überfall)"
+  },
+  "b44a8a02": {
+    "key": "TXT_SMN_So4e00_3",
+    "text": "Albacore III"
+  },
+  "b4cf26c6": {
+    "key": "TXT_SMN_So5400_1",
+    "text": "Wächter von Saatholm"
+  },
+  "b5449253": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "Erwartungsv. Himmelsbewohner"
+  },
+  "b79312a7": {
+    "key": "TXT_SMN_So3300_2",
+    "text": "Steingolem II"
+  },
+  "b960d2bb": {
+    "key": "TXT_SMN_So3b00_3",
+    "text": "Eisdrache Wilinus III"
+  },
+  "b96cb87d": {
+    "key": "TXT_SMN_So2300_1",
+    "text": "Stiller Beobachter"
+  },
+  "bdd84e9a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "Pyet-A II"
+  },
+  "bfac23dc": {
+    "key": "TXT_SMN_So3500_3",
+    "text": "Greif III"
+  },
+  "c1ccbc3c": {
+    "key": "TXT_SMN_So3600_2",
+    "text": "Obsidian- Raubvogel II"
+  },
+  "c2f91a7f": {
+    "key": "TXT_SMN_So1100_3",
+    "text": "Goblinkrieger III"
+  },
+  "c3e918f9": {
+    "key": "TXT_SMN_So2a00_1",
+    "text": "Feuergeist"
+  },
+  "c52147d4": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "Eisdil II"
+  },
+  "ca95cd8c": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "Furkan"
+  },
+  "cc3c45f3": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "Steingolem"
+  },
+  "ce0039d4": {
+    "key": "TXT_SMN_So3900_3",
+    "text": "Urtümlicher Drache III"
+  },
+  "ce8e0b79": {
+    "key": "TXT_SMN_So5000_2",
+    "text": "Erwartungsv. Himmelsbewohner II"
+  },
+  "d4ac8684": {
+    "key": "TXT_SMN_So3600_3",
+    "text": "Obsidian- Raubvogel III"
+  },
+  "d5536ae8": {
+    "key": "TXT_SMN_So4b00_2",
+    "text": "Managarmr II"
+  },
+  "d6387caa": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "Goblin- Gladiator II"
+  },
+  "d751d8d2": {
+    "key": "TXT_SMN_So2a00_2",
+    "text": "Feuergeist II"
+  },
+  "d7555b1f": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "Reinkarniertes Orakel II"
+  },
+  "da0b6092": {
+    "key": "TXT_SMN_So5600_1",
+    "text": "Mellose-Mönch"
+  },
+  "dbd2f84e": {
+    "key": "TXT_SMN_So4b00_3",
+    "text": "Managarmr III"
+  },
+  "ddb21c31": {
+    "key": "TXT_SMN_So5100_1",
+    "text": "Verteidigungskorps von Folca"
+  },
+  "dfab70b7": {
+    "key": "TXT_SMN_So4500",
+    "text": "Lilith"
+  },
+  "e24b4807": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "Reinkarniertes Orakel II"
+  },
+  "e492e6bf": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "Pyet-A III"
+  },
+  "e4b7dcf9": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "Behemoth III"
+  },
+  "e51ce5b0": {
+    "key": "TXT_SMN_So4900_2",
+    "text": "Furkan II"
+  },
+  "e528e76f": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "Silberschleimchen III"
+  },
+  "e6ebb6fa": {
+    "key": "TXT_SMN_So5900",
+    "text": "Schiedsrichter"
+  },
+  "e7f607dc": {
+    "key": "TXT_SMN_So4400_2",
+    "text": "Sandschnitter II"
+  },
+  "ebeb3dc0": {
+    "key": "TXT_SMN_So1900_1",
+    "text": "Wolfsbestie"
+  },
+  "eeea2080": {
+    "key": "TXT_SMN_So1900_2",
+    "text": "Wolfsbestie II"
+  },
+  "ef554891": {
+    "key": "TXT_SMN_So2200_2",
+    "text": "Cyaegha II"
+  },
+  "ef973d88": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "Korps der Silberwölfe"
+  },
+  "f1c229f7": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "Feuerdrache Vrazarek II"
+  },
+  "f1fc31c4": {
+    "key": "TXT_SMN_So5100_2",
+    "text": "Verteidigungskorps von Folca II"
+  },
+  "f28d0e35": {
+    "key": "TXT_SMN_So6300_3",
+    "text": "Kleinzange III"
+  },
+  "f2be819e": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "Feuerdrache Vrazarek III"
+  },
+  "f32aa7a7": {
+    "key": "TXT_SMN_So5300_2",
+    "text": "Die Familie Zathba II"
+  },
+  "f501285c": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "Goblin- Gladiator II"
+  },
+  "f7eb57dd": {
+    "key": "TXT_SMN_So4e00_2",
+    "text": "Albacore II"
+  },
+  "f7f2d161": {
+    "key": "TXT_SMN_So3500_2",
+    "text": "Greif II"
+  },
+  "f862e7da": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "Die Familie Zathba"
+  },
+  "f98f8b97": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "Flammdil II"
+  },
+  "fc8444a1": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "Gerasene II"
+  },
+  "fc8a2ecb": {
+    "key": "TXT_SMN_So3d00_3",
+    "text": "Winddrache Elusious III"
+  },
+  "fd5fb92b": {
+    "key": "TXT_SMN_So1100_2",
+    "text": "Goblinkrieger II"
+  },
+  "ff513849": {
+    "key": "TXT_SMN_So3d00_2",
+    "text": "Winddrache Elusious II"
+  }
+}

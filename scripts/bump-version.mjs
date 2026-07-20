@@ -11,11 +11,14 @@
 //   npm run bump -- minor    -> 1.9.5 -> 1.10.0 (also: patch, major)
 //
 // The release workflow tags + publishes automatically when a commit on main
-// carries a package.json version with no matching tag, so bump, commit, and
-// merge to main to cut a release.
+// carries a package.json version with no matching tag. It also REFUSES to tag
+// a version with no `## <version>` section in CHANGELOG.md, so cutting a
+// release is: bump, write the changelog section, commit, merge to main.
 import { readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+
+import { extractSection } from "./extract-changelog.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -65,3 +68,10 @@ replaceOnce(
 );
 
 console.log(`[bump-version] ${current} -> ${next}`);
+
+// Catch the missing-notes case here rather than as a red CI run after merge:
+// the tag job hard-fails without this section, and a tag without a release
+// would block the version forever.
+if (extractSection(readFileSync(resolve(root, "CHANGELOG.md"), "utf8"), next) === null) {
+  console.log(`[bump-version] CHANGELOG.md has no "## ${next}" section yet — write one before merging, or the release will not tag`);
+}

@@ -1,4 +1,8 @@
 {
+  "00277247": {
+    "key": "GEEN_327_01",
+    "text": "Divergenz II"
+  },
   "004557b8": {
     "key": "GEEN_158_13",
     "text": "Glaskanone IV+"
@@ -11,6 +15,10 @@
     "key": "GEEN_146_24",
     "text": "Krieg-Elementar+"
   },
+  "006e474e": {
+    "key": "GEEN_322_14",
+    "text": "Caelum-Grenze V+"
+  },
   "0114dd91": {
     "key": "GEEN_151_02",
     "text": "Zusätzlicher Schaden III"
@@ -19,9 +27,25 @@
     "key": "GEEN_119_04",
     "text": "Blüte der Rose"
   },
+  "0188e9e3": {
+    "key": "GEEN_001_11",
+    "text": "Leben II+"
+  },
+  "01b49f0d": {
+    "key": "GEEN_111_21",
+    "text": "Schnelle Aufladung II+"
+  },
+  "01bb436b": {
+    "key": "GEEN_176_04",
+    "text": "Munition des Donnerwolfs"
+  },
   "01d1a6ce": {
     "key": "GEEN_119_91",
     "text": "Blüte der Rose+"
+  },
+  "02262975": {
+    "key": "GEEN_031_10",
+    "text": "Break-Attentäter I+"
   },
   "02472c43": {
     "key": "GEEN_123_90",
@@ -35,6 +59,10 @@
     "key": "GEEN_154_14",
     "text": "Berserker V+"
   },
+  "02c1d304": {
+    "key": "GEEN_063_16",
+    "text": "Verbessertes Ausweichen+"
+  },
   "02c67f5e": {
     "key": "GEEN_008_24",
     "text": "Himmelssturm V+"
@@ -47,17 +75,45 @@
     "key": "GEEN_106_04",
     "text": "Flinker Ansturm V"
   },
+  "041d7b20": {
+    "key": "GEEN_096_44",
+    "text": "Nerven aus Stahl V+"
+  },
+  "04ac2281": {
+    "key": "GEEN_072_34",
+    "text": "Erheben V+"
+  },
+  "04bd9f6b": {
+    "key": "GEEN_325_14",
+    "text": "Sagenhaft V+"
+  },
   "04d028e3": {
     "key": "GEEN_013_03",
     "text": "Kritischer Schaden IV"
+  },
+  "0523a202": {
+    "key": "GEEN_178_91",
+    "text": "Schwarzes Fluchsiegel+"
   },
   "0537ef0b": {
     "key": "GEEN_004_00",
     "text": "Betäubungskraft I"
   },
+  "054f4ace": {
+    "key": "GEEN_113_00",
+    "text": "Siegelstärker I"
+  },
   "05aca892": {
     "key": "GEEN_118_92",
     "text": "Vision des Veteranen+"
+  },
+  "05e72720": {
+    "key": "GEEN_321_21",
+    "text": "Caelum-Glanz II+"
+  },
+  "05fe0351": {
+    "key": "GEEN_234_14",
+    "text": "Spartaner+"
   },
   "06260d96": {
     "key": "GEEN_005_13",
@@ -79,9 +135,33 @@
     "key": "GEEN_114_93",
     "text": "Furchtloses Herz+"
   },
+  "0723f7ec": {
+    "key": "GEEN_178_92",
+    "text": "Schwarzer Satz+"
+  },
   "07703a8a": {
     "key": "GEEN_072_02",
     "text": "Erheben III"
+  },
+  "07a3abd9": {
+    "key": "GEEN_322_22",
+    "text": "Caelum-Grenze III+"
+  },
+  "088829b8": {
+    "key": "GEEN_327_21",
+    "text": "Divergenz II+"
+  },
+  "0890882f": {
+    "key": "GEEN_013_10",
+    "text": "Kritischer Schaden I+"
+  },
+  "0890cd68": {
+    "key": "GEEN_078_34",
+    "text": "Provozieren V+"
+  },
+  "0898bb55": {
+    "key": "GEEN_327_12",
+    "text": "Divergenz III+"
   },
   "08da7279": {
     "key": "GEEN_000_14",
@@ -90,6 +170,10 @@
   "0952f945": {
     "key": "GEEN_111_04",
     "text": "Schnelle Aufladung V"
+  },
+  "0980b80f": {
+    "key": "GEEN_008_21",
+    "text": "Himmelssturm II+"
   },
   "0a410bd8": {
     "key": "GEEN_114_04",
@@ -110,6 +194,10 @@
   "0b456def": {
     "key": "GEEN_094_24",
     "text": "Hohe Konzentration V+"
+  },
+  "0b55dd64": {
+    "key": "GEEN_006_10",
+    "text": "Ausdauer I+"
   },
   "0bb4ccda": {
     "key": "GEEN_153_14",
@@ -151,6 +239,10 @@
     "key": "GEEN_083_04",
     "text": "Geschickter Überfall V"
   },
+  "0e87c8d2": {
+    "key": "GEEN_008_10",
+    "text": "Himmelssturm I+"
+  },
   "0ea21045": {
     "key": "GEEN_154_13",
     "text": "Berserker IV+"
@@ -179,6 +271,10 @@
     "key": "GEEN_152_00",
     "text": "Weniger ist mehr I"
   },
+  "0fc3e656": {
+    "key": "GEEN_004_10",
+    "text": "Betäubungskraft I+"
+  },
   "100e4b1d": {
     "key": "GEEN_079_03",
     "text": "Helles Köpfchen IV"
@@ -199,6 +295,14 @@
     "key": "GEEN_111_02",
     "text": "Schnelle Aufladung III"
   },
+  "113035d8": {
+    "key": "GEEN_235_34",
+    "text": "Super Ult. Perf. Ausweichen+"
+  },
+  "1147543e": {
+    "key": "GEEN_324_12",
+    "text": "Caelum-Schnee III+"
+  },
   "1150513c": {
     "key": "GEEN_110_03",
     "text": "Leben auf dem Drahtseil IV"
@@ -214,6 +318,10 @@
   "120c5d98": {
     "key": "GEEN_147_03",
     "text": "Weg zur Meisterschaft IV"
+  },
+  "12789216": {
+    "key": "GEEN_321_02",
+    "text": "Caelum-Glanz III"
   },
   "1291f7ca": {
     "key": "GEEN_031_22",
@@ -259,6 +367,18 @@
     "key": "GEEN_129_91",
     "text": "Strategie der Gründerin+"
   },
+  "158d506f": {
+    "key": "GEEN_111_20",
+    "text": "Schnelle Aufladung I+"
+  },
+  "15f618b1": {
+    "key": "GEEN_323_22",
+    "text": "Caelum-Flamme III+"
+  },
+  "16199eae": {
+    "key": "GEEN_009_20",
+    "text": "Linkangriff I+"
+  },
   "16216fdd": {
     "key": "GEEN_072_03",
     "text": "Erheben IV"
@@ -299,6 +419,10 @@
     "key": "GEEN_221_94",
     "text": "Schadensobergrenze V+"
   },
+  "186407ed": {
+    "key": "GEEN_320_12",
+    "text": "Caelum-Erprobung III+"
+  },
   "190c656d": {
     "key": "GEEN_151_13",
     "text": "Zusätzlicher Schaden IV+"
@@ -306,6 +430,14 @@
   "197818b7": {
     "key": "GEEN_055_03",
     "text": "Lähmungsresistenz IV"
+  },
+  "19a4598e": {
+    "key": "GEEN_110_21",
+    "text": "Leben auf dem Drahtseil II+"
+  },
+  "19c4348e": {
+    "key": "GEEN_324_01",
+    "text": "Caelum-Schnee II"
   },
   "19cb4eb9": {
     "key": "GEEN_057_24",
@@ -319,9 +451,21 @@
     "key": "GEEN_104_04",
     "text": "Flinke Verteidigung V"
   },
+  "1a359b67": {
+    "key": "GEEN_176_92",
+    "text": "Auge des Donnerwolfs+"
+  },
   "1a57aef1": {
     "key": "GEEN_127_90",
     "text": "Erwachen des Schmetterlings+"
+  },
+  "1a5f39d2": {
+    "key": "GEEN_325_15",
+    "text": "Sagenhaft V+"
+  },
+  "1a743e14": {
+    "key": "GEEN_322_03",
+    "text": "Caelum-Grenze IV"
   },
   "1a94123d": {
     "key": "GEEN_006_13",
@@ -329,15 +473,23 @@
   },
   "1abadc4d": {
     "key": "GEEN_125_04",
-    "text": "Glanz der heiligen Ritterin"
+    "text": "Glanz der Heiligen Ritterin"
   },
   "1af3d4dc": {
     "key": "GEEN_094_00",
     "text": "Hohe Konzentration I"
   },
+  "1b813e10": {
+    "key": "GEEN_005_20",
+    "text": "Bosheit I+"
+  },
   "1bbe919c": {
     "key": "GEEN_118_90",
     "text": "Erwachen des Veteranen+"
+  },
+  "1be87ead": {
+    "key": "GEEN_013_21",
+    "text": "Kritischer Schaden II+"
   },
   "1bf76d02": {
     "key": "GEEN_106_00",
@@ -347,13 +499,25 @@
     "key": "GEEN_030_22",
     "text": "Overdrive-Attentäter III+"
   },
+  "1c166abc": {
+    "key": "GEEN_079_34",
+    "text": "Helles Köpfchen V+"
+  },
   "1c4d37e4": {
     "key": "GEEN_140_00",
     "text": "Krabbenecho"
   },
+  "1c500ab2": {
+    "key": "GEEN_323_12",
+    "text": "Caelum-Flamme III+"
+  },
   "1ca872e7": {
     "key": "GEEN_008_14",
     "text": "Himmelssturm V+"
+  },
+  "1caa06bd": {
+    "key": "GEEN_100_00",
+    "text": "Ergänzung I"
   },
   "1cd1d367": {
     "key": "GEEN_151_14",
@@ -375,6 +539,10 @@
     "key": "GEEN_064_03",
     "text": "Ausweichen-Rache IV"
   },
+  "1e2ebc39": {
+    "key": "GEEN_151_16",
+    "text": "Zusätzlicher Schaden V+"
+  },
   "1e56fe99": {
     "key": "GEEN_004_01",
     "text": "Betäubungskraft II"
@@ -383,9 +551,25 @@
     "key": "GEEN_066_24",
     "text": "Regenerieren V+"
   },
+  "1e7796e1": {
+    "key": "GEEN_321_16",
+    "text": "Caelum-Glanz V+"
+  },
+  "1f012233": {
+    "key": "GEEN_104_44",
+    "text": "Flinke Verteidigung V+"
+  },
+  "1f372593": {
+    "key": "GEEN_223_94",
+    "text": "Tyrannei V+"
+  },
   "1fc0c1a5": {
     "key": "GEEN_085_94",
     "text": "Ägide V+"
+  },
+  "1ffb1aed": {
+    "key": "GEEN_030_21",
+    "text": "Overdrive-Attentäter II+"
   },
   "2014714c": {
     "key": "GEEN_009_00",
@@ -395,9 +579,17 @@
     "key": "GEEN_014_23",
     "text": "Schwachstellenangriff IV+"
   },
+  "20492635": {
+    "key": "GEEN_321_24",
+    "text": "Caelum-Glanz V+"
+  },
   "207559b9": {
     "key": "GEEN_028_14",
     "text": "Glück-Himmelssturm V+"
+  },
+  "207b67d1": {
+    "key": "GEEN_027_11",
+    "text": "Tyrannei II+"
   },
   "208af595": {
     "key": "GEEN_063_04",
@@ -423,6 +615,14 @@
     "key": "GEEN_087_01",
     "text": "Starker Stand II"
   },
+  "22dc8701": {
+    "key": "GEEN_323_03",
+    "text": "Caelum-Flamme IV"
+  },
+  "231ebaa2": {
+    "key": "GEEN_321_23",
+    "text": "Caelum-Glanz IV+"
+  },
   "232147ad": {
     "key": "GEEN_152_23",
     "text": "Weniger ist mehr IV+"
@@ -431,13 +631,17 @@
     "key": "GEEN_136_00",
     "text": "Unterdrückungsresistenz I"
   },
+  "23953fd4": {
+    "key": "GEEN_176_90",
+    "text": "Erwachen des Donnerwolfs+"
+  },
   "23c84e82": {
     "key": "GEEN_073_24",
     "text": "Tränkehamsterer V+"
   },
-  "23e7990d": {
-    "key": "GEEN_168_04",
-    "text": "Verbesserter Schaden V"
+  "247a41f3": {
+    "key": "GEEN_174_54",
+    "text": "Tanz der Klingenprinzessin"
   },
   "248c0116": {
     "key": "GEEN_054_00",
@@ -451,6 +655,10 @@
     "key": "GEEN_166_02",
     "text": "Größere Ägide III"
   },
+  "2679a4f0": {
+    "key": "GEEN_106_34",
+    "text": "Flinker Ansturm V+"
+  },
   "268cedc5": {
     "key": "GEEN_070_03",
     "text": "Herabstürzen IV"
@@ -458,6 +666,14 @@
   "26ddcd39": {
     "key": "GEEN_044_24",
     "text": "Starkes Herz+"
+  },
+  "274973d7": {
+    "key": "GEEN_028_21",
+    "text": "Glück-Himmelssturm II+"
+  },
+  "2767b7e2": {
+    "key": "GEEN_325_22",
+    "text": "Sagenhaft III+"
   },
   "27c62352": {
     "key": "GEEN_051_02",
@@ -471,25 +687,61 @@
     "key": "GEEN_130_04",
     "text": "Versalis-Fundament"
   },
+  "280e1329": {
+    "key": "GEEN_145_20",
+    "text": "Machthungrig I+"
+  },
+  "282dbff0": {
+    "key": "GEEN_173_91",
+    "text": "Passion des Alpha-Wolfs+"
+  },
+  "2835e81b": {
+    "key": "GEEN_029_21",
+    "text": "Wie zum Hohn II+"
+  },
   "28a30205": {
     "key": "GEEN_017_12",
     "text": "Kombo-Finisher III+"
+  },
+  "28b71e53": {
+    "key": "GEEN_051_14",
+    "text": "Sandgrabresistenz V+"
   },
   "295219f9": {
     "key": "GEEN_106_24",
     "text": "Flinker Ansturm V+"
   },
+  "297d03f7": {
+    "key": "GEEN_144_16",
+    "text": "Festung V+"
+  },
   "29be4772": {
     "key": "GEEN_051_00",
     "text": "Sandgrabresistenz I"
+  },
+  "2a2304e2": {
+    "key": "GEEN_325_16",
+    "text": "Sagenhaft V+"
   },
   "2a85a4c2": {
     "key": "GEEN_083_24",
     "text": "Geschickter Überfall V+"
   },
+  "2ac47940": {
+    "key": "GEEN_233_14",
+    "text": "Raserei+"
+  },
+  "2b2401ef": {
+    "key": "GEEN_321_13",
+    "text": "Caelum-Glanz IV+"
+  },
   "2b247ee4": {
     "key": "GEEN_067_00",
     "text": "Entziehen I"
+  },
+  "2b400faa": {
+    "key": "GEEN_005_21",
+    "text": "Bosheit II+"
   },
   "2b94d8d6": {
     "key": "GEEN_147_02",
@@ -498,6 +750,14 @@
   "2bdfba94": {
     "key": "GEEN_054_04",
     "text": "Schwindelresistenz V"
+  },
+  "2c150c6a": {
+    "key": "GEEN_154_21",
+    "text": "Berserker II+"
+  },
+  "2c6f3453": {
+    "key": "GEEN_024_10",
+    "text": "Kombo-Bonus I+"
   },
   "2c958609": {
     "key": "GEEN_057_00",
@@ -531,9 +791,25 @@
     "key": "GEEN_154_04",
     "text": "Berserker V"
   },
+  "2d70c37d": {
+    "key": "GEEN_177_93",
+    "text": "Reinkarnierter Pfad+"
+  },
   "2d7f2e70": {
     "key": "GEEN_000_24",
     "text": "Angriffskraft V+"
+  },
+  "2d85102a": {
+    "key": "GEEN_146_34",
+    "text": "Krieg-Elementar+"
+  },
+  "2d8e0e4d": {
+    "key": "GEEN_003_11",
+    "text": "Kritische Trefferrate II+"
+  },
+  "2e1bdb4a": {
+    "key": "GEEN_151_21",
+    "text": "Zusätzlicher Schaden II+"
   },
   "2e3351e3": {
     "key": "GEEN_147_24",
@@ -550,6 +826,10 @@
   "2fd5965c": {
     "key": "GEEN_151_22",
     "text": "Zusätzlicher Schaden III+"
+  },
+  "2ff84069": {
+    "key": "GEEN_100_01",
+    "text": "Ergänzung II"
   },
   "3069c2fe": {
     "key": "GEEN_128_93",
@@ -575,6 +855,14 @@
     "key": "GEEN_124_54",
     "text": "Kreativität des Drachentöters"
   },
+  "329c4e1c": {
+    "key": "GEEN_067_44",
+    "text": "Entziehen V+"
+  },
+  "33006fc3": {
+    "key": "GEEN_326_04",
+    "text": "Caelum-Stille V"
+  },
   "332e9b30": {
     "key": "GEEN_233_24",
     "text": "Raserei+"
@@ -586,6 +874,14 @@
   "335b55d0": {
     "key": "GEEN_061_22",
     "text": "Blocken-Rache III+"
+  },
+  "335da2a5": {
+    "key": "GEEN_045_15",
+    "text": "Mumm V+"
+  },
+  "33ac7f74": {
+    "key": "GEEN_077_34",
+    "text": "Untertauchen V+"
   },
   "33c89f1c": {
     "key": "GEEN_153_04",
@@ -635,6 +931,10 @@
     "key": "GEEN_031_13",
     "text": "Break-Attentäter IV+"
   },
+  "35ae024e": {
+    "key": "GEEN_324_22",
+    "text": "Caelum-Schnee III+"
+  },
   "35bd0f81": {
     "key": "GEEN_005_22",
     "text": "Bosheit III+"
@@ -642,6 +942,10 @@
   "361d44c4": {
     "key": "GEEN_012_12",
     "text": "Werfen III+"
+  },
+  "36360691": {
+    "key": "GEEN_322_13",
+    "text": "Caelum-Grenze IV+"
   },
   "3644ef2c": {
     "key": "GEEN_106_02",
@@ -651,9 +955,17 @@
     "key": "GEEN_064_22",
     "text": "Ausweichen-Rache III+"
   },
+  "36e1c7fc": {
+    "key": "GEEN_020_17",
+    "text": "Schadensobergrenze V+"
+  },
   "36f4b48a": {
     "key": "GEEN_013_22",
     "text": "Kritischer Schaden III+"
+  },
+  "3739db5e": {
+    "key": "GEEN_012_20",
+    "text": "Werfen I+"
   },
   "37b0783c": {
     "key": "GEEN_170_54",
@@ -695,6 +1007,10 @@
     "key": "GEEN_138_02",
     "text": "ANG↓-Resistenz III"
   },
+  "39810c9e": {
+    "key": "GEEN_064_11",
+    "text": "Ausweichen-Rache II+"
+  },
   "39a38b2c": {
     "key": "GEEN_086_02",
     "text": "Langsam-Resistenz III"
@@ -715,6 +1031,10 @@
     "key": "GEEN_018_04",
     "text": "Konzentriertes Feuer V"
   },
+  "3ba37635": {
+    "key": "GEEN_067_34",
+    "text": "Entziehen V+"
+  },
   "3bca3fd5": {
     "key": "GEEN_137_03",
     "text": "Dunkelflammenresistenz IV"
@@ -723,9 +1043,33 @@
     "key": "GEEN_117_04",
     "text": "Bestreben der Magierin"
   },
+  "3beed064": {
+    "key": "GEEN_001_20",
+    "text": "Leben I+"
+  },
+  "3c0d684d": {
+    "key": "GEEN_083_11",
+    "text": "Geschickter Überfall II+"
+  },
+  "3c0f5461": {
+    "key": "GEEN_167_34",
+    "text": "Autom. Trank+"
+  },
   "3c4e2fcf": {
     "key": "GEEN_003_12",
     "text": "Kritische Trefferrate III+"
+  },
+  "3cb7e988": {
+    "key": "GEEN_061_10",
+    "text": "Blocken-Rache I+"
+  },
+  "3cc5e451": {
+    "key": "GEEN_000_20",
+    "text": "Angriffskraft I+"
+  },
+  "3d0bf8cb": {
+    "key": "GEEN_146_14",
+    "text": "Krieg-Elementar+"
   },
   "3d5e4678": {
     "key": "GEEN_171_04",
@@ -743,13 +1087,25 @@
     "key": "GEEN_047_03",
     "text": "Brennen-Resistenz IV"
   },
+  "3dd38511": {
+    "key": "GEEN_324_00",
+    "text": "Caelum-Schnee"
+  },
   "3ea4134b": {
     "key": "GEEN_172_91",
-    "text": "Ehrfurcht des Ob. Primarchen+"
+    "text": "Ehrfurcht des Oberengels+"
+  },
+  "3ed16fb2": {
+    "key": "GEEN_073_34",
+    "text": "Tränkehamsterer V+"
   },
   "3edd4c1f": {
     "key": "GEEN_066_02",
     "text": "Regenerieren III"
+  },
+  "3ede3cc3": {
+    "key": "GEEN_144_21",
+    "text": "Festung II+"
   },
   "3f45dbdc": {
     "key": "GEEN_054_02",
@@ -763,6 +1119,18 @@
     "key": "GEEN_139_00",
     "text": "ABW↓-Resistenz I"
   },
+  "40049a6c": {
+    "key": "GEEN_324_21",
+    "text": "Caelum-Schnee II+"
+  },
+  "40214c38": {
+    "key": "GEEN_320_14",
+    "text": "Caelum-Erprobung V+"
+  },
+  "4035d98a": {
+    "key": "GEEN_113_02",
+    "text": "Siegelstärker III"
+  },
   "40738cdd": {
     "key": "GEEN_120_64",
     "text": "Pfad des Phantoms"
@@ -771,13 +1139,29 @@
     "key": "GEEN_110_14",
     "text": "Leben auf dem Drahtseil V+"
   },
+  "4119f09b": {
+    "key": "GEEN_178_64",
+    "text": "Schwarzer Pfad"
+  },
+  "41ac1082": {
+    "key": "GEEN_173_93",
+    "text": "Pfad des Alpha-Wolfs+"
+  },
+  "41cd7fa1": {
+    "key": "GEEN_061_20",
+    "text": "Blocken-Rache I+"
+  },
+  "425056c4": {
+    "key": "GEEN_047_14",
+    "text": "Brennen-Resistenz V+"
+  },
+  "426ad20e": {
+    "key": "GEEN_300_11",
+    "text": "Ewiges Krabbensiegel+"
+  },
   "42bb0c1c": {
     "key": "GEEN_151_04",
     "text": "Zusätzlicher Schaden V"
-  },
-  "43088191": {
-    "key": "GEEN_168_02",
-    "text": "Verbesserter Schaden III"
   },
   "430df884": {
     "key": "GEEN_028_00",
@@ -794,6 +1178,10 @@
   "439a2d9c": {
     "key": "GEEN_018_22",
     "text": "Konzentriertes Feuer III+"
+  },
+  "43cdd1fc": {
+    "key": "GEEN_020_15",
+    "text": "Schadensobergrenze V+"
   },
   "43dde5dd": {
     "key": "GEEN_171_74",
@@ -819,6 +1207,10 @@
     "key": "GEEN_158_22",
     "text": "Glaskanone III+"
   },
+  "4597a8a8": {
+    "key": "GEEN_173_64",
+    "text": "Pfad des Alpha-Wolfs"
+  },
   "459dd2c2": {
     "key": "GEEN_003_14",
     "text": "Kritische Trefferrate V+"
@@ -826,6 +1218,10 @@
   "45b43024": {
     "key": "GEEN_005_01",
     "text": "Bosheit II"
+  },
+  "45d92c1a": {
+    "key": "GEEN_008_11",
+    "text": "Himmelssturm II+"
   },
   "462782d5": {
     "key": "GEEN_123_04",
@@ -855,13 +1251,21 @@
     "key": "GEEN_066_01",
     "text": "Regenerieren II"
   },
+  "482fd699": {
+    "key": "GEEN_014_11",
+    "text": "Schwachstellenangriff II+"
+  },
   "4840c322": {
     "key": "GEEN_008_03",
     "text": "Himmelssturm IV"
   },
-  "4872d685": {
-    "key": "2DB5D969",
-    "text": "Verbesserter Schaden V"
+  "490f7304": {
+    "key": "GEEN_073_14",
+    "text": "Tränkehamsterer V+"
+  },
+  "49434696": {
+    "key": "GEEN_301_00",
+    "text": "Fürchterliche Krabben"
   },
   "49651c89": {
     "key": "GEEN_126_92",
@@ -874,6 +1278,18 @@
   "49745934": {
     "key": "GEEN_150_24",
     "text": "Unantastbar+"
+  },
+  "49d00caf": {
+    "key": "GEEN_003_21",
+    "text": "Kritische Trefferrate II+"
+  },
+  "49ebebeb": {
+    "key": "GEEN_150_34",
+    "text": "Unantastbar+"
+  },
+  "4a25d812": {
+    "key": "GEEN_326_23",
+    "text": "Caelum-Stille IV+"
   },
   "4a336d1e": {
     "key": "GEEN_104_02",
@@ -891,9 +1307,21 @@
     "key": "GEEN_156_24",
     "text": "Wirksame Kräuter+"
   },
+  "4ae72c9e": {
+    "key": "GEEN_234_34",
+    "text": "Spartaner+"
+  },
+  "4b253ac6": {
+    "key": "GEEN_018_21",
+    "text": "Konzentriertes Feuer II+"
+  },
   "4b754d3a": {
     "key": "GEEN_083_00",
     "text": "Geschickter Überfall I"
+  },
+  "4b86cc01": {
+    "key": "GEEN_321_00",
+    "text": "Caelum-Glanz"
   },
   "4b98f53a": {
     "key": "GEEN_085_02",
@@ -927,6 +1355,14 @@
     "key": "GEEN_123_93",
     "text": "Pfad des Lords+"
   },
+  "4d50d1fb": {
+    "key": "GEEN_031_21",
+    "text": "Break-Attentäter II+"
+  },
+  "4d52c35c": {
+    "key": "GEEN_327_23",
+    "text": "Divergenz IV+"
+  },
   "4d7c8632": {
     "key": "GEEN_123_64",
     "text": "Pfad des Lords"
@@ -938,6 +1374,10 @@
   "4db1fdc1": {
     "key": "GEEN_061_14",
     "text": "Blocken-Rache V+"
+  },
+  "4e22352d": {
+    "key": "GEEN_013_20",
+    "text": "Kritischer Schaden I+"
   },
   "4e4911fa": {
     "key": "GEEN_078_04",
@@ -963,17 +1403,37 @@
     "key": "GEEN_069_02",
     "text": "Schnelles Abklingen III"
   },
+  "4fde80ae": {
+    "key": "GEEN_017_20",
+    "text": "Kombo-Finisher I+"
+  },
   "4ffe62e5": {
     "key": "GEEN_027_12",
     "text": "Tyrannei III+"
+  },
+  "501973ce": {
+    "key": "GEEN_325_04",
+    "text": "Sagenhaft V"
   },
   "5048c546": {
     "key": "GEEN_139_24",
     "text": "ABW↓-Resistenz V+"
   },
+  "50996321": {
+    "key": "GEEN_320_23",
+    "text": "Caelum-Erprobung IV+"
+  },
   "50b05700": {
     "key": "GEEN_077_04",
     "text": "Untertauchen V"
+  },
+  "51163103": {
+    "key": "GEEN_012_10",
+    "text": "Werfen I+"
+  },
+  "5119e3f4": {
+    "key": "GEEN_325_13",
+    "text": "Sagenhaft IV+"
   },
   "5144fe4d": {
     "key": "GEEN_031_14",
@@ -982,6 +1442,10 @@
   "515e693c": {
     "key": "GEEN_119_93",
     "text": "Pfad der Rose+"
+  },
+  "51e98a7c": {
+    "key": "GEEN_175_93",
+    "text": "Indigofarbener Pfad+"
   },
   "522004ab": {
     "key": "GEEN_115_91",
@@ -995,9 +1459,17 @@
     "key": "GEEN_170_04",
     "text": "Aufruf der Seelenschneide"
   },
+  "5252689f": {
+    "key": "GEEN_024_11",
+    "text": "Kombo-Bonus II+"
+  },
   "52a6e299": {
     "key": "GEEN_114_90",
     "text": "Furchtlose Seele+"
+  },
+  "52abe046": {
+    "key": "GEEN_322_16",
+    "text": "Caelum-Grenze V+"
   },
   "52bd3102": {
     "key": "GEEN_110_23",
@@ -1011,6 +1483,18 @@
     "key": "GEEN_005_12",
     "text": "Bosheit III+"
   },
+  "53b1458d": {
+    "key": "GEEN_323_23",
+    "text": "Caelum-Flamme IV+"
+  },
+  "53bc1f91": {
+    "key": "GEEN_321_20",
+    "text": "Caelum-Glanz+"
+  },
+  "53bd323f": {
+    "key": "GEEN_325_00",
+    "text": "Sagenhaft"
+  },
   "54cefd1c": {
     "key": "GEEN_005_00",
     "text": "Bosheit I"
@@ -1022,6 +1506,10 @@
   "54d8ea04": {
     "key": "GEEN_020_24",
     "text": "Schadensobergrenze V+"
+  },
+  "5536ee62": {
+    "key": "GEEN_323_04",
+    "text": "Caelum-Flamme V"
   },
   "5608ef7e": {
     "key": "GEEN_152_02",
@@ -1038,6 +1526,10 @@
   "56a668b1": {
     "key": "GEEN_134_02",
     "text": "Leistungstropfen"
+  },
+  "56d196c5": {
+    "key": "GEEN_320_04",
+    "text": "Caelum-Erprobung V"
   },
   "57b6d9a5": {
     "key": "GEEN_058_03",
@@ -1063,17 +1555,37 @@
     "key": "GEEN_001_02",
     "text": "Leben III"
   },
+  "590715d9": {
+    "key": "GEEN_324_02",
+    "text": "Caelum-Schnee III"
+  },
   "590c19c8": {
     "key": "GEEN_132_64",
     "text": "Tiefschwarzer Pfad"
+  },
+  "595ad681": {
+    "key": "GEEN_027_20",
+    "text": "Tyrannei I+"
+  },
+  "59de6187": {
+    "key": "GEEN_106_44",
+    "text": "Flinker Ansturm V+"
   },
   "59e5335b": {
     "key": "GEEN_009_24",
     "text": "Linkangriff V+"
   },
+  "5a360ea8": {
+    "key": "GEEN_177_90",
+    "text": "Reinkarniertes Erwachen+"
+  },
   "5b939637": {
     "key": "GEEN_139_03",
     "text": "ABW↓-Resistenz IV"
+  },
+  "5bf84fd1": {
+    "key": "GEEN_325_24",
+    "text": "Sagenhaft V+"
   },
   "5c19bbb0": {
     "key": "GEEN_046_04",
@@ -1083,13 +1595,25 @@
     "key": "GEEN_145_13",
     "text": "Machthungrig IV+"
   },
+  "5cb2445f": {
+    "key": "GEEN_177_54",
+    "text": "Reinkarnierter Schwung"
+  },
   "5d592fdd": {
     "key": "GEEN_172_93",
-    "text": "Pfad des Obersten Primarchen+"
+    "text": "Pfad des Oberengels+"
   },
   "5dcc1f70": {
     "key": "GEEN_004_22",
     "text": "Betäubungskraft III+"
+  },
+  "5df353c3": {
+    "key": "GEEN_014_10",
+    "text": "Schwachstellenangriff I+"
+  },
+  "5e19150e": {
+    "key": "GEEN_004_11",
+    "text": "Betäubungskraft II+"
   },
   "5e7eeec4": {
     "key": "GEEN_001_04",
@@ -1098,6 +1622,10 @@
   "5eb282c6": {
     "key": "GEEN_068_04",
     "text": "Autom. Wiederbeleben V"
+  },
+  "5f097193": {
+    "key": "GEEN_320_03",
+    "text": "Caelum-Erprobung IV"
   },
   "5f117445": {
     "key": "GEEN_013_13",
@@ -1131,6 +1659,10 @@
     "key": "GEEN_057_01",
     "text": "Fähigk. vers.-Resistenz II"
   },
+  "612b6458": {
+    "key": "GEEN_045_44",
+    "text": "Mumm V+"
+  },
   "6130d327": {
     "key": "GEEN_085_01",
     "text": "Ägide II"
@@ -1143,6 +1675,14 @@
     "key": "GEEN_158_23",
     "text": "Glaskanone IV+"
   },
+  "61a1a299": {
+    "key": "GEEN_176_64",
+    "text": "Pfad des Donnerwolfs"
+  },
+  "61c49c10": {
+    "key": "GEEN_326_17",
+    "text": "Caelum-Stille V+"
+  },
   "621a2a97": {
     "key": "GEEN_115_64",
     "text": "Pfad der Wächterin"
@@ -1151,6 +1691,10 @@
     "key": "GEEN_018_00",
     "text": "Konzentriertes Feuer I"
   },
+  "62e18d53": {
+    "key": "GEEN_031_11",
+    "text": "Break-Attentäter II+"
+  },
   "62fed4f1": {
     "key": "GEEN_086_03",
     "text": "Langsam-Resistenz IV"
@@ -1158,6 +1702,18 @@
   "630de5dd": {
     "key": "GEEN_013_14",
     "text": "Kritischer Schaden V+"
+  },
+  "634f82cb": {
+    "key": "GEEN_324_20",
+    "text": "Caelum-Schnee+"
+  },
+  "64245ea7": {
+    "key": "GEEN_028_11",
+    "text": "Glück-Himmelssturm II+"
+  },
+  "64301e91": {
+    "key": "GEEN_177_91",
+    "text": "Reinkarnierte Güte+"
   },
   "645acee5": {
     "key": "GEEN_126_54",
@@ -1179,9 +1735,25 @@
     "key": "GEEN_222_94",
     "text": "Tränkehamsterer V+"
   },
+  "65b7e5c8": {
+    "key": "GEEN_323_15",
+    "text": "Caelum-Flamme V+"
+  },
+  "65f0420a": {
+    "key": "GEEN_302_00",
+    "text": "Pechschwarze Bande"
+  },
+  "661b4d50": {
+    "key": "GEEN_006_11",
+    "text": "Ausdauer II+"
+  },
   "6674c639": {
     "key": "GEEN_131_64",
     "text": "Blutroter Pfad"
+  },
+  "66cb28ba": {
+    "key": "GEEN_301_10",
+    "text": "Fürchterliche Krabben+"
   },
   "66f1b128": {
     "key": "GEEN_129_93",
@@ -1203,6 +1775,10 @@
     "key": "GEEN_073_00",
     "text": "Tränkehamsterer I"
   },
+  "688ab21c": {
+    "key": "GEEN_004_44",
+    "text": "Betäubungskraft V+"
+  },
   "68b1e888": {
     "key": "GEEN_006_04",
     "text": "Ausdauer V"
@@ -1221,7 +1797,7 @@
   },
   "696226bb": {
     "key": "GEEN_132_04",
-    "text": "Tiefschwarze Gegenwart"
+    "text": "Tiefschwarze Sense"
   },
   "69bf4aac": {
     "key": "GEEN_012_01",
@@ -1247,6 +1823,14 @@
     "key": "GEEN_156_04",
     "text": "Wirksame Kräuter"
   },
+  "6b8224eb": {
+    "key": "GEEN_030_20",
+    "text": "Overdrive-Attentäter I+"
+  },
+  "6b920da2": {
+    "key": "GEEN_174_64",
+    "text": "Pfad der Klingenprinzessin"
+  },
   "6ba991cd": {
     "key": "GEEN_079_00",
     "text": "Helles Köpfchen I"
@@ -1255,9 +1839,25 @@
     "key": "GEEN_088_03",
     "text": "Zerstörungsresistenz IV"
   },
+  "6c788459": {
+    "key": "GEEN_000_11",
+    "text": "Angriffskraft II+"
+  },
+  "6c788db7": {
+    "key": "GEEN_110_10",
+    "text": "Leben auf dem Drahtseil I+"
+  },
   "6c85983c": {
     "key": "GEEN_144_14",
     "text": "Festung V+"
+  },
+  "6c943387": {
+    "key": "GEEN_005_11",
+    "text": "Bosheit II+"
+  },
+  "6cba6b0d": {
+    "key": "GEEN_070_34",
+    "text": "Herabstürzen V+"
   },
   "6cca1ff7": {
     "key": "GEEN_128_92",
@@ -1267,9 +1867,21 @@
     "key": "GEEN_116_54",
     "text": "Hartnäckiger Steuermann"
   },
+  "6db307d5": {
+    "key": "GEEN_157_34",
+    "text": "Würfelwurf+"
+  },
+  "6def71c8": {
+    "key": "GEEN_064_10",
+    "text": "Ausweichen-Rache I+"
+  },
   "6ec9d6bb": {
     "key": "GEEN_028_23",
     "text": "Glück-Himmelssturm IV+"
+  },
+  "6efcd286": {
+    "key": "GEEN_146_16",
+    "text": "Krieg-Elementar+"
   },
   "6f1d0870": {
     "key": "GEEN_166_24",
@@ -1286,6 +1898,22 @@
   "6fd12e61": {
     "key": "GEEN_070_24",
     "text": "Herabstürzen V+"
+  },
+  "6ff3308a": {
+    "key": "GEEN_146_17",
+    "text": "Krieg-Elementar+"
+  },
+  "6ffc5452": {
+    "key": "GEEN_003_20",
+    "text": "Kritische Trefferrate I+"
+  },
+  "70051799": {
+    "key": "GEEN_147_34",
+    "text": "Weg zur Meisterschaft V+"
+  },
+  "7009517b": {
+    "key": "GEEN_326_14",
+    "text": "Caelum-Stille V+"
   },
   "70336d00": {
     "key": "GEEN_069_00",
@@ -1311,9 +1939,17 @@
     "key": "GEEN_061_23",
     "text": "Blocken-Rache IV+"
   },
+  "71b2da28": {
+    "key": "GEEN_017_21",
+    "text": "Kombo-Finisher II+"
+  },
   "71ff966a": {
     "key": "GEEN_024_12",
     "text": "Kombo-Bonus III+"
+  },
+  "72118f86": {
+    "key": "GEEN_144_20",
+    "text": "Festung I+"
   },
   "72304799": {
     "key": "GEEN_119_54",
@@ -1339,6 +1975,10 @@
     "key": "GEEN_057_03",
     "text": "Fähigk. vers.-Resistenz IV"
   },
+  "72c5a23d": {
+    "key": "GEEN_320_02",
+    "text": "Caelum-Erprobung III"
+  },
   "72cba710": {
     "key": "GEEN_051_04",
     "text": "Sandgrabresistenz V"
@@ -1347,17 +1987,33 @@
     "key": "GEEN_152_22",
     "text": "Weniger ist mehr III+"
   },
+  "7300a967": {
+    "key": "GEEN_321_04",
+    "text": "Caelum-Glanz V"
+  },
   "735769a7": {
     "key": "GEEN_069_01",
     "text": "Schnelles Abklingen II"
   },
-  "73b77d4f": {
-    "key": "GEEN_168_03",
-    "text": "Verbesserter Schaden IV"
+  "73db3bd3": {
+    "key": "GEEN_321_12",
+    "text": "Caelum-Glanz III+"
+  },
+  "73e4c05e": {
+    "key": "GEEN_166_14",
+    "text": "Größere Ägide V+"
   },
   "73e5554f": {
     "key": "GEEN_036_00",
     "text": "Besetzen I"
+  },
+  "73f80160": {
+    "key": "GEEN_113_04",
+    "text": "Siegelstärker V"
+  },
+  "74061b0c": {
+    "key": "GEEN_323_24",
+    "text": "Caelum-Flamme V+"
   },
   "7428df74": {
     "key": "GEEN_154_12",
@@ -1366,6 +2022,14 @@
   "7461bd6d": {
     "key": "GEEN_147_01",
     "text": "Weg zur Meisterschaft II"
+  },
+  "748dd213": {
+    "key": "GEEN_063_15",
+    "text": "Verbessertes Ausweichen+"
+  },
+  "74eedc99": {
+    "key": "GEEN_320_01",
+    "text": "Caelum-Erprobung II"
   },
   "751228a2": {
     "key": "GEEN_006_02",
@@ -1403,6 +2067,10 @@
     "key": "GEEN_078_01",
     "text": "Provozieren II"
   },
+  "76786869": {
+    "key": "GEEN_302_10",
+    "text": "Pechschwarze Bande+"
+  },
   "76c7eb69": {
     "key": "GEEN_060_01",
     "text": "Verbessertes Blocken II"
@@ -1427,6 +2095,10 @@
     "key": "GEEN_012_02",
     "text": "Werfen III"
   },
+  "77fae8c2": {
+    "key": "GEEN_020_11",
+    "text": "Schadensobergrenze II+"
+  },
   "7885354a": {
     "key": "GEEN_077_01",
     "text": "Untertauchen II"
@@ -1447,6 +2119,10 @@
     "key": "GEEN_014_00",
     "text": "Schwachstellenangriff I"
   },
+  "79495b88": {
+    "key": "GEEN_073_44",
+    "text": "Tränkehamsterer V+"
+  },
   "79d7536f": {
     "key": "GEEN_065_02",
     "text": "Verbesserte Heilung III"
@@ -1454,6 +2130,14 @@
   "79f4fd3e": {
     "key": "GEEN_027_00",
     "text": "Tyrannei I"
+  },
+  "7a06c7fb": {
+    "key": "GEEN_177_04",
+    "text": "Reinkarnierte Güte"
+  },
+  "7a65b8fb": {
+    "key": "GEEN_322_20",
+    "text": "Caelum-Grenze+"
   },
   "7a74e84c": {
     "key": "GEEN_144_13",
@@ -1463,13 +2147,33 @@
     "key": "GEEN_024_04",
     "text": "Kombo-Bonus V"
   },
+  "7ac9dc94": {
+    "key": "GEEN_327_03",
+    "text": "Divergenz IV"
+  },
   "7aebef91": {
     "key": "GEEN_012_00",
     "text": "Werfen I"
   },
+  "7b4aab30": {
+    "key": "GEEN_327_24",
+    "text": "Divergenz V+"
+  },
   "7b8c3e06": {
     "key": "GEEN_158_03",
     "text": "Glaskanone IV"
+  },
+  "7b9bb801": {
+    "key": "GEEN_113_03",
+    "text": "Siegelstärker IV"
+  },
+  "7bf56b6f": {
+    "key": "GEEN_322_15",
+    "text": "Caelum-Grenze V+"
+  },
+  "7c5b7fae": {
+    "key": "GEEN_110_20",
+    "text": "Leben auf dem Drahtseil I+"
   },
   "7c7ec053": {
     "key": "GEEN_118_64",
@@ -1477,7 +2181,11 @@
   },
   "7c8580ca": {
     "key": "GEEN_125_92",
-    "text": "Erhabene heilige Ritterin+"
+    "text": "Erhabene Heilige Ritterin+"
+  },
+  "7ce4d81c": {
+    "key": "GEEN_322_17",
+    "text": "Caelum-Grenze V+"
   },
   "7d318ff7": {
     "key": "GEEN_128_91",
@@ -1487,9 +2195,21 @@
     "key": "GEEN_138_00",
     "text": "ANG↓-Resistenz I"
   },
+  "7d720227": {
+    "key": "GEEN_326_13",
+    "text": "Caelum-Stille IV+"
+  },
   "7d8ff2ee": {
     "key": "GEEN_094_02",
     "text": "Hohe Konzentration III"
+  },
+  "7d9c105c": {
+    "key": "GEEN_006_20",
+    "text": "Ausdauer I+"
+  },
+  "7dc9da30": {
+    "key": "GEEN_323_21",
+    "text": "Caelum-Flamme II+"
   },
   "7dea157b": {
     "key": "GEEN_073_04",
@@ -1505,7 +2225,7 @@
   },
   "7e3a52a3": {
     "key": "GEEN_172_92",
-    "text": "Nimbus des Obersten Primarchen+"
+    "text": "Nimbus des Oberengels+"
   },
   "7e76f58d": {
     "key": "GEEN_078_02",
@@ -1514,6 +2234,10 @@
   "7efa8c0d": {
     "key": "GEEN_013_12",
     "text": "Kritischer Schaden III+"
+  },
+  "7f4f38ef": {
+    "key": "GEEN_326_03",
+    "text": "Caelum-Stille IV"
   },
   "7f5dda19": {
     "key": "GEEN_004_23",
@@ -1527,6 +2251,10 @@
     "key": "GEEN_088_02",
     "text": "Zerstörungsresistenz III"
   },
+  "7fccef02": {
+    "key": "GEEN_145_21",
+    "text": "Machthungrig II+"
+  },
   "803f64bd": {
     "key": "GEEN_132_54",
     "text": "Tiefschwarze Gelassenheit"
@@ -1539,9 +2267,21 @@
     "key": "GEEN_145_00",
     "text": "Machthungrig I"
   },
+  "80c94a24": {
+    "key": "GEEN_109_34",
+    "text": "Präziser Zorn V+"
+  },
+  "80ca66ed": {
+    "key": "GEEN_100_04",
+    "text": "Ergänzung V"
+  },
   "80cccd83": {
     "key": "GEEN_129_54",
     "text": "Wahrheit der Gründerin"
+  },
+  "80cfc2f1": {
+    "key": "GEEN_327_15",
+    "text": "Divergenz V+"
   },
   "80dc0fb8": {
     "key": "GEEN_087_04",
@@ -1554,6 +2294,10 @@
   "81742849": {
     "key": "GEEN_144_03",
     "text": "Festung IV"
+  },
+  "81b3962d": {
+    "key": "GEEN_326_22",
+    "text": "Caelum-Stille III+"
   },
   "81cb6c6b": {
     "key": "GEEN_106_03",
@@ -1591,13 +2335,25 @@
     "key": "GEEN_164_00",
     "text": "Verscherung"
   },
-  "83111a4b": {
-    "key": "GEEN_168_01",
-    "text": "Verbesserter Schaden II"
+  "837b3d64": {
+    "key": "GEEN_066_34",
+    "text": "Regenerieren V+"
+  },
+  "83b5463b": {
+    "key": "GEEN_326_00",
+    "text": "Caelum-Stille"
   },
   "83e5006e": {
     "key": "GEEN_154_24",
     "text": "Berserker V+"
+  },
+  "83e94b0c": {
+    "key": "GEEN_009_21",
+    "text": "Linkangriff II+"
+  },
+  "840c419a": {
+    "key": "GEEN_322_00",
+    "text": "Caelum-Grenze"
   },
   "842abbeb": {
     "key": "GEEN_012_03",
@@ -1619,13 +2375,29 @@
     "key": "GEEN_121_91",
     "text": "Schwur des Weißdrachen+"
   },
+  "85e85d91": {
+    "key": "GEEN_325_01",
+    "text": "Sagenhaft II"
+  },
   "867effed": {
     "key": "GEEN_000_22",
     "text": "Angriffskraft III+"
   },
+  "86e38bab": {
+    "key": "GEEN_028_10",
+    "text": "Glück-Himmelssturm I+"
+  },
   "872d3af9": {
     "key": "GEEN_171_54",
     "text": "Eruption der Dunkeljägerin"
+  },
+  "87658a6f": {
+    "key": "GEEN_322_04",
+    "text": "Caelum-Grenze V"
+  },
+  "88131731": {
+    "key": "GEEN_303_10",
+    "text": "Sumo-Kriegsmarsch+"
   },
   "883380d4": {
     "key": "GEEN_072_04",
@@ -1634,6 +2406,14 @@
   "8856f755": {
     "key": "GEEN_111_01",
     "text": "Schnelle Aufladung II"
+  },
+  "89538be0": {
+    "key": "GEEN_326_15",
+    "text": "Caelum-Stille V+"
+  },
+  "895abbf6": {
+    "key": "GEEN_173_90",
+    "text": "Erwachen des Alpha-Wolfs+"
   },
   "89ca4db0": {
     "key": "GEEN_001_13",
@@ -1659,6 +2439,10 @@
     "key": "GEEN_154_02",
     "text": "Berserker III"
   },
+  "8b105fc8": {
+    "key": "GEEN_152_21",
+    "text": "Weniger ist mehr II+"
+  },
   "8b647510": {
     "key": "GEEN_003_13",
     "text": "Kritische Trefferrate IV+"
@@ -1667,13 +2451,29 @@
     "key": "GEEN_061_02",
     "text": "Blocken-Rache III"
   },
-  "8bf28309": {
-    "key": "GEEN_168_23",
-    "text": "Verbesserter Schaden IV+"
+  "8b6c67f0": {
+    "key": "GEEN_020_20",
+    "text": "Schadensobergrenze I+"
+  },
+  "8b8085c0": {
+    "key": "GEEN_320_24",
+    "text": "Caelum-Erprobung V+"
+  },
+  "8b9c3d0f": {
+    "key": "GEEN_322_23",
+    "text": "Caelum-Grenze IV+"
+  },
+  "8c4688e2": {
+    "key": "GEEN_009_10",
+    "text": "Linkangriff I+"
   },
   "8ca7d9c1": {
     "key": "GEEN_012_14",
     "text": "Werfen V+"
+  },
+  "8ce18579": {
+    "key": "GEEN_324_04",
+    "text": "Caelum-Schnee V"
   },
   "8d639e0c": {
     "key": "GEEN_080_01",
@@ -1682,6 +2482,10 @@
   "8dbf201a": {
     "key": "GEEN_001_12",
     "text": "Leben III+"
+  },
+  "8e20b20c": {
+    "key": "GEEN_159_34",
+    "text": "Flucht vor Kampf+"
   },
   "8e3f1ec7": {
     "key": "GEEN_153_01",
@@ -1703,13 +2507,41 @@
     "key": "GEEN_018_03",
     "text": "Konzentriertes Feuer IV"
   },
+  "8f2ffe00": {
+    "key": "GEEN_003_10",
+    "text": "Kritische Trefferrate I+"
+  },
+  "8f519293": {
+    "key": "GEEN_320_21",
+    "text": "Caelum-Erprobung II+"
+  },
+  "8ff568f7": {
+    "key": "GEEN_322_02",
+    "text": "Caelum-Grenze III"
+  },
+  "90176d85": {
+    "key": "GEEN_321_03",
+    "text": "Caelum-Glanz IV"
+  },
   "905c6d7f": {
     "key": "GEEN_024_00",
     "text": "Kombo-Bonus I"
   },
+  "90822db1": {
+    "key": "GEEN_151_17",
+    "text": "Zusätzlicher Schaden V+"
+  },
+  "908d5612": {
+    "key": "GEEN_327_22",
+    "text": "Divergenz III+"
+  },
   "909a3aeb": {
     "key": "GEEN_027_01",
     "text": "Tyrannei II"
+  },
+  "90e42e35": {
+    "key": "GEEN_321_22",
+    "text": "Caelum-Glanz III+"
   },
   "90fbb4bf": {
     "key": "GEEN_068_01",
@@ -1722,6 +2554,10 @@
   "9172d000": {
     "key": "GEEN_001_22",
     "text": "Leben III+"
+  },
+  "9184f37b": {
+    "key": "GEEN_174_04",
+    "text": "Arie der Klingenprinzessin"
   },
   "91956b39": {
     "key": "GEEN_111_24",
@@ -1751,9 +2587,17 @@
     "key": "GEEN_000_13",
     "text": "Angriffskraft IV+"
   },
+  "92373af9": {
+    "key": "GEEN_009_11",
+    "text": "Linkangriff II+"
+  },
   "92b2d85f": {
     "key": "GEEN_078_00",
     "text": "Provozieren I"
+  },
+  "9300fadb": {
+    "key": "GEEN_326_24",
+    "text": "Caelum-Stille V+"
   },
   "936dfe00": {
     "key": "GEEN_114_54",
@@ -1783,9 +2627,25 @@
     "key": "GEEN_145_02",
     "text": "Machthungrig III"
   },
+  "94dc820e": {
+    "key": "GEEN_178_54",
+    "text": "Schwarzer Satz"
+  },
+  "94dd2628": {
+    "key": "GEEN_083_20",
+    "text": "Geschickter Überfall I+"
+  },
   "94f7053c": {
     "key": "GEEN_014_12",
     "text": "Schwachstellenangriff III+"
+  },
+  "9503691b": {
+    "key": "GEEN_018_20",
+    "text": "Konzentriertes Feuer I+"
+  },
+  "9558f543": {
+    "key": "GEEN_325_21",
+    "text": "Sagenhaft II+"
   },
   "958588f6": {
     "key": "GEEN_087_03",
@@ -1807,9 +2667,17 @@
     "key": "GEEN_067_24",
     "text": "Entziehen V+"
   },
+  "95cc3cb8": {
+    "key": "GEEN_175_90",
+    "text": "Indigofarbenes Erwachen+"
+  },
   "961b274c": {
     "key": "GEEN_003_23",
     "text": "Kritische Trefferrate IV+"
+  },
+  "96390ecf": {
+    "key": "GEEN_323_02",
+    "text": "Caelum-Flamme III"
   },
   "96434c8d": {
     "key": "GEEN_046_01",
@@ -1819,9 +2687,21 @@
     "key": "GEEN_073_03",
     "text": "Tränkehamsterer IV"
   },
+  "96c069d8": {
+    "key": "GEEN_020_21",
+    "text": "Schadensobergrenze II+"
+  },
+  "96d6fe5e": {
+    "key": "GEEN_174_92",
+    "text": "Tanz der Klingenprinzessin+"
+  },
   "978255ef": {
     "key": "GEEN_060_00",
     "text": "Verbessertes Blocken I"
+  },
+  "97927f50": {
+    "key": "GEEN_153_21",
+    "text": "Vorsprung II+"
   },
   "97cf485d": {
     "key": "GEEN_151_94",
@@ -1843,6 +2723,10 @@
     "key": "GEEN_083_01",
     "text": "Geschickter Überfall II"
   },
+  "98a07ee2": {
+    "key": "GEEN_045_14",
+    "text": "Mumm V+"
+  },
   "98a6d249": {
     "key": "GEEN_116_90",
     "text": "Erwachen des Steuermanns+"
@@ -1859,6 +2743,10 @@
     "key": "GEEN_000_23",
     "text": "Angriffskraft IV+"
   },
+  "98e33f8e": {
+    "key": "GEEN_080_34",
+    "text": "Rupien-Sparfuchs V+"
+  },
   "98e88fdf": {
     "key": "GEEN_057_02",
     "text": "Fähigk. vers.-Resistenz III"
@@ -1866,6 +2754,18 @@
   "98e9e6ef": {
     "key": "GEEN_130_93",
     "text": "Versalis-Herz+"
+  },
+  "99194505": {
+    "key": "GEEN_176_54",
+    "text": "Auge des Donnerwolfs"
+  },
+  "9978c657": {
+    "key": "GEEN_178_04",
+    "text": "Schwarzes Fluchsiegel"
+  },
+  "99926ea8": {
+    "key": "GEEN_321_14",
+    "text": "Caelum-Glanz V+"
   },
   "99a4b2a7": {
     "key": "GEEN_080_00",
@@ -1875,6 +2775,14 @@
     "key": "GEEN_137_01",
     "text": "Dunkelflammenresistenz II"
   },
+  "99e8b892": {
+    "key": "GEEN_233_34",
+    "text": "Raserei+"
+  },
+  "9a250027": {
+    "key": "GEEN_321_15",
+    "text": "Caelum-Glanz V+"
+  },
   "9a341899": {
     "key": "GEEN_147_00",
     "text": "Weg zur Meisterschaft I"
@@ -1883,9 +2791,17 @@
     "key": "GEEN_154_00",
     "text": "Berserker I"
   },
+  "9a60fbf0": {
+    "key": "GEEN_156_34",
+    "text": "Wirksame Kräuter+"
+  },
   "9a753e01": {
     "key": "GEEN_028_04",
     "text": "Glück-Himmelssturm V"
+  },
+  "9abd2da5": {
+    "key": "GEEN_178_93",
+    "text": "Schwarzer Pfad+"
   },
   "9ada3e00": {
     "key": "GEEN_115_90",
@@ -1903,13 +2819,29 @@
     "key": "GEEN_119_90",
     "text": "Erwachen der Rose+"
   },
+  "9bd2b40e": {
+    "key": "GEEN_326_12",
+    "text": "Caelum-Stille III+"
+  },
   "9c2399da": {
     "key": "GEEN_085_24",
     "text": "Ägide V+"
   },
+  "9c309b7a": {
+    "key": "GEEN_020_18",
+    "text": "Schadensobergrenze V+"
+  },
   "9cb98cc1": {
     "key": "GEEN_036_02",
     "text": "Besetzen III"
+  },
+  "9cbbcf0f": {
+    "key": "GEEN_326_20",
+    "text": "Caelum-Stille+"
+  },
+  "9cd340a8": {
+    "key": "GEEN_325_20",
+    "text": "Sagenhaft+"
   },
   "9d3093ae": {
     "key": "GEEN_013_24",
@@ -1947,6 +2879,14 @@
     "key": "GEEN_213_94",
     "text": "Verbessertes Blocken V+"
   },
+  "9eb767bb": {
+    "key": "GEEN_068_44",
+    "text": "Autom. Wiederbeleben V+"
+  },
+  "9ec6c56d": {
+    "key": "GEEN_175_91",
+    "text": "Indigofarbener Schwertstoß+"
+  },
   "9f08f697": {
     "key": "GEEN_116_91",
     "text": "Navigation des Steuermanns+"
@@ -1963,9 +2903,17 @@
     "key": "GEEN_029_04",
     "text": "Wie zum Hohn V"
   },
+  "9ff30620": {
+    "key": "GEEN_064_21",
+    "text": "Ausweichen-Rache II+"
+  },
+  "a07bdc96": {
+    "key": "GEEN_018_10",
+    "text": "Konzentriertes Feuer I+"
+  },
   "a0f94f69": {
     "key": "GEEN_125_91",
-    "text": "Glanz der heiligen Ritterin+"
+    "text": "Glanz der Heiligen Ritterin+"
   },
   "a110dc1e": {
     "key": "GEEN_060_23",
@@ -1979,6 +2927,10 @@
     "key": "GEEN_144_12",
     "text": "Festung III+"
   },
+  "a14ba9ce": {
+    "key": "GEEN_326_01",
+    "text": "Caelum-Stille II"
+  },
   "a1c947c2": {
     "key": "GEEN_020_23",
     "text": "Schadensobergrenze IV+"
@@ -1987,6 +2939,10 @@
     "key": "GEEN_058_00",
     "text": "HK versiegelt-Resistenz I"
   },
+  "a21005e9": {
+    "key": "GEEN_003_44",
+    "text": "Kritische Trefferrate V+"
+  },
   "a224a830": {
     "key": "GEEN_036_04",
     "text": "Besetzen V"
@@ -1994,6 +2950,10 @@
   "a248e5d1": {
     "key": "GEEN_096_03",
     "text": "Nerven aus Stahl IV"
+  },
+  "a266e055": {
+    "key": "GEEN_327_13",
+    "text": "Divergenz IV+"
   },
   "a278238e": {
     "key": "GEEN_064_24",
@@ -2059,9 +3019,21 @@
     "key": "GEEN_000_02",
     "text": "Angriffskraft III"
   },
+  "a6aac25f": {
+    "key": "GEEN_325_23",
+    "text": "Sagenhaft IV+"
+  },
   "a6ee588a": {
     "key": "GEEN_001_00",
     "text": "Leben I"
+  },
+  "a6f5982e": {
+    "key": "GEEN_000_21",
+    "text": "Angriffskraft II+"
+  },
+  "a70c5270": {
+    "key": "GEEN_324_13",
+    "text": "Caelum-Schnee IV+"
   },
   "a70daf5a": {
     "key": "GEEN_110_00",
@@ -2083,6 +3055,14 @@
     "key": "GEEN_159_14",
     "text": "Flucht vor Kampf+"
   },
+  "a8533ce3": {
+    "key": "GEEN_327_04",
+    "text": "Divergenz V"
+  },
+  "a86b5418": {
+    "key": "GEEN_158_21",
+    "text": "Glaskanone II+"
+  },
   "a879208f": {
     "key": "GEEN_127_92",
     "text": "Mut des Schmetterlings+"
@@ -2090,6 +3070,10 @@
   "a89c98c9": {
     "key": "GEEN_024_14",
     "text": "Kombo-Bonus V+"
+  },
+  "a8a0cbff": {
+    "key": "GEEN_178_90",
+    "text": "Schwarzes Erwachen+"
   },
   "a8c67937": {
     "key": "GEEN_111_12",
@@ -2107,6 +3091,14 @@
     "key": "GEEN_006_22",
     "text": "Ausdauer III+"
   },
+  "a99085f7": {
+    "key": "GEEN_323_01",
+    "text": "Caelum-Flamme II"
+  },
+  "a99e6b1a": {
+    "key": "GEEN_100_02",
+    "text": "Ergänzung III"
+  },
   "a9d804d4": {
     "key": "GEEN_130_64",
     "text": "Versalis-Herz"
@@ -2123,21 +3115,41 @@
     "key": "GEEN_110_01",
     "text": "Leben auf dem Drahtseil II"
   },
+  "aaab893b": {
+    "key": "GEEN_111_11",
+    "text": "Schnelle Aufladung II+"
+  },
   "aac7a219": {
     "key": "GEEN_151_03",
     "text": "Zusätzlicher Schaden IV"
   },
   "ab4f7d56": {
     "key": "GEEN_172_54",
-    "text": "Nimbus des Obersten Primarchen"
+    "text": "Nimbus des Oberengels"
+  },
+  "ab70208c": {
+    "key": "GEEN_069_34",
+    "text": "Schnelles Abklingen V+"
   },
   "ab835493": {
     "key": "GEEN_124_90",
     "text": "Erwachen des Drachentöters+"
   },
+  "abaefe36": {
+    "key": "GEEN_324_23",
+    "text": "Caelum-Schnee IV+"
+  },
   "abc07972": {
     "key": "GEEN_027_22",
     "text": "Tyrannei III+"
+  },
+  "abc0b11b": {
+    "key": "GEEN_027_15",
+    "text": "Tyrannei V+"
+  },
+  "abf24655": {
+    "key": "GEEN_322_01",
+    "text": "Caelum-Grenze II"
   },
   "abfa79f2": {
     "key": "GEEN_133_02",
@@ -2155,13 +3167,17 @@
     "key": "GEEN_047_04",
     "text": "Brennen-Resistenz V"
   },
-  "aca7fb5a": {
-    "key": "GEEN_168_00",
-    "text": "Verbesserter Schaden"
-  },
   "ad0a2ae1": {
     "key": "GEEN_070_01",
     "text": "Herabstürzen II"
+  },
+  "ad2e0751": {
+    "key": "GEEN_017_10",
+    "text": "Kombo-Finisher I+"
+  },
+  "ad341007": {
+    "key": "GEEN_020_10",
+    "text": "Schadensobergrenze I+"
   },
   "ad8caefb": {
     "key": "GEEN_171_93",
@@ -2189,7 +3205,7 @@
   },
   "aeef8343": {
     "key": "GEEN_125_90",
-    "text": "Erwachte heilige Ritterin+"
+    "text": "Erwachte Heilige Ritterin+"
   },
   "af7fb20d": {
     "key": "GEEN_009_03",
@@ -2199,6 +3215,10 @@
     "key": "GEEN_130_90",
     "text": "Versalis-Seele+"
   },
+  "b0207b68": {
+    "key": "GEEN_153_20",
+    "text": "Vorsprung I+"
+  },
   "b0634504": {
     "key": "GEEN_171_64",
     "text": "Pfad der Dunkeljägerin"
@@ -2206,6 +3226,10 @@
   "b06c66a6": {
     "key": "GEEN_104_23",
     "text": "Flinke Verteidigung IV+"
+  },
+  "b09e9d63": {
+    "key": "GEEN_070_44",
+    "text": "Herabstürzen V+"
   },
   "b0ad15dd": {
     "key": "GEEN_005_23",
@@ -2215,17 +3239,33 @@
     "key": "GEEN_020_14",
     "text": "Schadensobergrenze V+"
   },
+  "b0ce994b": {
+    "key": "GEEN_320_13",
+    "text": "Caelum-Erprobung IV+"
+  },
   "b109c429": {
     "key": "GEEN_046_00",
     "text": "Giftresistenz I"
+  },
+  "b12e3029": {
+    "key": "GEEN_144_15",
+    "text": "Festung V+"
   },
   "b143dae6": {
     "key": "GEEN_127_91",
     "text": "Anmut des Schmetterlings+"
   },
+  "b1683add": {
+    "key": "GEEN_173_54",
+    "text": "Kreisel des Alpha-Wolfs"
+  },
   "b17c7207": {
     "key": "GEEN_083_13",
     "text": "Geschickter Überfall IV+"
+  },
+  "b1b79be4": {
+    "key": "GEEN_320_17",
+    "text": "Caelum-Erprobung V+"
   },
   "b1c1200b": {
     "key": "GEEN_119_64",
@@ -2245,7 +3285,19 @@
   },
   "b2191f16": {
     "key": "GEEN_125_54",
-    "text": "Erhabene heilige Ritterin"
+    "text": "Erhabene Heilige Ritterin"
+  },
+  "b2420cbe": {
+    "key": "GEEN_326_02",
+    "text": "Caelum-Stille III"
+  },
+  "b242510c": {
+    "key": "GEEN_325_12",
+    "text": "Sagenhaft III+"
+  },
+  "b289a9ad": {
+    "key": "GEEN_303_00",
+    "text": "Sumo-Kriegsmarsch"
   },
   "b2b08f0d": {
     "key": "GEEN_077_02",
@@ -2259,9 +3311,17 @@
     "key": "GEEN_069_03",
     "text": "Schnelles Abklingen IV"
   },
+  "b2dee2b6": {
+    "key": "GEEN_111_10",
+    "text": "Schnelle Aufladung I+"
+  },
   "b3ab43f3": {
     "key": "GEEN_132_93",
     "text": "Tiefschwarzer Pfad+"
+  },
+  "b3c0c93d": {
+    "key": "GEEN_321_01",
+    "text": "Caelum-Glanz II"
   },
   "b441275d": {
     "key": "GEEN_120_90",
@@ -2271,9 +3331,13 @@
     "key": "GEEN_012_24",
     "text": "Werfen V+"
   },
-  "b5170056": {
-    "key": "GEEN_168_24",
-    "text": "Verbesserter Schaden V+"
+  "b4ece7bc": {
+    "key": "GEEN_175_64",
+    "text": "Indigofarbener Pfad"
+  },
+  "b506b258": {
+    "key": "GEEN_094_34",
+    "text": "Hohe Konzentration V+"
   },
   "b570d9ca": {
     "key": "GEEN_013_00",
@@ -2286,6 +3350,10 @@
   "b5b23f02": {
     "key": "GEEN_001_14",
     "text": "Leben V+"
+  },
+  "b5d4581f": {
+    "key": "GEEN_083_21",
+    "text": "Geschickter Überfall II+"
   },
   "b5da3e80": {
     "key": "GEEN_121_92",
@@ -2306,6 +3374,14 @@
   "b694cdd6": {
     "key": "GEEN_158_01",
     "text": "Glaskanone II"
+  },
+  "b6ada175": {
+    "key": "GEEN_001_10",
+    "text": "Leben I+"
+  },
+  "b6e74772": {
+    "key": "GEEN_024_20",
+    "text": "Kombo-Bonus I+"
   },
   "b71df666": {
     "key": "GEEN_086_00",
@@ -2335,17 +3411,41 @@
     "key": "GEEN_072_01",
     "text": "Erheben II"
   },
+  "b87b2777": {
+    "key": "GEEN_013_11",
+    "text": "Kritischer Schaden II+"
+  },
+  "b87c64c5": {
+    "key": "GEEN_005_10",
+    "text": "Bosheit I+"
+  },
   "b8a811ed": {
     "key": "GEEN_080_04",
     "text": "Rupien-Sparfuchs V"
   },
   "b8c44d5e": {
     "key": "GEEN_172_90",
-    "text": "Erwachen+ des Ob. Primarchen"
+    "text": "Erwachen des Oberengels+"
+  },
+  "b9060498": {
+    "key": "GEEN_029_10",
+    "text": "Wie zum Hohn I+"
+  },
+  "b98343cd": {
+    "key": "GEEN_326_21",
+    "text": "Caelum-Stille II+"
   },
   "b98a0f22": {
     "key": "GEEN_130_91",
     "text": "Versalis-Fundament+"
+  },
+  "ba16f729": {
+    "key": "GEEN_065_34",
+    "text": "Verbesserte Heilung V+"
+  },
+  "ba28c81c": {
+    "key": "GEEN_177_92",
+    "text": "Reinkarnierter Schwung+"
   },
   "ba77b7f2": {
     "key": "GEEN_045_04",
@@ -2354,6 +3454,14 @@
   "ba8a0229": {
     "key": "GEEN_152_13",
     "text": "Weniger ist mehr IV+"
+  },
+  "bb49c8f6": {
+    "key": "GEEN_045_34",
+    "text": "Mumm V+"
+  },
+  "bb6dee38": {
+    "key": "GEEN_027_44",
+    "text": "Tyrannei V+"
   },
   "bb86ef75": {
     "key": "GEEN_018_23",
@@ -2370,6 +3478,10 @@
   "bc445153": {
     "key": "GEEN_009_14",
     "text": "Linkangriff V+"
+  },
+  "bc4a3c09": {
+    "key": "GEEN_018_11",
+    "text": "Konzentriertes Feuer II+"
   },
   "bc53ce24": {
     "key": "GEEN_116_93",
@@ -2391,6 +3503,14 @@
     "key": "GEEN_006_03",
     "text": "Ausdauer IV"
   },
+  "bd8ba705": {
+    "key": "GEEN_327_02",
+    "text": "Divergenz III"
+  },
+  "bda8ed0d": {
+    "key": "GEEN_061_21",
+    "text": "Blocken-Rache II+"
+  },
   "bdcc9a89": {
     "key": "GEEN_115_54",
     "text": "Ehre der Wächterin"
@@ -2402,6 +3522,10 @@
   "be3c851c": {
     "key": "GEEN_000_04",
     "text": "Angriffskraft V"
+  },
+  "be4c13a6": {
+    "key": "GEEN_173_04",
+    "text": "Passion des Alpha-Wolfs"
   },
   "be6b6288": {
     "key": "GEEN_153_24",
@@ -2451,6 +3575,10 @@
     "key": "GEEN_083_23",
     "text": "Geschickter Überfall IV+"
   },
+  "c122758c": {
+    "key": "GEEN_322_21",
+    "text": "Caelum-Grenze II+"
+  },
   "c1377955": {
     "key": "GEEN_077_00",
     "text": "Untertauchen I"
@@ -2467,6 +3595,10 @@
     "key": "GEEN_064_23",
     "text": "Ausweichen-Rache IV+"
   },
+  "c2c979fc": {
+    "key": "GEEN_321_17",
+    "text": "Caelum-Glanz V+"
+  },
   "c349ad51": {
     "key": "GEEN_061_01",
     "text": "Blocken-Rache II"
@@ -2479,9 +3611,21 @@
     "key": "GEEN_001_01",
     "text": "Leben II"
   },
+  "c3a4c1ec": {
+    "key": "GEEN_005_44",
+    "text": "Bosheit V+"
+  },
+  "c42e609c": {
+    "key": "GEEN_020_19",
+    "text": "Schadensobergrenze V+"
+  },
   "c452ab03": {
     "key": "GEEN_012_04",
     "text": "Werfen V"
+  },
+  "c4c213bd": {
+    "key": "GEEN_322_12",
+    "text": "Caelum-Grenze III+"
   },
   "c4dd863a": {
     "key": "GEEN_170_74",
@@ -2515,17 +3659,25 @@
     "key": "GEEN_009_02",
     "text": "Linkangriff III"
   },
+  "c6b0616d": {
+    "key": "GEEN_004_21",
+    "text": "Betäubungskraft II+"
+  },
   "c6b1bbe6": {
     "key": "GEEN_020_00",
     "text": "Schadensobergrenze I"
   },
-  "c6b50fea": {
-    "key": "GEEN_168_22",
-    "text": "Verbesserter Schaden III+"
-  },
   "c6e71d09": {
     "key": "GEEN_111_13",
     "text": "Schnelle Aufladung IV+"
+  },
+  "c77aa05d": {
+    "key": "GEEN_006_21",
+    "text": "Ausdauer II+"
+  },
+  "c79bd47f": {
+    "key": "GEEN_027_10",
+    "text": "Tyrannei I+"
   },
   "c7d124dd": {
     "key": "GEEN_073_02",
@@ -2534,6 +3686,10 @@
   "c7d94dc9": {
     "key": "GEEN_017_04",
     "text": "Kombo-Finisher V"
+  },
+  "c856d9a9": {
+    "key": "GEEN_020_16",
+    "text": "Schadensobergrenze V+"
   },
   "c8935975": {
     "key": "GEEN_031_02",
@@ -2545,7 +3701,11 @@
   },
   "c9d8bd97": {
     "key": "GEEN_172_04",
-    "text": "Ehrfurcht des Ob. Primarchen"
+    "text": "Ehrfurcht des Oberengels"
+  },
+  "ca227740": {
+    "key": "GEEN_320_20",
+    "text": "Caelum-Erprobung+"
   },
   "caae3f9c": {
     "key": "GEEN_118_93",
@@ -2559,6 +3719,10 @@
     "key": "GEEN_018_01",
     "text": "Konzentriertes Feuer II"
   },
+  "cbe5dc36": {
+    "key": "GEEN_012_11",
+    "text": "Werfen II+"
+  },
   "cc29955a": {
     "key": "GEEN_077_03",
     "text": "Untertauchen IV"
@@ -2567,17 +3731,37 @@
     "key": "GEEN_008_02",
     "text": "Himmelssturm III"
   },
+  "cc5ff698": {
+    "key": "GEEN_020_44",
+    "text": "Schadensobergrenze V+"
+  },
+  "cc7dde55": {
+    "key": "GEEN_323_00",
+    "text": "Caelum-Flamme"
+  },
   "ccd29b2b": {
     "key": "GEEN_086_04",
     "text": "Langsam-Resistenz V"
   },
   "cce507e7": {
     "key": "GEEN_172_64",
-    "text": "Pfad des Obersten Primarchen"
+    "text": "Pfad des Oberengels"
+  },
+  "cd357780": {
+    "key": "GEEN_113_01",
+    "text": "Siegelstärker II"
   },
   "cd4b83c7": {
     "key": "GEEN_136_04",
     "text": "Unterdrückungsresistenz V"
+  },
+  "cd6bb486": {
+    "key": "GEEN_320_00",
+    "text": "Caelum-Erprobung"
+  },
+  "cd77d1aa": {
+    "key": "GEEN_024_21",
+    "text": "Kombo-Bonus II+"
   },
   "cdfeb37e": {
     "key": "GEEN_153_13",
@@ -2594,6 +3778,10 @@
   "ce8aa073": {
     "key": "GEEN_212_94",
     "text": "Zusätzlicher Schaden V+"
+  },
+  "ce8c3c96": {
+    "key": "GEEN_146_15",
+    "text": "Krieg-Elementar+"
   },
   "cee9dd46": {
     "key": "GEEN_153_02",
@@ -2615,6 +3803,10 @@
     "key": "GEEN_070_00",
     "text": "Herabstürzen I"
   },
+  "d135e07d": {
+    "key": "GEEN_001_21",
+    "text": "Leben II+"
+  },
   "d14aa754": {
     "key": "GEEN_029_12",
     "text": "Wie zum Hohn III+"
@@ -2631,6 +3823,14 @@
     "key": "GEEN_055_00",
     "text": "Lähmungsresistenz I"
   },
+  "d28011a6": {
+    "key": "GEEN_324_03",
+    "text": "Caelum-Schnee IV"
+  },
+  "d29cd8e0": {
+    "key": "GEEN_322_24",
+    "text": "Caelum-Grenze V+"
+  },
   "d3071d85": {
     "key": "GEEN_137_24",
     "text": "Dunkelflammenresistenz V+"
@@ -2642,6 +3842,10 @@
   "d32dc086": {
     "key": "GEEN_028_13",
     "text": "Glück-Himmelssturm IV+"
+  },
+  "d340651c": {
+    "key": "GEEN_068_34",
+    "text": "Autom. Wiederbeleben V+"
   },
   "d3538cfd": {
     "key": "GEEN_104_01",
@@ -2667,6 +3871,10 @@
     "key": "GEEN_009_12",
     "text": "Linkangriff III+"
   },
+  "d4117ff3": {
+    "key": "GEEN_175_92",
+    "text": "Indigofarbenes Unglück+"
+  },
   "d42a2d77": {
     "key": "GEEN_109_00",
     "text": "Präziser Zorn I"
@@ -2687,6 +3895,10 @@
     "key": "GEEN_087_02",
     "text": "Starker Stand III"
   },
+  "d4cb7d87": {
+    "key": "GEEN_061_11",
+    "text": "Blocken-Rache II+"
+  },
   "d4ebb836": {
     "key": "GEEN_144_24",
     "text": "Festung V+"
@@ -2695,13 +3907,29 @@
     "key": "GEEN_001_23",
     "text": "Leben IV+"
   },
+  "d594d945": {
+    "key": "GEEN_175_04",
+    "text": "Indigofarbener Schwertstoß"
+  },
+  "d59e112b": {
+    "key": "GEEN_028_20",
+    "text": "Glück-Himmelssturm I+"
+  },
   "d5a23569": {
     "key": "GEEN_086_01",
     "text": "Langsam-Resistenz II"
   },
+  "d5b71062": {
+    "key": "GEEN_158_20",
+    "text": "Glaskanone I+"
+  },
   "d5ca277f": {
     "key": "GEEN_009_23",
     "text": "Linkangriff IV+"
+  },
+  "d5cf6765": {
+    "key": "GEEN_326_16",
+    "text": "Caelum-Stille V+"
   },
   "d626ac9f": {
     "key": "GEEN_051_01",
@@ -2719,6 +3947,14 @@
     "key": "GEEN_060_04",
     "text": "Verbessertes Blocken V"
   },
+  "d6cdd98e": {
+    "key": "GEEN_017_11",
+    "text": "Kombo-Finisher II+"
+  },
+  "d77a4a3f": {
+    "key": "GEEN_110_11",
+    "text": "Leben auf dem Drahtseil II+"
+  },
   "d77efbc6": {
     "key": "GEEN_046_02",
     "text": "Giftresistenz III"
@@ -2731,9 +3967,25 @@
     "key": "GEEN_052_01",
     "text": "Gletscherresistenz II"
   },
+  "d7d2f16e": {
+    "key": "GEEN_323_14",
+    "text": "Caelum-Flamme V+"
+  },
+  "d8a464f1": {
+    "key": "GEEN_174_90",
+    "text": "Erw. der Klingenprinzessin+"
+  },
+  "d8c61507": {
+    "key": "GEEN_176_93",
+    "text": "Pfad des Donnerwolfs+"
+  },
   "d8d6b380": {
     "key": "GEEN_045_01",
     "text": "Mumm II"
+  },
+  "d9215e48": {
+    "key": "GEEN_014_21",
+    "text": "Schwachstellenangriff II+"
   },
   "d959a6d2": {
     "key": "GEEN_017_02",
@@ -2747,6 +3999,10 @@
     "key": "GEEN_146_04",
     "text": "Krieg-Elementar"
   },
+  "db05a865": {
+    "key": "GEEN_177_64",
+    "text": "Reinkarnierter Pfad"
+  },
   "dbe503c7": {
     "key": "GEEN_171_92",
     "text": "Eruption der Dunkeljägerin+"
@@ -2759,6 +4015,10 @@
     "key": "GEEN_030_14",
     "text": "Overdrive-Attentäter V+"
   },
+  "dce00ddb": {
+    "key": "GEEN_325_02",
+    "text": "Sagenhaft III"
+  },
   "dd12001e": {
     "key": "GEEN_096_02",
     "text": "Nerven aus Stahl III"
@@ -2770,6 +4030,14 @@
   "dd5eff28": {
     "key": "GEEN_094_03",
     "text": "Hohe Konzentration IV"
+  },
+  "ddbd7013": {
+    "key": "GEEN_014_20",
+    "text": "Schwachstellenangriff I+"
+  },
+  "de19a583": {
+    "key": "GEEN_320_16",
+    "text": "Caelum-Erprobung V+"
   },
   "ded4e384": {
     "key": "GEEN_144_04",
@@ -2795,6 +4063,10 @@
     "key": "GEEN_065_03",
     "text": "Verbesserte Heilung IV"
   },
+  "e0294510": {
+    "key": "GEEN_151_15",
+    "text": "Zusätzlicher Schaden V+"
+  },
   "e073ea65": {
     "key": "GEEN_120_91",
     "text": "Eintracht des Phantoms+"
@@ -2811,9 +4083,17 @@
     "key": "GEEN_083_03",
     "text": "Geschickter Überfall IV"
   },
+  "e14e1598": {
+    "key": "GEEN_324_24",
+    "text": "Caelum-Schnee V+"
+  },
   "e16e4dd4": {
     "key": "GEEN_004_04",
     "text": "Betäubungskraft V"
+  },
+  "e18cc78f": {
+    "key": "GEEN_327_00",
+    "text": "Divergenz"
   },
   "e19b1965": {
     "key": "GEEN_121_90",
@@ -2847,9 +4127,25 @@
     "key": "GEEN_013_04",
     "text": "Kritischer Schaden V"
   },
+  "e365b951": {
+    "key": "GEEN_066_44",
+    "text": "Regenerieren V+"
+  },
+  "e3cd2935": {
+    "key": "GEEN_175_54",
+    "text": "Indigofarbenes Unglück"
+  },
+  "e3ff2e6a": {
+    "key": "GEEN_152_20",
+    "text": "Weniger ist mehr I+"
+  },
   "e405aca0": {
     "key": "GEEN_107_02",
     "text": "Präzise Belastbarkeit III"
+  },
+  "e4815918": {
+    "key": "GEEN_325_03",
+    "text": "Sagenhaft IV"
   },
   "e496d882": {
     "key": "GEEN_120_93",
@@ -2883,6 +4179,14 @@
     "key": "GEEN_121_64",
     "text": "Pfad des Weißdrachen"
   },
+  "e58bc7db": {
+    "key": "GEEN_012_21",
+    "text": "Werfen II+"
+  },
+  "e59bbe0a": {
+    "key": "GEEN_327_16",
+    "text": "Divergenz V+"
+  },
   "e5b58127": {
     "key": "GEEN_080_02",
     "text": "Rupien-Sparfuchs III"
@@ -2895,6 +4199,10 @@
     "key": "GEEN_018_13",
     "text": "Konzentriertes Feuer IV+"
   },
+  "e5e2ad4b": {
+    "key": "GEEN_063_14",
+    "text": "Verbessertes Ausweichen+"
+  },
   "e7062c19": {
     "key": "GEEN_116_04",
     "text": "Navigation des Steuermanns"
@@ -2902,6 +4210,14 @@
   "e71b1fe4": {
     "key": "GEEN_085_04",
     "text": "Ägide V"
+  },
+  "e71b5cd5": {
+    "key": "GEEN_085_44",
+    "text": "Ägide V+"
+  },
+  "e7279480": {
+    "key": "GEEN_154_20",
+    "text": "Berserker I+"
   },
   "e7624711": {
     "key": "GEEN_126_91",
@@ -2911,9 +4227,17 @@
     "key": "GEEN_004_12",
     "text": "Betäubungskraft III+"
   },
+  "e8257487": {
+    "key": "GEEN_008_20",
+    "text": "Himmelssturm I+"
+  },
   "e8454459": {
     "key": "GEEN_006_24",
     "text": "Ausdauer V+"
+  },
+  "e87b1975": {
+    "key": "GEEN_070_14",
+    "text": "Herabstürzen V+"
   },
   "e89224a1": {
     "key": "GEEN_063_24",
@@ -2943,6 +4267,10 @@
     "key": "GEEN_130_92",
     "text": "Versalis-Entzündung+"
   },
+  "eae396e1": {
+    "key": "GEEN_323_13",
+    "text": "Caelum-Flamme IV+"
+  },
   "eb105b98": {
     "key": "GEEN_144_22",
     "text": "Festung III+"
@@ -2963,6 +4291,10 @@
     "key": "GEEN_070_02",
     "text": "Herabstürzen III"
   },
+  "eb766d87": {
+    "key": "GEEN_174_93",
+    "text": "Pfad der Klingenprinzessin+"
+  },
   "ebc1fe90": {
     "key": "GEEN_144_00",
     "text": "Festung I"
@@ -2971,13 +4303,33 @@
     "key": "GEEN_096_00",
     "text": "Nerven aus Stahl I"
   },
+  "ec9ffe77": {
+    "key": "GEEN_174_91",
+    "text": "Arie der Klingenprinzessin+"
+  },
   "ecd324c7": {
     "key": "GEEN_094_04",
     "text": "Hohe Konzentration V"
   },
+  "ed715e85": {
+    "key": "GEEN_001_44",
+    "text": "Leben V+"
+  },
   "eda2116a": {
     "key": "GEEN_096_24",
     "text": "Nerven aus Stahl V+"
+  },
+  "edd3770b": {
+    "key": "GEEN_072_44",
+    "text": "Erheben V+"
+  },
+  "eded0b97": {
+    "key": "GEEN_006_44",
+    "text": "Ausdauer V+"
+  },
+  "edef9eb0": {
+    "key": "GEEN_063_44",
+    "text": "Verbessertes Ausweichen+"
   },
   "ee25bd8f": {
     "key": "GEEN_083_02",
@@ -2995,13 +4347,25 @@
     "key": "GEEN_030_04",
     "text": "Overdrive-Attentäter V"
   },
+  "ef08f02c": {
+    "key": "GEEN_000_10",
+    "text": "Angriffskraft I+"
+  },
   "ef5d0d16": {
     "key": "GEEN_136_24",
     "text": "Unterdrückungsresistenz V+"
   },
+  "ef60ed89": {
+    "key": "GEEN_083_10",
+    "text": "Geschickter Überfall I+"
+  },
   "ef70ca76": {
     "key": "GEEN_052_24",
     "text": "Gletscherresistenz V+"
+  },
+  "efeff6d1": {
+    "key": "GEEN_027_21",
+    "text": "Tyrannei II+"
   },
   "f04c2cdc": {
     "key": "GEEN_024_23",
@@ -3031,9 +4395,17 @@
     "key": "GEEN_000_12",
     "text": "Angriffskraft III+"
   },
+  "f1b56e13": {
+    "key": "GEEN_151_20",
+    "text": "Zusätzlicher Schaden I+"
+  },
   "f1caffa6": {
     "key": "GEEN_145_24",
     "text": "Machthungrig V+"
+  },
+  "f1d8f754": {
+    "key": "GEEN_327_14",
+    "text": "Divergenz V+"
   },
   "f1d9e8dd": {
     "key": "GEEN_003_03",
@@ -3043,9 +4415,17 @@
     "key": "GEEN_029_23",
     "text": "Wie zum Hohn IV+"
   },
+  "f21404b1": {
+    "key": "GEEN_173_92",
+    "text": "Kreisel des Alpha-Wolfs+"
+  },
   "f22290a6": {
     "key": "GEEN_005_14",
     "text": "Bosheit V+"
+  },
+  "f27d1b15": {
+    "key": "GEEN_100_03",
+    "text": "Ergänzung IV"
   },
   "f2c84d4f": {
     "key": "GEEN_103_04",
@@ -3054,6 +4434,10 @@
   "f2cbffd2": {
     "key": "GEEN_068_03",
     "text": "Autom. Wiederbeleben IV"
+  },
+  "f2e371d3": {
+    "key": "GEEN_030_10",
+    "text": "Overdrive-Attentäter I+"
   },
   "f30a86f6": {
     "key": "GEEN_109_03",
@@ -3067,9 +4451,17 @@
     "key": "GEEN_159_04",
     "text": "Flucht vor Kampf"
   },
+  "f39b8fe1": {
+    "key": "GEEN_068_14",
+    "text": "Autom. Wiederbeleben V+"
+  },
   "f3c8c676": {
     "key": "GEEN_055_02",
     "text": "Lähmungsresistenz III"
+  },
+  "f3f24c7f": {
+    "key": "GEEN_030_11",
+    "text": "Overdrive-Attentäter II+"
   },
   "f40082d6": {
     "key": "GEEN_030_12",
@@ -3091,13 +4483,25 @@
     "key": "GEEN_064_01",
     "text": "Ausweichen-Rache II"
   },
+  "f4dd8a6b": {
+    "key": "GEEN_004_20",
+    "text": "Betäubungskraft I+"
+  },
   "f50a5fe2": {
     "key": "GEEN_085_00",
     "text": "Ägide I"
   },
+  "f5171ca2": {
+    "key": "GEEN_029_11",
+    "text": "Wie zum Hohn II+"
+  },
   "f610e3b9": {
     "key": "GEEN_110_24",
     "text": "Leben auf dem Drahtseil V+"
+  },
+  "f650d741": {
+    "key": "GEEN_327_20",
+    "text": "Divergenz+"
   },
   "f687b1bb": {
     "key": "GEEN_005_04",
@@ -3143,6 +4547,14 @@
     "key": "GEEN_029_14",
     "text": "Wie zum Hohn V+"
   },
+  "f94e0066": {
+    "key": "GEEN_320_22",
+    "text": "Caelum-Erprobung III+"
+  },
+  "f964a4ca": {
+    "key": "GEEN_176_91",
+    "text": "Munition des Donnerwolfs+"
+  },
   "f9870ad0": {
     "key": "GEEN_020_12",
     "text": "Schadensobergrenze III+"
@@ -3157,7 +4569,7 @@
   },
   "fb0f9037": {
     "key": "GEEN_132_91",
-    "text": "Tiefschwarze Gegenwart+"
+    "text": "Tiefschwarze Sense+"
   },
   "fb5092f2": {
     "key": "GEEN_167_04",
@@ -3175,6 +4587,10 @@
     "key": "GEEN_055_04",
     "text": "Lähmungsresistenz V"
   },
+  "fbb1778f": {
+    "key": "GEEN_324_14",
+    "text": "Caelum-Schnee V+"
+  },
   "fbb938e9": {
     "key": "GEEN_061_13",
     "text": "Blocken-Rache IV+"
@@ -3186,6 +4602,10 @@
   "fbf24912": {
     "key": "GEEN_061_00",
     "text": "Blocken-Rache I"
+  },
+  "fc19bf26": {
+    "key": "GEEN_324_15",
+    "text": "Caelum-Schnee V+"
   },
   "fc1a2561": {
     "key": "GEEN_154_03",
@@ -3199,17 +4619,37 @@
     "key": "GEEN_120_04",
     "text": "Eintracht des Phantoms"
   },
+  "fde6479f": {
+    "key": "GEEN_323_20",
+    "text": "Caelum-Flamme+"
+  },
+  "fe7f1552": {
+    "key": "GEEN_031_20",
+    "text": "Break-Attentäter I+"
+  },
   "feee9198": {
     "key": "GEEN_153_23",
     "text": "Vorsprung IV+"
+  },
+  "ff28d126": {
+    "key": "GEEN_029_20",
+    "text": "Wie zum Hohn I+"
   },
   "ff2cbcd0": {
     "key": "GEEN_077_24",
     "text": "Untertauchen V+"
   },
+  "ff4fd22d": {
+    "key": "GEEN_064_20",
+    "text": "Ausweichen-Rache I+"
+  },
   "ff580af6": {
     "key": "GEEN_118_04",
     "text": "Erkenntnis des Veteranen"
+  },
+  "ff5f3079": {
+    "key": "GEEN_320_15",
+    "text": "Caelum-Erprobung V+"
   },
   "ff8a608b": {
     "key": "GEEN_111_03",

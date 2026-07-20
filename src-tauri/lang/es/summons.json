@@ -1,0 +1,758 @@
+{
+  "0033943a": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "Draco azabache Evyl III"
+  },
+  "01b80951": {
+    "key": "TXT_SMN_So4000",
+    "text": "Morador de las tinieblas"
+  },
+  "03c8bf90": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "Rueda divina II"
+  },
+  "03c95420": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "Glaciosaurio II"
+  },
+  "045efb5b": {
+    "key": "TXT_SMN_So4100_3",
+    "text": "Ferromotor ejecutor III"
+  },
+  "0525e77d": {
+    "key": "TXT_SMN_So6300_2",
+    "text": "Pinzador pigmeo II"
+  },
+  "099e1dd3": {
+    "key": "TXT_SMN_So4c00",
+    "text": "Mánagarm Nihilla"
+  },
+  "0b366ad9": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "Vulcasaurio II"
+  },
+  "0be2a43a": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "Telurosaurio II"
+  },
+  "0d94b89f": {
+    "key": "TXT_SMN_So2000_2",
+    "text": "Viscosín plateado II"
+  },
+  "0ee2670a": {
+    "key": "TXT_SMN_So1600_3",
+    "text": "Geraseno III"
+  },
+  "0f986ed9": {
+    "key": "TXT_SMN_So0200",
+    "text": "Rolan"
+  },
+  "109e2271": {
+    "key": "TXT_SMN_So5700_3",
+    "text": "Alianza de Compañías de Rafale III"
+  },
+  "15ec425e": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "Artillería sublevada II"
+  },
+  "15ed6d77": {
+    "key": "TXT_SMN_So4f00_3",
+    "text": "Celícolas optimistas III"
+  },
+  "16b702dc": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "Monje de Mellose III"
+  },
+  "16ba3b8a": {
+    "key": "TXT_SMN_So1800_3",
+    "text": "Scarmiglione III"
+  },
+  "1ab77fdf": {
+    "key": "TXT_SMN_So5f00",
+    "text": "Gato"
+  },
+  "1abade1d": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "Cyaegha"
+  },
+  "1b5daebd": {
+    "key": "TXT_SMN_So1b00_1",
+    "text": "Guiverno"
+  },
+  "1b6a4024": {
+    "key": "TXT_SMN_So1f00_3",
+    "text": "Vulcasaurio III"
+  },
+  "1b9de0fa": {
+    "key": "TXT_SMN_So5400_2",
+    "text": "Guardianes de Semitia II"
+  },
+  "1be16847": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "Cyaegha"
+  },
+  "1cc0e0ef": {
+    "key": "TXT_SMN_So2b00_1",
+    "text": "Espíritu del agua"
+  },
+  "1e6543a3": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "Draco ígneo Vrazarek II"
+  },
+  "239f769f": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "Bégimo III"
+  },
+  "23d839a3": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "Mánagarm"
+  },
+  "2517c481": {
+    "key": "TXT_SMN_So3f00_2",
+    "text": "Draco azabache Evyl II"
+  },
+  "26e7ccb1": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "Draco gélido Wilino II"
+  },
+  "299c1a08": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "Celícolas anhelantes"
+  },
+  "2e3ce3d9": {
+    "key": "TXT_SMN_So2900_2",
+    "text": "Gyro umbrío II"
+  },
+  "2e657b01": {
+    "key": "TXT_SMN_So3100_1",
+    "text": "Madre droita"
+  },
+  "2ea15d18": {
+    "key": "TXT_SMN_So2500_2",
+    "text": "Nazarbonju II"
+  },
+  "2eacd79c": {
+    "key": "TXT_SMN_So1a00_1",
+    "text": "Cálao"
+  },
+  "2f15455c": {
+    "key": "TXT_SMN_So9200",
+    "text": "Beelzebub"
+  },
+  "30f63214": {
+    "key": "TXT_SMN_So2800_1",
+    "text": "Gyro luminoso"
+  },
+  "315695ae": {
+    "key": "TXT_SMN_So3400",
+    "text": "Gólem rubí"
+  },
+  "316641a4": {
+    "key": "TXT_SMN_So2100_2",
+    "text": "Viscosín dorado II"
+  },
+  "31ee9ba5": {
+    "key": "TXT_SMN_So0f00_2",
+    "text": "Cabecilla azul II"
+  },
+  "326dc2de": {
+    "key": "TXT_SMN_So1800_2",
+    "text": "Scarmiglione II"
+  },
+  "36cb5052": {
+    "key": "TXT_SMN_So5600_2",
+    "text": "Monje de Mellose II"
+  },
+  "38348e1e": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "Dragón ancestral II"
+  },
+  "391c7857": {
+    "key": "TXT_SMN_So4d00_1",
+    "text": "Ente siniestro"
+  },
+  "3bad1134": {
+    "key": "TXT_SMN_So3c00_3",
+    "text": "Draco telúrico Corvell III"
+  },
+  "3c381dcd": {
+    "key": "TXT_SMN_So0e00_1",
+    "text": "Gladiador trasgo"
+  },
+  "3c4f2b7d": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "Celícolas optimistas"
+  },
+  "3dd9ecee": {
+    "key": "TXT_SMN_So2600_1",
+    "text": "Gyro ardiente"
+  },
+  "3fd89c3a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "Torp II"
+  },
+  "42465367": {
+    "key": "TXT_SMN_So5500_2",
+    "text": "Velo de la Espada II"
+  },
+  "439cdb88": {
+    "key": "TXT_SMN_So2100_3",
+    "text": "Viscosín dorado III"
+  },
+  "44a5cab1": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "Familia Zathba"
+  },
+  "47e2ae71": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "Rueda divina III"
+  },
+  "48732d1f": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "Rueda divina III"
+  },
+  "4a65c97d": {
+    "key": "TXT_SMN_So2600_2",
+    "text": "Gyro ardiente II"
+  },
+  "4b3d1768": {
+    "key": "TXT_SMN_So1c00_1",
+    "text": "Guiverno antiguo"
+  },
+  "4ba8ceba": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "Celícolas optimistas"
+  },
+  "4c966e4f": {
+    "key": "TXT_SMN_So5300_3",
+    "text": "Familia Zathba III"
+  },
+  "4d84581f": {
+    "key": "TXT_SMN_So1000_1",
+    "text": "Vándalo carmín"
+  },
+  "4ea296fc": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "Viscosín plateado III"
+  },
+  "4f484bbb": {
+    "key": "TXT_SMN_So2800_2",
+    "text": "Gyro luminoso II"
+  },
+  "4fd78af8": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "Draco telúrico Corvell II"
+  },
+  "513d05cc": {
+    "key": "TXT_SMN_So5700_2",
+    "text": "Alianza de Compañías de Rafale II"
+  },
+  "514cf53b": {
+    "key": "TXT_SMN_So5200_2",
+    "text": "Unidad de los Lobos Plateados II"
+  },
+  "524d1660": {
+    "key": "TXT_SMN_So1200_3",
+    "text": "Lacayo agreste III"
+  },
+  "52b14b66": {
+    "key": "TXT_SMN_So4900_3",
+    "text": "Furiacán III"
+  },
+  "52e21e37": {
+    "key": "TXT_SMN_So3400",
+    "text": "Gólem rubí"
+  },
+  "5365294f": {
+    "key": "TXT_SMN_So3100_2",
+    "text": "Madre droita II"
+  },
+  "547e7dfc": {
+    "key": "TXT_SMN_So4e00_1",
+    "text": "Albacora"
+  },
+  "551dc320": {
+    "key": "TXT_SMN_So4d00_2",
+    "text": "Ente siniestro II"
+  },
+  "556da7b4": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "Dragón ancestral II"
+  },
+  "55815e99": {
+    "key": "TXT_SMN_So1200_2",
+    "text": "Lacayo agreste II"
+  },
+  "576310df": {
+    "key": "TXT_SMN_So5000_3",
+    "text": "Celícolas anhelantes III"
+  },
+  "58aa9cad": {
+    "key": "TXT_SMN_So5500_1",
+    "text": "Velo de la Espada"
+  },
+  "59f8666f": {
+    "key": "TXT_SMN_So2900_1",
+    "text": "Gyro umbrío"
+  },
+  "5c42d57c": {
+    "key": "TXT_SMN_So4a00",
+    "text": "Furiacán Nihilla"
+  },
+  "5ca9330a": {
+    "key": "TXT_SMN_So5200_3",
+    "text": "Unidad de los Lobos Plateados III"
+  },
+  "5e29e993": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "Mánagarm"
+  },
+  "5f3337b6": {
+    "key": "TXT_SMN_So0d00_1",
+    "text": "Soldado trasgo"
+  },
+  "60a6d3a5": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "Draco gélido Wilino II"
+  },
+  "61c79814": {
+    "key": "TXT_SMN_So0d00_2",
+    "text": "Soldado trasgo II"
+  },
+  "6262979b": {
+    "key": "TXT_SMN_So2500_3",
+    "text": "Nazarbonju III"
+  },
+  "634a379d": {
+    "key": "TXT_SMN_So2400_1",
+    "text": "Ahriman"
+  },
+  "6368a53d": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "Monje de Mellose III"
+  },
+  "65e658d9": {
+    "key": "TXT_SMN_So4700_2",
+    "text": "Vulkan Bora II"
+  },
+  "666947c2": {
+    "key": "TXT_SMN_So3e00_2",
+    "text": "Draco prístino Radis II"
+  },
+  "67a73702": {
+    "key": "TXT_SMN_So4f00_2",
+    "text": "Celícolas optimistas II"
+  },
+  "67c7e1ff": {
+    "key": "TXT_SMN_So3800_3",
+    "text": "Ennugi III"
+  },
+  "6b514309": {
+    "key": "TXT_SMN_So2400_2",
+    "text": "Ahriman II"
+  },
+  "6d6cb496": {
+    "key": "TXT_SMN_So4000",
+    "text": "Morador de las tinieblas"
+  },
+  "6e5968fc": {
+    "key": "TXT_SMN_So0000",
+    "text": "Lucilius"
+  },
+  "6ee91e7d": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "Artillería sublevada II"
+  },
+  "6f6bbbe0": {
+    "key": "TXT_SMN_So4700_3",
+    "text": "Vulkan Bora III"
+  },
+  "730395dc": {
+    "key": "TXT_SMN_So5500_3",
+    "text": "Velo de la Espada III"
+  },
+  "735dd55b": {
+    "key": "TXT_SMN_So1a00_2",
+    "text": "Cálao II"
+  },
+  "7996a856": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "Furiacán"
+  },
+  "7a46e50e": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "Telurosaurio II"
+  },
+  "7a7615d3": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "Cobra II"
+  },
+  "7e154422": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "Cuerpo de Defensa de Folca III"
+  },
+  "7e853e16": {
+    "key": "TXT_SMN_So6400_1",
+    "text": "Rueda divina"
+  },
+  "7e8a659a": {
+    "key": "TXT_SMN_So2300_2",
+    "text": "Vigía silente II"
+  },
+  "7f8364e5": {
+    "key": "TXT_SMN_So3f00_1",
+    "text": "Draco azabache Evyl"
+  },
+  "81ecec7f": {
+    "key": "TXT_SMN_So0200",
+    "text": "Rolan"
+  },
+  "847cf372": {
+    "key": "TXT_SMN_So4200_3",
+    "text": "Artillería sublevada III"
+  },
+  "852287ba": {
+    "key": "TXT_SMN_So2700_1",
+    "text": "Gyro acuático"
+  },
+  "855d018c": {
+    "key": "TXT_SMN_So4500",
+    "text": "Lilith"
+  },
+  "87c6c345": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "Gólem pétreo"
+  },
+  "897ffaf0": {
+    "key": "TXT_SMN_So1000_2",
+    "text": "Vándalo carmín II"
+  },
+  "8b489804": {
+    "key": "TXT_SMN_So4300_1",
+    "text": "Cobra"
+  },
+  "8c607d26": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "Unidad de los Lobos Plateados"
+  },
+  "8cf23b58": {
+    "key": "TXT_SMN_So3300_3",
+    "text": "Gólem pétreo III"
+  },
+  "8d7fde58": {
+    "key": "TXT_SMN_So4100_2",
+    "text": "Ferromotor ejecutor II"
+  },
+  "8db272e5": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "Draco azabache Evyl III"
+  },
+  "8e02e207": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "Geraseno II"
+  },
+  "90bd4ac0": {
+    "key": "TXT_SMN_So0000",
+    "text": "Lucilius"
+  },
+  "9118453a": {
+    "key": "TXT_SMN_So6300_1",
+    "text": "Pinzador pigmeo"
+  },
+  "9235fb9f": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "Cobra II"
+  },
+  "9360b2b5": {
+    "key": "TXT_SMN_So2b00_2",
+    "text": "Espíritu del agua II"
+  },
+  "9384a5d3": {
+    "key": "TXT_SMN_So3e00_3",
+    "text": "Draco prístino Radis III"
+  },
+  "97e451a4": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "Draco telúrico Corvell II"
+  },
+  "99a68616": {
+    "key": "TXT_SMN_So0f00_1",
+    "text": "Cabecilla azul"
+  },
+  "99cf3e05": {
+    "key": "TXT_SMN_So1e00_3",
+    "text": "Glaciosaurio III"
+  },
+  "9a6d89dc": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "Cuerpo de Defensa de Folca III"
+  },
+  "9bc09751": {
+    "key": "TXT_SMN_So1b00_2",
+    "text": "Guiverno II"
+  },
+  "9d5c27de": {
+    "key": "TXT_SMN_So3700_2",
+    "text": "Bégimo II"
+  },
+  "9f0ecf8b": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "Draco ígneo Vrazarek III"
+  },
+  "a062ec06": {
+    "key": "TXT_SMN_So1300",
+    "text": "Furia escarlata"
+  },
+  "a0c96959": {
+    "key": "TXT_SMN_So5700_1",
+    "text": "Alianza de Compañías de Rafale"
+  },
+  "a34bdecb": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "Torp III"
+  },
+  "a40e64f4": {
+    "key": "TXT_SMN_So2700_2",
+    "text": "Gyro acuático II"
+  },
+  "a4f63a8f": {
+    "key": "TXT_SMN_So5400_3",
+    "text": "Guardianes de Semitia III"
+  },
+  "a608aecd": {
+    "key": "TXT_SMN_So5900",
+    "text": "Árbitro"
+  },
+  "a6bb6299": {
+    "key": "TXT_SMN_So1d00_3",
+    "text": "Telurosaurio III"
+  },
+  "a7eff558": {
+    "key": "TXT_SMN_So9200",
+    "text": "Beelzebub"
+  },
+  "aa2bbdbf": {
+    "key": "TXT_SMN_So1c00_2",
+    "text": "Guiverno antiguo II"
+  },
+  "ac20c821": {
+    "key": "TXT_SMN_So3800_2",
+    "text": "Ennugi II"
+  },
+  "ad15d880": {
+    "key": "TXT_SMN_So4800",
+    "text": "Vulkan Bora Nihilla"
+  },
+  "ae52556d": {
+    "key": "TXT_SMN_So3200_2",
+    "text": "Madre droita (asalto) II"
+  },
+  "b360dd8d": {
+    "key": "TXT_SMN_So4400_1",
+    "text": "Segador de las arenas"
+  },
+  "b3c2f3a4": {
+    "key": "TXT_SMN_So3200_1",
+    "text": "Madre droita (asalto)"
+  },
+  "b44a8a02": {
+    "key": "TXT_SMN_So4e00_3",
+    "text": "Albacora III"
+  },
+  "b4cf26c6": {
+    "key": "TXT_SMN_So5400_1",
+    "text": "Guardianes de Semitia"
+  },
+  "b5449253": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "Celícolas anhelantes"
+  },
+  "b79312a7": {
+    "key": "TXT_SMN_So3300_2",
+    "text": "Gólem pétreo II"
+  },
+  "b960d2bb": {
+    "key": "TXT_SMN_So3b00_3",
+    "text": "Draco gélido Wilino III"
+  },
+  "b96cb87d": {
+    "key": "TXT_SMN_So2300_1",
+    "text": "Vigía silente"
+  },
+  "bdd84e9a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "Torp II"
+  },
+  "bfac23dc": {
+    "key": "TXT_SMN_So3500_3",
+    "text": "Grifo III"
+  },
+  "c1ccbc3c": {
+    "key": "TXT_SMN_So3600_2",
+    "text": "Rapaz de obsidiana II"
+  },
+  "c2f91a7f": {
+    "key": "TXT_SMN_So1100_3",
+    "text": "Guerrero trasgo III"
+  },
+  "c3e918f9": {
+    "key": "TXT_SMN_So2a00_1",
+    "text": "Espíritu del fuego"
+  },
+  "c52147d4": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "Glaciosaurio II"
+  },
+  "ca95cd8c": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "Furiacán"
+  },
+  "cc3c45f3": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "Gólem pétreo"
+  },
+  "ce0039d4": {
+    "key": "TXT_SMN_So3900_3",
+    "text": "Dragón ancestral III"
+  },
+  "ce8e0b79": {
+    "key": "TXT_SMN_So5000_2",
+    "text": "Celícolas anhelantes II"
+  },
+  "d4ac8684": {
+    "key": "TXT_SMN_So3600_3",
+    "text": "Rapaz de obsidiana III"
+  },
+  "d5536ae8": {
+    "key": "TXT_SMN_So4b00_2",
+    "text": "Mánagarm II"
+  },
+  "d6387caa": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "Gladiador trasgo II"
+  },
+  "d751d8d2": {
+    "key": "TXT_SMN_So2a00_2",
+    "text": "Espíritu del fuego II"
+  },
+  "d7555b1f": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "Rueda divina II"
+  },
+  "da0b6092": {
+    "key": "TXT_SMN_So5600_1",
+    "text": "Monje de Mellose"
+  },
+  "dbd2f84e": {
+    "key": "TXT_SMN_So4b00_3",
+    "text": "Mánagarm III"
+  },
+  "ddb21c31": {
+    "key": "TXT_SMN_So5100_1",
+    "text": "Cuerpo de Defensa de Folca"
+  },
+  "dfab70b7": {
+    "key": "TXT_SMN_So4500",
+    "text": "Lilith"
+  },
+  "e24b4807": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "Rueda divina II"
+  },
+  "e492e6bf": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "Torp III"
+  },
+  "e4b7dcf9": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "Bégimo III"
+  },
+  "e51ce5b0": {
+    "key": "TXT_SMN_So4900_2",
+    "text": "Furiacán II"
+  },
+  "e528e76f": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "Viscosín plateado III"
+  },
+  "e6ebb6fa": {
+    "key": "TXT_SMN_So5900",
+    "text": "Árbitro"
+  },
+  "e7f607dc": {
+    "key": "TXT_SMN_So4400_2",
+    "text": "Segador de las arenas II"
+  },
+  "ebeb3dc0": {
+    "key": "TXT_SMN_So1900_1",
+    "text": "Lobo"
+  },
+  "eeea2080": {
+    "key": "TXT_SMN_So1900_2",
+    "text": "Lobo II"
+  },
+  "ef554891": {
+    "key": "TXT_SMN_So2200_2",
+    "text": "Cyaegha II"
+  },
+  "ef973d88": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "Unidad de los Lobos Plateados"
+  },
+  "f1c229f7": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "Draco ígneo Vrazarek II"
+  },
+  "f1fc31c4": {
+    "key": "TXT_SMN_So5100_2",
+    "text": "Cuerpo de Defensa de Folca II"
+  },
+  "f28d0e35": {
+    "key": "TXT_SMN_So6300_3",
+    "text": "Pinzador pigmeo III"
+  },
+  "f2be819e": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "Draco ígneo Vrazarek III"
+  },
+  "f32aa7a7": {
+    "key": "TXT_SMN_So5300_2",
+    "text": "Familia Zathba II"
+  },
+  "f501285c": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "Gladiador trasgo II"
+  },
+  "f7eb57dd": {
+    "key": "TXT_SMN_So4e00_2",
+    "text": "Albacora II"
+  },
+  "f7f2d161": {
+    "key": "TXT_SMN_So3500_2",
+    "text": "Grifo II"
+  },
+  "f862e7da": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "Familia Zathba"
+  },
+  "f98f8b97": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "Vulcasaurio II"
+  },
+  "fc8444a1": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "Geraseno II"
+  },
+  "fc8a2ecb": {
+    "key": "TXT_SMN_So3d00_3",
+    "text": "Draco eólico Elusio III"
+  },
+  "fd5fb92b": {
+    "key": "TXT_SMN_So1100_2",
+    "text": "Guerrero trasgo II"
+  },
+  "ff513849": {
+    "key": "TXT_SMN_So3d00_2",
+    "text": "Draco eólico Elusio II"
+  }
+}

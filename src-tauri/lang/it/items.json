@@ -7,13 +7,29 @@
     "key": "ITEM_16_0001",
     "text": "Piuma di semidio"
   },
+  "0311b2de": {
+    "key": "ITEM_18_0003",
+    "text": "Altocristallo dell'apocalisse"
+  },
   "035c056d": {
     "key": "ITEM_28_0010",
     "text": "Pietraforgia della reclusione"
   },
+  "03a19196": {
+    "key": "ITEM_16_0013",
+    "text": "Nucleo della fine"
+  },
+  "04c18eec": {
+    "key": "ITEM_31_0077",
+    "text": "Motore dell'impulso massacrante"
+  },
   "050c5228": {
     "key": "ITEM_01_0033",
     "text": "Sabbia elettromagnetica"
+  },
+  "05474649": {
+    "key": "ITEM_19_0022",
+    "text": "Cristallo dell'inoppugnabilità"
   },
   "05d2cf79": {
     "key": "ITEM_22_0020",
@@ -27,9 +43,25 @@
     "key": "ITEM_31_0011",
     "text": "Bracciale tetro"
   },
+  "06c0d0a1": {
+    "key": "ITEM_70_0019",
+    "text": "Statua dorata di Alalunga"
+  },
+  "06e5185f": {
+    "key": "ITEM_23_0007",
+    "text": "Carta compagno: Fediel"
+  },
+  "076a9f41": {
+    "key": "ITEM_70_0018",
+    "text": "Statua d'onice di granchio"
+  },
   "09370a3a": {
     "key": "ITEM_21_0000",
     "text": "Coupon oggetti"
+  },
+  "0943913b": {
+    "key": "ITEM_70_0024",
+    "text": "Ricordo celeste: La ragazza in blu"
   },
   "09c7a73e": {
     "key": "ITEM_01_0053",
@@ -50,6 +82,14 @@
   "0bd373a4": {
     "key": "ITEM_28_0130",
     "text": "Pietraforgia della reclusione"
+  },
+  "0e7cbc8e": {
+    "key": "ITEM_31_0033",
+    "text": "Rostro robusto glorioso"
+  },
+  "0eb683cd": {
+    "key": "ITEM_15_0010",
+    "text": "Granrefinio I"
   },
   "0f34eabc": {
     "key": "ITEM_32_0042",
@@ -107,9 +147,17 @@
     "key": "ITEM_28_1002",
     "text": "Pietraforgia della reclusione"
   },
+  "17f349ba": {
+    "key": "ITEM_31_0003",
+    "text": "Occhio di demone mostruoso"
+  },
   "181381e5": {
     "key": "ITEM_16_0004",
     "text": "Catena divina"
+  },
+  "19871bf3": {
+    "key": "ITEM_31_0023",
+    "text": "Ascia da guerra incandescente"
   },
   "19b187d7": {
     "key": "ITEM_28_0001",
@@ -122,6 +170,10 @@
   "1aa4382d": {
     "key": "ITEM_02_0012",
     "text": "Sfera glaciale"
+  },
+  "1c195d33": {
+    "key": "ITEM_14_0066",
+    "text": "Ragnalite (Terminus)"
   },
   "1c67e865": {
     "key": "ITEM_01_0011",
@@ -139,6 +191,14 @@
     "key": "ITEM_18_0000",
     "text": "Residuo oscuro"
   },
+  "1f4bae8c": {
+    "key": "ITEM_14_0064",
+    "text": "Ragnalite (Perforatore)"
+  },
+  "1fce9159": {
+    "key": "1fce9159",
+    "text": "Motore dell'impulso massacrante"
+  },
   "202a0db9": {
     "key": "ITEM_28_0131",
     "text": "Pietraforgia della reclusione"
@@ -155,12 +215,20 @@
     "key": "ITEM_02_0041",
     "text": "Sfera di tenebre"
   },
+  "20c742de": {
+    "key": "ITEM_14_0001",
+    "text": "Azzurrite imperfetta"
+  },
   "21b32140": {
     "key": "ITEM_31_0042",
     "text": "Corno di belva terrestre"
   },
   "21dad920": {
     "key": "ITEM_26_9999",
+    "text": "Pietraforgia della prosperità"
+  },
+  "22acc7bf": {
+    "key": "22acc7bf",
     "text": "Pietraforgia della prosperità"
   },
   "23c59c51": {
@@ -183,6 +251,18 @@
     "key": "ITEM_10_0003",
     "text": "Cristallo della fermezza (L)"
   },
+  "25165316": {
+    "key": "ITEM_16_0902",
+    "text": "Nodo originale dell'onda"
+  },
+  "25289584": {
+    "key": "ITEM_31_0043",
+    "text": "Lucicorno di belva terrestre"
+  },
+  "2657283e": {
+    "key": "ITEM_35_3000",
+    "text": "Punti risonanza"
+  },
   "26fa7da3": {
     "key": "ITEM_01_0042",
     "text": "Polvere vermiglia"
@@ -190,6 +270,10 @@
   "28592cb2": {
     "key": "ITEM_02_0022",
     "text": "Sfera sismica"
+  },
+  "29748bf8": {
+    "key": "29748bf8",
+    "text": "Ricordo celeste: Rinascita di un nuovo mondo"
   },
   "29a7eec9": {
     "key": "ITEM_16_0011",
@@ -202,6 +286,14 @@
   "2a2ea603": {
     "key": "ITEM_25_0030",
     "text": "Pietraforgia del terrore"
+  },
+  "2a5548a9": {
+    "key": "ITEM_31_0086",
+    "text": "Mandibola niellata"
+  },
+  "2c0b5a82": {
+    "key": "ITEM_70_0021",
+    "text": "Ricordo celeste: Risveglio"
   },
   "2c8fa06c": {
     "key": "ITEM_25_9999",
@@ -235,6 +327,10 @@
     "key": "ITEM_34_2000",
     "text": "Luccipietra (G)"
   },
+  "31291925": {
+    "key": "31291925",
+    "text": "Pietraforgia della prosperità"
+  },
   "32dc23f3": {
     "key": "ITEM_70_0016",
     "text": "Pacchetto colori 4"
@@ -250,6 +346,14 @@
   "35c7fba0": {
     "key": "ITEM_23_0000",
     "text": "Carta compagno"
+  },
+  "35f709e3": {
+    "key": "ITEM_06_0003",
+    "text": "Coda resistente del terrore"
+  },
+  "381526a4": {
+    "key": "ITEM_31_0095",
+    "text": "Elmo del demone"
   },
   "38d2ecd0": {
     "key": "ITEM_02_0032",
@@ -267,6 +371,10 @@
     "key": "ITEM_32_0041",
     "text": "Ala del portento"
   },
+  "3cb3eb94": {
+    "key": "3cb3eb94",
+    "text": "Pietraforgia del terrore"
+  },
   "3e0269bd": {
     "key": "ITEM_26_0030",
     "text": "Pietraforgia della prosperità"
@@ -283,9 +391,17 @@
     "key": "ITEM_30_0000",
     "text": "Munizione miraggio"
   },
+  "41e4c8ce": {
+    "key": "ITEM_23_0006",
+    "text": "Carta compagno: Fraux"
+  },
   "41e92f0a": {
     "key": "ITEM_16_0003",
     "text": "Aculeo della realtà"
+  },
+  "4249436e": {
+    "key": "ITEM_70_0026",
+    "text": "Ricordo celeste: La scissione dell'Onnipotente"
   },
   "4325ab79": {
     "key": "ITEM_14_0011",
@@ -303,17 +419,29 @@
     "key": "ITEM_06_0000",
     "text": "Anima di Vulkan Bolla"
   },
+  "456d2bb3": {
+    "key": "ITEM_09_0003",
+    "text": "Mortido"
+  },
   "463abc2d": {
     "key": "ITEM_28_0000",
     "text": "Pietraforgia della reclusione"
   },
+  "4a41482c": {
+    "key": "ITEM_03_0003",
+    "text": "Zoccolo verde della prosperità"
+  },
   "4ac30d94": {
     "key": "ITEM_19_0003",
-    "text": "Curiosità"
+    "text": "Reliquia"
   },
   "4be41ec1": {
     "key": "ITEM_26_1003",
     "text": "Pietraforgia della prosperità"
+  },
+  "4c21dc42": {
+    "key": "ITEM_09_0023",
+    "text": "Tripudio del Velo"
   },
   "4c4caa77": {
     "key": "ITEM_06_0002",
@@ -335,6 +463,10 @@
     "key": "ITEM_03_0001",
     "text": "Anima di Furycane Omega"
   },
+  "5030beba": {
+    "key": "5030beba",
+    "text": "Ricordo celeste: Cieli frammentati"
+  },
   "51355c28": {
     "key": "ITEM_22_0031",
     "text": "Gioiello del Drago del Ghiaccio"
@@ -347,9 +479,29 @@
     "key": "ITEM_31_0041",
     "text": "Placca di belva terrestre"
   },
+  "537cb6d9": {
+    "key": "ITEM_14_0061",
+    "text": "Ragnalite (Difensore)"
+  },
+  "5392dee6": {
+    "key": "ITEM_16_0005",
+    "text": "Piuma suprema della divinità"
+  },
+  "53a9d491": {
+    "key": "ITEM_16_0904",
+    "text": "Nodo originale della frana"
+  },
   "541d3800": {
     "key": "ITEM_15_0001",
     "text": "Refinio standard"
+  },
+  "54732298": {
+    "key": "ITEM_14_0065",
+    "text": "Ragnalite (Boia)"
+  },
+  "54ae4c95": {
+    "key": "54ae4c95",
+    "text": "Ricordo celeste: Risveglio"
   },
   "54fc643a": {
     "key": "ITEM_17_0000",
@@ -366,6 +518,10 @@
   "55d1b23f": {
     "key": "ITEM_25_1003",
     "text": "Pietraforgia del terrore"
+  },
+  "58fc9b99": {
+    "key": "ITEM_21_0001",
+    "text": "Coupon trasmeraviglia"
   },
   "5942c5fb": {
     "key": "ITEM_70_0005",
@@ -413,7 +569,7 @@
   },
   "6198f427": {
     "key": "ITEM_19_0002",
-    "text": "Curiosità"
+    "text": "Reliquia"
   },
   "644536df": {
     "key": "ITEM_10_0001",
@@ -426,6 +582,18 @@
   "648cda74": {
     "key": "ITEM_11_0001",
     "text": "Manuale di magia d'argento"
+  },
+  "64a63fbc": {
+    "key": "ITEM_15_0012",
+    "text": "Granrefinio III"
+  },
+  "65063e17": {
+    "key": "ITEM_14_0076",
+    "text": "Reperto dell'epoca divina"
+  },
+  "654fa095": {
+    "key": "ITEM_14_0063",
+    "text": "Ragnalite (Ascensione)"
   },
   "659230f4": {
     "key": "ITEM_14_0051",
@@ -447,6 +615,14 @@
     "key": "ITEM_32_0030",
     "text": "Unità di testa Tayu'itar"
   },
+  "6837efc6": {
+    "key": "ITEM_31_0013",
+    "text": "Ascia da guerra glaciale"
+  },
+  "686f12ad": {
+    "key": "ITEM_16_0903",
+    "text": "Nodo originale del vento"
+  },
   "687733c4": {
     "key": "ITEM_10_0000",
     "text": "Scheggia della fermezza"
@@ -455,9 +631,21 @@
     "key": "ITEM_26_0020",
     "text": "Pietraforgia della prosperità"
   },
+  "68bafc37": {
+    "key": "ITEM_16_0105",
+    "text": "Piuma blu dimenticata"
+  },
+  "68eadaa9": {
+    "key": "ITEM_35_2000",
+    "text": "Punti Avernus"
+  },
   "68ff3a08": {
     "key": "ITEM_31_0022",
     "text": "Ascia da guerra rovente"
+  },
+  "695ea716": {
+    "key": "ITEM_31_0063",
+    "text": "Lucicorno di belva del fuoco"
   },
   "6b4e2182": {
     "key": "ITEM_09_0001",
@@ -467,17 +655,37 @@
     "key": "ITEM_02_0051",
     "text": "Sfera di luce"
   },
+  "6c375d99": {
+    "key": "ITEM_70_0020",
+    "text": "Ricordo celeste: Vite incalcolabili"
+  },
   "6d876fab": {
     "key": "ITEM_32_0051",
     "text": "Corno cremisi"
+  },
+  "6dd50a91": {
+    "key": "6dd50a91",
+    "text": "Ricordo celeste: La scissione dell'Onnipotente"
+  },
+  "6e13e372": {
+    "key": "ITEM_09_0013",
+    "text": "Altalama dei Lupi Argentei"
   },
   "6e49a111": {
     "key": "ITEM_01_0063",
     "text": "Materia astrale"
   },
+  "6e81c3ac": {
+    "key": "6e81c3ac",
+    "text": "Pietraforgia della reclusione"
+  },
   "6f1fabe6": {
     "key": "ITEM_14_0021",
     "text": "Merito supremo"
+  },
+  "6f38afe1": {
+    "key": "ITEM_19_0010",
+    "text": "Idea del mondo"
   },
   "71173866": {
     "key": "ITEM_26_0131",
@@ -495,17 +703,33 @@
     "key": "ITEM_03_0002",
     "text": "Zoccolo della prosperità"
   },
+  "7388fe67": {
+    "key": "ITEM_33_0002",
+    "text": "Lucore di Sephira"
+  },
+  "74201317": {
+    "key": "ITEM_70_0027",
+    "text": "Ricordo celeste: Rinascita di un nuovo mondo"
+  },
   "745fd287": {
     "key": "ITEM_32_0054",
     "text": "Corno turbinante"
+  },
+  "7500c5d9": {
+    "key": "ITEM_31_0053",
+    "text": "Lucicorno di belva dei ghiacci"
   },
   "759850ca": {
     "key": "ITEM_01_0041",
     "text": "Uovo di salamandra"
   },
+  "75a25fb1": {
+    "key": "75a25fb1",
+    "text": "Ricordo celeste: La scintilla dell'amore"
+  },
   "76079579": {
     "key": "ITEM_19_0004",
-    "text": "Curiosità"
+    "text": "Reliquia"
   },
   "771d9272": {
     "key": "ITEM_70_0009",
@@ -551,6 +775,10 @@
     "key": "ITEM_17_0001",
     "text": "Spada di Nihilla"
   },
+  "7bcdaa54": {
+    "key": "7bcdaa54",
+    "text": "Ricordo celeste: La Guerra dei Cieli"
+  },
   "7cfa41fc": {
     "key": "ITEM_14_0012",
     "text": "Prisma perfetto"
@@ -587,9 +815,25 @@
     "key": "ITEM_32_0053",
     "text": "Corno terrestre"
   },
+  "831f31ff": {
+    "key": "ITEM_16_0007",
+    "text": "Spina del vuoto"
+  },
+  "833afc6d": {
+    "key": "833afc6d",
+    "text": "Pietraforgia della prosperità"
+  },
+  "84292d6a": {
+    "key": "84292d6a",
+    "text": "Ricordo celeste: Vite incalcolabili"
+  },
   "8572b2ce": {
     "key": "ITEM_23_0001",
     "text": "Carta compagno: Seofon"
+  },
+  "85f40d79": {
+    "key": "ITEM_19_0012",
+    "text": "Segno del caos"
   },
   "8682c2ac": {
     "key": "ITEM_80_0001",
@@ -599,9 +843,25 @@
     "key": "ITEM_80_0002",
     "text": "Chiave di platino"
   },
+  "86fb2ee1": {
+    "key": "ITEM_14_0062",
+    "text": "Ragnalite (Storditore)"
+  },
   "8816adc5": {
     "key": "ITEM_14_0010",
     "text": "Scheggia prismatica"
+  },
+  "882f94a7": {
+    "key": "ITEM_22_0062",
+    "text": "Luce primordiale"
+  },
+  "89406db0": {
+    "key": "ITEM_22_0042",
+    "text": "Terra primordiale"
+  },
+  "8a08f64e": {
+    "key": "ITEM_19_0013",
+    "text": "Segno dell'aurora"
   },
   "8b75e58a": {
     "key": "ITEM_02_0011",
@@ -611,13 +871,29 @@
     "key": "ITEM_31_0012",
     "text": "Ascia da guerra gelida"
   },
+  "8bf58697": {
+    "key": "ITEM_90_0001",
+    "text": "Evoquarzo: Drago argenteo della Frontiera"
+  },
   "8c44f0ab": {
     "key": "ITEM_28_0030",
     "text": "Pietraforgia della reclusione"
   },
+  "8c4fc319": {
+    "key": "ITEM_14_0074",
+    "text": "Refinio caotico"
+  },
+  "8cf738ab": {
+    "key": "8cf738ab",
+    "text": "Pietraforgia della fortificazione"
+  },
   "8d101b82": {
     "key": "ITEM_25_1002",
     "text": "Pietraforgia del terrore"
+  },
+  "8d888638": {
+    "key": "ITEM_09_0030",
+    "text": "Anima del cielo blu"
   },
   "8db0b117": {
     "key": "ITEM_28_9999",
@@ -667,6 +943,10 @@
     "key": "ITEM_13_0001",
     "text": "Pozione mega"
   },
+  "946b78ee": {
+    "key": "946b78ee",
+    "text": "Ricordo celeste: La ragazza in blu"
+  },
   "94dd261d": {
     "key": "ITEM_22_0021",
     "text": "Gioiello del Drago del Fuoco"
@@ -679,6 +959,10 @@
     "key": "ITEM_26_0011",
     "text": "Pietraforgia della prosperità"
   },
+  "96a00c42": {
+    "key": "ITEM_70_0022",
+    "text": "Ricordo celeste: La scintilla dell'amore"
+  },
   "9738c87a": {
     "key": "ITEM_14_0020",
     "text": "Merito del campione"
@@ -686,6 +970,10 @@
   "981c29bd": {
     "key": "ITEM_70_0011",
     "text": "Frammento iridescente"
+  },
+  "98cdb46f": {
+    "key": "ITEM_15_0011",
+    "text": "Granrefinio II"
   },
   "98e75fcb": {
     "key": "ITEM_22_0061",
@@ -702,6 +990,10 @@
   "99f44080": {
     "key": "ITEM_31_0081",
     "text": "Fauce di golem"
+  },
+  "9a3dc719": {
+    "key": "ITEM_09_0050",
+    "text": "Lume del cielo blu"
   },
   "9b442642": {
     "key": "ITEM_12_0000",
@@ -735,6 +1027,10 @@
     "key": "ITEM_22_0070",
     "text": "Scaglia del Drago Nero"
   },
+  "9fba96d1": {
+    "key": "ITEM_60_0001",
+    "text": "Piccola tenaglia nera"
+  },
   "9fc6585e": {
     "key": "ITEM_50_0009",
     "text": "Ambra solare di mezzanotte"
@@ -743,9 +1039,17 @@
     "key": "ITEM_26_1000",
     "text": "Pietraforgia della prosperità"
   },
+  "a1ead2c2": {
+    "key": "ITEM_22_0052",
+    "text": "Vento primordiale"
+  },
   "a23f4f46": {
     "key": "ITEM_27_0010",
     "text": "Pietraforgia della fortificazione"
+  },
+  "a2452b7c": {
+    "key": "ITEM_22_0032",
+    "text": "Acqua primordiale"
   },
   "a7c72f41": {
     "key": "ITEM_34_1000",
@@ -787,9 +1091,25 @@
     "key": "ITEM_27_1000",
     "text": "Pietraforgia della fortificazione"
   },
+  "adffe24e": {
+    "key": "ITEM_32_0046",
+    "text": "Magatama della bestia spietata"
+  },
+  "b0782428": {
+    "key": "ITEM_04_0003",
+    "text": "Criniera blu della segregazione"
+  },
   "b2045655": {
     "key": "ITEM_14_0000",
     "text": "Splendore di azzurrite"
+  },
+  "b359b5b2": {
+    "key": "b359b5b2",
+    "text": "Pietraforgia della fortificazione"
+  },
+  "b3b624ba": {
+    "key": "b3b624ba",
+    "text": "Pietraforgia della fortificazione"
   },
   "b451e459": {
     "key": "ITEM_01_0003",
@@ -843,6 +1163,10 @@
     "key": "ITEM_25_0130",
     "text": "Pietraforgia del terrore"
   },
+  "bdbf43ee": {
+    "key": "ITEM_32_0044",
+    "text": "Coacervo del lamento"
+  },
   "be6124ad": {
     "key": "ITEM_27_0130",
     "text": "Pietraforgia della fortificazione"
@@ -855,6 +1179,10 @@
     "key": "ITEM_32_0040",
     "text": "Unghia della morte"
   },
+  "c043bac9": {
+    "key": "ITEM_14_0023",
+    "text": "Merito dell'alba"
+  },
   "c05ca6a1": {
     "key": "ITEM_09_0000",
     "text": "Orgoglio del paladino"
@@ -862,6 +1190,10 @@
   "c1481583": {
     "key": "ITEM_25_0001",
     "text": "Pietraforgia del terrore"
+  },
+  "c1563862": {
+    "key": "ITEM_16_0106",
+    "text": "Piuma purpurea della divinità"
   },
   "c1dcb7ae": {
     "key": "ITEM_32_0081",
@@ -887,9 +1219,21 @@
     "key": "ITEM_31_0074",
     "text": "Cannone girevole"
   },
+  "c57a5fe9": {
+    "key": "ITEM_70_0025",
+    "text": "Ricordo celeste: Cieli frammentati"
+  },
   "c783f39d": {
     "key": "ITEM_09_0010",
     "text": "Coraggio del lupo alfa"
+  },
+  "c83f9e36": {
+    "key": "ITEM_22_0072",
+    "text": "Tenebra primordiale"
+  },
+  "c93e2fdd": {
+    "key": "ITEM_90_0000",
+    "text": "Evoquarzo: Progenie di tenebre e fiamme"
   },
   "c96755a7": {
     "key": "ITEM_31_0040",
@@ -923,6 +1267,22 @@
     "key": "ITEM_50_0010",
     "text": "Olio del deserto"
   },
+  "cf24b2f6": {
+    "key": "ITEM_90_0002",
+    "text": "Evoquarzo: Titano della fortificazione"
+  },
+  "d0f04d9f": {
+    "key": "ITEM_22_0022",
+    "text": "Fiamma primordiale"
+  },
+  "d11baafc": {
+    "key": "ITEM_70_0028",
+    "text": "Pacchetto colori concept art"
+  },
+  "d147a1ba": {
+    "key": "ITEM_19_0020",
+    "text": "Scheggia oscura"
+  },
   "d15091d9": {
     "key": "ITEM_03_0000",
     "text": "Anima di Furycane"
@@ -939,6 +1299,10 @@
     "key": "ITEM_28_1000",
     "text": "Pietraforgia della reclusione"
   },
+  "d3a6a16a": {
+    "key": "d3a6a16a",
+    "text": "Pietraforgia del terrore"
+  },
   "d465046a": {
     "key": "ITEM_31_0070",
     "text": "Ruota di mithril"
@@ -946,6 +1310,10 @@
   "d47f792a": {
     "key": "ITEM_31_0000",
     "text": "Ala bizzarra"
+  },
+  "d4ee7fc3": {
+    "key": "ITEM_31_0085",
+    "text": "Ematorubino"
   },
   "d5af421a": {
     "key": "ITEM_31_0080",
@@ -995,6 +1363,10 @@
     "key": "ITEM_09_0020",
     "text": "Mossa dell'Evocalama"
   },
+  "df713fa9": {
+    "key": "ITEM_16_0009",
+    "text": "Ultimo ricordo"
+  },
   "e0937c5b": {
     "key": "ITEM_01_0020",
     "text": "Ago di ghiaccio"
@@ -1006,6 +1378,10 @@
   "e379e863": {
     "key": "ITEM_11_0000",
     "text": "Manuale di magia di rame"
+  },
+  "e3abc397": {
+    "key": "ITEM_70_0023",
+    "text": "Ricordo celeste: La Guerra dei Cieli"
   },
   "e3adb298": {
     "key": "ITEM_25_1001",
@@ -1039,6 +1415,10 @@
     "key": "ITEM_22_0050",
     "text": "Scaglia di drago verde"
   },
+  "e8926145": {
+    "key": "ITEM_23_0005",
+    "text": "Carta compagno: Maglielle"
+  },
   "e8c461ca": {
     "key": "ITEM_50_0004",
     "text": "Gemma azzurra"
@@ -1055,9 +1435,17 @@
     "key": "ITEM_01_0010",
     "text": "Legno carbonizzato"
   },
+  "eb707ea7": {
+    "key": "ITEM_23_0004",
+    "text": "Carta compagno: Gallanza"
+  },
   "eb9c99e5": {
     "key": "ITEM_28_1001",
     "text": "Pietraforgia della reclusione"
+  },
+  "ec480443": {
+    "key": "ec480443",
+    "text": "Pietraforgia del terrore"
   },
   "ed3b872d": {
     "key": "ITEM_07_0001",
@@ -1083,6 +1471,10 @@
     "key": "ITEM_70_0013",
     "text": "Pacchetto colori 1"
   },
+  "ef56c64b": {
+    "key": "ef56c64b",
+    "text": "Pietraforgia della reclusione"
+  },
   "f147229b": {
     "key": "ITEM_70_0002",
     "text": "Diario di Lyria"
@@ -1093,7 +1485,7 @@
   },
   "f42d8c01": {
     "key": "ITEM_19_0001",
-    "text": "Curiosità"
+    "text": "Reliquia"
   },
   "f430b195": {
     "key": "ITEM_01_0012",
@@ -1115,9 +1507,25 @@
     "key": "ITEM_34_4000",
     "text": "Blocco di luccicristallo"
   },
+  "f6e684fa": {
+    "key": "f6e684fa",
+    "text": "Pietraforgia della reclusione"
+  },
   "f6ee4068": {
     "key": "ITEM_02_0042",
     "text": "Sfera abissale"
+  },
+  "f74a6a4d": {
+    "key": "ITEM_32_1000",
+    "text": "Corno del granchio del sumo"
+  },
+  "f7dc6ed9": {
+    "key": "ITEM_19_0023",
+    "text": "Esacristallo dell'inoppugnabilità"
+  },
+  "f7f9a658": {
+    "key": "ITEM_31_0078",
+    "text": "Forca sinistra"
   },
   "f82726d9": {
     "key": "ITEM_31_0061",
@@ -1142,6 +1550,14 @@
   "fa737b89": {
     "key": "ITEM_02_0050",
     "text": "Scheggia di luce"
+  },
+  "faf93bcc": {
+    "key": "ITEM_22_0121",
+    "text": "Fiamma dei pilastri"
+  },
+  "fd1dc09a": {
+    "key": "ITEM_16_0901",
+    "text": "Nodo originale rovente"
   },
   "fe52f7cb": {
     "key": "ITEM_23_0002",

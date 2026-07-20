@@ -1,0 +1,90 @@
+{
+  "00d171e0": {
+    "key": "TXT_LBP_EFF_TITLE_CRITICAL01",
+    "text": "Taux critique renforcé"
+  },
+  "2270bc40": {
+    "key": "TXT_LBP_EFF_TITLE_REC_LIMIT_SUM",
+    "text": "Limite de soins renforcée"
+  },
+  "2ea9ca80": {
+    "key": "TXT_LBP_EFF_TITLE_REC_LIMIT_SUM",
+    "text": "Limite de soins renforcée"
+  },
+  "2ffb509f": {
+    "key": "TXT_LBP_EFF_TITLE_AB_LIMIT01",
+    "text": "Lim. de dégâts de comp. renforcée"
+  },
+  "33c0d50c": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_DMG01",
+    "text": "Dégâts d'Art céleste renforcés"
+  },
+  "54b09a37": {
+    "key": "TXT_LBP_EFF_TITLE_BURST_DMG01",
+    "text": "Dégâts de chain burst renforcés"
+  },
+  "5a1d2c89": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_LIMIT01",
+    "text": "Lim. de dég. d'Art céleste renforcée"
+  },
+  "5a39d81b": {
+    "key": "TXT_LBP_EFF_TITLE_BURST_DMG01",
+    "text": "Dégâts de chain burst renforcés"
+  },
+  "664e8e32": {
+    "key": "TXT_LBP_EFF_TITLE_AB_DMG01",
+    "text": "Dégâts de compétence renforcés"
+  },
+  "75138d21": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_DMG01",
+    "text": "Dégâts d'Art céleste renforcés"
+  },
+  "9245dfa4": {
+    "key": "TXT_LBP_EFF_TITLE_ATK_LIMIT01",
+    "text": "Lim. de dégâts d'att. nor. renforcée"
+  },
+  "a074a967": {
+    "key": "TXT_LBP_EFF_TITLE_CRITICAL01",
+    "text": "Taux critique renforcé"
+  },
+  "a3539fbb": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_LIMIT01",
+    "text": "Lim. de dég. d'Art céleste renforcée"
+  },
+  "a3e537b1": {
+    "key": "TXT_LBP_EFF_TITLE_ATK01",
+    "text": "Attaque renforcée"
+  },
+  "a66241c9": {
+    "key": "TXT_LBP_EFF_TITLE_ATK_LIMIT01",
+    "text": "Lim. de dégâts d'att. nor. renforcée"
+  },
+  "a8900c80": {
+    "key": "TXT_LBP_EFF_TITLE_ATK01",
+    "text": "Attaque renforcée"
+  },
+  "af39a3fb": {
+    "key": "TXT_LBP_EFF_TITLE_AB_DMG01",
+    "text": "Dégâts de compétence renforcés"
+  },
+  "bc4e92cb": {
+    "key": "TXT_LBP_EFF_TITLE_HP01",
+    "text": "Santé renforcée"
+  },
+  "ce70c58a": {
+    "key": "TXT_LBP_EFF_TITLE_AB_LIMIT01",
+    "text": "Lim. de dégâts de comp. renforcée"
+  },
+  "f0f77bc1": {
+    "key": "TXT_LBP_EFF_TITLE_BREAK01",
+    "text": "Étourdissement renforcé"
+  },
+  "f2256e44": {
+    "key": "TXT_LBP_EFF_TITLE_HP01",
+    "text": "Santé renforcée"
+  },
+  "f7b0316f": {
+    "key": "TXT_LBP_EFF_TITLE_BREAK01",
+    "text": "Étourdissement renforcé"
+  }
+}

@@ -1,0 +1,758 @@
+{
+  "0033943a": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "黑龍伊維爾 III"
+  },
+  "01b80951": {
+    "key": "TXT_SMN_So4000",
+    "text": "潛伏於常闇者"
+  },
+  "03c8bf90": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "神諭轉輪 II"
+  },
+  "03c95420": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "冰雪巨鱷 II"
+  },
+  "045efb5b": {
+    "key": "TXT_SMN_So4100_3",
+    "text": "斷罪的鐵甲 III"
+  },
+  "0525e77d": {
+    "key": "TXT_SMN_So6300_2",
+    "text": "小型巨鉗追跡者 II"
+  },
+  "099e1dd3": {
+    "key": "TXT_SMN_So4c00",
+    "text": "瑪納加爾姆‧虛無"
+  },
+  "0b366ad9": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "燃焰巨鱷 II"
+  },
+  "0be2a43a": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "岩石巨鱷 II"
+  },
+  "0d94b89f": {
+    "key": "TXT_SMN_So2000_2",
+    "text": "白銀史萊姆 II"
+  },
+  "0ee2670a": {
+    "key": "TXT_SMN_So1600_3",
+    "text": "格拉森 III"
+  },
+  "0f986ed9": {
+    "key": "TXT_SMN_So0200",
+    "text": "羅蘭"
+  },
+  "109e2271": {
+    "key": "TXT_SMN_So5700_3",
+    "text": "騎空團聯盟拉法爾 III"
+  },
+  "15ec425e": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "叛亂的巨砲 II"
+  },
+  "15ed6d77": {
+    "key": "TXT_SMN_So4f00_3",
+    "text": "懷抱希望的空之民 III"
+  },
+  "16b702dc": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "瑪洛斯僧兵 III"
+  },
+  "16ba3b8a": {
+    "key": "TXT_SMN_So1800_3",
+    "text": "司加密朗 III"
+  },
+  "1ab77fdf": {
+    "key": "TXT_SMN_So5f00",
+    "text": "貓"
+  },
+  "1abade1d": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "毀滅之眼"
+  },
+  "1b5daebd": {
+    "key": "TXT_SMN_So1b00_1",
+    "text": "狂爪翼龍"
+  },
+  "1b6a4024": {
+    "key": "TXT_SMN_So1f00_3",
+    "text": "燃焰巨鱷 III"
+  },
+  "1b9de0fa": {
+    "key": "TXT_SMN_So5400_2",
+    "text": "席多霍姆衛兵 II"
+  },
+  "1be16847": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "毀滅之眼"
+  },
+  "1cc0e0ef": {
+    "key": "TXT_SMN_So2b00_1",
+    "text": "水精靈"
+  },
+  "1e6543a3": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "火龍巴列薩雷克 II"
+  },
+  "239f769f": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "貝西摩斯 III"
+  },
+  "23d839a3": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "瑪納加爾姆"
+  },
+  "2517c481": {
+    "key": "TXT_SMN_So3f00_2",
+    "text": "黑龍伊維爾 II"
+  },
+  "26e7ccb1": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "冰龍維里奴斯 II"
+  },
+  "299c1a08": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "託付願望的空之民"
+  },
+  "2e3ce3d9": {
+    "key": "TXT_SMN_So2900_2",
+    "text": "黑暗魔種 II"
+  },
+  "2e657b01": {
+    "key": "TXT_SMN_So3100_1",
+    "text": "魔動母機"
+  },
+  "2ea15d18": {
+    "key": "TXT_SMN_So2500_2",
+    "text": "納札馮珠 II"
+  },
+  "2eacd79c": {
+    "key": "TXT_SMN_So1a00_1",
+    "text": "犄角鷹"
+  },
+  "2f15455c": {
+    "key": "TXT_SMN_So9200",
+    "text": "巴力巴布"
+  },
+  "30f63214": {
+    "key": "TXT_SMN_So2800_1",
+    "text": "聖光魔種"
+  },
+  "315695ae": {
+    "key": "TXT_SMN_So3400",
+    "text": "紅寶石巨像"
+  },
+  "316641a4": {
+    "key": "TXT_SMN_So2100_2",
+    "text": "黃金史萊姆 II"
+  },
+  "31ee9ba5": {
+    "key": "TXT_SMN_So0f00_2",
+    "text": "蒼色頭領 II"
+  },
+  "326dc2de": {
+    "key": "TXT_SMN_So1800_2",
+    "text": "司加密朗 II"
+  },
+  "36cb5052": {
+    "key": "TXT_SMN_So5600_2",
+    "text": "瑪洛斯僧兵 II"
+  },
+  "38348e1e": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "遠古巨龍 II"
+  },
+  "391c7857": {
+    "key": "TXT_SMN_So4d00_1",
+    "text": "災禍之影"
+  },
+  "3bad1134": {
+    "key": "TXT_SMN_So3c00_3",
+    "text": "地龍多貝爾 III"
+  },
+  "3c381dcd": {
+    "key": "TXT_SMN_So0e00_1",
+    "text": "哥布林劍鬥士"
+  },
+  "3c4f2b7d": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "懷抱希望的空之民"
+  },
+  "3dd9ecee": {
+    "key": "TXT_SMN_So2600_1",
+    "text": "烈焰魔種"
+  },
+  "3fd89c3a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "世須良加 II"
+  },
+  "42465367": {
+    "key": "TXT_SMN_So5500_2",
+    "text": "刃重眾 II"
+  },
+  "439cdb88": {
+    "key": "TXT_SMN_So2100_3",
+    "text": "黃金史萊姆 III"
+  },
+  "44a5cab1": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "札斯柏一家"
+  },
+  "47e2ae71": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "神諭轉輪 III"
+  },
+  "48732d1f": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "神諭轉輪 III"
+  },
+  "4a65c97d": {
+    "key": "TXT_SMN_So2600_2",
+    "text": "烈焰魔種 II"
+  },
+  "4b3d1768": {
+    "key": "TXT_SMN_So1c00_1",
+    "text": "年長的狂爪翼龍"
+  },
+  "4ba8ceba": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "懷抱希望的空之民"
+  },
+  "4c966e4f": {
+    "key": "TXT_SMN_So5300_3",
+    "text": "札斯柏一家 III"
+  },
+  "4d84581f": {
+    "key": "TXT_SMN_So1000_1",
+    "text": "緋色蠻主"
+  },
+  "4ea296fc": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "白銀史萊姆 III"
+  },
+  "4f484bbb": {
+    "key": "TXT_SMN_So2800_2",
+    "text": "聖光魔種 II"
+  },
+  "4fd78af8": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "地龍多貝爾 II"
+  },
+  "513d05cc": {
+    "key": "TXT_SMN_So5700_2",
+    "text": "騎空團聯盟拉法爾 II"
+  },
+  "514cf53b": {
+    "key": "TXT_SMN_So5200_2",
+    "text": "白狼兵團 II"
+  },
+  "524d1660": {
+    "key": "TXT_SMN_So1200_3",
+    "text": "烏色狂士 III"
+  },
+  "52b14b66": {
+    "key": "TXT_SMN_So4900_3",
+    "text": "胡拉坎 III"
+  },
+  "52e21e37": {
+    "key": "TXT_SMN_So3400",
+    "text": "紅寶石巨像"
+  },
+  "5365294f": {
+    "key": "TXT_SMN_So3100_2",
+    "text": "魔動母機 II"
+  },
+  "547e7dfc": {
+    "key": "TXT_SMN_So4e00_1",
+    "text": "巨大鮪魚"
+  },
+  "551dc320": {
+    "key": "TXT_SMN_So4d00_2",
+    "text": "災禍之影 II"
+  },
+  "556da7b4": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "遠古巨龍 II"
+  },
+  "55815e99": {
+    "key": "TXT_SMN_So1200_2",
+    "text": "烏色狂士 II"
+  },
+  "576310df": {
+    "key": "TXT_SMN_So5000_3",
+    "text": "託付願望的空之民 III"
+  },
+  "58aa9cad": {
+    "key": "TXT_SMN_So5500_1",
+    "text": "刃重眾"
+  },
+  "59f8666f": {
+    "key": "TXT_SMN_So2900_1",
+    "text": "黑暗魔種"
+  },
+  "5c42d57c": {
+    "key": "TXT_SMN_So4a00",
+    "text": "胡拉坎‧虛無"
+  },
+  "5ca9330a": {
+    "key": "TXT_SMN_So5200_3",
+    "text": "白狼兵團 III"
+  },
+  "5e29e993": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "瑪納加爾姆"
+  },
+  "5f3337b6": {
+    "key": "TXT_SMN_So0d00_1",
+    "text": "哥布林士兵"
+  },
+  "60a6d3a5": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "冰龍維里奴斯 II"
+  },
+  "61c79814": {
+    "key": "TXT_SMN_So0d00_2",
+    "text": "哥布林士兵 II"
+  },
+  "6262979b": {
+    "key": "TXT_SMN_So2500_3",
+    "text": "納札馮珠 III"
+  },
+  "634a379d": {
+    "key": "TXT_SMN_So2400_1",
+    "text": "阿里曼"
+  },
+  "6368a53d": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "瑪洛斯僧兵 III"
+  },
+  "65e658d9": {
+    "key": "TXT_SMN_So4700_2",
+    "text": "沃爾坎波拉 II"
+  },
+  "666947c2": {
+    "key": "TXT_SMN_So3e00_2",
+    "text": "白龍拉迪斯 II"
+  },
+  "67a73702": {
+    "key": "TXT_SMN_So4f00_2",
+    "text": "懷抱希望的空之民 II"
+  },
+  "67c7e1ff": {
+    "key": "TXT_SMN_So3800_3",
+    "text": "恩努其 III"
+  },
+  "6b514309": {
+    "key": "TXT_SMN_So2400_2",
+    "text": "阿里曼 II"
+  },
+  "6d6cb496": {
+    "key": "TXT_SMN_So4000",
+    "text": "潛伏於常闇者"
+  },
+  "6e5968fc": {
+    "key": "TXT_SMN_So0000",
+    "text": "路西弗"
+  },
+  "6ee91e7d": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "叛亂的巨砲 II"
+  },
+  "6f6bbbe0": {
+    "key": "TXT_SMN_So4700_3",
+    "text": "沃爾坎波拉 III"
+  },
+  "730395dc": {
+    "key": "TXT_SMN_So5500_3",
+    "text": "刃重眾 III"
+  },
+  "735dd55b": {
+    "key": "TXT_SMN_So1a00_2",
+    "text": "犄角鷹 II"
+  },
+  "7996a856": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "胡拉坎"
+  },
+  "7a46e50e": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "岩石巨鱷 II"
+  },
+  "7a7615d3": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "魔王眼鏡蛇 II"
+  },
+  "7e154422": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "霍爾嘉自警團 III"
+  },
+  "7e853e16": {
+    "key": "TXT_SMN_So6400_1",
+    "text": "神諭轉輪"
+  },
+  "7e8a659a": {
+    "key": "TXT_SMN_So2300_2",
+    "text": "目目連 II"
+  },
+  "7f8364e5": {
+    "key": "TXT_SMN_So3f00_1",
+    "text": "黑龍伊維爾"
+  },
+  "81ecec7f": {
+    "key": "TXT_SMN_So0200",
+    "text": "羅蘭"
+  },
+  "847cf372": {
+    "key": "TXT_SMN_So4200_3",
+    "text": "叛亂的巨砲 III"
+  },
+  "852287ba": {
+    "key": "TXT_SMN_So2700_1",
+    "text": "流水魔種"
+  },
+  "855d018c": {
+    "key": "TXT_SMN_So4500",
+    "text": "莉莉絲"
+  },
+  "87c6c345": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "岩塊巨像"
+  },
+  "897ffaf0": {
+    "key": "TXT_SMN_So1000_2",
+    "text": "緋色蠻主 II"
+  },
+  "8b489804": {
+    "key": "TXT_SMN_So4300_1",
+    "text": "魔王眼鏡蛇"
+  },
+  "8c607d26": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "白狼兵團"
+  },
+  "8cf23b58": {
+    "key": "TXT_SMN_So3300_3",
+    "text": "岩塊巨像 III"
+  },
+  "8d7fde58": {
+    "key": "TXT_SMN_So4100_2",
+    "text": "斷罪的鐵甲 II"
+  },
+  "8db272e5": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "黑龍伊維爾 III"
+  },
+  "8e02e207": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "格拉森 II"
+  },
+  "90bd4ac0": {
+    "key": "TXT_SMN_So0000",
+    "text": "路西弗"
+  },
+  "9118453a": {
+    "key": "TXT_SMN_So6300_1",
+    "text": "小型巨鉗追跡者"
+  },
+  "9235fb9f": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "魔王眼鏡蛇 II"
+  },
+  "9360b2b5": {
+    "key": "TXT_SMN_So2b00_2",
+    "text": "水精靈 II"
+  },
+  "9384a5d3": {
+    "key": "TXT_SMN_So3e00_3",
+    "text": "白龍拉迪斯 III"
+  },
+  "97e451a4": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "地龍多貝爾 II"
+  },
+  "99a68616": {
+    "key": "TXT_SMN_So0f00_1",
+    "text": "蒼色頭領"
+  },
+  "99cf3e05": {
+    "key": "TXT_SMN_So1e00_3",
+    "text": "冰雪巨鱷 III"
+  },
+  "9a6d89dc": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "霍爾嘉自警團 III"
+  },
+  "9bc09751": {
+    "key": "TXT_SMN_So1b00_2",
+    "text": "狂爪翼龍 II"
+  },
+  "9d5c27de": {
+    "key": "TXT_SMN_So3700_2",
+    "text": "貝西摩斯 II"
+  },
+  "9f0ecf8b": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "火龍巴列薩雷克 III"
+  },
+  "a062ec06": {
+    "key": "TXT_SMN_So1300",
+    "text": "朱色羅剎"
+  },
+  "a0c96959": {
+    "key": "TXT_SMN_So5700_1",
+    "text": "騎空團聯盟拉法爾"
+  },
+  "a34bdecb": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "世須良加 III"
+  },
+  "a40e64f4": {
+    "key": "TXT_SMN_So2700_2",
+    "text": "流水魔種 II"
+  },
+  "a4f63a8f": {
+    "key": "TXT_SMN_So5400_3",
+    "text": "席多霍姆衛兵 III"
+  },
+  "a608aecd": {
+    "key": "TXT_SMN_So5900",
+    "text": "裁判"
+  },
+  "a6bb6299": {
+    "key": "TXT_SMN_So1d00_3",
+    "text": "岩石巨鱷 III"
+  },
+  "a7eff558": {
+    "key": "TXT_SMN_So9200",
+    "text": "巴力巴布"
+  },
+  "aa2bbdbf": {
+    "key": "TXT_SMN_So1c00_2",
+    "text": "年長的狂爪翼龍 II"
+  },
+  "ac20c821": {
+    "key": "TXT_SMN_So3800_2",
+    "text": "恩努其 II"
+  },
+  "ad15d880": {
+    "key": "TXT_SMN_So4800",
+    "text": "沃爾坎波拉‧虛無"
+  },
+  "ae52556d": {
+    "key": "TXT_SMN_So3200_2",
+    "text": "強襲型魔動母機 II"
+  },
+  "b360dd8d": {
+    "key": "TXT_SMN_So4400_1",
+    "text": "黃沙死神"
+  },
+  "b3c2f3a4": {
+    "key": "TXT_SMN_So3200_1",
+    "text": "強襲型魔動母機"
+  },
+  "b44a8a02": {
+    "key": "TXT_SMN_So4e00_3",
+    "text": "巨大鮪魚 III"
+  },
+  "b4cf26c6": {
+    "key": "TXT_SMN_So5400_1",
+    "text": "席多霍姆衛兵"
+  },
+  "b5449253": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "託付願望的空之民"
+  },
+  "b79312a7": {
+    "key": "TXT_SMN_So3300_2",
+    "text": "岩塊巨像 II"
+  },
+  "b960d2bb": {
+    "key": "TXT_SMN_So3b00_3",
+    "text": "冰龍維里奴斯 III"
+  },
+  "b96cb87d": {
+    "key": "TXT_SMN_So2300_1",
+    "text": "目目連"
+  },
+  "bdd84e9a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "世須良加 II"
+  },
+  "bfac23dc": {
+    "key": "TXT_SMN_So3500_3",
+    "text": "獅鷲獸 III"
+  },
+  "c1ccbc3c": {
+    "key": "TXT_SMN_So3600_2",
+    "text": "黑翼猛鷙 II"
+  },
+  "c2f91a7f": {
+    "key": "TXT_SMN_So1100_3",
+    "text": "哥布林戰士 III"
+  },
+  "c3e918f9": {
+    "key": "TXT_SMN_So2a00_1",
+    "text": "火精靈"
+  },
+  "c52147d4": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "冰雪巨鱷 II"
+  },
+  "ca95cd8c": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "胡拉坎"
+  },
+  "cc3c45f3": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "岩塊巨像"
+  },
+  "ce0039d4": {
+    "key": "TXT_SMN_So3900_3",
+    "text": "遠古巨龍 III"
+  },
+  "ce8e0b79": {
+    "key": "TXT_SMN_So5000_2",
+    "text": "託付願望的空之民 II"
+  },
+  "d4ac8684": {
+    "key": "TXT_SMN_So3600_3",
+    "text": "黑翼猛鷙 III"
+  },
+  "d5536ae8": {
+    "key": "TXT_SMN_So4b00_2",
+    "text": "瑪納加爾姆 II"
+  },
+  "d6387caa": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "哥布林劍鬥士 II"
+  },
+  "d751d8d2": {
+    "key": "TXT_SMN_So2a00_2",
+    "text": "火精靈 II"
+  },
+  "d7555b1f": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "神諭轉輪 II"
+  },
+  "da0b6092": {
+    "key": "TXT_SMN_So5600_1",
+    "text": "瑪洛斯僧兵"
+  },
+  "dbd2f84e": {
+    "key": "TXT_SMN_So4b00_3",
+    "text": "瑪納加爾姆 III"
+  },
+  "ddb21c31": {
+    "key": "TXT_SMN_So5100_1",
+    "text": "霍爾嘉自警團"
+  },
+  "dfab70b7": {
+    "key": "TXT_SMN_So4500",
+    "text": "莉莉絲"
+  },
+  "e24b4807": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "神諭轉輪 II"
+  },
+  "e492e6bf": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "世須良加 III"
+  },
+  "e4b7dcf9": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "貝西摩斯 III"
+  },
+  "e51ce5b0": {
+    "key": "TXT_SMN_So4900_2",
+    "text": "胡拉坎 II"
+  },
+  "e528e76f": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "白銀史萊姆 III"
+  },
+  "e6ebb6fa": {
+    "key": "TXT_SMN_So5900",
+    "text": "裁判"
+  },
+  "e7f607dc": {
+    "key": "TXT_SMN_So4400_2",
+    "text": "黃沙死神 II"
+  },
+  "ebeb3dc0": {
+    "key": "TXT_SMN_So1900_1",
+    "text": "原野之狼"
+  },
+  "eeea2080": {
+    "key": "TXT_SMN_So1900_2",
+    "text": "原野之狼 II"
+  },
+  "ef554891": {
+    "key": "TXT_SMN_So2200_2",
+    "text": "毀滅之眼 II"
+  },
+  "ef973d88": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "白狼兵團"
+  },
+  "f1c229f7": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "火龍巴列薩雷克 II"
+  },
+  "f1fc31c4": {
+    "key": "TXT_SMN_So5100_2",
+    "text": "霍爾嘉自警團 II"
+  },
+  "f28d0e35": {
+    "key": "TXT_SMN_So6300_3",
+    "text": "小型巨鉗追跡者 III"
+  },
+  "f2be819e": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "火龍巴列薩雷克 III"
+  },
+  "f32aa7a7": {
+    "key": "TXT_SMN_So5300_2",
+    "text": "札斯柏一家 II"
+  },
+  "f501285c": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "哥布林劍鬥士 II"
+  },
+  "f7eb57dd": {
+    "key": "TXT_SMN_So4e00_2",
+    "text": "巨大鮪魚 II"
+  },
+  "f7f2d161": {
+    "key": "TXT_SMN_So3500_2",
+    "text": "獅鷲獸 II"
+  },
+  "f862e7da": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "札斯柏一家"
+  },
+  "f98f8b97": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "燃焰巨鱷 II"
+  },
+  "fc8444a1": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "格拉森 II"
+  },
+  "fc8a2ecb": {
+    "key": "TXT_SMN_So3d00_3",
+    "text": "風龍伊爾西斯 III"
+  },
+  "fd5fb92b": {
+    "key": "TXT_SMN_So1100_2",
+    "text": "哥布林戰士 II"
+  },
+  "ff513849": {
+    "key": "TXT_SMN_So3d00_2",
+    "text": "風龍伊爾西斯 II"
+  }
+}

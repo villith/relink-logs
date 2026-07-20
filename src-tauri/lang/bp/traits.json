@@ -3,6 +3,14 @@
     "key": "SKILL_094_00",
     "text": "Concentração Fixa"
   },
+  "0151cf9e": {
+    "key": "SKILL_315_00",
+    "text": "Limite de Dano Escarlate"
+  },
+  "020db733": {
+    "key": "SKILL_317_00",
+    "text": "Técnica Desatada"
+  },
   "05f2ecdc": {
     "key": "SKILL_070_00",
     "text": "Cascata"
@@ -10,6 +18,10 @@
   "05fa4599": {
     "key": "SKILL_124_01",
     "text": "Engenh. do Mat. de Dragões"
+  },
+  "06719232": {
+    "key": "SKILL_178_00",
+    "text": "Marca da Sombria"
   },
   "082033cb": {
     "key": "SKILL_140_00",
@@ -27,6 +39,10 @@
     "key": "SKILL_126_00",
     "text": "Destreza de Espadachim"
   },
+  "0de887a0": {
+    "key": "SKILL_320_00",
+    "text": "Nix Celestial"
+  },
   "0e42be1b": {
     "key": "SKILL_118_02",
     "text": "Ímpeto do Veterano"
@@ -38,10 +54,6 @@
   "0f026cf0": {
     "key": "SKILL_128_02",
     "text": "Ímpeto da Ira Eterna"
-  },
-  "0fba47e8": {
-    "key": "SKILL_133_00",
-    "text": "Vigor Fortificante"
   },
   "11aae5f5": {
     "key": "SKILL_117_01",
@@ -71,10 +83,6 @@
     "key": "SKILL_172_03",
     "text": "Ain"
   },
-  "1b0d9897": {
-    "key": "SKILL_141_00",
-    "text": "Rendimentos Crustáceos"
-  },
   "1c360c63": {
     "key": "SKILL_008_00",
     "text": "Dano de Ataque Carregado"
@@ -83,9 +91,21 @@
     "key": "SKILL_136_00",
     "text": "Resistente a Afogamento"
   },
+  "1de14c65": {
+    "key": "SKILL_173_00",
+    "text": "Frenesi do Gladiador"
+  },
+  "1e1cecce": {
+    "key": "SKILL_143_10",
+    "text": "Nova Catastrófica"
+  },
   "2242921f": {
     "key": "SKILL_055_00",
     "text": "Resistente a Paralisia"
+  },
+  "235d86ef": {
+    "key": "SKILL_313_00",
+    "text": "Supernova"
   },
   "23d0f67f": {
     "key": "SKILL_119_00",
@@ -94,6 +114,10 @@
   "24883af3": {
     "key": "SKILL_073_00",
     "text": "Colecionador de Poções"
+  },
+  "26956f25": {
+    "key": "SKILL_173_01",
+    "text": "Topo do Gladiador"
   },
   "281214ab": {
     "key": "SKILL_171_03",
@@ -115,6 +139,10 @@
     "key": "SKILL_006_00",
     "text": "Vigor"
   },
+  "30773197": {
+    "key": "SKILL_177_01",
+    "text": "Ritmo da Feiticeira"
+  },
   "318d12e9": {
     "key": "SKILL_069_00",
     "text": "Recarga Rápida"
@@ -123,9 +151,17 @@
     "key": "SKILL_157_00",
     "text": "Jogada de Dados"
   },
+  "36e3848d": {
+    "key": "SKILL_323_00",
+    "text": "Incendo Celestial"
+  },
   "3759a5b9": {
     "key": "SKILL_054_00",
     "text": "Resistente a Tontura"
+  },
+  "3b71af12": {
+    "key": "SKILL_311_00",
+    "text": "Limite de Dano Bege"
   },
   "3bfed918": {
     "key": "SKILL_115_00",
@@ -139,6 +175,10 @@
     "key": "SKILL_234_00",
     "text": "Espartano"
   },
+  "3eb345d7": {
+    "key": "SKILL_176_02",
+    "text": "Ímpeto do Lobo do Trovão"
+  },
   "3f2c482e": {
     "key": "SKILL_100_00",
     "text": "Suplementos"
@@ -146,6 +186,10 @@
   "3f488339": {
     "key": "SKILL_005_00",
     "text": "Animosidade"
+  },
+  "3f682593": {
+    "key": "SKILL_318_00",
+    "text": "Empenho Desatado"
   },
   "3fec5f80": {
     "key": "SKILL_009_00",
@@ -158,6 +202,18 @@
   "451d814c": {
     "key": "SKILL_128_01",
     "text": "Etos da Ira Eterna"
+  },
+  "461a8e07": {
+    "key": "SKILL_175_01",
+    "text": "Adversid. da Ultramarina"
+  },
+  "46ee3116": {
+    "key": "SKILL_302_00",
+    "text": "Pega-pinça"
+  },
+  "47384248": {
+    "key": "SKILL_177_00",
+    "text": "Bênção da Feiticeira"
   },
   "48a95b8d": {
     "key": "SKILL_166_00",
@@ -202,6 +258,10 @@
   "5463232f": {
     "key": "SKILL_128_00",
     "text": "Valentia da Ira Eterna"
+  },
+  "5559232f": {
+    "key": "SKILL_178_02",
+    "text": "Ímpeto da Sombria"
   },
   "57ab5b10": {
     "key": "SKILL_151_00",
@@ -255,6 +315,10 @@
     "key": "SKILL_027_00",
     "text": "Tirania"
   },
+  "73220725": {
+    "key": "SKILL_326_00",
+    "text": "Ventus Celestial"
+  },
   "7351d602": {
     "key": "SKILL_120_01",
     "text": "Harmonia Fantasmagórica"
@@ -271,6 +335,14 @@
     "key": "SKILL_170_00",
     "text": "Brado da Lâmina Espiritual"
   },
+  "79027fc8": {
+    "key": "SKILL_319_00",
+    "text": "Mestre Desatado"
+  },
+  "79266456": {
+    "key": "SKILL_174_02",
+    "text": "Ímpeto da Regilâmina"
+  },
   "7ad0c010": {
     "key": "SKILL_130_01",
     "text": "Ignição Versalis"
@@ -278,6 +350,10 @@
   "7b4fc47a": {
     "key": "SKILL_170_02",
     "text": "Ímpeto da Lâmina Espiritual"
+  },
+  "7b5b081d": {
+    "key": "SKILL_174_00",
+    "text": "Serenata da Regilâmina"
   },
   "7c2e4d64": {
     "key": "SKILL_064_00",
@@ -291,9 +367,17 @@
     "key": "SKILL_067_00",
     "text": "Drenar"
   },
+  "7d75d904": {
+    "key": "SKILL_176_00",
+    "text": "Recarga do Lobo do Trovão"
+  },
   "7edd69d0": {
     "key": "SKILL_109_00",
     "text": "Fúria Precisa"
+  },
+  "807b6684": {
+    "key": "SKILL_177_02",
+    "text": "Ímpeto da Feiticeira"
   },
   "81b293d9": {
     "key": "SKILL_171_02",
@@ -318,6 +402,10 @@
   "86cbcdc4": {
     "key": "SKILL_124_00",
     "text": "Suprem. do Mat. de Dragões"
+  },
+  "89c66acb": {
+    "key": "SKILL_303_00",
+    "text": "Força do Sumô"
   },
   "8b3bf60c": {
     "key": "SKILL_063_00",
@@ -351,6 +439,10 @@
     "key": "SKILL_170_01",
     "text": "Fúria da Lâmina Espiritual"
   },
+  "9232dc17": {
+    "key": "SKILL_322_00",
+    "text": "Terra Celestial"
+  },
   "9389cc06": {
     "key": "SKILL_065_00",
     "text": "Cura Aprimorada"
@@ -374,6 +466,10 @@
   "9a9dc170": {
     "key": "SKILL_125_00",
     "text": "Esplendor da Cav. Sagrada"
+  },
+  "9ace140b": {
+    "key": "SKILL_174_01",
+    "text": "Circuito da Regilâmina"
   },
   "9ad8b5e6": {
     "key": "SKILL_142_00",
@@ -407,17 +503,21 @@
     "key": "SKILL_126_01",
     "text": "Arte de Espadachim"
   },
-  "a4d6b880": {
-    "key": "SKILL_134_00",
-    "text": "Vigor Penetrante"
-  },
   "a63b89cd": {
     "key": "SKILL_127_01",
     "text": "Valor da Borboleta"
   },
+  "a7726190": {
+    "key": "SKILL_321_00",
+    "text": "Lúmen Celestial"
+  },
   "a7a45f28": {
     "key": "SKILL_017_00",
     "text": "Dano de Fim de Combo"
+  },
+  "a898e283": {
+    "key": "SKILL_324_00",
+    "text": "Aqua Celestial"
   },
   "a8a3163b": {
     "key": "SKILL_158_00",
@@ -434,6 +534,10 @@
   "ac9674c1": {
     "key": "SKILL_031_00",
     "text": "Assassino de Break"
+  },
+  "aefeb1bc": {
+    "key": "SKILL_314_00",
+    "text": "Limite de Dano Cobalto"
   },
   "af513a9d": {
     "key": "SKILL_129_01",
@@ -467,9 +571,25 @@
     "key": "SKILL_125_02",
     "text": "Ímpeto da Cavaleira Sagrada"
   },
+  "b953cc1e": {
+    "key": "SKILL_175_02",
+    "text": "Ímpeto da Ultramarina"
+  },
   "ba504607": {
     "key": "SKILL_123_02",
     "text": "Ímpeto do Imperador"
+  },
+  "bbd77c33": {
+    "key": "SKILL_316_00",
+    "text": "Golpe Desatado"
+  },
+  "be3404b9": {
+    "key": "SKILL_176_01",
+    "text": "Acuid. do Lobo do Trovão"
+  },
+  "bf78fbfc": {
+    "key": "SKILL_301_00",
+    "text": "Carapaça Imortal"
   },
   "c00163b3": {
     "key": "SKILL_117_02",
@@ -507,10 +627,6 @@
     "key": "SKILL_156_00",
     "text": "Verde Potente"
   },
-  "cdeb73f6": {
-    "key": "SKILL_135_00",
-    "text": "Vigor Dourado"
-  },
   "ceb700ee": {
     "key": "SKILL_004_00",
     "text": "Poder de Atordoamento"
@@ -519,9 +635,17 @@
     "key": "SKILL_058_00",
     "text": "Resistente a AC Seladas"
   },
+  "d029fe08": {
+    "key": "SKILL_325_00",
+    "text": "Quebra-Destino"
+  },
   "d1012d8c": {
     "key": "SKILL_121_01",
     "text": "Glória do Dragão Branco"
+  },
+  "d176d262": {
+    "key": "SKILL_175_00",
+    "text": "Carne da Ultramarina"
   },
   "d2c8e10a": {
     "key": "SKILL_106_00",
@@ -534,6 +658,10 @@
   "d40d1e9b": {
     "key": "SKILL_172_00",
     "text": "Esplen. do Arcanjo Supremo"
+  },
+  "d461ecfb": {
+    "key": "SKILL_141_04",
+    "text": "Rendimentos Crustáceos"
   },
   "d54f8ca7": {
     "key": "SKILL_051_00",
@@ -562,6 +690,10 @@
   "daefbb27": {
     "key": "SKILL_126_02",
     "text": "Ímpeto do Espadachim"
+  },
+  "dba19768": {
+    "key": "SKILL_173_02",
+    "text": "Ímpeto do Gladiador"
   },
   "dbe1d775": {
     "key": "SKILL_160_00",
@@ -619,6 +751,10 @@
     "key": "SKILL_129_00",
     "text": "Estratégia da Fundadora"
   },
+  "ed8d8ad8": {
+    "key": "SKILL_178_01",
+    "text": "Impulso da Sombria"
+  },
   "ee85cd1f": {
     "key": "SKILL_233_00",
     "text": "Frenesi"
@@ -634,6 +770,10 @@
   "f1d5dbd0": {
     "key": "SKILL_131_01",
     "text": "Voo Escarlate"
+  },
+  "f26baea5": {
+    "key": "SKILL_327_00",
+    "text": "Divergência"
   },
   "f372f096": {
     "key": "SKILL_001_00",
@@ -658,5 +798,9 @@
   "fdd1ad24": {
     "key": "SKILL_127_02",
     "text": "Ímpeto da Borboleta"
+  },
+  "fff8cf64": {
+    "key": "SKILL_312_00",
+    "text": "Limite de Dano Sálvia"
   }
 }

@@ -3,6 +3,14 @@
     "key": "SKILL_094_00",
     "text": "Concentrazione massima"
   },
+  "0151cf9e": {
+    "key": "SKILL_315_00",
+    "text": "Limite danni: cielo cremisi"
+  },
+  "020db733": {
+    "key": "SKILL_317_00",
+    "text": "Arti eccelse"
+  },
   "05f2ecdc": {
     "key": "SKILL_070_00",
     "text": "Cascata"
@@ -10,6 +18,10 @@
   "05fa4599": {
     "key": "SKILL_124_01",
     "text": "Ingegno dello sterminadraghi"
+  },
+  "06719232": {
+    "key": "SKILL_178_00",
+    "text": "Maledizione oscura"
   },
   "082033cb": {
     "key": "SKILL_140_00",
@@ -27,6 +39,10 @@
     "key": "SKILL_126_00",
     "text": "Talento dello spadaccino"
   },
+  "0de887a0": {
+    "key": "SKILL_320_00",
+    "text": "Aggressione rediviva"
+  },
   "0e42be1b": {
     "key": "SKILL_118_02",
     "text": "Sentiero del veterano"
@@ -38,10 +54,6 @@
   "0f026cf0": {
     "key": "SKILL_128_02",
     "text": "Sentiero della Furia perpetua"
-  },
-  "0fba47e8": {
-    "key": "SKILL_133_00",
-    "text": "Vigore fortificante"
   },
   "11aae5f5": {
     "key": "SKILL_117_01",
@@ -71,10 +83,6 @@
     "key": "SKILL_172_03",
     "text": "Ain"
   },
-  "1b0d9897": {
-    "key": "SKILL_141_00",
-    "text": "Guadagni granchieschi"
-  },
   "1c360c63": {
     "key": "SKILL_008_00",
     "text": "Danni Attacco caricato"
@@ -83,9 +91,21 @@
     "key": "SKILL_136_00",
     "text": "Resistenza Oppressione"
   },
+  "1de14c65": {
+    "key": "SKILL_173_00",
+    "text": "Fervore del lupo alfa"
+  },
+  "1e1cecce": {
+    "key": "SKILL_143_10",
+    "text": "Nova catastrofica"
+  },
   "2242921f": {
     "key": "SKILL_055_00",
     "text": "Resistenza Paralisi"
+  },
+  "235d86ef": {
+    "key": "SKILL_313_00",
+    "text": "Supernova"
   },
   "23d0f67f": {
     "key": "SKILL_119_00",
@@ -94,6 +114,10 @@
   "24883af3": {
     "key": "SKILL_073_00",
     "text": "Scorta di pozioni"
+  },
+  "26956f25": {
+    "key": "SKILL_173_01",
+    "text": "Gran trottola del lupo alfa"
   },
   "281214ab": {
     "key": "SKILL_171_03",
@@ -115,6 +139,10 @@
     "key": "SKILL_006_00",
     "text": "Vigore"
   },
+  "30773197": {
+    "key": "SKILL_177_01",
+    "text": "Grinta della trasmigrazione"
+  },
   "318d12e9": {
     "key": "SKILL_069_00",
     "text": "Recupero veloce"
@@ -123,9 +151,17 @@
     "key": "SKILL_157_00",
     "text": "Tiro di dado"
   },
+  "36e3848d": {
+    "key": "SKILL_323_00",
+    "text": "Assassino redivivo"
+  },
   "3759a5b9": {
     "key": "SKILL_054_00",
     "text": "Resistenza Vertigine"
+  },
+  "3b71af12": {
+    "key": "SKILL_311_00",
+    "text": "Limite danni: cielo roboante"
   },
   "3bfed918": {
     "key": "SKILL_115_00",
@@ -139,6 +175,10 @@
     "key": "SKILL_234_00",
     "text": "Spartano"
   },
+  "3eb345d7": {
+    "key": "SKILL_176_02",
+    "text": "Sentiero del lupo tonante"
+  },
   "3f2c482e": {
     "key": "SKILL_100_00",
     "text": "Integratori"
@@ -146,6 +186,10 @@
   "3f488339": {
     "key": "SKILL_005_00",
     "text": "Avversione"
+  },
+  "3f682593": {
+    "key": "SKILL_318_00",
+    "text": "Arti celesti eccelse"
   },
   "3fec5f80": {
     "key": "SKILL_009_00",
@@ -158,6 +202,18 @@
   "451d814c": {
     "key": "SKILL_128_01",
     "text": "Etica della Furia perpetua"
+  },
+  "461a8e07": {
+    "key": "SKILL_175_01",
+    "text": "Avversità blu oltremare"
+  },
+  "46ee3116": {
+    "key": "SKILL_302_00",
+    "text": "Legame di pece"
+  },
+  "47384248": {
+    "key": "SKILL_177_00",
+    "text": "Grazia della trasmigrazione"
   },
   "48a95b8d": {
     "key": "SKILL_166_00",
@@ -202,6 +258,10 @@
   "5463232f": {
     "key": "SKILL_128_00",
     "text": "Tempra della Furia perpetua"
+  },
+  "5559232f": {
+    "key": "SKILL_178_02",
+    "text": "Sentiero oscuro"
   },
   "57ab5b10": {
     "key": "SKILL_151_00",
@@ -255,6 +315,10 @@
     "key": "SKILL_027_00",
     "text": "Tirannia"
   },
+  "73220725": {
+    "key": "SKILL_326_00",
+    "text": "Calma rediviva"
+  },
   "7351d602": {
     "key": "SKILL_120_01",
     "text": "Armonia spettrale"
@@ -271,6 +335,14 @@
     "key": "SKILL_170_00",
     "text": "Adunata dello spirito"
   },
+  "79027fc8": {
+    "key": "SKILL_319_00",
+    "text": "Maestria eccelsa"
+  },
+  "79266456": {
+    "key": "SKILL_174_02",
+    "text": "Sentiero della lady"
+  },
   "7ad0c010": {
     "key": "SKILL_130_01",
     "text": "Accensione di Alteris"
@@ -278,6 +350,10 @@
   "7b4fc47a": {
     "key": "SKILL_170_02",
     "text": "Sentiero dello spirito"
+  },
+  "7b5b081d": {
+    "key": "SKILL_174_00",
+    "text": "Serenata della lady"
   },
   "7c2e4d64": {
     "key": "SKILL_064_00",
@@ -291,9 +367,17 @@
     "key": "SKILL_067_00",
     "text": "Assorbimento"
   },
+  "7d75d904": {
+    "key": "SKILL_176_00",
+    "text": "Munizioni del lupo tonante"
+  },
   "7edd69d0": {
     "key": "SKILL_109_00",
     "text": "Collera precisa"
+  },
+  "807b6684": {
+    "key": "SKILL_177_02",
+    "text": "Sentiero della trasmigrazione"
   },
   "81b293d9": {
     "key": "SKILL_171_02",
@@ -318,6 +402,10 @@
   "86cbcdc4": {
     "key": "SKILL_124_00",
     "text": "Dominio dello sterminadraghi"
+  },
+  "89c66acb": {
+    "key": "SKILL_303_00",
+    "text": "Potere del lottatore di sumo"
   },
   "8b3bf60c": {
     "key": "SKILL_063_00",
@@ -351,6 +439,10 @@
     "key": "SKILL_170_01",
     "text": "Furia dello spirito"
   },
+  "9232dc17": {
+    "key": "SKILL_322_00",
+    "text": "Despota redivivo"
+  },
   "9389cc06": {
     "key": "SKILL_065_00",
     "text": "Cura migliorata"
@@ -374,6 +466,10 @@
   "9a9dc170": {
     "key": "SKILL_125_00",
     "text": "Lustro della paladina"
+  },
+  "9ace140b": {
+    "key": "SKILL_174_01",
+    "text": "Girotondo della lady"
   },
   "9ad8b5e6": {
     "key": "SKILL_142_00",
@@ -407,17 +503,21 @@
     "key": "SKILL_126_01",
     "text": "Arte dello spadaccino"
   },
-  "a4d6b880": {
-    "key": "SKILL_134_00",
-    "text": "Vigore instillato"
-  },
   "a63b89cd": {
     "key": "SKILL_127_01",
     "text": "Valore della farfalla"
   },
+  "a7726190": {
+    "key": "SKILL_321_00",
+    "text": "Vigore redivivo"
+  },
   "a7a45f28": {
     "key": "SKILL_017_00",
     "text": "Danni colpo finale combo"
+  },
+  "a898e283": {
+    "key": "SKILL_324_00",
+    "text": "Carnefice redivivo"
   },
   "a8a3163b": {
     "key": "SKILL_158_00",
@@ -434,6 +534,10 @@
   "ac9674c1": {
     "key": "SKILL_031_00",
     "text": "Assassinio break"
+  },
+  "aefeb1bc": {
+    "key": "SKILL_314_00",
+    "text": "Limite danni: cielo blu"
   },
   "af513a9d": {
     "key": "SKILL_129_01",
@@ -467,9 +571,25 @@
     "key": "SKILL_125_02",
     "text": "Sentiero della paladina"
   },
+  "b953cc1e": {
+    "key": "SKILL_175_02",
+    "text": "Sentiero blu oltremare"
+  },
   "ba504607": {
     "key": "SKILL_123_02",
     "text": "Sentiero del signore"
+  },
+  "bbd77c33": {
+    "key": "SKILL_316_00",
+    "text": "Attacco eccelso"
+  },
+  "be3404b9": {
+    "key": "SKILL_176_01",
+    "text": "Perspicacia del lupo tonante"
+  },
+  "bf78fbfc": {
+    "key": "SKILL_301_00",
+    "text": "Granchigillo pauroscuro"
   },
   "c00163b3": {
     "key": "SKILL_117_02",
@@ -507,10 +627,6 @@
     "key": "SKILL_156_00",
     "text": "Verdi potenti"
   },
-  "cdeb73f6": {
-    "key": "SKILL_135_00",
-    "text": "Vigore dorato"
-  },
   "ceb700ee": {
     "key": "SKILL_004_00",
     "text": "Forza stordente"
@@ -519,9 +635,17 @@
     "key": "SKILL_058_00",
     "text": "Resistenza AC sigillata"
   },
+  "d029fe08": {
+    "key": "SKILL_325_00",
+    "text": "Senza limiti"
+  },
   "d1012d8c": {
     "key": "SKILL_121_01",
     "text": "Gloria dei Draghi Bianchi"
+  },
+  "d176d262": {
+    "key": "SKILL_175_00",
+    "text": "Lampo blu oltremare"
   },
   "d2c8e10a": {
     "key": "SKILL_106_00",
@@ -534,6 +658,10 @@
   "d40d1e9b": {
     "key": "SKILL_172_00",
     "text": "Splendore del primarca supremo"
+  },
+  "d461ecfb": {
+    "key": "SKILL_141_04",
+    "text": "Guadagni granchieschi"
   },
   "d54f8ca7": {
     "key": "SKILL_051_00",
@@ -562,6 +690,10 @@
   "daefbb27": {
     "key": "SKILL_126_02",
     "text": "Sentiero dello spadaccino"
+  },
+  "dba19768": {
+    "key": "SKILL_173_02",
+    "text": "Sentiero del lupo alfa"
   },
   "dbe1d775": {
     "key": "SKILL_160_00",
@@ -619,6 +751,10 @@
     "key": "SKILL_129_00",
     "text": "Strategia fondante"
   },
+  "ed8d8ad8": {
+    "key": "SKILL_178_01",
+    "text": "Balzo oscuro"
+  },
   "ee85cd1f": {
     "key": "SKILL_233_00",
     "text": "Frenesia"
@@ -634,6 +770,10 @@
   "f1d5dbd0": {
     "key": "SKILL_131_01",
     "text": "Volo cremisi"
+  },
+  "f26baea5": {
+    "key": "SKILL_327_00",
+    "text": "Divergenza"
   },
   "f372f096": {
     "key": "SKILL_001_00",
@@ -658,5 +798,9 @@
   "fdd1ad24": {
     "key": "SKILL_127_02",
     "text": "Sentiero della farfalla"
+  },
+  "fff8cf64": {
+    "key": "SKILL_312_00",
+    "text": "Limite danni: cielo pestilenziale"
   }
 }

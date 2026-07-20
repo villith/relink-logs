@@ -1,0 +1,758 @@
+{
+  "0033943a": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "黑龙伊弗欧Ⅲ"
+  },
+  "01b80951": {
+    "key": "TXT_SMN_So4000",
+    "text": "永暗藏匿者"
+  },
+  "03c8bf90": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "神谕转轮Ⅱ"
+  },
+  "03c95420": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "巨爪霜鳄Ⅱ"
+  },
+  "045efb5b": {
+    "key": "TXT_SMN_So4100_3",
+    "text": "断罪铁骑Ⅲ"
+  },
+  "0525e77d": {
+    "key": "TXT_SMN_So6300_2",
+    "text": "小钳蟹Ⅱ"
+  },
+  "099e1dd3": {
+    "key": "TXT_SMN_So4c00",
+    "text": "玛纳加尔姆·虚无"
+  },
+  "0b366ad9": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "巨爪焰鳄Ⅱ"
+  },
+  "0be2a43a": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "巨爪岩鳄Ⅱ"
+  },
+  "0d94b89f": {
+    "key": "TXT_SMN_So2000_2",
+    "text": "银史莱姆Ⅱ"
+  },
+  "0ee2670a": {
+    "key": "TXT_SMN_So1600_3",
+    "text": "死骸格拉森Ⅲ"
+  },
+  "0f986ed9": {
+    "key": "TXT_SMN_So0200",
+    "text": "罗兰"
+  },
+  "109e2271": {
+    "key": "TXT_SMN_So5700_3",
+    "text": "骑空团联盟拉法尔Ⅲ"
+  },
+  "15ec425e": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "叛乱重炮Ⅱ"
+  },
+  "15ed6d77": {
+    "key": "TXT_SMN_So4f00_3",
+    "text": "怀揣希望的空之民Ⅲ"
+  },
+  "16b702dc": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "玛洛斯僧兵Ⅲ"
+  },
+  "16ba3b8a": {
+    "key": "TXT_SMN_So1800_3",
+    "text": "冰骸斯卡米勒Ⅲ"
+  },
+  "1ab77fdf": {
+    "key": "TXT_SMN_So5f00",
+    "text": "猫"
+  },
+  "1abade1d": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "赛伊格亚"
+  },
+  "1b5daebd": {
+    "key": "TXT_SMN_So1b00_1",
+    "text": "双足飞龙"
+  },
+  "1b6a4024": {
+    "key": "TXT_SMN_So1f00_3",
+    "text": "巨爪焰鳄Ⅲ"
+  },
+  "1b9de0fa": {
+    "key": "TXT_SMN_So5400_2",
+    "text": "希德霍姆兵Ⅱ"
+  },
+  "1be16847": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "赛伊格亚"
+  },
+  "1cc0e0ef": {
+    "key": "TXT_SMN_So2b00_1",
+    "text": "水精灵"
+  },
+  "1e6543a3": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "火龙布雷扎莱克Ⅱ"
+  },
+  "239f769f": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "贝希摩斯Ⅲ"
+  },
+  "23d839a3": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "玛纳加尔姆"
+  },
+  "2517c481": {
+    "key": "TXT_SMN_So3f00_2",
+    "text": "黑龙伊弗欧Ⅱ"
+  },
+  "26e7ccb1": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "冰龙威利努斯Ⅱ"
+  },
+  "299c1a08": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "托付愿望的空之民"
+  },
+  "2e3ce3d9": {
+    "key": "TXT_SMN_So2900_2",
+    "text": "暗之种Ⅱ"
+  },
+  "2e657b01": {
+    "key": "TXT_SMN_So3100_1",
+    "text": "机械武装·主机"
+  },
+  "2ea15d18": {
+    "key": "TXT_SMN_So2500_2",
+    "text": "魔眼守卫Ⅱ"
+  },
+  "2eacd79c": {
+    "key": "TXT_SMN_So1a00_1",
+    "text": "角禽"
+  },
+  "2f15455c": {
+    "key": "TXT_SMN_So9200",
+    "text": "别西卜"
+  },
+  "30f63214": {
+    "key": "TXT_SMN_So2800_1",
+    "text": "光之种"
+  },
+  "315695ae": {
+    "key": "TXT_SMN_So3400",
+    "text": "红宝石魔像"
+  },
+  "316641a4": {
+    "key": "TXT_SMN_So2100_2",
+    "text": "金史莱姆Ⅱ"
+  },
+  "31ee9ba5": {
+    "key": "TXT_SMN_So0f00_2",
+    "text": "苍百长Ⅱ"
+  },
+  "326dc2de": {
+    "key": "TXT_SMN_So1800_2",
+    "text": "冰骸斯卡米勒Ⅱ"
+  },
+  "36cb5052": {
+    "key": "TXT_SMN_So5600_2",
+    "text": "玛洛斯僧兵Ⅱ"
+  },
+  "38348e1e": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "远古巨龙Ⅱ"
+  },
+  "391c7857": {
+    "key": "TXT_SMN_So4d00_1",
+    "text": "灾祸之影"
+  },
+  "3bad1134": {
+    "key": "TXT_SMN_So3c00_3",
+    "text": "地龙杜雷贝尔Ⅲ"
+  },
+  "3c381dcd": {
+    "key": "TXT_SMN_So0e00_1",
+    "text": "哥布林角斗士"
+  },
+  "3c4f2b7d": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "怀揣希望的空之民"
+  },
+  "3dd9ecee": {
+    "key": "TXT_SMN_So2600_1",
+    "text": "火之种"
+  },
+  "3fd89c3a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "世须良加Ⅱ"
+  },
+  "42465367": {
+    "key": "TXT_SMN_So5500_2",
+    "text": "刃重众Ⅱ"
+  },
+  "439cdb88": {
+    "key": "TXT_SMN_So2100_3",
+    "text": "金史莱姆Ⅲ"
+  },
+  "44a5cab1": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "扎斯巴家"
+  },
+  "47e2ae71": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "神谕转轮Ⅲ"
+  },
+  "48732d1f": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "神谕转轮Ⅲ"
+  },
+  "4a65c97d": {
+    "key": "TXT_SMN_So2600_2",
+    "text": "火之种Ⅱ"
+  },
+  "4b3d1768": {
+    "key": "TXT_SMN_So1c00_1",
+    "text": "老双足飞龙"
+  },
+  "4ba8ceba": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "怀揣希望的空之民"
+  },
+  "4c966e4f": {
+    "key": "TXT_SMN_So5300_3",
+    "text": "扎斯巴家Ⅲ"
+  },
+  "4d84581f": {
+    "key": "TXT_SMN_So1000_1",
+    "text": "赤蛮尉"
+  },
+  "4ea296fc": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "银史莱姆Ⅲ"
+  },
+  "4f484bbb": {
+    "key": "TXT_SMN_So2800_2",
+    "text": "光之种Ⅱ"
+  },
+  "4fd78af8": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "地龙杜雷贝尔Ⅱ"
+  },
+  "513d05cc": {
+    "key": "TXT_SMN_So5700_2",
+    "text": "骑空团联盟拉法尔Ⅱ"
+  },
+  "514cf53b": {
+    "key": "TXT_SMN_So5200_2",
+    "text": "白狼兵团Ⅱ"
+  },
+  "524d1660": {
+    "key": "TXT_SMN_So1200_3",
+    "text": "玄夜叉Ⅲ"
+  },
+  "52b14b66": {
+    "key": "TXT_SMN_So4900_3",
+    "text": "胡拉坎Ⅲ"
+  },
+  "52e21e37": {
+    "key": "TXT_SMN_So3400",
+    "text": "红宝石魔像"
+  },
+  "5365294f": {
+    "key": "TXT_SMN_So3100_2",
+    "text": "机械武装·主机Ⅱ"
+  },
+  "547e7dfc": {
+    "key": "TXT_SMN_So4e00_1",
+    "text": "金枪鱼"
+  },
+  "551dc320": {
+    "key": "TXT_SMN_So4d00_2",
+    "text": "灾祸之影Ⅱ"
+  },
+  "556da7b4": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "远古巨龙Ⅱ"
+  },
+  "55815e99": {
+    "key": "TXT_SMN_So1200_2",
+    "text": "玄夜叉Ⅱ"
+  },
+  "576310df": {
+    "key": "TXT_SMN_So5000_3",
+    "text": "托付愿望的空之民Ⅲ"
+  },
+  "58aa9cad": {
+    "key": "TXT_SMN_So5500_1",
+    "text": "刃重众"
+  },
+  "59f8666f": {
+    "key": "TXT_SMN_So2900_1",
+    "text": "暗之种"
+  },
+  "5c42d57c": {
+    "key": "TXT_SMN_So4a00",
+    "text": "胡拉坎·虚无"
+  },
+  "5ca9330a": {
+    "key": "TXT_SMN_So5200_3",
+    "text": "白狼兵团Ⅲ"
+  },
+  "5e29e993": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "玛纳加尔姆"
+  },
+  "5f3337b6": {
+    "key": "TXT_SMN_So0d00_1",
+    "text": "哥布林军士"
+  },
+  "60a6d3a5": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "冰龙威利努斯Ⅱ"
+  },
+  "61c79814": {
+    "key": "TXT_SMN_So0d00_2",
+    "text": "哥布林军士Ⅱ"
+  },
+  "6262979b": {
+    "key": "TXT_SMN_So2500_3",
+    "text": "魔眼守卫Ⅲ"
+  },
+  "634a379d": {
+    "key": "TXT_SMN_So2400_1",
+    "text": "阿里曼"
+  },
+  "6368a53d": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "玛洛斯僧兵Ⅲ"
+  },
+  "65e658d9": {
+    "key": "TXT_SMN_So4700_2",
+    "text": "伏尔甘博拉Ⅱ"
+  },
+  "666947c2": {
+    "key": "TXT_SMN_So3e00_2",
+    "text": "白龙拉迪斯Ⅱ"
+  },
+  "67a73702": {
+    "key": "TXT_SMN_So4f00_2",
+    "text": "怀揣希望的空之民Ⅱ"
+  },
+  "67c7e1ff": {
+    "key": "TXT_SMN_So3800_3",
+    "text": "恩奴基Ⅲ"
+  },
+  "6b514309": {
+    "key": "TXT_SMN_So2400_2",
+    "text": "阿里曼Ⅱ"
+  },
+  "6d6cb496": {
+    "key": "TXT_SMN_So4000",
+    "text": "永暗藏匿者"
+  },
+  "6e5968fc": {
+    "key": "TXT_SMN_So0000",
+    "text": "路西法"
+  },
+  "6ee91e7d": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "叛乱重炮Ⅱ"
+  },
+  "6f6bbbe0": {
+    "key": "TXT_SMN_So4700_3",
+    "text": "伏尔甘博拉Ⅲ"
+  },
+  "730395dc": {
+    "key": "TXT_SMN_So5500_3",
+    "text": "刃重众Ⅲ"
+  },
+  "735dd55b": {
+    "key": "TXT_SMN_So1a00_2",
+    "text": "角禽Ⅱ"
+  },
+  "7996a856": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "胡拉坎"
+  },
+  "7a46e50e": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "巨爪岩鳄Ⅱ"
+  },
+  "7a7615d3": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "眼镜蛇Ⅱ"
+  },
+  "7e154422": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "弗尔卡自卫团Ⅲ"
+  },
+  "7e853e16": {
+    "key": "TXT_SMN_So6400_1",
+    "text": "神谕转轮"
+  },
+  "7e8a659a": {
+    "key": "TXT_SMN_So2300_2",
+    "text": "目目连Ⅱ"
+  },
+  "7f8364e5": {
+    "key": "TXT_SMN_So3f00_1",
+    "text": "黑龙伊弗欧"
+  },
+  "81ecec7f": {
+    "key": "TXT_SMN_So0200",
+    "text": "罗兰"
+  },
+  "847cf372": {
+    "key": "TXT_SMN_So4200_3",
+    "text": "叛乱重炮Ⅲ"
+  },
+  "852287ba": {
+    "key": "TXT_SMN_So2700_1",
+    "text": "水之种"
+  },
+  "855d018c": {
+    "key": "TXT_SMN_So4500",
+    "text": "莉莉丝"
+  },
+  "87c6c345": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "巨石魔像"
+  },
+  "897ffaf0": {
+    "key": "TXT_SMN_So1000_2",
+    "text": "赤蛮尉Ⅱ"
+  },
+  "8b489804": {
+    "key": "TXT_SMN_So4300_1",
+    "text": "眼镜蛇"
+  },
+  "8c607d26": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "白狼兵团"
+  },
+  "8cf23b58": {
+    "key": "TXT_SMN_So3300_3",
+    "text": "巨石魔像Ⅲ"
+  },
+  "8d7fde58": {
+    "key": "TXT_SMN_So4100_2",
+    "text": "断罪铁骑Ⅱ"
+  },
+  "8db272e5": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "黑龙伊弗欧Ⅲ"
+  },
+  "8e02e207": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "死骸格拉森Ⅱ"
+  },
+  "90bd4ac0": {
+    "key": "TXT_SMN_So0000",
+    "text": "路西法"
+  },
+  "9118453a": {
+    "key": "TXT_SMN_So6300_1",
+    "text": "小钳蟹"
+  },
+  "9235fb9f": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "眼镜蛇Ⅱ"
+  },
+  "9360b2b5": {
+    "key": "TXT_SMN_So2b00_2",
+    "text": "水精灵Ⅱ"
+  },
+  "9384a5d3": {
+    "key": "TXT_SMN_So3e00_3",
+    "text": "白龙拉迪斯Ⅲ"
+  },
+  "97e451a4": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "地龙杜雷贝尔Ⅱ"
+  },
+  "99a68616": {
+    "key": "TXT_SMN_So0f00_1",
+    "text": "苍百长"
+  },
+  "99cf3e05": {
+    "key": "TXT_SMN_So1e00_3",
+    "text": "巨爪霜鳄Ⅲ"
+  },
+  "9a6d89dc": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "弗尔卡自卫团Ⅲ"
+  },
+  "9bc09751": {
+    "key": "TXT_SMN_So1b00_2",
+    "text": "双足飞龙Ⅱ"
+  },
+  "9d5c27de": {
+    "key": "TXT_SMN_So3700_2",
+    "text": "贝希摩斯Ⅱ"
+  },
+  "9f0ecf8b": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "火龙布雷扎莱克Ⅲ"
+  },
+  "a062ec06": {
+    "key": "TXT_SMN_So1300",
+    "text": "朱罗刹"
+  },
+  "a0c96959": {
+    "key": "TXT_SMN_So5700_1",
+    "text": "骑空团联盟拉法尔"
+  },
+  "a34bdecb": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "世须良加Ⅲ"
+  },
+  "a40e64f4": {
+    "key": "TXT_SMN_So2700_2",
+    "text": "水之种Ⅱ"
+  },
+  "a4f63a8f": {
+    "key": "TXT_SMN_So5400_3",
+    "text": "希德霍姆兵Ⅲ"
+  },
+  "a608aecd": {
+    "key": "TXT_SMN_So5900",
+    "text": "裁判"
+  },
+  "a6bb6299": {
+    "key": "TXT_SMN_So1d00_3",
+    "text": "巨爪岩鳄Ⅲ"
+  },
+  "a7eff558": {
+    "key": "TXT_SMN_So9200",
+    "text": "别西卜"
+  },
+  "aa2bbdbf": {
+    "key": "TXT_SMN_So1c00_2",
+    "text": "老双足飞龙Ⅱ"
+  },
+  "ac20c821": {
+    "key": "TXT_SMN_So3800_2",
+    "text": "恩奴基Ⅱ"
+  },
+  "ad15d880": {
+    "key": "TXT_SMN_So4800",
+    "text": "伏尔甘博拉·虚无"
+  },
+  "ae52556d": {
+    "key": "TXT_SMN_So3200_2",
+    "text": "强袭型 机械武装·主机Ⅱ"
+  },
+  "b360dd8d": {
+    "key": "TXT_SMN_So4400_1",
+    "text": "沙漠死神"
+  },
+  "b3c2f3a4": {
+    "key": "TXT_SMN_So3200_1",
+    "text": "强袭型 机械武装·主机"
+  },
+  "b44a8a02": {
+    "key": "TXT_SMN_So4e00_3",
+    "text": "金枪鱼Ⅲ"
+  },
+  "b4cf26c6": {
+    "key": "TXT_SMN_So5400_1",
+    "text": "希德霍姆兵"
+  },
+  "b5449253": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "托付愿望的空之民"
+  },
+  "b79312a7": {
+    "key": "TXT_SMN_So3300_2",
+    "text": "巨石魔像Ⅱ"
+  },
+  "b960d2bb": {
+    "key": "TXT_SMN_So3b00_3",
+    "text": "冰龙威利努斯Ⅲ"
+  },
+  "b96cb87d": {
+    "key": "TXT_SMN_So2300_1",
+    "text": "目目连"
+  },
+  "bdd84e9a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "世须良加Ⅱ"
+  },
+  "bfac23dc": {
+    "key": "TXT_SMN_So3500_3",
+    "text": "狮鹫Ⅲ"
+  },
+  "c1ccbc3c": {
+    "key": "TXT_SMN_So3600_2",
+    "text": "漆黑猛禽Ⅱ"
+  },
+  "c2f91a7f": {
+    "key": "TXT_SMN_So1100_3",
+    "text": "哥布林勇士Ⅲ"
+  },
+  "c3e918f9": {
+    "key": "TXT_SMN_So2a00_1",
+    "text": "火精灵"
+  },
+  "c52147d4": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "巨爪霜鳄Ⅱ"
+  },
+  "ca95cd8c": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "胡拉坎"
+  },
+  "cc3c45f3": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "巨石魔像"
+  },
+  "ce0039d4": {
+    "key": "TXT_SMN_So3900_3",
+    "text": "远古巨龙Ⅲ"
+  },
+  "ce8e0b79": {
+    "key": "TXT_SMN_So5000_2",
+    "text": "托付愿望的空之民Ⅱ"
+  },
+  "d4ac8684": {
+    "key": "TXT_SMN_So3600_3",
+    "text": "漆黑猛禽Ⅲ"
+  },
+  "d5536ae8": {
+    "key": "TXT_SMN_So4b00_2",
+    "text": "玛纳加尔姆Ⅱ"
+  },
+  "d6387caa": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "哥布林角斗士Ⅱ"
+  },
+  "d751d8d2": {
+    "key": "TXT_SMN_So2a00_2",
+    "text": "火精灵Ⅱ"
+  },
+  "d7555b1f": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "神谕转轮Ⅱ"
+  },
+  "da0b6092": {
+    "key": "TXT_SMN_So5600_1",
+    "text": "玛洛斯僧兵"
+  },
+  "dbd2f84e": {
+    "key": "TXT_SMN_So4b00_3",
+    "text": "玛纳加尔姆Ⅲ"
+  },
+  "ddb21c31": {
+    "key": "TXT_SMN_So5100_1",
+    "text": "弗尔卡自卫团"
+  },
+  "dfab70b7": {
+    "key": "TXT_SMN_So4500",
+    "text": "莉莉丝"
+  },
+  "e24b4807": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "神谕转轮Ⅱ"
+  },
+  "e492e6bf": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "世须良加Ⅲ"
+  },
+  "e4b7dcf9": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "贝希摩斯Ⅲ"
+  },
+  "e51ce5b0": {
+    "key": "TXT_SMN_So4900_2",
+    "text": "胡拉坎Ⅱ"
+  },
+  "e528e76f": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "银史莱姆Ⅲ"
+  },
+  "e6ebb6fa": {
+    "key": "TXT_SMN_So5900",
+    "text": "裁判"
+  },
+  "e7f607dc": {
+    "key": "TXT_SMN_So4400_2",
+    "text": "沙漠死神Ⅱ"
+  },
+  "ebeb3dc0": {
+    "key": "TXT_SMN_So1900_1",
+    "text": "群居狼"
+  },
+  "eeea2080": {
+    "key": "TXT_SMN_So1900_2",
+    "text": "群居狼Ⅱ"
+  },
+  "ef554891": {
+    "key": "TXT_SMN_So2200_2",
+    "text": "赛伊格亚Ⅱ"
+  },
+  "ef973d88": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "白狼兵团"
+  },
+  "f1c229f7": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "火龙布雷扎莱克Ⅱ"
+  },
+  "f1fc31c4": {
+    "key": "TXT_SMN_So5100_2",
+    "text": "弗尔卡自卫团Ⅱ"
+  },
+  "f28d0e35": {
+    "key": "TXT_SMN_So6300_3",
+    "text": "小钳蟹Ⅲ"
+  },
+  "f2be819e": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "火龙布雷扎莱克Ⅲ"
+  },
+  "f32aa7a7": {
+    "key": "TXT_SMN_So5300_2",
+    "text": "扎斯巴家Ⅱ"
+  },
+  "f501285c": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "哥布林角斗士Ⅱ"
+  },
+  "f7eb57dd": {
+    "key": "TXT_SMN_So4e00_2",
+    "text": "金枪鱼Ⅱ"
+  },
+  "f7f2d161": {
+    "key": "TXT_SMN_So3500_2",
+    "text": "狮鹫Ⅱ"
+  },
+  "f862e7da": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "扎斯巴家"
+  },
+  "f98f8b97": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "巨爪焰鳄Ⅱ"
+  },
+  "fc8444a1": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "死骸格拉森Ⅱ"
+  },
+  "fc8a2ecb": {
+    "key": "TXT_SMN_So3d00_3",
+    "text": "风龙伊尔西亚斯Ⅲ"
+  },
+  "fd5fb92b": {
+    "key": "TXT_SMN_So1100_2",
+    "text": "哥布林勇士Ⅱ"
+  },
+  "ff513849": {
+    "key": "TXT_SMN_So3d00_2",
+    "text": "风龙伊尔西亚斯Ⅱ"
+  }
+}

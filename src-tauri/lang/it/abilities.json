@@ -1,0 +1,1918 @@
+{
+  "0026ab65": {
+    "key": "AB_PL2700_06",
+    "text": "Mai arrendersi"
+  },
+  "00667f3e": {
+    "key": "AB_PL0400_01_CG",
+    "text": "Venti curativi"
+  },
+  "00aace55": {
+    "key": "AB_PL1100_02",
+    "text": "L'Ombre d'Hier"
+  },
+  "00f6213e": {
+    "key": "AB_PL0600_01",
+    "text": "Scia"
+  },
+  "01051e0b": {
+    "key": "AB_PL1000_07",
+    "text": "Autorità reale"
+  },
+  "01439452": {
+    "key": "AB_PL1000_03",
+    "text": "X-Seele"
+  },
+  "01449bb2": {
+    "key": "AB_PL1200_08_CG",
+    "text": "Scala sacra"
+  },
+  "017117e8": {
+    "key": "AB_PL2700_01",
+    "text": "Morte lenta"
+  },
+  "026e43b2": {
+    "key": "AB_PL0900_03_CG",
+    "text": "Irruzione"
+  },
+  "02aee83e": {
+    "key": "AB_PL2100_08_CG",
+    "text": "Prigione eterea"
+  },
+  "02f9b06a": {
+    "key": "AB_PL2800_03_CG",
+    "text": "Indomabile"
+  },
+  "0352fa56": {
+    "key": "AB_PL2500_06_CG",
+    "text": "Notturno"
+  },
+  "038bf7b3": {
+    "key": "AB_PL1500_06_CG",
+    "text": "Pressa infernale"
+  },
+  "03bd9249": {
+    "key": "AB_PL1200_03_CG",
+    "text": "Taglio ascendente"
+  },
+  "03e4d1bc": {
+    "key": "AB_PL0700_03",
+    "text": "Attacca, Geegee!"
+  },
+  "050ddce6": {
+    "key": "AB_PL0900_04",
+    "text": "Disarmo"
+  },
+  "05359b18": {
+    "key": "AB_PL0800_07",
+    "text": "Schwertgeist"
+  },
+  "05ce9ce6": {
+    "key": "AB_PL1200_04",
+    "text": "Postura valorosa"
+  },
+  "05e3941c": {
+    "key": "AB_PL0200_07_CG",
+    "text": "Lama glaciale"
+  },
+  "06e91fc3": {
+    "key": "AB_PL2900_01_CG",
+    "text": "Spezzanima"
+  },
+  "07692e4d": {
+    "key": "AB_PL1300_01_CG",
+    "text": "Risveglio"
+  },
+  "07a7ec0f": {
+    "key": "AB_PL0400_02_CG",
+    "text": "Congelamento"
+  },
+  "088a1d08": {
+    "key": "AB_PL1500_03",
+    "text": "Spallata di ferro"
+  },
+  "0954d8f1": {
+    "key": "AB_PL0900_01_CG",
+    "text": "Bastione"
+  },
+  "096fb0b5": {
+    "key": "AB_PL0000_02_CG",
+    "text": "Anticorazza"
+  },
+  "099abf09": {
+    "key": "AB_PL0300_05",
+    "text": "Becchino"
+  },
+  "09c256cf": {
+    "key": "AB_PL1000_05_CG",
+    "text": "Träumerei"
+  },
+  "09fa329e": {
+    "key": "AB_PL1600_03_CG",
+    "text": "Lancia di Arvess"
+  },
+  "0a487f81": {
+    "key": "AB_PL2500_07_CG",
+    "text": "Ritmo sostenuto"
+  },
+  "0a87f009": {
+    "key": "AB_PL2900_03_CG",
+    "text": "Calamità imminente"
+  },
+  "0adac47b": {
+    "key": "AB_PL1400_04",
+    "text": "Spicchio di luna"
+  },
+  "0af90b6d": {
+    "key": "AB_PL1900_03",
+    "text": "Espiazione"
+  },
+  "0b04fd2a": {
+    "key": "AB_NP0000_01",
+    "text": "Acque curative"
+  },
+  "0b1bb3fb": {
+    "key": "AB_PL2100_06",
+    "text": "Solitudine celeste"
+  },
+  "0b84f88d": {
+    "key": "AB_PL2800_08",
+    "text": "Propulsione energetica"
+  },
+  "0bd7b2e1": {
+    "key": "AB_PL2200_05",
+    "text": "Prisión de Armas"
+  },
+  "0c33610c": {
+    "key": "AB_PL1900_06_CG",
+    "text": "Quadrupla vendetta"
+  },
+  "0c722622": {
+    "key": "AB_PL2700_06_CG",
+    "text": "Mai arrendersi"
+  },
+  "0d78aa71": {
+    "key": "AB_PL2400_06_CG",
+    "text": "Lampo diretto"
+  },
+  "0d88c2f5": {
+    "key": "AB_PL2300_07_CG",
+    "text": "Occhio infallibile"
+  },
+  "0e0872ae": {
+    "key": "AB_PL1300_05_CG",
+    "text": "Rappresaglia"
+  },
+  "0e63035b": {
+    "key": "AB_PL2200_06_CG",
+    "text": "Despedazar"
+  },
+  "0f41d9b0": {
+    "key": "AB_PL1500_06",
+    "text": "Pressa infernale"
+  },
+  "0fa608e7": {
+    "key": "AB_PL1700_04_CG",
+    "text": "Dolore immortale"
+  },
+  "1031dbd0": {
+    "key": "AB_PL2100_07",
+    "text": "Talviyö"
+  },
+  "10ee82bb": {
+    "key": "AB_PL1800_05_CG",
+    "text": "Perturbazione"
+  },
+  "10fae6ab": {
+    "key": "AB_PL2800_06",
+    "text": "Calcio in picchiata"
+  },
+  "1263f6c4": {
+    "key": "AB_PL0000_16_CG",
+    "text": "Sostituzione"
+  },
+  "12a18828": {
+    "key": "AB_PL1800_02",
+    "text": "Mehen"
+  },
+  "12f12cac": {
+    "key": "AB_PL0900_01",
+    "text": "Bastione"
+  },
+  "1333a09a": {
+    "key": "AB_PL1100_06_CG",
+    "text": "Mirage"
+  },
+  "147b60f6": {
+    "key": "AB_PL0700_08_CG",
+    "text": "Umlauf"
+  },
+  "14dcdbb1": {
+    "key": "AB_PL2200_04_CG",
+    "text": "Ispirazione"
+  },
+  "16301075": {
+    "key": "AB_PL1100_03_CG",
+    "text": "Manigance"
+  },
+  "167179d2": {
+    "key": "AB_PL1300_05",
+    "text": "Rappresaglia"
+  },
+  "174fec8f": {
+    "key": "AB_PL0300_05_CG",
+    "text": "Becchino"
+  },
+  "18784cf8": {
+    "key": "AB_PL2000_01",
+    "text": "Reginleif recidivo"
+  },
+  "18ec0290": {
+    "key": "AB_PL1500_04_CG",
+    "text": "Avidya reale"
+  },
+  "198e6910": {
+    "key": "AB_PL2500_05_CG",
+    "text": "Persistenza"
+  },
+  "19a55d74": {
+    "key": "AB_PL1300_03",
+    "text": "Lama fugace"
+  },
+  "1a1b320c": {
+    "key": "AB_PL1500_05_CG",
+    "text": "Postura leonina"
+  },
+  "1a4a8013": {
+    "key": "AB_PL2300_05_CG",
+    "text": "Ruota della morte"
+  },
+  "1c7aa5cc": {
+    "key": "AB_PL0400_02",
+    "text": "Congelamento"
+  },
+  "1ca55616": {
+    "key": "AB_PL2300_08_CG",
+    "text": "Conflitto delle due corone"
+  },
+  "1d6f5c2d": {
+    "key": "AB_PL1400_01",
+    "text": "Kyokasuigetsu"
+  },
+  "1d756c75": {
+    "key": "AB_PL1100_02_CG",
+    "text": "L'Ombre d'Hier"
+  },
+  "1dd6b65d": {
+    "key": "AB_PL0900_03",
+    "text": "Irruzione"
+  },
+  "1deeb111": {
+    "key": "AB_PL1300_01",
+    "text": "Risveglio"
+  },
+  "1e4c06ec": {
+    "key": "AB_PL0000_09",
+    "text": "Nitidezza"
+  },
+  "1eaffc34": {
+    "key": "AB_PL2200_08_CG",
+    "text": "Lucentezza delle sette stelle"
+  },
+  "1edd396e": {
+    "key": "AB_PL0300_03_CG",
+    "text": "Doppio colpo"
+  },
+  "1f66f295": {
+    "key": "AB_PL2400_03_CG",
+    "text": "Prodigio della lancia"
+  },
+  "200663cb": {
+    "key": "AB_PL0400_04",
+    "text": "Pozzo gravitazionale"
+  },
+  "204e6f6a": {
+    "key": "AB_PL2100_01_CG",
+    "text": "Afflato vitale"
+  },
+  "2121698e": {
+    "key": "AB_PL0000_12_CG",
+    "text": "Rianimazione"
+  },
+  "2189f8ba": {
+    "key": "AB_PL2300_08",
+    "text": "Conflitto delle due corone"
+  },
+  "2229a8fa": {
+    "key": "AB_PL0800_03_CG",
+    "text": "Lawinensturm"
+  },
+  "2246eec2": {
+    "key": "AB_PL0500_07",
+    "text": "Proiettile curativo"
+  },
+  "239d49c4": {
+    "key": "AB_PL0800_01_CG",
+    "text": "Impulso di lama"
+  },
+  "23b4d574": {
+    "key": "AB_PL1900_04_CG",
+    "text": "Forma di Ragnarok"
+  },
+  "23f204b0": {
+    "key": "AB_PL0600_05_CG",
+    "text": "Vergine di ferro"
+  },
+  "241e1792": {
+    "key": "AB_PL1000_08",
+    "text": "Roter Wirbel"
+  },
+  "243ecbfc": {
+    "key": "AB_PL0300_06",
+    "text": "Nube da sparo"
+  },
+  "246a5485": {
+    "key": "AB_PL1700_01_CG",
+    "text": "Battaglioni del terrore"
+  },
+  "24b19804": {
+    "key": "AB_PL1200_03",
+    "text": "Taglio ascendente"
+  },
+  "24b49fe8": {
+    "key": "AB_PL2600_04",
+    "text": "Missione eterna"
+  },
+  "258b17c2": {
+    "key": "AB_PL2500_01_CG",
+    "text": "Vincastro miracoloso"
+  },
+  "267ff179": {
+    "key": "AB_PL2600_03",
+    "text": "Spada Embrasque"
+  },
+  "282fd588": {
+    "key": "AB_PL0800_03",
+    "text": "Lawinensturm"
+  },
+  "2a282e10": {
+    "key": "AB_PL1200_02_CG",
+    "text": "Assalto scintillante"
+  },
+  "2a60f8ca": {
+    "key": "AB_PL2600_08",
+    "text": "Nova nascente"
+  },
+  "2ae2fa9d": {
+    "key": "AB_PL1600_05",
+    "text": "Ali tarpate"
+  },
+  "2bd2830c": {
+    "key": "AB_PL0700_04_CG",
+    "text": "Benedizione"
+  },
+  "2ce998d1": {
+    "key": "AB_PL1100_04_CG",
+    "text": "Nelahnav"
+  },
+  "2cf1038c": {
+    "key": "AB_PL0000_05_CG",
+    "text": "Pioggia di frecce"
+  },
+  "2e064364": {
+    "key": "AB_PL1800_03",
+    "text": "Fantasmagoria"
+  },
+  "2ea1b3db": {
+    "key": "AB_PL0500_05",
+    "text": "Granata velenosa"
+  },
+  "2ecb1f0b": {
+    "key": "AB_PL0800_06",
+    "text": "Croce del sud"
+  },
+  "31e089b9": {
+    "key": "AB_PL2100_05",
+    "text": "Revontulet"
+  },
+  "32b4a16e": {
+    "key": "AB_PL0400_03",
+    "text": "Fulmine"
+  },
+  "33028d0b": {
+    "key": "AB_PL1600_07",
+    "text": "Millefiamme"
+  },
+  "3339d71e": {
+    "key": "AB_PL2400_02_CG",
+    "text": "Impatto distruttivo"
+  },
+  "34050fc6": {
+    "key": "AB_PL0500_03_CG",
+    "text": "Intercettazione"
+  },
+  "34222ea5": {
+    "key": "AB_PL2100_03",
+    "text": "Ecliptica"
+  },
+  "355b0df9": {
+    "key": "AB_PL2800_01",
+    "text": "Riduzione totale"
+  },
+  "35e894c3": {
+    "key": "AB_PL0600_04_CG",
+    "text": "Rosa spiraleggiante"
+  },
+  "3614971b": {
+    "key": "AB_PL1400_07",
+    "text": "Danza dei petali blu"
+  },
+  "367d13fd": {
+    "key": "AB_PL1900_08_CG",
+    "text": "Arcadia"
+  },
+  "38145c67": {
+    "key": "AB_PL0900_06_CG",
+    "text": "Eruzione d'anima"
+  },
+  "38278041": {
+    "key": "AB_PL2700_04_CG",
+    "text": "Ululato furioso"
+  },
+  "38b12f6a": {
+    "key": "AB_PL1900_05",
+    "text": "Flagello"
+  },
+  "390a6ec6": {
+    "key": "AB_PL1400_05",
+    "text": "Transeunte"
+  },
+  "393db908": {
+    "key": "AB_PL2900_04_CG",
+    "text": "Benedizione oscura"
+  },
+  "395e4823": {
+    "key": "AB_PL0600_06",
+    "text": "Amore perduto"
+  },
+  "3a23b561": {
+    "key": "AB_PL2200_03_CG",
+    "text": "Rottura"
+  },
+  "3a6c7767": {
+    "key": "AB_PL1700_04",
+    "text": "Dolore immortale"
+  },
+  "3ab14269": {
+    "key": "AB_PL2700_03_CG",
+    "text": "Giocare col fuoco"
+  },
+  "3b5c9f6d": {
+    "key": "AB_PL1700_01",
+    "text": "Battaglioni del terrore"
+  },
+  "3b6fa972": {
+    "key": "AB_PL0500_01_CG",
+    "text": "Sumrak"
+  },
+  "3bb98b51": {
+    "key": "AB_PL2200_08",
+    "text": "Lucentezza delle sette stelle"
+  },
+  "3bc21501": {
+    "key": "AB_PL1100_08_CG",
+    "text": "Rilascio draconico"
+  },
+  "3c111db7": {
+    "key": "AB_PL0000_04_CG",
+    "text": "Panacea"
+  },
+  "3cad2dd9": {
+    "key": "AB_PL1400_08",
+    "text": "Devozione assoluta"
+  },
+  "3cf50957": {
+    "key": "AB_PL0500_02",
+    "text": "Detonatore"
+  },
+  "3d4193db": {
+    "key": "AB_PL0400_01",
+    "text": "Venti curativi"
+  },
+  "3e0e9aff": {
+    "key": "AB_PL0700_07_CG",
+    "text": "Hinrichten"
+  },
+  "3eb33877": {
+    "key": "AB_PL0600_02",
+    "text": "Dominio rosa"
+  },
+  "3f4b5c9e": {
+    "key": "AB_PL2000_04",
+    "text": "Arcadia"
+  },
+  "3fe66b9d": {
+    "key": "AB_PL0500_04_CG",
+    "text": "Proiettile anticorazza"
+  },
+  "40193580": {
+    "key": "AB_PL2600_03_CG",
+    "text": "Spada Embrasque"
+  },
+  "41e3c434": {
+    "key": "AB_PL1400_06",
+    "text": "Danza dei petali rosa"
+  },
+  "42a43df8": {
+    "key": "AB_PL1400_08_CG",
+    "text": "Devozione assoluta"
+  },
+  "42d185d5": {
+    "key": "AB_PL0000_06",
+    "text": "Foschia funesta"
+  },
+  "42dec04d": {
+    "key": "AB_PL2800_05_CG",
+    "text": "Lande mortali"
+  },
+  "430aecc1": {
+    "key": "AB_PL0500_02_CG",
+    "text": "Detonatore"
+  },
+  "430f5db4": {
+    "key": "AB_PL2400_02",
+    "text": "Impatto distruttivo"
+  },
+  "4347ae3a": {
+    "key": "AB_PL1400_05_CG",
+    "text": "Transeunte"
+  },
+  "436c3066": {
+    "key": "AB_PL0300_06_CG",
+    "text": "Nube da sparo"
+  },
+  "44f5c74f": {
+    "key": "AB_PL2800_05",
+    "text": "Lande mortali"
+  },
+  "47baeea5": {
+    "key": "AB_PL2400_05_CG",
+    "text": "Calma e sangue caldo"
+  },
+  "47ef96a1": {
+    "key": "AB_PL0500_08_CG",
+    "text": "Destabilizzatore"
+  },
+  "48016ff5": {
+    "key": "AB_PL2000_01_CG",
+    "text": "Reginleif recidivo"
+  },
+  "484b29f5": {
+    "key": "AB_PL2800_03",
+    "text": "Indomabile"
+  },
+  "496b938b": {
+    "key": "AB_PL1700_07_CG",
+    "text": "Eclissi tenebrosa"
+  },
+  "49c924a2": {
+    "key": "AB_PL0000_01_CG",
+    "text": "Decimazione"
+  },
+  "4a821f93": {
+    "key": "AB_PL2400_08_CG",
+    "text": "Corazza dispiegata"
+  },
+  "4acd4edd": {
+    "key": "AB_PL2800_06_CG",
+    "text": "Calcio in picchiata"
+  },
+  "4ba37b99": {
+    "key": "AB_PL0200_05_CG",
+    "text": "Spada azzurra"
+  },
+  "4bc55ee0": {
+    "key": "AB_PL2400_07",
+    "text": "Spaccateste"
+  },
+  "4c13102e": {
+    "key": "AB_PL2400_06",
+    "text": "Lampo diretto"
+  },
+  "4d081111": {
+    "key": "AB_PL2900_08_CG",
+    "text": "Sfera dell'inversione"
+  },
+  "4d598bbd": {
+    "key": "AB_PL0300_07",
+    "text": "Scheggia"
+  },
+  "4e665c18": {
+    "key": "AB_PL0700_05_CG",
+    "text": "Pendel"
+  },
+  "4f634ad4": {
+    "key": "AB_PL0000_16",
+    "text": "Sostituzione"
+  },
+  "4fc77dcb": {
+    "key": "AB_PL1700_06_CG",
+    "text": "Dannazione"
+  },
+  "5099cf81": {
+    "key": "AB_PL1800_07_CG",
+    "text": "Alexandria"
+  },
+  "511571ee": {
+    "key": "AB_PL0800_05",
+    "text": "Turbulenz"
+  },
+  "512cba53": {
+    "key": "AB_PL0700_04",
+    "text": "Benedizione"
+  },
+  "512ddb88": {
+    "key": "AB_PL1300_08",
+    "text": "Cielo infranto"
+  },
+  "51978338": {
+    "key": "AB_PL1400_04_CG",
+    "text": "Spicchio di luna"
+  },
+  "52e3eed1": {
+    "key": "AB_PL1600_04",
+    "text": "Impeto Signo"
+  },
+  "530600d2": {
+    "key": "AB_PL2800_04",
+    "text": "Opportunità"
+  },
+  "531e8994": {
+    "key": "AB_PL2100_03_CG",
+    "text": "Ecliptica"
+  },
+  "5349f8ae": {
+    "key": "AB_PL1400_06_CG",
+    "text": "Danza dei petali rosa"
+  },
+  "53705c60": {
+    "key": "AB_PL2700_08_CG",
+    "text": "Crolla il paradiso"
+  },
+  "538572d0": {
+    "key": "AB_PL0000_02",
+    "text": "Anticorazza"
+  },
+  "542f400f": {
+    "key": "AB_PL2100_01",
+    "text": "Afflato vitale"
+  },
+  "547c38ae": {
+    "key": "AB_PL2500_05",
+    "text": "Persistenza"
+  },
+  "552650d3": {
+    "key": "AB_PL0800_02_CG",
+    "text": "Kaltzwinger"
+  },
+  "55289dfa": {
+    "key": "AB_PL2800_08_CG",
+    "text": "Propulsione energetica"
+  },
+  "55aedf7b": {
+    "key": "AB_PL2500_03",
+    "text": "Fucilata letale"
+  },
+  "5611a30e": {
+    "key": "AB_PL1100_01_CG",
+    "text": "Uwe"
+  },
+  "586a0bff": {
+    "key": "AB_PL1000_07_CG",
+    "text": "Autorità reale"
+  },
+  "58e10372": {
+    "key": "AB_PL1200_08",
+    "text": "Scala sacra"
+  },
+  "5a02a6c9": {
+    "key": "AB_PL2600_02_CG",
+    "text": "Cacciastelle"
+  },
+  "5a356634": {
+    "key": "AB_PL1100_07",
+    "text": "Verdrängen"
+  },
+  "5acc7a93": {
+    "key": "AB_PL1300_06",
+    "text": "Inno dei cento"
+  },
+  "5b0fb261": {
+    "key": "AB_PL2300_06_CG",
+    "text": "Pioggia letale"
+  },
+  "5b42826c": {
+    "key": "AB_PL1800_08",
+    "text": "Dolore travolgente"
+  },
+  "5b4d43df": {
+    "key": "AB_PL1700_03_CG",
+    "text": "Falcione Grynoth"
+  },
+  "5c1519f8": {
+    "key": "AB_PL0300_01",
+    "text": "Sputafuoco"
+  },
+  "5ccca979": {
+    "key": "AB_PL0700_01_CG",
+    "text": "Purificazione"
+  },
+  "5ce11765": {
+    "key": "AB_PL0700_08",
+    "text": "Umlauf"
+  },
+  "5d19bbe2": {
+    "key": "AB_PL0800_04",
+    "text": "Blauer Dolch"
+  },
+  "5d39ff76": {
+    "key": "AB_PL1300_02",
+    "text": "Nebbia impalpabile"
+  },
+  "5f4c5757": {
+    "key": "AB_PL2000_03",
+    "text": "Insaziabile"
+  },
+  "609208dc": {
+    "key": "AB_PL0500_07_CG",
+    "text": "Proiettile curativo"
+  },
+  "62aab75d": {
+    "key": "AB_PL1100_01",
+    "text": "Uwe"
+  },
+  "642b9935": {
+    "key": "AB_PL2400_05",
+    "text": "Calma e sangue caldo"
+  },
+  "64a6c124": {
+    "key": "AB_PL0400_05",
+    "text": "Fuoco"
+  },
+  "65083f2d": {
+    "key": "AB_PL0400_06",
+    "text": "Focalizzazione"
+  },
+  "6570a2d5": {
+    "key": "AB_PL0600_01_CG",
+    "text": "Scia"
+  },
+  "657b3a08": {
+    "key": "AB_PL1800_08_CG",
+    "text": "Dolore travolgente"
+  },
+  "66b7cf9c": {
+    "key": "AB_PL0000_12",
+    "text": "Rianimazione"
+  },
+  "66e797cc": {
+    "key": "AB_PL0200_03",
+    "text": "Cura"
+  },
+  "67270513": {
+    "key": "AB_PL1600_02",
+    "text": "Pioggia furente"
+  },
+  "6848b8fc": {
+    "key": "AB_PL1300_08_CG",
+    "text": "Cielo infranto"
+  },
+  "6891463e": {
+    "key": "AB_PL1000_05",
+    "text": "Träumerei"
+  },
+  "69ddef59": {
+    "key": "AB_PL1800_06_CG",
+    "text": "Rhizomata"
+  },
+  "69fcecc3": {
+    "key": "AB_PL1200_06",
+    "text": "Invincibilità"
+  },
+  "6a068d8c": {
+    "key": "AB_PL1800_03_CG",
+    "text": "Fantasmagoria"
+  },
+  "6aa831f7": {
+    "key": "AB_PL2400_08",
+    "text": "Corazza dispiegata"
+  },
+  "6b21afbb": {
+    "key": "AB_PL2500_07",
+    "text": "Ritmo sostenuto"
+  },
+  "6b4f3e86": {
+    "key": "AB_PL2200_05_CG",
+    "text": "Prisión de Armas"
+  },
+  "6b54f359": {
+    "key": "AB_PL1500_05",
+    "text": "Postura leonina"
+  },
+  "6b96ca56": {
+    "key": "AB_PL2600_04_CG",
+    "text": "Missione eterna"
+  },
+  "6cfcc852": {
+    "key": "AB_PL0800_07_CG",
+    "text": "Schwertgeist"
+  },
+  "6dc4e1e2": {
+    "key": "AB_PL1800_01_CG",
+    "text": "Bambola mimo"
+  },
+  "6e8e210a": {
+    "key": "AB_PL2200_03",
+    "text": "Rottura"
+  },
+  "6fb5fbda": {
+    "key": "AB_PL2800_02",
+    "text": "Incubo cremisi"
+  },
+  "6fd0843a": {
+    "key": "AB_PL0000_10",
+    "text": "Reginleif"
+  },
+  "705a6a63": {
+    "key": "AB_PL2200_04",
+    "text": "Ispirazione"
+  },
+  "70b2eb23": {
+    "key": "AB_PL1000_03_CG",
+    "text": "X-Seele"
+  },
+  "70fe4df6": {
+    "key": "AB_PL1000_04",
+    "text": "Zerreissen"
+  },
+  "71b81b9c": {
+    "key": "AB_PL0200_06",
+    "text": "Muro di luce"
+  },
+  "71f1824e": {
+    "key": "AB_PL1700_08_CG",
+    "text": "Collera infernale"
+  },
+  "724636a8": {
+    "key": "AB_PL2900_05",
+    "text": "Fonte di terrore"
+  },
+  "74085f2c": {
+    "key": "AB_PL0900_07_CG",
+    "text": "Energia distruttiva"
+  },
+  "746f18a4": {
+    "key": "AB_PL2600_05",
+    "text": "Cuori in fiamme"
+  },
+  "74a1fadd": {
+    "key": "AB_PL1200_01_CG",
+    "text": "Königsschild"
+  },
+  "75043b52": {
+    "key": "AB_PL1800_01",
+    "text": "Bambola mimo"
+  },
+  "7590b485": {
+    "key": "AB_PL0700_02_CG",
+    "text": "Blaues Gespenst"
+  },
+  "75d65667": {
+    "key": "AB_PL1100_08",
+    "text": "Rilascio draconico"
+  },
+  "761b6e0d": {
+    "key": "AB_PL0200_08_CG",
+    "text": "Scudo di smeraldo"
+  },
+  "772fa1d5": {
+    "key": "AB_PL0500_03",
+    "text": "Intercettazione"
+  },
+  "775825fc": {
+    "key": "AB_PL2700_05_CG",
+    "text": "Corsia di sorpasso"
+  },
+  "78483cac": {
+    "key": "AB_PL0000_03_CG",
+    "text": "Falange"
+  },
+  "798047ba": {
+    "key": "AB_PL0200_02_CG",
+    "text": "Pioggia invernale"
+  },
+  "79a07d8e": {
+    "key": "AB_PL0200_04",
+    "text": "Venti sacri"
+  },
+  "7c0f49fb": {
+    "key": "AB_PL2300_02",
+    "text": "Depravazione"
+  },
+  "7c63d77a": {
+    "key": "AB_PL0300_02",
+    "text": "Pioggia di proiettili"
+  },
+  "7d60a4be": {
+    "key": "AB_PL2800_04_CG",
+    "text": "Opportunità"
+  },
+  "7da113ff": {
+    "key": "AB_PL1600_08_CG",
+    "text": "Maestà del regno"
+  },
+  "7dc36a6f": {
+    "key": "AB_PL1200_05_CG",
+    "text": "Tecnica sacra"
+  },
+  "7ea722fc": {
+    "key": "AB_PL1700_06",
+    "text": "Dannazione"
+  },
+  "7eb5a896": {
+    "key": "AB_PL0800_01",
+    "text": "Impulso di lama"
+  },
+  "7f0888f3": {
+    "key": "AB_PL0400_07_CG",
+    "text": "Sette fiori"
+  },
+  "7f3b7770": {
+    "key": "AB_PL2400_07_CG",
+    "text": "Spaccateste"
+  },
+  "7f66d413": {
+    "key": "AB_PL0600_08_CG",
+    "text": "Bouquet"
+  },
+  "7f683594": {
+    "key": "AB_PL2300_01",
+    "text": "Luce mercuriale"
+  },
+  "7f7e4a32": {
+    "key": "AB_PL2400_09_CG",
+    "text": "Grande zanna scintillante"
+  },
+  "802b537f": {
+    "key": "AB_PL1900_03_CG",
+    "text": "Espiazione"
+  },
+  "810c11e9": {
+    "key": "AB_PL2100_06_CG",
+    "text": "Solitudine celeste"
+  },
+  "8121f2bf": {
+    "key": "AB_PL1700_03",
+    "text": "Falcione Grynoth"
+  },
+  "81541335": {
+    "key": "AB_PL1800_02_CG",
+    "text": "Mehen"
+  },
+  "8172bd0a": {
+    "key": "AB_PL2000_04_CG",
+    "text": "Arcadia"
+  },
+  "82695b1e": {
+    "key": "AB_PL0700_07",
+    "text": "Hinrichten"
+  },
+  "84174bdd": {
+    "key": "AB_PL1500_08",
+    "text": "Dhyana"
+  },
+  "847f91ee": {
+    "key": "AB_PL2500_08_CG",
+    "text": "Canto valoroso"
+  },
+  "84e6c459": {
+    "key": "AB_PL1000_06_CG",
+    "text": "Macht"
+  },
+  "85c06563": {
+    "key": "AB_PL1800_04",
+    "text": "Rinforzo"
+  },
+  "869bd124": {
+    "key": "AB_NP0000_02",
+    "text": "Terra rigeneratrice"
+  },
+  "87288538": {
+    "key": "AB_PL0200_05",
+    "text": "Spada azzurra"
+  },
+  "87d51ba4": {
+    "key": "AB_PL2800_07",
+    "text": "Splendore"
+  },
+  "88156149": {
+    "key": "AB_PL2700_01_CG",
+    "text": "Morte lenta"
+  },
+  "88bcd098": {
+    "key": "AB_PL0900_08",
+    "text": "Drachenstolz"
+  },
+  "88d0f523": {
+    "key": "AB_PL0000_13_CG",
+    "text": "Velo"
+  },
+  "8abdf3d7": {
+    "key": "AB_PL0400_05_CG",
+    "text": "Fuoco"
+  },
+  "8ae4a7a0": {
+    "key": "AB_PL1400_07_CG",
+    "text": "Danza dei petali blu"
+  },
+  "8aea1313": {
+    "key": "AB_NP0300_02",
+    "text": "Geyser sacro"
+  },
+  "8b70dd12": {
+    "key": "AB_PL1000_06",
+    "text": "Macht"
+  },
+  "8c3c7ddc": {
+    "key": "AB_PL1600_06",
+    "text": "Fiamma vendicativa"
+  },
+  "8c4d811c": {
+    "key": "AB_PL0600_04",
+    "text": "Rosa spiraleggiante"
+  },
+  "8cbe0423": {
+    "key": "AB_PL0700_05",
+    "text": "Pendel"
+  },
+  "8dc8a58f": {
+    "key": "AB_PL1800_04_CG",
+    "text": "Rinforzo"
+  },
+  "8e7cd4ac": {
+    "key": "AB_PL2100_02_CG",
+    "text": "Senza uscita"
+  },
+  "8ef93263": {
+    "key": "AB_PL0200_03_CG",
+    "text": "Cura"
+  },
+  "8efe9bbb": {
+    "key": "AB_PL2600_06_CG",
+    "text": "Falco tonante"
+  },
+  "8f187f08": {
+    "key": "AB_PL0600_08",
+    "text": "Bouquet"
+  },
+  "8f4e9d6f": {
+    "key": "AB_PL2900_01",
+    "text": "Spezzanima"
+  },
+  "8ffd7823": {
+    "key": "AB_PL1300_03_CG",
+    "text": "Lama fugace"
+  },
+  "900b11f1": {
+    "key": "AB_PL2700_02_CG",
+    "text": "Per sempre tuo"
+  },
+  "90534c5b": {
+    "key": "AB_PL0400_06_CG",
+    "text": "Focalizzazione"
+  },
+  "90c49270": {
+    "key": "AB_PL1700_08",
+    "text": "Collera infernale"
+  },
+  "90e19c7d": {
+    "key": "AB_PL1200_07_CG",
+    "text": "Spada di Lumiere"
+  },
+  "910c4eef": {
+    "key": "AB_PL1900_05_CG",
+    "text": "Flagello"
+  },
+  "915b5131": {
+    "key": "AB_PL2400_03",
+    "text": "Prodigio della lancia"
+  },
+  "916f100f": {
+    "key": "AB_PL0600_07_CG",
+    "text": "Barriera rosea"
+  },
+  "91d8e40b": {
+    "key": "AB_PL2500_02",
+    "text": "Maglio del fulmine"
+  },
+  "920dd8b3": {
+    "key": "AB_PL0800_02",
+    "text": "Kaltzwinger"
+  },
+  "92214b36": {
+    "key": "AB_PL0400_04_CG",
+    "text": "Pozzo gravitazionale"
+  },
+  "94b29689": {
+    "key": "AB_PL1100_03",
+    "text": "Manigance"
+  },
+  "94da6b12": {
+    "key": "AB_PL0700_06",
+    "text": "Strafe"
+  },
+  "9571317d": {
+    "key": "AB_PL1300_06_CG",
+    "text": "Inno dei cento"
+  },
+  "95ae7091": {
+    "key": "AB_PL2800_01_CG",
+    "text": "Riduzione totale"
+  },
+  "95e40e12": {
+    "key": "AB_PL1600_01",
+    "text": "Infinite meraviglie"
+  },
+  "962506f1": {
+    "key": "AB_PL0300_01_CG",
+    "text": "Sputafuoco"
+  },
+  "966f4a6f": {
+    "key": "AB_PL2400_01",
+    "text": "Lancia recriminante"
+  },
+  "967964c1": {
+    "key": "AB_PL0000_05",
+    "text": "Pioggia di frecce"
+  },
+  "967c9abc": {
+    "key": "AB_PL1500_07",
+    "text": "Furia perpetua"
+  },
+  "968220fa": {
+    "key": "AB_PL1900_07",
+    "text": "Insaziabile"
+  },
+  "974342aa": {
+    "key": "AB_PL1600_03",
+    "text": "Lancia di Arvess"
+  },
+  "97fe7dc9": {
+    "key": "AB_PL2600_01_CG",
+    "text": "Spirito libero"
+  },
+  "981a10bc": {
+    "key": "AB_PL2900_02",
+    "text": "Artigli dell'inversione"
+  },
+  "98309953": {
+    "key": "AB_PL1900_04",
+    "text": "Forma di Ragnarok"
+  },
+  "9887f9a4": {
+    "key": "AB_PL2600_01",
+    "text": "Spirito libero"
+  },
+  "98e1b356": {
+    "key": "AB_PL1000_02",
+    "text": "Flammenmarsch"
+  },
+  "995f3cb4": {
+    "key": "AB_PL2800_07_CG",
+    "text": "Splendore"
+  },
+  "9abfc62c": {
+    "key": "AB_PL2700_04",
+    "text": "Ululato furioso"
+  },
+  "9ac21d84": {
+    "key": "AB_PL2700_05",
+    "text": "Corsia di sorpasso"
+  },
+  "9b1826be": {
+    "key": "AB_PL0000_14_CG",
+    "text": "Dissipazione"
+  },
+  "9b9eef73": {
+    "key": "AB_PL1500_08_CG",
+    "text": "Dhyana"
+  },
+  "9bd470fc": {
+    "key": "AB_PL0900_02_CG",
+    "text": "Fendivarco"
+  },
+  "9cb7fa23": {
+    "key": "AB_PL1600_04_CG",
+    "text": "Impeto Signo"
+  },
+  "9dee4d38": {
+    "key": "AB_PL0000_10_CG",
+    "text": "Reginleif"
+  },
+  "9e6f273b": {
+    "key": "AB_PL2500_02_CG",
+    "text": "Maglio del fulmine"
+  },
+  "9e8a1562": {
+    "key": "AB_PL2900_07_CG",
+    "text": "Voragine miasmatica"
+  },
+  "9ed935a6": {
+    "key": "AB_PL2600_08_CG",
+    "text": "Nova nascente"
+  },
+  "9f1539d2": {
+    "key": "AB_PL0200_07",
+    "text": "Lama glaciale"
+  },
+  "9fed6cf3": {
+    "key": "AB_PL0200_01",
+    "text": "Terre incantate"
+  },
+  "a0ebb136": {
+    "key": "AB_PL0000_08_CG",
+    "text": "Picco di carica"
+  },
+  "a3b52f17": {
+    "key": "AB_PL1300_04_CG",
+    "text": "Rotazione perpetua"
+  },
+  "a44b77a1": {
+    "key": "AB_PL0700_01",
+    "text": "Purificazione"
+  },
+  "a4d546ab": {
+    "key": "AB_PL0800_08",
+    "text": "Luftspiegelung"
+  },
+  "a5391991": {
+    "key": "AB_PL2700_07",
+    "text": "Tuono Flamek"
+  },
+  "a5f5e86c": {
+    "key": "AB_PL0300_04",
+    "text": "Durata"
+  },
+  "a662c045": {
+    "key": "AB_PL1100_04",
+    "text": "Nelahnav"
+  },
+  "a6776518": {
+    "key": "AB_PL0000_15_CG",
+    "text": "Conduzione"
+  },
+  "a6b54953": {
+    "key": "AB_PL2300_06",
+    "text": "Pioggia letale"
+  },
+  "a75a4c15": {
+    "key": "AB_PL1500_02_CG",
+    "text": "Marchio del palmo"
+  },
+  "a7c5a324": {
+    "key": "AB_PL2100_08",
+    "text": "Prigione eterea"
+  },
+  "a7eb9e69": {
+    "key": "AB_PL2200_02",
+    "text": "Infinito creare"
+  },
+  "a8dd5b10": {
+    "key": "AB_PL1600_08",
+    "text": "Maestà del regno"
+  },
+  "a8fe63f7": {
+    "key": "AB_PL0300_04_CG",
+    "text": "Durata"
+  },
+  "aa6e61e5": {
+    "key": "AB_PL2700_02",
+    "text": "Per sempre tuo"
+  },
+  "abab2642": {
+    "key": "AB_PL2200_06",
+    "text": "Despedazar"
+  },
+  "abd5990a": {
+    "key": "AB_PL1500_02",
+    "text": "Marchio del palmo"
+  },
+  "abfe9091": {
+    "key": "AB_PL0000_15",
+    "text": "Conduzione"
+  },
+  "ac89b2c5": {
+    "key": "AB_PL1100_05_CG",
+    "text": "Salvator"
+  },
+  "ad1eb226": {
+    "key": "AB_PL0300_07_CG",
+    "text": "Scheggia"
+  },
+  "aea6d151": {
+    "key": "AB_PL2700_08",
+    "text": "Crolla il paradiso"
+  },
+  "b09eac4c": {
+    "key": "AB_PL2900_06",
+    "text": "Funerale nefasto"
+  },
+  "b116a81b": {
+    "key": "AB_PL2700_07_CG",
+    "text": "Tuono Flamek"
+  },
+  "b132100b": {
+    "key": "AB_PL1900_06",
+    "text": "Quadrupla vendetta"
+  },
+  "b1c60cab": {
+    "key": "AB_PL2900_08",
+    "text": "Sfera dell'inversione"
+  },
+  "b2795ca0": {
+    "key": "AB_PL2900_03",
+    "text": "Calamità imminente"
+  },
+  "b28d2735": {
+    "key": "AB_PL1400_03",
+    "text": "Apice della vacuità"
+  },
+  "b2f74994": {
+    "key": "AB_PL0000_08",
+    "text": "Picco di carica"
+  },
+  "b3f51b27": {
+    "key": "AB_PL0400_03_CG",
+    "text": "Fulmine"
+  },
+  "b40ccd9c": {
+    "key": "AB_PL0400_08",
+    "text": "Vortice mistico"
+  },
+  "b5225a30": {
+    "key": "AB_PL2300_02_CG",
+    "text": "Depravazione"
+  },
+  "b54c90e4": {
+    "key": "AB_PL0500_04",
+    "text": "Proiettile anticorazza"
+  },
+  "b63c6cf3": {
+    "key": "AB_PL0900_08_CG",
+    "text": "Drachenstolz"
+  },
+  "b777aade": {
+    "key": "AB_PL2000_03_CG",
+    "text": "Insaziabile"
+  },
+  "b83b43a3": {
+    "key": "AB_PL2300_03_CG",
+    "text": "Fattore chiave"
+  },
+  "b85aa34f": {
+    "key": "AB_PL2600_06",
+    "text": "Falco tonante"
+  },
+  "b924b87b": {
+    "key": "AB_PL2900_02_CG",
+    "text": "Artigli dell'inversione"
+  },
+  "b97bd8d4": {
+    "key": "AB_PL1800_06",
+    "text": "Rhizomata"
+  },
+  "b9c0abb5": {
+    "key": "AB_PL2400_01_CG",
+    "text": "Lancia recriminante"
+  },
+  "b9c33c89": {
+    "key": "AB_PL2500_01",
+    "text": "Vincastro miracoloso"
+  },
+  "b9e9ed9f": {
+    "key": "AB_PL0900_05",
+    "text": "Colpo eroico"
+  },
+  "bad9baa3": {
+    "key": "AB_PL0000_01",
+    "text": "Decimazione"
+  },
+  "bb425ac9": {
+    "key": "AB_PL2300_05",
+    "text": "Ruota della morte"
+  },
+  "bba467c0": {
+    "key": "AB_PL2300_03",
+    "text": "Fattore chiave"
+  },
+  "bbe2476b": {
+    "key": "AB_PL2000_02_CG",
+    "text": "Flagello"
+  },
+  "bbfb2829": {
+    "key": "AB_PL2500_03_CG",
+    "text": "Fucilata letale"
+  },
+  "bc2ef1d8": {
+    "key": "AB_PL2400_09",
+    "text": "Grande zanna scintillante"
+  },
+  "bc4ebf36": {
+    "key": "AB_PL0900_07",
+    "text": "Energia distruttiva"
+  },
+  "bcb4c311": {
+    "key": "AB_PL1500_01",
+    "text": "Flagello celeste di Arhat"
+  },
+  "bcc01262": {
+    "key": "AB_PL2400_04",
+    "text": "Lancia marziale"
+  },
+  "bce7d1a7": {
+    "key": "AB_PL0500_05_CG",
+    "text": "Granata velenosa"
+  },
+  "bd038b68": {
+    "key": "AB_PL1200_02",
+    "text": "Assalto scintillante"
+  },
+  "bd38e05b": {
+    "key": "AB_PL0900_06",
+    "text": "Eruzione d'anima"
+  },
+  "be054910": {
+    "key": "AB_PL1500_01_CG",
+    "text": "Flagello celeste di Arhat"
+  },
+  "be851bb6": {
+    "key": "AB_PL2200_01_CG",
+    "text": "Barrido"
+  },
+  "bec27092": {
+    "key": "AB_PL0600_02_CG",
+    "text": "Dominio rosa"
+  },
+  "c02cf1f8": {
+    "key": "AB_PL0000_09_CG",
+    "text": "Nitidezza"
+  },
+  "c07a8e90": {
+    "key": "AB_PL1200_05",
+    "text": "Tecnica sacra"
+  },
+  "c0fc8194": {
+    "key": "AB_PL2900_05_CG",
+    "text": "Fonte di terrore"
+  },
+  "c145162b": {
+    "key": "AB_PL1000_08_CG",
+    "text": "Roter Wirbel"
+  },
+  "c1974605": {
+    "key": "AB_PL0600_06_CG",
+    "text": "Amore perduto"
+  },
+  "c1d7660c": {
+    "key": "AB_PL1900_02",
+    "text": "Senza limiti"
+  },
+  "c3c3d59a": {
+    "key": "AB_PL2900_04",
+    "text": "Benedizione oscura"
+  },
+  "c3ccadf8": {
+    "key": "AB_PL0500_06",
+    "text": "Proiettile paralizzante"
+  },
+  "c3d7cd9d": {
+    "key": "AB_PL0700_06_CG",
+    "text": "Strafe"
+  },
+  "c3ed239e": {
+    "key": "AB_PL0300_08_CG",
+    "text": "Danni collaterali"
+  },
+  "c516d104": {
+    "key": "AB_PL1900_08",
+    "text": "Arcadia"
+  },
+  "c6629ae0": {
+    "key": "AB_PL2200_07",
+    "text": "Tempesta"
+  },
+  "c6b7a81b": {
+    "key": "AB_PL1000_04_CG",
+    "text": "Zerreissen"
+  },
+  "c6f4ccb1": {
+    "key": "AB_PL1100_05",
+    "text": "Salvator"
+  },
+  "c7db192c": {
+    "key": "AB_PL0600_03",
+    "text": "Incanto"
+  },
+  "c89937f2": {
+    "key": "AB_PL1600_05_CG",
+    "text": "Ali tarpate"
+  },
+  "caeeda5d": {
+    "key": "AB_PL1000_01",
+    "text": "Feuerangriff"
+  },
+  "cd6940de": {
+    "key": "AB_PL0600_05",
+    "text": "Vergine di ferro"
+  },
+  "cda2c9c8": {
+    "key": "AB_PL0900_05_CG",
+    "text": "Colpo eroico"
+  },
+  "ce6a60cf": {
+    "key": "AB_PL1700_07",
+    "text": "Eclissi tenebrosa"
+  },
+  "ceebae4a": {
+    "key": "AB_PL0700_02",
+    "text": "Blaues Gespenst"
+  },
+  "cf0b171b": {
+    "key": "AB_PL0600_07",
+    "text": "Barriera rosea"
+  },
+  "cfc77cc3": {
+    "key": "AB_PL2900_06_CG",
+    "text": "Funerale nefasto"
+  },
+  "d0768c6b": {
+    "key": "AB_PL0500_01",
+    "text": "Sumrak"
+  },
+  "d08a0a37": {
+    "key": "AB_NP0000_03",
+    "text": "Barriera blu"
+  },
+  "d0cc4740": {
+    "key": "AB_PL0800_05_CG",
+    "text": "Turbulenz"
+  },
+  "d113989a": {
+    "key": "AB_PL2900_07",
+    "text": "Voragine miasmatica"
+  },
+  "d16eeeea": {
+    "key": "AB_PL2600_07",
+    "text": "Spezzacatene"
+  },
+  "d27ee773": {
+    "key": "AB_PL1600_02_CG",
+    "text": "Pioggia furente"
+  },
+  "d457585d": {
+    "key": "AB_PL0500_08",
+    "text": "Destabilizzatore"
+  },
+  "d4698778": {
+    "key": "AB_PL1300_02_CG",
+    "text": "Nebbia impalpabile"
+  },
+  "d4c45d64": {
+    "key": "AB_PL0400_07",
+    "text": "Sette fiori"
+  },
+  "d58eee51": {
+    "key": "AB_PL2600_05_CG",
+    "text": "Cuori in fiamme"
+  },
+  "d59612b8": {
+    "key": "AB_PL0800_04_CG",
+    "text": "Blauer Dolch"
+  },
+  "d5d1bd18": {
+    "key": "AB_PL2500_08",
+    "text": "Canto valoroso"
+  },
+  "d6403105": {
+    "key": "AB_PL2500_06",
+    "text": "Notturno"
+  },
+  "d696964e": {
+    "key": "AB_PL1200_07",
+    "text": "Spada di Lumiere"
+  },
+  "d69b0b80": {
+    "key": "AB_PL0000_11_CG",
+    "text": "Stallo"
+  },
+  "d6ac18a7": {
+    "key": "AB_PL1600_06_CG",
+    "text": "Fiamma vendicativa"
+  },
+  "d6d6bcfb": {
+    "key": "AB_PL1700_02_CG",
+    "text": "Ombre violente"
+  },
+  "d712d990": {
+    "key": "AB_PL0300_03",
+    "text": "Doppio colpo"
+  },
+  "d716d50b": {
+    "key": "AB_PL0000_07_CG",
+    "text": "Furia"
+  },
+  "d71a616c": {
+    "key": "AB_PL1700_05",
+    "text": "Storie dimenticate"
+  },
+  "d7cc0564": {
+    "key": "AB_PL1300_07",
+    "text": "Vuoto abbagliante"
+  },
+  "d7e5a4fd": {
+    "key": "AB_PL2300_01_CG",
+    "text": "Luce mercuriale"
+  },
+  "d87e05cf": {
+    "key": "AB_PL2400_04_CG",
+    "text": "Lancia marziale"
+  },
+  "d8b2584c": {
+    "key": "AB_PL2100_07_CG",
+    "text": "Talviyö"
+  },
+  "d95b6aba": {
+    "key": "AB_PL2300_07",
+    "text": "Occhio infallibile"
+  },
+  "d99ad2ad": {
+    "key": "AB_PL2200_01",
+    "text": "Barrido"
+  },
+  "da7e9324": {
+    "key": "AB_PL0800_06_CG",
+    "text": "Croce del sud"
+  },
+  "da802603": {
+    "key": "AB_PL2100_04_CG",
+    "text": "Potere del singolo"
+  },
+  "da816022": {
+    "key": "AB_PL2300_04",
+    "text": "Intreccio valoroso"
+  },
+  "da860bd8": {
+    "key": "AB_PL2100_02",
+    "text": "Senza uscita"
+  },
+  "da9a0dfd": {
+    "key": "AB_PL0500_06_CG",
+    "text": "Proiettile paralizzante"
+  },
+  "dbbf87c1": {
+    "key": "AB_PL1200_04_CG",
+    "text": "Postura valorosa"
+  },
+  "dbe960dd": {
+    "key": "AB_PL0000_03",
+    "text": "Falange"
+  },
+  "dcedaf5e": {
+    "key": "AB_PL1100_07_CG",
+    "text": "Verdrängen"
+  },
+  "dd0e7f22": {
+    "key": "AB_PL0900_04_CG",
+    "text": "Disarmo"
+  },
+  "ddf7a53e": {
+    "key": "AB_PL2600_07_CG",
+    "text": "Spezzacatene"
+  },
+  "deb86f71": {
+    "key": "AB_PL2300_04_CG",
+    "text": "Intreccio valoroso"
+  },
+  "e024a4d3": {
+    "key": "AB_PL0800_08_CG",
+    "text": "Luftspiegelung"
+  },
+  "e065d980": {
+    "key": "AB_PL1300_07_CG",
+    "text": "Vuoto abbagliante"
+  },
+  "e1410c7b": {
+    "key": "AB_PL2700_03",
+    "text": "Giocare col fuoco"
+  },
+  "e224a3d2": {
+    "key": "AB_PL0200_02",
+    "text": "Pioggia invernale"
+  },
+  "e277f47a": {
+    "key": "AB_PL1500_07_CG",
+    "text": "Furia perpetua"
+  },
+  "e2dc99d9": {
+    "key": "AB_PL1900_01",
+    "text": "Reginleif recidivo"
+  },
+  "e37aa176": {
+    "key": "AB_PL1200_06_CG",
+    "text": "Invincibilità"
+  },
+  "e5598482": {
+    "key": "AB_PL0000_04",
+    "text": "Panacea"
+  },
+  "e6489b22": {
+    "key": "AB_PL2200_02_CG",
+    "text": "Infinito creare"
+  },
+  "e69d5c9c": {
+    "key": "AB_PL2500_04",
+    "text": "Tridente divino"
+  },
+  "e7697668": {
+    "key": "AB_PL0300_02_CG",
+    "text": "Pioggia di proiettili"
+  },
+  "ea2dfaa8": {
+    "key": "AB_PL1000_01_CG",
+    "text": "Feuerangriff"
+  },
+  "eaf3191c": {
+    "key": "AB_PL0200_06_CG",
+    "text": "Muro di luce"
+  },
+  "eb3e3386": {
+    "key": "AB_PL0200_01_CG",
+    "text": "Terre incantate"
+  },
+  "eb5b5f91": {
+    "key": "AB_PL1700_05_CG",
+    "text": "Storie dimenticate"
+  },
+  "eb81f079": {
+    "key": "AB_PL2100_04",
+    "text": "Potere del singolo"
+  },
+  "ec775337": {
+    "key": "AB_PL1700_02",
+    "text": "Ombre violente"
+  },
+  "ed00c663": {
+    "key": "AB_PL1200_01",
+    "text": "Königsschild"
+  },
+  "ed04d44b": {
+    "key": "AB_PL0200_08",
+    "text": "Scudo di smeraldo"
+  },
+  "ed1219cc": {
+    "key": "AB_PL1800_07",
+    "text": "Alexandria"
+  },
+  "ee1ed3e4": {
+    "key": "AB_PL1500_04",
+    "text": "Avidya reale"
+  },
+  "ee45b7ef": {
+    "key": "AB_PL1800_05",
+    "text": "Perturbazione"
+  },
+  "ee866a53": {
+    "key": "AB_PL0200_04_CG",
+    "text": "Venti sacri"
+  },
+  "ef560e15": {
+    "key": "AB_PL1500_03_CG",
+    "text": "Spallata di ferro"
+  },
+  "ef6b0959": {
+    "key": "AB_PL1400_01_CG",
+    "text": "Kyokasuigetsu"
+  },
+  "ef8a4c83": {
+    "key": "AB_PL2200_07_CG",
+    "text": "Tempesta"
+  },
+  "eff4746c": {
+    "key": "AB_PL1100_06",
+    "text": "Mirage"
+  },
+  "f07b5a9d": {
+    "key": "AB_PL0300_08",
+    "text": "Danni collaterali"
+  },
+  "f1e56fb1": {
+    "key": "AB_PL2600_02",
+    "text": "Cacciastelle"
+  },
+  "f1e89657": {
+    "key": "AB_PL1600_01_CG",
+    "text": "Infinite meraviglie"
+  },
+  "f34b48c1": {
+    "key": "AB_PL0600_03_CG",
+    "text": "Incanto"
+  },
+  "f3aa6c59": {
+    "key": "AB_PL1600_07_CG",
+    "text": "Millefiamme"
+  },
+  "f474ddc0": {
+    "key": "AB_PL1900_07_CG",
+    "text": "Insaziabile"
+  },
+  "f4bb441f": {
+    "key": "AB_PL0000_14",
+    "text": "Dissipazione"
+  },
+  "f4f5c45c": {
+    "key": "AB_PL2800_02_CG",
+    "text": "Incubo cremisi"
+  },
+  "f74b3c5b": {
+    "key": "AB_PL1400_02",
+    "text": "Setsuna"
+  },
+  "f78f1601": {
+    "key": "AB_PL0400_08_CG",
+    "text": "Vortice mistico"
+  },
+  "f7e68cb9": {
+    "key": "AB_PL1400_02_CG",
+    "text": "Setsuna"
+  },
+  "f8b69c6b": {
+    "key": "AB_PL1900_02_CG",
+    "text": "Senza limiti"
+  },
+  "f8cf236b": {
+    "key": "AB_PL1000_02_CG",
+    "text": "Flammenmarsch"
+  },
+  "f8f512dc": {
+    "key": "AB_PL2000_02",
+    "text": "Flagello"
+  },
+  "f9492778": {
+    "key": "AB_PL0000_13",
+    "text": "Velo"
+  },
+  "fb1526c3": {
+    "key": "AB_PL0000_07",
+    "text": "Furia"
+  },
+  "fb52815e": {
+    "key": "AB_NP0300_01",
+    "text": "Vincolo divino"
+  },
+  "fbef06f2": {
+    "key": "AB_PL0900_02",
+    "text": "Fendivarco"
+  },
+  "fc016c9a": {
+    "key": "AB_PL2500_04_CG",
+    "text": "Tridente divino"
+  },
+  "fc0562ec": {
+    "key": "AB_PL0000_11",
+    "text": "Stallo"
+  },
+  "fc8b3658": {
+    "key": "AB_PL0700_03_CG",
+    "text": "Attacca, Geegee!"
+  },
+  "fe554ce1": {
+    "key": "AB_PL1300_04",
+    "text": "Rotazione perpetua"
+  },
+  "fea055a2": {
+    "key": "AB_PL1400_03_CG",
+    "text": "Apice della vacuità"
+  },
+  "feae39dd": {
+    "key": "AB_PL2100_05_CG",
+    "text": "Revontulet"
+  },
+  "ffc630ad": {
+    "key": "AB_PL1900_01_CG",
+    "text": "Reginleif recidivo"
+  },
+  "ffed57b6": {
+    "key": "AB_PL0000_06_CG",
+    "text": "Foschia funesta"
+  }
+}

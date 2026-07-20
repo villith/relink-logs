@@ -111,10 +111,6 @@
 .table.full-values .header-column {
   width: 6rem;
 }
-/* Sup % shows two figures ("+60% (+47%)") and needs more room than the rest. */
-.table .header-column.header-column-sup-percentage {
-  width: 7rem;
-}
 
 .table .header-name,
 .table .header-column {

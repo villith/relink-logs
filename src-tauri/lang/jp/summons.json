@@ -1,0 +1,758 @@
+{
+  "0033943a": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "黒竜イーヴィル III"
+  },
+  "01b80951": {
+    "key": "TXT_SMN_So4000",
+    "text": "常闇に潜みし者"
+  },
+  "03c8bf90": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "神託の廻輪 II"
+  },
+  "03c95420": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "ブリズダイル II"
+  },
+  "045efb5b": {
+    "key": "TXT_SMN_So4100_3",
+    "text": "断罪の鉄機 III"
+  },
+  "0525e77d": {
+    "key": "TXT_SMN_So6300_2",
+    "text": "リトルスニッパー II"
+  },
+  "099e1dd3": {
+    "key": "TXT_SMN_So4c00",
+    "text": "マナガルム・ニヒラ"
+  },
+  "0b366ad9": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "フレイダイル II"
+  },
+  "0be2a43a": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "ストンダイル II"
+  },
+  "0d94b89f": {
+    "key": "TXT_SMN_So2000_2",
+    "text": "シルバースライム II"
+  },
+  "0ee2670a": {
+    "key": "TXT_SMN_So1600_3",
+    "text": "ゲラシーン III"
+  },
+  "0f986ed9": {
+    "key": "TXT_SMN_So0200",
+    "text": "ローラン"
+  },
+  "109e2271": {
+    "key": "TXT_SMN_So5700_3",
+    "text": "騎空団連合 ラファール III"
+  },
+  "15ec425e": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "叛乱の轟砲 II"
+  },
+  "15ed6d77": {
+    "key": "TXT_SMN_So4f00_3",
+    "text": "希望抱きし空の民 III"
+  },
+  "16b702dc": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "マロース僧兵 III"
+  },
+  "16ba3b8a": {
+    "key": "TXT_SMN_So1800_3",
+    "text": "スカルミリオーネ III"
+  },
+  "1ab77fdf": {
+    "key": "TXT_SMN_So5f00",
+    "text": "猫"
+  },
+  "1abade1d": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "シアエガ"
+  },
+  "1b5daebd": {
+    "key": "TXT_SMN_So1b00_1",
+    "text": "ワイバーン"
+  },
+  "1b6a4024": {
+    "key": "TXT_SMN_So1f00_3",
+    "text": "フレイダイル III"
+  },
+  "1b9de0fa": {
+    "key": "TXT_SMN_So5400_2",
+    "text": "シードホルム・ ガーディアンズ II"
+  },
+  "1be16847": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "シアエガ"
+  },
+  "1cc0e0ef": {
+    "key": "TXT_SMN_So2b00_1",
+    "text": "水の精霊"
+  },
+  "1e6543a3": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "火竜ヴレッザレク II"
+  },
+  "239f769f": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "ベヒーモス III"
+  },
+  "23d839a3": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "マナガルム"
+  },
+  "2517c481": {
+    "key": "TXT_SMN_So3f00_2",
+    "text": "黒竜イーヴィル II"
+  },
+  "26e7ccb1": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "氷竜ウィリヌス II"
+  },
+  "299c1a08": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "願い託す空の民"
+  },
+  "2e3ce3d9": {
+    "key": "TXT_SMN_So2900_2",
+    "text": "ダークシード II"
+  },
+  "2e657b01": {
+    "key": "TXT_SMN_So3100_1",
+    "text": "ドロイタ・マザー"
+  },
+  "2ea15d18": {
+    "key": "TXT_SMN_So2500_2",
+    "text": "ナザルボンジュ II"
+  },
+  "2eacd79c": {
+    "key": "TXT_SMN_So1a00_1",
+    "text": "ホーンバード"
+  },
+  "2f15455c": {
+    "key": "TXT_SMN_So9200",
+    "text": "ベルゼバブ"
+  },
+  "30f63214": {
+    "key": "TXT_SMN_So2800_1",
+    "text": "ホーリーシード"
+  },
+  "315695ae": {
+    "key": "TXT_SMN_So3400",
+    "text": "ルビードール"
+  },
+  "316641a4": {
+    "key": "TXT_SMN_So2100_2",
+    "text": "ゴールドスライム II"
+  },
+  "31ee9ba5": {
+    "key": "TXT_SMN_So0f00_2",
+    "text": "蒼番長 II"
+  },
+  "326dc2de": {
+    "key": "TXT_SMN_So1800_2",
+    "text": "スカルミリオーネ II"
+  },
+  "36cb5052": {
+    "key": "TXT_SMN_So5600_2",
+    "text": "マロース僧兵 II"
+  },
+  "38348e1e": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "エンシェント ドラゴン II"
+  },
+  "391c7857": {
+    "key": "TXT_SMN_So4d00_1",
+    "text": "禍つ影"
+  },
+  "3bad1134": {
+    "key": "TXT_SMN_So3c00_3",
+    "text": "地竜ドルベイル III"
+  },
+  "3c381dcd": {
+    "key": "TXT_SMN_So0e00_1",
+    "text": "ゴブリン グラディエーター"
+  },
+  "3c4f2b7d": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "希望抱きし空の民"
+  },
+  "3dd9ecee": {
+    "key": "TXT_SMN_So2600_1",
+    "text": "フレイムシード"
+  },
+  "3fd89c3a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "セスラカ II"
+  },
+  "42465367": {
+    "key": "TXT_SMN_So5500_2",
+    "text": "刃重衆 II"
+  },
+  "439cdb88": {
+    "key": "TXT_SMN_So2100_3",
+    "text": "ゴールドスライム III"
+  },
+  "44a5cab1": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "ザスバ一家"
+  },
+  "47e2ae71": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "神託の廻輪 III"
+  },
+  "48732d1f": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "神託の廻輪 III"
+  },
+  "4a65c97d": {
+    "key": "TXT_SMN_So2600_2",
+    "text": "フレイムシード II"
+  },
+  "4b3d1768": {
+    "key": "TXT_SMN_So1c00_1",
+    "text": "エルダーワイバーン"
+  },
+  "4ba8ceba": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "希望抱きし空の民"
+  },
+  "4c966e4f": {
+    "key": "TXT_SMN_So5300_3",
+    "text": "ザスバ一家 III"
+  },
+  "4d84581f": {
+    "key": "TXT_SMN_So1000_1",
+    "text": "紅蛮殻"
+  },
+  "4ea296fc": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "シルバースライム III"
+  },
+  "4f484bbb": {
+    "key": "TXT_SMN_So2800_2",
+    "text": "ホーリーシード II"
+  },
+  "4fd78af8": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "地竜ドルベイル II"
+  },
+  "513d05cc": {
+    "key": "TXT_SMN_So5700_2",
+    "text": "騎空団連合 ラファール II"
+  },
+  "514cf53b": {
+    "key": "TXT_SMN_So5200_2",
+    "text": "白狼兵団 II"
+  },
+  "524d1660": {
+    "key": "TXT_SMN_So1200_3",
+    "text": "荒師子 III"
+  },
+  "52b14b66": {
+    "key": "TXT_SMN_So4900_3",
+    "text": "フラカーン III"
+  },
+  "52e21e37": {
+    "key": "TXT_SMN_So3400",
+    "text": "ルビードール"
+  },
+  "5365294f": {
+    "key": "TXT_SMN_So3100_2",
+    "text": "ドロイタ・マザー II"
+  },
+  "547e7dfc": {
+    "key": "TXT_SMN_So4e00_1",
+    "text": "アルバコア"
+  },
+  "551dc320": {
+    "key": "TXT_SMN_So4d00_2",
+    "text": "禍つ影 II"
+  },
+  "556da7b4": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "エンシェント ドラゴン II"
+  },
+  "55815e99": {
+    "key": "TXT_SMN_So1200_2",
+    "text": "荒師子 II"
+  },
+  "576310df": {
+    "key": "TXT_SMN_So5000_3",
+    "text": "願い託す空の民 III"
+  },
+  "58aa9cad": {
+    "key": "TXT_SMN_So5500_1",
+    "text": "刃重衆"
+  },
+  "59f8666f": {
+    "key": "TXT_SMN_So2900_1",
+    "text": "ダークシード"
+  },
+  "5c42d57c": {
+    "key": "TXT_SMN_So4a00",
+    "text": "フラカーン・ニヒラ"
+  },
+  "5ca9330a": {
+    "key": "TXT_SMN_So5200_3",
+    "text": "白狼兵団 III"
+  },
+  "5e29e993": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "マナガルム"
+  },
+  "5f3337b6": {
+    "key": "TXT_SMN_So0d00_1",
+    "text": "ゴブリンソルジャー"
+  },
+  "60a6d3a5": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "氷竜ウィリヌス II"
+  },
+  "61c79814": {
+    "key": "TXT_SMN_So0d00_2",
+    "text": "ゴブリンソルジャー II"
+  },
+  "6262979b": {
+    "key": "TXT_SMN_So2500_3",
+    "text": "ナザルボンジュ III"
+  },
+  "634a379d": {
+    "key": "TXT_SMN_So2400_1",
+    "text": "アーリマン"
+  },
+  "6368a53d": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "マロース僧兵 III"
+  },
+  "65e658d9": {
+    "key": "TXT_SMN_So4700_2",
+    "text": "ヴォルカンボーラ II"
+  },
+  "666947c2": {
+    "key": "TXT_SMN_So3e00_2",
+    "text": "白竜ラディス II"
+  },
+  "67a73702": {
+    "key": "TXT_SMN_So4f00_2",
+    "text": "希望抱きし空の民 II"
+  },
+  "67c7e1ff": {
+    "key": "TXT_SMN_So3800_3",
+    "text": "エンヌギ III"
+  },
+  "6b514309": {
+    "key": "TXT_SMN_So2400_2",
+    "text": "アーリマン II"
+  },
+  "6d6cb496": {
+    "key": "TXT_SMN_So4000",
+    "text": "常闇に潜みし者"
+  },
+  "6e5968fc": {
+    "key": "TXT_SMN_So0000",
+    "text": "ルシファー"
+  },
+  "6ee91e7d": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "叛乱の轟砲 II"
+  },
+  "6f6bbbe0": {
+    "key": "TXT_SMN_So4700_3",
+    "text": "ヴォルカンボーラ III"
+  },
+  "730395dc": {
+    "key": "TXT_SMN_So5500_3",
+    "text": "刃重衆 III"
+  },
+  "735dd55b": {
+    "key": "TXT_SMN_So1a00_2",
+    "text": "ホーンバード II"
+  },
+  "7996a856": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "フラカーン"
+  },
+  "7a46e50e": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "ストンダイル II"
+  },
+  "7a7615d3": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "コブラ II"
+  },
+  "7e154422": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "フォルカ自警団 III"
+  },
+  "7e853e16": {
+    "key": "TXT_SMN_So6400_1",
+    "text": "神託の廻輪"
+  },
+  "7e8a659a": {
+    "key": "TXT_SMN_So2300_2",
+    "text": "モクモクレン II"
+  },
+  "7f8364e5": {
+    "key": "TXT_SMN_So3f00_1",
+    "text": "黒竜イーヴィル"
+  },
+  "81ecec7f": {
+    "key": "TXT_SMN_So0200",
+    "text": "ローラン"
+  },
+  "847cf372": {
+    "key": "TXT_SMN_So4200_3",
+    "text": "叛乱の轟砲 III"
+  },
+  "852287ba": {
+    "key": "TXT_SMN_So2700_1",
+    "text": "アクアシード"
+  },
+  "855d018c": {
+    "key": "TXT_SMN_So4500",
+    "text": "リリス"
+  },
+  "87c6c345": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "ロックゴーレム"
+  },
+  "897ffaf0": {
+    "key": "TXT_SMN_So1000_2",
+    "text": "紅蛮殻 II"
+  },
+  "8b489804": {
+    "key": "TXT_SMN_So4300_1",
+    "text": "コブラ"
+  },
+  "8c607d26": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "白狼兵団"
+  },
+  "8cf23b58": {
+    "key": "TXT_SMN_So3300_3",
+    "text": "ロックゴーレム III"
+  },
+  "8d7fde58": {
+    "key": "TXT_SMN_So4100_2",
+    "text": "断罪の鉄機 II"
+  },
+  "8db272e5": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "黒竜イーヴィル III"
+  },
+  "8e02e207": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "ゲラシーン II"
+  },
+  "90bd4ac0": {
+    "key": "TXT_SMN_So0000",
+    "text": "ルシファー"
+  },
+  "9118453a": {
+    "key": "TXT_SMN_So6300_1",
+    "text": "リトルスニッパー"
+  },
+  "9235fb9f": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "コブラ II"
+  },
+  "9360b2b5": {
+    "key": "TXT_SMN_So2b00_2",
+    "text": "水の精霊 II"
+  },
+  "9384a5d3": {
+    "key": "TXT_SMN_So3e00_3",
+    "text": "白竜ラディス III"
+  },
+  "97e451a4": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "地竜ドルベイル II"
+  },
+  "99a68616": {
+    "key": "TXT_SMN_So0f00_1",
+    "text": "蒼番長"
+  },
+  "99cf3e05": {
+    "key": "TXT_SMN_So1e00_3",
+    "text": "ブリズダイル III"
+  },
+  "9a6d89dc": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "フォルカ自警団 III"
+  },
+  "9bc09751": {
+    "key": "TXT_SMN_So1b00_2",
+    "text": "ワイバーン II"
+  },
+  "9d5c27de": {
+    "key": "TXT_SMN_So3700_2",
+    "text": "ベヒーモス II"
+  },
+  "9f0ecf8b": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "火竜ヴレッザレク III"
+  },
+  "a062ec06": {
+    "key": "TXT_SMN_So1300",
+    "text": "朱羅刹"
+  },
+  "a0c96959": {
+    "key": "TXT_SMN_So5700_1",
+    "text": "騎空団連合 ラファール"
+  },
+  "a34bdecb": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "セスラカ III"
+  },
+  "a40e64f4": {
+    "key": "TXT_SMN_So2700_2",
+    "text": "アクアシード II"
+  },
+  "a4f63a8f": {
+    "key": "TXT_SMN_So5400_3",
+    "text": "シードホルム・ ガーディアンズ III"
+  },
+  "a608aecd": {
+    "key": "TXT_SMN_So5900",
+    "text": "レフェリー"
+  },
+  "a6bb6299": {
+    "key": "TXT_SMN_So1d00_3",
+    "text": "ストンダイル III"
+  },
+  "a7eff558": {
+    "key": "TXT_SMN_So9200",
+    "text": "ベルゼバブ"
+  },
+  "aa2bbdbf": {
+    "key": "TXT_SMN_So1c00_2",
+    "text": "エルダーワイバーン II"
+  },
+  "ac20c821": {
+    "key": "TXT_SMN_So3800_2",
+    "text": "エンヌギ II"
+  },
+  "ad15d880": {
+    "key": "TXT_SMN_So4800",
+    "text": "ヴォルカンボーラ・ ニヒラ"
+  },
+  "ae52556d": {
+    "key": "TXT_SMN_So3200_2",
+    "text": "強襲型 ドロイタ・マザー II"
+  },
+  "b360dd8d": {
+    "key": "TXT_SMN_So4400_1",
+    "text": "サンドリーパー"
+  },
+  "b3c2f3a4": {
+    "key": "TXT_SMN_So3200_1",
+    "text": "強襲型 ドロイタ・マザー"
+  },
+  "b44a8a02": {
+    "key": "TXT_SMN_So4e00_3",
+    "text": "アルバコア III"
+  },
+  "b4cf26c6": {
+    "key": "TXT_SMN_So5400_1",
+    "text": "シードホルム・ ガーディアンズ"
+  },
+  "b5449253": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "願い託す空の民"
+  },
+  "b79312a7": {
+    "key": "TXT_SMN_So3300_2",
+    "text": "ロックゴーレム II"
+  },
+  "b960d2bb": {
+    "key": "TXT_SMN_So3b00_3",
+    "text": "氷竜ウィリヌス III"
+  },
+  "b96cb87d": {
+    "key": "TXT_SMN_So2300_1",
+    "text": "モクモクレン"
+  },
+  "bdd84e9a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "セスラカ II"
+  },
+  "bfac23dc": {
+    "key": "TXT_SMN_So3500_3",
+    "text": "グリフォン III"
+  },
+  "c1ccbc3c": {
+    "key": "TXT_SMN_So3600_2",
+    "text": "ブラックラプター II"
+  },
+  "c2f91a7f": {
+    "key": "TXT_SMN_So1100_3",
+    "text": "ゴブリンウォーリア III"
+  },
+  "c3e918f9": {
+    "key": "TXT_SMN_So2a00_1",
+    "text": "火の精霊"
+  },
+  "c52147d4": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "ブリズダイル II"
+  },
+  "ca95cd8c": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "フラカーン"
+  },
+  "cc3c45f3": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "ロックゴーレム"
+  },
+  "ce0039d4": {
+    "key": "TXT_SMN_So3900_3",
+    "text": "エンシェント ドラゴン III"
+  },
+  "ce8e0b79": {
+    "key": "TXT_SMN_So5000_2",
+    "text": "願い託す空の民 II"
+  },
+  "d4ac8684": {
+    "key": "TXT_SMN_So3600_3",
+    "text": "ブラックラプター III"
+  },
+  "d5536ae8": {
+    "key": "TXT_SMN_So4b00_2",
+    "text": "マナガルム II"
+  },
+  "d6387caa": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "ゴブリン グラディエーター II"
+  },
+  "d751d8d2": {
+    "key": "TXT_SMN_So2a00_2",
+    "text": "火の精霊 II"
+  },
+  "d7555b1f": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "神託の廻輪 II"
+  },
+  "da0b6092": {
+    "key": "TXT_SMN_So5600_1",
+    "text": "マロース僧兵"
+  },
+  "dbd2f84e": {
+    "key": "TXT_SMN_So4b00_3",
+    "text": "マナガルム III"
+  },
+  "ddb21c31": {
+    "key": "TXT_SMN_So5100_1",
+    "text": "フォルカ自警団"
+  },
+  "dfab70b7": {
+    "key": "TXT_SMN_So4500",
+    "text": "リリス"
+  },
+  "e24b4807": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "神託の廻輪 II"
+  },
+  "e492e6bf": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "セスラカ III"
+  },
+  "e4b7dcf9": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "ベヒーモス III"
+  },
+  "e51ce5b0": {
+    "key": "TXT_SMN_So4900_2",
+    "text": "フラカーン II"
+  },
+  "e528e76f": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "シルバースライム III"
+  },
+  "e6ebb6fa": {
+    "key": "TXT_SMN_So5900",
+    "text": "レフェリー"
+  },
+  "e7f607dc": {
+    "key": "TXT_SMN_So4400_2",
+    "text": "サンドリーパー II"
+  },
+  "ebeb3dc0": {
+    "key": "TXT_SMN_So1900_1",
+    "text": "ラウンドウルフ"
+  },
+  "eeea2080": {
+    "key": "TXT_SMN_So1900_2",
+    "text": "ラウンドウルフ II"
+  },
+  "ef554891": {
+    "key": "TXT_SMN_So2200_2",
+    "text": "シアエガ II"
+  },
+  "ef973d88": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "白狼兵団"
+  },
+  "f1c229f7": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "火竜ヴレッザレク II"
+  },
+  "f1fc31c4": {
+    "key": "TXT_SMN_So5100_2",
+    "text": "フォルカ自警団 II"
+  },
+  "f28d0e35": {
+    "key": "TXT_SMN_So6300_3",
+    "text": "リトルスニッパー III"
+  },
+  "f2be819e": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "火竜ヴレッザレク III"
+  },
+  "f32aa7a7": {
+    "key": "TXT_SMN_So5300_2",
+    "text": "ザスバ一家 II"
+  },
+  "f501285c": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "ゴブリン グラディエーター II"
+  },
+  "f7eb57dd": {
+    "key": "TXT_SMN_So4e00_2",
+    "text": "アルバコア II"
+  },
+  "f7f2d161": {
+    "key": "TXT_SMN_So3500_2",
+    "text": "グリフォン II"
+  },
+  "f862e7da": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "ザスバ一家"
+  },
+  "f98f8b97": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "フレイダイル II"
+  },
+  "fc8444a1": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "ゲラシーン II"
+  },
+  "fc8a2ecb": {
+    "key": "TXT_SMN_So3d00_3",
+    "text": "風竜イールシアス III"
+  },
+  "fd5fb92b": {
+    "key": "TXT_SMN_So1100_2",
+    "text": "ゴブリンウォーリア II"
+  },
+  "ff513849": {
+    "key": "TXT_SMN_So3d00_2",
+    "text": "風竜イールシアス II"
+  }
+}

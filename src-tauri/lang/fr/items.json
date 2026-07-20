@@ -7,13 +7,29 @@
     "key": "ITEM_16_0001",
     "text": "Plume de demi-dieu"
   },
+  "0311b2de": {
+    "key": "ITEM_18_0003",
+    "text": "Cristal de l’apocalypse"
+  },
   "035c056d": {
     "key": "ITEM_28_0010",
     "text": "Cristal de séquestration"
   },
+  "03a19196": {
+    "key": "ITEM_16_0013",
+    "text": "Noyau de la Fin"
+  },
+  "04c18eec": {
+    "key": "ITEM_31_0077",
+    "text": "Unité de pulsations Carnage"
+  },
   "050c5228": {
     "key": "ITEM_01_0033",
     "text": "Sable électromagnétique"
+  },
+  "05474649": {
+    "key": "ITEM_19_0022",
+    "text": "Cristal d'Ultime Vérité"
   },
   "05d2cf79": {
     "key": "ITEM_22_0020",
@@ -27,9 +43,25 @@
     "key": "ITEM_31_0011",
     "text": "Brassard funeste"
   },
+  "06c0d0a1": {
+    "key": "ITEM_70_0019",
+    "text": "Statue d’Albacore dorée"
+  },
+  "06e5185f": {
+    "key": "ITEM_23_0007",
+    "text": "Carte de coéquipier\u00A0: Fediel"
+  },
+  "076a9f41": {
+    "key": "ITEM_70_0018",
+    "text": "Statue de crabe de jais"
+  },
   "09370a3a": {
     "key": "ITEM_21_0000",
     "text": "Bon d'échange"
+  },
+  "0943913b": {
+    "key": "ITEM_70_0024",
+    "text": "Souvenir des cieux « Fille de l'Azur »"
   },
   "09c7a73e": {
     "key": "ITEM_01_0053",
@@ -50,6 +82,14 @@
   "0bd373a4": {
     "key": "ITEM_28_0130",
     "text": "Cristal de séquestration"
+  },
+  "0e7cbc8e": {
+    "key": "ITEM_31_0033",
+    "text": "Bec endurci parfait"
+  },
+  "0eb683cd": {
+    "key": "ITEM_15_0010",
+    "text": "Granmatériau I"
   },
   "0f34eabc": {
     "key": "ITEM_32_0042",
@@ -101,15 +141,23 @@
   },
   "173851d4": {
     "key": "ITEM_04_0002",
-    "text": "Crinière de réclusion"
+    "text": "Crinière de séquestration"
   },
   "176436f3": {
     "key": "ITEM_28_1002",
     "text": "Cristal de séquestration"
   },
+  "17f349ba": {
+    "key": "ITEM_31_0003",
+    "text": "Œil de démon monstrueux"
+  },
   "181381e5": {
     "key": "ITEM_16_0004",
     "text": "Bride divine"
+  },
+  "19871bf3": {
+    "key": "ITEM_31_0023",
+    "text": "Hache de guerre infernale"
   },
   "19b187d7": {
     "key": "ITEM_28_0001",
@@ -122,6 +170,10 @@
   "1aa4382d": {
     "key": "ITEM_02_0012",
     "text": "Orbe de givre"
+  },
+  "1c195d33": {
+    "key": "ITEM_14_0066",
+    "text": "Ragnite [Terminus]"
   },
   "1c67e865": {
     "key": "ITEM_01_0011",
@@ -139,6 +191,14 @@
     "key": "ITEM_18_0000",
     "text": "Résidu noir"
   },
+  "1f4bae8c": {
+    "key": "ITEM_14_0064",
+    "text": "Ragnite [Critique]"
+  },
+  "1fce9159": {
+    "key": "1fce9159",
+    "text": "Unité de pulsations Carnage"
+  },
   "202a0db9": {
     "key": "ITEM_28_0131",
     "text": "Cristal de séquestration"
@@ -155,12 +215,20 @@
     "key": "ITEM_02_0041",
     "text": "Orbe de ténèbres"
   },
+  "20c742de": {
+    "key": "ITEM_14_0001",
+    "text": "Fragment azuré"
+  },
   "21b32140": {
     "key": "ITEM_31_0042",
     "text": "Corne de bête terrestre"
   },
   "21dad920": {
     "key": "ITEM_26_9999",
+    "text": "Cristal de vitalité"
+  },
+  "22acc7bf": {
+    "key": "22acc7bf",
     "text": "Cristal de vitalité"
   },
   "23c59c51": {
@@ -183,6 +251,18 @@
     "key": "ITEM_10_0003",
     "text": "Cristal de bravoure (G)"
   },
+  "25165316": {
+    "key": "ITEM_16_0902",
+    "text": "Nœud originel aquatique"
+  },
+  "25289584": {
+    "key": "ITEM_31_0043",
+    "text": "Corne luisante terrestre"
+  },
+  "2657283e": {
+    "key": "ITEM_35_3000",
+    "text": "Points de résonance"
+  },
   "26fa7da3": {
     "key": "ITEM_01_0042",
     "text": "Poudre vermillon"
@@ -190,6 +270,10 @@
   "28592cb2": {
     "key": "ITEM_02_0022",
     "text": "Orbe de séisme"
+  },
+  "29748bf8": {
+    "key": "29748bf8",
+    "text": "Souvenir des cieux « Renaissance ou création »"
   },
   "29a7eec9": {
     "key": "ITEM_16_0011",
@@ -202,6 +286,14 @@
   "2a2ea603": {
     "key": "ITEM_25_0030",
     "text": "Cristal de terreur"
+  },
+  "2a5548a9": {
+    "key": "ITEM_31_0086",
+    "text": "Mentonnière noir doré"
+  },
+  "2c0b5a82": {
+    "key": "ITEM_70_0021",
+    "text": "Souvenir des cieux « Manifestation »"
   },
   "2c8fa06c": {
     "key": "ITEM_25_9999",
@@ -235,6 +327,10 @@
     "key": "ITEM_34_2000",
     "text": "Gemme éclatante (G)"
   },
+  "31291925": {
+    "key": "31291925",
+    "text": "Cristal de vitalité"
+  },
   "32dc23f3": {
     "key": "ITEM_70_0016",
     "text": "Pack de couleurs personnage 4"
@@ -250,6 +346,14 @@
   "35c7fba0": {
     "key": "ITEM_23_0000",
     "text": "Carte de coéquipier"
+  },
+  "35f709e3": {
+    "key": "ITEM_06_0003",
+    "text": "Aiguillon caudal d'effroi"
+  },
+  "381526a4": {
+    "key": "ITEM_31_0095",
+    "text": "Heaume de Rakshasa"
   },
   "38d2ecd0": {
     "key": "ITEM_02_0032",
@@ -267,6 +371,10 @@
     "key": "ITEM_32_0041",
     "text": "Aile sinistre"
   },
+  "3cb3eb94": {
+    "key": "3cb3eb94",
+    "text": "Cristal de terreur"
+  },
   "3e0269bd": {
     "key": "ITEM_26_0030",
     "text": "Cristal de vitalité"
@@ -283,9 +391,17 @@
     "key": "ITEM_30_0000",
     "text": "Munition mirage"
   },
+  "41e4c8ce": {
+    "key": "ITEM_23_0006",
+    "text": "Carte de coéquipier\u00A0: Fraux"
+  },
   "41e92f0a": {
     "key": "ITEM_16_0003",
     "text": "Spinelle existentiel"
+  },
+  "4249436e": {
+    "key": "ITEM_70_0026",
+    "text": "Souvenir des cieux « Dieu séparé »"
   },
   "4325ab79": {
     "key": "ITEM_14_0011",
@@ -303,9 +419,17 @@
     "key": "ITEM_06_0000",
     "text": "Anima de Vulkan Bolla"
   },
+  "456d2bb3": {
+    "key": "ITEM_09_0003",
+    "text": "Mortido"
+  },
   "463abc2d": {
     "key": "ITEM_28_0000",
     "text": "Cristal de séquestration"
+  },
+  "4a41482c": {
+    "key": "ITEM_03_0003",
+    "text": "Sabot d'émeraude de vitalité"
   },
   "4ac30d94": {
     "key": "ITEM_19_0003",
@@ -314,6 +438,10 @@
   "4be41ec1": {
     "key": "ITEM_26_1003",
     "text": "Cristal de vitalité"
+  },
+  "4c21dc42": {
+    "key": "ITEM_09_0023",
+    "text": "Fendoir du Voile de l'épée"
   },
   "4c4caa77": {
     "key": "ITEM_06_0002",
@@ -335,6 +463,10 @@
     "key": "ITEM_03_0001",
     "text": "Anima oméga Furicane"
   },
+  "5030beba": {
+    "key": "5030beba",
+    "text": "Souvenir des cieux « Ciel déchiré »"
+  },
   "51355c28": {
     "key": "ITEM_22_0031",
     "text": "Orbe du drake de glace"
@@ -347,9 +479,29 @@
     "key": "ITEM_31_0041",
     "text": "Cuirasse de bête terrestre"
   },
+  "537cb6d9": {
+    "key": "ITEM_14_0061",
+    "text": "Ragnite [Défensive]"
+  },
+  "5392dee6": {
+    "key": "ITEM_16_0005",
+    "text": "Plume intégrale divine"
+  },
+  "53a9d491": {
+    "key": "ITEM_16_0904",
+    "text": "Nœud originel rocailleux"
+  },
   "541d3800": {
     "key": "ITEM_15_0001",
     "text": "Matériau standard"
+  },
+  "54732298": {
+    "key": "ITEM_14_0065",
+    "text": "Ragnite [Point faible]"
+  },
+  "54ae4c95": {
+    "key": "54ae4c95",
+    "text": "Souvenir des cieux « Manifestation »"
   },
   "54fc643a": {
     "key": "ITEM_17_0000",
@@ -366,6 +518,10 @@
   "55d1b23f": {
     "key": "ITEM_25_1003",
     "text": "Cristal de terreur"
+  },
+  "58fc9b99": {
+    "key": "ITEM_21_0001",
+    "text": "Bon transmerveille"
   },
   "5942c5fb": {
     "key": "ITEM_70_0005",
@@ -405,7 +561,7 @@
   },
   "60cb5ea6": {
     "key": "ITEM_14_0050",
-    "text": "Médaillon éthéré"
+    "text": "Médaillon astral"
   },
   "60fd93bd": {
     "key": "ITEM_27_0030",
@@ -427,6 +583,18 @@
     "key": "ITEM_11_0001",
     "text": "Grimoire d'argent"
   },
+  "64a63fbc": {
+    "key": "ITEM_15_0012",
+    "text": "Granmatériau III"
+  },
+  "65063e17": {
+    "key": "ITEM_14_0076",
+    "text": "Coffret des récits divins"
+  },
+  "654fa095": {
+    "key": "ITEM_14_0063",
+    "text": "Ragnite [Ascension]"
+  },
   "659230f4": {
     "key": "ITEM_14_0051",
     "text": "Essence d'arme suprême"
@@ -447,6 +615,14 @@
     "key": "ITEM_32_0030",
     "text": "Unité sup. de Tayu'itar"
   },
+  "6837efc6": {
+    "key": "ITEM_31_0013",
+    "text": "Hache de guerre oubliée"
+  },
+  "686f12ad": {
+    "key": "ITEM_16_0903",
+    "text": "Nœud originel tempétueux"
+  },
   "687733c4": {
     "key": "ITEM_10_0000",
     "text": "Fragment de bravoure"
@@ -455,9 +631,21 @@
     "key": "ITEM_26_0020",
     "text": "Cristal de vitalité"
   },
+  "68bafc37": {
+    "key": "ITEM_16_0105",
+    "text": "Plume azurée oubliée"
+  },
+  "68eadaa9": {
+    "key": "ITEM_35_2000",
+    "text": "Points de chaos"
+  },
   "68ff3a08": {
     "key": "ITEM_31_0022",
     "text": "Hache de guerre ardente"
+  },
+  "695ea716": {
+    "key": "ITEM_31_0063",
+    "text": "Corne luisante ardente"
   },
   "6b4e2182": {
     "key": "ITEM_09_0001",
@@ -467,17 +655,37 @@
     "key": "ITEM_02_0051",
     "text": "Orbe de lumière"
   },
+  "6c375d99": {
+    "key": "ITEM_70_0020",
+    "text": "Souvenir des cieux « D’innombrables vies »"
+  },
   "6d876fab": {
     "key": "ITEM_32_0051",
     "text": "Corne cramoisie"
+  },
+  "6dd50a91": {
+    "key": "6dd50a91",
+    "text": "Souvenir des cieux « Dieu séparé »"
+  },
+  "6e13e372": {
+    "key": "ITEM_09_0013",
+    "text": "Lame des loups d'argent"
   },
   "6e49a111": {
     "key": "ITEM_01_0063",
     "text": "Substance astrale"
   },
+  "6e81c3ac": {
+    "key": "6e81c3ac",
+    "text": "Cristal de séquestration"
+  },
   "6f1fabe6": {
     "key": "ITEM_14_0021",
     "text": "Emblème du maître"
+  },
+  "6f38afe1": {
+    "key": "ITEM_19_0010",
+    "text": "Idéal du monde"
   },
   "71173866": {
     "key": "ITEM_26_0131",
@@ -495,13 +703,29 @@
     "key": "ITEM_03_0002",
     "text": "Sabot de vitalité"
   },
+  "7388fe67": {
+    "key": "ITEM_33_0002",
+    "text": "Éclat Sephira"
+  },
+  "74201317": {
+    "key": "ITEM_70_0027",
+    "text": "Souvenir des cieux « Renaissance ou création »"
+  },
   "745fd287": {
     "key": "ITEM_32_0054",
     "text": "Corne cyclonique"
   },
+  "7500c5d9": {
+    "key": "ITEM_31_0053",
+    "text": "Corne luisante glaciale"
+  },
   "759850ca": {
     "key": "ITEM_01_0041",
     "text": "Œuf de salamandre"
+  },
+  "75a25fb1": {
+    "key": "75a25fb1",
+    "text": "Souvenir des cieux « Flamme d’amour »"
   },
   "76079579": {
     "key": "ITEM_19_0004",
@@ -551,6 +775,10 @@
     "key": "ITEM_17_0001",
     "text": "Épée maudite Nihilla"
   },
+  "7bcdaa54": {
+    "key": "7bcdaa54",
+    "text": "Souvenir des cieux « Guerre des cieux »"
+  },
   "7cfa41fc": {
     "key": "ITEM_14_0012",
     "text": "Amas prismatique"
@@ -587,9 +815,25 @@
     "key": "ITEM_32_0053",
     "text": "Corne terrestre"
   },
+  "831f31ff": {
+    "key": "ITEM_16_0007",
+    "text": "Épine du Néant"
+  },
+  "833afc6d": {
+    "key": "833afc6d",
+    "text": "Cristal de vitalité"
+  },
+  "84292d6a": {
+    "key": "84292d6a",
+    "text": "Souvenir des cieux « D’innombrables vies »"
+  },
   "8572b2ce": {
     "key": "ITEM_23_0001",
-    "text": "Carte de coéquipier : Seofon"
+    "text": "Carte de coéquipier\u00A0: Seofon"
+  },
+  "85f40d79": {
+    "key": "ITEM_19_0012",
+    "text": "Signe chaotique"
   },
   "8682c2ac": {
     "key": "ITEM_80_0001",
@@ -599,9 +843,25 @@
     "key": "ITEM_80_0002",
     "text": "Clé de platine"
   },
+  "86fb2ee1": {
+    "key": "ITEM_14_0062",
+    "text": "Ragnite [Étourdissante]"
+  },
   "8816adc5": {
     "key": "ITEM_14_0010",
     "text": "Éclat prismatique"
+  },
+  "882f94a7": {
+    "key": "ITEM_22_0062",
+    "text": "Lumière originelle"
+  },
+  "89406db0": {
+    "key": "ITEM_22_0042",
+    "text": "Terre originelle"
+  },
+  "8a08f64e": {
+    "key": "ITEM_19_0013",
+    "text": "Signe de l'aurore"
   },
   "8b75e58a": {
     "key": "ITEM_02_0011",
@@ -611,13 +871,29 @@
     "key": "ITEM_31_0012",
     "text": "Hache de guerre glacée"
   },
+  "8bf58697": {
+    "key": "ITEM_90_0001",
+    "text": "Pierre d'invoc. : Dragon argenté des confins"
+  },
   "8c44f0ab": {
     "key": "ITEM_28_0030",
     "text": "Cristal de séquestration"
   },
+  "8c4fc319": {
+    "key": "ITEM_14_0074",
+    "text": "Matériau chaotique"
+  },
+  "8cf738ab": {
+    "key": "8cf738ab",
+    "text": "Cristal de fortification"
+  },
   "8d101b82": {
     "key": "ITEM_25_1002",
     "text": "Cristal de terreur"
+  },
+  "8d888638": {
+    "key": "ITEM_09_0030",
+    "text": "Âme du Ciel d'azur"
   },
   "8db0b117": {
     "key": "ITEM_28_9999",
@@ -667,6 +943,10 @@
     "key": "ITEM_13_0001",
     "text": "Méga potion"
   },
+  "946b78ee": {
+    "key": "946b78ee",
+    "text": "Souvenir des cieux « Fille de l'Azur »"
+  },
   "94dd261d": {
     "key": "ITEM_22_0021",
     "text": "Orbe du drake de feu"
@@ -679,6 +959,10 @@
     "key": "ITEM_26_0011",
     "text": "Cristal de vitalité"
   },
+  "96a00c42": {
+    "key": "ITEM_70_0022",
+    "text": "Souvenir des cieux « Flamme d’amour »"
+  },
   "9738c87a": {
     "key": "ITEM_14_0020",
     "text": "Emblème de la gloire"
@@ -686,6 +970,10 @@
   "981c29bd": {
     "key": "ITEM_70_0011",
     "text": "Éclat de cristal inaltérable"
+  },
+  "98cdb46f": {
+    "key": "ITEM_15_0011",
+    "text": "Granmatériau II"
   },
   "98e75fcb": {
     "key": "ITEM_22_0061",
@@ -702,6 +990,10 @@
   "99f44080": {
     "key": "ITEM_31_0081",
     "text": "Mâchoire de golem"
+  },
+  "9a3dc719": {
+    "key": "ITEM_09_0050",
+    "text": "Brasier du Ciel d'azur"
   },
   "9b442642": {
     "key": "ITEM_12_0000",
@@ -735,6 +1027,10 @@
     "key": "ITEM_22_0070",
     "text": "Écaille du drake noir"
   },
+  "9fba96d1": {
+    "key": "ITEM_60_0001",
+    "text": "Bébé pince noir"
+  },
   "9fc6585e": {
     "key": "ITEM_50_0009",
     "text": "Ambre du soleil de minuit"
@@ -743,9 +1039,17 @@
     "key": "ITEM_26_1000",
     "text": "Cristal de vitalité"
   },
+  "a1ead2c2": {
+    "key": "ITEM_22_0052",
+    "text": "Vent originel"
+  },
   "a23f4f46": {
     "key": "ITEM_27_0010",
     "text": "Cristal de fortification"
+  },
+  "a2452b7c": {
+    "key": "ITEM_22_0032",
+    "text": "Eau originelle"
   },
   "a7c72f41": {
     "key": "ITEM_34_1000",
@@ -787,9 +1091,25 @@
     "key": "ITEM_27_1000",
     "text": "Cristal de fortification"
   },
+  "adffe24e": {
+    "key": "ITEM_32_0046",
+    "text": "Magatama de la bête féroce"
+  },
+  "b0782428": {
+    "key": "ITEM_04_0003",
+    "text": "Crinière azurée de séquestration"
+  },
   "b2045655": {
     "key": "ITEM_14_0000",
     "text": "Splendeur azurée"
+  },
+  "b359b5b2": {
+    "key": "b359b5b2",
+    "text": "Cristal de fortification"
+  },
+  "b3b624ba": {
+    "key": "b3b624ba",
+    "text": "Cristal de fortification"
   },
   "b451e459": {
     "key": "ITEM_01_0003",
@@ -843,6 +1163,10 @@
     "key": "ITEM_25_0130",
     "text": "Cristal de terreur"
   },
+  "bdbf43ee": {
+    "key": "ITEM_32_0044",
+    "text": "Masse de lamentation"
+  },
   "be6124ad": {
     "key": "ITEM_27_0130",
     "text": "Cristal de fortification"
@@ -855,6 +1179,10 @@
     "key": "ITEM_32_0040",
     "text": "Griffe sinistre"
   },
+  "c043bac9": {
+    "key": "ITEM_14_0023",
+    "text": "Emblème de l'aube"
+  },
   "c05ca6a1": {
     "key": "ITEM_09_0000",
     "text": "Fierté du protecteur"
@@ -862,6 +1190,10 @@
   "c1481583": {
     "key": "ITEM_25_0001",
     "text": "Cristal de terreur"
+  },
+  "c1563862": {
+    "key": "ITEM_16_0106",
+    "text": "Plume écarlate divine"
   },
   "c1dcb7ae": {
     "key": "ITEM_32_0081",
@@ -887,9 +1219,21 @@
     "key": "ITEM_31_0074",
     "text": "Canon rotatif"
   },
+  "c57a5fe9": {
+    "key": "ITEM_70_0025",
+    "text": "Souvenir des cieux « Ciel déchiré »"
+  },
   "c783f39d": {
     "key": "ITEM_09_0010",
     "text": "Bravoure du loup alpha"
+  },
+  "c83f9e36": {
+    "key": "ITEM_22_0072",
+    "text": "Ténèbres originelles"
+  },
+  "c93e2fdd": {
+    "key": "ITEM_90_0000",
+    "text": "Pierre d'invoc. : Enfant des flammes et des ténèbres"
   },
   "c96755a7": {
     "key": "ITEM_31_0040",
@@ -923,6 +1267,22 @@
     "key": "ITEM_50_0010",
     "text": "Huile du désert"
   },
+  "cf24b2f6": {
+    "key": "ITEM_90_0002",
+    "text": "Pierre d'invoc. : Dieu de la fortification"
+  },
+  "d0f04d9f": {
+    "key": "ITEM_22_0022",
+    "text": "Flamme originelle"
+  },
+  "d11baafc": {
+    "key": "ITEM_70_0028",
+    "text": "Pack de couleurs Concept Art"
+  },
+  "d147a1ba": {
+    "key": "ITEM_19_0020",
+    "text": "Aile épineuse de jais"
+  },
   "d15091d9": {
     "key": "ITEM_03_0000",
     "text": "Anima de Furicane"
@@ -939,6 +1299,10 @@
     "key": "ITEM_28_1000",
     "text": "Cristal de séquestration"
   },
+  "d3a6a16a": {
+    "key": "d3a6a16a",
+    "text": "Cristal de terreur"
+  },
   "d465046a": {
     "key": "ITEM_31_0070",
     "text": "Roue de mithril"
@@ -946,6 +1310,10 @@
   "d47f792a": {
     "key": "ITEM_31_0000",
     "text": "Aile mystérieuse"
+  },
+  "d4ee7fc3": {
+    "key": "ITEM_31_0085",
+    "text": "Rubis de sang"
   },
   "d5af421a": {
     "key": "ITEM_31_0080",
@@ -995,6 +1363,10 @@
     "key": "ITEM_09_0020",
     "text": "Manœuvre de la porte-lame"
   },
+  "df713fa9": {
+    "key": "ITEM_16_0009",
+    "text": "Mémoire Ultima"
+  },
   "e0937c5b": {
     "key": "ITEM_01_0020",
     "text": "Pointe de glace"
@@ -1006,6 +1378,10 @@
   "e379e863": {
     "key": "ITEM_11_0000",
     "text": "Grimoire de cuivre"
+  },
+  "e3abc397": {
+    "key": "ITEM_70_0023",
+    "text": "Souvenir des cieux « Guerre des cieux »"
   },
   "e3adb298": {
     "key": "ITEM_25_1001",
@@ -1039,6 +1415,10 @@
     "key": "ITEM_22_0050",
     "text": "Écaille du drake de vent"
   },
+  "e8926145": {
+    "key": "ITEM_23_0005",
+    "text": "Carte de coéquipier : Maglielle"
+  },
   "e8c461ca": {
     "key": "ITEM_50_0004",
     "text": "Gemme azurée"
@@ -1055,9 +1435,17 @@
     "key": "ITEM_01_0010",
     "text": "Bois calciné"
   },
+  "eb707ea7": {
+    "key": "ITEM_23_0004",
+    "text": "Carte de coéquipier : Gallanza"
+  },
   "eb9c99e5": {
     "key": "ITEM_28_1001",
     "text": "Cristal de séquestration"
+  },
+  "ec480443": {
+    "key": "ec480443",
+    "text": "Cristal de terreur"
   },
   "ed3b872d": {
     "key": "ITEM_07_0001",
@@ -1082,6 +1470,10 @@
   "eedfa4e4": {
     "key": "ITEM_70_0013",
     "text": "Pack de couleurs personnage 1"
+  },
+  "ef56c64b": {
+    "key": "ef56c64b",
+    "text": "Cristal de séquestration"
   },
   "f147229b": {
     "key": "ITEM_70_0002",
@@ -1115,9 +1507,25 @@
     "key": "ITEM_34_4000",
     "text": "Amas de cristaux éclatants"
   },
+  "f6e684fa": {
+    "key": "f6e684fa",
+    "text": "Cristal de séquestration"
+  },
   "f6ee4068": {
     "key": "ITEM_02_0042",
     "text": "Orbe d'abîme"
+  },
+  "f74a6a4d": {
+    "key": "ITEM_32_1000",
+    "text": "Corne du crabe sumo"
+  },
+  "f7dc6ed9": {
+    "key": "ITEM_19_0023",
+    "text": "Hexacristal d'Ultime Vérité"
+  },
+  "f7f9a658": {
+    "key": "ITEM_31_0078",
+    "text": "Pique sinistre"
   },
   "f82726d9": {
     "key": "ITEM_31_0061",
@@ -1143,9 +1551,17 @@
     "key": "ITEM_02_0050",
     "text": "Fragment de lumière"
   },
+  "faf93bcc": {
+    "key": "ITEM_22_0121",
+    "text": "Flamme des Piliers"
+  },
+  "fd1dc09a": {
+    "key": "ITEM_16_0901",
+    "text": "Nœud originel enflammé"
+  },
   "fe52f7cb": {
     "key": "ITEM_23_0002",
-    "text": "Carte de coéquipier : Tweyen"
+    "text": "Carte de coéquipier\u00A0: Tweyen"
   },
   "feeafccf": {
     "key": "ITEM_01_0062",

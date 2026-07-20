@@ -1,5 +1,6 @@
 import { type ChecklistGroup } from "@/stores/useChecklistStore";
 import { useLogIndexStore } from "@/stores/useLogIndexStore";
+import { useManualUpdateCheck } from "@/useUpdateCheck";
 import { translateTraitId } from "@/utils";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 import {
@@ -11,6 +12,7 @@ import {
   Divider,
   Fieldset,
   Flex,
+  Group,
   Menu,
   NumberInput,
   Select,
@@ -104,9 +106,11 @@ const SettingsPage = () => {
     addOverlayColumn,
     removeOverlayColumn,
     open_log_on_save,
+    auto_check_updates,
   } = useSettings();
 
   const checklist = useChecklistSettings();
+  const { checking, checkNow } = useManualUpdateCheck();
 
   const { deleteAllLogs } = useLogIndexStore((state) => ({ deleteAllLogs: state.deleteAllLogs }));
 
@@ -206,6 +210,18 @@ const SettingsPage = () => {
               onChange={(event) => setMeterSettings({ open_log_on_save: event.currentTarget.checked })}
             />
           </Tooltip>
+          <Group gap="sm">
+            <Tooltip label={t("ui.auto-check-updates-description")}>
+              <Checkbox
+                label={t("ui.auto-check-updates")}
+                checked={auto_check_updates}
+                onChange={(event) => setMeterSettings({ auto_check_updates: event.currentTarget.checked })}
+              />
+            </Tooltip>
+            <Button size="compact-sm" variant="light" onClick={checkNow} loading={checking}>
+              {t("ui.check-updates")}
+            </Button>
+          </Group>
           <Tooltip label={t("ui.debug-mode-description")}>
             <Checkbox label={t("ui.debug-mode")} checked={debugMode} onChange={toggleDebugMode} />
           </Tooltip>

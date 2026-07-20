@@ -7,13 +7,29 @@
     "key": "ITEM_16_0001",
     "text": "Pluma de semidiós"
   },
+  "0311b2de": {
+    "key": "ITEM_18_0003",
+    "text": "Lágrimas del apocalipsis caótico"
+  },
   "035c056d": {
     "key": "ITEM_28_0010",
     "text": "Talismán de aislamiento"
   },
+  "03a19196": {
+    "key": "ITEM_16_0013",
+    "text": "Núcleo de Período"
+  },
+  "04c18eec": {
+    "key": "ITEM_31_0077",
+    "text": "Unidad pulsativa de carnicería"
+  },
   "050c5228": {
     "key": "ITEM_01_0033",
     "text": "Arena electromagnética"
+  },
+  "05474649": {
+    "key": "ITEM_19_0022",
+    "text": "Cristal supremo"
   },
   "05d2cf79": {
     "key": "ITEM_22_0020",
@@ -27,9 +43,25 @@
     "key": "ITEM_31_0011",
     "text": "Guantelete funesto"
   },
+  "06c0d0a1": {
+    "key": "ITEM_70_0019",
+    "text": "Figura de albacora dorada"
+  },
+  "06e5185f": {
+    "key": "ITEM_23_0007",
+    "text": "Carta de tripulante: Fediel"
+  },
+  "076a9f41": {
+    "key": "ITEM_70_0018",
+    "text": "Figura de cangrejo azabache"
+  },
   "09370a3a": {
     "key": "ITEM_21_0000",
     "text": "Supercupón"
+  },
+  "0943913b": {
+    "key": "ITEM_70_0024",
+    "text": "Recuerdo célico: Chica Celeste"
   },
   "09c7a73e": {
     "key": "ITEM_01_0053",
@@ -50,6 +82,14 @@
   "0bd373a4": {
     "key": "ITEM_28_0130",
     "text": "Talismán de aislamiento"
+  },
+  "0e7cbc8e": {
+    "key": "ITEM_31_0033",
+    "text": "Pico rígido de megabelleza"
+  },
+  "0eb683cd": {
+    "key": "ITEM_15_0010",
+    "text": "Gran cubo I"
   },
   "0f34eabc": {
     "key": "ITEM_32_0042",
@@ -81,7 +121,7 @@
   },
   "13fcf405": {
     "key": "ITEM_05_0001",
-    "text": "Alma de Excavalion Ω"
+    "text": "Alma de Mega-Excavalion"
   },
   "141ef3a7": {
     "key": "ITEM_02_0001",
@@ -107,9 +147,17 @@
     "key": "ITEM_28_1002",
     "text": "Talismán de aislamiento"
   },
+  "17f349ba": {
+    "key": "ITEM_31_0003",
+    "text": "Ojo singular de megaunión"
+  },
   "181381e5": {
     "key": "ITEM_16_0004",
     "text": "Cadena de divinidad"
+  },
+  "19871bf3": {
+    "key": "ITEM_31_0023",
+    "text": "Hacha purg. megamiseria"
   },
   "19b187d7": {
     "key": "ITEM_28_0001",
@@ -117,11 +165,15 @@
   },
   "1a114b03": {
     "key": "ITEM_04_0001",
-    "text": "Alma de Mánagarm Ω"
+    "text": "Alma de Mega-Mánagarm"
   },
   "1aa4382d": {
     "key": "ITEM_02_0012",
     "text": "Orbe escarchado"
+  },
+  "1c195d33": {
+    "key": "ITEM_14_0066",
+    "text": "Ragnita (proto)"
   },
   "1c67e865": {
     "key": "ITEM_01_0011",
@@ -139,6 +191,14 @@
     "key": "ITEM_18_0000",
     "text": "Residuo oscuro"
   },
+  "1f4bae8c": {
+    "key": "ITEM_14_0064",
+    "text": "Ragnita (aguijón)"
+  },
+  "1fce9159": {
+    "key": "1fce9159",
+    "text": "Unidad pulsativa de carnicería"
+  },
   "202a0db9": {
     "key": "ITEM_28_0131",
     "text": "Talismán de aislamiento"
@@ -155,12 +215,20 @@
     "key": "ITEM_02_0041",
     "text": "Orbe de oscuridad"
   },
+  "20c742de": {
+    "key": "ITEM_14_0001",
+    "text": "Azurita imperfecta"
+  },
   "21b32140": {
     "key": "ITEM_31_0042",
     "text": "Cuerno de bestia telúrica"
   },
   "21dad920": {
     "key": "ITEM_26_9999",
+    "text": "Talismán de vitalidad"
+  },
+  "22acc7bf": {
+    "key": "22acc7bf",
     "text": "Talismán de vitalidad"
   },
   "23c59c51": {
@@ -183,6 +251,18 @@
     "key": "ITEM_10_0003",
     "text": "Cristal de entereza (G)"
   },
+  "25165316": {
+    "key": "ITEM_16_0902",
+    "text": "Génesis torrencial"
+  },
+  "25289584": {
+    "key": "ITEM_31_0043",
+    "text": "Asta de bestia telúrica"
+  },
+  "2657283e": {
+    "key": "ITEM_35_3000",
+    "text": "Punto de resonancia"
+  },
   "26fa7da3": {
     "key": "ITEM_01_0042",
     "text": "Arena primordial"
@@ -190,6 +270,10 @@
   "28592cb2": {
     "key": "ITEM_02_0022",
     "text": "Orbe telúrico"
+  },
+  "29748bf8": {
+    "key": "29748bf8",
+    "text": "Recuerdo célico: Regeneración y génesis"
   },
   "29a7eec9": {
     "key": "ITEM_16_0011",
@@ -202,6 +286,14 @@
   "2a2ea603": {
     "key": "ITEM_25_0030",
     "text": "Talismán de miedo"
+  },
+  "2a5548a9": {
+    "key": "ITEM_31_0086",
+    "text": "Mandíbula de oro negro"
+  },
+  "2c0b5a82": {
+    "key": "ITEM_70_0021",
+    "text": "Recuerdo célico: Materialización"
   },
   "2c8fa06c": {
     "key": "ITEM_25_9999",
@@ -235,6 +327,10 @@
     "key": "ITEM_34_2000",
     "text": "Gema luminosa (G)"
   },
+  "31291925": {
+    "key": "31291925",
+    "text": "Talismán de vitalidad"
+  },
   "32dc23f3": {
     "key": "ITEM_70_0016",
     "text": "Paquete de colores 4"
@@ -250,6 +346,14 @@
   "35c7fba0": {
     "key": "ITEM_23_0000",
     "text": "Carta de tripulante"
+  },
+  "35f709e3": {
+    "key": "ITEM_06_0003",
+    "text": "Cola rígida temible"
+  },
+  "381526a4": {
+    "key": "ITEM_31_0095",
+    "text": "Yelmo de furia"
   },
   "38d2ecd0": {
     "key": "ITEM_02_0032",
@@ -267,6 +371,10 @@
     "key": "ITEM_32_0041",
     "text": "Ala portentosa"
   },
+  "3cb3eb94": {
+    "key": "3cb3eb94",
+    "text": "Talismán de miedo"
+  },
   "3e0269bd": {
     "key": "ITEM_26_0030",
     "text": "Talismán de vitalidad"
@@ -283,9 +391,17 @@
     "key": "ITEM_30_0000",
     "text": "Gema mística"
   },
+  "41e4c8ce": {
+    "key": "ITEM_23_0006",
+    "text": "Carta de tripulante: Fraux"
+  },
   "41e92f0a": {
     "key": "ITEM_16_0003",
     "text": "Espina de realidad"
+  },
+  "4249436e": {
+    "key": "ITEM_70_0026",
+    "text": "Recuerdo célico: Un dios dividido en dos"
   },
   "4325ab79": {
     "key": "ITEM_14_0011",
@@ -303,9 +419,17 @@
     "key": "ITEM_06_0000",
     "text": "Alma de Vulkan Bora"
   },
+  "456d2bb3": {
+    "key": "ITEM_09_0003",
+    "text": "Mortido"
+  },
   "463abc2d": {
     "key": "ITEM_28_0000",
     "text": "Talismán de aislamiento"
+  },
+  "4a41482c": {
+    "key": "ITEM_03_0003",
+    "text": "Pezuña esmeralda de vitalidad"
   },
   "4ac30d94": {
     "key": "ITEM_19_0003",
@@ -314,6 +438,10 @@
   "4be41ec1": {
     "key": "ITEM_26_1003",
     "text": "Talismán de vitalidad"
+  },
+  "4c21dc42": {
+    "key": "ITEM_09_0023",
+    "text": "Columelar degollador caótico"
   },
   "4c4caa77": {
     "key": "ITEM_06_0002",
@@ -333,7 +461,11 @@
   },
   "4f1e4c13": {
     "key": "ITEM_03_0001",
-    "text": "Alma de Furiacán Ω"
+    "text": "Alma de Mega-Furiacán"
+  },
+  "5030beba": {
+    "key": "5030beba",
+    "text": "Recuerdo célico: Cielos fragmentados"
   },
   "51355c28": {
     "key": "ITEM_22_0031",
@@ -347,9 +479,29 @@
     "key": "ITEM_31_0041",
     "text": "Coraza de bestia telúrica"
   },
+  "537cb6d9": {
+    "key": "ITEM_14_0061",
+    "text": "Ragnita (defensa)"
+  },
+  "5392dee6": {
+    "key": "ITEM_16_0005",
+    "text": "Pluma de divinidad caótica"
+  },
+  "53a9d491": {
+    "key": "ITEM_16_0904",
+    "text": "Génesis sepultada"
+  },
   "541d3800": {
     "key": "ITEM_15_0001",
     "text": "Cubo de metal"
+  },
+  "54732298": {
+    "key": "ITEM_14_0065",
+    "text": "Ragnita (espíritu luchador)"
+  },
+  "54ae4c95": {
+    "key": "54ae4c95",
+    "text": "Recuerdo célico: Materialización"
   },
   "54fc643a": {
     "key": "ITEM_17_0000",
@@ -366,6 +518,10 @@
   "55d1b23f": {
     "key": "ITEM_25_1003",
     "text": "Talismán de miedo"
+  },
+  "58fc9b99": {
+    "key": "ITEM_21_0001",
+    "text": "Vale avanzado"
   },
   "5942c5fb": {
     "key": "ITEM_70_0005",
@@ -401,11 +557,11 @@
   },
   "6096c6bf": {
     "key": "ITEM_16_0012",
-    "text": "Núcleo de Grynoth"
+    "text": "Núcleo de Cronos"
   },
   "60cb5ea6": {
     "key": "ITEM_14_0050",
-    "text": "Medallón del renacer"
+    "text": "Medallón del empíreo"
   },
   "60fd93bd": {
     "key": "ITEM_27_0030",
@@ -427,6 +583,18 @@
     "key": "ITEM_11_0001",
     "text": "Grimorio de plata"
   },
+  "64a63fbc": {
+    "key": "ITEM_15_0012",
+    "text": "Gran cubo III"
+  },
+  "65063e17": {
+    "key": "ITEM_14_0076",
+    "text": "Recipiente de era divina"
+  },
+  "654fa095": {
+    "key": "ITEM_14_0063",
+    "text": "Ragnita (ascensión)"
+  },
   "659230f4": {
     "key": "ITEM_14_0051",
     "text": "Esencia de arma suprema"
@@ -447,6 +615,14 @@
     "key": "ITEM_32_0030",
     "text": "Casco de Tayu'itar"
   },
+  "6837efc6": {
+    "key": "ITEM_31_0013",
+    "text": "Hacha funesta de megahielo"
+  },
+  "686f12ad": {
+    "key": "ITEM_16_0903",
+    "text": "Génesis huracanada"
+  },
   "687733c4": {
     "key": "ITEM_10_0000",
     "text": "Fragmento de entereza"
@@ -455,9 +631,21 @@
     "key": "ITEM_26_0020",
     "text": "Talismán de vitalidad"
   },
+  "68bafc37": {
+    "key": "ITEM_16_0105",
+    "text": "Pluma celeste olvidada"
+  },
+  "68eadaa9": {
+    "key": "ITEM_35_2000",
+    "text": "Punto de la Vorágine"
+  },
   "68ff3a08": {
     "key": "ITEM_31_0022",
     "text": "Hacha abrasadora"
+  },
+  "695ea716": {
+    "key": "ITEM_31_0063",
+    "text": "Asta de bestia ígnea"
   },
   "6b4e2182": {
     "key": "ITEM_09_0001",
@@ -467,17 +655,37 @@
     "key": "ITEM_02_0051",
     "text": "Orbe de luz"
   },
+  "6c375d99": {
+    "key": "ITEM_70_0020",
+    "text": "Recuerdo célico: Innumerables vidas"
+  },
   "6d876fab": {
     "key": "ITEM_32_0051",
     "text": "Cuerno carmesí"
+  },
+  "6dd50a91": {
+    "key": "6dd50a91",
+    "text": "Recuerdo célico: Un dios dividido en dos"
+  },
+  "6e13e372": {
+    "key": "ITEM_09_0013",
+    "text": "Hoja de Lobo Plateado caótico"
   },
   "6e49a111": {
     "key": "ITEM_01_0063",
     "text": "Materia astral"
   },
+  "6e81c3ac": {
+    "key": "6e81c3ac",
+    "text": "Talismán de aislamiento"
+  },
   "6f1fabe6": {
     "key": "ITEM_14_0021",
     "text": "Título de distinción"
+  },
+  "6f38afe1": {
+    "key": "ITEM_19_0010",
+    "text": "Concepto de mundo"
   },
   "71173866": {
     "key": "ITEM_26_0131",
@@ -495,13 +703,29 @@
     "key": "ITEM_03_0002",
     "text": "Pezuña de vitalidad"
   },
+  "7388fe67": {
+    "key": "ITEM_33_0002",
+    "text": "Resplandor de Céfira"
+  },
+  "74201317": {
+    "key": "ITEM_70_0027",
+    "text": "Recuerdo célico: Regeneración y génesis"
+  },
   "745fd287": {
     "key": "ITEM_32_0054",
     "text": "Cuerno huracanado"
   },
+  "7500c5d9": {
+    "key": "ITEM_31_0053",
+    "text": "Asta de bestia gélida"
+  },
   "759850ca": {
     "key": "ITEM_01_0041",
     "text": "Huevo de salamandra"
+  },
+  "75a25fb1": {
+    "key": "75a25fb1",
+    "text": "Recuerdo célico: Las luces del amor"
   },
   "76079579": {
     "key": "ITEM_19_0004",
@@ -551,6 +775,10 @@
     "key": "ITEM_17_0001",
     "text": "Espada de N fundido"
   },
+  "7bcdaa54": {
+    "key": "7bcdaa54",
+    "text": "Recuerdo célico: La guerra de los cielos"
+  },
   "7cfa41fc": {
     "key": "ITEM_14_0012",
     "text": "Prisma perfecto"
@@ -587,21 +815,53 @@
     "key": "ITEM_32_0053",
     "text": "Cuerno terrestre"
   },
+  "831f31ff": {
+    "key": "ITEM_16_0007",
+    "text": "Espina de vacío"
+  },
+  "833afc6d": {
+    "key": "833afc6d",
+    "text": "Talismán de vitalidad"
+  },
+  "84292d6a": {
+    "key": "84292d6a",
+    "text": "Recuerdo célico: Innumerables vidas"
+  },
   "8572b2ce": {
     "key": "ITEM_23_0001",
-    "text": "Carta de tripulante: Seofón"
+    "text": "Carta de tripulante: Siete"
+  },
+  "85f40d79": {
+    "key": "ITEM_19_0012",
+    "text": "Signo del caos"
   },
   "8682c2ac": {
     "key": "ITEM_80_0001",
-    "text": "Llave de lazurita"
+    "text": "Llave de oro"
   },
   "86b12abc": {
     "key": "ITEM_80_0002",
     "text": "Llave de platino"
   },
+  "86fb2ee1": {
+    "key": "ITEM_14_0062",
+    "text": "Ragnita (aturdimiento)"
+  },
   "8816adc5": {
     "key": "ITEM_14_0010",
     "text": "Viruta de prisma"
+  },
+  "882f94a7": {
+    "key": "ITEM_22_0062",
+    "text": "Luz primigenia"
+  },
+  "89406db0": {
+    "key": "ITEM_22_0042",
+    "text": "Tierra primigenia"
+  },
+  "8a08f64e": {
+    "key": "ITEM_19_0013",
+    "text": "Signo de la aurora"
   },
   "8b75e58a": {
     "key": "ITEM_02_0011",
@@ -611,13 +871,29 @@
     "key": "ITEM_31_0012",
     "text": "Hacha escarchada"
   },
+  "8bf58697": {
+    "key": "ITEM_90_0001",
+    "text": "Cuarzo invoc.: Draco argénteo de Terminus"
+  },
   "8c44f0ab": {
     "key": "ITEM_28_0030",
     "text": "Talismán de aislamiento"
   },
+  "8c4fc319": {
+    "key": "ITEM_14_0074",
+    "text": "Cubo caótico"
+  },
+  "8cf738ab": {
+    "key": "8cf738ab",
+    "text": "Talismán de fortificación"
+  },
   "8d101b82": {
     "key": "ITEM_25_1002",
     "text": "Talismán de miedo"
+  },
+  "8d888638": {
+    "key": "ITEM_09_0030",
+    "text": "Alma celeste"
   },
   "8db0b117": {
     "key": "ITEM_28_9999",
@@ -667,6 +943,10 @@
     "key": "ITEM_13_0001",
     "text": "Poción integral"
   },
+  "946b78ee": {
+    "key": "946b78ee",
+    "text": "Recuerdo célico: Chica Celeste"
+  },
   "94dd261d": {
     "key": "ITEM_22_0021",
     "text": "Orbe de draco ígneo"
@@ -679,6 +959,10 @@
     "key": "ITEM_26_0011",
     "text": "Talismán de vitalidad"
   },
+  "96a00c42": {
+    "key": "ITEM_70_0022",
+    "text": "Recuerdo célico: Las luces del amor"
+  },
   "9738c87a": {
     "key": "ITEM_14_0020",
     "text": "Título de honor"
@@ -686,6 +970,10 @@
   "981c29bd": {
     "key": "ITEM_70_0011",
     "text": "Fragmento de cristal perenne"
+  },
+  "98cdb46f": {
+    "key": "ITEM_15_0011",
+    "text": "Gran cubo II"
   },
   "98e75fcb": {
     "key": "ITEM_22_0061",
@@ -702,6 +990,10 @@
   "99f44080": {
     "key": "ITEM_31_0081",
     "text": "Fauces de gólem"
+  },
+  "9a3dc719": {
+    "key": "ITEM_09_0050",
+    "text": "Almenara celeste"
   },
   "9b442642": {
     "key": "ITEM_12_0000",
@@ -735,6 +1027,10 @@
     "key": "ITEM_22_0070",
     "text": "Escama de dragón negro"
   },
+  "9fba96d1": {
+    "key": "ITEM_60_0001",
+    "text": "Pinzador pigmeo negro"
+  },
   "9fc6585e": {
     "key": "ITEM_50_0009",
     "text": "Sol de medianoche"
@@ -743,9 +1039,17 @@
     "key": "ITEM_26_1000",
     "text": "Talismán de vitalidad"
   },
+  "a1ead2c2": {
+    "key": "ITEM_22_0052",
+    "text": "Aire primigenio"
+  },
   "a23f4f46": {
     "key": "ITEM_27_0010",
     "text": "Talismán de fortificación"
+  },
+  "a2452b7c": {
+    "key": "ITEM_22_0032",
+    "text": "Agua primigenia"
   },
   "a7c72f41": {
     "key": "ITEM_34_1000",
@@ -787,9 +1091,25 @@
     "key": "ITEM_27_1000",
     "text": "Talismán de fortificación"
   },
+  "adffe24e": {
+    "key": "ITEM_32_0046",
+    "text": "Magatama de bestia feroz"
+  },
+  "b0782428": {
+    "key": "ITEM_04_0003",
+    "text": "Crin celeste de aislamiento"
+  },
   "b2045655": {
     "key": "ITEM_14_0000",
     "text": "Resplandor de azurita"
+  },
+  "b359b5b2": {
+    "key": "b359b5b2",
+    "text": "Talismán de fortificación"
+  },
+  "b3b624ba": {
+    "key": "b3b624ba",
+    "text": "Talismán de fortificación"
   },
   "b451e459": {
     "key": "ITEM_01_0003",
@@ -843,6 +1163,10 @@
     "key": "ITEM_25_0130",
     "text": "Talismán de miedo"
   },
+  "bdbf43ee": {
+    "key": "ITEM_32_0044",
+    "text": "Clúster del lamento caótico"
+  },
   "be6124ad": {
     "key": "ITEM_27_0130",
     "text": "Talismán de fortificación"
@@ -855,6 +1179,10 @@
     "key": "ITEM_32_0040",
     "text": "Zarpa fatídica"
   },
+  "c043bac9": {
+    "key": "ITEM_14_0023",
+    "text": "Título de pionerismo"
+  },
   "c05ca6a1": {
     "key": "ITEM_09_0000",
     "text": "Orgullo protector"
@@ -862,6 +1190,10 @@
   "c1481583": {
     "key": "ITEM_25_0001",
     "text": "Talismán de miedo"
+  },
+  "c1563862": {
+    "key": "ITEM_16_0106",
+    "text": "Pluma bermellón divina"
   },
   "c1dcb7ae": {
     "key": "ITEM_32_0081",
@@ -887,9 +1219,21 @@
     "key": "ITEM_31_0074",
     "text": "Cañón de éter de tipo B"
   },
+  "c57a5fe9": {
+    "key": "ITEM_70_0025",
+    "text": "Recuerdo célico: Cielos fragmentados"
+  },
   "c783f39d": {
     "key": "ITEM_09_0010",
     "text": "Valor de lobo alfa"
+  },
+  "c83f9e36": {
+    "key": "ITEM_22_0072",
+    "text": "Oscuridad primigenia"
+  },
+  "c93e2fdd": {
+    "key": "ITEM_90_0000",
+    "text": "Cuarzo invoc.: Hijo del averno y las tinieblas"
   },
   "c96755a7": {
     "key": "ITEM_31_0040",
@@ -923,6 +1267,22 @@
     "key": "ITEM_50_0010",
     "text": "Aceite desértico"
   },
+  "cf24b2f6": {
+    "key": "ITEM_90_0002",
+    "text": "Cuarzo invoc.: Deidad de la fortificación"
+  },
+  "d0f04d9f": {
+    "key": "ITEM_22_0022",
+    "text": "Fuego primigenio"
+  },
+  "d11baafc": {
+    "key": "ITEM_70_0028",
+    "text": "Paquete de colores temático"
+  },
+  "d147a1ba": {
+    "key": "ITEM_19_0020",
+    "text": "Pluma azabache puntiaguda"
+  },
   "d15091d9": {
     "key": "ITEM_03_0000",
     "text": "Alma de Furiacán"
@@ -939,13 +1299,21 @@
     "key": "ITEM_28_1000",
     "text": "Talismán de aislamiento"
   },
+  "d3a6a16a": {
+    "key": "d3a6a16a",
+    "text": "Talismán de miedo"
+  },
   "d465046a": {
     "key": "ITEM_31_0070",
-    "text": "Rueda de mitrilo"
+    "text": "Rueda de mithril"
   },
   "d47f792a": {
     "key": "ITEM_31_0000",
     "text": "Ala singular"
+  },
+  "d4ee7fc3": {
+    "key": "ITEM_31_0085",
+    "text": "Rubí de sangre"
   },
   "d5af421a": {
     "key": "ITEM_31_0080",
@@ -995,6 +1363,10 @@
     "key": "ITEM_09_0020",
     "text": "Gambito de emperatriz"
   },
+  "df713fa9": {
+    "key": "ITEM_16_0009",
+    "text": "Recuerdo ultimus"
+  },
   "e0937c5b": {
     "key": "ITEM_01_0020",
     "text": "Aguja de hielo"
@@ -1007,6 +1379,10 @@
     "key": "ITEM_11_0000",
     "text": "Grimorio de cobre"
   },
+  "e3abc397": {
+    "key": "ITEM_70_0023",
+    "text": "Recuerdo célico: La guerra de los cielos"
+  },
   "e3adb298": {
     "key": "ITEM_25_1001",
     "text": "Talismán de miedo"
@@ -1017,7 +1393,7 @@
   },
   "e5481168": {
     "key": "ITEM_06_0001",
-    "text": "Alma de Vulkan Bora Ω"
+    "text": "Alma de Mega-Vulkan Bora"
   },
   "e578bb85": {
     "key": "ITEM_70_0008",
@@ -1039,6 +1415,10 @@
     "key": "ITEM_22_0050",
     "text": "Escama de dragón verde"
   },
+  "e8926145": {
+    "key": "ITEM_23_0005",
+    "text": "Carta de tripulante: Maglielle"
+  },
   "e8c461ca": {
     "key": "ITEM_50_0004",
     "text": "Gema cerúlea"
@@ -1055,13 +1435,21 @@
     "key": "ITEM_01_0010",
     "text": "Leño quemado"
   },
+  "eb707ea7": {
+    "key": "ITEM_23_0004",
+    "text": "Carta de tripulante: Gallanza"
+  },
   "eb9c99e5": {
     "key": "ITEM_28_1001",
     "text": "Talismán de aislamiento"
   },
+  "ec480443": {
+    "key": "ec480443",
+    "text": "Talismán de miedo"
+  },
   "ed3b872d": {
     "key": "ITEM_07_0001",
-    "text": "Alma de Angra Mainyu Ω"
+    "text": "Alma de Mega-Angra Mainyu"
   },
   "ed91fe58": {
     "key": "ITEM_31_0001",
@@ -1082,6 +1470,10 @@
   "eedfa4e4": {
     "key": "ITEM_70_0013",
     "text": "Paquete de colores 1"
+  },
+  "ef56c64b": {
+    "key": "ef56c64b",
+    "text": "Talismán de aislamiento"
   },
   "f147229b": {
     "key": "ITEM_70_0002",
@@ -1115,9 +1507,25 @@
     "key": "ITEM_34_4000",
     "text": "Clúster de cristales luminosos"
   },
+  "f6e684fa": {
+    "key": "f6e684fa",
+    "text": "Talismán de aislamiento"
+  },
   "f6ee4068": {
     "key": "ITEM_02_0042",
     "text": "Orbe abismal"
+  },
+  "f74a6a4d": {
+    "key": "ITEM_32_1000",
+    "text": "Cuerno de cangrejo luchador"
+  },
+  "f7dc6ed9": {
+    "key": "ITEM_19_0023",
+    "text": "Hexacristal supremo"
+  },
+  "f7f9a658": {
+    "key": "ITEM_31_0078",
+    "text": "Punta siniestra"
   },
   "f82726d9": {
     "key": "ITEM_31_0061",
@@ -1143,9 +1551,17 @@
     "key": "ITEM_02_0050",
     "text": "Fragmento de luz"
   },
+  "faf93bcc": {
+    "key": "ITEM_22_0121",
+    "text": "Flama de los pilares"
+  },
+  "fd1dc09a": {
+    "key": "ITEM_16_0901",
+    "text": "Génesis llameante"
+  },
   "fe52f7cb": {
     "key": "ITEM_23_0002",
-    "text": "Carta de tripulante: Tueyen"
+    "text": "Carta de tripulante: Song"
   },
   "feeafccf": {
     "key": "ITEM_01_0062",
@@ -1153,6 +1569,6 @@
   },
   "ff1a207a": {
     "key": "ITEM_70_0007",
-    "text": "Figura de cangrejo"
+    "text": "Figura de cangrejo dorada"
   }
 }

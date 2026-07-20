@@ -3,6 +3,14 @@
     "key": "SKILL_094_00",
     "text": "Hohe Konzentration"
   },
+  "0151cf9e": {
+    "key": "SKILL_315_00",
+    "text": "Magentahimmel"
+  },
+  "020db733": {
+    "key": "SKILL_317_00",
+    "text": "Gesteigerte Finesse"
+  },
   "05f2ecdc": {
     "key": "SKILL_070_00",
     "text": "Herabstürzen"
@@ -10,6 +18,10 @@
   "05fa4599": {
     "key": "SKILL_124_01",
     "text": "Kreativität des Drachentöters"
+  },
+  "06719232": {
+    "key": "SKILL_178_00",
+    "text": "Schwarzes Fluchsiegel"
   },
   "082033cb": {
     "key": "SKILL_140_00",
@@ -27,6 +39,10 @@
     "key": "SKILL_126_00",
     "text": "Talent des Schwertmeisters"
   },
+  "0de887a0": {
+    "key": "SKILL_320_00",
+    "text": "Caelum-Erprobung"
+  },
   "0e42be1b": {
     "key": "SKILL_118_02",
     "text": "Pfad des Veteranen"
@@ -38,10 +54,6 @@
   "0f026cf0": {
     "key": "SKILL_128_02",
     "text": "Pfad des Ewigen Jähzorns"
-  },
-  "0fba47e8": {
-    "key": "SKILL_133_00",
-    "text": "Verstärkender Tropfen"
   },
   "11aae5f5": {
     "key": "SKILL_117_01",
@@ -61,7 +73,7 @@
   },
   "15806dfc": {
     "key": "SKILL_172_01",
-    "text": "Nimbus des Ob. Primarchen"
+    "text": "Nimbus des Oberengels"
   },
   "16eff868": {
     "key": "SKILL_122_01",
@@ -71,10 +83,6 @@
     "key": "SKILL_172_03",
     "text": "Ain"
   },
-  "1b0d9897": {
-    "key": "SKILL_141_00",
-    "text": "Ein Meer an Erträgen"
-  },
   "1c360c63": {
     "key": "SKILL_008_00",
     "text": "Himmelssturm-Schaden"
@@ -83,9 +91,21 @@
     "key": "SKILL_136_00",
     "text": "Unterdrückungsresistenz"
   },
+  "1de14c65": {
+    "key": "SKILL_173_00",
+    "text": "Passion des Alpha-Wolfs"
+  },
+  "1e1cecce": {
+    "key": "SKILL_143_10",
+    "text": "Katastrophen-Nova"
+  },
   "2242921f": {
     "key": "SKILL_055_00",
     "text": "Lähmungsresistenz"
+  },
+  "235d86ef": {
+    "key": "SKILL_313_00",
+    "text": "Supernova"
   },
   "23d0f67f": {
     "key": "SKILL_119_00",
@@ -94,6 +114,10 @@
   "24883af3": {
     "key": "SKILL_073_00",
     "text": "Tränkehamsterer"
+  },
+  "26956f25": {
+    "key": "SKILL_173_01",
+    "text": "Kreisel des Alpha-Wolfs"
   },
   "281214ab": {
     "key": "SKILL_171_03",
@@ -115,6 +139,10 @@
     "key": "SKILL_006_00",
     "text": "Ausdauer"
   },
+  "30773197": {
+    "key": "SKILL_177_01",
+    "text": "Reinkarnierter Schwung"
+  },
   "318d12e9": {
     "key": "SKILL_069_00",
     "text": "Schnelles Abklingen"
@@ -123,9 +151,17 @@
     "key": "SKILL_157_00",
     "text": "Würfelwurf"
   },
+  "36e3848d": {
+    "key": "SKILL_323_00",
+    "text": "Caelum-Flamme"
+  },
   "3759a5b9": {
     "key": "SKILL_054_00",
     "text": "Schwindelresistenz"
+  },
+  "3b71af12": {
+    "key": "SKILL_311_00",
+    "text": "Himmelsgrollen"
   },
   "3bfed918": {
     "key": "SKILL_115_00",
@@ -139,6 +175,10 @@
     "key": "SKILL_234_00",
     "text": "Spartaner"
   },
+  "3eb345d7": {
+    "key": "SKILL_176_02",
+    "text": "Pfad des Donnerwolfs"
+  },
   "3f2c482e": {
     "key": "SKILL_100_00",
     "text": "Ergänzung"
@@ -146,6 +186,10 @@
   "3f488339": {
     "key": "SKILL_005_00",
     "text": "Bosheit"
+  },
+  "3f682593": {
+    "key": "SKILL_318_00",
+    "text": "Gesteigerter Durchbruch"
   },
   "3fec5f80": {
     "key": "SKILL_009_00",
@@ -158,6 +202,18 @@
   "451d814c": {
     "key": "SKILL_128_01",
     "text": "Ethos des Ewigen Jähzorns"
+  },
+  "461a8e07": {
+    "key": "SKILL_175_01",
+    "text": "Indigofarbenes Unglück"
+  },
+  "46ee3116": {
+    "key": "SKILL_302_00",
+    "text": "Pechschwarze Bande"
+  },
+  "47384248": {
+    "key": "SKILL_177_00",
+    "text": "Reinkarnierte Güte"
   },
   "48a95b8d": {
     "key": "SKILL_166_00",
@@ -173,7 +229,7 @@
   },
   "4e5f6706": {
     "key": "SKILL_172_02",
-    "text": "Pfad des Obersten Primarchen"
+    "text": "Pfad des Oberengels"
   },
   "4f135217": {
     "key": "SKILL_131_02",
@@ -197,11 +253,15 @@
   },
   "522e2388": {
     "key": "SKILL_125_01",
-    "text": "Erhabene heilige Ritterin"
+    "text": "Erhabene Heilige Ritterin"
   },
   "5463232f": {
     "key": "SKILL_128_00",
     "text": "Bravura des Ewigen Jähzorns"
+  },
+  "5559232f": {
+    "key": "SKILL_178_02",
+    "text": "Schwarzer Pfad"
   },
   "57ab5b10": {
     "key": "SKILL_151_00",
@@ -255,13 +315,17 @@
     "key": "SKILL_027_00",
     "text": "Tyrannei"
   },
+  "73220725": {
+    "key": "SKILL_326_00",
+    "text": "Caelum-Stille"
+  },
   "7351d602": {
     "key": "SKILL_120_01",
     "text": "Harmonie des Phantoms"
   },
   "7440e869": {
     "key": "SKILL_132_00",
-    "text": "Tiefschwarze Gegenwart"
+    "text": "Tiefschwarze Sense"
   },
   "74aa75d6": {
     "key": "SKILL_144_00",
@@ -271,6 +335,14 @@
     "key": "SKILL_170_00",
     "text": "Aufruf der Seelenschneide"
   },
+  "79027fc8": {
+    "key": "SKILL_319_00",
+    "text": "Gesteigerte Zertrümmerung"
+  },
+  "79266456": {
+    "key": "SKILL_174_02",
+    "text": "Pfad der Klingenprinzessin"
+  },
   "7ad0c010": {
     "key": "SKILL_130_01",
     "text": "Versalis-Entzündung"
@@ -278,6 +350,10 @@
   "7b4fc47a": {
     "key": "SKILL_170_02",
     "text": "Pfad der Seelenschneide"
+  },
+  "7b5b081d": {
+    "key": "SKILL_174_00",
+    "text": "Arie der Klingenprinzessin"
   },
   "7c2e4d64": {
     "key": "SKILL_064_00",
@@ -291,9 +367,17 @@
     "key": "SKILL_067_00",
     "text": "Entziehen"
   },
+  "7d75d904": {
+    "key": "SKILL_176_00",
+    "text": "Munition des Donnerwolfs"
+  },
   "7edd69d0": {
     "key": "SKILL_109_00",
     "text": "Präziser Zorn"
+  },
+  "807b6684": {
+    "key": "SKILL_177_02",
+    "text": "Reinkarnierter Pfad"
   },
   "81b293d9": {
     "key": "SKILL_171_02",
@@ -318,6 +402,10 @@
   "86cbcdc4": {
     "key": "SKILL_124_00",
     "text": "Überlegener Drachentöter"
+  },
+  "89c66acb": {
+    "key": "SKILL_303_00",
+    "text": "Sumo-Kriegsmarsch"
   },
   "8b3bf60c": {
     "key": "SKILL_063_00",
@@ -351,6 +439,10 @@
     "key": "SKILL_170_01",
     "text": "Wut der Seelenschneide"
   },
+  "9232dc17": {
+    "key": "SKILL_322_00",
+    "text": "Caelum-Grenze"
+  },
   "9389cc06": {
     "key": "SKILL_065_00",
     "text": "Verbesserte Heilung"
@@ -373,7 +465,11 @@
   },
   "9a9dc170": {
     "key": "SKILL_125_00",
-    "text": "Glanz der heiligen Ritterin"
+    "text": "Glanz der Heiligen Ritterin"
+  },
+  "9ace140b": {
+    "key": "SKILL_174_01",
+    "text": "Tanz der Klingenprinzessin"
   },
   "9ad8b5e6": {
     "key": "SKILL_142_00",
@@ -407,17 +503,21 @@
     "key": "SKILL_126_01",
     "text": "Kunst des Schwertmeisters"
   },
-  "a4d6b880": {
-    "key": "SKILL_134_00",
-    "text": "Leistungstropfen"
-  },
   "a63b89cd": {
     "key": "SKILL_127_01",
     "text": "Mut des Schmetterlings"
   },
+  "a7726190": {
+    "key": "SKILL_321_00",
+    "text": "Caelum-Glanz"
+  },
   "a7a45f28": {
     "key": "SKILL_017_00",
     "text": "Kombo-Finisher-Schaden"
+  },
+  "a898e283": {
+    "key": "SKILL_324_00",
+    "text": "Caelum-Schnee"
   },
   "a8a3163b": {
     "key": "SKILL_158_00",
@@ -425,7 +525,7 @@
   },
   "a9d17f55": {
     "key": "SKILL_030_00",
-    "text": "Überladungsattentäter"
+    "text": "Overdrive-Attentäter"
   },
   "aa83f548": {
     "key": "SKILL_118_00",
@@ -433,7 +533,11 @@
   },
   "ac9674c1": {
     "key": "SKILL_031_00",
-    "text": "Durchbrechen-Attentäter"
+    "text": "Break-Attentäter"
+  },
+  "aefeb1bc": {
+    "key": "SKILL_314_00",
+    "text": "Azurhimmel"
   },
   "af513a9d": {
     "key": "SKILL_129_01",
@@ -467,9 +571,25 @@
     "key": "SKILL_125_02",
     "text": "Pfad der Heiligen Ritterin"
   },
+  "b953cc1e": {
+    "key": "SKILL_175_02",
+    "text": "Indigofarbener Pfad"
+  },
   "ba504607": {
     "key": "SKILL_123_02",
     "text": "Pfad des Lords"
+  },
+  "bbd77c33": {
+    "key": "SKILL_316_00",
+    "text": "Gesteigerte Hiebe"
+  },
+  "be3404b9": {
+    "key": "SKILL_176_01",
+    "text": "Auge des Donnerwolfs"
+  },
+  "bf78fbfc": {
+    "key": "SKILL_301_00",
+    "text": "Fürchterliche Krabben"
   },
   "c00163b3": {
     "key": "SKILL_117_02",
@@ -507,10 +627,6 @@
     "key": "SKILL_156_00",
     "text": "Wirksame Kräuter"
   },
-  "cdeb73f6": {
-    "key": "SKILL_135_00",
-    "text": "Goldtropfen"
-  },
   "ceb700ee": {
     "key": "SKILL_004_00",
     "text": "Betäubungskraft"
@@ -519,9 +635,17 @@
     "key": "SKILL_058_00",
     "text": "HK versiegelt-Resistenz"
   },
+  "d029fe08": {
+    "key": "SKILL_325_00",
+    "text": "Sagenhaft"
+  },
   "d1012d8c": {
     "key": "SKILL_121_01",
     "text": "Stolz des Weißdrachen"
+  },
+  "d176d262": {
+    "key": "SKILL_175_00",
+    "text": "Indigofarbener Schwertstoß"
   },
   "d2c8e10a": {
     "key": "SKILL_106_00",
@@ -533,7 +657,11 @@
   },
   "d40d1e9b": {
     "key": "SKILL_172_00",
-    "text": "Ehrfurcht des Ob. Primarchen"
+    "text": "Ehrfurcht des Oberengels"
+  },
+  "d461ecfb": {
+    "key": "SKILL_141_04",
+    "text": "Ein Meer an Erträgen"
   },
   "d54f8ca7": {
     "key": "SKILL_051_00",
@@ -562,6 +690,10 @@
   "daefbb27": {
     "key": "SKILL_126_02",
     "text": "Pfad des Schwertmeisters"
+  },
+  "dba19768": {
+    "key": "SKILL_173_02",
+    "text": "Pfad des Alpha-Wolfs"
   },
   "dbe1d775": {
     "key": "SKILL_160_00",
@@ -619,6 +751,10 @@
     "key": "SKILL_129_00",
     "text": "Strategie der Gründerin"
   },
+  "ed8d8ad8": {
+    "key": "SKILL_178_01",
+    "text": "Schwarzer Satz"
+  },
   "ee85cd1f": {
     "key": "SKILL_233_00",
     "text": "Raserei"
@@ -634,6 +770,10 @@
   "f1d5dbd0": {
     "key": "SKILL_131_01",
     "text": "Blutroter Flug"
+  },
+  "f26baea5": {
+    "key": "SKILL_327_00",
+    "text": "Divergenz"
   },
   "f372f096": {
     "key": "SKILL_001_00",
@@ -658,5 +798,9 @@
   "fdd1ad24": {
     "key": "SKILL_127_02",
     "text": "Pfad des Schmetterlings"
+  },
+  "fff8cf64": {
+    "key": "SKILL_312_00",
+    "text": "Seuchenhimmel"
   }
 }

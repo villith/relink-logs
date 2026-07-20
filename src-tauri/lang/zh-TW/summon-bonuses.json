@@ -1,0 +1,90 @@
+{
+  "00d171e0": {
+    "key": "TXT_LBP_EFF_TITLE_CRITICAL01",
+    "text": "爆擊機率"
+  },
+  "2270bc40": {
+    "key": "TXT_LBP_EFF_TITLE_REC_LIMIT_SUM",
+    "text": "HP回復上限"
+  },
+  "2ea9ca80": {
+    "key": "TXT_LBP_EFF_TITLE_REC_LIMIT_SUM",
+    "text": "HP回復上限"
+  },
+  "2ffb509f": {
+    "key": "TXT_LBP_EFF_TITLE_AB_LIMIT01",
+    "text": "技能的傷害上限"
+  },
+  "33c0d50c": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_DMG01",
+    "text": "奧義的給予傷害"
+  },
+  "54b09a37": {
+    "key": "TXT_LBP_EFF_TITLE_BURST_DMG01",
+    "text": "奧義連擊的給予傷害"
+  },
+  "5a1d2c89": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_LIMIT01",
+    "text": "奧義的傷害上限"
+  },
+  "5a39d81b": {
+    "key": "TXT_LBP_EFF_TITLE_BURST_DMG01",
+    "text": "奧義連擊的給予傷害"
+  },
+  "664e8e32": {
+    "key": "TXT_LBP_EFF_TITLE_AB_DMG01",
+    "text": "技能的給予傷害"
+  },
+  "75138d21": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_DMG01",
+    "text": "奧義的給予傷害"
+  },
+  "9245dfa4": {
+    "key": "TXT_LBP_EFF_TITLE_ATK_LIMIT01",
+    "text": "一般攻擊的傷害上限"
+  },
+  "a074a967": {
+    "key": "TXT_LBP_EFF_TITLE_CRITICAL01",
+    "text": "爆擊機率"
+  },
+  "a3539fbb": {
+    "key": "TXT_LBP_EFF_TITLE_ARTS_LIMIT01",
+    "text": "奧義的傷害上限"
+  },
+  "a3e537b1": {
+    "key": "TXT_LBP_EFF_TITLE_ATK01",
+    "text": "攻擊力"
+  },
+  "a66241c9": {
+    "key": "TXT_LBP_EFF_TITLE_ATK_LIMIT01",
+    "text": "一般攻擊的傷害上限"
+  },
+  "a8900c80": {
+    "key": "TXT_LBP_EFF_TITLE_ATK01",
+    "text": "攻擊力"
+  },
+  "af39a3fb": {
+    "key": "TXT_LBP_EFF_TITLE_AB_DMG01",
+    "text": "技能的給予傷害"
+  },
+  "bc4e92cb": {
+    "key": "TXT_LBP_EFF_TITLE_HP01",
+    "text": "HP"
+  },
+  "ce70c58a": {
+    "key": "TXT_LBP_EFF_TITLE_AB_LIMIT01",
+    "text": "技能的傷害上限"
+  },
+  "f0f77bc1": {
+    "key": "TXT_LBP_EFF_TITLE_BREAK01",
+    "text": "暈眩值"
+  },
+  "f2256e44": {
+    "key": "TXT_LBP_EFF_TITLE_HP01",
+    "text": "HP"
+  },
+  "f7b0316f": {
+    "key": "TXT_LBP_EFF_TITLE_BREAK01",
+    "text": "暈眩值"
+  }
+}

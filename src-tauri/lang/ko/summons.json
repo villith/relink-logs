@@ -1,0 +1,758 @@
+{
+  "0033943a": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "흑룡 이빌 III"
+  },
+  "01b80951": {
+    "key": "TXT_SMN_So4000",
+    "text": "어둠에 숨은 자"
+  },
+  "03c8bf90": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "신탁의 회륜 II"
+  },
+  "03c95420": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "블리자다일 II"
+  },
+  "045efb5b": {
+    "key": "TXT_SMN_So4100_3",
+    "text": "단죄의 철기 III"
+  },
+  "0525e77d": {
+    "key": "TXT_SMN_So6300_2",
+    "text": "리틀 스니퍼 II"
+  },
+  "099e1dd3": {
+    "key": "TXT_SMN_So4c00",
+    "text": "마나가름 니힐라"
+  },
+  "0b366ad9": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "플레임다일 II"
+  },
+  "0be2a43a": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "스톤다일 II"
+  },
+  "0d94b89f": {
+    "key": "TXT_SMN_So2000_2",
+    "text": "실버 슬라임 II"
+  },
+  "0ee2670a": {
+    "key": "TXT_SMN_So1600_3",
+    "text": "게러신 III"
+  },
+  "0f986ed9": {
+    "key": "TXT_SMN_So0200",
+    "text": "롤란"
+  },
+  "109e2271": {
+    "key": "TXT_SMN_So5700_3",
+    "text": "기공단 연합 라팔 III"
+  },
+  "15ec425e": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "반란의 굉포 II"
+  },
+  "15ed6d77": {
+    "key": "TXT_SMN_So4f00_3",
+    "text": "희망에 찬 하늘의 민족 III"
+  },
+  "16b702dc": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "마로스 승병 III"
+  },
+  "16ba3b8a": {
+    "key": "TXT_SMN_So1800_3",
+    "text": "스카르밀리오네 III"
+  },
+  "1ab77fdf": {
+    "key": "TXT_SMN_So5f00",
+    "text": "고양이"
+  },
+  "1abade1d": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "크아이가"
+  },
+  "1b5daebd": {
+    "key": "TXT_SMN_So1b00_1",
+    "text": "와이번"
+  },
+  "1b6a4024": {
+    "key": "TXT_SMN_So1f00_3",
+    "text": "플레임다일 III"
+  },
+  "1b9de0fa": {
+    "key": "TXT_SMN_So5400_2",
+    "text": "시드홀름 가디언즈 II"
+  },
+  "1be16847": {
+    "key": "TXT_SMN_So2200_1",
+    "text": "크아이가"
+  },
+  "1cc0e0ef": {
+    "key": "TXT_SMN_So2b00_1",
+    "text": "물의 정령"
+  },
+  "1e6543a3": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "화룡 브라자레크 II"
+  },
+  "239f769f": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "베헤모스 III"
+  },
+  "23d839a3": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "마나가름"
+  },
+  "2517c481": {
+    "key": "TXT_SMN_So3f00_2",
+    "text": "흑룡 이빌 II"
+  },
+  "26e7ccb1": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "빙룡 윌리누스 II"
+  },
+  "299c1a08": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "간절한 하늘의 민족"
+  },
+  "2e3ce3d9": {
+    "key": "TXT_SMN_So2900_2",
+    "text": "다크 시드 II"
+  },
+  "2e657b01": {
+    "key": "TXT_SMN_So3100_1",
+    "text": "드로이타 마더"
+  },
+  "2ea15d18": {
+    "key": "TXT_SMN_So2500_2",
+    "text": "나자르 본주우 II"
+  },
+  "2eacd79c": {
+    "key": "TXT_SMN_So1a00_1",
+    "text": "혼 버드"
+  },
+  "2f15455c": {
+    "key": "TXT_SMN_So9200",
+    "text": "벨제붑"
+  },
+  "30f63214": {
+    "key": "TXT_SMN_So2800_1",
+    "text": "홀리 시드"
+  },
+  "315695ae": {
+    "key": "TXT_SMN_So3400",
+    "text": "루비 돌"
+  },
+  "316641a4": {
+    "key": "TXT_SMN_So2100_2",
+    "text": "골드 슬라임 II"
+  },
+  "31ee9ba5": {
+    "key": "TXT_SMN_So0f00_2",
+    "text": "청색의 우두머리 II"
+  },
+  "326dc2de": {
+    "key": "TXT_SMN_So1800_2",
+    "text": "스카르밀리오네 II"
+  },
+  "36cb5052": {
+    "key": "TXT_SMN_So5600_2",
+    "text": "마로스 승병 II"
+  },
+  "38348e1e": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "에인션트 드래곤 II"
+  },
+  "391c7857": {
+    "key": "TXT_SMN_So4d00_1",
+    "text": "재앙의 그림자"
+  },
+  "3bad1134": {
+    "key": "TXT_SMN_So3c00_3",
+    "text": "지룡 도르베일 III"
+  },
+  "3c381dcd": {
+    "key": "TXT_SMN_So0e00_1",
+    "text": "고블린 글래디에이터"
+  },
+  "3c4f2b7d": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "희망에 찬 하늘의 민족"
+  },
+  "3dd9ecee": {
+    "key": "TXT_SMN_So2600_1",
+    "text": "플레임 시드"
+  },
+  "3fd89c3a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "세스라카 II"
+  },
+  "42465367": {
+    "key": "TXT_SMN_So5500_2",
+    "text": "인중단 II"
+  },
+  "439cdb88": {
+    "key": "TXT_SMN_So2100_3",
+    "text": "골드 슬라임 III"
+  },
+  "44a5cab1": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "자스바 일가"
+  },
+  "47e2ae71": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "신탁의 회륜 III"
+  },
+  "48732d1f": {
+    "key": "TXT_SMN_So6400_3",
+    "text": "신탁의 회륜 III"
+  },
+  "4a65c97d": {
+    "key": "TXT_SMN_So2600_2",
+    "text": "플레임 시드 II"
+  },
+  "4b3d1768": {
+    "key": "TXT_SMN_So1c00_1",
+    "text": "엘더 와이번"
+  },
+  "4ba8ceba": {
+    "key": "TXT_SMN_So4f00_1",
+    "text": "희망에 찬 하늘의 민족"
+  },
+  "4c966e4f": {
+    "key": "TXT_SMN_So5300_3",
+    "text": "자스바 일가 III"
+  },
+  "4d84581f": {
+    "key": "TXT_SMN_So1000_1",
+    "text": "적색의 무뢰한"
+  },
+  "4ea296fc": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "실버 슬라임 III"
+  },
+  "4f484bbb": {
+    "key": "TXT_SMN_So2800_2",
+    "text": "홀리 시드 II"
+  },
+  "4fd78af8": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "지룡 도르베일 II"
+  },
+  "513d05cc": {
+    "key": "TXT_SMN_So5700_2",
+    "text": "기공단 연합 라팔 II"
+  },
+  "514cf53b": {
+    "key": "TXT_SMN_So5200_2",
+    "text": "백랑병단 II"
+  },
+  "524d1660": {
+    "key": "TXT_SMN_So1200_3",
+    "text": "거친 무사 III"
+  },
+  "52b14b66": {
+    "key": "TXT_SMN_So4900_3",
+    "text": "후라칸 III"
+  },
+  "52e21e37": {
+    "key": "TXT_SMN_So3400",
+    "text": "루비 돌"
+  },
+  "5365294f": {
+    "key": "TXT_SMN_So3100_2",
+    "text": "드로이타 마더 II"
+  },
+  "547e7dfc": {
+    "key": "TXT_SMN_So4e00_1",
+    "text": "알바코어"
+  },
+  "551dc320": {
+    "key": "TXT_SMN_So4d00_2",
+    "text": "재앙의 그림자 II"
+  },
+  "556da7b4": {
+    "key": "TXT_SMN_So3900_2",
+    "text": "에인션트 드래곤 II"
+  },
+  "55815e99": {
+    "key": "TXT_SMN_So1200_2",
+    "text": "거친 무사 II"
+  },
+  "576310df": {
+    "key": "TXT_SMN_So5000_3",
+    "text": "간절한 하늘의 민족 III"
+  },
+  "58aa9cad": {
+    "key": "TXT_SMN_So5500_1",
+    "text": "인중단"
+  },
+  "59f8666f": {
+    "key": "TXT_SMN_So2900_1",
+    "text": "다크 시드"
+  },
+  "5c42d57c": {
+    "key": "TXT_SMN_So4a00",
+    "text": "후라칸 니힐라"
+  },
+  "5ca9330a": {
+    "key": "TXT_SMN_So5200_3",
+    "text": "백랑병단 III"
+  },
+  "5e29e993": {
+    "key": "TXT_SMN_So4b00_1",
+    "text": "마나가름"
+  },
+  "5f3337b6": {
+    "key": "TXT_SMN_So0d00_1",
+    "text": "고블린 솔져"
+  },
+  "60a6d3a5": {
+    "key": "TXT_SMN_So3b00_2",
+    "text": "빙룡 윌리누스 II"
+  },
+  "61c79814": {
+    "key": "TXT_SMN_So0d00_2",
+    "text": "고블린 솔져 II"
+  },
+  "6262979b": {
+    "key": "TXT_SMN_So2500_3",
+    "text": "나자르 본주우 III"
+  },
+  "634a379d": {
+    "key": "TXT_SMN_So2400_1",
+    "text": "아리만"
+  },
+  "6368a53d": {
+    "key": "TXT_SMN_So5600_3",
+    "text": "마로스 승병 III"
+  },
+  "65e658d9": {
+    "key": "TXT_SMN_So4700_2",
+    "text": "불칸 볼라 II"
+  },
+  "666947c2": {
+    "key": "TXT_SMN_So3e00_2",
+    "text": "백룡 라디스 II"
+  },
+  "67a73702": {
+    "key": "TXT_SMN_So4f00_2",
+    "text": "희망에 찬 하늘의 민족 II"
+  },
+  "67c7e1ff": {
+    "key": "TXT_SMN_So3800_3",
+    "text": "엔누기 III"
+  },
+  "6b514309": {
+    "key": "TXT_SMN_So2400_2",
+    "text": "아리만 II"
+  },
+  "6d6cb496": {
+    "key": "TXT_SMN_So4000",
+    "text": "어둠에 숨은 자"
+  },
+  "6e5968fc": {
+    "key": "TXT_SMN_So0000",
+    "text": "루시퍼"
+  },
+  "6ee91e7d": {
+    "key": "TXT_SMN_So4200_2",
+    "text": "반란의 굉포 II"
+  },
+  "6f6bbbe0": {
+    "key": "TXT_SMN_So4700_3",
+    "text": "불칸 볼라 III"
+  },
+  "730395dc": {
+    "key": "TXT_SMN_So5500_3",
+    "text": "인중단 III"
+  },
+  "735dd55b": {
+    "key": "TXT_SMN_So1a00_2",
+    "text": "혼 버드 II"
+  },
+  "7996a856": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "후라칸"
+  },
+  "7a46e50e": {
+    "key": "TXT_SMN_So1d00_2",
+    "text": "스톤다일 II"
+  },
+  "7a7615d3": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "코브라 II"
+  },
+  "7e154422": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "폴카 자경단 III"
+  },
+  "7e853e16": {
+    "key": "TXT_SMN_So6400_1",
+    "text": "신탁의 회륜"
+  },
+  "7e8a659a": {
+    "key": "TXT_SMN_So2300_2",
+    "text": "모쿠모쿠렌 II"
+  },
+  "7f8364e5": {
+    "key": "TXT_SMN_So3f00_1",
+    "text": "흑룡 이빌"
+  },
+  "81ecec7f": {
+    "key": "TXT_SMN_So0200",
+    "text": "롤란"
+  },
+  "847cf372": {
+    "key": "TXT_SMN_So4200_3",
+    "text": "반란의 굉포 III"
+  },
+  "852287ba": {
+    "key": "TXT_SMN_So2700_1",
+    "text": "아쿠아 시드"
+  },
+  "855d018c": {
+    "key": "TXT_SMN_So4500",
+    "text": "릴리스"
+  },
+  "87c6c345": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "바위 골렘"
+  },
+  "897ffaf0": {
+    "key": "TXT_SMN_So1000_2",
+    "text": "적색의 무뢰한 II"
+  },
+  "8b489804": {
+    "key": "TXT_SMN_So4300_1",
+    "text": "코브라"
+  },
+  "8c607d26": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "백랑병단"
+  },
+  "8cf23b58": {
+    "key": "TXT_SMN_So3300_3",
+    "text": "바위 골렘 III"
+  },
+  "8d7fde58": {
+    "key": "TXT_SMN_So4100_2",
+    "text": "단죄의 철기 II"
+  },
+  "8db272e5": {
+    "key": "TXT_SMN_So3f00_3",
+    "text": "흑룡 이빌 III"
+  },
+  "8e02e207": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "게러신 II"
+  },
+  "90bd4ac0": {
+    "key": "TXT_SMN_So0000",
+    "text": "루시퍼"
+  },
+  "9118453a": {
+    "key": "TXT_SMN_So6300_1",
+    "text": "리틀 스니퍼"
+  },
+  "9235fb9f": {
+    "key": "TXT_SMN_So4300_2",
+    "text": "코브라 II"
+  },
+  "9360b2b5": {
+    "key": "TXT_SMN_So2b00_2",
+    "text": "물의 정령 II"
+  },
+  "9384a5d3": {
+    "key": "TXT_SMN_So3e00_3",
+    "text": "백룡 라디스 III"
+  },
+  "97e451a4": {
+    "key": "TXT_SMN_So3c00_2",
+    "text": "지룡 도르베일 II"
+  },
+  "99a68616": {
+    "key": "TXT_SMN_So0f00_1",
+    "text": "청색의 우두머리"
+  },
+  "99cf3e05": {
+    "key": "TXT_SMN_So1e00_3",
+    "text": "블리자다일 III"
+  },
+  "9a6d89dc": {
+    "key": "TXT_SMN_So5100_3",
+    "text": "폴카 자경단 III"
+  },
+  "9bc09751": {
+    "key": "TXT_SMN_So1b00_2",
+    "text": "와이번 II"
+  },
+  "9d5c27de": {
+    "key": "TXT_SMN_So3700_2",
+    "text": "베헤모스 II"
+  },
+  "9f0ecf8b": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "화룡 브라자레크 III"
+  },
+  "a062ec06": {
+    "key": "TXT_SMN_So1300",
+    "text": "붉은 나찰"
+  },
+  "a0c96959": {
+    "key": "TXT_SMN_So5700_1",
+    "text": "기공단 연합 라팔"
+  },
+  "a34bdecb": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "세스라카 III"
+  },
+  "a40e64f4": {
+    "key": "TXT_SMN_So2700_2",
+    "text": "아쿠아 시드 II"
+  },
+  "a4f63a8f": {
+    "key": "TXT_SMN_So5400_3",
+    "text": "시드홀름 가디언즈 III"
+  },
+  "a608aecd": {
+    "key": "TXT_SMN_So5900",
+    "text": "레퍼리"
+  },
+  "a6bb6299": {
+    "key": "TXT_SMN_So1d00_3",
+    "text": "스톤다일 III"
+  },
+  "a7eff558": {
+    "key": "TXT_SMN_So9200",
+    "text": "벨제붑"
+  },
+  "aa2bbdbf": {
+    "key": "TXT_SMN_So1c00_2",
+    "text": "엘더 와이번 II"
+  },
+  "ac20c821": {
+    "key": "TXT_SMN_So3800_2",
+    "text": "엔누기 II"
+  },
+  "ad15d880": {
+    "key": "TXT_SMN_So4800",
+    "text": "불칸 볼라 니힐라"
+  },
+  "ae52556d": {
+    "key": "TXT_SMN_So3200_2",
+    "text": "기습형 드로이타 마더 II"
+  },
+  "b360dd8d": {
+    "key": "TXT_SMN_So4400_1",
+    "text": "샌드 리퍼"
+  },
+  "b3c2f3a4": {
+    "key": "TXT_SMN_So3200_1",
+    "text": "기습형 드로이타 마더"
+  },
+  "b44a8a02": {
+    "key": "TXT_SMN_So4e00_3",
+    "text": "알바코어 III"
+  },
+  "b4cf26c6": {
+    "key": "TXT_SMN_So5400_1",
+    "text": "시드홀름 가디언즈"
+  },
+  "b5449253": {
+    "key": "TXT_SMN_So5000_1",
+    "text": "간절한 하늘의 민족"
+  },
+  "b79312a7": {
+    "key": "TXT_SMN_So3300_2",
+    "text": "바위 골렘 II"
+  },
+  "b960d2bb": {
+    "key": "TXT_SMN_So3b00_3",
+    "text": "빙룡 윌리누스 III"
+  },
+  "b96cb87d": {
+    "key": "TXT_SMN_So2300_1",
+    "text": "모쿠모쿠렌"
+  },
+  "bdd84e9a": {
+    "key": "TXT_SMN_So4600_2",
+    "text": "세스라카 II"
+  },
+  "bfac23dc": {
+    "key": "TXT_SMN_So3500_3",
+    "text": "그리핀 III"
+  },
+  "c1ccbc3c": {
+    "key": "TXT_SMN_So3600_2",
+    "text": "블랙 랩터 II"
+  },
+  "c2f91a7f": {
+    "key": "TXT_SMN_So1100_3",
+    "text": "고블린 워리어 III"
+  },
+  "c3e918f9": {
+    "key": "TXT_SMN_So2a00_1",
+    "text": "불의 정령"
+  },
+  "c52147d4": {
+    "key": "TXT_SMN_So1e00_2",
+    "text": "블리자다일 II"
+  },
+  "ca95cd8c": {
+    "key": "TXT_SMN_So4900_1",
+    "text": "후라칸"
+  },
+  "cc3c45f3": {
+    "key": "TXT_SMN_So3300_1",
+    "text": "바위 골렘"
+  },
+  "ce0039d4": {
+    "key": "TXT_SMN_So3900_3",
+    "text": "에인션트 드래곤 III"
+  },
+  "ce8e0b79": {
+    "key": "TXT_SMN_So5000_2",
+    "text": "간절한 하늘의 민족 II"
+  },
+  "d4ac8684": {
+    "key": "TXT_SMN_So3600_3",
+    "text": "블랙 랩터 III"
+  },
+  "d5536ae8": {
+    "key": "TXT_SMN_So4b00_2",
+    "text": "마나가름 II"
+  },
+  "d6387caa": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "고블린 글래디에이터 II"
+  },
+  "d751d8d2": {
+    "key": "TXT_SMN_So2a00_2",
+    "text": "불의 정령 II"
+  },
+  "d7555b1f": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "신탁의 회륜 II"
+  },
+  "da0b6092": {
+    "key": "TXT_SMN_So5600_1",
+    "text": "마로스 승병"
+  },
+  "dbd2f84e": {
+    "key": "TXT_SMN_So4b00_3",
+    "text": "마나가름 III"
+  },
+  "ddb21c31": {
+    "key": "TXT_SMN_So5100_1",
+    "text": "폴카 자경단"
+  },
+  "dfab70b7": {
+    "key": "TXT_SMN_So4500",
+    "text": "릴리스"
+  },
+  "e24b4807": {
+    "key": "TXT_SMN_So6400_2",
+    "text": "신탁의 회륜 II"
+  },
+  "e492e6bf": {
+    "key": "TXT_SMN_So4600_3",
+    "text": "세스라카 III"
+  },
+  "e4b7dcf9": {
+    "key": "TXT_SMN_So3700_3",
+    "text": "베헤모스 III"
+  },
+  "e51ce5b0": {
+    "key": "TXT_SMN_So4900_2",
+    "text": "후라칸 II"
+  },
+  "e528e76f": {
+    "key": "TXT_SMN_So2000_3",
+    "text": "실버 슬라임 III"
+  },
+  "e6ebb6fa": {
+    "key": "TXT_SMN_So5900",
+    "text": "레퍼리"
+  },
+  "e7f607dc": {
+    "key": "TXT_SMN_So4400_2",
+    "text": "샌드 리퍼 II"
+  },
+  "ebeb3dc0": {
+    "key": "TXT_SMN_So1900_1",
+    "text": "라운드 울프"
+  },
+  "eeea2080": {
+    "key": "TXT_SMN_So1900_2",
+    "text": "라운드 울프 II"
+  },
+  "ef554891": {
+    "key": "TXT_SMN_So2200_2",
+    "text": "크아이가 II"
+  },
+  "ef973d88": {
+    "key": "TXT_SMN_So5200_1",
+    "text": "백랑병단"
+  },
+  "f1c229f7": {
+    "key": "TXT_SMN_So3a00_2",
+    "text": "화룡 브라자레크 II"
+  },
+  "f1fc31c4": {
+    "key": "TXT_SMN_So5100_2",
+    "text": "폴카 자경단 II"
+  },
+  "f28d0e35": {
+    "key": "TXT_SMN_So6300_3",
+    "text": "리틀 스니퍼 III"
+  },
+  "f2be819e": {
+    "key": "TXT_SMN_So3a00_3",
+    "text": "화룡 브라자레크 III"
+  },
+  "f32aa7a7": {
+    "key": "TXT_SMN_So5300_2",
+    "text": "자스바 일가 II"
+  },
+  "f501285c": {
+    "key": "TXT_SMN_So0e00_2",
+    "text": "고블린 글래디에이터 II"
+  },
+  "f7eb57dd": {
+    "key": "TXT_SMN_So4e00_2",
+    "text": "알바코어 II"
+  },
+  "f7f2d161": {
+    "key": "TXT_SMN_So3500_2",
+    "text": "그리핀 II"
+  },
+  "f862e7da": {
+    "key": "TXT_SMN_So5300_1",
+    "text": "자스바 일가"
+  },
+  "f98f8b97": {
+    "key": "TXT_SMN_So1f00_2",
+    "text": "플레임다일 II"
+  },
+  "fc8444a1": {
+    "key": "TXT_SMN_So1600_2",
+    "text": "게러신 II"
+  },
+  "fc8a2ecb": {
+    "key": "TXT_SMN_So3d00_3",
+    "text": "풍룡 일루시어스 III"
+  },
+  "fd5fb92b": {
+    "key": "TXT_SMN_So1100_2",
+    "text": "고블린 워리어 II"
+  },
+  "ff513849": {
+    "key": "TXT_SMN_So3d00_2",
+    "text": "풍룡 일루시어스 II"
+  }
+}

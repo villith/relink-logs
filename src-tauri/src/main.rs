@@ -10,7 +10,7 @@ use std::{
 };
 
 use anyhow::Context;
-use gbfr_logs::{db, parser, synthesis};
+use gbfr_logs::{db, overmastery, parser, synthesis};
 
 use db::logs::LogEntry;
 use dll_syringe::{process::OwnedProcess, Syringe};
@@ -89,7 +89,83 @@ async fn search_synthesis(
             pairs_tested,
             sigil_count: snap.sigils.len() as u32,
             rng_unpredictable: snap.rng_state == 0,
+            rng_state: snap.rng_state,
+            seed_counter: snap.seed_counter,
         })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Toolbox / Synthesis Helper: current seed identity for staleness polling.
+/// `None` = game not running (staleness unknowable, not stale).
+#[tauri::command(async)]
+async fn fetch_synthesis_seed() -> Result<Option<synthesis::SynthesisSeed>, String> {
+    tokio::task::spawn_blocking(|| synthesis::snapshot::take_seed_state().map_err(|e| e.to_string()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Toolbox / Overmastery Predictor: is the game up, and which characters
+/// exist in the roster (for the character picker).
+#[tauri::command(async)]
+async fn fetch_overmastery_status() -> Result<overmastery::OvermasteryStatus, String> {
+    tokio::task::spawn_blocking(|| match overmastery::snapshot::take_snapshot() {
+        Ok(None) => Ok(overmastery::OvermasteryStatus { game_running: false, roster: Vec::new() }),
+        Ok(Some(snap)) => {
+            Ok(overmastery::OvermasteryStatus { game_running: true, roster: snap.roster })
+        }
+        Err(e) => Err(e.to_string()),
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Toolbox / Overmastery Predictor: fresh RNG snapshot + simulate the next N
+/// meditation rolls for one character and size.
+#[tauri::command(async)]
+async fn predict_overmastery(
+    query: overmastery::OvermasteryQuery,
+) -> Result<overmastery::OvermasteryPrediction, String> {
+    let tables = overmastery::stock_tables();
+    if query.tier >= tables.tiers.len() {
+        return Err("invalid-tier".to_string());
+    }
+    let rolls = query.rolls.min(500);
+    tokio::task::spawn_blocking(move || {
+        let snap = overmastery::snapshot::take_snapshot()
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "game-not-running".to_string())?;
+        if snap.slot_override != u32::MAX {
+            return Err("rng-override-active".to_string());
+        }
+        let char_idx = overmastery::char_slot_index(&snap.roster, query.char_id)
+            .ok_or_else(|| "character-not-found".to_string())?;
+        let slot = overmastery::rng_slot(query.tier as u32, char_idx);
+        let slot_state = *snap
+            .slots
+            .get(slot as usize)
+            .ok_or_else(|| "slot-out-of-range".to_string())?;
+        Ok(overmastery::OvermasteryPrediction {
+            rolls: overmastery::simulate(slot_state, query.tier, tables, rolls),
+            slot,
+            slot_state,
+            unpredictable: slot_state == 0,
+            msp_cost: tables.tiers[query.tier].msp_cost,
+        })
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Toolbox / Overmastery Predictor: current RNG state of one slot, for
+/// staleness polling against a prediction's `slot_state`. `None` = game not
+/// running (staleness unknowable, not stale).
+#[tauri::command(async)]
+async fn fetch_overmastery_seed(slot: u32) -> Result<Option<u32>, String> {
+    // The bound is owned by `take_slot_state`, which knows RNG_SLOT_COUNT.
+    tokio::task::spawn_blocking(move || {
+        overmastery::snapshot::take_slot_state(slot).map_err(|e| e.to_string())
     })
     .await
     .map_err(|e| e.to_string())?
@@ -520,7 +596,7 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
 // Continuously check for the game process and inject the DLL when found.
 async fn check_and_perform_hook(app: AppHandle) {
     loop {
-        match OwnedProcess::find_first_by_name("granblue_fantasy_relink.exe") {
+        match OwnedProcess::find_first_by_name(gbfr_logs::game_mem::GAME_EXE) {
             Some(target) => {
                 let syringe = Syringe::for_process(target);
                 let debug_dll_path = Path::new("hook-dbg.dll");
@@ -750,6 +826,37 @@ fn toggle_clickthrough(window: tauri::Window, state: State<ClickThrough>) {
         });
 }
 
+#[tauri::command]
+fn reset_meter_window(app_handle: AppHandle) {
+    reset_window_to_default(&app_handle, "main", true);
+}
+
+/// Show `label` and restore the default geometry declared for it in
+/// tauri.conf.json. Shared by the in-app reset command and the tray's
+/// "Reset Windows" item so the two can't drift apart.
+fn reset_window_to_default(handle: &AppHandle, label: &str, center: bool) {
+    let Some(window) = handle.get_window(label) else {
+        return;
+    };
+    let _ = window.show();
+    let _ = window.unminimize();
+    match handle.config().tauri.windows.iter().find(|w| w.label == label) {
+        Some(default) => {
+            let _ = window.set_size(Size::Logical(LogicalSize {
+                width: default.width,
+                height: default.height,
+            }));
+        }
+        // Resetting is the escape hatch for a window dragged off-screen or
+        // sized to nothing, so a config that no longer declares this label
+        // should be loud rather than a silent no-op.
+        None => log::warn!("no window config for label {label:?}; size not reset"),
+    }
+    if center {
+        let _ = window.center();
+    }
+}
+
 fn menu_tray_handler(handle: &AppHandle, event: SystemTrayEvent) {
     let should_focus = true;
     match event {
@@ -768,23 +875,8 @@ fn menu_tray_handler(handle: &AppHandle, event: SystemTrayEvent) {
                 handle.state::<AlwaysOnTop>(),
             ),
             "reset_windows" => {
-                if let Some(window) = handle.get_window("main") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_size(Size::Logical(LogicalSize {
-                        width: 500.0,
-                        height: 350.0,
-                    }));
-                }
-
-                if let Some(window) = handle.get_window("logs") {
-                    let _ = window.show();
-                    let _ = window.unminimize();
-                    let _ = window.set_size(Size::Logical(LogicalSize {
-                        width: 800.0,
-                        height: 600.0,
-                    }));
-                }
+                reset_window_to_default(handle, "main", false);
+                reset_window_to_default(handle, "logs", false);
             }
             "quit" => {
                 let _ = handle.save_window_state(StateFlags::all());
@@ -843,10 +935,15 @@ fn main() {
             delete_logs,
             delete_all_logs,
             toggle_always_on_top,
+            reset_meter_window,
             export_damage_log_to_file,
             set_debug_mode,
             reset_encounter,
             fetch_synthesis_status,
+            fetch_synthesis_seed,
+            fetch_overmastery_status,
+            predict_overmastery,
+            fetch_overmastery_seed,
             search_synthesis,
         ])
         .setup(|app| {

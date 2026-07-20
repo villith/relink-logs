@@ -1,7 +1,7 @@
 {
   "name": "relink-logs",
   "private": true,
-  "version": "1.9.6",
+  "version": "1.10.0",
   "type": "module",
   "scripts": {
     "dev": "cargo build --release --package hook --features hook/console,hook/hookdiag,hook/dmgdiag && node scripts/refresh-dbg-hook.mjs && vite",
@@ -34,6 +34,7 @@
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
     "react-i18next": "^14.0.5",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^6.22.1",
     "zustand": "^4.5.2"
   },
