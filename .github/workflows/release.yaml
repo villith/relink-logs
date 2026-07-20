@@ -37,6 +37,13 @@ jobs:
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # Fail before tagging: a tag without a release would block this version
+      # forever (the tag check above would skip it on every later push).
+      - name: Require CHANGELOG.md notes for this version
+        if: steps.check.outputs.should_release == 'true'
+        shell: bash
+        run: node scripts/extract-changelog.mjs "${{ steps.check.outputs.version }}"
+
       - name: Create and push tag
         if: steps.check.outputs.should_release == 'true'
         shell: bash
@@ -71,6 +78,20 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      # The release body doubles as the updater prompt's patch notes:
+      # tauri-action copies it into latest.json as `notes`.
+      - name: Extract release notes from CHANGELOG.md
+        id: notes
+        shell: bash
+        run: |
+          {
+            echo "body<<NOTES_EOF"
+            node scripts/extract-changelog.mjs "${{ needs.tag.outputs.version }}"
+            echo ""
+            echo "Make sure to save and exit the game before updating."
+            echo "NOTES_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       # The release build bundles src-tauri/hook.dll as a Tauri resource, but
       # nothing in `tauri build` produces it. Build the hook crate first and place
       # the DLL where the resource glob expects it (mirrors scripts/build.ps1).
@@ -90,7 +111,7 @@ jobs:
         with:
           tagName: ${{ needs.tag.outputs.version }}
           releaseName: "Relink Logs ${{ needs.tag.outputs.version }}"
-          releaseBody: "See the assets below to download and install. Make sure to save and exit before updating."
+          releaseBody: ${{ steps.notes.outputs.body }}
           # Publish (not draft) so releases/latest/download/latest.json resolves —
           # that auto-generated manifest is the updater endpoint. tauri-action
           # uploads latest.json + the .sig by default.
