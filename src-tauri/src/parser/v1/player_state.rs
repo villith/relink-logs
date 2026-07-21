@@ -46,6 +46,29 @@ pub struct PlayerState {
 }
 
 impl PlayerState {
+    /// A zeroed row for a player who has produced no tracked events yet — the
+    /// single place a fresh row is built, so a new field can never be
+    /// initialized differently on different creation paths.
+    pub fn new(index: u32, character_type: CharacterType) -> Self {
+        PlayerState {
+            index,
+            character_type,
+            total_damage: 0,
+            dps: 0.0,
+            sba: 0.0,
+            stun_per_second: 0.0,
+            total_stun_value: 0.0,
+            stun_delta_sum: 0.0,
+            stun_message_sum: 0.0,
+            skill_breakdown: Vec::new(),
+            last_known_pet_skill: None,
+            capped_hits: 0,
+            cappable_hits: 0,
+            overcap_base_sum: 0.0,
+            overcap_cap_sum: 0.0,
+        }
+    }
+
     pub fn set_sba(&mut self, sba: f64) {
         self.sba = sba;
     }
@@ -54,6 +77,46 @@ impl PlayerState {
     pub fn add_stun_message(&mut self, amount: f64) {
         self.stun_message_sum += amount;
         self.refresh_total_stun();
+    }
+
+    /// Folds one Perfect Guard counter-stun into this player: delta-path totals
+    /// (it has no damage event of its own) plus a zero-damage breakdown row that
+    /// counts guards as hits and carries only stun.
+    pub fn add_perfect_guard_stun(&mut self, amount: f64) {
+        self.stun_delta_sum += amount;
+        self.refresh_total_stun();
+
+        let row = self.breakdown_row_mut(ActionType::PerfectGuard);
+        row.hits += 1;
+        row.total_stun_value += amount;
+        row.max_stun_value = row.max_stun_value.max(amount);
+    }
+
+    /// Counts one guarded Quickening (The World) as a hits-only breakdown row:
+    /// no stun (the marker carries none) and no damage (the scripted counter
+    /// damage is intentionally untracked).
+    pub fn add_perfect_guard_quickening(&mut self) {
+        self.breakdown_row_mut(ActionType::PerfectGuardQuickening).hits += 1;
+    }
+
+    /// The find-or-create breakdown row for a parser-SYNTHESIZED action (guard
+    /// rows have no damage event, so a fresh row starts zeroed and is keyed by
+    /// action type alone — damage-event rows go through
+    /// [`Self::update_from_damage_event`], which also matches the child
+    /// character type).
+    fn breakdown_row_mut(&mut self, action_type: ActionType) -> &mut SkillState {
+        if let Some(index) = self
+            .skill_breakdown
+            .iter()
+            .position(|skill| skill.action_type == action_type)
+        {
+            return &mut self.skill_breakdown[index];
+        }
+        self.skill_breakdown
+            .push(SkillState::new(action_type, self.character_type));
+        self.skill_breakdown
+            .last_mut()
+            .expect("row pushed just above")
     }
 
     /// `total_stun_value` = whichever capture path saw the accrual (they
@@ -610,23 +673,7 @@ mod tests {
     }
 
     fn empty_player() -> PlayerState {
-        PlayerState {
-            index: 0,
-            character_type: CharacterType::Pl0000,
-            total_damage: 0,
-            last_known_pet_skill: None,
-            dps: 0.0,
-            skill_breakdown: vec![],
-            sba: 0.0,
-            total_stun_value: 0.0,
-            stun_delta_sum: 0.0,
-            stun_message_sum: 0.0,
-            stun_per_second: 0.0,
-            capped_hits: 0,
-            cappable_hits: 0,
-            overcap_base_sum: 0.0,
-            overcap_cap_sum: 0.0,
-        }
+        PlayerState::new(0, CharacterType::Pl0000)
     }
 
     fn plain_event(action_id: ActionType, damage: i32) -> DamageEvent {

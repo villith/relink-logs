@@ -532,6 +532,16 @@ pub struct DerivedEncounterState {
     /// created their party row; folded in on row creation.
     #[serde(skip)]
     pending_player_stun: HashMap<u32, f64>,
+    /// Perfect Guard stun that arrived before the guarding player's first
+    /// damage event; folded into their DELTA sum on row creation. One entry per
+    /// guard so the breakdown row's guard count and per-guard max survive.
+    #[serde(skip)]
+    pending_player_pg_stun: HashMap<u32, Vec<f64>>,
+    /// Guarded-Quickening guard counts that arrived before the guarding
+    /// player's first damage event; folded into their hits-only row on row
+    /// creation.
+    #[serde(skip)]
+    pending_player_pg_quickening: HashMap<u32, u32>,
     /// Status of the parser
     status: ParserStatus,
     /// Derived party stats
@@ -552,6 +562,8 @@ impl Default for DerivedEncounterState {
             stun_delta_sum: 0.0,
             stun_message_sum: 0.0,
             pending_player_stun: HashMap::new(),
+            pending_player_pg_stun: HashMap::new(),
+            pending_player_pg_quickening: HashMap::new(),
             status: ParserStatus::Waiting,
             party: HashMap::new(),
             targets: HashMap::new(),
@@ -598,38 +610,16 @@ impl DerivedEncounterState {
         self.refresh_total_stun();
         self.stun_per_second = self.total_stun_value / ((self.duration()) as f64 / 1000.0);
 
-        // Stun messages that arrived before this player's first damage event.
-        let pending_stun = self
-            .pending_player_stun
-            .remove(&damage_instance.event.source.parent_index);
-
-        // Add actor to party if not already present.
+        // Add actor to party if not already present (folding in any stun/guard
+        // state held pending for the slot).
+        self.ensure_player_row(
+            damage_instance.event.source.parent_index,
+            CharacterType::from_hash(damage_instance.event.source.parent_actor_type),
+        );
         let source_player = self
             .party
-            .entry(damage_instance.event.source.parent_index)
-            .or_insert(PlayerState {
-                index: damage_instance.event.source.parent_index,
-                character_type: CharacterType::from_hash(
-                    damage_instance.event.source.parent_actor_type,
-                ),
-                total_damage: 0,
-                dps: 0.0,
-                sba: 0.0,
-                stun_per_second: 0.0,
-                total_stun_value: 0.0,
-                stun_delta_sum: 0.0,
-                stun_message_sum: 0.0,
-                skill_breakdown: Vec::new(),
-                last_known_pet_skill: None,
-                capped_hits: 0,
-                cappable_hits: 0,
-                overcap_base_sum: 0.0,
-                overcap_cap_sum: 0.0,
-            });
-
-        if let Some(pending) = pending_stun {
-            source_player.add_stun_message(pending);
-        }
+            .get_mut(&damage_instance.event.source.parent_index)
+            .expect("ensure_player_row created the row above");
 
         // Update player stats from damage event.
         source_player.update_from_damage_event(damage_instance);
@@ -675,6 +665,97 @@ impl DerivedEncounterState {
             *self.pending_player_stun.entry(actor_index).or_insert(0.0) += amount;
         }
     }
+
+    /// Creates a player's party row before their first damage event, from the
+    /// character type the identity snapshot carries — a player who only guards
+    /// must still show their Perfect Guard rows. Folds in any guard/stun state
+    /// already held pending for the slot. No-op (beyond the pending fold) when
+    /// the row already exists.
+    fn ensure_player_row(&mut self, actor_index: u32, character_type: CharacterType) {
+        let pending_stun = self.pending_player_stun.remove(&actor_index);
+        let pending_pg_stun = self.pending_player_pg_stun.remove(&actor_index);
+        let pending_pg_quickening = self.pending_player_pg_quickening.remove(&actor_index);
+
+        let player = self
+            .party
+            .entry(actor_index)
+            .or_insert_with(|| PlayerState::new(actor_index, character_type));
+
+        if let Some(pending) = pending_stun {
+            player.add_stun_message(pending);
+        }
+        if let Some(pending) = pending_pg_stun {
+            for amount in pending {
+                player.add_perfect_guard_stun(amount);
+            }
+        }
+        if let Some(pending) = pending_pg_quickening {
+            for _ in 0..pending {
+                player.add_perfect_guard_quickening();
+            }
+        }
+    }
+
+    /// Folds one Perfect Guard stun capture into the encounter. Captured as a
+    /// SOURCE-side accumulator delta on the enemy's guarded attack, so it is a
+    /// DELTA-path amount: hit stun and guard stun share `stun_delta_sum`, and
+    /// the max() dedupe against the message path keeps working (a message-path
+    /// duplicate of the same accrual can never push the total past it).
+    ///
+    /// The identity snapshot (resolved from `player_data`) lets the guard
+    /// create the player's row when they haven't dealt damage yet; without one
+    /// the guard is held pending until their first damage event.
+    fn process_perfect_guard_stun(
+        &mut self,
+        player_data: &[Option<PlayerData>; 4],
+        actor_index: u32,
+        amount: f64,
+    ) {
+        self.stun_delta_sum += amount;
+        self.refresh_total_stun();
+        let duration_secs = (self.duration()) as f64 / 1000.0;
+        self.stun_per_second = self.total_stun_value / duration_secs;
+
+        if let Some(character_type) = character_type_for_slot_key(player_data, actor_index) {
+            self.ensure_player_row(actor_index, character_type);
+        }
+        if let Some(player) = self.party.get_mut(&actor_index) {
+            player.add_perfect_guard_stun(amount);
+            player.stun_per_second = player.total_stun_value / duration_secs;
+        } else {
+            // No identity for the slot: hold it until the player's first
+            // damage event creates their row.
+            self.pending_player_pg_stun
+                .entry(actor_index)
+                .or_default()
+                .push(amount);
+        }
+    }
+
+    /// Counts one guarded Quickening (The World) for the player: a hits-only
+    /// breakdown row. No stun or damage is tracked — the marker carries no
+    /// measurable stun and the scripted counter damage is intentionally
+    /// untracked (user decision). Row creation as in
+    /// [`Self::process_perfect_guard_stun`].
+    fn process_perfect_guard_quickening(
+        &mut self,
+        player_data: &[Option<PlayerData>; 4],
+        actor_index: u32,
+    ) {
+        if let Some(character_type) = character_type_for_slot_key(player_data, actor_index) {
+            self.ensure_player_row(actor_index, character_type);
+        }
+        if let Some(player) = self.party.get_mut(&actor_index) {
+            player.add_perfect_guard_quickening();
+        } else {
+            // No identity for the slot: hold the count until the player's
+            // first damage event creates their row.
+            *self
+                .pending_player_pg_quickening
+                .entry(actor_index)
+                .or_default() += 1;
+        }
+    }
 }
 
 /// v2.0.2: the hook can no longer resolve Id's dragon form (Pl2000) to its Pl1900
@@ -703,6 +784,21 @@ pub fn remap_dragon_form(
     }
 
     event
+}
+
+/// Resolves the character type behind a player slot key (`0xF0000000 | slot`)
+/// from the identity snapshots. Identity events land at quest load — before a
+/// guard is possible — so this lets guard handlers create a party row for a
+/// player who has not dealt any damage yet. `None` for non-slot-key values or
+/// slots with no identity (the caller then falls back to holding the guard
+/// pending).
+fn character_type_for_slot_key(
+    player_data: &[Option<PlayerData>; 4],
+    slot_key: u32,
+) -> Option<CharacterType> {
+    player_data[protocol::party_slot_of(slot_key)?]
+        .as_ref()
+        .map(|player| player.character_type)
 }
 
 /// Cap on charted HP pools: beyond this many lines the chart is unreadable, so
@@ -1094,6 +1190,19 @@ impl Parser {
                     self.derived_state
                         .process_stun_message(event.actor_index, event.stun_amount as f64);
                 }
+                Message::OnPerfectGuardStun(event) => {
+                    self.derived_state.process_perfect_guard_stun(
+                        &self.encounter.player_data,
+                        event.actor_index,
+                        event.stun_amount as f64,
+                    );
+                }
+                Message::OnPerfectGuardQuickening(event) => {
+                    self.derived_state.process_perfect_guard_quickening(
+                        &self.encounter.player_data,
+                        event.actor_index,
+                    );
+                }
                 _ => {}
             }
         }
@@ -1289,6 +1398,21 @@ impl Parser {
         self.encounter.reset_player_data();
     }
 
+    /// Starts the encounter (discard stale state, set the start time, mark
+    /// InProgress) if it isn't already running. The encounter's opening event
+    /// is not necessarily a damage event — a dedicated guarder can perfect-guard
+    /// the boss's first attack before anyone deals damage — so every entry point
+    /// that records into the live encounter must call this before pushing.
+    /// Otherwise the first damage event's `reset()` would wipe an earlier guard
+    /// from both the meter and the raw event log (unrecoverable on reparse).
+    fn ensure_encounter_started(&mut self, now: i64) {
+        if self.status == ParserStatus::Stopped || self.status == ParserStatus::Waiting {
+            self.reset();
+            self.derived_state.start(now);
+            self.update_status(ParserStatus::InProgress);
+        }
+    }
+
     // Called when a damage event is received from the game.
     pub fn on_damage_event(&mut self, event: DamageEvent) {
         let now = Utc::now().timestamp_millis();
@@ -1297,12 +1421,8 @@ impl Parser {
             return;
         }
 
-        // If this is the first damage event, set the start time.
-        if self.status == ParserStatus::Stopped || self.status == ParserStatus::Waiting {
-            self.reset();
-            self.derived_state.start(now);
-            self.update_status(ParserStatus::InProgress);
-        }
+        // If this is the first event of the encounter, start it.
+        self.ensure_encounter_started(now);
 
         self.encounter
             .push_event(now, Message::DamageEvent(event.clone()));
@@ -1525,6 +1645,43 @@ impl Parser {
 
         self.derived_state
             .process_stun_message(event.actor_index, event.stun_amount as f64);
+
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
+        }
+    }
+
+    /// Handles one Perfect Guard stun capture (source-side accumulator delta on
+    /// the enemy's guarded attack, attributed to the guarding player).
+    pub fn on_perfect_guard_stun(&mut self, event: OnPlayerStunEvent) {
+        let now = Utc::now().timestamp_millis();
+        // A guard can be the encounter's opening event (see ensure_encounter_started).
+        self.ensure_encounter_started(now);
+        self.encounter
+            .push_event(now, Message::OnPerfectGuardStun(event.clone()));
+
+        self.derived_state.process_perfect_guard_stun(
+            &self.encounter.player_data,
+            event.actor_index,
+            event.stun_amount as f64,
+        );
+
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
+        }
+    }
+
+    /// Handles one guarded-Quickening marker (The World): counts the guard for
+    /// the player, nothing else.
+    pub fn on_perfect_guard_quickening(&mut self, event: OnPlayerStunEvent) {
+        let now = Utc::now().timestamp_millis();
+        // A guard can be the encounter's opening event (see ensure_encounter_started).
+        self.ensure_encounter_started(now);
+        self.encounter
+            .push_event(now, Message::OnPerfectGuardQuickening(event.clone()));
+
+        self.derived_state
+            .process_perfect_guard_quickening(&self.encounter.player_data, event.actor_index);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -2029,6 +2186,12 @@ mod tests {
         }
     }
 
+    /// Player-data array with no identities: guard events resolve no character
+    /// type and are held pending until the player's first damage event.
+    fn no_identities() -> [Option<PlayerData>; 4] {
+        [None, None, None, None]
+    }
+
     /// Stun totals must be max(delta, messages) at both player and encounter
     /// level: the two capture paths (accumulator delta solo, network messages
     /// online) observe the SAME accrual, so if both fire the totals must not
@@ -2058,6 +2221,178 @@ mod tests {
         assert_eq!(player.stun_message_sum, 50.0);
         assert_eq!(player.total_stun_value, 50.0); // max(30 delta, 50 messages)
         assert_eq!(state.total_stun_value, 50.0);
+    }
+
+    /// Perfect Guard stun is captured as a SOURCE-side accumulator delta on the
+    /// enemy's own attack (no player damage event exists for a guard), so it
+    /// belongs to the DELTA path: it must survive the max(delta, messages)
+    /// dedupe even when hit stun arrives duplicated via messages, and a guard
+    /// landed before the player's first damage event must fold in when their
+    /// row is created.
+    #[test]
+    fn perfect_guard_stun_adds_to_delta_path_and_survives_row_creation() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        // Guard happens before the player has dealt any damage: no row yet.
+        state.process_perfect_guard_stun(&no_identities(), 0xF000_0000, 25.0);
+        assert_eq!(state.total_stun_value, 25.0);
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        event.stun_value = Some(30.0);
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(1_000, &instance);
+
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        assert_eq!(player.stun_delta_sum, 55.0); // 25 guard (pending) + 30 hit
+        assert_eq!(player.total_stun_value, 55.0);
+        assert_eq!(state.total_stun_value, 55.0);
+
+        // Solo shape: the hit stun ALSO arrives duplicated as a message (30),
+        // but the guard stun exists only on the delta path — the max() dedupe
+        // must not lose it.
+        state.process_stun_message(0xF000_0000, 30.0);
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        assert_eq!(player.total_stun_value, 55.0); // max(55 delta, 30 messages)
+        assert_eq!(state.total_stun_value, 55.0);
+
+        // A guard after the row exists adds directly.
+        state.process_perfect_guard_stun(&no_identities(), 0xF000_0000, 5.0);
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        assert_eq!(player.stun_delta_sum, 60.0);
+        assert_eq!(player.total_stun_value, 60.0);
+        assert_eq!(state.total_stun_value, 60.0);
+    }
+
+    /// Every Perfect Guard also materializes as a zero-damage breakdown row on
+    /// the guarding player (name via `ActionType::PerfectGuard`), counting
+    /// guards as hits and carrying only stun — including guards held pending
+    /// before the player's first damage event.
+    #[test]
+    fn perfect_guard_stun_creates_a_breakdown_row_counting_guards() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        // One guard before the player's row exists (held pending)...
+        state.process_perfect_guard_stun(&no_identities(), 0xF000_0000, 25.0);
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(1_000, &instance);
+
+        // ...and one after.
+        state.process_perfect_guard_stun(&no_identities(), 0xF000_0000, 40.0);
+
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::PerfectGuard)
+            .expect("perfect guard breakdown row");
+        assert_eq!(row.hits, 2);
+        assert_eq!(row.total_stun_value, 65.0);
+        assert_eq!(row.max_stun_value, 40.0);
+        assert_eq!(row.total_damage, 0);
+        assert_eq!(row.min_damage, None);
+        assert_eq!(player.total_stun_value, 65.0);
+    }
+
+    /// A guarded Quickening (The World) is counted as its own hits-only
+    /// breakdown row (`ActionType::PerfectGuardQuickening`): no stun, no
+    /// damage, and no contribution to any stun/damage total — including guards
+    /// held pending before the player's first damage event.
+    #[test]
+    fn perfect_guard_quickening_counts_hits_only() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        // One guard before the player's row exists (held pending)...
+        state.process_perfect_guard_quickening(&no_identities(), 0xF000_0000);
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(1_000, &instance);
+
+        // ...and one after.
+        state.process_perfect_guard_quickening(&no_identities(), 0xF000_0000);
+
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::PerfectGuardQuickening)
+            .expect("perfect guard quickening breakdown row");
+        assert_eq!(row.hits, 2);
+        assert_eq!(row.total_stun_value, 0.0);
+        assert_eq!(row.max_stun_value, 0.0);
+        assert_eq!(row.total_damage, 0);
+        assert_eq!(row.min_damage, None);
+        assert_eq!(row.max_damage, None);
+        assert_eq!(player.total_stun_value, 0.0);
+        assert_eq!(state.total_stun_value, 0.0);
+    }
+
+    /// A guard from a player who never attacks must still show. Identity
+    /// events land at quest load — before any guard is possible — so the
+    /// guard handlers create the party row from the identity snapshot instead
+    /// of holding the guard until the player's first damage event (which may
+    /// never come for a dedicated guarder).
+    #[test]
+    fn quickening_guard_before_first_attack_shows_via_identity() {
+        let mut parser = Parser::default();
+        parser.on_player_identity_event(identity_event("Bob", 0x91418145, 0, 4_217_578_216, false));
+
+        parser.on_perfect_guard_quickening(OnPlayerStunEvent {
+            actor_index: 0xF000_0000,
+            stun_amount: 0.0,
+        });
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row created from the identity snapshot");
+        assert_eq!(
+            player.character_type,
+            CharacterType::from_hash(0x91418145)
+        );
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::PerfectGuardQuickening)
+            .expect("quickening row without any damage event");
+        assert_eq!(row.hits, 1);
+        assert_eq!(player.total_damage, 0);
+    }
+
+    /// Same for the generic Perfect Guard: the row (and its stun) must not
+    /// depend on the guarding player having attacked.
+    #[test]
+    fn perfect_guard_before_first_attack_shows_via_identity() {
+        let mut parser = Parser::default();
+        parser.on_player_identity_event(identity_event("Bob", 0x91418145, 0, 4_217_578_216, false));
+
+        parser.on_perfect_guard_stun(OnPlayerStunEvent {
+            actor_index: 0xF000_0000,
+            stun_amount: 250.4,
+        });
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row created from the identity snapshot");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::PerfectGuard)
+            .expect("perfect guard row without any damage event");
+        assert_eq!(row.hits, 1);
+        // The wire carries stun as f32, so compare at f32 precision.
+        assert!((player.total_stun_value - 250.4).abs() < 1e-3);
     }
 
     /// Target HP tracking: each hit carries the target's post-hit current/max HP

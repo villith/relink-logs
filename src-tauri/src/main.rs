@@ -840,6 +840,12 @@ fn connect_and_run_parser(app: AppHandle) {
                                 protocol::Message::OnPlayerStun(event) => {
                                     state.on_player_stun(event);
                                 }
+                                protocol::Message::OnPerfectGuardStun(event) => {
+                                    state.on_perfect_guard_stun(event);
+                                }
+                                protocol::Message::OnPerfectGuardQuickening(event) => {
+                                    state.on_perfect_guard_quickening(event);
+                                }
                             }
                         }
                     }
