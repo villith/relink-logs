@@ -24,7 +24,13 @@ pub struct SkillKey {
 /// per-character named skill (link/SBA/supplementary) or the character is unknown.
 pub fn derive_skill_key(event: &DamageEvent) -> Option<SkillKey> {
     let id = match event.action_id {
-        ActionType::Normal(id) | ActionType::DamageOverTime(id) => id,
+        ActionType::Normal(id) => id,
+        // DoT is NOT looked up by id: `getSkillName` renders every DamageOverTime event
+        // through the fixed `skills.<char>.damage-over-time` key. Its payload is the DoT
+        // TYPE (0 poison, 1 burn, 2 darkburn — populated since the 2.0.2 hook fix), which
+        // shares a number space with real skill ids, so treating it as one would report
+        // e.g. Eugen's poison ticks as unnamed skill 1 ("Sumrak").
+        ActionType::DamageOverTime(_) => return None,
         _ => return None,
     };
 
@@ -122,6 +128,8 @@ mod tests {
             stun_value: None,
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         }
     }
 
@@ -163,11 +171,14 @@ mod tests {
         assert!(derive_skill_key(&event(k, k, ActionType::SupplementaryDamage(5))).is_none());
     }
 
+    /// DoT is rendered by the fixed `damage-over-time` key, never by id, and its payload is
+    /// the DoT type (0 poison / 1 burn / 2 darkburn) — which would otherwise be mistaken for
+    /// a skill id in that character's block.
     #[test]
-    fn dot_yields_a_key() {
+    fn dot_yields_no_key() {
         let k = KATALINA_PL0100;
-        let key = derive_skill_key(&event(k, k, ActionType::DamageOverTime(9))).unwrap();
-        assert_eq!(key.id, 9);
+        assert!(derive_skill_key(&event(k, k, ActionType::DamageOverTime(0))).is_none());
+        assert!(derive_skill_key(&event(k, k, ActionType::DamageOverTime(1))).is_none());
     }
 
     #[test]
@@ -200,7 +211,11 @@ mod tests {
         let added = insert_missing(&mut skills, &keys);
         assert_eq!(added, 1);
         assert_eq!(skills["Pl0100"]["999"], json!("Skill 999"));
-        assert_eq!(skills["Pl0100"]["100"], json!("Slice"), "existing untouched");
+        assert_eq!(
+            skills["Pl0100"]["100"],
+            json!("Slice"),
+            "existing untouched"
+        );
     }
 
     #[test]

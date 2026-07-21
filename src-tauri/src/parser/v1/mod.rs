@@ -1711,6 +1711,8 @@ mod tests {
             stun_value: None,
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         }
     }
 
@@ -2443,6 +2445,8 @@ mod tests {
                 stun_value: None,
                 damage_cap: None,
                 base_damage: None,
+                target_current_hp: None,
+                target_max_hp: None,
             }),
         ));
 
@@ -2475,6 +2479,8 @@ mod tests {
                 stun_value: None,
                 damage_cap: None,
                 base_damage: None,
+                target_current_hp: None,
+                target_max_hp: None,
             }),
         ));
 
@@ -2500,6 +2506,8 @@ mod tests {
                 stun_value: None,
                 damage_cap: None,
                 base_damage: None,
+                target_current_hp: None,
+                target_max_hp: None,
             }),
         ));
 
@@ -2537,6 +2545,8 @@ mod tests {
                 stun_value: None,
                 damage_cap: Some(99_999),
                 base_damage: Some(200_000.0), // base > cap -> capped
+                target_current_hp: None,
+                target_max_hp: None,
             }),
         ));
 
@@ -2562,6 +2572,8 @@ mod tests {
                 stun_value: None,
                 damage_cap: Some(99_999),
                 base_damage: Some(100.0), // base < cap -> not capped
+                target_current_hp: None,
+                target_max_hp: None,
             }),
         ));
 
@@ -2601,6 +2613,8 @@ mod tests {
                 stun_value: None,
                 damage_cap: Some(cap),
                 base_damage: Some(base),
+                target_current_hp: None,
+                target_max_hp: None,
             }
         }
 
