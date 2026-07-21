@@ -3,17 +3,45 @@
     "key": "EM0003",
     "text": "Goblin Archer"
   },
+  "0014a1b8": {
+    "key": "EM0013",
+    "text": "Fiend Clan Yumi"
+  },
   "0178bc98": {
     "key": "EM0603",
     "text": "King Silverslime"
+  },
+  "01c00349": {
+    "key": "NP9057",
+    "text": "Aviaeth Dreadknight (Blue)"
+  },
+  "03ec1106": {
+    "key": "EM1006",
+    "text": "Aviaeth Crusader"
   },
   "044bbc73": {
     "key": "EM1800",
     "text": "Ancient Dragon"
   },
+  "0494f8ae": {
+    "key": "NP9928",
+    "text": "Rescued Islander B"
+  },
+  "05601f18": {
+    "key": "NP0600",
+    "text": "Zathba"
+  },
   "06d40674": {
     "key": "WE2112",
     "text": "Caduceus"
+  },
+  "073ad302": {
+    "key": "EM0012",
+    "text": "Fiend Clan Gatekeeper"
+  },
+  "08c5ecc7": {
+    "key": "WE8453",
+    "text": "Law of Emerald"
   },
   "095c118f": {
     "key": "EM0900",
@@ -43,6 +71,10 @@
     "key": "EM1805",
     "text": "Radis Whitewyrm"
   },
+  "0ed6a142": {
+    "key": "EM8401",
+    "text": "Logos Echo"
+  },
   "0ee3e67f": {
     "key": "EM0902",
     "text": "Water Spirit"
@@ -71,13 +103,37 @@
     "key": "EM7530",
     "text": "Aka Manah"
   },
+  "1b092cb6": {
+    "key": "NP9904",
+    "text": "Heroic Man"
+  },
   "1b7264b0": {
     "key": "EM00A4",
     "text": "Goblin Soldier"
   },
+  "1b918582": {
+    "key": "NP9936",
+    "text": "Aviaeth Crusader B"
+  },
+  "1f3323c0": {
+    "key": "EM0014",
+    "text": "Cruel Overseer"
+  },
+  "1f5497f7": {
+    "key": "NP9056",
+    "text": "Aviaeth Dreadknight (Red)"
+  },
   "20037267": {
     "key": "BA7200",
     "text": "Keeper"
+  },
+  "20dc738b": {
+    "key": "NP9058",
+    "text": "Aviaeth Bannerman E"
+  },
+  "21e6a855": {
+    "key": "NP9049",
+    "text": "Zathba's Henchman B"
   },
   "22102ccd": {
     "key": "WE7003",
@@ -95,25 +151,53 @@
     "key": "EM7700",
     "text": "Lucilius"
   },
+  "2b755d1c": {
+    "key": "EM1102",
+    "text": "Ramlahsona"
+  },
   "2bd7220b": {
     "key": "WE7701",
     "text": "Sword of Repudiation"
+  },
+  "2c0acbe3": {
+    "key": "EM1103",
+    "text": "Mysterious Swordsman"
   },
   "2c800d3a": {
     "key": "WE7000",
     "text": "Skotadi"
   },
+  "2cc56d42": {
+    "key": "NP1900",
+    "text": "Seedhollow Soldier"
+  },
   "2d1e3cc6": {
     "key": "EM0604",
     "text": "King Goldslime"
+  },
+  "2f5f3e49": {
+    "key": "EM8510",
+    "text": "Aces High"
   },
   "3165aaba": {
     "key": "EM1001",
     "text": "Aviaeth Lancer"
   },
+  "34cc55df": {
+    "key": "NP9929",
+    "text": "Mohawk (Wireless)"
+  },
   "363f9b5c": {
     "key": "EM1003",
     "text": "Aviaeth Flagbearer"
+  },
+  "36548147": {
+    "key": "NP9930",
+    "text": "Bandana (Wireless)"
+  },
+  "37c97a80": {
+    "key": "NP9910",
+    "text": "Grieving Man"
   },
   "3a0ea858": {
     "key": "EM0102",
@@ -127,13 +211,33 @@
     "key": "EM0002",
     "text": "Goblin Tanker"
   },
+  "3df2361c": {
+    "key": "NP9055",
+    "text": "Aviaeth Crusader D"
+  },
+  "3f4b75d5": {
+    "key": "EM8000",
+    "text": "Seofon"
+  },
+  "3f6f3fef": {
+    "key": "EM1510",
+    "text": "Fool's Golem"
+  },
   "3f7f9a35": {
     "key": "EM1500",
     "text": "Rock Golem"
   },
+  "4040b8cd": {
+    "key": "EM8100",
+    "text": "Tweyen"
+  },
   "427e32fe": {
     "key": "EM0000",
     "text": "Goblin Stormer"
+  },
+  "43cf4540": {
+    "key": "EM0104",
+    "text": "Feudal Grudge"
   },
   "44a72d4b": {
     "key": "EM0001",
@@ -146,6 +250,10 @@
   "48ebace1": {
     "key": "EM1000",
     "text": "Aviaeth Saber"
+  },
+  "498e8418": {
+    "key": "WE8454",
+    "text": "Law of White"
   },
   "4a299e62": {
     "key": "EM1801",
@@ -179,6 +287,10 @@
     "key": "BH2002",
     "text": "20mm Ether Autocannon"
   },
+  "565d2a87": {
+    "key": "NP9050",
+    "text": "Zathba's Henchman C"
+  },
   "578e0df2": {
     "key": "WE7024",
     "text": "Anemos"
@@ -203,6 +315,14 @@
     "key": "EM2600",
     "text": "Cobra"
   },
+  "61325867": {
+    "key": "EM0610",
+    "text": "Celestial Slime"
+  },
+  "62d7c859": {
+    "key": "EM0015",
+    "text": "Storm-Mane Gatekeeper"
+  },
   "635fffb6": {
     "key": "WE7702",
     "text": "Sword of Renunciation"
@@ -215,6 +335,18 @@
     "key": "EM1806",
     "text": "Evyl Blackwyrm"
   },
+  "662d329c": {
+    "key": "NP9932",
+    "text": "Aviaeth Crusader 1"
+  },
+  "66a3b7f4": {
+    "key": "EM8200",
+    "text": "Beelzebub"
+  },
+  "6777aa6e": {
+    "key": "NP9047",
+    "text": "Cowardly Minion"
+  },
   "677f73cd": {
     "key": "EM7409",
     "text": "Chest Reactor"
@@ -223,9 +355,17 @@
     "key": "EM0600",
     "text": "Slime"
   },
+  "67edc954": {
+    "key": "NP9931",
+    "text": "Aviaeth Crusader"
+  },
   "69bb1528": {
     "key": "WE7022",
     "text": "Hydor"
+  },
+  "6bf245ee": {
+    "key": "NP9905",
+    "text": "Villager"
   },
   "6d5ba989": {
     "key": "EM0701",
@@ -259,9 +399,17 @@
     "key": "EM0200",
     "text": "Timber Wolf"
   },
+  "78ca8553": {
+    "key": "NP9900",
+    "text": "Swordmancer"
+  },
   "7d71c604": {
     "key": "EM1600",
     "text": "Griffin"
+  },
+  "7df43932": {
+    "key": "NP9059",
+    "text": "Aviaeth Bannerman F"
   },
   "7ef65e6d": {
     "key": "EM7525",
@@ -279,6 +427,14 @@
     "key": "EM0005",
     "text": "Goblin Warrior"
   },
+  "85412de1": {
+    "key": "EM2510",
+    "text": "Fan-Fave Sumo Pincer"
+  },
+  "8aa5fdfe": {
+    "key": "NP2700",
+    "text": "Young Skyfarer"
+  },
   "8b964be7": {
     "key": "EM2800",
     "text": "Ominous Form"
@@ -294,6 +450,10 @@
   "90793b2e": {
     "key": "BA7211",
     "text": "Calamitous Gate"
+  },
+  "9161ae6c": {
+    "key": "NP0700",
+    "text": "Cheerful Merchant"
   },
   "9338abc9": {
     "key": "EM1200",
@@ -339,9 +499,17 @@
     "key": "WE7023",
     "text": "Edafos"
   },
+  "9e3c5762": {
+    "key": "WE8452",
+    "text": "Law of Gold"
+  },
   "9ff822ce": {
     "key": "EM7528",
     "text": "Daeva"
+  },
+  "a34053be": {
+    "key": "NP2500",
+    "text": "Herzeloyde"
   },
   "a379ac65": {
     "key": "EM2700",
@@ -355,6 +523,10 @@
     "key": "EM7407",
     "text": "Deltoid Reactor"
   },
+  "a5bc85d9": {
+    "key": "NP2900",
+    "text": "Lucifer"
+  },
   "a63de428": {
     "key": "EM0300",
     "text": "Hornbird"
@@ -362,6 +534,14 @@
   "a685791c": {
     "key": "EM7403",
     "text": "Excavallion"
+  },
+  "a79e19e4": {
+    "key": "NP9048",
+    "text": "Zathba's Henchman A"
+  },
+  "a7ba17c4": {
+    "key": "NP0100",
+    "text": "Vyrn"
   },
   "a81f6dca": {
     "key": "EM0101",
@@ -371,6 +551,14 @@
     "key": "EM7610",
     "text": "Bahamut Versa Omega"
   },
+  "ab5cc891": {
+    "key": "NP0702",
+    "text": "Soupstock"
+  },
+  "ad8d0675": {
+    "key": "NP0300",
+    "text": "Rolan"
+  },
   "ad9c4174": {
     "key": "EM7505",
     "text": "Angra Mainyu"
@@ -378,6 +566,10 @@
   "ae3325e8": {
     "key": "WE7001",
     "text": "Fotia"
+  },
+  "aecc1820": {
+    "key": "NP9060",
+    "text": "Aviaeth Bannerman G"
   },
   "afeb2d7e": {
     "key": "EM1803",
@@ -402,6 +594,10 @@
   "b39eeab5": {
     "key": "EM2400",
     "text": "Lilith"
+  },
+  "b3a08a57": {
+    "key": "WP2890",
+    "text": "The Devil"
   },
   "b4aed02d": {
     "key": "EM7600",
@@ -435,13 +631,29 @@
     "key": "WE7013",
     "text": "Edafos"
   },
+  "b75181ce": {
+    "key": "NP9927",
+    "text": "Rescued Islander A"
+  },
   "b81ca4b7": {
     "key": "WE7012",
     "text": "Hydor"
   },
+  "b8ed50e1": {
+    "key": "NP1402",
+    "text": "Rilla"
+  },
   "ba320eeb": {
     "key": "EM0502",
     "text": "Infernadile"
+  },
+  "ba4bb5f4": {
+    "key": "NP9066",
+    "text": "Cheerful Man"
+  },
+  "bae9f4aa": {
+    "key": "NP9062",
+    "text": "Zathba's Henchman"
   },
   "bc7e01a9": {
     "key": "BA2103",
@@ -459,6 +671,10 @@
     "key": "EM7601",
     "text": "Bahamut Versa"
   },
+  "c222c939": {
+    "key": "WE8451",
+    "text": "Law of Azure"
+  },
   "c3089918": {
     "key": "EM2500",
     "text": "Pincer"
@@ -471,17 +687,53 @@
     "key": "EM0803",
     "text": "Wind Gyre"
   },
+  "c90aa636": {
+    "key": "EM8500",
+    "text": "Albacore"
+  },
+  "c9795190": {
+    "key": "BA0350",
+    "text": "Cat"
+  },
   "ca4091c8": {
     "key": "EM0004",
     "text": "Goblin Soldier"
+  },
+  "ca4964ab": {
+    "key": "EM8400",
+    "text": "Omnis Zegalith"
+  },
+  "ca855dde": {
+    "key": "NP2800",
+    "text": "Anre"
   },
   "cdaa9205": {
     "key": "EM7504",
     "text": "Angra Mainyu"
   },
+  "ce3fb45e": {
+    "key": "NP1202",
+    "text": "Dagger"
+  },
+  "ceaa6901": {
+    "key": "NP9933",
+    "text": "Aviaeth Crusader 2"
+  },
+  "cfc0bcbe": {
+    "key": "NP0000",
+    "text": "Lyria"
+  },
   "d09c5b2e": {
     "key": "EM7201",
     "text": "Furycane"
+  },
+  "d2cc00ee": {
+    "key": "NP9911",
+    "text": "Fearful Woman"
+  },
+  "d316a5bd": {
+    "key": "WE8450",
+    "text": "Law of Vermillion"
   },
   "d4950d74": {
     "key": "WE7700",
@@ -495,9 +747,21 @@
     "key": "EM0800",
     "text": "Flame Gyre"
   },
+  "d7ba6d4a": {
+    "key": "EM8300",
+    "text": "The World"
+  },
   "d9e45318": {
     "key": "EM0705",
     "text": "Ahriman"
+  },
+  "da984d5f": {
+    "key": "WE8455",
+    "text": "Law of Black"
+  },
+  "dad1ba75": {
+    "key": "NP9054",
+    "text": "Aviaeth Crusader C"
   },
   "dbca3857": {
     "key": "EM7000",
@@ -511,6 +775,10 @@
     "key": "EM7001",
     "text": "Proto Bahamut"
   },
+  "e00b7ec0": {
+    "key": "NP1300",
+    "text": "Erune Girl"
+  },
   "e07acd74": {
     "key": "WE7300",
     "text": "Nereid"
@@ -523,9 +791,21 @@
     "key": "EM1802",
     "text": "Wilinus Icewyrm"
   },
+  "e1f70e38": {
+    "key": "NP1602",
+    "text": "Pops"
+  },
   "e25b6346": {
     "key": "BA7210",
     "text": "Calamitous Vestiges"
+  },
+  "e3ff1ef5": {
+    "key": "NP9913",
+    "text": "Pious Old Man"
+  },
+  "e4138080": {
+    "key": "EM1101",
+    "text": "Trulen"
   },
   "e4c12a94": {
     "key": "EM2100",
@@ -563,9 +843,37 @@
     "key": "EM0903",
     "text": "Wind Effigy"
   },
+  "e95bb4cb": {
+    "key": "NP0400",
+    "text": "Historiath"
+  },
   "eab390a0": {
     "key": "EM2200",
     "text": "Id"
+  },
+  "ec8ab786": {
+    "key": "NP0200",
+    "text": "Sierokarte"
+  },
+  "edce410d": {
+    "key": "NP2600",
+    "text": "King Carl"
+  },
+  "eef41328": {
+    "key": "NP9046",
+    "text": "Friendly Man"
+  },
+  "effc3497": {
+    "key": "EM0010",
+    "text": "Fiend Clan Grunt"
+  },
+  "f165f924": {
+    "key": "NP0900",
+    "text": "Human Boy"
+  },
+  "f38ad679": {
+    "key": "EM1501",
+    "text": "Aquila Ruby Golem"
   },
   "f45a0b6d": {
     "key": "EM1301",
@@ -574,6 +882,10 @@
   "f740812d": {
     "key": "EM7502",
     "text": "Angra Mainyu"
+  },
+  "f810a10f": {
+    "key": "NP9935",
+    "text": "Aviaeth Crusader A"
   },
   "f83b508a": {
     "key": "EM0601",
@@ -598,5 +910,9 @@
   "fdfb322b": {
     "key": "BH0003",
     "text": "Hallowed Ground"
+  },
+  "ff3d857a": {
+    "key": "NP9912",
+    "text": "Relieved Woman"
   }
 }
