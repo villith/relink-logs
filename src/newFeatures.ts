@@ -12,8 +12,8 @@ export type NewWindow = { from?: string; until?: string };
  * chip usages too (ids are typed, so the compiler points at them).
  */
 export const NEW_FEATURES = {
-  toolbox: { from: "1.10.0", until: "1.10.2" },
-  "overmastery-predictor": { from: "1.10.0", until: "1.10.2" },
+  toolbox: { from: "1.10.0", until: "1.12.0" },
+  "overmastery-predictor": { from: "1.10.0", until: "1.12.0" },
 } as const satisfies Record<string, NewWindow>;
 
 export type NewFeatureId = keyof typeof NEW_FEATURES;
