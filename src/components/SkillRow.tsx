@@ -3,7 +3,13 @@ import { computeOvercapPercentage, getSkillName, mergeTargetBreakdowns } from "@
 import { useMemo } from "react";
 import { OvercapCell } from "./OvercapCell";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
+import { StunCell } from "./StunCell";
 import { useSkillRow } from "./useSkillRow";
+
+/** Value columns after Skill + Hits in SkillBreakdown's header (Total, Min,
+ * Max, Avg, Stun, Overcap, %) — the dash-only Quickening row renders exactly
+ * one dash per value column to stay aligned under it. */
+const VALUE_COLUMN_COUNT = 7;
 
 export type SkillRowProps = {
   characterType: CharacterType;
@@ -30,6 +36,22 @@ export const SkillRow = ({ characterType, skill, color, nested, live }: SkillRow
 
   const overcapPercentage = computeOvercapPercentage(skill);
   const targetBreakdown = useMemo(() => (live ? [] : mergeTargetBreakdowns([skill.targets])), [live, skill.targets]);
+
+  // A guarded Quickening (The World) tracks only that the guard happened — no
+  // damage or stun exists to show, so every value column renders a dash.
+  if (skill.actionType === "PerfectGuardQuickening") {
+    return (
+      <tr className={`skill-row ${nested ? "nested" : ""}`}>
+        <td className={`text-left row-data ${nested ? "nested" : ""}`}>{getSkillName(characterType, skill)}</td>
+        <td className="text-center row-data">{skill.hits}</td>
+        {Array.from({ length: VALUE_COLUMN_COUNT }, (_, index) => (
+          <td key={index} className="text-center row-data">
+            -
+          </td>
+        ))}
+      </tr>
+    );
+  }
 
   return (
     <SkillTargetTooltip
@@ -93,6 +115,7 @@ export const SkillRow = ({ characterType, skill, color, nested, live }: SkillRow
             </>
           )}
         </td>
+        <StunCell value={skill.totalStunValue ?? 0} showFullValues={showFullValues} />
         <OvercapCell percentage={overcapPercentage} />
         <td className="text-center row-data">
           {skill.percentage.toFixed(0)}

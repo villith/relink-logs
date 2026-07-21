@@ -66,6 +66,8 @@ export type HpChartSeries = {
 export type ActionType =
   | "LinkAttack"
   | "SBA"
+  | "PerfectGuard"
+  | "PerfectGuardQuickening"
   | { SupplementaryDamage: number }
   | { DamageOverTime: number }
   | { Normal: number }

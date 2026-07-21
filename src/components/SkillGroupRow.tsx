@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { OvercapCell } from "./OvercapCell";
 import { SkillRow } from "./SkillRow";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
+import { StunCell } from "./StunCell";
 import { useSkillGroupRow } from "./useSkillGroupRow";
 
 export type SkillRowProps = {
@@ -100,6 +101,7 @@ export const SkillGroupRow = ({ characterType, group, color, live }: SkillRowPro
               </>
             )}
           </td>
+          <StunCell value={group.totalStunValue ?? 0} showFullValues={showFullValues} />
           <OvercapCell percentage={overcapPercentage} />
           <td className="text-center row-data">
             {group.percentage.toFixed(0)}

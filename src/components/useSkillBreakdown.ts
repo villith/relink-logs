@@ -15,7 +15,9 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
   const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
   const computedSkills = player.skillBreakdown.map<ComputedSkillState>((skill) => {
     return {
-      percentage: (skill.totalDamage / totalDamage) * 100,
+      // Guard the denominator: a stun-only breakdown (e.g. Perfect Guard before
+      // any damage) would otherwise divide 0 by 0 and render "NaN%".
+      percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
       groupName: getSkillName(player.characterType, skill),
       ...skill,
     };
@@ -60,6 +62,8 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
                 overcapBaseSum: skillGroup.overcapBaseSum + skill.overcapBaseSum,
                 overcapCapSum: skillGroup.overcapCapSum + skill.overcapCapSum,
                 percentage: skillGroup.percentage + skill.percentage,
+                totalStunValue: skillGroup.totalStunValue + skill.totalStunValue,
+                maxStunValue: Math.max(skillGroup.maxStunValue, skill.maxStunValue),
                 totalDamage: skillGroup.totalDamage + skill.totalDamage,
                 minDamage: Math.min(skillGroup?.minDamage || 0, skill.minDamage || 0),
                 maxDamage: Math.max(skillGroup?.maxDamage ?? Number.MIN_VALUE, skill.maxDamage || 0),

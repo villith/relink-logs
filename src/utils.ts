@@ -456,6 +456,13 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
       return t([`skills.${characterType}.link-attack`, "skills.default.link-attack"]);
     case skill.actionType === "SBA":
       return t([`skills.${characterType}.skybound-arts`, "skills.default.skybound-arts"]);
+    case skill.actionType === "PerfectGuard":
+      return t([`skills.${characterType}.perfect-guard`, "skills.default.perfect-guard"]);
+    case skill.actionType === "PerfectGuardQuickening":
+      return t([
+        `skills.${characterType}.perfect-guard-quickening`,
+        "skills.default.perfect-guard-quickening",
+      ]);
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "SupplementaryDamage"):
       return t(["skills.default.supplementary-damage"]);
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "DamageOverTime"):
@@ -672,7 +679,10 @@ export const exportSimpleEncounterToClipboard = (
       const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
       const computedSkills = player.skillBreakdown.map((skill) => {
         return {
-          percentage: (skill.totalDamage / totalDamage) * 100,
+          // Guard the denominator: a guard-only player (all zero-damage Perfect
+          // Guard rows) has totalDamage 0, which would export "NaN%" for every
+          // row — same guard as useSkillBreakdown.
+          percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
           ...skill,
         };
       });
@@ -730,7 +740,10 @@ export const exportFullEncounterToClipboard = (
       const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
       const computedSkills = player.skillBreakdown.map((skill) => {
         return {
-          percentage: (skill.totalDamage / totalDamage) * 100,
+          // Guard the denominator: a guard-only player (all zero-damage Perfect
+          // Guard rows) has totalDamage 0, which would export "NaN%" for every
+          // row — same guard as useSkillBreakdown.
+          percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
           ...skill,
         };
       });
