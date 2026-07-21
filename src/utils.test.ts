@@ -10,6 +10,7 @@ import {
   computeCombinedTraits,
   computeOvercapPercentage,
   computeSupPercentage,
+  damageOverTimeKeys,
   defaultChecklist,
   deriveNavState,
   deriveTranscendence,
@@ -713,5 +714,44 @@ describe("humanizeNumbers", () => {
   it("leaves sub-thousand values as whole numbers", () => {
     expect(humanizeNumbers(999)).toEqual(["999", ""]);
     expect(humanizeNumbers(0)).toEqual(["0", ""]);
+  });
+});
+
+describe("damageOverTimeKeys", () => {
+  it("prefers the type-specific name, per character then global", () => {
+    expect(damageOverTimeKeys("Pl0100", "Pl0100", 0)).toEqual([
+      "skills.Pl0100.damage-over-time-poison",
+      "skills.Pl0100.damage-over-time-poison",
+      "skills.Pl0100.damage-over-time",
+      "skills.Pl0100.damage-over-time",
+      "skills.default.damage-over-time-poison",
+      "skills.default.damage-over-time",
+    ]);
+  });
+
+  it("names each known DoT type", () => {
+    const nameKey = (dotType: number) => damageOverTimeKeys("Pl0100", "Pl0100", dotType)[0];
+
+    expect(nameKey(0)).toBe("skills.Pl0100.damage-over-time-poison");
+    expect(nameKey(1)).toBe("skills.Pl0100.damage-over-time-burn");
+    expect(nameKey(2)).toBe("skills.Pl0100.damage-over-time-darkburn");
+  });
+
+  it("keeps a character's own DoT name ahead of the generic type name", () => {
+    // Id's DoT is flavoured "Darkflame (DoT)"; that override should still win over
+    // the generic "Darkburn" once the type is known.
+    const keys = damageOverTimeKeys("Pl1900", "Pl1900", 2);
+
+    expect(keys.indexOf("skills.Pl1900.damage-over-time")).toBeLessThan(
+      keys.indexOf("skills.default.damage-over-time-darkburn")
+    );
+  });
+
+  it("falls back to the unnamed DoT keys for an unknown type", () => {
+    expect(damageOverTimeKeys("Pl0100", "Pl0200", 7)).toEqual([
+      "skills.Pl0200.damage-over-time",
+      "skills.Pl0100.damage-over-time",
+      "skills.default.damage-over-time",
+    ]);
   });
 });

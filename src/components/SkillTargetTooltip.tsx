@@ -1,5 +1,4 @@
 import { Box, Group, Text, Tooltip } from "@mantine/core";
-import { useTranslation } from "react-i18next";
 
 import { SkillTargetState } from "@/types";
 import { humanizeNumbers, translateEnemyType } from "@/utils";
@@ -26,7 +25,6 @@ export const SkillTargetTooltip = ({
   color: string;
   children: React.ReactElement;
 }) => {
-  const { t } = useTranslation();
   const totalDamage = targets.reduce((total, target) => total + target.totalDamage, 0);
 
   if (targets.length === 0 || totalDamage === 0) {
@@ -41,7 +39,7 @@ export const SkillTargetTooltip = ({
       label={
         <Box miw={260} maw={360}>
           <Text size="xs" fw={600} mb={4}>
-            {t("ui.logs.enemy-breakdown", { label })}
+            {label}
           </Text>
           {targets.map((target, index) => {
             const percentage = (target.totalDamage / totalDamage) * 100;

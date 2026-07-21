@@ -140,7 +140,6 @@
       "duration": "Duration",
       "total-damage": "Total Damage",
       "damage-per-second": "Damage Per Second",
-      "enemy-breakdown": "{{label}} - Enemy Breakdown",
       "enemy-hp": "Enemy HP",
       "window-full": "Full fight",
       "window-of": "{{selected}} of {{total}} selected",
@@ -1245,6 +1244,9 @@
       "link-attack": "Link Attack",
       "skybound-arts": "Skybound Arts",
       "damage-over-time": "Damage Over Time",
+      "damage-over-time-poison": "Poison",
+      "damage-over-time-burn": "Burn",
+      "damage-over-time-darkburn": "Darkburn",
       "unknown-skill": "Skill {{id}}"
     },
     "Pl2400": {

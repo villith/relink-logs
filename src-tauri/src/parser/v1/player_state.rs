@@ -150,18 +150,10 @@ impl PlayerState {
                 return;
             }
 
-            // Same for damage-over-time. Since the 2.0.2 hook fix the payload is the DoT
-            // TYPE (0 poison / 1 burn / 2 darkburn) rather than a constant 0, so keying on
-            // equality below would open one row per type — and `getSkillName` renders them
-            // all through the single `skills.<char>.damage-over-time` key, so the user would
-            // see two or three identically-named rows with the damage split between them.
-            // The type stays in the raw event log for whenever the UI learns to name them.
-            if matches!(skill.action_type, protocol::ActionType::DamageOverTime(_))
-                && matches!(action, protocol::ActionType::DamageOverTime(_))
-            {
-                skill.update_from_damage_event(damage_instance);
-                return;
-            }
+            // NOTE: damage-over-time deliberately falls through to the equality check
+            // below. Since the 2.0.2 hook fix its payload is the DoT TYPE (0 poison /
+            // 1 burn / 2 darkburn), and each type is named separately in the breakdown,
+            // so one row per type is what we want — ticks of the same type still merge.
 
             // If the skill is already being tracked, update it.
             if skill.action_type == action && skill.child_character_type == child_character_type {
@@ -194,13 +186,11 @@ mod tests {
         assert_eq!(player_state.dps, 100.0);
     }
 
-    /// Regression: the 2.0.2 DoT hook fix made the `DamageOverTime` payload the DoT TYPE
-    /// (0 poison / 1 burn / 2 darkburn) instead of a constant 0. Keying skill rows on
-    /// action-type equality then opened one row per type — and every one of them renders
-    /// through the same fixed `damage-over-time` i18n key, so the breakdown showed two
-    /// identically-named rows with the damage split between them.
+    /// The 2.0.2 DoT hook fix made the `DamageOverTime` payload the DoT TYPE
+    /// (0 poison / 1 burn / 2 darkburn) instead of a constant 0, so each type earns its
+    /// own named breakdown row. Ticks of the SAME type still aggregate into one row.
     #[test]
-    fn all_damage_over_time_types_share_one_skill_row() {
+    fn damage_over_time_types_each_get_their_own_skill_row() {
         let mut player_state = empty_player();
 
         for (dot_type, damage) in [(0u32, 100), (1, 50), (2, 25), (0, 25)] {
@@ -211,11 +201,17 @@ mod tests {
 
         assert_eq!(
             player_state.skill_breakdown.len(),
-            1,
-            "poison/burn/darkburn stay one row"
+            3,
+            "poison/burn/darkburn are separate rows"
         );
-        assert_eq!(player_state.skill_breakdown[0].hits, 4);
-        assert_eq!(player_state.skill_breakdown[0].total_damage, 200);
+
+        let poison = player_state
+            .skill_breakdown
+            .iter()
+            .find(|s| s.action_type == ActionType::DamageOverTime(0))
+            .expect("poison row");
+        assert_eq!(poison.hits, 2, "same-type ticks aggregate");
+        assert_eq!(poison.total_damage, 125);
     }
 
     #[test]

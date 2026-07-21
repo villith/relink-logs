@@ -418,6 +418,38 @@ export const epochToLocalTime = (epoch: number): string => {
   }).format(utc);
 };
 
+/** DoT type payload -> i18n slug. Populated by the hook since the 2.0.2 fix; anything
+ * outside this map (including every log recorded before it, which reports 0 for all
+ * three) falls back to the unnamed "Damage Over Time" keys. */
+const DOT_TYPE_SLUGS: Record<number, string> = { 0: "poison", 1: "burn", 2: "darkburn" };
+
+/**
+ * i18n key chain for one damage-over-time row, most specific first.
+ *
+ * A character's own `damage-over-time` override stays ahead of the generic type name:
+ * Id's DoT is flavoured "Darkflame (DoT)", which reads better than "Darkburn".
+ */
+export const damageOverTimeKeys = (
+  characterType: CharacterType,
+  childCharacterType: CharacterType,
+  dotType: number
+): string[] => {
+  const generic = [`skills.${childCharacterType}.damage-over-time`, `skills.${characterType}.damage-over-time`];
+  const slug = DOT_TYPE_SLUGS[dotType];
+
+  if (slug === undefined) {
+    return [...generic, "skills.default.damage-over-time"];
+  }
+
+  return [
+    `skills.${childCharacterType}.damage-over-time-${slug}`,
+    `skills.${characterType}.damage-over-time-${slug}`,
+    ...generic,
+    `skills.default.damage-over-time-${slug}`,
+    "skills.default.damage-over-time",
+  ];
+};
+
 export const getSkillName = (characterType: CharacterType, skill: SkillState) => {
   switch (true) {
     case skill.actionType === "LinkAttack":
@@ -427,11 +459,13 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "SupplementaryDamage"):
       return t(["skills.default.supplementary-damage"]);
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "DamageOverTime"):
-      return t([
-        `skills.${skill.childCharacterType}.damage-over-time`,
-        `skills.${characterType}.damage-over-time`,
-        "skills.default.damage-over-time",
-      ]);
+      return t(
+        damageOverTimeKeys(
+          characterType,
+          skill.childCharacterType,
+          (skill.actionType as { DamageOverTime: number }).DamageOverTime
+        )
+      );
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "Normal"): {
       const actionType = skill.actionType as { Normal: number };
       const skillID = actionType["Normal"];
