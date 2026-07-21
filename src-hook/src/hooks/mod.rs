@@ -220,9 +220,12 @@ pub fn get_source_parent(
     source: *const usize,
 ) -> Option<(u32, u32, *const usize)> {
     match source_type_id {
-        // Pl0700Ghost -> Pl0700
+        // Pl0700Ghost -> Pl0700. v2.0.2 moved the owner-entity link 0xE48 -> 0xE58
+        // (live UNSRC scan 2026-07-20: entity hits at 0xE58 + periodic copies every
+        // 0x2C00; with the old offset ALL ghost damage — pet normals, Blaus Gespenst,
+        // Pendel, Strafe, ghost link attacks — was silently dropped).
         0x2AF678E8 => {
-            let parent_instance = parent_specified_instance_at(source, 0xE48)?;
+            let parent_instance = parent_specified_instance_at(source, 0xE58)?;
 
             Some((
                 actor_type_id(parent_instance),
@@ -230,9 +233,11 @@ pub fn get_source_parent(
                 parent_instance,
             ))
         }
-        // Pl0700GhostSatellite -> Pl0700
+        // Pl0700GhostSatellite (Umlauf) -> Pl0700. v2.0.2 moved the owner-entity link
+        // 0x508 -> 0x4E8 (live UNSRC scan 2026-07-20 verify run: single entity hit at
+        // +0x4E8 — the same -0x20 shift as both Wp actors).
         0x8364C8BC => {
-            let parent_instance = parent_specified_instance_at(source, 0x508)?;
+            let parent_instance = parent_specified_instance_at(source, 0x4E8)?;
 
             Some((
                 actor_type_id(parent_instance),
@@ -240,9 +245,16 @@ pub fn get_source_parent(
                 parent_instance,
             ))
         }
-        // Wp1890: Cagliostro's Ouroboros Dragon Sled -> Pl1800
+        // Wp1890: Cagliostro's Ouroboros Dragon Sled -> Pl1800. Also the damage actor
+        // for Pain Train (action 1800) and Alexandria (action 1700) — with this link
+        // broken, BOTH skills silently vanished from the meter (the parser drops
+        // unknown-parent sources before the raw log, so old logs are unrecoverable).
+        // v2.0.2 moved the owner-entity link 0x578 -> 0x558 (live UNSRC scan
+        // 2026-07-20: entity hits at 0x4F0/0x558/0x2DB0/0x2F90; 0x558 is the old
+        // member shifted -0x20, 0x4F0 kept as guarded fallback).
         0xC9F45042 => {
-            let parent_instance = parent_specified_instance_at(source, 0x578)?;
+            let parent_instance = parent_specified_instance_at(source, 0x558)
+                .or_else(|| parent_specified_instance_at(source, 0x4F0))?;
             Some((
                 actor_type_id(parent_instance),
                 actor_idx(parent_instance),
@@ -257,9 +269,14 @@ pub fn get_source_parent(
             let parent_idx = diag::read_ptr_guarded(parent_instance as usize, 0x170)? as u32;
             Some((ID_HUMAN_TYPE, parent_idx, parent_instance))
         }
-        // Wp2290: Seofon's Avatar
+        // Wp2290: Seofon's Avatar (actions 900-904). v2.0.2 moved the owner-entity
+        // link 0x500 -> 0x4E0 — the same -0x20 shift as Wp1890's 0x578 -> 0x558 (live
+        // UNSRC scan 2026-07-20: entity hits at 0x4E0 + copies every 0x1200, plus
+        // 0x2DB0/0x2F90 which BOTH Wp scans shared — a weapon-actor base-class owner
+        // member, kept as the guarded fallback).
         0x5B1AB457 => {
-            let parent_instance = parent_specified_instance_at(source, 0x500)?;
+            let parent_instance = parent_specified_instance_at(source, 0x4E0)
+                .or_else(|| parent_specified_instance_at(source, 0x2DB0))?;
             Some((
                 actor_type_id(parent_instance),
                 actor_idx(parent_instance),

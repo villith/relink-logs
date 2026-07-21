@@ -306,6 +306,29 @@ impl OnProcessDamageHook {
             crate::hooks::diag::probe_pl2000_parent(source_specified_instance_ptr);
         }
 
+        // Unmapped-source probe (2026-07-20, Cagliostro Pain Train / Alexandria): a
+        // source that neither maps to a parent nor is a player itself is exactly what
+        // the parser silently drops, so these skills never reach the meter. Unbudgeted
+        // by request: EVERY unmapped hit logs (action id ties the actor to the skill
+        // that spawned it), and the parent scan rescans until it finds the owner-entity
+        // offset a new `get_source_parent` arm needs.
+        #[cfg(feature = "hookdiag")]
+        {
+            let source_ptr = source_specified_instance_ptr as *const usize;
+            if super::get_source_parent(source_type_id, source_ptr).is_none()
+                && super::player::player_slot_key_for_actor(source_ptr).is_none()
+            {
+                log::info!(
+                    "UNSRC hit type={source_type_id:#010x} idx={source_idx} \
+                     action={action_type:?} dmg={damage} flags={flags:#x}"
+                );
+                crate::hooks::diag::probe_unmapped_source_parent(
+                    source_specified_instance_ptr,
+                    source_type_id,
+                );
+            }
+        }
+
         // Resolve pets/avatars to their owner, then key players by their embedded
         // record's party slot (v2.0.2: the raw index is character-scoped and merges
         // two players on the same character into one meter row).
