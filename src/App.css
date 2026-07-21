@@ -55,6 +55,30 @@
 
 .titlebar .item {
   padding-right: 3px;
+  white-space: nowrap;
+}
+
+/* Every glyph of a live number gets the same advance width, so the header
+   sections stop jittering as values tick over mid-fight. */
+.titlebar .stat-value {
+  font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Tauri only starts a window drag when the mousedown target itself carries
+   data-tauri-drag-region — it doesn't walk up to ancestors. Without this the
+   nested value/unit spans swallow the press and the overlay won't drag from
+   its own header text. Safe as a blanket rule: nothing in here is clickable. */
+.titlebar-left * {
+  pointer-events: none;
+}
+
+/* Dot separators are drawn by CSS rather than markup so a section hidden at
+   narrow widths takes its leading divider with it. */
+.titlebar-left .item::before {
+  content: "•";
+  color: #696969;
+  padding-right: 5px;
 }
 
 .version {
@@ -208,9 +232,18 @@
   padding: 4px;
 }
 
+/* The absolute HP readout is the first thing to go on narrow overlays — the
+   fixed-width slots would otherwise push the window buttons out of reach. */
+@media only screen and (max-width: 480px) {
+  .encounter-bossHp .unit {
+    display: none;
+  }
+}
+
 @media only screen and (max-width: 325px) {
   .encounter-totalDamage,
-  .encounter-totalDps {
+  .encounter-totalDps,
+  .encounter-bossHp {
     display: none;
   }
 

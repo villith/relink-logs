@@ -19,6 +19,42 @@ export type CharacterType = string | { Unknown: number };
 export type EnemyType = string | { Unknown: number };
 
 /**
+ * One selectable target spawn of an encounter (mirrors the Rust
+ * `TargetSegment`): one contiguous lifetime of one spawn, 1:1 with the HP
+ * chart's series. `instance` is the "#n" shared with the chart; `id` alone is
+ * NOT unique across a fight (the game reuses freed instance ids across summon
+ * waves), which is why selections are spans.
+ */
+export type TargetEntry = {
+  id: number;
+  enemyType: EnemyType;
+  instance: number;
+  maxHp: number | null;
+  startMs: number;
+  endMs: number;
+};
+
+/** The selectable slice of a TargetEntry, sent back as a filter. */
+export type TargetSpan = {
+  id: number;
+  startMs: number;
+  endMs: number;
+};
+
+/**
+ * One enemy HP pool charted on the quest-details view (mirrors the Rust
+ * `HpChartSeries`). `instance` is 1-based among charted pools sharing the same
+ * enemy type, for disambiguating duplicate labels; `values` holds post-hit HP%
+ * per second, null where the pool wasn't hit.
+ */
+export type HpChartSeries = {
+  enemyType: EnemyType;
+  instance: number;
+  maxHp: number;
+  values: (number | null)[];
+};
+
+/**
  * ActionType represents the type of action that a skill can be.
  *
  * Examples:
@@ -34,6 +70,15 @@ export type ActionType =
   | { DamageOverTime: number }
   | { Normal: number }
   | { Group: string };
+
+/** Per-enemy-type share of one skill's damage (mirrors the Rust
+ * `SkillTargetState`); same-type spawns merge into one entry. Computed under
+ * the active target/time filters, like the rest of the derived state. */
+export type SkillTargetState = {
+  enemyType: EnemyType;
+  hits: number;
+  totalDamage: number;
+};
 
 export type SkillState = {
   /** ActionType of the skill */
@@ -60,6 +105,8 @@ export type SkillState = {
   overcapBaseSum: number;
   /** Sum of damage caps over cappable hits */
   overcapCapSum: number;
+  /** Per-enemy damage breakdown (optional so cached/older payloads without it stay valid) */
+  targets?: SkillTargetState[];
 };
 
 export type ComputedSkillState = SkillState & {
@@ -145,6 +192,11 @@ export type EnemyState = {
   targetType: EnemyType;
   /** Total damage done to this target */
   totalDamage: number;
+  /** Remaining HP after the last hit on this target's largest HP pool.
+   * Rust `Option<u64>` with no `skip_serializing_if`, so "no pool" arrives as `null`. */
+  currentHp?: number | null;
+  /** Maximum HP of that pool; `null` alongside `currentHp`. */
+  maxHp?: number | null;
 };
 
 export type EncounterStatus = "Waiting" | "InProgress" | "Stopped";

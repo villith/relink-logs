@@ -1,6 +1,7 @@
-import { LineChart } from "@mantine/charts";
+import { AreaChart, LineChart } from "@mantine/charts";
 import {
   ActionIcon,
+  Badge,
   Box,
   Button,
   Divider,
@@ -10,6 +11,7 @@ import {
   MultiSelect,
   NumberFormatter,
   Paper,
+  RangeSlider,
   Stack,
   Table,
   Tabs,
@@ -29,7 +31,7 @@ import {
 } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
 import { t } from "i18next";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 
@@ -40,7 +42,7 @@ import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import {
   MeterColumns,
   type ComputedPlayerState,
-  type EnemyType,
+  type EncounterState,
   type Overmastery,
   type PlayerData,
   type SortDirection,
@@ -74,10 +76,12 @@ import {
   skillboardLayoutFor,
   skillboardNodeMeta,
   summonBonusValue,
+  targetLabelKey,
   toHash,
   toHashString,
   traitMaxLevel,
   translateAbilityId,
+  translateEnemyType,
   translateItemId,
   translateOvermasteryId,
   translateQuestId,
@@ -182,33 +186,227 @@ const dedupeWeaponTraits = (traits: WeaponTraitDef[]): WeaponTraitDef[] => {
 interface ChartTooltipProps {
   label: string;
   payload: Record<string, any>[] | undefined; // eslint-disable-line
+  /** Overrides the plain thousands-separated rendering (the HP chart shows percentages).
+   * Mantine's own `valueFormatter` cannot reach a custom `content`, so it is passed here. */
+  formatValue?: (value: number) => string;
 }
 
-export const ChartTooltip = ({ label, payload }: ChartTooltipProps) => {
+export const ChartTooltip = ({ label, payload, formatValue }: ChartTooltipProps) => {
   if (!payload) return null;
+
+  const format = formatValue ?? ((value: number) => new Intl.NumberFormat("en-US").format(value));
 
   return (
     <Paper px="md" py="sm" withBorder shadow="md" radius="md">
       <Text fw={500} mb={5}>
         {label}
       </Text>
-      {payload.map(
-        (
-          item: any // eslint-disable-line
-        ) => (
-          <Text key={item.name} fz="sm">
-            <Text component="span" c={item.color}>
-              {item.name === "party" ? t("ui.logs.damage-per-second") : item.name}
+      {/* A null datapoint means "no data here" (e.g. an HP pool that hasn't
+          spawned yet or is already dead) — not a zero; leave it out. */}
+      {payload
+        .filter((item) => item.value !== null && item.value !== undefined)
+        .map(
+          (
+            item: any // eslint-disable-line
+          ) => (
+            <Text key={item.name} fz="sm">
+              <Text component="span" c={item.color}>
+                {item.name === "party" ? t("ui.logs.damage-per-second") : item.name}
+              </Text>
+              : {format(item.value)}
             </Text>
-            : {new Intl.NumberFormat("en-US").format(item.value)}
-          </Text>
-        )
-      )}
+          )
+        )}
     </Paper>
   );
 };
 
-const DPS_INTERVAL = 3;
+// Chart buckets are one second wide (the backend's DPS_INTERVAL), so a bucket
+// index IS the elapsed second. Every bucket-index↔milliseconds conversion must
+// go through this constant — a silent `* 1000` breaks if the width changes.
+const DPS_BUCKET_MS = 1000;
+
+// DPS points are smoothed with a trailing moving average this many seconds wide.
+const DPS_SMOOTHING_WINDOW = 10;
+
+// Chart geometry pinned so the overview brush can span exactly the plot area:
+// recharts margin (5px each side) + y-axis width, matched by the brush insets.
+const CHART_MARGIN = 5;
+const CHART_Y_AXIS_WIDTH = 60;
+
+type ChartDatapoint = {
+  timestamp?: string;
+  party?: number;
+} & { [key: string]: number };
+
+type HpDatapoint = { timestamp?: string; [key: string]: string | number | null | undefined };
+
+/** Fixed categorical order for the enemy HP lines: the boss (largest pool) is
+ * always the first, red; extra pools (summon waves count individually, up to
+ * the backend's 12-series cap) follow in pool-size order. */
+const HP_SERIES_COLORS = [
+  "red.6",
+  "cyan.6",
+  "yellow.6",
+  "grape.6",
+  "lime.6",
+  "indigo.6",
+  "orange.6",
+  "teal.6",
+  "pink.6",
+  "blue.6",
+  "green.6",
+  "violet.6",
+];
+
+const MemoMeterTable = memo(MeterTable);
+
+/** The zoomable detail charts (enemy HP% strip + per-player DPS). Memoized so
+ * brush drags — which re-render the page on every pointer move — skip these
+ * expensive recharts trees until a window is actually committed. */
+const mantineColorVar = (color: string) => `var(--mantine-color-${color.replace(".", "-")})`;
+
+const DetailCharts = memo(function DetailCharts({
+  data,
+  hpData,
+  hpSeries,
+  hiddenHpSeries,
+  onToggleHpSeries,
+  labels,
+}: {
+  data: ChartDatapoint[];
+  hpData: HpDatapoint[];
+  hpSeries: { name: string; color: string }[];
+  hiddenHpSeries: Set<string>;
+  onToggleHpSeries: (name: string) => void;
+  labels: Label;
+}) {
+  // Our own legend chips instead of the recharts legend: they toggle lines
+  // on/off, and they wrap ABOVE the chart instead of into the plot area on
+  // summon-heavy fights. Hidden series leave the plot and the tooltip alike.
+  const visibleHpSeries = hpSeries.filter((series) => !hiddenHpSeries.has(series.name));
+
+  return (
+    <>
+      {hpSeries.length > 0 && (
+        <>
+          <Group gap="xs" align="center">
+            <Text size="sm">{t("ui.logs.enemy-hp")}</Text>
+            {hpSeries.length > 1 &&
+              hpSeries.map((series) => {
+                const hidden = hiddenHpSeries.has(series.name);
+                return (
+                  <UnstyledButton
+                    key={series.name}
+                    onClick={() => onToggleHpSeries(series.name)}
+                    style={{ opacity: hidden ? 0.4 : 1 }}
+                  >
+                    <Group gap={4} wrap="nowrap">
+                      <span
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          flexShrink: 0,
+                          display: "inline-block",
+                          background: mantineColorVar(series.color),
+                        }}
+                      />
+                      <Text size="xs" td={hidden ? "line-through" : undefined}>
+                        {series.name}
+                      </Text>
+                    </Group>
+                  </UnstyledButton>
+                );
+              })}
+          </Group>
+          <LineChart
+            h={hpSeries.length > 1 ? 180 : 120}
+            data={hpData}
+            dataKey="timestamp"
+            withDots={false}
+            connectNulls
+            series={visibleHpSeries}
+            yAxisProps={{ domain: [0, 100], width: CHART_Y_AXIS_WIDTH }}
+            xAxisProps={{ interval: "preserveStartEnd" }}
+            valueFormatter={(value) => `${value.toFixed(1)}%`}
+            lineChartProps={{
+              syncId: "quest-details",
+              margin: { top: CHART_MARGIN, right: CHART_MARGIN, bottom: CHART_MARGIN, left: CHART_MARGIN },
+            }}
+            tooltipProps={{
+              // The synced DPS tooltip renders at the same instant right below;
+              // a tall HP tooltip must stack above it, not slide behind it.
+              wrapperStyle: { zIndex: 20 },
+              // Mantine spreads `tooltipProps` AFTER its own `content`, so this replaces
+              // the built-in tooltip outright and `valueFormatter` never reaches it — the
+              // formatter above only styles the y-axis ticks. Format here too, or the
+              // percentages render as bare floats next to raw DPS numbers.
+              content: ({ label, payload }) => (
+                <ChartTooltip label={label} payload={payload} formatValue={(value) => `${value.toFixed(1)}%`} />
+              ),
+            }}
+          />
+        </>
+      )}
+      <Text size="sm">{t("ui.logs.damage-per-second")}</Text>
+      <LineChart
+        h={400}
+        data={data}
+        dataKey="timestamp"
+        withDots={false}
+        withLegend
+        series={labels}
+        valueFormatter={(value) => {
+          const [num, suffix] = humanizeNumbers(value);
+          return `${num}${suffix}`;
+        }}
+        yAxisProps={{ width: CHART_Y_AXIS_WIDTH }}
+        xAxisProps={{ interval: "preserveStartEnd" }}
+        lineChartProps={{
+          syncId: "quest-details",
+          margin: { top: CHART_MARGIN, right: CHART_MARGIN, bottom: CHART_MARGIN, left: CHART_MARGIN },
+        }}
+        tooltipProps={{
+          wrapperStyle: { zIndex: 10 }, // below the HP tooltip when they meet
+          content: ({ label, payload }) => <ChartTooltip label={label} payload={payload} />,
+        }}
+      />
+    </>
+  );
+});
+
+/** The full-fight context strip the brush rides on: a quiet party-DPS area.
+ * Memoized for the same drag-performance reason as the detail charts. */
+const OverviewChart = memo(function OverviewChart({ data }: { data: { timestamp?: string; party?: number }[] }) {
+  return (
+    <AreaChart
+      h={56}
+      data={data}
+      dataKey="timestamp"
+      series={[{ name: "party", color: "gray.6" }]}
+      withDots={false}
+      withXAxis={false}
+      withYAxis={false}
+      withTooltip={false}
+      gridAxis="none"
+      fillOpacity={0.4}
+      areaChartProps={{ margin: { top: 2, right: 0, bottom: 0, left: 0 } }}
+    />
+  );
+});
+
+/** Dims the parts of the overview strip outside the selected window; follows
+ * the handles live during a drag. */
+const brushShade = (side: "left" | "right", widthPercent: number): React.CSSProperties => ({
+  position: "absolute",
+  top: 0,
+  bottom: 0,
+  [side]: 0,
+  width: `${Math.max(0, Math.min(100, widthPercent))}%`,
+  background: "rgba(10, 10, 10, 0.55)",
+  pointerEvents: "none",
+});
 
 // Tooltip grouping for the checklist source breakdown, in display order.
 const CHECKLIST_SOURCE_KINDS: { key: TraitSource["kind"]; label: string; translate: (id: number) => string }[] = [
@@ -445,40 +643,40 @@ export const ViewPage = () => {
   const { checklistBuild, checklistAi } = useChecklistStore(
     useShallow((state) => ({ checklistBuild: state.build, checklistAi: state.ai }))
   );
-  const playerColors = [color_1, color_2, color_3, color_4, ...PLAYER_COLORS.slice(4)];
-
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { id } = useParams();
 
   const {
     encounter,
     dpsChart,
+    hpChart,
     sbaChart,
     sbaEvents,
     chartLen,
     sbaChartLen,
-    targets,
-    selectedTargets,
+    targetEntries,
+    selectedTargetSpans,
     questId,
     questCompleted,
     roomIndex,
     playerData,
-    setSelectedTargets,
+    setSelectedTargetSpans,
     loadFromResponse,
   } = useEncounterStore((state) => ({
     encounter: state.encounterState,
     dpsChart: state.dpsChart,
+    hpChart: state.hpChart,
     sbaChart: state.sbaChart,
     sbaEvents: state.sbaEvents,
     chartLen: state.chartLen,
     sbaChartLen: state.sbaChartLen,
-    targets: state.targets,
-    selectedTargets: state.selectedTargets,
+    targetEntries: state.targetEntries,
+    selectedTargetSpans: state.selectedTargetSpans,
     playerData: state.players,
     questId: state.questId,
     questCompleted: state.questCompleted,
     roomIndex: state.roomIndex,
-    setSelectedTargets: state.setSelectedTargets,
+    setSelectedTargetSpans: state.setSelectedTargetSpans,
     loadFromResponse: state.loadFromResponse,
   }));
   // Builds tab: the combined traits scan all of a player's equipment, and two
@@ -494,6 +692,14 @@ export const ViewPage = () => {
 
   const [sortType, setSortType] = useState<SortType>(MeterColumns.TotalDamage);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  // Committed scrub window on the overview charts, as [start, end] second
+  // indexes; null = the full fight. `pendingRange` tracks the handles DURING a
+  // drag — only the cheap shade/label layers follow it live; the charts slice
+  // and the meter reparses when the drag commits on release.
+  const [range, setRange] = useState<[number, number] | null>(null);
+  const [pendingRange, setPendingRange] = useState<[number, number] | null>(null);
+  // Meter state reparsed over the committed window; null = show the full fight.
+  const [scrubbedEncounter, setScrubbedEncounter] = useState<EncounterState | null>(null);
   // Shared so toggling a master-trait tier expands/collapses it for every player column.
   const [expandedMasterTraitTiers, setExpandedMasterTraitTiers] = useState<Set<number | "ex">>(new Set());
   const toggleMasterTraitTier = useCallback((tierKey: number | "ex") => {
@@ -511,15 +717,103 @@ export const ViewPage = () => {
     setExpandedMasterTraitTiers(expand ? new Set(tierKeys) : new Set());
   }, []);
 
+  // The target filter's MultiSelect value, derived from the store's
+  // selectedTargetSpans (the single source of truth) — the dropdown encodes a
+  // span as "id:start:end".
+  const selectedTargets = useMemo(
+    () => selectedTargetSpans.map((span) => `${span.id}:${span.startMs}:${span.endMs}`),
+    [selectedTargetSpans]
+  );
+
+  // Navigating to a different log clears every quest-detail filter — enemy
+  // selection and time window — so the new log never renders through the
+  // previous one's filters. The spans clear re-runs this effect, which then
+  // fetches unfiltered (the sentinel start value makes a fresh mount with
+  // stale store spans take the clear path too).
+  const lastLoadedId = useRef<string | undefined>(undefined);
+  // `fetch_encounter_state` is a `#[tauri::command(async)]`, so responses are NOT ordered
+  // with respect to the requests that issued them: a slow reparse can land after a newer
+  // one. Each response checks its generation and drops itself once superseded. The two
+  // kinds are counted separately — a full load and a window reparse write different state,
+  // and clearing the window must not also cancel an in-flight load.
+  const loadGeneration = useRef(0);
+  const windowGeneration = useRef(0);
   useEffect(() => {
-    invoke("fetch_encounter_state", { id: Number(id), options: { targets: selectedTargets } })
+    const idChanged = lastLoadedId.current !== id;
+    lastLoadedId.current = id;
+    if (idChanged && selectedTargetSpans.length > 0) {
+      setSelectedTargetSpans([]);
+      return;
+    }
+
+    const generation = ++loadGeneration.current;
+    // A load resets the window, so any window fetch still in flight is stale too.
+    windowGeneration.current += 1;
+    invoke("fetch_encounter_state", { id: Number(id), options: { targetSpans: selectedTargetSpans } })
       .then((result) => {
+        if (generation !== loadGeneration.current) return;
         loadFromResponse(result as EncounterStateResponse);
+        setRange(null);
+        setPendingRange(null);
+        setScrubbedEncounter(null);
       })
       .catch((e) => {
+        if (generation !== loadGeneration.current) return;
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
-  }, [id, selectedTargets]);
+  }, [id, selectedTargetSpans]);
+
+  // Brush release: commit the window and reparse the meter over exactly that
+  // span. A window covering the whole track clears back to the (already
+  // loaded) full-fight state without a refetch.
+  const handleRangeCommit = useCallback(
+    (value: [number, number]) => {
+      setPendingRange(null);
+      if (value[0] <= 0 && value[1] >= chartLen) {
+        setRange(null);
+        setScrubbedEncounter(null);
+        return;
+      }
+      setRange(value);
+      const generation = ++windowGeneration.current;
+      invoke("fetch_encounter_state", {
+        id: Number(id),
+        options: {
+          targetSpans: selectedTargetSpans,
+          fromMs: value[0] * DPS_BUCKET_MS,
+          // Buckets are inclusive at BOTH ends in the charts, so the window the user sees
+          // is [start, end] whole seconds. `fromMs` admits all of the first bucket, so the
+          // cutoff has to admit all of the last one too — sending `end * 1000` reparsed a
+          // window one bucket shorter than the highlighted region.
+          upToMs: (value[1] + 1) * DPS_BUCKET_MS - 1,
+          // Only the derived state is consumed here — the charts stay from the
+          // full fetch — so skip chart building backend-side.
+          stateOnly: true,
+        },
+      })
+        .then((result) => {
+          if (generation !== windowGeneration.current) return;
+          setScrubbedEncounter((result as EncounterStateResponse).encounterState);
+        })
+        .catch((e) => {
+          if (generation !== windowGeneration.current) return;
+          // The window is already committed, so the charts are zoomed and the badge
+          // advertises it — clear back to the full fight rather than leave the meter
+          // showing full-fight totals under a window label.
+          setRange(null);
+          toast.error(`Failed to fetch encounter state: ${e}`);
+        });
+    },
+    [id, selectedTargetSpans, chartLen]
+  );
+
+  const resetWindow = useCallback(() => {
+    // Supersede any in-flight window fetch so it can't re-apply after the reset.
+    windowGeneration.current += 1;
+    setPendingRange(null);
+    setRange(null);
+    setScrubbedEncounter(null);
+  }, []);
 
   const handleCharacterDataCopy = useCallback((player: PlayerData) => {
     if (player) exportCharacterDataToClipboard(player);
@@ -541,9 +835,308 @@ export const ViewPage = () => {
     exportScreenshotToClipboard("#log-view-page");
   }, []);
 
+  // Exports what the view shows: the target filter AND the committed scrub window, so a
+  // CSV taken from a windowed view doesn't silently contain the whole fight.
   const exportDamageLogToFile = useCallback(() => {
-    if (id) invoke("export_damage_log_to_file", { id: Number(id), options: { targets: selectedTargets } });
-  }, [id, selectedTargets]);
+    if (!id) return;
+    invoke("export_damage_log_to_file", {
+      id: Number(id),
+      options: {
+        targetSpans: selectedTargetSpans,
+        ...(range ? { fromMs: range[0] * DPS_BUCKET_MS, upToMs: (range[1] + 1) * DPS_BUCKET_MS - 1 } : {}),
+      },
+    });
+  }, [id, selectedTargetSpans, range]);
+
+  // Display labels for every target spawn segment, keyed by
+  // `${name}#${instance}` — shared by the HP-chart legend and the target-filter
+  // dropdown (the game names summon INSTANCES individually, but only the type
+  // is in the data). Same-name entries (summon waves, sibling adds) get their
+  // instance suffix so each keeps its own identity; when one name additionally
+  // spans different pool sizes (Lucilius' 141m vs 49m swords), the pool size is
+  // the only distinguisher we have, so show it. Computed ONCE from
+  // targetEntries (the dropdown's superset population) and looked up by the
+  // chart, so the two UIs can never disagree on a label.
+  const targetLabels = useMemo(() => {
+    const countsByName = new Map<string, number>();
+    const maxesByName = new Map<string, Set<number>>();
+    for (const entry of targetEntries) {
+      const name = translateEnemyType(entry.enemyType);
+      countsByName.set(name, (countsByName.get(name) ?? 0) + 1);
+      if (entry.maxHp !== null) {
+        (maxesByName.get(name) ?? maxesByName.set(name, new Set()).get(name)!).add(entry.maxHp);
+      }
+    }
+
+    // The "#n" shown to the user counts within the NAME, not within the type hash.
+    // `entry.instance` is per-type, so two types that translate to the same name would
+    // both be "#1" — and since the chart uses the label as its series key, one pool's
+    // line would overwrite the other's. targetEntries is in first-hit order, so these
+    // ordinals stay chronological.
+    const ordinalsByName = new Map<string, number>();
+    const labels = new Map<string, string>();
+    for (const entry of targetEntries) {
+      const name = translateEnemyType(entry.enemyType);
+      const ordinal = (ordinalsByName.get(name) ?? 0) + 1;
+      ordinalsByName.set(name, ordinal);
+
+      let label = name;
+      if ((countsByName.get(name) ?? 0) > 1) {
+        label = `${name} #${ordinal}`;
+        if ((maxesByName.get(name)?.size ?? 0) > 1 && entry.maxHp !== null) {
+          const [max, maxUnit] = humanizeNumbers(entry.maxHp);
+          label = `${label} (${max}${maxUnit})`;
+        }
+      }
+      labels.set(targetLabelKey(entry.enemyType, entry.instance), label);
+    }
+    return labels;
+    // `i18n.language` re-derives the labels on language change — the translate
+    // helper reads the module-level i18n instance.
+  }, [targetEntries, i18n.language]);
+
+  const players = useMemo(() => (encounter ? formatInPartyOrder(encounter.party) : []), [encounter]);
+
+  // Chart series names for a per-player chart keyed by actor index — shared by
+  // the DPS and SBA charts so the display-name rules (streamer mode, display
+  // names toggle) live in one place.
+  const buildPlayerSeriesNames = useCallback(
+    (chart: Record<number, unknown>) => {
+      const seriesNames = new Map<string, string>();
+      for (const playerIndex in chart) {
+        const player = players.find((p) => p.index === Number(playerIndex));
+        const partySlotIndex = playerData.findIndex((partyMember) => partyMember?.actorIndex === player?.index);
+        seriesNames.set(
+          playerIndex,
+          translatedPlayerName(
+            partySlotIndex,
+            playerData[partySlotIndex],
+            player as ComputedPlayerState,
+            show_display_names && !streamer_mode
+          )
+        );
+      }
+      return seriesNames;
+    },
+    [players, playerData, show_display_names, streamer_mode]
+  );
+
+  // Per-player smoothed DPS series, one point per second. Everything below is
+  // memoized on the underlying log — a brush drag re-renders the page on every
+  // pointer move and must not rebuild any of it.
+  const data = useMemo(() => {
+    const seriesNames = buildPlayerSeriesNames(dpsChart);
+
+    const rows: ChartDatapoint[] = [];
+    for (let i = 0; i < chartLen + 1; i++) {
+      const datapoint: ChartDatapoint = {};
+      datapoint["timestamp"] = millisecondsToElapsedFormat(i * DPS_BUCKET_MS);
+      datapoint["party"] = 0;
+      rows.push(datapoint);
+    }
+
+    // One pass per player carrying a running sum, rather than re-slicing and re-reducing
+    // the trailing window at every bucket: buckets are now per-SECOND and the window is
+    // 10 wide, so the naive form allocated one array and did ~10 adds per bucket per
+    // player — thousands of throwaway arrays before the chart's first paint.
+    for (const playerIndex in dpsChart) {
+      const values = dpsChart[playerIndex];
+      const name = seriesNames.get(playerIndex) as string;
+      let sum = 0;
+      for (let i = 0; i < rows.length; i++) {
+        if (i < values.length) sum += values[i];
+        const dropped = i - DPS_SMOOTHING_WINDOW;
+        if (dropped >= 0 && dropped < values.length) sum -= values[dropped];
+
+        // `rows` runs one past `values` (the chart gets a trailing bucket), so the
+        // divisor is the count of REAL samples in the window, matching what slicing
+        // the array used to yield.
+        const start = Math.max(i - (DPS_SMOOTHING_WINDOW - 1), 0);
+        const end = Math.min(i, values.length - 1);
+        const width = end - start + 1;
+        const value = width > 0 ? Math.round(sum / width) : 0;
+
+        rows[i][name] = value;
+        rows[i]["party"] = (rows[i]["party"] as number) + value;
+      }
+    }
+
+    return rows;
+  }, [chartLen, dpsChart, buildPlayerSeriesNames]);
+
+  // Enemy HP% series, one line per charted pool, kept separate from DPS
+  // (different scale — never a dual axis) but with a synced hover crosshair.
+  // Same bucket count as `data`, so recharts' index-based sync lines the
+  // charts up exactly. HP only changes when hit, so each line forward-fills
+  // its last known value across unhit buckets — otherwise the line cuts off
+  // wherever the pool takes no damage (e.g. the boss flying away), which is
+  // especially visible inside a scrub window.
+  // Kept OUT of the hpData memo below: hpSeries depends only on the HP pools and their
+  // labels, but hpData needs `data` for its timestamp column. Deriving both together gave
+  // hpSeries `data`'s dependency chain (which reaches show_display_names / streamer_mode),
+  // so flipping an unrelated display setting minted a new hpSeries identity and the
+  // defaultHidden effect below wiped whichever HP lines the user had just un-hidden.
+  const hpSeries = useMemo(() => {
+    // "Boss" = a pool at least a quarter the size of the fight's largest pool
+    // (the only boss signal in the data — bosses dwarf summons and adds, while
+    // co-bosses are comparable). Non-boss lines start toggled off.
+    const largestMax = hpChart.reduce((acc, series) => Math.max(acc, series.maxHp), 0);
+    return hpChart.map((series, index) => ({
+      name: targetLabels.get(targetLabelKey(series.enemyType, series.instance)) ?? translateEnemyType(series.enemyType),
+      color: HP_SERIES_COLORS[index % HP_SERIES_COLORS.length],
+      defaultHidden: series.maxHp < largestMax / 4,
+    }));
+  }, [hpChart, targetLabels]);
+
+  const hpData = useMemo(() => {
+    // Forward-fill only INSIDE a pool's lifetime (first to last real report):
+    // HP holds its last known value across unhit stretches, but a dead or
+    // despawned pool must end, not drag a flat line to the end of the fight.
+    const filled = hpChart.map((series) => {
+      const lastReport = series.values.reduce((acc: number, value, i) => (value != null ? i : acc), -1);
+      let last: number | null = null;
+      return series.values.map((value, i) => {
+        if (i > lastReport) return null;
+        return value != null ? (last = value) : last;
+      });
+    });
+
+    return data.map((row, bucket) => {
+      const point: HpDatapoint = { timestamp: row.timestamp };
+      hpSeries.forEach((series, seriesIndex) => {
+        point[series.name] = filled[seriesIndex][bucket] ?? null;
+      });
+      return point;
+    });
+  }, [data, hpChart, hpSeries]);
+
+  // Legend chips toggle HP lines; non-boss pools (summons, adds) start hidden.
+  // Reapplied whenever the series set changes (new log, target filter, language).
+  const [hiddenHpSeries, setHiddenHpSeries] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setHiddenHpSeries(new Set(hpSeries.filter((series) => series.defaultHidden).map((series) => series.name)));
+  }, [hpSeries]);
+  const toggleHpSeries = useCallback((name: string) => {
+    setHiddenHpSeries((previous) => {
+      const next = new Set(previous);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  }, []);
+
+  const { labels, sbaLabels } = useMemo(() => {
+    const playerColors = [color_1, color_2, color_3, color_4, ...PLAYER_COLORS.slice(4)];
+    const base: Label = players.map((player) => {
+      const partySlotIndex = playerData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
+      const color = resolvePlayerColor(playerColors, playerData, partySlotIndex, player.partyIndex);
+
+      return {
+        name: translatedPlayerName(
+          partySlotIndex,
+          playerData[partySlotIndex],
+          player,
+          show_display_names && !streamer_mode
+        ),
+        damage: player.totalDamage,
+        partySlotIndex,
+        color,
+      };
+    });
+
+    // Chart every actor that actually has SBA gauge data (AI companions have no
+    // playerData slot match, but their OnUpdateSBA events are recorded all the same).
+    const sbaLabels = base.filter((_, index) => {
+      const player = players[index];
+      return player !== undefined && sbaChart[player.index] !== undefined;
+    });
+
+    const labels: Label = [
+      ...base,
+      {
+        name: "party",
+        partySlotIndex: -1,
+        label: t("ui.logs.damage-per-second"),
+        color: "grey",
+        strokeDasharray: "2 2",
+      },
+    ];
+
+    return { labels, sbaLabels };
+  }, [players, playerData, color_1, color_2, color_3, color_4, show_display_names, streamer_mode, sbaChart, t]);
+
+  const sbaData = useMemo(() => {
+    const seriesNames = buildPlayerSeriesNames(sbaChart);
+
+    const rows: ({ timestamp?: string } & { [key: string]: number })[] = [];
+    for (let i = 0; i < sbaChartLen; i++) {
+      const sbaDatapoint: { timestamp?: string } & { [key: string]: number } = {};
+      sbaDatapoint["timestamp"] = millisecondsToElapsedFormat(i * DPS_BUCKET_MS);
+
+      for (const playerIndex in sbaChart) {
+        sbaDatapoint[seriesNames.get(playerIndex) as string] = sbaChart[playerIndex][i] / 10.0;
+      }
+
+      rows.push(sbaDatapoint);
+    }
+    return rows;
+  }, [sbaChart, sbaChartLen, buildPlayerSeriesNames]);
+
+  // Target-filter dropdown: one entry per SPAWN SEGMENT — exactly the units
+  // the HP chart draws, same #n numbers — grouped under the enemy's name.
+  // Values encode the segment's span, because a spawn id alone is not unique
+  // across a fight (waves reuse freed instance ids). The pool size is added
+  // when one name spans different sizes.
+  const targetOptions = useMemo(() => {
+    const groups = new Map<string, { value: string; label: string; maxHp: number; instance: number }[]>();
+    for (const entry of targetEntries) {
+      const name = translateEnemyType(entry.enemyType);
+      const label = targetLabels.get(targetLabelKey(entry.enemyType, entry.instance)) ?? name;
+
+      let group = groups.get(name);
+      if (!group) groups.set(name, (group = []));
+      group.push({
+        value: `${entry.id}:${entry.startMs}:${entry.endMs}`,
+        label,
+        maxHp: entry.maxHp ?? 0,
+        instance: entry.instance,
+      });
+    }
+
+    // Biggest pools first — the boss group on top, then within a group the
+    // larger variants first (spawn order breaks ties; unknown HP sinks last).
+    return [...groups.entries()]
+      .sort(([, a], [, b]) => Math.max(...b.map((item) => item.maxHp)) - Math.max(...a.map((item) => item.maxHp)))
+      .map(([group, items]) => ({
+        group,
+        items: items
+          .sort((a, b) => b.maxHp - a.maxHp || a.instance - b.instance)
+          .map(({ value, label }) => ({ value, label })),
+      }));
+  }, [targetEntries, targetLabels]);
+
+  // The scrub window, clamped (log switches change the bucket count). The
+  // detail charts and the meter follow the COMMITTED window; the shades and
+  // labels follow the handles live via `shownRange`.
+  const maxIndex = Math.max(data.length - 1, 0);
+  const clampIndex = (value: number) => Math.max(0, Math.min(value, maxIndex));
+  const committedStart = range ? clampIndex(range[0]) : 0;
+  const committedEnd = range ? clampIndex(range[1]) : maxIndex;
+  const isWindowed = committedStart > 0 || committedEnd < maxIndex;
+  const shownRange: [number, number] = pendingRange ?? [committedStart, committedEnd];
+
+  const detailData = useMemo(
+    () => (isWindowed ? data.slice(committedStart, committedEnd + 1) : data),
+    [data, isWindowed, committedStart, committedEnd]
+  );
+  const detailHpData = useMemo(
+    () => (isWindowed ? hpData.slice(committedStart, committedEnd + 1) : hpData),
+    [hpData, isWindowed, committedStart, committedEnd]
+  );
+  const overviewData = useMemo(() => data.map((row) => ({ timestamp: row.timestamp, party: row.party })), [data]);
 
   if (!encounter) {
     return (
@@ -557,120 +1150,11 @@ export const ViewPage = () => {
     );
   }
 
-  const data = [];
-  const sbaData = [];
-
-  const players = formatInPartyOrder(encounter.party);
-
-  for (let i = 0; i < chartLen + 1; i++) {
-    const datapoint: {
-      timestamp?: string;
-      party?: number;
-    } & { [key: string]: number } = {};
-
-    const timestamp = i * (DPS_INTERVAL * 1000);
-
-    datapoint["timestamp"] = millisecondsToElapsedFormat(timestamp);
-    datapoint["party"] = 0;
-
-    for (const playerIndex in dpsChart) {
-      const player = players.find((p) => p.index === Number(playerIndex));
-      const partySlotIndex = playerData.findIndex((partyMember) => partyMember?.actorIndex === player?.index);
-      const playerName = translatedPlayerName(
-        partySlotIndex,
-        playerData[partySlotIndex],
-        player as ComputedPlayerState,
-        show_display_names && !streamer_mode
-      );
-
-      const lastFiveValues = dpsChart[playerIndex].slice(i - 5, i);
-      const totalLastFiveValues = lastFiveValues.reduce((a, b) => a + b, 0);
-      const currentValue = dpsChart[playerIndex][i] || 0;
-      const averageValue = (totalLastFiveValues + currentValue) / (lastFiveValues.length + 1);
-
-      const value = Math.round(averageValue / DPS_INTERVAL);
-      datapoint[playerName] = value;
-      datapoint["party"] += value;
-    }
-
-    data.push(datapoint);
-  }
-
-  for (let i = 0; i < sbaChartLen; i++) {
-    const sbaDatapoint: {
-      timestamp?: string;
-    } & { [key: string]: number } = {};
-
-    const timestamp = i * 1_000;
-
-    sbaDatapoint["timestamp"] = millisecondsToElapsedFormat(timestamp);
-
-    for (const playerIndex in sbaChart) {
-      const player = players.find((p) => p.index === Number(playerIndex));
-      const partySlotIndex = playerData.findIndex((partyMember) => partyMember?.actorIndex === player?.index);
-      const playerName = translatedPlayerName(
-        partySlotIndex,
-        playerData[partySlotIndex],
-        player as ComputedPlayerState,
-        show_display_names && !streamer_mode
-      );
-
-      const value = sbaChart[playerIndex][i];
-      sbaDatapoint[playerName] = value / 10.0;
-    }
-
-    sbaData.push(sbaDatapoint);
-  }
-
-  const labels: Label = players.map((player) => {
-    const partySlotIndex = playerData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-    const color = resolvePlayerColor(playerColors, playerData, partySlotIndex, player.partyIndex);
-
-    return {
-      name: translatedPlayerName(
-        partySlotIndex,
-        playerData[partySlotIndex],
-        player,
-        show_display_names && !streamer_mode
-      ),
-      damage: player.totalDamage,
-      partySlotIndex,
-      color,
-    };
-  });
-
-  // Chart every actor that actually has SBA gauge data (AI companions have no
-  // playerData slot match, but their OnUpdateSBA events are recorded all the same).
-  const sbaLabels = labels.filter((_, index) => {
-    const player = players[index];
-    return player !== undefined && sbaChart[player.index] !== undefined;
-  });
-
-  labels.push({
-    name: "party",
-    partySlotIndex: -1,
-    label: t("ui.logs.damage-per-second"),
-    color: "grey",
-    strokeDasharray: "2 2",
-  });
-
-  const targetItems = targets.map((target) => {
-    if (typeof target == "object" && Object.hasOwn(target, "Unknown")) {
-      const hash = target.Unknown.toString(16).padStart(8, "0");
-
-      return {
-        rawValue: target,
-        value: target.Unknown.toString(),
-        label: t([`enemies:${hash}.text`, `enemies.unknown.${hash}`, "enemies.unknown-type"], { id: hash }),
-      };
-    }
-
-    return {
-      rawValue: target,
-      value: target.toString(),
-      label: t([`enemies.${target}`, "enemies.unknown-type"]),
-    };
-  });
+  const windowActive = isWindowed || pendingRange !== null;
+  const windowStart = millisecondsToElapsedFormat(shownRange[0] * DPS_BUCKET_MS);
+  const windowEnd = millisecondsToElapsedFormat(shownRange[1] * DPS_BUCKET_MS);
+  const windowDuration = millisecondsToElapsedFormat((shownRange[1] - shownRange[0]) * DPS_BUCKET_MS);
+  const fullDuration = millisecondsToElapsedFormat(maxIndex * DPS_BUCKET_MS);
 
   return (
     <Box>
@@ -761,7 +1245,7 @@ export const ViewPage = () => {
 
         <Divider my="sm" />
 
-        <Tabs defaultValue="overview" variant="outline">
+        <Tabs defaultValue="overview" variant="outline" keepMounted={false}>
           <Tabs.List>
             <Tabs.Tab value="overview">{t("ui.logs.overview")}</Tabs.Tab>
             <Tabs.Tab value="sba">{t("ui.logs.sba-chart")}</Tabs.Tab>
@@ -776,41 +1260,97 @@ export const ViewPage = () => {
             <Box mt="md">
               <Stack>
                 <MultiSelect
-                  data={targetItems}
+                  data={targetOptions}
                   placeholder="All"
                   clearable
+                  value={selectedTargets}
                   onChange={(value) => {
-                    const targets = value
-                      .map((v) => targetItems.find((t) => t.value === v)?.rawValue)
-                      .filter((v) => v !== undefined) as EnemyType[];
-
-                    setSelectedTargets(targets);
+                    setSelectedTargetSpans(
+                      value.map((encoded) => {
+                        const [id, startMs, endMs] = encoded.split(":").map(Number);
+                        return { id, startMs, endMs };
+                      })
+                    );
                   }}
                 />
-                <MeterTable
-                  encounterState={encounter}
+                {/* The meter shows whatever window the brush selects — this row,
+                    fixed-height so it never shifts the table, states that window.
+                    It follows the handles live during a drag. */}
+                <Group gap="xs" align="center" wrap="nowrap" h={22}>
+                  {windowActive ? (
+                    <>
+                      <Badge
+                        size="sm"
+                        radius="sm"
+                        variant="light"
+                        color="yellow"
+                        style={{ textTransform: "none", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
+                      >
+                        {windowStart} – {windowEnd}
+                      </Badge>
+                      <Text size="xs" c="dimmed" style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                        {t("ui.logs.window-of", { selected: windowDuration, total: fullDuration })}
+                      </Text>
+                      <Button
+                        size="compact-xs"
+                        variant="subtle"
+                        color="gray"
+                        leftSection={<X size={12} weight="bold" />}
+                        onClick={resetWindow}
+                      >
+                        {t("ui.logs.window-reset")}
+                      </Button>
+                    </>
+                  ) : (
+                    <Text size="xs" c="dimmed" style={{ fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                      {t("ui.logs.window-full")} · {fullDuration}
+                    </Text>
+                  )}
+                </Group>
+                <MemoMeterTable
+                  encounterState={scrubbedEncounter ?? encounter}
                   sortType={sortType}
                   sortDirection={sortDirection}
                   setSortType={setSortType}
                   setSortDirection={setSortDirection}
                   partyData={playerData}
                 />
-                <Text size="sm">{t("ui.logs.damage-per-second")}</Text>
-                <LineChart
-                  h={400}
-                  data={data}
-                  dataKey="timestamp"
-                  withDots={false}
-                  withLegend
-                  series={labels}
-                  valueFormatter={(value) => {
-                    const [num, suffix] = humanizeNumbers(value);
-                    return `${num}${suffix}`;
-                  }}
-                  tooltipProps={{
-                    content: ({ label, payload }) => <ChartTooltip label={label} payload={payload} />,
-                  }}
+                <DetailCharts
+                  data={detailData}
+                  hpData={detailHpData}
+                  hpSeries={hpSeries}
+                  hiddenHpSeries={hiddenHpSeries}
+                  onToggleHpSeries={toggleHpSeries}
+                  labels={labels}
                 />
+                {/* Full-fight context strip + two-ended brush: drag the handles
+                    to zoom the charts and scope the meter to that window. */}
+                {maxIndex > 0 && (
+                  <Box>
+                    <Box
+                      pos="relative"
+                      style={{ marginLeft: CHART_MARGIN + CHART_Y_AXIS_WIDTH, marginRight: CHART_MARGIN }}
+                    >
+                      <OverviewChart data={overviewData} />
+                      <Box style={brushShade("left", (shownRange[0] / maxIndex) * 100)} />
+                      <Box style={brushShade("right", 100 - (shownRange[1] / maxIndex) * 100)} />
+                    </Box>
+                    <RangeSlider
+                      mt={4}
+                      size="sm"
+                      color="yellow"
+                      min={0}
+                      max={maxIndex}
+                      step={1}
+                      minRange={Math.min(5, maxIndex)}
+                      value={shownRange}
+                      onChange={setPendingRange}
+                      onChangeEnd={handleRangeCommit}
+                      label={(value) => millisecondsToElapsedFormat(value * DPS_BUCKET_MS)}
+                      style={{ marginLeft: CHART_MARGIN + CHART_Y_AXIS_WIDTH, marginRight: CHART_MARGIN }}
+                    />
+                  </Box>
+                )}
               </Stack>
             </Box>
           </Tabs.Panel>

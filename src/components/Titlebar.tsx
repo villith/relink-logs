@@ -12,9 +12,41 @@ import {
   exportFullEncounterToClipboard,
   exportScreenshotToClipboard,
   exportSimpleEncounterToClipboard,
+  getBossHpTarget,
   humanizeNumbers,
   millisecondsToElapsedFormat,
 } from "@/utils";
+
+const BossHpStats = ({ encounterState }: { encounterState: EncounterState }) => {
+  const boss = getBossHpTarget(encounterState.targets);
+  if (!boss) return null;
+
+  const currentHp = boss.currentHp as number;
+  const maxHp = boss.maxHp as number;
+  const percent = (currentHp / maxHp) * 100;
+  const [current, currentUnit] = humanizeNumbers(currentHp);
+  const [max, maxUnit] = humanizeNumbers(maxHp);
+
+  return (
+    <div data-tauri-drag-region className="encounter-bossHp item">
+      HP <span className="stat-value">{percent.toFixed(1)}%</span>
+      <span className="unit font-sm">
+        {" "}
+        (
+        <span className="stat-value">
+          {current}
+          {currentUnit}
+        </span>{" "}
+        /{" "}
+        <span className="stat-value">
+          {max}
+          {maxUnit}
+        </span>
+        )
+      </span>
+    </div>
+  );
+};
 
 const TeamDamageStats = ({ encounterState }: { encounterState: EncounterState }) => {
   const [teamDps, dpsUnit] = humanizeNumbers(encounterState.dps);
@@ -23,12 +55,16 @@ const TeamDamageStats = ({ encounterState }: { encounterState: EncounterState })
   return (
     <Fragment>
       <div data-tauri-drag-region className="encounter-totalDamage item">
-        - {totalTeamDmg}
-        <span className="unit font-sm">{dmgUnit} -</span>
+        <span className="stat-value">
+          {totalTeamDmg}
+          <span className="unit font-sm">{dmgUnit}</span>
+        </span>
       </div>
       <div data-tauri-drag-region className="encounter-totalDps item">
-        {teamDps}
-        <span className="unit font-sm">{dpsUnit}/s</span>
+        <span className="stat-value">
+          {teamDps}
+          <span className="unit font-sm">{dpsUnit}/s</span>
+        </span>
       </div>
     </Fragment>
   );
@@ -44,7 +80,7 @@ const EncounterStatus = ({ encounterState, elapsedTime }: { encounterState: Enco
   } else if (encounterState.status === "InProgress") {
     return (
       <Fragment>
-        <div data-tauri-drag-region className="encounter-elapsedTime item">
+        <div data-tauri-drag-region className="encounter-elapsedTime item stat-value">
           {millisecondsToElapsedFormat(elapsedTime)}
         </div>
       </Fragment>
@@ -52,7 +88,7 @@ const EncounterStatus = ({ encounterState, elapsedTime }: { encounterState: Enco
   } else if (encounterState.status === "Stopped") {
     return (
       <Fragment>
-        <div data-tauri-drag-region className="encounter-elapsedTime item">
+        <div data-tauri-drag-region className="encounter-elapsedTime item stat-value">
           {millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime)}
         </div>
       </Fragment>
@@ -102,6 +138,7 @@ export const Titlebar = ({
           Relink Logs <span className="version-number">{version}</span>
         </div>
         {encounterState.totalDamage > 0 && <TeamDamageStats encounterState={encounterState} />}
+        <BossHpStats encounterState={encounterState} />
       </div>
       <div data-tauri-drag-region className="titlebar-right">
         <EncounterStatus encounterState={encounterState} elapsedTime={elapsedTime} />

@@ -51,7 +51,8 @@ impl<'a> AdjustedDamageInstance<'a> {
             protocol::ActionType::SupplementaryDamage(_)
         );
         let is_cappable = !is_supplementary && event.damage_cap.is_some_and(|cap| cap > 0);
-        let is_capped = is_cappable && cap_detection::is_capped(event.base_damage, event.damage_cap);
+        let is_capped =
+            is_cappable && cap_detection::is_capped(event.base_damage, event.damage_cap);
 
         Self {
             event,
@@ -392,11 +393,42 @@ struct EnemyState {
     target_type: EnemyType,
     raw_target_type: u32,
     total_damage: u64,
+    /// Post-hit remaining HP of the largest pool seen under this key. Multi-part
+    /// bosses report per-part pools against the same parent index, so smaller
+    /// pools never clobber the main body's. `None` on old logs / failed reads.
+    #[serde(default)]
+    current_hp: Option<u64>,
+    /// Maximum HP of that same pool.
+    #[serde(default)]
+    max_hp: Option<u64>,
 }
 
 impl EnemyState {
     fn update_from_damage_event(&mut self, damage_instance: &AdjustedDamageInstance) {
         self.total_damage += damage_instance.event.damage as u64;
+
+        if let (Some(current), Some(max)) = (
+            damage_instance.event.target_current_hp,
+            damage_instance.event.target_max_hp,
+        ) {
+            // Track the largest pool under this key; same-pool reports refresh
+            // current, smaller pools (other parts) are ignored.
+            //
+            // ...EXCEPT once the tracked pool is dead. This key is the game's actor
+            // index, which is reused across boss phases and summon waves, so latching
+            // on "largest ever seen" left a killed 50m phase-1 pool pinned at 0% while
+            // a live 30m phase-2 pool was being hit — every later report failed
+            // `max >= known` and could never take over. A different pool arriving after
+            // the tracked one hit zero replaces it outright.
+            let tracked_pool_is_dead = self.current_hp == Some(0);
+            let is_a_different_pool = self.max_hp.is_some_and(|known| known != max);
+            if self.max_hp.map_or(true, |known| max >= known)
+                || (tracked_pool_is_dead && is_a_different_pool)
+            {
+                self.current_hp = Some(current);
+                self.max_hp = Some(max);
+            }
+        }
     }
 }
 
@@ -611,6 +643,8 @@ impl DerivedEncounterState {
                 target_type: EnemyType::from_hash(damage_instance.event.target.parent_actor_type),
                 raw_target_type: damage_instance.event.target.parent_actor_type,
                 total_damage: 0,
+                current_hp: None,
+                max_hp: None,
             });
 
         target.update_from_damage_event(damage_instance);
@@ -669,6 +703,253 @@ pub fn remap_dragon_form(
     }
 
     event
+}
+
+/// Cap on charted HP pools: beyond this many lines the chart is unreadable, so
+/// only the largest pools (bosses dwarf adds and breakable parts) are kept.
+/// Generous because summon waves legitimately produce many series (Lucilius
+/// spawns 3 swords, three times).
+pub const HP_CHART_MAX_SERIES: usize = 12;
+
+/// One enemy HP pool charted on the quest-details view.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HpChartSeries {
+    pub enemy_type: EnemyType,
+    /// 1-based occurrence among charted pools sharing `enemy_type`, so the
+    /// frontend can disambiguate duplicate labels ("Goblin #2").
+    pub instance: u32,
+    pub max_hp: u64,
+    /// Post-hit HP% per time bucket; `None` where the pool wasn't hit (HP only
+    /// changes when hit, so consumers forward-fill across the gaps).
+    pub values: Vec<Option<f32>>,
+}
+
+/// A caller-selected slice of one target spawn's lifetime (the selectable half
+/// of a [`TargetSegment`]). The spawn id alone is NOT unique across a fight —
+/// the game reuses freed actor instances (wave 2's sword lands on wave 1's
+/// pointer) — so selections carry the segment's time span too.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetSpan {
+    pub id: u32,
+    pub start_ms: i64,
+    pub end_ms: i64,
+}
+
+/// One contiguous lifetime of one enemy spawn: a `target.index` key from its
+/// first damage event until a respawn boundary (its max HP changes, or its HP
+/// jumps back to near-full — see [`segment_targets`]). The quest-details
+/// target dropdown lists exactly these, and the HP chart draws one series per
+/// segment, so the two stay in 1:1 parity (matching `instance` numbers).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetSegment {
+    pub id: u32,
+    pub enemy_type: EnemyType,
+    /// 1-based, chronological within `enemy_type` — the "#n" in both UIs.
+    pub instance: u32,
+    /// The pool's max HP (`None` on logs recorded before HP capture).
+    pub max_hp: Option<u64>,
+    /// First/last damage event of the segment, ms relative to the log start.
+    pub start_ms: i64,
+    pub end_ms: i64,
+}
+
+// A respawn behind a reused key must show REAL evidence, not just a value
+// rising toward full — on pre-per-spawn-id logs several simultaneous summons
+// interleave on one key, and "sword A at 90%, then a splash hit on near-full
+// sword B" must not read as a respawn. Evidence = the jump lands near full AND
+// either the pool was nearly dead, or the key went quiet for a wave-length gap
+// (waves are minutes apart; interleaved hits are milliseconds apart — and the
+// gap also catches a wave despawning mid-HP at a boss phase change).
+const RESPAWN_FRACTION: f64 = 0.95;
+const NEARLY_DEAD_FRACTION: f64 = 0.25;
+const RESPAWN_QUIET_GAP_MS: i64 = 30_000;
+
+/// Split every damage-event target into [`TargetSegment`]s, in first-hit
+/// order. Events without HP data still open/extend segments (DoT-only spans,
+/// old logs) — they just can't trigger respawn boundaries.
+pub fn segment_targets(events: &[(i64, Message)], start_time: i64) -> Vec<TargetSegment> {
+    struct KeyState {
+        position: usize,
+        max: Option<u64>,
+        last_current: Option<u64>,
+        last_ts: i64,
+    }
+
+    let mut segments: Vec<TargetSegment> = Vec::new();
+    let mut live: HashMap<u32, KeyState> = HashMap::new();
+
+    for (timestamp, message) in events {
+        let Message::DamageEvent(event) = message else {
+            continue;
+        };
+        let rel_ts = timestamp - start_time;
+        let hp = event.target_current_hp.zip(event.target_max_hp);
+        let key = event.target.index;
+
+        let boundary = match (live.get(&key), hp) {
+            (None, _) => true,
+            (Some(state), Some((current, max))) => {
+                let max_changed = state.max.is_some_and(|known| known != max);
+                let respawned = state.last_current.is_some_and(|last| {
+                    current > last
+                        && current as f64 >= max as f64 * RESPAWN_FRACTION
+                        && (last as f64 <= max as f64 * NEARLY_DEAD_FRACTION
+                            || rel_ts - state.last_ts >= RESPAWN_QUIET_GAP_MS)
+                });
+                max_changed || respawned
+            }
+            (Some(_), None) => false,
+        };
+
+        if boundary {
+            segments.push(TargetSegment {
+                id: key,
+                enemy_type: EnemyType::from_hash(event.target.parent_actor_type),
+                instance: 0, // numbered below
+                max_hp: hp.map(|(_, max)| max),
+                start_ms: rel_ts,
+                end_ms: rel_ts,
+            });
+            live.insert(
+                key,
+                KeyState {
+                    position: segments.len() - 1,
+                    max: hp.map(|(_, max)| max),
+                    last_current: hp.map(|(current, _)| current),
+                    last_ts: rel_ts,
+                },
+            );
+        } else if let Some(state) = live.get_mut(&key) {
+            let segment = &mut segments[state.position];
+            segment.end_ms = rel_ts;
+            // `last_ts` is the quiet-gap clock, so EVERY event touching this key resets
+            // it — including hp-less ones (DoT ticks). Updating it only on hp-carrying
+            // events let a boss that took nothing but DoT for 30s, then healed to full at
+            // a phase change, read as a respawn and split into a phantom second instance.
+            state.last_ts = rel_ts;
+            if let Some((current, max)) = hp {
+                segment.max_hp = Some(max);
+                state.max = Some(max);
+                state.last_current = Some(current);
+            }
+        }
+    }
+
+    // Chronological per-type numbering (EnemyType has no Hash; n is tiny).
+    let mut counts: Vec<(EnemyType, u32)> = Vec::new();
+    for segment in &mut segments {
+        match counts
+            .iter_mut()
+            .find(|(enemy_type, _)| *enemy_type == segment.enemy_type)
+        {
+            Some((_, count)) => {
+                *count += 1;
+                segment.instance = *count;
+            }
+            None => {
+                counts.push((segment.enemy_type, 1));
+                segment.instance = 1;
+            }
+        }
+    }
+
+    segments
+}
+
+/// Whether a damage event's target passes the quest-details filter: with no
+/// spans selected everything passes; otherwise one of the selected spawn spans
+/// (id + time window) must match. Spans let the UI select ONE summon out of
+/// several sharing an enemy type — and one wave out of several reusing an
+/// instance id.
+pub fn target_selected(
+    rel_ts: i64,
+    event: &protocol::DamageEvent,
+    target_spans: &[TargetSpan],
+) -> bool {
+    target_spans.is_empty()
+        || target_spans.iter().any(|span| {
+            span.id == event.target.index && span.start_ms <= rel_ts && rel_ts <= span.end_ms
+        })
+}
+
+/// Build the quest-details enemy HP charts: one series per [`TargetSegment`]
+/// with HP data passing the filter, largest max-HP first (stable, so same-size
+/// series keep spawn order), capped at [`HP_CHART_MAX_SERIES`]. Series carry
+/// the segment's `instance` number, so chart labels match the target dropdown.
+/// Within a bucket the last report wins. Old logs carry no HP data and yield
+/// no series.
+///
+/// `segments` MUST be [`segment_targets`] of the same `events`/`start_time` —
+/// sharing the caller's segmentation (rather than recomputing it) is what
+/// guarantees the 1:1 chart↔dropdown parity.
+pub fn build_target_hp_charts(
+    events: &[(i64, Message)],
+    segments: &[TargetSegment],
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+    target_spans: &[TargetSpan],
+) -> Vec<HpChartSeries> {
+    let mut series_by_segment: Vec<Option<HpChartSeries>> = vec![None; segments.len()];
+
+    // Spawn ids repeat across waves but a fight has few segments per id; index
+    // by id so the per-event lookup scans a handful of spans, not every segment.
+    let mut positions_by_id: HashMap<u32, Vec<usize>> = HashMap::new();
+    for (position, segment) in segments.iter().enumerate() {
+        positions_by_id
+            .entry(segment.id)
+            .or_default()
+            .push(position);
+    }
+
+    for (timestamp, message) in events {
+        let Message::DamageEvent(event) = message else {
+            continue;
+        };
+        let (Some(current), Some(max)) = (event.target_current_hp, event.target_max_hp) else {
+            continue;
+        };
+        let rel_ts = timestamp - start_time;
+        if !target_selected(rel_ts, event, target_spans) {
+            continue;
+        }
+        // Newest matching segment wins. A respawn boundary gives the closing segment an
+        // `end_ms` equal to the opening one's `start_ms`, and both bounds are inclusive —
+        // scanning forward charted the new wave's first (near-full) report onto the dead
+        // wave's line, which reads as a heal.
+        let Some(position) = positions_by_id
+            .get(&event.target.index)
+            .into_iter()
+            .flatten()
+            .rev()
+            .copied()
+            .find(|&position| {
+                let segment = &segments[position];
+                segment.start_ms <= rel_ts && rel_ts <= segment.end_ms
+            })
+        else {
+            continue;
+        };
+
+        let series = series_by_segment[position].get_or_insert_with(|| HpChartSeries {
+            enemy_type: segments[position].enemy_type,
+            instance: segments[position].instance,
+            max_hp: max,
+            values: vec![None; chart_len],
+        });
+        let bucket = (rel_ts / interval) as usize;
+        if let Some(slot) = series.values.get_mut(bucket) {
+            *slot = Some((current as f64 / max as f64 * 100.0) as f32);
+        }
+    }
+
+    let mut charts: Vec<HpChartSeries> = series_by_segment.into_iter().flatten().collect();
+    charts.sort_by_key(|series| std::cmp::Reverse(series.max_hp));
+    charts.truncate(HP_CHART_MAX_SERIES);
+    charts
 }
 
 /// The parser for the encounter.
@@ -756,24 +1037,41 @@ impl Parser {
 
     /// Reparses derived state from the current encounter.
     pub fn reparse(&mut self) {
-        self.reparse_with_options(&[]);
+        self.reparse_with_options_window(&[], None, None);
     }
 
-    // Re-analyzes the encounter with the given targets.
-    pub fn reparse_with_options(&mut self, targets: &[EnemyType]) {
+    /// [`Self::reparse`] restricted to a window: the derived state covers only
+    /// events inside `[from_ms, up_to_ms]` (both relative to the first event,
+    /// `None` = unbounded). Drives the quest-details window scrubber — the
+    /// derived start time moves to the window start, so DPS and stun/s are
+    /// computed over the window's duration, not the full fight's.
+    ///
+    /// `target_spans` filters by per-spawn segment (see [`target_selected`])
+    /// so individual summons are selectable; empty = everything.
+    pub fn reparse_with_options_window(
+        &mut self,
+        target_spans: &[TargetSpan],
+        from_ms: Option<i64>,
+        up_to_ms: Option<i64>,
+    ) {
+        let log_start = self.start_time();
         self.derived_state = Default::default();
-        self.derived_state.start(self.start_time());
+        let from = from_ms.map(|from| log_start + from);
+        self.derived_state.start(from.unwrap_or(log_start));
+        let cutoff = up_to_ms.map(|up_to| log_start + up_to);
 
         for (timestamp, event) in self.encounter.event_log() {
+            if cutoff.is_some_and(|cutoff| *timestamp > cutoff) {
+                break;
+            }
+            if from.is_some_and(|from| *timestamp < from) {
+                continue;
+            }
             self.derived_state.end_time = *timestamp;
 
             match event {
                 Message::DamageEvent(event) => {
-                    // If the target list is empty, then we're not filtering by target.
-                    // Otherwise, we only process damage events that match the target list.
-                    let target_type = EnemyType::from_hash(event.target.parent_actor_type);
-
-                    if targets.is_empty() || targets.contains(&target_type) {
+                    if target_selected(*timestamp - log_start, event, target_spans) {
                         let event = remap_dragon_form(&self.encounter.player_data, event);
 
                         let player_data = self
@@ -801,9 +1099,23 @@ impl Parser {
         }
     }
 
+    /// Duration of the FULL raw event log (first event → last event, ms, min 1),
+    /// independent of any scrub cutoff on the derived state. Anything that walks
+    /// the full event log (the quest-details charts) MUST size its buffers from
+    /// this — `derived_state.duration()` shrinks under a scrub cutoff and made
+    /// the full-log walks index out of bounds.
+    pub fn full_log_duration(&self) -> i64 {
+        self.encounter
+            .raw_event_log
+            .last()
+            .map(|(timestamp, _)| timestamp - self.start_time())
+            .unwrap_or(1)
+            .max(1)
+    }
+
     pub fn generate_sba_chart(&self, interval: i64) -> HashMap<u32, Vec<f32>> {
         let start_time = self.start_time();
-        let duration = self.derived_state.duration();
+        let duration = self.full_log_duration();
 
         let mut chart_values: HashMap<u32, Vec<f32>> = HashMap::new();
 
@@ -1413,7 +1725,8 @@ impl Parser {
     /// finalized first — a run can end by the next run starting even if the dtor was
     /// missed).
     pub fn on_conflux_room_enter(&mut self, event: ConfluxRoomEnterEvent) {
-        let is_new_run = self.active_run_id.is_none() || self.active_run_manager != event.manager_ptr;
+        let is_new_run =
+            self.active_run_id.is_none() || self.active_run_manager != event.manager_ptr;
 
         if is_new_run {
             // A leftover NORMAL encounter can still be in progress here: a quest that
@@ -1747,6 +2060,319 @@ mod tests {
         assert_eq!(state.total_stun_value, 50.0);
     }
 
+    /// Target HP tracking: each hit carries the target's post-hit current/max HP
+    /// (read from the ExHp component). The derived target keeps the values of the
+    /// LARGEST pool seen under its key (multi-part bosses report per-part pools
+    /// keyed to the same parent), updates current whenever the same pool reports,
+    /// and never clobbers known values with hp-less events (DoT, old logs).
+    #[test]
+    fn target_hp_tracks_largest_pool_and_ignores_missing() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        // First hit on the boss main body: 50m pool, 49m remaining.
+        let mut event = a_damage_event();
+        event.target_current_hp = Some(49_000_000);
+        event.target_max_hp = Some(50_000_000);
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(1_000, &instance);
+
+        let target = state.targets.get(&1).expect("target row");
+        assert_eq!(target.current_hp, Some(49_000_000));
+        assert_eq!(target.max_hp, Some(50_000_000));
+
+        // A part with a smaller pool under the same parent must not clobber.
+        let mut event = a_damage_event();
+        event.target_current_hp = Some(9_000_000);
+        event.target_max_hp = Some(10_000_000);
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(2_000, &instance);
+
+        let target = state.targets.get(&1).expect("target row");
+        assert_eq!(target.current_hp, Some(49_000_000));
+        assert_eq!(target.max_hp, Some(50_000_000));
+
+        // Same pool reporting again updates current HP.
+        let mut event = a_damage_event();
+        event.target_current_hp = Some(48_000_000);
+        event.target_max_hp = Some(50_000_000);
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(3_000, &instance);
+
+        let target = state.targets.get(&1).expect("target row");
+        assert_eq!(target.current_hp, Some(48_000_000));
+
+        // An hp-less event (DoT / old log) leaves known values untouched.
+        let event = a_damage_event();
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(4_000, &instance);
+
+        let target = state.targets.get(&1).expect("target row");
+        assert_eq!(target.current_hp, Some(48_000_000));
+        assert_eq!(target.max_hp, Some(50_000_000));
+    }
+
+    /// Regression: `targets` is keyed on the game's actor index, which is REUSED across
+    /// boss phases and summon waves. Latching on the largest pool ever seen left a killed
+    /// phase-1 pool pinned at 0% forever — a smaller phase-2 pool could never satisfy
+    /// `max >= known`, so the overlay read "HP 0.0%" while the player fought a live enemy.
+    #[test]
+    fn target_hp_lets_a_new_pool_replace_a_dead_one_under_a_reused_index() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        let hit = |current: u64, max: u64| {
+            let mut event = a_damage_event();
+            event.target_current_hp = Some(current);
+            event.target_max_hp = Some(max);
+            event
+        };
+
+        // Phase 1: a 50m pool, fought down to zero.
+        for (ts, current) in [(1_000, 25_000_000), (2_000, 0)] {
+            let event = hit(current, 50_000_000);
+            let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+            state.process_damage_event(ts, &instance);
+        }
+        assert_eq!(state.targets[&1].current_hp, Some(0));
+
+        // Phase 2 reuses the index with a SMALLER pool — it must take over.
+        let event = hit(29_000_000, 30_000_000);
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(3_000, &instance);
+
+        let target = state.targets.get(&1).expect("target row");
+        assert_eq!(
+            target.max_hp,
+            Some(30_000_000),
+            "live pool takes over the corpse"
+        );
+        assert_eq!(target.current_hp, Some(29_000_000));
+
+        // ...but a smaller multi-part pool reported while the tracked one is ALIVE is
+        // still ignored, which is what the largest-pool rule exists for.
+        let event = hit(1_000, 2_000);
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(4_000, &instance);
+        assert_eq!(state.targets[&1].max_hp, Some(30_000_000));
+    }
+
+    /// The quest-details HP charts: one series per (parent_index, max) pool
+    /// passing the target filter, largest pool first, post-hit HP% bucketed by
+    /// time (last report in a bucket wins; unhit buckets are None). Duplicate
+    /// enemy types get 1-based instance numbers so labels can disambiguate.
+    #[test]
+    fn hp_charts_series_per_pool_largest_first_and_respect_target_filter() {
+        const BOSS_HASH: u32 = 0xB055_0001;
+        const ADD_HASH: u32 = 0x0ADD_0001;
+
+        let hit = |ts: i64, spawn_id: u32, type_hash: u32, current: u64, max: u64| {
+            let mut event = a_damage_event();
+            // The hook fills index with its per-spawn id and parent_index with
+            // the game's (summon-collapsed) index; pools key on the former.
+            event.target.index = spawn_id;
+            event.target.parent_index = spawn_id;
+            event.target.parent_actor_type = type_hash;
+            event.target_current_hp = Some(current);
+            event.target_max_hp = Some(max);
+            (ts, Message::DamageEvent(event))
+        };
+
+        let events = vec![
+            hit(0, 1, BOSS_HASH, 100_000, 100_000),
+            hit(1_000, 1, BOSS_HASH, 90_000, 100_000), // bucket 0: last report wins
+            hit(3_500, 2, ADD_HASH, 50, 100),          // smaller pool, bucket 1
+            hit(4_000, 3, ADD_HASH, 75, 100),          // second add pool, bucket 1
+            hit(7_000, 1, BOSS_HASH, 50_000, 100_000), // bucket 2
+        ];
+
+        let segments = segment_targets(&events, 0);
+        let charts = build_target_hp_charts(&events, &segments, 0, 3_000, 3, &[]);
+        assert_eq!(charts.len(), 3);
+
+        // Largest pool first; smaller pools never pollute its line.
+        assert_eq!(charts[0].enemy_type, EnemyType::from_hash(BOSS_HASH));
+        assert_eq!(charts[0].max_hp, 100_000);
+        assert_eq!(charts[0].instance, 1);
+        assert_eq!(charts[0].values, vec![Some(90.0), None, Some(50.0)]);
+
+        // Same-type pools keep first-hit order and get instance numbers.
+        assert_eq!(charts[1].enemy_type, EnemyType::from_hash(ADD_HASH));
+        assert_eq!(charts[1].instance, 1);
+        assert_eq!(charts[1].values, vec![None, Some(50.0), None]);
+        assert_eq!(charts[2].instance, 2);
+        assert_eq!(charts[2].values, vec![None, Some(75.0), None]);
+
+        // Filtering by spawn span selects ONE add out of the two sharing a type.
+        let span = TargetSpan {
+            id: 3,
+            start_ms: 0,
+            end_ms: 10_000,
+        };
+        let charts = build_target_hp_charts(&events, &segments, 0, 3_000, 3, &[span]);
+        assert_eq!(charts.len(), 1);
+        assert_eq!(charts[0].values, vec![None, Some(75.0), None]);
+
+        // Events without HP data can never produce a chart.
+        let bare = vec![(0, Message::DamageEvent(a_damage_event()))];
+        let bare_segments = segment_targets(&bare, 0);
+        assert!(build_target_hp_charts(&bare, &bare_segments, 0, 3_000, 1, &[]).is_empty());
+    }
+
+    /// Lucilius' summon waves: every wave's swords report the SAME collapsed
+    /// game index (and a freed instance id can be reused), so a pool whose HP
+    /// jumps back UP to near-full is a new spawn behind a reused key — it must
+    /// open a new series, while an ordinary partial heal must not.
+    #[test]
+    fn hp_charts_split_a_new_series_when_a_pool_respawns_at_full() {
+        const SWORD_HASH: u32 = 0x0511_0001;
+
+        let hit = |ts: i64, spawn_id: u32, current: u64, max: u64| {
+            let mut event = a_damage_event();
+            event.target.index = spawn_id;
+            event.target.parent_index = spawn_id;
+            event.target.parent_actor_type = SWORD_HASH;
+            event.target_current_hp = Some(current);
+            event.target_max_hp = Some(max);
+            (ts, Message::DamageEvent(event))
+        };
+
+        let events = vec![
+            hit(0, 7, 100, 141),       // wave 1, bucket 0
+            hit(1_000, 7, 10, 141),    // wave 1 nearly dead, still bucket 0
+            hit(6_000, 7, 140, 141),   // near-full + was nearly dead = wave 2, bucket 2
+            hit(7_000, 7, 60, 141),    // wave 2, bucket 2: last report wins
+            hit(8_000, 9, 100, 200),   // separate pool...
+            hit(8_500, 9, 120, 200),   // ...healed to 60% — no respawn evidence
+            hit(9_000, 11, 90, 141),   // third pool, despawns mid-HP (64%)...
+            hit(45_000, 11, 140, 141), // ...back near full after a 36s quiet gap = new wave
+        ];
+
+        let segments = segment_targets(&events, 0);
+        let charts = build_target_hp_charts(&events, &segments, 0, 3_000, 16, &[]);
+        assert_eq!(charts.len(), 5);
+
+        // Largest first: the (healed, unsplit) 200-max pool. Instance numbers
+        // are CHRONOLOGICAL per type (this pool spawned third), matching the
+        // dropdown's numbering, not the chart's display order.
+        assert_eq!(charts[0].max_hp, 200);
+        assert_eq!(charts[0].instance, 3);
+        assert_eq!(charts[0].values[2], Some(60.0));
+
+        // ...then the 141-max series in spawn order.
+        let percent = |current: f64| Some((current / 141.0 * 100.0) as f32);
+        assert_eq!(charts[1].instance, 1);
+        assert_eq!(charts[1].values[0], percent(10.0)); // wave 1 froze where it ended
+        assert_eq!(charts[1].values[2], None);
+        assert_eq!(charts[2].instance, 2);
+        assert_eq!(charts[2].values[2], percent(60.0)); // wave 2 owns bucket 2
+        assert_eq!(charts[3].instance, 4);
+        assert_eq!(charts[3].values[3], percent(90.0)); // despawned-at-64% pool
+        assert_eq!(charts[4].instance, 5);
+        assert_eq!(charts[4].values[15], percent(140.0)); // quiet-gap respawn
+    }
+
+    /// Old logs carry no HP data at all — targets must still segment (one
+    /// segment per spawn id) so the filter dropdown has entries to offer.
+    #[test]
+    fn segment_targets_covers_hp_less_logs() {
+        let events = vec![
+            (1_000, Message::DamageEvent(a_damage_event())),
+            (6_000, Message::DamageEvent(a_damage_event())),
+        ];
+
+        let segments = segment_targets(&events, 1_000);
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].instance, 1);
+        assert_eq!(segments[0].max_hp, None);
+        assert_eq!((segments[0].start_ms, segments[0].end_ms), (0, 5_000));
+    }
+
+    /// Scrubbing the quest-details view reparses the meter "as of" a time: events
+    /// after the cutoff (relative to the first event) are excluded, so totals,
+    /// DPS duration, and per-target damage all reflect that moment of the fight.
+    #[test]
+    fn reparse_until_excludes_events_after_the_cutoff() {
+        let mut parser = Parser::default();
+        let base = 10_000; // arbitrary absolute start timestamp
+
+        for (offset, damage) in [(0, 100), (4_000, 200), (8_000, 400)] {
+            let mut event = a_damage_event();
+            event.damage = damage;
+            parser
+                .encounter
+                .push_event(base + offset, Message::DamageEvent(event));
+        }
+
+        parser.reparse_with_options_window(&[], None, Some(5_000));
+        assert_eq!(parser.derived_state.total_damage, 300);
+        assert_eq!(parser.derived_state.end_time, base + 4_000);
+
+        // No cutoff = the full fight (same as a plain reparse).
+        parser.reparse_with_options_window(&[], None, None);
+        assert_eq!(parser.derived_state.total_damage, 700);
+    }
+
+    /// The two-ended window scrubber: events on both sides of the window are
+    /// excluded, and the derived start time moves to the window start so DPS
+    /// spans the window, not the whole fight.
+    #[test]
+    fn reparse_window_excludes_events_outside_both_bounds() {
+        let mut parser = Parser::default();
+        let base = 10_000;
+
+        for (offset, damage) in [(0, 100), (4_000, 200), (8_000, 400)] {
+            let mut event = a_damage_event();
+            event.damage = damage;
+            parser
+                .encounter
+                .push_event(base + offset, Message::DamageEvent(event));
+        }
+
+        parser.reparse_with_options_window(&[], Some(2_000), Some(5_000));
+        assert_eq!(parser.derived_state.total_damage, 200);
+        assert_eq!(parser.derived_state.start_time, base + 2_000);
+        assert_eq!(parser.derived_state.end_time, base + 4_000);
+
+        // No lower bound = same as the cutoff-only reparse.
+        parser.reparse_with_options_window(&[], None, Some(5_000));
+        assert_eq!(parser.derived_state.total_damage, 300);
+        assert_eq!(parser.derived_state.start_time, base);
+
+        // An empty window stays at zero rather than picking up stale state.
+        parser.reparse_with_options_window(&[], Some(1_000), Some(3_000));
+        assert_eq!(parser.derived_state.total_damage, 0);
+    }
+
+    /// Regression: the SBA chart walks the FULL event log, so it must size its
+    /// buffers from the full log too. Sizing from `derived_state.duration()`
+    /// crashed the app on scrub — a cutoff truncates the derived duration, and
+    /// any SBA event after the scrub point then indexed past the buffer.
+    #[test]
+    fn sba_chart_spans_the_full_log_even_with_a_scrub_cutoff() {
+        let mut parser = Parser::default();
+        let base = 5_000;
+
+        parser
+            .encounter
+            .push_event(base, Message::DamageEvent(a_damage_event()));
+        parser.encounter.push_event(
+            base + 10_000,
+            Message::OnUpdateSBA(protocol::OnUpdateSBAEvent {
+                actor_index: 0,
+                sba_value: 250.0,
+                sba_added: 250.0,
+            }),
+        );
+
+        parser.reparse_with_options_window(&[], None, Some(3_000));
+        let chart = parser.generate_sba_chart(1_000);
+
+        let row = chart.get(&0).expect("player row");
+        assert_eq!(row.len(), 11, "buffer spans the full 10s log");
+        assert_eq!(row[10], 250.0, "post-cutoff SBA event lands in its bucket");
+    }
+
     fn room_enter(quest_id: u32, manager_ptr: u64) -> protocol::ConfluxRoomEnterEvent {
         protocol::ConfluxRoomEnterEvent {
             quest_id,
@@ -1837,7 +2463,9 @@ mod tests {
         assert!(parser.active_run_id.is_some(), "run stays active");
         let conn = parser.db.as_ref().unwrap();
         let count: u32 = conn
-            .query_row("SELECT COUNT(*) FROM logs WHERE run_id IS NULL", [], |r| r.get(0))
+            .query_row("SELECT COUNT(*) FROM logs WHERE run_id IS NULL", [], |r| {
+                r.get(0)
+            })
             .unwrap();
         assert_eq!(count, 0, "no normal log saved for a mid-run fail event");
     }
@@ -1905,7 +2533,10 @@ mod tests {
             )
             .unwrap();
         assert_eq!(quest_id, Some(0xBBBB));
-        assert_eq!(timer, None, "failed quest must not inherit quest A's 213s timer");
+        assert_eq!(
+            timer, None,
+            "failed quest must not inherit quest A's 213s timer"
+        );
     }
 
     #[test]
@@ -1931,7 +2562,10 @@ mod tests {
 
         // Back to town — the path that used to mark the run ✗.
         parser.on_area_enter_event(area_enter(0xAAAA));
-        assert!(parser.active_run_id.is_none(), "run closed by leaving Conflux");
+        assert!(
+            parser.active_run_id.is_none(),
+            "run closed by leaving Conflux"
+        );
 
         let conn = parser.db.as_ref().unwrap();
         let runs = crate::db::runs::get_runs(conn, 10, 0).unwrap();
@@ -1975,7 +2609,11 @@ mod tests {
 
         let conn = parser.db.as_ref().unwrap();
         let runs = crate::db::runs::get_runs(conn, 10, 0).unwrap();
-        assert_eq!(runs.len(), 1, "exactly ONE run for the whole 2-room sequence");
+        assert_eq!(
+            runs.len(),
+            1,
+            "exactly ONE run for the whole 2-room sequence"
+        );
         let run = &runs[0];
         assert_eq!(run.rooms.len(), 2, "two rooms saved and tagged to the run");
         assert_eq!(run.rooms[0].room_index, 0);
@@ -2097,7 +2735,13 @@ mod tests {
         // snapshot is the only stable position — player_data[N] must be party slot N.
         let mut parser = Parser::default();
 
-        parser.on_player_identity_event(identity_event("Alice", 0x8056ABCD, 2, 4_215_158_024, true));
+        parser.on_player_identity_event(identity_event(
+            "Alice",
+            0x8056ABCD,
+            2,
+            4_215_158_024,
+            true,
+        ));
         parser.on_player_identity_event(identity_event("Bob", 0x2AF678E8, 0, 4_208_915_704, true));
 
         let slot0 = parser.encounter.player_data[0]
@@ -2306,12 +2950,18 @@ mod tests {
         });
 
         let player = parser.derived_state.party.get(&0).unwrap();
-        assert_eq!(player.cappable_hits, 110, "denominator counts all capped-capable hits");
-        assert_eq!(player.capped_hits, 100, "only base>cap hits count as capped");
-        let (skill_capped, skill_cappable) = player
-            .skill_breakdown
-            .iter()
-            .fold((0, 0), |acc, s| (acc.0 + s.capped_hits, acc.1 + s.cappable_hits));
+        assert_eq!(
+            player.cappable_hits, 110,
+            "denominator counts all capped-capable hits"
+        );
+        assert_eq!(
+            player.capped_hits, 100,
+            "only base>cap hits count as capped"
+        );
+        let (skill_capped, skill_cappable) =
+            player.skill_breakdown.iter().fold((0, 0), |acc, s| {
+                (acc.0 + s.capped_hits, acc.1 + s.cappable_hits)
+            });
         assert_eq!(skill_cappable, 110);
         assert_eq!(skill_capped, 100);
 
@@ -2384,11 +3034,18 @@ mod tests {
                 |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .unwrap();
-        assert_eq!(normal_logs, 1, "leftover normal encounter saved as its own log");
+        assert_eq!(
+            normal_logs, 1,
+            "leftover normal encounter saved as its own log"
+        );
         assert_eq!(normal_damage, 500, "room damage not merged into it");
         let runs = crate::db::runs::get_runs(conn, 10, 0).unwrap();
         assert_eq!(runs.len(), 1);
-        assert_eq!(runs[0].rooms.len(), 1, "room 1 saved separately under the run");
+        assert_eq!(
+            runs[0].rooms.len(),
+            1,
+            "room 1 saved separately under the run"
+        );
     }
 
     #[test]

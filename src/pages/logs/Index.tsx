@@ -36,7 +36,7 @@ export const IndexPage = () => {
     searchResult,
     selectedLogIds,
     setSelectedLogIds,
-    setSelectedTargets,
+    setSelectedTargetSpans,
     confirmDeleteSelected,
     handleSetPage,
     currentPage,
@@ -84,7 +84,7 @@ export const IndexPage = () => {
     }
 
     const resetSelectedTargets = () => {
-      setSelectedTargets([]);
+      setSelectedTargetSpans([]);
     };
 
     return (

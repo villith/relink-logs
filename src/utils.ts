@@ -6,12 +6,14 @@ import {
   CharacterType,
   ComputedPlayerState,
   EncounterState,
+  EnemyState,
   EnemyType,
   MeterColumns,
   PlayerData,
   PlayerState,
   Sigil,
   SkillState,
+  SkillTargetState,
   SortDirection,
   SortType,
 } from "./types";
@@ -40,6 +42,30 @@ export const formatInPartyOrder = (party: Record<string, PlayerState>): Computed
     percentage: 0,
     ...player,
   }));
+};
+
+/** The target whose HP bar the meter should show: the largest HP pool still
+ * standing (bosses dwarf adds/parts), or null when no target reported HP.
+ *
+ * Killed targets stay in the map for the rest of the encounter, so preferring
+ * the living ones is what moves the readout on to the next enemy instead of
+ * pinning it at 0% behind a corpse. Once everything we've hit is dead we fall
+ * back to the largest pool, leaving the finished boss on screen at 0%. */
+export const getBossHpTarget = (targets: Record<number, EnemyState>): EnemyState | null => {
+  let boss: EnemyState | null = null;
+  let living: EnemyState | null = null;
+
+  for (const target of Object.values(targets)) {
+    // `null`, not just `undefined`: these mirror Rust `Option<u64>` fields with no
+    // `skip_serializing_if`, so an absent pool arrives as JSON `null`. Testing only
+    // for `undefined` let those rows through and rendered `HP NaN% (0 / 0)`.
+    const { currentHp, maxHp } = target;
+    if (currentHp == null || maxHp == null) continue;
+    if (boss === null || maxHp > boss.maxHp!) boss = target;
+    if (currentHp > 0 && (living === null || maxHp > living.maxHp!)) living = target;
+  }
+
+  return living ?? boss;
 };
 
 export const isSupplementaryAction = (actionType: SkillState["actionType"]): boolean =>
@@ -457,10 +483,12 @@ const tryParseInt = (intString: string | number, defaultValue = 0) => {
 /// Takes a number and returns a shortened version of it that is friendlier to read.
 /// For example, 1200 would be returned as 1.2k, 1200000 as 1.2m, and so on.
 export const humanizeNumbers = (n: number) => {
-  if (n >= 1e3 && n < 1e6) return [+(n / 1e3).toFixed(1), "k"];
-  if (n >= 1e6 && n < 1e9) return [+(n / 1e6).toFixed(1), "m"];
-  if (n >= 1e9 && n < 1e12) return [+(n / 1e9).toFixed(1), "b"];
-  if (n >= 1e12) return [+(n / 1e12).toFixed(1), "t"];
+  // Keep the string from toFixed rather than coercing back to a number — the
+  // coercion drops the trailing zero, so 400m rendered as "400m" next to "1.5m".
+  if (n >= 1e3 && n < 1e6) return [(n / 1e3).toFixed(1), "k"];
+  if (n >= 1e6 && n < 1e9) return [(n / 1e6).toFixed(1), "m"];
+  if (n >= 1e9 && n < 1e12) return [(n / 1e9).toFixed(1), "b"];
+  if (n >= 1e12) return [(n / 1e12).toFixed(1), "t"];
   else return [tryParseInt(n).toFixed(0), ""];
 };
 
@@ -749,6 +777,41 @@ export const translateEnemyType = (type: EnemyType | null): string => {
 export const translateEnemyTypeId = (id: number): string => {
   const hash = toHashString(id);
   return t([`enemies:${hash}.text`, `enemies.unknown.${hash}`, "enemies.unknown-type"], { id: hash });
+};
+
+// A string form usable as a map key ("Em1000" and { Unknown: 0x1234 } stay distinct).
+const enemyTypeKey = (type: EnemyType): string => (typeof type === "string" ? `s:${type}` : `h:${type.Unknown}`);
+
+/** Key for one target spawn segment, shared by the quest-view HP chart and the target
+ * filter so they can never disagree on a label.
+ *
+ * Keyed on the enemy TYPE, never on its translated name: `instance` is numbered per type,
+ * and en/enemies.json has 19 display names shared by two or three distinct type hashes
+ * (Fotia, Anemos, Edafos, Hydor, the Goblin variants — exactly the summon-heavy fights
+ * this chart is for). A name-based key collapsed those into one entry, so one pool's HP
+ * line silently overwrote another's. */
+export const targetLabelKey = (enemyType: EnemyType, instance: number): string =>
+  `${enemyTypeKey(enemyType)}#${instance}`;
+
+/** Merge per-enemy skill breakdowns — one array per skill, `undefined` for
+ * skills from logs saved before the breakdown existed — summing hits and
+ * damage by enemy type, sorted by damage descending. Used by the quest-view
+ * skill tooltips (a condensed group merges its member skills). */
+export const mergeTargetBreakdowns = (breakdowns: (SkillTargetState[] | undefined)[]): SkillTargetState[] => {
+  const merged = new Map<string, SkillTargetState>();
+  for (const breakdown of breakdowns) {
+    for (const target of breakdown ?? []) {
+      const key = enemyTypeKey(target.enemyType);
+      const entry = merged.get(key);
+      if (entry) {
+        entry.hits += target.hits;
+        entry.totalDamage += target.totalDamage;
+      } else {
+        merged.set(key, { ...target });
+      }
+    }
+  }
+  return [...merged.values()].sort((a, b) => b.totalDamage - a.totalDamage);
 };
 
 /// Translates the quest ID to a human-readable string.
