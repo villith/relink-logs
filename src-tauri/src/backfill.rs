@@ -67,6 +67,19 @@ pub fn placeholder_for(id: u32) -> String {
     format!("Skill {id}")
 }
 
+/// First id of the game's GLOBAL action namespace. Ids from here up are not
+/// defined in any character's own action table (`system/player/data/<pl>/
+/// <pl>_action.msg` tops out around 1900); they are system-spawned generic
+/// attacks executed *through* the player actor — e.g. the Conflux/EndlessMode
+/// buff procs (`caos_collateraldamage` = 99999, `caos_chainburst_*_lv3` =
+/// 100003, `caos_disruption_burn` = 100008, `caos_umlauf` = 100009, spawned by
+/// `ExPlayerEndlessModeBuff` via the generic attack spawner at 0x1409f9e20 in
+/// game v2.0.2) and shared procs like `core_pl_buff_counter_hit`. The same id
+/// means the same thing for every character, so their names belong in the
+/// `skills.default` block, not under a `Pl####` block. (The pre-existing
+/// `default` entry 4294967295 "Dodge" is this same namespace's u32::MAX end.)
+pub const GENERIC_ACTION_MIN: u32 = 99_999;
+
 /// True if `skills` already resolves a name for `key` via the getSkillName chain:
 /// child block, then parent block, then the `default` block.
 fn is_resolved(skills: &Map<String, Value>, key: &SkillKey) -> bool {
@@ -84,15 +97,22 @@ fn is_resolved(skills: &Map<String, Value>, key: &SkillKey) -> bool {
 /// Inserts `"Skill <id>"` placeholders into `skills` for every `key` that
 /// does not already resolve. Returns the number of placeholders added. Add-only:
 /// never overwrites or removes. Idempotent: an already-present placeholder counts
-/// as resolved. New entries land under the child block.
+/// as resolved. New entries land under the child block, except ids in the global
+/// action namespace ([`GENERIC_ACTION_MIN`]..), which are character-independent
+/// and land under `default`.
 pub fn insert_missing(skills: &mut Map<String, Value>, keys: &BTreeSet<SkillKey>) -> usize {
     let mut added = 0;
     for key in keys {
         if is_resolved(skills, key) {
             continue;
         }
+        let block_key = if key.id >= GENERIC_ACTION_MIN {
+            "default"
+        } else {
+            key.child_key.as_str()
+        };
         let block = skills
-            .entry(key.child_key.clone())
+            .entry(block_key.to_string())
             .or_insert_with(|| Value::Object(Map::new()));
         if let Value::Object(entries) = block {
             entries.insert(key.id.to_string(), Value::String(placeholder_for(key.id)));
@@ -235,6 +255,31 @@ mod tests {
 
         let added = insert_missing(&mut skills, &keys);
         assert_eq!(added, 0, "all three already resolve");
+    }
+
+    /// Ids in the global action namespace (Conflux buff procs etc.) are the same
+    /// attack for every character, so their placeholder lands in `default` — one
+    /// entry serves all characters instead of one per character block.
+    #[test]
+    fn generic_namespace_ids_land_in_default_block() {
+        let mut skills = Map::new();
+        let mut keys = BTreeSet::new();
+        keys.insert(key("Pl2400", "Pl2400", 99_999));
+        keys.insert(key("Pl2700", "Pl2700", 100_008));
+
+        let added = insert_missing(&mut skills, &keys);
+        assert_eq!(added, 2);
+        assert_eq!(skills["default"]["99999"], json!("Skill 99999"));
+        assert_eq!(skills["default"]["100008"], json!("Skill 100008"));
+        assert!(
+            skills.get("Pl2400").is_none() && skills.get("Pl2700").is_none(),
+            "no per-character block for generic ids"
+        );
+
+        // The same id seen from ANOTHER character now resolves via default.
+        let mut more = BTreeSet::new();
+        more.insert(key("Pl0600", "Pl0600", 100_008));
+        assert_eq!(insert_missing(&mut skills, &more), 0);
     }
 
     #[test]
