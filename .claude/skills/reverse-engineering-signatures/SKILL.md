@@ -177,6 +177,8 @@ The injected DLL is **locked while the game runs** — close the game to swap it
 - `ghidra/FindStringRefs.java` — ASCII substring → enclosing C-strings → code xrefs + containing-function entries (needs the **analyzed** DB for xrefs).
 - `ghidra/XrefsTo.java` — RVA(s) → every referencing site, deduped by containing function with per-function counts. THE query for "who touches this global/vtable/function" (needs the **analyzed** DB).
 - `ghidra/ListSymbols.java` — case-insensitive substring search over the symbol table (RTTI class/vtable names) (needs the **analyzed** DB).
+- `ghidra/FindVCallSlot.java` — slot displacement (e.g. `0x48`) → every indirect `CALL qword ptr [reg + disp]` site with its containing function, plus the surrounding instructions. THE query for "who calls virtual slot N", which `XrefsTo` cannot answer: a virtual call references only the vtable, never the callee. Scans the listing, so data bytes that happen to match are never reported. Expect many hits — filter by the caller's code region and by how the out-param is used.
+- `ghidra/DumpVtableSlot.java` — class-name substring + slot displacement → the function each matching `<Class>::vftable` holds at that slot, with a tally of distinct targets. Answers "which subclasses OVERRIDE this virtual and which inherit the base", i.e. exactly how many detours a virtual needs. Classes with multiple vftables (multiple inheritance) or short vtables produce misaligned reads — sanity-check a candidate by decompiling it before trusting it.
 - `ghidra/Decompile.java` — RVA(s) → decompiled C of the containing function (needs the **analyzed** `gbfr202fast` DB).
 - `ghidra/FastAnalysisOptions.java` — pre-script that disables slow analyzers for the fast full-analysis build.
 

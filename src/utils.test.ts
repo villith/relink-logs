@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EquippedSummon, PlayerState, Sigil, SkillState, WeaponInfo, WeaponState } from "./types";
+import { EnemyState, EquippedSummon, PlayerState, Sigil, SkillState, WeaponInfo, WeaponState } from "./types";
 import {
   EMPTY_ID,
   OVERMASTERY_EFFECT_IDS,
@@ -10,12 +10,16 @@ import {
   computeCombinedTraits,
   computeOvercapPercentage,
   computeSupPercentage,
+  damageOverTimeKeys,
   defaultChecklist,
   deriveNavState,
   deriveTranscendence,
   fillBonusGroups,
   formatSummonBonusValue,
+  getBossHpTarget,
   groupBonuses,
+  humanizeNumbers,
+  mergeTargetBreakdowns,
   skillboardLayoutFor,
   skillboardNodeKey,
   skillboardNodeMeta,
@@ -608,5 +612,146 @@ describe("utils", () => {
       expect(deriveNavState("/logs/123")).toMatchObject({ questsActive: true, onListPage: false });
       expect(deriveNavState("/logs/settings")).toMatchObject({ questsActive: false, onListPage: false });
     });
+  });
+});
+
+describe("mergeTargetBreakdowns", () => {
+  it("merges same-enemy entries across skills and sorts by damage descending", () => {
+    const merged = mergeTargetBreakdowns([
+      [
+        { enemyType: { Unknown: 0xaaaa }, hits: 2, totalDamage: 100 },
+        { enemyType: { Unknown: 0xbbbb }, hits: 1, totalDamage: 500 },
+      ],
+      [{ enemyType: { Unknown: 0xaaaa }, hits: 3, totalDamage: 250 }],
+    ]);
+
+    expect(merged).toEqual([
+      { enemyType: { Unknown: 0xbbbb }, hits: 1, totalDamage: 500 },
+      { enemyType: { Unknown: 0xaaaa }, hits: 5, totalDamage: 350 },
+    ]);
+  });
+
+  it("treats string and hash enemy types as distinct keys", () => {
+    const merged = mergeTargetBreakdowns([
+      [
+        { enemyType: "Em1000", hits: 1, totalDamage: 10 },
+        { enemyType: { Unknown: 0x1234 }, hits: 1, totalDamage: 20 },
+      ],
+    ]);
+
+    expect(merged).toEqual([
+      { enemyType: { Unknown: 0x1234 }, hits: 1, totalDamage: 20 },
+      { enemyType: "Em1000", hits: 1, totalDamage: 10 },
+    ]);
+  });
+
+  it("ignores missing breakdowns from logs saved by older app versions", () => {
+    expect(mergeTargetBreakdowns([undefined])).toEqual([]);
+    expect(mergeTargetBreakdowns([undefined, [{ enemyType: { Unknown: 1 }, hits: 1, totalDamage: 5 }]])).toEqual([
+      { enemyType: { Unknown: 1 }, hits: 1, totalDamage: 5 },
+    ]);
+  });
+});
+
+describe("getBossHpTarget", () => {
+  const enemy = (index: number, hp?: { current: number; max: number }, totalDamage = 0): EnemyState => ({
+    index,
+    targetType: { Unknown: 0 } as unknown as EnemyState["targetType"],
+    totalDamage,
+    currentHp: hp?.current,
+    maxHp: hp?.max,
+  });
+
+  it("returns null when no target carries HP data", () => {
+    expect(getBossHpTarget({})).toBeNull();
+    expect(getBossHpTarget({ 1: enemy(1) })).toBeNull();
+  });
+
+  /** Regression: the backend serializes `Option<u64>::None` as JSON `null`, not as an
+   * absent key, so a guard that only tested `undefined` let hp-less rows through and the
+   * overlay header rendered `HP NaN% (0 / 0)` for the whole fight. */
+  it("treats null HP the same as absent HP, as the backend actually sends it", () => {
+    const nullHp = { ...enemy(1), currentHp: null, maxHp: null };
+    expect(getBossHpTarget({ 1: nullHp })).toBeNull();
+    expect(getBossHpTarget({ 1: nullHp, 2: enemy(2, { current: 5, max: 10 }) })?.index).toBe(2);
+  });
+
+  it("picks the target with the largest max HP among those with HP data", () => {
+    const targets = {
+      1: enemy(1, { current: 100, max: 1000 }),
+      2: enemy(2, { current: 40_000_000, max: 50_000_000 }),
+      3: enemy(3), // no HP data, even with more damage taken
+    };
+    expect(getBossHpTarget(targets)?.index).toBe(2);
+  });
+
+  it("skips dead targets so a finished boss doesn't pin the readout at 0%", () => {
+    const targets = {
+      1: enemy(1, { current: 0, max: 50_000_000 }), // killed, biggest pool
+      2: enemy(2, { current: 30_000_000, max: 40_000_000 }),
+      3: enemy(3, { current: 1_000_000, max: 2_000_000 }),
+    };
+    expect(getBossHpTarget(targets)?.index).toBe(2);
+  });
+
+  it("falls back to the largest pool once every known target is dead", () => {
+    const targets = {
+      1: enemy(1, { current: 0, max: 50_000_000 }),
+      2: enemy(2, { current: 0, max: 40_000_000 }),
+    };
+    expect(getBossHpTarget(targets)?.index).toBe(1);
+  });
+});
+
+describe("humanizeNumbers", () => {
+  it("keeps a trailing zero so scaled values are always one decimal place", () => {
+    expect(humanizeNumbers(400_000_000)).toEqual(["400.0", "m"]);
+    expect(humanizeNumbers(2_000)).toEqual(["2.0", "k"]);
+    expect(humanizeNumbers(1_500_000_000)).toEqual(["1.5", "b"]);
+    expect(humanizeNumbers(3_000_000_000_000)).toEqual(["3.0", "t"]);
+  });
+
+  it("leaves sub-thousand values as whole numbers", () => {
+    expect(humanizeNumbers(999)).toEqual(["999", ""]);
+    expect(humanizeNumbers(0)).toEqual(["0", ""]);
+  });
+});
+
+describe("damageOverTimeKeys", () => {
+  it("prefers the type-specific name, per character then global", () => {
+    expect(damageOverTimeKeys("Pl0100", "Pl0100", 0)).toEqual([
+      "skills.Pl0100.damage-over-time-poison",
+      "skills.Pl0100.damage-over-time-poison",
+      "skills.Pl0100.damage-over-time",
+      "skills.Pl0100.damage-over-time",
+      "skills.default.damage-over-time-poison",
+      "skills.default.damage-over-time",
+    ]);
+  });
+
+  it("names each known DoT type", () => {
+    const nameKey = (dotType: number) => damageOverTimeKeys("Pl0100", "Pl0100", dotType)[0];
+
+    expect(nameKey(0)).toBe("skills.Pl0100.damage-over-time-poison");
+    expect(nameKey(1)).toBe("skills.Pl0100.damage-over-time-burn");
+    expect(nameKey(2)).toBe("skills.Pl0100.damage-over-time-darkburn");
+  });
+
+  it("keeps a character's own DoT name ahead of the generic type name", () => {
+    // Id's DoT is flavoured "Darkflame (DoT)"; that override should still win over
+    // the generic "Darkburn" once the type is known.
+    const keys = damageOverTimeKeys("Pl1900", "Pl1900", 2);
+
+    expect(keys.indexOf("skills.Pl1900.damage-over-time")).toBeLessThan(
+      keys.indexOf("skills.default.damage-over-time-darkburn")
+    );
+  });
+
+  it("falls back to the unnamed DoT keys for an unknown type", () => {
+    expect(damageOverTimeKeys("Pl0100", "Pl0200", 7)).toEqual([
+      "skills.Pl0200.damage-over-time",
+      "skills.Pl0100.damage-over-time",
+      "skills.default.damage-over-time",
+    ]);
   });
 });

@@ -184,6 +184,52 @@ fn set_debug_mode(app: AppHandle, state: State<DebugMode>, enabled: bool) {
     state.0.store(enabled, Ordering::Release);
 }
 
+/// Config file the injected hook reads ONCE at startup. It lives next to the hook's own
+/// log (`dirs::data_dir()/gbfr-logs`, which `tauri::api::path::data_dir` resolves
+/// identically) because the hook runs inside the game process and shares no state with us.
+fn hook_config_path() -> Result<std::path::PathBuf, String> {
+    let mut path = tauri::api::path::data_dir().ok_or("Could not find the data folder")?;
+    path.push("gbfr-logs");
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    path.push("hook-config.json");
+
+    Ok(path)
+}
+
+/// Whether the dev-only Infinity Full Assist unlock is armed for the next game launch.
+#[tauri::command]
+fn get_full_assist_unlock() -> Result<bool, String> {
+    if !cfg!(debug_assertions) {
+        return Ok(false);
+    }
+
+    let path = hook_config_path()?;
+    let Ok(contents) = std::fs::read_to_string(&path) else {
+        return Ok(false);
+    };
+
+    let value: serde_json::Value = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+
+    Ok(value
+        .get("unlock_full_assist_infinity")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false))
+}
+
+/// Arm/disarm the unlock. Dev builds only — and even then it does nothing unless the hook
+/// was built with the `fullassist` feature, which only `npm run dev` passes.
+#[tauri::command]
+fn set_full_assist_unlock(enabled: bool) -> Result<(), String> {
+    if !cfg!(debug_assertions) {
+        return Err("The Full Assist unlock is only available in development builds".into());
+    }
+
+    let path = hook_config_path()?;
+    let contents = serde_json::json!({ "unlock_full_assist_infinity": enabled });
+
+    std::fs::write(&path, contents.to_string()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn delete_all_logs() -> Result<(), String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
@@ -237,7 +283,14 @@ fn export_damage_log_to_file(id: u32, options: ParseOptions) -> Result<(), Strin
                 CharacterType::from_hash(damage_event.source.parent_actor_type);
             let child_character_type = CharacterType::from_hash(damage_event.source.actor_type);
 
-            if options.targets.is_empty() || options.targets.contains(&target_type) {
+            // Honour the scrub window too, not just the target filter: the export is
+            // meant to be what the view shows, and exporting from a windowed view used to
+            // silently write the whole fight.
+            let inside_window = options.from_ms.map_or(true, |from| timestamp >= from)
+                && options.up_to_ms.map_or(true, |up_to| timestamp <= up_to);
+
+            if inside_window && v1::target_selected(timestamp, damage_event, &options.target_spans)
+            {
                 writeln!(
                     writer,
                     "{},{},{},{},{},{},{},{},{}",
@@ -445,7 +498,7 @@ fn fetch_conflux_runs(page: Option<u32>) -> Result<ConfluxSearchResult, String> 
     })
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct EncounterStateResponse {
     encounter_state: v1::DerivedEncounterState,
@@ -456,8 +509,13 @@ struct EncounterStateResponse {
     /// 0-based room index when this log is a Conflux room, else None. Lets the
     /// detail view suppress quest-status/elapsed-time (meaningless for a room).
     room_index: Option<u32>,
-    targets: Vec<EnemyType>,
+    /// Per-spawn selectable targets for the filter dropdown, in first-hit
+    /// order — 1:1 with the HP chart's series (same instance numbers).
+    target_entries: Vec<v1::TargetSegment>,
     dps_chart: HashMap<u32, Vec<i32>>,
+    /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
+    /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
+    hp_chart: Vec<v1::HpChartSeries>,
     sba_chart: HashMap<u32, Vec<f32>>,
     sba_events: Vec<(i64, protocol::Message)>,
     death_events: Vec<(i64, protocol::Message)>,
@@ -466,11 +524,34 @@ struct EncounterStateResponse {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct ParseOptions {
-    targets: Vec<EnemyType>,
+    /// Per-spawn segment spans to filter by (empty = all). Spans, not bare
+    /// ids: the game reuses freed instance ids across summon waves, so a
+    /// selection is "this id DURING this window".
+    #[serde(default)]
+    target_spans: Vec<v1::TargetSpan>,
+    /// Scrubber cutoff relative to the first event (ms): the derived meter state
+    /// reflects the fight up to this moment. Absent/None = the full fight.
+    #[serde(default)]
+    up_to_ms: Option<i64>,
+    /// When true, skip chart/segment/event-list building and return those
+    /// fields empty — scrub commits only consume `encounter_state` and keep
+    /// their charts from the full fetch, so rebuilding the rest per brush
+    /// release is wasted work (and its per-player rows would be wrong anyway:
+    /// they'd exist only for players active inside the window).
+    #[serde(default)]
+    state_only: bool,
+    /// Scrubber window start relative to the first event (ms); pairs with
+    /// `up_to_ms` so the derived meter state covers only `[from_ms, up_to_ms]`.
+    /// Absent/None = from the start of the fight.
+    #[serde(default)]
+    from_ms: Option<i64>,
 }
 
-#[tauri::command]
+// `(async)` so the decompress + full reparse runs off the main thread — this is
+// called on every log open, filter change, and brush release.
+#[tauri::command(async)]
 fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStateResponse, String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
     let mut stmt = conn
@@ -484,13 +565,33 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     // @TODO(false): If we deserialize from an older version, we should save it back into the DB as the newer format.
     let mut parser = parser::deserialize_version(&blob, version).map_err(|e| e.to_string())?;
 
-    parser.reparse_with_options(&options.targets);
+    parser.reparse_with_options_window(&options.target_spans, options.from_ms, options.up_to_ms);
 
-    let duration = parser.derived_state.duration();
+    if options.state_only {
+        // Only the fields the scrub commit actually consumes; everything else stays at its
+        // Default so a new response field doesn't have to be mirrored as a hand-written
+        // zero here (where forgetting it would silently return stale-looking data).
+        return Ok(EncounterStateResponse {
+            encounter_state: parser.derived_state,
+            players: parser.encounter.player_data,
+            quest_id: parser.encounter.quest_id,
+            quest_timer: parser.encounter.quest_timer,
+            quest_completed: parser.encounter.quest_completed,
+            room_index,
+            ..Default::default()
+        });
+    }
+
+    // Chart buffers span the FULL fight even when a scrub cutoff truncates the
+    // derived state — the chart-building loops below walk the full event log, so
+    // sizing from the truncated duration would index out of bounds.
+    let duration = parser.full_log_duration();
 
     let mut player_dps: HashMap<u32, Vec<i32>> = HashMap::new();
 
-    const DPS_INTERVAL: i64 = 3 * 1_000;
+    // Per-second buckets: the quest-details charts and the window scrubber both
+    // work in whole seconds, so a bucket index IS the elapsed second.
+    const DPS_INTERVAL: i64 = 1_000;
     const SBA_INTERVAL: i64 = 1_000;
 
     for player in parser.derived_state.party.values() {
@@ -500,8 +601,10 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         );
     }
 
-    let mut targets = Vec::new();
     let start_time = parser.start_time();
+    // Dropdown entries are ALWAYS the unfiltered segmentation — the user picks
+    // from everything the fight contained, whatever is currently selected.
+    let target_entries = v1::segment_targets(&parser.encounter.raw_event_log, start_time);
 
     for (timestamp, event) in parser.encounter.event_log() {
         match event {
@@ -513,15 +616,14 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
                 let damage_event = &damage_event;
 
                 let index = ((timestamp - start_time) / DPS_INTERVAL) as usize;
-                let target_type = EnemyType::from_hash(damage_event.target.parent_actor_type);
-
-                if !targets.contains(&target_type) {
-                    targets.push(target_type);
-                }
 
                 if let Some(chart) = player_dps.get_mut(&damage_event.source.parent_index) {
                     // Check to see if the target is in the list of targets to filter by.
-                    if options.targets.is_empty() || options.targets.contains(&target_type) {
+                    if v1::target_selected(
+                        timestamp - start_time,
+                        damage_event,
+                        &options.target_spans,
+                    ) {
                         chart[index] += damage_event.damage;
                     }
                 }
@@ -529,6 +631,15 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             _ => continue,
         }
     }
+
+    let hp_chart = v1::build_target_hp_charts(
+        &parser.encounter.raw_event_log,
+        &target_entries,
+        start_time,
+        DPS_INTERVAL,
+        (duration / DPS_INTERVAL) as usize + 1,
+        &options.target_spans,
+    );
 
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 
@@ -561,12 +672,13 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         quest_completed: parser.encounter.quest_completed,
         room_index,
         dps_chart: player_dps,
+        hp_chart,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
         sba_chart_len: (duration / SBA_INTERVAL) as usize + 1,
         sba_chart,
         sba_events,
         death_events,
-        targets,
+        target_entries,
     })
 }
 
@@ -945,6 +1057,8 @@ fn main() {
             predict_overmastery,
             fetch_overmastery_seed,
             search_synthesis,
+            get_full_assist_unlock,
+            set_full_assist_unlock,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.

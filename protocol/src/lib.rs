@@ -51,7 +51,10 @@ pub enum ActionType {
     SBA,
     /// Supplementary Damage containing the original skill ID that trigged it.
     SupplementaryDamage(u32),
-    /// Damage over time, containing the effect type. (Currently, always 0 until we find more info)
+    /// Damage over time, containing the effect type: 0 poison, 1 burn, 2 darkburn.
+    /// Populated for real since the v2.0.2 `getDotDamage` hook fix; older logs carry 0
+    /// for every type. NOT a skill id — the parser merges all types into one breakdown
+    /// row because they share a single display name.
     DamageOverTime(u32),
     /// Normal Skill Attack containing the skill ID.
     Normal(u32),
@@ -84,6 +87,13 @@ pub struct DamageEvent {
     /// hooks that don't provide it. Lets the parser compute exact cap detection
     /// (`base > cap`) and the game's overcap %: `(base / cap) * 100`.
     pub base_damage: Option<f32>,
+    /// The target's remaining HP AFTER this hit, read from its `ExHp` component
+    /// (embedded at instance+0x150; current = +0x160, statically derived v2.0.2).
+    /// `None` on old logs and when the read fails its sanity checks.
+    pub target_current_hp: Option<u64>,
+    /// The target's maximum HP (`ExHp` +0x168). `None` alongside
+    /// `target_current_hp`.
+    pub target_max_hp: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

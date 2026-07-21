@@ -12,7 +12,7 @@ use dll_syringe::process::{OwnedProcess, Process};
 use pelite::pattern;
 use pelite::pe64::{Pe, PeFile};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
 use windows::Win32::System::Diagnostics::ToolHelp::{
@@ -47,6 +47,12 @@ pub fn xorshift32(mut s: u32) -> u32 {
 }
 
 pub struct Mem(pub HANDLE);
+
+// A process handle is a kernel object usable from any thread; the reads it
+// backs (ReadProcessMemory) and its CloseHandle are thread-safe. Needed so the
+// opened game can be cached in [`open_game`]'s static across poll threads.
+unsafe impl Send for Mem {}
+unsafe impl Sync for Mem {}
 
 impl Mem {
     pub fn read(&self, addr: u64, buf: &mut [u8]) -> Result<()> {
@@ -118,17 +124,39 @@ pub fn module_base(pid: u32) -> Result<(u64, PathBuf)> {
     ))
 }
 
+/// The opened game, cached across calls: the toolbox staleness watchers land
+/// here every 5 seconds, and a fresh discovery walks every process on the
+/// system plus every module of the game just to read a few bytes.
+static GAME_CACHE: Mutex<Option<(Arc<Mem>, u64, PathBuf)>> = Mutex::new(None);
+
 /// Open the running game for reading: process handle + exe base + exe path.
-/// `Ok(None)` = game not running.
-pub fn open_game() -> Result<Option<(Mem, u64, PathBuf)>> {
+/// `Ok(None)` = game not running. Cached; revalidated with a 4-byte read at
+/// the module base (fails once the process exits) and rebuilt on failure, so
+/// a game restart is picked up on the next call.
+pub fn open_game() -> Result<Option<(Arc<Mem>, u64, PathBuf)>> {
+    // Take a snapshot and DROP the lock before doing any syscall. Holding it across the
+    // revalidating read, the process-table walk and the module walk serialized every
+    // poller behind the slowest one — worst exactly when the game is closed and the walk
+    // is a full system enumeration that finds nothing.
+    let cached = GAME_CACHE.lock().unwrap_or_else(|e| e.into_inner()).clone();
+
+    if let Some((mem, base, exe)) = cached {
+        if mem.u32(base).is_ok() {
+            return Ok(Some((mem, base, exe)));
+        }
+        // The read failed, so the process is gone: drop the stale entry and rediscover.
+        *GAME_CACHE.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    }
+
     let Some(pid) = find_game_pid()? else {
         return Ok(None);
     };
-    let mem = Mem(
+    let mem = Arc::new(Mem(
         unsafe { OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid) }
             .context("OpenProcess (run as admin?)")?,
-    );
+    ));
     let (base, exe) = module_base(pid)?;
+    *GAME_CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some((mem.clone(), base, exe.clone()));
     Ok(Some((mem, base, exe)))
 }
 

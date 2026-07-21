@@ -1,4 +1,5 @@
 import synthesisTraits from "@/assets/synthesis-traits.json";
+import useGameStatus from "@/pages/toolbox/useGameStatus";
 import useStalenessWatch from "@/pages/toolbox/useStalenessWatch";
 import { useSynthesisFormStore } from "@/stores/useSynthesisFormStore";
 import { SynthesisSearchResponse, SynthesisSeed, SynthesisStatus } from "@/types";
@@ -92,11 +93,9 @@ export default function useSynthesisHelper() {
   // as useChecklistSettings).
   const { i18n } = useTranslation("traits");
   const [form, setForm] = useState<SynthesisForm>(() => sanitizeSynthesisForm(useSynthesisFormStore.getState().saved));
-  const [status, setStatus] = useState<SynthesisStatus | null>(null);
+  const { status, error, setError, loading } = useGameStatus<SynthesisStatus>("fetch_synthesis_status");
   const [response, setResponse] = useState<SynthesisSearchResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
-  const [loading, setLoading] = useState(true);
   const saveForm = useSynthesisFormStore((s) => s.save);
 
   useEffect(() => {
@@ -112,22 +111,6 @@ export default function useSynthesisHelper() {
       return seed !== null && (seed.rngState !== watched.rngState || seed.seedCounter !== watched.seedCounter);
     }
   );
-
-  useEffect(() => {
-    const load = () =>
-      invoke<SynthesisStatus>("fetch_synthesis_status")
-        .then(setStatus)
-        .catch((e) => setError(String(e)))
-        .finally(() => setLoading(false));
-    load();
-    // Users routinely open the tool before launching the game; re-read when
-    // the window comes back so the "game not running" banner clears itself.
-    const onVisible = () => {
-      if (!document.hidden) load();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
 
   const traitOptions = useMemo(() => buildTraitOptions(getTraitsBundle()), [i18n.language]);
 

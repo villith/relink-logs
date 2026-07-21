@@ -1,39 +1,42 @@
-import { CharacterType, DeathEvent, EncounterState, EnemyType, PlayerData, SBAEvent } from "@/types";
+import { DeathEvent, EncounterState, HpChartSeries, PlayerData, SBAEvent, TargetEntry, TargetSpan } from "@/types";
 import { create } from "zustand";
 
 interface EncounterStore {
   encounterState: EncounterState | null;
   dpsChart: Record<number, number[]>;
+  /** Enemy HP% per second, one series per charted HP pool (largest first). Empty on old logs. */
+  hpChart: HpChartSeries[];
   sbaChart: Record<number, number[]>;
   sbaEvents: SBAEvent[];
   deathEvents: DeathEvent[];
   chartLen: number;
   sbaChartLen: number;
-  targets: EnemyType[];
-  selectedTargets: EnemyType[];
+  /** Per-spawn selectable targets, first-hit order. */
+  targetEntries: TargetEntry[];
+  /** Selected target spawn spans; empty = all. */
+  selectedTargetSpans: TargetSpan[];
   selectedPlayers: string[];
-  selectedPlayerTypes: EnemyType[];
   players: PlayerData[];
   questId: number | null;
   questTimer: number | null;
   questCompleted: boolean;
   /** 0-based room index when this log is a Conflux room, else null. */
   roomIndex: number | null;
-  setSelectedTargets: (targets: EnemyType[]) => void;
+  setSelectedTargetSpans: (targetSpans: TargetSpan[]) => void;
   setSelectedPlayers: (playerNames: string[]) => void;
-  setSelectedPlayerTypes: (playerTypes: CharacterType[]) => void;
   loadFromResponse: (response: EncounterStateResponse) => void;
 }
 
 export interface EncounterStateResponse {
   encounterState: EncounterState;
   dpsChart: Record<number, number[]>;
+  hpChart: HpChartSeries[];
   sbaChart: Record<number, number[]>;
   sbaEvents: SBAEvent[];
   deathEvents: DeathEvent[];
   chartLen: number;
   sbaChartLen: number;
-  targets: EnemyType[];
+  targetEntries: TargetEntry[];
   players: PlayerData[];
   questId: number | null;
   questTimer: number | null;
@@ -44,35 +47,35 @@ export interface EncounterStateResponse {
 export const useEncounterStore = create<EncounterStore>((set) => ({
   encounterState: null,
   dpsChart: {},
+  hpChart: [],
   sbaChart: {},
   sbaEvents: [],
   deathEvents: [],
   chartLen: 0,
   sbaChartLen: 0,
-  targets: [],
-  selectedTargets: [],
+  targetEntries: [],
+  selectedTargetSpans: [],
   selectedPlayers: [],
-  selectedPlayerTypes: [],
   players: [],
   questId: null,
   questTimer: null,
   questCompleted: false,
   roomIndex: null,
-  setSelectedTargets: (targets: EnemyType[]) => set({ selectedTargets: targets }),
+  setSelectedTargetSpans: (targetSpans: TargetSpan[]) => set({ selectedTargetSpans: targetSpans }),
   setSelectedPlayers: (playerNames: string[]) => set({ selectedPlayers: playerNames }),
-  setSelectedPlayerTypes: (playerTypes: CharacterType[]) => set({ selectedPlayerTypes: playerTypes }),
   loadFromResponse: (response: EncounterStateResponse) => {
     const filteredPlayers = response.players.filter((player) => player !== null);
 
     set({
       encounterState: response.encounterState,
       dpsChart: response.dpsChart,
+      hpChart: response.hpChart ?? [],
       sbaChart: response.sbaChart,
       sbaEvents: response.sbaEvents,
       deathEvents: response.deathEvents,
       chartLen: response.chartLen,
       sbaChartLen: response.sbaChartLen,
-      targets: response.targets,
+      targetEntries: response.targetEntries ?? [],
       players: filteredPlayers,
       questId: response.questId,
       questTimer: response.questTimer,

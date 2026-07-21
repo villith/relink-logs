@@ -5,6 +5,21 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.11.0
+
+### Features
+
+- Per-enemy damage meters
+- Time range scrubber for viewing logs
+
+### Bug Fixes
+
+- DoTs are now properly tracked
+
+### Language
+
+- Added most Endless Ragnarok enemy names in all languages
+
 ## 1.10.0
 
 ### Features

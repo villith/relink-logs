@@ -93,27 +93,57 @@ impl Process {
     /// `addrs[0]` = RVA where the match was found; `addrs[1]` = the first capture (the `'`
     /// cursor, or the `$`-followed call target).
     fn scan(&self, signature_pattern: &str, keep_last: bool) -> anyhow::Result<[u32; 8]> {
+        let matches = self.scan_all(signature_pattern, !keep_last)?;
+        // `scan_all` errors on an empty result, so there is always a last element.
+        Ok(*matches.last().expect("scan_all rejects zero matches"))
+    }
+
+    /// Runs the pelite code scan and returns the capture array of every match, in address
+    /// order — or just the first when `first_only` is set, which lets single-match callers
+    /// keep their early exit instead of walking the rest of the module. The one place the
+    /// scanner/pattern setup and the not-found error live.
+    fn scan_all(&self, signature_pattern: &str, first_only: bool) -> anyhow::Result<Vec<[u32; 8]>> {
         let view = unsafe { PeView::module(self.module_handle.0 as *const u8) };
         let scanner = view.scanner();
         let pattern = pattern::parse(signature_pattern)?;
         let mut addrs = [0; 8];
-        let mut found = None;
+        let mut found = Vec::new();
         let mut matches = scanner.matches_code(&pattern);
         while matches.next(&mut addrs) {
-            found = Some(addrs);
-            if !keep_last {
+            found.push(addrs);
+            if first_only {
                 break;
             }
         }
-        found.ok_or(anyhow!(
-            "Could not find match for pattern: {}",
-            signature_pattern
-        ))
+        if found.is_empty() {
+            return Err(anyhow!(
+                "Could not find match for pattern: {}",
+                signature_pattern
+            ));
+        }
+        Ok(found)
     }
 
     /// Runs the pelite code scan and returns the capture array (`addrs`) of the FIRST match.
     fn first_match(&self, signature_pattern: &str) -> anyhow::Result<[u32; 8]> {
         self.scan(signature_pattern, false)
+    }
+
+    /// Searches and returns the absolute addresses where the signature begins to match, for
+    /// EVERY match (`addrs[0]` of each).
+    ///
+    /// Unlike the single-match searches above, this is for a signature that is deliberately
+    /// non-unique because the same source function was compiled into several sibling
+    /// overrides. The 2.0.2 DoT getter is the case in point: `StatusBase::getDotDamage` is a
+    /// virtual whose three DoT-dealing subclasses (poison/burn/darkburn) each emit a
+    /// byte-identical prologue, so one pattern legitimately resolves to all three entries and
+    /// every one of them has to be detoured. Callers should assert the count they expect.
+    pub fn search_match_addresses(&self, signature_pattern: &str) -> anyhow::Result<Vec<usize>> {
+        Ok(self
+            .scan_all(signature_pattern, false)?
+            .into_iter()
+            .map(|addrs| self.base_address + addrs[0] as usize)
+            .collect())
     }
 
     /// Searches and returns the absolute address of the function that matches the given

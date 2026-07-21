@@ -8,12 +8,15 @@ import { useSkillBreakdown } from "./useSkillBreakdown";
 export type SkillBreakdownProps = {
   player: ComputedPlayerState;
   color: string;
+  /** Live overlay rows skip the per-enemy tooltip (quest view only). */
+  live?: boolean;
 };
 
 const renderSkillRow = (
   characterType: CharacterType,
   skillData: ComputedSkillState | ComputedSkillGroup,
-  color: string
+  color: string,
+  live?: boolean
 ) => {
   const isSkillGroup = typeof skillData.actionType === "object" && Object.hasOwn(skillData.actionType, "Group");
 
@@ -26,6 +29,7 @@ const renderSkillRow = (
         characterType={characterType}
         group={skillGroup}
         color={color}
+        live={live}
       />
     );
   } else {
@@ -37,12 +41,13 @@ const renderSkillRow = (
         characterType={characterType}
         skill={skill}
         color={color}
+        live={live}
       />
     );
   }
 };
 
-export const SkillBreakdown = ({ player, color }: SkillBreakdownProps) => {
+export const SkillBreakdown = ({ player, color, live }: SkillBreakdownProps) => {
   const { skills } = useSkillBreakdown(player);
 
   return (
@@ -62,7 +67,7 @@ export const SkillBreakdown = ({ player, color }: SkillBreakdownProps) => {
             </tr>
           </thead>
           <tbody className="transparent-bg">
-            {skills.map((skill) => renderSkillRow(player.characterType, skill, color))}
+            {skills.map((skill) => renderSkillRow(player.characterType, skill, color, live))}
           </tbody>
         </table>
       </td>

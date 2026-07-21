@@ -58,6 +58,9 @@
     "version-update-available-unknown": "update available",
     "debug-mode": "Debug Mode",
     "debug-mode-description": "Opens the developer console to view all raw event data.",
+    "dev-settings": "Development",
+    "full-assist-unlock": "Unlock Full Assist in Infinity quests",
+    "full-assist-unlock-description": "Development builds only. Lets the game's built-in Full Assist AI keep fighting in Infinity quests, which the game normally disables. Applies the next time the game starts.",
     "weapon": "Weapon",
     "player-stats": "Player Stats",
     "player-overmasteries": "Overmasteries",
@@ -137,6 +140,10 @@
       "duration": "Duration",
       "total-damage": "Total Damage",
       "damage-per-second": "Damage Per Second",
+      "enemy-hp": "Enemy HP",
+      "window-full": "Full fight",
+      "window-of": "{{selected}} of {{total}} selected",
+      "window-reset": "Show full fight",
       "delete-all-logs-confirmation": "This will delete all logs from the database. This action cannot be undone.",
       "delete-selected-logs-confirmation_one": "This will delete {{count}} log from the database. This action cannot be undone.",
       "delete-selected-logs-confirmation_other": "This will delete {{count}} logs from the database. This action cannot be undone.",
@@ -1237,6 +1244,9 @@
       "link-attack": "Link Attack",
       "skybound-arts": "Skybound Arts",
       "damage-over-time": "Damage Over Time",
+      "damage-over-time-poison": "Poison",
+      "damage-over-time-burn": "Burn",
+      "damage-over-time-darkburn": "Darkburn",
       "unknown-skill": "Skill {{id}}"
     },
     "Pl2400": {
@@ -1418,7 +1428,8 @@
         "aerial-attack": "Aerial Attack",
         "kick-face": "Kick Face",
         "stance-flip": "Stance Flip",
-        "flipkick": "Flipkick"
+        "flipkick": "Flipkick",
+        "dead-lands": "Dead Lands"
       }
     },
     "Pl2900": {

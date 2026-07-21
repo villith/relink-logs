@@ -89,9 +89,15 @@ mod tests {
     #[test]
     fn overcap_percent_matches_game_formula() {
         // Exactly at cap => 100%.
-        assert_eq!(overcap_display_percent(Some(1000.0), Some(1000)), Some(100.0));
+        assert_eq!(
+            overcap_display_percent(Some(1000.0), Some(1000)),
+            Some(100.0)
+        );
         // 3x over cap => 300%.
-        assert_eq!(overcap_display_percent(Some(3000.0), Some(1000)), Some(300.0));
+        assert_eq!(
+            overcap_display_percent(Some(3000.0), Some(1000)),
+            Some(300.0)
+        );
         // Below cap => under 100%.
         assert_eq!(overcap_display_percent(Some(500.0), Some(1000)), Some(50.0));
     }

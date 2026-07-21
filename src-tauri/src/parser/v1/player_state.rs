@@ -150,6 +150,11 @@ impl PlayerState {
                 return;
             }
 
+            // NOTE: damage-over-time deliberately falls through to the equality check
+            // below. Since the 2.0.2 hook fix its payload is the DoT TYPE (0 poison /
+            // 1 burn / 2 darkburn), and each type is named separately in the breakdown,
+            // so one row per type is what we want — ticks of the same type still merge.
+
             // If the skill is already being tracked, update it.
             if skill.action_type == action && skill.child_character_type == child_character_type {
                 skill.update_from_damage_event(damage_instance);
@@ -181,6 +186,34 @@ mod tests {
         assert_eq!(player_state.dps, 100.0);
     }
 
+    /// The 2.0.2 DoT hook fix made the `DamageOverTime` payload the DoT TYPE
+    /// (0 poison / 1 burn / 2 darkburn) instead of a constant 0, so each type earns its
+    /// own named breakdown row. Ticks of the SAME type still aggregate into one row.
+    #[test]
+    fn damage_over_time_types_each_get_their_own_skill_row() {
+        let mut player_state = empty_player();
+
+        for (dot_type, damage) in [(0u32, 100), (1, 50), (2, 25), (0, 25)] {
+            let event = plain_event(ActionType::DamageOverTime(dot_type), damage);
+            player_state
+                .update_from_damage_event(&AdjustedDamageInstance::from_damage_event(&event, None));
+        }
+
+        assert_eq!(
+            player_state.skill_breakdown.len(),
+            3,
+            "poison/burn/darkburn are separate rows"
+        );
+
+        let poison = player_state
+            .skill_breakdown
+            .iter()
+            .find(|s| s.action_type == ActionType::DamageOverTime(0))
+            .expect("poison row");
+        assert_eq!(poison.hits, 2, "same-type ticks aggregate");
+        assert_eq!(poison.total_damage, 125);
+    }
+
     #[test]
     fn updates_from_damage_event() {
         let mut player_state = empty_player();
@@ -205,6 +238,8 @@ mod tests {
             stun_value: None,
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -241,6 +276,8 @@ mod tests {
             stun_value: None,
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -285,6 +322,8 @@ mod tests {
             stun_value: None,
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         };
 
         let skill_two = DamageEvent {
@@ -307,6 +346,8 @@ mod tests {
             stun_value: None,
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         };
 
         player_state
@@ -346,6 +387,8 @@ mod tests {
             stun_value: None,
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         };
 
         let child_skill = DamageEvent {
@@ -368,6 +411,8 @@ mod tests {
             stun_value: None,
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -413,6 +458,8 @@ mod tests {
             stun_value: Some(5.0),
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         };
 
         let player_data = PlayerData {
@@ -473,6 +520,8 @@ mod tests {
             stun_value: Some(5.0),
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -504,6 +553,8 @@ mod tests {
             stun_value: None,
             damage_cap: Some(22_999),
             base_damage: Some(40_000.0), // base > cap -> capped
+            target_current_hp: None,
+            target_max_hp: None,
         }
     }
 
@@ -528,6 +579,8 @@ mod tests {
             stun_value: None,
             damage_cap: Some(22_999),
             base_damage: Some(100.0), // base < cap -> not capped
+            target_current_hp: None,
+            target_max_hp: None,
         }
     }
 
@@ -597,6 +650,8 @@ mod tests {
             stun_value: None,
             damage_cap: None,
             base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
         }
     }
 

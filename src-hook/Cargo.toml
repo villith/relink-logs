@@ -16,6 +16,9 @@ dmgdiag = []
 # hooks that still work, so triggering an in-game event (death, SBA, player load)
 # reveals the RVA of the nearby broken target. See hooks/diag.rs.
 hookdiag = ["dep:backtrace"]
+# DEV ONLY: unlock the game's built-in Full Assist AI in Infinity quests
+# (hooks/assist.rs). Changes game behavior, so it is never built for release.
+fullassist = ["dep:serde_json"]
 
 [package.metadata.winres]
 OriginalFilename = "hook.dll"
@@ -25,6 +28,7 @@ LegalCopyright = "Copyright (C) Relink Logs contributors"
 [dependencies]
 anyhow = "1.0"
 backtrace = { version = "0.3", optional = true }
+serde_json = { version = "1.0", optional = true }
 ctor = "0.2.6"
 dirs = "5.0"
 fern = { version = "0.6" }
@@ -39,6 +43,13 @@ futures = "0.3"
 protocol = { path = "../protocol" }
 tokio-util = { version = "0.7.11", features = ["codec"] }
 
+
+[dev-dependencies]
+# So `hooks/assist.rs` still COMPILES (and its tests run) under a plain `cargo test`,
+# which does not enable the `fullassist` feature. Without this the one hook that
+# changes game behaviour is the only one whose logic is never type-checked or tested
+# by the default suite. The hook is still only INSTALLED behind the feature.
+serde_json = "1.0"
 
 [build-dependencies]
 winres = "0.1"

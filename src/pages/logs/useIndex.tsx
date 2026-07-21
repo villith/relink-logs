@@ -33,8 +33,8 @@ export default function useIndex() {
     fetchLogs: state.fetchLogs,
   }));
 
-  const { setSelectedTargets } = useEncounterStore((state) => ({
-    setSelectedTargets: state.setSelectedTargets,
+  const { setSelectedTargetSpans } = useEncounterStore((state) => ({
+    setSelectedTargetSpans: state.setSelectedTargetSpans,
   }));
 
   useEffect(() => {
@@ -86,7 +86,7 @@ export default function useIndex() {
     searchResult,
     selectedLogIds,
     setSelectedLogIds,
-    setSelectedTargets,
+    setSelectedTargetSpans,
     confirmDeleteSelected,
     handleSetPage,
     currentPage,

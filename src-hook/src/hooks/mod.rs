@@ -16,6 +16,11 @@ use self::{
 };
 
 mod area;
+// Compiled under `cfg(test)` too, so a plain `cargo test` type-checks and exercises the
+// quest-classification logic. The hook itself is still only INSTALLED behind the feature
+// (see `setup_hooks`), so a release `hook.dll` contains none of this.
+#[cfg(any(feature = "fullassist", test))]
+mod assist;
 mod damage;
 mod death;
 pub mod diag;
@@ -174,6 +179,14 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     try_step(
         "sba_continue_chain",
         OnContinueSBAChainHook::new(tx.clone()).setup(&process),
+    );
+
+    // DEV BUILDS ONLY. The one hook that changes game behavior rather than observing it;
+    // it no-ops unless hook-config.json asks for it (see hooks/assist.rs).
+    #[cfg(feature = "fullassist")]
+    try_step(
+        "full_assist_unlock",
+        assist::OnFullAssistGateHook::new().setup(&process),
     );
 
     Ok(())
