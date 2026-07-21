@@ -1,9 +1,20 @@
 use protocol::ActionType;
 use serde::{Deserialize, Serialize};
 
-use crate::parser::constants::CharacterType;
+use crate::parser::constants::{CharacterType, EnemyType};
 
 use super::AdjustedDamageInstance;
+
+/// Damage attribution of one enemy type within a skill's stats — the
+/// quest-details per-enemy tooltip breakdown. Accumulated during the same
+/// reparse as everything else, so it reflects the active target/time filters.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillTargetState {
+    pub enemy_type: EnemyType,
+    pub hits: u32,
+    pub total_damage: u64,
+}
 
 /// Derived stat breakdown of a particular skill
 #[derive(Debug, Serialize, Deserialize)]
@@ -39,6 +50,9 @@ pub struct SkillState {
     pub overcap_base_sum: f64,
     #[serde(default)]
     pub overcap_cap_sum: f64,
+    /// Per-enemy-type share of this skill's damage (same-type spawns merge).
+    #[serde(default)]
+    pub targets: Vec<SkillTargetState>,
 }
 
 impl SkillState {
@@ -56,6 +70,7 @@ impl SkillState {
             cappable_hits: 0,
             overcap_base_sum: 0.0,
             overcap_cap_sum: 0.0,
+            targets: Vec::new(),
         }
     }
 
@@ -73,6 +88,23 @@ impl SkillState {
         }
         self.hits += 1;
         self.total_damage += damage_instance.event.damage as u64;
+
+        let enemy_type = EnemyType::from_hash(damage_instance.event.target.parent_actor_type);
+        match self
+            .targets
+            .iter_mut()
+            .find(|target| target.enemy_type == enemy_type)
+        {
+            Some(target) => {
+                target.hits += 1;
+                target.total_damage += damage_instance.event.damage as u64;
+            }
+            None => self.targets.push(SkillTargetState {
+                enemy_type,
+                hits: 1,
+                total_damage: damage_instance.event.damage as u64,
+            }),
+        }
         self.max_stun_value = self.max_stun_value.max(damage_instance.stun_damage);
         self.total_stun_value += damage_instance.stun_damage;
 
@@ -223,6 +255,46 @@ mod tests {
         // (e6 had no base). base_sum = 22999+40000+10000, cap_sum = 22999*3.
         assert_eq!(skill_state.overcap_base_sum, 72_999.0);
         assert_eq!(skill_state.overcap_cap_sum, 68_997.0);
+    }
+
+    #[test]
+    fn tracks_per_enemy_type_target_breakdown() {
+        use crate::parser::constants::EnemyType;
+
+        let mut skill_state = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+
+        // Two hits on enemy type 0xAAAA (different spawn indexes merge by type),
+        // one hit on enemy type 0xBBBB.
+        let mut e1 = make_event(100, None, None);
+        e1.target.parent_actor_type = 0xAAAA;
+        e1.target.index = 1;
+        let mut e2 = make_event(50, None, None);
+        e2.target.parent_actor_type = 0xAAAA;
+        e2.target.index = 2;
+        let mut e3 = make_event(25, None, None);
+        e3.target.parent_actor_type = 0xBBBB;
+        e3.target.index = 3;
+
+        for event in [&e1, &e2, &e3] {
+            skill_state
+                .update_from_damage_event(&AdjustedDamageInstance::from_damage_event(event, None));
+        }
+
+        assert_eq!(skill_state.targets.len(), 2);
+        let a = skill_state
+            .targets
+            .iter()
+            .find(|target| target.enemy_type == EnemyType::Unknown(0xAAAA))
+            .unwrap();
+        assert_eq!(a.hits, 2);
+        assert_eq!(a.total_damage, 150);
+        let b = skill_state
+            .targets
+            .iter()
+            .find(|target| target.enemy_type == EnemyType::Unknown(0xBBBB))
+            .unwrap();
+        assert_eq!(b.hits, 1);
+        assert_eq!(b.total_damage, 25);
     }
 
     #[test]
