@@ -668,6 +668,109 @@ pub fn probe_pl2000_parent(instance: usize) {
     );
 }
 
+/// ONE-SHOT per distinct UNMAPPED damage-source actor TYPE: a source that neither
+/// `get_source_parent` maps nor resolves as a player via its embedded record — exactly
+/// the event class the parser silently drops (`should_ignore_damage_event` discards
+/// unknown parent hashes BEFORE the raw event log, so old logs hold no trace of these).
+///
+/// Same technique as [`probe_pl2000_parent`]: scan the instance's first 0xE000 bytes
+/// for a pointer back to a known player instance, direct or via the entity indirection
+/// (`*(candidate + 0x70)`). A `hits` offset is the parent-link offset a new
+/// `get_source_parent` arm needs. Purely guarded reads, no vtable calls, one scan per
+/// distinct type — can't fault and can't lag repeated hits. Enemy sources also land
+/// here (they scan once each, hitting nothing) — their type hashes name themselves
+/// offline via `scripts/gbfr_hash.py` against the game filelist.
+///
+/// Why (2026-07-20): Cagliostro's Pain Train / Alexandria summon actors (likely the
+/// Wp1892..Wp1898 family; Wp1890, her sled, is the one already mapped) have no parent
+/// mapping, so both skills are invisible in the meter.
+#[cfg(feature = "hookdiag")]
+pub fn probe_unmapped_source_parent(instance: usize, type_id: u32) {
+    use std::sync::{Mutex, OnceLock};
+    // Per-type scan state: (type, found). NO budgets by request (2026-07-20): a found
+    // parent ends that type's scanning (nothing more to learn); until then every hit
+    // of the type rescans. Enemy sources rescan on every incoming hit too — if combat
+    // slows down under this probe, that cost is why.
+    static SCANS: OnceLock<Mutex<Vec<(u32, bool)>>> = OnceLock::new();
+    {
+        let scans = SCANS.get_or_init(|| Mutex::new(Vec::new()));
+        let Ok(mut scans) = scans.try_lock() else {
+            return;
+        };
+        match scans.iter_mut().find(|(t, _)| *t == type_id) {
+            Some((_, found)) => {
+                if *found {
+                    return;
+                }
+            }
+            None => {
+                scans.push((type_id, false));
+            }
+        }
+    }
+
+    let known: Vec<usize> = PLAYER_INSTANCES_SNAPSHOT
+        .get_or_init(|| Mutex::new(Vec::new()))
+        .lock()
+        .expect("player instance snapshot lock poisoned")
+        .clone();
+
+    // A candidate is a player instance if it was noted by the identity path OR its
+    // embedded record resolves (pure guarded reads, no vtable calls) — the latter
+    // needs no prior identity event, so the scan works even when the summon's hits
+    // are the only damage all quest (exactly the Pain Train/Alexandria repro).
+    let classify = |candidate: usize| -> Option<&'static str> {
+        if known.contains(&candidate) {
+            Some("noted")
+        } else if crate::hooks::player::player_slot_key_for_actor(candidate as *const usize)
+            .is_some()
+        {
+            Some("record")
+        } else {
+            None
+        }
+    };
+
+    let mut found_any = false;
+    let mut hits = String::new();
+    for off in (0usize..0xE000).step_by(8) {
+        let Some(p) = read_ptr_guarded(instance, off) else {
+            continue;
+        };
+        if p == 0 {
+            continue;
+        }
+        if let Some(kind) = classify(p) {
+            hits.push_str(&format!("+{off:#x}=direct-{kind}({p:#x}) "));
+            found_any = true;
+            continue;
+        }
+        if let Some(behind) = read_ptr_guarded(p, 0x70) {
+            if behind != 0 && behind != p {
+                if let Some(kind) = classify(behind) {
+                    hits.push_str(&format!("+{off:#x}=entity->{kind}({behind:#x}) "));
+                    found_any = true;
+                }
+            }
+        }
+    }
+
+    if found_any {
+        let scans = SCANS.get_or_init(|| Mutex::new(Vec::new()));
+        if let Ok(mut scans) = scans.try_lock() {
+            if let Some((_, found)) = scans.iter_mut().find(|(t, _)| *t == type_id) {
+                *found = true;
+            }
+        }
+    }
+
+    log::info!(
+        "UNSRC parent scan type={type_id:#010x} instance={instance:#x} known_players={} hits: {}",
+        known.len(),
+        if hits.is_empty() { "(none)".into() } else { hits }
+    );
+}
+
 // No-op shims so call sites don't need their own cfg guards.
 #[cfg(not(feature = "hookdiag"))]
 #[inline(always)]

@@ -951,6 +951,7 @@
       "400": "Launch",
       "410": "Aerial Barrage",
       "1000": "Mimic Doll",
+      "1100": "Mehen",
       "1110": "Mehen",
       "1410": "Disruption",
       "1700": "Alexandria",
@@ -963,8 +964,7 @@
         "aerial-attack": "Aerial Attack"
       },
       "0": "Skill 0",
-      "800": "Skill 800",
-      "1100": "Skill 1100"
+      "800": "Skill 800"
     },
     "Pl1900": {
       "1": "Reginleiv Recidiv",

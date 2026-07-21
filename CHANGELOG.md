@@ -5,6 +5,13 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.11.1
+
+### Bug Fixes
+
+- Properly track Cagliostro's Pain Train and Alexandria
+- Fix parent tracking of Cagliostro, Ferry, and Seofon summons
+
 ## 1.11.0
 
 ### Features
