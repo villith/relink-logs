@@ -184,6 +184,52 @@ fn set_debug_mode(app: AppHandle, state: State<DebugMode>, enabled: bool) {
     state.0.store(enabled, Ordering::Release);
 }
 
+/// Config file the injected hook reads ONCE at startup. It lives next to the hook's own
+/// log (`dirs::data_dir()/gbfr-logs`, which `tauri::api::path::data_dir` resolves
+/// identically) because the hook runs inside the game process and shares no state with us.
+fn hook_config_path() -> Result<std::path::PathBuf, String> {
+    let mut path = tauri::api::path::data_dir().ok_or("Could not find the data folder")?;
+    path.push("gbfr-logs");
+    std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
+    path.push("hook-config.json");
+
+    Ok(path)
+}
+
+/// Whether the dev-only Infinity Full Assist unlock is armed for the next game launch.
+#[tauri::command]
+fn get_full_assist_unlock() -> Result<bool, String> {
+    if !cfg!(debug_assertions) {
+        return Ok(false);
+    }
+
+    let path = hook_config_path()?;
+    let Ok(contents) = std::fs::read_to_string(&path) else {
+        return Ok(false);
+    };
+
+    let value: serde_json::Value = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+
+    Ok(value
+        .get("unlock_full_assist_infinity")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false))
+}
+
+/// Arm/disarm the unlock. Dev builds only — and even then it does nothing unless the hook
+/// was built with the `fullassist` feature, which only `npm run dev` passes.
+#[tauri::command]
+fn set_full_assist_unlock(enabled: bool) -> Result<(), String> {
+    if !cfg!(debug_assertions) {
+        return Err("The Full Assist unlock is only available in development builds".into());
+    }
+
+    let path = hook_config_path()?;
+    let contents = serde_json::json!({ "unlock_full_assist_infinity": enabled });
+
+    std::fs::write(&path, contents.to_string()).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 async fn delete_all_logs() -> Result<(), String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
@@ -1011,6 +1057,8 @@ fn main() {
             predict_overmastery,
             fetch_overmastery_seed,
             search_synthesis,
+            get_full_assist_unlock,
+            set_full_assist_unlock,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.

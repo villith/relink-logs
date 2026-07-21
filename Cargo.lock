@@ -1845,6 +1845,7 @@ dependencies = [
  "pelite",
  "protocol",
  "retour",
+ "serde_json",
  "thiserror",
  "tokio",
  "tokio-util",
