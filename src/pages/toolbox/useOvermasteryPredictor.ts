@@ -1,9 +1,10 @@
 import characterIdHashes from "@/assets/character-id-hashes.json";
 import overmasteryCategories from "@/assets/overmastery-categories.json";
+import useGameStatus from "@/pages/toolbox/useGameStatus";
 import useStalenessWatch from "@/pages/toolbox/useStalenessWatch";
 import { useOvermasterySelectionsStore } from "@/stores/useOvermasterySelectionsStore";
 import { CharacterType, OvermasteryMastery, OvermasteryPrediction, OvermasteryStatus } from "@/types";
-import { translateCharacterType, translateOvermasteryId } from "@/utils";
+import { toHashString, translateCharacterType, translateOvermasteryId } from "@/utils";
 import { invoke } from "@tauri-apps/api";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -176,7 +177,7 @@ export const buildCharacterOptions = (roster: number[], translate: (plCode: stri
 
   const options: CharacterOption[] = [{ value: PROTAGONIST_HEX, label: translate(CHARACTER_BY_HASH[PROTAGONIST_HEX]) }];
   for (const id of roster) {
-    const hex = id.toString(16).padStart(8, "0");
+    const hex = toHashString(id);
     const plCode = CHARACTER_BY_HASH[hex];
     if (!plCode || hex === PROTAGONIST_HEX || plCode === "Pl0100") continue;
     options.push({ value: hex, label: translate(plCode) });
@@ -196,11 +197,12 @@ export default function useOvermasteryPredictor() {
     const { lastCharacter, selections } = useOvermasterySelectionsStore.getState();
     return restoreForm(lastCharacter, selections);
   });
-  const [status, setStatus] = useState<OvermasteryStatus | null>(null);
+  // The character picker is built from `status.roster`, so a status read
+  // taken before the game was up would leave the tool unusable — the shared
+  // hook re-reads on visibility so the roster and banner recover on their own.
+  const { status, error, setError, loading } = useGameStatus<OvermasteryStatus>("fetch_overmastery_status");
   const [prediction, setPrediction] = useState<OvermasteryPrediction | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [predicting, setPredicting] = useState(false);
-  const [loading, setLoading] = useState(true);
   const selections = useOvermasterySelectionsStore((s) => s.selections);
   const saveSelection = useOvermasterySelectionsStore((s) => s.save);
 
@@ -234,24 +236,6 @@ export default function useOvermasteryPredictor() {
   useEffect(() => {
     if (form.character) saveSelection(form.character, { tier: form.tier, wanted: form.wanted });
   }, [form.character, form.tier, form.wanted, saveSelection]);
-
-  useEffect(() => {
-    const load = () =>
-      invoke<OvermasteryStatus>("fetch_overmastery_status")
-        .then(setStatus)
-        .catch((e) => setError(String(e)))
-        .finally(() => setLoading(false));
-    load();
-    // The character picker is built from `status.roster`, so a status read
-    // taken before the game was up leaves the tool unusable. Users routinely
-    // open the tool first and launch the game after: re-read when the window
-    // comes back, so the roster and the banner recover on their own.
-    const onVisible = () => {
-      if (!document.hidden) load();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, []);
 
   const characterOptions = useMemo(
     () => buildCharacterOptions(status?.roster ?? [], (plCode) => translateCharacterType(plCode as CharacterType)),
