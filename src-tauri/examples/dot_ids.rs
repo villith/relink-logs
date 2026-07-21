@@ -80,6 +80,8 @@ fn main() -> Result<()> {
             ActionType::SupplementaryDamage(id) => format!("Supp({id})"),
             ActionType::LinkAttack => "LinkAttack".into(),
             ActionType::SBA => "SBA".into(),
+            ActionType::PerfectGuard => "PerfectGuard".into(),
+            ActionType::PerfectGuardQuickening => "PerfectGuardQuickening".into(),
         };
         by_action.entry(key).or_default().add(e.damage as i64);
     }

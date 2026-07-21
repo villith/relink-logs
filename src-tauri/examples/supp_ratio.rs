@@ -83,6 +83,7 @@ fn main() -> Result<()> {
                 ActionType::LinkAttack => t.la += e.damage as u64,
                 ActionType::SBA => t.sba += e.damage as u64,
                 ActionType::DamageOverTime(_) => t.dot += e.damage as u64,
+                ActionType::PerfectGuard | ActionType::PerfectGuardQuickening => {}
                 ActionType::SupplementaryDamage(aid) => {
                     t.supp += e.damage as u64;
                     t.supp_events += 1;
