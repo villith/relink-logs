@@ -201,21 +201,7 @@ impl OnNetworkStunHook {
                 .flatten()
                 .and_then(|entity| read_ptr_guarded(entity, 0x70))
                 .filter(|specified| *specified != 0)
-                .and_then(|specified| {
-                    let specified = specified as *const usize;
-                    super::player::player_slot_key_for_actor(specified).or_else(|| {
-                        // Pets/avatars: resolve to the owner, then key by its slot.
-                        let source_type_id = super::actor_type_id(specified);
-                        let (_, keyed) = super::player_keyed_parent(
-                            source_type_id,
-                            super::actor_idx(specified),
-                            specified,
-                        );
-                        (keyed & super::player::PLAYER_SLOT_INDEX_BASE
-                            == super::player::PLAYER_SLOT_INDEX_BASE)
-                            .then_some(keyed)
-                    })
-                })
+                .and_then(|specified| super::player_slot_key_for_source(specified as *const usize))
         };
 
         #[cfg(feature = "hookdiag")]

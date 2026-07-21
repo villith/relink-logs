@@ -314,6 +314,18 @@ pub fn player_keyed_parent(
     (parent_type_id, keyed_idx)
 }
 
+/// The slot key of the PLAYER to credit an event on `source` to: the actor's
+/// own embedded-record slot when it is a player, else its player-keyed owner
+/// (pets/avatars resolve to the owner via [`player_keyed_parent`]). `None` for
+/// enemy/unowned sources. Shared by the stun-net hook and the damage hooks'
+/// guard attribution so they can never resolve differently.
+pub fn player_slot_key_for_source(source: *const usize) -> Option<u32> {
+    player::player_slot_key_for_actor(source).or_else(|| {
+        let (_, keyed) = player_keyed_parent(actor_type_id(source), actor_idx(source), source);
+        player::is_player_slot_key(keyed).then_some(keyed)
+    })
+}
+
 // Returns the specified instance of the parent entity.
 // ptr+offset: Entity
 // *(ptr+offset) + 0x70: m_pSpecifiedInstance (Pl0700, Pl1200, etc.)

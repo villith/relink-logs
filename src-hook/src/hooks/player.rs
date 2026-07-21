@@ -1630,21 +1630,12 @@ fn log_identity_record(record: *const usize, snapshot: *const u8, player_key: u3
     );
 }
 
-/// Base of the synthetic per-PLAYER actor index. The game's own actor index
-/// (`+0x170`) and player key (`+0x1AB40`) are CHARACTER-scoped — two players on
-/// the same character share both, which merged their meter rows (live-proven
-/// 2026-07-18: both Maglielles carried actor_index 2368344264 / id 0x25d46f4b).
-/// The party slot from the actor's embedded record is the only player-unique,
-/// mode-independent key, so player-attributed events carry
-/// `PLAYER_SLOT_INDEX_BASE | slot` instead. The base sits far above real actor
-/// indexes (observed values are 0x8D......) so it can never collide with an
-/// enemy index.
-pub(crate) const PLAYER_SLOT_INDEX_BASE: u32 = 0xF000_0000;
-
-/// The per-player event key for a party slot (0..=3).
-pub(crate) fn slot_key(party_index: u8) -> u32 {
-    PLAYER_SLOT_INDEX_BASE | (party_index.min(3) as u32)
-}
+// The slot-key scheme lives in `protocol` (it crosses the wire in
+// `actor_index` — the parser must recognize keys with the SAME definitions the
+// hook builds them with). Live context for this crate: the game's own actor
+// index (`+0x170`) and player key (`+0x1AB40`) are what proved CHARACTER-scoped
+// (2026-07-18: both Maglielles carried actor_index 2368344264 / id 0x25d46f4b).
+pub(crate) use protocol::{is_player_slot_key, player_slot_key as slot_key};
 
 /// Full identity read from the actor's own embedded record (`actor+0x15030`).
 /// `None` for non-player actors (enemies, pets) — their record slot holds
