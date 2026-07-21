@@ -178,7 +178,7 @@
       "skills": [200, 201, 202, 203, 204]
     },
     "aerial-attack": {
-      "skills": [300, 310, 320]
+      "skills": [300, 301, 310, 320]
     }
   },
   "Pl1000": {
@@ -190,6 +190,9 @@
     },
     "schlaht": {
       "skills": [200, 201]
+    },
+    "zerreissen": {
+      "skills": [4, 40]
     }
   },
   "Pl1100": {
@@ -245,7 +248,7 @@
   },
   "Pl1400": {
     "freeflutter-attack": {
-      "skills": [100, 101, 102, 110, 111, 112, 113, 114]
+      "skills": [100, 101, 102, 110, 111, 112, 113, 114, 3000]
     },
     "freeflutter-aerial-attack": {
       "skills": [300, 310, 320]
@@ -348,6 +351,9 @@
     },
     "aerial-attack": {
       "skills": [300, 301, 302]
+    },
+    "reginleiv": {
+      "skills": [1000, 1010]
     }
   },
   "Pl2100": {
@@ -418,25 +424,25 @@
   },
   "Pl2400": {
     "normal-attack": {
-      "skills": [100, 101, 102, 103, 140, 141, 142]
+      "skills": [100, 101, 102, 103, 140, 141, 142, 150]
     },
     "turbine": {
-      "skills": [200, 202, 210, 220, 230]
+      "skills": [200, 201, 202, 210, 211, 212, 220, 230]
     },
     "combo-finisher": {
-      "skills": [104,111,121]
+      "skills": [104, 111, 116, 121]
     },
     "aerial-attack": {
-      "skills": [300, 301, 302]
+      "skills": [300, 301, 302, 310]
     },
     "power-strike": {
-      "skills": [110,120,130]
+      "skills": [110, 115, 120, 125, 130]
     },
     "martial-spear": {
-      "skills": [1400,1410]
+      "skills": [1400, 1410]
     },
     "perfect-finisher": {
-      "skills": [232,233]
+      "skills": [232, 233]
     }
   },
   "Pl2500": {
@@ -452,67 +458,79 @@
   },
   "Pl2600": {
     "normal-attack": {
-      "skills": [100,101,102,103,900,901,902,903]
+      "skills": [100, 101, 102, 103, 900, 901, 902, 903]
     },
     "power-strike": {
-      "skills": [110,120,130,910,920,930]
+      "skills": [110, 120, 130, 910, 920, 930]
     },
     "combo-finisher": {
-      "skills": [111,121,131,140,911,921,933,940]
+      "skills": [111, 121, 131, 140, 911, 921, 931, 940]
     },
     "aerial-attack": {
-      "skills": [300,301,302,310]
+      "skills": [300, 301, 302, 310]
     },
     "power-finisher": {
-      "skills": [960,980]
+      "skills": [950, 960, 970, 980]
     }
   },
   "Pl2700": {
     "normal-attack": {
-      "skills": [120,121,122,125,130]
+      "skills": [120, 121, 122, 125, 130]
     },
     "aerial-attack": {
-      "skills": [300,301,304]
+      "skills": [300, 301, 304]
     },
     "flamek-thunder": {
-      "skills": [1601,1602]
+      "skills": [1600, 1601, 1602]
     },
     "acidrage-howl": {
-      "skills": [1300,1310]
+      "skills": [1300, 1310]
     },
     "slow-kill": {
-      "skills": [1000,1010,1011]
+      "skills": [1000, 1010, 1011]
+    },
+    "strafe-shot": {
+      "skills": [110, 111, 112, 115, 140]
     }
   },
   "Pl2800": {
     "normal-attack": {
-      "skills": [100,101,102,111,116,900,901,902,910]
+      "skills": [100, 101, 102, 111, 116, 170, 900, 901, 902, 910, 970]
     },
     "dead-lands": {
-      "skills": [5000,5010]
+      "skills": [5000, 5010]
     },
     "kick-face": {
-      "skills": [6000,6002]
+      "skills": [6000, 6002]
     },
     "stance-flip": {
-      "skills": [200,201]
+      "skills": [200, 201]
     },
-    "flipkick": {
-      "skills": [130,170]
+    "power-strike": {
+      "skills": [120, 130, 140, 150, 920, 930, 940, 950]
+    },
+    "combo-finisher": {
+      "skills": [121, 131, 141, 151, 931, 941, 951]
+    },
+    "aerial-attack": {
+      "skills": [310, 311]
     }
   },
   "Pl2900": {
     "normal-attack": {
-      "skills": [100,101,102,103]
+      "skills": [100, 101, 102, 103]
     },
     "stomp": {
-      "skills": [110,111,112,113]
+      "skills": [110, 111, 112, 113, 120]
     },
     "miasma-hands": {
-      "skills": [150,151,152,153]
+      "skills": [150, 151, 152, 153]
     },
     "aerial-attack": {
-      "skills": [300,301,302,310]
+      "skills": [300, 301, 302, 310]
+    },
+    "combo-finisher": {
+      "skills": [950, 951, 952, 953, 954]
     }
   }
 }
