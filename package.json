@@ -1,7 +1,7 @@
 {
   "name": "relink-logs",
   "private": true,
-  "version": "1.11.1",
+  "version": "1.11.2-1",
   "type": "module",
   "scripts": {
     "dev": "cargo build --release --package hook --features hook/console,hook/hookdiag,hook/dmgdiag,hook/fullassist && node scripts/refresh-dbg-hook.mjs && vite",
