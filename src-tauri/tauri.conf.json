@@ -101,6 +101,9 @@
       "windows": {
         "webviewInstallMode": {
           "type": "embedBootstrapper"
+        },
+        "wix": {
+          "template": "wix/main.wxs"
         }
       }
     },
