@@ -1,5 +1,17 @@
 # Linux Support — Session Handoff (2026-07-22)
 
+> **UPDATE (later on 2026-07-22): all 15 coding tasks are DONE.** The branch is
+> pushed to `fork` and draft PR #20 (targeting `dev`) is open with CI green,
+> including the first-ever Linux compile (`Rust - Linux check`, 102 tests).
+> `fork/dev` (1.12.0-3, tauri 1.8.3) was merged in; Task 14 was re-derived
+> against dev's single-pass signCommand release pipeline (the plan's Task 14
+> YAML predates it and is stale — do not use it). Remaining before merge:
+> the two manual validation gates (Windows TCP soak via `GBFR_LOGS_FORCE_TCP=1`,
+> then the 9-item live-Proton checklist) and a human-written CHANGELOG.md
+> section before the first stable release. The split release workflow first
+> actually runs on the RC auto-publish when this merges to dev — watch it.
+> The task table below is the pre-resume state, kept for history.
+
 Work paused mid-plan at the user's request. This doc captures exact state so
 the next session can resume without re-derivation.
 
