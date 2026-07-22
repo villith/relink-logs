@@ -37,7 +37,11 @@ name: Release
 #   1. Authenticode (Azure Artifact Signing) — what Windows/SmartScreen/UAC check.
 #   2. minisign (TAURI_PRIVATE_KEY) — what the in-app updater checks.
 # minisign covers the *bytes* of the updater artifact, so Authenticode must be
-# applied first. Signing after minisign would invalidate every auto-update.
+# applied first. The bundler enforces this itself via
+# bundle.windows.signCommand (Tauri >= 1.7): it signs the exe and MSI with
+# scripts/ci-sign.ps1 during bundling, then zips the SIGNED MSI and minisigns
+# it. Only hook.dll is signed separately — it is a resource, and the bundler
+# does not sign resources.
 
 on:
   push:
@@ -204,10 +208,11 @@ jobs:
         run: cargo build --release --package hook
 
       # hook.dll is a *resource*, and the Tauri v1 bundler does not sign
-      # resources — so it must be signed here, before it is staged and packaged.
-      # It is also the file AV cares about most, since it gets injected into the
-      # game process. It must be final BEFORE pass 1 so nothing the build passes
-      # watch changes between them.
+      # resources — so it must be signed here, before it is staged and
+      # packaged. It is also the file AV cares about most, since it gets
+      # injected into the game process. Side effect this pipeline relies on:
+      # this action installs the TrustedSigning PowerShell module, which
+      # scripts/ci-sign.ps1 (the bundler's signCommand) uses during the build.
       - name: Sign hook.dll
         uses: azure/trusted-signing-action@v2
         with:
@@ -226,108 +231,57 @@ jobs:
         shell: bash
         run: cp target/release/hook.dll src-tauri/hook.dll
 
-      # The frontend is built ONCE, here, instead of via beforeBuildCommand.
-      # In Tauri v1 dist/ is embedded into the exe at compile time and
-      # tauri-build watches it, so if pass 2 re-ran `npm run build` the fresh
-      # dist/ mtimes would force a recompile and clobber the signed exe. Both
-      # tauri passes therefore run with beforeBuildCommand disabled — via the
-      # SAME --config file, so nothing the build script sees differs between
-      # passes.
-      - name: Build frontend
+      # The frontend is built here for clearer failure attribution; the
+      # overlay config disables beforeBuildCommand so the bundler doesn't
+      # rebuild it. The overlay also carries bundle.windows.signCommand
+      # (Tauri >= 1.7 / npm CLI >= 1.6), pointing the bundler at
+      # scripts/ci-sign.ps1 — the bundler then signs the exe and the MSI
+      # itself, at the right points in its own sequence, and produces the
+      # updater zip FROM the signed MSI. signCommand lives only in this
+      # CI-written overlay, never in tauri.conf.json, so local builds stay
+      # unsigned and need no Azure credentials.
+      - name: Build frontend and write CI build config
         shell: pwsh
         run: |
           npm run build
-          Set-Content -Path .tauri-release-config.json -Value '{"build":{"beforeBuildCommand":""}}' -Encoding utf8
-
-      # Pass 1 compiles the app binary so it can be signed. Its MSI wraps the
-      # unsigned exe and is overwritten by pass 2. The invocation must be
-      # BYTE-IDENTICAL to pass 2's: tauri-build declares
-      # rerun-if-env-changed=TAURI_CONFIG, and the CLI feeds it the merged
-      # config — a differing `-b` list (run 29937005294 used `-b none` here)
-      # re-runs the build script, recompiles, and silently replaces the signed
-      # exe. No updater artifact is produced in either pass, so neither needs
-      # TAURI_PRIVATE_KEY. After the build the CLI *moves* (std::fs::rename)
-      # target/release/gbfr-logs.exe to "GBFR Logs.exe" (productName).
-      - name: Build app (pass 1 — compile and discard unsigned bundle)
-        run: npx tauri build -b msi --config .tauri-release-config.json
-
-      # Signed here rather than inside the bundler because Tauri 1.5 can only
-      # drive signtool via `certificateThumbprint` (a cert in the machine store),
-      # which Artifact Signing's short-lived, dlib-issued certs cannot satisfy.
-      # This is the signature users see in the UAC prompt on every launch.
-      - name: Sign app binary
-        uses: azure/trusted-signing-action@v2
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
-          trusted-signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
-          files: ${{ github.workspace }}\target\release\${{ env.PRODUCT }}.exe
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-
-      # Pass 1's rename left cargo's own output path (gbfr-logs.exe) EMPTY, and
-      # cargo restores a missing output from deps/ — unsigned — even when the
-      # build is otherwise fresh. Put the SIGNED bytes back at cargo's output
-      # path instead: cargo never touches an output that already exists, so
-      # pass 2 stays fresh and its rename moves this signed copy into place.
-      - name: Restore signed binary to cargo output path
-        shell: pwsh
-        run: Copy-Item "target/release/$env:PRODUCT.exe" target/release/gbfr-logs.exe
-
-      # Same sources, same config, same command → cargo is fully fresh; the
-      # bundler packages the signed exe and signed hook.dll into the MSI. If
-      # anything DID recompile, the signature is silently lost — the next step
-      # catches that and fails the job (nothing is stranded: no tag exists
-      # yet), and CARGO_LOG prints exactly which fingerprint input went dirty.
-      - name: Build app (pass 2 — bundle MSI from signed binary)
-        run: npx tauri build -b msi --config .tauri-release-config.json
-        env:
-          CARGO_LOG: cargo::core::compiler::fingerprint=info
-
-      - name: Verify the packaged binary is still signed
-        shell: pwsh
-        run: |
-          $exe = "target/release/$env:PRODUCT.exe"
-          $sig = Get-AuthenticodeSignature $exe
-          Write-Host "$exe -> $($sig.Status): $($sig.SignerCertificate.Subject)"
-          if ($sig.Status -ne 'Valid') {
-            throw "Pass 2 rebuilt the binary and dropped its Authenticode signature."
+          $cfg = [ordered]@{
+            build = @{ beforeBuildCommand = "" }
+            tauri = @{ bundle = @{ windows = @{
+              signCommand = "powershell -NoProfile -ExecutionPolicy Bypass -File $env:GITHUB_WORKSPACE\scripts\ci-sign.ps1 %1"
+            } } }
           }
+          $cfg | ConvertTo-Json -Depth 6 | Set-Content -Path .tauri-release-config.json -Encoding utf8
+          Get-Content .tauri-release-config.json
 
-      - name: Sign MSI installer
-        uses: azure/trusted-signing-action@v2
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
-          trusted-signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
-          files-folder: ${{ github.workspace }}\target\release\bundle\msi
-          files-folder-filter: msi
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
-
-      # The updater artifact (.msi.zip + minisign signature) is built by hand
-      # from the signed MSI. The updater key is unencrypted, hence the empty
-      # password.
-      - name: Build and minisign the updater artifact
-        shell: pwsh
+      # One pass: compile → sign exe (signCommand) → bundle MSI → sign MSI
+      # (signCommand) → zip the signed MSI as the updater artifact → minisign
+      # it with TAURI_PRIVATE_KEY. The ordering constraint (Authenticode
+      # before minisign) is satisfied inside the bundler itself. The updater
+      # key is unencrypted, hence the empty TAURI_KEY_PASSWORD.
+      - name: Build, sign, and bundle app
+        run: npx tauri build -b msi,updater --config .tauri-release-config.json
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ""
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_CERT_PROFILE: ${{ vars.AZURE_CERT_PROFILE }}
+
+      - name: Verify exe and MSI signatures
+        shell: pwsh
         run: |
-          $msiDir = "target/release/bundle/msi"
-          $msi = Get-ChildItem "$msiDir/*.msi" | Select-Object -First 1
-          $zip = Join-Path $msiDir "$($msi.Name).zip"
-          Write-Host "Packaging signed $($msi.Name)"
-          Compress-Archive -Path $msi.FullName -DestinationPath $zip -Force
-          npx tauri signer sign --private-key "$env:TAURI_PRIVATE_KEY" --password "" $zip
-          if (-not (Test-Path "$zip.sig")) { throw "minisign did not produce $zip.sig" }
+          $files = @("target/release/$env:PRODUCT.exe") + (Get-ChildItem "target/release/bundle/msi/*.msi").FullName
+          foreach ($f in $files) {
+            $sig = Get-AuthenticodeSignature $f
+            Write-Host "$f -> $($sig.Status): $($sig.SignerCertificate.Subject)"
+            if ($sig.Status -ne 'Valid') { throw "$f is not validly signed." }
+          }
+          $zip = Get-ChildItem "target/release/bundle/msi/*.msi.zip" | Select-Object -First 1
+          if (-not $zip) { throw "bundler did not produce the updater .msi.zip" }
+          if (-not (Test-Path "$($zip.FullName).sig")) { throw "bundler did not minisign the updater artifact" }
 
       # Hand-built because tauri-action is no longer doing the build. GitHub
       # rewrites spaces in uploaded asset names to dots, so the download URL
