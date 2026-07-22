@@ -183,16 +183,28 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install nightly Rust
+      # Install exactly the toolchain pinned in rust-toolchain.toml. No
+      # `rustup update nightly`: that installs the day's latest nightly, which
+      # the build (pinned) never uses but which lands in rust-cache's
+      # environment hash — churning the cache key daily and forcing cold
+      # builds.
+      - name: Install pinned Rust toolchain
         shell: bash
         run: |
           rustup set auto-self-update disable
-          rustup update nightly && rustup default nightly
+          rustup toolchain install
 
       # Default mapping (`. -> target`): the cargo workspace root is the repo
-      # root — that's where target/ lives.
+      # root — that's where target/ lives. Note the RC version bump commits a
+      # new Cargo.lock every run, so the exact key always misses; restores
+      # come from the prefix fallback and a fresh cache is saved each release.
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
+      # No node_modules cache here (unlike ci.yaml): the version bump rewrites
+      # package-lock.json every release, so a lockfile-keyed cache would never
+      # hit and the save would cost time on every run.
       - name: Install npm dependencies
         run: npm ci
 

@@ -2,63 +2,123 @@ name: Lint and Format
 on:
   push:
     branches:
-      - main
+      # dev (not main): main only receives fast-forwards of already-tested dev
+      # commits. Running on dev pushes also seeds the Rust/npm caches on the
+      # default branch, which is what PR runs are allowed to restore from.
+      - dev
   pull_request:
 jobs:
-  typescript:
-    name: Typescript
+  # npm ci runs once here; the four check jobs fan out behind `needs` and
+  # restore the node_modules cache this job guarantees exists. Exact lockfile
+  # match only — npm ci deletes node_modules before installing, so a stale
+  # partial restore has no value.
+  node_setup:
+    name: Install npm dependencies
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+      - name: Cache node_modules
+        id: node-modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
       - run: npm ci
+        if: steps.node-modules.outputs.cache-hit != 'true'
+  typescript:
+    name: Typescript
+    needs: node_setup
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+          fail-on-cache-miss: true
       - name: Typescript
         run: npm run tsc
   eslint:
     name: ESLint
+    needs: node_setup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+          fail-on-cache-miss: true
       - name: ESLint
         run: npm run lint
   prettier:
     name: Prettier
+    needs: node_setup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+          fail-on-cache-miss: true
       - name: Prettier
         run: npm run format-check
   vitest:
     name: Typescript - Vitest
+    needs: node_setup
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - run: npm ci
+      - name: Restore node_modules
+        uses: actions/cache/restore@v4
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+          fail-on-cache-miss: true
       - name: Vitest
         run: npm test
   cargo_test:
     name: Rust - Cargo Test
+    # Windows is required: the hook crate is a Windows DLL (windows-rs, DLL
+    # injection, named pipes) and the tests must run natively.
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Should not update rustup
+      - uses: actions/checkout@v4
+      # Install exactly the toolchain pinned in rust-toolchain.toml. No
+      # `rustup update nightly`: that installs the day's latest nightly, which
+      # the build (pinned) never uses but which lands in rust-cache's
+      # environment hash — churning the cache key daily and forcing cold
+      # builds.
+      - name: Install pinned Rust toolchain
         shell: bash
-        run: rustup set auto-self-update disable
-      - run: rustup update nightly && rustup default nightly
+        run: |
+          rustup set auto-self-update disable
+          rustup toolchain install
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      # src-tauri's build.rs requires target/release/hook.dll to exist.
       - run: cargo build --release --package hook
-      - run: cargo build --verbose
+      # No separate `cargo build`: cargo test compiles the same lib/bin
+      # targets itself, so a build step only duplicates the work.
       - run: cargo test --verbose
