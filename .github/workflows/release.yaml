@@ -23,10 +23,15 @@ name: Release
 #   dev→main merge until one exists. RCs use the section if present,
 #   placeholder notes otherwise.
 #
-#   The version-bump and back-merge commits are pushed with GITHUB_TOKEN,
-#   whose pushes never trigger workflows — no recursion. The tag is created
-#   atomically with the release (gh release create --target), so a failed
-#   build strands nothing; the next push retries.
+#   The version-bump, strip, and back-merge commits are pushed over SSH with
+#   the RELEASE_DEPLOY_KEY write deploy key: both branches sit behind rulesets
+#   (PR required + verified signatures), personal repos cannot grant the
+#   Actions app a ruleset bypass, but a deploy key CAN be a bypass actor.
+#   Deploy-key pushes DO trigger workflows (unlike GITHUB_TOKEN), so the
+#   version job skips any push whose head commit starts with
+#   "chore(release):" — every CI-authored commit uses that prefix. The tag is
+#   created atomically with the release (gh release create --target), so a
+#   failed build strands nothing; the next push retries.
 #
 # Two independent signatures are applied, and the ORDER MATTERS:
 #   1. Authenticode (Azure Artifact Signing) — what Windows/SmartScreen/UAC check.
@@ -48,9 +53,12 @@ concurrency:
 
 jobs:
   version:
+    # Recursion guard: CI's own pushes (version bumps, the stable strip, the
+    # back-merge) all start with "chore(release):" and must not release again.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write # pushes the version-bump commit back to the branch
+      contents: read # pushes go over SSH with the deploy key, not GITHUB_TOKEN
     outputs:
       version: ${{ steps.v.outputs.version }}
       sha: ${{ steps.v.outputs.sha }}
@@ -63,6 +71,24 @@ jobs:
           # branch tip, and the build then uses that exact commit.
           ref: ${{ github.ref_name }}
           fetch-depth: 0 # next-version.mjs needs the full tag list
+
+      # Rulesets on dev and main block direct pushes; the write deploy key is
+      # a ruleset bypass actor, so CI pushes authenticate with it over SSH.
+      # Fetches keep using GITHUB_TOKEN via the https remote.
+      - name: Use the release deploy key for pushes
+        shell: bash
+        env:
+          RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
+        run: |
+          if [[ -z "$RELEASE_DEPLOY_KEY" ]]; then
+            echo "::error::RELEASE_DEPLOY_KEY secret is missing - CI cannot push version bumps."
+            exit 1
+          fi
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$RELEASE_DEPLOY_KEY" > "$HOME/.ssh/release_bot"
+          chmod 600 "$HOME/.ssh/release_bot"
+          git remote set-url --push origin "git@github.com:$GITHUB_REPOSITORY.git"
+          echo "GIT_SSH_COMMAND=ssh -i $HOME/.ssh/release_bot -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
 
       - name: Compute next version and commit the bump
         id: v
@@ -356,14 +382,14 @@ jobs:
   # any release-only commits) back into dev so the next dev→main merge cannot
   # conflict. `-X ours` keeps dev's side of any overlapping hunk — the only
   # overlap main can introduce is the version lines, and dev's newer RC version
-  # is the correct survivor. GITHUB_TOKEN pushes never trigger workflows, so
-  # this cannot start an RC build.
+  # is the correct survivor. The push triggers a dev run that the version job's
+  # chore(release): guard immediately skips.
   backmerge:
     needs: [version, release]
     if: needs.version.outputs.prerelease == 'false'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -371,8 +397,14 @@ jobs:
           fetch-depth: 0
       - name: Merge main back into dev
         shell: bash
+        env:
+          RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
         run: |
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$RELEASE_DEPLOY_KEY" > "$HOME/.ssh/release_bot"
+          chmod 600 "$HOME/.ssh/release_bot"
+          export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/release_bot -o StrictHostKeyChecking=accept-new"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git merge origin/main -X ours -m "chore: merge main back into dev after ${{ needs.version.outputs.version }}"
-          git push origin dev
+          git merge origin/main -X ours -m "chore(release): merge main back into dev after ${{ needs.version.outputs.version }}"
+          git push "git@github.com:$GITHUB_REPOSITORY.git" dev
