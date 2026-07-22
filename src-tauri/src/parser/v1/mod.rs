@@ -657,14 +657,14 @@ impl DerivedEncounterState {
     /// because enemy stun is host-authoritative and lands asynchronously.
     /// Totals are max(delta, messages) at both encounter and player level, so a
     /// mode where both paths fire (solo loopback) can never double-count.
-    fn process_stun_message(&mut self, actor_index: u32, amount: f64) {
+    fn process_stun_message(&mut self, timestamp: i64, actor_index: u32, amount: f64) {
         self.stun_message_sum += amount;
         self.refresh_total_stun();
         let duration_secs = (self.duration()) as f64 / 1000.0;
         self.stun_per_second = self.total_stun_value / duration_secs;
 
         if let Some(player) = self.party.get_mut(&actor_index) {
-            player.add_stun_message(amount);
+            player.add_stun_message(timestamp, amount);
             player.stun_per_second = player.total_stun_value / duration_secs;
         } else {
             // Player row not created yet (no damage event seen); hold the stun
@@ -690,11 +690,13 @@ impl DerivedEncounterState {
             .or_insert_with(|| PlayerState::new(actor_index, character_type));
 
         if let Some(pending) = pending_stun {
-            player.add_stun_message(pending);
+            // Pending folds carry no timing context (they were held before the
+            // row existed), so `i64::MIN` keeps them out of every guard window.
+            player.add_stun_message(i64::MIN, pending);
         }
         if let Some(pending) = pending_pg_stun {
             for amount in pending {
-                player.add_perfect_guard_stun(amount);
+                player.add_perfect_guard_stun(i64::MIN, amount);
             }
         }
         if let Some(pending) = pending_pg_quickening {
@@ -720,6 +722,7 @@ impl DerivedEncounterState {
     /// the guard is held pending until their first damage event.
     fn process_perfect_guard_stun(
         &mut self,
+        timestamp: i64,
         player_data: &[Option<PlayerData>; 4],
         actor_index: u32,
         amount: f64,
@@ -745,7 +748,7 @@ impl DerivedEncounterState {
             self.ensure_player_row(actor_index, character_type);
         }
         if let Some(player) = self.party.get_mut(&actor_index) {
-            player.add_perfect_guard_stun(amount);
+            player.add_perfect_guard_stun(timestamp, amount);
             player.stun_per_second = player.total_stun_value / duration_secs;
         } else {
             // No identity for the slot: hold it until the player's first
@@ -1257,10 +1260,11 @@ impl Parser {
                 // apply (enemy stun is effectively boss-wide anyway).
                 Message::OnPlayerStun(event) => {
                     self.derived_state
-                        .process_stun_message(event.actor_index, event.stun_amount as f64);
+                        .process_stun_message(*timestamp, event.actor_index, event.stun_amount as f64);
                 }
                 Message::OnPerfectGuardStun(event) => {
                     self.derived_state.process_perfect_guard_stun(
+                        *timestamp,
                         &self.encounter.player_data,
                         event.actor_index,
                         event.stun_amount as f64,
@@ -1714,13 +1718,12 @@ impl Parser {
     /// Handles one per-hit stun message from the network stun-apply hook — the
     /// online stun source (the damage-event delta path reads 0 in lobbies).
     pub fn on_player_stun(&mut self, event: OnPlayerStunEvent) {
-        self.encounter.push_event(
-            Utc::now().timestamp_millis(),
-            Message::OnPlayerStun(event.clone()),
-        );
+        let now = Utc::now().timestamp_millis();
+        self.encounter
+            .push_event(now, Message::OnPlayerStun(event.clone()));
 
         self.derived_state
-            .process_stun_message(event.actor_index, event.stun_amount as f64);
+            .process_stun_message(now, event.actor_index, event.stun_amount as f64);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -1737,6 +1740,7 @@ impl Parser {
             .push_event(now, Message::OnPerfectGuardStun(event.clone()));
 
         self.derived_state.process_perfect_guard_stun(
+            now,
             &self.encounter.player_data,
             event.actor_index,
             event.stun_amount as f64,
@@ -2300,7 +2304,7 @@ mod tests {
 
         // Stun message arriving BEFORE the player's first damage event is held
         // and folded in when the row is created.
-        state.process_stun_message(0xF000_0000, 30.0);
+        state.process_stun_message(0, 0xF000_0000, 30.0);
 
         let mut event = a_damage_event();
         event.source.parent_index = 0xF000_0000;
@@ -2313,7 +2317,7 @@ mod tests {
         assert_eq!(state.total_stun_value, 30.0);
 
         // Online shape: delta dead (0), messages carry everything.
-        state.process_stun_message(0xF000_0000, 20.0);
+        state.process_stun_message(0, 0xF000_0000, 20.0);
         let player = state.party.get(&0xF000_0000).expect("player row");
         assert_eq!(player.stun_message_sum, 50.0);
         assert_eq!(player.total_stun_value, 50.0); // max(30 delta, 50 messages)
@@ -2332,7 +2336,7 @@ mod tests {
         state.start(0);
 
         // Guard happens before the player has dealt any damage: no row yet.
-        state.process_perfect_guard_stun(&no_identities(), 0xF000_0000, 25.0);
+        state.process_perfect_guard_stun(0, &no_identities(), 0xF000_0000, 25.0);
         assert_eq!(state.total_stun_value, 25.0);
 
         let mut event = a_damage_event();
@@ -2349,13 +2353,13 @@ mod tests {
         // Solo shape: the hit stun ALSO arrives duplicated as a message (30),
         // but the guard stun exists only on the delta path — the max() dedupe
         // must not lose it.
-        state.process_stun_message(0xF000_0000, 30.0);
+        state.process_stun_message(0, 0xF000_0000, 30.0);
         let player = state.party.get(&0xF000_0000).expect("player row");
         assert_eq!(player.total_stun_value, 55.0); // max(55 delta, 30 messages)
         assert_eq!(state.total_stun_value, 55.0);
 
         // A guard after the row exists adds directly.
-        state.process_perfect_guard_stun(&no_identities(), 0xF000_0000, 5.0);
+        state.process_perfect_guard_stun(0, &no_identities(), 0xF000_0000, 5.0);
         let player = state.party.get(&0xF000_0000).expect("player row");
         assert_eq!(player.stun_delta_sum, 60.0);
         assert_eq!(player.total_stun_value, 60.0);
@@ -2412,7 +2416,7 @@ mod tests {
         state.start(0);
 
         // One guard before the player's row exists (held pending)...
-        state.process_perfect_guard_stun(&no_identities(), 0xF000_0000, 25.0);
+        state.process_perfect_guard_stun(0, &no_identities(), 0xF000_0000, 25.0);
 
         let mut event = a_damage_event();
         event.source.parent_index = 0xF000_0000;
@@ -2420,7 +2424,7 @@ mod tests {
         state.process_damage_event(1_000, &instance);
 
         // ...and one after.
-        state.process_perfect_guard_stun(&no_identities(), 0xF000_0000, 40.0);
+        state.process_perfect_guard_stun(0, &no_identities(), 0xF000_0000, 40.0);
 
         let player = state.party.get(&0xF000_0000).expect("player row");
         let row = player
@@ -2454,7 +2458,7 @@ mod tests {
         let instance = AdjustedDamageInstance::from_damage_event(&event, None);
         state.process_damage_event(1_000, &instance);
 
-        state.process_stun_message(0xF000_0000, 5.0);
+        state.process_stun_message(0, 0xF000_0000, 5.0);
 
         // An echo and a DoT tick land after the hit; the next stun message must
         // still attribute to the real skill.
@@ -2470,7 +2474,7 @@ mod tests {
         let dot_instance = AdjustedDamageInstance::from_damage_event(&dot, None);
         state.process_damage_event(1_200, &dot_instance);
 
-        state.process_stun_message(0xF000_0000, 3.0);
+        state.process_stun_message(0, 0xF000_0000, 3.0);
 
         // Switching skills moves the attribution.
         let mut second = a_damage_event();
@@ -2479,7 +2483,7 @@ mod tests {
         let second_instance = AdjustedDamageInstance::from_damage_event(&second, None);
         state.process_damage_event(1_300, &second_instance);
 
-        state.process_stun_message(0xF000_0000, 4.0);
+        state.process_stun_message(0, 0xF000_0000, 4.0);
 
         let player = state.party.get(&0xF000_0000).expect("player row");
         let first_row = player
@@ -2527,7 +2531,7 @@ mod tests {
         state.process_damage_event(1_000, &instance);
 
         // The same 6 stun arrives duplicated via the message path.
-        state.process_stun_message(0xF000_0000, 6.0);
+        state.process_stun_message(0, 0xF000_0000, 6.0);
 
         let player = state.party.get(&0xF000_0000).expect("player row");
         let row = player
@@ -2634,6 +2638,77 @@ mod tests {
         assert_eq!(row.hits, 1);
         // The wire carries stun as f32, so compare at f32 precision.
         assert!((player.total_stun_value - 250.4).abs() < 1e-3);
+    }
+
+    /// A REMOTE player's guard applies its stun host-side, so it arrives as a
+    /// NETWORK stun message trailing the guard — live capture 07-22: the three
+    /// real remote guards were each followed at +100/+100/+101ms by a message
+    /// carrying 188.4/188.4/125.6, while that slot's skill messages carried
+    /// 12-71. Without a guard attribution that stun silently lands on whatever
+    /// skill the player last hit with, and the guard row reads 0.
+    #[test]
+    fn a_guards_trailing_stun_message_credits_the_guard_row() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        // A skill hit first, so the fallback attribution points somewhere else.
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        event.action_id = ActionType::Normal(1);
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(1_000, &instance);
+
+        // Remote guard: no observable delta here, then its message 100ms later.
+        state.process_perfect_guard_stun(2_000, &no_identities(), 0xF000_0000, 0.0);
+        state.process_stun_message(2_100, 0xF000_0000, 188.4);
+
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        let guard = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::PerfectGuard)
+            .expect("guard row");
+        assert_eq!(guard.total_stun_value, 188.4);
+
+        let skill = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(1))
+            .expect("skill row");
+        assert_eq!(skill.total_stun_value, 0.0, "the guard's stun is not the skill's");
+    }
+
+    /// The guard only claims the message that trails it. A message arriving well
+    /// after the guard belongs to the player's ordinary attacks again, so the
+    /// attribution falls back to their last stun-capable skill.
+    #[test]
+    fn a_stun_message_long_after_a_guard_attributes_to_the_last_skill() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        event.action_id = ActionType::Normal(1);
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(1_000, &instance);
+
+        state.process_perfect_guard_stun(2_000, &no_identities(), 0xF000_0000, 0.0);
+        state.process_stun_message(2_400, 0xF000_0000, 9.0);
+
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        let guard = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::PerfectGuard)
+            .expect("guard row");
+        assert_eq!(guard.total_stun_value, 0.0);
+
+        let skill = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(1))
+            .expect("skill row");
+        assert_eq!(skill.total_stun_value, 9.0);
     }
 
     /// A guard that applied NO stun is noise when the LOCAL player made it: the

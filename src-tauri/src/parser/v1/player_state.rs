@@ -5,6 +5,13 @@ use crate::parser::constants::{CharacterType, FerrySkillId};
 
 use super::{skill_state::SkillState, AdjustedDamageInstance};
 
+/// How long a Perfect Guard may claim a trailing network stun message. The
+/// captured guard messages arrived at +100/+100/+101ms, and ordinary hits'
+/// messages trail their own hit by ~30-70ms, so this is wide enough for the
+/// guard's message and tight enough that the next attack's message is not
+/// swallowed.
+const GUARD_STUN_WINDOW_MS: i64 = 150;
+
 /// Derived stat breakdown for a player
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -39,6 +46,15 @@ pub struct PlayerState {
     /// triggering hit by ~30-70ms, so the last real action is the trigger.
     #[serde(skip)]
     last_stun_attribution: Option<(ActionType, CharacterType)>,
+    /// When this player's most recent Perfect Guard landed, while it is still
+    /// unclaimed. A REMOTE player's guard stun is applied host-side and reaches
+    /// us only as a network message trailing the guard — live capture 07-22: the
+    /// three real remote guards were each followed at +100/+100/+101ms by a
+    /// message carrying 188.4/188.4/125.6, against 12-71 for that slot's skill
+    /// messages. Without this the guard's stun would attribute to whatever skill
+    /// the player last hit with, leaving the guard row at 0.
+    #[serde(skip)]
+    last_guard_at: Option<i64>,
     /// Number of hits by this player that reached the game's damage cap (base > cap)
     pub capped_hits: u32,
     /// Number of hits that were subject to a damage cap at all — the denominator
@@ -70,6 +86,7 @@ impl PlayerState {
             stun_delta_sum: 0.0,
             stun_message_sum: 0.0,
             last_stun_attribution: None,
+            last_guard_at: None,
             skill_breakdown: Vec::new(),
             last_known_pet_skill: None,
             capped_hits: 0,
@@ -88,11 +105,25 @@ impl PlayerState {
     /// stun source — the per-hit delta path is structurally 0 in lobbies). A
     /// message with no attribution yet (e.g. held pending before the player's
     /// first damage event) still counts toward the player total.
-    pub fn add_stun_message(&mut self, amount: f64) {
+    pub fn add_stun_message(&mut self, timestamp: i64, amount: f64) {
         self.stun_message_sum += amount;
         self.refresh_total_stun();
 
-        if let Some((action, child_character_type)) = self.last_stun_attribution {
+        // A guard that just landed claims the message trailing it (see
+        // `last_guard_at`); one message per guard, so the claim is consumed.
+        // `saturating_sub`: a guard folded from the pending map carries `i64::MIN`
+        // (no timing context), which would overflow a plain subtraction.
+        let claims_guard = self.last_guard_at.is_some_and(|at| {
+            at <= timestamp && timestamp.saturating_sub(at) <= GUARD_STUN_WINDOW_MS
+        });
+        let attribution = if claims_guard {
+            self.last_guard_at = None;
+            Some((ActionType::PerfectGuard, self.character_type))
+        } else {
+            self.last_stun_attribution
+        };
+
+        if let Some((action, child_character_type)) = attribution {
             self.breakdown_row_mut(action, child_character_type)
                 .add_stun_message(amount);
         }
@@ -112,8 +143,11 @@ impl PlayerState {
     }
 
     /// Folds one Perfect Guard counter-stun into this player (see
-    /// [`Self::add_synthesized_delta_stun`]).
-    pub fn add_perfect_guard_stun(&mut self, amount: f64) {
+    /// [`Self::add_synthesized_delta_stun`]) and arms the guard's claim on the
+    /// stun message trailing it (see [`Self::last_guard_at`]), which is the only
+    /// way a REMOTE player's guard stun can reach the guard's own row.
+    pub fn add_perfect_guard_stun(&mut self, timestamp: i64, amount: f64) {
+        self.last_guard_at = Some(timestamp);
         self.add_synthesized_delta_stun(ActionType::PerfectGuard, amount);
     }
 
@@ -787,7 +821,7 @@ mod tests {
         let mut player = empty_player();
         player.add_stun_effect(25.0);
         player.add_stun_effect(25.0);
-        player.add_perfect_guard_stun(250.0);
+        player.add_perfect_guard_stun(0, 250.0);
 
         let effect = player
             .skill_breakdown
