@@ -25,6 +25,7 @@
         "minimize": true,
         "unmaximize": true,
         "unminimize": true,
+        "setMinSize": true,
         "startDragging": true
       },
       "fs": {

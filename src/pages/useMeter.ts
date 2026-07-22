@@ -71,7 +71,12 @@ export default function useMeter() {
       overlayMinWidth(overlayColumns.length, showFullValues),
       overlayMinWidth(overlaySkillColumns.length, showFullValues)
     );
-    void appWindow.setMinSize(new LogicalSize(minWidth, OVERLAY_MIN_HEIGHT));
+    // setMinSize is allowlisted (tauri.conf.json window.setMinSize); surface any
+    // rejection instead of swallowing it, so a missing permission can't fail
+    // silently the way it did before.
+    appWindow
+      .setMinSize(new LogicalSize(minWidth, OVERLAY_MIN_HEIGHT))
+      .catch((error) => console.error("failed to set the overlay minimum width", error));
   }, [overlayColumns, overlaySkillColumns, showFullValues]);
 
   useEffect(() => {
