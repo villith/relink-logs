@@ -57,7 +57,9 @@ fn is_capped(damage: i32, cap: i32, mults: &[f64]) -> bool {
         return damage >= cap;
     }
     let tol = (0.003 * damage as f64).max(2.0);
-    mults.iter().any(|&m| (cap as f64 * m - damage as f64).abs() <= tol)
+    mults
+        .iter()
+        .any(|&m| (cap as f64 * m - damage as f64).abs() <= tol)
 }
 
 fn main() -> Result<()> {
@@ -76,9 +78,8 @@ fn main() -> Result<()> {
     }
 
     let conn = Connection::open(db_path)?;
-    let mut stmt = conn.prepare(
-        "SELECT id, data FROM logs WHERE version = 1 ORDER BY id DESC LIMIT ?",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT id, data FROM logs WHERE version = 1 ORDER BY id DESC LIMIT ?")?;
     let rows = stmt.query_map([last], |row| {
         Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?))
     })?;
@@ -110,7 +111,11 @@ fn main() -> Result<()> {
         }));
         let mut sorted_mults = mults.clone();
         sorted_mults.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        println!("\n=== log {id} (quest {:?}), {} damage events", encounter.quest_id, events.len());
+        println!(
+            "\n=== log {id} (quest {:?}), {} damage events",
+            encounter.quest_id,
+            events.len()
+        );
         println!("learned multipliers: {sorted_mults:?}");
 
         // Per-hit breakdown for the requested skill, grouped by source player.
@@ -154,14 +159,20 @@ fn main() -> Result<()> {
                 let cap = e.damage_cap.unwrap();
                 println!(
                     "    UNDER  dmg={:>9} cap={:>9} ratio={:.4} flags={:#010x}",
-                    e.damage, cap, e.damage as f64 / cap as f64, e.flags
+                    e.damage,
+                    cap,
+                    e.damage as f64 / cap as f64,
+                    e.flags
                 );
             }
             for e in off_peak.iter().take(15) {
                 let cap = e.damage_cap.unwrap();
                 println!(
                     "    OFFPK  dmg={:>9} cap={:>9} ratio={:.4} flags={:#010x}",
-                    e.damage, cap, e.damage as f64 / cap as f64, e.flags
+                    e.damage,
+                    cap,
+                    e.damage as f64 / cap as f64,
+                    e.flags
                 );
             }
         }
@@ -170,29 +181,52 @@ fn main() -> Result<()> {
         // peak structure, including sub-1.0 peaks and sub-threshold repeats.
         let mut buckets: HashMap<i64, usize> = HashMap::new();
         for e in &events {
-            if matches!(e.action_id, ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)) {
+            if matches!(
+                e.action_id,
+                ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)
+            ) {
                 continue;
             }
-            let Some(cap) = e.damage_cap.filter(|c| *c > 0) else { continue };
+            let Some(cap) = e.damage_cap.filter(|c| *c > 0) else {
+                continue;
+            };
             let ratio = e.damage as f64 / cap as f64;
             *buckets.entry((ratio / BUCKET).round() as i64).or_default() += 1;
         }
         let mut hist: Vec<_> = buckets.iter().filter(|(_, c)| **c >= 3).collect();
         hist.sort_by_key(|(b, _)| **b);
-        println!("\n  ratio buckets with >=3 hits (ratio: count, * = would be learned at 1% threshold):");
-        let total_at_or_over: usize = buckets.iter().filter(|(b, _)| **b >= 500).map(|(_, c)| *c).sum();
+        println!(
+            "\n  ratio buckets with >=3 hits (ratio: count, * = would be learned at 1% threshold):"
+        );
+        let total_at_or_over: usize = buckets
+            .iter()
+            .filter(|(b, _)| **b >= 500)
+            .map(|(_, c)| *c)
+            .sum();
         let one_pct = (total_at_or_over / 100).max(3);
         for (b, c) in &hist {
             let ratio = **b as f64 * BUCKET;
             let learned = ratio >= 0.999 && **c >= one_pct;
             let doubled = (ratio * 2.0 / BUCKET).round() as i64;
             let half_of = if ratio < 1.0 {
-                let near: usize = (doubled - 2..=doubled + 2).filter_map(|k| buckets.get(&k)).sum();
-                if near >= 3 { format!("  (x2={:.3} also a peak, {} hits)", ratio * 2.0, near) } else { String::new() }
+                let near: usize = (doubled - 2..=doubled + 2)
+                    .filter_map(|k| buckets.get(&k))
+                    .sum();
+                if near >= 3 {
+                    format!("  (x2={:.3} also a peak, {} hits)", ratio * 2.0, near)
+                } else {
+                    String::new()
+                }
             } else {
                 String::new()
             };
-            println!("    {:>7.3}: {:>4}{}{}", ratio, c, if learned { " *" } else { "" }, half_of);
+            println!(
+                "    {:>7.3}: {:>4}{}{}",
+                ratio,
+                c,
+                if learned { " *" } else { "" },
+                half_of
+            );
         }
 
         // Composition of sub-1.0 buckets with >=3 hits: which skill hit which
@@ -200,10 +234,15 @@ fn main() -> Result<()> {
         // that went through a post-cap reduction.
         let mut sub_comp: HashMap<(i64, String, u32), usize> = HashMap::new();
         for e in &events {
-            if matches!(e.action_id, ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)) {
+            if matches!(
+                e.action_id,
+                ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)
+            ) {
                 continue;
             }
-            let Some(cap) = e.damage_cap.filter(|c| *c > 0) else { continue };
+            let Some(cap) = e.damage_cap.filter(|c| *c > 0) else {
+                continue;
+            };
             let ratio = e.damage as f64 / cap as f64;
             let b = (ratio / BUCKET).round() as i64;
             if ratio < 1.0 && buckets.get(&b).copied().unwrap_or(0) >= 3 {
@@ -216,7 +255,10 @@ fn main() -> Result<()> {
         sub.sort();
         println!("\n  sub-1.0 bucket composition (ratio, action, target_type -> hits):");
         for ((b, action, target), count) in sub {
-            println!("    {:>7.3} {action:<20} target={target:#010x} -> {count}", b as f64 * BUCKET);
+            println!(
+                "    {:>7.3} {action:<20} target={target:#010x} -> {count}",
+                b as f64 * BUCKET
+            );
         }
 
         // Global per-action summary so we can see if this is skill-specific.
@@ -229,10 +271,15 @@ fn main() -> Result<()> {
         }
         let mut per_action: HashMap<String, ActionAgg> = HashMap::new();
         for e in &events {
-            if matches!(e.action_id, ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)) {
+            if matches!(
+                e.action_id,
+                ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)
+            ) {
                 continue;
             }
-            let Some(cap) = e.damage_cap.filter(|c| *c > 0) else { continue };
+            let Some(cap) = e.damage_cap.filter(|c| *c > 0) else {
+                continue;
+            };
             let agg = per_action.entry(format!("{:?}", e.action_id)).or_default();
             agg.hits += 1;
             if is_capped(e.damage, cap, &mults) {
@@ -243,13 +290,19 @@ fn main() -> Result<()> {
                 agg.off_peak += 1;
             }
         }
-        let mut actions: Vec<_> = per_action.into_iter().filter(|(_, a)| a.hits >= 10).collect();
+        let mut actions: Vec<_> = per_action
+            .into_iter()
+            .filter(|(_, a)| a.hits >= 10)
+            .collect();
         actions.sort_by_key(|(_, a)| std::cmp::Reverse(a.hits));
         println!("\n  per-action (>=10 cappable hits): action hits capped under off-peak");
         for (name, a) in actions.iter().take(25) {
             println!(
                 "    {name:<28} {:>5} {:>6} {:>5} {:>8}   ({}% capped)",
-                a.hits, a.capped, a.under, a.off_peak,
+                a.hits,
+                a.capped,
+                a.under,
+                a.off_peak,
                 a.capped * 100 / a.hits
             );
         }

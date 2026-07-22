@@ -31,6 +31,34 @@ use serde::{Deserialize, Serialize};
 
 pub const PIPE_NAME: &str = r"\\.\pipe\gbfr-logs";
 
+/// Base of the synthetic per-PLAYER actor index. The game's own actor index and
+/// player key are CHARACTER-scoped — two players on the same character share
+/// both, which merged their meter rows (live-proven 2026-07-18). The party slot
+/// from the actor's embedded record is the only player-unique, mode-independent
+/// key, so player-attributed events carry `PLAYER_SLOT_INDEX_BASE | slot` in
+/// `actor_index`/`parent_index`. The encoding crosses the wire, so it lives
+/// here — the hook builds keys and the parser recognizes them with the SAME
+/// definitions.
+pub const PLAYER_SLOT_INDEX_BASE: u32 = 0xF000_0000;
+
+/// The per-player event key for a party slot (0..=3).
+pub fn player_slot_key(party_index: u8) -> u32 {
+    PLAYER_SLOT_INDEX_BASE | (party_index.min(3) as u32)
+}
+
+/// True only for the four real slot keys (`BASE | 0..=3`). A plain
+/// `key & BASE == BASE` mask test is NOT enough: v2.0.2 enemy actor indexes are
+/// pointer-like values (e.g. 0xF1EBxxxx) that satisfy the mask — live-caught
+/// 2026-07-21 when a boss-sourced guarded hit "resolved" to slot 4058884280.
+pub fn is_player_slot_key(key: u32) -> bool {
+    key & !0x3 == PLAYER_SLOT_INDEX_BASE
+}
+
+/// The party slot (0..=3) behind a player slot key; `None` for anything else.
+pub fn party_slot_of(key: u32) -> Option<usize> {
+    is_player_slot_key(key).then_some((key & 0x3) as usize)
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Actor {
     /// Index of the actor, unique in the party.
@@ -58,6 +86,24 @@ pub enum ActionType {
     DamageOverTime(u32),
     /// Normal Skill Attack containing the skill ID.
     Normal(u32),
+    /// Perfect Guard's counter-stun (no damage event of its own — synthesized by
+    /// the parser from `OnPerfectGuardStun` messages into a zero-damage breakdown
+    /// row). Appended last: bincode encodes the variant index (append-only rule).
+    PerfectGuard,
+    /// A Perfect Guard of The World's "Quickening" (synthesized by the parser
+    /// from `OnPerfectGuardQuickening` marker messages). Carries only a guard
+    /// count: no stun (the instant gauge fill happens outside any hooked call)
+    /// and no damage (the scripted counter damage is intentionally untracked).
+    /// Appended last per the append-only rule.
+    PerfectGuardQuickening,
+    /// Stun applied by a non-guard player zero-damage effect (synthesized by the
+    /// parser from `OnStunEffect` messages into a zero-damage, stun-only
+    /// breakdown row). Live-confirmed 07-21 as Eugen's sticky grenade. The `u32`
+    /// is a per-character effect index (always 0 today — the source events carry
+    /// no discriminator yet), reserved so a character with more than one such
+    /// proc can name them separately (`stun-effect-0`, `stun-effect-1`, ...)
+    /// without a breaking variant change. Appended last per the append-only rule.
+    StunEffect(u32),
 }
 
 impl Display for ActionType {
@@ -68,6 +114,9 @@ impl Display for ActionType {
             ActionType::SupplementaryDamage(id) => write!(f, "Supplementary Damage ({})", id),
             ActionType::DamageOverTime(id) => write!(f, "Damage Over Time ({})", id),
             ActionType::Normal(id) => write!(f, "Skill ({})", id),
+            ActionType::PerfectGuard => write!(f, "Perfect Guard"),
+            ActionType::PerfectGuardQuickening => write!(f, "Perfect Guard (Quickening)"),
+            ActionType::StunEffect(id) => write!(f, "Stun Effect ({})", id),
         }
     }
 }
@@ -476,4 +525,29 @@ pub enum Message {
     /// Appended last (bincode encodes the variant index — see the crate doc
     /// comment's append-only rule).
     OnQuestFail(OnQuestFailEvent),
+    /// Stun dealt by a player's Perfect Guard. A guard produces no player
+    /// damage event; the capture is the SOURCE enemy's stun-accumulator delta
+    /// measured across its own (guarded) attack's `ProcessDamageEvent` call.
+    /// `actor_index` is the guarding player's slot key (the TARGET of the
+    /// guarded hit); `stun_amount` is the measured delta (ramp and cap
+    /// clamping included). Appended last per the append-only rule.
+    OnPerfectGuardStun(OnPlayerStunEvent),
+    /// A Perfect Guard of The World's "Quickening", detected via the game's
+    /// zero-damage marker event (`action_id == 0` + guard flag bit 5,
+    /// player-sourced). Distinct from `OnPerfectGuardStun` because the marker
+    /// carries no measurable stun (the boss's gauge fills asynchronously after
+    /// the call) — the parser only counts the guard. `actor_index` is the
+    /// guarding player's slot key; `stun_amount` is the in-call accumulator
+    /// delta (0.0 in every observed capture, kept for diagnostics). Appended
+    /// last per the append-only rule.
+    OnPerfectGuardQuickening(OnPlayerStunEvent),
+    /// Stun applied by a NON-guard player zero-damage effect — live-confirmed
+    /// 07-21 to be Eugen's sticky grenade applying stun when it sticks to a
+    /// target (action id 0, flags 0x6100000, flat ~25 stun). Distinct from
+    /// `OnPerfectGuardStun`: it carries real stun but is not a guard, so the
+    /// parser surfaces it as its own "Stun Effect" row instead of inflating the
+    /// Perfect Guard row. `actor_index` is the source player's slot key;
+    /// `stun_amount` is the measured accumulator delta. Appended last per the
+    /// append-only rule.
+    OnStunEffect(OnPlayerStunEvent),
 }

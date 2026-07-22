@@ -2,7 +2,7 @@ import { CaretDown, CaretUp } from "@phosphor-icons/react";
 import { Fragment, useMemo } from "react";
 
 import { ComputedPlayerState, PlayerData } from "@/types";
-import { mergeTargetBreakdowns, translatedPlayerName } from "@/utils";
+import { NO_TARGETS, mergeTargetBreakdowns, translatedPlayerName } from "@/utils";
 
 import { SkillBreakdown } from "./SkillBreakdown";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
@@ -12,10 +12,12 @@ export const PlayerRow = ({
   live = false,
   player,
   partyData,
+  durationSeconds = 0,
 }: {
   live?: boolean;
   player: ComputedPlayerState;
   partyData: Array<PlayerData | null>;
+  durationSeconds?: number;
 }) => {
   const {
     color,
@@ -29,7 +31,7 @@ export const PlayerRow = ({
   } = usePlayerRow(live, player, partyData);
 
   const targetBreakdown = useMemo(
-    () => (live ? [] : mergeTargetBreakdowns(player.skillBreakdown.map((skill) => skill.targets))),
+    () => (live ? NO_TARGETS : mergeTargetBreakdowns(player.skillBreakdown.map((skill) => skill.targets))),
     [live, player.skillBreakdown]
   );
 
@@ -65,7 +67,7 @@ export const PlayerRow = ({
           <div className="damage-bar" style={{ backgroundColor: color, width: `${player.percentage}%` }} />
         </tr>
       </SkillTargetTooltip>
-      {isOpen && <SkillBreakdown player={player} color={color} live={live} />}
+      {isOpen && <SkillBreakdown player={player} color={color} durationSeconds={durationSeconds} live={live} />}
     </Fragment>
   );
 };

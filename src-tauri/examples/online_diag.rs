@@ -65,9 +65,7 @@ fn main() -> Result<()> {
                         v.get("characterType")
                             .map(|c| c.to_string())
                             .unwrap_or_default(),
-                        v.get("isOnline")
-                            .and_then(|b| b.as_bool())
-                            .unwrap_or(false),
+                        v.get("isOnline").and_then(|b| b.as_bool()).unwrap_or(false),
                     );
                 }
                 None => println!("  slot{i}: <none>"),
@@ -106,7 +104,9 @@ fn main() -> Result<()> {
                     if e.base_damage.is_some() {
                         agg.base_events += 1;
                     }
-                    *agg.char_types.entry(e.source.parent_actor_type).or_default() += 1;
+                    *agg.char_types
+                        .entry(e.source.parent_actor_type)
+                        .or_default() += 1;
                 }
                 Message::OnUpdateSBA(e) => sba_events.entry(e.actor_index).or_default()[0] += 1,
                 Message::OnAttemptSBA(e) => sba_events.entry(e.actor_index).or_default()[1] += 1,

@@ -1,35 +1,60 @@
-import { CharacterType, ComputedSkillState } from "@/types";
-import { computeOvercapPercentage, getSkillName, mergeTargetBreakdowns } from "@/utils";
+import { CharacterType, ComputedSkillState, SkillColumns } from "@/types";
+import { NO_TARGETS, computeOvercapPercentage, getSkillName, mergeTargetBreakdowns } from "@/utils";
 import { useMemo } from "react";
-import { OvercapCell } from "./OvercapCell";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
+import { renderSkillCell } from "./renderSkillCell";
 import { useSkillRow } from "./useSkillRow";
 
 export type SkillRowProps = {
   characterType: CharacterType;
   skill: ComputedSkillState;
   color: string;
+  /** The value columns to render, in order (after the Skill name column). */
+  columns: SkillColumns[];
+  /** Encounter duration in seconds, for the stun-per-second column. */
+  durationSeconds?: number;
   nested?: boolean;
   /** Live overlay rows skip the per-enemy tooltip (quest view only). */
   live?: boolean;
 };
 
-export const SkillRow = ({ characterType, skill, color, nested, live }: SkillRowProps) => {
-  const {
-    showFullValues,
-    totalDamage,
-    totalDamageUnit,
-    minDmg,
-    minDmgUnit,
-    maxDmg,
-    maxDmgUnit,
-    rawAverageDmg,
-    averageDmg,
-    averageDmgUnit,
-  } = useSkillRow(skill);
+export const SkillRow = ({
+  characterType,
+  skill,
+  color,
+  columns,
+  durationSeconds = 0,
+  nested,
+  live,
+}: SkillRowProps) => {
+  const skillRow = useSkillRow(skill);
+  const { showFullValues } = skillRow;
 
   const overcapPercentage = computeOvercapPercentage(skill);
-  const targetBreakdown = useMemo(() => (live ? [] : mergeTargetBreakdowns([skill.targets])), [live, skill.targets]);
+  const targetBreakdown = useMemo(
+    () => (live ? NO_TARGETS : mergeTargetBreakdowns([skill.targets])),
+    [live, skill.targets]
+  );
+
+  // Built once per row, not per column: identical across every cell of the row.
+  const cellContext = { ...skillRow, overcapPercentage, durationSeconds };
+  const renderCell = (column: SkillColumns) => renderSkillCell(column, skill, cellContext);
+
+  // A guarded Quickening (The World) tracks only that the guard happened — no
+  // damage or stun exists to show, so every column except the hit count renders
+  // a dash (which keeps the row aligned with whatever columns are visible).
+  if (skill.actionType === "PerfectGuardQuickening") {
+    return (
+      <tr className={`skill-row ${nested ? "nested" : ""}`}>
+        <td className={`text-left row-data ${nested ? "nested" : ""}`}>{getSkillName(characterType, skill)}</td>
+        {columns.map((column) => (
+          <td key={column} className="text-center row-data">
+            {column === SkillColumns.Hits ? skill.hits : "-"}
+          </td>
+        ))}
+      </tr>
+    );
+  }
 
   return (
     <SkillTargetTooltip
@@ -39,65 +64,8 @@ export const SkillRow = ({ characterType, skill, color, nested, live }: SkillRow
       color={color}
     >
       <tr className={`skill-row ${nested ? "nested" : ""}`}>
-        {nested ? (
-          <td className="text-left row-data nested">{getSkillName(characterType, skill)}</td>
-        ) : (
-          <td className="text-left row-data">{getSkillName(characterType, skill)}</td>
-        )}
-        <td className="text-center row-data">{skill.hits}</td>
-        <td className="text-center row-data">
-          {showFullValues ? (
-            skill.totalDamage.toLocaleString()
-          ) : (
-            <>
-              {totalDamage}
-              <span className="unit font-sm">{totalDamageUnit}</span>
-            </>
-          )}
-        </td>
-        <td className="text-center row-data">
-          {showFullValues ? (
-            skill.minDamage ? (
-              skill.minDamage.toLocaleString()
-            ) : (
-              ""
-            )
-          ) : (
-            <>
-              {skill.minDamage && minDmg}
-              <span className="unit font-sm">{minDmgUnit}</span>
-            </>
-          )}
-        </td>
-        <td className="text-center row-data">
-          {showFullValues ? (
-            skill.maxDamage ? (
-              skill.maxDamage.toLocaleString()
-            ) : (
-              ""
-            )
-          ) : (
-            <>
-              {skill.maxDamage && maxDmg}
-              <span className="unit font-sm">{maxDmgUnit}</span>
-            </>
-          )}
-        </td>
-        <td className="text-center row-data">
-          {showFullValues ? (
-            rawAverageDmg.toLocaleString()
-          ) : (
-            <>
-              {averageDmg}
-              <span className="unit font-sm">{averageDmgUnit}</span>
-            </>
-          )}
-        </td>
-        <OvercapCell percentage={overcapPercentage} />
-        <td className="text-center row-data">
-          {skill.percentage.toFixed(0)}
-          <span className="unit font-sm">%</span>
-        </td>
+        <td className={`text-left row-data ${nested ? "nested" : ""}`}>{getSkillName(characterType, skill)}</td>
+        {columns.map(renderCell)}
         <div className="damage-bar" style={{ backgroundColor: color, width: `${skill.percentage}%` }} />
       </tr>
     </SkillTargetTooltip>

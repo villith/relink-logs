@@ -456,6 +456,14 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
       return t([`skills.${characterType}.link-attack`, "skills.default.link-attack"]);
     case skill.actionType === "SBA":
       return t([`skills.${characterType}.skybound-arts`, "skills.default.skybound-arts"]);
+    case skill.actionType === "PerfectGuard":
+      return t([`skills.${characterType}.perfect-guard`, "skills.default.perfect-guard"]);
+    case skill.actionType === "PerfectGuardQuickening":
+      return t([`skills.${characterType}.perfect-guard-quickening`, "skills.default.perfect-guard-quickening"]);
+    case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "StunEffect"): {
+      const index = (skill.actionType as { StunEffect: number }).StunEffect;
+      return t([`skills.${characterType}.stun-effect-${index}`, `skills.default.stun-effect-${index}`]);
+    }
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "SupplementaryDamage"):
       return t(["skills.default.supplementary-damage"]);
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "DamageOverTime"):
@@ -672,7 +680,10 @@ export const exportSimpleEncounterToClipboard = (
       const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
       const computedSkills = player.skillBreakdown.map((skill) => {
         return {
-          percentage: (skill.totalDamage / totalDamage) * 100,
+          // Guard the denominator: a guard-only player (all zero-damage Perfect
+          // Guard rows) has totalDamage 0, which would export "NaN%" for every
+          // row — same guard as useSkillBreakdown.
+          percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
           ...skill,
         };
       });
@@ -730,7 +741,10 @@ export const exportFullEncounterToClipboard = (
       const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
       const computedSkills = player.skillBreakdown.map((skill) => {
         return {
-          percentage: (skill.totalDamage / totalDamage) * 100,
+          // Guard the denominator: a guard-only player (all zero-damage Perfect
+          // Guard rows) has totalDamage 0, which would export "NaN%" for every
+          // row — same guard as useSkillBreakdown.
+          percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
           ...skill,
         };
       });
@@ -827,6 +841,12 @@ const enemyTypeKey = (type: EnemyType): string => (typeof type === "string" ? `s
 export const targetLabelKey = (enemyType: EnemyType, instance: number): string =>
   `${enemyTypeKey(enemyType)}#${instance}`;
 
+/** Stable empty breakdown for live rows: the meter re-renders on every tick, and
+ * a fresh `[]` each time would invalidate the tooltip's `breakdown` memo and force
+ * it to rebuild its element tree only to be discarded. Sharing one reference keeps
+ * that memo cached. Never mutate. */
+export const NO_TARGETS: SkillTargetState[] = [];
+
 /** Merge per-enemy skill breakdowns — one array per skill, `undefined` for
  * skills from logs saved before the breakdown existed — summing hits and
  * damage by enemy type, sorted by damage descending. Used by the quest-view
@@ -898,6 +918,12 @@ export const translateItemId = (id: number | null): string => {
   const hash = id.toString(16).padStart(8, "0");
   return t([`items:${hash}.text`, "ui.unknown-id"], { id: hash });
 };
+
+/** The wrightstone's display name. The stone's ITEM id never syncs for remote
+ * players (only its trait pairs do), so 0 means "a stone we can't name", not
+ * "Unknown (00000000)" — fall back to the generic label. */
+export const translateWrightstoneId = (id: number | null): string =>
+  id && id !== EMPTY_ID ? translateItemId(id) : t("ui.wrightstone");
 
 /// Translates the overmastery ID to a human-readable string.
 export const translateOvermasteryId = (id: number | null): string => {

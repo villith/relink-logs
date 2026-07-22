@@ -4,6 +4,6 @@
 pub mod backfill;
 pub mod db;
 pub mod game_mem;
-pub mod parser;
 pub mod overmastery;
+pub mod parser;
 pub mod synthesis;

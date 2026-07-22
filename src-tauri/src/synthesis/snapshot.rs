@@ -120,7 +120,8 @@ pub fn take_snapshot() -> Result<Option<SynthesisSnapshot>> {
         let key = mem.u32(node + 0x10)?;
         let val = mem.u64(node + 0x18)?;
         if val != 0 {
-            snap.level_weights.insert(key, (mem.u32(val)?, mem.u32(val + 4)?));
+            snap.level_weights
+                .insert(key, (mem.u32(val)?, mem.u32(val + 4)?));
         }
         Ok(())
     })?;

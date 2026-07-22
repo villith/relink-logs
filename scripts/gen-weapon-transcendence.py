@@ -22,11 +22,16 @@ the weapons.json / traits.json map keys):
 """
 
 import json
+import re
 import sqlite3
 import sys
 from pathlib import Path
 
-from gbfr_hash import cell_hash
+from gbfr_hash import cell_hash, game_xxhash32
+
+# WEP_PL####_NN with an optional _MM ascension-variant suffix; group 1 is the
+# weapon family shared by all of its variant rows.
+FAMILY_RE = re.compile(r"^(WEP_PL\d{4}_\w{2})(?:_\d{2})?$")
 
 
 def main() -> None:
@@ -54,10 +59,15 @@ def main() -> None:
         }
 
     out = {}
+    names = {}  # weapon-key hash -> resolved Key string (raw-hex cells excluded)
+    row_hashes = set()
     for row in con.execute("SELECT * FROM weapon"):
         weapon_key = cell_hash(row["Key"])
         if weapon_key is None:
             continue
+        row_hashes.add(weapon_key)
+        if FAMILY_RE.match(row["Key"] or ""):
+            names[weapon_key] = row["Key"]
         slots = []
         for i in range(1, 6):
             curve = curves.get(cell_hash(row[f"WeaponSkillLevelRebuildId{i}"]) or -1)
@@ -66,8 +76,43 @@ def main() -> None:
         if slots:
             out[f"{weapon_key:08x}"] = slots
 
+    # The hook can report a weapon under a PRE-ascension variant row id (a
+    # stale record read: e.g. WEP_PL2700_06_02 for a weapon whose true form is
+    # _06_03), but the tbl attaches transcendence curves only to the final
+    # variant — which killed the frontend's stage derivation for those reads.
+    # The live innate LEVELS identify the stage on their own, so share each
+    # family's single curve set with its curve-less sibling rows.
+    #
+    # Some rows' Key cells are unresolved raw hex (entire families can be,
+    # e.g. every WEP_PL2700_06* row); recover their names by hashing every
+    # plausible key (character x weapon-slot x ascension variant).
+    weapon_slots = [f"{i:02d}" for i in range(10)] + [f"{c}{i}" for c in "AB" for i in range(10)]
+    for char in range(100):
+        for slot in weapon_slots:
+            base = f"WEP_PL{char * 100:04d}_{slot}"
+            for candidate in [base] + [f"{base}_{mm:02d}" for mm in range(10)]:
+                candidate_hash = game_xxhash32(candidate.encode("ascii"))
+                if candidate_hash in row_hashes and candidate_hash not in names:
+                    names[candidate_hash] = candidate
+
+    families = {}
+    for weapon_hash, name in names.items():
+        families.setdefault(FAMILY_RE.match(name).group(1), set()).add(weapon_hash)
+
+    propagated = 0
+    for members in families.values():
+        holders = {f"{h:08x}" for h in members} & out.keys()
+        if len(holders) != 1:
+            continue
+        slots = out[next(iter(holders))]
+        for member in members:
+            key = f"{member:08x}"
+            if key not in out:
+                out[key] = slots
+                propagated += 1
+
     out_path.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"{len(out)} weapons -> {out_path}")
+    print(f"{len(out)} weapons ({propagated} via family sharing) -> {out_path}")
 
 
 if __name__ == "__main__":

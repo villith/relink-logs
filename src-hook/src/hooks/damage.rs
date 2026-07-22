@@ -18,10 +18,174 @@ type ProcessDotEventFunc = unsafe extern "system" fn(*const usize, *const usize)
 
 static_detour! {
     static ProcessDamageEvent: unsafe extern "system" fn(*const usize, *const usize, *const usize, u8) -> usize;
+    // The reaction-less direct-apply path (see PROCESS_DAMAGE_BYPASS_SIG): void,
+    // 3 args (receiver, damage instance, mode flag).
+    static ProcessDamageBypass: unsafe extern "system" fn(*const usize, *const usize, u32);
     // One detour per DoT-dealing status subclass; see PROCESS_DOT_SIG.
     static ProcessDotEvent0: unsafe extern "system" fn(*const usize, *const usize) -> usize;
     static ProcessDotEvent1: unsafe extern "system" fn(*const usize, *const usize) -> usize;
     static ProcessDotEvent2: unsafe extern "system" fn(*const usize, *const usize) -> usize;
+}
+
+#[cfg(feature = "hookdiag")]
+static_detour! {
+    // The game's damage-number display fn (`OnAttackApplyAndSetupForDisplay`,
+    // entry 0x1fbe120; sig from the overcap RE, still unique on v2.0.2).
+    static DisplayDamage: unsafe extern "system" fn(*const usize, *const usize) -> usize;
+}
+
+/// DISPDIAG hook target: The World's guarded-Quickening counter damage (a
+/// scripted 1%-max-HP hit, 27.7M on Defy Infinity) reaches the SCREEN without
+/// passing ProcessDamageEvent or the direct-apply bypass (0 ALTDMG lines,
+/// 07-21) — so log every display call's instance fields to catch the render
+/// path of numbers the damage hooks never see.
+#[cfg(feature = "hookdiag")]
+const DISPLAY_DAMAGE_SIG: &str = "' 41 57 41 56 41 55 41 54 56 57 55 53 48 81 ec ? ? ? ? \
+     c5 f8 29 b4 24 ? ? ? ? 48 89 d6 48 89 cf 48 8b 42";
+
+/// The World's actor-type hash (`EM8300`, XXHash32Custom of the capitalized
+/// id — same id space as `lang/*/enemies.json` keys). Gates the
+/// guarded-Quickening marker so action-0 guard-flagged events from other
+/// content can't count as a Quickening guard.
+const EM8300_THE_WORLD: u32 = 0xd7ba6d4a;
+
+/// Supplementary-damage ("echo") flag. A perfect guard's counter event is
+/// followed ~150ms later by a supp-echo companion event with the SAME action
+/// id and this bit added (live log 07-21: flags 0x40040e0020 then
+/// 0x40040e8020, echo delta 0) — echo events must never count as guards or
+/// every PG shows double hits.
+const SUPP_ECHO_FLAG: u64 = 1 << 15;
+
+/// Guard flag: set on a guarded (perfectly blocked) hit and on the guard's
+/// marker/counter events (every live-captured counter carries it, e.g. flags
+/// 0x40040e0020 on 07-21).
+const GUARD_FLAG: u64 = 1 << 5;
+
+/// Skybound Art flags. An SBA in progress fires zero-damage events EVERY FRAME
+/// that reuse action id -1 (and sometimes the guard bit), so the guard
+/// classifiers must exclude them — see [`is_generic_pg_counter`].
+const SBA_FLAGS: u64 = 1 << 13 | 1 << 14;
+
+/// Generic Perfect Guard counter signature: ~48ms after a guard the game fires
+/// a player-sourced zero-damage event with action id -1 carrying the guard's
+/// stun. Identified by signature — NOT by the stun gauge moving — because a
+/// stun-immune target yields a 0 delta and the guard must still count (and
+/// ONLINE the in-call delta is structurally 0, since enemy stun is
+/// host-authoritative and arrives as network messages instead).
+///
+/// Action id -1 alone is not enough: it means "no specific action", and other
+/// mechanics ride it. Live capture 07-22 (online, stored log 537) found
+/// SBA-flagged zero-damage events firing ONCE PER FRAME for an SBA's whole
+/// duration — 286 events over 4.67s from one player — which booked 700 phantom
+/// guards in that one quest. Some of them even carry the guard bit, so the
+/// counter is pinned to all three conditions: the guard flag present (every one
+/// of the 173 captured real counters had it), and neither an echo companion
+/// (bit 15, which shadows every real counter ~150ms later) nor an SBA.
+fn is_generic_pg_counter(action_id: u32, flags: u64) -> bool {
+    action_id == u32::MAX
+        && flags & GUARD_FLAG != 0
+        && flags & SUPP_ECHO_FLAG == 0
+        && flags & SBA_FLAGS == 0
+}
+
+/// Guarded-Quickening marker signature: on a guarded Quickening The World
+/// fires a zero-damage player-sourced event with action id 0 + guard flag
+/// (bit 5). Gated on the target being The World — action-0 guard-flagged
+/// events are not proven unique to it. Echo companions (bit 15) are excluded,
+/// see [`SUPP_ECHO_FLAG`].
+fn is_quickening_marker(action_id: u32, flags: u64, target_type_id: u32) -> bool {
+    action_id == 0
+        && flags & GUARD_FLAG != 0
+        && flags & SUPP_ECHO_FLAG == 0
+        && target_type_id == EM8300_THE_WORLD
+}
+
+/// What a player-sourced ZERO-damage event should be surfaced as. Pure so both
+/// damage detours share one authority and the decision is unit-tested.
+#[derive(Debug, PartialEq, Eq)]
+enum ZeroDamageGuard {
+    /// Nothing to emit.
+    None,
+    /// The World's guarded Quickening (hits-only marker row).
+    Quickening,
+    /// A genuine Perfect Guard counter (the game's generic action-id -1 counter).
+    PerfectGuard,
+    /// A NON-guard player zero-damage stun accrual. Live-confirmed 07-21 to be an
+    /// Eugen stun-application proc — the sticky grenade applying stun when it
+    /// sticks to a target (action id 0, flags 0x6100000, no guard bit, flat ~25
+    /// stun). Previously mis-surfaced as a Perfect Guard because the old rule
+    /// admitted ANY positive stun delta.
+    StunEffect,
+}
+
+/// Classify a player-sourced zero-damage event. Only the generic counter
+/// (action -1) is a Perfect Guard; a bare positive stun delta without the guard
+/// signature is a non-guard melee-stun accrual, not a guard.
+fn classify_zero_damage_guard(
+    action_id: u32,
+    flags: u64,
+    added_stun_value: f32,
+    target_type_id: u32,
+) -> ZeroDamageGuard {
+    // Echo companions never classify — one rides ~150ms behind every guard and
+    // would double the count.
+    if flags & SUPP_ECHO_FLAG != 0 {
+        return ZeroDamageGuard::None;
+    }
+    if is_quickening_marker(action_id, flags, target_type_id) {
+        return ZeroDamageGuard::Quickening;
+    }
+    if is_generic_pg_counter(action_id, flags) {
+        return ZeroDamageGuard::PerfectGuard;
+    }
+    if added_stun_value > 0.0 {
+        return ZeroDamageGuard::StunEffect;
+    }
+    ZeroDamageGuard::None
+}
+
+/// Flag-bit → [`ActionType`] classification, shared by both damage detours so
+/// the bit table can never diverge between them.
+fn classify_action_type(flags: u64, action_id: u32) -> ActionType {
+    if ((1 << 7 | 1 << 50) & flags) != 0 {
+        ActionType::LinkAttack
+    } else if (SBA_FLAGS & flags) != 0 {
+        ActionType::SBA
+    } else if (SUPP_ECHO_FLAG & flags) != 0 {
+        ActionType::SupplementaryDamage(action_id)
+    } else {
+        ActionType::Normal(action_id)
+    }
+}
+
+/// Delta of a guarded f32 read across the original call; either side
+/// unavailable reports no delta rather than faulting. Only a finite positive
+/// delta is real: a shifted accumulator offset after a future patch can read
+/// NaN/inf, and this value flows unguarded into stun totals (which serialize to
+/// JSON `null` when non-finite), so reject anything that isn't a clean number —
+/// the same defensive rule `base_damage` uses.
+fn f32_delta(previous: Option<f32>, current: Option<f32>) -> f32 {
+    match (previous, current) {
+        (Some(prev), Some(cur)) => {
+            let delta = cur - prev;
+            if delta.is_finite() && delta > 0.0 {
+                delta
+            } else {
+                0.0
+            }
+        }
+        _ => 0.0,
+    }
+}
+
+/// The source specified instance behind a damage event's `a2`:
+/// `a2+0x18 -> entity -> +0x70`, both hops guarded; `None` for a
+/// null/unreadable source.
+fn damage_source_instance_ptr(a2: *const usize) -> Option<usize> {
+    // Same two-hop specified-instance resolution as every other parent link;
+    // reuse the shared SEH-guarded, unit-tested helper so the version-fragile
+    // +0x70 offset and its null checks live in exactly one place.
+    super::parent_specified_instance_at(a2, 0x18).map(|p| p as usize)
 }
 
 /// Per-target budget for the stun_scan window probe (module-scoped so it can be
@@ -42,12 +206,128 @@ pub(crate) fn reset_stun_scan_budget() {
     }
 }
 
+/// Between-call stun tracker (hookdiag): last post-call `+0xB90` value per actor
+/// instance, sampled whenever a damage event touches the actor as source or
+/// target. A PRE-call read HIGHER than the stored value is stun that accrued
+/// OUTSIDE every damage call — the signature of an async apply. This is the
+/// Perfect Guard discriminator: the 2026-07-21 PGDIAG run proved guarded hits
+/// (flags bit 5, dmg 0) add nothing synchronously and no stun message fires
+/// solo, so a PG accrual can only appear as one of these jumps. Unbudgeted.
+/// Pointer reuse across waves can false-positive; the dt in the log exposes it.
+#[cfg(feature = "hookdiag")]
+static B90_LAST_SEEN: std::sync::Mutex<Vec<(usize, f32, u128)>> = std::sync::Mutex::new(Vec::new());
+
+#[cfg(feature = "hookdiag")]
+fn b90_check_unattributed(label: &str, ptr: usize, pre: f32) {
+    if let Ok(track) = B90_LAST_SEEN.try_lock() {
+        if let Some((_, last, t_last)) = track.iter().find(|entry| entry.0 == ptr) {
+            if pre > *last + 0.01 {
+                log::info!(
+                    "UNATTRB90 t={} {label} ptr={ptr:#x} b90 {last:.3} -> {pre:.3} (+{:.3}) dt_ms={}",
+                    crate::hooks::diag::ms(),
+                    pre - *last,
+                    crate::hooks::diag::ms().saturating_sub(*t_last),
+                );
+            }
+        }
+    }
+}
+
+/// PG watch (hookdiag): full-window Perfect Guard discriminator. For every
+/// enemy→player hit the ATTACKER's f32 window (0x000..0x1800) is snapshotted
+/// pre- and post-call: the in-call diff catches a stun applied synchronously to
+/// ANY field during the guarded hit (not just +0xB90 — the 07-21 dummy run
+/// proved +0xB90 itself never moves), and the post-call window stays armed so
+/// the NEXT event touching that actor diffs against it, catching an async apply
+/// landing between calls. One armed watch at a time (last attacker wins).
+#[cfg(feature = "hookdiag")]
+#[allow(clippy::type_complexity)]
+static PG_WATCH: std::sync::Mutex<Option<(usize, Vec<f32>, u128)>> = std::sync::Mutex::new(None);
+
+#[cfg(feature = "hookdiag")]
+fn pg_watch_check(target_ptr: usize, source_ptr: Option<usize>) {
+    if let Ok(mut watch) = PG_WATCH.try_lock() {
+        if let Some((ptr, saved, t_armed)) = watch.as_ref() {
+            if *ptr == target_ptr || Some(*ptr) == source_ptr {
+                let now = crate::hooks::diag::ms();
+                let current = crate::hooks::diag::snapshot_f32_window(*ptr, 0x000, 0x1800);
+                // The check line always logs (negative evidence matters: "sampled,
+                // nothing rose"); the increase line below is quiet when empty.
+                log::info!(
+                    "PGWATCH check t={now} ptr={ptr:#x} dt_ms={}",
+                    now.saturating_sub(*t_armed)
+                );
+                crate::hooks::diag::log_f32_increases("pg_watch", *ptr, 0x000, saved, &current);
+                *watch = None;
+            }
+        }
+    }
+}
+
+#[cfg(feature = "hookdiag")]
+fn pg_watch_arm(source_ptr: usize, pre_window: &[f32], flags: u64) {
+    let post_window = crate::hooks::diag::snapshot_f32_window(source_ptr, 0x000, 0x1800);
+    // In-call diff: anything the guarded hit applied to the attacker DURING the
+    // original call, at any offset.
+    crate::hooks::diag::log_f32_increases("pg_incall", source_ptr, 0x000, pre_window, &post_window);
+    if let Ok(mut watch) = PG_WATCH.try_lock() {
+        log::info!(
+            "PGWATCH armed t={} ptr={source_ptr:#x} flags={flags:#x}",
+            crate::hooks::diag::ms()
+        );
+        *watch = Some((source_ptr, post_window, crate::hooks::diag::ms()));
+    }
+}
+
+#[cfg(feature = "hookdiag")]
+fn b90_record(ptr: usize, value: f32) {
+    if let Ok(mut track) = B90_LAST_SEEN.try_lock() {
+        let now = crate::hooks::diag::ms();
+        if let Some(entry) = track.iter_mut().find(|entry| entry.0 == ptr) {
+            entry.1 = value;
+            entry.2 = now;
+        } else {
+            if track.len() >= 16 {
+                // Evict the stalest entry (dead/despawned actors age out naturally).
+                if let Some(oldest) = track
+                    .iter()
+                    .enumerate()
+                    .min_by_key(|(_, entry)| entry.2)
+                    .map(|(i, _)| i)
+                {
+                    track.swap_remove(oldest);
+                }
+            }
+            track.push((ptr, value, now));
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct OnProcessDamageHook {
     tx: event::Tx,
 }
 
 const PROCESS_DAMAGE_EVENT_SIG: &str = "e8 $ { ' } 66 83 bc 24 ? ? ? ? ?";
+
+/// Direct-entry signature for the PDE-BYPASS damage path `FUN_141fbd260`: the
+/// damage-message deserializer (`FUN_1429376b0`) routes an event here INSTEAD of
+/// ProcessDamageEvent when its bypass bit is set — no reaction processing, the
+/// damage is applied straight through the receiver's vtable (slot 0x58).
+/// Live-proven 2026-07-21: The World's guarded-Quickening counter damage (a
+/// scripted percent-max-HP hit; 27.7M on Defy Infinity) flows ONLY through here.
+/// Anchored on the preceding `ret; int3*10` padding, cursor on the entry; the
+/// prologue reads rcx/rdx/r8d (3 args, matches the decompile). Verified unique,
+/// target_rva=0x1fbd260.
+const PROCESS_DAMAGE_BYPASS_SIG: &str = "c3 cc cc cc cc cc cc cc cc cc cc ' 41 57 41 56 41 55 \
+     41 54 56 57 55 53 48 83 ec 28 44 89 c6 48 89 d7 48 89 cb 48 8b 41 08 4c 8b 30";
+
+/// v2.0.2: the stun accumulator moved target+0xA70 -> +0xB90. Live-derived via
+/// the stun_scan probe (2026-07-15, three targets across three sessions): +0xB90
+/// is strictly monotonic across hits with old-scale increments, while the old
+/// 0xA70 deltas 0.0 on every hit. Nearby look-alikes rejected: +0xB3C refreshes
+/// to a 2.50 cap and decays (flinch timer), +0xA44 moves <0.01/hit.
+const STUN_ACCUMULATOR_OFFSET: usize = 0xB90;
 
 impl OnProcessDamageHook {
     pub fn new(tx: event::Tx) -> Self {
@@ -73,7 +353,257 @@ impl OnProcessDamageHook {
             return Err(anyhow!("Could not find process_dmg_evt"));
         }
 
+        // Non-fatal: without the bypass hook everything except direct-apply events
+        // (guarded-Quickening counter damage) still works.
+        match process.search_address(PROCESS_DAMAGE_BYPASS_SIG) {
+            Ok(bypass_addr) => {
+                #[cfg(feature = "console")]
+                println!("Found process dmg bypass");
+
+                let cloned_self = self.clone();
+                unsafe {
+                    let func: unsafe extern "system" fn(*const usize, *const usize, u32) =
+                        std::mem::transmute(bypass_addr);
+                    ProcessDamageBypass
+                        .initialize(func, move |a1, a2, a3| cloned_self.run_bypass(a1, a2, a3))?;
+                    ProcessDamageBypass.enable()?;
+                }
+            }
+            Err(e) => {
+                log::warn!("process_damage_bypass: sig failed, direct-apply damage untracked: {e:?}");
+            }
+        }
+
+        #[cfg(feature = "hookdiag")]
+        match process.search_address(DISPLAY_DAMAGE_SIG) {
+            Ok(display_addr) => {
+                let cloned_self = self.clone();
+                unsafe {
+                    let func: unsafe extern "system" fn(*const usize, *const usize) -> usize =
+                        std::mem::transmute(display_addr);
+                    DisplayDamage
+                        .initialize(func, move |a1, a2| cloned_self.run_display(a1, a2))?;
+                    DisplayDamage.enable()?;
+                }
+                log::info!("DISPDIAG hook armed at {display_addr:#x}");
+            }
+            Err(e) => {
+                log::warn!("display_damage: sig failed: {e:?}");
+            }
+        }
+
         Ok(())
+    }
+
+    /// DISPDIAG (hookdiag, unbudgeted): one line per damage-number display call.
+    /// Fields read pre-call from the same DamageInstance layout the damage hooks
+    /// use; source resolved through the entity list like everywhere else.
+    #[cfg(feature = "hookdiag")]
+    fn run_display(&self, a1: *const usize, a2: *const usize) -> usize {
+        use crate::hooks::diag::{read_ptr_guarded, read_u32_guarded};
+
+        let dmg = read_u32_guarded(a2 as usize, 0xD4) as i32;
+        let d0 = read_u32_guarded(a2 as usize, 0xD0) as i32;
+        let action = read_u32_guarded(a2 as usize, 0x16C) as i32;
+        let flags = ((read_u32_guarded(a2 as usize, 0xEC) as u64) << 32)
+            | read_u32_guarded(a2 as usize, 0xE8) as u64;
+        let src_type = damage_source_instance_ptr(a2)
+            .map(|src| actor_type_id(src as *const usize))
+            .unwrap_or(0);
+        let target_type = read_ptr_guarded(a1 as usize, 0x08)
+            .and_then(|p| read_ptr_guarded(p, 0x00))
+            .filter(|p| *p != 0)
+            .map(|tgt| actor_type_id(tgt as *const usize))
+            .unwrap_or(0);
+        log::info!(
+            "DISPDIAG t={} src_type={src_type:#010x} tgt_type={target_type:#010x} dmg={dmg} \
+             d0={d0} action={action} flags={flags:#x}",
+            crate::hooks::diag::ms(),
+        );
+
+        unsafe { DisplayDamage.call(a1, a2) }
+    }
+
+    /// Zero-damage guard capture, shared by BOTH damage detours so the tested
+    /// classifiers are the single authority regardless of which path observed
+    /// the event. A perfect guard produces no player damage event — ~48ms after
+    /// the guard the game fires a PLAYER-sourced ZERO-damage event at the
+    /// guarded enemy carrying the guard's stun (live-proven 07-21 on the
+    /// training bot: two guards, two uncounted zero-damage events at +48/47ms,
+    /// each delivering the stun in-call; regular hits never did). Zero-damage
+    /// events are ignored by the parser, so the guard is emitted as its own
+    /// message. The classifiers — NOT the stun gauge — decide what it is (a
+    /// stun-immune target legitimately yields a 0 delta):
+    ///   * Quickening marker → `OnPerfectGuardQuickening`, the dedicated
+    ///     hits-only row (the gauge fills asynchronously and the scripted
+    ///     counter damage is intentionally untracked)
+    ///   * generic counter, or any other in-call stun accrual → `OnPerfectGuardStun`
+    ///
+    /// Attribution = the SOURCE player (the game itself credits the counter to
+    /// the guarder); pets resolve to owners exactly like the stun-net hook.
+    fn emit_zero_damage_guard(
+        &self,
+        source_specified_instance_ptr: usize,
+        target_specified_instance_ptr: usize,
+        damage_instance: &DamageInstance,
+        added_stun_value: f32,
+    ) {
+        let action_id = damage_instance.action_id;
+        let flags = damage_instance.flags;
+        // A supp-echo companion (bit 15) shadows every guard ~150ms later with the
+        // SAME action id; it must never count (doing so doubles the hits/stun), so
+        // drop echoes up front — `classify_zero_damage_guard` also excludes them,
+        // this just skips the slot/target reads below.
+        if flags & SUPP_ECHO_FLAG != 0 {
+            return;
+        }
+        // Cheap pure gate before the slot resolution + target-type read (guarded
+        // pointer / vtable work this path shouldn't pay on every whiffed hit):
+        // nothing can emit unless there's a generic counter, a stun accrual, or
+        // the guard flag (the Quickening marker requires it).
+        if !is_generic_pg_counter(action_id, flags)
+            && added_stun_value <= 0.0
+            && flags & GUARD_FLAG == 0
+        {
+            return;
+        }
+        let Some(actor_index) =
+            super::player_slot_key_for_source(source_specified_instance_ptr as *const usize)
+        else {
+            return;
+        };
+        let event = protocol::OnPlayerStunEvent {
+            actor_index,
+            stun_amount: added_stun_value,
+        };
+        let target_type_id = actor_type_id(target_specified_instance_ptr as *const usize);
+        // The classifiers — NOT the stun gauge — decide what this is. Only the
+        // generic counter (action -1) is a Perfect Guard; a bare stun delta with no
+        // guard signature is a stun-application proc (Eugen's sticky grenade), which
+        // must NOT inflate the Perfect Guard row (live-diagnosed 07-21).
+        match classify_zero_damage_guard(action_id, flags, added_stun_value, target_type_id) {
+            ZeroDamageGuard::Quickening => {
+                let _ = self.tx.send(Message::OnPerfectGuardQuickening(event));
+            }
+            ZeroDamageGuard::PerfectGuard => {
+                let _ = self.tx.send(Message::OnPerfectGuardStun(event));
+            }
+            ZeroDamageGuard::StunEffect => {
+                let _ = self.tx.send(Message::OnStunEffect(event));
+            }
+            ZeroDamageGuard::None => {}
+        }
+    }
+
+    /// Detour for the reaction-less direct-apply path (`FUN_141fbd260`). Same
+    /// `a1`/`a2` layouts as ProcessDamageEvent (the deserializer hands both
+    /// branches the same stack object); `a3` is a small mode flag. Emits a
+    /// standard DamageEvent so the parser attributes it like any other hit. A
+    /// scripted percent-HP hit can leave the damage field 0 — the in-call target
+    /// HP drop is the applied damage then.
+    fn run_bypass(&self, a1: *const usize, a2: *const usize, a3: u32) {
+        use crate::hooks::diag::{read_f32_guarded, read_ptr_guarded};
+
+        let target_specified_instance_ptr =
+            match read_ptr_guarded(a1 as usize, 0x08).and_then(|p| read_ptr_guarded(p, 0x00)) {
+                Some(ptr) if ptr != 0 => ptr,
+                _ => return unsafe { ProcessDamageBypass.call(a1, a2, a3) },
+            };
+        let pre_call_source_ptr = damage_source_instance_ptr(a2);
+
+        let previous_stun_value =
+            read_f32_guarded(target_specified_instance_ptr, STUN_ACCUMULATOR_OFFSET);
+        let target_pre_hp = read_target_hp_pair(target_specified_instance_ptr);
+
+        unsafe { ProcessDamageBypass.call(a1, a2, a3) };
+
+        let source_specified_instance_ptr = match pre_call_source_ptr {
+            Some(ptr) => ptr,
+            None => return,
+        };
+
+        let damage_instance = unsafe { NonNull::new(a2 as *mut DamageInstance).unwrap().as_ref() };
+
+        let added_stun_value = f32_delta(
+            previous_stun_value,
+            read_f32_guarded(target_specified_instance_ptr, STUN_ACCUMULATOR_OFFSET),
+        );
+        let (target_current_hp, target_max_hp) =
+            read_target_hp_pair(target_specified_instance_ptr).unzip();
+        let hp_drop: i64 = match (target_pre_hp, target_current_hp) {
+            (Some((pre_cur, _)), Some(post_cur)) => pre_cur as i64 - post_cur as i64,
+            _ => 0,
+        };
+
+        let damage = if damage_instance.damage > 0 {
+            damage_instance.damage
+        } else {
+            hp_drop.clamp(0, i32::MAX as i64) as i32
+        };
+
+        let source_type_id = actor_type_id(source_specified_instance_ptr as *const usize);
+        let source_idx = actor_idx(source_specified_instance_ptr as *const usize);
+        let (source_parent_type_id, source_parent_idx) = super::player_keyed_parent(
+            source_type_id,
+            source_idx,
+            source_specified_instance_ptr as *const usize,
+        );
+
+        #[cfg(feature = "hookdiag")]
+        {
+            let target_type_id = actor_type_id(target_specified_instance_ptr as *const usize);
+            log::info!(
+                "ALTDMG t={} src_type={source_type_id:#010x} parent={source_parent_type_id:#010x}/\
+                 {source_parent_idx:#x} tgt_type={target_type_id:#010x} a3={a3} dmg_field={} \
+                 used={damage} flags={:#x} action={} cap={} precap={:.1} \
+                 stun_delta={added_stun_value:.3} hp_drop={hp_drop} \
+                 tgt_hp={target_current_hp:?}/{target_max_hp:?}",
+                crate::hooks::diag::ms(),
+                damage_instance.damage,
+                damage_instance.flags,
+                damage_instance.action_id,
+                damage_instance.damage_cap,
+                damage_instance.base_damage,
+            );
+            // Unresolved source: run the parent scan so the owner-entity offset
+            // for a new proxy actor can be derived from the log.
+            let source_ptr = source_specified_instance_ptr as *const usize;
+            if super::get_source_parent(source_type_id, source_ptr).is_none()
+                && super::player::player_slot_key_for_actor(source_ptr).is_none()
+            {
+                crate::hooks::diag::probe_unmapped_source_parent(
+                    source_specified_instance_ptr,
+                    source_type_id,
+                );
+            }
+        }
+
+        if damage <= 0 {
+            // Nothing measurable applied; classify and surface a guard event
+            // exactly like the main path's zero-damage branch.
+            self.emit_zero_damage_guard(
+                source_specified_instance_ptr,
+                target_specified_instance_ptr,
+                damage_instance,
+                added_stun_value,
+            );
+            return;
+        }
+
+        let _ = self.tx.send(Message::DamageEvent(build_damage_event(
+            damage_instance,
+            Actor {
+                index: source_idx,
+                actor_type: source_type_id,
+                parent_index: source_parent_idx,
+                parent_actor_type: source_parent_type_id,
+            },
+            target_specified_instance_ptr,
+            damage,
+            added_stun_value,
+            target_current_hp,
+            target_max_hp,
+        )));
     }
 
     fn run(&self, a1: *const usize, a2: *const usize, a3: *const usize, a4: u8) -> usize {
@@ -105,16 +635,64 @@ impl OnProcessDamageHook {
                 _ => return unsafe { ProcessDamageEvent.call(a1, a2, a3, a4) },
             };
 
-        // v2.0.2: the stun accumulator moved target+0xA70 -> +0xB90. Live-derived via
-        // the stun_scan probe (2026-07-15, three targets across three sessions): +0xB90
-        // is strictly monotonic across hits with old-scale increments (repeated attacks
-        // add identical amounts, e.g. +12.72 per hit), while the old 0xA70 deltas 0.0
-        // on every hit. Nearby look-alikes rejected: +0xB3C refreshes to a 2.50 cap and
-        // decays (flinch timer), +0xA44 moves <0.01/hit.
-        const STUN_ACCUMULATOR_OFFSET: usize = 0xB90;
-
         let previous_stun_value =
             read_f32_guarded(target_specified_instance_ptr, STUN_ACCUMULATOR_OFFSET);
+
+        #[cfg(feature = "hookdiag")]
+        if let Some(pre) = previous_stun_value {
+            b90_check_unattributed("tgt", target_specified_instance_ptr, pre);
+        }
+
+        // +0xB30: written by instant-stun effects (+20.0 on The World's guarded
+        // Quickening, +15.0 on the training bot — both in-call) — distinct from the
+        // +0xB90 gauge. NOT stun-duration seconds (The World recovers much faster
+        // than 20s); semantics unknown. Sampled for PGCOUNTER diagnostics.
+        #[cfg(feature = "hookdiag")]
+        let target_pre_b30 = read_f32_guarded(target_specified_instance_ptr, 0xB30);
+
+        // Target HP before the call: a guarded-Quickening counter can apply damage
+        // that never shows in the damage field (Defy Infinity 27.7M, 07-21) — the
+        // in-call HP delta is the only way to see it.
+        #[cfg(feature = "hookdiag")]
+        let target_pre_hp = read_target_hp_pair(target_specified_instance_ptr);
+
+        // Source extracted BEFORE the original call (the post-call code reuses
+        // this pointer for attribution).
+        let pre_call_source_ptr = damage_source_instance_ptr(a2);
+
+        // SOURCE-side accumulator snapshot, diagnostics only: the 07-21 sessions
+        // proved the guarded hit itself never moves the ATTACKER's accumulator —
+        // the guard's stun arrives as a separate zero-damage counter event
+        // handled in the zero-damage branch below. Release builds skip the
+        // guarded read entirely (this path runs on every damage event).
+        #[cfg(feature = "hookdiag")]
+        let source_previous_stun =
+            pre_call_source_ptr.and_then(|src| read_f32_guarded(src, STUN_ACCUMULATOR_OFFSET));
+
+        #[cfg(feature = "hookdiag")]
+        if let (Some(src), Some(pre)) = (pre_call_source_ptr, source_previous_stun) {
+            b90_check_unattributed("src", src, pre);
+        }
+
+        // Cross-event PG watch: if a prior enemy→player hit armed a window on this
+        // event's source or target, diff it NOW (pre-call) — an async apply since
+        // the arming shows up here.
+        #[cfg(feature = "hookdiag")]
+        pg_watch_check(target_specified_instance_ptr, pre_call_source_ptr);
+
+        // Enemy→player hit: snapshot the attacker's full window before the call so
+        // the in-call diff can catch a guard-stun applied to ANY of its fields.
+        #[cfg(feature = "hookdiag")]
+        let pg_pre_window: Option<(usize, Vec<f32>)> = pre_call_source_ptr.and_then(|src| {
+            let target_is_player = super::player::player_slot_key_for_actor(
+                target_specified_instance_ptr as *const usize,
+            )
+            .is_some();
+            let source_is_player =
+                super::player::player_slot_key_for_actor(src as *const usize).is_some();
+            (target_is_player && !source_is_player)
+                .then(|| (src, crate::hooks::diag::snapshot_f32_window(src, 0x000, 0x1800)))
+        });
 
         // Stun re-derivation probe (kept for the next patch): snapshot a float window
         // across the original call and log offsets that INCREASED; the accumulator is
@@ -164,34 +742,23 @@ impl OnProcessDamageHook {
             );
         }
 
-        // Stun is a delta across the original call; if either read is unavailable we simply
-        // report no stun rather than faulting.
-        let added_stun_value = match (
-            previous_stun_value,
-            read_f32_guarded(target_specified_instance_ptr, STUN_ACCUMULATOR_OFFSET),
-        ) {
-            (Some(prev), Some(cur)) => (cur - prev).max(0.0),
-            _ => 0.0,
-        };
+        // Stun is a delta across the original call.
+        let target_post_stun =
+            read_f32_guarded(target_specified_instance_ptr, STUN_ACCUMULATOR_OFFSET);
+        let added_stun_value = f32_delta(previous_stun_value, target_post_stun);
 
-        // This points to the first Entity instance in the 'a2' entity list.
-        let source_entity_ptr = match read_ptr_guarded(a2 as usize, 0x18) {
-            Some(ptr) => ptr as *const usize,
-            None => return original_value,
-        };
-
-        // @TODO(false): For some reason, online + Ferry's Umlauf skill pet can return a null pointer here.
-        // Possible data race with online?
-        if source_entity_ptr.is_null() {
-            return original_value;
+        #[cfg(feature = "hookdiag")]
+        if let Some(post) = target_post_stun {
+            b90_record(target_specified_instance_ptr, post);
         }
 
-        // entity->m_pSpecifiedInstance, offset 0x70 from entity pointer.
-        // Returns the specific class instance of the source entity. (e.g. Instance of Pl1200 / Pl0700Ghost)
-        let source_specified_instance_ptr = match read_ptr_guarded(source_entity_ptr as usize, 0x70)
-        {
-            Some(ptr) if ptr != 0 => ptr,
-            _ => return original_value,
+        // The source specified instance, extracted from the 'a2' entity list BEFORE the
+        // original call (see the Perfect Guard snapshot above). Same early-return
+        // semantics as the old post-call extraction: a null/unreadable source (e.g.
+        // online + Ferry's Umlauf pet, @TODO(false): possible online data race) bails.
+        let source_specified_instance_ptr = match pre_call_source_ptr {
+            Some(ptr) => ptr,
+            None => return original_value,
         };
 
         // hookdiag: DISABLED — the wide instance scan was too heavy for the game thread and
@@ -203,10 +770,100 @@ impl OnProcessDamageHook {
         let damage_instance = unsafe { NonNull::new(a2 as *mut DamageInstance).unwrap().as_ref() };
         let damage: i32 = damage_instance.damage;
 
+        // Source-side accumulator delta (diagnostics; see the pre-call snapshot
+        // above for why this is hookdiag-only).
+        #[cfg(feature = "hookdiag")]
+        {
+            let source_post_stun =
+                read_f32_guarded(source_specified_instance_ptr, STUN_ACCUMULATOR_OFFSET);
+            let source_added_stun = f32_delta(source_previous_stun, source_post_stun);
+            if let Some(post) = source_post_stun {
+                b90_record(source_specified_instance_ptr, post);
+            }
+            // Enemy→player hit: in-call window diff + arm the cross-event watch.
+            if let Some((src, pre_window)) = &pg_pre_window {
+                pg_watch_arm(*src, pre_window, damage_instance.flags);
+            }
+            let source_is_player = super::player::player_slot_key_for_actor(
+                source_specified_instance_ptr as *const usize,
+            )
+            .is_some();
+            if !source_is_player {
+                let target_slot_key = super::player::player_slot_key_for_actor(
+                    target_specified_instance_ptr as *const usize,
+                );
+                if target_slot_key.is_some() || source_added_stun > 0.0 {
+                    log::info!(
+                        "PGDIAG t={} src_type={:#010x} src_ptr={source_specified_instance_ptr:#x} \
+                         tgt_slot={target_slot_key:?} action={} dmg={damage} flags={:#x} \
+                         src_b90 {source_previous_stun:?} -> {source_post_stun:?} \
+                         delta={source_added_stun:.3}",
+                        crate::hooks::diag::ms(),
+                        actor_type_id(source_specified_instance_ptr as *const usize),
+                        damage_instance.action_id,
+                        damage_instance.flags,
+                    );
+                }
+            }
+        }
         if original_value == 0 || damage <= 0 {
+            // hookdiag: log every zero-damage candidate with the diag-only
+            // deltas and the resolved slot, so a mis-classified guard event can
+            // be diagnosed live.
+            #[cfg(feature = "hookdiag")]
+            {
+                // Instant-stun duration delta (+0xB30).
+                let b30_delta = f32_delta(
+                    target_pre_b30,
+                    read_f32_guarded(target_specified_instance_ptr, 0xB30),
+                );
+                // In-call target HP drop: catches counter damage that bypasses
+                // the damage field entirely (guarded Quickening, 07-21).
+                let hp_drop: i64 = match (
+                    target_pre_hp,
+                    read_target_hp_pair(target_specified_instance_ptr),
+                ) {
+                    (Some((pre_cur, _)), Some((post_cur, _))) => pre_cur as i64 - post_cur as i64,
+                    _ => 0,
+                };
+                let guard_flagged = damage_instance.flags & GUARD_FLAG != 0;
+                if added_stun_value > 0.0
+                    || b30_delta > 0.0
+                    || hp_drop > 0
+                    || guard_flagged
+                    || damage != 0
+                {
+                    let source_slot_key = super::player_slot_key_for_source(
+                        source_specified_instance_ptr as *const usize,
+                    );
+                    log::info!(
+                        "PGCOUNTER t={} src_type={:#010x} tgt_type={:#010x} slot={source_slot_key:?} \
+                         action={} flags={:#x} dmg={damage} ret={original_value} \
+                         b90_delta={added_stun_value:.3} b30_delta={b30_delta:.3} hp_drop={hp_drop} \
+                         cap={} precap={:.1}",
+                        crate::hooks::diag::ms(),
+                        actor_type_id(source_specified_instance_ptr as *const usize),
+                        actor_type_id(target_specified_instance_ptr as *const usize),
+                        damage_instance.action_id,
+                        damage_instance.flags,
+                        damage_instance.damage_cap,
+                        damage_instance.base_damage,
+                    );
+                }
+            }
+
+            self.emit_zero_damage_guard(
+                source_specified_instance_ptr,
+                target_specified_instance_ptr,
+                damage_instance,
+                added_stun_value,
+            );
             return original_value;
         }
 
+        // Only the diagnostics below read the raw flags directly; the release
+        // path classifies inside `build_damage_event`.
+        #[cfg(any(feature = "hookdiag", feature = "dmgdiag"))]
         let flags: u64 = damage_instance.flags;
 
         // Struct-offset diagnostic, kept for the next game patch (a major update shifts
@@ -226,11 +883,7 @@ impl OnProcessDamageHook {
                 // Source identity (2026-07-17): tag each dump with who dealt the
                 // hit, so an online capture can separate remote players' hits
                 // (whose cap/base fields read 0 in log 405) from local ones.
-                let (src_type, src_idx) = match read_ptr_guarded(a2 as usize, 0x18)
-                    .filter(|p| *p != 0)
-                    .and_then(|e| read_ptr_guarded(e, 0x70))
-                    .filter(|p| *p != 0)
-                {
+                let (src_type, src_idx) = match damage_source_instance_ptr(a2) {
                     Some(src) => (
                         actor_type_id(src as *const usize),
                         actor_idx(src as *const usize),
@@ -271,16 +924,6 @@ impl OnProcessDamageHook {
             }
         }
 
-        let action_type: ActionType = if ((1 << 7 | 1 << 50) & flags) != 0 {
-            ActionType::LinkAttack
-        } else if ((1 << 13 | 1 << 14) & flags) != 0 {
-            ActionType::SBA
-        } else if ((1 << 15) & flags) != 0 {
-            ActionType::SupplementaryDamage(damage_instance.action_id)
-        } else {
-            ActionType::Normal(damage_instance.action_id)
-        };
-
         // Get the source actor's type ID.
         let source_type_id = actor_type_id(source_specified_instance_ptr as *const usize);
         let source_idx = actor_idx(source_specified_instance_ptr as *const usize);
@@ -318,6 +961,7 @@ impl OnProcessDamageHook {
             if super::get_source_parent(source_type_id, source_ptr).is_none()
                 && super::player::player_slot_key_for_actor(source_ptr).is_none()
             {
+                let action_type = classify_action_type(flags, damage_instance.action_id);
                 log::info!(
                     "UNSRC hit type={source_type_id:#010x} idx={source_idx} \
                      action={action_type:?} dmg={damage} flags={flags:#x}"
@@ -338,9 +982,6 @@ impl OnProcessDamageHook {
             source_specified_instance_ptr as *const usize,
         );
 
-        let target_type_id: u32 = actor_type_id(target_specified_instance_ptr as *const usize);
-        let target_idx = actor_idx(target_specified_instance_ptr as *const usize);
-
         // Post-hit target HP from the ExHp component. Read AFTER the original call so
         // the killing blow reports 0. Guarded read + plausibility checks: an actor
         // class without the +0x150 embed, or a future patch shifting it, yields None
@@ -348,65 +989,49 @@ impl OnProcessDamageHook {
         let (target_current_hp, target_max_hp) =
             read_target_hp_pair(target_specified_instance_ptr).unzip();
 
-        let stun_value = if matches!(action_type, ActionType::SupplementaryDamage(_)) {
-            None
-        } else {
-            Some(added_stun_value)
-        };
+        // PGDMG (hookdiag, unbudgeted): on some quest versions the guarded-Quickening
+        // counter arrives as a NORMAL player-attributed hit with action id 0 (Chaos++
+        // 07-21: "Skill 0" summed ~384k while the on-screen number was far larger).
+        // Log the full damage fields + the in-call HP drop to find where the real
+        // number lives (displayed dmg vs d0 vs precap base vs raw HP loss).
+        #[cfg(feature = "hookdiag")]
+        {
+            let action_type = classify_action_type(flags, damage_instance.action_id);
+            if matches!(action_type, ActionType::Normal(0)) || flags & GUARD_FLAG != 0 {
+                let target_type_id = actor_type_id(target_specified_instance_ptr as *const usize);
+                let hp_drop: i64 = match (target_pre_hp, target_current_hp) {
+                    (Some((pre_cur, _)), Some(post_cur)) => pre_cur as i64 - post_cur as i64,
+                    _ => 0,
+                };
+                let dmg_d0 = crate::hooks::diag::read_u32_guarded(a2 as usize, 0xD0) as i32;
+                log::info!(
+                    "PGDMG t={} src_type={source_type_id:#010x} src_idx={source_idx} \
+                     tgt_type={target_type_id:#010x} action={:?} dmg={damage} d0={dmg_d0} \
+                     flags={:#x} cap={} precap={:.1} stun_delta={added_stun_value:.3} \
+                     hp_drop={hp_drop} tgt_hp={target_current_hp:?}/{target_max_hp:?}",
+                    crate::hooks::diag::ms(),
+                    action_type,
+                    damage_instance.flags,
+                    damage_instance.damage_cap,
+                    damage_instance.base_damage,
+                );
+            }
+        }
 
-        // Supplementary damage is never subject to the damage cap; the cap value on
-        // its instance belongs to the hit that TRIGGERED it. Send no cap so it can
-        // never count as a capped hit. (The parser enforces the same rule for events
-        // already recorded in old logs.)
-        let damage_cap = if matches!(action_type, ActionType::SupplementaryDamage(_)) {
-            None
-        } else {
-            // v2.0.2: "no cap" now arrives as the 99,999,999 sentinel (the game normalizes
-            // a -1 cap to it) rather than 0 — send None for both so cap detection stays off
-            // for uncapped hits.
-            (damage_instance.damage_cap > 0 && damage_instance.damage_cap < 99_999_999)
-                .then_some(damage_instance.damage_cap)
-        };
-
-        // Pre-cap base damage (game's DamageInstance +0x2D4). Only meaningful alongside a
-        // real cap, so send it only for cappable hits — the parser uses base > cap for exact
-        // cap detection and (base/cap)*100 for the game's overcap %. Guard against garbage
-        // (NaN/inf/negative) so a shifted offset after a future patch can't poison the parser.
-        let base_damage = damage_cap.and_then(|_| {
-            let b = damage_instance.base_damage;
-            (b.is_finite() && b > 0.0).then_some(b)
-        });
-
-        let event = Message::DamageEvent(DamageEvent {
-            source: Actor {
+        let _ = self.tx.send(Message::DamageEvent(build_damage_event(
+            damage_instance,
+            Actor {
                 index: source_idx,
                 actor_type: source_type_id,
                 parent_index: source_parent_idx,
                 parent_actor_type: source_parent_type_id,
             },
-            target: Actor {
-                // Per-spawn id, NOT the game index: sibling summons collapse to
-                // one game index (Lucilius' three swords), so the instance
-                // pointer is the only discriminator between actors alive at the
-                // same time. Consumers group targets by `parent_index`; `index`
-                // exists to tell simultaneous same-kind actors apart.
-                index: target_spawn_id(target_specified_instance_ptr),
-                actor_type: target_type_id,
-                parent_index: target_idx,
-                parent_actor_type: target_type_id,
-            },
+            target_specified_instance_ptr,
             damage,
-            flags,
-            action_id: action_type,
-            attack_rate: Some(damage_instance.attack_rate),
-            damage_cap,
-            stun_value,
-            base_damage,
+            added_stun_value,
             target_current_hp,
             target_max_hp,
-        });
-
-        let _ = self.tx.send(event);
+        )));
 
         original_value
     }
@@ -617,6 +1242,71 @@ impl OnProcessDotHook {
     }
 }
 
+/// Assembles the [`DamageEvent`] both damage detours emit, so the send-side
+/// rules live in exactly one place: flag classification, the
+/// supplementary-damage cap/stun strip, the no-cap sentinel, the base-damage
+/// sanity guard and the per-spawn target id.
+fn build_damage_event(
+    damage_instance: &DamageInstance,
+    source: Actor,
+    target_specified_instance_ptr: usize,
+    damage: i32,
+    added_stun_value: f32,
+    target_current_hp: Option<u64>,
+    target_max_hp: Option<u64>,
+) -> DamageEvent {
+    let flags = damage_instance.flags;
+    let action_type = classify_action_type(flags, damage_instance.action_id);
+    let is_supplementary = matches!(action_type, ActionType::SupplementaryDamage(_));
+
+    // Supplementary damage is never subject to the damage cap; the cap value on
+    // its instance belongs to the hit that TRIGGERED it. Send no cap so it can
+    // never count as a capped hit, and no stun for the same reason. (The parser
+    // enforces the same rule for events already recorded in old logs.)
+    //
+    // v2.0.2: "no cap" now arrives as the 99,999,999 sentinel (the game
+    // normalizes a -1 cap to it) rather than 0 — send None for both so cap
+    // detection stays off for uncapped hits.
+    let damage_cap = (!is_supplementary
+        && damage_instance.damage_cap > 0
+        && damage_instance.damage_cap < 99_999_999)
+        .then_some(damage_instance.damage_cap);
+
+    // Pre-cap base damage (game's DamageInstance +0x2D4). Only meaningful alongside a
+    // real cap, so send it only for cappable hits — the parser uses base > cap for exact
+    // cap detection and (base/cap)*100 for the game's overcap %. Guard against garbage
+    // (NaN/inf/negative) so a shifted offset after a future patch can't poison the parser.
+    let base_damage = damage_cap.and_then(|_| {
+        let b = damage_instance.base_damage;
+        (b.is_finite() && b > 0.0).then_some(b)
+    });
+
+    let target_type_id = actor_type_id(target_specified_instance_ptr as *const usize);
+    DamageEvent {
+        source,
+        target: Actor {
+            // Per-spawn id, NOT the game index: sibling summons collapse to
+            // one game index (Lucilius' three swords), so the instance
+            // pointer is the only discriminator between actors alive at the
+            // same time. Consumers group targets by `parent_index`; `index`
+            // exists to tell simultaneous same-kind actors apart.
+            index: target_spawn_id(target_specified_instance_ptr),
+            actor_type: target_type_id,
+            parent_index: actor_idx(target_specified_instance_ptr as *const usize),
+            parent_actor_type: target_type_id,
+        },
+        damage,
+        flags,
+        action_id: action_type,
+        attack_rate: Some(damage_instance.attack_rate),
+        damage_cap,
+        stun_value: (!is_supplementary).then_some(added_stun_value),
+        base_damage,
+        target_current_hp,
+        target_max_hp,
+    }
+}
+
 /// Per-spawn id for a TARGET actor, folded from its instance pointer. The
 /// game's own actor index collapses sibling summons into one value (Lucilius'
 /// three swords all report the same index across the whole fight), so the
@@ -687,6 +1377,120 @@ fn sanitize_target_hp(current: Option<u64>, max: Option<u64>) -> Option<(u64, u6
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Live log 2026-07-21: EVERY perfect guard fires TWO player-sourced
+    /// action-id -1 zero-damage events ~150ms apart — the real counter
+    /// (flags 0x40040e0020, carries the stun delta) and a supplementary-echo
+    /// companion (flags 0x40040e8020: same but bit 15, 0 delta). Counting
+    /// both showed 2 hits per guard, so echo-flagged events never classify.
+    #[test]
+    fn pg_counter_signature_excludes_the_supp_echo_companion() {
+        // The real counter (live-captured flags).
+        assert!(is_generic_pg_counter(u32::MAX, 0x40040e0020));
+        // Its supp-echo companion (bit 15) must NOT count as a second guard.
+        assert!(!is_generic_pg_counter(u32::MAX, 0x40040e8020));
+        // Any other action id is not a counter.
+        assert!(!is_generic_pg_counter(0, 0x20));
+        assert!(!is_generic_pg_counter(1200, 0x40040e0020));
+    }
+
+    /// The Quickening marker (live-captured: action 0, flags 0x4000220) only
+    /// counts against The World, and — like the generic counter — a supp-echo
+    /// companion (bit 15) must never count as a second guard.
+    #[test]
+    fn quickening_marker_requires_the_world_and_excludes_echoes() {
+        assert!(is_quickening_marker(0, 0x4000220, EM8300_THE_WORLD));
+        // Same event against any other enemy is not a Quickening guard.
+        assert!(!is_quickening_marker(0, 0x4000220, 0x84fdd7b5));
+        // Guard bit missing → not a marker.
+        assert!(!is_quickening_marker(0, 0x4000200, EM8300_THE_WORLD));
+        // A supp echo of the marker must not double-count the guard.
+        assert!(!is_quickening_marker(0, 0x4000220 | (1 << 15), EM8300_THE_WORLD));
+        assert!(!is_quickening_marker(u32::MAX, 0x4000220, EM8300_THE_WORLD));
+    }
+
+    /// Live-confirmed 07-21: Eugen's sticky grenade (applying stun when it sticks
+    /// to a target) fires player-sourced zero-damage events with action id 0,
+    /// flags 0x6100000 (NO guard bit, not an echo) and a flat ~25 stun. They are
+    /// NOT perfect guards — only the generic counter (action -1) is — so they
+    /// must classify as their own StunEffect category, not PerfectGuard.
+    #[test]
+    fn eugen_stun_proc_is_stun_effect_not_perfect_guard() {
+        assert_eq!(
+            classify_zero_damage_guard(0, 0x6100000, 25.04, 0x2b31654b),
+            ZeroDamageGuard::StunEffect
+        );
+        // Ramped variant (37.56 = 25.04 * 1.5) is the same mechanic.
+        assert_eq!(
+            classify_zero_damage_guard(0, 0x6100000, 37.56, 0x2b31654b),
+            ZeroDamageGuard::StunEffect
+        );
+    }
+
+    /// A genuine counter (action -1 + guard flag) is a Perfect Guard, and it must
+    /// still count when a stun-immune target yields a 0 delta.
+    #[test]
+    fn real_counter_classifies_as_perfect_guard_even_at_zero_stun() {
+        assert_eq!(
+            classify_zero_damage_guard(u32::MAX, 0x40040e0020, 250.40, 0x2b31654b),
+            ZeroDamageGuard::PerfectGuard
+        );
+        assert_eq!(
+            classify_zero_damage_guard(u32::MAX, 0x40040e0020, 0.0, 0x2b31654b),
+            ZeroDamageGuard::PerfectGuard
+        );
+    }
+
+    /// Live capture 07-22 (online quest, stored log 537): SBA-flagged zero-damage
+    /// events also carry action id -1, and they fire ONCE PER FRAME for the whole
+    /// duration of an SBA — two bursts of 286 events spanning 4.67s each from a
+    /// single player — every one of them carrying no stun. Counting them booked
+    /// 700 phantom Perfect Guard hits in one quest (615 on one player), which is
+    /// what the guard flag alone could not filter: the largest burst carries it.
+    #[test]
+    fn per_frame_sba_events_are_not_perfect_guard_counters() {
+        // Fediel's SBA, 572 captured events: guard bit SET, but SBA-flagged (13).
+        assert!(!is_generic_pg_counter(u32::MAX, 0x4002020));
+        // The bit-14 SBA variant (39 captured events).
+        assert!(!is_generic_pg_counter(u32::MAX, 0x2044040));
+        // ...and the signatures carrying no guard bit at all (141 + 91 captured).
+        assert!(!is_generic_pg_counter(u32::MAX, 0x2042040));
+        assert!(!is_generic_pg_counter(u32::MAX, 0x2042000));
+        // Nothing to emit: no guard, and the SBA ticks carry no stun either.
+        assert_eq!(
+            classify_zero_damage_guard(u32::MAX, 0x4002020, 0.0, 0x181b3a5b),
+            ZeroDamageGuard::None
+        );
+    }
+
+    /// The guard flag is required, not merely typical: all 173 live-captured real
+    /// counters carried bit 5, so an action -1 event without it is some other
+    /// mechanic riding the same "no specific action" id.
+    #[test]
+    fn generic_counter_requires_the_guard_flag() {
+        assert!(!is_generic_pg_counter(u32::MAX, 0x40040e0000));
+    }
+
+    /// The Quickening marker still wins (checked before the melee-stun fallback),
+    /// and events with nothing to emit (echo companion, or a stunless non-guard)
+    /// classify as None.
+    #[test]
+    fn quickening_wins_and_empty_events_emit_nothing() {
+        assert_eq!(
+            classify_zero_damage_guard(0, 0x4000220, 0.0, EM8300_THE_WORLD),
+            ZeroDamageGuard::Quickening
+        );
+        // Echo companion (bit 15) never classifies, even carrying stun.
+        assert_eq!(
+            classify_zero_damage_guard(u32::MAX, 0x40040e8020, 250.0, 0x2b31654b),
+            ZeroDamageGuard::None
+        );
+        // A non-guard zero-damage event with no stun has nothing to emit.
+        assert_eq!(
+            classify_zero_damage_guard(0, 0x6100000, 0.0, 0x2b31654b),
+            ZeroDamageGuard::None
+        );
+    }
 
     /// The ExHp reads are raw memory on an offset that will silently shift on a
     /// future patch — reject anything that doesn't look like a live HP pair so

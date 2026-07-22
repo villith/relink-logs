@@ -1,9 +1,12 @@
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
-import { ComputedSkillState } from "@/types";
+import { ComputedSkillGroup, ComputedSkillState } from "@/types";
 import { humanizeNumbers } from "@/utils";
 import { useShallow } from "zustand/react/shallow";
 
-export const useSkillRow = (skill: ComputedSkillState) => {
+/** The shared humanized value block a skill row or skill-group row renders. Both
+ * {@link ComputedSkillState} and {@link ComputedSkillGroup} carry the fields it
+ * reads, so `useSkillGroupRow` builds on this rather than duplicating it. */
+export const useSkillRow = (skill: ComputedSkillState | ComputedSkillGroup) => {
   const { show_full_values } = useMeterSettingsStore(
     useShallow((state) => ({
       show_full_values: state.show_full_values,

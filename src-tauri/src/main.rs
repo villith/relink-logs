@@ -74,9 +74,7 @@ async fn fetch_synthesis_status() -> Result<synthesis::SynthesisStatus, String> 
 async fn search_synthesis(
     query: synthesis::SynthesisQuery,
 ) -> Result<synthesis::SynthesisSearchResponse, String> {
-    if query.trait1 == synthesis::EMPTY_TRAIT
-        || query.trait2 == Some(synthesis::EMPTY_TRAIT)
-    {
+    if query.trait1 == synthesis::EMPTY_TRAIT || query.trait2 == Some(synthesis::EMPTY_TRAIT) {
         return Err("invalid-trait".to_string());
     }
     tokio::task::spawn_blocking(move || {
@@ -101,9 +99,11 @@ async fn search_synthesis(
 /// `None` = game not running (staleness unknowable, not stale).
 #[tauri::command(async)]
 async fn fetch_synthesis_seed() -> Result<Option<synthesis::SynthesisSeed>, String> {
-    tokio::task::spawn_blocking(|| synthesis::snapshot::take_seed_state().map_err(|e| e.to_string()))
-        .await
-        .map_err(|e| e.to_string())?
+    tokio::task::spawn_blocking(|| {
+        synthesis::snapshot::take_seed_state().map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Toolbox / Overmastery Predictor: is the game up, and which characters
@@ -111,10 +111,14 @@ async fn fetch_synthesis_seed() -> Result<Option<synthesis::SynthesisSeed>, Stri
 #[tauri::command(async)]
 async fn fetch_overmastery_status() -> Result<overmastery::OvermasteryStatus, String> {
     tokio::task::spawn_blocking(|| match overmastery::snapshot::take_snapshot() {
-        Ok(None) => Ok(overmastery::OvermasteryStatus { game_running: false, roster: Vec::new() }),
-        Ok(Some(snap)) => {
-            Ok(overmastery::OvermasteryStatus { game_running: true, roster: snap.roster })
-        }
+        Ok(None) => Ok(overmastery::OvermasteryStatus {
+            game_running: false,
+            roster: Vec::new(),
+        }),
+        Ok(Some(snap)) => Ok(overmastery::OvermasteryStatus {
+            game_running: true,
+            roster: snap.roster,
+        }),
         Err(e) => Err(e.to_string()),
     })
     .await
@@ -612,7 +616,8 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
                 // Attribute dragon-form (Id/Pl2000) damage to the Id player, matching the
                 // remap the party table uses — otherwise `derived_state.party` (keyed by the
                 // remapped index) has no bucket for the raw Pl2000 index and the chart drops it.
-                let damage_event = v1::remap_dragon_form(&parser.encounter.player_data, damage_event);
+                let damage_event =
+                    v1::remap_dragon_form(&parser.encounter.player_data, damage_event);
                 let damage_event = &damage_event;
 
                 let index = ((timestamp - start_time) / DPS_INTERVAL) as usize;
@@ -798,7 +803,10 @@ fn connect_and_run_parser(app: AppHandle) {
                                     state.on_quest_complete_event(event);
                                 }
                                 protocol::Message::OnQuestFail(event) => {
-                                    info!("quest retire/fail boundary: quest_id={:#x}", event.quest_id);
+                                    info!(
+                                        "quest retire/fail boundary: quest_id={:#x}",
+                                        event.quest_id
+                                    );
                                     state.on_quest_fail_event(event);
                                 }
                                 protocol::Message::OnUpdateSBA(event) => {
@@ -839,6 +847,15 @@ fn connect_and_run_parser(app: AppHandle) {
                                 }
                                 protocol::Message::OnPlayerStun(event) => {
                                     state.on_player_stun(event);
+                                }
+                                protocol::Message::OnPerfectGuardStun(event) => {
+                                    state.on_perfect_guard_stun(event);
+                                }
+                                protocol::Message::OnPerfectGuardQuickening(event) => {
+                                    state.on_perfect_guard_quickening(event);
+                                }
+                                protocol::Message::OnStunEffect(event) => {
+                                    state.on_stun_effect(event);
                                 }
                             }
                         }
@@ -952,7 +969,13 @@ fn reset_window_to_default(handle: &AppHandle, label: &str, center: bool) {
     };
     let _ = window.show();
     let _ = window.unminimize();
-    match handle.config().tauri.windows.iter().find(|w| w.label == label) {
+    match handle
+        .config()
+        .tauri
+        .windows
+        .iter()
+        .find(|w| w.label == label)
+    {
         Some(default) => {
             let _ = window.set_size(Size::Logical(LogicalSize {
                 width: default.width,

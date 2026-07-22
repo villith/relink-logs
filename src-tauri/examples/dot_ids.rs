@@ -80,11 +80,17 @@ fn main() -> Result<()> {
             ActionType::SupplementaryDamage(id) => format!("Supp({id})"),
             ActionType::LinkAttack => "LinkAttack".into(),
             ActionType::SBA => "SBA".into(),
+            ActionType::PerfectGuard => "PerfectGuard".into(),
+            ActionType::PerfectGuardQuickening => "PerfectGuardQuickening".into(),
+            ActionType::StunEffect(id) => format!("StunEffect({id})"),
         };
         by_action.entry(key).or_default().add(e.damage as i64);
     }
 
-    println!("log {log_id} @ {time} — {want_char} action ids ({} distinct)", by_action.len());
+    println!(
+        "log {log_id} @ {time} — {want_char} action ids ({} distinct)",
+        by_action.len()
+    );
     let mut rows: Vec<_> = by_action.iter().collect();
     rows.sort_by_key(|(_, s)| std::cmp::Reverse(s.hits));
     for (key, s) in rows {

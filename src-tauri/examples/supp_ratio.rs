@@ -68,7 +68,9 @@ fn main() -> Result<()> {
         let mut base_ratio_buckets: BTreeMap<&'static str, u64> = BTreeMap::new();
 
         for (i, event) in events.iter().enumerate() {
-            let Message::DamageEvent(e) = event else { continue };
+            let Message::DamageEvent(e) = event else {
+                continue;
+            };
             if e.damage <= 0 {
                 continue;
             }
@@ -83,6 +85,9 @@ fn main() -> Result<()> {
                 ActionType::LinkAttack => t.la += e.damage as u64,
                 ActionType::SBA => t.sba += e.damage as u64,
                 ActionType::DamageOverTime(_) => t.dot += e.damage as u64,
+                ActionType::PerfectGuard
+                | ActionType::PerfectGuardQuickening
+                | ActionType::StunEffect(_) => {}
                 ActionType::SupplementaryDamage(aid) => {
                     t.supp += e.damage as u64;
                     t.supp_events += 1;
@@ -90,7 +95,9 @@ fn main() -> Result<()> {
                     let src = (e.source.index, e.source.actor_type);
                     let mut ratio = None;
                     for prev in events[..i].iter().rev().take(300) {
-                        let Message::DamageEvent(p) = prev else { continue };
+                        let Message::DamageEvent(p) = prev else {
+                            continue;
+                        };
                         if (p.source.index, p.source.actor_type) != src || p.damage <= 0 {
                             continue;
                         }
@@ -117,7 +124,9 @@ fn main() -> Result<()> {
                     // displayed ratio blows past 1.0.
                     let mut base_ratio = None;
                     for prev in events[..i].iter().rev().take(300) {
-                        let Message::DamageEvent(p) = prev else { continue };
+                        let Message::DamageEvent(p) = prev else {
+                            continue;
+                        };
                         if (p.source.index, p.source.actor_type) != src || p.damage <= 0 {
                             continue;
                         }
@@ -179,7 +188,9 @@ fn main() -> Result<()> {
         let mut flags_oversize: BTreeMap<u64, u64> = BTreeMap::new();
         let mut supp_with_cap = 0u64;
         for (i, event) in events.iter().enumerate() {
-            let Message::DamageEvent(e) = event else { continue };
+            let Message::DamageEvent(e) = event else {
+                continue;
+            };
             let ActionType::SupplementaryDamage(aid) = e.action_id else {
                 continue;
             };
@@ -192,7 +203,9 @@ fn main() -> Result<()> {
             let src = (e.source.index, e.source.actor_type);
             let mut ratio = None;
             for prev in events[..i].iter().rev().take(300) {
-                let Message::DamageEvent(p) = prev else { continue };
+                let Message::DamageEvent(p) = prev else {
+                    continue;
+                };
                 if (p.source.index, p.source.actor_type) != src || p.damage <= 0 {
                     continue;
                 }

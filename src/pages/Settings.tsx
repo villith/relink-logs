@@ -1,8 +1,9 @@
+import { ColumnEditor } from "@/components/ColumnEditor";
+import { useColumnControls } from "@/components/useColumnControls";
 import { type ChecklistGroup } from "@/stores/useChecklistStore";
 import { useLogIndexStore } from "@/stores/useLogIndexStore";
 import { useManualUpdateCheck } from "@/useUpdateCheck";
 import { translateTraitId } from "@/utils";
-import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
 import {
   ActionIcon,
   Box,
@@ -13,7 +14,6 @@ import {
   Fieldset,
   Flex,
   Group,
-  Menu,
   NumberInput,
   Select,
   Slider,
@@ -22,7 +22,6 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
-import { DotsSixVertical } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -101,14 +100,11 @@ const SettingsPage = () => {
     setMeterSettings,
     languages,
     handleLanguageChange,
-    overlay_columns,
-    handleReorderOverlayColumns,
-    availableOverlayColumns,
-    addOverlayColumn,
-    removeOverlayColumn,
     open_log_on_save,
     auto_check_updates,
   } = useSettings();
+
+  const { overlayPlayer, overlaySkill } = useColumnControls();
 
   const checklist = useChecklistSettings();
   const { checking, checkNow } = useManualUpdateCheck();
@@ -250,57 +246,25 @@ const SettingsPage = () => {
             <Checkbox label={t("ui.debug-mode")} checked={debugMode} onChange={toggleDebugMode} />
           </Tooltip>
           <Divider />
-          <Text size="sm">Customize Overlay Meter Columns</Text>
-          <Menu shadow="md" trigger="hover" openDelay={100} closeDelay={400}>
-            <Menu.Target>
-              <Button>Add column</Button>
-            </Menu.Target>
-            <Menu.Dropdown>
-              {availableOverlayColumns.map((item) => (
-                <Menu.Item key={item} onClick={() => addOverlayColumn(item)}>
-                  {t(`ui.meter-columns.${item}`)} - {t(`ui.meter-columns.${item}-description`)}
-                </Menu.Item>
-              ))}
-            </Menu.Dropdown>
-          </Menu>
-          <DragDropContext onDragEnd={handleReorderOverlayColumns}>
-            <Droppable droppableId="overlay-columns">
-              {(droppableProvided) => (
-                <Stack ref={droppableProvided.innerRef}>
-                  {overlay_columns.map((item, index) => (
-                    <Draggable key={item} draggableId={item} index={index}>
-                      {(draggableProvided) => (
-                        <Box
-                          bg="var(--mantine-color-dark-8)"
-                          display="flex"
-                          p={10}
-                          ref={draggableProvided.innerRef}
-                          {...draggableProvided.draggableProps}
-                          {...draggableProvided.dragHandleProps}
-                        >
-                          <Flex align="center" flex={1}>
-                            <DotsSixVertical size={16} style={{ cursor: "grab", marginRight: "0.5em" }} />
-                            {t(`ui.meter-columns.${item}`)} - {t(`ui.meter-columns.${item}-description`)}
-                          </Flex>
-                          <Flex align="center">
-                            <ActionIcon
-                              aria-label="Remove column"
-                              variant="transparent"
-                              color="gray"
-                              onClick={() => removeOverlayColumn(item)}
-                            >
-                              x
-                            </ActionIcon>
-                          </Flex>
-                        </Box>
-                      )}
-                    </Draggable>
-                  ))}
-                  {droppableProvided.placeholder}
-                </Stack>
-              )}
-            </Droppable>
-          </DragDropContext>
+          <Text size="md" fw={700}>
+            Overlay Columns
+          </Text>
+          <ColumnEditor
+            title="Player Row"
+            droppableId="overlay-player-columns"
+            translationPrefix="ui.meter-columns"
+            items={overlayPlayer.items}
+            onToggle={overlayPlayer.onToggle}
+            onReorder={overlayPlayer.onReorder}
+          />
+          <ColumnEditor
+            title="Skill Breakdown"
+            droppableId="overlay-skill-columns"
+            translationPrefix="ui.skill-columns"
+            items={overlaySkill.items}
+            onToggle={overlaySkill.onToggle}
+            onReorder={overlaySkill.onReorder}
+          />
         </Stack>
       </Fieldset>
       <Fieldset legend={t("ui.checklist-settings.title")} mt="md">

@@ -106,8 +106,14 @@ fn main() -> Result<()> {
         .max(1);
     let chart_len = (duration / 1_000) as usize + 1;
     let segments = segment_targets(&encounter.raw_event_log, start);
-    let charts =
-        build_target_hp_charts(&encounter.raw_event_log, &segments, start, 1_000, chart_len, &[]);
+    let charts = build_target_hp_charts(
+        &encounter.raw_event_log,
+        &segments,
+        start,
+        1_000,
+        chart_len,
+        &[],
+    );
     println!("chart series ({}):", charts.len());
     for series in &charts {
         let first = series.values.iter().position(|v| v.is_some());

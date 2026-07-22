@@ -68,7 +68,9 @@ fn is_capped(damage: i32, cap: i32, mults: &[f64]) -> bool {
         return damage >= cap;
     }
     let tol = (0.003 * damage as f64).max(2.0);
-    mults.iter().any(|&m| (cap as f64 * m - damage as f64).abs() <= tol)
+    mults
+        .iter()
+        .any(|&m| (cap as f64 * m - damage as f64).abs() <= tol)
 }
 
 fn main() -> Result<()> {
@@ -91,14 +93,12 @@ fn main() -> Result<()> {
         }
     }
 
-    let conn = Connection::open_with_flags(
-        &db_path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )
-    .with_context(|| format!("opening {}", db_path.display()))?;
+    let conn = Connection::open_with_flags(&db_path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .with_context(|| format!("opening {}", db_path.display()))?;
 
     for id in ids {
-        let blob: Vec<u8> = conn.query_row("SELECT data FROM logs WHERE id = ?", [id], |r| r.get(0))?;
+        let blob: Vec<u8> =
+            conn.query_row("SELECT data FROM logs WHERE id = ?", [id], |r| r.get(0))?;
         let mut encounter = match Encounter::from_blob(&blob) {
             Ok(e) => e,
             Err(err) => {
@@ -135,16 +135,22 @@ fn main() -> Result<()> {
             encounter.quest_id,
             events.len()
         );
-        println!("learned cap peaks ({}): {:?}", sorted.len(),
-            sorted.iter().map(|m| (m * 1000.0).round() / 1000.0).collect::<Vec<_>>());
+        println!(
+            "learned cap peaks ({}): {:?}",
+            sorted.len(),
+            sorted
+                .iter()
+                .map(|m| (m * 1000.0).round() / 1000.0)
+                .collect::<Vec<_>>()
+        );
 
         // Per source-player aggregates over cappable (non-supp, has-cap) hits.
         #[derive(Default)]
         struct Agg {
             hits: u64,
             capped: u64,
-            under: u64,      // damage < cap, classified not-capped
-            off_peak: u64,   // damage >= cap but ratio matches no learned peak
+            under: u64,    // damage < cap, classified not-capped
+            off_peak: u64, // damage >= cap but ratio matches no learned peak
             // of the not-capped hits, how many are genuinely at-or-over the cap
             // (ratio >= 0.999) — i.e. physically capped but the learner missed the peak
             missed_at_cap: u64,
@@ -160,7 +166,9 @@ fn main() -> Result<()> {
             if matches!(e.action_id, ActionType::SupplementaryDamage(_)) {
                 continue;
             }
-            let Some(cap) = e.damage_cap.filter(|c| *c > 0) else { continue };
+            let Some(cap) = e.damage_cap.filter(|c| *c > 0) else {
+                continue;
+            };
             let a = per_player
                 .entry((e.source.parent_actor_type, e.source.parent_index))
                 .or_default();
@@ -207,8 +215,13 @@ fn main() -> Result<()> {
                     ActionType::SBA => u32::MAX - 1,
                     ActionType::DamageOverTime(x) => x,
                     ActionType::SupplementaryDamage(_) => continue,
+                    ActionType::PerfectGuard
+                    | ActionType::PerfectGuardQuickening
+                    | ActionType::StunEffect(_) => continue,
                 };
-                let Some(cap) = e.damage_cap.filter(|c| *c > 0) else { continue };
+                let Some(cap) = e.damage_cap.filter(|c| *c > 0) else {
+                    continue;
+                };
                 let s = per_skill.entry(sid).or_default();
                 s.hits += 1;
                 s.total_dmg += e.damage as i64;

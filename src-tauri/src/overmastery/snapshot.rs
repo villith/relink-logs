@@ -105,5 +105,9 @@ pub fn take_snapshot() -> Result<Option<OvermasterySnapshot>> {
         .map(|c| u32::from_le_bytes(c.try_into().expect("4 bytes")))
         .collect();
 
-    Ok(Some(OvermasterySnapshot { slots, slot_override, roster }))
+    Ok(Some(OvermasterySnapshot {
+        slots,
+        slot_override,
+        roster,
+    }))
 }
