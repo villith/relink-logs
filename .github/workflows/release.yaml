@@ -247,7 +247,7 @@ jobs:
           $cfg = [ordered]@{
             build = @{ beforeBuildCommand = "" }
             tauri = @{ bundle = @{ windows = @{
-              signCommand = "powershell -NoProfile -ExecutionPolicy Bypass -File $env:GITHUB_WORKSPACE\scripts\ci-sign.ps1 %1"
+              signCommand = "pwsh -NoProfile -ExecutionPolicy Bypass -File $env:GITHUB_WORKSPACE\scripts\ci-sign.ps1 %1"
             } } }
           }
           $cfg | ConvertTo-Json -Depth 6 | Set-Content -Path .tauri-release-config.json -Encoding utf8
