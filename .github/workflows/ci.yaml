@@ -62,3 +62,26 @@ jobs:
       - run: cargo build --release --package hook
       - run: cargo build --verbose
       - run: cargo test --verbose
+  cargo_check_linux:
+    name: Rust - Linux check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install Tauri v1 Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.0-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+      - run: rustup set auto-self-update disable
+      - run: rustup update nightly && rustup default nightly
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci
+      # generate_context! embeds dist/ at compile time, so the frontend must
+      # exist before any cargo command that compiles main.rs.
+      - run: npm run build
+      - run: cargo check -p protocol
+      - run: cargo check -p gbfr-logs
+      # --lib --bins: examples are windows-only diag tools and must not build here.
+      - run: cargo test -p gbfr-logs --lib --bins
