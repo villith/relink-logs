@@ -13,9 +13,7 @@ tauri-build = { version = "1.5", features = [] }
 
 [dependencies]
 anyhow = "1.0"
-dll-syringe = "0.15.2"
 futures = "0.3"
-interprocess = { version = "^2.0", features = ["tokio"] }
 protocol = { path = "../protocol" }
 sea-query = { version = "0" }
 sea-query-rusqlite = { version = "0", features = ["with-chrono"] }
@@ -55,6 +53,13 @@ strum = "0.26"
 strum_macros = "0.26"
 cbor4ii = { version = "0.3.2", features = ["use_std", "serde1"] }
 log = "^0.4"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[target.'cfg(windows)'.dependencies]
+dll-syringe = "0.15.2"
+interprocess = { version = "^2.0", features = ["tokio"] }
 pelite = "0.10.0"
 windows = { version = "0.52.0", features = [
   "Win32_Foundation",
@@ -63,5 +68,5 @@ windows = { version = "0.52.0", features = [
   "Win32_System_Threading",
 ] }
 
-[features]
-custom-protocol = ["tauri/custom-protocol"]
+[dev-dependencies]
+tempfile = "3"

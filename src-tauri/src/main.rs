@@ -10,10 +10,14 @@ use std::{
 };
 
 use anyhow::Context;
-use gbfr_logs::{db, overmastery, parser, synthesis};
+use gbfr_logs::{db, parser};
+#[cfg(windows)]
+use gbfr_logs::{overmastery, synthesis};
 
 use db::logs::LogEntry;
+#[cfg(windows)]
 use dll_syringe::{process::OwnedProcess, Syringe};
+#[cfg(windows)]
 use interprocess::os::windows::named_pipe::tokio::RecvPipeStream;
 use log::{info, LevelFilter};
 use parser::{
@@ -50,6 +54,7 @@ fn reset_encounter(state: State<ResetChannel>) {
 
 /// Toolbox / Synthesis Helper: snapshot the game's synthesis state and report
 /// whether predictions are currently possible.
+#[cfg(windows)]
 #[tauri::command(async)]
 async fn fetch_synthesis_status() -> Result<synthesis::SynthesisStatus, String> {
     tokio::task::spawn_blocking(|| match synthesis::snapshot::take_snapshot() {
@@ -70,6 +75,7 @@ async fn fetch_synthesis_status() -> Result<synthesis::SynthesisStatus, String> 
 }
 
 /// Toolbox / Synthesis Helper: fresh snapshot + exhaustive pair search.
+#[cfg(windows)]
 #[tauri::command(async)]
 async fn search_synthesis(
     query: synthesis::SynthesisQuery,
@@ -97,6 +103,7 @@ async fn search_synthesis(
 
 /// Toolbox / Synthesis Helper: current seed identity for staleness polling.
 /// `None` = game not running (staleness unknowable, not stale).
+#[cfg(windows)]
 #[tauri::command(async)]
 async fn fetch_synthesis_seed() -> Result<Option<synthesis::SynthesisSeed>, String> {
     tokio::task::spawn_blocking(|| {
@@ -108,6 +115,7 @@ async fn fetch_synthesis_seed() -> Result<Option<synthesis::SynthesisSeed>, Stri
 
 /// Toolbox / Overmastery Predictor: is the game up, and which characters
 /// exist in the roster (for the character picker).
+#[cfg(windows)]
 #[tauri::command(async)]
 async fn fetch_overmastery_status() -> Result<overmastery::OvermasteryStatus, String> {
     tokio::task::spawn_blocking(|| match overmastery::snapshot::take_snapshot() {
@@ -127,6 +135,7 @@ async fn fetch_overmastery_status() -> Result<overmastery::OvermasteryStatus, St
 
 /// Toolbox / Overmastery Predictor: fresh RNG snapshot + simulate the next N
 /// meditation rolls for one character and size.
+#[cfg(windows)]
 #[tauri::command(async)]
 async fn predict_overmastery(
     query: overmastery::OvermasteryQuery,
@@ -165,6 +174,7 @@ async fn predict_overmastery(
 /// Toolbox / Overmastery Predictor: current RNG state of one slot, for
 /// staleness polling against a prediction's `slot_state`. `None` = game not
 /// running (staleness unknowable, not stale).
+#[cfg(windows)]
 #[tauri::command(async)]
 async fn fetch_overmastery_seed(slot: u32) -> Result<Option<u32>, String> {
     // The bound is owned by `take_slot_state`, which knows RNG_SLOT_COUNT.
@@ -173,6 +183,45 @@ async fn fetch_overmastery_seed(slot: u32) -> Result<Option<u32>, String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Non-Windows stubs: these tools read game memory from outside the process,
+/// which the Linux build does not support (see the Linux spec). The frontend
+/// hides them; the stub keeps the invoke surface identical.
+#[cfg(not(windows))]
+#[tauri::command]
+async fn fetch_synthesis_status() -> Result<(), String> {
+    Err("windows-only".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn search_synthesis() -> Result<(), String> {
+    Err("windows-only".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn fetch_synthesis_seed() -> Result<(), String> {
+    Err("windows-only".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn fetch_overmastery_status() -> Result<(), String> {
+    Err("windows-only".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn predict_overmastery() -> Result<(), String> {
+    Err("windows-only".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn fetch_overmastery_seed() -> Result<(), String> {
+    Err("windows-only".into())
 }
 
 #[tauri::command]
@@ -711,6 +760,7 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
 }
 
 // Continuously check for the game process and inject the DLL when found.
+#[cfg(windows)]
 async fn check_and_perform_hook(app: AppHandle) {
     loop {
         match OwnedProcess::find_first_by_name(gbfr_logs::game_mem::GAME_EXE) {
@@ -739,6 +789,26 @@ async fn check_and_perform_hook(app: AppHandle) {
     }
 }
 
+// Replaced with the deploy-and-connect flow in the Linux-glue task.
+#[cfg(not(windows))]
+async fn check_and_perform_hook(app: AppHandle) {
+    connect_and_run_parser(app);
+}
+
+/// Connect to the hook's event stream: the named pipe on Windows (localhost
+/// TCP when GBFR_LOGS_FORCE_TCP=1, for parity-testing the Linux path), and
+/// localhost TCP elsewhere — under Proton the hook detects Wine and listens
+/// on TCP because a native Linux app cannot open Wine named pipes.
+async fn connect_event_stream() -> anyhow::Result<Box<dyn tokio::io::AsyncRead + Unpin + Send>> {
+    #[cfg(windows)]
+    if std::env::var("GBFR_LOGS_FORCE_TCP").as_deref() != Ok("1") {
+        let stream = RecvPipeStream::connect_by_path(protocol::PIPE_NAME).await?;
+        return Ok(Box::new(stream));
+    }
+    let stream = tokio::net::TcpStream::connect(protocol::TCP_ADDR).await?;
+    Ok(Box::new(stream))
+}
+
 // Connect to the game hook event channel and listen for damage events.
 fn connect_and_run_parser(app: AppHandle) {
     let window = app.get_window("main").expect("Window not found");
@@ -752,7 +822,7 @@ fn connect_and_run_parser(app: AppHandle) {
 
     tauri::async_runtime::spawn(async move {
         loop {
-            match RecvPipeStream::connect_by_path(protocol::PIPE_NAME).await {
+            match connect_event_stream().await {
                 Ok(stream) => {
                     info!("Connected to game!");
 
