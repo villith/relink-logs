@@ -61,13 +61,31 @@ const SUPP_ECHO_FLAG: u64 = 1 << 15;
 /// 0x40040e0020 on 07-21).
 const GUARD_FLAG: u64 = 1 << 5;
 
+/// Skybound Art flags. An SBA in progress fires zero-damage events EVERY FRAME
+/// that reuse action id -1 (and sometimes the guard bit), so the guard
+/// classifiers must exclude them — see [`is_generic_pg_counter`].
+const SBA_FLAGS: u64 = 1 << 13 | 1 << 14;
+
 /// Generic Perfect Guard counter signature: ~48ms after a guard the game fires
 /// a player-sourced zero-damage event with action id -1 carrying the guard's
 /// stun. Identified by signature — NOT by the stun gauge moving — because a
-/// stun-immune target yields a 0 delta and the guard must still count. Echo
-/// companions (bit 15) are excluded, see [`SUPP_ECHO_FLAG`].
+/// stun-immune target yields a 0 delta and the guard must still count (and
+/// ONLINE the in-call delta is structurally 0, since enemy stun is
+/// host-authoritative and arrives as network messages instead).
+///
+/// Action id -1 alone is not enough: it means "no specific action", and other
+/// mechanics ride it. Live capture 07-22 (online, stored log 537) found
+/// SBA-flagged zero-damage events firing ONCE PER FRAME for an SBA's whole
+/// duration — 286 events over 4.67s from one player — which booked 700 phantom
+/// guards in that one quest. Some of them even carry the guard bit, so the
+/// counter is pinned to all three conditions: the guard flag present (every one
+/// of the 173 captured real counters had it), and neither an echo companion
+/// (bit 15, which shadows every real counter ~150ms later) nor an SBA.
 fn is_generic_pg_counter(action_id: u32, flags: u64) -> bool {
-    action_id == u32::MAX && flags & SUPP_ECHO_FLAG == 0
+    action_id == u32::MAX
+        && flags & GUARD_FLAG != 0
+        && flags & SUPP_ECHO_FLAG == 0
+        && flags & SBA_FLAGS == 0
 }
 
 /// Guarded-Quickening marker signature: on a guarded Quickening The World
@@ -131,7 +149,7 @@ fn classify_zero_damage_guard(
 fn classify_action_type(flags: u64, action_id: u32) -> ActionType {
     if ((1 << 7 | 1 << 50) & flags) != 0 {
         ActionType::LinkAttack
-    } else if ((1 << 13 | 1 << 14) & flags) != 0 {
+    } else if (SBA_FLAGS & flags) != 0 {
         ActionType::SBA
     } else if (SUPP_ECHO_FLAG & flags) != 0 {
         ActionType::SupplementaryDamage(action_id)
@@ -1421,6 +1439,36 @@ mod tests {
             classify_zero_damage_guard(u32::MAX, 0x40040e0020, 0.0, 0x2b31654b),
             ZeroDamageGuard::PerfectGuard
         );
+    }
+
+    /// Live capture 07-22 (online quest, stored log 537): SBA-flagged zero-damage
+    /// events also carry action id -1, and they fire ONCE PER FRAME for the whole
+    /// duration of an SBA — two bursts of 286 events spanning 4.67s each from a
+    /// single player — every one of them carrying no stun. Counting them booked
+    /// 700 phantom Perfect Guard hits in one quest (615 on one player), which is
+    /// what the guard flag alone could not filter: the largest burst carries it.
+    #[test]
+    fn per_frame_sba_events_are_not_perfect_guard_counters() {
+        // Fediel's SBA, 572 captured events: guard bit SET, but SBA-flagged (13).
+        assert!(!is_generic_pg_counter(u32::MAX, 0x4002020));
+        // The bit-14 SBA variant (39 captured events).
+        assert!(!is_generic_pg_counter(u32::MAX, 0x2044040));
+        // ...and the signatures carrying no guard bit at all (141 + 91 captured).
+        assert!(!is_generic_pg_counter(u32::MAX, 0x2042040));
+        assert!(!is_generic_pg_counter(u32::MAX, 0x2042000));
+        // Nothing to emit: no guard, and the SBA ticks carry no stun either.
+        assert_eq!(
+            classify_zero_damage_guard(u32::MAX, 0x4002020, 0.0, 0x181b3a5b),
+            ZeroDamageGuard::None
+        );
+    }
+
+    /// The guard flag is required, not merely typical: all 173 live-captured real
+    /// counters carried bit 5, so an action -1 event without it is some other
+    /// mechanic riding the same "no specific action" id.
+    #[test]
+    fn generic_counter_requires_the_guard_flag() {
+        assert!(!is_generic_pg_counter(u32::MAX, 0x40040e0000));
     }
 
     /// The Quickening marker still wins (checked before the melee-stun fallback),
