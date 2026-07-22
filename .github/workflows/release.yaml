@@ -2,15 +2,20 @@ name: Release
 
 # Branch model (versions are managed by CI — do not hand-bump them):
 #
-#   PRs target dev. Every push to dev auto-bumps to the next RC version
-#   (X.Y.Z-N), commits the bump to the four version files, and publishes a
-#   fully signed GitHub *prerelease* — downloadable for testing, but invisible
-#   to installed apps, because GitHub never serves prereleases from
-#   releases/latest (the updater endpoint).
+#   PRs target dev (the default branch). Every push to dev auto-bumps to the
+#   next RC version (X.Y.Z-N), commits the bump to the four version files, and
+#   publishes a fully signed GitHub *prerelease* — downloadable for testing,
+#   but invisible to installed apps, because GitHub never serves prereleases
+#   from releases/latest (the updater endpoint).
 #
-#   Releasing = merging dev into main. The RC suffix is stripped, the stable
-#   version is committed to main, the release ships, and main is merged back
-#   into dev so the next dev→main merge cannot conflict on version lines.
+#   Releasing = pressing "Run workflow" on this workflow (from dev). CI strips
+#   the RC suffix ON dev, requires the human-written CHANGELOG.md section for
+#   that version (it becomes the release body and the in-app update prompt),
+#   builds and publishes the stable release from that commit, then
+#   FAST-FORWARDS main to it. main is a pointer to the last released state of
+#   dev — always an ancestor of dev, so the branches cannot diverge and
+#   nothing ever needs merging back. Never push to main directly: the promote
+#   job's plain (non-force) push will refuse to move a diverged main.
 #
 #   Version choice on dev: the base is whatever the files carry when it is
 #   ahead of the newest stable tag — set e.g. 1.13.0 in a PR to make the next
@@ -18,20 +23,15 @@ name: Release
 #   The RC number is the next -N not already tagged. N is numeric because WiX
 #   turns it into the MSI ProductVersion's 4th field and rejects -rc.N style.
 #
-#   Stable releases REQUIRE a human-written CHANGELOG.md section (it becomes
-#   the release body and the in-app update prompt); the version job fails the
-#   dev→main merge until one exists. RCs use the section if present,
-#   placeholder notes otherwise.
-#
-#   The version-bump, strip, and back-merge commits are pushed over SSH with
-#   the RELEASE_DEPLOY_KEY write deploy key: both branches sit behind rulesets
+#   CI's pushes to dev (RC bumps and the stable strip) go over SSH with the
+#   RELEASE_DEPLOY_KEY write deploy key: dev and main sit behind rulesets
 #   (PR required + verified signatures), personal repos cannot grant the
 #   Actions app a ruleset bypass, but a deploy key CAN be a bypass actor.
-#   Deploy-key pushes DO trigger workflows (unlike GITHUB_TOKEN), so the
-#   version job skips any push whose head commit starts with
-#   "chore(release):" — every CI-authored commit uses that prefix. The tag is
-#   created atomically with the release (gh release create --target), so a
-#   failed build strands nothing; the next push retries.
+#   Deploy-key pushes DO trigger workflows (unlike GITHUB_TOKEN), so every
+#   CI-authored commit starts with "chore(release):" and the version job
+#   skips such pushes. The release tag is created atomically with the GitHub
+#   release (gh release create --target), so a failed build strands nothing;
+#   pushing again (or re-dispatching) retries.
 #
 # Two independent signatures are applied, and the ORDER MATTERS:
 #   1. Authenticode (Azure Artifact Signing) — what Windows/SmartScreen/UAC check.
@@ -42,8 +42,8 @@ name: Release
 on:
   push:
     branches:
-      - main
       - dev
+  workflow_dispatch: # the release button — publishes a stable from dev
 
 # Rapid merges must not race the version computation or publish the same
 # version twice.
@@ -53,9 +53,9 @@ concurrency:
 
 jobs:
   version:
-    # Recursion guard: CI's own pushes (version bumps, the stable strip, the
-    # back-merge) all start with "chore(release):" and must not release again.
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    # Recursion guard: CI's own deploy-key pushes (RC bumps, the stable strip)
+    # start with "chore(release):" and must not trigger another release.
+    if: ${{ github.event_name == 'workflow_dispatch' || !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read # pushes go over SSH with the deploy key, not GITHUB_TOKEN
@@ -63,13 +63,12 @@ jobs:
       version: ${{ steps.v.outputs.version }}
       sha: ${{ steps.v.outputs.sha }}
       prerelease: ${{ steps.v.outputs.prerelease }}
-      should_release: ${{ steps.v.outputs.should_release }}
     steps:
       - uses: actions/checkout@v4
         with:
           # The branch, not the push SHA: the bump commit must land on the
           # branch tip, and the build then uses that exact commit.
-          ref: ${{ github.ref_name }}
+          ref: dev
           fetch-depth: 0 # next-version.mjs needs the full tag list
 
       # Rulesets on dev and main block direct pushes; the write deploy key is
@@ -96,26 +95,24 @@ jobs:
         run: |
           file_version="$(node -p "require('./package.json').version")"
 
-          if [[ "$GITHUB_REF_NAME" == "dev" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$GITHUB_REF_NAME" != "dev" ]]; then
+              echo "::error::Releases are dispatched from the dev branch, not $GITHUB_REF_NAME."
+              exit 1
+            fi
+            prerelease=false
+            next="$(node scripts/next-version.mjs main "$file_version")"
+            if git rev-parse -q --verify "refs/tags/$next" >/dev/null; then
+              echo "::error::$next is already released - merge new work into dev before dispatching a release."
+              exit 1
+            fi
+            # Gate BEFORE committing anything: the section is the release
+            # body, and it must be written by a human. The dispatch simply
+            # fails here until the changelog exists on dev.
+            node scripts/extract-changelog.mjs "$next" > /dev/null
+          else
             prerelease=true
             next="$(git tag | node scripts/next-version.mjs dev "$file_version")"
-          else
-            prerelease=false
-            next="$(git tag | node scripts/next-version.mjs main "$file_version")"
-            if git rev-parse -q --verify "refs/tags/$next" >/dev/null; then
-              echo "Tag $next already exists; nothing to release."
-              {
-                echo "version=$next"
-                echo "prerelease=$prerelease"
-                echo "should_release=false"
-                echo "sha=$GITHUB_SHA"
-              } >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            # Gate BEFORE committing anything: the section is the release body,
-            # and it must be written by a human. The merge simply fails here
-            # until the changelog exists.
-            node scripts/extract-changelog.mjs "$next" > /dev/null
           fi
 
           echo "Releasing $next (files carried $file_version)"
@@ -128,11 +125,11 @@ jobs:
             # A human push can race ours; rebase the bump onto it and retry.
             pushed=false
             for i in 1 2 3; do
-              if git push origin "HEAD:$GITHUB_REF_NAME"; then pushed=true; break; fi
-              git pull --rebase origin "$GITHUB_REF_NAME"
+              if git push origin HEAD:dev; then pushed=true; break; fi
+              git pull --rebase origin dev
             done
             if [[ "$pushed" != "true" ]]; then
-              echo "::error::could not push the version-bump commit to $GITHUB_REF_NAME"
+              echo "::error::could not push the version-bump commit to dev"
               exit 1
             fi
           fi
@@ -140,13 +137,11 @@ jobs:
           {
             echo "version=$next"
             echo "prerelease=$prerelease"
-            echo "should_release=true"
             echo "sha=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
 
   release:
     needs: version
-    if: needs.version.outputs.should_release == 'true'
     runs-on: windows-latest
     permissions:
       contents: write # required to create the GitHub Release (and its tag)
@@ -378,13 +373,12 @@ jobs:
           if ($env:PRERELEASE -eq 'true') { $extra += '--prerelease' }
           gh release create $env:VERSION $assets --target $env:TARGET_SHA --title "Relink Logs $env:VERSION" --notes-file notes.md @extra
 
-  # After a stable release, fold main (now carrying the stripped version and
-  # any release-only commits) back into dev so the next dev→main merge cannot
-  # conflict. `-X ours` keeps dev's side of any overlapping hunk — the only
-  # overlap main can introduce is the version lines, and dev's newer RC version
-  # is the correct survivor. The push triggers a dev run that the version job's
-  # chore(release): guard immediately skips.
-  backmerge:
+  # After a stable release, move main to the released commit. This is a plain
+  # fast-forward push: the released commit is on dev, and main is always an
+  # ancestor of dev because this job is the ONLY thing that moves main. If the
+  # push is rejected as non-fast-forward, someone pushed to main directly —
+  # reconcile by hand (get those changes onto dev via a PR), never force-push.
+  promote:
     needs: [version, release]
     if: needs.version.outputs.prerelease == 'false'
     runs-on: ubuntu-latest
@@ -395,7 +389,7 @@ jobs:
         with:
           ref: dev
           fetch-depth: 0
-      - name: Merge main back into dev
+      - name: Fast-forward main to the released commit
         shell: bash
         env:
           RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
@@ -404,7 +398,4 @@ jobs:
           printf '%s\n' "$RELEASE_DEPLOY_KEY" > "$HOME/.ssh/release_bot"
           chmod 600 "$HOME/.ssh/release_bot"
           export GIT_SSH_COMMAND="ssh -i $HOME/.ssh/release_bot -o StrictHostKeyChecking=accept-new"
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git merge origin/main -X ours -m "chore(release): merge main back into dev after ${{ needs.version.outputs.version }}"
-          git push "git@github.com:$GITHUB_REPOSITORY.git" dev
+          git push "git@github.com:$GITHUB_REPOSITORY.git" "${{ needs.version.outputs.sha }}:refs/heads/main"
