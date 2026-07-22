@@ -1,4 +1,4 @@
-//! TEMPORARY diagnostic (not for commit): validate per-skill stun-message
+//! Diagnostic: validate per-skill stun-message
 //! attribution against stored logs.
 //!
 //! Two oracles, both per skill row after a fresh reparse:

@@ -1,4 +1,4 @@
-//! TEMPORARY diagnostic (not for commit): dump every Perfect Guard / stun
+//! Diagnostic: dump every Perfect Guard / stun
 //! message in a stored log with its RELATIVE timestamp, so we can tell whether a
 //! player's N perfect-guard rows are N genuinely-separate guards (spread across
 //! the fight) or ONE guard whose stun got split into N counter events (a tight
