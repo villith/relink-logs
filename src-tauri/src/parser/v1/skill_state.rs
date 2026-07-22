@@ -52,12 +52,15 @@ pub struct SkillState {
     /// Number of DELTA-path hits that actually applied stun (amount > 0) — the
     /// solo per-hit count. A stun-capable hit that dealt 0 stun (target
     /// stunned/immune) is excluded; supplementary/DoT hits carry no stun so they
-    /// never count.
-    #[serde(default)]
+    /// never count. Internal accumulator: only `stun_eligible_hits` (their max) is
+    /// exposed, so this is skipped from the payload/stored blob rather than
+    /// mirrored in `types.ts`.
+    #[serde(skip)]
     pub stun_delta_hits: u32,
     /// Number of attributed network stun messages with a positive amount — the
-    /// online count (per-hit deltas are 0 there).
-    #[serde(default)]
+    /// online count (per-hit deltas are 0 there). Internal accumulator, skipped
+    /// like [`Self::stun_delta_hits`].
+    #[serde(skip)]
     pub stun_message_hits: u32,
     /// Hits that actually applied stun: `max(stun_delta_hits, stun_message_hits)`.
     /// Mirrors `total_stun_value`'s max over the two paths, so solo-loopback

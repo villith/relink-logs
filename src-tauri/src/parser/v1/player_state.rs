@@ -93,16 +93,54 @@ impl PlayerState {
         self.refresh_total_stun();
 
         if let Some((action, child_character_type)) = self.last_stun_attribution {
-            self.attributed_row_mut(action, child_character_type)
+            self.breakdown_row_mut(action, child_character_type)
                 .add_stun_message(amount);
         }
     }
 
-    /// The find-or-create breakdown row for a stun-message attribution, keyed
-    /// exactly like the damage path (action AND child character type). The row
-    /// virtually always exists already — attribution only ever points at the
-    /// key of a damage event this player has processed.
-    fn attributed_row_mut(
+    /// Folds one delta-path stun accrual that has no damage event of its own
+    /// (Perfect Guard counters, non-guard stun procs) into this player: the
+    /// delta-path total plus a zero-damage breakdown `action` row that counts the
+    /// occurrences as hits and carries only their stun.
+    fn add_synthesized_delta_stun(&mut self, action: ActionType, amount: f64) {
+        self.stun_delta_sum += amount;
+        self.refresh_total_stun();
+
+        let row = self.breakdown_row_mut(action, self.character_type);
+        row.hits += 1;
+        row.add_stun_delta(amount);
+    }
+
+    /// Folds one Perfect Guard counter-stun into this player (see
+    /// [`Self::add_synthesized_delta_stun`]).
+    pub fn add_perfect_guard_stun(&mut self, amount: f64) {
+        self.add_synthesized_delta_stun(ActionType::PerfectGuard, amount);
+    }
+
+    /// Folds one non-guard stun-application proc into this player. Live-confirmed
+    /// 07-21 as Eugen's sticky grenade — real stun, but NOT a guard, so it gets
+    /// its own [`ActionType::StunEffect`] row rather than inflating Perfect Guard.
+    /// Index 0 is the only stun-effect proc we can attribute today; the index is
+    /// reserved for a future discriminator (see `ActionType::StunEffect`).
+    pub fn add_stun_effect(&mut self, amount: f64) {
+        self.add_synthesized_delta_stun(ActionType::StunEffect(0), amount);
+    }
+
+    /// Counts one guarded Quickening (The World) as a hits-only breakdown row:
+    /// no stun (the marker carries none) and no damage (the scripted counter
+    /// damage is intentionally untracked).
+    pub fn add_perfect_guard_quickening(&mut self) {
+        self.breakdown_row_mut(ActionType::PerfectGuardQuickening, self.character_type)
+            .hits += 1;
+    }
+
+    /// The find-or-create breakdown row for an `(action, child character type)`
+    /// key — the same key [`Self::update_from_damage_event`] uses. Parser-
+    /// synthesized rows (guards, stun-effect procs, which have no damage event)
+    /// pass the player's own character type; online stun-message attribution
+    /// passes the key of the damage event it points at, which virtually always
+    /// already exists.
+    fn breakdown_row_mut(
         &mut self,
         action: ActionType,
         child_character_type: CharacterType,
@@ -114,61 +152,6 @@ impl PlayerState {
         }
         self.skill_breakdown
             .push(SkillState::new(action, child_character_type));
-        self.skill_breakdown
-            .last_mut()
-            .expect("row pushed just above")
-    }
-
-    /// Folds one Perfect Guard counter-stun into this player: delta-path totals
-    /// (it has no damage event of its own) plus a zero-damage breakdown row that
-    /// counts guards as hits and carries only stun.
-    pub fn add_perfect_guard_stun(&mut self, amount: f64) {
-        self.stun_delta_sum += amount;
-        self.refresh_total_stun();
-
-        let row = self.breakdown_row_mut(ActionType::PerfectGuard);
-        row.hits += 1;
-        row.add_stun_delta(amount);
-    }
-
-    /// Folds one non-guard stun-application proc into this player: delta-path
-    /// total (it has no damage event of its own) plus a zero-damage breakdown row
-    /// that counts the procs as hits and carries only their stun. Live-confirmed
-    /// 07-21 as Eugen's sticky grenade — real stun, but NOT a guard, so it gets
-    /// its own [`ActionType::StunEffect`] row rather than inflating Perfect Guard.
-    pub fn add_stun_effect(&mut self, amount: f64) {
-        self.stun_delta_sum += amount;
-        self.refresh_total_stun();
-
-        // Index 0: the only stun-effect proc we can attribute today. The index is
-        // reserved for a future discriminator (see `ActionType::StunEffect`).
-        let row = self.breakdown_row_mut(ActionType::StunEffect(0));
-        row.hits += 1;
-        row.add_stun_delta(amount);
-    }
-
-    /// Counts one guarded Quickening (The World) as a hits-only breakdown row:
-    /// no stun (the marker carries none) and no damage (the scripted counter
-    /// damage is intentionally untracked).
-    pub fn add_perfect_guard_quickening(&mut self) {
-        self.breakdown_row_mut(ActionType::PerfectGuardQuickening).hits += 1;
-    }
-
-    /// The find-or-create breakdown row for a parser-SYNTHESIZED action (guard
-    /// rows have no damage event, so a fresh row starts zeroed and is keyed by
-    /// action type alone — damage-event rows go through
-    /// [`Self::update_from_damage_event`], which also matches the child
-    /// character type).
-    fn breakdown_row_mut(&mut self, action_type: ActionType) -> &mut SkillState {
-        if let Some(index) = self
-            .skill_breakdown
-            .iter()
-            .position(|skill| skill.action_type == action_type)
-        {
-            return &mut self.skill_breakdown[index];
-        }
-        self.skill_breakdown
-            .push(SkillState::new(action_type, self.character_type));
         self.skill_breakdown
             .last_mut()
             .expect("row pushed just above")
