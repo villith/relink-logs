@@ -724,6 +724,18 @@ impl DerivedEncounterState {
         actor_index: u32,
         amount: f64,
     ) {
+        // A guard the LOCAL player made always registers its stun in-call, so 0
+        // here means the guard applied none — the redundant counter events the
+        // game fires alongside the real one (live capture 07-22: bursts of 30-40
+        // within 150ms, no stun anywhere in the burst). Remote players are the
+        // opposite case: their stun is host-authoritative and structurally
+        // unobservable from this process (821 of 821 captured remote guards read
+        // 0), so 0 carries no information there and the guard still counts. An
+        // unidentified slot stays countable — unknown is not local.
+        if amount <= 0.0 && is_remote_slot(player_data, actor_index) == Some(false) {
+            return;
+        }
+
         self.stun_delta_sum += amount;
         self.refresh_total_stun();
         let duration_secs = (self.duration()) as f64 / 1000.0;
@@ -844,6 +856,18 @@ fn character_type_for_slot_key(
     player_data[protocol::party_slot_of(slot_key)?]
         .as_ref()
         .map(|player| player.character_type)
+}
+
+/// Whether the slot's player belongs to a REMOTE client, or `None` while the
+/// slot has no identity yet (locality unknown — callers must not assume local).
+///
+/// This decides whether a measurement of 0 means "nothing happened" or "not
+/// observable here": the hook reads the enemy's stun accumulator across the
+/// guarded call in THIS process, which only sees stun the local client applies.
+fn is_remote_slot(player_data: &[Option<PlayerData>; 4], slot_key: u32) -> Option<bool> {
+    player_data[protocol::party_slot_of(slot_key)?]
+        .as_ref()
+        .map(|player| player.is_online)
 }
 
 /// Cap on charted HP pools: beyond this many lines the chart is unreadable, so
@@ -2610,6 +2634,59 @@ mod tests {
         assert_eq!(row.hits, 1);
         // The wire carries stun as f32, so compare at f32 precision.
         assert!((player.total_stun_value - 250.4).abs() < 1e-3);
+    }
+
+    /// A guard that applied NO stun is noise when the LOCAL player made it: the
+    /// hook measures the enemy's stun accumulator across the guarded call, which
+    /// the local client applies in-call, so a real local guard always registers
+    /// (every one of the 133 stun-carrying guards in the stored corpus is local).
+    /// Live capture 07-22: local 0-stun guards arrive in bursts of 30-40 inside
+    /// 150ms with no stun anywhere in the burst.
+    #[test]
+    fn zero_stun_perfect_guards_are_dropped_for_the_local_player() {
+        let mut parser = Parser::default();
+        parser.on_player_identity_event(identity_event("Bob", 0x91418145, 0, 4_217_578_216, false));
+
+        parser.on_perfect_guard_stun(OnPlayerStunEvent {
+            actor_index: 0xF000_0000,
+            stun_amount: 0.0,
+        });
+
+        let guards = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .into_iter()
+            .flat_map(|player| player.skill_breakdown.iter())
+            .find(|skill| skill.action_type == ActionType::PerfectGuard);
+        assert!(guards.is_none(), "a stunless local guard must not be shown");
+    }
+
+    /// ...but a REMOTE player's guard legitimately reports 0: their stun is
+    /// host-authoritative and lands asynchronously, so the local process's
+    /// in-call delta is structurally 0 (821 of 821 remote guards in the stored
+    /// corpus carried no stun). Dropping those would erase remote guard tracking
+    /// entirely, so they still count as hits.
+    #[test]
+    fn zero_stun_perfect_guards_are_kept_for_remote_players() {
+        let mut parser = Parser::default();
+        parser.on_player_identity_event(identity_event("Ally", 0x91418145, 1, 4_217_578_217, true));
+
+        parser.on_perfect_guard_stun(OnPlayerStunEvent {
+            actor_index: 0xF000_0001,
+            stun_amount: 0.0,
+        });
+
+        let row = parser
+            .derived_state
+            .party
+            .get(&0xF000_0001)
+            .expect("party row")
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::PerfectGuard)
+            .expect("remote guards stay countable even without measurable stun");
+        assert_eq!(row.hits, 1);
     }
 
     /// Target HP tracking: each hit carries the target's post-hit current/max HP
