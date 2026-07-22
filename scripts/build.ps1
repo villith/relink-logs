@@ -83,33 +83,11 @@ Write-Host "    $Dest"
 if ($Dev) {
     Invoke-Step "npm run tauri dev" { npm run tauri dev }
 } else {
-    # We do NOT use Invoke-Step here: `tauri build` exits non-zero when the updater
-    # signing step can't find TAURI_PRIVATE_KEY, even though the exe and MSI were
-    # produced successfully. We judge success by the presence of the built exe instead.
-    Write-Host ""
-    Write-Host "==> npm run tauri build" -ForegroundColor Cyan
-    npm run tauri build
-    $tauriExit = $LASTEXITCODE
-
-    $Exe = Join-Path $RepoRoot 'target/release/GBFR Logs.exe'
-    if (-not (Test-Path $Exe)) {
-        throw "tauri build failed: '$Exe' was not produced (exit code $tauriExit)."
-    }
-
-    if ($tauriExit -ne 0) {
-        Write-Host ""
-        Write-Host "Note: tauri exited $tauriExit, but the app binary was produced." -ForegroundColor DarkYellow
-        Write-Host "      This is the updater-signing step failing on a missing TAURI_PRIVATE_KEY" -ForegroundColor DarkYellow
-        Write-Host "      (a release-signing concern) and does not affect the local build." -ForegroundColor DarkYellow
-    }
+    Invoke-Step "npm run tauri build" { npm run tauri build }
 
     Write-Host ""
     Write-Host "Build complete." -ForegroundColor Green
     Write-Host "Artifacts:" -ForegroundColor Green
     Write-Host "  target/release/GBFR Logs.exe"
     Write-Host "  target/release/bundle/msi/GBFR Logs_<version>_x64_en-US.msi"
-
-    # Build succeeded (exe verified above); force a clean exit code so the trailing
-    # non-zero $LASTEXITCODE from the benign updater-signing step doesn't propagate.
-    exit 0
 }
