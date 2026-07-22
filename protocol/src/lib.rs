@@ -5,8 +5,9 @@ injected into the game process and consumed by the Relink Logs parser.
 Keep in mind that the serialization protocol is not defined here, only the
 serializable message types.
 
-The protocol between the hook and the parser is a simple named pipe, where the
-messages are encoded as "bincode" serialized bytes. This means that the hook and
+The protocol between the hook and the parser is a byte stream — a named pipe on native Windows,
+localhost TCP when the hook detects it is running under Wine/Proton (see TCP_ADDR) — carrying
+"bincode"-serialized messages. This means that the hook and
 the parser must be compiled together to ensure that the serialization format is
 the same.
 
@@ -30,6 +31,12 @@ pub use bincode;
 use serde::{Deserialize, Serialize};
 
 pub const PIPE_NAME: &str = r"\\.\pipe\gbfr-logs";
+
+/// Localhost TCP endpoint used instead of the named pipe when the hook runs
+/// under Wine/Proton — a native Linux app cannot open Wine named pipes. Same
+/// length-delimited framing and bincode payload as the pipe.
+pub const TCP_PORT: u16 = 39371;
+pub const TCP_ADDR: &str = "127.0.0.1:39371";
 
 /// Base of the synthetic per-PLAYER actor index. The game's own actor index and
 /// player key are CHARACTER-scoped — two players on the same character share
@@ -550,4 +557,12 @@ pub enum Message {
     /// `stun_amount` is the measured accumulator delta. Appended last per the
     /// append-only rule.
     OnStunEffect(OnPlayerStunEvent),
+}
+
+#[cfg(test)]
+mod transport_constants {
+    #[test]
+    fn tcp_addr_and_port_agree() {
+        assert_eq!(super::TCP_ADDR, format!("127.0.0.1:{}", super::TCP_PORT));
+    }
 }

@@ -1,5 +1,6 @@
 ﻿import NewChip, { NEW_CHIP_COLOR } from "@/components/NewChip";
 import { isNew, NewFeatureId } from "@/newFeatures";
+import { useIsLinux } from "@/platform";
 import { Box, Divider, Flex, Indicator, NavLink } from "@mantine/core";
 import { useLocalStorage } from "@mantine/hooks";
 import { CaretDoubleLeft, CaretDoubleRight, Flask, Sparkle } from "@phosphor-icons/react";
@@ -10,12 +11,20 @@ import { useTranslation } from "react-i18next";
 import { Link, Outlet, useLocation } from "react-router-dom";
 
 /** The tools in the side menu. `newId` (optional) keys into NEW_FEATURES. */
-const TOOLS: { to: string; labelKey: string; labelFallback: string; icon: Icon; newId?: NewFeatureId }[] = [
+const TOOLS: {
+  to: string;
+  labelKey: string;
+  labelFallback: string;
+  icon: Icon;
+  newId?: NewFeatureId;
+  windowsOnly?: boolean;
+}[] = [
   {
     to: "/logs/toolbox/synthesis",
     labelKey: "ui.toolbox.synthesis-helper",
     labelFallback: "Synthesis Helper",
     icon: Flask,
+    windowsOnly: true,
   },
   {
     to: "/logs/toolbox/overmastery",
@@ -23,8 +32,14 @@ const TOOLS: { to: string; labelKey: string; labelFallback: string; icon: Icon; 
     labelFallback: "Overmastery Predictor",
     icon: Sparkle,
     newId: "overmastery-predictor",
+    windowsOnly: true,
   },
 ];
+
+/** Tools visible on this platform: windows-only tools read game memory from
+ * outside the process, which the Linux build does not support. */
+export const visibleTools = <T extends { windowsOnly?: boolean }>(tools: T[], isLinux: boolean): T[] =>
+  tools.filter((tool) => !(isLinux && tool.windowsOnly));
 
 /** Toolbox: collapsible tool menu on the left (icon-only when collapsed,
  * with a chip-colored dot standing in for a visible "New" chip), the
@@ -33,6 +48,8 @@ const ToolboxPage = () => {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useLocalStorage({ key: "toolbox-menu-collapsed", defaultValue: false });
+  const isLinux = useIsLinux();
+  const tools = visibleTools(TOOLS, isLinux);
 
   // Hard-fixed row height: the label's line box (~40.8px row) vs icon-only
   // (40px row) would otherwise shift everything a fraction on collapse.
@@ -45,7 +62,7 @@ const ToolboxPage = () => {
   return (
     <Flex gap="md" align="flex-start">
       <Box w={collapsed ? 56 : 300} style={{ flexShrink: 0 }}>
-        {TOOLS.map(({ to, labelKey, labelFallback, icon: ToolIcon, newId }) => {
+        {tools.map(({ to, labelKey, labelFallback, icon: ToolIcon, newId }) => {
           const label = t(labelKey, labelFallback);
           return (
             <NavLink

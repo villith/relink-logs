@@ -1,5 +1,6 @@
 import { ColumnEditor } from "@/components/ColumnEditor";
 import { useColumnControls } from "@/components/useColumnControls";
+import { useIsLinux } from "@/platform";
 import { type ChecklistGroup } from "@/stores/useChecklistStore";
 import { useLogIndexStore } from "@/stores/useLogIndexStore";
 import { useManualUpdateCheck } from "@/useUpdateCheck";
@@ -25,6 +26,7 @@ import { modals } from "@mantine/modals";
 import { invoke } from "@tauri-apps/api";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { LinuxSetupSection } from "./settings/LinuxSetupSection";
 import useChecklistSettings from "./useChecklistSettings";
 import useSettings from "./useSettings";
 
@@ -86,6 +88,7 @@ const SettingsPage = () => {
   const { t, i18n } = useTranslation();
   const [debugMode, setDebugMode] = useState(false);
   const [fullAssistUnlock, setFullAssistUnlock] = useState(false);
+  const isLinux = useIsLinux();
 
   const {
     color_1,
@@ -293,6 +296,7 @@ const SettingsPage = () => {
           </Button>
         </Box>
       </Fieldset>
+      {isLinux && <LinuxSetupSection />}
       {import.meta.env.DEV && (
         <Fieldset legend={t("ui.dev-settings")} mt="md">
           <Tooltip label={t("ui.full-assist-unlock-description")}>

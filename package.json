@@ -4,7 +4,7 @@
   "version": "1.12.0-4",
   "type": "module",
   "scripts": {
-    "dev": "cargo build --release --package hook --features hook/console,hook/hookdiag,hook/dmgdiag,hook/fullassist && node scripts/refresh-dbg-hook.mjs && vite",
+    "dev": "node scripts/build-hook-dev.mjs && vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint ./src",

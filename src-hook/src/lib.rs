@@ -3,22 +3,27 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use futures::sink::SinkExt;
-use interprocess::os::windows::named_pipe::tokio::{PipeListenerOptionsExt, SendPipeStream};
-use interprocess::os::windows::named_pipe::{pipe_mode, PipeListenerOptions, PipeMode};
+use interprocess::os::windows::named_pipe::tokio::PipeListenerOptionsExt;
+use interprocess::os::windows::named_pipe::{PipeListenerOptions, PipeMode};
 use log::{info, warn};
 use tokio::sync::broadcast;
 
 mod event;
 mod hooks;
 mod process;
+mod proxy;
+mod transport;
 
 use protocol::Message;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
 
-async fn handle_client(
-    mut stream: FramedWrite<SendPipeStream<pipe_mode::Bytes>, LengthDelimitedCodec>,
+async fn handle_client<S>(
+    mut stream: FramedWrite<S, LengthDelimitedCodec>,
     mut rx: event::Rx,
-) -> Result<()> {
+) -> Result<()>
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
     while let Ok(msg) = rx.recv().await {
         let bytes = protocol::bincode::serialize(&msg)?;
         stream.send(bytes.into()).await?;
@@ -39,6 +44,13 @@ impl Server {
     }
 
     async fn run(&self) {
+        match transport::select_transport() {
+            transport::Transport::NamedPipe => self.run_pipe().await,
+            transport::Transport::Tcp => self.run_tcp().await,
+        }
+    }
+
+    async fn run_pipe(&self) {
         if let Ok(listener) = PipeListenerOptions::new()
             .path(protocol::PIPE_NAME)
             .mode(PipeMode::Bytes)
@@ -64,11 +76,44 @@ impl Server {
             }
         }
     }
+
+    // Under Wine/Proton: a native Linux app connects to this directly (Wine
+    // sockets are real Linux sockets). Bind failures (port taken) retry
+    // rather than killing event delivery for the whole session.
+    async fn run_tcp(&self) {
+        let listener = loop {
+            match tokio::net::TcpListener::bind(protocol::TCP_ADDR).await {
+                Ok(listener) => break listener,
+                Err(e) => {
+                    warn!("Could not bind {}: {e:?}; retrying in 5s", protocol::TCP_ADDR);
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                }
+            }
+        };
+        info!("Listening on {}", protocol::TCP_ADDR);
+        loop {
+            match listener.accept().await {
+                Ok((stream, _addr)) => {
+                    let rx = self.tx.subscribe();
+                    tokio::spawn(async move {
+                        let writer = FramedWrite::new(stream, LengthDelimitedCodec::new());
+                        let _ = handle_client(writer, rx).await;
+                    });
+                }
+                Err(e) => {
+                    warn!("Error accepting client: {:?}", e);
+                    // A persistent accept error (fd exhaustion, Wine socket
+                    // quirks) must not busy-spin inside the game process.
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+                }
+            }
+        }
+    }
 }
 
 #[tokio::main]
 async fn setup() {
-    info!("Setting up named pipe listener");
+    info!("Setting up event listener");
 
     let server = Server::new();
     let tx = server.tx.clone();

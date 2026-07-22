@@ -233,7 +233,24 @@
       "om-below-level": "Matching, but below minimum level"
     },
     "weapon-awakening": "Awakening",
-    "wrightstone": "Wrightstone"
+    "wrightstone": "Wrightstone",
+    "linux-setup": {
+      "title": "Linux setup",
+      "game-found": "Game found: {{dir}}",
+      "game-not-found": "Steam install of the game not found",
+      "proxy-current": "Hook is installed in the game folder",
+      "proxy-missing": "Hook is not installed in the game folder",
+      "proxy-outdated": "Installed hook is from an older version",
+      "proxy-foreign": "Another tool's dinput8.dll is in the game folder — remove it first",
+      "prefix-found": "Proton prefix found",
+      "prefix-missing": "Proton prefix not found — launch the game once via Steam",
+      "launch-options-hint": "One-time step: paste this into Steam → Granblue Fantasy: Relink → Properties → Launch Options:",
+      "copy": "Copy",
+      "copied": "Copied",
+      "deploy-btn": "Install hook",
+      "remove-btn": "Remove hook",
+      "refresh-btn": "Refresh"
+    }
   },
   "characters": {
     "Pl0000": "Gran",

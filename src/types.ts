@@ -623,3 +623,12 @@ export type OvermasteryPrediction = {
   unpredictable: boolean;
   mspCost: number;
 };
+
+/** Mirror of LinuxSetupStatus in src-tauri/src/main.rs. */
+export type LinuxSetupStatus = {
+  steamFound: boolean;
+  gameDir: string | null;
+  prefixFound: boolean;
+  proxyStatus: "missing" | "current" | "outdated" | "foreign";
+  launchOptions: string;
+};

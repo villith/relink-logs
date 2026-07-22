@@ -25,6 +25,38 @@ On top of the original gbfr-logs feature set, this project adds:
 - Download the latest .msi installer and run it.
 - Open Relink Logs after the game is already running.
 
+## Linux (Proton)
+
+Relink Logs runs natively on Linux and meters the Windows game running under
+Steam's Proton. Steam Deck gaming mode is **not** supported (an external
+overlay cannot draw over gamescope).
+
+1. Install the AppImage (auto-updates) or the .deb from the releases page.
+2. Launch Relink Logs, open **Settings → Linux setup**, and click
+   **Install hook** if it isn't already green.
+3. One-time: in Steam → Granblue Fantasy: Relink → Properties → Launch
+   Options, paste:
+   `WINEDLLOVERRIDES="dinput8=n,b" %command%`
+4. Launch the game. The meter connects automatically.
+
+Notes:
+
+- The overlay uses X11 (via XWayland on Wayland desktops). Always-on-top and
+  clickthrough behavior can vary by compositor; X11 sessions are the most
+  reliable.
+- The Synthesis Helper and Overmastery Predictor toolbox tools are
+  Windows-only for now.
+- The hook file installed into the game folder is the same Authenticode-signed
+  `hook.dll` Windows uses, renamed to `dinput8.dll`. **Remove hook** in
+  Settings deletes it again.
+- On Linux the hook and app talk over localhost TCP instead of a named pipe;
+  unlike the pipe's ACLs, localhost has no peer authentication, so another
+  local process could in principle feed the meter fake events — worst case is
+  garbage in a log.
+- Ubuntu 24.04 ships only webkit2gtk-4.1, which the current build does not
+  target — a known limitation; Ubuntu 22.04 (and distros still shipping
+  webkit2gtk-4.0) are what the AppImage and .deb are built against.
+
 ## Found a translation problem or a bug?
 
 You don't need any coding knowledge to help — just a GitHub account:
