@@ -5,6 +5,29 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.0
+
+### Features
+
+- Releases are now code-signed via Microsoft Authenticode: Windows shows a verified publisher when installing, and antivirus false positives should decrease over time
+- Perfect Guard stun values now appear in meters
+- Perfect Guard (Quickening) against The World will appear as an entry in meters now
+- Added a stun column for individual skills
+- Added support to select/deselect columns when viewing saved logs
+- Stun values that are not Perfect Guard (e.g. Eugen's sticky grenade) now show as their own row instead. If there is no label available they will appear as "Stun Effect". If you know the label, please submit it!
+
+### Bug Fixes
+
+- Online: other players' weapon awakening, wrightstone, and level data no longer shows stale or missing values
+- Online: two players playing the same character no longer show each other's equipment
+- Damage from system-generated actions (e.g. Conflux buff procs) is attributed correctly in the skill breakdown
+
+### Language
+
+- Beatrix and Fraux skills are now grouped by stance
+- Large language updates for all languages. Most skills/sigils/traits/etc. should be labelled now.
+
+
 ## 1.11.1
 
 ### Bug Fixes
