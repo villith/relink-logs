@@ -1,4 +1,4 @@
-import { MeterColumns } from "@/types";
+import { DEFAULT_SKILL_COLUMNS, MeterColumns, SkillColumns } from "@/types";
 import { Mutate, StoreApi, create } from "zustand";
 import { persist } from "zustand/middleware";
 
@@ -18,6 +18,8 @@ interface MeterSettings {
    * check stays quiet about exactly this version (manual checks still ask). */
   skipped_update_version: string | null;
   overlay_columns: MeterColumns[];
+  /** Customizable skill-breakdown value columns for the live overlay. */
+  overlay_skill_columns: SkillColumns[];
 }
 
 interface MeterStateFunctions {
@@ -45,6 +47,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
     MeterColumns.SupPercentage,
     MeterColumns.DamagePercentage,
   ],
+  overlay_skill_columns: [...DEFAULT_SKILL_COLUMNS],
 };
 
 export type StoreWithPersist<T> = Mutate<StoreApi<T>, [["zustand/persist", T]]>;

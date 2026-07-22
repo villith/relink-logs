@@ -1,4 +1,4 @@
-import { CharacterType, ComputedSkillGroup } from "@/types";
+import { CharacterType, ComputedSkillGroup, SkillColumns } from "@/types";
 import { computeOvercapPercentage, getSkillName, mergeTargetBreakdowns } from "@/utils";
 import { CaretDown, CaretUp } from "@phosphor-icons/react";
 import { useMemo } from "react";
@@ -12,11 +12,13 @@ export type SkillRowProps = {
   characterType: CharacterType;
   group: ComputedSkillGroup;
   color: string;
+  /** The value columns to render, in order (after the Skill name column). */
+  columns: SkillColumns[];
   /** Live overlay rows skip the per-enemy tooltip (quest view only). */
   live?: boolean;
 };
 
-export const SkillGroupRow = ({ characterType, group, color, live }: SkillRowProps) => {
+export const SkillGroupRow = ({ characterType, group, color, columns, live }: SkillRowProps) => {
   const {
     showFullValues,
     totalDamage,
@@ -39,21 +41,17 @@ export const SkillGroupRow = ({ characterType, group, color, live }: SkillRowPro
     [live, group.skills]
   );
 
-  return (
-    <>
-      <SkillTargetTooltip
-        label={getSkillName(group.childCharacterType, group)}
-        targets={targetBreakdown}
-        showFullValues={showFullValues}
-        color={color}
-      >
-        <tr className="skill-row group" onClick={() => setExpanded(!expanded)}>
-          <td className="text-left row-data">
-            <span>{getSkillName(group.childCharacterType, group)}</span>
-            <span className="p4">{expanded ? <CaretUp size={12} /> : <CaretDown size={12} />}</span>
+  const renderCell = (column: SkillColumns) => {
+    switch (column) {
+      case SkillColumns.Hits:
+        return (
+          <td key={column} className="text-center row-data">
+            {group.hits}
           </td>
-          <td className="text-center row-data">{group.hits}</td>
-          <td className="text-center row-data">
+        );
+      case SkillColumns.TotalDamage:
+        return (
+          <td key={column} className="text-center row-data">
             {showFullValues ? (
               group.totalDamage.toLocaleString()
             ) : (
@@ -63,7 +61,10 @@ export const SkillGroupRow = ({ characterType, group, color, live }: SkillRowPro
               </>
             )}
           </td>
-          <td className="text-center row-data">
+        );
+      case SkillColumns.MinDamage:
+        return (
+          <td key={column} className="text-center row-data">
             {showFullValues ? (
               group.minDamage ? (
                 group.minDamage.toLocaleString()
@@ -77,7 +78,10 @@ export const SkillGroupRow = ({ characterType, group, color, live }: SkillRowPro
               </>
             )}
           </td>
-          <td className="text-center row-data">
+        );
+      case SkillColumns.MaxDamage:
+        return (
+          <td key={column} className="text-center row-data">
             {showFullValues ? (
               group.maxDamage ? (
                 group.maxDamage.toLocaleString()
@@ -91,7 +95,10 @@ export const SkillGroupRow = ({ characterType, group, color, live }: SkillRowPro
               </>
             )}
           </td>
-          <td className="text-center row-data">
+        );
+      case SkillColumns.AverageDamage:
+        return (
+          <td key={column} className="text-center row-data">
             {showFullValues ? (
               rawAverageDmg.toLocaleString()
             ) : (
@@ -101,12 +108,35 @@ export const SkillGroupRow = ({ characterType, group, color, live }: SkillRowPro
               </>
             )}
           </td>
-          <StunCell value={group.totalStunValue ?? 0} showFullValues={showFullValues} />
-          <OvercapCell percentage={overcapPercentage} />
-          <td className="text-center row-data">
+        );
+      case SkillColumns.TotalStunValue:
+        return <StunCell key={column} value={group.totalStunValue ?? 0} showFullValues={showFullValues} />;
+      case SkillColumns.Overcap:
+        return <OvercapCell key={column} percentage={overcapPercentage} />;
+      case SkillColumns.DamagePercentage:
+        return (
+          <td key={column} className="text-center row-data">
             {group.percentage.toFixed(0)}
             <span className="unit font-sm">%</span>
           </td>
+        );
+    }
+  };
+
+  return (
+    <>
+      <SkillTargetTooltip
+        label={getSkillName(group.childCharacterType, group)}
+        targets={targetBreakdown}
+        showFullValues={showFullValues}
+        color={color}
+      >
+        <tr className="skill-row group" onClick={() => setExpanded(!expanded)}>
+          <td className="text-left row-data">
+            <span>{getSkillName(group.childCharacterType, group)}</span>
+            <span className="p4">{expanded ? <CaretUp size={12} /> : <CaretDown size={12} />}</span>
+          </td>
+          {columns.map(renderCell)}
           <div className="damage-bar" style={{ backgroundColor: color, width: `${group.percentage}%` }} />
         </tr>
       </SkillTargetTooltip>
@@ -117,6 +147,7 @@ export const SkillGroupRow = ({ characterType, group, color, live }: SkillRowPro
             characterType={characterType}
             skill={skill}
             color={color}
+            columns={columns}
             nested
             live={live}
           />

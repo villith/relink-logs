@@ -106,6 +106,11 @@ const SettingsPage = () => {
     availableOverlayColumns,
     addOverlayColumn,
     removeOverlayColumn,
+    overlay_skill_columns,
+    handleReorderSkillColumns,
+    availableSkillColumns,
+    addSkillColumn,
+    removeSkillColumn,
     open_log_on_save,
     auto_check_updates,
   } = useSettings();
@@ -288,6 +293,58 @@ const SettingsPage = () => {
                               variant="transparent"
                               color="gray"
                               onClick={() => removeOverlayColumn(item)}
+                            >
+                              x
+                            </ActionIcon>
+                          </Flex>
+                        </Box>
+                      )}
+                    </Draggable>
+                  ))}
+                  {droppableProvided.placeholder}
+                </Stack>
+              )}
+            </Droppable>
+          </DragDropContext>
+          <Divider />
+          <Text size="sm">Customize Skill Columns</Text>
+          <Menu shadow="md" trigger="hover" openDelay={100} closeDelay={400}>
+            <Menu.Target>
+              <Button>Add column</Button>
+            </Menu.Target>
+            <Menu.Dropdown>
+              {availableSkillColumns.map((item) => (
+                <Menu.Item key={item} onClick={() => addSkillColumn(item)}>
+                  {t(`ui.skill-columns.${item}`)} - {t(`ui.skill-columns.${item}-description`)}
+                </Menu.Item>
+              ))}
+            </Menu.Dropdown>
+          </Menu>
+          <DragDropContext onDragEnd={handleReorderSkillColumns}>
+            <Droppable droppableId="skill-columns">
+              {(droppableProvided) => (
+                <Stack ref={droppableProvided.innerRef}>
+                  {overlay_skill_columns.map((item, index) => (
+                    <Draggable key={item} draggableId={item} index={index}>
+                      {(draggableProvided) => (
+                        <Box
+                          bg="var(--mantine-color-dark-8)"
+                          display="flex"
+                          p={10}
+                          ref={draggableProvided.innerRef}
+                          {...draggableProvided.draggableProps}
+                          {...draggableProvided.dragHandleProps}
+                        >
+                          <Flex align="center" flex={1}>
+                            <DotsSixVertical size={16} style={{ cursor: "grab", marginRight: "0.5em" }} />
+                            {t(`ui.skill-columns.${item}`)} - {t(`ui.skill-columns.${item}-description`)}
+                          </Flex>
+                          <Flex align="center">
+                            <ActionIcon
+                              aria-label="Remove column"
+                              variant="transparent"
+                              color="gray"
+                              onClick={() => removeSkillColumn(item)}
                             >
                               x
                             </ActionIcon>

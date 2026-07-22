@@ -367,6 +367,35 @@ export enum MeterColumns {
   StunPerSecond = "stun-per-second",
 }
 
+/**
+ * Customizable value columns in the skill breakdown (live overlay only; the
+ * logs detail view always shows the full set). The Skill name column is always
+ * shown and is not part of this list. Enum member order is irrelevant — the
+ * display order is whatever the user's column list holds.
+ */
+export enum SkillColumns {
+  Hits = "hits",
+  TotalDamage = "total",
+  MinDamage = "min",
+  MaxDamage = "max",
+  AverageDamage = "average",
+  TotalStunValue = "stun",
+  Overcap = "overcap",
+  DamagePercentage = "percentage",
+}
+
+/** Default skill-column set and order — matches the pre-customization layout. */
+export const DEFAULT_SKILL_COLUMNS: SkillColumns[] = [
+  SkillColumns.Hits,
+  SkillColumns.TotalDamage,
+  SkillColumns.MinDamage,
+  SkillColumns.MaxDamage,
+  SkillColumns.AverageDamage,
+  SkillColumns.TotalStunValue,
+  SkillColumns.Overcap,
+  SkillColumns.DamagePercentage,
+];
+
 export type SortType = MeterColumns;
 
 export type LogSortType = "time" | "duration" | "quest-elapsed-time";

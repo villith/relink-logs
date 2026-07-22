@@ -117,6 +117,24 @@
       "stun-per-second": "SPS",
       "stun-per-second-description": "Stun Per Second"
     },
+    "skill-columns": {
+      "hits": "Hits",
+      "hits-description": "Number of Hits",
+      "total": "Total",
+      "total-description": "Total Damage",
+      "min": "Min",
+      "min-description": "Minimum Hit Damage",
+      "max": "Max",
+      "max-description": "Maximum Hit Damage",
+      "average": "Avg",
+      "average-description": "Average Hit Damage",
+      "stun": "Stun",
+      "stun-description": "Total Stun Value",
+      "overcap": "Overcap",
+      "overcap-description": "Overcap Percentage",
+      "percentage": "%",
+      "percentage-description": "Damage in Percentage"
+    },
     "stats": {
       "level": "Level",
       "master-level": "Master Level",

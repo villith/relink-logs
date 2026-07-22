@@ -53,21 +53,26 @@ export default function useMeter() {
 
   const [sortType, setSortType] = useState<SortType>(MeterColumns.TotalDamage);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-  const { transparency, overlayColumns, showFullValues } = useMeterSettingsStore(
+  const { transparency, overlayColumns, overlaySkillColumns, showFullValues } = useMeterSettingsStore(
     useShallow((state) => ({
       transparency: state.transparency,
       overlayColumns: state.overlay_columns,
+      overlaySkillColumns: state.overlay_skill_columns,
       showFullValues: state.show_full_values,
     }))
   );
 
   // Grow the overlay's minimum width with the number of visible columns so that
-  // adding columns can't squeeze the player/skill names into an ellipsis.
+  // adding columns can't squeeze the player/skill names into an ellipsis. The
+  // expanded skill breakdown can have more columns than the player row, so size
+  // to whichever is wider.
   useEffect(() => {
-    void appWindow.setMinSize(
-      new LogicalSize(overlayMinWidth(overlayColumns.length, showFullValues), OVERLAY_MIN_HEIGHT)
+    const minWidth = Math.max(
+      overlayMinWidth(overlayColumns.length, showFullValues),
+      overlayMinWidth(overlaySkillColumns.length, showFullValues)
     );
-  }, [overlayColumns, showFullValues]);
+    void appWindow.setMinSize(new LogicalSize(minWidth, OVERLAY_MIN_HEIGHT));
+  }, [overlayColumns, overlaySkillColumns, showFullValues]);
 
   useEffect(() => {
     const interval = setInterval(() => {

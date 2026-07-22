@@ -3,7 +3,7 @@ import { render } from "@testing-library/react";
 import i18next from "i18next";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { ComputedSkillState } from "@/types";
+import { ComputedSkillState, DEFAULT_SKILL_COLUMNS } from "@/types";
 import { SkillRow } from "./SkillRow";
 
 const makeSkill = (overrides: Partial<ComputedSkillState>): ComputedSkillState => ({
@@ -29,7 +29,7 @@ const renderRow = (skill: ComputedSkillState) =>
     <MantineProvider>
       <table>
         <tbody>
-          <SkillRow characterType="Pl0000" skill={skill} color="#ff0000" live />
+          <SkillRow characterType="Pl0000" skill={skill} color="#ff0000" columns={DEFAULT_SKILL_COLUMNS} live />
         </tbody>
       </table>
     </MantineProvider>
