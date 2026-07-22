@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rusqlite::Connection;
-use sea_query::{Expr, Condition, Iden, Order, Query, SqliteQueryBuilder};
+use sea_query::{Condition, Expr, Iden, Order, Query, SqliteQueryBuilder};
 use sea_query_rusqlite::RusqliteBinder;
 use serde::Serialize;
 
@@ -89,7 +89,7 @@ pub fn get_logs(
     sort_direction: &SortDirection,
     cleared: Option<bool>,
     filter_by_player_id: &Option<String>,
-    filter_by_player_character: &Option<String>
+    filter_by_player_character: &Option<String>,
 ) -> anyhow::Result<Vec<LogEntry>> {
     let sort_column = match sort_by {
         SortType::Time => Logs::Time,
@@ -152,17 +152,29 @@ pub fn get_logs(
             |q| {
                 let player_id = filter_by_player_id.as_ref().unwrap();
                 let player_character = filter_by_player_character.as_ref().unwrap();
-        
+
                 q.cond_where(
                     Condition::any()
-                        .add(Expr::col(Logs::P1Name).eq(player_id.clone())
-                                .and(Expr::col(Logs::P1Type).eq(player_character.clone())))
-                        .add(Expr::col(Logs::P2Name).eq(player_id.clone())
-                                .and(Expr::col(Logs::P2Type).eq(player_character.clone())))
-                        .add(Expr::col(Logs::P3Name).eq(player_id.clone())
-                                .and(Expr::col(Logs::P3Type).eq(player_character.clone())))
-                        .add(Expr::col(Logs::P4Name).eq(player_id)
-                                .and(Expr::col(Logs::P4Type).eq(player_character))),
+                        .add(
+                            Expr::col(Logs::P1Name)
+                                .eq(player_id.clone())
+                                .and(Expr::col(Logs::P1Type).eq(player_character.clone())),
+                        )
+                        .add(
+                            Expr::col(Logs::P2Name)
+                                .eq(player_id.clone())
+                                .and(Expr::col(Logs::P2Type).eq(player_character.clone())),
+                        )
+                        .add(
+                            Expr::col(Logs::P3Name)
+                                .eq(player_id.clone())
+                                .and(Expr::col(Logs::P3Type).eq(player_character.clone())),
+                        )
+                        .add(
+                            Expr::col(Logs::P4Name)
+                                .eq(player_id)
+                                .and(Expr::col(Logs::P4Type).eq(player_character)),
+                        ),
                 );
             },
             |_| {},
@@ -171,7 +183,7 @@ pub fn get_logs(
             filter_by_player_id.is_some() && filter_by_player_character.is_none(),
             |q| {
                 let player_id = filter_by_player_id.as_ref().unwrap();
-        
+
                 q.cond_where(
                     Condition::any()
                         .add(Expr::col(Logs::P1Name).eq(player_id.clone()))
@@ -186,7 +198,7 @@ pub fn get_logs(
             filter_by_player_id.is_none() && filter_by_player_character.is_some(),
             |q| {
                 let player_character = filter_by_player_character.as_ref().unwrap();
-        
+
                 q.cond_where(
                     Condition::any()
                         .add(Expr::col(Logs::P1Type).eq(player_character.clone()))
@@ -239,7 +251,7 @@ pub fn get_logs_count(
     filter_by_quest_id: Option<u32>,
     cleared: Option<bool>,
     filter_by_player_id: &Option<String>,
-    filter_by_player_character: &Option<String>
+    filter_by_player_character: &Option<String>,
 ) -> Result<i32> {
     let (sql, values) = Query::select()
         .expr(Expr::col(Logs::Id).count())
@@ -272,17 +284,29 @@ pub fn get_logs_count(
             |q| {
                 let player_id = filter_by_player_id.as_ref().unwrap();
                 let player_character = filter_by_player_character.as_ref().unwrap();
-        
+
                 q.cond_where(
                     Condition::any()
-                        .add(Expr::col(Logs::P1Name).eq(player_id.clone())
-                                .and(Expr::col(Logs::P1Type).eq(player_character.clone())))
-                        .add(Expr::col(Logs::P2Name).eq(player_id.clone())
-                                .and(Expr::col(Logs::P2Type).eq(player_character.clone())))
-                        .add(Expr::col(Logs::P3Name).eq(player_id.clone())
-                                .and(Expr::col(Logs::P3Type).eq(player_character.clone())))
-                        .add(Expr::col(Logs::P4Name).eq(player_id)
-                                .and(Expr::col(Logs::P4Type).eq(player_character))),
+                        .add(
+                            Expr::col(Logs::P1Name)
+                                .eq(player_id.clone())
+                                .and(Expr::col(Logs::P1Type).eq(player_character.clone())),
+                        )
+                        .add(
+                            Expr::col(Logs::P2Name)
+                                .eq(player_id.clone())
+                                .and(Expr::col(Logs::P2Type).eq(player_character.clone())),
+                        )
+                        .add(
+                            Expr::col(Logs::P3Name)
+                                .eq(player_id.clone())
+                                .and(Expr::col(Logs::P3Type).eq(player_character.clone())),
+                        )
+                        .add(
+                            Expr::col(Logs::P4Name)
+                                .eq(player_id)
+                                .and(Expr::col(Logs::P4Type).eq(player_character)),
+                        ),
                 );
             },
             |_| {},
@@ -291,7 +315,7 @@ pub fn get_logs_count(
             filter_by_player_id.is_some() && filter_by_player_character.is_none(),
             |q| {
                 let player_id = filter_by_player_id.as_ref().unwrap();
-        
+
                 q.cond_where(
                     Condition::any()
                         .add(Expr::col(Logs::P1Name).eq(player_id.clone()))
@@ -306,7 +330,7 @@ pub fn get_logs_count(
             filter_by_player_id.is_none() && filter_by_player_character.is_some(),
             |q| {
                 let player_character = filter_by_player_character.as_ref().unwrap();
-        
+
                 q.cond_where(
                     Condition::any()
                         .add(Expr::col(Logs::P1Type).eq(player_character.clone()))

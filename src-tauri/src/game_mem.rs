@@ -151,10 +151,10 @@ pub fn open_game() -> Result<Option<(Arc<Mem>, u64, PathBuf)>> {
     let Some(pid) = find_game_pid()? else {
         return Ok(None);
     };
-    let mem = Arc::new(Mem(
-        unsafe { OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid) }
-            .context("OpenProcess (run as admin?)")?,
-    ));
+    let mem = Arc::new(Mem(unsafe {
+        OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid)
+    }
+    .context("OpenProcess (run as admin?)")?));
     let (base, exe) = module_base(pid)?;
     *GAME_CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some((mem.clone(), base, exe.clone()));
     Ok(Some((mem, base, exe)))
@@ -168,7 +168,9 @@ pub fn rva_from_cursor(pe: &PeFile, cursor: u32) -> Result<u32> {
         .map_err(|e| anyhow::anyhow!("derva {cursor:#x}: {e:?}"))?
         .try_into()
         .expect("slice length is 4");
-    Ok(cursor.wrapping_add(4).wrapping_add(u32::from_le_bytes(bytes)))
+    Ok(cursor
+        .wrapping_add(4)
+        .wrapping_add(u32::from_le_bytes(bytes)))
 }
 
 /// All cursor RVAs matching `sig` (the pattern's save slot 1).
@@ -187,7 +189,10 @@ pub fn scan_cursors(pe: &PeFile, sig: &str) -> Result<Vec<u32>> {
 pub fn scan_unique_rva(pe: &PeFile, sig: &str, what: &str) -> Result<u32> {
     let cursors = scan_cursors(pe, sig)?;
     if cursors.len() != 1 {
-        bail!("{what} signature matched {} times (game patched?)", cursors.len());
+        bail!(
+            "{what} signature matched {} times (game patched?)",
+            cursors.len()
+        );
     }
     rva_from_cursor(pe, cursors[0])
 }

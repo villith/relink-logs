@@ -115,7 +115,9 @@ fn main() -> Result<()> {
         let rel = ts - start;
         let (kind, actor, amount) = match event {
             Message::OnPerfectGuardStun(e) => ("PerfectGuardStun", e.actor_index, e.stun_amount),
-            Message::OnPerfectGuardQuickening(e) => ("PerfectGuardQuick", e.actor_index, e.stun_amount),
+            Message::OnPerfectGuardQuickening(e) => {
+                ("PerfectGuardQuick", e.actor_index, e.stun_amount)
+            }
             Message::OnPlayerStun(e) => ("PlayerStun(net)", e.actor_index, e.stun_amount),
             _ => continue,
         };
@@ -154,7 +156,7 @@ fn main() -> Result<()> {
                 }
                 Message::OnPerfectGuardQuickening(e) => {
                     let who = label.get(&e.actor_index).cloned().unwrap_or_default();
-                    println!("  t={rel:>7}ms  PGQUICK [{who}]", );
+                    println!("  t={rel:>7}ms  PGQUICK [{who}]",);
                     let _ = e;
                 }
                 _ => {}
@@ -166,7 +168,9 @@ fn main() -> Result<()> {
     // For each PerfectGuardStun, what was the guarding actor doing right then?
     // A reactive guard is triggered by the ENEMY; a stun-applying SKILL of the
     // guarder's own would instead show that actor's damage hits co-timed with it.
-    println!("--- context around each PerfectGuardStun (actor's own damage in [-400ms,+200ms]) ---");
+    println!(
+        "--- context around each PerfectGuardStun (actor's own damage in [-400ms,+200ms]) ---"
+    );
     let pg_events: Vec<(u32, i64)> = parser
         .encounter
         .event_log()

@@ -10,9 +10,9 @@ pub mod snapshot;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+pub use crate::game_mem::xorshift32;
 /// The game's "no trait in this slot" sentinel.
 pub use crate::game_mem::EMPTY_KEY as EMPTY_TRAIT;
-pub use crate::game_mem::xorshift32;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -55,14 +55,30 @@ pub struct Prediction {
 }
 
 fn trait_sum(s: &SynthesisSigil) -> u64 {
-    let t1 = if s.trait1 == EMPTY_TRAIT { 0 } else { s.trait1 as u64 };
-    let t2 = if s.trait2 == EMPTY_TRAIT { 0 } else { s.trait2 as u64 };
+    let t1 = if s.trait1 == EMPTY_TRAIT {
+        0
+    } else {
+        s.trait1 as u64
+    };
+    let t2 = if s.trait2 == EMPTY_TRAIT {
+        0
+    } else {
+        s.trait2 as u64
+    };
     t1 + t2
 }
 
 fn rank(s: &SynthesisSigil) -> u32 {
-    let l1 = if s.trait1 == EMPTY_TRAIT { 0 } else { s.trait1_level };
-    let l2 = if s.trait2 == EMPTY_TRAIT { 0 } else { s.trait2_level };
+    let l1 = if s.trait1 == EMPTY_TRAIT {
+        0
+    } else {
+        s.trait1_level
+    };
+    let l2 = if s.trait2 == EMPTY_TRAIT {
+        0
+    } else {
+        s.trait2_level
+    };
     l1.wrapping_add(l2)
 }
 
@@ -72,10 +88,14 @@ fn rank(s: &SynthesisSigil) -> u32 {
 /// real sigil has a first trait). Two fully-blank sigils would make the
 /// candidate list empty.
 pub fn predict(snap: &SynthesisSnapshot, a: &SynthesisSigil, b: &SynthesisSigil) -> Prediction {
-    let pair_key = trait_sum(a)
-        + trait_sum(b)
-        + (a.record_level.wrapping_add(b.record_level) as u32) as u64;
-    let n = snap.pair_counters.get(&pair_key).copied().unwrap_or(0).wrapping_add(1);
+    let pair_key =
+        trait_sum(a) + trait_sum(b) + (a.record_level.wrapping_add(b.record_level) as u32) as u64;
+    let n = snap
+        .pair_counters
+        .get(&pair_key)
+        .copied()
+        .unwrap_or(0)
+        .wrapping_add(1);
     let warm = (n.wrapping_mul(9) as u64)
         .wrapping_add(pair_key)
         .wrapping_add(snap.seed_counter as u64)
@@ -111,7 +131,10 @@ pub fn predict(snap: &SynthesisSnapshot, a: &SynthesisSigil, b: &SynthesisSigil)
         cand.swap(i, i + r as usize);
     }
 
-    debug_assert!(!cand.is_empty(), "predict() called with two traitless sigils");
+    debug_assert!(
+        !cand.is_empty(),
+        "predict() called with two traitless sigils"
+    );
 
     Prediction {
         trait1: cand[0],
@@ -176,11 +199,15 @@ pub struct SynthesisSeed {
 fn excluded_sigils() -> &'static std::collections::HashSet<u32> {
     static SET: std::sync::OnceLock<std::collections::HashSet<u32>> = std::sync::OnceLock::new();
     SET.get_or_init(|| {
-        serde_json::from_str::<Vec<String>>(include_str!("../../assets/synthesis-excluded-sigils.json"))
-            .expect("synthesis-excluded-sigils.json is a JSON string array")
-            .into_iter()
-            .map(|s| u32::from_str_radix(&s, 16).expect("synthesis-excluded-sigils.json entries are hex ids"))
-            .collect()
+        serde_json::from_str::<Vec<String>>(include_str!(
+            "../../assets/synthesis-excluded-sigils.json"
+        ))
+        .expect("synthesis-excluded-sigils.json is a JSON string array")
+        .into_iter()
+        .map(|s| {
+            u32::from_str_radix(&s, 16).expect("synthesis-excluded-sigils.json entries are hex ids")
+        })
+        .collect()
     })
 }
 
@@ -199,7 +226,13 @@ pub fn is_eligible(s: &SynthesisSigil) -> bool {
 /// always synthesize identically (the instance uid does not affect the result,
 /// confirmed live), so search() collapses them to one representative.
 fn dedup_key(s: &SynthesisSigil) -> (u32, u32, u32, u32, i32) {
-    (s.trait1, s.trait1_level, s.trait2, s.trait2_level, s.record_level)
+    (
+        s.trait1,
+        s.trait1_level,
+        s.trait2,
+        s.trait2_level,
+        s.record_level,
+    )
 }
 
 /// A sigil's display level: eligible sigils have two real traits, whose
@@ -294,7 +327,13 @@ mod tests {
     #[test]
     fn xorshift32_reference_sequence() {
         let mut s = 1u32;
-        let expect = [0x1000a001u32, 0x45000201, 0x451080a1, 0x10150a23, 0x2814b28b];
+        let expect = [
+            0x1000a001u32,
+            0x45000201,
+            0x451080a1,
+            0x10150a23,
+            0x2814b28b,
+        ];
         for e in expect {
             s = xorshift32(s);
             assert_eq!(s, e);
@@ -433,7 +472,12 @@ mod tests {
         // Distinct record_level so dedup can't be what hides it.
         special.record_level = 6;
         snap.sigils.push(special);
-        let q = SynthesisQuery { trait1: 0x200, trait2: None, any_order: true, require_lucky: false };
+        let q = SynthesisQuery {
+            trait1: 0x200,
+            trait2: None,
+            any_order: true,
+            require_lucky: false,
+        };
         let (_m, tested) = search(&snap, &q);
         // Only the (1,2) pair — the special sigil joins no pair.
         assert_eq!(tested, 1);
@@ -446,7 +490,12 @@ mod tests {
         // A 1-trait sigil and a below-level-11 2-trait sigil; neither is usable.
         snap.sigils.push(sigil(3, 0x200, 15, EMPTY_TRAIT, 0, 9));
         snap.sigils.push(sigil(4, 0x100, 10, 0x400, 11, 9)); // trait1 below 11
-        let q = SynthesisQuery { trait1: 0x200, trait2: None, any_order: true, require_lucky: false };
+        let q = SynthesisQuery {
+            trait1: 0x200,
+            trait2: None,
+            any_order: true,
+            require_lucky: false,
+        };
         let (_m, tested) = search(&snap, &q);
         // Only the single eligible pair (1,2) is ever predicted.
         assert_eq!(tested, 1);
@@ -460,7 +509,12 @@ mod tests {
         snap.sigils.push(sigil(10, 0x100, 11, 0x300, 11, 5));
         snap.sigils.push(sigil(11, 0x100, 11, 0x300, 11, 5));
         snap.sigils.push(sigil(12, 0x100, 11, 0x300, 11, 5));
-        let q = SynthesisQuery { trait1: 0x200, trait2: Some(0x300), any_order: false, require_lucky: false };
+        let q = SynthesisQuery {
+            trait1: 0x200,
+            trait2: Some(0x300),
+            any_order: false,
+            require_lucky: false,
+        };
         let (matches, tested) = search(&snap, &q);
         // Still just one distinct pair, one match — not four.
         assert_eq!(tested, 1);
@@ -471,10 +525,20 @@ mod tests {
     #[test]
     fn search_order_toggle() {
         let snap = search_snap();
-        let exact = SynthesisQuery { trait1: 0x300, trait2: Some(0x200), any_order: false, require_lucky: false };
+        let exact = SynthesisQuery {
+            trait1: 0x300,
+            trait2: Some(0x200),
+            any_order: false,
+            require_lucky: false,
+        };
         let (m, _) = search(&snap, &exact);
         assert!(m.is_empty());
-        let any = SynthesisQuery { trait1: 0x300, trait2: Some(0x200), any_order: true, require_lucky: false };
+        let any = SynthesisQuery {
+            trait1: 0x300,
+            trait2: Some(0x200),
+            any_order: true,
+            require_lucky: false,
+        };
         let (m, _) = search(&snap, &any);
         assert_eq!(m.len(), 1);
     }
@@ -483,7 +547,12 @@ mod tests {
     #[test]
     fn search_require_lucky() {
         let snap = search_snap();
-        let q = SynthesisQuery { trait1: 0x200, trait2: Some(0x300), any_order: false, require_lucky: true };
+        let q = SynthesisQuery {
+            trait1: 0x200,
+            trait2: Some(0x300),
+            any_order: false,
+            require_lucky: true,
+        };
         let (m, _) = search(&snap, &q);
         assert!(m.is_empty());
     }
@@ -525,12 +594,20 @@ mod tests {
             sigil(2, 0x100, 11, 0x120, 11, 1),
             sigil(3, 0x100, 15, 0x130, 15, 1),
         ];
-        let q = SynthesisQuery { trait1: 0x100, trait2: None, any_order: false, require_lucky: false };
+        let q = SynthesisQuery {
+            trait1: 0x100,
+            trait2: None,
+            any_order: false,
+            require_lucky: false,
+        };
         let (matches, _) = search(&snap, &q);
         assert_eq!(matches.len(), 3);
         // Discovery order is (1,2),(1,3),(2,3); level keys (11,15),(15,15),(11,15).
         // Sorted: (1,2) then (2,3) then (1,3).
-        let uids: Vec<(u32, u32)> = matches.iter().map(|m| (m.sigil_a.uid, m.sigil_b.uid)).collect();
+        let uids: Vec<(u32, u32)> = matches
+            .iter()
+            .map(|m| (m.sigil_a.uid, m.sigil_b.uid))
+            .collect();
         assert_eq!(uids, vec![(1, 2), (2, 3), (1, 3)]);
     }
 }

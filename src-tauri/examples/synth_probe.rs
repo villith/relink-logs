@@ -61,12 +61,20 @@ fn main() -> anyhow::Result<()> {
             .map(|s| parse(s));
         let any_order = args.iter().any(|a| a == "any");
         let require_lucky = args.iter().any(|a| a == "lucky");
-        let q = SynthesisQuery { trait1, trait2, any_order, require_lucky };
+        let q = SynthesisQuery {
+            trait1,
+            trait2,
+            any_order,
+            require_lucky,
+        };
         let (matches, tested) = synthesis::search(&snap, &q);
         println!(
             "query trait1={trait1:#010x} trait2={trait2:x?} any_order={any_order} lucky={require_lucky}"
         );
-        println!("pairs_tested={tested}  total_matches={}  (showing 20)", matches.len());
+        println!(
+            "pairs_tested={tested}  total_matches={}  (showing 20)",
+            matches.len()
+        );
         for m in matches.iter().take(20) {
             println!(
                 "  {:#010x}({:#010x}/{:#010x}) + {:#010x}({:#010x}/{:#010x}) -> {:#010x} {:x?} lucky={}",
@@ -99,14 +107,18 @@ fn main() -> anyhow::Result<()> {
         println!("-- eligible sigils (uid  sigil  t1/l  t2/l  rec) --");
         let mut shown = 0;
         for s in &elig {
-            if !filters.is_empty()
-                && !filters.iter().all(|&f| s.trait1 == f || s.trait2 == f)
-            {
+            if !filters.is_empty() && !filters.iter().all(|&f| s.trait1 == f || s.trait2 == f) {
                 continue;
             }
             println!(
                 "  {:#010x}  {:#010x}  {:#010x}/{:<2} {:#010x}/{:<2} rec={}",
-                s.uid, s.sigil_id, s.trait1, s.trait1_level, s.trait2, s.trait2_level, s.record_level
+                s.uid,
+                s.sigil_id,
+                s.trait1,
+                s.trait1_level,
+                s.trait2,
+                s.trait2_level,
+                s.record_level
             );
             shown += 1;
             if filters.is_empty() && shown >= 60 {
@@ -131,15 +143,27 @@ fn main() -> anyhow::Result<()> {
         // Recompute the decompile's warm-up terms so we can correlate them with
         // the observed result. pairKey (per the commit trace) = traitsum(A) +
         // traitsum(B) + (rec_A + rec_B); the per-pair map is keyed on it.
-        let tsum = |s: &SynthesisSigil| -> u64 {
-            traits(s).iter().map(|&t| t as u64).sum()
-        };
+        let tsum = |s: &SynthesisSigil| -> u64 { traits(s).iter().map(|&t| t as u64).sum() };
         let pair_key =
             tsum(sa) + tsum(sb) + (sa.record_level.wrapping_add(sb.record_level) as u32) as u64;
         let count = snap.pair_counters.get(&pair_key).copied().unwrap_or(0);
 
-        println!("A uid={:#010x} traits={:x?} levels=[{},{}] rec={}", sa.uid, traits(sa), sa.trait1_level, sa.trait2_level, sa.record_level);
-        println!("B uid={:#010x} traits={:x?} levels=[{},{}] rec={}", sb.uid, traits(sb), sb.trait1_level, sb.trait2_level, sb.record_level);
+        println!(
+            "A uid={:#010x} traits={:x?} levels=[{},{}] rec={}",
+            sa.uid,
+            traits(sa),
+            sa.trait1_level,
+            sa.trait2_level,
+            sa.record_level
+        );
+        println!(
+            "B uid={:#010x} traits={:x?} levels=[{},{}] rec={}",
+            sb.uid,
+            traits(sb),
+            sb.trait1_level,
+            sb.trait2_level,
+            sb.record_level
+        );
         println!("pair_key={pair_key}  count(this pair so far)={count}  seed_counter={}  rng_state={:#010x}", snap.seed_counter, snap.rng_state);
         println!("uidA={ua:#010x} uidB={ub:#010x}  (instance-dependence check: does swapping which copy changes result?)");
 

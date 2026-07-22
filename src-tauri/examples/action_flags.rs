@@ -76,7 +76,10 @@ fn main() -> Result<()> {
     {
         let mut per_log: BTreeMap<(i64, Option<i64>), BTreeSet<u32>> = BTreeMap::new();
         for (id, run_id, action_id) in &origins {
-            per_log.entry((*id, *run_id)).or_default().insert(*action_id);
+            per_log
+                .entry((*id, *run_id))
+                .or_default()
+                .insert(*action_id);
         }
         for ((id, run_id), actions) in &per_log {
             println!("log {id} run_id={run_id:?} high-ids={actions:?}");

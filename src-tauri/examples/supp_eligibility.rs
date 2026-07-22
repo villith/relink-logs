@@ -128,7 +128,9 @@ fn main() -> Result<()> {
         let mut tallies: BTreeMap<Src, SrcTally> = BTreeMap::new();
 
         for event in &events {
-            let Message::DamageEvent(e) = event else { continue };
+            let Message::DamageEvent(e) = event else {
+                continue;
+            };
             if e.damage <= 0 {
                 continue;
             }
@@ -154,7 +156,9 @@ fn main() -> Result<()> {
         // window. A Normal hit whose aid matches the supp's embedded trigger aid wins
         // outright; otherwise the candidate (any class) closest to a clean ratio wins.
         for (i, event) in events.iter().enumerate() {
-            let Message::DamageEvent(e) = event else { continue };
+            let Message::DamageEvent(e) = event else {
+                continue;
+            };
             let ActionType::SupplementaryDamage(supp_aid) = e.action_id else {
                 continue;
             };
@@ -163,7 +167,9 @@ fn main() -> Result<()> {
             let mut best: Option<(TriggerClass, f64)> = None; // (class, ratio distance)
             let dist = |r: f64| (r - 0.2).abs().min((r - 0.4).abs());
             for prev in events[..i].iter().rev().take(LOOKBACK) {
-                let Message::DamageEvent(p) = prev else { continue };
+                let Message::DamageEvent(p) = prev else {
+                    continue;
+                };
                 if (p.source.index, p.source.actor_type) != src || p.damage <= 0 {
                     continue;
                 }
@@ -249,7 +255,14 @@ fn main() -> Result<()> {
             };
             println!(
                 "  src {:#x}/{}: normal={} la={} sba={} dot={} supp={} proc_rate={:.3}",
-                src.1, src.0, t.normal_hits, t.la_hits, t.sba_hits, t.dot_hits, t.supp_events, proc_rate
+                src.1,
+                src.0,
+                t.normal_hits,
+                t.la_hits,
+                t.sba_hits,
+                t.dot_hits,
+                t.supp_events,
+                proc_rate
             );
             proc_rates.insert(*src, proc_rate);
             for (class, n) in &t.attributed {
@@ -259,11 +272,7 @@ fn main() -> Result<()> {
             // Roll into global per-class stats (opportunity-weighted by this
             // player-log's Normal proc rate).
             for (name, hits, attributed) in [
-                (
-                    "normal",
-                    t.normal_hits,
-                    normal_attr,
-                ),
+                ("normal", t.normal_hits, normal_attr),
                 (
                     "link attack",
                     t.la_hits,
@@ -297,7 +306,9 @@ fn main() -> Result<()> {
         // the supp's aid to NOT be any Normal skill of the source — a supp no Normal
         // hit could explain.
         for (i, event) in events.iter().enumerate() {
-            let Message::DamageEvent(h) = event else { continue };
+            let Message::DamageEvent(h) = event else {
+                continue;
+            };
             if h.damage <= 0 {
                 continue;
             }
@@ -318,7 +329,9 @@ fn main() -> Result<()> {
             let normal_aids = &tallies[&src].normal_aids;
             let (mut loose_hit, mut tight_hit) = (false, false);
             for next in events[i + 1..].iter().take(FWD_WINDOW) {
-                let Message::DamageEvent(s) = next else { continue };
+                let Message::DamageEvent(s) = next else {
+                    continue;
+                };
                 let ActionType::SupplementaryDamage(said) = s.action_id else {
                     continue;
                 };
@@ -353,7 +366,9 @@ fn main() -> Result<()> {
     }
 
     println!();
-    println!("==================== AGGREGATE ({logs_with_supp} logs with supp) ====================");
+    println!(
+        "==================== AGGREGATE ({logs_with_supp} logs with supp) ===================="
+    );
     println!("supp attribution by trigger class:");
     for (class, n) in &global_attr {
         println!("  {}: {n}", class.name());
@@ -388,10 +403,18 @@ fn main() -> Result<()> {
             class,
             n,
             tot,
-            if *tot > 0 { *n as f64 / *tot as f64 * 100.0 } else { 0.0 },
+            if *tot > 0 {
+                *n as f64 / *tot as f64 * 100.0
+            } else {
+                0.0
+            },
             tn,
             ttot,
-            if ttot > 0 { tn as f64 / ttot as f64 * 100.0 } else { 0.0 },
+            if ttot > 0 {
+                tn as f64 / ttot as f64 * 100.0
+            } else {
+                0.0
+            },
         );
     }
     println!();

@@ -190,11 +190,7 @@ fn audit(db_path: &PathBuf, online_id: i64, baseline_since: i64) -> Result<()> {
     // bound, the burst test remains the definitive check).
     let ratios: Vec<f32> = messages
         .iter()
-        .filter_map(|(ch, a, amount)| {
-            primary
-                .get(&(*ch, a.clone()))
-                .map(|base| amount / base)
-        })
+        .filter_map(|(ch, a, amount)| primary.get(&(*ch, a.clone())).map(|base| amount / base))
         .filter(|m| (0.5..=4.0).contains(m))
         .collect();
     let ladder: Vec<(f32, f32, u32)> = cluster(ratios)
@@ -203,8 +199,11 @@ fn audit(db_path: &PathBuf, online_id: i64, baseline_since: i64) -> Result<()> {
         .collect();
     println!("=== ONLINE log {online_id} — measured ramp ladder (m clusters, n>=3) ===");
     println!("  {}", fmt_clusters(&ladder));
-    let on_ladder =
-        |m: f32| -> bool { ladder.iter().any(|(min, max, _)| m >= min * 0.98 && m <= max * 1.02) };
+    let on_ladder = |m: f32| -> bool {
+        ladder
+            .iter()
+            .any(|(min, max, _)| m >= min * 0.98 && m <= max * 1.02)
+    };
 
     // Pass 2: verdict per message. A skill fits when ANY of its offline
     // weights w gives an on-ladder multiplier amount/w.
@@ -220,7 +219,11 @@ fn audit(db_path: &PathBuf, online_id: i64, baseline_since: i64) -> Result<()> {
             .filter_map(|((_, a), ws)| fits_skill(ws, *amount).map(|m| (a.clone(), m)))
             .collect();
         match (attributed_ws, attributed_fit, alternatives.is_empty()) {
-            (None, _, _) => *verdicts.entry("no baseline for attributed skill").or_default() += 1,
+            (None, _, _) => {
+                *verdicts
+                    .entry("no baseline for attributed skill")
+                    .or_default() += 1
+            }
             (Some(_), Some(_), _) => *verdicts.entry("consistent").or_default() += 1,
             (Some(_), None, false) => {
                 *verdicts.entry("MISATTRIBUTED-likely").or_default() += 1;
@@ -271,7 +274,10 @@ fn main() -> Result<()> {
             "--amounts" => amounts = true,
             "--audit" => audit_log = Some(args.next().context("--audit needs a log id")?.parse()?),
             "--baseline-since" => {
-                baseline_since = args.next().context("--baseline-since needs an id")?.parse()?
+                baseline_since = args
+                    .next()
+                    .context("--baseline-since needs an id")?
+                    .parse()?
             }
             other => anyhow::bail!("unknown arg: {other}"),
         }
@@ -352,10 +358,7 @@ fn main() -> Result<()> {
                     let v = serde_json::to_value(p)?;
                     println!(
                         "  slot{i} actor_index={} char={} stats={} playerStats={}",
-                        v["actorIndex"],
-                        v["characterType"],
-                        v["stats"],
-                        v["playerStats"],
+                        v["actorIndex"], v["characterType"], v["stats"], v["playerStats"],
                     );
                 }
             }
@@ -404,7 +407,9 @@ fn main() -> Result<()> {
             continue; // no stun data at all — nothing to validate
         }
         let mode = match (enc_delta > 0.0, enc_msg > 0.0) {
-            (true, true) => "MIXED (offline-conversion tail; per-hit ratios diluted, excluded from compare)",
+            (true, true) => {
+                "MIXED (offline-conversion tail; per-hit ratios diluted, excluded from compare)"
+            }
             (true, false) => "delta-only (offline)",
             (false, true) => "message-only (online shape)",
             _ => unreachable!(),

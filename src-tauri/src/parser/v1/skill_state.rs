@@ -411,7 +411,10 @@ mod tests {
         let mut supp = SkillState::new(ActionType::SupplementaryDamage(1), CharacterType::Pl0000);
         let mut supp_event = make_event(5_000, None, None);
         supp_event.action_id = ActionType::SupplementaryDamage(1);
-        supp.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(&supp_event, None));
+        supp.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
+            &supp_event,
+            None,
+        ));
 
         let mut dot = SkillState::new(ActionType::DamageOverTime(0), CharacterType::Pl0000);
         let mut dot_event = make_event(1_000, None, None);

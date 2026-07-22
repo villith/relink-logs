@@ -36,9 +36,17 @@ fn main() -> anyhow::Result<()> {
     if let [a, b] = args.as_slice() {
         let parse = |s: &str| u32::from_str_radix(s.trim_start_matches("0x"), 16).unwrap();
         let (ua, ub) = (parse(a), parse(b));
-        let find = |uid: u32| snap.sigils.iter().find(|s| s.uid == uid).expect("uid not found");
+        let find = |uid: u32| {
+            snap.sigils
+                .iter()
+                .find(|s| s.uid == uid)
+                .expect("uid not found")
+        };
         let p = synthesis::predict(&snap, find(ua), find(ub));
-        println!("prediction: trait1={:#010x} trait2={:x?} lucky={}", p.trait1, p.trait2, p.lucky);
+        println!(
+            "prediction: trait1={:#010x} trait2={:x?} lucky={}",
+            p.trait1, p.trait2, p.lucky
+        );
     }
     Ok(())
 }

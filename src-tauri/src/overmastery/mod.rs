@@ -31,7 +31,10 @@ pub fn char_slot_index(roster: &[u32], char_id: u32) -> Option<u32> {
     if PROTAGONIST_IDS.contains(&char_id) {
         return Some(0);
     }
-    roster.iter().position(|&id| id == char_id).map(|i| i as u32)
+    roster
+        .iter()
+        .position(|&id| id == char_id)
+        .map(|i| i as u32)
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -143,10 +146,20 @@ pub fn predict_roll(state: &mut u32, tier: usize, t: &OvermasteryTables) -> Vec<
 
     let resolve = |key: u32, bit: u32| -> Mastery {
         match t.params.get(&key) {
-            Some(p) => Mastery { category: key, level: bit + 1, kind: p.kind, value: p.values[bit as usize] },
+            Some(p) => Mastery {
+                category: key,
+                level: bit + 1,
+                kind: p.kind,
+                value: p.values[bit as usize],
+            },
             // The game appends an entry with the empty id and no value when
             // the param row is missing (never happens with stock data).
-            None => Mastery { category: EMPTY_KEY, level: bit + 1, kind: 0, value: 0.0 },
+            None => Mastery {
+                category: EMPTY_KEY,
+                level: bit + 1,
+                kind: 0,
+                value: 0.0,
+            },
         }
     };
 
@@ -206,8 +219,15 @@ pub fn predict_roll(state: &mut u32, tier: usize, t: &OvermasteryTables) -> Vec<
 
 /// Simulate `rolls` consecutive rolls of the same (character, size) stream
 /// starting from `state`.
-pub fn simulate(mut state: u32, tier: usize, t: &OvermasteryTables, rolls: u32) -> Vec<Vec<Mastery>> {
-    (0..rolls).map(|_| predict_roll(&mut state, tier, t)).collect()
+pub fn simulate(
+    mut state: u32,
+    tier: usize,
+    t: &OvermasteryTables,
+    rolls: u32,
+) -> Vec<Vec<Mastery>> {
+    (0..rolls)
+        .map(|_| predict_roll(&mut state, tier, t))
+        .collect()
 }
 
 #[derive(Debug, Serialize)]
@@ -257,16 +277,58 @@ mod tests {
     /// transcription of the decompiled algorithm).
     fn tables() -> OvermasteryTables {
         let mut params = HashMap::new();
-        params.insert(0x100, ParamDef { kind: 0, values: std::array::from_fn(|i| 10.0 * (i + 1) as f32) });
-        params.insert(0x200, ParamDef { kind: 1, values: std::array::from_fn(|i| 100.0 * (i + 1) as f32) });
-        params.insert(0x300, ParamDef { kind: 2, values: std::array::from_fn(|i| (i + 1) as f32) });
-        params.insert(0x400, ParamDef { kind: 3, values: std::array::from_fn(|i| (i + 1) as f32 / 10.0) });
-        params.insert(0x500, ParamDef { kind: 100, values: std::array::from_fn(|i| (i + 1) as f32) });
-        let pool = |keys: &[u32]| keys.iter().map(|&key| PoolEntry { key, weight: 1 }).collect::<Vec<_>>();
+        params.insert(
+            0x100,
+            ParamDef {
+                kind: 0,
+                values: std::array::from_fn(|i| 10.0 * (i + 1) as f32),
+            },
+        );
+        params.insert(
+            0x200,
+            ParamDef {
+                kind: 1,
+                values: std::array::from_fn(|i| 100.0 * (i + 1) as f32),
+            },
+        );
+        params.insert(
+            0x300,
+            ParamDef {
+                kind: 2,
+                values: std::array::from_fn(|i| (i + 1) as f32),
+            },
+        );
+        params.insert(
+            0x400,
+            ParamDef {
+                kind: 3,
+                values: std::array::from_fn(|i| (i + 1) as f32 / 10.0),
+            },
+        );
+        params.insert(
+            0x500,
+            ParamDef {
+                kind: 100,
+                values: std::array::from_fn(|i| (i + 1) as f32),
+            },
+        );
+        let pool = |keys: &[u32]| {
+            keys.iter()
+                .map(|&key| PoolEntry { key, weight: 1 })
+                .collect::<Vec<_>>()
+        };
         OvermasteryTables {
             tiers: vec![
-                TierDef { counts: [(4, 100), (3, 0), (2, 0)], msp_cost: 700, guarantee_pct: 0 },
-                TierDef { counts: [(4, 100), (3, 0), (2, 0)], msp_cost: 1000, guarantee_pct: 50 },
+                TierDef {
+                    counts: [(4, 100), (3, 0), (2, 0)],
+                    msp_cost: 700,
+                    guarantee_pct: 0,
+                },
+                TierDef {
+                    counts: [(4, 100), (3, 0), (2, 0)],
+                    msp_cost: 1000,
+                    guarantee_pct: 50,
+                },
             ],
             // pool 0 carries a duplicate 0x100 like the stock small pool
             pools: vec![
@@ -303,8 +365,14 @@ mod tests {
         let r = predict_roll(&mut s, 0, &t);
         assert_eq!(s, 0x26b13ea);
         assert_eq!(cats(&r), vec![0x400, 0x100, 0x500, 0x300]);
-        assert_eq!(r.iter().map(|m| m.level).collect::<Vec<_>>(), vec![3, 4, 9, 3]);
-        assert_eq!(r.iter().map(|m| m.kind).collect::<Vec<_>>(), vec![3, 0, 100, 2]);
+        assert_eq!(
+            r.iter().map(|m| m.level).collect::<Vec<_>>(),
+            vec![3, 4, 9, 3]
+        );
+        assert_eq!(
+            r.iter().map(|m| m.kind).collect::<Vec<_>>(),
+            vec![3, 0, 100, 2]
+        );
         assert!((r[0].value - 0.3).abs() < 1e-6);
         assert!((r[1].value - 40.0).abs() < 1e-6);
         assert!((r[3].value - 3.0).abs() < 1e-6);
@@ -320,7 +388,10 @@ mod tests {
         let r = predict_roll(&mut s, 1, &t);
         assert_eq!(s, 0x38c9b3c1);
         assert_eq!(cats(&r), vec![0x100, 0x200, 0x400, 0x500]);
-        assert_eq!(r.iter().map(|m| m.level).collect::<Vec<_>>(), vec![6, 6, 8, 6]);
+        assert_eq!(
+            r.iter().map(|m| m.level).collect::<Vec<_>>(),
+            vec![6, 6, 8, 6]
+        );
     }
 
     /// state 3 tier 1: guarantee misses (draw %100 = 51 >= 50) -> all four
@@ -384,7 +455,10 @@ mod tests {
         for d in &t.tiers {
             assert_eq!(d.counts, [(4, 100), (3, 0), (2, 0)]);
         }
-        assert_eq!(t.pools.iter().map(Vec::len).collect::<Vec<_>>(), vec![23, 11, 11]);
+        assert_eq!(
+            t.pools.iter().map(Vec::len).collect::<Vec<_>>(),
+            vec![23, 11, 11]
+        );
         // MED_EFF_ATK01 / HP01 / CRITICAL01 / BREAK01 head every pool.
         let atk01 = 0xc4925bd7u32;
         for pool in &t.pools {
@@ -396,7 +470,11 @@ mod tests {
         assert_eq!(t.level_weights[2], [3500, 300, 500]);
         for pool in &t.pools {
             for e in pool {
-                assert!(t.params.contains_key(&e.key), "param missing for {:#x}", e.key);
+                assert!(
+                    t.params.contains_key(&e.key),
+                    "param missing for {:#x}",
+                    e.key
+                );
             }
         }
         assert_eq!(t.params[&atk01].kind, 0);

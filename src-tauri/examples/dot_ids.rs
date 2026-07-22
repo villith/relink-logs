@@ -87,7 +87,10 @@ fn main() -> Result<()> {
         by_action.entry(key).or_default().add(e.damage as i64);
     }
 
-    println!("log {log_id} @ {time} — {want_char} action ids ({} distinct)", by_action.len());
+    println!(
+        "log {log_id} @ {time} — {want_char} action ids ({} distinct)",
+        by_action.len()
+    );
     let mut rows: Vec<_> = by_action.iter().collect();
     rows.sort_by_key(|(_, s)| std::cmp::Reverse(s.hits));
     for (key, s) in rows {

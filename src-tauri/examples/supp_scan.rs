@@ -137,13 +137,17 @@ fn main() -> Result<()> {
         let mut paired = 0u64;
         let mut unpaired = 0u64;
         for (i, event) in events.iter().enumerate() {
-            let Message::DamageEvent(e) = event else { continue };
+            let Message::DamageEvent(e) = event else {
+                continue;
+            };
             let ActionType::SupplementaryDamage(aid) = e.action_id else {
                 continue;
             };
             let mut found = None;
             for prev in events[..i].iter().rev().take(200) {
-                let Message::DamageEvent(p) = prev else { continue };
+                let Message::DamageEvent(p) = prev else {
+                    continue;
+                };
                 let trigger_aid = match p.action_id {
                     ActionType::Normal(a) => a,
                     _ => continue,
@@ -173,9 +177,7 @@ fn main() -> Result<()> {
                         None
                     };
                     if let Some(bucket) = bucket {
-                        *flags_by_bucket
-                            .entry((bucket, e.flags))
-                            .or_default() += 1;
+                        *flags_by_bucket.entry((bucket, e.flags)).or_default() += 1;
                     }
                 }
                 None => unpaired += 1,
@@ -188,7 +190,9 @@ fn main() -> Result<()> {
             let clean = |r: f64| (r - 0.2).abs() < 0.01 || (r - 0.4).abs() < 0.01;
             let mut counts = [(0u64, 0u64); 4]; // (clean, total) for A,B,C,D
             for (i, event) in events.iter().enumerate() {
-                let Message::DamageEvent(e) = event else { continue };
+                let Message::DamageEvent(e) = event else {
+                    continue;
+                };
                 let ActionType::SupplementaryDamage(aid) = e.action_id else {
                     continue;
                 };
@@ -202,7 +206,9 @@ fn main() -> Result<()> {
                 let mut d_best: Option<f64> = None;
                 let mut d_seen = 0;
                 for prev in events[..i].iter().rev().take(400) {
-                    let Message::DamageEvent(p) = prev else { continue };
+                    let Message::DamageEvent(p) = prev else {
+                        continue;
+                    };
                     if p.source.index != e.source.index
                         || p.source.actor_type != e.source.actor_type
                         || p.damage <= 0
@@ -247,9 +253,14 @@ fn main() -> Result<()> {
                     }
                 }
             }
-            for (name, (cl, tot)) in ["A prev-any", "B prev-same-aid", "C same-aid+target", "D best-of-8"]
-                .iter()
-                .zip(counts)
+            for (name, (cl, tot)) in [
+                "A prev-any",
+                "B prev-same-aid",
+                "C same-aid+target",
+                "D best-of-8",
+            ]
+            .iter()
+            .zip(counts)
             {
                 if tot > 0 {
                     println!(
@@ -264,14 +275,18 @@ fn main() -> Result<()> {
             for k in [1usize, 2, 4, 6, 8, 12, 16] {
                 let (mut cl, mut tot, mut amb) = (0u64, 0u64, 0u64);
                 for (i, event) in events.iter().enumerate() {
-                    let Message::DamageEvent(e) = event else { continue };
+                    let Message::DamageEvent(e) = event else {
+                        continue;
+                    };
                     let ActionType::SupplementaryDamage(aid) = e.action_id else {
                         continue;
                     };
                     let mut best: Option<f64> = None;
                     let (mut has02, mut has04, mut seen) = (false, false, 0);
                     for prev in events[..i].iter().rev().take(600) {
-                        let Message::DamageEvent(p) = prev else { continue };
+                        let Message::DamageEvent(p) = prev else {
+                            continue;
+                        };
                         if p.source.index != e.source.index
                             || p.source.actor_type != e.source.actor_type
                             || p.damage <= 0
@@ -320,14 +335,18 @@ fn main() -> Result<()> {
             let mut ambiguous = 0u64;
             let mut total_procs = 0u64;
             for (i, event) in events.iter().enumerate() {
-                let Message::DamageEvent(e) = event else { continue };
+                let Message::DamageEvent(e) = event else {
+                    continue;
+                };
                 let ActionType::SupplementaryDamage(aid) = e.action_id else {
                     continue;
                 };
                 total_procs += 1;
                 let (mut has02, mut has04, mut seen) = (false, false, 0);
                 for prev in events[..i].iter().rev().take(400) {
-                    let Message::DamageEvent(p) = prev else { continue };
+                    let Message::DamageEvent(p) = prev else {
+                        continue;
+                    };
                     if p.source.index != e.source.index
                         || p.source.actor_type != e.source.actor_type
                         || p.damage <= 0
@@ -364,13 +383,17 @@ fn main() -> Result<()> {
         // mechanics; never-both => one mechanic with a variable multiplier.
         let mut per_trigger: BTreeMap<usize, Vec<String>> = BTreeMap::new();
         for (i, event) in events.iter().enumerate() {
-            let Message::DamageEvent(e) = event else { continue };
+            let Message::DamageEvent(e) = event else {
+                continue;
+            };
             let ActionType::SupplementaryDamage(aid) = e.action_id else {
                 continue;
             };
             let mut found = None;
             for (back, prev) in events[..i].iter().rev().take(200).enumerate() {
-                let Message::DamageEvent(p) = prev else { continue };
+                let Message::DamageEvent(p) = prev else {
+                    continue;
+                };
                 let ActionType::Normal(trigger_aid) = p.action_id else {
                     continue;
                 };
