@@ -5,7 +5,6 @@ use std::{
     collections::HashMap,
     fs::File,
     io::Write,
-    path::Path,
     sync::atomic::{AtomicBool, Ordering},
 };
 
@@ -19,6 +18,8 @@ use db::logs::LogEntry;
 use dll_syringe::{process::OwnedProcess, Syringe};
 #[cfg(windows)]
 use interprocess::os::windows::named_pipe::tokio::RecvPipeStream;
+#[cfg(windows)]
+use std::path::Path;
 use log::{info, LevelFilter};
 use parser::{
     constants::{CharacterType, EnemyType},
@@ -237,12 +238,27 @@ fn set_debug_mode(app: AppHandle, state: State<DebugMode>, enabled: bool) {
     state.0.store(enabled, Ordering::Release);
 }
 
-/// Config file the injected hook reads ONCE at startup. It lives next to the hook's own
-/// log (`dirs::data_dir()/gbfr-logs`, which `tauri::api::path::data_dir` resolves
-/// identically) because the hook runs inside the game process and shares no state with us.
+/// Config file the injected hook reads ONCE at startup. It lives in the data
+/// dir the HOOK resolves at runtime — `dirs::data_dir()/gbfr-logs` on
+/// Windows; on Linux the hook runs inside the Proton prefix, so the same
+/// logical path lands inside `pfx/drive_c/...` and we write it there.
 fn hook_config_path() -> Result<std::path::PathBuf, String> {
-    let mut path = tauri::api::path::data_dir().ok_or("Could not find the data folder")?;
-    path.push("gbfr-logs");
+    #[cfg(not(target_os = "linux"))]
+    let mut path = {
+        let mut path = tauri::api::path::data_dir().ok_or("Could not find the data folder")?;
+        path.push("gbfr-logs");
+        path
+    };
+    #[cfg(target_os = "linux")]
+    let mut path = {
+        use gbfr_logs::linux_support::steam;
+        let home = std::env::var_os("HOME")
+            .map(std::path::PathBuf::from)
+            .ok_or("HOME is not set")?;
+        steam::discover(&steam::default_steam_roots(&home))
+            .ok_or("Could not find the game's Steam install")?
+            .hook_data_dir
+    };
     std::fs::create_dir_all(&path).map_err(|e| e.to_string())?;
     path.push("hook-config.json");
 
@@ -281,6 +297,105 @@ fn set_full_assist_unlock(enabled: bool) -> Result<(), String> {
     let contents = serde_json::json!({ "unlock_full_assist_infinity": enabled });
 
     std::fs::write(&path, contents.to_string()).map_err(|e| e.to_string())
+}
+
+#[cfg(target_os = "linux")]
+mod linux_setup {
+    use serde::Serialize;
+    use std::path::PathBuf;
+    use tauri::AppHandle;
+
+    use gbfr_logs::linux_support::{deploy, steam};
+
+    #[derive(Debug, Clone, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct LinuxSetupStatus {
+        steam_found: bool,
+        game_dir: Option<String>,
+        prefix_found: bool,
+        /// "missing" | "current" | "outdated" | "foreign"
+        proxy_status: String,
+        launch_options: String,
+    }
+
+    fn game_and_hook(app: &AppHandle) -> Result<(steam::SteamGame, PathBuf), String> {
+        let home = std::env::var_os("HOME")
+            .map(PathBuf::from)
+            .ok_or("HOME is not set")?;
+        let game = steam::discover(&steam::default_steam_roots(&home))
+            .ok_or("Could not find the game's Steam install")?;
+        let bundled = app
+            .path_resolver()
+            .resolve_resource("hook.dll")
+            .ok_or("hook.dll resource missing from this build")?;
+        Ok((game, bundled))
+    }
+
+    fn status_word(status: deploy::ProxyStatus) -> String {
+        match status {
+            deploy::ProxyStatus::Missing => "missing",
+            deploy::ProxyStatus::Current => "current",
+            deploy::ProxyStatus::Outdated => "outdated",
+            deploy::ProxyStatus::Foreign => "foreign",
+        }
+        .into()
+    }
+
+    #[tauri::command]
+    pub fn fetch_linux_setup_status(app: AppHandle) -> Result<LinuxSetupStatus, String> {
+        let Ok((game, bundled)) = game_and_hook(&app) else {
+            return Ok(LinuxSetupStatus {
+                steam_found: false,
+                game_dir: None,
+                prefix_found: false,
+                proxy_status: "missing".into(),
+                launch_options: deploy::LAUNCH_OPTIONS.into(),
+            });
+        };
+        let proxy = deploy::proxy_status(&game.game_dir, &bundled).map_err(|e| e.to_string())?;
+        Ok(LinuxSetupStatus {
+            steam_found: true,
+            game_dir: Some(game.game_dir.display().to_string()),
+            prefix_found: game.prefix_dir.is_dir(),
+            proxy_status: status_word(proxy),
+            launch_options: deploy::LAUNCH_OPTIONS.into(),
+        })
+    }
+
+    #[tauri::command]
+    pub fn deploy_linux_hook(app: AppHandle) -> Result<(), String> {
+        let (game, bundled) = game_and_hook(&app)?;
+        deploy::deploy(&game.game_dir, &bundled)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+
+    #[tauri::command]
+    pub fn remove_linux_hook(app: AppHandle) -> Result<(), String> {
+        let (game, _) = game_and_hook(&app)?;
+        deploy::remove(&game.game_dir).map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(target_os = "linux")]
+use linux_setup::{deploy_linux_hook, fetch_linux_setup_status, remove_linux_hook};
+
+#[cfg(not(target_os = "linux"))]
+#[tauri::command]
+fn fetch_linux_setup_status() -> Result<(), String> {
+    Err("linux-only".into())
+}
+
+#[cfg(not(target_os = "linux"))]
+#[tauri::command]
+fn deploy_linux_hook() -> Result<(), String> {
+    Err("linux-only".into())
+}
+
+#[cfg(not(target_os = "linux"))]
+#[tauri::command]
+fn remove_linux_hook() -> Result<(), String> {
+    Err("linux-only".into())
 }
 
 #[tauri::command]
@@ -789,9 +904,30 @@ async fn check_and_perform_hook(app: AppHandle) {
     }
 }
 
-// Replaced with the deploy-and-connect flow in the Linux-glue task.
+// Linux: no injector. Refresh the dinput8 proxy in the game folder
+// (best-effort — the setup panel surfaces failures), then let the TCP
+// connect-retry loop double as the "game running?" poll.
 #[cfg(not(windows))]
 async fn check_and_perform_hook(app: AppHandle) {
+    use gbfr_logs::linux_support::{deploy, steam};
+
+    let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
+    let bundled = app.path_resolver().resolve_resource("hook.dll");
+    match (home, bundled) {
+        (Some(home), Some(bundled)) => {
+            match steam::discover(&steam::default_steam_roots(&home)) {
+                Some(game) => match deploy::deploy(&game.game_dir, &bundled) {
+                    Ok(_) => info!("proxy dinput8.dll is current in {:?}", game.game_dir),
+                    Err(e) => log::warn!("could not deploy the proxy DLL: {e:?}"),
+                },
+                None => log::warn!(
+                    "Steam install of the game not found; see Settings → Linux setup"
+                ),
+            }
+        }
+        _ => log::warn!("no HOME or no bundled hook.dll; cannot deploy the proxy DLL"),
+    }
+
     connect_and_run_parser(app);
 }
 
@@ -994,7 +1130,9 @@ fn toggle_always_on_top(window: tauri::Window, state: State<AlwaysOnTop>) {
     let always_on_top = &state.0;
     let new_state = !always_on_top.load(Ordering::Acquire);
     always_on_top.store(new_state, Ordering::Release);
-    window.set_always_on_top(new_state).unwrap();
+    if let Err(e) = window.set_always_on_top(new_state) {
+        log::warn!("set_always_on_top({new_state}) failed: {e:?}");
+    }
     let _ = window.emit("on-pinned", new_state);
     let _ = window
         .app_handle()
@@ -1012,7 +1150,9 @@ fn toggle_clickthrough(window: tauri::Window, state: State<ClickThrough>) {
     let click_through = &state.0;
     let new_state = !click_through.load(Ordering::Acquire);
     click_through.store(new_state, Ordering::Release);
-    window.set_ignore_cursor_events(new_state).unwrap();
+    if let Err(e) = window.set_ignore_cursor_events(new_state) {
+        log::warn!("set_ignore_cursor_events({new_state}) failed: {e:?}");
+    }
     let _ = window.emit("on-clickthrough", new_state);
     let _ = window
         .app_handle()
@@ -1102,6 +1242,14 @@ fn show_window(app: &AppHandle) {
 }
 
 fn main() {
+    // The overlay depends on WM hints native Wayland refuses to clients
+    // (always-on-top, clickthrough); route through XWayland — the game under
+    // Proton is an XWayland window anyway. Respect an explicit user choice.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("GDK_BACKEND").is_none() {
+        std::env::set_var("GDK_BACKEND", "x11");
+    }
+
     info!("Starting application..");
 
     // Setup the database.
@@ -1152,6 +1300,9 @@ fn main() {
             search_synthesis,
             get_full_assist_unlock,
             set_full_assist_unlock,
+            fetch_linux_setup_status,
+            deploy_linux_hook,
+            remove_linux_hook,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.
