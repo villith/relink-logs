@@ -272,7 +272,7 @@ impl From<protocol::RecordStats> for RecordStats {
 }
 
 /// One trait id/level pair (wrightstone or innate weapon skill).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct WeaponTraitPair {
     pub id: u32,
@@ -326,6 +326,45 @@ impl From<protocol::WeaponState> for WeaponState {
             wrightstone_traits: pairs(state.wrightstone_traits),
             innate_traits: pairs(state.innate_traits),
         }
+    }
+}
+
+/// Folds a fresh weapon-state read into the already-known one for the same
+/// player. Identity refreshes re-read the record repeatedly, and reads of
+/// REMOTE players are often partial (the wrightstone item id never syncs, and
+/// awakening / innate skills can read empty before the network sync lands) —
+/// so a later sparse read must not wipe fields an earlier read recovered.
+/// A different weapon id replaces the state wholesale (a real re-equip in the
+/// lobby); the same weapon id keeps the best-known value per field. The
+/// progression fields use max() because they only ever grow while equipped and
+/// the hook's sanity clamp turns garbage into 0.
+fn merge_weapon_state(known: WeaponState, fresh: WeaponState) -> WeaponState {
+    if fresh.weapon_id != known.weapon_id {
+        return fresh;
+    }
+    // Non-empty beats empty, leveled beats unleveled; ties keep the fresh read.
+    let pick = |known: Vec<WeaponTraitPair>, fresh: Vec<WeaponTraitPair>| {
+        let score =
+            |t: &[WeaponTraitPair]| (!t.is_empty() as u8, t.iter().any(|p| p.level > 0) as u8);
+        if score(&fresh) >= score(&known) {
+            fresh
+        } else {
+            known
+        }
+    };
+    WeaponState {
+        weapon_id: fresh.weapon_id,
+        exp: known.exp.max(fresh.exp),
+        star_level: known.star_level.max(fresh.star_level),
+        plus_marks: known.plus_marks.max(fresh.plus_marks),
+        awakening_level: known.awakening_level.max(fresh.awakening_level),
+        wrightstone_id: if fresh.wrightstone_id != 0 {
+            fresh.wrightstone_id
+        } else {
+            known.wrightstone_id
+        },
+        wrightstone_traits: pick(known.wrightstone_traits, fresh.wrightstone_traits),
+        innate_traits: pick(known.innate_traits, fresh.innate_traits),
     }
 }
 
@@ -1259,8 +1298,11 @@ impl Parser {
                 // Stun messages carry no target, so target filtering doesn't
                 // apply (enemy stun is effectively boss-wide anyway).
                 Message::OnPlayerStun(event) => {
-                    self.derived_state
-                        .process_stun_message(*timestamp, event.actor_index, event.stun_amount as f64);
+                    self.derived_state.process_stun_message(
+                        *timestamp,
+                        event.actor_index,
+                        event.stun_amount as f64,
+                    );
                 }
                 Message::OnPerfectGuardStun(event) => {
                     self.derived_state.process_perfect_guard_stun(
@@ -1673,7 +1715,11 @@ impl Parser {
             player_data.stats = Some(stats.into());
         }
         if let Some(weapon_state) = event.weapon_state {
-            player_data.weapon_state = Some(weapon_state.into());
+            let fresh: WeaponState = weapon_state.into();
+            player_data.weapon_state = Some(match player_data.weapon_state.take() {
+                Some(known) => merge_weapon_state(known, fresh),
+                None => fresh,
+            });
         }
 
         // Character level, also town-loadout-only. Fold it into player_stats without
@@ -2600,10 +2646,7 @@ mod tests {
             .party
             .get(&0xF000_0000)
             .expect("party row created from the identity snapshot");
-        assert_eq!(
-            player.character_type,
-            CharacterType::from_hash(0x91418145)
-        );
+        assert_eq!(player.character_type, CharacterType::from_hash(0x91418145));
         let row = player
             .skill_breakdown
             .iter()
@@ -2675,7 +2718,10 @@ mod tests {
             .iter()
             .find(|skill| skill.action_type == ActionType::Normal(1))
             .expect("skill row");
-        assert_eq!(skill.total_stun_value, 0.0, "the guard's stun is not the skill's");
+        assert_eq!(
+            skill.total_stun_value, 0.0,
+            "the guard's stun is not the skill's"
+        );
     }
 
     /// The guard only claims the message that trails it. A message arriving well
@@ -3465,6 +3511,116 @@ mod tests {
         let slot2 = parser.encounter.player_data[2].as_ref().unwrap();
         assert_eq!(slot2.actor_index, 999);
         assert_eq!(parser.encounter.player_data.iter().flatten().count(), 2);
+    }
+
+    fn a_weapon_state(weapon_id: u32) -> protocol::WeaponState {
+        protocol::WeaponState {
+            weapon_id,
+            exp: 0,
+            star_level: 0,
+            plus_marks: 0,
+            awakening_level: 0,
+            wrightstone_id: 0,
+            wrightstone_traits: Vec::new(),
+            innate_traits: Vec::new(),
+        }
+    }
+
+    fn identity_event_with_weapon(state: protocol::WeaponState) -> PlayerIdentityEvent {
+        let mut event = identity_event("ふみ", 0x2AF678E8, 1, 42, true);
+        event.weapon_state = Some(state);
+        event
+    }
+
+    #[test]
+    fn sparse_weapon_state_refresh_keeps_recovered_fields() {
+        // Online quests: identity refreshes re-read the record while the remote
+        // player's network sync is still partial, and the stored state was
+        // last-write-wins — one late sparse read wiped awakening, innate skills
+        // and the wrightstone an earlier read had recovered (Jumbo Crab log 542).
+        let mut parser = Parser::default();
+
+        let mut full = a_weapon_state(0xCB5A08CD);
+        full.exp = 162_540;
+        full.star_level = 6;
+        full.awakening_level = 10;
+        full.wrightstone_id = 0x667E_E1D3;
+        full.wrightstone_traits = vec![protocol::WeaponTraitPair {
+            id: 0xF372_F096,
+            level: 20,
+        }];
+        full.innate_traits = vec![protocol::WeaponTraitPair {
+            id: 0x1E1C_ECCE,
+            level: 35,
+        }];
+        parser.on_player_identity_event(identity_event_with_weapon(full));
+
+        let mut sparse = a_weapon_state(0xCB5A08CD);
+        sparse.plus_marks = 99; // the one field the partial read carried
+        parser.on_player_identity_event(identity_event_with_weapon(sparse));
+
+        let player = parser.encounter.player_data[1].as_ref().unwrap();
+        let state = player.weapon_state.as_ref().unwrap();
+        assert_eq!(state.awakening_level, 10);
+        assert_eq!(state.star_level, 6);
+        assert_eq!(state.plus_marks, 99, "new fields still fold in");
+        assert_eq!(state.wrightstone_id, 0x667E_E1D3);
+        assert_eq!(state.wrightstone_traits.len(), 1);
+        assert_eq!(
+            state.innate_traits,
+            vec![WeaponTraitPair {
+                id: 0x1E1C_ECCE,
+                level: 35,
+            }]
+        );
+    }
+
+    #[test]
+    fn leveled_innate_skills_beat_an_unleveled_refresh() {
+        // A refresh can carry the innate skill IDS but no levels (the level pair
+        // array reads zero when the id lookup misses) — that read must not
+        // replace a previously recovered leveled set, but a leveled one may.
+        let mut parser = Parser::default();
+
+        let mut leveled = a_weapon_state(0xCB5A08CD);
+        leveled.innate_traits = vec![protocol::WeaponTraitPair {
+            id: 0x1E1C_ECCE,
+            level: 35,
+        }];
+        parser.on_player_identity_event(identity_event_with_weapon(leveled));
+
+        let mut unleveled = a_weapon_state(0xCB5A08CD);
+        unleveled.innate_traits = vec![protocol::WeaponTraitPair {
+            id: 0x1E1C_ECCE,
+            level: 0,
+        }];
+        parser.on_player_identity_event(identity_event_with_weapon(unleveled));
+
+        let player = parser.encounter.player_data[1].as_ref().unwrap();
+        let state = player.weapon_state.as_ref().unwrap();
+        assert_eq!(state.innate_traits[0].level, 35);
+    }
+
+    #[test]
+    fn a_different_weapon_id_replaces_the_state_wholesale() {
+        // A different weapon id is a real re-equip (lobby loadout change), not a
+        // partial read — carrying the old weapon's fields over would fabricate
+        // a hybrid loadout.
+        let mut parser = Parser::default();
+
+        let mut old = a_weapon_state(0xCB5A08CD);
+        old.awakening_level = 10;
+        old.wrightstone_id = 0x667E_E1D3;
+        parser.on_player_identity_event(identity_event_with_weapon(old));
+
+        let new = a_weapon_state(0xE3B3_5C0D);
+        parser.on_player_identity_event(identity_event_with_weapon(new));
+
+        let player = parser.encounter.player_data[1].as_ref().unwrap();
+        let state = player.weapon_state.as_ref().unwrap();
+        assert_eq!(state.weapon_id, 0xE3B3_5C0D);
+        assert_eq!(state.awakening_level, 0);
+        assert_eq!(state.wrightstone_id, 0);
     }
 
     #[test]
