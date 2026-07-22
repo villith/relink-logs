@@ -22,7 +22,14 @@ export type ColumnEditorProps = {
  * with a checkbox: checked = shown. Toggling a card keeps it in place (it just
  * stops rendering in the table); drag to reorder. Shared by the overlay settings
  * and the quest-details columns popover. */
-export const ColumnEditor = ({ title, droppableId, translationPrefix, items, onToggle, onReorder }: ColumnEditorProps) => {
+export const ColumnEditor = ({
+  title,
+  droppableId,
+  translationPrefix,
+  items,
+  onToggle,
+  onReorder,
+}: ColumnEditorProps) => {
   const { t } = useTranslation();
   const label = (column: string) =>
     `${t(`${translationPrefix}.${column}`)} — ${t(`${translationPrefix}.${column}-description`)}`;
@@ -56,7 +63,12 @@ export const ColumnEditor = ({ title, droppableId, translationPrefix, items, onT
                       <Box
                         component="span"
                         aria-label="Reorder column"
-                        style={{ cursor: "grab", display: "flex", alignItems: "center", color: "var(--mantine-color-dark-2)" }}
+                        style={{
+                          cursor: "grab",
+                          display: "flex",
+                          alignItems: "center",
+                          color: "var(--mantine-color-dark-2)",
+                        }}
                         {...draggableProvided.dragHandleProps}
                       >
                         <DotsSixVertical size={16} />
