@@ -1,23 +1,50 @@
 name: Release
 
-# On every push to main, if the version in package.json doesn't already have a
-# matching tag, create the tag and build + sign + publish a GitHub Release.
-# A merge that doesn't bump the version is a no-op. Requires the
-# TAURI_PRIVATE_KEY repo secret.
+# On every push to main or dev, if the version in package.json doesn't already
+# have a matching tag, build + sign + publish a GitHub Release. The tag is
+# created atomically WITH the release (gh release create --target), so a failed
+# build strands nothing — the next push simply retries. A push that doesn't
+# bump the version is a no-op. Requires the TAURI_PRIVATE_KEY repo secret.
+#
+# Release channels:
+#   main -> stable (X.Y.Z). Requires a human-written CHANGELOG.md section.
+#           Becomes releases/latest — the endpoint every installed app polls.
+#   dev  -> release candidate (X.Y.Z-N), published as a GitHub *prerelease*.
+#           GitHub never serves prereleases from releases/latest, so installed
+#           apps cannot see RCs — this is the safe end-to-end test of this
+#           pipeline. N must be NUMERIC (<= 65535): WiX only accepts a numeric
+#           prerelease field, which becomes the MSI's 4th version component
+#           (1.12.0-1 -> 1.12.0.1). A non-RC version on dev is a no-op, so dev
+#           can track ordinary development between RCs. A CHANGELOG section is
+#           optional for RCs (placeholder notes are used when absent).
+#
+# Two independent signatures are applied, and the ORDER MATTERS:
+#   1. Authenticode (Azure Artifact Signing) — what Windows/SmartScreen/UAC check.
+#   2. minisign (TAURI_PRIVATE_KEY) — what the in-app updater checks.
+# minisign covers the *bytes* of the updater artifact, so Authenticode must be
+# applied first. Signing after minisign would invalidate every auto-update.
 
 on:
   push:
     branches:
       - main
+      - dev
+
+# Two rapid merges must not race the version check and try to publish the same
+# release twice.
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  tag:
+  check:
     runs-on: ubuntu-latest
     permissions:
-      contents: write # required to push the tag
+      contents: read
     outputs:
       version: ${{ steps.check.outputs.version }}
       should_release: ${{ steps.check.outputs.should_release }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,41 +56,60 @@ jobs:
         run: |
           version="$(node -p "require('./package.json').version")"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          if git rev-parse "$version" >/dev/null 2>&1; then
+
+          if [[ "$GITHUB_REF_NAME" == "dev" ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$ ]]; then
+              echo "dev version $version is not an RC (X.Y.Z-N); nothing to release."
+              echo "should_release=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            if (( ${version##*-} > 65535 )); then
+              echo "::error::RC suffix ${version##*-} exceeds 65535, the MSI ProductVersion field limit."
+              exit 1
+            fi
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            if [[ "$version" == *-* ]]; then
+              echo "::error::main releases must be stable versions; got $version. RCs ship from dev."
+              exit 1
+            fi
+          fi
+
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
             echo "Tag $version already exists; nothing to release."
             echo "should_release=false" >> "$GITHUB_OUTPUT"
           else
-            echo "New version $version; will tag and release."
+            echo "New version $version; will build and release."
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # Fail before tagging: a tag without a release would block this version
-      # forever (the tag check above would skip it on every later push).
+      # Fail fast, before the expensive Windows build. The stable release body
+      # (and the in-app update prompt) comes from this section, so it must
+      # exist. RCs fall back to placeholder notes instead.
       - name: Require CHANGELOG.md notes for this version
-        if: steps.check.outputs.should_release == 'true'
+        if: steps.check.outputs.should_release == 'true' && steps.check.outputs.prerelease != 'true'
         shell: bash
         run: node scripts/extract-changelog.mjs "${{ steps.check.outputs.version }}"
 
-      - name: Create and push tag
-        if: steps.check.outputs.should_release == 'true'
-        shell: bash
-        run: |
-          version="${{ steps.check.outputs.version }}"
-          git tag "$version"
-          git push origin "$version"
-
   release:
-    needs: tag
-    if: needs.tag.outputs.should_release == 'true'
+    needs: check
+    if: needs.check.outputs.should_release == 'true'
     runs-on: windows-latest
     permissions:
-      contents: write # required to create the GitHub Release
+      contents: write # required to create the GitHub Release (and its tag)
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      PRERELEASE: ${{ needs.check.outputs.prerelease }}
+      # productName in tauri.conf.json. Drives every artifact filename below.
+      PRODUCT: GBFR Logs
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Install nightly Rust
         shell: bash
@@ -71,22 +117,29 @@ jobs:
           rustup set auto-self-update disable
           rustup update nightly && rustup default nightly
 
+      # Default mapping (`. -> target`): the cargo workspace root is the repo
+      # root — that's where target/ lives.
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "./src-tauri -> target"
 
       - name: Install npm dependencies
         run: npm ci
 
-      # The release body doubles as the updater prompt's patch notes:
-      # tauri-action copies it into latest.json as `notes`.
+      # The release body doubles as the updater prompt's patch notes: it is
+      # copied into latest.json as `notes` further down.
       - name: Extract release notes from CHANGELOG.md
         id: notes
         shell: bash
         run: |
+          if notes="$(node scripts/extract-changelog.mjs "$VERSION")"; then
+            echo "Using the CHANGELOG.md section for $VERSION."
+          elif [[ "$PRERELEASE" == "true" ]]; then
+            notes="Release candidate $VERSION — a test build published from the dev branch. Not intended for general use."
+          else
+            exit 1
+          fi
           {
             echo "body<<NOTES_EOF"
-            node scripts/extract-changelog.mjs "${{ needs.tag.outputs.version }}"
+            echo "$notes"
             echo ""
             echo "Make sure to save and exit the game before updating."
             echo "NOTES_EOF"
@@ -98,23 +151,172 @@ jobs:
       - name: Build hook DLL
         run: cargo build --release --package hook
 
-      - name: Stage hook.dll
+      # hook.dll is a *resource*, and the Tauri v1 bundler does not sign
+      # resources — so it must be signed here, before it is staged and packaged.
+      # It is also the file AV cares about most, since it gets injected into the
+      # game process. It must be final BEFORE pass 1 so nothing the build passes
+      # watch changes between them.
+      - name: Sign hook.dll
+        uses: azure/trusted-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
+          files: ${{ github.workspace }}\target\release\hook.dll
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      - name: Stage signed hook.dll
         shell: bash
         run: cp target/release/hook.dll src-tauri/hook.dll
 
-      - name: Build, sign, and publish release
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+      # The frontend is built ONCE, here, instead of via beforeBuildCommand.
+      # In Tauri v1 dist/ is embedded into the exe at compile time and
+      # tauri-build watches it, so if pass 2 re-ran `npm run build` the fresh
+      # dist/ mtimes would force a recompile and clobber the signed exe. Both
+      # tauri passes therefore run with beforeBuildCommand disabled — via the
+      # SAME --config file, so nothing the build script sees differs between
+      # passes.
+      - name: Build frontend
+        shell: pwsh
+        run: |
+          npm run build
+          Set-Content -Path .tauri-release-config.json -Value '{"build":{"beforeBuildCommand":""}}' -Encoding utf8
+
+      # Pass 1 compiles the app binary so it can be signed; bundling is skipped
+      # (`-b none`) — an MSI built now would wrap an unsigned exe and be thrown
+      # away. No updater artifact is produced in either pass, so neither needs
+      # TAURI_PRIVATE_KEY. After the build the CLI *moves* (std::fs::rename)
+      # target/release/gbfr-logs.exe to "GBFR Logs.exe" (productName).
+      - name: Build app (pass 1 — compile only)
+        run: npx tauri build -b none --config .tauri-release-config.json
+
+      # Signed here rather than inside the bundler because Tauri 1.5 can only
+      # drive signtool via `certificateThumbprint` (a cert in the machine store),
+      # which Artifact Signing's short-lived, dlib-issued certs cannot satisfy.
+      # This is the signature users see in the UAC prompt on every launch.
+      - name: Sign app binary
+        uses: azure/trusted-signing-action@v2
         with:
-          tagName: ${{ needs.tag.outputs.version }}
-          releaseName: "Relink Logs ${{ needs.tag.outputs.version }}"
-          releaseBody: ${{ steps.notes.outputs.body }}
-          # Publish (not draft) so releases/latest/download/latest.json resolves —
-          # that auto-generated manifest is the updater endpoint. tauri-action
-          # uploads latest.json + the .sig by default.
-          releaseDraft: false
-          prerelease: false
-          uploadUpdaterJson: true
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
+          files: ${{ github.workspace }}\target\release\${{ env.PRODUCT }}.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      # Pass 1's rename left cargo's own output path (gbfr-logs.exe) EMPTY, and
+      # cargo restores a missing output from deps/ — unsigned — even when the
+      # build is otherwise fresh. Put the SIGNED bytes back at cargo's output
+      # path instead: cargo never touches an output that already exists, so
+      # pass 2 stays fresh and its rename moves this signed copy into place.
+      - name: Restore signed binary to cargo output path
+        shell: pwsh
+        run: Copy-Item "target/release/$env:PRODUCT.exe" target/release/gbfr-logs.exe
+
+      # Same sources, same config, dist/ untouched → cargo is fully fresh; the
+      # bundler packages the signed exe and signed hook.dll into the MSI. If
+      # anything DID recompile, the signature is silently lost — the next step
+      # catches that and fails the job (nothing is stranded: no tag exists yet).
+      - name: Build app (pass 2 — bundle MSI from signed binary)
+        run: npx tauri build -b msi --config .tauri-release-config.json
+
+      - name: Verify the packaged binary is still signed
+        shell: pwsh
+        run: |
+          $exe = "target/release/$env:PRODUCT.exe"
+          $sig = Get-AuthenticodeSignature $exe
+          Write-Host "$exe -> $($sig.Status): $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne 'Valid') {
+            throw "Pass 2 rebuilt the binary and dropped its Authenticode signature."
+          }
+
+      - name: Sign MSI installer
+        uses: azure/trusted-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
+          files-folder: ${{ github.workspace }}\target\release\bundle\msi
+          files-folder-filter: msi
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      # The updater artifact (.msi.zip + minisign signature) is built by hand
+      # from the signed MSI. The updater key is unencrypted, hence the empty
+      # password.
+      - name: Build and minisign the updater artifact
+        shell: pwsh
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+        run: |
+          $msiDir = "target/release/bundle/msi"
+          $msi = Get-ChildItem "$msiDir/*.msi" | Select-Object -First 1
+          $zip = Join-Path $msiDir "$($msi.Name).zip"
+          Write-Host "Packaging signed $($msi.Name)"
+          Compress-Archive -Path $msi.FullName -DestinationPath $zip -Force
+          npx tauri signer sign --private-key "$env:TAURI_PRIVATE_KEY" --password "" $zip
+          if (-not (Test-Path "$zip.sig")) { throw "minisign did not produce $zip.sig" }
+
+      # Hand-built because tauri-action is no longer doing the build. GitHub
+      # rewrites spaces in uploaded asset names to dots, so the download URL
+      # must use the rewritten name.
+      - name: Generate latest.json
+        shell: pwsh
+        env:
+          NOTES: ${{ steps.notes.outputs.body }}
+        run: |
+          $msiDir = "target/release/bundle/msi"
+          $zip = Get-ChildItem "$msiDir/*.msi.zip" | Select-Object -First 1
+          $signature = Get-Content "$($zip.FullName).sig" -Raw
+          $assetName = $zip.Name -replace ' ', '.'
+          $manifest = [ordered]@{
+            version   = $env:VERSION
+            notes     = $env:NOTES
+            pub_date  = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ')
+            platforms = [ordered]@{
+              'windows-x86_64' = [ordered]@{
+                signature = $signature.Trim()
+                url = "https://github.com/villith/relink-logs/releases/download/$env:VERSION/$assetName"
+              }
+            }
+          }
+          $manifest | ConvertTo-Json -Depth 5 | Out-File "$msiDir/latest.json" -Encoding utf8
+          Get-Content "$msiDir/latest.json"
+
+      # Published (not draft) so releases/latest/download/latest.json resolves —
+      # that manifest is the updater endpoint. `--target` creates the version tag
+      # on the exact commit this job built, atomically with the release; the
+      # .sig is not uploaded because the updater reads the signature from
+      # latest.json, never from a file. RCs are published with --prerelease,
+      # which GitHub excludes from releases/latest — installed apps never see
+      # them (their latest.json stays reachable via the versioned download URL,
+      # which is how an RC update flow is tested by hand).
+      - name: Publish GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NOTES: ${{ steps.notes.outputs.body }}
+        run: |
+          $msiDir = "target/release/bundle/msi"
+          $NOTES | Out-File notes.md -Encoding utf8
+          $assets = @(
+            (Get-ChildItem "$msiDir/*.msi").FullName
+            (Get-ChildItem "$msiDir/*.msi.zip").FullName
+            (Resolve-Path "$msiDir/latest.json").Path
+          )
+          $extra = @()
+          if ($env:PRERELEASE -eq 'true') { $extra += '--prerelease' }
+          gh release create $env:VERSION $assets --target $env:GITHUB_SHA --title "Relink Logs $env:VERSION" --notes-file notes.md @extra

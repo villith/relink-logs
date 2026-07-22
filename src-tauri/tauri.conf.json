@@ -79,8 +79,7 @@
     "bundle": {
       "active": true,
       "targets": [
-        "msi",
-        "updater"
+        "msi"
       ],
       "identifier": "com.false",
       "longDescription": "GBFR Logs - DPS Meter for Granblue Fantasy: Relink",
