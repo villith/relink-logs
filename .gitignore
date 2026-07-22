@@ -40,3 +40,4 @@ docs/damage-calculators/
 .tauri/
 *.key
 *.key.pub
+/.worktrees
