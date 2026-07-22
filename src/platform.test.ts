@@ -1,5 +1,5 @@
 import { renderHook, waitFor } from "@testing-library/react";
-import { vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@tauri-apps/api/os", () => ({ platform: vi.fn().mockResolvedValue("linux") }));
 
