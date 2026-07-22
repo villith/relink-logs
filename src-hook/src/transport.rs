@@ -4,7 +4,9 @@
 //! Linux app cannot open Wine named pipes, so the server listens on
 //! localhost TCP instead. `GBFR_LOGS_FORCE_TCP=1` in the game process
 //! environment forces TCP so the path can be soak-tested on Windows.
-//! Note: winecfg's "Hide Wine version" setting (HideWineExports) removes the export we probe, silently falling back to the pipe — GBFR_LOGS_FORCE_TCP=1 is the escape hatch.
+//! Note: winecfg's "Hide Wine version" setting (HideWineExports) removes
+//! the export we probe, silently falling back to the pipe —
+//! GBFR_LOGS_FORCE_TCP=1 is the escape hatch.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Transport {

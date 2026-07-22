@@ -101,6 +101,9 @@ impl Server {
                 }
                 Err(e) => {
                     warn!("Error accepting client: {:?}", e);
+                    // A persistent accept error (fd exhaustion, Wine socket
+                    // quirks) must not busy-spin inside the game process.
+                    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 }
             }
         }
