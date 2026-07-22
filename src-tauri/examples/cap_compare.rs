@@ -207,7 +207,9 @@ fn main() -> Result<()> {
                     ActionType::SBA => u32::MAX - 1,
                     ActionType::DamageOverTime(x) => x,
                     ActionType::SupplementaryDamage(_) => continue,
-                    ActionType::PerfectGuard | ActionType::PerfectGuardQuickening => continue,
+                    ActionType::PerfectGuard
+                    | ActionType::PerfectGuardQuickening
+                    | ActionType::StunEffect(_) => continue,
                 };
                 let Some(cap) = e.damage_cap.filter(|c| *c > 0) else { continue };
                 let s = per_skill.entry(sid).or_default();

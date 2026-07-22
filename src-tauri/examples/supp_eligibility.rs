@@ -144,7 +144,9 @@ fn main() -> Result<()> {
                 ActionType::SBA => t.sba_hits += 1,
                 ActionType::DamageOverTime(_) => t.dot_hits += 1,
                 ActionType::SupplementaryDamage(_) => t.supp_events += 1,
-                ActionType::PerfectGuard | ActionType::PerfectGuardQuickening => {}
+                ActionType::PerfectGuard
+                | ActionType::PerfectGuardQuickening
+                | ActionType::StunEffect(_) => {}
             }
         }
 
@@ -177,7 +179,8 @@ fn main() -> Result<()> {
                     ActionType::DamageOverTime(_) => TriggerClass::Dot,
                     ActionType::SupplementaryDamage(_)
                     | ActionType::PerfectGuard
-                    | ActionType::PerfectGuardQuickening => continue,
+                    | ActionType::PerfectGuardQuickening
+                    | ActionType::StunEffect(_) => continue,
                 };
                 if class == TriggerClass::NormalAidMatch {
                     best = Some((class, 0.0));
@@ -309,7 +312,8 @@ fn main() -> Result<()> {
                 ActionType::DamageOverTime(_) => ("dot", None),
                 ActionType::SupplementaryDamage(_)
                 | ActionType::PerfectGuard
-                | ActionType::PerfectGuardQuickening => continue,
+                | ActionType::PerfectGuardQuickening
+                | ActionType::StunEffect(_) => continue,
             };
             let normal_aids = &tallies[&src].normal_aids;
             let (mut loose_hit, mut tight_hit) = (false, false);

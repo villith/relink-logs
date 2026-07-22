@@ -86,6 +86,7 @@ fn main() -> Result<()> {
                     ActionType::Normal(_) => "normal",
                     ActionType::PerfectGuard => "perfect-guard",
                     ActionType::PerfectGuardQuickening => "perfect-guard-quickening",
+                    ActionType::StunEffect(_) => "stun-effect",
                 };
                 per_class.entry(class).or_default().add(e.damage as i64);
                 match e.action_id {

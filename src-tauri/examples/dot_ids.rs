@@ -82,6 +82,7 @@ fn main() -> Result<()> {
             ActionType::SBA => "SBA".into(),
             ActionType::PerfectGuard => "PerfectGuard".into(),
             ActionType::PerfectGuardQuickening => "PerfectGuardQuickening".into(),
+            ActionType::StunEffect(id) => format!("StunEffect({id})"),
         };
         by_action.entry(key).or_default().add(e.damage as i64);
     }
