@@ -85,6 +85,13 @@ if ($Dev) {
 } else {
     Invoke-Step "npm run tauri build" { npm run tauri build }
 
+    # Exit code alone is not proof the artifact exists: don't print "Build
+    # complete" and list paths that were never checked.
+    $Exe = Join-Path $RepoRoot 'target/release/GBFR Logs.exe'
+    if (-not (Test-Path $Exe)) {
+        throw "tauri build reported success but '$Exe' was not produced."
+    }
+
     Write-Host ""
     Write-Host "Build complete." -ForegroundColor Green
     Write-Host "Artifacts:" -ForegroundColor Green
