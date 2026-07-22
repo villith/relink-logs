@@ -29,7 +29,10 @@ fn real_create() -> Option<DirectInput8CreateFn> {
     *REAL.get_or_init(|| unsafe {
         let module = LoadLibraryW(w!(r"C:\windows\system32\dinput8.dll")).ok()?;
         let addr = GetProcAddress(module, s!("DirectInput8Create"))?;
-        Some(std::mem::transmute::<unsafe extern "system" fn() -> isize, DirectInput8CreateFn>(addr))
+        Some(std::mem::transmute::<
+            unsafe extern "system" fn() -> isize,
+            DirectInput8CreateFn,
+        >(addr))
     })
 }
 
