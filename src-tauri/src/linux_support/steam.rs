@@ -214,7 +214,7 @@ mod tests {
         let mk = |name: &str| {
             let root = tmp.path().join(name);
             let game = root.join("steamapps/common/Granblue Fantasy Relink");
-            fs::create_dir_all(&game).unwrap();
+            fs::create_dir_all(game).unwrap();
             fs::write(
                 root.join(format!("steamapps/appmanifest_{APP_ID}.acf")),
                 "\"AppState\"\n{\n  \"installdir\"  \"Granblue Fantasy Relink\"\n}\n",

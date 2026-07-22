@@ -49,11 +49,25 @@ pub fn deploy(game_dir: &Path, bundled_hook: &Path) -> Result<ProxyStatus> {
     match proxy_status(game_dir, bundled_hook)? {
         ProxyStatus::Current => Ok(ProxyStatus::Current),
         ProxyStatus::Foreign => {
-            bail!("a dinput8.dll from another tool is already in the game folder")
+            bail!(
+                "a dinput8.dll from another tool is already at {}",
+                game_dir.join(PROXY_DLL_NAME).display()
+            )
         }
         ProxyStatus::Missing | ProxyStatus::Outdated => {
-            fs::copy(bundled_hook, game_dir.join(PROXY_DLL_NAME))
-                .context("copy hook.dll into the game folder")?;
+            let bundled = fs::read(bundled_hook).context("read bundled hook.dll")?;
+            if !is_ours(&bundled) {
+                bail!(
+                    "bundled hook.dll at {} lacks the \"Relink Logs\" version resource; \
+                     refusing to deploy a DLL later versions could not recognize as ours",
+                    bundled_hook.display()
+                );
+            }
+            let target = game_dir.join(PROXY_DLL_NAME);
+            // Same-directory temp file → same filesystem → rename is atomic.
+            let tmp = game_dir.join("dinput8.dll.gbfr-logs.tmp");
+            fs::write(&tmp, &bundled).context("write temp proxy dll")?;
+            fs::rename(&tmp, target).context("move temp proxy dll into place")?;
             Ok(ProxyStatus::Current)
         }
     }
@@ -66,7 +80,10 @@ pub fn remove(game_dir: &Path) -> Result<()> {
         return Ok(());
     }
     if !is_ours(&fs::read(&target).context("read existing dinput8.dll")?) {
-        bail!("the dinput8.dll in the game folder is not ours; not deleting it");
+        bail!(
+            "the dinput8.dll at {} is not ours; not deleting it",
+            target.display()
+        );
     }
     fs::remove_file(&target).context("remove proxy dll")
 }
@@ -160,6 +177,16 @@ mod tests {
             fs::read(f.game_dir.join(PROXY_DLL_NAME)).unwrap(),
             b"reshade or whatever"
         );
+    }
+
+    /// A bundled hook missing the version-resource marker must be refused —
+    /// deploying it would wedge the NEXT update (it would read as Foreign).
+    #[test]
+    fn deploy_refuses_marker_less_bundled_hook() {
+        let f = fixture();
+        fs::write(&f.bundled, b"built without winres somehow").unwrap();
+        assert!(deploy(&f.game_dir, &f.bundled).is_err());
+        assert!(!f.game_dir.join(PROXY_DLL_NAME).exists());
     }
 
     #[test]
