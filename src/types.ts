@@ -68,6 +68,7 @@ export type ActionType =
   | "SBA"
   | "PerfectGuard"
   | "PerfectGuardQuickening"
+  | { StunEffect: number }
   | { SupplementaryDamage: number }
   | { DamageOverTime: number }
   | { Normal: number }
@@ -99,6 +100,12 @@ export type SkillState = {
   totalStunValue: number;
   /** Maximum recorded stun value of the skill */
   maxStunValue: number;
+  /** Stun captured via per-hit accumulator deltas (solo path; 0 in online lobbies) */
+  stunDeltaSum?: number;
+  /** Stun captured via network stun messages attributed to this skill (online path); totalStunValue = max of both */
+  stunMessageSum?: number;
+  /** Hits that actually applied stun (excludes 0-stun/echo/DoT); the denominator for "stun per hit". Optional so older cached payloads stay valid. */
+  stunEligibleHits?: number;
   /** Number of hits that reached the game's damage cap */
   cappedHits: number;
   /** Number of hits that were subject to a damage cap at all (cap-less sources like supplementary damage excluded) */
@@ -137,6 +144,8 @@ export type ComputedSkillGroup = {
   totalStunValue: number;
   /** Maximum recorded stun value of the skill */
   maxStunValue: number;
+  /** Hits that actually applied stun (summed over grouped skills) */
+  stunEligibleHits?: number;
   /** Number of hits that reached the game's damage cap (summed over grouped skills) */
   cappedHits: number;
   /** Number of cappable hits (summed over grouped skills) */
@@ -380,6 +389,8 @@ export enum SkillColumns {
   MaxDamage = "max",
   AverageDamage = "average",
   TotalStunValue = "stun",
+  StunEligibleHits = "stun-hits",
+  StunPerEligibleHit = "stun-per-hit",
   Overcap = "overcap",
   DamagePercentage = "percentage",
 }
@@ -392,6 +403,8 @@ export const DEFAULT_SKILL_COLUMNS: SkillColumns[] = [
   SkillColumns.MaxDamage,
   SkillColumns.AverageDamage,
   SkillColumns.TotalStunValue,
+  SkillColumns.StunEligibleHits,
+  SkillColumns.StunPerEligibleHit,
   SkillColumns.Overcap,
   SkillColumns.DamagePercentage,
 ];

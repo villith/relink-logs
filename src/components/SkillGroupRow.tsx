@@ -111,6 +111,17 @@ export const SkillGroupRow = ({ characterType, group, color, columns, live }: Sk
         );
       case SkillColumns.TotalStunValue:
         return <StunCell key={column} value={group.totalStunValue ?? 0} showFullValues={showFullValues} />;
+      case SkillColumns.StunEligibleHits:
+        return (
+          <td key={column} className="text-center row-data">
+            {(group.stunEligibleHits ?? 0) > 0 ? group.stunEligibleHits : ""}
+          </td>
+        );
+      case SkillColumns.StunPerEligibleHit: {
+        const eligible = group.stunEligibleHits ?? 0;
+        const perHit = eligible > 0 ? (group.totalStunValue ?? 0) / eligible : 0;
+        return <StunCell key={column} value={perHit} showFullValues={showFullValues} />;
+      }
       case SkillColumns.Overcap:
         return <OvercapCell key={column} percentage={overcapPercentage} />;
       case SkillColumns.DamagePercentage:

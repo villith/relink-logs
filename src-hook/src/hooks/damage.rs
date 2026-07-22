@@ -82,6 +82,50 @@ fn is_quickening_marker(action_id: u32, flags: u64, target_type_id: u32) -> bool
         && target_type_id == EM8300_THE_WORLD
 }
 
+/// What a player-sourced ZERO-damage event should be surfaced as. Pure so both
+/// damage detours share one authority and the decision is unit-tested.
+#[derive(Debug, PartialEq, Eq)]
+enum ZeroDamageGuard {
+    /// Nothing to emit.
+    None,
+    /// The World's guarded Quickening (hits-only marker row).
+    Quickening,
+    /// A genuine Perfect Guard counter (the game's generic action-id -1 counter).
+    PerfectGuard,
+    /// A NON-guard player zero-damage stun accrual. Live-confirmed 07-21 to be an
+    /// Eugen stun-application proc — the sticky grenade applying stun when it
+    /// sticks to a target (action id 0, flags 0x6100000, no guard bit, flat ~25
+    /// stun). Previously mis-surfaced as a Perfect Guard because the old rule
+    /// admitted ANY positive stun delta.
+    StunEffect,
+}
+
+/// Classify a player-sourced zero-damage event. Only the generic counter
+/// (action -1) is a Perfect Guard; a bare positive stun delta without the guard
+/// signature is a non-guard melee-stun accrual, not a guard.
+fn classify_zero_damage_guard(
+    action_id: u32,
+    flags: u64,
+    added_stun_value: f32,
+    target_type_id: u32,
+) -> ZeroDamageGuard {
+    // Echo companions never classify — one rides ~150ms behind every guard and
+    // would double the count.
+    if flags & SUPP_ECHO_FLAG != 0 {
+        return ZeroDamageGuard::None;
+    }
+    if is_quickening_marker(action_id, flags, target_type_id) {
+        return ZeroDamageGuard::Quickening;
+    }
+    if is_generic_pg_counter(action_id, flags) {
+        return ZeroDamageGuard::PerfectGuard;
+    }
+    if added_stun_value > 0.0 {
+        return ZeroDamageGuard::StunEffect;
+    }
+    ZeroDamageGuard::None
+}
+
 /// Flag-bit → [`ActionType`] classification, shared by both damage detours so
 /// the bit table can never diverge between them.
 fn classify_action_type(flags: u64, action_id: u32) -> ActionType {
@@ -386,23 +430,23 @@ impl OnProcessDamageHook {
         damage_instance: &DamageInstance,
         added_stun_value: f32,
     ) {
+        let action_id = damage_instance.action_id;
+        let flags = damage_instance.flags;
         // A supp-echo companion (bit 15) shadows every guard ~150ms later with the
-        // SAME action id; it must never count as a guard (doing so doubles the
-        // hits/stun). `is_generic_pg_counter` excludes it from the counter
-        // signature, but the `emit_stun` stun fallback below would re-admit it if
-        // the echo ever carries a stun delta — so drop echoes up front.
-        if damage_instance.flags & SUPP_ECHO_FLAG != 0 {
+        // SAME action id; it must never count (doing so doubles the hits/stun), so
+        // drop echoes up front — `classify_zero_damage_guard` also excludes them,
+        // this just skips the slot/target reads below.
+        if flags & SUPP_ECHO_FLAG != 0 {
             return;
         }
-        let is_pg_counter = is_generic_pg_counter(damage_instance.action_id, damage_instance.flags);
-        // A generic counter, or any other in-call stun accrual, is a Perfect Guard
-        // stun (single source of truth for the gate and the emit below).
-        let emit_stun = is_pg_counter || added_stun_value > 0.0;
-        // Cheap pure gate first: nothing below can emit unless `emit_stun` holds or
-        // the event is guard-flagged (the marker requires the guard flag), and the
-        // slot resolution + target type read are guarded-pointer/vtable work this
-        // path shouldn't pay on every whiffed hit.
-        if !emit_stun && damage_instance.flags & GUARD_FLAG == 0 {
+        // Cheap pure gate before the slot resolution + target-type read (guarded
+        // pointer / vtable work this path shouldn't pay on every whiffed hit):
+        // nothing can emit unless there's a generic counter, a stun accrual, or
+        // the guard flag (the Quickening marker requires it).
+        if !is_generic_pg_counter(action_id, flags)
+            && added_stun_value <= 0.0
+            && flags & GUARD_FLAG == 0
+        {
             return;
         }
         let Some(actor_index) =
@@ -414,14 +458,22 @@ impl OnProcessDamageHook {
             actor_index,
             stun_amount: added_stun_value,
         };
-        if is_quickening_marker(
-            damage_instance.action_id,
-            damage_instance.flags,
-            actor_type_id(target_specified_instance_ptr as *const usize),
-        ) {
-            let _ = self.tx.send(Message::OnPerfectGuardQuickening(event));
-        } else if emit_stun {
-            let _ = self.tx.send(Message::OnPerfectGuardStun(event));
+        let target_type_id = actor_type_id(target_specified_instance_ptr as *const usize);
+        // The classifiers — NOT the stun gauge — decide what this is. Only the
+        // generic counter (action -1) is a Perfect Guard; a bare stun delta with no
+        // guard signature is a stun-application proc (Eugen's sticky grenade), which
+        // must NOT inflate the Perfect Guard row (live-diagnosed 07-21).
+        match classify_zero_damage_guard(action_id, flags, added_stun_value, target_type_id) {
+            ZeroDamageGuard::Quickening => {
+                let _ = self.tx.send(Message::OnPerfectGuardQuickening(event));
+            }
+            ZeroDamageGuard::PerfectGuard => {
+                let _ = self.tx.send(Message::OnPerfectGuardStun(event));
+            }
+            ZeroDamageGuard::StunEffect => {
+                let _ = self.tx.send(Message::OnStunEffect(event));
+            }
+            ZeroDamageGuard::None => {}
         }
     }
 
@@ -1337,6 +1389,59 @@ mod tests {
         // A supp echo of the marker must not double-count the guard.
         assert!(!is_quickening_marker(0, 0x4000220 | (1 << 15), EM8300_THE_WORLD));
         assert!(!is_quickening_marker(u32::MAX, 0x4000220, EM8300_THE_WORLD));
+    }
+
+    /// Live-confirmed 07-21: Eugen's sticky grenade (applying stun when it sticks
+    /// to a target) fires player-sourced zero-damage events with action id 0,
+    /// flags 0x6100000 (NO guard bit, not an echo) and a flat ~25 stun. They are
+    /// NOT perfect guards — only the generic counter (action -1) is — so they
+    /// must classify as their own StunEffect category, not PerfectGuard.
+    #[test]
+    fn eugen_stun_proc_is_stun_effect_not_perfect_guard() {
+        assert_eq!(
+            classify_zero_damage_guard(0, 0x6100000, 25.04, 0x2b31654b),
+            ZeroDamageGuard::StunEffect
+        );
+        // Ramped variant (37.56 = 25.04 * 1.5) is the same mechanic.
+        assert_eq!(
+            classify_zero_damage_guard(0, 0x6100000, 37.56, 0x2b31654b),
+            ZeroDamageGuard::StunEffect
+        );
+    }
+
+    /// A genuine counter (action -1 + guard flag) is a Perfect Guard, and it must
+    /// still count when a stun-immune target yields a 0 delta.
+    #[test]
+    fn real_counter_classifies_as_perfect_guard_even_at_zero_stun() {
+        assert_eq!(
+            classify_zero_damage_guard(u32::MAX, 0x40040e0020, 250.40, 0x2b31654b),
+            ZeroDamageGuard::PerfectGuard
+        );
+        assert_eq!(
+            classify_zero_damage_guard(u32::MAX, 0x40040e0020, 0.0, 0x2b31654b),
+            ZeroDamageGuard::PerfectGuard
+        );
+    }
+
+    /// The Quickening marker still wins (checked before the melee-stun fallback),
+    /// and events with nothing to emit (echo companion, or a stunless non-guard)
+    /// classify as None.
+    #[test]
+    fn quickening_wins_and_empty_events_emit_nothing() {
+        assert_eq!(
+            classify_zero_damage_guard(0, 0x4000220, 0.0, EM8300_THE_WORLD),
+            ZeroDamageGuard::Quickening
+        );
+        // Echo companion (bit 15) never classifies, even carrying stun.
+        assert_eq!(
+            classify_zero_damage_guard(u32::MAX, 0x40040e8020, 250.0, 0x2b31654b),
+            ZeroDamageGuard::None
+        );
+        // A non-guard zero-damage event with no stun has nothing to emit.
+        assert_eq!(
+            classify_zero_damage_guard(0, 0x6100000, 0.0, 0x2b31654b),
+            ZeroDamageGuard::None
+        );
     }
 
     /// The ExHp reads are raw memory on an offset that will silently shift on a

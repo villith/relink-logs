@@ -21,7 +21,7 @@ sea-query = { version = "0" }
 sea-query-rusqlite = { version = "0", features = ["with-chrono"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-tauri = { version = "1.5", features = [
+tauri = { version = "1.5", features = [ "window-set-size", "window-set-min-size",
   "path-all",
   "fs-read-file",
   "updater",

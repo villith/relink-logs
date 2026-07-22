@@ -96,6 +96,14 @@ pub enum ActionType {
     /// and no damage (the scripted counter damage is intentionally untracked).
     /// Appended last per the append-only rule.
     PerfectGuardQuickening,
+    /// Stun applied by a non-guard player zero-damage effect (synthesized by the
+    /// parser from `OnStunEffect` messages into a zero-damage, stun-only
+    /// breakdown row). Live-confirmed 07-21 as Eugen's sticky grenade. The `u32`
+    /// is a per-character effect index (always 0 today — the source events carry
+    /// no discriminator yet), reserved so a character with more than one such
+    /// proc can name them separately (`stun-effect-0`, `stun-effect-1`, ...)
+    /// without a breaking variant change. Appended last per the append-only rule.
+    StunEffect(u32),
 }
 
 impl Display for ActionType {
@@ -108,6 +116,7 @@ impl Display for ActionType {
             ActionType::Normal(id) => write!(f, "Skill ({})", id),
             ActionType::PerfectGuard => write!(f, "Perfect Guard"),
             ActionType::PerfectGuardQuickening => write!(f, "Perfect Guard (Quickening)"),
+            ActionType::StunEffect(id) => write!(f, "Stun Effect ({})", id),
         }
     }
 }
@@ -532,4 +541,13 @@ pub enum Message {
     /// delta (0.0 in every observed capture, kept for diagnostics). Appended
     /// last per the append-only rule.
     OnPerfectGuardQuickening(OnPlayerStunEvent),
+    /// Stun applied by a NON-guard player zero-damage effect — live-confirmed
+    /// 07-21 to be Eugen's sticky grenade applying stun when it sticks to a
+    /// target (action id 0, flags 0x6100000, flat ~25 stun). Distinct from
+    /// `OnPerfectGuardStun`: it carries real stun but is not a guard, so the
+    /// parser surfaces it as its own "Stun Effect" row instead of inflating the
+    /// Perfect Guard row. `actor_index` is the source player's slot key;
+    /// `stun_amount` is the measured accumulator delta. Appended last per the
+    /// append-only rule.
+    OnStunEffect(OnPlayerStunEvent),
 }

@@ -846,6 +846,9 @@ fn connect_and_run_parser(app: AppHandle) {
                                 protocol::Message::OnPerfectGuardQuickening(event) => {
                                     state.on_perfect_guard_quickening(event);
                                 }
+                                protocol::Message::OnStunEffect(event) => {
+                                    state.on_stun_effect(event);
+                                }
                             }
                         }
                     }

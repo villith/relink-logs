@@ -104,6 +104,17 @@ export const SkillRow = ({ characterType, skill, color, columns, nested, live }:
         );
       case SkillColumns.TotalStunValue:
         return <StunCell key={column} value={skill.totalStunValue ?? 0} showFullValues={showFullValues} />;
+      case SkillColumns.StunEligibleHits:
+        return (
+          <td key={column} className="text-center row-data">
+            {(skill.stunEligibleHits ?? 0) > 0 ? skill.stunEligibleHits : ""}
+          </td>
+        );
+      case SkillColumns.StunPerEligibleHit: {
+        const eligible = skill.stunEligibleHits ?? 0;
+        const perHit = eligible > 0 ? (skill.totalStunValue ?? 0) / eligible : 0;
+        return <StunCell key={column} value={perHit} showFullValues={showFullValues} />;
+      }
       case SkillColumns.Overcap:
         return <OvercapCell key={column} percentage={overcapPercentage} />;
       case SkillColumns.DamagePercentage:

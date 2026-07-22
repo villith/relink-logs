@@ -542,6 +542,12 @@ pub struct DerivedEncounterState {
     /// creation.
     #[serde(skip)]
     pending_player_pg_quickening: HashMap<u32, u32>,
+    /// Non-guard stun-effect procs (Eugen's sticky grenade) that arrived before
+    /// the applying player's first damage event; folded into their StunEffect row
+    /// on row creation. One entry per proc so the row's hit count and per-proc max
+    /// survive.
+    #[serde(skip)]
+    pending_player_stun_effect: HashMap<u32, Vec<f64>>,
     /// Status of the parser
     status: ParserStatus,
     /// Derived party stats
@@ -564,6 +570,7 @@ impl Default for DerivedEncounterState {
             pending_player_stun: HashMap::new(),
             pending_player_pg_stun: HashMap::new(),
             pending_player_pg_quickening: HashMap::new(),
+            pending_player_stun_effect: HashMap::new(),
             status: ParserStatus::Waiting,
             party: HashMap::new(),
             targets: HashMap::new(),
@@ -675,6 +682,7 @@ impl DerivedEncounterState {
         let pending_stun = self.pending_player_stun.remove(&actor_index);
         let pending_pg_stun = self.pending_player_pg_stun.remove(&actor_index);
         let pending_pg_quickening = self.pending_player_pg_quickening.remove(&actor_index);
+        let pending_stun_effect = self.pending_player_stun_effect.remove(&actor_index);
 
         let player = self
             .party
@@ -692,6 +700,11 @@ impl DerivedEncounterState {
         if let Some(pending) = pending_pg_quickening {
             for _ in 0..pending {
                 player.add_perfect_guard_quickening();
+            }
+        }
+        if let Some(pending) = pending_stun_effect {
+            for amount in pending {
+                player.add_stun_effect(amount);
             }
         }
     }
@@ -754,6 +767,38 @@ impl DerivedEncounterState {
                 .pending_player_pg_quickening
                 .entry(actor_index)
                 .or_default() += 1;
+        }
+    }
+
+    /// Folds one non-guard stun-effect proc (Eugen's sticky grenade) into the
+    /// encounter: a DELTA-path amount (like Perfect Guard, it's a source-side
+    /// accumulator delta with no damage event), routed to the player's own
+    /// `StunEffect` row rather than Perfect Guard. Row creation / pending
+    /// handling mirror [`Self::process_perfect_guard_stun`].
+    fn process_stun_effect(
+        &mut self,
+        player_data: &[Option<PlayerData>; 4],
+        actor_index: u32,
+        amount: f64,
+    ) {
+        self.stun_delta_sum += amount;
+        self.refresh_total_stun();
+        let duration_secs = (self.duration()) as f64 / 1000.0;
+        self.stun_per_second = self.total_stun_value / duration_secs;
+
+        if let Some(character_type) = character_type_for_slot_key(player_data, actor_index) {
+            self.ensure_player_row(actor_index, character_type);
+        }
+        if let Some(player) = self.party.get_mut(&actor_index) {
+            player.add_stun_effect(amount);
+            player.stun_per_second = player.total_stun_value / duration_secs;
+        } else {
+            // No identity for the slot: hold it until the player's first
+            // damage event creates their row.
+            self.pending_player_stun_effect
+                .entry(actor_index)
+                .or_default()
+                .push(amount);
         }
     }
 }
@@ -1201,6 +1246,13 @@ impl Parser {
                     self.derived_state.process_perfect_guard_quickening(
                         &self.encounter.player_data,
                         event.actor_index,
+                    );
+                }
+                Message::OnStunEffect(event) => {
+                    self.derived_state.process_stun_effect(
+                        &self.encounter.player_data,
+                        event.actor_index,
+                        event.stun_amount as f64,
                     );
                 }
                 _ => {}
@@ -1661,6 +1713,27 @@ impl Parser {
             .push_event(now, Message::OnPerfectGuardStun(event.clone()));
 
         self.derived_state.process_perfect_guard_stun(
+            &self.encounter.player_data,
+            event.actor_index,
+            event.stun_amount as f64,
+        );
+
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
+        }
+    }
+
+    /// Handles one non-guard stun-effect proc (Eugen's sticky grenade): a
+    /// source-side accumulator delta attributed to the applying player, surfaced
+    /// as their own StunEffect row (not Perfect Guard).
+    pub fn on_stun_effect(&mut self, event: OnPlayerStunEvent) {
+        let now = Utc::now().timestamp_millis();
+        // A stun proc can be the encounter's opening event (see ensure_encounter_started).
+        self.ensure_encounter_started(now);
+        self.encounter
+            .push_event(now, Message::OnStunEffect(event.clone()));
+
+        self.derived_state.process_stun_effect(
             &self.encounter.player_data,
             event.actor_index,
             event.stun_amount as f64,
@@ -2265,6 +2338,46 @@ mod tests {
         assert_eq!(state.total_stun_value, 60.0);
     }
 
+    /// A non-guard stun-effect proc (Eugen's sticky grenade) routes to the
+    /// player's own `StunEffect` row — never Perfect Guard — and one landing
+    /// before the player's first damage event folds in on row creation.
+    #[test]
+    fn stun_effect_routes_to_its_own_row_and_survives_pending() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        // Proc before any damage: held pending, still counted in the total.
+        state.process_stun_effect(&no_identities(), 0xF000_0000, 25.0);
+        assert_eq!(state.total_stun_value, 25.0);
+        assert!(state.party.get(&0xF000_0000).is_none());
+
+        // First damage event creates the row and folds the pending proc in.
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        event.stun_value = None;
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(1_000, &instance);
+
+        // A proc after the row exists adds directly.
+        state.process_stun_effect(&no_identities(), 0xF000_0000, 25.0);
+
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        let effect = player
+            .skill_breakdown
+            .iter()
+            .find(|s| s.action_type == ActionType::StunEffect(0))
+            .expect("stun effect row");
+        assert_eq!(effect.hits, 2);
+        assert_eq!(effect.total_stun_value, 50.0);
+        assert_eq!(effect.stun_eligible_hits, 2);
+        // The procs are NEVER a Perfect Guard.
+        assert!(player
+            .skill_breakdown
+            .iter()
+            .all(|s| s.action_type != ActionType::PerfectGuard));
+        assert_eq!(state.total_stun_value, 50.0);
+    }
+
     /// Every Perfect Guard also materializes as a zero-damage breakdown row on
     /// the guarding player (name via `ActionType::PerfectGuard`), counting
     /// guards as hits and carrying only stun — including guards held pending
@@ -2297,6 +2410,110 @@ mod tests {
         assert_eq!(row.total_damage, 0);
         assert_eq!(row.min_damage, None);
         assert_eq!(player.total_stun_value, 65.0);
+    }
+
+    /// Online, the per-hit delta path is structurally 0 (stun is
+    /// host-authoritative), so per-skill stun comes from the network stun
+    /// messages: each message is attributed to the source player's most recent
+    /// stun-CAPABLE action. Supplementary echoes and DoT ticks interleave
+    /// between real hits (an echo lands ~150ms after its trigger, right when
+    /// the stun message arrives) and never proc stun themselves, so they must
+    /// not steal the attribution.
+    #[test]
+    fn stun_messages_attribute_to_the_players_last_stun_capable_action() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        event.action_id = ActionType::Normal(1);
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(1_000, &instance);
+
+        state.process_stun_message(0xF000_0000, 5.0);
+
+        // An echo and a DoT tick land after the hit; the next stun message must
+        // still attribute to the real skill.
+        let mut echo = a_damage_event();
+        echo.source.parent_index = 0xF000_0000;
+        echo.action_id = ActionType::SupplementaryDamage(1);
+        let echo_instance = AdjustedDamageInstance::from_damage_event(&echo, None);
+        state.process_damage_event(1_100, &echo_instance);
+
+        let mut dot = a_damage_event();
+        dot.source.parent_index = 0xF000_0000;
+        dot.action_id = ActionType::DamageOverTime(1);
+        let dot_instance = AdjustedDamageInstance::from_damage_event(&dot, None);
+        state.process_damage_event(1_200, &dot_instance);
+
+        state.process_stun_message(0xF000_0000, 3.0);
+
+        // Switching skills moves the attribution.
+        let mut second = a_damage_event();
+        second.source.parent_index = 0xF000_0000;
+        second.action_id = ActionType::Normal(2);
+        let second_instance = AdjustedDamageInstance::from_damage_event(&second, None);
+        state.process_damage_event(1_300, &second_instance);
+
+        state.process_stun_message(0xF000_0000, 4.0);
+
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        let first_row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(1))
+            .expect("first skill row");
+        assert_eq!(first_row.total_stun_value, 8.0); // 5 + 3
+        assert_eq!(first_row.max_stun_value, 5.0);
+
+        let second_row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(2))
+            .expect("second skill row");
+        assert_eq!(second_row.total_stun_value, 4.0);
+
+        for skill in &player.skill_breakdown {
+            if matches!(
+                skill.action_type,
+                ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)
+            ) {
+                assert_eq!(skill.total_stun_value, 0.0);
+            }
+        }
+
+        assert_eq!(player.total_stun_value, 12.0);
+        assert_eq!(state.total_stun_value, 12.0);
+    }
+
+    /// Solo, BOTH capture paths can fire for the same accrual (loopback): the
+    /// per-hit delta lands on the row via the damage event AND the same amount
+    /// arrives as a stun message attributed to the same row. Row totals must be
+    /// max(delta, messages), mirroring the player/encounter dedupe.
+    #[test]
+    fn skill_row_stun_survives_solo_loopback_without_double_count() {
+        let mut state = DerivedEncounterState::default();
+        state.start(0);
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        event.action_id = ActionType::Normal(1);
+        event.stun_value = Some(6.0);
+        let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+        state.process_damage_event(1_000, &instance);
+
+        // The same 6 stun arrives duplicated via the message path.
+        state.process_stun_message(0xF000_0000, 6.0);
+
+        let player = state.party.get(&0xF000_0000).expect("player row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(1))
+            .expect("skill row");
+        assert_eq!(row.total_stun_value, 6.0); // max(6, 6), not 12
+        assert_eq!(player.total_stun_value, 6.0);
+        assert_eq!(state.total_stun_value, 6.0);
     }
 
     /// A guarded Quickening (The World) is counted as its own hits-only

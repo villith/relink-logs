@@ -36,6 +36,34 @@ pub struct SkillState {
     pub max_stun_value: f64,
     /// Total stun value done by this skill
     pub total_stun_value: f64,
+    /// Stun via per-hit accumulator deltas (the solo path; structurally 0 in
+    /// online lobbies where enemy stun is host-authoritative).
+    #[serde(default)]
+    pub stun_delta_sum: f64,
+    /// Stun via network stun-apply messages attributed to this skill as the
+    /// source player's most recent stun-capable action (the online path; may
+    /// also fire solo, duplicating the delta path).
+    ///
+    /// `total_stun_value` = max(delta, messages): both paths observe the same
+    /// accumulator, so whichever captured the accrual wins and double-counting
+    /// is impossible in either mode.
+    #[serde(default)]
+    pub stun_message_sum: f64,
+    /// Number of DELTA-path hits that actually applied stun (amount > 0) — the
+    /// solo per-hit count. A stun-capable hit that dealt 0 stun (target
+    /// stunned/immune) is excluded; supplementary/DoT hits carry no stun so they
+    /// never count.
+    #[serde(default)]
+    pub stun_delta_hits: u32,
+    /// Number of attributed network stun messages with a positive amount — the
+    /// online count (per-hit deltas are 0 there).
+    #[serde(default)]
+    pub stun_message_hits: u32,
+    /// Hits that actually applied stun: `max(stun_delta_hits, stun_message_hits)`.
+    /// Mirrors `total_stun_value`'s max over the two paths, so solo-loopback
+    /// (both paths fire) can't double-count. The denominator for "stun per hit".
+    #[serde(default)]
+    pub stun_eligible_hits: u32,
     /// Number of hits that reached the game's damage cap for this skill (base > cap).
     pub capped_hits: u32,
     /// Number of hits that were subject to a damage cap at all — the denominator
@@ -66,6 +94,11 @@ impl SkillState {
             total_damage: 0,
             max_stun_value: 0.0,
             total_stun_value: 0.0,
+            stun_delta_sum: 0.0,
+            stun_message_sum: 0.0,
+            stun_delta_hits: 0,
+            stun_message_hits: 0,
+            stun_eligible_hits: 0,
             capped_hits: 0,
             cappable_hits: 0,
             overcap_base_sum: 0.0,
@@ -105,8 +138,7 @@ impl SkillState {
                 total_damage: damage_instance.event.damage as u64,
             }),
         }
-        self.max_stun_value = self.max_stun_value.max(damage_instance.stun_damage);
-        self.total_stun_value += damage_instance.stun_damage;
+        self.add_stun_delta(damage_instance.stun_damage);
 
         if let Some(min_damage) = self.min_damage {
             self.min_damage = Some(min_damage.min(damage_instance.event.damage as u64));
@@ -119,6 +151,36 @@ impl SkillState {
         } else {
             self.max_damage = Some(damage_instance.event.damage as u64);
         }
+    }
+
+    /// Folds one DELTA-path stun accrual into this skill (per-hit accumulator
+    /// delta, or a Perfect Guard capture — both measure the accumulator
+    /// directly). A positive amount is one hit that actually applied stun.
+    pub fn add_stun_delta(&mut self, amount: f64) {
+        self.stun_delta_sum += amount;
+        if amount > 0.0 {
+            self.stun_delta_hits += 1;
+        }
+        self.max_stun_value = self.max_stun_value.max(amount);
+        self.refresh_total_stun();
+    }
+
+    /// Folds one attributed network stun message into this skill. A positive
+    /// amount is one stun application (the online analogue of a stunning hit).
+    pub fn add_stun_message(&mut self, amount: f64) {
+        self.stun_message_sum += amount;
+        if amount > 0.0 {
+            self.stun_message_hits += 1;
+        }
+        self.max_stun_value = self.max_stun_value.max(amount);
+        self.refresh_total_stun();
+    }
+
+    /// `total_stun_value` / `stun_eligible_hits` = whichever capture path saw the
+    /// accrual (the per-skill mirror of `PlayerState::refresh_total_stun`).
+    fn refresh_total_stun(&mut self) {
+        self.total_stun_value = self.stun_delta_sum.max(self.stun_message_sum);
+        self.stun_eligible_hits = self.stun_delta_hits.max(self.stun_message_hits);
     }
 }
 
@@ -295,6 +357,66 @@ mod tests {
             .unwrap();
         assert_eq!(b.hits, 1);
         assert_eq!(b.total_damage, 25);
+    }
+
+    #[test]
+    fn counts_stun_eligible_hits_on_the_delta_path() {
+        let mut skill_state = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+
+        // A hit that actually applied stun counts; a stun-capable hit that dealt
+        // 0 stun (target stunned/immune) does not.
+        skill_state.add_stun_delta(12.0);
+        skill_state.add_stun_delta(0.0);
+        skill_state.add_stun_delta(8.0);
+
+        assert_eq!(skill_state.stun_eligible_hits, 2);
+        assert_eq!(skill_state.total_stun_value, 20.0);
+    }
+
+    #[test]
+    fn counts_stun_eligible_hits_on_the_message_path() {
+        let mut skill_state = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+
+        // Online: stun arrives as attributed messages, per-hit deltas are 0.
+        skill_state.add_stun_message(30.0);
+        skill_state.add_stun_message(0.0);
+        skill_state.add_stun_message(30.0);
+
+        assert_eq!(skill_state.stun_eligible_hits, 2);
+        assert_eq!(skill_state.total_stun_value, 60.0);
+    }
+
+    #[test]
+    fn stun_eligible_hits_max_dedupes_delta_and_message_paths() {
+        // Solo loopback fires BOTH paths for the same accruals; max() over the
+        // per-path counts (mirroring total_stun_value's max over the sums) keeps
+        // the count from doubling.
+        let mut skill_state = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+
+        skill_state.add_stun_delta(10.0);
+        skill_state.add_stun_delta(10.0);
+        skill_state.add_stun_message(10.0);
+        skill_state.add_stun_message(10.0);
+
+        assert_eq!(skill_state.stun_eligible_hits, 2);
+    }
+
+    #[test]
+    fn supplementary_and_dot_hits_are_not_stun_eligible() {
+        // Supplementary echoes and DoT ticks never proc stun, so their per-hit
+        // stun is 0 and they never count toward the eligible-hit denominator.
+        let mut supp = SkillState::new(ActionType::SupplementaryDamage(1), CharacterType::Pl0000);
+        let mut supp_event = make_event(5_000, None, None);
+        supp_event.action_id = ActionType::SupplementaryDamage(1);
+        supp.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(&supp_event, None));
+
+        let mut dot = SkillState::new(ActionType::DamageOverTime(0), CharacterType::Pl0000);
+        let mut dot_event = make_event(1_000, None, None);
+        dot_event.action_id = ActionType::DamageOverTime(0);
+        dot.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(&dot_event, None));
+
+        assert_eq!(supp.stun_eligible_hits, 0);
+        assert_eq!(dot.stun_eligible_hits, 0);
     }
 
     #[test]

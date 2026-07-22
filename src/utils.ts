@@ -460,6 +460,10 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
       return t([`skills.${characterType}.perfect-guard`, "skills.default.perfect-guard"]);
     case skill.actionType === "PerfectGuardQuickening":
       return t([`skills.${characterType}.perfect-guard-quickening`, "skills.default.perfect-guard-quickening"]);
+    case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "StunEffect"): {
+      const index = (skill.actionType as { StunEffect: number }).StunEffect;
+      return t([`skills.${characterType}.stun-effect-${index}`, `skills.default.stun-effect-${index}`]);
+    }
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "SupplementaryDamage"):
       return t(["skills.default.supplementary-damage"]);
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "DamageOverTime"):

@@ -33,13 +33,20 @@ const DEFAULT_ENCOUNTER_STATE: EncounterState = {
 const NAME_COLUMN_MIN_WIDTH = 120;
 const VALUE_COLUMN_WIDTH = 72;
 const VALUE_COLUMN_WIDTH_FULL = 96;
+// Player rows have a trailing expand/collapse caret column (`.row-button`, 1em
+// at the 14px row font); the skill-breakdown rows don't. Credit it so the
+// player row's true width is compared, not one column short.
+const ROW_BUTTON_WIDTH = 16;
 const OVERLAY_CHROME_WIDTH = 24; // window edges + scrollbar allowance
 const OVERLAY_MIN_HEIGHT = 120; // matches tauri.conf.json main.minHeight
 
-/** Minimum overlay width for a given set of visible value columns. */
-const overlayMinWidth = (columnCount: number, showFullValues: boolean): number => {
+/** Minimum overlay width for a given set of visible value columns. Set
+ * `trailingButton` for the player row, whose extra caret column the skill
+ * breakdown lacks. */
+const overlayMinWidth = (columnCount: number, showFullValues: boolean, trailingButton = false): number => {
   const valueColumnWidth = showFullValues ? VALUE_COLUMN_WIDTH_FULL : VALUE_COLUMN_WIDTH;
-  return NAME_COLUMN_MIN_WIDTH + columnCount * valueColumnWidth + OVERLAY_CHROME_WIDTH;
+  const buttonWidth = trailingButton ? ROW_BUTTON_WIDTH : 0;
+  return NAME_COLUMN_MIN_WIDTH + columnCount * valueColumnWidth + buttonWidth + OVERLAY_CHROME_WIDTH;
 };
 
 export default function useMeter() {
@@ -68,15 +75,29 @@ export default function useMeter() {
   // to whichever is wider.
   useEffect(() => {
     const minWidth = Math.max(
-      overlayMinWidth(overlayColumns.length, showFullValues),
-      overlayMinWidth(overlaySkillColumns.length, showFullValues)
+      overlayMinWidth(overlayColumns.length, showFullValues, true), // player rows: + caret column
+      overlayMinWidth(overlaySkillColumns.length, showFullValues) // skill-breakdown rows
     );
-    // setMinSize is allowlisted (tauri.conf.json window.setMinSize); surface any
+
+    // setMinSize/setSize are allowlisted (tauri.conf.json window.*); surface any
     // rejection instead of swallowing it, so a missing permission can't fail
     // silently the way it did before.
-    appWindow
-      .setMinSize(new LogicalSize(minWidth, OVERLAY_MIN_HEIGHT))
-      .catch((error) => console.error("failed to set the overlay minimum width", error));
+    const applyOverlayWidth = async () => {
+      await appWindow.setMinSize(new LogicalSize(minWidth, OVERLAY_MIN_HEIGHT));
+
+      // setMinSize only constrains future user resizing — it does NOT grow a
+      // window that's already narrower than the new minimum. Without this, a
+      // fresh launch (or newly-enabled columns) leaves the expanded skill
+      // breakdown clipped behind a horizontal scrollbar until the user drags the
+      // window edge. Grow to fit, but never shrink a window the user widened.
+      const scaleFactor = await appWindow.scaleFactor();
+      const current = (await appWindow.innerSize()).toLogical(scaleFactor);
+      if (current.width < minWidth) {
+        await appWindow.setSize(new LogicalSize(minWidth, current.height));
+      }
+    };
+
+    applyOverlayWidth().catch((error) => console.error("failed to set the overlay minimum width", error));
   }, [overlayColumns, overlaySkillColumns, showFullValues]);
 
   useEffect(() => {

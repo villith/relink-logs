@@ -30,6 +30,15 @@ pub struct PlayerState {
     /// impossible in either mode.
     #[serde(default)]
     pub stun_message_sum: f64,
+    /// Row key (action + child character) of this player's most recent
+    /// stun-CAPABLE damage event — supplementary echoes and DoT ticks never
+    /// proc stun and interleave between real hits, so they are skipped.
+    /// Network stun messages (which carry no action id on the wire — receiver
+    /// and dispatcher of game message type 7/subtype 8 read only
+    /// {target, amount, source}) attribute to this row: messages trail their
+    /// triggering hit by ~30-70ms, so the last real action is the trigger.
+    #[serde(skip)]
+    last_stun_attribution: Option<(ActionType, CharacterType)>,
     /// Number of hits by this player that reached the game's damage cap (base > cap)
     pub capped_hits: u32,
     /// Number of hits that were subject to a damage cap at all — the denominator
@@ -60,6 +69,7 @@ impl PlayerState {
             total_stun_value: 0.0,
             stun_delta_sum: 0.0,
             stun_message_sum: 0.0,
+            last_stun_attribution: None,
             skill_breakdown: Vec::new(),
             last_known_pet_skill: None,
             capped_hits: 0,
@@ -73,10 +83,40 @@ impl PlayerState {
         self.sba = sba;
     }
 
-    /// Folds one network stun message into this player's totals.
+    /// Folds one network stun message into this player's totals and attributes
+    /// it to their most recent stun-capable skill row (the online per-skill
+    /// stun source — the per-hit delta path is structurally 0 in lobbies). A
+    /// message with no attribution yet (e.g. held pending before the player's
+    /// first damage event) still counts toward the player total.
     pub fn add_stun_message(&mut self, amount: f64) {
         self.stun_message_sum += amount;
         self.refresh_total_stun();
+
+        if let Some((action, child_character_type)) = self.last_stun_attribution {
+            self.attributed_row_mut(action, child_character_type)
+                .add_stun_message(amount);
+        }
+    }
+
+    /// The find-or-create breakdown row for a stun-message attribution, keyed
+    /// exactly like the damage path (action AND child character type). The row
+    /// virtually always exists already — attribution only ever points at the
+    /// key of a damage event this player has processed.
+    fn attributed_row_mut(
+        &mut self,
+        action: ActionType,
+        child_character_type: CharacterType,
+    ) -> &mut SkillState {
+        if let Some(index) = self.skill_breakdown.iter().position(|skill| {
+            skill.action_type == action && skill.child_character_type == child_character_type
+        }) {
+            return &mut self.skill_breakdown[index];
+        }
+        self.skill_breakdown
+            .push(SkillState::new(action, child_character_type));
+        self.skill_breakdown
+            .last_mut()
+            .expect("row pushed just above")
     }
 
     /// Folds one Perfect Guard counter-stun into this player: delta-path totals
@@ -88,8 +128,23 @@ impl PlayerState {
 
         let row = self.breakdown_row_mut(ActionType::PerfectGuard);
         row.hits += 1;
-        row.total_stun_value += amount;
-        row.max_stun_value = row.max_stun_value.max(amount);
+        row.add_stun_delta(amount);
+    }
+
+    /// Folds one non-guard stun-application proc into this player: delta-path
+    /// total (it has no damage event of its own) plus a zero-damage breakdown row
+    /// that counts the procs as hits and carries only their stun. Live-confirmed
+    /// 07-21 as Eugen's sticky grenade — real stun, but NOT a guard, so it gets
+    /// its own [`ActionType::StunEffect`] row rather than inflating Perfect Guard.
+    pub fn add_stun_effect(&mut self, amount: f64) {
+        self.stun_delta_sum += amount;
+        self.refresh_total_stun();
+
+        // Index 0: the only stun-effect proc we can attribute today. The index is
+        // reserved for a future discriminator (see `ActionType::StunEffect`).
+        let row = self.breakdown_row_mut(ActionType::StunEffect(0));
+        row.hits += 1;
+        row.add_stun_delta(amount);
     }
 
     /// Counts one guarded Quickening (The World) as a hits-only breakdown row:
@@ -200,6 +255,16 @@ impl PlayerState {
         } else {
             damage_instance.event.action_id
         };
+
+        // Remember where a trailing network stun message should attribute (see
+        // the field doc): echoes and DoT ticks can't proc stun, so they must
+        // not overwrite the real trigger between a hit and its stun message.
+        if !matches!(
+            action,
+            ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)
+        ) {
+            self.last_stun_attribution = Some((action, child_character_type));
+        }
 
         // If the skill is already being tracked, update it.
         for skill in self.skill_breakdown.iter_mut() {
@@ -729,5 +794,36 @@ mod tests {
         assert_eq!(merged.hits, 2);
         assert_eq!(merged.total_damage, 1000);
         assert_eq!(player.total_damage, 2000);
+    }
+
+    /// A non-guard stun-application proc (Eugen's sticky grenade) gets its OWN
+    /// zero-damage row and must never inflate the Perfect Guard row; its stun
+    /// still counts toward the player total and its eligible-hit count.
+    #[test]
+    fn stun_effect_gets_its_own_row_separate_from_perfect_guard() {
+        let mut player = empty_player();
+        player.add_stun_effect(25.0);
+        player.add_stun_effect(25.0);
+        player.add_perfect_guard_stun(250.0);
+
+        let effect = player
+            .skill_breakdown
+            .iter()
+            .find(|s| s.action_type == ActionType::StunEffect(0))
+            .expect("stun effect row");
+        assert_eq!(effect.hits, 2);
+        assert_eq!(effect.total_stun_value, 50.0);
+        assert_eq!(effect.stun_eligible_hits, 2);
+
+        let pg = player
+            .skill_breakdown
+            .iter()
+            .find(|s| s.action_type == ActionType::PerfectGuard)
+            .expect("perfect guard row");
+        assert_eq!(pg.hits, 1);
+        assert_eq!(pg.total_stun_value, 250.0);
+
+        // Both paths feed the player's delta-path total.
+        assert_eq!(player.total_stun_value, 300.0);
     }
 }

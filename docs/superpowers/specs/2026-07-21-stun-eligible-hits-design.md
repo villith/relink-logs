@@ -26,9 +26,11 @@ hits), computed on the frontend — not stored.
 
 - **Skill-breakdown rows only** (both individual `SkillRow` and condensed
   `SkillGroupRow`). No player-row / main-meter columns — explicitly declined.
-- Both columns are **opt-in** via the existing customizable skill-column picker;
-  they are **not** added to `DEFAULT_SKILL_COLUMNS`, so no existing layout
-  changes.
+- Both columns are added to `DEFAULT_SKILL_COLUMNS` (after the existing Stun
+  column) so they appear in the post-fight logs detail view and in the live
+  overlay by default; the overlay's picker still lets users reorder/remove them.
+  (Users with a previously-persisted overlay column list keep it and can add the
+  columns from the picker; the logs detail view shows them immediately.)
 - Perfect Guard rows deal real stun and count naturally as stun hits.
 
 ## Solo vs online (why a mirrored count)
