@@ -1257,6 +1257,21 @@ fn main() {
         std::env::set_var("GDK_BACKEND", "x11");
     }
 
+    // logs.db and the logs/ folder are opened via CWD-relative paths. On
+    // Windows the installer's shortcut sets CWD to the (writable) install
+    // dir, but on Linux a desktop entry or AppImage launches with CWD = `/`
+    // or a read-only mount, so anchor the CWD to the XDG data dir instead.
+    #[cfg(target_os = "linux")]
+    {
+        let mut data_dir = tauri::api::path::data_dir()
+            .expect("Could not resolve the user data directory ($XDG_DATA_HOME)");
+        data_dir.push("gbfr-logs");
+        std::fs::create_dir_all(&data_dir)
+            .unwrap_or_else(|e| panic!("Failed to create {}: {e}", data_dir.display()));
+        std::env::set_current_dir(&data_dir)
+            .unwrap_or_else(|e| panic!("Failed to enter {}: {e}", data_dir.display()));
+    }
+
     info!("Starting application..");
 
     // Setup the database.

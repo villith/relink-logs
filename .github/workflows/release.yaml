@@ -404,9 +404,12 @@ jobs:
           echo '{"build":{"beforeBuildCommand":""}}' > .tauri-release-config.json
 
       # TAURI_TRAY=ayatana: the AppImage must link the ayatana appindicator
-      # (matching the deb dependency and what modern distros actually ship).
-      - name: Build and bundle app (AppImage + deb)
-        run: npx tauri build -b appimage,deb,updater --config .tauri-release-config.json
+      # (what modern distros actually ship). No deb: the Tauri v1 Linux
+      # updater can only replace AppImages, so a deb install would get
+      # update prompts it can never complete and then run stale — and stale
+      # versions break on game patches. AppImage is the only Linux channel.
+      - name: Build and bundle app (AppImage)
+        run: npx tauri build -b appimage,updater --config .tauri-release-config.json
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
@@ -432,7 +435,6 @@ jobs:
             target/release/bundle/appimage/*.AppImage
             target/release/bundle/appimage/*.AppImage.tar.gz
             target/release/bundle/appimage/*.AppImage.tar.gz.sig
-            target/release/bundle/deb/*.deb
           if-no-files-found: error
 
   publish:
@@ -480,8 +482,8 @@ jobs:
           pattern: "*-bundle"
           merge-multiple: true
 
-      # The linux artifact preserves its bundle-dir structure (appimage/,
-      # deb/); flatten so make-latest-json.mjs and the asset glob below see
+      # The linux artifact preserves its bundle-dir structure (appimage/);
+      # flatten so make-latest-json.mjs and the asset glob below see
       # plain files.
       - name: Flatten downloaded artifacts
         run: |

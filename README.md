@@ -31,7 +31,8 @@ Relink Logs runs natively on Linux and meters the Windows game running under
 Steam's Proton. Steam Deck gaming mode is **not** supported (an external
 overlay cannot draw over gamescope).
 
-1. Install the AppImage (auto-updates) or the .deb from the releases page.
+1. Download the AppImage from the releases page, make it executable
+   (`chmod +x`), and run it. It auto-updates itself on new releases.
 2. Launch Relink Logs, open **Settings → Linux setup**, and click
    **Install hook** if it isn't already green.
 3. One-time: in Steam → Granblue Fantasy: Relink → Properties → Launch
@@ -55,7 +56,7 @@ Notes:
   garbage in a log.
 - Ubuntu 24.04 ships only webkit2gtk-4.1, which the current build does not
   target — a known limitation; Ubuntu 22.04 (and distros still shipping
-  webkit2gtk-4.0) are what the AppImage and .deb are built against.
+  webkit2gtk-4.0) are what the AppImage is built against.
 
 ## Found a translation problem or a bug?
 
