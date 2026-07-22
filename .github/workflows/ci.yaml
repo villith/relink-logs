@@ -157,6 +157,10 @@ jobs:
       # generate_context! embeds dist/ at compile time, so the frontend must
       # exist before any cargo command that compiles main.rs.
       - run: npm run build
+      # Same stub rationale as cargo_test: the tauri resource glob in build.rs
+      # requires a hook.dll file to exist; nothing on Linux CI loads it.
+      - name: Stub the hook.dll resource
+        run: touch src-tauri/hook.dll
       - run: cargo check -p protocol
       - run: cargo check -p gbfr-logs
       # --lib --bins: examples are windows-only diag tools and must not build here.
