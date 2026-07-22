@@ -125,7 +125,10 @@
 .table .header-name {
   width: 100%;
   padding: 2px 8px;
-  min-width: 50px;
+  /* Keep the name column readable when many value columns compete for space
+     (table-layout is fixed, so the name column is the one that gets squeezed).
+     The table overflows/scrolls before the name collapses to an ellipsis. */
+  min-width: 120px;
 }
 
 .table .header-column {
