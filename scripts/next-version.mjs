@@ -33,30 +33,32 @@ if (!current) {
   process.exit(1);
 }
 
+// No process.exit() on the success paths below: stdout is a pipe here (the
+// caller uses command substitution), pipe writes are asynchronous on POSIX,
+// and exiting on the next tick can truncate or drop the value being read.
 if (channel === "main") {
   console.log(baseStr(current));
-  process.exit(0);
+} else {
+  let stdin = "";
+  for await (const chunk of process.stdin) stdin += chunk;
+  const tags = stdin.split(/\r?\n/).map(parse).filter(Boolean);
+
+  const stables = tags.filter((t) => t.rc === null);
+  const lastStable = stables.reduce(
+    (a, b) => (cmpBase(a, b) >= 0 ? a : b),
+    { major: 0, minor: 0, patch: 0, rc: null },
+  );
+
+  const base =
+    cmpBase(current, lastStable) > 0
+      ? { major: current.major, minor: current.minor, patch: current.patch }
+      : { major: lastStable.major, minor: lastStable.minor, patch: lastStable.patch + 1 };
+
+  const rcs = tags.filter((t) => t.rc !== null && cmpBase(t, base) === 0).map((t) => t.rc);
+  const n = (rcs.length ? Math.max(...rcs) : 0) + 1;
+  if (n > 65535) {
+    console.error(`[next-version] RC number ${n} exceeds 65535, the MSI ProductVersion field limit`);
+    process.exit(1);
+  }
+  console.log(`${baseStr(base)}-${n}`);
 }
-
-let stdin = "";
-for await (const chunk of process.stdin) stdin += chunk;
-const tags = stdin.split(/\r?\n/).map(parse).filter(Boolean);
-
-const stables = tags.filter((t) => t.rc === null);
-const lastStable = stables.reduce(
-  (a, b) => (cmpBase(a, b) >= 0 ? a : b),
-  { major: 0, minor: 0, patch: 0, rc: null },
-);
-
-const base =
-  cmpBase(current, lastStable) > 0
-    ? { major: current.major, minor: current.minor, patch: current.patch }
-    : { major: lastStable.major, minor: lastStable.minor, patch: lastStable.patch + 1 };
-
-const rcs = tags.filter((t) => t.rc !== null && cmpBase(t, base) === 0).map((t) => t.rc);
-const n = (rcs.length ? Math.max(...rcs) : 0) + 1;
-if (n > 65535) {
-  console.error(`[next-version] RC number ${n} exceeds 65535, the MSI ProductVersion field limit`);
-  process.exit(1);
-}
-console.log(`${baseStr(base)}-${n}`);

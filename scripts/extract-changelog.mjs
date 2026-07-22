@@ -1,7 +1,9 @@
 // Prints the CHANGELOG.md section for one version — the release workflow uses
-// it as the GitHub release body, which tauri-action copies into latest.json as
-// the updater dialog's notes. Exits nonzero when the section is missing so the
-// workflow can refuse to release an unnoted version (checked before tagging).
+// it as the GitHub release body and copies it into the latest.json it builds,
+// as the updater dialog's notes. Exits nonzero when the section is missing so
+// the workflow can refuse to release an unnoted version (a stable release is
+// gated on this before anything is committed or tagged; RC prereleases fall
+// back to placeholder notes).
 //
 // Usage:
 //   node scripts/extract-changelog.mjs           -> section for package.json's version

@@ -36,6 +36,10 @@ src-tauri/hook.dll
 # Local reference data, not part of the app
 docs/damage-calculators/
 
+# CI-only Tauri config overlay (carries bundle.windows.signCommand), written
+# by .github/workflows/release.yaml at build time — never committed
+.tauri-release-config.json
+
 # Tauri updater signing keys — NEVER commit the private key
 .tauri/
 *.key
