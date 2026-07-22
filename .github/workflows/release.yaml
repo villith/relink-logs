@@ -1,22 +1,32 @@
 name: Release
 
-# On every push to main or dev, if the version in package.json doesn't already
-# have a matching tag, build + sign + publish a GitHub Release. The tag is
-# created atomically WITH the release (gh release create --target), so a failed
-# build strands nothing — the next push simply retries. A push that doesn't
-# bump the version is a no-op. Requires the TAURI_PRIVATE_KEY repo secret.
+# Branch model (versions are managed by CI — do not hand-bump them):
 #
-# Release channels:
-#   main -> stable (X.Y.Z). Requires a human-written CHANGELOG.md section.
-#           Becomes releases/latest — the endpoint every installed app polls.
-#   dev  -> release candidate (X.Y.Z-N), published as a GitHub *prerelease*.
-#           GitHub never serves prereleases from releases/latest, so installed
-#           apps cannot see RCs — this is the safe end-to-end test of this
-#           pipeline. N must be NUMERIC (<= 65535): WiX only accepts a numeric
-#           prerelease field, which becomes the MSI's 4th version component
-#           (1.12.0-1 -> 1.12.0.1). A non-RC version on dev is a no-op, so dev
-#           can track ordinary development between RCs. A CHANGELOG section is
-#           optional for RCs (placeholder notes are used when absent).
+#   PRs target dev. Every push to dev auto-bumps to the next RC version
+#   (X.Y.Z-N), commits the bump to the four version files, and publishes a
+#   fully signed GitHub *prerelease* — downloadable for testing, but invisible
+#   to installed apps, because GitHub never serves prereleases from
+#   releases/latest (the updater endpoint).
+#
+#   Releasing = merging dev into main. The RC suffix is stripped, the stable
+#   version is committed to main, the release ships, and main is merged back
+#   into dev so the next dev→main merge cannot conflict on version lines.
+#
+#   Version choice on dev: the base is whatever the files carry when it is
+#   ahead of the newest stable tag — set e.g. 1.13.0 in a PR to make the next
+#   release minor/major — otherwise the newest stable tag plus a patch bump.
+#   The RC number is the next -N not already tagged. N is numeric because WiX
+#   turns it into the MSI ProductVersion's 4th field and rejects -rc.N style.
+#
+#   Stable releases REQUIRE a human-written CHANGELOG.md section (it becomes
+#   the release body and the in-app update prompt); the version job fails the
+#   dev→main merge until one exists. RCs use the section if present,
+#   placeholder notes otherwise.
+#
+#   The version-bump and back-merge commits are pushed with GITHUB_TOKEN,
+#   whose pushes never trigger workflows — no recursion. The tag is created
+#   atomically with the release (gh release create --target), so a failed
+#   build strands nothing; the next push retries.
 #
 # Two independent signatures are applied, and the ORDER MATTERS:
 #   1. Authenticode (Azure Artifact Signing) — what Windows/SmartScreen/UAC check.
@@ -30,81 +40,100 @@ on:
       - main
       - dev
 
-# Two rapid merges must not race the version check and try to publish the same
-# release twice.
+# Rapid merges must not race the version computation or publish the same
+# version twice.
 concurrency:
   group: release
   cancel-in-progress: false
 
 jobs:
-  check:
+  version:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # pushes the version-bump commit back to the branch
     outputs:
-      version: ${{ steps.check.outputs.version }}
-      should_release: ${{ steps.check.outputs.should_release }}
-      prerelease: ${{ steps.check.outputs.prerelease }}
+      version: ${{ steps.v.outputs.version }}
+      sha: ${{ steps.v.outputs.sha }}
+      prerelease: ${{ steps.v.outputs.prerelease }}
+      should_release: ${{ steps.v.outputs.should_release }}
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # need tags to detect whether this version is already released
+          # The branch, not the push SHA: the bump commit must land on the
+          # branch tip, and the build then uses that exact commit.
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0 # next-version.mjs needs the full tag list
 
-      - name: Determine version and whether to release
-        id: check
+      - name: Compute next version and commit the bump
+        id: v
         shell: bash
         run: |
-          version="$(node -p "require('./package.json').version")"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+          file_version="$(node -p "require('./package.json').version")"
 
           if [[ "$GITHUB_REF_NAME" == "dev" ]]; then
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-            if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$ ]]; then
-              echo "dev version $version is not an RC (X.Y.Z-N); nothing to release."
-              echo "should_release=false" >> "$GITHUB_OUTPUT"
+            prerelease=true
+            next="$(git tag | node scripts/next-version.mjs dev "$file_version")"
+          else
+            prerelease=false
+            next="$(git tag | node scripts/next-version.mjs main "$file_version")"
+            if git rev-parse -q --verify "refs/tags/$next" >/dev/null; then
+              echo "Tag $next already exists; nothing to release."
+              {
+                echo "version=$next"
+                echo "prerelease=$prerelease"
+                echo "should_release=false"
+                echo "sha=$GITHUB_SHA"
+              } >> "$GITHUB_OUTPUT"
               exit 0
             fi
-            if (( ${version##*-} > 65535 )); then
-              echo "::error::RC suffix ${version##*-} exceeds 65535, the MSI ProductVersion field limit."
-              exit 1
-            fi
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-            if [[ "$version" == *-* ]]; then
-              echo "::error::main releases must be stable versions; got $version. RCs ship from dev."
+            # Gate BEFORE committing anything: the section is the release body,
+            # and it must be written by a human. The merge simply fails here
+            # until the changelog exists.
+            node scripts/extract-changelog.mjs "$next" > /dev/null
+          fi
+
+          echo "Releasing $next (files carried $file_version)"
+          if [[ "$next" != "$file_version" ]]; then
+            node scripts/set-version.mjs "$next"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock
+            git commit -m "chore(release): $next"
+            # A human push can race ours; rebase the bump onto it and retry.
+            pushed=false
+            for i in 1 2 3; do
+              if git push origin "HEAD:$GITHUB_REF_NAME"; then pushed=true; break; fi
+              git pull --rebase origin "$GITHUB_REF_NAME"
+            done
+            if [[ "$pushed" != "true" ]]; then
+              echo "::error::could not push the version-bump commit to $GITHUB_REF_NAME"
               exit 1
             fi
           fi
 
-          if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
-            echo "Tag $version already exists; nothing to release."
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "New version $version; will build and release."
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      # Fail fast, before the expensive Windows build. The stable release body
-      # (and the in-app update prompt) comes from this section, so it must
-      # exist. RCs fall back to placeholder notes instead.
-      - name: Require CHANGELOG.md notes for this version
-        if: steps.check.outputs.should_release == 'true' && steps.check.outputs.prerelease != 'true'
-        shell: bash
-        run: node scripts/extract-changelog.mjs "${{ steps.check.outputs.version }}"
+          {
+            echo "version=$next"
+            echo "prerelease=$prerelease"
+            echo "should_release=true"
+            echo "sha=$(git rev-parse HEAD)"
+          } >> "$GITHUB_OUTPUT"
 
   release:
-    needs: check
-    if: needs.check.outputs.should_release == 'true'
+    needs: version
+    if: needs.version.outputs.should_release == 'true'
     runs-on: windows-latest
     permissions:
       contents: write # required to create the GitHub Release (and its tag)
     env:
-      VERSION: ${{ needs.check.outputs.version }}
-      PRERELEASE: ${{ needs.check.outputs.prerelease }}
+      VERSION: ${{ needs.version.outputs.version }}
+      PRERELEASE: ${{ needs.version.outputs.prerelease }}
+      TARGET_SHA: ${{ needs.version.outputs.sha }}
       # productName in tauri.conf.json. Drives every artifact filename below.
       PRODUCT: GBFR Logs
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }} # the version-bump commit
 
       - uses: actions/setup-node@v4
         with:
@@ -125,7 +154,9 @@ jobs:
         run: npm ci
 
       # The release body doubles as the updater prompt's patch notes: it is
-      # copied into latest.json as `notes` further down.
+      # copied into latest.json as `notes` further down. Stable versions are
+      # guaranteed a section by the version job; RCs fall back to placeholder
+      # notes.
       - name: Extract release notes from CHANGELOG.md
         id: notes
         shell: bash
@@ -298,12 +329,12 @@ jobs:
 
       # Published (not draft) so releases/latest/download/latest.json resolves —
       # that manifest is the updater endpoint. `--target` creates the version tag
-      # on the exact commit this job built, atomically with the release; the
-      # .sig is not uploaded because the updater reads the signature from
-      # latest.json, never from a file. RCs are published with --prerelease,
-      # which GitHub excludes from releases/latest — installed apps never see
-      # them (their latest.json stays reachable via the versioned download URL,
-      # which is how an RC update flow is tested by hand).
+      # on the version-bump commit, atomically with the release; the .sig is not
+      # uploaded because the updater reads the signature from latest.json, never
+      # from a file. RCs are published with --prerelease, which GitHub excludes
+      # from releases/latest — installed apps never see them (their latest.json
+      # stays reachable via the versioned download URL, which is how an RC
+      # update flow is tested by hand).
       - name: Publish GitHub Release
         shell: pwsh
         env:
@@ -319,4 +350,29 @@ jobs:
           )
           $extra = @()
           if ($env:PRERELEASE -eq 'true') { $extra += '--prerelease' }
-          gh release create $env:VERSION $assets --target $env:GITHUB_SHA --title "Relink Logs $env:VERSION" --notes-file notes.md @extra
+          gh release create $env:VERSION $assets --target $env:TARGET_SHA --title "Relink Logs $env:VERSION" --notes-file notes.md @extra
+
+  # After a stable release, fold main (now carrying the stripped version and
+  # any release-only commits) back into dev so the next dev→main merge cannot
+  # conflict. `-X ours` keeps dev's side of any overlapping hunk — the only
+  # overlap main can introduce is the version lines, and dev's newer RC version
+  # is the correct survivor. GITHUB_TOKEN pushes never trigger workflows, so
+  # this cannot start an RC build.
+  backmerge:
+    needs: [version, release]
+    if: needs.version.outputs.prerelease == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 0
+      - name: Merge main back into dev
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git merge origin/main -X ours -m "chore: merge main back into dev after ${{ needs.version.outputs.version }}"
+          git push origin dev
