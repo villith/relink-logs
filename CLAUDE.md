@@ -46,3 +46,15 @@ Data flows **game → hook → pipe → parser → frontend**:
 - **Stable releases require a `CHANGELOG.md` section.** `.github/workflows/release.yaml` runs `scripts/extract-changelog.mjs <version>` *before* committing anything and fails the dispatch when the version has no `## <version>` section. The section body becomes the GitHub release body and is copied into `latest.json` as the updater notes rendered by `src/components/UpdateNotes.tsx`. RC prereleases skip this gate and fall back to placeholder notes. Changelog entries are written by humans, not generated.
 - **Adding a tracked event end-to-end** touches all four projects: add a hook in `src-hook/src/hooks/`, a `Message` variant in `protocol/`, a handler in `connect_and_run_parser` (`main.rs`) + parser logic in `parser/v1/`, and frontend display in `src/`.
 - The app keeps running in the system tray after windows close; closing a window hides it rather than exiting (`on_window_event` in `main.rs`).
+- **Linux (Proton) build:** the game has no Linux version; Linux support runs
+  the same Windows exe under Proton, so all RE'd signatures/offsets are shared.
+  The hook doubles as a `dinput8.dll` proxy (`src-hook/src/proxy.rs`) and
+  serves events over localhost TCP (`protocol::TCP_ADDR`) when it detects
+  Wine; the app deploys it via `src-tauri/src/linux_support/`. The hook crate
+  itself only compiles on Windows — Linux CI (`cargo_check_linux` in ci.yaml)
+  builds `-p gbfr-logs` with `--lib --bins` (the examples are Windows diag
+  tools; don't "fix" them to build on Linux). `npm run dev` on a non-Windows
+  host skips the hook build; drop a CI-built `hook.dll` into `src-tauri/` for
+  live-game work there. The `libayatana-appindicator3-1` entry in
+  tauri.conf.json's `deb.depends` is intentionally duplicated — the CLI
+  auto-adds it, but the explicit entry documents the tray dependency.
