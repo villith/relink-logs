@@ -22,13 +22,16 @@ if (!/^\d+\.\d+\.\d+(-\d+)?$/.test(version ?? "")) {
   process.exit(1);
 }
 
+// The version as a regex-safe literal, for the post-write verifications.
+const escaped = version.replace(/[.-]/g, "\\$&");
+
 const edit = (rel, pattern, replacement, verify) => {
   const path = resolve(root, rel);
   const before = readFileSync(path, "utf8");
-  const after = before.replace(pattern, replacement);
-  if (after === before && !verify(before)) {
+  if (!pattern.test(before)) {
     throw new Error(`${rel}: version pattern not found`);
   }
+  const after = before.replace(pattern, replacement);
   writeFileSync(path, after);
   if (!verify(after)) {
     throw new Error(`${rel}: verification failed after edit`);
@@ -61,11 +64,11 @@ edit(
   "src-tauri/Cargo.toml",
   /^version\s*=\s*"[^"]+"/m,
   `version = "${version}"`,
-  (s) => new RegExp(`^version\\s*=\\s*"${version.replace(/[.-]/g, "\\$&")}"`, "m").test(s),
+  (s) => new RegExp(`^version\\s*=\\s*"${escaped}"`, "m").test(s),
 );
 edit(
   "Cargo.lock",
   /(name = "gbfr-logs"\r?\nversion = ")[^"]+(")/,
   `$1${version}$2`,
-  (s) => new RegExp(`name = "gbfr-logs"\\r?\\nversion = "${version.replace(/[.-]/g, "\\$&")}"`).test(s),
+  (s) => new RegExp(`name = "gbfr-logs"\\r?\\nversion = "${escaped}"`).test(s),
 );

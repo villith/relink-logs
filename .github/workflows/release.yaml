@@ -58,8 +58,14 @@ concurrency:
 jobs:
   version:
     # Recursion guard: CI's own deploy-key pushes (RC bumps, the stable strip)
-    # start with "chore(release):" and must not trigger another release.
-    if: ${{ github.event_name == 'workflow_dispatch' || !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    # start with "chore(release):" and must not trigger another release. The
+    # author check matters: "chore(release):" is also a plausible human commit
+    # subject, and matching on the message alone would silently skip the whole
+    # release for that push.
+    if: >-
+      ${{ github.event_name == 'workflow_dispatch' ||
+          !(startsWith(github.event.head_commit.message, 'chore(release):') &&
+            github.event.head_commit.author.email == '41898282+github-actions[bot]@users.noreply.github.com') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read # pushes go over SSH with the deploy key, not GITHUB_TOKEN
@@ -120,17 +126,29 @@ jobs:
           fi
 
           echo "Releasing $next (files carried $file_version)"
-          if [[ "$next" != "$file_version" ]]; then
-            node scripts/set-version.mjs "$next"
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock
+          # Run unconditionally, even when $next already equals $file_version:
+          # set-version.mjs verifies that ALL five files carry the version, so
+          # this is the only thing that enforces the "they must always agree"
+          # invariant. Committing is then gated on whether anything actually
+          # changed, which also makes a re-run of an already-bumped commit a
+          # no-op instead of an empty commit.
+          node scripts/set-version.mjs "$next"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock
+          if ! git diff --cached --quiet; then
             git commit -m "chore(release): $next"
             # A human push can race ours; rebase the bump onto it and retry.
             pushed=false
             for i in 1 2 3; do
               if git push origin HEAD:dev; then pushed=true; break; fi
-              git pull --rebase origin dev
+              # Bare `git pull` here would abort the step under `set -e`,
+              # skipping the remaining attempts AND the error message below.
+              if ! git pull --rebase origin dev; then
+                git rebase --abort || true
+                echo "::error::could not rebase the version bump onto dev (conflict) - resolve by hand"
+                exit 1
+              fi
             done
             if [[ "$pushed" != "true" ]]; then
               echo "::error::could not push the version-bump commit to dev"
@@ -193,12 +211,16 @@ jobs:
           else
             exit 1
           fi
+          # Randomised delimiter: a changelog section containing a literal
+          # NOTES_EOF line would otherwise close the heredoc early and let the
+          # rest of the notes be parsed as arbitrary step outputs.
+          delim="NOTES_EOF_${RANDOM}${RANDOM}${RANDOM}"
           {
-            echo "body<<NOTES_EOF"
+            echo "body<<$delim"
             echo "$notes"
             echo ""
             echo "Make sure to save and exit the game before updating."
-            echo "NOTES_EOF"
+            echo "$delim"
           } >> "$GITHUB_OUTPUT"
 
       # The release build bundles src-tauri/hook.dll as a Tauri resource, but
@@ -262,7 +284,10 @@ jobs:
         run: npx tauri build -b msi,updater --config .tauri-release-config.json
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
-          TAURI_KEY_PASSWORD: ""
+          # Resolves to "" while the key is unencrypted (the secret does not
+          # exist), but routing it through a secret means rotating to a
+          # passphrase-protected key is a secrets change, not a workflow edit.
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
@@ -273,7 +298,14 @@ jobs:
       - name: Verify exe and MSI signatures
         shell: pwsh
         run: |
-          $files = @("target/release/$env:PRODUCT.exe") + (Get-ChildItem "target/release/bundle/msi/*.msi").FullName
+          # src-tauri/hook.dll is the copy that actually ships inside the MSI,
+          # and it is signed by a separate step — verify it here too, so the
+          # bundled resource is covered by the same check as the exe and MSI.
+          $msi = @(Get-ChildItem "target/release/bundle/msi/*.msi")
+          # Assert explicitly: an empty glob would otherwise shrink $files and
+          # let the loop "pass" without ever checking an MSI.
+          if ($msi.Count -ne 1) { throw "expected exactly 1 MSI, found $($msi.Count)" }
+          $files = @("target/release/$env:PRODUCT.exe", "src-tauri/hook.dll") + $msi.FullName
           foreach ($f in $files) {
             $sig = Get-AuthenticodeSignature $f
             Write-Host "$f -> $($sig.Status): $($sig.SignerCertificate.Subject)"
@@ -293,6 +325,9 @@ jobs:
         run: |
           $msiDir = "target/release/bundle/msi"
           $zip = Get-ChildItem "$msiDir/*.msi.zip" | Select-Object -First 1
+          # Without this, a missing zip makes $zip.FullName silently $null and
+          # the step dies later on $signature.Trim() with an unrelated message.
+          if (-not $zip) { throw "no updater .msi.zip found in $msiDir" }
           $signature = Get-Content "$($zip.FullName).sig" -Raw
           $assetName = $zip.Name -replace ' ', '.'
           $manifest = [ordered]@{
@@ -302,7 +337,7 @@ jobs:
             platforms = [ordered]@{
               'windows-x86_64' = [ordered]@{
                 signature = $signature.Trim()
-                url = "https://github.com/villith/relink-logs/releases/download/$env:VERSION/$assetName"
+                url = "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:VERSION/$assetName"
               }
             }
           }
@@ -324,7 +359,10 @@ jobs:
           NOTES: ${{ steps.notes.outputs.body }}
         run: |
           $msiDir = "target/release/bundle/msi"
-          $NOTES | Out-File notes.md -Encoding utf8
+          # $env:NOTES, not $NOTES: PowerShell does not expose environment
+          # variables as bare variables, so $NOTES would be $null and the
+          # release would publish with an empty body.
+          $env:NOTES | Out-File notes.md -Encoding utf8
           $assets = @(
             (Get-ChildItem "$msiDir/*.msi").FullName
             (Get-ChildItem "$msiDir/*.msi.zip").FullName
@@ -355,6 +393,10 @@ jobs:
         env:
           RELEASE_DEPLOY_KEY: ${{ secrets.RELEASE_DEPLOY_KEY }}
         run: |
+          if [[ -z "$RELEASE_DEPLOY_KEY" ]]; then
+            echo "::error::RELEASE_DEPLOY_KEY secret is missing - CI cannot fast-forward main."
+            exit 1
+          fi
           mkdir -p "$HOME/.ssh"
           printf '%s\n' "$RELEASE_DEPLOY_KEY" > "$HOME/.ssh/release_bot"
           chmod 600 "$HOME/.ssh/release_bot"

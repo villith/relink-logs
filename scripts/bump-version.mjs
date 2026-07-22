@@ -1,77 +1,67 @@
-// Bumps the app version in every place that must agree on release:
-//   package.json            .version
-//   src-tauri/tauri.conf.json .package.version
-//   src-tauri/Cargo.toml    [package] version
-//   Cargo.lock              the gbfr-logs package entry (kept in sync so the
-//                           next cargo build doesn't dirty the lockfile)
+// Sets a new BASE version (X.Y.Z) across every file that carries one.
 //
-// Usage:
-//   npm run bump             -> patch bump (1.9.5 -> 1.9.6)
-//   npm run bump -- 1.10.0   -> explicit version
-//   npm run bump -- minor    -> 1.9.5 -> 1.10.0 (also: patch, major)
+// Versions are normally managed by CI: every push to dev auto-bumps to the
+// next RC (X.Y.Z-N), and the release button strips the suffix. See the header
+// of .github/workflows/release.yaml. The one thing CI cannot decide for you is
+// whether the next release is a patch, minor, or major — so this script exists
+// to set that base in a PR:
 //
-// The release workflow tags + publishes automatically when a commit on main
-// carries a package.json version with no matching tag. It also REFUSES to tag
-// a version with no `## <version>` section in CHANGELOG.md, so cutting a
-// release is: bump, write the changelog section, commit, merge to main.
-import { readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
+//   npm run bump -- minor    -> 1.11.2-3 becomes 1.12.0
+//   npm run bump -- 1.13.0   -> explicit version
+//   npm run bump             -> patch bump of the base
+//
+// CI then appends the RC number, so this always writes a plain X.Y.Z with no
+// -N suffix. The current version may already carry one (dev almost always
+// does); it is stripped before the bump — parsing it as a plain X.Y.Z used to
+// yield "1.11.NaN" and silently corrupt every version file.
+//
+// The actual writing is delegated to set-version.mjs so there is exactly one
+// implementation of "write this version everywhere" (it also covers
+// package-lock.json, which this script historically missed, leaving `npm ci`
+// to fail on a lockfile/package.json version mismatch).
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { extractSection } from "./extract-changelog.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const current = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8")).version;
 
-const pkgPath = resolve(root, "package.json");
-const tauriConfPath = resolve(root, "src-tauri/tauri.conf.json");
-const cargoTomlPath = resolve(root, "src-tauri/Cargo.toml");
-const cargoLockPath = resolve(root, "Cargo.lock");
-
-const current = JSON.parse(readFileSync(pkgPath, "utf8")).version;
+const parsed = /^(\d+)\.(\d+)\.(\d+)(?:-\d+)?$/.exec(current);
+if (!parsed) {
+  console.error(`[bump-version] current version "${current}" is not X.Y.Z or X.Y.Z-N`);
+  process.exit(1);
+}
+const [major, minor, patch] = parsed.slice(1, 4).map(Number);
 
 const arg = process.argv[2] ?? "patch";
 let next;
 if (/^\d+\.\d+\.\d+$/.test(arg)) {
   next = arg;
-} else if (["patch", "minor", "major"].includes(arg)) {
-  const [major, minor, patch] = current.split(".").map(Number);
-  next =
-    arg === "major"
-      ? `${major + 1}.0.0`
-      : arg === "minor"
-        ? `${major}.${minor + 1}.0`
-        : `${major}.${minor}.${patch + 1}`;
+} else if (arg === "major") {
+  next = `${major + 1}.0.0`;
+} else if (arg === "minor") {
+  next = `${major}.${minor + 1}.0`;
+} else if (arg === "patch") {
+  next = `${major}.${minor}.${patch + 1}`;
 } else {
   console.error(`[bump-version] invalid argument "${arg}" — expected x.y.z, patch, minor, or major`);
   process.exit(1);
 }
 
-// Edit files textually so formatting and key order survive untouched.
-const replaceOnce = (path, pattern, replacement) => {
-  const text = readFileSync(path, "utf8");
-  const updated = text.replace(pattern, replacement);
-  if (updated === text) {
-    console.error(`[bump-version] no match for ${pattern} in ${path} — aborting, no files changed beyond earlier steps`);
-    process.exit(1);
-  }
-  writeFileSync(path, updated);
-  console.log(`[bump-version] ${path}: -> ${next}`);
-};
-
-replaceOnce(pkgPath, `"version": "${current}"`, `"version": "${next}"`);
-replaceOnce(tauriConfPath, `"version": "${current}"`, `"version": "${next}"`);
-replaceOnce(cargoTomlPath, `version = "${current}"`, `version = "${next}"`);
-replaceOnce(
-  cargoLockPath,
-  new RegExp(`(name = "gbfr-logs"\\nversion = )"${current.replaceAll(".", "\\.")}"`),
-  `$1"${next}"`
-);
-
+execFileSync(process.execPath, [resolve(root, "scripts/set-version.mjs"), next], {
+  cwd: root,
+  stdio: "inherit",
+});
 console.log(`[bump-version] ${current} -> ${next}`);
 
-// Catch the missing-notes case here rather than as a red CI run after merge:
-// the tag job hard-fails without this section, and a tag without a release
-// would block the version forever.
+// Catch the missing-notes case here rather than as a failed release later: the
+// stable release is gated on this section existing, and it must be written by
+// a human.
 if (extractSection(readFileSync(resolve(root, "CHANGELOG.md"), "utf8"), next) === null) {
-  console.log(`[bump-version] CHANGELOG.md has no "## ${next}" section yet — write one before merging, or the release will not tag`);
+  console.log(
+    `[bump-version] CHANGELOG.md has no "## ${next}" section yet — write one before releasing ${next}`,
+  );
 }
