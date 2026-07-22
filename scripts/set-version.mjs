@@ -1,12 +1,16 @@
-// Writes one version into every file that carries it:
-// package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml, Cargo.lock.
-// These four must always agree — the app reports tauri.conf.json's version to
+// Writes one version into every file that carries it: package.json,
+// package-lock.json (root + packages[""]), src-tauri/tauri.conf.json,
+// src-tauri/Cargo.toml, Cargo.lock.
+// These must always agree — the app reports tauri.conf.json's version to
 // the updater, and a mismatch with the release tag breaks update comparisons.
 //
 //   node scripts/set-version.mjs 1.12.0-1
 //
-// Edits are targeted line replacements (not parse/re-serialize) so file
-// formatting survives; each edit is verified after writing.
+// The npm-owned pair goes through `npm version` (offline, no dependency
+// re-resolution — unlike `npm install`, which can churn the lock). The other
+// three get targeted line replacements so file formatting survives; every
+// file is verified after writing.
+import { execSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,12 +36,21 @@ const edit = (rel, pattern, replacement, verify) => {
   console.log(`${rel} -> ${version}`);
 };
 
-edit(
-  "package.json",
-  /("version":\s*")[^"]+(")/,
-  `$1${version}$2`,
-  (s) => JSON.parse(s).version === version,
-);
+// A shell string is deliberate: npm is npm.cmd on Windows, which Node
+// refuses to spawn shell-less (CVE-2024-27980). Injection-safe because
+// `version` is locked to \d+.\d+.\d+(-\d+)? above.
+execSync(`npm version ${version} --no-git-tag-version --allow-same-version`, {
+  cwd: root,
+  stdio: "pipe",
+});
+for (const rel of ["package.json", "package-lock.json"]) {
+  const parsed = JSON.parse(readFileSync(resolve(root, rel), "utf8"));
+  const got = rel === "package-lock.json" ? parsed.packages[""].version : parsed.version;
+  if (parsed.version !== version || got !== version) {
+    throw new Error(`${rel}: npm version did not set ${version}`);
+  }
+  console.log(`${rel} -> ${version}`);
+}
 edit(
   "src-tauri/tauri.conf.json",
   /("version":\s*")[^"]+(")/,

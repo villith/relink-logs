@@ -3,7 +3,7 @@ name: Release
 # Branch model (versions are managed by CI — do not hand-bump them):
 #
 #   PRs target dev (the default branch). Every push to dev auto-bumps to the
-#   next RC version (X.Y.Z-N), commits the bump to the four version files, and
+#   next RC version (X.Y.Z-N), commits the bump to the five version files, and
 #   publishes a fully signed GitHub *prerelease* — downloadable for testing,
 #   but invisible to installed apps, because GitHub never serves prereleases
 #   from releases/latest (the updater endpoint).
@@ -120,7 +120,7 @@ jobs:
             node scripts/set-version.mjs "$next"
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock
+            git add package.json package-lock.json src-tauri/tauri.conf.json src-tauri/Cargo.toml Cargo.lock
             git commit -m "chore(release): $next"
             # A human push can race ours; rebase the bump onto it and retry.
             pushed=false
@@ -239,13 +239,17 @@ jobs:
           npm run build
           Set-Content -Path .tauri-release-config.json -Value '{"build":{"beforeBuildCommand":""}}' -Encoding utf8
 
-      # Pass 1 compiles the app binary so it can be signed; bundling is skipped
-      # (`-b none`) — an MSI built now would wrap an unsigned exe and be thrown
-      # away. No updater artifact is produced in either pass, so neither needs
+      # Pass 1 compiles the app binary so it can be signed. Its MSI wraps the
+      # unsigned exe and is overwritten by pass 2. The invocation must be
+      # BYTE-IDENTICAL to pass 2's: tauri-build declares
+      # rerun-if-env-changed=TAURI_CONFIG, and the CLI feeds it the merged
+      # config — a differing `-b` list (run 29937005294 used `-b none` here)
+      # re-runs the build script, recompiles, and silently replaces the signed
+      # exe. No updater artifact is produced in either pass, so neither needs
       # TAURI_PRIVATE_KEY. After the build the CLI *moves* (std::fs::rename)
       # target/release/gbfr-logs.exe to "GBFR Logs.exe" (productName).
-      - name: Build app (pass 1 — compile only)
-        run: npx tauri build -b none --config .tauri-release-config.json
+      - name: Build app (pass 1 — compile and discard unsigned bundle)
+        run: npx tauri build -b msi --config .tauri-release-config.json
 
       # Signed here rather than inside the bundler because Tauri 1.5 can only
       # drive signtool via `certificateThumbprint` (a cert in the machine store),
@@ -274,12 +278,15 @@ jobs:
         shell: pwsh
         run: Copy-Item "target/release/$env:PRODUCT.exe" target/release/gbfr-logs.exe
 
-      # Same sources, same config, dist/ untouched → cargo is fully fresh; the
+      # Same sources, same config, same command → cargo is fully fresh; the
       # bundler packages the signed exe and signed hook.dll into the MSI. If
       # anything DID recompile, the signature is silently lost — the next step
-      # catches that and fails the job (nothing is stranded: no tag exists yet).
+      # catches that and fails the job (nothing is stranded: no tag exists
+      # yet), and CARGO_LOG prints exactly which fingerprint input went dirty.
       - name: Build app (pass 2 — bundle MSI from signed binary)
         run: npx tauri build -b msi --config .tauri-release-config.json
+        env:
+          CARGO_LOG: cargo::core::compiler::fingerprint=info
 
       - name: Verify the packaged binary is still signed
         shell: pwsh
