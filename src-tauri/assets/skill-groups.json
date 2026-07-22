@@ -458,13 +458,22 @@
   },
   "Pl2600": {
     "normal-attack": {
-      "skills": [100, 101, 102, 103, 900, 901, 902, 903]
+      "skills": [100, 101, 102, 103]
+    },
+    "normal-attack-empowered": {
+      "skills": [900, 901, 902, 903]
     },
     "power-strike": {
-      "skills": [110, 120, 130, 910, 920, 930]
+      "skills": [110, 120, 130]
+    },
+    "power-strike-empowered": {
+      "skills": [910, 920, 930]
     },
     "combo-finisher": {
-      "skills": [111, 121, 131, 140, 911, 921, 931, 940]
+      "skills": [111, 121, 131, 140]
+    },
+    "combo-finisher-empowered": {
+      "skills": [911, 921, 931, 940]
     },
     "aerial-attack": {
       "skills": [300, 301, 302, 310]
@@ -494,8 +503,11 @@
     }
   },
   "Pl2800": {
-    "normal-attack": {
-      "skills": [100, 101, 102, 111, 116, 170, 900, 901, 902, 910, 970]
+    "normal-attack-upright": {
+      "skills": [100, 101, 102, 111, 116, 170]
+    },
+    "normal-attack-reversed": {
+      "skills": [900, 901, 902, 910, 970]
     },
     "dead-lands": {
       "skills": [5000, 5010]
@@ -506,11 +518,17 @@
     "stance-flip": {
       "skills": [200, 201]
     },
-    "power-strike": {
-      "skills": [120, 130, 140, 150, 920, 930, 940, 950]
+    "power-strike-upright": {
+      "skills": [120, 130, 140, 150]
     },
-    "combo-finisher": {
-      "skills": [121, 131, 141, 151, 931, 941, 951]
+    "power-strike-reversed": {
+      "skills": [920, 930, 940, 950]
+    },
+    "combo-finisher-upright": {
+      "skills": [121, 131, 141, 151]
+    },
+    "combo-finisher-reversed": {
+      "skills": [931, 941, 951]
     },
     "aerial-attack": {
       "skills": [310, 311]
