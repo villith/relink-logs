@@ -102,6 +102,10 @@ jobs:
     # Windows is required: the hook crate is a Windows DLL (windows-rs, DLL
     # injection, named pipes) and the tests must run natively.
     runs-on: windows-latest
+    env:
+      # No debuginfo (PDBs): tests don't need it, and generating/linking it
+      # is a large share of Windows compile time and of the target/ cache.
+      CARGO_PROFILE_DEV_DEBUG: "0"
     steps:
       - uses: actions/checkout@v4
       # Install exactly the toolchain pinned in rust-toolchain.toml. No
@@ -117,8 +121,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      # src-tauri's build.rs requires target/release/hook.dll to exist.
-      - run: cargo build --release --package hook
+      # src-tauri's build.rs only requires that a hook.dll file EXISTS to
+      # satisfy the tauri resource glob (its copy from target/release is a
+      # tolerated failure), and tests never load the DLL. An empty stub
+      # avoids compiling the whole hook dependency tree a second time in the
+      # release profile just to produce a file nothing reads.
+      - name: Stub the hook.dll resource
+        shell: bash
+        run: touch src-tauri/hook.dll
       # No separate `cargo build`: cargo test compiles the same lib/bin
       # targets itself, so a build step only duplicates the work.
       - run: cargo test --verbose
