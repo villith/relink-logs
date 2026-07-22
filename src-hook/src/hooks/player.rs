@@ -477,80 +477,96 @@ struct StoredPlayerIdentity {
     weapon_state: Option<protocol::WeaponState>,
 }
 
-/// One party slot's identity, paired with the id its record most recently carried
-/// at [`PLAYER_KEY_OFFSET`].
+/// One player's cached identity, paired with the id its record most recently
+/// carried at [`PLAYER_KEY_OFFSET`] (kept only for the legacy [`find_by_id`]
+/// fallback — the equipment join no longer uses it).
+///
+/// [`find_by_id`]: IdentityStore::find_by_id
 struct SlotIdentity {
     id: u32,
     identity: StoredPlayerIdentity,
 }
 
-/// Player identities keyed by PARTY SLOT — the game's own addressing for player
-/// records (they're fetched per slot 0..=3 internally).
+/// Player identities keyed by `(party slot, online)`.
 ///
-/// v2.0.2: the id at record+0x5EA8 is RECYCLED, not a stable player key — the same
-/// value moves between players/slots, and even the local player's id changes
-/// between contexts within one session (confirmed live). So the id is only a
-/// transient correlator: it's matched at the instant a damage event arrives against
-/// the LATEST value each slot's record announced, and is never cached per actor.
-/// A stale pairing therefore cannot outlive the next identity refresh, which is
-/// what made names flip between players and stick wrong before.
+/// The equipment join must satisfy two constraints the record id at +0x5EA8
+/// cannot meet on its own:
+///
+/// - **Two players on the SAME character share that id** — it is character-scoped
+///   (2026-07-18 live: both Maglielles carried id `0x25d46f4b`). Keying equipment
+///   by id therefore returned one player's whole build for both (duplicated
+///   weapon/summons/overmasteries/master-traits; only sigils, read per-actor from
+///   the embedded snapshot, stayed distinct). Two players on one character always
+///   occupy DISTINCT party slots, so the slot separates them.
+/// - **A local AI town record and a remote player can share a slot** — the local
+///   town-roster records (AI companions) keep refreshing slots 1..=3 during online
+///   play, so a slot-ONLY join dressed remote players in a local companion's build
+///   (2026-07-18: a remote Tweyen shipped with the local AI Maglielle's build).
+///   The AI record is offline and the remote player online, so the online flag
+///   separates them.
+///
+/// `(party slot, online)` uniquely identifies a logical player at any instant (a
+/// slot holds one player; the online flag splits the AI/remote overlap), so each
+/// claim owns its own bucket and never evicts a sibling.
 #[derive(Default)]
 struct IdentityStore {
-    by_slot: [Option<SlotIdentity>; 4],
+    entries: Vec<SlotIdentity>,
 }
 
 impl IdentityStore {
-    /// Records that party slot `identity.party_index` currently carries `id`.
-    /// Latest claim wins: an id can belong to at most one slot at a time, so any
-    /// other slot still holding it is evicted.
+    /// Records the identity for its `(party slot, online)` bucket, replacing any
+    /// previous claim for that same bucket (latest wins). Unlike the old id-keyed
+    /// store this never evicts another bucket — two same-character players hold
+    /// the same `id` in different slots and must coexist.
     fn claim(&mut self, id: u32, identity: StoredPlayerIdentity) {
-        let slot = identity.party_index.min(3) as usize;
+        let slot = identity.party_index.min(3);
+        let online = identity.is_online;
 
-        for (index, entry) in self.by_slot.iter_mut().enumerate() {
-            if index != slot && entry.as_ref().is_some_and(|e| e.id == id) {
-                #[cfg(feature = "hookdiag")]
-                log::info!("IDDIAG id {id:#010x} moved slot {index} -> {slot}");
-                *entry = None;
-            }
-        }
-
-        #[cfg(feature = "hookdiag")]
-        if let Some(previous) = &self.by_slot[slot] {
-            if previous.identity.display_name != identity.display_name || previous.id != id {
+        if let Some(existing) = self
+            .entries
+            .iter_mut()
+            .find(|e| e.identity.party_index.min(3) == slot && e.identity.is_online == online)
+        {
+            #[cfg(feature = "hookdiag")]
+            if existing.identity.display_name != identity.display_name || existing.id != id {
                 log::info!(
-                    "IDDIAG slot {slot} update {:?}/{:#010x} -> {:?}/{id:#010x}",
-                    previous.identity.display_name,
-                    previous.id,
+                    "IDDIAG slot {slot} online={online} update {:?}/{:#010x} -> {:?}/{id:#010x}",
+                    existing.identity.display_name,
+                    existing.id,
                     identity.display_name,
                 );
             }
+            existing.id = id;
+            existing.identity = identity;
+        } else {
+            self.entries.push(SlotIdentity { id, identity });
         }
-
-        self.by_slot[slot] = Some(SlotIdentity { id, identity });
     }
 
-    /// Finds the slot whose record most recently carried `id`.
+    /// Finds the entry whose record most recently carried `id`. Used only by the
+    /// legacy fallback for an actor with no embedded record (the primary path
+    /// joins on `(party slot, online)` via [`equipment_donor`]); it inherits the
+    /// same character-scoped-id limitation, but that path can supply no slot.
+    ///
+    /// [`equipment_donor`]: IdentityStore::equipment_donor
     fn find_by_id(&self, id: u32) -> Option<&StoredPlayerIdentity> {
-        self.by_slot
+        self.entries
             .iter()
-            .flatten()
             .find(|entry| entry.id == id)
             .map(|entry| &entry.identity)
     }
 
-    /// The equipment-donor claim for a damage actor resolved through its
-    /// EMBEDDED record: only the claim carrying the actor's own record id
-    /// (`record+0x5EA8`) may donate equipment.
-    ///
-    /// A slot number alone is NOT a player identity — the local town-roster
-    /// records (AI companions) claim slots 1..=3 too and keep refreshing
-    /// during online play, so a slot-only join dressed remote players in a
-    /// local companion's build (2026-07-18: a remote Tweyen shipped with the
-    /// local AI Maglielle's weapon/abilities/master-level). On an id mismatch
-    /// the actor simply gets no enrichment; the parser keeps any equipment a
-    /// matching refresh taught it earlier.
-    fn equipment_donor(&self, record_id: Option<u32>) -> Option<&StoredPlayerIdentity> {
-        self.find_by_id(record_id?)
+    /// The equipment-donor claim for a damage actor, joined on its own embedded
+    /// record's `(party slot, online)` — the key that distinguishes both two
+    /// same-character players and a remote player from a local AI on one slot (see
+    /// [`IdentityStore`]). `None` when no claim matches; the parser then keeps any
+    /// equipment a matching refresh taught it earlier.
+    fn equipment_donor(&self, party_index: u8, is_online: bool) -> Option<&StoredPlayerIdentity> {
+        let slot = party_index.min(3);
+        self.entries
+            .iter()
+            .find(|e| e.identity.party_index.min(3) == slot && e.identity.is_online == is_online)
+            .map(|e| &e.identity)
     }
 }
 
@@ -863,14 +879,17 @@ pub fn identity_event_for_actor(
         // The embedded snapshot carries identity + sigils; the RefreshPlayerIdentity
         // hook reads the fuller equipment payload (weapon, overmasteries, stats...)
         // from the same records — enrich from its cache, joined on the actor's own
-        // record id so a town-roster claim on the same slot can't donate a local
-        // AI companion's build to a remote player.
+        // (party slot, online). The record id at +0x5EA8 can't be the join key: it
+        // is character-scoped, so two players on one character share it and both
+        // resolved to a single donor (duplicated builds). Slot separates
+        // same-character players; the online flag keeps a local AI town record on
+        // the same slot from donating its build to a remote player.
         let cached = identities()
             .lock()
             .ok()
             .and_then(|store| {
                 store
-                    .equipment_donor(embedded_record_id(actor as usize))
+                    .equipment_donor(party_index, identity.is_online)
                     .cloned()
             });
         let equip = cached.unwrap_or_else(|| identity.clone());
@@ -1649,17 +1668,6 @@ fn embedded_identity_struct(actor: usize) -> Option<StoredPlayerIdentity> {
         return None;
     }
     unsafe { read_player_identity(snapshot as *const u8) }
-}
-
-/// The id the actor's own embedded record carries at [`PLAYER_KEY_OFFSET`] —
-/// the join key for equipment enrichment (see [`IdentityStore::equipment_donor`]).
-/// Refreshes fire on the embedded record itself in lobbies, and solo records
-/// share their id between the pool and embedded copies, so a player's claim and
-/// their damage actor always agree on it. `None` when unreadable or unset.
-fn embedded_record_id(actor: usize) -> Option<u32> {
-    let record = actor.checked_add(ACTOR_RECORD_OFFSET)?;
-    let id = crate::hooks::diag::read_u32_guarded(record, PLAYER_KEY_OFFSET);
-    (id != 0 && id != INVALID_PLAYER_KEY).then_some(id)
 }
 
 /// The per-player slot key for an actor, when its embedded record resolves.
@@ -2579,34 +2587,95 @@ mod tests {
     const TOWN_AI_ID: u32 = 0x25d4_6f4b;
     const REMOTE_PLAYER_ID: u32 = 0x718e_1a14;
 
+    // Two players on the SAME character share the character-scoped record id at
+    // +0x5EA8 (live-observed: "both Maglielles carried ... id 0x25d46f4b"), so an
+    // id-keyed donor join returned one player's build for both. The store keys on
+    // (party slot, online) instead — the two players always occupy distinct slots.
     #[test]
-    fn equipment_donor_rejects_a_slot_claim_from_a_different_record() {
+    fn same_character_players_each_resolve_their_own_build() {
+        let mut store = IdentityStore::default();
+        // Slot 0 and slot 1, same character => identical record id.
+        store.claim(TOWN_AI_ID, identity("A", 0, false, 55));
+        store.claim(TOWN_AI_ID, identity("B", 1, false, 12));
+
+        assert_eq!(
+            store
+                .equipment_donor(0, false)
+                .expect("slot 0 must resolve its own build")
+                .master_level,
+            55
+        );
+        assert_eq!(
+            store
+                .equipment_donor(1, false)
+                .expect("slot 1 must resolve its own build")
+                .master_level,
+            12
+        );
+    }
+
+    // The claim for one same-character sibling must not evict the other's slot.
+    #[test]
+    fn claiming_a_same_id_sibling_slot_keeps_the_first() {
+        let mut store = IdentityStore::default();
+        store.claim(TOWN_AI_ID, identity("A", 0, false, 55));
+        store.claim(TOWN_AI_ID, identity("B", 1, false, 12));
+
+        assert!(store.equipment_donor(0, false).is_some());
+    }
+
+    // Anti-contamination (the original id-join's purpose), preserved: a local AI
+    // town record and a remote player can occupy the same party slot; the online
+    // flag separates them so neither is dressed in the other's build.
+    #[test]
+    fn remote_player_and_local_ai_on_one_slot_keep_their_own_builds() {
         let mut store = IdentityStore::default();
         store.claim(REMOTE_PLAYER_ID, identity("Sylmorn", 3, true, 42));
-        // The town AI record refreshes later and takes the slot (latest claim
-        // wins — correct for solo, but it must not dress the remote player).
+        // The town AI record refreshes later on the same slot (latest claim wins
+        // for its own online bucket — but it must not dress the remote player).
         store.claim(TOWN_AI_ID, identity("", 3, false, 1));
 
-        assert!(store.equipment_donor(Some(REMOTE_PLAYER_ID)).is_none());
+        assert_eq!(
+            store
+                .equipment_donor(3, true)
+                .expect("the remote player resolves its own claim")
+                .master_level,
+            42
+        );
+        assert_eq!(
+            store
+                .equipment_donor(3, false)
+                .expect("the AI companion resolves its own claim")
+                .master_level,
+            1
+        );
     }
 
     #[test]
-    fn equipment_donor_returns_the_claim_carrying_the_actors_record_id() {
+    fn equipment_donor_returns_none_for_an_unclaimed_slot() {
         let mut store = IdentityStore::default();
         store.claim(TOWN_AI_ID, identity("", 3, false, 1));
 
-        let donor = store
-            .equipment_donor(Some(TOWN_AI_ID))
-            .expect("an AI companion actor must still resolve its own claim");
-        assert_eq!(donor.master_level, 1);
+        assert!(store.equipment_donor(0, false).is_none());
+        // Same slot, wrong online-ness is also a miss.
+        assert!(store.equipment_donor(3, true).is_none());
     }
 
+    // The legacy fallback path (actor with no embedded record) still resolves by
+    // the raw record id.
     #[test]
-    fn equipment_donor_rejects_an_unreadable_record_id() {
+    fn find_by_id_resolves_the_legacy_fallback() {
         let mut store = IdentityStore::default();
-        store.claim(TOWN_AI_ID, identity("", 3, false, 1));
+        store.claim(REMOTE_PLAYER_ID, identity("Sylmorn", 3, true, 42));
 
-        assert!(store.equipment_donor(None).is_none());
+        assert_eq!(
+            store
+                .find_by_id(REMOTE_PLAYER_ID)
+                .expect("the fallback resolves by record id")
+                .master_level,
+            42
+        );
+        assert!(store.find_by_id(0xDEAD_BEEF).is_none());
     }
 
     #[test]
