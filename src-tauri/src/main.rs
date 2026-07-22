@@ -343,16 +343,23 @@ mod linux_setup {
 
     #[tauri::command]
     pub fn fetch_linux_setup_status(app: AppHandle) -> Result<LinuxSetupStatus, String> {
-        let Ok((game, bundled)) = game_and_hook(&app) else {
-            return Ok(LinuxSetupStatus {
-                steam_found: false,
-                game_dir: None,
-                prefix_found: false,
-                proxy_status: "missing".into(),
-                launch_options: deploy::LAUNCH_OPTIONS.into(),
-            });
+        let (game, bundled) = match game_and_hook(&app) {
+            Ok(pair) => pair,
+            Err(e) => {
+                // "Steam not found" is the panel's normal empty state, but a
+                // missing bundled resource is a packaging defect — keep the
+                // real reason in the log.
+                log::warn!("linux setup status unavailable: {e}");
+                return Ok(LinuxSetupStatus {
+                    steam_found: false,
+                    game_dir: None,
+                    prefix_found: false,
+                    proxy_status: "missing".into(),
+                    launch_options: deploy::LAUNCH_OPTIONS.into(),
+                });
+            }
         };
-        let proxy = deploy::proxy_status(&game.game_dir, &bundled).map_err(|e| e.to_string())?;
+        let proxy = deploy::proxy_status(&game.game_dir, &bundled).map_err(|e| format!("{e:#}"))?;
         Ok(LinuxSetupStatus {
             steam_found: true,
             game_dir: Some(game.game_dir.display().to_string()),
@@ -367,13 +374,13 @@ mod linux_setup {
         let (game, bundled) = game_and_hook(&app)?;
         deploy::deploy(&game.game_dir, &bundled)
             .map(|_| ())
-            .map_err(|e| e.to_string())
+            .map_err(|e| format!("{e:#}"))
     }
 
     #[tauri::command]
     pub fn remove_linux_hook(app: AppHandle) -> Result<(), String> {
         let (game, _) = game_and_hook(&app)?;
-        deploy::remove(&game.game_dir).map_err(|e| e.to_string())
+        deploy::remove(&game.game_dir).map_err(|e| format!("{e:#}"))
     }
 }
 
