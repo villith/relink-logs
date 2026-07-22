@@ -582,6 +582,14 @@ describe("utils", () => {
     it("is null for weapons without transcendence curves", () => {
       expect(deriveTranscendence(0x12345678, stage9Traits)).toBeNull();
     });
+
+    it("derives via family curve sharing when the hook reports a stale pre-ascension variant id", () => {
+      // Online reads can carry the weapon's _06_02 row id (0xe3b35c0d,
+      // Jumbo Crab log 542/544) alongside live levels from the true _06_03
+      // form — the gen script shares each family's curves with its
+      // curve-less sibling rows so the stage still derives.
+      expect(deriveTranscendence(0xe3b35c0d, stage9Traits)).toBe(9);
+    });
   });
 
   describe("deriveNavState", () => {

@@ -93,6 +93,7 @@ import {
   translateTraitId,
   translateWeaponId,
   translateWeaponKey,
+  translateWrightstoneId,
   translatedPlayerName,
   weaponInnateTraits,
   type BonusAmount,
@@ -413,7 +414,7 @@ const brushShade = (side: "left" | "right", widthPercent: number): React.CSSProp
 const CHECKLIST_SOURCE_KINDS: { key: TraitSource["kind"]; label: string; translate: (id: number) => string }[] = [
   { key: "sigil", label: "ui.player-sigils", translate: translateSigilId },
   { key: "summon", label: "ui.player-summons", translate: translateSummonId },
-  { key: "wrightstone", label: "ui.wrightstone", translate: translateItemId },
+  { key: "wrightstone", label: "ui.wrightstone", translate: translateWrightstoneId },
   { key: "weapon", label: "ui.weapon", translate: translateWeaponId },
 ];
 
@@ -1576,21 +1577,28 @@ export const ViewPage = () => {
                                 })}{" "}
                                 +{player.weaponState.plusMarks}
                               </Text>
-                              <Text size="xs" fs="italic" fw={300}>
-                                Awakening {player.weaponState.awakeningLevel}/10
-                              </Text>
                               {(() => {
                                 /* Derived from the innate skill levels vs the per-stage
-                                   curves — needs a log recorded with level data. */
+                                   curves — needs a log recorded with level data. A derived
+                                   stage implies a fully awakened weapon (transcending
+                                   requires it), and remote players' awakening often fails
+                                   to sync (reads 0) — so the stage overrides the display. */
                                 const stage = deriveTranscendence(
                                   player.weaponState.weaponId,
                                   player.weaponState.innateTraits
                                 );
-                                return stage !== null ? (
-                                  <Text size="xs" fs="italic" fw={300}>
-                                    Transcendence {stage}/10
-                                  </Text>
-                                ) : null;
+                                return (
+                                  <>
+                                    <Text size="xs" fs="italic" fw={300}>
+                                      Awakening {stage ? 10 : player.weaponState.awakeningLevel}/10
+                                    </Text>
+                                    {stage !== null && (
+                                      <Text size="xs" fs="italic" fw={300}>
+                                        Transcendence {stage}/10
+                                      </Text>
+                                    )}
+                                  </>
+                                );
                               })()}
                               {player.weaponState.innateTraits.map((trait) => (
                                 <Text size="xs" fs="italic" fw={300} key={trait.id}>
@@ -1598,13 +1606,14 @@ export const ViewPage = () => {
                                   {trait.level > 0 ? ` (Lvl. ${trait.level})` : ""}
                                 </Text>
                               ))}
-                              {player.weaponState.wrightstoneId > 0 && (
+                              {/* Remote players sync the wrightstone's trait pairs but never its
+                                  item id — id 0 with traits still means a stone is equipped, so
+                                  show the traits under the generic label. */}
+                              {(player.weaponState.wrightstoneId > 0 ||
+                                player.weaponState.wrightstoneTraits.length > 0) && (
                                 <>
                                   <Text size="xs" fw={700}>
-                                    {t([
-                                      `items:${toHashString(player.weaponState.wrightstoneId)}.text`,
-                                      "ui.wrightstone",
-                                    ])}
+                                    {translateWrightstoneId(player.weaponState.wrightstoneId)}
                                   </Text>
                                   {player.weaponState.wrightstoneTraits.map((trait) => (
                                     <Text size="xs" fs="italic" fw={300} key={trait.id}>

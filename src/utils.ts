@@ -919,6 +919,12 @@ export const translateItemId = (id: number | null): string => {
   return t([`items:${hash}.text`, "ui.unknown-id"], { id: hash });
 };
 
+/** The wrightstone's display name. The stone's ITEM id never syncs for remote
+ * players (only its trait pairs do), so 0 means "a stone we can't name", not
+ * "Unknown (00000000)" — fall back to the generic label. */
+export const translateWrightstoneId = (id: number | null): string =>
+  id && id !== EMPTY_ID ? translateItemId(id) : t("ui.wrightstone");
+
 /// Translates the overmastery ID to a human-readable string.
 export const translateOvermasteryId = (id: number | null): string => {
   if (id === null) return "";

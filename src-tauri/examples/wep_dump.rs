@@ -56,7 +56,10 @@ fn main() -> Result<()> {
             );
             let ws = &value["weaponState"];
             if ws.is_null() {
-                println!("    weaponState: null (weaponInfo: {})", value["weaponInfo"]);
+                println!(
+                    "    weaponState: null (weaponInfo: {})",
+                    value["weaponInfo"]
+                );
                 continue;
             }
             println!(
@@ -67,6 +70,18 @@ fn main() -> Result<()> {
                 ws["awakeningLevel"],
                 ws["exp"],
             );
+            println!(
+                "    wrightstone {:08x} traits {}",
+                ws["wrightstoneId"].as_u64().unwrap_or(0),
+                ws["wrightstoneTraits"]
+                    .as_array()
+                    .map(|ts| ts
+                        .iter()
+                        .map(|t| format!("{:08x}:{}", t["id"].as_u64().unwrap_or(0), t["level"]))
+                        .collect::<Vec<_>>()
+                        .join(" "))
+                    .unwrap_or_default(),
+            );
             if let Some(traits) = ws["innateTraits"].as_array() {
                 for t in traits {
                     println!(
@@ -76,6 +91,10 @@ fn main() -> Result<()> {
                     );
                 }
             }
+            println!(
+                "    partyIndex {} isOnline {} weaponInfo {}",
+                value["partyIndex"], value["isOnline"], value["weaponInfo"],
+            );
         }
     }
 
