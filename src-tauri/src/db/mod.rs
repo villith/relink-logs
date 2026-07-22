@@ -10,7 +10,7 @@ pub mod runs;
 pub fn setup_db() -> Result<()> {
     info!("Setting up the database, opening logs.db..");
 
-    let mut conn = Connection::open("logs.db")?;
+    let mut conn = Connection::open(crate::data_paths::data_dir().join("logs.db"))?;
 
     conn.pragma_update(None, "journal_mode", "WAL")?;
 
@@ -64,7 +64,7 @@ pub fn setup_db() -> Result<()> {
 
 /// Connect to database.
 pub fn connect_to_db() -> Result<Connection> {
-    let conn = Connection::open("logs.db")?;
+    let conn = Connection::open(crate::data_paths::data_dir().join("logs.db"))?;
     conn.pragma_update(None, "journal_mode", "WAL")?;
 
     Ok(conn)

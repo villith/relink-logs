@@ -2,6 +2,7 @@
 //! Tauri binary (`main.rs`) and auxiliary binaries (e.g. `bin/skill_backfill.rs`)
 //! can share them. main.rs is a thin binary that `use`s this crate.
 pub mod backfill;
+pub mod data_paths;
 pub mod db;
 #[cfg(windows)]
 pub mod game_mem;
