@@ -11,6 +11,7 @@ use tokio::sync::broadcast;
 mod event;
 mod hooks;
 mod process;
+mod transport;
 
 use protocol::Message;
 use tokio_util::codec::{FramedWrite, LengthDelimitedCodec};
