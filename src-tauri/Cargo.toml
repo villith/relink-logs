@@ -37,6 +37,7 @@ tauri = { version = "1.5", features = [
   "shell-open",
   "devtools",
   "dialog",
+  "os-all",
 ] }
 tauri-plugin-single-instance = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }
 tauri-plugin-window-state = { git = "https://github.com/tauri-apps/plugins-workspace", branch = "v1" }

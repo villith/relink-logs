@@ -41,6 +41,9 @@
       },
       "path": {
         "all": true
+      },
+      "os": {
+        "all": true
       }
     },
     "windows": [
@@ -98,6 +101,9 @@
         "assets/*",
         "lang/*"
       ],
+      "deb": {
+        "depends": ["libayatana-appindicator3-1"]
+      },
       "windows": {
         "webviewInstallMode": {
           "type": "embedBootstrapper"
