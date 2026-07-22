@@ -841,6 +841,12 @@ const enemyTypeKey = (type: EnemyType): string => (typeof type === "string" ? `s
 export const targetLabelKey = (enemyType: EnemyType, instance: number): string =>
   `${enemyTypeKey(enemyType)}#${instance}`;
 
+/** Stable empty breakdown for live rows: the meter re-renders on every tick, and
+ * a fresh `[]` each time would invalidate the tooltip's `breakdown` memo and force
+ * it to rebuild its element tree only to be discarded. Sharing one reference keeps
+ * that memo cached. Never mutate. */
+export const NO_TARGETS: SkillTargetState[] = [];
+
 /** Merge per-enemy skill breakdowns — one array per skill, `undefined` for
  * skills from logs saved before the breakdown existed — summing hits and
  * damage by enemy type, sorted by damage descending. Used by the quest-view

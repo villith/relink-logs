@@ -391,12 +391,88 @@ export enum SkillColumns {
   TotalStunValue = "stun",
   StunEligibleHits = "stun-hits",
   StunPerEligibleHit = "stun-per-hit",
+  StunPerSecond = "stun-per-second",
   Overcap = "overcap",
   DamagePercentage = "percentage",
 }
 
-/** Default skill-column set and order — matches the pre-customization layout. */
-export const DEFAULT_SKILL_COLUMNS: SkillColumns[] = [
+/** A column plus whether it's currently shown. Column lists persist EVERY column
+ * of the set in a user-chosen order; hiding a column flips `visible` and leaves
+ * it in place (it just stops rendering) instead of moving it out of the list. */
+export type ColumnSetting<T extends string> = { id: T; visible: boolean };
+
+/** The shown columns, in order — what the meter / skill tables actually render. */
+export const visibleColumns = <T extends string>(settings: ColumnSetting<T>[]): T[] =>
+  settings.filter((setting) => setting.visible).map((setting) => setting.id);
+
+/** All player columns except the always-on Name column, in enum order. */
+export const ALL_METER_COLUMNS: MeterColumns[] = Object.values(MeterColumns).filter(
+  (column) => column !== MeterColumns.Name
+);
+/** All skill-breakdown columns, in enum order. */
+export const ALL_SKILL_COLUMNS: SkillColumns[] = Object.values(SkillColumns);
+
+/** Build a column-settings list: the `shown` columns first (in order, visible),
+ * then every remaining column of `universe` appended as hidden. */
+export const buildColumns = <T extends string>(universe: T[], shown: T[]): ColumnSetting<T>[] => {
+  const rest = universe.filter((column) => !shown.includes(column));
+  return [...shown, ...rest].map((id) => ({ id, visible: shown.includes(id) }));
+};
+
+/** Reconcile a persisted column list against the current column `universe`,
+ * preserving the user's order and per-column visibility. Columns no longer in
+ * the universe (or explicitly `removed`) are dropped; columns added to the
+ * universe since the list was saved are appended as hidden. Run on every
+ * hydration so a newly-added column always becomes reachable in the picker even
+ * for users whose stored list predates it (the persist `version` only bumps on
+ * shape changes, so migration alone can't cover new members). */
+export const reconcileColumns = <T extends string>(
+  existing: ColumnSetting<T>[],
+  universe: T[],
+  removed: string[] = []
+): ColumnSetting<T>[] => {
+  const known = existing.filter(
+    (setting) => (universe as string[]).includes(setting.id) && !removed.includes(setting.id)
+  );
+  const present = new Set(known.map((setting) => setting.id));
+  const appended = universe
+    .filter((id) => !present.has(id) && !removed.includes(id))
+    .map((id) => ({ id, visible: false }));
+  return [...known, ...appended];
+};
+
+/** Overlay (live meter) default player columns — lean, to fit the narrow window.
+ * The Name column is always shown and is not part of this list. */
+export const DEFAULT_OVERLAY_COLUMNS: ColumnSetting<MeterColumns>[] = buildColumns(ALL_METER_COLUMNS, [
+  MeterColumns.TotalDamage,
+  MeterColumns.DPS,
+  MeterColumns.StunPerSecond,
+  MeterColumns.DamagePercentage,
+]);
+
+/** Main-window (logs / quest-details) default player columns. */
+export const DEFAULT_LOGS_COLUMNS: ColumnSetting<MeterColumns>[] = buildColumns(ALL_METER_COLUMNS, [
+  MeterColumns.TotalDamage,
+  MeterColumns.DPS,
+  MeterColumns.TotalStunValue,
+  MeterColumns.StunPerSecond,
+  MeterColumns.SupPercentage,
+  MeterColumns.DamagePercentage,
+]);
+
+/** Overlay (live meter) default skill-breakdown columns — lean. */
+export const DEFAULT_OVERLAY_SKILL_COLUMNS: ColumnSetting<SkillColumns>[] = buildColumns(ALL_SKILL_COLUMNS, [
+  SkillColumns.Hits,
+  SkillColumns.TotalDamage,
+  SkillColumns.MinDamage,
+  SkillColumns.MaxDamage,
+  SkillColumns.AverageDamage,
+  SkillColumns.StunPerSecond,
+  SkillColumns.DamagePercentage,
+]);
+
+/** Main-window (logs / quest-details) default skill-breakdown columns — full set. */
+export const DEFAULT_LOGS_SKILL_COLUMNS: ColumnSetting<SkillColumns>[] = buildColumns(ALL_SKILL_COLUMNS, [
   SkillColumns.Hits,
   SkillColumns.TotalDamage,
   SkillColumns.MinDamage,
@@ -405,9 +481,10 @@ export const DEFAULT_SKILL_COLUMNS: SkillColumns[] = [
   SkillColumns.TotalStunValue,
   SkillColumns.StunEligibleHits,
   SkillColumns.StunPerEligibleHit,
+  SkillColumns.StunPerSecond,
   SkillColumns.Overcap,
   SkillColumns.DamagePercentage,
-];
+]);
 
 export type SortType = MeterColumns;
 

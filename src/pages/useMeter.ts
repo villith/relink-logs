@@ -7,6 +7,7 @@ import {
   PlayerData,
   SortDirection,
   SortType,
+  visibleColumns,
 } from "@/types";
 import { usePrevious } from "@mantine/hooks";
 import { listen } from "@tauri-apps/api/event";
@@ -74,15 +75,22 @@ export default function useMeter() {
   // expanded skill breakdown can have more columns than the player row, so size
   // to whichever is wider.
   useEffect(() => {
+    // Rapid column edits fire this effect repeatedly; `cancelled` (flipped by the
+    // cleanup below when a newer run supersedes this one) stops a stale run's
+    // window writes from landing after the newer run's and leaving the overlay
+    // sized for the wrong column set.
+    let cancelled = false;
+
     const minWidth = Math.max(
-      overlayMinWidth(overlayColumns.length, showFullValues, true), // player rows: + caret column
-      overlayMinWidth(overlaySkillColumns.length, showFullValues) // skill-breakdown rows
+      overlayMinWidth(visibleColumns(overlayColumns).length, showFullValues, true), // player rows: + caret column
+      overlayMinWidth(visibleColumns(overlaySkillColumns).length, showFullValues) // skill-breakdown rows
     );
 
     // setMinSize/setSize are allowlisted (tauri.conf.json window.*); surface any
     // rejection instead of swallowing it, so a missing permission can't fail
     // silently the way it did before.
     const applyOverlayWidth = async () => {
+      if (cancelled) return;
       await appWindow.setMinSize(new LogicalSize(minWidth, OVERLAY_MIN_HEIGHT));
 
       // setMinSize only constrains future user resizing — it does NOT grow a
@@ -90,14 +98,20 @@ export default function useMeter() {
       // fresh launch (or newly-enabled columns) leaves the expanded skill
       // breakdown clipped behind a horizontal scrollbar until the user drags the
       // window edge. Grow to fit, but never shrink a window the user widened.
-      const scaleFactor = await appWindow.scaleFactor();
-      const current = (await appWindow.innerSize()).toLogical(scaleFactor);
+      // The two reads are independent, so fetch them concurrently.
+      const [scaleFactor, innerSize] = await Promise.all([appWindow.scaleFactor(), appWindow.innerSize()]);
+      if (cancelled) return;
+      const current = innerSize.toLogical(scaleFactor);
       if (current.width < minWidth) {
         await appWindow.setSize(new LogicalSize(minWidth, current.height));
       }
     };
 
     applyOverlayWidth().catch((error) => console.error("failed to set the overlay minimum width", error));
+
+    return () => {
+      cancelled = true;
+    };
   }, [overlayColumns, overlaySkillColumns, showFullValues]);
 
   useEffect(() => {

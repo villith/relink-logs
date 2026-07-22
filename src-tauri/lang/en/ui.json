@@ -134,6 +134,8 @@
       "stun-hits-description": "Hits That Applied Stun (excludes 0-stun, echo, DoT)",
       "stun-per-hit": "Stun/Hit",
       "stun-per-hit-description": "Average Stun Per Stunning Hit",
+      "stun-per-second": "SPS",
+      "stun-per-second-description": "Stun Per Second",
       "overcap": "Overcap",
       "overcap-description": "Overcap Percentage",
       "percentage": "%",
@@ -1059,6 +1061,7 @@
       "1100": "Scourge (Dragonform)",
       "1200": "Never Enough (Dragonform)",
       "1300": "Arcadia (Dragonform)",
+      "1400": "Fourfold Vengeance (Dragonform)",
       "1500": "Ragnarok Form (Activation)",
       "skill-groups": {
         "normal-attack": "Normal Attack (Dragonform)",

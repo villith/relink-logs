@@ -35,6 +35,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 
+import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { Table as MeterTable } from "@/components/Table";
 import { useChecklistStore } from "@/stores/useChecklistStore";
 import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
@@ -1306,6 +1307,9 @@ export const ViewPage = () => {
                       {t("ui.logs.window-full")} · {fullDuration}
                     </Text>
                   )}
+                  <Box ml="auto">
+                    <ColumnsPopover />
+                  </Box>
                 </Group>
                 <MemoMeterTable
                   encounterState={scrubbedEncounter ?? encounter}

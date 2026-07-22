@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
-import { ComputedPlayerState, MeterColumns, PlayerData } from "@/types";
+import { ComputedPlayerState, MeterColumns, PlayerData, visibleColumns } from "@/types";
 import { PLAYER_COLORS, computeSupPercentage, humanizeNumbers, resolvePlayerColor } from "@/utils";
 
 export type ColumnValue = {
@@ -11,7 +11,7 @@ export type ColumnValue = {
 };
 
 export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyData: Array<PlayerData | null>) => {
-  const { color_1, color_2, color_3, color_4, show_display_names, show_full_values, overlay_columns } =
+  const { color_1, color_2, color_3, color_4, show_display_names, show_full_values, overlay_columns, logs_columns } =
     useMeterSettingsStore(
       useShallow((state) => ({
         color_1: state.color_1,
@@ -21,6 +21,7 @@ export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyDa
         show_display_names: state.show_display_names,
         show_full_values: state.show_full_values,
         overlay_columns: state.overlay_columns,
+        logs_columns: state.logs_columns,
       }))
     );
 
@@ -70,17 +71,13 @@ export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyDa
     }
   };
 
-  // If the meter is in live mode, only show the overlay columns that are enabled, otherwise show all columns.
-  const columns = live
-    ? overlay_columns
-    : [
-        MeterColumns.TotalDamage,
-        MeterColumns.DPS,
-        MeterColumns.TotalStunValue,
-        MeterColumns.StunPerSecond,
-        MeterColumns.SupPercentage,
-        MeterColumns.DamagePercentage,
-      ];
+  // If the meter is live, show the overlay columns; otherwise the logs columns.
+  // Memoized: the source lists are stable store refs, so this only recomputes
+  // when the user edits columns — not on every meter tick.
+  const columns = useMemo(
+    () => visibleColumns(live ? overlay_columns : logs_columns),
+    [live, overlay_columns, logs_columns]
+  );
 
   return {
     columns,

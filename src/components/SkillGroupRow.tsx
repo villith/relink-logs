@@ -1,11 +1,10 @@
 import { CharacterType, ComputedSkillGroup, SkillColumns } from "@/types";
-import { computeOvercapPercentage, getSkillName, mergeTargetBreakdowns } from "@/utils";
+import { NO_TARGETS, computeOvercapPercentage, getSkillName, mergeTargetBreakdowns } from "@/utils";
 import { CaretDown, CaretUp } from "@phosphor-icons/react";
 import { useMemo } from "react";
-import { OvercapCell } from "./OvercapCell";
 import { SkillRow } from "./SkillRow";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
-import { StunCell } from "./StunCell";
+import { renderSkillCell } from "./renderSkillCell";
 import { useSkillGroupRow } from "./useSkillGroupRow";
 
 export type SkillRowProps = {
@@ -14,125 +13,25 @@ export type SkillRowProps = {
   color: string;
   /** The value columns to render, in order (after the Skill name column). */
   columns: SkillColumns[];
+  /** Encounter duration in seconds, for the stun-per-second column. */
+  durationSeconds?: number;
   /** Live overlay rows skip the per-enemy tooltip (quest view only). */
   live?: boolean;
 };
 
-export const SkillGroupRow = ({ characterType, group, color, columns, live }: SkillRowProps) => {
-  const {
-    showFullValues,
-    totalDamage,
-    totalDamageUnit,
-    minDmg,
-    minDmgUnit,
-    maxDmg,
-    maxDmgUnit,
-    rawAverageDmg,
-    averageDmg,
-    averageDmgUnit,
-    expanded,
-    setExpanded,
-    sortedSkills,
-  } = useSkillGroupRow(group);
+export const SkillGroupRow = ({ characterType, group, color, columns, durationSeconds = 0, live }: SkillRowProps) => {
+  const groupRow = useSkillGroupRow(group);
+  const { showFullValues, expanded, setExpanded, sortedSkills } = groupRow;
 
   const overcapPercentage = computeOvercapPercentage(group);
   const targetBreakdown = useMemo(
-    () => (live ? [] : mergeTargetBreakdowns((group.skills ?? []).map((skill) => skill.targets))),
+    () => (live ? NO_TARGETS : mergeTargetBreakdowns((group.skills ?? []).map((skill) => skill.targets))),
     [live, group.skills]
   );
 
-  const renderCell = (column: SkillColumns) => {
-    switch (column) {
-      case SkillColumns.Hits:
-        return (
-          <td key={column} className="text-center row-data">
-            {group.hits}
-          </td>
-        );
-      case SkillColumns.TotalDamage:
-        return (
-          <td key={column} className="text-center row-data">
-            {showFullValues ? (
-              group.totalDamage.toLocaleString()
-            ) : (
-              <>
-                {totalDamage}
-                <span className="unit font-sm">{totalDamageUnit}</span>
-              </>
-            )}
-          </td>
-        );
-      case SkillColumns.MinDamage:
-        return (
-          <td key={column} className="text-center row-data">
-            {showFullValues ? (
-              group.minDamage ? (
-                group.minDamage.toLocaleString()
-              ) : (
-                ""
-              )
-            ) : (
-              <>
-                {group.minDamage && minDmg}
-                <span className="unit font-sm">{minDmgUnit}</span>
-              </>
-            )}
-          </td>
-        );
-      case SkillColumns.MaxDamage:
-        return (
-          <td key={column} className="text-center row-data">
-            {showFullValues ? (
-              group.maxDamage ? (
-                group.maxDamage.toLocaleString()
-              ) : (
-                ""
-              )
-            ) : (
-              <>
-                {group.maxDamage && maxDmg}
-                <span className="unit font-sm">{maxDmgUnit}</span>
-              </>
-            )}
-          </td>
-        );
-      case SkillColumns.AverageDamage:
-        return (
-          <td key={column} className="text-center row-data">
-            {showFullValues ? (
-              rawAverageDmg.toLocaleString()
-            ) : (
-              <>
-                {averageDmg}
-                <span className="unit font-sm">{averageDmgUnit}</span>
-              </>
-            )}
-          </td>
-        );
-      case SkillColumns.TotalStunValue:
-        return <StunCell key={column} value={group.totalStunValue ?? 0} showFullValues={showFullValues} />;
-      case SkillColumns.StunEligibleHits:
-        return (
-          <td key={column} className="text-center row-data">
-            {(group.stunEligibleHits ?? 0) > 0 ? group.stunEligibleHits : ""}
-          </td>
-        );
-      case SkillColumns.StunPerEligibleHit: {
-        const eligible = group.stunEligibleHits ?? 0;
-        const perHit = eligible > 0 ? (group.totalStunValue ?? 0) / eligible : 0;
-        return <StunCell key={column} value={perHit} showFullValues={showFullValues} />;
-      }
-      case SkillColumns.Overcap:
-        return <OvercapCell key={column} percentage={overcapPercentage} />;
-      case SkillColumns.DamagePercentage:
-        return (
-          <td key={column} className="text-center row-data">
-            {group.percentage.toFixed(0)}
-            <span className="unit font-sm">%</span>
-          </td>
-        );
-    }
-  };
+  // Built once per row, not per column: identical across every cell of the row.
+  const cellContext = { ...groupRow, overcapPercentage, durationSeconds };
+  const renderCell = (column: SkillColumns) => renderSkillCell(column, group, cellContext);
 
   return (
     <>
@@ -159,6 +58,7 @@ export const SkillGroupRow = ({ characterType, group, color, columns, live }: Sk
             skill={skill}
             color={color}
             columns={columns}
+            durationSeconds={durationSeconds}
             nested
             live={live}
           />

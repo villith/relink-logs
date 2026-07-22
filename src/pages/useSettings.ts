@@ -1,16 +1,6 @@
 import { SUPPORTED_LANGUAGES } from "@/i18n";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
-import { MeterColumns, SkillColumns } from "@/types";
-import { DropResult } from "@hello-pangea/dnd";
 import { useTranslation } from "react-i18next";
-
-const reorder = <TList extends unknown[]>(list: TList, startIndex: number, endIndex: number): TList => {
-  const result = Array.from(list) as TList;
-  const [removed] = result.splice(startIndex, 1);
-  result.splice(endIndex, 0, removed);
-
-  return result;
-};
 
 export default function useSettings() {
   const {
@@ -23,10 +13,8 @@ export default function useSettings() {
     streamer_mode,
     show_full_values,
     use_condensed_skills,
-    overlay_columns,
     open_log_on_save,
     auto_check_updates,
-    overlay_skill_columns,
     setMeterSettings,
   } = useMeterSettingsStore((state) => ({
     color_1: state.color_1,
@@ -41,8 +29,6 @@ export default function useSettings() {
     open_log_on_save: state.open_log_on_save,
     auto_check_updates: state.auto_check_updates,
     setMeterSettings: state.set,
-    overlay_columns: state.overlay_columns,
-    overlay_skill_columns: state.overlay_skill_columns,
   }));
 
   const { i18n } = useTranslation();
@@ -51,59 +37,7 @@ export default function useSettings() {
     i18n.changeLanguage(language as string);
   };
 
-  const handleReorderOverlayColumns = (result: DropResult) => {
-    if (!result.destination) return;
-    const items = reorder(overlay_columns, result.source.index, result.destination.index);
-    setMeterSettings({ overlay_columns: items });
-  };
-
-  // Adds a column to the overlay_columns array if it doesn't exist.
-  const addOverlayColumn = (column: MeterColumns) => {
-    const items = [...overlay_columns];
-
-    if (items.indexOf(column) === -1) {
-      items.push(column);
-      setMeterSettings({ overlay_columns: items });
-    }
-  };
-
-  // Removes a column from the overlay_columns array.
-  const removeOverlayColumn = (column: MeterColumns) => {
-    const items = overlay_columns.filter((item) => item !== column);
-    setMeterSettings({ overlay_columns: items });
-  };
-
-  const handleReorderSkillColumns = (result: DropResult) => {
-    if (!result.destination) return;
-    const items = reorder(overlay_skill_columns, result.source.index, result.destination.index);
-    setMeterSettings({ overlay_skill_columns: items });
-  };
-
-  // Adds a column to the overlay_skill_columns array if it doesn't exist.
-  const addSkillColumn = (column: SkillColumns) => {
-    const items = [...overlay_skill_columns];
-
-    if (items.indexOf(column) === -1) {
-      items.push(column);
-      setMeterSettings({ overlay_skill_columns: items });
-    }
-  };
-
-  // Removes a column from the overlay_skill_columns array.
-  const removeSkillColumn = (column: SkillColumns) => {
-    const items = overlay_skill_columns.filter((item) => item !== column);
-    setMeterSettings({ overlay_skill_columns: items });
-  };
-
   const languages = Object.keys(SUPPORTED_LANGUAGES).map((key) => ({ value: key, label: SUPPORTED_LANGUAGES[key] }));
-
-  const availableOverlayColumns = Object.values(MeterColumns).filter(
-    (column) => overlay_columns.indexOf(column) === -1 && column !== MeterColumns.Name
-  );
-
-  const availableSkillColumns = Object.values(SkillColumns).filter(
-    (column) => overlay_skill_columns.indexOf(column) === -1
-  );
 
   return {
     color_1,
@@ -117,18 +51,8 @@ export default function useSettings() {
     use_condensed_skills,
     setMeterSettings,
     languages,
-    overlay_columns,
-    availableOverlayColumns,
     open_log_on_save,
     auto_check_updates,
     handleLanguageChange,
-    handleReorderOverlayColumns,
-    addOverlayColumn,
-    removeOverlayColumn,
-    overlay_skill_columns,
-    availableSkillColumns,
-    handleReorderSkillColumns,
-    addSkillColumn,
-    removeSkillColumn,
   };
 }
