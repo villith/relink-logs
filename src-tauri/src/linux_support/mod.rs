@@ -4,4 +4,5 @@
 //! path-and-file logic platform-independent is what keeps it unit-tested.
 //! Only the thin glue in main.rs is #[cfg(target_os = "linux")].
 
+pub mod deploy;
 pub mod steam;

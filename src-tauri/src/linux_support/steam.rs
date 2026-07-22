@@ -33,6 +33,10 @@ pub fn default_steam_roots(home: &Path) -> Vec<PathBuf> {
 }
 
 /// Find the game in any library of any root. `None` = not installed / no Steam.
+///
+/// Pre-2021 `libraryfolders.vdf` layouts (numeric key → inline path string)
+/// are not handled: any Steam client new enough to run this game under
+/// Proton writes the nested format.
 pub fn discover(roots: &[PathBuf]) -> Option<SteamGame> {
     for root in roots {
         let mut libraries: Vec<PathBuf> = vec![root.clone()];
@@ -83,6 +87,9 @@ fn vdf_string_values(vdf: &str, key: &str) -> Vec<String> {
         };
         let rest = rest.trim();
         if rest.len() >= 2 && rest.starts_with('"') && rest.ends_with('"') {
+            // Sequential replaces mis-decode the pathological `\\"` sequence; a
+            // real Steam path/installdir value can never end a segment that way,
+            // and this parser is scoped to those two keys.
             out.push(
                 rest[1..rest.len() - 1]
                     .replace("\\\\", "\\")
@@ -198,5 +205,59 @@ mod tests {
     fn discover_returns_none_when_nothing_matches() {
         let tmp = tempfile::tempdir().unwrap();
         assert_eq!(discover(&[tmp.path().to_path_buf()]), None);
+    }
+
+    /// Two roots both contain the game: the FIRST root's paths must win.
+    #[test]
+    fn discover_prefers_the_first_root() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mk = |name: &str| {
+            let root = tmp.path().join(name);
+            let game = root.join("steamapps/common/Granblue Fantasy Relink");
+            fs::create_dir_all(&game).unwrap();
+            fs::write(
+                root.join(format!("steamapps/appmanifest_{APP_ID}.acf")),
+                "\"AppState\"\n{\n  \"installdir\"  \"Granblue Fantasy Relink\"\n}\n",
+            )
+            .unwrap();
+            root
+        };
+        let first = mk("first");
+        let second = mk("second");
+        let game = discover(&[first.clone(), second]).unwrap();
+        assert!(game.game_dir.starts_with(&first));
+    }
+
+    /// A manifest whose game folder is gone (uninstalled/moved) is skipped.
+    #[test]
+    fn discover_skips_stale_manifest_without_game_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("Steam");
+        fs::create_dir_all(root.join("steamapps")).unwrap();
+        fs::write(
+            root.join(format!("steamapps/appmanifest_{APP_ID}.acf")),
+            "\"AppState\"\n{\n  \"installdir\"  \"Granblue Fantasy Relink\"\n}\n",
+        )
+        .unwrap();
+        assert_eq!(discover(&[root]), None);
+    }
+
+    /// Garbage vdf/acf content degrades to None, never a panic.
+    #[test]
+    fn discover_survives_malformed_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("Steam");
+        fs::create_dir_all(root.join("steamapps")).unwrap();
+        fs::write(
+            root.join("steamapps/libraryfolders.vdf"),
+            "\x00\x01{{{\"path",
+        )
+        .unwrap();
+        fs::write(
+            root.join(format!("steamapps/appmanifest_{APP_ID}.acf")),
+            "not a vdf at all",
+        )
+        .unwrap();
+        assert_eq!(discover(&[root]), None);
     }
 }
