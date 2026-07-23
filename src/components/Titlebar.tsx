@@ -71,10 +71,11 @@ const TeamDamageStats = ({ encounterState }: { encounterState: EncounterState })
 };
 
 const EncounterStatus = ({ encounterState, elapsedTime }: { encounterState: EncounterState; elapsedTime: number }) => {
+  const { t } = useTranslation();
   if (encounterState.status === "Waiting") {
     return (
       <div data-tauri-drag-region className="encounter-status item">
-        {encounterState.status}..
+        {t("ui.status-waiting")}
       </div>
     );
   } else if (encounterState.status === "InProgress") {
@@ -153,17 +154,17 @@ export const Titlebar = ({
             <Menu.Item onClick={handleFullEncounterCopy}>{t("ui.copy-to-clipboard-full")}</Menu.Item>
           </Menu.Dropdown>
         </Menu>
-        <Tooltip label="Pin window" color="dark">
+        <Tooltip label={t("ui.pin-window")} color="dark">
           <div className="titlebar-button" id="titlebar-snapshot" onClick={onPin}>
             <PushPinSimple size={16} />
           </div>
         </Tooltip>
-        <Tooltip label="Copy screenshot to clipboard" color="dark">
+        <Tooltip label={t("ui.copy-screenshot-to-clipboard")} color="dark">
           <div className="titlebar-button" id="titlebar-snapshot" onClick={() => exportScreenshotToClipboard(".app")}>
             <Camera size={16} />
           </div>
         </Tooltip>
-        <Tooltip label="Reset session" color="dark">
+        <Tooltip label={t("ui.reset-session")} color="dark">
           <div className="titlebar-button" id="titlebar-reset" onClick={onResetSession}>
             <ArrowCounterClockwise size={16} />
           </div>
