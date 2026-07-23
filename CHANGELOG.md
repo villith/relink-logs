@@ -5,6 +5,21 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.2
+
+### Features
+
+- (Linux) Toolbox tools are now available ( parity with Windows client )
+  - **Synthesis Helper**: choose the traits you want on a sigil and this tool will give you a list of sigils you own that, when synthesized, will result in the sigil you want
+  - **Overmastery Predictor**: select the character, overmastery traits, and the minimum levels you are aiming for, and this tool will give you a list of any upcoming overmastery rolls that match your criteria
+
+### Bug Fixes
+
+- (Linux) Fixed a startup crash caused by newer WebKitGTK versions
+- (Linux) Fixed the transparency of the overlay
+- (Linux) Fixed the display of the meter rows
+- Fixed an issue where if Id's first instance of damage was from his Dragon Form, he would not appear in the log details post-quest ( only applies to logs post-patch )
+
 ## 1.12.1
 
 ### Bug Fixes
