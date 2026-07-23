@@ -88,7 +88,7 @@ export const Table = ({
       <thead className="header transparent-bg">
         <tr>
           <th className="header-name" onClick={() => toggleSort(MeterColumns.Name)}>
-            Name
+            {t("ui.meter-columns.name")}
           </th>
           {columns.map((column) => (
             <th

@@ -49,6 +49,7 @@ const BossHpStats = ({ encounterState }: { encounterState: EncounterState }) => 
 };
 
 const TeamDamageStats = ({ encounterState }: { encounterState: EncounterState }) => {
+  const { t } = useTranslation();
   const [teamDps, dpsUnit] = humanizeNumbers(encounterState.dps);
   const [totalTeamDmg, dmgUnit] = humanizeNumbers(encounterState.totalDamage);
 
@@ -63,7 +64,7 @@ const TeamDamageStats = ({ encounterState }: { encounterState: EncounterState })
       <div data-tauri-drag-region className="encounter-totalDps item">
         <span className="stat-value">
           {teamDps}
-          <span className="unit font-sm">{dpsUnit}/s</span>
+          <span className="unit font-sm">{t("ui.per-second", { unit: dpsUnit })}</span>
         </span>
       </div>
     </Fragment>
@@ -135,6 +136,7 @@ export const Titlebar = ({
   return (
     <div data-tauri-drag-region className="titlebar transparent-bg font-sm">
       <div data-tauri-drag-region className="titlebar-left">
+        {/* eslint-disable-next-line i18next/no-literal-string -- app name, never translated */}
         <div data-tauri-drag-region className="version">
           Relink Logs <span className="version-number">{version}</span>
         </div>

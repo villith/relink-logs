@@ -228,6 +228,8 @@ function LogEntry({
   names: string;
   resetSelectedTargets: () => void;
 }): JSX.Element {
+  const { t } = useTranslation();
+
   return (
     <Table.Tr key={log.id}>
       <Table.Td>
@@ -259,7 +261,7 @@ function LogEntry({
       </Table.Td>
       <Table.Td>
         <Button size="xs" variant="default" component={Link} to={`/logs/${log.id}`} onClick={resetSelectedTargets}>
-          View
+          {t("ui.view-btn")}
         </Button>
       </Table.Td>
     </Table.Tr>

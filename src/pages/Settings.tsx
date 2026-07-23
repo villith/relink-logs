@@ -23,6 +23,7 @@ import {
   Tooltip,
 } from "@mantine/core";
 import { modals } from "@mantine/modals";
+import { X } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -67,7 +68,7 @@ export const ChecklistSection = ({
             color="gray"
             onClick={() => checklist.remove(group, entry.ids[0])}
           >
-            x
+            <X size={16} />
           </ActionIcon>
         </Flex>
       ))}
