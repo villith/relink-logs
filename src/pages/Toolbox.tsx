@@ -24,7 +24,6 @@ const TOOLS: {
     labelKey: "ui.toolbox.synthesis-helper",
     labelFallback: "Synthesis Helper",
     icon: Flask,
-    windowsOnly: true,
   },
   {
     to: "/logs/toolbox/overmastery",
@@ -32,12 +31,12 @@ const TOOLS: {
     labelFallback: "Overmastery Predictor",
     icon: Sparkle,
     newId: "overmastery-predictor",
-    windowsOnly: true,
   },
 ];
 
-/** Tools visible on this platform: windows-only tools read game memory from
- * outside the process, which the Linux build does not support. */
+/** Tools visible on this platform. All current tools are served by the hook
+ * over the toolbox RPC channel and work everywhere; the mechanism stays for
+ * any future platform-gated tool. */
 export const visibleTools = <T extends { windowsOnly?: boolean }>(tools: T[], isLinux: boolean): T[] =>
   tools.filter((tool) => !(isLinux && tool.windowsOnly));
 

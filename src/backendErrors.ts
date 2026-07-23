@@ -8,6 +8,8 @@ const TOOL_ERRORS = {
   synthesis: {
     "invalid-trait": "ui.toolbox.invalid-trait",
     "game-not-running": "ui.toolbox.game-not-running",
+    "hook-outdated": "ui.toolbox.hook-outdated",
+    "hook-unreachable": "ui.toolbox.hook-unreachable",
   },
   overmastery: {
     "game-not-running": "ui.toolbox.om-game-not-running",
@@ -15,6 +17,8 @@ const TOOL_ERRORS = {
     "rng-override-active": "ui.toolbox.om-rng-override-active",
     "invalid-tier": "ui.toolbox.om-invalid-tier",
     "slot-out-of-range": "ui.toolbox.om-slot-out-of-range",
+    "hook-outdated": "ui.toolbox.hook-outdated",
+    "hook-unreachable": "ui.toolbox.hook-unreachable",
   },
 } as const satisfies Record<string, Record<string, string>>;
 
