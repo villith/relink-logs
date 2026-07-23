@@ -41,6 +41,15 @@ static_detour! {
     static OnRemoteSBAUpdate: unsafe extern "system" fn(*const usize, *const usize, f32, f32) -> usize;
 }
 
+#[cfg(any(feature = "eject", test))]
+pub(super) fn disable() {
+    super::disable_quiet("OnSBAUpdate", &OnSBAUpdate);
+    super::disable_quiet("OnSBAAttempt", &OnSBAAttempt);
+    super::disable_quiet("OnCheckSBACollision", &OnCheckSBACollision);
+    super::disable_quiet("OnContinueSBAChain", &OnContinueSBAChain);
+    super::disable_quiet("OnRemoteSBAUpdate", &OnRemoteSBAUpdate);
+}
+
 // v2.0.2: call-follow sig at the unique gauge-update call site, resolving to the clean
 // entry 0xbb8840 (sigscan: 1 match). Arity fixed to the decompiler-verified 11 args (see
 // OnSBAUpdateFunc above) — the previous 6-arg declaration corrupted the in-game gauge.

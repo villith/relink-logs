@@ -813,11 +813,13 @@ export const resolvePlayerColor = (
 /// (see .player-row/.skill-row in App.css). The bar must NOT be a positioned
 /// child element: relative/z-index layering on table internals is undefined
 /// CSS that WebKitGTK (Linux) resolves by painting the bar over the cell text.
-export const damageBarStyle = (color: string, percentage: number): CSSProperties =>
-  ({
+export const damageBarStyle = (color: string, percentage: number): CSSProperties => {
+  const width = Number.isFinite(percentage) ? Math.min(100, Math.max(0, percentage)) : 0;
+  return {
     "--damage-bar-color": color,
-    "--damage-bar-width": `${percentage}%`,
-  }) as CSSProperties;
+    "--damage-bar-width": `${width}%`,
+  } as CSSProperties;
+};
 
 /// Translates the enemy type to a human-readable string.
 export const translateEnemyType = (type: EnemyType | null): string => {

@@ -46,6 +46,11 @@ static_detour! {
     static FullAssistGate: unsafe extern "system" fn() -> u8;
 }
 
+#[cfg(any(feature = "eject", test))]
+pub(super) fn disable() {
+    super::disable_quiet("FullAssistGate", &FullAssistGate);
+}
+
 static UNLOCK_ENABLED: AtomicBool = AtomicBool::new(false);
 static QUEST_STATE_GLOBAL: AtomicUsize = AtomicUsize::new(0);
 static ASSIST_SELECTION_GLOBAL: AtomicUsize = AtomicUsize::new(0);

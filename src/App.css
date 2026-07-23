@@ -227,7 +227,7 @@
 }
 
 .transparent-bg {
-  background: rgba(22, 22, 22, 0.8);
+  background-color: rgba(22, 22, 22, 0.8);
 }
 
 .font-sm {

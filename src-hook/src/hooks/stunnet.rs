@@ -70,6 +70,11 @@ static_detour! {
     static NetworkStun: unsafe extern "system" fn(*const usize, *const usize) -> usize;
 }
 
+#[cfg(any(feature = "eject", test))]
+pub(super) fn disable() {
+    super::disable_quiet("NetworkStun", &NetworkStun);
+}
+
 /// FNV-1a-64 over the 8 little-endian bytes of `id` — exactly the hash
 /// FUN_140270250 computes for the bucket index.
 fn fnv1a64_of_id(id: u64) -> u64 {

@@ -34,6 +34,17 @@ static_detour! {
     static DisplayDamage: unsafe extern "system" fn(*const usize, *const usize) -> usize;
 }
 
+#[cfg(any(feature = "eject", test))]
+pub(super) fn disable() {
+    super::disable_quiet("ProcessDamageEvent", &ProcessDamageEvent);
+    super::disable_quiet("ProcessDamageBypass", &ProcessDamageBypass);
+    super::disable_quiet("ProcessDotEvent0", &ProcessDotEvent0);
+    super::disable_quiet("ProcessDotEvent1", &ProcessDotEvent1);
+    super::disable_quiet("ProcessDotEvent2", &ProcessDotEvent2);
+    #[cfg(feature = "hookdiag")]
+    super::disable_quiet("DisplayDamage", &DisplayDamage);
+}
+
 /// DISPDIAG hook target: The World's guarded-Quickening counter damage (a
 /// scripted 1%-max-HP hit, 27.7M on Defy Infinity) reaches the SCREEN without
 /// passing ProcessDamageEvent or the direct-apply bypass (0 ALTDMG lines,

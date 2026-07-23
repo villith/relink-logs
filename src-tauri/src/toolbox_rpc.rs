@@ -23,6 +23,10 @@ pub struct HookStatus {
     /// version — e.g. a stale Linux dinput8 proxy until the game restarts,
     /// or a pre-RPC hook that refuses the connection outright.
     pub outdated: AtomicBool,
+    /// Dev hook hot-reload in flight (debug builds only set it): the
+    /// injection loop must not re-inject until the old module is ejected and
+    /// hook-dbg.dll refreshed. See `reload_hook` in main.rs.
+    pub reloading: AtomicBool,
 }
 
 /// A wedged hook (or frozen game) must not hang a Tauri command.

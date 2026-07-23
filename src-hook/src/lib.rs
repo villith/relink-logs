@@ -8,10 +8,16 @@ use interprocess::os::windows::named_pipe::{PipeListenerOptions, PipeMode};
 use log::{info, warn};
 use tokio::sync::broadcast;
 
+// Dev-only hook control channel (self-teardown for hot-reload). Kept out of
+// the toolbox RPC on purpose — a lifecycle command is not a Toolbox tool.
+#[cfg(feature = "eject")]
+mod control;
 mod event;
 mod hooks;
 mod process;
 mod proxy;
+#[cfg(any(feature = "eject", test))]
+mod teardown;
 mod toolbox;
 mod transport;
 
@@ -48,6 +54,10 @@ impl Server {
         // The toolbox RPC channel is independent of the event stream and
         // must not die with a client, so it gets its own task.
         tokio::spawn(toolbox::run());
+        // Dev eject: a SEPARATE control endpoint carries the self-teardown
+        // command (kept out of the toolbox tool RPC). Own task, same reason.
+        #[cfg(feature = "eject")]
+        tokio::spawn(control::run());
         match transport::select_transport() {
             transport::Transport::NamedPipe => self.run_pipe().await,
             transport::Transport::Tcp => self.run_tcp().await,
@@ -134,6 +144,16 @@ async fn setup() {
 
     let _ = std::io::stdout().flush();
 
+    // Dev eject: exit the runtime when teardown signals, which closes every
+    // listener — the app's cue that this module is safe to FreeLibrary.
+    #[cfg(feature = "eject")]
+    tokio::select! {
+        _ = server.run() => {}
+        _ = teardown::shutdown_notified() => {
+            log::info!("eject: hook runtime shutting down");
+        }
+    }
+    #[cfg(not(feature = "eject"))]
     server.run().await;
 }
 
