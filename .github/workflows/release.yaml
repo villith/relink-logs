@@ -368,10 +368,26 @@ jobs:
           node-version: 20
           cache: npm
 
+      # webkit2gtk is pinned to the jammy release pocket (2.36): the AppImage
+      # bundles whatever webkit CI installs, and jammy-updates has moved to
+      # 2.50, where DMA-BUF is the only rendering path (the X11/WPE renderers
+      # and WEBKIT_DISABLE_DMABUF_RENDERER were removed in 2.44). On hosts
+      # where its EGL/GBM init fails — NVIDIA proprietary, newer Mesa — the
+      # web process aborts with "Could not create default EGL display:
+      # EGL_BAD_PARAMETER" and the app shows nothing. 2.36 predates that
+      # renderer and falls back gracefully everywhere (field-verified failure
+      # on two of three Linux testers; same pin as gitbutler#5301).
       - name: Install Tauri v1 Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.0-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y --allow-downgrades \
+            libwebkit2gtk-4.0-dev=2.36.0-2ubuntu1 \
+            libwebkit2gtk-4.0-37=2.36.0-2ubuntu1 \
+            libjavascriptcoregtk-4.0-dev=2.36.0-2ubuntu1 \
+            libjavascriptcoregtk-4.0-18=2.36.0-2ubuntu1 \
+            gir1.2-javascriptcoregtk-4.0=2.36.0-2ubuntu1 \
+            gir1.2-webkit2-4.0=2.36.0-2ubuntu1 \
+            build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
       - name: Install pinned Rust toolchain
         run: |
