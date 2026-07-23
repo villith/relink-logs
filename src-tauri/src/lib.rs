@@ -12,3 +12,4 @@ pub mod overmastery;
 pub mod parser;
 #[cfg(windows)]
 pub mod synthesis;
+pub mod toolbox_rpc;

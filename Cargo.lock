@@ -1441,6 +1441,7 @@ dependencies = [
  "chrono",
  "dll-syringe",
  "futures",
+ "game-reader",
  "interprocess",
  "log",
  "num_enum 0.7.2",
