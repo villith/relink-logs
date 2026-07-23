@@ -3,7 +3,6 @@ import "./Logs.css";
 
 import NewChip from "@/components/NewChip";
 import UpdateAvailableButton from "@/components/UpdateAvailableButton";
-import { useIsLinux } from "@/platform";
 import { deriveNavState } from "@/utils";
 import { ActionIcon, AppShell, Button, Group, Text } from "@mantine/core";
 import { ArrowsCounterClockwise, Bug, Flag, Gear, House, ListDashes, Translate, Wrench } from "@phosphor-icons/react";
@@ -62,7 +61,6 @@ const Layout = () => {
   const [version, setVersion] = useState("");
   useUpdateCheck(auto_check_updates);
   const updateStatus = useUpdateStatusStore((state) => state.status);
-  const isLinux = useIsLinux();
   const versionSuffix = !updateStatus
     ? ""
     : updateStatus.upToDate
@@ -126,14 +124,12 @@ const Layout = () => {
               <NavTab to="/logs" icon={<ListDashes size="1rem" />} active={logsActive}>
                 {t("ui.logs-tab")}
               </NavTab>
-              {!isLinux && (
-                <NavTab to="/logs/toolbox" icon={<Wrench size="1rem" />} active={toolboxActive}>
-                  <Group gap={6} wrap="nowrap">
-                    {t("ui.toolbox.title")}
-                    <NewChip id="toolbox" />
-                  </Group>
-                </NavTab>
-              )}
+              <NavTab to="/logs/toolbox" icon={<Wrench size="1rem" />} active={toolboxActive}>
+                <Group gap={6} wrap="nowrap">
+                  {t("ui.toolbox.title")}
+                  <NewChip id="toolbox" />
+                </Group>
+              </NavTab>
               <NavTab to="/logs/settings" icon={<Gear size="1rem" />} active={settingsActive}>
                 {t("ui.settings")}
               </NavTab>
