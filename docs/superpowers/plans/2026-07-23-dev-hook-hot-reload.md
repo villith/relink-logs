@@ -6,6 +6,21 @@
 
 **Architecture:** The app sends a new `Eject` toolbox RPC; the hook (feature `eject` only) disables every static detour, drains, and shuts down its tokio runtime; the app then FreeLibrary-s the dead module via `dll_syringe::Syringe::eject`, refreshes `hook-dbg.dll` (unlocked after eject), and the existing reconnect loop re-injects. Spec: `docs/superpowers/specs/2026-07-23-dev-hook-hot-reload-design.md`.
 
+> **AS-BUILT (2026-07-23):** `Eject` was NOT added to the Toolbox RPC. Per a
+> mid-implementation design decision, it rides a dedicated dev-only control
+> channel `protocol::control` (`HookControlRequest`/`HookControlResponse` over
+> `\\.\pipe\gbfr-logs-control` / `HOOK_CONTROL_TCP_ADDR`) instead — a lifecycle
+> command does not belong in the Toolbox tool enum, and this leaves every
+> toolbox wire shape and `TOOLBOX_PROTOCOL_VERSION` untouched. Concretely, vs.
+> the tasks below: **Task 1** created `protocol/src/control.rs` (not toolbox
+> variants); **Task 3** added `src-hook/src/control.rs` (a control listener
+> under the `eject` feature) and left `src-hook/src/toolbox.rs` unchanged — no
+> `handle_request`/`eject_supported` arm; **Task 4/5** put the client in
+> `gbfr_logs::control_rpc` (`#[cfg(all(windows, debug_assertions))]`) and call
+> `control_rpc::eject()`. Tasks 2 and 6 were executed as written, except
+> `player::disable()` gates `BuildPlayerProfile` behind `hookdiag` (it is a
+> hookdiag-only detour). All commits landed on `feat/auto-reload-dll-dev`.
+
 **Tech Stack:** Rust — `retour` 0.3.1 static detours, `dll-syringe` 0.15.2, tokio, Tauri v1 system tray. No frontend changes.
 
 **⚠ Working-tree caution:** The checkout has UNRELATED uncommitted changes (Pl2000 identity fix in `src-hook/src/hooks/damage.rs`, `src-hook/src/hooks/mod.rs`, `src-tauri/src/parser/v1/mod.rs`, plus stray root files). Never `git add -A` / `git add -u`. Stage only the exact files each commit step names. Work on the current branch `feat/toolbox-hook-rpc`. Do NOT use git worktrees (repo rule).

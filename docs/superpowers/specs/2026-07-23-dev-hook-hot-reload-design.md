@@ -1,7 +1,19 @@
 # Dev-only hook hot-reload (eject + re-inject)
 
 **Date:** 2026-07-23
-**Status:** Approved
+**Status:** Approved (implemented — see as-built note)
+
+> **As-built deviation (2026-07-23):** during implementation the `Eject`
+> command was moved OUT of the Toolbox RPC (`protocol::toolbox`) into a
+> dedicated dev-only control channel, `protocol::control`
+> (`HookControlRequest::Eject` / `HookControlResponse::Eject` over
+> `\\.\pipe\gbfr-logs-control`, or `HOOK_CONTROL_TCP_ADDR` under Wine). A
+> lifecycle command does not belong in the Toolbox tool enum, and this keeps
+> `TOOLBOX_PROTOCOL_VERSION` and every toolbox wire shape untouched. The hook
+> serves the channel from `src-hook/src/control.rs` under its `eject` feature;
+> the app calls it from `gbfr_logs::control_rpc` in debug Windows builds. A
+> release hook has no control listener, so the reload surfaces a connection
+> error instead of a structured refusal. Everything else below is as built.
 
 ## Problem
 
