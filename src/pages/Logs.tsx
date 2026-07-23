@@ -173,10 +173,10 @@ const Layout = () => {
           {onListPage && (
             <Group gap="xs" mb="sm" justify="center">
               <NavTab to="/logs" icon={<House size="1rem" />} active={questsActive}>
-                Quests
+                {t("ui.logs.quests-tab")}
               </NavTab>
               <NavTab to="/logs/conflux" icon={<Flag size="1rem" />} active={confluxActive}>
-                Conflux
+                {t("ui.logs.conflux-tab")}
               </NavTab>
             </Group>
           )}

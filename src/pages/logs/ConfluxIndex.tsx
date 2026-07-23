@@ -13,7 +13,7 @@ function RoomRow({ room, buffIds }: { room: ConfluxRoom; buffIds: number[] }) {
     <Table.Tr>
       <Table.Td />
       <Table.Td>
-        <Text size="xs">Room #{room.roomIndex + 1}</Text>
+        <Text size="xs">{t("ui.logs.conflux-room-number", { number: room.roomIndex + 1 })}</Text>
       </Table.Td>
       <Table.Td>
         <Text size="xs">{room.primaryTarget !== null ? translateEnemyTypeId(room.primaryTarget) : ""}</Text>
@@ -32,7 +32,7 @@ function RoomRow({ room, buffIds }: { room: ConfluxRoom; buffIds: number[] }) {
       </Table.Td>
       <Table.Td>
         <Button size="xs" variant="default" component={Link} to={`/logs/${room.logId}`}>
-          View
+          {t("ui.logs.overview")}
         </Button>
       </Table.Td>
     </Table.Tr>
@@ -40,6 +40,7 @@ function RoomRow({ room, buffIds }: { room: ConfluxRoom; buffIds: number[] }) {
 }
 
 function RunRow({ run }: { run: ConfluxRun }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const buffsFor = (roomIndex: number) => run.buffs.find((b) => b.roomIndex === roomIndex)?.buffIds ?? [];
 
@@ -51,11 +52,11 @@ function RunRow({ run }: { run: ConfluxRun }) {
           <Text size="xs">{epochToLocalTime(run.startTime)}</Text>
         </Table.Td>
         <Table.Td>
-          <Text size="xs">Conflux Run</Text>
+          <Text size="xs">{t("ui.logs.conflux-run")}</Text>
         </Table.Td>
         <Table.Td>
           <Badge size="xs" variant="light">
-            ×{run.roomCount} rooms
+            {t("ui.logs.conflux-rooms-count", { count: run.roomCount })}
           </Badge>
         </Table.Td>
         <Table.Td>
@@ -68,7 +69,7 @@ function RunRow({ run }: { run: ConfluxRun }) {
             <Text size="xs">✓</Text>
           ) : run.endTime === null ? (
             <Text size="xs" c="dimmed">
-              In progress
+              {t("ui.logs.in-progress")}
             </Text>
           ) : (
             <Text size="xs" c="dimmed">
@@ -97,13 +98,14 @@ function RunRow({ run }: { run: ConfluxRun }) {
 }
 
 export const ConfluxIndexPage = () => {
+  const { t } = useTranslation();
   const { result, page, setPage } = useConfluxIndex();
 
   return (
     <Box>
       {result.runs.length === 0 ? (
         <Center py="xl">
-          <Text c="dimmed">No Conflux runs recorded yet.</Text>
+          <Text c="dimmed">{t("ui.logs.no-conflux-runs")}</Text>
         </Center>
       ) : (
         <Box>
@@ -111,11 +113,11 @@ export const ConfluxIndexPage = () => {
             <Table.Thead>
               <Table.Tr>
                 <Table.Th />
-                <Table.Th>Date</Table.Th>
-                <Table.Th>Type</Table.Th>
-                <Table.Th>Rooms</Table.Th>
-                <Table.Th>Duration</Table.Th>
-                <Table.Th>Cleared</Table.Th>
+                <Table.Th>{t("ui.logs.date")}</Table.Th>
+                <Table.Th>{t("ui.logs.type")}</Table.Th>
+                <Table.Th>{t("ui.logs.rooms")}</Table.Th>
+                <Table.Th>{t("ui.logs.duration")}</Table.Th>
+                <Table.Th>{t("ui.logs.cleared")}</Table.Th>
                 <Table.Th />
                 <Table.Th />
               </Table.Tr>
@@ -130,7 +132,7 @@ export const ConfluxIndexPage = () => {
           <Group justify="space-between">
             <Pagination total={result.pageCount} value={page} onChange={setPage} />
             <Text size="sm" c="dimmed">
-              {result.runCount} runs saved
+              {t("ui.logs.conflux-runs-saved", { count: result.runCount })}
             </Text>
           </Group>
         </Box>

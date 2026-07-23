@@ -91,7 +91,7 @@ export const SkillBreakdown = ({ player, color, durationSeconds = 0, live }: Ski
         <table className="table w-full">
           <thead className="header transparent-bg">
             <tr>
-              <th className="header-name">Skill</th>
+              <th className="header-name">{t("ui.skill-columns.skill")}</th>
               {columns.map((column) => (
                 <th key={column} className="header-column text-center">
                   {t(`ui.skill-columns.${column}`)}
