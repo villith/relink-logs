@@ -32,7 +32,7 @@ pub struct SynthesisRvas {
 
 /// Sigscan for the two globals (manager + RNG array). Works on a PeFile
 /// (on-disk exe, probes) or PeView (loaded image, hook) alike.
-pub fn resolve_rvas<'a>(pe: impl Pe<'a> + Copy) -> Result<SynthesisRvas> {
+pub fn resolve_rvas<'a>(pe: impl Pe<'a>) -> Result<SynthesisRvas> {
     Ok(SynthesisRvas {
         manager: scan_unique_rva(pe, COMMIT_SIG, "commit")?,
         rng: resolve_rng_rva(pe)?,

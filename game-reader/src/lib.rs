@@ -63,9 +63,9 @@ pub trait MemRead {
 }
 
 /// Decode the rip-relative disp32 a signature cursor points at:
-/// global RVA = cursor + 4 + disp. (`+ Copy` on these helpers because
-/// callers reuse the handle across calls — PeFile and PeView are both Copy.)
-pub fn rva_from_cursor<'a>(pe: impl Pe<'a> + Copy, cursor: u32) -> Result<u32> {
+/// global RVA = cursor + 4 + disp. (Callers can reuse the handle across
+/// calls — `Pe` is `Copy`, and PeFile and PeView both implement it.)
+pub fn rva_from_cursor<'a>(pe: impl Pe<'a>, cursor: u32) -> Result<u32> {
     let bytes: [u8; 4] = pe
         .derva_slice::<u8>(cursor, 4)
         .map_err(|e| anyhow::anyhow!("derva {cursor:#x}: {e:?}"))?
@@ -77,7 +77,7 @@ pub fn rva_from_cursor<'a>(pe: impl Pe<'a> + Copy, cursor: u32) -> Result<u32> {
 }
 
 /// All cursor RVAs matching `sig` (the pattern's save slot 1).
-pub fn scan_cursors<'a>(pe: impl Pe<'a> + Copy, sig: &str) -> Result<Vec<u32>> {
+pub fn scan_cursors<'a>(pe: impl Pe<'a>, sig: &str) -> Result<Vec<u32>> {
     let pat = pattern::parse(sig).context("parse pattern")?;
     let mut out = Vec::new();
     let mut matches = pe.scanner().matches_code(&pat);
@@ -89,7 +89,7 @@ pub fn scan_cursors<'a>(pe: impl Pe<'a> + Copy, sig: &str) -> Result<Vec<u32>> {
 }
 
 /// Scan for `sig`, demanding exactly one match; returns the decoded global RVA.
-pub fn scan_unique_rva<'a>(pe: impl Pe<'a> + Copy, sig: &str, what: &str) -> Result<u32> {
+pub fn scan_unique_rva<'a>(pe: impl Pe<'a>, sig: &str, what: &str) -> Result<u32> {
     let cursors = scan_cursors(pe, sig)?;
     if cursors.len() != 1 {
         bail!(
@@ -102,7 +102,7 @@ pub fn scan_unique_rva<'a>(pe: impl Pe<'a> + Copy, sig: &str, what: &str) -> Res
 
 /// The RNG slot-array global. Its signature matches several call sites that
 /// must all decode to the same RVA.
-pub fn resolve_rng_rva<'a>(pe: impl Pe<'a> + Copy) -> Result<u32> {
+pub fn resolve_rng_rva<'a>(pe: impl Pe<'a>) -> Result<u32> {
     let cursors = scan_cursors(pe, RNG_SIG)?;
     // Distinguish "the signature is gone" from "it points at two different
     // globals" — after a game patch these need very different fixes.

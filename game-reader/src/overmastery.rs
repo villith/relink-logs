@@ -21,7 +21,7 @@ pub struct OvermasteryRvas {
 }
 
 /// Sigscan for the RNG and roster globals (PeFile or PeView alike).
-pub fn resolve_rvas<'a>(pe: impl Pe<'a> + Copy) -> Result<OvermasteryRvas> {
+pub fn resolve_rvas<'a>(pe: impl Pe<'a>) -> Result<OvermasteryRvas> {
     Ok(OvermasteryRvas {
         rng: resolve_rng_rva(pe)?,
         roster: scan_unique_rva(pe, ROSTER_SIG, "roster")?,
