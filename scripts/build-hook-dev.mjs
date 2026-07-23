@@ -5,7 +5,7 @@
 import { execSync } from "node:child_process";
 
 if (process.platform === "win32") {
-  execSync("cargo build --release --package hook --features hook/console,hook/hookdiag,hook/dmgdiag,hook/fullassist", {
+  execSync("cargo build --release --package hook --features hook/console,hook/hookdiag,hook/dmgdiag,hook/fullassist,hook/eject", {
     stdio: "inherit",
   });
   execSync("node scripts/refresh-dbg-hook.mjs", { stdio: "inherit" });
