@@ -834,6 +834,13 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
 #[cfg(windows)]
 async fn check_and_perform_hook(app: AppHandle) {
     loop {
+        // Dev hook reload in flight: the old module must be ejected and
+        // hook-dbg.dll refreshed before we may inject again (see reload_hook).
+        #[cfg(debug_assertions)]
+        while app.state::<HookStatus>().reloading.load(Ordering::Relaxed) {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+
         match OwnedProcess::find_first_by_name(gbfr_logs::game_mem::GAME_EXE) {
             Some(target) => {
                 let syringe = Syringe::for_process(target);
