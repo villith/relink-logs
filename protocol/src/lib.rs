@@ -18,6 +18,10 @@ parser.
 Because of this, any changes to the protocol must be done carefully to ensure that
 the parser can still read old logs. This is done by adding new fields to the existing
 message types, or adding new message types that are ignored by the parser
+
+The `toolbox` module carries the second channel: request/response RPC served
+by the hook (snapshots for the Toolbox tools). It shares the compiled-together
+rule but never touches the parser's on-disk format.
 */
 
 use core::fmt;
@@ -27,6 +31,8 @@ use std::{
 };
 
 pub use bincode;
+
+pub mod toolbox;
 
 use serde::{Deserialize, Serialize};
 
