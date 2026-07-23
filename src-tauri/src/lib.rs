@@ -13,5 +13,6 @@ pub mod game_mem;
 pub mod linux_support;
 pub mod overmastery;
 pub mod parser;
+pub mod rpc;
 pub mod synthesis;
 pub mod toolbox_rpc;

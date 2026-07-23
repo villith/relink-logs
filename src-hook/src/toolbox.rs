@@ -11,9 +11,7 @@
 use anyhow::Result;
 use futures::{SinkExt, StreamExt};
 use game_reader::MemRead;
-use interprocess::os::windows::named_pipe::tokio::PipeListenerOptionsExt;
-use interprocess::os::windows::named_pipe::{pipe_mode, PipeListenerOptions, PipeMode};
-use log::{info, warn};
+use log::warn;
 use pelite::pe64::PeView;
 use protocol::toolbox::{
     ToolboxRequest, ToolboxResponse, TOOLBOX_PIPE_NAME, TOOLBOX_PROTOCOL_VERSION, TOOLBOX_TCP_ADDR,
@@ -22,7 +20,7 @@ use std::sync::OnceLock;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 use crate::hooks::diag::readable;
-use crate::transport::{self, Transport};
+use crate::transport::{self, BoxStream};
 
 /// Guarded in-process reads: chasing a torn map pointer unguarded would
 /// crash the game, so every read SEH-probes first (see `diag::readable`).
@@ -115,10 +113,7 @@ fn handle_request(req: ToolboxRequest) -> ToolboxResponse {
 }
 
 /// One connection = one request, one response.
-async fn serve<S>(stream: S)
-where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
-{
+async fn serve(stream: BoxStream) {
     let mut framed = Framed::new(stream, LengthDelimitedCodec::new());
     let Some(Ok(frame)) = framed.next().await else {
         return;
@@ -140,59 +135,7 @@ where
 }
 
 pub async fn run() {
-    match transport::select_transport() {
-        Transport::NamedPipe => run_pipe().await,
-        Transport::Tcp => run_tcp().await,
-    }
-}
-
-async fn run_pipe() {
-    let listener = match PipeListenerOptions::new()
-        .path(TOOLBOX_PIPE_NAME)
-        .mode(PipeMode::Bytes)
-        .accept_remote(false)
-        .create_tokio_duplex::<pipe_mode::Bytes>()
-    {
-        Ok(listener) => listener,
-        Err(e) => {
-            warn!("toolbox: could not create pipe listener: {e:?}");
-            return;
-        }
-    };
-    loop {
-        match listener.accept().await {
-            Ok(stream) => {
-                tokio::spawn(serve(stream));
-            }
-            Err(e) => warn!("toolbox: error accepting client: {e:?}"),
-        }
-    }
-}
-
-// Same bind-retry rationale as the event listener: a taken port must not
-// permanently disable the toolbox for the session.
-async fn run_tcp() {
-    let listener = loop {
-        match tokio::net::TcpListener::bind(TOOLBOX_TCP_ADDR).await {
-            Ok(listener) => break listener,
-            Err(e) => {
-                warn!("toolbox: could not bind {TOOLBOX_TCP_ADDR}: {e:?}; retrying in 5s");
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            }
-        }
-    };
-    info!("toolbox: listening on {TOOLBOX_TCP_ADDR}");
-    loop {
-        match listener.accept().await {
-            Ok((stream, _addr)) => {
-                tokio::spawn(serve(stream));
-            }
-            Err(e) => {
-                warn!("toolbox: error accepting client: {e:?}");
-                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-            }
-        }
-    }
+    transport::serve_rpc(TOOLBOX_PIPE_NAME, TOOLBOX_TCP_ADDR, "toolbox", serve).await;
 }
 
 #[cfg(test)]
