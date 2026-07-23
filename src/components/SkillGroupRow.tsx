@@ -1,5 +1,5 @@
 import { CharacterType, ComputedSkillGroup, SkillColumns } from "@/types";
-import { NO_TARGETS, computeOvercapPercentage, getSkillName, mergeTargetBreakdowns } from "@/utils";
+import { NO_TARGETS, computeOvercapPercentage, damageBarStyle, getSkillName, mergeTargetBreakdowns } from "@/utils";
 import { CaretDown, CaretUp } from "@phosphor-icons/react";
 import { useMemo } from "react";
 import { SkillRow } from "./SkillRow";
@@ -41,13 +41,16 @@ export const SkillGroupRow = ({ characterType, group, color, columns, durationSe
         showFullValues={showFullValues}
         color={color}
       >
-        <tr className="skill-row group" onClick={() => setExpanded(!expanded)}>
+        <tr
+          className="skill-row group"
+          style={damageBarStyle(color, group.percentage)}
+          onClick={() => setExpanded(!expanded)}
+        >
           <td className="text-left row-data">
             <span>{getSkillName(group.childCharacterType, group)}</span>
             <span className="p4">{expanded ? <CaretUp size={12} /> : <CaretDown size={12} />}</span>
           </td>
           {columns.map(renderCell)}
-          <div className="damage-bar" style={{ backgroundColor: color, width: `${group.percentage}%` }} />
         </tr>
       </SkillTargetTooltip>
       {expanded &&

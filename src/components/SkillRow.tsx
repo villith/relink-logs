@@ -1,5 +1,5 @@
 import { CharacterType, ComputedSkillState, SkillColumns } from "@/types";
-import { NO_TARGETS, computeOvercapPercentage, getSkillName, mergeTargetBreakdowns } from "@/utils";
+import { NO_TARGETS, computeOvercapPercentage, damageBarStyle, getSkillName, mergeTargetBreakdowns } from "@/utils";
 import { useMemo } from "react";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
 import { renderSkillCell } from "./renderSkillCell";
@@ -63,10 +63,9 @@ export const SkillRow = ({
       showFullValues={showFullValues}
       color={color}
     >
-      <tr className={`skill-row ${nested ? "nested" : ""}`}>
+      <tr className={`skill-row ${nested ? "nested" : ""}`} style={damageBarStyle(color, skill.percentage)}>
         <td className={`text-left row-data ${nested ? "nested" : ""}`}>{getSkillName(characterType, skill)}</td>
         {columns.map(renderCell)}
-        <div className="damage-bar" style={{ backgroundColor: color, width: `${skill.percentage}%` }} />
       </tr>
     </SkillTargetTooltip>
   );

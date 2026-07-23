@@ -1,5 +1,5 @@
 import { SUPPORTED_LANGUAGES } from "@/i18n";
-import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
+import { broadcastLanguage, useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { useTranslation } from "react-i18next";
 
 export default function useSettings() {
@@ -34,7 +34,9 @@ export default function useSettings() {
   const { i18n } = useTranslation();
 
   const handleLanguageChange = (language: string | null) => {
-    i18n.changeLanguage(language as string);
+    if (!language) return;
+    i18n.changeLanguage(language);
+    broadcastLanguage(language);
   };
 
   const languages = Object.keys(SUPPORTED_LANGUAGES).map((key) => ({ value: key, label: SUPPORTED_LANGUAGES[key] }));

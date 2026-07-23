@@ -44,7 +44,7 @@ Notes:
 
 - The overlay uses X11 (via XWayland on Wayland desktops). Always-on-top and
   clickthrough behavior can vary by compositor; X11 sessions are the most
-  reliable.
+  reliable. If the overlay hides behind the game, see the FAQ entry below.
 - The Synthesis Helper and Overmastery Predictor toolbox tools are
   Windows-only for now.
 - The hook file installed into the game folder is the same Authenticode-signed
@@ -111,6 +111,16 @@ Same as with installing, you can download the [latest release](https://github.co
 You can uninstall Relink Logs the normal way through the Control Panel or by running the uninstall script in the folder where you installed it to. You may also want to remove these folders.
 
 - `%AppData%\gbfr-logs`
+
+> Q: (Linux) The overlay hides behind the game instead of staying on top.
+
+On Windows an app can keep its own window on top. On Linux it can only *ask* — your desktop environment decides, and each one behaves differently. Try these in order:
+
+1. **Run the game in borderless or windowed mode**, not exclusive fullscreen. Most window managers stack fullscreen windows above everything, including "always on top" windows.
+2. **Add a "keep above" rule for the Meter window in your desktop settings.** For example, on KDE Plasma: System Settings → Window Management → Window Rules → Add New, match the window title `Meter`, and set "Keep above other windows" to Force / Yes. Other desktops have equivalents (on Hyprland a `windowrule`; on an X11 session, `wmctrl -r Meter -b add,above` also works).
+3. **Prefer an X11 session** if your desktop offers the choice at the login screen — X11 honors the app's own always-on-top request far more reliably than Wayland, which ignores it by design.
+
+Steam Deck gaming mode (gamescope) cannot show external overlays at all — this is not fixable with settings.
 
 > Q: How do I add/edit my language?
 

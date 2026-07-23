@@ -2,7 +2,7 @@ import { CaretDown, CaretUp } from "@phosphor-icons/react";
 import { Fragment, useMemo } from "react";
 
 import { ComputedPlayerState, PlayerData } from "@/types";
-import { NO_TARGETS, mergeTargetBreakdowns, translatedPlayerName } from "@/utils";
+import { NO_TARGETS, damageBarStyle, mergeTargetBreakdowns, translatedPlayerName } from "@/utils";
 
 import { SkillBreakdown } from "./SkillBreakdown";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
@@ -43,7 +43,11 @@ export const PlayerRow = ({
         showFullValues={showFullValues}
         color={color}
       >
-        <tr className={`player-row ${isOpen ? "transparent-bg" : ""}`} onClick={() => setIsOpen(!isOpen)}>
+        <tr
+          className={`player-row ${isOpen ? "transparent-bg" : ""}`}
+          style={damageBarStyle(color, player.percentage)}
+          onClick={() => setIsOpen(!isOpen)}
+        >
           <td className="text-left row-data">
             {translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player, showDisplayNames)}
           </td>
@@ -64,7 +68,6 @@ export const PlayerRow = ({
             );
           })}
           <td className="text-center row-button">{isOpen ? <CaretUp size={16} /> : <CaretDown size={16} />}</td>
-          <div className="damage-bar" style={{ backgroundColor: color, width: `${player.percentage}%` }} />
         </tr>
       </SkillTargetTooltip>
       {isOpen && <SkillBreakdown player={player} color={color} durationSeconds={durationSeconds} live={live} />}

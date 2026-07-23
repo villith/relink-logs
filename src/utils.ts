@@ -26,7 +26,7 @@ import traitMaxLevels from "@/assets/trait-max-levels.json";
 import weaponTraitsData from "@/assets/weapon-traits.json";
 import weaponTranscendenceData from "@/assets/weapon-transcendence.json";
 import i18next, { t } from "i18next";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 
 export const EMPTY_ID = 2289754288;
 
@@ -808,6 +808,16 @@ export const resolvePlayerColor = (
   const freeColors = colors.filter((_, i) => i >= 4 || !partyData[i]);
   return freeColors[sortIndex % freeColors.length];
 };
+
+/// Style for a meter row's damage bar, painted as the row's own background
+/// (see .player-row/.skill-row in App.css). The bar must NOT be a positioned
+/// child element: relative/z-index layering on table internals is undefined
+/// CSS that WebKitGTK (Linux) resolves by painting the bar over the cell text.
+export const damageBarStyle = (color: string, percentage: number): CSSProperties =>
+  ({
+    "--damage-bar-color": color,
+    "--damage-bar-width": `${percentage}%`,
+  }) as CSSProperties;
 
 /// Translates the enemy type to a human-readable string.
 export const translateEnemyType = (type: EnemyType | null): string => {

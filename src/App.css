@@ -148,15 +148,10 @@
 .table .player-row,
 .table .skill-row {
   cursor: pointer;
-  position: relative;
 }
 
 .skill-row:hover {
-  background: rgba(51, 51, 51, 0.8);
-}
-
-.skill-row.nested .damage-bar {
-  filter: brightness(0.5);
+  background-color: rgba(51, 51, 51, 0.8);
 }
 
 .skill-row.nested .row-data {
@@ -169,29 +164,37 @@
     0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
+/* The damage bar is painted as the row's own background, sized by the
+   --damage-bar-* custom properties set inline on the row (damageBarStyle in
+   utils.ts). It must NOT be a positioned child element layered with z-index:
+   position/z-index on table internals (tr/td) is undefined in CSS 2.1 —
+   Chromium (Windows WebView2) honors it, but WebKitGTK (Linux) paints such a
+   bar over the cell text (https://bugs.webkit.org/show_bug.cgi?id=240961).
+   A row background can never paint over cell content, in any engine. */
 .table .player-row,
-.table .skill-row,
-.table .damage-bar {
+.table .skill-row {
   color: white;
   font-size: 14px;
   height: 27px;
+  background-image: linear-gradient(var(--damage-bar-color, transparent), var(--damage-bar-color, transparent));
+  background-size: var(--damage-bar-width, 0%) 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.1s ease-in-out;
 }
 
-.table .damage-bar {
-  z-index: 1;
-  position: absolute;
-  left: 0;
-  box-shadow:
-    0 1px 3px 0 rgb(0 0 0 / 0.1),
-    0 1px 2px -1px rgb(0 0 0 / 0.1);
-  transition: width 0.1s ease-in-out;
+/* Same 50%-darkening the old bar got from filter: brightness(0.5) — a black
+   overlay gradient stacked on the bar gradient, both sized to the bar. */
+.table .skill-row.nested {
+  background-image: linear-gradient(rgb(0 0 0 / 0.5), rgb(0 0 0 / 0.5)),
+    linear-gradient(var(--damage-bar-color, transparent), var(--damage-bar-color, transparent));
+  background-size:
+    var(--damage-bar-width, 0%) 100%,
+    var(--damage-bar-width, 0%) 100%;
 }
 
 .skill-row .row-data,
 .player-row .row-data,
 .row-button {
-  z-index: 2;
-  position: inherit;
   padding: 0 6px;
   text-overflow: ellipsis;
   white-space: nowrap;
