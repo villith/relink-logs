@@ -9,6 +9,11 @@ static_detour! {
     static OnDeathEvent: unsafe extern "system" fn(*const usize) -> usize;
 }
 
+#[cfg(any(feature = "eject", test))]
+pub(super) fn disable() {
+    super::disable_quiet("OnDeathEvent", &OnDeathEvent);
+}
+
 const ON_DEATH_EVENT_SIG: &str = "e8 $ { ' } 49 ? ? 48 ? ? ? ? ? ? 83 78 ? ?";
 
 #[derive(Clone)]

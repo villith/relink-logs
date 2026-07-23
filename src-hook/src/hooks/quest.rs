@@ -376,6 +376,14 @@ static_detour! {
     static QuestSequenceTick: unsafe extern "system" fn(*const usize) -> usize;
 }
 
+#[cfg(any(feature = "eject", test))]
+pub(super) fn disable() {
+    super::disable_quiet("OnLoadQuestState", &OnLoadQuestState);
+    super::disable_quiet("OnShowResultScreen", &OnShowResultScreen);
+    super::disable_quiet("OnSetRetireSelect", &OnSetRetireSelect);
+    super::disable_quiet("QuestSequenceTick", &QuestSequenceTick);
+}
+
 // Ret-padding + prologue with the distinguishing AVX spill bytes (1 sigscan match).
 const QUEST_SEQUENCE_TICK_SIG: &str =
     "cc cc cc cc ' 55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec a8 03 00 00 48 8d ac 24 80 00 00 00 c5 78 29 bd 10 03 00 00 c5 78 29 b5 00 03 00 00";

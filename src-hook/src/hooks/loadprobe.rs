@@ -15,6 +15,11 @@
 #[cfg(feature = "hookdiag")]
 pub use imp::OnComponentLookupProbe;
 
+// The dev-eject teardown for this diag detour; only meaningful when the probe
+// itself exists (hookdiag) and an eject/test build wants to tear it down.
+#[cfg(all(feature = "hookdiag", any(feature = "eject", test)))]
+pub(super) use imp::disable;
+
 #[cfg(not(feature = "hookdiag"))]
 pub struct OnComponentLookupProbe;
 
@@ -62,6 +67,11 @@ mod imp {
 
     static_detour! {
         static Dispatcher: unsafe extern "system" fn(*const usize, u32) -> *const usize;
+    }
+
+    #[cfg(any(feature = "eject", test))]
+    pub(in crate::hooks) fn disable() {
+        crate::hooks::disable_quiet("Dispatcher", &Dispatcher);
     }
 
     #[derive(Clone)]

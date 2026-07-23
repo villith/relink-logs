@@ -64,6 +64,18 @@ fn try_step(name: &str, result: Result<()>) {
     }
 }
 
+/// Disable one static detour during dev eject. `NotInitialized` is the
+/// normal case for a signature that never resolved on this game build, so it
+/// is silent; anything else is logged but must not stop the other detours.
+#[cfg(any(feature = "eject", test))]
+fn disable_quiet<T: retour::Function>(name: &str, detour: &retour::StaticDetour<T>) {
+    match unsafe { detour.disable() } {
+        Ok(()) => log::info!("[hook off] {name}"),
+        Err(retour::Error::NotInitialized) => {}
+        Err(e) => log::warn!("[hook off FAIL] {name}: {e:?}"),
+    }
+}
+
 pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     let process = Process::with_name("granblue_fantasy_relink.exe")?;
 
@@ -192,6 +204,27 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     );
 
     Ok(())
+}
+
+/// Dev-only (feature `eject`): disable every detour `setup_hooks` may have
+/// installed, in mirror order. After this, no game thread can ENTER our
+/// code; callers still wait a drain period for threads already inside a
+/// trampoline before the module is ejected (see crate::teardown).
+#[cfg(any(feature = "eject", test))]
+pub fn teardown_hooks() {
+    damage::disable();
+    death::disable();
+    player::disable();
+    stunnet::disable();
+    area::disable();
+    quest::disable();
+    endless::disable();
+    sba::disable();
+    #[cfg(feature = "hookdiag")]
+    loadprobe::disable();
+    #[cfg(any(feature = "fullassist", test))]
+    assist::disable();
+    log::info!("all detours disabled");
 }
 
 #[inline(always)]
@@ -395,5 +428,15 @@ mod tests {
             parent_specified_instance_at(actor.as_ptr().cast(), 0x40),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod teardown_tests {
+    /// In the test binary no detour is ever initialized; teardown must treat
+    /// that as "nothing to do" for every hook and return cleanly.
+    #[test]
+    fn teardown_hooks_with_no_detours_initialized_returns_cleanly() {
+        super::teardown_hooks();
     }
 }
