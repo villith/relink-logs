@@ -456,7 +456,7 @@ const ChecklistEntryRow = ({
             .filter((source) => source.kind === kind.key)
             .map((source, index) => (
               <Text key={index} size="xs" pl={8}>
-                - {kind.translate(source.sourceId)} (Lvl. {source.level})
+                - {kind.translate(source.sourceId)} {t("ui.trait-level", { level: source.level })}
               </Text>
             ))}
         </Box>
@@ -552,7 +552,7 @@ const SigilCategoryRow = ({
           </Text>
           {matches.map((sigil, index) => (
             <Text key={index} size="xs" pl={8}>
-              - {translateSigilId(sigil.sigilId)} (Lvl. {sigil.sigilLevel})
+              - {translateSigilId(sigil.sigilId)} {t("ui.trait-level", { level: sigil.sigilLevel })}
             </Text>
           ))}
         </Box>
@@ -1147,7 +1147,7 @@ export const ViewPage = () => {
           <Link to="/logs">{t("ui.back-btn")}</Link>
         </Text>
         <Divider my="sm" />
-        <Text>Loading...</Text>
+        <Text>{t("ui.loading")}</Text>
       </Box>
     );
   }
@@ -1590,11 +1590,13 @@ export const ViewPage = () => {
                                 return (
                                   <>
                                     <Text size="xs" fs="italic" fw={300}>
-                                      Awakening {stage ? 10 : player.weaponState.awakeningLevel}/10
+                                      {t("ui.awakening-level", {
+                                        level: stage ? 10 : player.weaponState.awakeningLevel,
+                                      })}
                                     </Text>
                                     {stage !== null && (
                                       <Text size="xs" fs="italic" fw={300}>
-                                        Transcendence {stage}/10
+                                        {t("ui.transcendence-level", { stage })}
                                       </Text>
                                     )}
                                   </>
@@ -1658,31 +1660,34 @@ export const ViewPage = () => {
                                 +{player.weaponInfo?.plusMarks}
                               </Text>
                               <Text size="xs" fs="italic" fw={300}>
-                                Awakening {player.weaponInfo?.awakeningLevel || 0}/10
+                                {t("ui.awakening-level", { level: player.weaponInfo?.awakeningLevel || 0 })}
                               </Text>
                               <Text size="xs" fs="italic" fw={300}>
-                                Lvl {player.weaponInfo?.weaponLevel || 0} / ATK {player.weaponInfo?.weaponAttack || 0} /
-                                HP {player.weaponInfo?.weaponHp || 0}
+                                {t("ui.weapon-stats", {
+                                  level: player.weaponInfo?.weaponLevel || 0,
+                                  attack: player.weaponInfo?.weaponAttack || 0,
+                                  hp: player.weaponInfo?.weaponHp || 0,
+                                })}
                               </Text>
                               <Text size="xs" fw={700}>
                                 {translateItemId(player.weaponInfo?.wrightstoneId || EMPTY_ID)}
                               </Text>
                               <Placeholder empty={!player.weaponInfo?.trait1Id || player.weaponInfo?.trait1Level == 0}>
                                 <Text size="xs" fs="italic" fw={300}>
-                                  - {translateTraitId(player.weaponInfo?.trait1Id || EMPTY_ID)} (Lvl.{" "}
-                                  {player.weaponInfo?.trait1Level})
+                                  - {translateTraitId(player.weaponInfo?.trait1Id || EMPTY_ID)}{" "}
+                                  {t("ui.trait-level", { level: player.weaponInfo?.trait1Level })}
                                 </Text>
                               </Placeholder>
                               <Placeholder empty={!player.weaponInfo?.trait2Id || player.weaponInfo?.trait2Level == 0}>
                                 <Text size="xs" fs="italic" fw={300}>
-                                  - {translateTraitId(player.weaponInfo?.trait2Id || EMPTY_ID)} (Lvl.{" "}
-                                  {player.weaponInfo?.trait2Level})
+                                  - {translateTraitId(player.weaponInfo?.trait2Id || EMPTY_ID)}{" "}
+                                  {t("ui.trait-level", { level: player.weaponInfo?.trait2Level })}
                                 </Text>
                               </Placeholder>
                               <Placeholder empty={!player.weaponInfo?.trait3Id || player.weaponInfo?.trait3Level == 0}>
                                 <Text size="xs" fs="italic" fw={300}>
-                                  - {translateTraitId(player.weaponInfo?.trait3Id || EMPTY_ID)} (Lvl.{" "}
-                                  {player.weaponInfo?.trait3Level})
+                                  - {translateTraitId(player.weaponInfo?.trait3Id || EMPTY_ID)}{" "}
+                                  {t("ui.trait-level", { level: player.weaponInfo?.trait3Level })}
                                 </Text>
                               </Placeholder>
                             </>
@@ -1707,7 +1712,8 @@ export const ViewPage = () => {
                                   {translateSummonId(summon.summonId)}
                                 </Text>
                                 <Text size="xs" fs="italic" fw={300} pl={8}>
-                                  - {translateTraitId(summon.mainTraitId)} (Lvl. {summon.mainTraitLevel})
+                                  - {translateTraitId(summon.mainTraitId)}{" "}
+                                  {t("ui.trait-level", { level: summon.mainTraitLevel })}
                                 </Text>
                                 <Text size="xs" fs="italic" fw={300} pl={8}>
                                   - {translateSummonBonusId(summon.bonusId)}{" "}
@@ -1741,14 +1747,16 @@ export const ViewPage = () => {
                             {sigils.map((sigil, sigilIndex) => (
                               <Box key={sigilIndex} mt={sigilIndex > 0 ? 4 : 0}>
                                 <Text size="xs" fw={600}>
-                                  {translateSigilId(sigil.sigilId)} (Lvl. {sigil.sigilLevel})
+                                  {translateSigilId(sigil.sigilId)} {t("ui.trait-level", { level: sigil.sigilLevel })}
                                 </Text>
                                 <Text size="xs" fs="italic" fw={300} pl={8}>
-                                  - {translateTraitId(sigil.firstTraitId)} (Lvl. {sigil.firstTraitLevel})
+                                  - {translateTraitId(sigil.firstTraitId)}{" "}
+                                  {t("ui.trait-level", { level: sigil.firstTraitLevel })}
                                 </Text>
                                 {sigil.secondTraitId !== EMPTY_ID && (
                                   <Text size="xs" fs="italic" fw={300} pl={8}>
-                                    - {translateTraitId(sigil.secondTraitId)} (Lvl. {sigil.secondTraitLevel})
+                                    - {translateTraitId(sigil.secondTraitId)}{" "}
+                                    {t("ui.trait-level", { level: sigil.secondTraitLevel })}
                                   </Text>
                                 )}
                               </Box>

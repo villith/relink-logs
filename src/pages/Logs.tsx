@@ -110,6 +110,7 @@ const Layout = () => {
         <AppShell.Header>
           <Group h="100%" px="sm" gap="xs" wrap="nowrap">
             <Group h="100%" gap="sm" wrap="nowrap" style={{ flex: 1 }}>
+              {/* eslint-disable-next-line i18next/no-literal-string -- app name, never translated */}
               <Text style={{ whiteSpace: "nowrap" }}>
                 Relink Logs
                 {version && ` - v${version}`}

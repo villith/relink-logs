@@ -885,6 +885,30 @@ pub fn remap_dragon_form(
     event
 }
 
+/// The character a player-identity/load event should record in its party slot.
+///
+/// Pl2000 (Id's dragon form) events resolve to the Id player (Pl1900) instead of
+/// being dropped: a recruited crewmate Id fights entirely in dragon form — its
+/// Pl1900 base actor may never deal a hit — so dragon-sourced events are the only
+/// identity the meter ever sees for that player (live logs 344-346, 2026-07-23,
+/// where slot 4 stayed empty all quest). Slot-scoped, so two Ids in one party
+/// each keep their own entry. `None` means ignore the event: its slot is owned by
+/// a different character (bad embedded-record read) or out of range.
+fn slot_character_for_identity(
+    player_data: &[Option<PlayerData>; 4],
+    character_type: CharacterType,
+    party_index: u8,
+) -> Option<CharacterType> {
+    if character_type != CharacterType::Pl2000 {
+        return Some(character_type);
+    }
+    let slot = player_data.get(party_index as usize)?;
+    match slot {
+        Some(holder) if holder.character_type != CharacterType::Pl1900 => None,
+        _ => Some(CharacterType::Pl1900),
+    }
+}
+
 /// Resolves the character type behind a player slot key (`0xF0000000 | slot`)
 /// from the identity snapshots. Identity events land at quest load — before a
 /// guard is possible — so this lets guard handlers create a party row for a
@@ -1571,10 +1595,15 @@ impl Parser {
     pub fn on_player_load_event(&mut self, event: PlayerLoadEvent) {
         let character_type = CharacterType::from_hash(event.character_type);
 
-        // Ignore Id's transformation.
-        if character_type == CharacterType::Pl2000 {
+        // Id's transformation resolves to the Id player (or is ignored when its
+        // slot belongs to someone else) — see slot_character_for_identity.
+        let Some(character_type) = slot_character_for_identity(
+            &self.encounter.player_data,
+            character_type,
+            event.party_index,
+        ) else {
             return;
-        }
+        };
 
         let sigils = event
             .sigils
@@ -1622,10 +1651,15 @@ impl Parser {
     pub fn on_player_identity_event(&mut self, event: PlayerIdentityEvent) {
         let character_type = CharacterType::from_hash(event.character_type);
 
-        // Ignore Id's transformation (same guard as the full player_load path).
-        if character_type == CharacterType::Pl2000 {
+        // Id's transformation resolves to the Id player (or is ignored when its
+        // slot belongs to someone else) — see slot_character_for_identity.
+        let Some(character_type) = slot_character_for_identity(
+            &self.encounter.player_data,
+            character_type,
+            event.party_index,
+        ) else {
             return;
-        }
+        };
 
         let mut player_data = self
             .encounter
@@ -3668,6 +3702,164 @@ mod tests {
         let player = party.get(&100).expect("damage attributed to the Id player");
         assert_eq!(player.character_type, CharacterType::Pl1900);
         assert_eq!(player.total_damage, 500);
+    }
+
+    #[test]
+    fn dragon_identity_populates_an_empty_slot_as_id() {
+        // A recruited crewmate Id fights entirely as its Pl2000 dragon actor — the
+        // Pl1900 base actor may never deal a hit, so dragon-sourced identity events
+        // are the ONLY ones that ever arrive for that player (live logs 344-346,
+        // 2026-07-23: slot 4 stayed empty for the whole quest). They must fill the
+        // slot as the Id player instead of being dropped.
+        let mut parser = Parser::default();
+
+        parser.on_player_identity_event(identity_event(
+            "IdRecruit",
+            0xF5755C0E,
+            3,
+            0xF000_0003,
+            true,
+        ));
+
+        let slot = parser.encounter.player_data[3]
+            .as_ref()
+            .expect("dragon-form identity fills the recruit's empty slot");
+        assert_eq!(slot.character_type, CharacterType::Pl1900);
+        assert_eq!(slot.display_name, "IdRecruit");
+    }
+
+    #[test]
+    fn dragon_identity_updates_each_id_players_own_slot() {
+        // Two Ids in the party (e.g. a real Id player plus a recruited crewmate Id):
+        // each dragon actor resolves to its own party slot, so dragon identity events
+        // must stay slot-scoped and never merge or cross-claim the other Id's entry.
+        let mut parser = Parser::default();
+
+        parser.on_player_identity_event(identity_event(
+            "LocalId",
+            0x8056ABCD,
+            0,
+            0xF000_0000,
+            false,
+        ));
+        parser.on_player_identity_event(identity_event(
+            "RecruitId",
+            0xF5755C0E,
+            3,
+            0xF000_0003,
+            true,
+        ));
+        // The local Id transforms mid-quest: its own dragon identity refresh.
+        parser.on_player_identity_event(identity_event(
+            "LocalId",
+            0xF5755C0E,
+            0,
+            0xF000_0000,
+            false,
+        ));
+
+        let slot0 = parser.encounter.player_data[0].as_ref().unwrap();
+        assert_eq!(slot0.character_type, CharacterType::Pl1900);
+        assert_eq!(slot0.display_name, "LocalId");
+        let slot3 = parser.encounter.player_data[3].as_ref().unwrap();
+        assert_eq!(slot3.character_type, CharacterType::Pl1900);
+        assert_eq!(slot3.display_name, "RecruitId");
+        assert_eq!(parser.encounter.player_data.iter().flatten().count(), 2);
+    }
+
+    #[test]
+    fn dragon_identity_never_claims_another_characters_slot() {
+        // Defensive: if a dragon-form event ever arrives carrying a party slot that
+        // a different character already owns (a bad embedded-record read), it must
+        // not overwrite that player.
+        let mut parser = Parser::default();
+
+        parser.on_player_identity_event(identity_event(
+            "Manmoth",
+            0x91418145,
+            3,
+            0xF000_0003,
+            false,
+        ));
+        parser.on_player_identity_event(identity_event(
+            "IdRecruit",
+            0xF5755C0E,
+            3,
+            0xF000_0003,
+            true,
+        ));
+
+        let slot = parser.encounter.player_data[3].as_ref().unwrap();
+        assert_eq!(slot.character_type, CharacterType::Pl2700);
+        assert_eq!(slot.display_name, "Manmoth");
+    }
+
+    fn a_player_load_event(
+        name: &str,
+        character_type: u32,
+        party_index: u8,
+        actor_index: u32,
+    ) -> PlayerLoadEvent {
+        let name = std::ffi::CString::new(name).unwrap();
+        PlayerLoadEvent {
+            sigils: Vec::new(),
+            character_name: name.clone(),
+            display_name: name,
+            character_type,
+            party_index,
+            actor_index,
+            is_online: false,
+            weapon_info: protocol::WeaponInfo {
+                weapon_id: 0,
+                star_level: 0,
+                plus_marks: 0,
+                awakening_level: 0,
+                trait_1_id: 0,
+                trait_1_level: 0,
+                trait_2_id: 0,
+                trait_2_level: 0,
+                trait_3_id: 0,
+                trait_3_level: 0,
+                wrightstone_id: 0,
+                weapon_level: 0,
+                weapon_hp: 0,
+                weapon_attack: 0,
+            },
+            overmastery_info: protocol::OvermasteryInfo {
+                overmasteries: Vec::new(),
+            },
+            player_stats: protocol::PlayerStats {
+                level: 0,
+                total_hp: 0,
+                total_attack: 0,
+                stun_power: 0.0,
+                critical_rate: 0.0,
+                total_power: 0,
+            },
+        }
+    }
+
+    #[test]
+    fn dragon_player_load_populates_the_slot_as_id() {
+        // Same rule on the legacy full player-load path: a Pl2000 load event fills
+        // an empty slot as the Id player instead of being dropped, and never
+        // overwrites a slot another character owns.
+        let mut parser = Parser::default();
+
+        parser.on_player_load_event(a_player_load_event("IdRecruit", 0xF5755C0E, 3, 0xF000_0003));
+        let slot = parser.encounter.player_data[3]
+            .as_ref()
+            .expect("dragon-form load fills the recruit's empty slot");
+        assert_eq!(slot.character_type, CharacterType::Pl1900);
+
+        parser.on_player_load_event(a_player_load_event("Manmoth", 0x91418145, 0, 0xF000_0000));
+        parser.on_player_load_event(a_player_load_event("IdRecruit", 0xF5755C0E, 0, 0xF000_0000));
+        let slot0 = parser.encounter.player_data[0].as_ref().unwrap();
+        assert_eq!(
+            slot0.character_type,
+            CharacterType::Pl2700,
+            "dragon load must not claim another character's slot"
+        );
     }
 
     #[test]

@@ -19,6 +19,10 @@ hookdiag = ["dep:backtrace"]
 # DEV ONLY: unlock the game's built-in Full Assist AI in Infinity quests
 # (hooks/assist.rs). Changes game behavior, so it is never built for release.
 fullassist = ["dep:serde_json"]
+# DEV ONLY: the hook tears down its detours and shuts down its runtime on a
+# control-channel `Eject` request, so the app can FreeLibrary + re-inject a
+# rebuilt DLL without a game restart. Never built for release.
+eject = []
 
 [package.metadata.winres]
 OriginalFilename = "hook.dll"
@@ -41,6 +45,7 @@ tokio = { version = "1.0", features = ["full"] }
 windows = { version = "0.52.0", features = ["Win32_Foundation", "Win32_System_Diagnostics_Debug", "Win32_System_Diagnostics_ToolHelp", "Win32_System_Console", "Win32_System_Memory", "Win32_System_LibraryLoader"] }
 futures = "0.3"
 protocol = { path = "../protocol" }
+game-reader = { path = "../game-reader" }
 tokio-util = { version = "0.7.11", features = ["codec"] }
 
 

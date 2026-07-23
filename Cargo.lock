@@ -1424,6 +1424,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "game-reader"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "pelite",
+ "protocol",
+]
+
+[[package]]
 name = "gbfr-logs"
 version = "1.12.2-1"
 dependencies = [
@@ -1432,6 +1441,7 @@ dependencies = [
  "chrono",
  "dll-syringe",
  "futures",
+ "game-reader",
  "interprocess",
  "log",
  "num_enum 0.7.2",
@@ -1856,6 +1866,7 @@ dependencies = [
  "dirs",
  "fern",
  "futures",
+ "game-reader",
  "interprocess",
  "log",
  "pelite",

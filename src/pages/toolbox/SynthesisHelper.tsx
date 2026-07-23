@@ -7,15 +7,20 @@ import { SynthesisMatch, SynthesisSigil } from "@/types";
 
 import useSynthesisHelper from "./useSynthesisHelper";
 
-const SigilCell = ({ sigil }: { sigil: SynthesisSigil }) => (
-  <Stack gap={0}>
-    <Text size="sm">{translateSigilId(sigil.sigilId)}</Text>
-    <Text size="xs" c="dimmed">
-      {translateTraitId(sigil.trait1)} Lv{sigil.trait1Level}
-      {translateTraitId(sigil.trait2) && ` / ${translateTraitId(sigil.trait2)} Lv${sigil.trait2Level}`}
-    </Text>
-  </Stack>
-);
+const SigilCell = ({ sigil }: { sigil: SynthesisSigil }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack gap={0}>
+      <Text size="sm">{translateSigilId(sigil.sigilId)}</Text>
+      <Text size="xs" c="dimmed">
+        {translateTraitId(sigil.trait1)} {t("ui.level-short", { level: sigil.trait1Level })}
+        {translateTraitId(sigil.trait2) &&
+          ` / ${translateTraitId(sigil.trait2)} ${t("ui.level-short", { level: sigil.trait2Level })}`}
+      </Text>
+    </Stack>
+  );
+};
 
 const ResultCell = ({ match }: { match: SynthesisMatch }) => {
   const { prediction, resultSigilId } = match;

@@ -66,6 +66,7 @@ function RunRow({ run }: { run: ConfluxRun }) {
           {/* completed=false only means the reward screen wasn't observed (the usual
               town-exit path can't tell cleared from abandoned) — never show it as a failure. */}
           {run.completed ? (
+            // eslint-disable-next-line i18next/no-literal-string -- checkmark glyph, not a word
             <Text size="xs">✓</Text>
           ) : run.endTime === null ? (
             <Text size="xs" c="dimmed">

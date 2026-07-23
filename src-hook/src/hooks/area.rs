@@ -11,6 +11,11 @@ static_detour! {
     static OnEnterArea: unsafe extern "system" fn(u32, *const usize, u8, *const usize) -> usize;
 }
 
+#[cfg(any(feature = "eject", test))]
+pub(super) fn disable() {
+    super::disable_quiet("OnEnterArea", &OnEnterArea);
+}
+
 // v2.0.2: DISABLED pending re-derivation. The old pattern (`e8 $ { ' } c5 ? ? ? c5 f8 29 45 ?
 // c7 45 ? ? ? ? ?`) now matches 11 sites, ALL of them `call +0xf` hash-loading stubs inside one
 // type-hash switch at rva 0x3d0a5xx — none is a real function entry. search_address picked the

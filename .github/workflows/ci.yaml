@@ -172,6 +172,7 @@ jobs:
       - name: Stub the hook.dll resource
         run: touch src-tauri/hook.dll
       - run: cargo check -p protocol
+      - run: cargo test -p game-reader
       - run: cargo check -p gbfr-logs
       # --lib --bins: examples are windows-only diag tools and must not build here.
       - run: cargo test -p gbfr-logs --lib --bins

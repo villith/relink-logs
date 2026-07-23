@@ -79,6 +79,13 @@ static_detour! {
     static OnEndlessMgrDtor: unsafe extern "system" fn(*const usize) -> usize;
 }
 
+#[cfg(any(feature = "eject", test))]
+pub(super) fn disable() {
+    super::disable_quiet("OnReceptionFlowDispatch", &OnReceptionFlowDispatch);
+    super::disable_quiet("OnEndlessBuffInstall", &OnEndlessBuffInstall);
+    super::disable_quiet("OnEndlessMgrDtor", &OnEndlessMgrDtor);
+}
+
 /// Detects the start of a Conflux run: emits `ConfluxRunStart` on the reception-flow slot
 /// transitioning INTO an EndlessMode flow. Observe-only: both args are passed straight
 /// through (a dropped arg crashed the quest hook on v2.0.2 — see quest.rs).

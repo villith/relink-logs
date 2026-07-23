@@ -533,6 +533,29 @@ jobs:
             --notes-file notes.md \
             "${extra[@]}"
 
+      # The releases page lists strictly newest-first and GitHub offers no way
+      # to pin a release, so RCs pile up above the stable marked "Latest".
+      # Prune instead: after every publish, delete every prerelease entry
+      # except the one just published — an RC push leaves at most one RC above
+      # the stable, and a stable release clears them all. Only the release
+      # entries (and their assets) go; the tags stay, because next-version.mjs
+      # derives the next RC number from the tag list. Deletion failures are
+      # warnings, not errors: the release is already published, failing here
+      # would skip the promote job on stables, and the next publish re-prunes
+      # whatever was left behind anyway.
+      - name: Prune superseded prereleases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            --jq '.[] | select(.prerelease) | .tag_name' |
+          while read -r tag; do
+            if [[ "$tag" == "$VERSION" ]]; then continue; fi
+            echo "Deleting superseded prerelease $tag"
+            gh release delete "$tag" --yes || echo "::warning::could not delete prerelease $tag"
+          done
+
+
   # After a stable release, move main to the released commit. This is a plain
   # fast-forward push: the released commit is on dev, and main is always an
   # ancestor of dev because this job is the ONLY thing that moves main. If the

@@ -9,9 +9,8 @@ use std::{
 };
 
 use anyhow::Context;
-use gbfr_logs::{db, parser};
-#[cfg(windows)]
-use gbfr_logs::{overmastery, synthesis};
+use gbfr_logs::toolbox_rpc::{self, HookStatus};
+use gbfr_logs::{db, overmastery, parser, synthesis};
 
 use db::logs::LogEntry;
 #[cfg(windows)]
@@ -53,41 +52,42 @@ fn reset_encounter(state: State<ResetChannel>) {
     }
 }
 
-/// Toolbox / Synthesis Helper: snapshot the game's synthesis state and report
-/// whether predictions are currently possible.
-#[cfg(windows)]
+/// Toolbox / Synthesis Helper: snapshot the game's synthesis state (served
+/// by the hook over the toolbox RPC channel) and report whether predictions
+/// are currently possible.
 #[tauri::command(async)]
-async fn fetch_synthesis_status() -> Result<synthesis::SynthesisStatus, String> {
-    tokio::task::spawn_blocking(|| match synthesis::snapshot::take_snapshot() {
-        Ok(None) => Ok(synthesis::SynthesisStatus {
+async fn fetch_synthesis_status(
+    hook: State<'_, HookStatus>,
+) -> Result<synthesis::SynthesisStatus, String> {
+    match toolbox_rpc::synthesis_snapshot(&hook).await? {
+        None => Ok(synthesis::SynthesisStatus {
             game_running: false,
             sigil_count: 0,
             rng_unpredictable: false,
         }),
-        Ok(Some(snap)) => Ok(synthesis::SynthesisStatus {
+        Some(snap) => Ok(synthesis::SynthesisStatus {
             game_running: true,
             sigil_count: snap.sigils.len() as u32,
             rng_unpredictable: snap.rng_state == 0,
         }),
-        Err(e) => Err(e.to_string()),
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    }
 }
 
-/// Toolbox / Synthesis Helper: fresh snapshot + exhaustive pair search.
-#[cfg(windows)]
+/// Toolbox / Synthesis Helper: fresh snapshot + exhaustive pair search. The
+/// snapshot is an RPC; the search itself is CPU-heavy, so it stays on a
+/// blocking thread.
 #[tauri::command(async)]
 async fn search_synthesis(
     query: synthesis::SynthesisQuery,
+    hook: State<'_, HookStatus>,
 ) -> Result<synthesis::SynthesisSearchResponse, String> {
     if query.trait1 == synthesis::EMPTY_TRAIT || query.trait2 == Some(synthesis::EMPTY_TRAIT) {
         return Err("invalid-trait".to_string());
     }
+    let snap = toolbox_rpc::synthesis_snapshot(&hook)
+        .await?
+        .ok_or_else(|| "game-not-running".to_string())?;
     tokio::task::spawn_blocking(move || {
-        let snap = synthesis::snapshot::take_snapshot()
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "game-not-running".to_string())?;
         let (matches, pairs_tested) = synthesis::search(&snap, &query);
         Ok(synthesis::SynthesisSearchResponse {
             matches,
@@ -104,125 +104,74 @@ async fn search_synthesis(
 
 /// Toolbox / Synthesis Helper: current seed identity for staleness polling.
 /// `None` = game not running (staleness unknowable, not stale).
-#[cfg(windows)]
 #[tauri::command(async)]
-async fn fetch_synthesis_seed() -> Result<Option<synthesis::SynthesisSeed>, String> {
-    tokio::task::spawn_blocking(|| {
-        synthesis::snapshot::take_seed_state().map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+async fn fetch_synthesis_seed(
+    hook: State<'_, HookStatus>,
+) -> Result<Option<synthesis::SynthesisSeed>, String> {
+    toolbox_rpc::synthesis_seed(&hook).await
 }
 
 /// Toolbox / Overmastery Predictor: is the game up, and which characters
 /// exist in the roster (for the character picker).
-#[cfg(windows)]
 #[tauri::command(async)]
-async fn fetch_overmastery_status() -> Result<overmastery::OvermasteryStatus, String> {
-    tokio::task::spawn_blocking(|| match overmastery::snapshot::take_snapshot() {
-        Ok(None) => Ok(overmastery::OvermasteryStatus {
+async fn fetch_overmastery_status(
+    hook: State<'_, HookStatus>,
+) -> Result<overmastery::OvermasteryStatus, String> {
+    match toolbox_rpc::overmastery_snapshot(&hook).await? {
+        None => Ok(overmastery::OvermasteryStatus {
             game_running: false,
             roster: Vec::new(),
         }),
-        Ok(Some(snap)) => Ok(overmastery::OvermasteryStatus {
+        Some(snap) => Ok(overmastery::OvermasteryStatus {
             game_running: true,
             roster: snap.roster,
         }),
-        Err(e) => Err(e.to_string()),
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    }
 }
 
 /// Toolbox / Overmastery Predictor: fresh RNG snapshot + simulate the next N
 /// meditation rolls for one character and size.
-#[cfg(windows)]
 #[tauri::command(async)]
 async fn predict_overmastery(
     query: overmastery::OvermasteryQuery,
+    hook: State<'_, HookStatus>,
 ) -> Result<overmastery::OvermasteryPrediction, String> {
     let tables = overmastery::stock_tables();
     if query.tier >= tables.tiers.len() {
         return Err("invalid-tier".to_string());
     }
     let rolls = query.rolls.min(500);
-    tokio::task::spawn_blocking(move || {
-        let snap = overmastery::snapshot::take_snapshot()
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "game-not-running".to_string())?;
-        if snap.slot_override != u32::MAX {
-            return Err("rng-override-active".to_string());
-        }
-        let char_idx = overmastery::char_slot_index(&snap.roster, query.char_id)
-            .ok_or_else(|| "character-not-found".to_string())?;
-        let slot = overmastery::rng_slot(query.tier as u32, char_idx);
-        let slot_state = *snap
-            .slots
-            .get(slot as usize)
-            .ok_or_else(|| "slot-out-of-range".to_string())?;
-        Ok(overmastery::OvermasteryPrediction {
-            rolls: overmastery::simulate(slot_state, query.tier, tables, rolls),
-            slot,
-            slot_state,
-            unpredictable: slot_state == 0,
-            msp_cost: tables.tiers[query.tier].msp_cost,
-        })
+    let snap = toolbox_rpc::overmastery_snapshot(&hook)
+        .await?
+        .ok_or_else(|| "game-not-running".to_string())?;
+    if snap.slot_override != u32::MAX {
+        return Err("rng-override-active".to_string());
+    }
+    let char_idx = overmastery::char_slot_index(&snap.roster, query.char_id)
+        .ok_or_else(|| "character-not-found".to_string())?;
+    let slot = overmastery::rng_slot(query.tier as u32, char_idx);
+    let slot_state = *snap
+        .slots
+        .get(slot as usize)
+        .ok_or_else(|| "slot-out-of-range".to_string())?;
+    Ok(overmastery::OvermasteryPrediction {
+        rolls: overmastery::simulate(slot_state, query.tier, tables, rolls),
+        slot,
+        slot_state,
+        unpredictable: slot_state == 0,
+        msp_cost: tables.tiers[query.tier].msp_cost,
     })
-    .await
-    .map_err(|e| e.to_string())?
 }
 
 /// Toolbox / Overmastery Predictor: current RNG state of one slot, for
 /// staleness polling against a prediction's `slot_state`. `None` = game not
 /// running (staleness unknowable, not stale).
-#[cfg(windows)]
 #[tauri::command(async)]
-async fn fetch_overmastery_seed(slot: u32) -> Result<Option<u32>, String> {
-    // The bound is owned by `take_slot_state`, which knows RNG_SLOT_COUNT.
-    tokio::task::spawn_blocking(move || {
-        overmastery::snapshot::take_slot_state(slot).map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-/// Non-Windows stubs: these tools read game memory from outside the process,
-/// which the Linux build does not support (see the Linux spec). The frontend
-/// hides them; the stub keeps the invoke surface identical.
-#[cfg(not(windows))]
-#[tauri::command]
-async fn fetch_synthesis_status() -> Result<(), String> {
-    Err("windows-only".into())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-async fn search_synthesis() -> Result<(), String> {
-    Err("windows-only".into())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-async fn fetch_synthesis_seed() -> Result<(), String> {
-    Err("windows-only".into())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-async fn fetch_overmastery_status() -> Result<(), String> {
-    Err("windows-only".into())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-async fn predict_overmastery() -> Result<(), String> {
-    Err("windows-only".into())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-async fn fetch_overmastery_seed() -> Result<(), String> {
-    Err("windows-only".into())
+async fn fetch_overmastery_seed(
+    slot: u32,
+    hook: State<'_, HookStatus>,
+) -> Result<Option<u32>, String> {
+    toolbox_rpc::overmastery_slot(&hook, slot).await
 }
 
 #[tauri::command]
@@ -881,10 +830,129 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
     Ok(())
 }
 
+/// Dev reload diagnostics that land in a file we can always read, regardless of
+/// the app's log level/target: `%APPDATA%\gbfr-logs\reload-debug.log`, next to
+/// the hook's own gbfr-logs.txt. Also mirrors to the normal `info!` sink. The
+/// file write happens only in debug builds; release still gets the `info!`.
+#[cfg(windows)]
+fn reload_dbg(msg: &str) {
+    info!("{msg}");
+    #[cfg(debug_assertions)]
+    {
+        use std::io::Write;
+        let line = format!(
+            "[{}] {msg}\n",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f")
+        );
+        // Best-effort: a logging hiccup must never disrupt the reload flow.
+        if let Some(path) = tauri::api::path::data_dir() {
+            let path = path.join("gbfr-logs").join("reload-debug.log");
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&path)
+            {
+                let _ = f.write_all(line.as_bytes());
+            }
+        }
+    }
+}
+
+/// FreeLibrary the injected hook module until it is genuinely unmapped — not
+/// just once.
+///
+/// `syringe.inject()` is `LoadLibrary`, and Windows runs a DLL's `#[ctor]`
+/// (`DllMain` attach) ONLY on the first load into a process; a later
+/// `LoadLibrary` of an already-mapped module just bumps its refcount and
+/// returns the existing handle WITHOUT re-running the ctor. So a hook module
+/// left mapped (refcount > 1 from reconnect re-injections, or a prior session's
+/// module that outlived a single FreeLibrary) gets reused on the next inject as
+/// a dead hook: no ctor, no event pipe, no control pipe. Ejecting until
+/// `find_module_by_name` reports it gone guarantees the next inject is a true
+/// fresh load. Bounded so a module that refuses to unmap surfaces as an error
+/// instead of looping forever.
+#[cfg(windows)]
+fn eject_hook_until_gone(syringe: &Syringe) -> anyhow::Result<u32> {
+    use dll_syringe::process::Process as _;
+
+    // dll_syringe::eject runs FreeLibrary (decrementing the refcount) and
+    // returns Ok, but then a `debug_assert!(..., "ejected module survived")`
+    // panics in debug builds when the module is STILL mapped afterward (i.e.
+    // the refcount was > 1). The FreeLibrary already happened by that point, so
+    // we catch that specific panic and loop — each pass drops one refcount
+    // until the module is genuinely unmapped, at which point eject returns Ok
+    // without panicking. This drains a legacy refcount left by pre-fix reconnect
+    // re-injections; steady-state refcount is 1, so no panic occurs then.
+    //
+    // Silence the intentional panics' console noise for the duration (restored
+    // right after). The window is brief and only during (re)injection.
+    let prev_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let result = (|| -> anyhow::Result<u32> {
+        let mut ejected = 0u32;
+        for _ in 0..64 {
+            let module = match syringe.process().find_module_by_name("hook-dbg.dll")? {
+                Some(m) => Some(m),
+                None => syringe.process().find_module_by_name("hook.dll")?,
+            };
+            let Some(module) = module else {
+                return Ok(ejected);
+            };
+            match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| syringe.eject(module))) {
+                // Clean unload (module gone → debug_assert passed).
+                Ok(Ok(())) => ejected += 1,
+                // A real eject error (not the survival assert): give up.
+                Ok(Err(e)) => {
+                    return Err(anyhow::Error::new(e).context("FreeLibrary of the hook"))
+                }
+                // "ejected module survived": FreeLibrary ran, refcount still > 0.
+                Err(_) => ejected += 1,
+            }
+        }
+        anyhow::bail!("hook module still mapped after 64 FreeLibrary attempts")
+    })();
+    std::panic::set_hook(prev_hook);
+    result
+}
+
+/// Is a hook module (`hook-dbg.dll` or `hook.dll`) currently mapped in the
+/// target process? Used to avoid a second inject (LoadLibrary would just bump
+/// the refcount without re-running the ctor) and, more importantly, to avoid
+/// FreeLibrary'ing a live hook — see check_and_perform_hook.
+#[cfg(windows)]
+fn hook_module_present(syringe: &Syringe) -> bool {
+    use dll_syringe::process::Process as _;
+    let process = syringe.process();
+    process
+        .find_module_by_name("hook-dbg.dll")
+        .ok()
+        .flatten()
+        .or_else(|| process.find_module_by_name("hook.dll").ok().flatten())
+        .is_some()
+}
+
 // Continuously check for the game process and inject the DLL when found.
 #[cfg(windows)]
 async fn check_and_perform_hook(app: AppHandle) {
+    reload_dbg("check_and_perform_hook: (re)entered, polling for game process");
     loop {
+        // Dev hook reload in flight: the old module must be ejected and
+        // hook-dbg.dll refreshed before we may inject again (see reload_hook).
+        #[cfg(debug_assertions)]
+        {
+            let mut waited = false;
+            while app.state::<HookStatus>().reloading.load(Ordering::Relaxed) {
+                if !waited {
+                    reload_dbg("check_and_perform_hook: reloading gate SET, waiting");
+                    waited = true;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+            if waited {
+                reload_dbg("check_and_perform_hook: reloading gate CLEARED, proceeding");
+            }
+        }
+
         match OwnedProcess::find_first_by_name(gbfr_logs::game_mem::GAME_EXE) {
             Some(target) => {
                 let syringe = Syringe::for_process(target);
@@ -895,12 +963,39 @@ async fn check_and_perform_hook(app: AppHandle) {
                     dll_path = debug_dll_path;
                 }
 
-                info!("Found game process, injecting DLL: {:?}", dll_path);
-
-                let _ = syringe.inject(dll_path);
+                // If a hook is ALREADY mapped, do not inject again and NEVER
+                // FreeLibrary it here. A live hook has detours installed and game
+                // threads running through its trampolines; unmapping it out from
+                // under them crashes the game (AccessViolation). A second inject
+                // would only bump the refcount without re-running the ctor
+                // (LoadLibrary runs it once). The only safe teardown of a live
+                // hook is the graceful control-channel path in reload_hook_inner,
+                // which disables the detours and fully unmaps BEFORE we get here —
+                // so a real reload arrives with nothing mapped and injects below.
+                // A hook already present is therefore either that live hook (from
+                // a prior app session) or an abnormally dead one: in both cases we
+                // just (re)connect and let the pipe tell us which.
+                if hook_module_present(&syringe) {
+                    reload_dbg(
+                        "check_and_perform_hook: a hook is already mapped; connecting without re-inject (never FreeLibrary a live hook)",
+                    );
+                } else {
+                    reload_dbg(&format!(
+                        "check_and_perform_hook: game found, injecting {dll_path:?}"
+                    ));
+                    match syringe.inject(dll_path) {
+                        Ok(module) => reload_dbg(&format!(
+                            "check_and_perform_hook: inject OK ({dll_path:?} -> {module:?})"
+                        )),
+                        Err(e) => reload_dbg(&format!(
+                            "check_and_perform_hook: inject FAILED for {dll_path:?}: {e:?}"
+                        )),
+                    }
+                }
                 let _ = app.emit_all("success-alert", "Found game..");
 
                 connect_and_run_parser(app);
+                reload_dbg("check_and_perform_hook: connect_and_run_parser spawned; loop exiting");
 
                 break;
             }
@@ -909,6 +1004,96 @@ async fn check_and_perform_hook(app: AppHandle) {
             }
         }
     }
+}
+
+/// Dev-only hook hot-reload: ask the running hook to tear itself down, eject
+/// the dead module, refresh hook-dbg.dll from the cargo artifact, and let
+/// the standard reconnect loop re-inject. See
+/// docs/superpowers/specs/2026-07-23-dev-hook-hot-reload-design.md.
+#[cfg(all(windows, debug_assertions))]
+async fn reload_hook(app: AppHandle) {
+    if app
+        .state::<HookStatus>()
+        .reloading
+        .swap(true, Ordering::SeqCst)
+    {
+        return; // a reload is already in flight
+    }
+    reload_dbg("reload_hook: START (reloading gate set)");
+    let result = reload_hook_inner(&app).await;
+    app.state::<HookStatus>()
+        .reloading
+        .store(false, Ordering::SeqCst);
+    match result {
+        Ok(()) => {
+            reload_dbg("reload_hook: reload_hook_inner OK; reloading gate cleared");
+            let _ = app.emit_all("success-alert", "Hook reloaded");
+        }
+        Err(e) => {
+            reload_dbg(&format!("reload_hook: reload_hook_inner FAILED: {e:?}"));
+            log::warn!("hook reload failed: {e:?}");
+            let _ = app.emit_all("error-alert", format!("Hook reload failed: {e}"));
+        }
+    }
+}
+
+#[cfg(all(windows, debug_assertions))]
+async fn reload_hook_inner(app: &AppHandle) -> anyhow::Result<()> {
+    use anyhow::{anyhow, bail, Context};
+
+    reload_dbg("reload_hook_inner: sending Eject over control channel");
+    gbfr_logs::control_rpc::eject().await?;
+    reload_dbg("reload_hook_inner: Eject acknowledged; waiting for connected=false");
+
+    // The event pipe closing (connect loop flips `connected` off) means the
+    // hook's runtime exited. Timing out means the hook is half-dead —
+    // ejecting would FreeLibrary a module with live threads, so refuse.
+    let wait_start = std::time::Instant::now();
+    let deadline = wait_start + std::time::Duration::from_secs(5);
+    while app
+        .state::<HookStatus>()
+        .connected
+        .load(Ordering::Relaxed)
+    {
+        if std::time::Instant::now() >= deadline {
+            reload_dbg("reload_hook_inner: TIMEOUT — connected never went false within 5s (pipe did not close)");
+            bail!("hook did not shut down within 5s; state unknown — restart the game");
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    reload_dbg(&format!(
+        "reload_hook_inner: connected=false after {}ms; 300ms grace then eject",
+        wait_start.elapsed().as_millis()
+    ));
+    // Grace: the setup thread finishes exiting shortly after its runtime
+    // drops (the pipe closes slightly before the thread is gone).
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+    let target = OwnedProcess::find_first_by_name(gbfr_logs::game_mem::GAME_EXE)
+        .ok_or_else(|| anyhow!("game process not found"))?;
+    let syringe = Syringe::for_process(target);
+    // Unmap the old module fully (refcount may be > 1), else the reconnect
+    // re-inject reuses it without re-running the ctor. See eject_hook_until_gone.
+    match eject_hook_until_gone(&syringe).context("unloading the old hook")? {
+        0 => reload_dbg("reload_hook_inner: no hook module mapped; skipping eject"),
+        n => reload_dbg(&format!(
+            "reload_hook_inner: old hook fully unmapped after {n} FreeLibrary call(s)"
+        )),
+    }
+
+    // The file is unlocked now — refresh it from the dev build artifact.
+    // CWD is src-tauri under `npm run tauri dev`, matching the relative
+    // hook-dbg.dll path in check_and_perform_hook.
+    let artifact = Path::new("../target/release/hook.dll");
+    if artifact.exists() {
+        std::fs::copy(artifact, "hook-dbg.dll").context("refreshing hook-dbg.dll")?;
+        reload_dbg(&format!("reload_hook_inner: hook-dbg.dll refreshed from {artifact:?}"));
+    } else {
+        reload_dbg(&format!(
+            "reload_hook_inner: {artifact:?} NOT FOUND; will re-inject existing hook-dbg.dll"
+        ));
+    }
+    Ok(())
 }
 
 // Linux: no injector. Refresh the dinput8 proxy in the game folder
@@ -964,12 +1149,25 @@ fn connect_and_run_parser(app: AppHandle) {
     *app.state::<ResetChannel>().0.lock().unwrap() = Some(reset_tx);
 
     tauri::async_runtime::spawn(async move {
+        #[cfg(windows)]
+        let mut connect_failures: u32 = 0;
         loop {
             match connect_event_stream().await {
                 Ok(stream) => {
                     info!("Connected to game!");
+                    #[cfg(windows)]
+                    reload_dbg("connect_and_run_parser: event pipe CONNECTED (hook is live)");
 
                     let _ = app.emit_all("success-alert", "Connnected to game!");
+
+                    let hook_status = app.state::<HookStatus>();
+                    hook_status.connected.store(true, Ordering::Relaxed);
+                    // Hello up front, once per (re)connect: a stale Linux
+                    // proxy or pre-RPC hook shows as "outdated" instead of
+                    // per-command failures.
+                    hook_status
+                        .outdated
+                        .store(!toolbox_rpc::hello_ok().await, Ordering::Relaxed);
 
                     let decoder = tokio_util::codec::LengthDelimitedCodec::new();
                     let mut reader = FramedRead::new(stream, decoder);
@@ -1074,6 +1272,10 @@ fn connect_and_run_parser(app: AppHandle) {
                         }
                     }
 
+                    app.state::<HookStatus>()
+                        .connected
+                        .store(false, Ordering::Relaxed);
+
                     info!("Game has closed.");
 
                     // Last chance to persist anything still in progress (abandoned quest →
@@ -1082,10 +1284,26 @@ fn connect_and_run_parser(app: AppHandle) {
                     state.on_game_disconnect();
 
                     // The game has closed, so we should go back to waiting for the game to reopen.
+                    #[cfg(windows)]
+                    reload_dbg("connect_and_run_parser: event pipe closed (connected=false); breaking to respawn check_and_perform_hook");
                     let _ = app.emit_all("error-alert", "Game has closed!");
                     break;
                 }
                 Err(_) => {
+                    // A fresh hook whose ctor never came up leaves us spinning
+                    // here forever (no live connection to lose → no respawn).
+                    // Log the first failure + periodically so a wedged reload
+                    // is visible instead of silent.
+                    #[cfg(windows)]
+                    {
+                        if connect_failures == 0 || connect_failures % 50 == 0 {
+                            reload_dbg(&format!(
+                                "connect_and_run_parser: event pipe connect failing (attempt {}); no hook pipe to connect to",
+                                connect_failures + 1
+                            ));
+                        }
+                        connect_failures += 1;
+                    }
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 }
             }
@@ -1093,6 +1311,8 @@ fn connect_and_run_parser(app: AppHandle) {
 
         // Check for the game process again.
         tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+        #[cfg(windows)]
+        reload_dbg("connect_and_run_parser: respawning check_and_perform_hook");
         tauri::async_runtime::spawn(check_and_perform_hook(app));
     });
 }
@@ -1110,7 +1330,14 @@ fn system_tray_with_menu() -> SystemTray {
         .add_item(logs)
         .add_item(always_on_top)
         .add_item(toggle_clickthrough)
-        .add_item(reset_windows)
+        .add_item(reset_windows);
+
+    // Dev-only hook hot-reload. Tray strings don't go through i18next
+    // (backend); an English label is fine for a debug-only item.
+    #[cfg(all(windows, debug_assertions))]
+    let menu = menu.add_item(CustomMenuItem::new("reload_hook", "Reload hook (dev)"));
+
+    let menu = menu
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit);
 
@@ -1234,6 +1461,10 @@ fn menu_tray_handler(handle: &AppHandle, event: SystemTrayEvent) {
                 let _ = handle.save_window_state(StateFlags::all());
                 handle.exit(0)
             }
+            #[cfg(all(windows, debug_assertions))]
+            "reload_hook" => {
+                tauri::async_runtime::spawn(reload_hook(handle.clone()));
+            }
             _ => {}
         },
         _ => {} // Ignore rest of the events.
@@ -1296,6 +1527,7 @@ fn main() {
         .manage(ClickThrough(AtomicBool::new(false)))
         .manage(DebugMode(AtomicBool::new(false)))
         .manage(ResetChannel(std::sync::Mutex::new(None)))
+        .manage(HookStatus::default())
         .system_tray(system_tray_with_menu())
         .on_system_tray_event(menu_tray_handler)
         .on_window_event(|event| {

@@ -4,10 +4,11 @@
 //!   cargo run -p gbfr-logs --example synth_diag            # snapshot summary
 //!   cargo run -p gbfr-logs --example synth_diag <uidA> <uidB>   # predict one pair (hex uids)
 
-use gbfr_logs::synthesis::{self, snapshot};
+use gbfr_logs::game_mem;
+use gbfr_logs::synthesis;
 
 fn main() -> anyhow::Result<()> {
-    let snap = match snapshot::take_snapshot()? {
+    let snap = match game_mem::rpm_synthesis_snapshot()? {
         Some(s) => s,
         None => {
             println!("game not running");

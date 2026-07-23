@@ -34,6 +34,17 @@ static_detour! {
     static DisplayDamage: unsafe extern "system" fn(*const usize, *const usize) -> usize;
 }
 
+#[cfg(any(feature = "eject", test))]
+pub(super) fn disable() {
+    super::disable_quiet("ProcessDamageEvent", &ProcessDamageEvent);
+    super::disable_quiet("ProcessDamageBypass", &ProcessDamageBypass);
+    super::disable_quiet("ProcessDotEvent0", &ProcessDotEvent0);
+    super::disable_quiet("ProcessDotEvent1", &ProcessDotEvent1);
+    super::disable_quiet("ProcessDotEvent2", &ProcessDotEvent2);
+    #[cfg(feature = "hookdiag")]
+    super::disable_quiet("DisplayDamage", &DisplayDamage);
+}
+
 /// DISPDIAG hook target: The World's guarded-Quickening counter damage (a
 /// scripted 1%-max-HP hit, 27.7M on Defy Infinity) reaches the SCREEN without
 /// passing ProcessDamageEvent or the direct-apply bypass (0 ALTDMG lines,
@@ -944,8 +955,27 @@ impl OnProcessDamageHook {
             let _ = self.tx.send(Message::PlayerIdentityEvent(identity));
         }
 
+        // A recruited crewmate Id fights entirely as its Pl2000 dragon actor — the
+        // Pl1900 base actor may never deal a hit, so the source-keyed publish above
+        // never fires for that player and its party slot stays empty (no Builds
+        // entry, fallback bar color; live logs 344-346, 2026-07-23). Resolve the
+        // dragon's owner and publish identity from the owner actor instead; the
+        // parser slot-scopes the event, so two Ids in one party stay distinct.
+        if source_type_id == super::ID_DRAGON_TYPE {
+            if let Some((parent_type_id, parent_idx, parent_ptr)) = super::get_source_parent(
+                source_type_id,
+                source_specified_instance_ptr as *const usize,
+            ) {
+                if let Some(identity) =
+                    super::player::identity_event_for_actor(parent_ptr, parent_type_id, parent_idx)
+                {
+                    let _ = self.tx.send(Message::PlayerIdentityEvent(identity));
+                }
+            }
+        }
+
         #[cfg(feature = "hookdiag")]
-        if source_type_id == 0xF5755C0E {
+        if source_type_id == super::ID_DRAGON_TYPE {
             crate::hooks::diag::probe_pl2000_parent(source_specified_instance_ptr);
         }
 

@@ -36,6 +36,16 @@ static_detour! {
     static BuildPlayerProfile: unsafe extern "system" fn(*mut u8, *mut u8);
 }
 
+#[cfg(any(feature = "eject", test))]
+pub(super) fn disable() {
+    super::disable_quiet("OnLoadPlayer", &OnLoadPlayer);
+    super::disable_quiet("RefreshPlayerIdentity", &RefreshPlayerIdentity);
+    // BuildPlayerProfile only exists in hookdiag builds (see its static_detour
+    // block above), so its teardown must be gated the same way.
+    #[cfg(feature = "hookdiag")]
+    super::disable_quiet("BuildPlayerProfile", &BuildPlayerProfile);
+}
+
 /// Entry prologue of FUN_1407a1dc0 (profile <- loadout serializer). VERIFIED
 /// unique (1 match, clean entry, 2 args rcx=profile dest / rdx=loadout src) on
 /// v2.0.2 via sigscan; the embedded `add rdx, 0x34E8` displacement anchors it.

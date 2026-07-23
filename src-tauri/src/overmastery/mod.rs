@@ -2,17 +2,17 @@
 //!
 //! Pure port of the game's meditation roll (v2.0.2, reverse-engineered from
 //! FUN_141beb1b0 — see docs/superpowers/specs/2026-07-19-overmastery-predictor-design.md).
-//! The snapshot module reads the RNG slot states and character roster from
-//! game memory; everything here is deterministic and unit-testable.
-
-pub mod snapshot;
+//! The hook takes the RNG slot states and character roster in-process
+//! (game-reader crate, served over the toolbox RPC channel); everything here
+//! is deterministic and unit-testable.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// The game's "empty" sentinel (shared with synthesis, where it's the empty
 /// trait slot).
-pub use crate::game_mem::{xorshift32, EMPTY_KEY};
+pub use game_reader::{xorshift32, EMPTY_KEY};
+pub use protocol::toolbox::OvermasterySnapshot;
 
 /// RNG slot for a (character, meditation size) pair: `5 + tier*0x29 + char_idx`.
 /// Char index 0 is the protagonist (PL0000/PL0100); everyone else is their

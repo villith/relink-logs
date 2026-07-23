@@ -562,6 +562,8 @@ export type SynthesisSigil = {
   trait1Level: number;
   trait2: number;
   trait2Level: number;
+  /** Item-config record level; backend implementation detail, unused in UI. */
+  recordLevel: number;
 };
 
 export type SynthesisPrediction = {

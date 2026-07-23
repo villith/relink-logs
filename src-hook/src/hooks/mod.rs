@@ -37,6 +37,8 @@ type GetEntityHashID0x58 = unsafe extern "system" fn(*const usize, *const u32) -
 
 /// Pl1900 (Id, human form) actor type hash.
 const ID_HUMAN_TYPE: u32 = 0x8056ABCD;
+/// Pl2000 (Id, dragon form) actor type hash.
+const ID_DRAGON_TYPE: u32 = 0xF5755C0E;
 const ID_DRAGON_PARENT_ENTITY_OFFSET: usize = 0x1CA98;
 
 /// Run one hook/global setup step, logging (and swallowing) any error so that a
@@ -59,6 +61,18 @@ fn try_step(name: &str, result: Result<()>) {
             #[cfg(feature = "console")]
             println!("[hook FAIL] {name}: {e:?}");
         }
+    }
+}
+
+/// Disable one static detour during dev eject. `NotInitialized` is the
+/// normal case for a signature that never resolved on this game build, so it
+/// is silent; anything else is logged but must not stop the other detours.
+#[cfg(any(feature = "eject", test))]
+fn disable_quiet<T: retour::Function>(name: &str, detour: &retour::StaticDetour<T>) {
+    match unsafe { detour.disable() } {
+        Ok(()) => log::info!("[hook off] {name}"),
+        Err(retour::Error::NotInitialized) => {}
+        Err(e) => log::warn!("[hook off FAIL] {name}: {e:?}"),
     }
 }
 
@@ -192,6 +206,27 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     Ok(())
 }
 
+/// Dev-only (feature `eject`): disable every detour `setup_hooks` may have
+/// installed, in mirror order. After this, no game thread can ENTER our
+/// code; callers still wait a drain period for threads already inside a
+/// trampoline before the module is ejected (see crate::teardown).
+#[cfg(any(feature = "eject", test))]
+pub fn teardown_hooks() {
+    damage::disable();
+    death::disable();
+    player::disable();
+    stunnet::disable();
+    area::disable();
+    quest::disable();
+    endless::disable();
+    sba::disable();
+    #[cfg(feature = "hookdiag")]
+    loadprobe::disable();
+    #[cfg(any(feature = "fullassist", test))]
+    assist::disable();
+    log::info!("all detours disabled");
+}
+
 #[inline(always)]
 pub unsafe fn v_func<T: Sized>(ptr: *const usize, offset: usize) -> T {
     ((ptr.read() as *const usize).byte_add(offset) as *const T).read()
@@ -262,7 +297,7 @@ pub fn get_source_parent(
             ))
         }
         // Pl2000: Id's Dragon Form -> Pl1900
-        0xF5755C0E => {
+        ID_DRAGON_TYPE => {
             let parent_instance =
                 parent_specified_instance_at(source, ID_DRAGON_PARENT_ENTITY_OFFSET)?;
 
@@ -393,5 +428,15 @@ mod tests {
             parent_specified_instance_at(actor.as_ptr().cast(), 0x40),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod teardown_tests {
+    /// In the test binary no detour is ever initialized; teardown must treat
+    /// that as "nothing to do" for every hook and return cleanly.
+    #[test]
+    fn teardown_hooks_with_no_detours_initialized_returns_cleanly() {
+        super::teardown_hooks();
     }
 }

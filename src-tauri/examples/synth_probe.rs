@@ -21,7 +21,8 @@
 //!      for a DIFFERENT pair, then title-reset and repeat to confirm the
 //!      sequence is a pure function of (seed, pairKey, count).
 
-use gbfr_logs::synthesis::{self, snapshot, SynthesisQuery, SynthesisSigil, EMPTY_TRAIT};
+use gbfr_logs::game_mem;
+use gbfr_logs::synthesis::{self, SynthesisQuery, SynthesisSigil, EMPTY_TRAIT};
 
 fn eligible(s: &SynthesisSigil) -> bool {
     // Working hypothesis for rule #1/#2: two real traits, both >= level 11.
@@ -39,7 +40,7 @@ fn traits(s: &SynthesisSigil) -> Vec<u32> {
 }
 
 fn main() -> anyhow::Result<()> {
-    let snap = match snapshot::take_snapshot()? {
+    let snap = match game_mem::rpm_synthesis_snapshot()? {
         Some(s) => s,
         None => {
             println!("game not running");

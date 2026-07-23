@@ -1,18 +1,18 @@
-//! Shared plumbing for reading the running game's memory: process/module
-//! discovery, a bounds-checked ReadProcessMemory wrapper, the sigscan
-//! resolver for global RVAs, and the RE'd constants common to every feature
-//! (the per-slot RNG and the "empty" sentinel).
+//! Diag-only RPM plumbing: open the running game with OpenProcess /
+//! ReadProcessMemory and take toolbox snapshots from OUTSIDE the process.
 //!
-//! Feature modules (synthesis, overmastery) keep their own signatures and
-//! struct offsets; everything process- or RNG-array-shaped lives here so a
-//! game patch is fixed in one place.
+//! The production path no longer lives here — the hook serves snapshots
+//! in-process over the toolbox RPC channel (see `toolbox_rpc`). This module
+//! remains for the ground-truth probes in examples/ (om_probe, synth_probe,
+//! synth_diag, toolbox_probe), which deliberately read the same structures
+//! through a channel that shares no hook code, so they can cross-check it.
+//! Windows-only, requires admin, reads the on-disk exe for sigscanning.
 
 use anyhow::{bail, Context, Result};
 use dll_syringe::process::{OwnedProcess, Process};
-use pelite::pattern;
-use pelite::pe64::{Pe, PeFile};
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use game_reader::MemRead;
+use pelite::pe64::PeFile;
+use std::path::PathBuf;
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::Diagnostics::Debug::ReadProcessMemory;
 use windows::Win32::System::Diagnostics::ToolHelp::{
@@ -20,42 +20,12 @@ use windows::Win32::System::Diagnostics::ToolHelp::{
 };
 use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_INFORMATION, PROCESS_VM_READ};
 
-/// The game process/module name, shared with the injector in main.rs.
-pub const GAME_EXE: &str = "granblue_fantasy_relink.exe";
-
-/// The game's "empty" sentinel hash (no trait in this slot / missing key).
-pub const EMPTY_KEY: u32 = 0x887a_e0b0;
-
-/// The RNG slot-array global. Cursor lands on the disp32 of a rip-relative
-/// load of the array pointer.
-pub const RNG_SIG: &str = "48 8b 0d ' ? ? ? ? ba 81 00 00 00 e8";
-/// Number of RNG slots (0..=0x82).
-pub const RNG_SLOT_COUNT: usize = 0x83;
-/// Offset of the slot-override word, right after the slots (0xffffffff when
-/// idle; anything else redirects every draw to that slot).
-pub const RNG_SLOT_OVERRIDE: u64 = 0x20c;
-const _: () = assert!(RNG_SLOT_OVERRIDE == RNG_SLOT_COUNT as u64 * 4);
-
-/// One step of the game's per-slot RNG. Returns the new state, which is also
-/// the drawn value.
-#[inline]
-pub fn xorshift32(mut s: u32) -> u32 {
-    s ^= s << 13;
-    s ^= s >> 17;
-    s ^= s << 15;
-    s
-}
+pub use game_reader::GAME_EXE;
 
 pub struct Mem(pub HANDLE);
 
-// A process handle is a kernel object usable from any thread; the reads it
-// backs (ReadProcessMemory) and its CloseHandle are thread-safe. Needed so the
-// opened game can be cached in [`open_game`]'s static across poll threads.
-unsafe impl Send for Mem {}
-unsafe impl Sync for Mem {}
-
-impl Mem {
-    pub fn read(&self, addr: u64, buf: &mut [u8]) -> Result<()> {
+impl MemRead for Mem {
+    fn read(&self, addr: u64, buf: &mut [u8]) -> Result<()> {
         let mut got = 0usize;
         unsafe {
             ReadProcessMemory(
@@ -72,19 +42,6 @@ impl Mem {
             bail!("short read at {addr:#x}");
         }
         Ok(())
-    }
-    pub fn u64(&self, addr: u64) -> Result<u64> {
-        let mut b = [0u8; 8];
-        self.read(addr, &mut b)?;
-        Ok(u64::from_le_bytes(b))
-    }
-    pub fn u32(&self, addr: u64) -> Result<u32> {
-        let mut b = [0u8; 4];
-        self.read(addr, &mut b)?;
-        Ok(u32::from_le_bytes(b))
-    }
-    pub fn i32(&self, addr: u64) -> Result<i32> {
-        Ok(self.u32(addr)? as i32)
     }
 }
 
@@ -124,122 +81,38 @@ pub fn module_base(pid: u32) -> Result<(u64, PathBuf)> {
     ))
 }
 
-/// The opened game, cached across calls: the toolbox staleness watchers land
-/// here every 5 seconds, and a fresh discovery walks every process on the
-/// system plus every module of the game just to read a few bytes.
-static GAME_CACHE: Mutex<Option<(Arc<Mem>, u64, PathBuf)>> = Mutex::new(None);
-
 /// Open the running game for reading: process handle + exe base + exe path.
-/// `Ok(None)` = game not running. Cached; revalidated with a 4-byte read at
-/// the module base (fails once the process exits) and rebuilt on failure, so
-/// a game restart is picked up on the next call.
-pub fn open_game() -> Result<Option<(Arc<Mem>, u64, PathBuf)>> {
-    // Take a snapshot and DROP the lock before doing any syscall. Holding it across the
-    // revalidating read, the process-table walk and the module walk serialized every
-    // poller behind the slowest one — worst exactly when the game is closed and the walk
-    // is a full system enumeration that finds nothing.
-    let cached = GAME_CACHE.lock().unwrap_or_else(|e| e.into_inner()).clone();
-
-    if let Some((mem, base, exe)) = cached {
-        if mem.u32(base).is_ok() {
-            return Ok(Some((mem, base, exe)));
-        }
-        // The read failed, so the process is gone: drop the stale entry and rediscover.
-        *GAME_CACHE.lock().unwrap_or_else(|e| e.into_inner()) = None;
-    }
-
+/// `Ok(None)` = game not running. Uncached — the probes are one-shot tools;
+/// the old cache existed for the app's 5-second staleness pollers, which now
+/// go through the hook instead.
+pub fn open_game() -> Result<Option<(Mem, u64, PathBuf)>> {
     let Some(pid) = find_game_pid()? else {
         return Ok(None);
     };
-    let mem = Arc::new(Mem(unsafe {
-        OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid)
-    }
-    .context("OpenProcess (run as admin?)")?));
+    let mem = Mem(unsafe { OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid) }
+        .context("OpenProcess (run as admin?)")?);
     let (base, exe) = module_base(pid)?;
-    *GAME_CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some((mem.clone(), base, exe.clone()));
     Ok(Some((mem, base, exe)))
 }
 
-/// Decode the rip-relative disp32 a signature cursor points at:
-/// global RVA = cursor + 4 + disp.
-pub fn rva_from_cursor(pe: &PeFile, cursor: u32) -> Result<u32> {
-    let bytes: [u8; 4] = pe
-        .derva_slice::<u8>(cursor, 4)
-        .map_err(|e| anyhow::anyhow!("derva {cursor:#x}: {e:?}"))?
-        .try_into()
-        .expect("slice length is 4");
-    Ok(cursor
-        .wrapping_add(4)
-        .wrapping_add(u32::from_le_bytes(bytes)))
-}
-
-/// All cursor RVAs matching `sig` (the pattern's save slot 1).
-pub fn scan_cursors(pe: &PeFile, sig: &str) -> Result<Vec<u32>> {
-    let pat = pattern::parse(sig).context("parse pattern")?;
-    let mut out = Vec::new();
-    let mut matches = pe.scanner().matches_code(&pat);
-    let mut save = [0u32; 8];
-    while matches.next(&mut save) {
-        out.push(save[1]);
-    }
-    Ok(out)
-}
-
-/// Scan for `sig`, demanding exactly one match; returns the decoded global RVA.
-pub fn scan_unique_rva(pe: &PeFile, sig: &str, what: &str) -> Result<u32> {
-    let cursors = scan_cursors(pe, sig)?;
-    if cursors.len() != 1 {
-        bail!(
-            "{what} signature matched {} times (game patched?)",
-            cursors.len()
-        );
-    }
-    rva_from_cursor(pe, cursors[0])
-}
-
-/// The RNG slot-array global. Its signature matches several call sites that
-/// must all decode to the same RVA.
-pub fn resolve_rng_rva(pe: &PeFile) -> Result<u32> {
-    let cursors = scan_cursors(pe, RNG_SIG)?;
-    // Distinguish "the signature is gone" from "it points at two different
-    // globals" — after a game patch these need very different fixes.
-    if cursors.is_empty() {
-        bail!("rng signature matched 0 times (game patched?)");
-    }
-    let mut rvas: Vec<u32> = cursors
-        .into_iter()
-        .map(|c| rva_from_cursor(pe, c))
-        .collect::<Result<_>>()?;
-    rvas.dedup();
-    if rvas.len() != 1 {
-        bail!("rng signature resolved to conflicting globals {rvas:x?} (game patched?)");
-    }
-    Ok(rvas[0])
-}
-
-/// Sigscan the on-disk exe for a feature's global RVAs, cached in the
-/// caller's `cache` per exe path (the exe only changes on a game patch,
-/// which needs a restart).
-///
-/// A `Mutex<Option<..>>` and not a `OnceLock`: the cache is keyed by exe
-/// path, and a `OnceLock` can never be re-keyed — once filled, `set` on a
-/// different path fails silently and every later call would re-read and
-/// re-scan the ~120 MB exe, including the 5s staleness polls.
-pub fn resolve_globals_cached<const N: usize>(
-    cache: &Mutex<Option<(PathBuf, [u32; N])>>,
-    exe: &Path,
-    resolve: impl FnOnce(&PeFile) -> Result<[u32; N]>,
-) -> Result<[u32; N]> {
-    // A poisoned lock only means some other caller panicked mid-scan; the
-    // cached value is still just a path and three RVAs.
-    if let Some((p, rvas)) = cache.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
-        if p == exe {
-            return Ok(*rvas);
-        }
-    }
-    let data = std::fs::read(exe).with_context(|| format!("read {}", exe.display()))?;
+/// RPM synthesis snapshot (probe ground truth). `Ok(None)` = game not running.
+pub fn rpm_synthesis_snapshot() -> Result<Option<protocol::toolbox::SynthesisSnapshot>> {
+    let Some((mem, base, exe)) = open_game()? else {
+        return Ok(None);
+    };
+    let data = std::fs::read(&exe).with_context(|| format!("read {}", exe.display()))?;
     let pe = PeFile::from_bytes(&data).context("parse exe")?;
-    let rvas = resolve(&pe)?;
-    *cache.lock().unwrap_or_else(|e| e.into_inner()) = Some((exe.to_path_buf(), rvas));
-    Ok(rvas)
+    let rvas = game_reader::synthesis::resolve_rvas(pe)?;
+    Ok(Some(game_reader::synthesis::take_snapshot(&mem, base, rvas)?))
+}
+
+/// RPM overmastery snapshot (probe ground truth). `Ok(None)` = game not running.
+pub fn rpm_overmastery_snapshot() -> Result<Option<protocol::toolbox::OvermasterySnapshot>> {
+    let Some((mem, base, exe)) = open_game()? else {
+        return Ok(None);
+    };
+    let data = std::fs::read(&exe).with_context(|| format!("read {}", exe.display()))?;
+    let pe = PeFile::from_bytes(&data).context("parse exe")?;
+    let rvas = game_reader::overmastery::resolve_rvas(pe)?;
+    Ok(Some(game_reader::overmastery::take_snapshot(&mem, base, rvas)?))
 }
