@@ -12,6 +12,7 @@ mod event;
 mod hooks;
 mod process;
 mod proxy;
+mod toolbox;
 mod transport;
 
 use protocol::Message;
@@ -44,6 +45,9 @@ impl Server {
     }
 
     async fn run(&self) {
+        // The toolbox RPC channel is independent of the event stream and
+        // must not die with a client, so it gets its own task.
+        tokio::spawn(toolbox::run());
         match transport::select_transport() {
             transport::Transport::NamedPipe => self.run_pipe().await,
             transport::Transport::Tcp => self.run_tcp().await,

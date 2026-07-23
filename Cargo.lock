@@ -1865,6 +1865,7 @@ dependencies = [
  "dirs",
  "fern",
  "futures",
+ "game-reader",
  "interprocess",
  "log",
  "pelite",
