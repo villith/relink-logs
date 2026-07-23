@@ -37,6 +37,8 @@ type GetEntityHashID0x58 = unsafe extern "system" fn(*const usize, *const u32) -
 
 /// Pl1900 (Id, human form) actor type hash.
 const ID_HUMAN_TYPE: u32 = 0x8056ABCD;
+/// Pl2000 (Id, dragon form) actor type hash.
+const ID_DRAGON_TYPE: u32 = 0xF5755C0E;
 const ID_DRAGON_PARENT_ENTITY_OFFSET: usize = 0x1CA98;
 
 /// Run one hook/global setup step, logging (and swallowing) any error so that a
@@ -262,7 +264,7 @@ pub fn get_source_parent(
             ))
         }
         // Pl2000: Id's Dragon Form -> Pl1900
-        0xF5755C0E => {
+        ID_DRAGON_TYPE => {
             let parent_instance =
                 parent_specified_instance_at(source, ID_DRAGON_PARENT_ENTITY_OFFSET)?;
 

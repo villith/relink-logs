@@ -944,8 +944,27 @@ impl OnProcessDamageHook {
             let _ = self.tx.send(Message::PlayerIdentityEvent(identity));
         }
 
+        // A recruited crewmate Id fights entirely as its Pl2000 dragon actor — the
+        // Pl1900 base actor may never deal a hit, so the source-keyed publish above
+        // never fires for that player and its party slot stays empty (no Builds
+        // entry, fallback bar color; live logs 344-346, 2026-07-23). Resolve the
+        // dragon's owner and publish identity from the owner actor instead; the
+        // parser slot-scopes the event, so two Ids in one party stay distinct.
+        if source_type_id == super::ID_DRAGON_TYPE {
+            if let Some((parent_type_id, parent_idx, parent_ptr)) = super::get_source_parent(
+                source_type_id,
+                source_specified_instance_ptr as *const usize,
+            ) {
+                if let Some(identity) =
+                    super::player::identity_event_for_actor(parent_ptr, parent_type_id, parent_idx)
+                {
+                    let _ = self.tx.send(Message::PlayerIdentityEvent(identity));
+                }
+            }
+        }
+
         #[cfg(feature = "hookdiag")]
-        if source_type_id == 0xF5755C0E {
+        if source_type_id == super::ID_DRAGON_TYPE {
             crate::hooks::diag::probe_pl2000_parent(source_specified_instance_ptr);
         }
 
