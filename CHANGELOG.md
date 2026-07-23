@@ -5,6 +5,17 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.1
+
+### Bug Fixes
+
+- (Linux) fixed overlay text rendering behind the damage bars
+- (Linux) fixed settings changes not reaching the live overlay
+
+### Language
+
+- zh-CN UI Language support has been greatly improved [credit to Souma-Sumire](https://github.com/Souma-Sumire)
+
 ## 1.12.0
 
 ### Features
