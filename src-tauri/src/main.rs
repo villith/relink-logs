@@ -1257,6 +1257,19 @@ fn main() {
         std::env::set_var("GDK_BACKEND", "x11");
     }
 
+    // The transparent overlay only stays transparent on WebKitGTK's software
+    // (Cairo) path: when accelerated compositing engages — it's on-demand, a
+    // CSS animation can trigger it mid-session — the GL surface loses its
+    // alpha channel and the whole webview composites onto an opaque backdrop,
+    // so the transparency slider appears dead (field report). Keep compositing
+    // off; must be set before any webview exists, and only bites with the
+    // webkit 2.36 the AppImage pins (2.44+ dropped these escape hatches).
+    // Respect an explicit user choice.
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("WEBKIT_DISABLE_COMPOSITING_MODE").is_none() {
+        std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
+    }
+
     info!("Starting application..");
 
     // Setup the database.

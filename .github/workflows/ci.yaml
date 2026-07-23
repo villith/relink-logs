@@ -140,10 +140,20 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      # webkit2gtk pinned to 2.36 to match release.yaml (see the rationale
+      # there) — checking against the same version the AppImage bundles means
+      # a 2.36 API incompatibility fails the PR, not the release run.
       - name: Install Tauri v1 Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.0-dev build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y --allow-downgrades \
+            libwebkit2gtk-4.0-dev=2.36.0-2ubuntu1 \
+            libwebkit2gtk-4.0-37=2.36.0-2ubuntu1 \
+            libjavascriptcoregtk-4.0-dev=2.36.0-2ubuntu1 \
+            libjavascriptcoregtk-4.0-18=2.36.0-2ubuntu1 \
+            gir1.2-javascriptcoregtk-4.0=2.36.0-2ubuntu1 \
+            gir1.2-webkit2-4.0=2.36.0-2ubuntu1 \
+            build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
       # Same pinned-toolchain rationale as cargo_test: `rustup update nightly`
       # would churn rust-cache's environment hash daily.
       - name: Install pinned Rust toolchain
