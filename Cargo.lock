@@ -1426,6 +1426,11 @@ dependencies = [
 [[package]]
 name = "game-reader"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "pelite",
+ "protocol",
+]
 
 [[package]]
 name = "gbfr-logs"
