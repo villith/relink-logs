@@ -858,6 +858,26 @@ fn reload_dbg(msg: &str) {
     }
 }
 
+/// The hook module currently mapped in the target, preferring the dev
+/// `hook-dbg.dll` over the release `hook.dll` (only one is ever present).
+#[cfg(windows)]
+fn find_hook_module(
+    syringe: &Syringe,
+) -> std::io::Result<Option<dll_syringe::process::ProcessModule<dll_syringe::process::BorrowedProcess<'_>>>>
+{
+    use dll_syringe::process::Process as _;
+    let process = syringe.process();
+    // A hook-dbg.dll lookup error falls through to hook.dll rather than
+    // propagating: a transient module-enumeration error must not read as "no
+    // hook present" (that would drive a redundant re-inject over a live hook —
+    // refcount bump, stale mapping reused). hook.dll's own error still
+    // propagates so eject_hook_until_gone can surface a real failure.
+    if let Ok(Some(m)) = process.find_module_by_name("hook-dbg.dll") {
+        return Ok(Some(m));
+    }
+    process.find_module_by_name("hook.dll")
+}
+
 /// FreeLibrary the injected hook module until it is genuinely unmapped — not
 /// just once.
 ///
@@ -873,8 +893,6 @@ fn reload_dbg(msg: &str) {
 /// instead of looping forever.
 #[cfg(windows)]
 fn eject_hook_until_gone(syringe: &Syringe) -> anyhow::Result<u32> {
-    use dll_syringe::process::Process as _;
-
     // dll_syringe::eject runs FreeLibrary (decrementing the refcount) and
     // returns Ok, but then a `debug_assert!(..., "ejected module survived")`
     // panics in debug builds when the module is STILL mapped afterward (i.e.
@@ -891,11 +909,7 @@ fn eject_hook_until_gone(syringe: &Syringe) -> anyhow::Result<u32> {
     let result = (|| -> anyhow::Result<u32> {
         let mut ejected = 0u32;
         for _ in 0..64 {
-            let module = match syringe.process().find_module_by_name("hook-dbg.dll")? {
-                Some(m) => Some(m),
-                None => syringe.process().find_module_by_name("hook.dll")?,
-            };
-            let Some(module) = module else {
+            let Some(module) = find_hook_module(syringe)? else {
                 return Ok(ejected);
             };
             match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| syringe.eject(module))) {
@@ -921,14 +935,7 @@ fn eject_hook_until_gone(syringe: &Syringe) -> anyhow::Result<u32> {
 /// FreeLibrary'ing a live hook — see check_and_perform_hook.
 #[cfg(windows)]
 fn hook_module_present(syringe: &Syringe) -> bool {
-    use dll_syringe::process::Process as _;
-    let process = syringe.process();
-    process
-        .find_module_by_name("hook-dbg.dll")
-        .ok()
-        .flatten()
-        .or_else(|| process.find_module_by_name("hook.dll").ok().flatten())
-        .is_some()
+    matches!(find_hook_module(syringe), Ok(Some(_)))
 }
 
 // Continuously check for the game process and inject the DLL when found.

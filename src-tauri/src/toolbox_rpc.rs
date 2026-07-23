@@ -3,15 +3,13 @@
 //! "game not running", "hook outdated", and "hook unreachable" each surface
 //! as the right thing in the UI.
 
-use anyhow::{bail, Context, Result};
-use futures::{SinkExt, StreamExt};
+use anyhow::Result;
 use protocol::toolbox::{
     ToolboxRequest, ToolboxResponse, TOOLBOX_PROTOCOL_VERSION, TOOLBOX_TCP_ADDR,
 };
 use protocol::toolbox::{OvermasterySnapshot, SynthesisSeed, SynthesisSnapshot};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
-use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 /// Managed Tauri state, kept current by the event-stream connect loop in
 /// main.rs. Both flags default to false.
@@ -32,43 +30,14 @@ pub struct HookStatus {
 /// A wedged hook (or frozen game) must not hang a Tauri command.
 const RPC_TIMEOUT: Duration = Duration::from_secs(2);
 
-async fn exchange<S>(stream: S, req: &ToolboxRequest) -> Result<ToolboxResponse>
-where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
-{
-    let mut framed = Framed::new(stream, LengthDelimitedCodec::new());
-    framed
-        .send(protocol::bincode::serialize(req)?.into())
-        .await?;
-    match framed.next().await {
-        Some(Ok(frame)) => Ok(protocol::bincode::deserialize(&frame)?),
-        Some(Err(e)) => Err(e.into()),
-        None => bail!("toolbox channel closed before responding"),
-    }
-}
-
-/// Same transport selection as `connect_event_stream` in main.rs: pipe on
-/// native Windows, TCP under GBFR_LOGS_FORCE_TCP=1 and on Linux.
-async fn call_inner(req: &ToolboxRequest) -> Result<ToolboxResponse> {
-    #[cfg(windows)]
-    if std::env::var("GBFR_LOGS_FORCE_TCP").as_deref() != Ok("1") {
-        // TOOLBOX_PIPE_NAME referenced fully qualified: a top-level import
-        // would be an unused-import warning in the Linux build.
-        use interprocess::os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream};
-        let stream = DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(
-            protocol::toolbox::TOOLBOX_PIPE_NAME,
-        )
-        .await?;
-        return exchange(stream, req).await;
-    }
-    let stream = tokio::net::TcpStream::connect(TOOLBOX_TCP_ADDR).await?;
-    exchange(stream, req).await
-}
-
 pub async fn call(req: ToolboxRequest) -> Result<ToolboxResponse> {
-    tokio::time::timeout(RPC_TIMEOUT, call_inner(&req))
-        .await
-        .context("toolbox rpc timed out")?
+    crate::rpc::call(
+        protocol::toolbox::TOOLBOX_PIPE_NAME,
+        TOOLBOX_TCP_ADDR,
+        RPC_TIMEOUT,
+        req,
+    )
+    .await
 }
 
 /// True only when the hook answers Hello with OUR protocol version. Called

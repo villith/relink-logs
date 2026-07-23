@@ -95,24 +95,30 @@ pub fn open_game() -> Result<Option<(Mem, u64, PathBuf)>> {
     Ok(Some((mem, base, exe)))
 }
 
-/// RPM synthesis snapshot (probe ground truth). `Ok(None)` = game not running.
-pub fn rpm_synthesis_snapshot() -> Result<Option<protocol::toolbox::SynthesisSnapshot>> {
+/// Open the running game, read+parse its on-disk exe (for sigscanning), and
+/// hand the parsed PE, a live reader, and the module base to `f`.
+/// `Ok(None)` = game not running.
+fn with_game_pe<T>(f: impl FnOnce(PeFile, &Mem, u64) -> Result<T>) -> Result<Option<T>> {
     let Some((mem, base, exe)) = open_game()? else {
         return Ok(None);
     };
     let data = std::fs::read(&exe).with_context(|| format!("read {}", exe.display()))?;
     let pe = PeFile::from_bytes(&data).context("parse exe")?;
-    let rvas = game_reader::synthesis::resolve_rvas(pe)?;
-    Ok(Some(game_reader::synthesis::take_snapshot(&mem, base, rvas)?))
+    f(pe, &mem, base).map(Some)
+}
+
+/// RPM synthesis snapshot (probe ground truth). `Ok(None)` = game not running.
+pub fn rpm_synthesis_snapshot() -> Result<Option<protocol::toolbox::SynthesisSnapshot>> {
+    with_game_pe(|pe, mem, base| {
+        let rvas = game_reader::synthesis::resolve_rvas(pe)?;
+        game_reader::synthesis::take_snapshot(mem, base, rvas)
+    })
 }
 
 /// RPM overmastery snapshot (probe ground truth). `Ok(None)` = game not running.
 pub fn rpm_overmastery_snapshot() -> Result<Option<protocol::toolbox::OvermasterySnapshot>> {
-    let Some((mem, base, exe)) = open_game()? else {
-        return Ok(None);
-    };
-    let data = std::fs::read(&exe).with_context(|| format!("read {}", exe.display()))?;
-    let pe = PeFile::from_bytes(&data).context("parse exe")?;
-    let rvas = game_reader::overmastery::resolve_rvas(pe)?;
-    Ok(Some(game_reader::overmastery::take_snapshot(&mem, base, rvas)?))
+    with_game_pe(|pe, mem, base| {
+        let rvas = game_reader::overmastery::resolve_rvas(pe)?;
+        game_reader::overmastery::take_snapshot(mem, base, rvas)
+    })
 }

@@ -8,10 +8,100 @@
 //! the export we probe, silently falling back to the pipe —
 //! GBFR_LOGS_FORCE_TCP=1 is the escape hatch.
 
+use std::future::Future;
+use std::time::Duration;
+
+use interprocess::os::windows::named_pipe::tokio::PipeListenerOptionsExt;
+use interprocess::os::windows::named_pipe::{pipe_mode, PipeListenerOptions, PipeMode};
+use log::{info, warn};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Transport {
     NamedPipe,
     Tcp,
+}
+
+/// A boxed, type-erased duplex stream (named pipe or TCP) so one generic
+/// `serve` handles both transports. `AsyncRead + AsyncWrite` are two
+/// non-auto traits and can't be combined in a trait object directly, so we
+/// fold them into one subtrait.
+pub trait RpcStream: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send {}
+impl<T: tokio::io::AsyncRead + tokio::io::AsyncWrite + Send> RpcStream for T {}
+pub type BoxStream = std::pin::Pin<Box<dyn RpcStream>>;
+
+/// One-request-per-connection RPC listener shared by the toolbox and dev
+/// control channels: named pipe on native Windows, localhost TCP under
+/// Wine/Proton (and `GBFR_LOGS_FORCE_TCP=1`). Each accepted connection is
+/// handed to `serve` on its own task; `label` tags the log lines.
+pub async fn serve_rpc<F, Fut>(pipe_name: &str, tcp_addr: &str, label: &str, serve: F)
+where
+    F: Fn(BoxStream) -> Fut + Clone + Send + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
+    match select_transport() {
+        Transport::NamedPipe => run_pipe(pipe_name, label, serve).await,
+        Transport::Tcp => run_tcp(tcp_addr, label, serve).await,
+    }
+}
+
+async fn run_pipe<F, Fut>(pipe_name: &str, label: &str, serve: F)
+where
+    F: Fn(BoxStream) -> Fut + Clone + Send + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
+    let listener = match PipeListenerOptions::new()
+        .path(pipe_name)
+        .mode(PipeMode::Bytes)
+        .accept_remote(false)
+        .create_tokio_duplex::<pipe_mode::Bytes>()
+    {
+        Ok(listener) => listener,
+        Err(e) => {
+            warn!("{label}: could not create pipe listener: {e:?}");
+            return;
+        }
+    };
+    info!("{label}: listening on {pipe_name}");
+    loop {
+        match listener.accept().await {
+            Ok(stream) => {
+                let serve = serve.clone();
+                tokio::spawn(async move { serve(Box::pin(stream)).await });
+            }
+            Err(e) => warn!("{label}: error accepting client: {e:?}"),
+        }
+    }
+}
+
+// Same bind-retry rationale as the event listener: a taken port must not
+// permanently disable the channel for the session.
+async fn run_tcp<F, Fut>(tcp_addr: &str, label: &str, serve: F)
+where
+    F: Fn(BoxStream) -> Fut + Clone + Send + 'static,
+    Fut: Future<Output = ()> + Send + 'static,
+{
+    let listener = loop {
+        match tokio::net::TcpListener::bind(tcp_addr).await {
+            Ok(listener) => break listener,
+            Err(e) => {
+                warn!("{label}: could not bind {tcp_addr}: {e:?}; retrying in 5s");
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
+        }
+    };
+    info!("{label}: listening on {tcp_addr}");
+    loop {
+        match listener.accept().await {
+            Ok((stream, _addr)) => {
+                let serve = serve.clone();
+                tokio::spawn(async move { serve(Box::pin(stream)).await });
+            }
+            Err(e) => {
+                warn!("{label}: error accepting client: {e:?}");
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
+    }
 }
 
 pub fn select_transport() -> Transport {
