@@ -20,11 +20,13 @@
 //!      protagonist (Gran/Djeeta) uses char index 0; roster order matches
 //!      char_slot_index expectations.
 
-use gbfr_logs::overmastery::{char_slot_index, rng_slot, simulate, snapshot, stock_tables};
+use gbfr_logs::game_mem;
+use gbfr_logs::overmastery::{char_slot_index, rng_slot, simulate, stock_tables};
 
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let snap = snapshot::take_snapshot()?.ok_or_else(|| anyhow::anyhow!("game not running"))?;
+    let snap =
+        game_mem::rpm_overmastery_snapshot()?.ok_or_else(|| anyhow::anyhow!("game not running"))?;
 
     println!("slot_override: {:#x}", snap.slot_override);
     println!("roster ({} chars):", snap.roster.len());

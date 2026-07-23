@@ -9,9 +9,8 @@ use std::{
 };
 
 use anyhow::Context;
-use gbfr_logs::{db, parser};
-#[cfg(windows)]
-use gbfr_logs::{overmastery, synthesis};
+use gbfr_logs::toolbox_rpc::{self, HookStatus};
+use gbfr_logs::{db, overmastery, parser, synthesis};
 
 use db::logs::LogEntry;
 #[cfg(windows)]
@@ -53,41 +52,42 @@ fn reset_encounter(state: State<ResetChannel>) {
     }
 }
 
-/// Toolbox / Synthesis Helper: snapshot the game's synthesis state and report
-/// whether predictions are currently possible.
-#[cfg(windows)]
+/// Toolbox / Synthesis Helper: snapshot the game's synthesis state (served
+/// by the hook over the toolbox RPC channel) and report whether predictions
+/// are currently possible.
 #[tauri::command(async)]
-async fn fetch_synthesis_status() -> Result<synthesis::SynthesisStatus, String> {
-    tokio::task::spawn_blocking(|| match synthesis::snapshot::take_snapshot() {
-        Ok(None) => Ok(synthesis::SynthesisStatus {
+async fn fetch_synthesis_status(
+    hook: State<'_, HookStatus>,
+) -> Result<synthesis::SynthesisStatus, String> {
+    match toolbox_rpc::synthesis_snapshot(&hook).await? {
+        None => Ok(synthesis::SynthesisStatus {
             game_running: false,
             sigil_count: 0,
             rng_unpredictable: false,
         }),
-        Ok(Some(snap)) => Ok(synthesis::SynthesisStatus {
+        Some(snap) => Ok(synthesis::SynthesisStatus {
             game_running: true,
             sigil_count: snap.sigils.len() as u32,
             rng_unpredictable: snap.rng_state == 0,
         }),
-        Err(e) => Err(e.to_string()),
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    }
 }
 
-/// Toolbox / Synthesis Helper: fresh snapshot + exhaustive pair search.
-#[cfg(windows)]
+/// Toolbox / Synthesis Helper: fresh snapshot + exhaustive pair search. The
+/// snapshot is an RPC; the search itself is CPU-heavy, so it stays on a
+/// blocking thread.
 #[tauri::command(async)]
 async fn search_synthesis(
     query: synthesis::SynthesisQuery,
+    hook: State<'_, HookStatus>,
 ) -> Result<synthesis::SynthesisSearchResponse, String> {
     if query.trait1 == synthesis::EMPTY_TRAIT || query.trait2 == Some(synthesis::EMPTY_TRAIT) {
         return Err("invalid-trait".to_string());
     }
+    let snap = toolbox_rpc::synthesis_snapshot(&hook)
+        .await?
+        .ok_or_else(|| "game-not-running".to_string())?;
     tokio::task::spawn_blocking(move || {
-        let snap = synthesis::snapshot::take_snapshot()
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "game-not-running".to_string())?;
         let (matches, pairs_tested) = synthesis::search(&snap, &query);
         Ok(synthesis::SynthesisSearchResponse {
             matches,
@@ -104,125 +104,74 @@ async fn search_synthesis(
 
 /// Toolbox / Synthesis Helper: current seed identity for staleness polling.
 /// `None` = game not running (staleness unknowable, not stale).
-#[cfg(windows)]
 #[tauri::command(async)]
-async fn fetch_synthesis_seed() -> Result<Option<synthesis::SynthesisSeed>, String> {
-    tokio::task::spawn_blocking(|| {
-        synthesis::snapshot::take_seed_state().map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
+async fn fetch_synthesis_seed(
+    hook: State<'_, HookStatus>,
+) -> Result<Option<synthesis::SynthesisSeed>, String> {
+    toolbox_rpc::synthesis_seed(&hook).await
 }
 
 /// Toolbox / Overmastery Predictor: is the game up, and which characters
 /// exist in the roster (for the character picker).
-#[cfg(windows)]
 #[tauri::command(async)]
-async fn fetch_overmastery_status() -> Result<overmastery::OvermasteryStatus, String> {
-    tokio::task::spawn_blocking(|| match overmastery::snapshot::take_snapshot() {
-        Ok(None) => Ok(overmastery::OvermasteryStatus {
+async fn fetch_overmastery_status(
+    hook: State<'_, HookStatus>,
+) -> Result<overmastery::OvermasteryStatus, String> {
+    match toolbox_rpc::overmastery_snapshot(&hook).await? {
+        None => Ok(overmastery::OvermasteryStatus {
             game_running: false,
             roster: Vec::new(),
         }),
-        Ok(Some(snap)) => Ok(overmastery::OvermasteryStatus {
+        Some(snap) => Ok(overmastery::OvermasteryStatus {
             game_running: true,
             roster: snap.roster,
         }),
-        Err(e) => Err(e.to_string()),
-    })
-    .await
-    .map_err(|e| e.to_string())?
+    }
 }
 
 /// Toolbox / Overmastery Predictor: fresh RNG snapshot + simulate the next N
 /// meditation rolls for one character and size.
-#[cfg(windows)]
 #[tauri::command(async)]
 async fn predict_overmastery(
     query: overmastery::OvermasteryQuery,
+    hook: State<'_, HookStatus>,
 ) -> Result<overmastery::OvermasteryPrediction, String> {
     let tables = overmastery::stock_tables();
     if query.tier >= tables.tiers.len() {
         return Err("invalid-tier".to_string());
     }
     let rolls = query.rolls.min(500);
-    tokio::task::spawn_blocking(move || {
-        let snap = overmastery::snapshot::take_snapshot()
-            .map_err(|e| e.to_string())?
-            .ok_or_else(|| "game-not-running".to_string())?;
-        if snap.slot_override != u32::MAX {
-            return Err("rng-override-active".to_string());
-        }
-        let char_idx = overmastery::char_slot_index(&snap.roster, query.char_id)
-            .ok_or_else(|| "character-not-found".to_string())?;
-        let slot = overmastery::rng_slot(query.tier as u32, char_idx);
-        let slot_state = *snap
-            .slots
-            .get(slot as usize)
-            .ok_or_else(|| "slot-out-of-range".to_string())?;
-        Ok(overmastery::OvermasteryPrediction {
-            rolls: overmastery::simulate(slot_state, query.tier, tables, rolls),
-            slot,
-            slot_state,
-            unpredictable: slot_state == 0,
-            msp_cost: tables.tiers[query.tier].msp_cost,
-        })
+    let snap = toolbox_rpc::overmastery_snapshot(&hook)
+        .await?
+        .ok_or_else(|| "game-not-running".to_string())?;
+    if snap.slot_override != u32::MAX {
+        return Err("rng-override-active".to_string());
+    }
+    let char_idx = overmastery::char_slot_index(&snap.roster, query.char_id)
+        .ok_or_else(|| "character-not-found".to_string())?;
+    let slot = overmastery::rng_slot(query.tier as u32, char_idx);
+    let slot_state = *snap
+        .slots
+        .get(slot as usize)
+        .ok_or_else(|| "slot-out-of-range".to_string())?;
+    Ok(overmastery::OvermasteryPrediction {
+        rolls: overmastery::simulate(slot_state, query.tier, tables, rolls),
+        slot,
+        slot_state,
+        unpredictable: slot_state == 0,
+        msp_cost: tables.tiers[query.tier].msp_cost,
     })
-    .await
-    .map_err(|e| e.to_string())?
 }
 
 /// Toolbox / Overmastery Predictor: current RNG state of one slot, for
 /// staleness polling against a prediction's `slot_state`. `None` = game not
 /// running (staleness unknowable, not stale).
-#[cfg(windows)]
 #[tauri::command(async)]
-async fn fetch_overmastery_seed(slot: u32) -> Result<Option<u32>, String> {
-    // The bound is owned by `take_slot_state`, which knows RNG_SLOT_COUNT.
-    tokio::task::spawn_blocking(move || {
-        overmastery::snapshot::take_slot_state(slot).map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())?
-}
-
-/// Non-Windows stubs: these tools read game memory from outside the process,
-/// which the Linux build does not support (see the Linux spec). The frontend
-/// hides them; the stub keeps the invoke surface identical.
-#[cfg(not(windows))]
-#[tauri::command]
-async fn fetch_synthesis_status() -> Result<(), String> {
-    Err("windows-only".into())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-async fn search_synthesis() -> Result<(), String> {
-    Err("windows-only".into())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-async fn fetch_synthesis_seed() -> Result<(), String> {
-    Err("windows-only".into())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-async fn fetch_overmastery_status() -> Result<(), String> {
-    Err("windows-only".into())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-async fn predict_overmastery() -> Result<(), String> {
-    Err("windows-only".into())
-}
-
-#[cfg(not(windows))]
-#[tauri::command]
-async fn fetch_overmastery_seed() -> Result<(), String> {
-    Err("windows-only".into())
+async fn fetch_overmastery_seed(
+    slot: u32,
+    hook: State<'_, HookStatus>,
+) -> Result<Option<u32>, String> {
+    toolbox_rpc::overmastery_slot(&hook, slot).await
 }
 
 #[tauri::command]
@@ -971,6 +920,15 @@ fn connect_and_run_parser(app: AppHandle) {
 
                     let _ = app.emit_all("success-alert", "Connnected to game!");
 
+                    let hook_status = app.state::<HookStatus>();
+                    hook_status.connected.store(true, Ordering::Relaxed);
+                    // Hello up front, once per (re)connect: a stale Linux
+                    // proxy or pre-RPC hook shows as "outdated" instead of
+                    // per-command failures.
+                    hook_status
+                        .outdated
+                        .store(!toolbox_rpc::hello_ok().await, Ordering::Relaxed);
+
                     let decoder = tokio_util::codec::LengthDelimitedCodec::new();
                     let mut reader = FramedRead::new(stream, decoder);
 
@@ -1073,6 +1031,10 @@ fn connect_and_run_parser(app: AppHandle) {
                             }
                         }
                     }
+
+                    app.state::<HookStatus>()
+                        .connected
+                        .store(false, Ordering::Relaxed);
 
                     info!("Game has closed.");
 
@@ -1296,6 +1258,7 @@ fn main() {
         .manage(ClickThrough(AtomicBool::new(false)))
         .manage(DebugMode(AtomicBool::new(false)))
         .manage(ResetChannel(std::sync::Mutex::new(None)))
+        .manage(HookStatus::default())
         .system_tray(system_tray_with_menu())
         .on_system_tray_event(menu_tray_handler)
         .on_window_event(|event| {

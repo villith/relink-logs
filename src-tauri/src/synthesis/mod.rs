@@ -2,48 +2,16 @@
 //!
 //! Pure port of the game's synthesis algorithm (v2.0.2, reverse-engineered —
 //! see docs/superpowers/specs/2026-07-18-synthesis-helper-design.md). The
-//! snapshot module reads the inputs from game memory; everything here is
-//! deterministic and unit-testable.
-
-pub mod snapshot;
+//! hook takes the input snapshot in-process (game-reader crate, served over
+//! the toolbox RPC channel); everything here is deterministic and
+//! unit-testable.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
-pub use crate::game_mem::xorshift32;
+pub use game_reader::xorshift32;
 /// The game's "no trait in this slot" sentinel.
-pub use crate::game_mem::EMPTY_KEY as EMPTY_TRAIT;
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SynthesisSigil {
-    /// Per-copy instance uid (map key in the sigil manager).
-    pub uid: u32,
-    /// The sigil's item id (GEEN_* hash) — translatable via `sigils.json`.
-    pub sigil_id: u32,
-    pub trait1: u32,
-    pub trait1_level: u32,
-    pub trait2: u32,
-    pub trait2_level: u32,
-    /// `record+8` of the sigil's item-config record; feeds the warm-up count.
-    #[serde(skip)]
-    pub record_level: i32,
-}
-
-#[derive(Debug, Default)]
-pub struct SynthesisSnapshot {
-    /// xorshift32 state of RNG slot 0x81 at snapshot time.
-    pub rng_state: u32,
-    /// MGR+0x2d8; part of the warm-up count.
-    pub seed_counter: u32,
-    /// pairKey -> times this pair-shape has been synthesized.
-    pub pair_counters: HashMap<u64, u32>,
-    /// rank(A)+rank(B) -> (lo, hi) level-roll weights.
-    pub level_weights: HashMap<u32, (u32, u32)>,
-    /// first result trait -> result sigil item id.
-    pub trait_to_item: HashMap<u32, u32>,
-    pub sigils: Vec<SynthesisSigil>,
-}
+pub use game_reader::EMPTY_KEY as EMPTY_TRAIT;
+pub use protocol::toolbox::{SynthesisSeed, SynthesisSigil, SynthesisSnapshot};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -180,15 +148,6 @@ pub struct SynthesisSearchResponse {
     pub rng_unpredictable: bool,
     /// Seed identity the search was computed from; when the live values move
     /// off these, the result list is stale.
-    pub rng_state: u32,
-    pub seed_counter: u32,
-}
-
-/// The two live values every synthesis prediction depends on (beyond the
-/// sigil box itself); read cheaply for staleness polling.
-#[derive(Debug, Clone, Copy, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct SynthesisSeed {
     pub rng_state: u32,
     pub seed_counter: u32,
 }
