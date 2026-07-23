@@ -1263,7 +1263,7 @@ export const ViewPage = () => {
               <Stack>
                 <MultiSelect
                   data={targetOptions}
-                  placeholder="All"
+                  placeholder={t("ui.logs.filter-all")}
                   clearable
                   value={selectedTargets}
                   onChange={(value) => {

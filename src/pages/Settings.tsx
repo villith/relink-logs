@@ -250,10 +250,10 @@ const SettingsPage = () => {
           </Tooltip>
           <Divider />
           <Text size="md" fw={700}>
-            Overlay Columns
+            {t("ui.overlay-columns-section")}
           </Text>
           <ColumnEditor
-            title="Player Row"
+            title={t("ui.player-row")}
             droppableId="overlay-player-columns"
             translationPrefix="ui.meter-columns"
             items={overlayPlayer.items}
@@ -261,7 +261,7 @@ const SettingsPage = () => {
             onReorder={overlayPlayer.onReorder}
           />
           <ColumnEditor
-            title="Skill Breakdown"
+            title={t("ui.skill-breakdown")}
             droppableId="overlay-skill-columns"
             translationPrefix="ui.skill-columns"
             items={overlaySkill.items}
@@ -289,7 +289,7 @@ const SettingsPage = () => {
           </Button>
         </Stack>
       </Fieldset>
-      <Fieldset legend="Logs" mt="md">
+      <Fieldset legend={t("ui.logs-tab")} mt="md">
         <Box>
           <Button variant="default" onClick={confirmDeleteAll}>
             {t("ui.logs.delete-all-btn")}

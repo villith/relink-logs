@@ -1,5 +1,6 @@
 import { Box, Button, Popover, Stack } from "@mantine/core";
 import { CaretDown, Columns } from "@phosphor-icons/react";
+import { useTranslation } from "react-i18next";
 
 import { ColumnEditor } from "./ColumnEditor";
 import { useColumnControls } from "./useColumnControls";
@@ -9,6 +10,7 @@ import { useColumnControls } from "./useColumnControls";
  * wrapped in a ScrollArea — @hello-pangea/dnd misbehaves inside transformed
  * scroll containers; a plain scroll box with a stable gutter is used instead. */
 export const ColumnsPopover = () => {
+  const { t } = useTranslation();
   const { logsPlayer, logsSkill } = useColumnControls();
 
   return (
@@ -21,14 +23,14 @@ export const ColumnsPopover = () => {
           leftSection={<Columns size={14} />}
           rightSection={<CaretDown size={12} />}
         >
-          Columns
+          {t("ui.columns-btn")}
         </Button>
       </Popover.Target>
       <Popover.Dropdown>
         <Box mah={460} style={{ overflowY: "auto", scrollbarGutter: "stable" }}>
           <Stack gap="md">
             <ColumnEditor
-              title="Player Row"
+              title={t("ui.player-row")}
               droppableId="logs-player-columns"
               translationPrefix="ui.meter-columns"
               items={logsPlayer.items}
@@ -36,7 +38,7 @@ export const ColumnsPopover = () => {
               onReorder={logsPlayer.onReorder}
             />
             <ColumnEditor
-              title="Skill Breakdown"
+              title={t("ui.skill-breakdown")}
               droppableId="logs-skill-columns"
               translationPrefix="ui.skill-columns"
               items={logsSkill.items}

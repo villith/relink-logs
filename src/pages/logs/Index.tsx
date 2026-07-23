@@ -350,15 +350,16 @@ function SelectableQuestCompletion({
   filters: FilterState;
   setFilters: (filters: Partial<FilterState>) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Select
       data={[
-        { value: "null", label: "All" },
-        { value: "true", label: "Completed" },
-        { value: "false", label: "Failed" },
+        { value: "null", label: t("ui.logs.filter-all") },
+        { value: "true", label: t("ui.logs.filter-completed") },
+        { value: "false", label: t("ui.logs.filter-failed") },
       ]}
       onChange={(value) => setFilters({ questCompletedFilter: value === "null" ? null : value === "true" })}
-      placeholder="Quest Completion"
+      placeholder={t("ui.logs.filter-quest-completion")}
       value={filters.questCompletedFilter === null ? "null" : filters.questCompletedFilter ? "true" : "false"}
       onClear={() => setFilters({ questCompletedFilter: null })}
       searchable
