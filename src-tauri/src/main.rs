@@ -867,6 +867,90 @@ async fn check_and_perform_hook(app: AppHandle) {
     }
 }
 
+/// Dev-only hook hot-reload: ask the running hook to tear itself down, eject
+/// the dead module, refresh hook-dbg.dll from the cargo artifact, and let
+/// the standard reconnect loop re-inject. See
+/// docs/superpowers/specs/2026-07-23-dev-hook-hot-reload-design.md.
+#[cfg(all(windows, debug_assertions))]
+async fn reload_hook(app: AppHandle) {
+    if app
+        .state::<HookStatus>()
+        .reloading
+        .swap(true, Ordering::SeqCst)
+    {
+        return; // a reload is already in flight
+    }
+    let result = reload_hook_inner(&app).await;
+    app.state::<HookStatus>()
+        .reloading
+        .store(false, Ordering::SeqCst);
+    match result {
+        Ok(()) => {
+            info!("hook reload complete");
+            let _ = app.emit_all("success-alert", "Hook reloaded");
+        }
+        Err(e) => {
+            log::warn!("hook reload failed: {e:?}");
+            let _ = app.emit_all("error-alert", format!("Hook reload failed: {e}"));
+        }
+    }
+}
+
+#[cfg(all(windows, debug_assertions))]
+async fn reload_hook_inner(app: &AppHandle) -> anyhow::Result<()> {
+    use anyhow::{anyhow, bail, Context};
+    use dll_syringe::process::Process as _;
+
+    gbfr_logs::control_rpc::eject().await?;
+
+    // The event pipe closing (connect loop flips `connected` off) means the
+    // hook's runtime exited. Timing out means the hook is half-dead —
+    // ejecting would FreeLibrary a module with live threads, so refuse.
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    while app
+        .state::<HookStatus>()
+        .connected
+        .load(Ordering::Relaxed)
+    {
+        if std::time::Instant::now() >= deadline {
+            bail!("hook did not shut down within 5s; state unknown — restart the game");
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    // Grace: the setup thread finishes exiting shortly after its runtime
+    // drops (the pipe closes slightly before the thread is gone).
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+
+    let target = OwnedProcess::find_first_by_name(gbfr_logs::game_mem::GAME_EXE)
+        .ok_or_else(|| anyhow!("game process not found"))?;
+    let syringe = Syringe::for_process(target);
+    let module = match syringe.process().find_module_by_name("hook-dbg.dll")? {
+        Some(m) => Some(m),
+        None => syringe.process().find_module_by_name("hook.dll")?,
+    };
+    match module {
+        Some(module) => {
+            syringe.eject(module).context("FreeLibrary of the old hook")?;
+            info!("old hook module ejected");
+        }
+        // Not fatal: nothing loaded means inject-from-scratch, which the
+        // reconnect loop does anyway.
+        None => log::warn!("no hook module found in the game process; skipping eject"),
+    }
+
+    // The file is unlocked now — refresh it from the dev build artifact.
+    // CWD is src-tauri under `npm run tauri dev`, matching the relative
+    // hook-dbg.dll path in check_and_perform_hook.
+    let artifact = Path::new("../target/release/hook.dll");
+    if artifact.exists() {
+        std::fs::copy(artifact, "hook-dbg.dll").context("refreshing hook-dbg.dll")?;
+        info!("hook-dbg.dll refreshed from {artifact:?}");
+    } else {
+        log::warn!("{artifact:?} not found; re-injecting the existing hook-dbg.dll");
+    }
+    Ok(())
+}
+
 // Linux: no injector. Refresh the dinput8 proxy in the game folder
 // (best-effort — the setup panel surfaces failures), then let the TCP
 // connect-retry loop double as the "game running?" poll.
@@ -1079,7 +1163,14 @@ fn system_tray_with_menu() -> SystemTray {
         .add_item(logs)
         .add_item(always_on_top)
         .add_item(toggle_clickthrough)
-        .add_item(reset_windows)
+        .add_item(reset_windows);
+
+    // Dev-only hook hot-reload. Tray strings don't go through i18next
+    // (backend); an English label is fine for a debug-only item.
+    #[cfg(all(windows, debug_assertions))]
+    let menu = menu.add_item(CustomMenuItem::new("reload_hook", "Reload hook (dev)"));
+
+    let menu = menu
         .add_native_item(SystemTrayMenuItem::Separator)
         .add_item(quit);
 
@@ -1202,6 +1293,10 @@ fn menu_tray_handler(handle: &AppHandle, event: SystemTrayEvent) {
             "quit" => {
                 let _ = handle.save_window_state(StateFlags::all());
                 handle.exit(0)
+            }
+            #[cfg(all(windows, debug_assertions))]
+            "reload_hook" => {
+                tauri::async_runtime::spawn(reload_hook(handle.clone()));
             }
             _ => {}
         },
