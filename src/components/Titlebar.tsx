@@ -7,6 +7,7 @@ import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
 import getVersion from "@/hooks/getVersion";
+import { useHookStatus } from "@/useHookStatus";
 import { EncounterState, PlayerData, SortDirection, SortType } from "@/types";
 import {
   exportFullEncounterToClipboard,
@@ -73,10 +74,28 @@ const TeamDamageStats = ({ encounterState }: { encounterState: EncounterState })
 
 const EncounterStatus = ({ encounterState, elapsedTime }: { encounterState: EncounterState; elapsedTime: number }) => {
   const { t } = useTranslation();
+  const hook = useHookStatus();
+
   if (encounterState.status === "Waiting") {
+    // Map hook state -> label + glyph color class. Default to the normal
+    // "waiting" copy while status is still loading or connected.
+    let label = t("ui.status-waiting");
+    let tone = "hook-ok";
+    if (hook) {
+      if (hook.state === "reconnecting") {
+        label = t("ui.hook-status.reconnecting");
+        tone = "hook-warn";
+      } else if (hook.state === "outOfDate") {
+        label = t("ui.hook-status.out-of-date");
+        tone = "hook-warn";
+      } else if (hook.state === "disconnected") {
+        label = t("ui.hook-status.waiting-for-game");
+        tone = "hook-idle";
+      }
+    }
     return (
-      <div data-tauri-drag-region className="encounter-status item">
-        {t("ui.status-waiting")}
+      <div data-tauri-drag-region className={`encounter-status item ${tone}`}>
+        {label}
       </div>
     );
   } else if (encounterState.status === "InProgress") {
