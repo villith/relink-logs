@@ -29,6 +29,17 @@ pub struct HookStatus {
     pub hook_version: Mutex<Option<String>>,
     /// True when the connected hook advertised the `eject` control channel.
     pub supports_eject: AtomicBool,
+    /// Dev-only: hold the hook OUT of the game process after an eject, so a
+    /// debug `Disconnected` stays put instead of self-healing when the
+    /// injection loop reinjects a second later. Deliberately NOT read by
+    /// `snapshot()` — the state stays derived, never dictated. Only
+    /// `check_and_perform_hook`'s Windows injection loop honors this; there is
+    /// no non-Windows injection loop to hold out of, so it's a no-op there.
+    /// `Relaxed` throughout (unlike `reloading`'s `SeqCst` swap, which claims
+    /// the gate against a concurrent `refresh_hook`): this flag has no
+    /// companion data to publish and nothing races to set it, so ordering
+    /// beyond atomicity buys nothing.
+    pub dev_hold_out: AtomicBool,
 }
 
 /// The user-facing hook state, computed by `HookStatus::snapshot`.
@@ -81,6 +92,15 @@ impl HookStatus {
         };
 
         HookStatusSnapshot { state, hook_version, app_version, supports_eject }
+    }
+
+    /// Fold a `Hello` result in. Shared by the connect loop and the dev
+    /// re-handshake so the debug path can never drift from the real one.
+    pub fn apply_hello(&self, info: HelloInfo) {
+        self.outdated.store(!info.ok, Ordering::Relaxed);
+        *self.hook_version.lock().unwrap() = info.hook_version;
+        self.supports_eject
+            .store(info.supports_eject, Ordering::Relaxed);
     }
 }
 
@@ -253,5 +273,45 @@ mod tests {
     fn snapshot_dev_hook_never_flagged_on_version() {
         let hook = connected_hook(Some(protocol::toolbox::HOOK_DEV_VERSION), true);
         assert_eq!(hook.snapshot().state, HookState::Connected);
+    }
+
+    #[test]
+    fn apply_hello_failure_reads_out_of_date() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        hook.apply_hello(HelloInfo {
+            ok: false,
+            hook_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            supports_eject: true,
+        });
+        assert_eq!(hook.snapshot().state, HookState::OutOfDate);
+    }
+
+    #[test]
+    fn apply_hello_matching_version_reads_connected() {
+        let hook = connected_hook(None, false);
+        hook.apply_hello(HelloInfo {
+            ok: true,
+            hook_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            supports_eject: true,
+        });
+        let snapshot = hook.snapshot();
+        assert_eq!(snapshot.state, HookState::Connected);
+        assert_eq!(
+            snapshot.hook_version.as_deref(),
+            Some(env!("CARGO_PKG_VERSION"))
+        );
+        assert!(snapshot.supports_eject);
+    }
+
+    /// `dev_hold_out` keeps an ejected hook OUT of the process; it must not
+    /// colour the reported state, which stays derived from the real signals.
+    #[test]
+    fn dev_hold_out_does_not_change_the_reported_state() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        hook.dev_hold_out.store(true, Ordering::Relaxed);
+        assert_eq!(hook.snapshot().state, HookState::Connected);
+
+        hook.connected.store(false, Ordering::Relaxed);
+        assert_eq!(hook.snapshot().state, HookState::Disconnected);
     }
 }

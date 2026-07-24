@@ -118,6 +118,20 @@ fn emit_hook_status(app: &AppHandle) {
     let _ = app.emit_all("hook-status", &snapshot);
 }
 
+/// Fold a `Hello` result into `HookStatus` and broadcast the new status. Shared
+/// by the connect loop and the dev re-handshake so the debug path can never
+/// drift from the real one.
+fn apply_hello(app: &AppHandle, info: toolbox_rpc::HelloInfo) {
+    app.state::<HookStatus>().apply_hello(info);
+    emit_hook_status(app);
+}
+
+/// Re-run the handshake and fold the result in. The only way the debug path
+/// should ever refresh hook status.
+async fn handshake_and_apply(app: &AppHandle) {
+    apply_hello(app, toolbox_rpc::hello().await);
+}
+
 #[tauri::command]
 fn get_hook_status(hook: State<'_, HookStatus>) -> toolbox_rpc::HookStatusSnapshot {
     hook.snapshot()
@@ -958,16 +972,28 @@ async fn check_and_perform_hook(app: AppHandle) {
         // Hook reload/refresh in flight: the old module must be ejected (and,
         // for a dev reload, hook-dbg.dll refreshed) before we may inject again.
         {
-            let mut waited = false;
-            while app.state::<HookStatus>().reloading.load(Ordering::Relaxed) {
-                if !waited {
-                    reload_dbg("check_and_perform_hook: reloading gate SET, waiting");
-                    waited = true;
+            let hook = app.state::<HookStatus>();
+            let mut waits: u32 = 0;
+            while hook.reloading.load(Ordering::Relaxed)
+                || hook.dev_hold_out.load(Ordering::Relaxed)
+            {
+                // Log the first wait + periodically: dev_hold_out is designed
+                // to hold indefinitely (see its doc comment), so a one-shot
+                // log here would leave a long hold invisible in
+                // reload-debug.log — exactly where a stranded session should
+                // leave a breadcrumb.
+                if waits == 0 || waits % 50 == 0 {
+                    reload_dbg(&format!(
+                        "check_and_perform_hook: gate SET, waiting (reloading={}, dev_hold_out={})",
+                        hook.reloading.load(Ordering::Relaxed),
+                        hook.dev_hold_out.load(Ordering::Relaxed)
+                    ));
                 }
+                waits += 1;
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
-            if waited {
-                reload_dbg("check_and_perform_hook: reloading gate CLEARED, proceeding");
+            if waits > 0 {
+                reload_dbg("check_and_perform_hook: gate CLEARED, proceeding");
             }
         }
 
@@ -1217,18 +1243,13 @@ fn connect_and_run_parser(app: AppHandle) {
 
                     let _ = app.emit_all("success-alert", "Connnected to game!");
 
-                    let hook_status = app.state::<HookStatus>();
-                    hook_status.connected.store(true, Ordering::Relaxed);
+                    app.state::<HookStatus>()
+                        .connected
+                        .store(true, Ordering::Relaxed);
                     // Hello up front, once per (re)connect: a stale proxy or
                     // pre-RPC hook shows as "outdated"; the reported version +
                     // eject support drive the status badge and refresh gating.
-                    let info = toolbox_rpc::hello().await;
-                    hook_status.outdated.store(!info.ok, Ordering::Relaxed);
-                    *hook_status.hook_version.lock().unwrap() = info.hook_version;
-                    hook_status
-                        .supports_eject
-                        .store(info.supports_eject, Ordering::Relaxed);
-                    emit_hook_status(&app);
+                    handshake_and_apply(&app).await;
 
                     let decoder = tokio_util::codec::LengthDelimitedCodec::new();
                     let mut reader = FramedRead::new(stream, decoder);
