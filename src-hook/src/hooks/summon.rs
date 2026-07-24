@@ -147,6 +147,35 @@ pub(crate) fn parent_specified_instance_at(
     (parent != 0).then_some(parent as *const usize)
 }
 
+/// Summon body classes that store their summoner as a validated entity handle
+/// `{+0xFE0 idx, +0xFE8 CEntityInfo*}`. Enemy-cast summons resolve to an enemy
+/// owner, which fails closed downstream — no player is credited, which is
+/// correct.
+const SUMMON_BODY_HASHES: &[u32] = &[
+    0xD2E5407A, // So0000  Lucilius
+    0x6D068BDE, // So0200  Rolan
+    0x69893920, // So0d00  Goblin Soldier
+    0x1D3EDC63, // So1100  Goblin Warrior
+    0xAE913DE3, // So1100Base (generic summon body)
+    0xDFEC5706, // So1d00  Quakadile
+    0x34894579, // So2001  Silverslime var.
+    0x1DB19581, // So4500  Lilith
+    0x9F394F85, // So4502  Lilith var.
+    0x65294C5C, // So4c00  Managarmr Nihilla
+    0x18617D59, // So4e00  Albacore
+    0x925ADE1B, // So4f00  Hope-Filled Skydwellers
+    0x6093301C, // So5600  Mellose Clan
+    0xA22E16CF, // So5700  Crew Alliance Rafale
+    0x0F617FF0, // So5f01  Cat var.
+    0xF065D8B8, // So6400  Wheel of Fate
+    0x5395CE93, // So9200  Beelzebub
+    0xB0792857, // BehaviorSummonObjectBase (generic summon body)
+];
+
+/// Handle offsets on a summon body: index gate, then the entity pointer.
+const SUMMON_OWNER_IDX_OFFSET: usize = 0xFE0;
+const SUMMON_OWNER_PTR_OFFSET: usize = 0xFE8;
+
 /// Resolves a keyless sub-entity source to its owner's instance pointer.
 /// Returns `None` for any source we do not own a mapping for, and for every
 /// failed read along the way.
@@ -165,6 +194,12 @@ fn resolve_source_parent_ptr(source_type_id: u32, source: *const usize) -> Optio
         // Train and Alexandria). The owner handle is empty in some sled states,
         // so gate on the handle index at +0x550.
         0xC9F45042 => gated_parent_offset(source, 0x550, 0x558)?,
+        // Summon bodies -> summoner, via the validated entity handle.
+        hash if SUMMON_BODY_HASHES.contains(&hash) => {
+            gated_parent_offset(source, SUMMON_OWNER_IDX_OFFSET, SUMMON_OWNER_PTR_OFFSET)?
+        }
+        // Pl8000 (controllable-summon spawner) -> summoner; same handle idiom.
+        0x3B5133C4 => gated_parent_offset(source, 0x23E0, 0x23E8)?,
         _ => return None,
     };
 
@@ -272,6 +307,28 @@ mod tests {
         let actor = vec![0u8; 0x100];
         assert_eq!(
             super::parent_specified_instance_at(actor.as_ptr().cast(), 0x40),
+            None
+        );
+    }
+
+    #[test]
+    fn summon_class_hashes_are_unique() {
+        // A duplicate arm in the match is a silent compile-time shadow: the second
+        // never fires, so one summon's damage would vanish with no error.
+        let mut hashes = super::SUMMON_BODY_HASHES.to_vec();
+        let before = hashes.len();
+        hashes.sort_unstable();
+        hashes.dedup();
+        assert_eq!(before, hashes.len(), "duplicate hash in SUMMON_BODY_HASHES");
+        assert_eq!(before, 18, "expected 18 summon body classes");
+    }
+
+    #[test]
+    fn summon_body_source_with_empty_handle_resolves_to_nothing() {
+        // So0000 with a zeroed +0xFE0 handle index must fail closed.
+        let actor = vec![0u8; 0x1100];
+        assert_eq!(
+            super::resolve_source_parent_ptr(0xD2E5407A, actor.as_ptr().cast()),
             None
         );
     }
