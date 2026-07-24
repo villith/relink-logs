@@ -955,9 +955,8 @@ fn hook_module_present(syringe: &Syringe) -> bool {
 async fn check_and_perform_hook(app: AppHandle) {
     reload_dbg("check_and_perform_hook: (re)entered, polling for game process");
     loop {
-        // Dev hook reload in flight: the old module must be ejected and
-        // hook-dbg.dll refreshed before we may inject again (see reload_hook).
-        #[cfg(debug_assertions)]
+        // Hook reload/refresh in flight: the old module must be ejected (and,
+        // for a dev reload, hook-dbg.dll refreshed) before we may inject again.
         {
             let mut waited = false;
             while app.state::<HookStatus>().reloading.load(Ordering::Relaxed) {
@@ -1039,7 +1038,7 @@ async fn reload_hook(app: AppHandle) {
         return; // a reload is already in flight
     }
     reload_dbg("reload_hook: START (reloading gate set)");
-    let result = reload_hook_inner(&app).await;
+    let result = reload_hook_inner(&app, Some(Path::new("../target/release/hook.dll"))).await;
     app.state::<HookStatus>()
         .reloading
         .store(false, Ordering::SeqCst);
@@ -1056,8 +1055,8 @@ async fn reload_hook(app: AppHandle) {
     }
 }
 
-#[cfg(all(windows, debug_assertions))]
-async fn reload_hook_inner(app: &AppHandle) -> anyhow::Result<()> {
+#[cfg(windows)]
+async fn reload_hook_inner(app: &AppHandle, refresh_from: Option<&Path>) -> anyhow::Result<()> {
     use anyhow::{anyhow, bail, Context};
 
     reload_dbg("reload_hook_inner: sending Eject over control channel");
@@ -1100,19 +1099,65 @@ async fn reload_hook_inner(app: &AppHandle) -> anyhow::Result<()> {
         )),
     }
 
-    // The file is unlocked now — refresh it from the dev build artifact.
-    // CWD is src-tauri under `npm run tauri dev`, matching the relative
-    // hook-dbg.dll path in check_and_perform_hook.
-    let artifact = Path::new("../target/release/hook.dll");
-    if artifact.exists() {
-        std::fs::copy(artifact, "hook-dbg.dll").context("refreshing hook-dbg.dll")?;
-        reload_dbg(&format!("reload_hook_inner: hook-dbg.dll refreshed from {artifact:?}"));
-    } else {
-        reload_dbg(&format!(
-            "reload_hook_inner: {artifact:?} NOT FOUND; will re-inject existing hook-dbg.dll"
-        ));
+    // Refresh the DLL to be re-injected, if a source path was given. Dev
+    // reload copies the cargo artifact over hook-dbg.dll; production refresh
+    // re-injects the installed hook.dll in place (no copy needed), passing None.
+    if let Some(src) = refresh_from {
+        std::fs::copy(src, "hook-dbg.dll").context("refreshing hook-dbg.dll")?;
+        reload_dbg(&format!("reload_hook_inner: hook-dbg.dll refreshed from {src:?}"));
     }
     Ok(())
+}
+
+/// Production hook hot-swap: graceful eject + re-inject of the installed
+/// hook.dll, so an updated app can refresh the hook without a game restart.
+/// Gated on the running hook advertising the `eject` control channel — a
+/// pre-rollout hook cannot be safely ejected, so we tell the user to restart
+/// the game instead. Windows only (no injector under Proton).
+#[cfg(windows)]
+#[tauri::command]
+async fn refresh_hook(app: AppHandle) -> Result<(), String> {
+    let hook = app.state::<HookStatus>();
+    if !hook.connected.load(Ordering::Relaxed) {
+        return Err("game-not-running".into());
+    }
+    if !hook.supports_eject.load(Ordering::Relaxed) {
+        return Err("hook-refresh-unsupported".into());
+    }
+    if hook.reloading.swap(true, Ordering::SeqCst) {
+        return Err("hook-refresh-in-progress".into());
+    }
+    emit_hook_status(&app);
+    // None => re-inject the installed hook.dll in place (no artifact copy).
+    let result = reload_hook_inner(&app, None).await;
+    app.state::<HookStatus>()
+        .reloading
+        .store(false, Ordering::SeqCst);
+    emit_hook_status(&app);
+    result.map_err(|e| format!("{e}"))
+}
+
+/// Non-Windows: no injector, so refresh is not available — restart the game.
+#[cfg(not(windows))]
+#[tauri::command]
+async fn refresh_hook(_app: AppHandle) -> Result<(), String> {
+    Err("hook-refresh-unsupported".into())
+}
+
+/// Force an immediate hook re-probe: re-run Hello and re-broadcast status,
+/// so the badge updates without waiting for the auto-reconnect cycle. Always
+/// safe — it never injects or ejects.
+#[tauri::command]
+async fn reconnect_hook(app: AppHandle) {
+    let hook = app.state::<HookStatus>();
+    if hook.connected.load(Ordering::Relaxed) {
+        let info = toolbox_rpc::hello().await;
+        hook.outdated.store(!info.ok, Ordering::Relaxed);
+        *hook.hook_version.lock().unwrap() = info.hook_version;
+        hook.supports_eject
+            .store(info.supports_eject, Ordering::Relaxed);
+    }
+    emit_hook_status(&app);
 }
 
 // Linux: no injector. Refresh the dinput8 proxy in the game folder
@@ -1583,6 +1628,8 @@ fn main() {
             deploy_linux_hook,
             remove_linux_hook,
             get_hook_status,
+            refresh_hook,
+            reconnect_hook,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.

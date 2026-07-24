@@ -1,9 +1,8 @@
-//! Dev-only client for the hook's control channel (feature `eject` hooks).
+//! Client for the hook's control channel (feature `eject` hooks).
 //!
 //! Separate from `toolbox_rpc`: the control channel carries hook-lifecycle
-//! commands (currently just `Eject`), not Toolbox tool data. Compiled only in
-//! debug Windows builds — the reload flow that uses it (`reload_hook` in
-//! main.rs) is itself dev-only.
+//! commands (currently just `Eject`). Used by the hook refresh flow
+//! (`refresh_hook`/`reload_hook` in main.rs).
 
 use anyhow::{bail, Result};
 use protocol::control::{HookControlRequest, HookControlResponse, HOOK_CONTROL_PIPE_NAME};
