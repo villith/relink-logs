@@ -61,22 +61,26 @@ export default function HookStatusBadge() {
     }
   };
 
+  const label = t(LABEL_KEY[hook.state]);
+
   return (
-    <Group gap={6} wrap="nowrap">
+    // The header is tight; the label truncates rather than overflowing, and
+    // the native title tooltip carries the full text (same as Report a bug).
+    <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
       {/* eslint-disable-next-line i18next/no-literal-string -- status glyph, not prose */}
-      <Text span style={{ color: TONE[hook.state], lineHeight: 1 }}>
+      <Text span style={{ color: TONE[hook.state], lineHeight: 1, flex: "none" }}>
         ●
       </Text>
-      <Text span size="sm" c="dimmed">
-        {t(LABEL_KEY[hook.state])}
+      <Text span size="sm" c="dimmed" truncate title={label}>
+        {label}
       </Text>
       {hook.state === "outOfDate" &&
         (hook.supportsEject ? (
-          <Button size="compact-xs" variant="light" loading={busy} onClick={onRefresh}>
+          <Button size="compact-xs" variant="light" loading={busy} onClick={onRefresh} style={{ flex: "none" }}>
             {t("ui.hook-status.refresh")}
           </Button>
         ) : (
-          <Text span size="xs" c="dimmed">
+          <Text span size="xs" c="dimmed" truncate title={t("ui.hook-status.restart-game")}>
             {t("ui.hook-status.restart-game")}
           </Text>
         ))}
