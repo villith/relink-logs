@@ -1063,6 +1063,12 @@ async fn reload_hook(app: AppHandle) {
     {
         return; // a reload is already in flight
     }
+    // Same rule as refresh_hook: asking for a reload means asking for a working
+    // hook, so a debug hold-out left set must not survive it and block the
+    // re-inject that ends this flow.
+    app.state::<HookStatus>()
+        .dev_hold_out
+        .store(false, Ordering::Relaxed);
     reload_dbg("reload_hook: START (reloading gate set)");
     let result = reload_hook_inner(&app, Some(Path::new("../target/release/hook.dll"))).await;
     app.state::<HookStatus>()
@@ -1153,6 +1159,12 @@ async fn reload_hook_inner(app: &AppHandle, refresh_from: Option<&Path>) -> anyh
 #[tauri::command]
 async fn refresh_hook(app: AppHandle) -> Result<(), String> {
     let hook = app.state::<HookStatus>();
+    // A user reaching for Refresh wants a working hook; a stale debug hold-out
+    // must never outrank that. Clear it BEFORE the `connected` check: a held
+    // gate blocks injection, so `connected` is false in exactly the stranded
+    // case this exists to rescue, and clearing below the early return would
+    // never run there.
+    hook.dev_hold_out.store(false, Ordering::Relaxed);
     if !hook.connected.load(Ordering::Relaxed) {
         return Err("game-not-running".into());
     }
@@ -1177,6 +1189,170 @@ async fn refresh_hook(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn refresh_hook(_app: AppHandle) -> Result<(), String> {
     Err("hook-refresh-unsupported".into())
+}
+
+/// Dev Debug tab: every command below drives the REAL hook over the dev control
+/// channel. Nothing here fabricates frontend state — the app derives hook status
+/// from real handshakes and the parser derives encounter status from real frames.
+#[cfg(windows)]
+fn debug_guard() -> Result<(), String> {
+    if !cfg!(debug_assertions) {
+        return Err("debug-only".into());
+    }
+    Ok(())
+}
+
+/// Map a control-channel failure to the slug the frontend knows. A release hook
+/// serves no control listener, so a connect failure is the common case.
+#[cfg(windows)]
+fn control_error(e: anyhow::Error) -> String {
+    log::warn!("debug control call failed: {e:?}");
+    "hook-control-unavailable".to_string()
+}
+
+/// Eject the live hook. With `hold`, keep it out of the process so the
+/// resulting `Disconnected` stays put instead of self-healing in ~1s.
+#[cfg(windows)]
+#[tauri::command]
+async fn debug_eject_hook(app: AppHandle, hold: bool) -> Result<(), String> {
+    debug_guard()?;
+    if !app.state::<HookStatus>().connected.load(Ordering::Relaxed) {
+        return Err("game-not-running".into());
+    }
+    // Eject FIRST. Setting the gate before a failed eject would leave it stuck
+    // and silently block every injection for the rest of the session.
+    gbfr_logs::control_rpc::eject()
+        .await
+        .map_err(control_error)?;
+    if hold {
+        app.state::<HookStatus>()
+            .dev_hold_out
+            .store(true, Ordering::Relaxed);
+    }
+    Ok(())
+}
+
+/// Release the hold-out gate; the injection loop reinjects on its own.
+#[cfg(windows)]
+#[tauri::command]
+fn debug_allow_reinject(app: AppHandle) -> Result<(), String> {
+    debug_guard()?;
+    app.state::<HookStatus>()
+        .dev_hold_out
+        .store(false, Ordering::Relaxed);
+    Ok(())
+}
+
+/// Read the dev hold-out flag so the Debug page can show it. A SEPARATE query,
+/// deliberately not a field on `HookStatusSnapshot`: putting it there would undo
+/// the point, which is that the reported state stays derived from real signals.
+#[cfg(windows)]
+#[tauri::command]
+fn debug_hold_out_state(app: AppHandle) -> Result<bool, String> {
+    debug_guard()?;
+    Ok(app
+        .state::<HookStatus>()
+        .dev_hold_out
+        .load(Ordering::Relaxed))
+}
+
+/// Override the live hook's `Hello`, then re-run the handshake so the app
+/// DERIVES the new state instead of being handed it. Pass all-`None` field
+/// values via `clear` to restore the hook's real answer.
+#[cfg(windows)]
+#[tauri::command]
+async fn debug_set_hello_override(
+    app: AppHandle,
+    hook_version: Option<String>,
+    protocol_version: Option<u32>,
+    supports_eject: Option<bool>,
+) -> Result<(), String> {
+    debug_guard()?;
+    if !app.state::<HookStatus>().connected.load(Ordering::Relaxed) {
+        return Err("game-not-running".into());
+    }
+    let o = protocol::control::HelloOverride {
+        hook_version,
+        protocol_version,
+        supports_eject,
+    };
+    gbfr_logs::control_rpc::set_hello_override(Some(o))
+        .await
+        .map_err(control_error)?;
+    handshake_and_apply(&app).await;
+    Ok(())
+}
+
+/// Clear the override and re-handshake.
+#[cfg(windows)]
+#[tauri::command]
+async fn debug_clear_hello_override(app: AppHandle) -> Result<(), String> {
+    debug_guard()?;
+    if !app.state::<HookStatus>().connected.load(Ordering::Relaxed) {
+        return Err("game-not-running".into());
+    }
+    gbfr_logs::control_rpc::set_hello_override(None)
+        .await
+        .map_err(control_error)?;
+    handshake_and_apply(&app).await;
+    Ok(())
+}
+
+/// Send one scenario batch to the hook, which rebroadcasts it on the real
+/// event stream. Returns how many frames were delivered.
+#[cfg(windows)]
+#[tauri::command]
+async fn debug_broadcast_scenario(
+    app: AppHandle,
+    kind: gbfr_logs::debug_events::Scenario,
+) -> Result<u32, String> {
+    debug_guard()?;
+    if !app.state::<HookStatus>().connected.load(Ordering::Relaxed) {
+        return Err("game-not-running".into());
+    }
+    gbfr_logs::control_rpc::broadcast_events(gbfr_logs::debug_events::scenario(kind))
+        .await
+        .map_err(control_error)
+}
+
+// Non-Windows: no control channel client, so the Debug tab reports the same
+// slug the Toolbox uses for an unusable hook.
+#[cfg(not(windows))]
+#[tauri::command]
+async fn debug_eject_hook(_app: AppHandle) -> Result<(), String> {
+    Err("hook-control-unavailable".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn debug_allow_reinject(_app: AppHandle) -> Result<(), String> {
+    Err("hook-control-unavailable".into())
+}
+
+/// Unlike its siblings this answers rather than errors: with no injection loop
+/// to hold out of, the flag can never be set here, so `false` is the truth.
+#[cfg(not(windows))]
+#[tauri::command]
+fn debug_hold_out_state(_app: AppHandle) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn debug_set_hello_override(_app: AppHandle) -> Result<(), String> {
+    Err("hook-control-unavailable".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn debug_clear_hello_override(_app: AppHandle) -> Result<(), String> {
+    Err("hook-control-unavailable".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn debug_broadcast_scenario(_app: AppHandle) -> Result<u32, String> {
+    Err("hook-control-unavailable".into())
 }
 
 // Linux: no injector. Refresh the dinput8 proxy in the game folder
@@ -1643,6 +1819,12 @@ fn main() {
             remove_linux_hook,
             get_hook_status,
             refresh_hook,
+            debug_eject_hook,
+            debug_allow_reinject,
+            debug_hold_out_state,
+            debug_set_hello_override,
+            debug_clear_hello_override,
+            debug_broadcast_scenario,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.

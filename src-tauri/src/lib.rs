@@ -2,8 +2,9 @@
 //! Tauri binary (`main.rs`) and auxiliary binaries (e.g. `bin/skill_backfill.rs`)
 //! can share them. main.rs is a thin binary that `use`s this crate.
 pub mod backfill;
-// Client for the hook's control channel (hook hot-reload / refresh). Windows
-// only; the hook ships the `eject` control channel in release.
+// Client for the hook's control channel: hook hot-reload / refresh (`Eject`)
+// plus the dev Debug tab's event broadcast and `Hello` override. Windows only;
+// the hook ships the `eject` control channel in release.
 #[cfg(windows)]
 pub mod control_rpc;
 pub mod data_paths;
