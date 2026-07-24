@@ -270,6 +270,15 @@
 
 /* Hook status tones in the overlay waiting slot. A leading dot glyph carries
    the state without a hover tooltip (overlay is glanceable, not interactive). */
-.encounter-status.hook-ok::before { content: "● "; color: #51cf66; }
-.encounter-status.hook-warn::before { content: "▲ "; color: #ffd43b; }
-.encounter-status.hook-idle::before { content: "○ "; color: #868e96; }
+.encounter-status.hook-ok::before {
+  content: "● ";
+  color: #51cf66;
+}
+.encounter-status.hook-warn::before {
+  content: "▲ ";
+  color: #ffd43b;
+}
+.encounter-status.hook-idle::before {
+  content: "○ ";
+  color: #868e96;
+}

@@ -7,8 +7,8 @@ import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
 import getVersion from "@/hooks/getVersion";
-import { useHookStatus } from "@/useHookStatus";
 import { EncounterState, PlayerData, SortDirection, SortType } from "@/types";
+import { useHookStatus } from "@/useHookStatus";
 import {
   exportFullEncounterToClipboard,
   exportScreenshotToClipboard,
