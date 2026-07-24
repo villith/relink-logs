@@ -33,6 +33,7 @@ mod quest;
 mod sba;
 mod stunnet;
 mod summon;
+mod trial;
 
 pub(crate) type GetEntityHashID0x58 =
     unsafe extern "system" fn(*const usize, *const u32) -> *const usize;
@@ -152,6 +153,9 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         "quest_flow_end",
         quest::OnQuestFlowEndHook::new(tx.clone()).setup(&process),
     );
+    // Training room: no flow object and no quest load, so its own start/quit
+    // boundaries are the only thing that can close a training encounter.
+    try_step("trial", trial::TrialHooks::new(tx.clone()).setup(&process));
 
     /* Conflux / EndlessMode — emits run-start / buff / run-end messages so the parser can
     group a run's rooms + buffs (room-enter itself comes from quest_load_state above). The
@@ -214,6 +218,7 @@ pub fn teardown_hooks() {
     stunnet::disable();
     area::disable();
     quest::disable();
+    trial::disable();
     endless::disable();
     sba::disable();
     #[cfg(feature = "hookdiag")]
