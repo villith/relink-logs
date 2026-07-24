@@ -111,6 +111,18 @@ async fn fetch_synthesis_seed(
     toolbox_rpc::synthesis_seed(&hook).await
 }
 
+/// Compute and broadcast the current hook status to both windows. Called on
+/// connect, disconnect, and around a refresh.
+fn emit_hook_status(app: &AppHandle) {
+    let snapshot = app.state::<HookStatus>().snapshot();
+    let _ = app.emit_all("hook-status", &snapshot);
+}
+
+#[tauri::command]
+fn get_hook_status(hook: State<'_, HookStatus>) -> toolbox_rpc::HookStatusSnapshot {
+    hook.snapshot()
+}
+
 /// Toolbox / Overmastery Predictor: is the game up, and which characters
 /// exist in the roster (for the character picker).
 #[tauri::command(async)]
@@ -1169,12 +1181,16 @@ fn connect_and_run_parser(app: AppHandle) {
 
                     let hook_status = app.state::<HookStatus>();
                     hook_status.connected.store(true, Ordering::Relaxed);
-                    // Hello up front, once per (re)connect: a stale Linux
-                    // proxy or pre-RPC hook shows as "outdated" instead of
-                    // per-command failures.
+                    // Hello up front, once per (re)connect: a stale proxy or
+                    // pre-RPC hook shows as "outdated"; the reported version +
+                    // eject support drive the status badge and refresh gating.
+                    let info = toolbox_rpc::hello().await;
+                    hook_status.outdated.store(!info.ok, Ordering::Relaxed);
+                    *hook_status.hook_version.lock().unwrap() = info.hook_version;
                     hook_status
-                        .outdated
-                        .store(!toolbox_rpc::hello_ok().await, Ordering::Relaxed);
+                        .supports_eject
+                        .store(info.supports_eject, Ordering::Relaxed);
+                    emit_hook_status(&app);
 
                     let decoder = tokio_util::codec::LengthDelimitedCodec::new();
                     let mut reader = FramedRead::new(stream, decoder);
@@ -1282,6 +1298,7 @@ fn connect_and_run_parser(app: AppHandle) {
                     app.state::<HookStatus>()
                         .connected
                         .store(false, Ordering::Relaxed);
+                    emit_hook_status(&app);
 
                     info!("Game has closed.");
 
@@ -1565,6 +1582,7 @@ fn main() {
             fetch_linux_setup_status,
             deploy_linux_hook,
             remove_linux_hook,
+            get_hook_status,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.

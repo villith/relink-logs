@@ -97,14 +97,31 @@ pub async fn call(req: ToolboxRequest) -> Result<ToolboxResponse> {
     .await
 }
 
-/// True only when the hook answers Hello with OUR protocol version. Called
-/// by the connect loop each time the event stream (re)connects.
-pub async fn hello_ok() -> bool {
-    matches!(
-        call(ToolboxRequest::Hello).await,
-        Ok(ToolboxResponse::Hello { protocol_version, .. })
-            if protocol_version == TOOLBOX_PROTOCOL_VERSION
-    )
+/// The parsed Hello handshake for the connect loop: whether the hook speaks
+/// our protocol, plus the version + eject support it reported.
+pub struct HelloInfo {
+    pub ok: bool,
+    pub hook_version: Option<String>,
+    pub supports_eject: bool,
+}
+
+pub async fn hello() -> HelloInfo {
+    match call(ToolboxRequest::Hello).await {
+        Ok(ToolboxResponse::Hello {
+            protocol_version,
+            hook_version,
+            supports_eject,
+        }) => HelloInfo {
+            ok: protocol_version == TOOLBOX_PROTOCOL_VERSION,
+            hook_version: Some(hook_version),
+            supports_eject,
+        },
+        _ => HelloInfo {
+            ok: false,
+            hook_version: None,
+            supports_eject: false,
+        },
+    }
 }
 
 /// Shared precondition for every toolbox command. `Ok(None)` = the event
