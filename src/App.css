@@ -199,6 +199,10 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
+  /**
+   * For some reason on Linux, all of the row-data bars inherit the player-row/skill-row parent background-image
+   */
+  background-image: none !important;
 }
 
 .skill-row .row-data.nested {
