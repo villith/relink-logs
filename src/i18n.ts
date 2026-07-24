@@ -3,6 +3,7 @@ import LanguageDetector from "i18next-browser-languagedetector";
 import resourcesToBackend from "i18next-resources-to-backend";
 import { initReactI18next } from "react-i18next";
 
+import { invoke } from "@tauri-apps/api";
 import { readTextFile } from "@tauri-apps/api/fs";
 import { resolveResource } from "@tauri-apps/api/path";
 
@@ -22,6 +23,24 @@ export const SUPPORTED_LANGUAGES: { [key: string]: string } = {
   ge: "Deutsch",
   "es-ES": "Español",
   "it-IT": "Italiano",
+};
+
+const syncTrayLabels = async () => {
+  if (!("__TAURI_IPC__" in window)) return;
+  try {
+    await invoke("update_tray_labels", {
+      openMeter: i18n.t("ui.tray-open-meter"),
+      openLogs: i18n.t("ui.tray-open-logs"),
+      alwaysOnTop: i18n.t("ui.tray-always-on-top"),
+      alwaysOnTopActive: i18n.t("ui.tray-always-on-top-active"),
+      clickthrough: i18n.t("ui.tray-clickthrough"),
+      clickthroughActive: i18n.t("ui.tray-clickthrough-active"),
+      resetWindows: i18n.t("ui.tray-reset-windows"),
+      quit: i18n.t("ui.tray-quit"),
+    });
+  } catch (e) {
+    console.warn("[i18n] Failed to sync tray labels:", e);
+  }
 };
 
 i18n
@@ -63,6 +82,9 @@ i18n
       bindI18nStore: "added",
     },
   });
+
+i18n.on("initialized", () => void syncTrayLabels());
+i18n.on("languageChanged", () => void syncTrayLabels());
 
 declare global {
   interface Window {

@@ -17,8 +17,6 @@ use db::logs::LogEntry;
 use dll_syringe::{process::OwnedProcess, Syringe};
 #[cfg(windows)]
 use interprocess::os::windows::named_pipe::tokio::RecvPipeStream;
-#[cfg(windows)]
-use std::path::Path;
 use log::{info, LevelFilter};
 use parser::{
     constants::{CharacterType, EnemyType},
@@ -27,6 +25,8 @@ use parser::{
 use protocol::Message;
 use rusqlite::params_from_iter;
 use serde::{Deserialize, Serialize};
+#[cfg(windows)]
+use std::path::Path;
 use tauri::{
     api::dialog::blocking::FileDialogBuilder, AppHandle, CustomMenuItem, LogicalSize, Manager,
     Size, State, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
@@ -40,6 +40,32 @@ struct AlwaysOnTop(AtomicBool);
 struct ClickThrough(AtomicBool);
 struct DebugMode(AtomicBool);
 
+struct TrayLabels {
+    open_meter: std::sync::Mutex<String>,
+    open_logs: std::sync::Mutex<String>,
+    always_on_top: std::sync::Mutex<String>,
+    always_on_top_active: std::sync::Mutex<String>,
+    clickthrough: std::sync::Mutex<String>,
+    clickthrough_active: std::sync::Mutex<String>,
+    reset_windows: std::sync::Mutex<String>,
+    quit: std::sync::Mutex<String>,
+}
+
+impl Default for TrayLabels {
+    fn default() -> Self {
+        Self {
+            open_meter: std::sync::Mutex::new("Open Meter".into()),
+            open_logs: std::sync::Mutex::new("Open Logs".into()),
+            always_on_top: std::sync::Mutex::new("Always on top".into()),
+            always_on_top_active: std::sync::Mutex::new("Always on top \u{2713}".into()),
+            clickthrough: std::sync::Mutex::new("Clickthrough".into()),
+            clickthrough_active: std::sync::Mutex::new("Clickthrough \u{2713}".into()),
+            reset_windows: std::sync::Mutex::new("Reset Windows".into()),
+            quit: std::sync::Mutex::new("Quit".into()),
+        }
+    }
+}
+
 /// Sender half of the live parser's reset channel. `None` until a parser is
 /// connected; replaced on every reconnect (the parser is owned by the
 /// pipe-reading task, so commands reach it through this channel).
@@ -50,6 +76,69 @@ fn reset_encounter(state: State<ResetChannel>) {
     if let Some(tx) = state.0.lock().unwrap().as_ref() {
         let _ = tx.send(());
     }
+}
+
+#[tauri::command]
+fn update_tray_labels(
+    app: AppHandle,
+    labels: State<TrayLabels>,
+    always_on_top_state: State<AlwaysOnTop>,
+    clickthrough_state: State<ClickThrough>,
+    open_meter: String,
+    open_logs: String,
+    always_on_top: String,
+    always_on_top_active: String,
+    clickthrough: String,
+    clickthrough_active: String,
+    reset_windows: String,
+    quit: String,
+) {
+    let tray = app.tray_handle();
+
+    if let Ok(mut v) = labels.open_meter.lock() {
+        *v = open_meter.clone();
+    }
+    if let Ok(mut v) = labels.open_logs.lock() {
+        *v = open_logs.clone();
+    }
+    if let Ok(mut v) = labels.always_on_top.lock() {
+        *v = always_on_top.clone();
+    }
+    if let Ok(mut v) = labels.always_on_top_active.lock() {
+        *v = always_on_top_active.clone();
+    }
+    if let Ok(mut v) = labels.clickthrough.lock() {
+        *v = clickthrough.clone();
+    }
+    if let Ok(mut v) = labels.clickthrough_active.lock() {
+        *v = clickthrough_active.clone();
+    }
+    if let Ok(mut v) = labels.reset_windows.lock() {
+        *v = reset_windows.clone();
+    }
+    if let Ok(mut v) = labels.quit.lock() {
+        *v = quit.clone();
+    }
+
+    let aot_active = always_on_top_state.0.load(Ordering::Acquire);
+    let ct_active = clickthrough_state.0.load(Ordering::Acquire);
+
+    let _ = tray.get_item("open_meter").set_title(&open_meter);
+    let _ = tray.get_item("open_logs").set_title(&open_logs);
+    let _ = tray.get_item("always_on_top").set_title(if aot_active {
+        &always_on_top_active
+    } else {
+        &always_on_top
+    });
+    let _ = tray
+        .get_item("toggle_clickthrough")
+        .set_title(if ct_active {
+            &clickthrough_active
+        } else {
+            &clickthrough
+        });
+    let _ = tray.get_item("reset_windows").set_title(&reset_windows);
+    let _ = tray.get_item("quit").set_title(&quit);
 }
 
 /// Toolbox / Synthesis Helper: snapshot the game's synthesis state (served
@@ -889,8 +978,9 @@ fn reload_dbg(msg: &str) {
 #[cfg(windows)]
 fn find_hook_module(
     syringe: &Syringe,
-) -> std::io::Result<Option<dll_syringe::process::ProcessModule<dll_syringe::process::BorrowedProcess<'_>>>>
-{
+) -> std::io::Result<
+    Option<dll_syringe::process::ProcessModule<dll_syringe::process::BorrowedProcess<'_>>>,
+> {
     use dll_syringe::process::Process as _;
     let process = syringe.process();
     // A hook-dbg.dll lookup error falls through to hook.dll rather than
@@ -942,9 +1032,7 @@ fn eject_hook_until_gone(syringe: &Syringe) -> anyhow::Result<u32> {
                 // Clean unload (module gone → debug_assert passed).
                 Ok(Ok(())) => ejected += 1,
                 // A real eject error (not the survival assert): give up.
-                Ok(Err(e)) => {
-                    return Err(anyhow::Error::new(e).context("FreeLibrary of the hook"))
-                }
+                Ok(Err(e)) => return Err(anyhow::Error::new(e).context("FreeLibrary of the hook")),
                 // "ejected module survived": FreeLibrary ran, refcount still > 0.
                 Err(_) => ejected += 1,
             }
@@ -1098,11 +1186,7 @@ async fn reload_hook_inner(app: &AppHandle, refresh_from: Option<&Path>) -> anyh
     // ejecting would FreeLibrary a module with live threads, so refuse.
     let wait_start = std::time::Instant::now();
     let deadline = wait_start + std::time::Duration::from_secs(5);
-    while app
-        .state::<HookStatus>()
-        .connected
-        .load(Ordering::Relaxed)
-    {
+    while app.state::<HookStatus>().connected.load(Ordering::Relaxed) {
         if std::time::Instant::now() >= deadline {
             reload_dbg("reload_hook_inner: TIMEOUT — connected never went false within 5s (pipe did not close)");
             bail!("hook did not shut down within 5s; state unknown — restart the game");
@@ -1135,7 +1219,9 @@ async fn reload_hook_inner(app: &AppHandle, refresh_from: Option<&Path>) -> anyh
     if let Some(src) = refresh_from {
         if src.exists() {
             std::fs::copy(src, "hook-dbg.dll").context("refreshing hook-dbg.dll")?;
-            reload_dbg(&format!("reload_hook_inner: hook-dbg.dll refreshed from {src:?}"));
+            reload_dbg(&format!(
+                "reload_hook_inner: hook-dbg.dll refreshed from {src:?}"
+            ));
         } else {
             // Missing dev artifact: re-inject the existing hook-dbg.dll rather
             // than hard-failing (which would leave the game with no hook, since
@@ -1398,17 +1484,13 @@ async fn check_and_perform_hook(app: AppHandle) {
     let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
     let bundled = app.path_resolver().resolve_resource("hook.dll");
     match (home, bundled) {
-        (Some(home), Some(bundled)) => {
-            match steam::discover(&steam::default_steam_roots(&home)) {
-                Some(game) => match deploy::deploy(&game.game_dir, &bundled) {
-                    Ok(_) => info!("proxy dinput8.dll is current in {:?}", game.game_dir),
-                    Err(e) => log::warn!("could not deploy the proxy DLL: {e:?}"),
-                },
-                None => log::warn!(
-                    "Steam install of the game not found; see Settings → Linux setup"
-                ),
-            }
-        }
+        (Some(home), Some(bundled)) => match steam::discover(&steam::default_steam_roots(&home)) {
+            Some(game) => match deploy::deploy(&game.game_dir, &bundled) {
+                Ok(_) => info!("proxy dinput8.dll is current in {:?}", game.game_dir),
+                Err(e) => log::warn!("could not deploy the proxy DLL: {e:?}"),
+            },
+            None => log::warn!("Steam install of the game not found; see Settings → Linux setup"),
+        },
         _ => log::warn!("no HOME or no bundled hook.dll; cannot deploy the proxy DLL"),
     }
 
@@ -1652,7 +1734,11 @@ fn toggle_window_visibility(handle: &AppHandle, id: &str, focus: Option<bool>) {
 }
 
 #[tauri::command]
-fn toggle_always_on_top(window: tauri::Window, state: State<AlwaysOnTop>) {
+fn toggle_always_on_top(
+    window: tauri::Window,
+    state: State<AlwaysOnTop>,
+    labels: State<TrayLabels>,
+) {
     let always_on_top = &state.0;
     let new_state = !always_on_top.load(Ordering::Acquire);
     always_on_top.store(new_state, Ordering::Release);
@@ -1660,19 +1746,32 @@ fn toggle_always_on_top(window: tauri::Window, state: State<AlwaysOnTop>) {
         log::warn!("set_always_on_top({new_state}) failed: {e:?}");
     }
     let _ = window.emit("on-pinned", new_state);
+    let title = if new_state {
+        labels
+            .always_on_top_active
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_else(|_| "Always on top \u{2713}".into())
+    } else {
+        labels
+            .always_on_top
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_else(|_| "Always on top".into())
+    };
     let _ = window
         .app_handle()
         .tray_handle()
         .get_item("always_on_top")
-        .set_title(if new_state {
-            "Always on top ✓"
-        } else {
-            "Always on top"
-        });
+        .set_title(&title);
 }
 
 #[tauri::command]
-fn toggle_clickthrough(window: tauri::Window, state: State<ClickThrough>) {
+fn toggle_clickthrough(
+    window: tauri::Window,
+    state: State<ClickThrough>,
+    labels: State<TrayLabels>,
+) {
     let click_through = &state.0;
     let new_state = !click_through.load(Ordering::Acquire);
     click_through.store(new_state, Ordering::Release);
@@ -1680,15 +1779,24 @@ fn toggle_clickthrough(window: tauri::Window, state: State<ClickThrough>) {
         log::warn!("set_ignore_cursor_events({new_state}) failed: {e:?}");
     }
     let _ = window.emit("on-clickthrough", new_state);
+    let title = if new_state {
+        labels
+            .clickthrough_active
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_else(|_| "Clickthrough \u{2713}".into())
+    } else {
+        labels
+            .clickthrough
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_else(|_| "Clickthrough".into())
+    };
     let _ = window
         .app_handle()
         .tray_handle()
         .get_item("toggle_clickthrough")
-        .set_title(if new_state {
-            "Clickthrough ✓"
-        } else {
-            "Clickthrough"
-        });
+        .set_title(&title);
 }
 
 #[tauri::command]
@@ -1740,10 +1848,12 @@ fn menu_tray_handler(handle: &AppHandle, event: SystemTrayEvent) {
             "toggle_clickthrough" => toggle_clickthrough(
                 handle.get_window("main").unwrap(),
                 handle.state::<ClickThrough>(),
+                handle.state::<TrayLabels>(),
             ),
             "always_on_top" => toggle_always_on_top(
                 handle.get_window("main").unwrap(),
                 handle.state::<AlwaysOnTop>(),
+                handle.state::<TrayLabels>(),
             ),
             "reset_windows" => {
                 reset_window_to_default(handle, "main", false);
@@ -1820,6 +1930,7 @@ fn main() {
         .manage(DebugMode(AtomicBool::new(false)))
         .manage(ResetChannel(std::sync::Mutex::new(None)))
         .manage(HookStatus::default())
+        .manage(TrayLabels::default())
         .system_tray(system_tray_with_menu())
         .on_system_tray_event(menu_tray_handler)
         .on_window_event(|event| {
@@ -1835,6 +1946,7 @@ fn main() {
             delete_logs,
             delete_all_logs,
             toggle_always_on_top,
+            toggle_clickthrough,
             reset_meter_window,
             export_damage_log_to_file,
             set_debug_mode,
@@ -1858,6 +1970,7 @@ fn main() {
             debug_set_hello_override,
             debug_clear_hello_override,
             debug_broadcast_scenario,
+            update_tray_labels,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.
