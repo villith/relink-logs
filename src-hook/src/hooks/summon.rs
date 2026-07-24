@@ -172,6 +172,14 @@ const SUMMON_BODY_HASHES: &[u32] = &[
     0xB0792857, // BehaviorSummonObjectBase (generic summon body)
 ];
 
+/// True iff `type_id` is one of the summon body classes above. Only sixteen of
+/// the game's seventy-four summons own a body class; the rest share a generic
+/// one, so a true answer here does NOT identify which summon was called.
+#[cfg(feature = "hookdiag")]
+pub(crate) fn is_summon_body(type_id: u32) -> bool {
+    SUMMON_BODY_HASHES.contains(&type_id)
+}
+
 /// Handle offsets on a summon body: index gate, then the entity pointer.
 const SUMMON_OWNER_IDX_OFFSET: usize = 0xFE0;
 const SUMMON_OWNER_PTR_OFFSET: usize = 0xFE8;

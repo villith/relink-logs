@@ -576,6 +576,17 @@ impl OnProcessDamageHook {
                 damage_instance.damage_cap,
                 damage_instance.base_damage,
             );
+            // A summon body: dump the per-summon configuration it copied out of
+            // its own data record, so summons that share a generic body can be
+            // told apart. Action id 80000 and the body class are identical for
+            // all of them, so nothing in the event itself distinguishes them.
+            if crate::hooks::summon::is_summon_body(source_type_id) {
+                crate::hooks::diag::probe_summon_body(
+                    source_specified_instance_ptr,
+                    source_type_id,
+                );
+            }
+
             // Unresolved source: run the parent scan so the owner-entity offset
             // for a new proxy actor can be derived from the log.
             let source_ptr = source_specified_instance_ptr as *const usize;
