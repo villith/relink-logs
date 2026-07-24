@@ -7,16 +7,17 @@ import { useTranslation } from "react-i18next";
 
 import { backendErrorMessage } from "@/backendErrors";
 import { useEncounterStore } from "@/stores/useEncounterStore";
+import { HookState } from "@/types";
 import { useHookStatus } from "@/useHookStatus";
 
-const TONE: Record<string, string> = {
+const TONE: Record<HookState, string> = {
   connected: "#51cf66",
   reconnecting: "#ffd43b",
   outOfDate: "#ffd43b",
   disconnected: "#868e96",
 };
 
-const LABEL_KEY: Record<string, string> = {
+const LABEL_KEY: Record<HookState, string> = {
   connected: "ui.hook-status.connected",
   reconnecting: "ui.hook-status.reconnecting",
   outOfDate: "ui.hook-status.out-of-date",
@@ -60,9 +61,16 @@ export default function HookStatusBadge() {
     }
   };
 
-  const onReconnect = () => {
+  const onReconnect = async () => {
     setBusy(true);
-    invoke("reconnect_hook").finally(() => setBusy(false));
+    try {
+      await invoke("reconnect_hook");
+    } catch (e) {
+      const msg = backendErrorMessage(t, "hook", String(e)) ?? String(e);
+      toast.error(t("ui.hook-status.refresh-failed", { error: msg }));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
