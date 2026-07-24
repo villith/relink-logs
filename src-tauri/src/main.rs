@@ -79,6 +79,7 @@ fn reset_encounter(state: State<ResetChannel>) {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 fn update_tray_labels(
     app: AppHandle,
     labels: State<TrayLabels>,
@@ -91,54 +92,62 @@ fn update_tray_labels(
     clickthrough: String,
     clickthrough_active: String,
     reset_windows: String,
+    reload_hook: String,
     quit: String,
 ) {
     let tray = app.tray_handle();
 
-    if let Ok(mut v) = labels.open_meter.lock() {
-        *v = open_meter.clone();
-    }
-    if let Ok(mut v) = labels.open_logs.lock() {
-        *v = open_logs.clone();
-    }
-    if let Ok(mut v) = labels.always_on_top.lock() {
-        *v = always_on_top.clone();
-    }
-    if let Ok(mut v) = labels.always_on_top_active.lock() {
-        *v = always_on_top_active.clone();
-    }
-    if let Ok(mut v) = labels.clickthrough.lock() {
-        *v = clickthrough.clone();
-    }
-    if let Ok(mut v) = labels.clickthrough_active.lock() {
-        *v = clickthrough_active.clone();
-    }
-    if let Ok(mut v) = labels.reset_windows.lock() {
-        *v = reset_windows.clone();
-    }
-    if let Ok(mut v) = labels.quit.lock() {
-        *v = quit.clone();
-    }
-
     let aot_active = always_on_top_state.0.load(Ordering::Acquire);
     let ct_active = clickthrough_state.0.load(Ordering::Acquire);
 
-    let _ = tray.get_item("open_meter").set_title(&open_meter);
-    let _ = tray.get_item("open_logs").set_title(&open_logs);
-    let _ = tray.get_item("always_on_top").set_title(if aot_active {
+    // `get_item` panics when the id isn't in the menu (tauri `app/tray.rs`:
+    // `panic!("item id not found")`). This runs on the main thread inside the
+    // webview IPC callback, so such a panic would unwind across FFI. The
+    // fallible variant makes a missing item a no-op — which is what lets us
+    // set `reload_hook` unconditionally even though the item only exists
+    // under `cfg(all(windows, debug_assertions))`.
+    let set = |id: &str, title: &str| {
+        if let Some(item) = tray.try_get_item(id) {
+            let _ = item.set_title(title);
+        }
+    };
+
+    let aot_title = if aot_active {
         &always_on_top_active
     } else {
         &always_on_top
-    });
-    let _ = tray
-        .get_item("toggle_clickthrough")
-        .set_title(if ct_active {
-            &clickthrough_active
-        } else {
-            &clickthrough
-        });
-    let _ = tray.get_item("reset_windows").set_title(&reset_windows);
-    let _ = tray.get_item("quit").set_title(&quit);
+    };
+    let ct_title = if ct_active {
+        &clickthrough_active
+    } else {
+        &clickthrough
+    };
+
+    set("open_meter", &open_meter);
+    set("open_logs", &open_logs);
+    set("always_on_top", aot_title);
+    set("toggle_clickthrough", ct_title);
+    set("reset_windows", &reset_windows);
+    set("reload_hook", &reload_hook);
+    set("quit", &quit);
+
+    // Cached so the toggles can re-render the ✓/no-✓ variants without a round
+    // trip to the frontend. `reload_hook` has no toggle state, so it isn't
+    // stored.
+    let store = |slot: &std::sync::Mutex<String>, value: String| {
+        if let Ok(mut v) = slot.lock() {
+            *v = value;
+        }
+    };
+
+    store(&labels.open_meter, open_meter);
+    store(&labels.open_logs, open_logs);
+    store(&labels.always_on_top, always_on_top);
+    store(&labels.always_on_top_active, always_on_top_active);
+    store(&labels.clickthrough, clickthrough);
+    store(&labels.clickthrough_active, clickthrough_active);
+    store(&labels.reset_windows, reset_windows);
+    store(&labels.quit, quit);
 }
 
 /// Toolbox / Synthesis Helper: snapshot the game's synthesis state (served
@@ -1706,8 +1715,8 @@ fn system_tray_with_menu() -> SystemTray {
         .add_item(toggle_clickthrough)
         .add_item(reset_windows);
 
-    // Dev-only hook hot-reload. Tray strings don't go through i18next
-    // (backend); an English label is fine for a debug-only item.
+    // Dev-only hook hot-reload. The English label is the startup default;
+    // `update_tray_labels` localizes it once a webview has booted.
     #[cfg(all(windows, debug_assertions))]
     let menu = menu.add_item(CustomMenuItem::new("reload_hook", "Reload hook (dev)"));
 
@@ -1759,11 +1768,13 @@ fn toggle_always_on_top(
             .map(|g| g.clone())
             .unwrap_or_else(|_| "Always on top".into())
     };
-    let _ = window
+    if let Some(item) = window
         .app_handle()
         .tray_handle()
-        .get_item("always_on_top")
-        .set_title(&title);
+        .try_get_item("always_on_top")
+    {
+        let _ = item.set_title(&title);
+    }
 }
 
 #[tauri::command]
@@ -1792,11 +1803,13 @@ fn toggle_clickthrough(
             .map(|g| g.clone())
             .unwrap_or_else(|_| "Clickthrough".into())
     };
-    let _ = window
+    if let Some(item) = window
         .app_handle()
         .tray_handle()
-        .get_item("toggle_clickthrough")
-        .set_title(&title);
+        .try_get_item("toggle_clickthrough")
+    {
+        let _ = item.set_title(&title);
+    }
 }
 
 #[tauri::command]
