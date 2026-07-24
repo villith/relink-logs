@@ -54,6 +54,7 @@ import {
   OVERMASTERY_EFFECT_IDS,
   PLAYER_COLORS,
   SIGIL_CATEGORY_TARGET,
+  SKILLBOARD_CATEGORIES,
   checklistLevel,
   checklistStatus,
   collectSigilsByCategory,
@@ -74,6 +75,7 @@ import {
   millisecondsToElapsedFormat,
   openDamageCalculator,
   resolvePlayerColor,
+  skillboardActivationCost,
   skillboardLayoutFor,
   skillboardNodeMeta,
   summonBonusValue,
@@ -103,6 +105,7 @@ import {
   type CombinedBonus,
   type CombinedTrait,
   type SigilCategory,
+  type SkillboardCategory,
   type TraitSource,
   type WeaponTraitDef,
 } from "@/utils";
@@ -524,6 +527,13 @@ const BonusRow = ({ bonus }: { bonus: CombinedBonus }) => {
   );
 };
 
+/** Flips one key's membership in a set-as-state, returning a new set. */
+const toggleKey = (previous: Set<string>, key: string): Set<string> => {
+  const next = new Set(previous);
+  if (!next.delete(key)) next.add(key);
+  return next;
+};
+
 // A Computed group line: how many equipped sigils are of the given in-game
 // types (a sigil's type is its FIRST trait's type), out of the 5 each check
 // targets — e.g. the DMG Cap skillboard node counts 5 Basic Stats-type sigils.
@@ -702,21 +712,20 @@ export const ViewPage = () => {
   const [pendingRange, setPendingRange] = useState<[number, number] | null>(null);
   // Meter state reparsed over the committed window; null = show the full fight.
   const [scrubbedEncounter, setScrubbedEncounter] = useState<EncounterState | null>(null);
-  // Shared so toggling a master-trait tier expands/collapses it for every player column.
-  const [expandedMasterTraitTiers, setExpandedMasterTraitTiers] = useState<Set<number | "ex">>(new Set());
-  const toggleMasterTraitTier = useCallback((tierKey: number | "ex") => {
-    setExpandedMasterTraitTiers((previous) => {
-      const next = new Set(previous);
-      if (next.has(tierKey)) {
-        next.delete(tierKey);
-      } else {
-        next.add(tierKey);
-      }
-      return next;
-    });
+  // Shared so toggling a master-trait tier or branch expands/collapses it for
+  // every player column at once. Both start collapsed — the section header's
+  // per-branch activation pips are the at-a-glance summary, so the rows below
+  // only need to open when someone wants the individual nodes.
+  const [expandedMasterTraitTiers, setExpandedMasterTraitTiers] = useState<Set<string>>(new Set());
+  const [expandedMasterTraitCategories, setExpandedMasterTraitCategories] = useState<Set<string>>(new Set());
+  const toggleMasterTraitTier = useCallback((tierId: string) => {
+    setExpandedMasterTraitTiers((previous) => toggleKey(previous, tierId));
   }, []);
-  const setAllMasterTraitTiers = useCallback((tierKeys: (number | "ex")[], expand: boolean) => {
-    setExpandedMasterTraitTiers(expand ? new Set(tierKeys) : new Set());
+  const toggleMasterTraitCategory = useCallback((categoryId: string) => {
+    setExpandedMasterTraitCategories((previous) => toggleKey(previous, categoryId));
+  }, []);
+  const setAllMasterTraitTiers = useCallback((tierIds: string[], expand: boolean) => {
+    setExpandedMasterTraitTiers(expand ? new Set(tierIds) : new Set());
   }, []);
 
   // The target filter's MultiSelect value, derived from the store's
@@ -1738,7 +1747,9 @@ export const ViewPage = () => {
                   <MasterTraitsRows
                     playerData={playerData}
                     expandedTiers={expandedMasterTraitTiers}
+                    expandedCategories={expandedMasterTraitCategories}
                     onToggleTier={toggleMasterTraitTier}
+                    onToggleCategory={toggleMasterTraitCategory}
                     onToggleAll={setAllMasterTraitTiers}
                   />
                   <Table.Tr>
@@ -1915,7 +1926,9 @@ export const ViewPage = () => {
                   <MasterTraitsRows
                     playerData={playerData}
                     expandedTiers={expandedMasterTraitTiers}
+                    expandedCategories={expandedMasterTraitCategories}
                     onToggleTier={toggleMasterTraitTier}
+                    onToggleCategory={toggleMasterTraitCategory}
                     onToggleAll={setAllMasterTraitTiers}
                   />
                 </Table.Tbody>
@@ -1928,34 +1941,55 @@ export const ViewPage = () => {
   );
 };
 
+type SkillboardNode = { text: string; unlocked: boolean; warn: boolean };
+
+/// One branch (ATK/DEF/LIM) of a tier: its nodes plus the progress toward the
+/// tier's activation threshold. `key` is null only for a node id whose
+/// category can't be decoded (game-patch drift) — every shipped board node
+/// resolves.
+type SkillboardCategoryGroup = {
+  key: SkillboardCategory | null;
+  nodes: SkillboardNode[];
+  /** Points spent in this branch of this tier. */
+  spent: number;
+  /** Points needed to activate it; 0 for EX, which has no threshold. */
+  required: number;
+};
+
 type SkillboardTier = {
   key: number | "ex";
-  nodes: { text: string; unlocked: boolean; warn: boolean }[];
+  /** Points spent across every branch of the tier. */
+  spent: number;
+  categories: SkillboardCategoryGroup[];
 };
 
 /// The character's full master-trait board grouped by tier (Chaos 1-3, then
-/// EX) with the player's unlocked nodes flagged, each tier sorted unlocked
-/// first, then unselected DMG Cap warnings, then alphabetically within each
-/// group. Placement comes from the
+/// EX) and, within each tier, by branch (ATK/DEF/LIM), with the player's
+/// unlocked nodes flagged. Each branch is sorted unlocked first, then
+/// unselected DMG Cap warnings, then alphabetically within each group.
+/// Placement comes from the
 /// game's skillboard_layout table (skillboard-layout.json) — the node id does
-/// not encode the tier. Empty when the player has no skillboard data at all
-/// (older logs, companions) so the cell falls back to a placeholder instead
-/// of an all-unselected board.
+/// not encode the tier (the hundreds digit does encode the branch). Empty when
+/// the player has no skillboard data at all (older logs, companions) so the
+/// cell falls back to a placeholder instead of an all-unselected board.
 function groupSkillboardNodes(player: PlayerData): { total: number; tiers: SkillboardTier[] } {
   const unlocked = player.skillboard ?? [];
   if (unlocked.length === 0) return { total: 0, tiers: [] };
 
   const unlockedIds = new Set(unlocked);
-  const tiers = new Map<number | "ex", SkillboardTier["nodes"]>();
+  const tiers = new Map<number | "ex", Map<SkillboardCategory | null, SkillboardNode[]>>();
   let total = 0;
   const push = (tierKey: number | "ex", id: number, isUnlocked: boolean) => {
     if (isUnlocked) total += 1;
     let tier = tiers.get(tierKey);
-    if (!tier) tiers.set(tierKey, (tier = []));
+    if (!tier) tiers.set(tierKey, (tier = new Map()));
+    const category = skillboardNodeMeta(id)?.category ?? null;
+    let nodes = tier.get(category);
+    if (!nodes) tier.set(category, (nodes = []));
     const text = translateSkillboardNode(player.characterType, id);
     // Unselected DMG Cap nodes are almost always a build mistake — flag them
     // like the checklist's warning state.
-    tier.push({ text, unlocked: isUnlocked, warn: !isUnlocked && text.includes("DMG Cap") });
+    nodes.push({ text, unlocked: isUnlocked, warn: !isUnlocked && text.includes("DMG Cap") });
   };
 
   const placed = new Set<number>();
@@ -1979,15 +2013,29 @@ function groupSkillboardNodes(player: PlayerData): { total: number; tiers: Skill
     total,
     tiers: [...tiers.entries()]
       .sort((a, b) => order(a[0]) - order(b[0]))
-      .map(([key, nodes]) => ({
-        key,
-        nodes: nodes.sort(
-          (a, b) =>
-            Number(b.unlocked) - Number(a.unlocked) || Number(b.warn) - Number(a.warn) || a.text.localeCompare(b.text)
-        ),
-      })),
+      .map(([key, byCategory]) => {
+        const categories = [...byCategory.entries()]
+          .sort((a, b) => categoryOrder(a[0]) - categoryOrder(b[0]))
+          .map(([category, nodes]) => ({
+            key: category,
+            nodes: nodes.sort(
+              (a, b) =>
+                Number(b.unlocked) - Number(a.unlocked) ||
+                Number(b.warn) - Number(a.warn) ||
+                a.text.localeCompare(b.text)
+            ),
+            spent: nodes.filter((node) => node.unlocked).length,
+            required: category === null ? 0 : skillboardActivationCost(key),
+          }));
+
+        return { key, categories, spent: categories.reduce((sum, category) => sum + category.spent, 0) };
+      }),
   };
 }
+
+/// Branch display order, with undecodable nodes (key null) trailing.
+const categoryOrder = (key: SkillboardCategory | null) =>
+  key === null ? SKILLBOARD_CATEGORIES.length : SKILLBOARD_CATEGORIES.indexOf(key);
 
 /** Kills the table's zebra striping on a row — the master-traits rows read as
  * one section, not alternating table entries. */
@@ -2003,13 +2051,18 @@ const UNSTRIPED = { backgroundColor: "transparent" } as const;
 function MasterTraitsRows({
   playerData,
   expandedTiers,
+  expandedCategories,
   onToggleTier,
+  onToggleCategory,
   onToggleAll,
 }: {
   playerData: PlayerData[];
-  expandedTiers: Set<number | "ex">;
-  onToggleTier: (tierKey: number | "ex") => void;
-  onToggleAll: (tierKeys: (number | "ex")[], expand: boolean) => void;
+  /** Tiers and branches both start collapsed, so these hold the open ones. */
+  expandedTiers: Set<string>;
+  expandedCategories: Set<string>;
+  onToggleTier: (tierId: string) => void;
+  onToggleCategory: (categoryId: string) => void;
+  onToggleAll: (tierIds: string[], expand: boolean) => void;
 }) {
   const { i18n } = useTranslation();
   // Grouping walks every layout node through i18next per player — cache it so
@@ -2023,23 +2076,26 @@ function MasterTraitsRows({
   const tierKeys = [...new Set(grouped.flatMap((skillboard) => skillboard.tiers.map((tier) => tier.key)))].sort(
     (a, b) => tierOrder(a) - tierOrder(b)
   );
-  const allExpanded = tierKeys.length > 0 && tierKeys.every((tierKey) => expandedTiers.has(tierKey));
+  const allExpanded = tierKeys.length > 0 && tierKeys.every((tierKey) => expandedTiers.has(String(tierKey)));
 
   const rows: JSX.Element[] = [];
   for (const tierKey of tierKeys) {
     const perPlayerTier = grouped.map((skillboard) => skillboard.tiers.find((tier) => tier.key === tierKey));
-    const expanded = expandedTiers.has(tierKey);
+    const tierId = String(tierKey);
+    const expanded = expandedTiers.has(tierId);
 
     rows.push(
       <Table.Tr key={`tier-${tierKey}`} style={UNSTRIPED}>
         {perPlayerTier.map((tier, playerIndex) => (
           <Table.Td key={playerData[playerIndex].actorIndex} style={{ verticalAlign: "top" }}>
             {tier && (
-              <UnstyledButton onClick={() => onToggleTier(tierKey)}>
-                <Text size="xs" fw={600} c="dimmed" style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <UnstyledButton onClick={() => onToggleTier(tierId)}>
+                {/* Brighter than the dimmed branch rows under it, dimmer than
+                    the section header above it — the middle rung of the three. */}
+                <Text size="xs" fw={600} c="gray.5" style={{ display: "flex", alignItems: "center", gap: 4 }}>
                   {expanded ? <Minus size="0.7rem" weight="bold" /> : <Plus size="0.7rem" weight="bold" />}
                   {tierKey === "ex" ? t("ui.master-traits.ex") : t("ui.master-traits.tier", { tier: tierKey })} (
-                  {tier.nodes.filter((node) => node.unlocked).length})
+                  {tier.spent})
                 </Text>
               </UnstyledButton>
             )}
@@ -2050,38 +2106,74 @@ function MasterTraitsRows({
 
     if (!expanded) continue;
 
-    const maxNodes = Math.max(...perPlayerTier.map((tier) => tier?.nodes.length ?? 0));
-    for (let nodeIndex = 0; nodeIndex < maxNodes; nodeIndex++) {
-      rows.push(
-        <Table.Tr key={`tier-${tierKey}-node-${nodeIndex}`} style={UNSTRIPED}>
-          {perPlayerTier.map((tier, playerIndex) => {
-            const node = tier?.nodes[nodeIndex];
+    // Union of the players' branches so every player's ATK block starts on the
+    // same row, exactly like the tier rows above.
+    const categoryKeys = [
+      ...new Set(perPlayerTier.flatMap((tier) => tier?.categories.map((category) => category.key) ?? [])),
+    ].sort((a, b) => categoryOrder(a) - categoryOrder(b));
 
-            return (
-              <Table.Td key={playerData[playerIndex].actorIndex} style={{ verticalAlign: "top" }}>
-                <Placeholder empty={!node}>
-                  {node && (
-                    <Text
-                      size="xs"
-                      fw={300}
-                      c={node.unlocked ? "teal" : node.warn ? "orange" : undefined}
-                      style={{ display: "flex", alignItems: "center", gap: 4 }}
-                    >
-                      {node.warn ? (
-                        <Warning size="0.7rem" weight="bold" style={{ flexShrink: 0 }} />
-                      ) : (
-                        // Kept invisible when locked so the text stays aligned.
-                        <Check size="0.7rem" weight="bold" style={{ opacity: node.unlocked ? 1 : 0, flexShrink: 0 }} />
-                      )}
-                      {node.text}
-                    </Text>
-                  )}
-                </Placeholder>
-              </Table.Td>
-            );
-          })}
+    for (const categoryKey of categoryKeys) {
+      const perPlayerCategory = perPlayerTier.map((tier) =>
+        tier?.categories.find((category) => category.key === categoryKey)
+      );
+      const categoryId = `${tierId}:${categoryKey ?? "other"}`;
+      const categoryExpanded = expandedCategories.has(categoryId);
+
+      rows.push(
+        <Table.Tr key={`tier-${tierKey}-cat-${categoryKey ?? "other"}`} style={UNSTRIPED}>
+          {perPlayerCategory.map((category, playerIndex) => (
+            <Table.Td key={playerData[playerIndex].actorIndex} style={{ verticalAlign: "top" }}>
+              {category && (
+                <CategoryHeader
+                  category={category}
+                  expanded={categoryExpanded}
+                  onToggle={() => onToggleCategory(categoryId)}
+                />
+              )}
+            </Table.Td>
+          ))}
         </Table.Tr>
       );
+
+      if (!categoryExpanded) continue;
+
+      const maxNodes = Math.max(...perPlayerCategory.map((category) => category?.nodes.length ?? 0));
+      for (let nodeIndex = 0; nodeIndex < maxNodes; nodeIndex++) {
+        rows.push(
+          <Table.Tr key={`tier-${tierKey}-cat-${categoryKey ?? "other"}-node-${nodeIndex}`} style={UNSTRIPED}>
+            {perPlayerCategory.map((category, playerIndex) => {
+              const node = category?.nodes[nodeIndex];
+
+              return (
+                <Table.Td key={playerData[playerIndex].actorIndex} style={{ verticalAlign: "top" }}>
+                  <Placeholder empty={!node}>
+                    {node && (
+                      <Text
+                        size="xs"
+                        fw={300}
+                        c={node.unlocked ? "teal" : node.warn ? "orange" : undefined}
+                        style={{ display: "flex", alignItems: "center", gap: 4, paddingLeft: 10 }}
+                      >
+                        {node.warn ? (
+                          <Warning size="0.7rem" weight="bold" style={{ flexShrink: 0 }} />
+                        ) : (
+                          // Kept invisible when locked so the text stays aligned.
+                          <Check
+                            size="0.7rem"
+                            weight="bold"
+                            style={{ opacity: node.unlocked ? 1 : 0, flexShrink: 0 }}
+                          />
+                        )}
+                        {node.text}
+                      </Text>
+                    )}
+                  </Placeholder>
+                </Table.Td>
+              );
+            })}
+          </Table.Tr>
+        );
+      }
     }
   }
 
@@ -2095,12 +2187,15 @@ function MasterTraitsRows({
           return (
             <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
               {anyTraits ? (
-                <UnstyledButton onClick={() => onToggleAll(tierKeys, !allExpanded)}>
-                  <Text size="xs" fw={700} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                    {allExpanded ? <Minus size="0.7rem" weight="bold" /> : <Plus size="0.7rem" weight="bold" />}
-                    {label}
-                  </Text>
-                </UnstyledButton>
+                <Group justify="space-between" wrap="nowrap" gap={8} align="center">
+                  <UnstyledButton onClick={() => onToggleAll(tierKeys.map(String), !allExpanded)}>
+                    <Text size="xs" fw={700} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      {allExpanded ? <Minus size="0.7rem" weight="bold" /> : <Plus size="0.7rem" weight="bold" />}
+                      {label}
+                    </Text>
+                  </UnstyledButton>
+                  <ActivationSummary tiers={grouped[playerIndex].tiers} />
+                </Group>
               ) : (
                 <>
                   <Text size="xs" fw={700}>
@@ -2115,6 +2210,122 @@ function MasterTraitsRows({
       </Table.Tr>
       {rows}
     </>
+  );
+}
+
+const CATEGORY_LABEL_KEY: Record<SkillboardCategory | "other", string> = {
+  atk: "ui.master-traits.category.atk",
+  def: "ui.master-traits.category.def",
+  lim: "ui.master-traits.category.lim",
+  other: "ui.master-traits.category.other",
+};
+
+const CATEGORY_INITIAL_KEY: Record<SkillboardCategory, string> = {
+  atk: "ui.master-traits.initial.atk",
+  def: "ui.master-traits.initial.def",
+  lim: "ui.master-traits.initial.lim",
+};
+
+/** The whole board at a glance, for the section header: a column per branch
+ * (E/I/C) holding one pip per Chaos tier, filled where that branch's
+ * activation threshold is met. EX carries no threshold, so it has no pip. */
+function ActivationSummary({ tiers }: { tiers: SkillboardTier[] }) {
+  return (
+    <Group gap={10} wrap="nowrap">
+      {SKILLBOARD_CATEGORIES.map((key) => {
+        const activated = tiers
+          .map((tier) => tier.categories.find((category) => category.key === key))
+          .filter((category) => category !== undefined && category.required > 0)
+          .map((category) => category!.spent >= category!.required);
+        if (activated.length === 0) return null;
+        // Every tier of the branch activated — the letter joins its pips.
+        const fullySpecced = activated.every(Boolean);
+
+        return (
+          <Stack key={key} gap={2} align="center">
+            <Text size="xs" fw={700} lh={1} c={fullySpecced ? PIP_SPENT_EDGE : "dimmed"}>
+              {t(CATEGORY_INITIAL_KEY[key])}
+            </Text>
+            <Group gap={4} wrap="nowrap">
+              {activated.map((isActivated, index) => (
+                <PointDiamond key={index} filled={isActivated} />
+              ))}
+            </Group>
+          </Stack>
+        );
+      })}
+    </Group>
+  );
+}
+
+/** One branch of one tier: a toggle for its node list, its name, and a pip per
+ * point needed to activate the branch's tier bonus, filled up to what the
+ * player actually spent. EX has no activation threshold, so it shows a plain
+ * count instead of pips. */
+function CategoryHeader({
+  category,
+  expanded,
+  onToggle,
+}: {
+  category: SkillboardCategoryGroup;
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const activated = category.required > 0 && category.spent >= category.required;
+
+  return (
+    <UnstyledButton onClick={onToggle} style={{ display: "block", width: "100%" }}>
+      {/* The pips sit flush against the column's right edge so they line up
+          into a single column across the branches, whose names vary in width. */}
+      <Group gap={8} wrap="nowrap" justify="space-between" style={{ paddingLeft: 10 }}>
+        <Text
+          size="xs"
+          fw={600}
+          c={activated ? PIP_SPENT_EDGE : "dimmed"}
+          style={{ display: "flex", alignItems: "center", gap: 4 }}
+        >
+          {expanded ? <Minus size="0.7rem" weight="bold" /> : <Plus size="0.7rem" weight="bold" />}
+          {t(CATEGORY_LABEL_KEY[category.key ?? "other"])}
+        </Text>
+        {category.required > 0 ? (
+          <Group gap={5} wrap="nowrap">
+            {Array.from({ length: category.required }, (_, index) => (
+              <PointDiamond key={index} filled={index < category.spent} />
+            ))}
+          </Group>
+        ) : (
+          <Text size="xs" fw={400} c="dimmed">
+            ({category.spent})
+          </Text>
+        )}
+      </Group>
+    </UnstyledButton>
+  );
+}
+
+// The master-trait pip palette. The edge color doubles as the highlight for
+// labels that echo their pips (an activated branch, a fully specced letter).
+const PIP_SPENT = "#c026d3";
+const PIP_SPENT_EDGE = "#f0abfc";
+const PIP_EMPTY = "#101014";
+const PIP_EMPTY_EDGE = "#4c5fd7";
+
+/** A spent master-trait point (filled pink/purple) or one still missing before
+ * the branch activates (purple-blue outline on near-black). */
+function PointDiamond({ filled }: { filled: boolean }) {
+  return (
+    <Box
+      component="span"
+      style={{
+        width: 6,
+        height: 6,
+        flexShrink: 0,
+        transform: "rotate(45deg)",
+        border: `1px solid ${filled ? PIP_SPENT_EDGE : PIP_EMPTY_EDGE}`,
+        backgroundColor: filled ? PIP_SPENT : PIP_EMPTY,
+        boxShadow: filled ? "0 0 4px rgba(217, 70, 239, 0.55)" : "none",
+      }}
+    />
   );
 }
 
