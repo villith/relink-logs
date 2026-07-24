@@ -4,9 +4,11 @@ import { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const invoke = vi.fn();
+const emit = vi.fn();
 let status: unknown = null;
 let encounterState: unknown = null;
 vi.mock("@tauri-apps/api", () => ({ invoke: (...a: unknown[]) => invoke(...a) }));
+vi.mock("@tauri-apps/api/event", () => ({ emit: (...a: unknown[]) => emit(...a) }));
 vi.mock("@/useHookStatus", () => ({ useHookStatus: () => status }));
 vi.mock("@mantine/modals", () => ({ modals: { openConfirmModal: vi.fn() } }));
 vi.mock("@/stores/useEncounterStore", () => ({
@@ -23,6 +25,8 @@ const renderBadge = (ui: ReactElement) => render(<MantineProvider>{ui}</MantineP
 describe("HookStatusBadge", () => {
   beforeEach(() => {
     invoke.mockReset();
+    emit.mockReset();
+    emit.mockResolvedValue(undefined);
     vi.mocked(modals.openConfirmModal).mockReset();
     status = null;
     encounterState = null;
@@ -72,6 +76,19 @@ describe("HookStatusBadge", () => {
     fireEvent.click(screen.getByRole("button", { name: "ui.hook-status.refresh" }));
     expect(modals.openConfirmModal).toHaveBeenCalledTimes(1);
     expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("simulates the refresh in the frontend (no backend call) for debug-simulated states", async () => {
+    vi.useFakeTimers();
+    encounterState = null;
+    status = { state: "outOfDate", hookVersion: "debug", appVersion: "debug", supportsEject: true, simulated: true };
+    renderBadge(<HookStatusBadge />);
+    fireEvent.click(screen.getByRole("button", { name: "ui.hook-status.refresh" }));
+    await vi.runAllTimersAsync();
+    expect(invoke).not.toHaveBeenCalled();
+    expect(emit).toHaveBeenCalledWith("hook-status", expect.objectContaining({ state: "reconnecting", simulated: true }));
+    expect(emit).toHaveBeenCalledWith("hook-status", expect.objectContaining({ state: "connected", simulated: true }));
+    vi.useRealTimers();
   });
 
   it("shows no action buttons in connected or reconnecting states", () => {

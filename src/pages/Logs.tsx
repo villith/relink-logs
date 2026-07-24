@@ -74,7 +74,7 @@ const Layout = () => {
 
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { logsActive, toolboxActive, settingsActive, confluxActive, questsActive, onListPage } =
+  const { logsActive, toolboxActive, settingsActive, debugActive, confluxActive, questsActive, onListPage } =
     deriveNavState(pathname);
   // Live pathname for the encounter-saved listener (its closure would
   // otherwise hold the pathname from when the listener was attached).
@@ -135,6 +135,11 @@ const Layout = () => {
               <NavTab to="/logs/settings" icon={<Gear size="1rem" />} active={settingsActive}>
                 {t("ui.settings")}
               </NavTab>
+              {import.meta.env.DEV && (
+                <NavTab to="/logs/debug" icon={<Bug size="1rem" />} active={debugActive}>
+                  {t("ui.debug.title")}
+                </NavTab>
+              )}
             </Group>
             <Group gap="xs" wrap="nowrap" justify="flex-end" style={{ flex: 1 }}>
               <Button

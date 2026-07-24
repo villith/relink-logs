@@ -1,14 +1,32 @@
 import { Button, Group, Text } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { invoke } from "@tauri-apps/api";
+import { emit } from "@tauri-apps/api/event";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
 import { backendErrorMessage } from "@/backendErrors";
 import { useEncounterStore } from "@/stores/useEncounterStore";
-import { HookState } from "@/types";
+import { HookState, HookStatusSnapshot } from "@/types";
 import { useHookStatus } from "@/useHookStatus";
+
+/** Dev Debug tab hook-state simulation: mimic a refresh purely in the frontend
+ * (reconnecting → connected) instead of reinjecting a real hook, which would
+ * act on true backend state rather than the simulated one. */
+const simulatedSnapshot = (state: HookState): HookStatusSnapshot => ({
+  state,
+  hookVersion: "debug",
+  appVersion: "debug",
+  supportsEject: true,
+  simulated: true,
+});
+
+const simulateRefresh = async () => {
+  await emit("hook-status", simulatedSnapshot("reconnecting"));
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  await emit("hook-status", simulatedSnapshot("connected"));
+};
 
 const TONE: Record<HookState, string> = {
   connected: "#51cf66",
@@ -21,7 +39,7 @@ const LABEL_KEY: Record<HookState, string> = {
   connected: "ui.hook-status.connected",
   reconnecting: "ui.hook-status.reconnecting",
   outOfDate: "ui.hook-status.out-of-date",
-  disconnected: "ui.hook-status.waiting-for-game",
+  disconnected: "ui.hook-status.no-game",
 };
 
 /** Hook connection/version status + actions, shown in the logs header. */
@@ -35,7 +53,12 @@ export default function HookStatusBadge() {
   const runRefresh = async () => {
     setBusy(true);
     try {
-      await invoke("refresh_hook");
+      // A debug-simulated state has no real hook to reinject — fake the refresh.
+      if (hook.simulated) {
+        await simulateRefresh();
+      } else {
+        await invoke("refresh_hook");
+      }
       toast.success(t("ui.hook-status.refreshed"));
     } catch (e) {
       const msg = backendErrorMessage(t, "hook", String(e)) ?? String(e);

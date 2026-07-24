@@ -1113,11 +1113,12 @@ export const toHashString = (num: number | undefined): string => (num ? num.toSt
 export const deriveNavState = (pathname: string) => {
   const toolboxActive = pathname.startsWith("/logs/toolbox");
   const settingsActive = pathname.startsWith("/logs/settings");
-  const logsActive = !toolboxActive && !settingsActive;
+  const debugActive = pathname.startsWith("/logs/debug");
+  const logsActive = !toolboxActive && !settingsActive && !debugActive;
   const confluxActive = pathname.startsWith("/logs/conflux");
   const questsActive = logsActive && !confluxActive;
   const onListPage = pathname === "/logs" || confluxActive;
-  return { logsActive, toolboxActive, settingsActive, confluxActive, questsActive, onListPage };
+  return { logsActive, toolboxActive, settingsActive, debugActive, confluxActive, questsActive, onListPage };
 };
 
 /// Hook that returns the previous value of a variable.

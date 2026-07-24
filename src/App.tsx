@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { Meter } from "./pages/Meter";
 
+import DebugPage from "./pages/Debug";
 import Logs from "./pages/Logs";
 import SettingsPage from "./pages/Settings";
 import ToolboxPage from "./pages/Toolbox";
@@ -28,6 +29,7 @@ export const App = () => {
           </Route>
           <Route path=":id" element={<LogViewPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          {import.meta.env.DEV && <Route path="debug" element={<DebugPage />} />}
         </Route>
       </Routes>
     </BrowserRouter>

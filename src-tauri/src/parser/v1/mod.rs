@@ -536,9 +536,8 @@ impl Encounter {
 /// The status of the parser.
 #[derive(Debug, Serialize, Deserialize, Default, PartialEq, PartialOrd, Clone, Copy)]
 enum ParserStatus {
-    #[default]
-    Waiting,
     InProgress,
+    #[default]
     Stopped,
 }
 
@@ -610,7 +609,7 @@ impl Default for DerivedEncounterState {
             pending_player_pg_stun: HashMap::new(),
             pending_player_pg_quickening: HashMap::new(),
             pending_player_stun_effect: HashMap::new(),
-            status: ParserStatus::Waiting,
+            status: ParserStatus::Stopped,
             party: HashMap::new(),
             targets: HashMap::new(),
         }
@@ -1443,7 +1442,11 @@ impl Parser {
             self.update_status(ParserStatus::Stopped);
             self.save_and_emit_encounter();
         } else {
-            self.update_status(ParserStatus::Waiting);
+            // Idle: no fight to end (any prior one is already saved). Clear the
+            // stale derived state so the emitted Stopped encounter reads empty
+            // (total_damage 0) — that's how the overlay tells idle from a result.
+            self.reset();
+            self.update_status(ParserStatus::Stopped);
         }
 
         // Fresh encounter: stamp the incoming quest (0 = guarded read failed, keep it
@@ -1552,7 +1555,7 @@ impl Parser {
     /// Otherwise the first damage event's `reset()` would wipe an earlier guard
     /// from both the meter and the raw event log (unrecoverable on reparse).
     fn ensure_encounter_started(&mut self, now: i64) {
-        if self.status == ParserStatus::Stopped || self.status == ParserStatus::Waiting {
+        if self.status != ParserStatus::InProgress {
             self.reset();
             self.derived_state.start(now);
             self.update_status(ParserStatus::InProgress);
@@ -1946,7 +1949,7 @@ impl Parser {
     /// without saving it and go back to waiting for the next damage event.
     pub fn on_manual_reset(&mut self) {
         self.reset();
-        self.update_status(ParserStatus::Waiting);
+        self.update_status(ParserStatus::Stopped);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -3661,7 +3664,7 @@ mod tests {
     fn encounter_reset_clears_stale_player_data() {
         // v2.0.2: the area-enter hook is dead, so nothing wiped player_data between
         // quests — stale names attached to reused actor indices. The encounter reset
-        // (first damage after Stopped/Waiting) must clear it; live identity events
+        // (first damage after a Stopped encounter) must clear it; live identity events
         // repopulate it immediately.
         let mut parser = parser_with_memory_db();
 
@@ -4124,7 +4127,7 @@ mod tests {
     fn can_create_parser() {
         let parser = Parser::default();
 
-        assert_eq!(parser.status, ParserStatus::Waiting);
+        assert_eq!(parser.status, ParserStatus::Stopped);
         assert_eq!(parser.start_time(), 1);
     }
 

@@ -610,6 +610,15 @@ describe("utils", () => {
       expect(settings).toMatchObject({ logsActive: false, toolboxActive: false, settingsActive: true });
     });
 
+    it("marks the debug tab active on its page without claiming the Logs tab", () => {
+      expect(deriveNavState("/logs/debug")).toMatchObject({
+        debugActive: true,
+        logsActive: false,
+        questsActive: false,
+      });
+      expect(deriveNavState("/logs")).toMatchObject({ debugActive: false });
+    });
+
     it("keeps the quests/conflux sub-tab split and list-page detection", () => {
       expect(deriveNavState("/logs")).toMatchObject({ questsActive: true, confluxActive: false, onListPage: true });
       expect(deriveNavState("/logs/conflux")).toMatchObject({

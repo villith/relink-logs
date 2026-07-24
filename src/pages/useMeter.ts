@@ -24,7 +24,7 @@ const DEFAULT_ENCOUNTER_STATE: EncounterState = {
   endTime: 1,
   party: {},
   targets: {},
-  status: "Waiting",
+  status: "Stopped",
 };
 
 /** Overlay minimum-width model: keep the window wide enough that every visible
@@ -127,10 +127,6 @@ export default function useMeter() {
   useEffect(() => {
     const encounterUpdateListener = listen("encounter-update", (event: EncounterUpdateEvent) => {
       setEncounterState(event.payload);
-
-      if (event.payload.status === "InProgress" && encounterState.status === "Waiting") {
-        encounterState.startTime == Date.now();
-      }
     });
 
     const encounterSavedListener = listen("encounter-saved", () => {
@@ -142,12 +138,9 @@ export default function useMeter() {
     });
 
     const onAreaEnterListener = listen("on-area-enter", (event: EncounterUpdateEvent) => {
-      if (event.payload.status === "Waiting") {
-        setEncounterState(DEFAULT_ENCOUNTER_STATE);
-      } else {
-        setEncounterState(event.payload);
-      }
-
+      // A finished fight (has damage) stays on screen; an idle area reset (no
+      // damage) blanks the overlay back to the default.
+      setEncounterState(event.payload.totalDamage > 0 ? event.payload : DEFAULT_ENCOUNTER_STATE);
       toast.success(t("ui.on-area-enter"));
     });
 

@@ -21,7 +21,7 @@ const TOOL_ERRORS = {
     "hook-unreachable": "ui.toolbox.hook-unreachable",
   },
   hook: {
-    "game-not-running": "ui.hook-status.waiting-for-game",
+    "game-not-running": "ui.hook-status.no-game",
     "hook-refresh-unsupported": "ui.hook-status.refresh-unsupported",
     "hook-refresh-in-progress": "ui.hook-status.reconnecting",
   },
