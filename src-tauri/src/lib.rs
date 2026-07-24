@@ -8,6 +8,9 @@ pub mod backfill;
 pub mod control_rpc;
 pub mod data_paths;
 pub mod db;
+/// Dev-only synthetic event scripts for the Debug tab. Platform-independent
+/// and pure, so it compiles and tests on Linux CI too.
+pub mod debug_events;
 #[cfg(windows)]
 pub mod game_mem;
 pub mod linux_support;
