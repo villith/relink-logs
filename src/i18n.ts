@@ -3,9 +3,9 @@ import LanguageDetector from "i18next-browser-languagedetector";
 import resourcesToBackend from "i18next-resources-to-backend";
 import { initReactI18next } from "react-i18next";
 
+import { invoke } from "@tauri-apps/api";
 import { readTextFile } from "@tauri-apps/api/fs";
 import { resolveResource } from "@tauri-apps/api/path";
-import { invoke } from "@tauri-apps/api";
 
 const loadLanguageFromPath = async (language: string, namespace: string) => {
   const resourcePath = await resolveResource(`lang/${language}/${namespace}.json`);
