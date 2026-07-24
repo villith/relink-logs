@@ -94,6 +94,32 @@ impl HookStatus {
         HookStatusSnapshot { state, hook_version, app_version, supports_eject }
     }
 
+    /// Shared precondition for the Debug tab's hook-driving commands: a dev
+    /// build (the control channel the hook serves only under its `eject`
+    /// feature) and a live hook. Both slugs are mapped to friendly copy in
+    /// src/backendErrors.ts. Lives here rather than in main.rs so the rule is
+    /// unit-testable without a Tauri app or a running game.
+    pub fn debug_precondition(&self) -> Result<(), String> {
+        if !cfg!(debug_assertions) {
+            return Err("debug-only".into());
+        }
+        if !self.connected.load(Ordering::Relaxed) {
+            return Err("game-not-running".into());
+        }
+        Ok(())
+    }
+
+    /// Whether the injection loop must hold off (re)injecting: a hook
+    /// reload/refresh is mid-flight, or a dev eject asked for the hook to stay
+    /// out. Extracted from `check_and_perform_hook`'s gate so the hazard the
+    /// two flags create together is an executable assertion (see the tests)
+    /// rather than only a comment: `reloading` clearing does NOT reopen the
+    /// gate while `dev_hold_out` is set, which is why `debug_eject_hook`
+    /// refuses to set a hold during a refresh.
+    pub fn injection_gated(&self) -> bool {
+        self.reloading.load(Ordering::Relaxed) || self.dev_hold_out.load(Ordering::Relaxed)
+    }
+
     /// Fold a `Hello` result in. Shared by the connect loop and the dev
     /// re-handshake so the debug path can never drift from the real one.
     pub fn apply_hello(&self, info: HelloInfo) {
@@ -301,6 +327,64 @@ mod tests {
             Some(env!("CARGO_PKG_VERSION"))
         );
         assert!(snapshot.supports_eject);
+    }
+
+    /// The Debug tab's hook-driving commands all want the same two things.
+    /// Tests build with `debug_assertions` on, so the dev-build half is
+    /// satisfied here and the `connected` half is what's under test.
+    #[cfg(debug_assertions)]
+    #[test]
+    fn debug_precondition_requires_a_live_hook() {
+        assert_eq!(
+            HookStatus::default().debug_precondition(),
+            Err("game-not-running".to_string())
+        );
+        assert_eq!(connected_hook(None, false).debug_precondition(), Ok(()));
+    }
+
+    /// The release half of the same precondition: these commands drive the
+    /// hook over a channel only dev builds serve, so a release build refuses
+    /// before it ever looks at `connected`.
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn debug_precondition_refuses_release_builds() {
+        assert_eq!(
+            connected_hook(None, false).debug_precondition(),
+            Err("debug-only".to_string())
+        );
+    }
+
+    /// The injection loop's gate: either flag alone holds it.
+    #[test]
+    fn injection_gated_on_either_flag() {
+        let hook = HookStatus::default();
+        assert!(!hook.injection_gated());
+
+        hook.reloading.store(true, Ordering::Relaxed);
+        assert!(hook.injection_gated());
+
+        hook.dev_hold_out.store(true, Ordering::Relaxed);
+        assert!(hook.injection_gated());
+
+        hook.reloading.store(false, Ordering::Relaxed);
+        assert!(hook.injection_gated());
+    }
+
+    /// The interleave `debug_eject_hook`'s reloading check exists to prevent:
+    /// a hold set mid-refresh survives the refresh's clear, so when
+    /// `reloading` drops the gate is STILL closed and the injection loop
+    /// waits forever. Pinned as an assertion, not just a comment.
+    #[test]
+    fn a_hold_set_during_a_refresh_outlives_it() {
+        let hook = HookStatus::default();
+        hook.reloading.store(true, Ordering::Relaxed);
+        hook.dev_hold_out.store(true, Ordering::Relaxed);
+
+        // The refresh finishes and clears its own flag...
+        hook.reloading.store(false, Ordering::SeqCst);
+
+        // ...and the loop is still gated, with nothing left to clear it.
+        assert!(hook.injection_gated());
     }
 
     /// `dev_hold_out` keeps an ejected hook OUT of the process; it must not
