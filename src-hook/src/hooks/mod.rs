@@ -32,8 +32,10 @@ mod player;
 mod quest;
 mod sba;
 mod stunnet;
+mod summon;
 
-type GetEntityHashID0x58 = unsafe extern "system" fn(*const usize, *const u32) -> *const usize;
+pub(crate) type GetEntityHashID0x58 =
+    unsafe extern "system" fn(*const usize, *const u32) -> *const usize;
 
 /// Pl1900 (Id, human form) actor type hash.
 const ID_HUMAN_TYPE: u32 = 0x8056ABCD;
