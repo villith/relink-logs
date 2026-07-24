@@ -202,6 +202,7 @@
   /**
    * For some reason on Linux, all of the row-data bars inherit the player-row/skill-row parent background-image
    */
+  background: none !important;
   background-image: none !important;
 }
 
