@@ -149,7 +149,18 @@
     },
     "master-traits": {
       "tier": "Tier {{tier}}",
-      "ex": "EX"
+      "ex": "EX",
+      "category": {
+        "atk": "Essence",
+        "def": "Insight",
+        "lim": "Crux",
+        "other": "Other"
+      },
+      "initial": {
+        "atk": "E",
+        "def": "I",
+        "lim": "C"
+      }
     },
     "show-all": "Show all",
     "show-less": "Show less",
@@ -1355,11 +1366,30 @@
         "strafe-shot": "Strafe Shot"
       }
     },
+    "summon-classes": {
+      "d2e5407a": "Lucilius",
+      "6d068bde": "Rolan",
+      "69893920": "Goblin Soldier",
+      "1d3edc63": "Goblin Warrior",
+      "dfec5706": "Quakadile",
+      "34894579": "Silverslime/Goldslime",
+      "1db19581": "Lilith",
+      "9f394f85": "Lilith",
+      "65294c5c": "Managarmr Nihilla",
+      "18617d59": "Albacore",
+      "925ade1b": "Hope-Filled Skydwellers",
+      "6093301c": "Mellose Clan",
+      "a22e16cf": "Crew Alliance Rafale",
+      "0f617ff0": "Cat",
+      "f065d8b8": "Wheel of Fate",
+      "5395ce93": "Beelzebub"
+    },
     "default": {
       "700": "Guard (?)",
       "800": "Chain Burst",
       "5000": "Ether Round",
       "5010": "Charged Shot",
+      "80000": "Summon Attack/Primal Burst",
       "99999": "Conflux Effect",
       "100000": "Holy Ladder (Conflux)",
       "100001": "Chain Burst (Conflux)",

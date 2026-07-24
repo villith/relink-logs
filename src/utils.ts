@@ -316,6 +316,18 @@ export const skillboardLayoutFor = (characterType: CharacterType): { key: Skillb
     .map((tier) => ({ key: tier === "ex" ? ("ex" as const) : (Number(tier) as 1 | 2 | 3), ids: board[tier] }));
 };
 
+/** The three master-trait branches, in the order the board shows them. */
+export const SKILLBOARD_CATEGORIES = ["atk", "def", "lim"] as const;
+
+export type SkillboardCategory = (typeof SKILLBOARD_CATEGORIES)[number];
+
+/**
+ * Points that must be spent in one category of a tier to activate that
+ * category's bonus: 3 on Chaos I, 6 on Chaos II and III. EX has no activation
+ * threshold, so it returns 0 (no progress pips are drawn for it).
+ */
+export const skillboardActivationCost = (tier: number | "ex"): number => (tier === "ex" ? 0 : tier === 1 ? 3 : 6);
+
 export type ChecklistEntry = {
   /** Trait ids that count toward this entry (levels summed); ids[0] provides the display name. */
   ids: number[];
@@ -450,6 +462,29 @@ export const damageOverTimeKeys = (
   ];
 };
 
+/** Every summon and primal-burst hit reports this one action id, so the id alone
+ * can never name the row — the summon's body class is the only discriminator. */
+export const SUMMON_ATTACK_ACTION_ID = 80000;
+
+/** Lookup chain for a summon hit: the body class first, then the generic label.
+ *
+ * The class arrives as an unresolved `{ Unknown: hash }` character type, since
+ * `So####` bodies are not player characters. Named per class in
+ * `skills.summon-classes` (in ui.json, which is hand-maintained — the other lang
+ * files are regenerated from game data and would lose these).
+ *
+ * Only summons with their OWN body class can be named. Most share one of two
+ * generic bodies and collapse into a single row, which is why the generic label
+ * has to stay: naming that row after any one summon would be wrong. */
+export const summonSkillKeys = (childCharacterType: CharacterType): string[] => {
+  const generic = [`skills.default.${SUMMON_ATTACK_ACTION_ID}`, "skills.default.unknown-skill"];
+  if (typeof childCharacterType !== "object" || !Object.hasOwn(childCharacterType, "Unknown")) {
+    return generic;
+  }
+  const hash = childCharacterType.Unknown.toString(16).padStart(8, "0");
+  return [`skills.summon-classes.${hash}`, ...generic];
+};
+
 export const getSkillName = (characterType: CharacterType, skill: SkillState) => {
   switch (true) {
     case skill.actionType === "LinkAttack":
@@ -477,6 +512,10 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "Normal"): {
       const actionType = skill.actionType as { Normal: number };
       const skillID = actionType["Normal"];
+
+      if (skillID === SUMMON_ATTACK_ACTION_ID) {
+        return t(summonSkillKeys(skill.childCharacterType), { id: skillID });
+      }
 
       return t(
         [

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
+import enUi from "../src-tauri/lang/en/ui.json";
 import { EnemyState, EquippedSummon, PlayerState, Sigil, SkillState, WeaponInfo, WeaponState } from "./types";
 import {
   EMPTY_ID,
   OVERMASTERY_EFFECT_IDS,
+  SKILLBOARD_CATEGORIES,
   checklistLevel,
   checklistStatus,
   collectSigilsByCategory,
@@ -20,10 +22,12 @@ import {
   groupBonuses,
   humanizeNumbers,
   mergeTargetBreakdowns,
+  skillboardActivationCost,
   skillboardLayoutFor,
   skillboardNodeKey,
   skillboardNodeMeta,
   summonBonusValue,
+  summonSkillKeys,
   toHash,
   toHashString,
   traitMaxLevel,
@@ -343,6 +347,29 @@ describe("utils", () => {
 
     it("is empty for unknown characters", () => {
       expect(skillboardLayoutFor({ Unknown: 123 })).toEqual([]);
+    });
+
+    it("splits every tier evenly across the three branches", () => {
+      // The board is uniform for all 29 characters: 4 nodes per branch on
+      // Chaos I, 8 on Chaos II/III — which is what the activation pips assume.
+      for (const tier of skillboardLayoutFor("Pl1600")) {
+        const perCategory = SKILLBOARD_CATEGORIES.map(
+          (category) => tier.ids.filter((id) => skillboardNodeMeta(id)?.category === category).length
+        );
+        expect(perCategory).toEqual([tier.ids.length / 3, tier.ids.length / 3, tier.ids.length / 3]);
+      }
+    });
+  });
+
+  describe("skillboardActivationCost", () => {
+    it("is 3 points on Chaos I and 6 on Chaos II/III", () => {
+      expect(skillboardActivationCost(1)).toBe(3);
+      expect(skillboardActivationCost(2)).toBe(6);
+      expect(skillboardActivationCost(3)).toBe(6);
+    });
+
+    it("is 0 for EX, which has no activation threshold", () => {
+      expect(skillboardActivationCost("ex")).toBe(0);
     });
   });
 
@@ -770,5 +797,50 @@ describe("damageOverTimeKeys", () => {
       "skills.Pl0100.damage-over-time",
       "skills.default.damage-over-time",
     ]);
+  });
+});
+
+describe("summonSkillKeys", () => {
+  it("prefers the summon class name, then the generic summon label", () => {
+    // Every summon hit arrives as action id 80000 with the summon's body class as
+    // the child type, so the class hash is the only thing that can name the row.
+    expect(summonSkillKeys({ Unknown: 0xd2e5407a })).toEqual([
+      "skills.summon-classes.d2e5407a",
+      "skills.default.80000",
+      "skills.default.unknown-skill",
+    ]);
+  });
+
+  it("zero-pads the class hash to eight digits", () => {
+    // A hash with a leading zero (So5f01 = 0x0f617ff0) must not lose it, or the
+    // lookup silently misses and the row falls back to the generic label.
+    expect(summonSkillKeys({ Unknown: 0x0f617ff0 })[0]).toBe("skills.summon-classes.0f617ff0");
+  });
+
+  it("skips the class lookup for a named character type", () => {
+    expect(summonSkillKeys("Pl1800")).toEqual(["skills.default.80000", "skills.default.unknown-skill"]);
+  });
+});
+
+describe("summon class names in en/ui.json", () => {
+  it("keys every entry by a lowercase eight-digit hash", () => {
+    // A mistyped or unpadded key never resolves, and the only symptom in game is
+    // a row silently reading "Summon Attack" — invisible without this check.
+    const classes = enUi.skills["summon-classes"] as Record<string, string>;
+    const bad = Object.keys(classes).filter((k) => !/^[0-9a-f]{8}$/.test(k));
+
+    expect(bad).toEqual([]);
+    expect(Object.keys(classes).length).toBeGreaterThan(0);
+  });
+
+  it("names the summon body classes the hook can attribute", () => {
+    const classes = enUi.skills["summon-classes"] as Record<string, string>;
+
+    expect(classes["d2e5407a"]).toBe("Lucilius");
+    expect(classes["5395ce93"]).toBe("Beelzebub");
+  });
+
+  it("provides the generic label every unnamed body class falls back to", () => {
+    expect(enUi.skills.default["80000"]).toBeTruthy();
   });
 });
