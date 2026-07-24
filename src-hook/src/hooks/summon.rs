@@ -176,10 +176,49 @@ const SUMMON_BODY_HASHES: &[u32] = &[
 const SUMMON_OWNER_IDX_OFFSET: usize = 0xFE0;
 const SUMMON_OWNER_PTR_OFFSET: usize = 0xFE8;
 
+/// Two-hop attribution: source -> parent summon (re-typed by vtable RVA, no
+/// vfunc call on a swept pointer) -> summoner. Fails closed at every step.
+fn two_hop_summoner(
+    source: *const usize,
+    hop1_idx_off: usize,
+    hop1_ptr_off: usize,
+) -> Option<*const usize> {
+    let hop1 = gated_parent_offset(source, hop1_idx_off, hop1_ptr_off)?;
+    let summon = parent_specified_instance_at(source, hop1)?;
+
+    // Re-type WITHOUT a vfunc call. A miss is a stale-RVA breadcrumb.
+    if !is_summon_base_vtable(summon) {
+        warn_stale_rva_once(&SUMMON_VTABLE_RVA_WARNED, "summon-base vtable RVAs");
+        return None;
+    }
+
+    let hop2 = gated_parent_offset(summon, SUMMON_OWNER_IDX_OFFSET, SUMMON_OWNER_PTR_OFFSET)?;
+    let owner = parent_specified_instance_at(summon, hop2)?;
+
+    // The terminal must be a real player, else credit nobody.
+    if !vfunc_slot_readable(owner, 0x58) {
+        return None;
+    }
+    crate::hooks::player::player_slot_key_for_actor(owner)?;
+    Some(owner)
+}
+
 /// Resolves a keyless sub-entity source to its owner's instance pointer.
 /// Returns `None` for any source we do not own a mapping for, and for every
 /// failed read along the way.
 fn resolve_source_parent_ptr(source_type_id: u32, source: *const usize) -> Option<*const usize> {
+    // Two-hop arms: owner handle -> parent summon -> +0xFE8 summoner. Handled
+    // ahead of the table because they yield a resolved pointer, not an offset.
+    match source_type_id {
+        // SoAhrimanBaseLaser
+        0x8FE0DF11 => return two_hop_summoner(source, 0x4F0, 0x4F8),
+        // We8090 / We8091 / We8170 (em8000 "Seofon" sword entities)
+        0xAE1F95D9 | 0xAE1E9FFC | 0x2E0DE3A8 => {
+            return two_hop_summoner(source, SUMMON_OWNER_IDX_OFFSET, SUMMON_OWNER_PTR_OFFSET)
+        }
+        _ => {}
+    }
+
     let parent_offset = match source_type_id {
         // Pl0700Ghost -> Pl0700 (Ferry). v2.0.2 moved the owner-entity link
         // 0xE48 -> 0xE58; with the old offset ALL ghost damage was dropped.
@@ -309,6 +348,29 @@ mod tests {
             super::parent_specified_instance_at(actor.as_ptr().cast(), 0x40),
             None
         );
+    }
+
+    #[test]
+    fn two_hop_fails_closed_when_the_first_handle_is_empty() {
+        let actor = vec![0u8; 0x1100];
+        assert_eq!(
+            super::two_hop_summoner(actor.as_ptr().cast(), 0x4F0, 0x4F8),
+            None
+        );
+    }
+
+    #[test]
+    fn two_hop_arms_route_through_the_two_hop_resolver() {
+        // All four two-hop sources must fail closed on a zeroed actor rather than
+        // falling through to the single-hop table.
+        let actor = vec![0u8; 0x1100];
+        for hash in [0x8FE0DF11u32, 0xAE1F95D9, 0xAE1E9FFC, 0x2E0DE3A8] {
+            assert_eq!(
+                super::resolve_source_parent_ptr(hash, actor.as_ptr().cast()),
+                None,
+                "hash {hash:#X} should fail closed"
+            );
+        }
     }
 
     #[test]
