@@ -1998,7 +1998,9 @@ impl Parser {
     }
 
     // Checks if the damage event should be ignored for the purposes of parsing.
-    fn should_ignore_damage_event(event: &DamageEvent) -> bool {
+    // `pub(crate)` so the Debug tab's synthetic scenarios can assert against the
+    // real filter instead of restating its conditions (see `debug_events`).
+    pub(crate) fn should_ignore_damage_event(event: &DamageEvent) -> bool {
         let character_type = CharacterType::from_hash(event.source.parent_actor_type);
 
         if event.damage <= 0 {

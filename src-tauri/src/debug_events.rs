@@ -14,13 +14,17 @@ use protocol::{
 };
 use serde::Deserialize;
 
-/// Gran/Djeeta and Katalina — real hashes from `parser::constants::CharacterType`.
+/// Gran — a real hash from `parser::constants::CharacterType`.
 const PL0000: u32 = 0x26A4848A;
-const PL0100: u32 = 0x9498420D;
+/// Katalina — likewise real, so the parser's character lookup resolves.
+const PL0200: u32 = 0x34D4FD8F;
 
-/// An arbitrary non-player target. Any hash works except Eugen's grenade
-/// (0x022a350f), which the parser ignores outright.
+/// The non-player target. Deliberately a hash outside the game's tables: a real
+/// enemy hash would render as that enemy's name in the UI, Eugen's grenade
+/// (0x022a350f) is dropped by the damage filter, and Sir Barrold (0xA379AC65)
+/// makes the save path discard the encounter's quest id.
 const TARGET_TYPE: u32 = 0xDEAD_BEEF;
+/// The target's actor index; any value works, it is never joined against.
 const TARGET_INDEX: u32 = 0x1000;
 
 #[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,9 +34,11 @@ pub enum Scenario {
     Start,
     /// More damage on the existing party. Click repeatedly to advance DPS.
     Tick,
-    /// Result screen: stops the encounter and saves it.
+    /// Result screen: stops the encounter and writes it to logs.db as a real
+    /// log row. Fired during a genuine fight, it ends and saves that fight.
     End,
-    /// Area change: clears parser state.
+    /// Area change: saves any in-progress encounter to logs.db first, then
+    /// resets. Fired during a genuine fight, it ends and saves that fight too.
     Reset,
 }
 
@@ -74,6 +80,10 @@ fn damage(slot: u8, character_type: u32, amount: i32, skill_id: u32) -> Message 
             parent_actor_type: TARGET_TYPE,
         },
         damage: amount,
+        // 0 = none of the game's per-hit classification bits (echo, guard, SBA,
+        // Ferry's pet-skill bit), so this lands as a plain attributed hit. The
+        // Nones below leave cap%, stun and the enemy HP chart unpopulated
+        // rather than fabricating numbers for them.
         flags: 0,
         action_id: ActionType::Normal(skill_id),
         attack_rate: None,
@@ -91,14 +101,14 @@ pub fn scenario(kind: Scenario) -> Vec<Message> {
     match kind {
         Scenario::Start => vec![
             identity(0, PL0000, "Debug Gran"),
-            identity(1, PL0100, "Debug Katalina"),
+            identity(1, PL0200, "Debug Katalina"),
             damage(0, PL0000, 125_000, 100),
-            damage(1, PL0100, 98_000, 200),
+            damage(1, PL0200, 98_000, 200),
         ],
         Scenario::Tick => vec![
             damage(0, PL0000, 240_000, 101),
             damage(0, PL0000, 55_000, 102),
-            damage(1, PL0100, 180_000, 201),
+            damage(1, PL0200, 180_000, 201),
         ],
         Scenario::End => vec![Message::OnQuestComplete(QuestCompleteEvent {
             quest_id: 0x1234_5678,
@@ -114,37 +124,82 @@ pub fn scenario(kind: Scenario) -> Vec<Message> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::constants::CharacterType;
+    use crate::parser::v1::Parser;
     use protocol::Message;
 
-    /// The parser silently drops damage from an unknown parent actor type or
-    /// with non-positive damage, so a scenario built that way would do nothing.
+    fn damage_events(kind: Scenario) -> Vec<DamageEvent> {
+        scenario(kind)
+            .into_iter()
+            .filter_map(|m| match m {
+                Message::DamageEvent(e) => Some(e),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Calls the real filter rather than restating its conditions, so a new
+    /// condition added to the parser is caught here instead of silently
+    /// reducing every scenario to nothing.
     #[test]
     fn every_damage_event_survives_the_parser_filter() {
         for kind in [Scenario::Start, Scenario::Tick] {
-            let msgs = scenario(kind);
-            let damages: Vec<_> = msgs
-                .iter()
-                .filter_map(|m| match m {
-                    Message::DamageEvent(e) => Some(e),
-                    _ => None,
-                })
-                .collect();
+            let damages = damage_events(kind);
             assert!(!damages.is_empty(), "{kind:?} should carry damage");
-            for e in damages {
-                assert!(e.damage > 0, "{kind:?}: damage must be positive");
+            for e in &damages {
                 assert!(
-                    !matches!(
-                        CharacterType::from_hash(e.source.parent_actor_type),
-                        CharacterType::Unknown(_)
-                    ),
-                    "{kind:?}: parent_actor_type must be a known character"
-                );
-                assert_ne!(
-                    e.target.actor_type, 0x022a350f,
-                    "{kind:?}: that hash is Eugen's grenade, which the parser ignores"
+                    !Parser::should_ignore_damage_event(e),
+                    "{kind:?}: the parser would drop {e:?}"
                 );
             }
+        }
+    }
+
+    /// `on_damage_event` attaches a player's name by matching the identity's
+    /// `actor_index` against the damage's `source.parent_index`. If the two
+    /// drift apart the scenario still parses, but every row shows up unnamed.
+    #[test]
+    fn identity_and_damage_share_the_slot_key() {
+        let msgs = scenario(Scenario::Start);
+        let identities: Vec<_> = msgs
+            .iter()
+            .filter_map(|m| match m {
+                Message::PlayerIdentityEvent(e) => Some(e),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(identities.len(), 2, "start should load two players");
+
+        let damages = damage_events(Scenario::Start);
+        for identity in &identities {
+            // `is_player_slot_key` and not a bare mask test: pointer-like enemy
+            // indexes satisfy the mask (see its doc comment).
+            assert!(
+                protocol::is_player_slot_key(identity.actor_index),
+                "slot {} identity key {:#x} is not a real slot key",
+                identity.party_index,
+                identity.actor_index
+            );
+            let joined = damages
+                .iter()
+                .filter(|e| e.source.parent_index == identity.actor_index)
+                .count();
+            assert!(
+                joined > 0,
+                "no damage joins slot {} (identity key {:#x})",
+                identity.party_index,
+                identity.actor_index
+            );
+        }
+
+        // ...and no damage is orphaned, which would show as an unnamed row.
+        for e in &damages {
+            assert!(
+                identities
+                    .iter()
+                    .any(|i| i.actor_index == e.source.parent_index),
+                "damage key {:#x} matches no identity",
+                e.source.parent_index
+            );
         }
     }
 
