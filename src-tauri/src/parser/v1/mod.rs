@@ -244,7 +244,12 @@ impl From<protocol::EquippedSummon> for EquippedSummon {
 
 /// The v2.0.2 record-inline stat block (identity-path recovery). Labels for
 /// `hp`/`attack`/`stun_power`/`power` follow the pre-2.0 `PlayerStats` layout
-/// the block mirrors; `unk_50`/`unk_58` are still unconfirmed slots.
+/// the block mirrors; `unk_50` is the one still-unconfirmed slot.
+///
+/// `critical_rate` was stored as `unk_58: u32` before 2026-07-24. The game
+/// always wrote an f32 there, so the stored bytes are already a valid float bit
+/// pattern and the retype is byte-compatible in bincode — old logs recover the
+/// correct value on reparse, with no migration.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordStats {
@@ -253,7 +258,7 @@ pub struct RecordStats {
     pub attack: u32,
     pub unk_50: u32,
     pub stun_power: f32,
-    pub unk_58: u32,
+    pub critical_rate: f32,
     pub power: u32,
 }
 
@@ -265,7 +270,7 @@ impl From<protocol::RecordStats> for RecordStats {
             attack: stats.attack,
             unk_50: stats.unk_50,
             stun_power: stats.stun_power,
-            unk_58: stats.unk_58,
+            critical_rate: stats.critical_rate,
             power: stats.power,
         }
     }
