@@ -61,18 +61,6 @@ export default function HookStatusBadge() {
     }
   };
 
-  const onReconnect = async () => {
-    setBusy(true);
-    try {
-      await invoke("reconnect_hook");
-    } catch (e) {
-      const msg = backendErrorMessage(t, "hook", String(e)) ?? String(e);
-      toast.error(t("ui.hook-status.refresh-failed", { error: msg }));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   return (
     <Group gap={6} wrap="nowrap">
       {/* eslint-disable-next-line i18next/no-literal-string -- status glyph, not prose */}
@@ -92,11 +80,6 @@ export default function HookStatusBadge() {
             {t("ui.hook-status.restart-game")}
           </Text>
         ))}
-      {hook.state === "disconnected" && (
-        <Button size="compact-xs" variant="light" loading={busy} onClick={onReconnect}>
-          {t("ui.hook-status.reconnect")}
-        </Button>
-      )}
     </Group>
   );
 }

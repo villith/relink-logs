@@ -11,7 +11,6 @@
       "out-of-date": "Hook out of date",
       "waiting-for-game": "Waiting for game…",
       "refresh": "Refresh hook",
-      "reconnect": "Reconnect",
       "restart-game": "Restart the game to update the hook",
       "refresh-encounter-warning": "This will interrupt the current encounter. Refresh the hook now?",
       "refresh-failed": "Hook refresh failed: {{error}}",

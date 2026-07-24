@@ -48,10 +48,10 @@ describe("HookStatusBadge", () => {
     expect(screen.getByText("ui.hook-status.restart-game")).toBeTruthy();
   });
 
-  it("shows a Reconnect button when disconnected", () => {
+  it("shows no action button when disconnected (auto-retry handles it)", () => {
     status = { state: "disconnected", hookVersion: null, appVersion: "1.0.0", supportsEject: false };
     renderBadge(<HookStatusBadge />);
-    expect(screen.getByRole("button", { name: "ui.hook-status.reconnect" })).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("refreshes immediately when not in an encounter", async () => {

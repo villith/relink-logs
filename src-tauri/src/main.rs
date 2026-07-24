@@ -1103,8 +1103,17 @@ async fn reload_hook_inner(app: &AppHandle, refresh_from: Option<&Path>) -> anyh
     // reload copies the cargo artifact over hook-dbg.dll; production refresh
     // re-injects the installed hook.dll in place (no copy needed), passing None.
     if let Some(src) = refresh_from {
-        std::fs::copy(src, "hook-dbg.dll").context("refreshing hook-dbg.dll")?;
-        reload_dbg(&format!("reload_hook_inner: hook-dbg.dll refreshed from {src:?}"));
+        if src.exists() {
+            std::fs::copy(src, "hook-dbg.dll").context("refreshing hook-dbg.dll")?;
+            reload_dbg(&format!("reload_hook_inner: hook-dbg.dll refreshed from {src:?}"));
+        } else {
+            // Missing dev artifact: re-inject the existing hook-dbg.dll rather
+            // than hard-failing (which would leave the game with no hook, since
+            // the old one is already ejected).
+            reload_dbg(&format!(
+                "reload_hook_inner: {src:?} NOT FOUND; re-injecting existing hook-dbg.dll"
+            ));
+        }
     }
     Ok(())
 }
@@ -1142,22 +1151,6 @@ async fn refresh_hook(app: AppHandle) -> Result<(), String> {
 #[tauri::command]
 async fn refresh_hook(_app: AppHandle) -> Result<(), String> {
     Err("hook-refresh-unsupported".into())
-}
-
-/// Force an immediate hook re-probe: re-run Hello and re-broadcast status,
-/// so the badge updates without waiting for the auto-reconnect cycle. Always
-/// safe — it never injects or ejects.
-#[tauri::command]
-async fn reconnect_hook(app: AppHandle) {
-    let hook = app.state::<HookStatus>();
-    if hook.connected.load(Ordering::Relaxed) {
-        let info = toolbox_rpc::hello().await;
-        hook.outdated.store(!info.ok, Ordering::Relaxed);
-        *hook.hook_version.lock().unwrap() = info.hook_version;
-        hook.supports_eject
-            .store(info.supports_eject, Ordering::Relaxed);
-    }
-    emit_hook_status(&app);
 }
 
 // Linux: no injector. Refresh the dinput8 proxy in the game folder
@@ -1629,7 +1622,6 @@ fn main() {
             remove_linux_hook,
             get_hook_status,
             refresh_hook,
-            reconnect_hook,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.
