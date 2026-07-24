@@ -634,3 +634,12 @@ export type LinuxSetupStatus = {
   proxyStatus: "missing" | "current" | "outdated" | "foreign";
   launchOptions: string;
 };
+
+export type HookState = "connected" | "reconnecting" | "outOfDate" | "disconnected";
+
+export interface HookStatusSnapshot {
+  state: HookState;
+  hookVersion: string | null;
+  appVersion: string;
+  supportsEject: boolean;
+}
