@@ -358,6 +358,12 @@ pub struct PlayerIdentityEvent {
     pub weapon_state: Option<WeaponState>,
 }
 
+/// Training-room ("Trial") lifecycle. The training room has no flow object and
+/// never runs `on_load_quest_state`, so it carries no quest id and no game
+/// timer — the parser keeps its own encounter id and elapsed time.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TrialLifecycleEvent {}
+
 /// One trait id/level pair (wrightstone or innate weapon skill).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WeaponTraitPair {
@@ -574,6 +580,13 @@ pub enum Message {
     /// `stun_amount` is the measured accumulator delta. Appended last per the
     /// append-only rule.
     OnStunEffect(OnPlayerStunEvent),
+    /// Fired when a training session starts, which also tears down the previous
+    /// one. Covers the in-training Restart button. Appended last per the
+    /// append-only rule.
+    OnTrialStart(TrialLifecycleEvent),
+    /// Fired when the player clicks Quit Training. Appended last per the
+    /// append-only rule.
+    OnTrialEnd(TrialLifecycleEvent),
 }
 
 #[cfg(test)]
