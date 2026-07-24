@@ -8,8 +8,65 @@
 //! cross-referenced against an independent implementation (2026-07-24). The
 //! offsets are facts about the game binary, not copied code.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::hooks::diag;
 use crate::hooks::GetEntityHashID0x58;
+
+/// Static RVAs of the summon-base body classes that store their summoner at
+/// +0xFE8, sorted for `binary_search`. Compared against
+/// `*(summon) - MODULE_BASE` — a plain read and compare, never a vfunc call on
+/// a swept pointer. Goes stale on every game patch by design; a miss fails
+/// closed and warns once.
+const SUMMON_BASE_VTABLE_RVAS: &[usize] = &[
+    0x59C61D0, // BehaviorSummonObjectBase (generic/data-driven body)
+    0x5C58DD0, // So0000  Lucilius
+    0x5C59FF0, // So4e00  Albacore
+    0x5C5CA60, // So6400  Wheel of Fate
+    0x5C5DC10, // So0200  Rolan
+    0x5C5EDA0, // So2001  Silverslime var.
+    0x5C61020, // So4502  Lilith var.
+    0x5E75600, // So4500  Lilith
+    0x5E78240, // So4c00  Managarmr Nihilla
+    0x5E793D0, // So1d00  Quakadile
+    0x5E7A4C0, // So9200  Beelzebub
+    0x5E7B650, // So0d00  Goblin Soldier
+    0x5E7C7E0, // So4f00  Hope-Filled Skydwellers
+    0x5E7D990, // So5600  Mellose Clan
+    0x5E7EB40, // So5700  Crew Alliance Rafale
+    0x5E7FCF0, // So5f01  Cat var.
+    0x617F998, // So1100  Goblin Warrior
+    0x617FD38, // So1100Base (generic body)
+];
+
+/// One-shot latch so a patch that moves these vtables logs once per session
+/// rather than once per hit.
+static SUMMON_VTABLE_RVA_WARNED: AtomicBool = AtomicBool::new(false);
+
+fn warn_stale_rva_once(flag: &AtomicBool, what: &str) {
+    if flag.swap(true, Ordering::Relaxed) {
+        return;
+    }
+    log::warn!("{what} did not match — offsets may be stale after a game patch");
+    #[cfg(feature = "console")]
+    println!("WARNING: {what} did not match — offsets may be stale after a game patch");
+}
+
+/// True iff `summon`'s vtable RVA is a known summon-base body class. All reads
+/// guarded, fails closed, no vfunc call.
+fn is_summon_base_vtable(summon: *const usize) -> bool {
+    let base = diag::MODULE_BASE.load(Ordering::Relaxed);
+    if base == 0 {
+        return false;
+    }
+    let Some(vtable) = diag::read_ptr_guarded(summon as usize, 0) else {
+        return false;
+    };
+    let Some(rva) = vtable.checked_sub(base) else {
+        return false;
+    };
+    SUMMON_BASE_VTABLE_RVAS.binary_search(&rva).is_ok()
+}
 
 /// The owner is stored as an entity-handle triple `{idx, CEntityInfo*, serial}`.
 /// The handle can be legitimately empty, so require a non-zero index before
@@ -217,6 +274,24 @@ mod tests {
             super::parent_specified_instance_at(actor.as_ptr().cast(), 0x40),
             None
         );
+    }
+
+    #[test]
+    fn vtable_rva_table_is_sorted_for_binary_search() {
+        // binary_search silently returns wrong answers on an unsorted slice, and a
+        // wrong answer here means crediting damage to the wrong player.
+        let table = super::SUMMON_BASE_VTABLE_RVAS;
+        assert!(
+            table.windows(2).all(|w| w[0] < w[1]),
+            "SUMMON_BASE_VTABLE_RVAS must be sorted ascending with no duplicates"
+        );
+    }
+
+    #[test]
+    fn unknown_vtable_is_rejected_when_module_base_is_unset() {
+        // MODULE_BASE is 0 in the test binary, so every lookup must fail closed.
+        let obj = vec![0u8; 0x40];
+        assert!(!super::is_summon_base_vtable(obj.as_ptr().cast()));
     }
 
     #[test]
