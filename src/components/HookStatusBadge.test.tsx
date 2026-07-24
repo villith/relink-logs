@@ -78,17 +78,17 @@ describe("HookStatusBadge", () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  it("simulates the refresh in the frontend (no backend call) for debug-simulated states", async () => {
-    vi.useFakeTimers();
+  it("always calls the backend refresh — no simulated path remains", async () => {
     encounterState = null;
+    // `simulated` is a dead flag now; even a payload still carrying it must
+    // reach the real backend command rather than a frontend fake.
     status = { state: "outOfDate", hookVersion: "debug", appVersion: "debug", supportsEject: true, simulated: true };
+    invoke.mockResolvedValue(undefined);
     renderBadge(<HookStatusBadge />);
     fireEvent.click(screen.getByRole("button", { name: "ui.hook-status.refresh" }));
-    await vi.runAllTimersAsync();
-    expect(invoke).not.toHaveBeenCalled();
-    expect(emit).toHaveBeenCalledWith("hook-status", expect.objectContaining({ state: "reconnecting", simulated: true }));
-    expect(emit).toHaveBeenCalledWith("hook-status", expect.objectContaining({ state: "connected", simulated: true }));
-    vi.useRealTimers();
+    await Promise.resolve();
+    expect(invoke).toHaveBeenCalledWith("refresh_hook");
+    expect(emit).not.toHaveBeenCalled();
   });
 
   it("shows no action buttons in connected or reconnecting states", () => {

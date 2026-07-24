@@ -642,8 +642,4 @@ export interface HookStatusSnapshot {
   hookVersion: string | null;
   appVersion: string;
   supportsEject: boolean;
-  /** Set only by the dev Debug tab's hook-state simulator; absent on real
-   * backend snapshots. When set, the Refresh action is simulated in the
-   * frontend rather than hitting the real `refresh_hook` command. */
-  simulated?: boolean;
 }
