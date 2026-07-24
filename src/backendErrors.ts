@@ -20,6 +20,11 @@ const TOOL_ERRORS = {
     "hook-outdated": "ui.toolbox.hook-outdated",
     "hook-unreachable": "ui.toolbox.hook-unreachable",
   },
+  hook: {
+    "game-not-running": "ui.hook-status.waiting-for-game",
+    "hook-refresh-unsupported": "ui.hook-status.refresh-unsupported",
+    "hook-refresh-in-progress": "ui.hook-status.reconnecting",
+  },
 } as const satisfies Record<string, Record<string, string>>;
 
 /** Friendly copy for a backend error, or the raw message when unmapped. */

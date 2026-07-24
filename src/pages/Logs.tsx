@@ -1,6 +1,7 @@
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import "./Logs.css";
 
+import HookStatusBadge from "@/components/HookStatusBadge";
 import NewChip from "@/components/NewChip";
 import UpdateAvailableButton from "@/components/UpdateAvailableButton";
 import { deriveNavState } from "@/utils";
@@ -119,6 +120,7 @@ const Layout = () => {
                 )}
               </Text>
               <UpdateAvailableButton />
+              <HookStatusBadge />
             </Group>
             <Group h="100%" gap="xs" wrap="nowrap" justify="center">
               <NavTab to="/logs" icon={<ListDashes size="1rem" />} active={logsActive}>
