@@ -24,6 +24,10 @@ const TOOL_ERRORS = {
     "game-not-running": "ui.hook-status.no-game",
     "hook-refresh-unsupported": "ui.hook-status.refresh-unsupported",
     "hook-refresh-in-progress": "ui.hook-status.reconnecting",
+    // Only the `#[cfg(not(windows))]` Debug-tab stubs return this literally;
+    // a real control-channel failure comes back as raw detail, unmapped.
+    "hook-control-unavailable": "ui.hook-status.control-unavailable",
+    "debug-only": "ui.hook-status.debug-only",
   },
 } as const satisfies Record<string, Record<string, string>>;
 
