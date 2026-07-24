@@ -1484,6 +1484,14 @@ export const ViewPage = () => {
                                   {t("ui.stats.total-attack")}: {player.stats.attack.toLocaleString()}
                                 </Text>
                               )}
+                              {player.stats.criticalRate > 0 && (
+                                <Text size="xs" fs="italic" fw={300}>
+                                  {t("ui.stats.critical-rate")}: {player.stats.criticalRate.toFixed(0)}%
+                                </Text>
+                              )}
+                              {/* No `* 10` here: that scaling compensates for the pre-2.0
+                                  PlayerLoadEvent source below and must not be applied to the
+                                  record block's own stun power. */}
                               {player.stats.stunPower > 0 && (
                                 <Text size="xs" fs="italic" fw={300}>
                                   {t("ui.stats.stun-power")}: {player.stats.stunPower.toFixed(0)}
