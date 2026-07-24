@@ -1,7 +1,7 @@
 {
   "name": "relink-logs",
   "private": true,
-  "version": "1.12.2-6",
+  "version": "1.12.2",
   "type": "module",
   "scripts": {
     "dev": "node scripts/build-hook-dev.mjs && vite",
