@@ -16,7 +16,7 @@ use protocol::toolbox::{ToolboxRequest, ToolboxResponse, TOOLBOX_PROTOCOL_VERSIO
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     match toolbox_rpc::call(ToolboxRequest::Hello).await? {
-        ToolboxResponse::Hello { protocol_version } => {
+        ToolboxResponse::Hello { protocol_version, .. } => {
             println!(
                 "hello: hook v{protocol_version}, app v{TOOLBOX_PROTOCOL_VERSION} => {}",
                 if protocol_version == TOOLBOX_PROTOCOL_VERSION { "OK" } else { "MISMATCH" }

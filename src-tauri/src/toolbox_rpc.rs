@@ -45,7 +45,7 @@ pub async fn call(req: ToolboxRequest) -> Result<ToolboxResponse> {
 pub async fn hello_ok() -> bool {
     matches!(
         call(ToolboxRequest::Hello).await,
-        Ok(ToolboxResponse::Hello { protocol_version })
+        Ok(ToolboxResponse::Hello { protocol_version, .. })
             if protocol_version == TOOLBOX_PROTOCOL_VERSION
     )
 }

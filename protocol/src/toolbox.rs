@@ -22,7 +22,13 @@ pub const TOOLBOX_TCP_ADDR: &str = "127.0.0.1:39372";
 /// each time the event stream connects: on Linux the deployed dinput8 proxy
 /// can be older than the app until the game restarts, and a bincode mismatch
 /// is silent garbage — better "restart the game" than wrong predictions.
-pub const TOOLBOX_PROTOCOL_VERSION: u32 = 1;
+pub const TOOLBOX_PROTOCOL_VERSION: u32 = 2;
+
+/// Version a hook reports when built outside a release (no `HOOK_VERSION`
+/// build env). The app treats this as a dev hook and never flags it as
+/// out of date on version difference. Kept in sync with the default in
+/// `src-hook/build.rs`.
+pub const HOOK_DEV_VERSION: &str = "0.1.0-dev";
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolboxRequest {
@@ -38,7 +44,15 @@ pub enum ToolboxRequest {
 /// the tools' error banner, unmapped slugs verbatim — see backendErrors.ts).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ToolboxResponse {
-    Hello { protocol_version: u32 },
+    Hello {
+        protocol_version: u32,
+        /// The hook crate's build version — its release version, or
+        /// `HOOK_DEV_VERSION` for a dev build. See `src-hook/build.rs`.
+        hook_version: String,
+        /// True when the hook was built with the `eject` control channel,
+        /// so the app may graceful-eject and re-inject it.
+        supports_eject: bool,
+    },
     SynthesisSnapshot(Result<SynthesisSnapshot, String>),
     SynthesisSeed(Result<SynthesisSeed, String>),
     OvermasterySnapshot(Result<OvermasterySnapshot, String>),

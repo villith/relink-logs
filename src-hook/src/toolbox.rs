@@ -81,6 +81,8 @@ fn handle_request(req: ToolboxRequest) -> ToolboxResponse {
     match req {
         ToolboxRequest::Hello => ToolboxResponse::Hello {
             protocol_version: TOOLBOX_PROTOCOL_VERSION,
+            hook_version: env!("HOOK_VERSION").to_string(),
+            supports_eject: cfg!(feature = "eject"),
         },
         ToolboxRequest::SynthesisSnapshot => ToolboxResponse::SynthesisSnapshot(
             globals().and_then(|g| {
@@ -144,12 +146,21 @@ mod tests {
     use protocol::toolbox::{ToolboxRequest, ToolboxResponse, TOOLBOX_PROTOCOL_VERSION};
 
     #[test]
-    fn hello_reports_our_protocol_version() {
-        let ToolboxResponse::Hello { protocol_version } = handle_request(ToolboxRequest::Hello)
+    fn hello_reports_version_and_eject_support() {
+        let ToolboxResponse::Hello {
+            protocol_version,
+            hook_version,
+            supports_eject,
+        } = handle_request(ToolboxRequest::Hello)
         else {
-            panic!("wrong variant");
+            panic!("expected Hello variant");
         };
         assert_eq!(protocol_version, TOOLBOX_PROTOCOL_VERSION);
+        // env!("HOOK_VERSION") is set by build.rs; in `cargo test` with no
+        // HOOK_VERSION env it is the dev sentinel.
+        assert_eq!(hook_version, env!("HOOK_VERSION"));
+        // `eject` feature is off under plain `cargo test -p hook`.
+        assert_eq!(supports_eject, cfg!(feature = "eject"));
     }
 
     /// In the test binary the sigscan finds nothing — the handler must turn
