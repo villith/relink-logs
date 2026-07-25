@@ -1205,6 +1205,13 @@ pub struct Parser {
     /// Status of the parser
     status: ParserStatus,
 
+    /// Which contested damage sources the derived state counts. Runtime
+    /// configuration rather than encounter data, so it is skipped: baking it
+    /// into a stored log would freeze one user's preference into the file, and
+    /// the whole point is that the raw log stays neutral.
+    #[serde(skip)]
+    pub filters: MeterFilters,
+
     /// The window handle for the parser, used to send messages to the front-end
     #[serde(skip)]
     app: Option<AppHandle>,
@@ -1280,7 +1287,7 @@ impl Parser {
 
     /// Reparses derived state from the current encounter.
     pub fn reparse(&mut self) {
-        self.reparse_with_options_window(&[], None, None);
+        self.reparse_with_options_window(&[], None, None, self.filters);
     }
 
     /// [`Self::reparse`] restricted to a window: the derived state covers only
@@ -1291,11 +1298,16 @@ impl Parser {
     ///
     /// `target_spans` filters by per-spawn segment (see [`target_selected`])
     /// so individual summons are selectable; empty = everything.
+    ///
+    /// `filters` drops contested damage sources (see [`is_excluded`]) from every
+    /// derived total. The raw log is untouched, so reparsing with a different
+    /// value restores them.
     pub fn reparse_with_options_window(
         &mut self,
         target_spans: &[TargetSpan],
         from_ms: Option<i64>,
         up_to_ms: Option<i64>,
+        filters: MeterFilters,
     ) {
         let log_start = self.start_time();
         self.derived_state = Default::default();
@@ -1309,6 +1321,17 @@ impl Parser {
             }
             if from.is_some_and(|from| *timestamp < from) {
                 continue;
+            }
+            // Ahead of the `end_time` assignment, not inside the DamageEvent arm
+            // below: an excluded hit must not stretch the encounter window
+            // either, or a fight ending on a filtered Primal Burst would keep
+            // that timestamp as its DPS denominator. This also matches the live
+            // path, which never reaches `process_damage_event` for an excluded
+            // hit and so never advances `end_time` from one.
+            if let Message::DamageEvent(event) = event {
+                if is_excluded(event, &filters) {
+                    continue;
+                }
             }
             self.derived_state.end_time = *timestamp;
 
@@ -2393,6 +2416,157 @@ mod tests {
         }
     }
 
+    /// Zeta's character hash — any real player hash works; an `Unknown` parent
+    /// is dropped by `should_ignore_damage_event` on the live path.
+    const PLAYER_HASH: u32 = 0x28AC1108;
+    /// So0300 "(Primal Burst) Catastrophe".
+    const PRIMAL_BURST_BODY: u32 = 0x5418B8F8;
+
+    /// A hit on enemy 9 credited to player slot 0. `body` is the acting actor's
+    /// class (the player's own hash for a normal hit, a Primal Burst body for a
+    /// burst); `action` is the skill id.
+    fn damage_from(body: u32, action: u32, damage: i32) -> DamageEvent {
+        DamageEvent {
+            source: Actor {
+                index: if body == PLAYER_HASH { 0 } else { 1 },
+                actor_type: body,
+                parent_index: 0,
+                parent_actor_type: PLAYER_HASH,
+            },
+            target: Actor {
+                index: 9,
+                actor_type: 0x1234,
+                parent_index: 9,
+                parent_actor_type: 0x1234,
+            },
+            damage,
+            flags: 0,
+            action_id: ActionType::Normal(action),
+            attack_rate: None,
+            stun_value: Some(50.0),
+            damage_cap: None,
+            base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
+        }
+    }
+
+    /// A parser holding one ordinary hit at t=1000 and one Primal Burst at
+    /// t=2000, both credited to player slot 0.
+    fn parser_with_a_burst() -> Parser {
+        let mut parser = Parser::default();
+        parser.encounter.raw_event_log.push((
+            1_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+        ));
+        parser.encounter.raw_event_log.push((
+            2_000,
+            Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, 80_000, 3_000)),
+        ));
+        parser
+    }
+
+    #[test]
+    fn primal_burst_is_left_out_of_derived_totals_by_default() {
+        let mut parser = parser_with_a_burst();
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0)
+            .expect("the ordinary hit should still create a player row");
+        assert_eq!(player.total_damage, 1_000, "burst damage must not count");
+        assert_eq!(
+            player.skill_breakdown.len(),
+            1,
+            "the burst should not open a breakdown row"
+        );
+        assert_eq!(parser.derived_state.total_damage, 1_000);
+        assert_eq!(
+            parser.derived_state.targets.get(&9).unwrap().total_damage,
+            1_000,
+            "enemy totals must drop the burst too"
+        );
+    }
+
+    #[test]
+    fn primal_burst_counts_when_the_filter_is_on() {
+        let mut parser = parser_with_a_burst();
+        parser.filters = MeterFilters {
+            include_primal_burst: true,
+        };
+
+        parser.reparse();
+
+        let player = parser.derived_state.party.get(&0).unwrap();
+        assert_eq!(player.total_damage, 4_000);
+        assert_eq!(player.skill_breakdown.len(), 2);
+        assert_eq!(parser.derived_state.total_damage, 4_000);
+    }
+
+    #[test]
+    fn excluded_damage_stays_in_the_raw_event_log() {
+        // The raw log is the source of truth, so flipping the setting and
+        // reparsing must bring the excluded damage straight back.
+        let mut parser = parser_with_a_burst();
+        parser.reparse();
+        assert_eq!(parser.derived_state.total_damage, 1_000);
+
+        parser.filters = MeterFilters {
+            include_primal_burst: true,
+        };
+        parser.reparse();
+
+        assert_eq!(parser.encounter.raw_event_log.len(), 2);
+        assert_eq!(parser.derived_state.total_damage, 4_000);
+    }
+
+    #[test]
+    fn excluded_primal_burst_carries_its_stun_out_with_it() {
+        // The row is gone entirely, so its stun must go too — otherwise the
+        // meter shows stun that no visible row accounts for. Asserted as a
+        // comparison rather than an absolute: the exact stun a hit contributes
+        // depends on the accumulator scaling, but including the burst must
+        // strictly increase the total.
+        let mut excluded = parser_with_a_burst();
+        excluded.reparse();
+
+        let mut included = parser_with_a_burst();
+        included.filters = MeterFilters {
+            include_primal_burst: true,
+        };
+        included.reparse();
+
+        let excluded_stun = excluded.derived_state.party.get(&0).unwrap().total_stun_value;
+        let included_stun = included.derived_state.party.get(&0).unwrap().total_stun_value;
+        assert!(
+            included_stun > excluded_stun,
+            "burst stun should be counted only when the burst is: {included_stun} vs {excluded_stun}"
+        );
+        assert!(
+            excluded.derived_state.stun_delta_sum < included.derived_state.stun_delta_sum,
+            "the encounter-wide stun total must drop the burst as well"
+        );
+    }
+
+    // Overcap counters need no test of their own: the exclusion skips the whole
+    // event before `update_from_damage_event` runs, so `cappable_hits`,
+    // `capped_hits` and the overcap sums cannot diverge from `total_damage`
+    // without the tests above failing first.
+
+    #[test]
+    fn excluded_damage_does_not_advance_the_encounter_end_time() {
+        // A fight whose last hit is a filtered burst would otherwise keep that
+        // hit's timestamp as the DPS denominator's upper bound.
+        let mut parser = parser_with_a_burst();
+
+        parser.reparse();
+
+        assert_eq!(parser.derived_state.end_time, 1_000);
+    }
+
     fn a_damage_event() -> DamageEvent {
         DamageEvent {
             source: Actor {
@@ -3140,12 +3314,12 @@ mod tests {
                 .push_event(base + offset, Message::DamageEvent(event));
         }
 
-        parser.reparse_with_options_window(&[], None, Some(5_000));
+        parser.reparse_with_options_window(&[], None, Some(5_000), MeterFilters::default());
         assert_eq!(parser.derived_state.total_damage, 300);
         assert_eq!(parser.derived_state.end_time, base + 4_000);
 
         // No cutoff = the full fight (same as a plain reparse).
-        parser.reparse_with_options_window(&[], None, None);
+        parser.reparse_with_options_window(&[], None, None, MeterFilters::default());
         assert_eq!(parser.derived_state.total_damage, 700);
     }
 
@@ -3165,18 +3339,18 @@ mod tests {
                 .push_event(base + offset, Message::DamageEvent(event));
         }
 
-        parser.reparse_with_options_window(&[], Some(2_000), Some(5_000));
+        parser.reparse_with_options_window(&[], Some(2_000), Some(5_000), MeterFilters::default());
         assert_eq!(parser.derived_state.total_damage, 200);
         assert_eq!(parser.derived_state.start_time, base + 2_000);
         assert_eq!(parser.derived_state.end_time, base + 4_000);
 
         // No lower bound = same as the cutoff-only reparse.
-        parser.reparse_with_options_window(&[], None, Some(5_000));
+        parser.reparse_with_options_window(&[], None, Some(5_000), MeterFilters::default());
         assert_eq!(parser.derived_state.total_damage, 300);
         assert_eq!(parser.derived_state.start_time, base);
 
         // An empty window stays at zero rather than picking up stale state.
-        parser.reparse_with_options_window(&[], Some(1_000), Some(3_000));
+        parser.reparse_with_options_window(&[], Some(1_000), Some(3_000), MeterFilters::default());
         assert_eq!(parser.derived_state.total_damage, 0);
     }
 
@@ -3201,7 +3375,7 @@ mod tests {
             }),
         );
 
-        parser.reparse_with_options_window(&[], None, Some(3_000));
+        parser.reparse_with_options_window(&[], None, Some(3_000), MeterFilters::default());
         let chart = parser.generate_sba_chart(1_000);
 
         let row = chart.get(&0).expect("player row");
