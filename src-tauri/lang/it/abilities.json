@@ -7,6 +7,10 @@
     "key": "AB_PL0400_01_CG",
     "text": "Venti curativi"
   },
+  "007ee2ae": {
+    "key": "AB_PL2000_05",
+    "text": "Quadrupla vendetta"
+  },
   "00aace55": {
     "key": "AB_PL1100_02",
     "text": "L'Ombre d'Hier"
@@ -38,6 +42,10 @@
   "02aee83e": {
     "key": "AB_PL2100_08_CG",
     "text": "Prigione eterea"
+  },
+  "02cfb3c2": {
+    "key": "AB_PL2100_13",
+    "text": "Senza uscita"
   },
   "02f9b06a": {
     "key": "AB_PL2800_03_CG",
@@ -86,6 +94,10 @@
   "07a7ec0f": {
     "key": "AB_PL0400_02_CG",
     "text": "Congelamento"
+  },
+  "081bd282": {
+    "key": "AB_PL2100_10",
+    "text": "Senza uscita"
   },
   "088a1d08": {
     "key": "AB_PL1500_03",
@@ -363,6 +375,10 @@
     "key": "AB_PL2600_08",
     "text": "Nova nascente"
   },
+  "2a8ef6c4": {
+    "key": "AB_PL0100_11",
+    "text": "Stallo"
+  },
   "2ae2fa9d": {
     "key": "AB_PL1600_05",
     "text": "Ali tarpate"
@@ -390,6 +406,10 @@
   "2ecb1f0b": {
     "key": "AB_PL0800_06",
     "text": "Croce del sud"
+  },
+  "3111fe5e": {
+    "key": "AB_PL0100_04",
+    "text": "Panacea"
   },
   "31e089b9": {
     "key": "AB_PL2100_05",
@@ -487,6 +507,10 @@
     "key": "AB_PL0000_04_CG",
     "text": "Panacea"
   },
+  "3c5a7509": {
+    "key": "AB_PL0100_07",
+    "text": "Furia"
+  },
   "3cad2dd9": {
     "key": "AB_PL1400_08",
     "text": "Devozione assoluta"
@@ -519,9 +543,17 @@
     "key": "AB_PL2600_03_CG",
     "text": "Spada Embrasque"
   },
+  "401ab759": {
+    "key": "AB_PL0100_08",
+    "text": "Picco di carica"
+  },
   "41e3c434": {
     "key": "AB_PL1400_06",
     "text": "Danza dei petali rosa"
+  },
+  "4257541b": {
+    "key": "AB_PL0100_10",
+    "text": "Reginleif"
   },
   "42a43df8": {
     "key": "AB_PL1400_08_CG",
@@ -646,6 +678,10 @@
   "530600d2": {
     "key": "AB_PL2800_04",
     "text": "Opportunità"
+  },
+  "531dd853": {
+    "key": "AB_PL0100_15",
+    "text": "Conduzione"
   },
   "531e8994": {
     "key": "AB_PL2100_03_CG",
@@ -863,6 +899,10 @@
     "key": "AB_PL1700_08_CG",
     "text": "Collera infernale"
   },
+  "71f427a1": {
+    "key": "AB_PL2100_09",
+    "text": "Afflato vitale"
+  },
   "724636a8": {
     "key": "AB_PL2900_05",
     "text": "Fonte di terrore"
@@ -923,6 +963,10 @@
     "key": "AB_PL0300_02",
     "text": "Pioggia di proiettili"
   },
+  "7c9fa051": {
+    "key": "AB_PL2100_14",
+    "text": "Revontulet"
+  },
   "7d60a4be": {
     "key": "AB_PL2800_04_CG",
     "text": "Opportunità"
@@ -943,9 +987,17 @@
     "key": "AB_PL0800_01",
     "text": "Impulso di lama"
   },
+  "7ef53ff4": {
+    "key": "AB_PL0100_13",
+    "text": "Velo"
+  },
   "7f0888f3": {
     "key": "AB_PL0400_07_CG",
     "text": "Sette fiori"
+  },
+  "7f36d12b": {
+    "key": "AB_PL2100_16",
+    "text": "Prigione eterea"
   },
   "7f3b7770": {
     "key": "AB_PL2400_07_CG",
@@ -986,6 +1038,10 @@
   "82695b1e": {
     "key": "AB_PL0700_07",
     "text": "Hinrichten"
+  },
+  "83bfbf22": {
+    "key": "AB_PL2100_15",
+    "text": "Afflato vitale"
   },
   "84174bdd": {
     "key": "AB_PL1500_08",
@@ -1058,6 +1114,10 @@
   "8dc8a58f": {
     "key": "AB_PL1800_04_CG",
     "text": "Rinforzo"
+  },
+  "8e2bfc26": {
+    "key": "AB_PL0100_14",
+    "text": "Dissipazione"
   },
   "8e7cd4ac": {
     "key": "AB_PL2100_02_CG",
@@ -1283,6 +1343,10 @@
     "key": "AB_PL2100_08",
     "text": "Prigione eterea"
   },
+  "a7e586b8": {
+    "key": "AB_PL2100_11",
+    "text": "Ecliptica"
+  },
   "a7eb9e69": {
     "key": "AB_PL2200_02",
     "text": "Infinito creare"
@@ -1298,6 +1362,10 @@
   "aa6e61e5": {
     "key": "AB_PL2700_02",
     "text": "Per sempre tuo"
+  },
+  "aa949a9e": {
+    "key": "AB_PL0100_01",
+    "text": "Decimazione"
   },
   "abab2642": {
     "key": "AB_PL2200_06",
@@ -1386,6 +1454,10 @@
   "b924b87b": {
     "key": "AB_PL2900_02_CG",
     "text": "Artigli dell'inversione"
+  },
+  "b9429f15": {
+    "key": "AB_PL2100_12",
+    "text": "Potere del singolo"
   },
   "b97bd8d4": {
     "key": "AB_PL1800_06",
@@ -1527,9 +1599,17 @@
     "key": "AB_PL1600_05_CG",
     "text": "Ali tarpate"
   },
+  "c908857c": {
+    "key": "AB_PL0100_06",
+    "text": "Foschia funesta"
+  },
   "caeeda5d": {
     "key": "AB_PL1000_01",
     "text": "Feuerangriff"
+  },
+  "ccec1035": {
+    "key": "AB_PL0100_09",
+    "text": "Nitidezza"
   },
   "cd6940de": {
     "key": "AB_PL0600_05",
@@ -1554,6 +1634,10 @@
   "cfc77cc3": {
     "key": "AB_PL2900_06_CG",
     "text": "Funerale nefasto"
+  },
+  "d064b37f": {
+    "key": "AB_PL0100_16",
+    "text": "Sostituzione"
   },
   "d0768c6b": {
     "key": "AB_PL0500_01",
@@ -1755,6 +1839,10 @@
     "key": "AB_PL0200_06_CG",
     "text": "Muro di luce"
   },
+  "eb16fd99": {
+    "key": "AB_PL0100_12",
+    "text": "Rianimazione"
+  },
   "eb3e3386": {
     "key": "AB_PL0200_01_CG",
     "text": "Terre incantate"
@@ -1794,6 +1882,10 @@
   "ee866a53": {
     "key": "AB_PL0200_04_CG",
     "text": "Venti sacri"
+  },
+  "ef2108b4": {
+    "key": "AB_PL0100_03",
+    "text": "Falange"
   },
   "ef560e15": {
     "key": "AB_PL1500_03_CG",
@@ -1870,6 +1962,14 @@
   "f9492778": {
     "key": "AB_PL0000_13",
     "text": "Velo"
+  },
+  "fad51809": {
+    "key": "AB_PL0100_05",
+    "text": "Pioggia di frecce"
+  },
+  "faff8838": {
+    "key": "AB_PL0100_02",
+    "text": "Anticorazza"
   },
   "fb1526c3": {
     "key": "AB_PL0000_07",
