@@ -358,6 +358,12 @@ pub struct PlayerIdentityEvent {
     pub weapon_state: Option<WeaponState>,
 }
 
+/// Training-room ("Trial") lifecycle. The training room has no flow object and
+/// never runs `on_load_quest_state`, so it carries no quest id and no game
+/// timer — the parser keeps its own encounter id and elapsed time.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TrialLifecycleEvent {}
+
 /// One trait id/level pair (wrightstone or innate weapon skill).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct WeaponTraitPair {
@@ -369,9 +375,12 @@ pub struct WeaponTraitPair {
 
 /// The v2.0.2 record-inline stat block. Labels tentative (see
 /// [`PlayerIdentityEvent::stats`]): `hp`/`attack`/`stun_power`/`power` follow
-/// the old `PlayerStats` field order; `unk_50`/`unk_58` are the two slots whose
-/// meaning is still unconfirmed (old layout suggests `unk_50` = the pre-2.0
-/// `unk_0c` filler and `unk_58` = critical rate).
+/// the old `PlayerStats` field order; `unk_50` is the one slot whose meaning is
+/// still unconfirmed (old layout suggests it is the pre-2.0 `unk_0c` filler).
+///
+/// Offsets below name the wire-replicated mirror the block was first found at.
+/// The hook now reads the same layout from the record head block, which the
+/// stat-compute pass fills with computed totals (see `read_record_stats`).
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct RecordStats {
     /// Character level (`record+0x5B44`).
@@ -385,8 +394,10 @@ pub struct RecordStats {
     /// `record+0x5B54` — stun power (the block's only float, matching the old
     /// layout's stun_power f32).
     pub stun_power: f32,
-    /// `record+0x5B58` — unknown (critical rate candidate).
-    pub unk_58: u32,
+    /// `record+0x5B58` — critical hit rate in percent. Read as `u32` before
+    /// 2026-07-24; the retype is byte-compatible in bincode and recovers the
+    /// correct value from older logs on reparse.
+    pub critical_rate: f32,
     /// `record+0x5B5C` — total power / power level candidate (town-filled).
     pub power: u32,
 }
@@ -569,6 +580,49 @@ pub enum Message {
     /// `stun_amount` is the measured accumulator delta. Appended last per the
     /// append-only rule.
     OnStunEffect(OnPlayerStunEvent),
+    /// Fired when a training session starts, which also tears down the previous
+    /// one. Covers the in-training Restart button. Appended last per the
+    /// append-only rule.
+    OnTrialStart(TrialLifecycleEvent),
+    /// Fired when the player clicks Quit Training. Appended last per the
+    /// append-only rule.
+    OnTrialEnd(TrialLifecycleEvent),
+}
+
+#[cfg(test)]
+mod record_stats_tests {
+    use super::RecordStats;
+
+    /// The old field was `unk_58: u32`, but the game writes an f32 there and we
+    /// read it with an integer reader. Both are 4 bytes little-endian, so the
+    /// stored bytes are already a valid f32 bit pattern: retyping recovers the
+    /// correct value from logs written before this change, with no migration.
+    #[test]
+    fn old_unk_58_blob_decodes_as_critical_rate() {
+        // A log written by the old code: crit was 21.5%, stored as the u32
+        // reinterpretation of that float's bits.
+        let stored_bits = 21.5f32.to_bits();
+
+        let old_blob = bincode::serialize(&(
+            10u32,       // level
+            5000u32,     // hp
+            3000u32,     // attack
+            0u32,        // unk_50
+            12.5f32,     // stun_power
+            stored_bits, // unk_58, an f32 bit pattern read as u32
+            9999u32,     // power
+        ))
+        .expect("serialize");
+
+        let decoded: RecordStats = bincode::deserialize(&old_blob).expect("deserialize");
+
+        assert_eq!(decoded.level, 10);
+        assert_eq!(decoded.hp, 5000);
+        assert_eq!(decoded.attack, 3000);
+        assert_eq!(decoded.stun_power, 12.5);
+        assert_eq!(decoded.critical_rate, 21.5);
+        assert_eq!(decoded.power, 9999);
+    }
 }
 
 #[cfg(test)]
