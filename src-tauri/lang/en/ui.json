@@ -1258,7 +1258,10 @@
       "damage-over-time-poison": "Poison",
       "damage-over-time-burn": "Burn",
       "damage-over-time-darkburn": "Darkburn",
-      "unknown-skill": "Skill {{id}}"
+      "unknown-skill": "Skill {{id}}",
+      "skill-groups": {
+        "primal-burst": "Primal Burst"
+      }
     },
     "Pl2400": {
       "0": "Skill 0",

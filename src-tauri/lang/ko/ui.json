@@ -577,7 +577,10 @@
       "link-attack": "링크어택",
       "skybound-arts": "오의",
       "damage-over-time": "도트 기술",
-      "unknown-skill": "스킬 {{id}}"
+      "unknown-skill": "스킬 {{id}}",
+      "skill-groups": {
+        "primal-burst": "어센드 체인"
+      }
     }
   },
   "enemies": {
