@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { Meter } from "./pages/Meter";
@@ -11,10 +12,15 @@ import { IndexPage as LogIndexPage } from "./pages/logs/Index";
 import { ViewPage as LogViewPage } from "./pages/logs/View";
 import OvermasteryPredictor from "./pages/toolbox/OvermasteryPredictor";
 import SynthesisHelper from "./pages/toolbox/SynthesisHelper";
+import { registerShortcutBlocker } from "./utils";
 
 import "./App.css";
 
 export const App = () => {
+  useEffect(() => {
+    return registerShortcutBlocker();
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

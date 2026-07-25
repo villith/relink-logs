@@ -1227,3 +1227,14 @@ export const usePrevious = <T>(value: T): T | undefined => {
 
   return ref.current;
 };
+
+export const registerShortcutBlocker = (): (() => void) => {
+  const handleKeyDown = (e: KeyboardEvent): void => {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && ["j", "p", "u"].includes(e.key.toLowerCase())) {
+      e.preventDefault();
+    }
+  };
+
+  window.addEventListener("keydown", handleKeyDown, { capture: true });
+  return () => window.removeEventListener("keydown", handleKeyDown, { capture: true });
+};
