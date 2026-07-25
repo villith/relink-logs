@@ -7,6 +7,10 @@
     "key": "AB_PL0400_01_CG",
     "text": "Heilender Wind"
   },
+  "007ee2ae": {
+    "key": "AB_PL2000_05",
+    "text": "Vierfache Vergeltung"
+  },
   "00aace55": {
     "key": "AB_PL1100_02",
     "text": "L’ombre d’hier"
@@ -38,6 +42,10 @@
   "02aee83e": {
     "key": "AB_PL2100_08_CG",
     "text": "Himmelsgefängnis"
+  },
+  "02cfb3c2": {
+    "key": "AB_PL2100_13",
+    "text": "Kein Ausweg"
   },
   "02f9b06a": {
     "key": "AB_PL2800_03_CG",
@@ -86,6 +94,10 @@
   "07a7ec0f": {
     "key": "AB_PL0400_02_CG",
     "text": "Einfrieren"
+  },
+  "081bd282": {
+    "key": "AB_PL2100_10",
+    "text": "Kein Ausweg"
   },
   "088a1d08": {
     "key": "AB_PL1500_03",
@@ -363,6 +375,10 @@
     "key": "AB_PL2600_08",
     "text": "Aufblitzende Nova"
   },
+  "2a8ef6c4": {
+    "key": "AB_PL0100_11",
+    "text": "Hinhalten"
+  },
   "2ae2fa9d": {
     "key": "AB_PL1600_05",
     "text": "Flügelknipser"
@@ -390,6 +406,10 @@
   "2ecb1f0b": {
     "key": "AB_PL0800_06",
     "text": "Südkreuz"
+  },
+  "3111fe5e": {
+    "key": "AB_PL0100_04",
+    "text": "Alle Heilen"
   },
   "31e089b9": {
     "key": "AB_PL2100_05",
@@ -487,6 +507,10 @@
     "key": "AB_PL0000_04_CG",
     "text": "Alle Heilen"
   },
+  "3c5a7509": {
+    "key": "AB_PL0100_07",
+    "text": "Jähzorn"
+  },
   "3cad2dd9": {
     "key": "AB_PL1400_08",
     "text": "Völlige Hingabe"
@@ -519,9 +543,17 @@
     "key": "AB_PL2600_03_CG",
     "text": "Embrasque-Schwert"
   },
+  "401ab759": {
+    "key": "AB_PL0100_08",
+    "text": "Eruption"
+  },
   "41e3c434": {
     "key": "AB_PL1400_06",
     "text": "Rosa Blütentanz"
+  },
+  "4257541b": {
+    "key": "AB_PL0100_10",
+    "text": "Reginleif"
   },
   "42a43df8": {
     "key": "AB_PL1400_08_CG",
@@ -646,6 +678,10 @@
   "530600d2": {
     "key": "AB_PL2800_04",
     "text": "Gelegenheit"
+  },
+  "531dd853": {
+    "key": "AB_PL0100_15",
+    "text": "Übertragung"
   },
   "531e8994": {
     "key": "AB_PL2100_03_CG",
@@ -863,6 +899,10 @@
     "key": "AB_PL1700_08_CG",
     "text": "Zorn des Jenseits"
   },
+  "71f427a1": {
+    "key": "AB_PL2100_09",
+    "text": "Atem des Lebens"
+  },
   "724636a8": {
     "key": "AB_PL2900_05",
     "text": "Urtümliche Furcht"
@@ -923,6 +963,10 @@
     "key": "AB_PL0300_02",
     "text": "Kugelhagel"
   },
+  "7c9fa051": {
+    "key": "AB_PL2100_14",
+    "text": "Revontulet"
+  },
   "7d60a4be": {
     "key": "AB_PL2800_04_CG",
     "text": "Gelegenheit"
@@ -943,9 +987,17 @@
     "key": "AB_PL0800_01",
     "text": "Impulsklinge"
   },
+  "7ef53ff4": {
+    "key": "AB_PL0100_13",
+    "text": "Schleier"
+  },
   "7f0888f3": {
     "key": "AB_PL0400_07_CG",
     "text": "Blühende Sieben"
+  },
+  "7f36d12b": {
+    "key": "AB_PL2100_16",
+    "text": "Himmelsgefängnis"
   },
   "7f3b7770": {
     "key": "AB_PL2400_07_CG",
@@ -986,6 +1038,10 @@
   "82695b1e": {
     "key": "AB_PL0700_07",
     "text": "Hinrichten"
+  },
+  "83bfbf22": {
+    "key": "AB_PL2100_15",
+    "text": "Atem des Lebens"
   },
   "84174bdd": {
     "key": "AB_PL1500_08",
@@ -1058,6 +1114,10 @@
   "8dc8a58f": {
     "key": "AB_PL1800_04_CG",
     "text": "Verstärken"
+  },
+  "8e2bfc26": {
+    "key": "AB_PL0100_14",
+    "text": "Annullieren"
   },
   "8e7cd4ac": {
     "key": "AB_PL2100_02_CG",
@@ -1283,6 +1343,10 @@
     "key": "AB_PL2100_08",
     "text": "Himmelsgefängnis"
   },
+  "a7e586b8": {
+    "key": "AB_PL2100_11",
+    "text": "Ecliptica"
+  },
   "a7eb9e69": {
     "key": "AB_PL2200_02",
     "text": "Infinito Creare"
@@ -1298,6 +1362,10 @@
   "aa6e61e5": {
     "key": "AB_PL2700_02",
     "text": "Für immer und ewig"
+  },
+  "aa949a9e": {
+    "key": "AB_PL0100_01",
+    "text": "Dezimieren"
   },
   "abab2642": {
     "key": "AB_PL2200_06",
@@ -1386,6 +1454,10 @@
   "b924b87b": {
     "key": "AB_PL2900_02_CG",
     "text": "Klaue der Umkehr"
+  },
+  "b9429f15": {
+    "key": "AB_PL2100_12",
+    "text": "Die Macht des Einen"
   },
   "b97bd8d4": {
     "key": "AB_PL1800_06",
@@ -1527,9 +1599,17 @@
     "key": "AB_PL1600_05_CG",
     "text": "Flügelknipser"
   },
+  "c908857c": {
+    "key": "AB_PL0100_06",
+    "text": "Nebel des Elends"
+  },
   "caeeda5d": {
     "key": "AB_PL1000_01",
     "text": "Feuerangriff"
+  },
+  "ccec1035": {
+    "key": "AB_PL0100_09",
+    "text": "Klarheit"
   },
   "cd6940de": {
     "key": "AB_PL0600_05",
@@ -1554,6 +1634,10 @@
   "cfc77cc3": {
     "key": "AB_PL2900_06_CG",
     "text": "Verfluchtes Begräbnis"
+  },
+  "d064b37f": {
+    "key": "AB_PL0100_16",
+    "text": "Ersetzen"
   },
   "d0768c6b": {
     "key": "AB_PL0500_01",
@@ -1755,6 +1839,10 @@
     "key": "AB_PL0200_06_CG",
     "text": "Lichtwall"
   },
+  "eb16fd99": {
+    "key": "AB_PL0100_12",
+    "text": "Wiederbeleben"
+  },
   "eb3e3386": {
     "key": "AB_PL0200_01_CG",
     "text": "Verwunschenes Terrain"
@@ -1794,6 +1882,10 @@
   "ee866a53": {
     "key": "AB_PL0200_04_CG",
     "text": "Heilige Winde"
+  },
+  "ef2108b4": {
+    "key": "AB_PL0100_03",
+    "text": "Phalanx"
   },
   "ef560e15": {
     "key": "AB_PL1500_03_CG",
@@ -1870,6 +1962,14 @@
   "f9492778": {
     "key": "AB_PL0000_13",
     "text": "Schleier"
+  },
+  "fad51809": {
+    "key": "AB_PL0100_05",
+    "text": "Pfeilregen"
+  },
+  "faff8838": {
+    "key": "AB_PL0100_02",
+    "text": "Harnischbruch"
   },
   "fb1526c3": {
     "key": "AB_PL0000_07",

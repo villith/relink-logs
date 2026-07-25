@@ -7,6 +7,10 @@
     "key": "AB_PL0400_01_CG",
     "text": "Healing Winds"
   },
+  "007ee2ae": {
+    "key": "AB_PL2000_05",
+    "text": "Fourfold Vengeance"
+  },
   "00aace55": {
     "key": "AB_PL1100_02",
     "text": "L'Ombre d'Hier"
@@ -38,6 +42,10 @@
   "02aee83e": {
     "key": "AB_PL2100_08_CG",
     "text": "Ethereal Prison"
+  },
+  "02cfb3c2": {
+    "key": "AB_PL2100_13",
+    "text": "No Way Out"
   },
   "02f9b06a": {
     "key": "AB_PL2800_03_CG",
@@ -86,6 +94,10 @@
   "07a7ec0f": {
     "key": "AB_PL0400_02_CG",
     "text": "Freeze"
+  },
+  "081bd282": {
+    "key": "AB_PL2100_10",
+    "text": "No Way Out"
   },
   "088a1d08": {
     "key": "AB_PL1500_03",
@@ -363,6 +375,10 @@
     "key": "AB_PL2600_08",
     "text": "Rising Nova"
   },
+  "2a8ef6c4": {
+    "key": "AB_PL0100_11",
+    "text": "Stall"
+  },
   "2ae2fa9d": {
     "key": "AB_PL1600_05",
     "text": "Wingclipper"
@@ -390,6 +406,10 @@
   "2ecb1f0b": {
     "key": "AB_PL0800_06",
     "text": "Southern Cross"
+  },
+  "3111fe5e": {
+    "key": "AB_PL0100_04",
+    "text": "Panacea"
   },
   "31e089b9": {
     "key": "AB_PL2100_05",
@@ -487,6 +507,10 @@
     "key": "AB_PL0000_04_CG",
     "text": "Panacea"
   },
+  "3c5a7509": {
+    "key": "AB_PL0100_07",
+    "text": "Rage"
+  },
   "3cad2dd9": {
     "key": "AB_PL1400_08",
     "text": "Utter Devotion"
@@ -519,9 +543,17 @@
     "key": "AB_PL2600_03_CG",
     "text": "Embrasque Sword"
   },
+  "401ab759": {
+    "key": "AB_PL0100_08",
+    "text": "Overdrive Surge"
+  },
   "41e3c434": {
     "key": "AB_PL1400_06",
     "text": "Dance of Pink Petals"
+  },
+  "4257541b": {
+    "key": "AB_PL0100_10",
+    "text": "Reginleiv"
   },
   "42a43df8": {
     "key": "AB_PL1400_08_CG",
@@ -646,6 +678,10 @@
   "530600d2": {
     "key": "AB_PL2800_04",
     "text": "Opportunity Knocks"
+  },
+  "531dd853": {
+    "key": "AB_PL0100_15",
+    "text": "Conduction"
   },
   "531e8994": {
     "key": "AB_PL2100_03_CG",
@@ -863,6 +899,10 @@
     "key": "AB_PL1700_08_CG",
     "text": "Netherwrath"
   },
+  "71f427a1": {
+    "key": "AB_PL2100_09",
+    "text": "Breath of Life"
+  },
   "724636a8": {
     "key": "AB_PL2900_05",
     "text": "Primordial Fear"
@@ -923,6 +963,10 @@
     "key": "AB_PL0300_02",
     "text": "Bullet Hail"
   },
+  "7c9fa051": {
+    "key": "AB_PL2100_14",
+    "text": "Revontulet"
+  },
   "7d60a4be": {
     "key": "AB_PL2800_04_CG",
     "text": "Opportunity Knocks"
@@ -943,9 +987,17 @@
     "key": "AB_PL0800_01",
     "text": "Blade Impulse"
   },
+  "7ef53ff4": {
+    "key": "AB_PL0100_13",
+    "text": "Veil"
+  },
   "7f0888f3": {
     "key": "AB_PL0400_07_CG",
     "text": "Flowery Seven"
+  },
+  "7f36d12b": {
+    "key": "AB_PL2100_16",
+    "text": "Ethereal Prison"
   },
   "7f3b7770": {
     "key": "AB_PL2400_07_CG",
@@ -986,6 +1038,10 @@
   "82695b1e": {
     "key": "AB_PL0700_07",
     "text": "Hinrichten"
+  },
+  "83bfbf22": {
+    "key": "AB_PL2100_15",
+    "text": "Breath of Life"
   },
   "84174bdd": {
     "key": "AB_PL1500_08",
@@ -1058,6 +1114,10 @@
   "8dc8a58f": {
     "key": "AB_PL1800_04_CG",
     "text": "Reinforce"
+  },
+  "8e2bfc26": {
+    "key": "AB_PL0100_14",
+    "text": "Dispel"
   },
   "8e7cd4ac": {
     "key": "AB_PL2100_02_CG",
@@ -1283,6 +1343,10 @@
     "key": "AB_PL2100_08",
     "text": "Ethereal Prison"
   },
+  "a7e586b8": {
+    "key": "AB_PL2100_11",
+    "text": "Ecliptica"
+  },
   "a7eb9e69": {
     "key": "AB_PL2200_02",
     "text": "Infinito Creare"
@@ -1298,6 +1362,10 @@
   "aa6e61e5": {
     "key": "AB_PL2700_02",
     "text": "Forever Yours"
+  },
+  "aa949a9e": {
+    "key": "AB_PL0100_01",
+    "text": "Decimate"
   },
   "abab2642": {
     "key": "AB_PL2200_06",
@@ -1386,6 +1454,10 @@
   "b924b87b": {
     "key": "AB_PL2900_02_CG",
     "text": "Claws of Reversal"
+  },
+  "b9429f15": {
+    "key": "AB_PL2100_12",
+    "text": "The Power of One"
   },
   "b97bd8d4": {
     "key": "AB_PL1800_06",
@@ -1527,9 +1599,17 @@
     "key": "AB_PL1600_05_CG",
     "text": "Wingclipper"
   },
+  "c908857c": {
+    "key": "AB_PL0100_06",
+    "text": "Miserable Mist"
+  },
   "caeeda5d": {
     "key": "AB_PL1000_01",
     "text": "Feuerangriff"
+  },
+  "ccec1035": {
+    "key": "AB_PL0100_09",
+    "text": "Clarity"
   },
   "cd6940de": {
     "key": "AB_PL0600_05",
@@ -1554,6 +1634,10 @@
   "cfc77cc3": {
     "key": "AB_PL2900_06_CG",
     "text": "Cursed Funeral"
+  },
+  "d064b37f": {
+    "key": "AB_PL0100_16",
+    "text": "Substitute"
   },
   "d0768c6b": {
     "key": "AB_PL0500_01",
@@ -1755,6 +1839,10 @@
     "key": "AB_PL0200_06_CG",
     "text": "Light Wall"
   },
+  "eb16fd99": {
+    "key": "AB_PL0100_12",
+    "text": "Revive"
+  },
   "eb3e3386": {
     "key": "AB_PL0200_01_CG",
     "text": "Enchanted Lands"
@@ -1794,6 +1882,10 @@
   "ee866a53": {
     "key": "AB_PL0200_04_CG",
     "text": "Sacred Winds"
+  },
+  "ef2108b4": {
+    "key": "AB_PL0100_03",
+    "text": "Phalanx"
   },
   "ef560e15": {
     "key": "AB_PL1500_03_CG",
@@ -1870,6 +1962,14 @@
   "f9492778": {
     "key": "AB_PL0000_13",
     "text": "Veil"
+  },
+  "fad51809": {
+    "key": "AB_PL0100_05",
+    "text": "Rain of Arrows"
+  },
+  "faff8838": {
+    "key": "AB_PL0100_02",
+    "text": "Armor Break"
   },
   "fb1526c3": {
     "key": "AB_PL0000_07",
