@@ -1,0 +1,350 @@
+{
+  "pl0000_atk": {
+    "key": "TXT_SB_NAME_PL0000_SP100",
+    "text": "Essence : Comp. curatives +"
+  },
+  "pl0000_def": {
+    "key": "TXT_SB_NAME_PL0000_SP000",
+    "text": "Ascension : Niveau d'arts +"
+  },
+  "pl0000_lim": {
+    "key": "TXT_SB_NAME_PL0000_SP200",
+    "text": "Arcane : Substitution"
+  },
+  "pl0100_atk": {
+    "key": "TXT_SB_NAME_PL0100_SP100",
+    "text": "Essence : Comp. curatives +"
+  },
+  "pl0100_def": {
+    "key": "TXT_SB_NAME_PL0100_SP000",
+    "text": "Ascension : Niveau d'arts +"
+  },
+  "pl0100_lim": {
+    "key": "TXT_SB_NAME_PL0100_SP200",
+    "text": "Arcane : Substitution"
+  },
+  "pl0200_atk": {
+    "key": "TXT_SB_NAME_PL0200_SP100",
+    "text": "Essence : Assaut d'Arès"
+  },
+  "pl0200_def": {
+    "key": "TXT_SB_NAME_PL0200_SP000",
+    "text": "Ascension : Durée d'Arès"
+  },
+  "pl0200_lim": {
+    "key": "TXT_SB_NAME_PL0200_SP200",
+    "text": "Arcane : Lame d'azur"
+  },
+  "pl0300_atk": {
+    "key": "TXT_SB_NAME_PL0300_SP100",
+    "text": "Essence : Mise en bière +"
+  },
+  "pl0300_def": {
+    "key": "TXT_SB_NAME_PL0300_SP000",
+    "text": "Ascension : Dans le mille +"
+  },
+  "pl0300_lim": {
+    "key": "TXT_SB_NAME_PL0300_SP200",
+    "text": "Arcane : Dommage collatéral"
+  },
+  "pl0400_atk": {
+    "key": "TXT_SB_NAME_PL0400_SP100",
+    "text": "Essence : Chaînes magiques"
+  },
+  "pl0400_def": {
+    "key": "TXT_SB_NAME_PL0400_SP000",
+    "text": "Ascension : Concentration +"
+  },
+  "pl0400_lim": {
+    "key": "TXT_SB_NAME_PL0400_SP200",
+    "text": "Arcane : Sept fleuri"
+  },
+  "pl0500_atk": {
+    "key": "TXT_SB_NAME_PL0500_SP100",
+    "text": "Essence : Poing grenade"
+  },
+  "pl0500_def": {
+    "key": "TXT_SB_NAME_PL0500_SP000",
+    "text": "Ascension : Mode Fusilier +"
+  },
+  "pl0500_lim": {
+    "key": "TXT_SB_NAME_PL0500_SP200",
+    "text": "Arcane : Grenade venin +"
+  },
+  "pl0600_atk": {
+    "key": "TXT_SB_NAME_PL0600_SP100",
+    "text": "Essence : Bonus et Malus"
+  },
+  "pl0600_def": {
+    "key": "TXT_SB_NAME_PL0600_SP000",
+    "text": "Ascension : Requiem des roses"
+  },
+  "pl0600_lim": {
+    "key": "TXT_SB_NAME_PL0600_SP200",
+    "text": "Arcane : Roses +"
+  },
+  "pl0700_atk": {
+    "key": "TXT_SB_NAME_PL0700_SP100",
+    "text": "Essence : Spectre solitaire"
+  },
+  "pl0700_def": {
+    "key": "TXT_SB_NAME_PL0700_SP000",
+    "text": "Ascension : Familiers +"
+  },
+  "pl0700_lim": {
+    "key": "TXT_SB_NAME_PL0700_SP200",
+    "text": "Arcane : Soutien"
+  },
+  "pl0800_atk": {
+    "key": "TXT_SB_NAME_PL0800_SP100",
+    "text": "Essence : Esquives +"
+  },
+  "pl0800_def": {
+    "key": "TXT_SB_NAME_PL0800_SP000",
+    "text": "Ascension : Combos finaux"
+  },
+  "pl0800_lim": {
+    "key": "TXT_SB_NAME_PL0800_SP200",
+    "text": "Arcane : Comp. offensives +"
+  },
+  "pl0900_atk": {
+    "key": "TXT_SB_NAME_PL0900_SP100",
+    "text": "Essence : Ensemble, debout"
+  },
+  "pl0900_def": {
+    "key": "TXT_SB_NAME_PL0900_SP000",
+    "text": "Ascension : Hostilité +"
+  },
+  "pl0900_lim": {
+    "key": "TXT_SB_NAME_PL0900_SP200",
+    "text": "Arcane : Détermination +"
+  },
+  "pl1000_atk": {
+    "key": "TXT_SB_NAME_PL1000_SP100",
+    "text": "Essence : Lame pourpre"
+  },
+  "pl1000_def": {
+    "key": "TXT_SB_NAME_PL1000_SP000",
+    "text": "Ascension : Attaques chargées +"
+  },
+  "pl1000_lim": {
+    "key": "TXT_SB_NAME_PL1000_SP200",
+    "text": "Arcane : Parades chargées"
+  },
+  "pl1100_atk": {
+    "key": "TXT_SB_NAME_PL1100_SP100",
+    "text": "Essence : Comp. offensives +"
+  },
+  "pl1100_def": {
+    "key": "TXT_SB_NAME_PL1100_SP000",
+    "text": "Ascension : Frappes parfaites"
+  },
+  "pl1100_lim": {
+    "key": "TXT_SB_NAME_PL1100_SP200",
+    "text": "Arcane : Sur le fil du rasoir"
+  },
+  "pl1200_atk": {
+    "key": "TXT_SB_NAME_PL1200_SP100",
+    "text": "Essence : Clash frontal"
+  },
+  "pl1200_def": {
+    "key": "TXT_SB_NAME_PL1200_SP000",
+    "text": "Ascension : Posture noble +"
+  },
+  "pl1200_lim": {
+    "key": "TXT_SB_NAME_PL1200_SP200",
+    "text": "Arcane : Invincible"
+  },
+  "pl1300_atk": {
+    "key": "TXT_SB_NAME_PL1300_SP100",
+    "text": "Essence : Course éclair"
+  },
+  "pl1300_def": {
+    "key": "TXT_SB_NAME_PL1300_SP000",
+    "text": "Ascension : Clés du Triple voile"
+  },
+  "pl1300_lim": {
+    "key": "TXT_SB_NAME_PL1300_SP200",
+    "text": "Arcane : Contres"
+  },
+  "pl1400_atk": {
+    "key": "TXT_SB_NAME_PL1400_SP100",
+    "text": "Essence : Frappe mortelle"
+  },
+  "pl1400_def": {
+    "key": "TXT_SB_NAME_PL1400_SP000",
+    "text": "Ascension : Chgt de posture +"
+  },
+  "pl1400_lim": {
+    "key": "TXT_SB_NAME_PL1400_SP200",
+    "text": "Arcane : Dévotion absolue"
+  },
+  "pl1500_atk": {
+    "key": "TXT_SB_NAME_PL1500_SP100",
+    "text": "Essence : Posture du lion"
+  },
+  "pl1500_def": {
+    "key": "TXT_SB_NAME_PL1500_SP000",
+    "text": "Ascension : Poings furieux"
+  },
+  "pl1500_lim": {
+    "key": "TXT_SB_NAME_PL1500_SP200",
+    "text": "Arcane : Poings percutants"
+  },
+  "pl1600_atk": {
+    "key": "TXT_SB_NAME_PL1600_SP100",
+    "text": "Essence : Comp. offensives +"
+  },
+  "pl1600_def": {
+    "key": "TXT_SB_NAME_PL1600_SP000",
+    "text": "Ascension : Combos aériens +"
+  },
+  "pl1600_lim": {
+    "key": "TXT_SB_NAME_PL1600_SP200",
+    "text": "Arcane : Contres"
+  },
+  "pl1700_atk": {
+    "key": "TXT_SB_NAME_PL1700_SP100",
+    "text": "Essence : Attaques chargées"
+  },
+  "pl1700_def": {
+    "key": "TXT_SB_NAME_PL1700_SP000",
+    "text": "Ascension : Combos aboutis"
+  },
+  "pl1700_lim": {
+    "key": "TXT_SB_NAME_PL1700_SP200",
+    "text": "Arcane : Parades chargées"
+  },
+  "pl1800_atk": {
+    "key": "TXT_SB_NAME_PL1800_SP100",
+    "text": "Essence : Collision +"
+  },
+  "pl1800_def": {
+    "key": "TXT_SB_NAME_PL1800_SP000",
+    "text": "Ascension : Combos malus +"
+  },
+  "pl1800_lim": {
+    "key": "TXT_SB_NAME_PL1800_SP200",
+    "text": "Arcane : Soutien et soins +"
+  },
+  "pl1900_atk": {
+    "key": "TXT_SB_NAME_PL1900_SP100",
+    "text": "Essence : Forme draconique +"
+  },
+  "pl1900_def": {
+    "key": "TXT_SB_NAME_PL1900_SP000",
+    "text": "Ascension : Puissance divine +"
+  },
+  "pl1900_lim": {
+    "key": "TXT_SB_NAME_PL1900_SP200",
+    "text": "Arcane : Vengeance divine"
+  },
+  "pl2100_atk": {
+    "key": "TXT_SB_NAME_PL2100_SP100",
+    "text": "Essence : Protection radieuse"
+  },
+  "pl2100_def": {
+    "key": "TXT_SB_NAME_PL2100_SP000",
+    "text": "Ascension : Serment ailé"
+  },
+  "pl2100_lim": {
+    "key": "TXT_SB_NAME_PL2100_SP200",
+    "text": "Arcane : Cloche du jugement"
+  },
+  "pl2200_atk": {
+    "key": "TXT_SB_NAME_PL2200_SP100",
+    "text": "Essence : Pluie d'épées"
+  },
+  "pl2200_def": {
+    "key": "TXT_SB_NAME_PL2200_SP000",
+    "text": "Ascension : Jauge d'avatar +"
+  },
+  "pl2200_lim": {
+    "key": "TXT_SB_NAME_PL2200_SP200",
+    "text": "Arcane : Changement"
+  },
+  "pl2300_atk": {
+    "key": "TXT_SB_NAME_PL2300_SP100",
+    "text": "Essence : Facteur décisif +"
+  },
+  "pl2300_def": {
+    "key": "TXT_SB_NAME_PL2300_SP000",
+    "text": "Ascension : Déluge multicible"
+  },
+  "pl2300_lim": {
+    "key": "TXT_SB_NAME_PL2300_SP200",
+    "text": "Arcane : Dissidence"
+  },
+  "pl2400_atk": {
+    "key": "TXT_SB_NAME_PL2400_SP100",
+    "text": "Essence : Grand moulin +"
+  },
+  "pl2400_def": {
+    "key": "TXT_SB_NAME_PL2400_SP000",
+    "text": "Ascension : Croc brise-armure +"
+  },
+  "pl2400_lim": {
+    "key": "TXT_SB_NAME_PL2400_SP200",
+    "text": "Arcane : Brutalité"
+  },
+  "pl2500_atk": {
+    "key": "TXT_SB_NAME_PL2500_SP100",
+    "text": "Essence : Armes magistrales +"
+  },
+  "pl2500_def": {
+    "key": "TXT_SB_NAME_PL2500_SP000",
+    "text": "Ascension : Épées dansantes +"
+  },
+  "pl2500_lim": {
+    "key": "TXT_SB_NAME_PL2500_SP200",
+    "text": "Arcane : Barrière du voile"
+  },
+  "pl2600_atk": {
+    "key": "TXT_SB_NAME_PL2600_SP100",
+    "text": "Essence : Clock O Delta +"
+  },
+  "pl2600_def": {
+    "key": "TXT_SB_NAME_PL2600_SP000",
+    "text": "Ascension : Dévoreur"
+  },
+  "pl2600_lim": {
+    "key": "TXT_SB_NAME_PL2600_SP200",
+    "text": "Arcane : Chaîne de compétences"
+  },
+  "pl2700_atk": {
+    "key": "TXT_SB_NAME_PL2700_SP100",
+    "text": "Essence : Tonnerre rugissant"
+  },
+  "pl2700_def": {
+    "key": "TXT_SB_NAME_PL2700_SP000",
+    "text": "Ascension : À bout portant"
+  },
+  "pl2700_lim": {
+    "key": "TXT_SB_NAME_PL2700_SP200",
+    "text": "Arcane : Tir parfait"
+  },
+  "pl2800_atk": {
+    "key": "TXT_SB_NAME_PL2800_SP100",
+    "text": "Essence : Force dévastatrice"
+  },
+  "pl2800_def": {
+    "key": "TXT_SB_NAME_PL2800_SP000",
+    "text": "Ascension : Postures +"
+  },
+  "pl2800_lim": {
+    "key": "TXT_SB_NAME_PL2800_SP200",
+    "text": "Arcane : Belles paroles du diable"
+  },
+  "pl2900_atk": {
+    "key": "TXT_SB_NAME_PL2900_SP100",
+    "text": "Essence : Érosion des Ténèbres"
+  },
+  "pl2900_def": {
+    "key": "TXT_SB_NAME_PL2900_SP000",
+    "text": "Ascension : Combos finaux +"
+  },
+  "pl2900_lim": {
+    "key": "TXT_SB_NAME_PL2900_SP200",
+    "text": "Arcane : Désastres des ténèbres"
+  }
+}

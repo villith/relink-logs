@@ -244,7 +244,12 @@ impl From<protocol::EquippedSummon> for EquippedSummon {
 
 /// The v2.0.2 record-inline stat block (identity-path recovery). Labels for
 /// `hp`/`attack`/`stun_power`/`power` follow the pre-2.0 `PlayerStats` layout
-/// the block mirrors; `unk_50`/`unk_58` are still unconfirmed slots.
+/// the block mirrors; `unk_50` is the one still-unconfirmed slot.
+///
+/// `critical_rate` was stored as `unk_58: u32` before 2026-07-24. The game
+/// always wrote an f32 there, so the stored bytes are already a valid float bit
+/// pattern and the retype is byte-compatible in bincode — old logs recover the
+/// correct value on reparse, with no migration.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordStats {
@@ -253,7 +258,7 @@ pub struct RecordStats {
     pub attack: u32,
     pub unk_50: u32,
     pub stun_power: f32,
-    pub unk_58: u32,
+    pub critical_rate: f32,
     pub power: u32,
 }
 
@@ -265,7 +270,7 @@ impl From<protocol::RecordStats> for RecordStats {
             attack: stats.attack,
             unk_50: stats.unk_50,
             stun_power: stats.stun_power,
-            unk_58: stats.unk_58,
+            critical_rate: stats.critical_rate,
             power: stats.power,
         }
     }
@@ -1512,6 +1517,40 @@ impl Parser {
         // previous quest's names to the next quest's actors. Cleared AFTER the save
         // above (the save reads player_data for the p1..p4 columns); every player's
         // identity is re-announced with their damage, so the next quest repopulates.
+        self.encounter.reset_player_data();
+    }
+
+    /// A training session started, which also tears down the previous one.
+    /// Closes and saves any run that has damage, then opens a fresh encounter.
+    ///
+    /// Deliberately NOT gated on a quest id or the quest-complete flag: training
+    /// never runs `on_load_quest_state`, so both are stale from the previous
+    /// quest and would silently suppress every training save.
+    pub fn on_trial_start_event(&mut self) {
+        self.on_trial_end_event();
+        self.reset();
+    }
+
+    /// The player quit training. Closes and saves the run.
+    ///
+    /// The training room has no quest flow object, so this (and the start
+    /// teardown above) is the only boundary that can ever close a training
+    /// encounter. The in-progress gate makes the second of the quit hook's two
+    /// per-quit calls inert.
+    pub fn on_trial_end_event(&mut self) {
+        if self.status != ParserStatus::InProgress {
+            return;
+        }
+
+        self.update_status(ParserStatus::Stopped);
+        self.save_and_emit_encounter();
+
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
+        }
+
+        // Same rationale as the quest boundaries: actor indices are reused across
+        // sessions, so stale identities must die here (after the save above).
         self.encounter.reset_player_data();
     }
 
@@ -3174,6 +3213,79 @@ mod tests {
             last_known_quest_id: quest_id,
             last_known_elapsed_time_in_secs: 0,
         }
+    }
+
+    #[test]
+    fn trial_end_saves_an_encounter_that_has_damage() {
+        // Training has no quest flow, so Quit Training is the ONLY boundary that
+        // can close the run — without it the log sat open until the next quest.
+        let mut parser = parser_with_memory_db();
+
+        parser.on_damage_event(a_damage_event());
+        assert_eq!(parser.status, ParserStatus::InProgress);
+
+        parser.on_trial_end_event();
+
+        assert_eq!(
+            parser.status,
+            ParserStatus::Stopped,
+            "trial end must close the encounter"
+        );
+        let conn = parser.db.as_ref().unwrap();
+        let (count, quest_id): (u32, Option<u32>) = conn
+            .query_row("SELECT COUNT(*), quest_id FROM logs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(count, 1, "training run saved at the quit boundary");
+        assert_eq!(quest_id, None, "training carries no quest id");
+    }
+
+    #[test]
+    fn trial_end_on_an_empty_encounter_is_a_no_op() {
+        // The quit hook fires up to twice per quit; a repeat must not panic or
+        // save an empty encounter.
+        let mut parser = parser_with_memory_db();
+
+        parser.on_trial_end_event();
+        parser.on_trial_end_event();
+
+        let conn = parser.db.as_ref().unwrap();
+        let count: u32 = conn
+            .query_row("SELECT COUNT(*) FROM logs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "no damage means nothing to save");
+    }
+
+    #[test]
+    fn trial_start_closes_the_previous_run_and_opens_a_fresh_one() {
+        // The in-training Restart button never runs the quit choke point, so the
+        // start/teardown hook is what closes a restarted run.
+        let mut parser = parser_with_memory_db();
+        parser.on_damage_event(a_damage_event());
+
+        parser.on_trial_start_event();
+
+        {
+            let conn = parser.db.as_ref().unwrap();
+            let count: u32 = conn
+                .query_row("SELECT COUNT(*) FROM logs", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(count, 1, "the previous run is saved before restarting");
+        }
+        assert!(
+            parser.encounter.raw_event_log.is_empty(),
+            "trial start must open a fresh encounter"
+        );
+        assert_eq!(parser.derived_state.total_damage, 0);
+
+        // A second restart with nothing recorded since must not save an empty log.
+        parser.on_trial_start_event();
+        let conn = parser.db.as_ref().unwrap();
+        let count: u32 = conn
+            .query_row("SELECT COUNT(*) FROM logs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
     }
 
     #[test]

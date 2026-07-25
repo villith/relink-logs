@@ -99,7 +99,11 @@ const EncounterStatus = ({ encounterState, elapsedTime }: { encounterState: Enco
   if (encounterState.status === "InProgress") {
     body = <span className="stat-value">{millisecondsToElapsedFormat(elapsedTime)}</span>;
   } else if (encounterState.totalDamage > 0) {
-    body = <span className="stat-value">{millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime)}</span>;
+    body = (
+      <span className="stat-value">
+        {millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime)}
+      </span>
+    );
   } else {
     body = idleLabel;
   }

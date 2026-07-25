@@ -1,0 +1,1174 @@
+{
+  "Pl0200": {
+    "1": {
+      "ns": "abilities",
+      "hash": "9fed6cf3",
+      "key": "AB_PL0200_01"
+    },
+    "2": {
+      "ns": "abilities",
+      "hash": "e224a3d2",
+      "key": "AB_PL0200_02"
+    },
+    "4": {
+      "ns": "abilities",
+      "hash": "79a07d8e",
+      "key": "AB_PL0200_04"
+    },
+    "5": {
+      "ns": "abilities",
+      "hash": "87288538",
+      "key": "AB_PL0200_05"
+    },
+    "6": {
+      "ns": "abilities",
+      "hash": "71b81b9c",
+      "key": "AB_PL0200_06"
+    },
+    "7": {
+      "ns": "abilities",
+      "hash": "9f1539d2",
+      "key": "AB_PL0200_07"
+    }
+  },
+  "Pl0300": {
+    "1": {
+      "ns": "abilities",
+      "hash": "5c1519f8",
+      "key": "AB_PL0300_01"
+    },
+    "2": {
+      "ns": "abilities",
+      "hash": "7c63d77a",
+      "key": "AB_PL0300_02"
+    },
+    "5": {
+      "ns": "abilities",
+      "hash": "099abf09",
+      "key": "AB_PL0300_05"
+    },
+    "7": {
+      "ns": "abilities",
+      "hash": "4d598bbd",
+      "key": "AB_PL0300_07"
+    },
+    "8": {
+      "ns": "abilities",
+      "hash": "f07b5a9d",
+      "key": "AB_PL0300_08"
+    }
+  },
+  "Pl0400": {
+    "2000": {
+      "ns": "abilities",
+      "hash": "1c7aa5cc",
+      "key": "AB_PL0400_02"
+    },
+    "3000": {
+      "ns": "abilities",
+      "hash": "64a6c124",
+      "key": "AB_PL0400_05"
+    },
+    "4000": {
+      "ns": "abilities",
+      "hash": "d4c45d64",
+      "key": "AB_PL0400_07"
+    }
+  },
+  "Pl0500": {
+    "1": {
+      "ns": "abilities",
+      "hash": "d0768c6b",
+      "key": "AB_PL0500_01"
+    },
+    "3": {
+      "ns": "abilities",
+      "hash": "772fa1d5",
+      "key": "AB_PL0500_03"
+    },
+    "4": {
+      "ns": "abilities",
+      "hash": "b54c90e4",
+      "key": "AB_PL0500_04"
+    },
+    "5": {
+      "ns": "abilities",
+      "hash": "2ea1b3db",
+      "key": "AB_PL0500_05"
+    },
+    "6": {
+      "ns": "abilities",
+      "hash": "c3ccadf8",
+      "key": "AB_PL0500_06"
+    },
+    "8": {
+      "ns": "abilities",
+      "hash": "d457585d",
+      "key": "AB_PL0500_08"
+    }
+  },
+  "Pl0600": {
+    "2": {
+      "ns": "abilities",
+      "hash": "3eb33877",
+      "key": "AB_PL0600_02"
+    },
+    "4": {
+      "ns": "abilities",
+      "hash": "8c4d811c",
+      "key": "AB_PL0600_04"
+    },
+    "6": {
+      "ns": "abilities",
+      "hash": "395e4823",
+      "key": "AB_PL0600_06"
+    }
+  },
+  "Pl0700": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "a44b77a1",
+      "key": "AB_PL0700_01"
+    },
+    "1100": {
+      "ns": "abilities",
+      "hash": "ceebae4a",
+      "key": "AB_PL0700_02"
+    },
+    "1340": {
+      "ns": "abilities",
+      "hash": "512cba53",
+      "key": "AB_PL0700_04"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "8cbe0423",
+      "key": "AB_PL0700_05"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "94da6b12",
+      "key": "AB_PL0700_06"
+    },
+    "1640": {
+      "ns": "abilities",
+      "hash": "82695b1e",
+      "key": "AB_PL0700_07"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "5ce11765",
+      "key": "AB_PL0700_08"
+    }
+  },
+  "Pl0800": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "7eb5a896",
+      "key": "AB_PL0800_01"
+    },
+    "1100": {
+      "ns": "abilities",
+      "hash": "920dd8b3",
+      "key": "AB_PL0800_02"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "282fd588",
+      "key": "AB_PL0800_03"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "511571ee",
+      "key": "AB_PL0800_05"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "2ecb1f0b",
+      "key": "AB_PL0800_06"
+    }
+  },
+  "Pl0900": {
+    "1100": {
+      "ns": "abilities",
+      "hash": "fbef06f2",
+      "key": "AB_PL0900_02"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "050ddce6",
+      "key": "AB_PL0900_04"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "b9e9ed9f",
+      "key": "AB_PL0900_05"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "bc4ebf36",
+      "key": "AB_PL0900_07"
+    }
+  },
+  "Pl1000": {
+    "1": {
+      "ns": "abilities",
+      "hash": "caeeda5d",
+      "key": "AB_PL1000_01"
+    },
+    "4": {
+      "ns": "abilities",
+      "hash": "70fe4df6",
+      "key": "AB_PL1000_04"
+    },
+    "6": {
+      "ns": "abilities",
+      "hash": "8b70dd12",
+      "key": "AB_PL1000_06"
+    },
+    "7": {
+      "ns": "abilities",
+      "hash": "01051e0b",
+      "key": "AB_PL1000_07"
+    },
+    "8": {
+      "ns": "abilities",
+      "hash": "241e1792",
+      "key": "AB_PL1000_08"
+    }
+  },
+  "Pl1100": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "62aab75d",
+      "key": "AB_PL1100_01"
+    },
+    "1100": {
+      "ns": "abilities",
+      "hash": "00aace55",
+      "key": "AB_PL1100_02"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "a662c045",
+      "key": "AB_PL1100_04"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "5a356634",
+      "key": "AB_PL1100_07"
+    }
+  },
+  "Pl1200": {
+    "1100": {
+      "ns": "abilities",
+      "hash": "bd038b68",
+      "key": "AB_PL1200_02"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "24b19804",
+      "key": "AB_PL1200_03"
+    },
+    "1610": {
+      "ns": "abilities",
+      "hash": "d696964e",
+      "key": "AB_PL1200_07"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "58e10372",
+      "key": "AB_PL1200_08"
+    }
+  },
+  "Pl1300": {
+    "1": {
+      "ns": "abilities",
+      "hash": "1deeb111",
+      "key": "AB_PL1300_01"
+    },
+    "2": {
+      "ns": "abilities",
+      "hash": "5d39ff76",
+      "key": "AB_PL1300_02"
+    },
+    "5": {
+      "ns": "abilities",
+      "hash": "167179d2",
+      "key": "AB_PL1300_05"
+    },
+    "7": {
+      "ns": "abilities",
+      "hash": "d7cc0564",
+      "key": "AB_PL1300_07"
+    },
+    "8": {
+      "ns": "abilities",
+      "hash": "512ddb88",
+      "key": "AB_PL1300_08"
+    }
+  },
+  "Pl1400": {
+    "1": {
+      "ns": "abilities",
+      "hash": "1d6f5c2d",
+      "key": "AB_PL1400_01"
+    },
+    "2": {
+      "ns": "abilities",
+      "hash": "f74b3c5b",
+      "key": "AB_PL1400_02"
+    },
+    "4": {
+      "ns": "abilities",
+      "hash": "0adac47b",
+      "key": "AB_PL1400_04"
+    }
+  },
+  "Pl1500": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "bcb4c311",
+      "key": "AB_PL1500_01"
+    },
+    "1100": {
+      "ns": "abilities",
+      "hash": "abd5990a",
+      "key": "AB_PL1500_02"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "088a1d08",
+      "key": "AB_PL1500_03"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "0f41d9b0",
+      "key": "AB_PL1500_06"
+    }
+  },
+  "Pl1600": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "95e40e12",
+      "key": "AB_PL1600_01"
+    },
+    "1100": {
+      "ns": "abilities",
+      "hash": "67270513",
+      "key": "AB_PL1600_02"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "974342aa",
+      "key": "AB_PL1600_03"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "2ae2fa9d",
+      "key": "AB_PL1600_05"
+    },
+    "1610": {
+      "ns": "abilities",
+      "hash": "33028d0b",
+      "key": "AB_PL1600_07"
+    }
+  },
+  "Pl1700": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "3b5c9f6d",
+      "key": "AB_PL1700_01"
+    },
+    "1100": {
+      "ns": "abilities",
+      "hash": "ec775337",
+      "key": "AB_PL1700_02"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "8121f2bf",
+      "key": "AB_PL1700_03"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "7ea722fc",
+      "key": "AB_PL1700_06"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "ce6a60cf",
+      "key": "AB_PL1700_07"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "90c49270",
+      "key": "AB_PL1700_08"
+    }
+  },
+  "Pl1800": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "75043b52",
+      "key": "AB_PL1800_01"
+    },
+    "1100": {
+      "ns": "abilities",
+      "hash": "12a18828",
+      "key": "AB_PL1800_02"
+    },
+    "1110": {
+      "ns": "abilities",
+      "hash": "12a18828",
+      "key": "AB_PL1800_02"
+    },
+    "1410": {
+      "ns": "abilities",
+      "hash": "ee45b7ef",
+      "key": "AB_PL1800_05"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "ed1219cc",
+      "key": "AB_PL1800_07"
+    },
+    "1800": {
+      "ns": "abilities",
+      "hash": "5b42826c",
+      "key": "AB_PL1800_08"
+    }
+  },
+  "Pl1900": {
+    "1": {
+      "ns": "abilities",
+      "hash": "e2dc99d9",
+      "key": "AB_PL1900_01"
+    },
+    "2": {
+      "ns": "abilities",
+      "hash": "c1d7660c",
+      "key": "AB_PL1900_02"
+    },
+    "3": {
+      "ns": "abilities",
+      "hash": "0af90b6d",
+      "key": "AB_PL1900_03"
+    },
+    "5": {
+      "ns": "abilities",
+      "hash": "38b12f6a",
+      "key": "AB_PL1900_05"
+    },
+    "6": {
+      "ns": "abilities",
+      "hash": "b132100b",
+      "key": "AB_PL1900_06"
+    },
+    "7": {
+      "ns": "abilities",
+      "hash": "968220fa",
+      "key": "AB_PL1900_07"
+    },
+    "8": {
+      "ns": "abilities",
+      "hash": "c516d104",
+      "key": "AB_PL1900_08"
+    }
+  },
+  "Pl2100": {
+    "2100": {
+      "ns": "abilities",
+      "hash": "da860bd8",
+      "key": "AB_PL2100_02"
+    },
+    "2200": {
+      "ns": "abilities",
+      "hash": "34222ea5",
+      "key": "AB_PL2100_03"
+    },
+    "2400": {
+      "ns": "abilities",
+      "hash": "31e089b9",
+      "key": "AB_PL2100_05"
+    },
+    "2700": {
+      "ns": "abilities",
+      "hash": "a7c5a324",
+      "key": "AB_PL2100_08"
+    }
+  },
+  "Pl2200": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "d99ad2ad",
+      "key": "AB_PL2200_01"
+    },
+    "2000": {
+      "ns": "abilities",
+      "hash": "a7eb9e69",
+      "key": "AB_PL2200_02"
+    },
+    "3000": {
+      "ns": "abilities",
+      "hash": "6e8e210a",
+      "key": "AB_PL2200_03"
+    },
+    "6000": {
+      "ns": "abilities",
+      "hash": "abab2642",
+      "key": "AB_PL2200_06"
+    }
+  },
+  "Pl2300": {
+    "1100": {
+      "ns": "abilities",
+      "hash": "7c0f49fb",
+      "key": "AB_PL2300_02"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "bba467c0",
+      "key": "AB_PL2300_03"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "da816022",
+      "key": "AB_PL2300_04"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "bb425ac9",
+      "key": "AB_PL2300_05"
+    },
+    "1510": {
+      "ns": "abilities",
+      "hash": "a6b54953",
+      "key": "AB_PL2300_06"
+    }
+  },
+  "Pl2400": {
+    "1200": {
+      "ns": "abilities",
+      "hash": "430f5db4",
+      "key": "AB_PL2400_02"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "915b5131",
+      "key": "AB_PL2400_03"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "bcc01262",
+      "key": "AB_PL2400_04"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "642b9935",
+      "key": "AB_PL2400_05"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "4c13102e",
+      "key": "AB_PL2400_06"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "4bc55ee0",
+      "key": "AB_PL2400_07"
+    }
+  },
+  "Pl2500": {
+    "1100": {
+      "ns": "abilities",
+      "hash": "91d8e40b",
+      "key": "AB_PL2500_02"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "55aedf7b",
+      "key": "AB_PL2500_03"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "e69d5c9c",
+      "key": "AB_PL2500_04"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "547c38ae",
+      "key": "AB_PL2500_05"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "d6403105",
+      "key": "AB_PL2500_06"
+    }
+  },
+  "Pl2600": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "9887f9a4",
+      "key": "AB_PL2600_01"
+    },
+    "2000": {
+      "ns": "abilities",
+      "hash": "f1e56fb1",
+      "key": "AB_PL2600_02"
+    },
+    "3000": {
+      "ns": "abilities",
+      "hash": "267ff179",
+      "key": "AB_PL2600_03"
+    },
+    "4000": {
+      "ns": "abilities",
+      "hash": "24b49fe8",
+      "key": "AB_PL2600_04"
+    },
+    "5000": {
+      "ns": "abilities",
+      "hash": "746f18a4",
+      "key": "AB_PL2600_05"
+    },
+    "6000": {
+      "ns": "abilities",
+      "hash": "b85aa34f",
+      "key": "AB_PL2600_06"
+    }
+  },
+  "Pl2700": {
+    "1110": {
+      "ns": "abilities",
+      "hash": "aa6e61e5",
+      "key": "AB_PL2700_02"
+    },
+    "1310": {
+      "ns": "abilities",
+      "hash": "9abfc62c",
+      "key": "AB_PL2700_04"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "aea6d151",
+      "key": "AB_PL2700_08"
+    }
+  },
+  "Pl2800": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "355b0df9",
+      "key": "AB_PL2800_01"
+    },
+    "2000": {
+      "ns": "abilities",
+      "hash": "6fb5fbda",
+      "key": "AB_PL2800_02"
+    },
+    "3000": {
+      "ns": "abilities",
+      "hash": "484b29f5",
+      "key": "AB_PL2800_03"
+    },
+    "4000": {
+      "ns": "abilities",
+      "hash": "530600d2",
+      "key": "AB_PL2800_04"
+    },
+    "5000": {
+      "ns": "abilities",
+      "hash": "44f5c74f",
+      "key": "AB_PL2800_05"
+    },
+    "6002": {
+      "ns": "abilities",
+      "hash": "10fae6ab",
+      "key": "AB_PL2800_06"
+    },
+    "7000": {
+      "ns": "abilities",
+      "hash": "87d51ba4",
+      "key": "AB_PL2800_07"
+    },
+    "8000": {
+      "ns": "abilities",
+      "hash": "0b84f88d",
+      "key": "AB_PL2800_08"
+    }
+  },
+  "Pl2900": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "8f4e9d6f",
+      "key": "AB_PL2900_01"
+    },
+    "7000": {
+      "ns": "abilities",
+      "hash": "d113989a",
+      "key": "AB_PL2900_07"
+    },
+    "8010": {
+      "ns": "abilities",
+      "hash": "b1c60cab",
+      "key": "AB_PL2900_08"
+    }
+  },
+  "summon-classes": {
+    "69893920": {
+      "ns": "summons",
+      "hash": "5f3337b6",
+      "key": "TXT_SMN_So0d00_1",
+      "via": "id"
+    },
+    "0254b5ee": {
+      "ns": "summons",
+      "hash": "3dd9ecee",
+      "key": "TXT_SMN_So2600_1",
+      "via": "id"
+    },
+    "0705d996": {
+      "ns": "summons",
+      "hash": "44a5cab1",
+      "key": "TXT_SMN_So5300_1",
+      "via": "id"
+    },
+    "0959266a": {
+      "ns": "summons",
+      "hash": "7e8a659a",
+      "key": "TXT_SMN_So2300_2",
+      "via": "id"
+    },
+    "0d471e7d": {
+      "ns": "summons",
+      "hash": "38348e1e",
+      "key": "TXT_SMN_So3900_2",
+      "via": "id"
+    },
+    "0f617ff0": {
+      "ns": "summons",
+      "hash": "1ab77fdf",
+      "key": "TXT_SMN_So5f00",
+      "via": "name"
+    },
+    "16818eac": {
+      "ns": "summons",
+      "hash": "31ee9ba5",
+      "key": "TXT_SMN_So0f00_2",
+      "via": "id"
+    },
+    "18617d59": {
+      "ns": "summons",
+      "hash": "547e7dfc",
+      "key": "TXT_SMN_So4e00_1",
+      "via": "id"
+    },
+    "1cff5fcd": {
+      "ns": "summons",
+      "hash": "239f769f",
+      "key": "TXT_SMN_So3700_3",
+      "via": "id"
+    },
+    "1d3edc63": {
+      "ns": "summons",
+      "hash": "c2f91a7f",
+      "key": "TXT_SMN_So1100_3",
+      "via": "id"
+    },
+    "1db19581": {
+      "ns": "summons",
+      "hash": "855d018c",
+      "key": "TXT_SMN_So4500",
+      "via": "id"
+    },
+    "21cadc5f": {
+      "ns": "summons",
+      "hash": "42465367",
+      "key": "TXT_SMN_So5500_2",
+      "via": "id"
+    },
+    "2b97a2ce": {
+      "ns": "summons",
+      "hash": "514cf53b",
+      "key": "TXT_SMN_So5200_2",
+      "via": "id"
+    },
+    "2d179019": {
+      "ns": "summons",
+      "hash": "0d94b89f",
+      "key": "TXT_SMN_So2000_2",
+      "via": "id"
+    },
+    "3113d005": {
+      "ns": "summons",
+      "hash": "3bad1134",
+      "key": "TXT_SMN_So3c00_3",
+      "via": "id"
+    },
+    "34e1145f": {
+      "ns": "summons",
+      "hash": "16ba3b8a",
+      "key": "TXT_SMN_So1800_3",
+      "via": "id"
+    },
+    "49c45df3": {
+      "ns": "summons",
+      "hash": "2e3ce3d9",
+      "key": "TXT_SMN_So2900_2",
+      "via": "id"
+    },
+    "4b381318": {
+      "ns": "summons",
+      "hash": "2eacd79c",
+      "key": "TXT_SMN_So1a00_1",
+      "via": "id"
+    },
+    "5395ce93": {
+      "ns": "summons",
+      "hash": "2f15455c",
+      "key": "TXT_SMN_So9200",
+      "via": "id"
+    },
+    "6093301c": {
+      "ns": "summons",
+      "hash": "16b702dc",
+      "key": "TXT_SMN_So5600_3",
+      "via": "id"
+    },
+    "65294c5c": {
+      "ns": "summons",
+      "hash": "099e1dd3",
+      "key": "TXT_SMN_So4c00",
+      "via": "id"
+    },
+    "531631e9": {
+      "ns": "summons",
+      "hash": "2ea15d18",
+      "key": "TXT_SMN_So2500_2",
+      "via": "id"
+    },
+    "37014e25": {
+      "ns": "summons",
+      "hash": "3c381dcd",
+      "key": "TXT_SMN_So0e00_1",
+      "via": "id"
+    },
+    "43c9fec2": {
+      "ns": "summons",
+      "hash": "ae52556d",
+      "key": "TXT_SMN_So3200_2",
+      "via": "id"
+    },
+    "52a9d192": {
+      "ns": "summons",
+      "hash": "52b14b66",
+      "key": "TXT_SMN_So4900_3",
+      "via": "id"
+    },
+    "535f95e7": {
+      "ns": "summons",
+      "hash": "1e6543a3",
+      "key": "TXT_SMN_So3a00_2",
+      "via": "id"
+    },
+    "537706eb": {
+      "ns": "summons",
+      "hash": "1cc0e0ef",
+      "key": "TXT_SMN_So2b00_1",
+      "via": "id"
+    },
+    "58b51943": {
+      "ns": "summons",
+      "hash": "c1ccbc3c",
+      "key": "TXT_SMN_So3600_2",
+      "via": "id"
+    },
+    "58ec7bb8": {
+      "ns": "summons",
+      "hash": "1ab77fdf",
+      "key": "TXT_SMN_So5f00",
+      "via": "id"
+    },
+    "65b83854": {
+      "ns": "summons",
+      "hash": "4b3d1768",
+      "key": "TXT_SMN_So1c00_1",
+      "via": "id"
+    },
+    "665d2fc8": {
+      "ns": "summons",
+      "hash": "67c7e1ff",
+      "key": "TXT_SMN_So3800_3",
+      "via": "id"
+    },
+    "6939a97c": {
+      "ns": "summons",
+      "hash": "634a379d",
+      "key": "TXT_SMN_So2400_1",
+      "via": "id"
+    },
+    "6bca42ab": {
+      "ns": "summons",
+      "hash": "316641a4",
+      "key": "TXT_SMN_So2100_2",
+      "via": "id"
+    },
+    "6d068bde": {
+      "ns": "summons",
+      "hash": "0f986ed9",
+      "key": "TXT_SMN_So0200",
+      "via": "id"
+    },
+    "6d40c206": {
+      "ns": "summons",
+      "hash": "1b5daebd",
+      "key": "TXT_SMN_So1b00_1",
+      "via": "id"
+    },
+    "6e56d634": {
+      "ns": "summons",
+      "hash": "a608aecd",
+      "key": "TXT_SMN_So5900",
+      "via": "id"
+    },
+    "752dca7d": {
+      "ns": "summons",
+      "hash": "23d839a3",
+      "key": "TXT_SMN_So4b00_1",
+      "via": "id"
+    },
+    "7872194f": {
+      "ns": "summons",
+      "hash": "bfac23dc",
+      "key": "TXT_SMN_So3500_3",
+      "via": "id"
+    },
+    "7b3551e1": {
+      "ns": "summons",
+      "hash": "4d84581f",
+      "key": "TXT_SMN_So1000_1",
+      "via": "id"
+    },
+    "84314abe": {
+      "ns": "summons",
+      "hash": "01b80951",
+      "key": "TXT_SMN_So4000",
+      "via": "id"
+    },
+    "84c0427c": {
+      "ns": "summons",
+      "hash": "ebeb3dc0",
+      "key": "TXT_SMN_So1900_1",
+      "via": "id"
+    },
+    "874eec5d": {
+      "ns": "summons",
+      "hash": "65e658d9",
+      "key": "TXT_SMN_So4700_2",
+      "via": "id"
+    },
+    "882083af": {
+      "ns": "summons",
+      "hash": "666947c2",
+      "key": "TXT_SMN_So3e00_2",
+      "via": "id"
+    },
+    "8a5b51ee": {
+      "ns": "summons",
+      "hash": "26e7ccb1",
+      "key": "TXT_SMN_So3b00_2",
+      "via": "id"
+    },
+    "8acdf47e": {
+      "ns": "summons",
+      "hash": "7e154422",
+      "key": "TXT_SMN_So5100_3",
+      "via": "id"
+    },
+    "8b15c6c3": {
+      "ns": "summons",
+      "hash": "fc8a2ecb",
+      "key": "TXT_SMN_So3d00_3",
+      "via": "id"
+    },
+    "8bbd28fe": {
+      "ns": "summons",
+      "hash": "391c7857",
+      "key": "TXT_SMN_So4d00_1",
+      "via": "id"
+    },
+    "9194760e": {
+      "ns": "summons",
+      "hash": "a062ec06",
+      "key": "TXT_SMN_So1300",
+      "via": "id"
+    },
+    "925ade1b": {
+      "ns": "summons",
+      "hash": "15ed6d77",
+      "key": "TXT_SMN_So4f00_3",
+      "via": "id"
+    },
+    "9551483a": {
+      "ns": "summons",
+      "hash": "c3e918f9",
+      "key": "TXT_SMN_So2a00_1",
+      "via": "id"
+    },
+    "9f394f85": {
+      "ns": "summons",
+      "hash": "855d018c",
+      "key": "TXT_SMN_So4500",
+      "via": "name"
+    },
+    "a22e16cf": {
+      "ns": "summons",
+      "hash": "109e2271",
+      "key": "TXT_SMN_So5700_3",
+      "via": "id"
+    },
+    "a2a61bc2": {
+      "ns": "summons",
+      "hash": "3fd89c3a",
+      "key": "TXT_SMN_So4600_2",
+      "via": "id"
+    },
+    "a76211e2": {
+      "ns": "summons",
+      "hash": "0525e77d",
+      "key": "TXT_SMN_So6300_2",
+      "via": "id"
+    },
+    "a98f78db": {
+      "ns": "summons",
+      "hash": "2e657b01",
+      "key": "TXT_SMN_So3100_1",
+      "via": "id"
+    },
+    "b384382f": {
+      "ns": "summons",
+      "hash": "299c1a08",
+      "key": "TXT_SMN_So5000_1",
+      "via": "id"
+    },
+    "b4ae6c1f": {
+      "ns": "summons",
+      "hash": "5c42d57c",
+      "key": "TXT_SMN_So4a00",
+      "via": "id"
+    },
+    "b79cbcaa": {
+      "ns": "summons",
+      "hash": "524d1660",
+      "key": "TXT_SMN_So1200_3",
+      "via": "id"
+    },
+    "bc9838e1": {
+      "ns": "summons",
+      "hash": "ad15d880",
+      "key": "TXT_SMN_So4800",
+      "via": "id"
+    },
+    "bf4b37f7": {
+      "ns": "summons",
+      "hash": "1abade1d",
+      "key": "TXT_SMN_So2200_1",
+      "via": "id"
+    },
+    "c279ef2a": {
+      "ns": "summons",
+      "hash": "045efb5b",
+      "key": "TXT_SMN_So4100_3",
+      "via": "id"
+    },
+    "c3e77085": {
+      "ns": "summons",
+      "hash": "0033943a",
+      "key": "TXT_SMN_So3f00_3",
+      "via": "id"
+    },
+    "cb814562": {
+      "ns": "summons",
+      "hash": "1b9de0fa",
+      "key": "TXT_SMN_So5400_2",
+      "via": "id"
+    },
+    "cc7bf116": {
+      "ns": "summons",
+      "hash": "315695ae",
+      "key": "TXT_SMN_So3400",
+      "via": "id"
+    },
+    "d0137d04": {
+      "ns": "summons",
+      "hash": "15ec425e",
+      "key": "TXT_SMN_So4200_2",
+      "via": "id"
+    },
+    "d2e5407a": {
+      "ns": "summons",
+      "hash": "6e5968fc",
+      "key": "TXT_SMN_So0000",
+      "via": "id"
+    },
+    "d4bbed75": {
+      "ns": "summons",
+      "hash": "0b366ad9",
+      "key": "TXT_SMN_So1f00_2",
+      "via": "id"
+    },
+    "d5635566": {
+      "ns": "summons",
+      "hash": "b360dd8d",
+      "key": "TXT_SMN_So4400_1",
+      "via": "id"
+    },
+    "dfec5706": {
+      "ns": "summons",
+      "hash": "0be2a43a",
+      "key": "TXT_SMN_So1d00_2",
+      "via": "id"
+    },
+    "e05ecfb8": {
+      "ns": "summons",
+      "hash": "30f63214",
+      "key": "TXT_SMN_So2800_1",
+      "via": "id"
+    },
+    "ef34022f": {
+      "ns": "summons",
+      "hash": "0ee2670a",
+      "key": "TXT_SMN_So1600_3",
+      "via": "id"
+    },
+    "f065d8b8": {
+      "ns": "summons",
+      "hash": "03c8bf90",
+      "key": "TXT_SMN_So6400_2",
+      "via": "id"
+    },
+    "f0f1eb6d": {
+      "ns": "summons",
+      "hash": "852287ba",
+      "key": "TXT_SMN_So2700_1",
+      "via": "id"
+    },
+    "f6fbd915": {
+      "ns": "summons",
+      "hash": "7a7615d3",
+      "key": "TXT_SMN_So4300_2",
+      "via": "id"
+    },
+    "f9c7f702": {
+      "ns": "summons",
+      "hash": "03c95420",
+      "key": "TXT_SMN_So1e00_2",
+      "via": "id"
+    },
+    "fed43afa": {
+      "ns": "summons",
+      "hash": "87c6c345",
+      "key": "TXT_SMN_So3300_1",
+      "via": "id"
+    }
+  }
+}

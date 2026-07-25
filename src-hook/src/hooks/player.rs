@@ -362,7 +362,9 @@ const RECORD_OVERMASTERY_STRIDE: usize = 0x10;
 const RECORD_ABILITY_OFFSET: usize = 0x5AF4;
 const RECORD_ABILITY_COUNT: usize = 4;
 const RECORD_CHARID_OFFSET: usize = 0x5B10;
-const RECORD_CHAR_LEVEL_OFFSET: usize = 0x5B44;
+/// Record offset (u32): wire-replicated level. Level-only fallback for when the
+/// head-block level reads unpopulated.
+const RECORD_LEVEL_WIRE_OFFSET: usize = 0x5B44;
 const RECORD_MASTER_LEVEL_OFFSET: usize = 0x5B60;
 
 /// RVA of the save-root singleton `DAT_147c24980` (global holds a pointer).
@@ -377,13 +379,19 @@ const EQ_MAP_BUCKETS: usize = 0x50;
 const EQ_MAP_MASK: usize = 0x68;
 const EQ_WEAPON_ASCII_LEN: usize = 0x10;
 
-/// The record's inline stat block (decompiled 2026-07-17 from the dispatcher
-/// `FUN_140a23e70` case 3 — which fills `+0x5B48/+0x5B4C/+0x5B54(float)/+0x5B58`
-/// from the same source struct as the ability ids, so it populates in-quest —
-/// and the town loadout-apply `FUN_1407a1080`, which maps loadout+0x3530..0x3550
-/// onto `+0x5B44..0x5B5C` including `+0x5B50` and `+0x5B5C`). The loadout-side
-/// values are level-interpolated stat-curve columns (`FUN_143c4f260`).
-const RECORD_STATS_OFFSET: usize = 0x5B48;
+/// Record offset (u32): character level, head of the relocated pre-2.0
+/// `PlayerStats` blob at rec+0x00..0x18. The game's stat-compute pass writes
+/// this block just before identity-refresh, so it holds computed totals — the
+/// mirror at +0x5B44 is wire-replicated and town-filled, and reading it was why
+/// the UI showed base character stats.
+///
+/// The mirror was decompiled 2026-07-17 from the dispatcher `FUN_140a23e70`
+/// case 3 (fills `+0x5B48/+0x5B4C/+0x5B54(float)/+0x5B58` from the same source
+/// struct as the ability ids) and the town loadout-apply `FUN_1407a1080`
+/// (maps loadout+0x3530..0x3550 onto `+0x5B44..0x5B5C`); those loadout-side
+/// values are level-interpolated stat-curve columns (`FUN_143c4f260`), i.e.
+/// base stats, which is exactly what made the UI wrong.
+const RECORD_STATS_OFFSET: usize = 0x00;
 
 /// The equipped weapon's state, live-labeled 2026-07-17 (user's Hraesvelgr:
 /// weapon id ded16fcf = WEP_PL2700_06_03, wrightstone Stun Power 20 / ATK 15 /
@@ -707,7 +715,7 @@ impl OnLoadPlayerIdentityHook {
             loadout_level
         } else {
             sanity_u32(
-                crate::hooks::diag::read_u32_guarded(record as usize, RECORD_CHAR_LEVEL_OFFSET),
+                crate::hooks::diag::read_u32_guarded(record as usize, RECORD_LEVEL_WIRE_OFFSET),
                 150,
             )
         };
@@ -1129,23 +1137,31 @@ fn read_equipped_weapon_key(record: *const usize) -> String {
     format!("WEP_PL{text}")
 }
 
-/// Reads the record's inline stat block (see [`RECORD_STATS_OFFSET`]). Returns
-/// `None` when every slot is zero/sentinel (record not yet populated). Field
-/// labels are tentative pending live confirmation — see `protocol::RecordStats`.
+/// Reads the record's authoritative stat block (see [`RECORD_STATS_OFFSET`]).
+/// Returns `None` when every slot is zero or sentinel (record not yet
+/// populated). Cross-referenced against an independent implementation
+/// 2026-07-24.
 fn read_record_stats(record: *const usize) -> Option<protocol::RecordStats> {
     use crate::hooks::diag::{read_f32_guarded, read_u32_guarded};
 
     let base = record as usize;
     let clean = |v: u32| if v == EMPTY_SIGIL_HASH { 0 } else { v };
-    let level = sanity_u32(read_u32_guarded(base, RECORD_CHAR_LEVEL_OFFSET), 150);
-    let hp = clean(read_u32_guarded(base, RECORD_STATS_OFFSET));
-    let attack = clean(read_u32_guarded(base, RECORD_STATS_OFFSET + 0x4));
-    let unk_50 = clean(read_u32_guarded(base, RECORD_STATS_OFFSET + 0x8));
-    let stun_power = read_f32_guarded(base, RECORD_STATS_OFFSET + 0xC)
-        .filter(|f| f.is_finite() && *f >= 0.0 && *f < 1e9)
-        .unwrap_or(0.0);
-    let unk_58 = clean(read_u32_guarded(base, RECORD_STATS_OFFSET + 0x10));
-    let power = clean(read_u32_guarded(base, RECORD_STATS_OFFSET + 0x14));
+    let sane_f32 = |v: Option<f32>| {
+        v.filter(|f| f.is_finite() && *f >= 0.0 && *f < 1e9)
+            .unwrap_or(0.0)
+    };
+
+    // Head-block level first; fall back to the wire-replicated scalar.
+    let level = match sanity_u32(read_u32_guarded(base, RECORD_STATS_OFFSET), 150) {
+        0 => sanity_u32(read_u32_guarded(base, RECORD_LEVEL_WIRE_OFFSET), 150),
+        lvl => lvl,
+    };
+    let hp = clean(read_u32_guarded(base, RECORD_STATS_OFFSET + 0x04));
+    let attack = clean(read_u32_guarded(base, RECORD_STATS_OFFSET + 0x08));
+    let unk_50 = clean(read_u32_guarded(base, RECORD_STATS_OFFSET + 0x0C));
+    let stun_power = sane_f32(read_f32_guarded(base, RECORD_STATS_OFFSET + 0x10));
+    let critical_rate = sane_f32(read_f32_guarded(base, RECORD_STATS_OFFSET + 0x14));
+    let power = clean(read_u32_guarded(base, RECORD_STATS_OFFSET + 0x18));
 
     if hp == 0 && attack == 0 && power == 0 {
         return None;
@@ -1156,7 +1172,7 @@ fn read_record_stats(record: *const usize) -> Option<protocol::RecordStats> {
         attack,
         unk_50,
         stun_power,
-        unk_58,
+        critical_rate,
         power,
     })
 }

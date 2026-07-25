@@ -1,0 +1,350 @@
+{
+  "pl0000_atk": {
+    "key": "TXT_SB_NAME_PL0000_SP100",
+    "text": "精髓：回復技能強化"
+  },
+  "pl0000_def": {
+    "key": "TXT_SB_NAME_PL0000_SP000",
+    "text": "覺醒：Class Lv強化"
+  },
+  "pl0000_lim": {
+    "key": "TXT_SB_NAME_PL0000_SP200",
+    "text": "奧祕：挺身掩護專精"
+  },
+  "pl0100_atk": {
+    "key": "TXT_SB_NAME_PL0100_SP100",
+    "text": "精髓：回復技能強化"
+  },
+  "pl0100_def": {
+    "key": "TXT_SB_NAME_PL0100_SP000",
+    "text": "覺醒：Class Lv強化"
+  },
+  "pl0100_lim": {
+    "key": "TXT_SB_NAME_PL0100_SP200",
+    "text": "奧祕：挺身掩護專精"
+  },
+  "pl0200_atk": {
+    "key": "TXT_SB_NAME_PL0200_SP100",
+    "text": "精隨：艾瑞斯強襲專精"
+  },
+  "pl0200_def": {
+    "key": "TXT_SB_NAME_PL0200_SP000",
+    "text": "覺醒：艾瑞斯持續時間專精"
+  },
+  "pl0200_lim": {
+    "key": "TXT_SB_NAME_PL0200_SP200",
+    "text": "奧祕：蒼刃"
+  },
+  "pl0300_atk": {
+    "key": "TXT_SB_NAME_PL0300_SP100",
+    "text": "精髓：造棺者強化"
+  },
+  "pl0300_def": {
+    "key": "TXT_SB_NAME_PL0300_SP000",
+    "text": "覺醒：靶心狙擊強化"
+  },
+  "pl0300_lim": {
+    "key": "TXT_SB_NAME_PL0300_SP200",
+    "text": "奧祕：間接傷害專精"
+  },
+  "pl0400_atk": {
+    "key": "TXT_SB_NAME_PL0400_SP100",
+    "text": "精髓：魔法連擊"
+  },
+  "pl0400_def": {
+    "key": "TXT_SB_NAME_PL0400_SP000",
+    "text": "覺醒：全神貫注強化"
+  },
+  "pl0400_lim": {
+    "key": "TXT_SB_NAME_PL0400_SP200",
+    "text": "奧祕：繁花七綻專精"
+  },
+  "pl0500_atk": {
+    "key": "TXT_SB_NAME_PL0500_SP100",
+    "text": "精髓：榴彈拳"
+  },
+  "pl0500_def": {
+    "key": "TXT_SB_NAME_PL0500_SP000",
+    "text": "覺醒：瞄準模式強化"
+  },
+  "pl0500_lim": {
+    "key": "TXT_SB_NAME_PL0500_SP200",
+    "text": "奧祕：毒榴彈強化"
+  },
+  "pl0600_atk": {
+    "key": "TXT_SB_NAME_PL0600_SP100",
+    "text": "精髓：強化＆弱化專精"
+  },
+  "pl0600_def": {
+    "key": "TXT_SB_NAME_PL0600_SP000",
+    "text": "覺醒：玫瑰鎮魂曲"
+  },
+  "pl0600_lim": {
+    "key": "TXT_SB_NAME_PL0600_SP200",
+    "text": "奧祕：薔薇強化"
+  },
+  "pl0700_atk": {
+    "key": "TXT_SB_NAME_PL0700_SP100",
+    "text": "精髓：孤高的幽靈"
+  },
+  "pl0700_def": {
+    "key": "TXT_SB_NAME_PL0700_SP000",
+    "text": "覺醒：寵物強化"
+  },
+  "pl0700_lim": {
+    "key": "TXT_SB_NAME_PL0700_SP200",
+    "text": "奧祕：支援專精"
+  },
+  "pl0800_atk": {
+    "key": "TXT_SB_NAME_PL0800_SP100",
+    "text": "精髓：閃避強化"
+  },
+  "pl0800_def": {
+    "key": "TXT_SB_NAME_PL0800_SP000",
+    "text": "覺醒：精準終擊專精"
+  },
+  "pl0800_lim": {
+    "key": "TXT_SB_NAME_PL0800_SP200",
+    "text": "奧祕：傷害技能高速化"
+  },
+  "pl0900_atk": {
+    "key": "TXT_SB_NAME_PL0900_SP100",
+    "text": "精髓：為眾人而戰"
+  },
+  "pl0900_def": {
+    "key": "TXT_SB_NAME_PL0900_SP000",
+    "text": "覺醒：敵對心＋"
+  },
+  "pl0900_lim": {
+    "key": "TXT_SB_NAME_PL0900_SP200",
+    "text": "奧祕：剛毅不屈"
+  },
+  "pl1000_atk": {
+    "key": "TXT_SB_NAME_PL1000_SP100",
+    "text": "精髓：紅蓮之刃"
+  },
+  "pl1000_def": {
+    "key": "TXT_SB_NAME_PL1000_SP000",
+    "text": "覺醒：蓄力攻擊強化"
+  },
+  "pl1000_lim": {
+    "key": "TXT_SB_NAME_PL1000_SP200",
+    "text": "奧祕：蓄力反制專精"
+  },
+  "pl1100_atk": {
+    "key": "TXT_SB_NAME_PL1100_SP100",
+    "text": "精髓：傷害技能強化"
+  },
+  "pl1100_def": {
+    "key": "TXT_SB_NAME_PL1100_SP000",
+    "text": "覺醒：精準攻擊專精"
+  },
+  "pl1100_lim": {
+    "key": "TXT_SB_NAME_PL1100_SP200",
+    "text": "奧祕：險境之刃"
+  },
+  "pl1200_atk": {
+    "key": "TXT_SB_NAME_PL1200_SP100",
+    "text": "精髓：正面對決"
+  },
+  "pl1200_def": {
+    "key": "TXT_SB_NAME_PL1200_SP000",
+    "text": "覺醒：高潔戰勢強化"
+  },
+  "pl1200_lim": {
+    "key": "TXT_SB_NAME_PL1200_SP200",
+    "text": "奧祕：所向披靡專精"
+  },
+  "pl1300_atk": {
+    "key": "TXT_SB_NAME_PL1300_SP100",
+    "text": "精髓：迅疾"
+  },
+  "pl1300_def": {
+    "key": "TXT_SB_NAME_PL1300_SP000",
+    "text": "覺醒：三幕的領悟"
+  },
+  "pl1300_lim": {
+    "key": "TXT_SB_NAME_PL1300_SP200",
+    "text": "奧祕：霞返"
+  },
+  "pl1400_atk": {
+    "key": "TXT_SB_NAME_PL1400_SP100",
+    "text": "精髓：一擊必殺"
+  },
+  "pl1400_def": {
+    "key": "TXT_SB_NAME_PL1400_SP000",
+    "text": "覺醒：架式切換強化"
+  },
+  "pl1400_lim": {
+    "key": "TXT_SB_NAME_PL1400_SP200",
+    "text": "奧祕：無二無三專精"
+  },
+  "pl1500_atk": {
+    "key": "TXT_SB_NAME_PL1500_SP100",
+    "text": "精髓：雄武見得專精"
+  },
+  "pl1500_def": {
+    "key": "TXT_SB_NAME_PL1500_SP000",
+    "text": "覺醒：超正拳擊"
+  },
+  "pl1500_lim": {
+    "key": "TXT_SB_NAME_PL1500_SP200",
+    "text": "奧祕：正拳絕技"
+  },
+  "pl1600_atk": {
+    "key": "TXT_SB_NAME_PL1600_SP100",
+    "text": "精髓：傷害技能強化"
+  },
+  "pl1600_def": {
+    "key": "TXT_SB_NAME_PL1600_SP000",
+    "text": "覺醒：浮空連技強化"
+  },
+  "pl1600_lim": {
+    "key": "TXT_SB_NAME_PL1600_SP200",
+    "text": "奧祕：反擊專精"
+  },
+  "pl1700_atk": {
+    "key": "TXT_SB_NAME_PL1700_SP100",
+    "text": "精髓：蓄力攻擊專精"
+  },
+  "pl1700_def": {
+    "key": "TXT_SB_NAME_PL1700_SP000",
+    "text": "覺醒：連技專精"
+  },
+  "pl1700_lim": {
+    "key": "TXT_SB_NAME_PL1700_SP200",
+    "text": "奧祕：蓄力反制專精"
+  },
+  "pl1800_atk": {
+    "key": "TXT_SB_NAME_PL1800_SP100",
+    "text": "精髓：大崩壞強化"
+  },
+  "pl1800_def": {
+    "key": "TXT_SB_NAME_PL1800_SP000",
+    "text": "覺醒：弱化連技增幅"
+  },
+  "pl1800_lim": {
+    "key": "TXT_SB_NAME_PL1800_SP200",
+    "text": "奧祕：回復支援強化"
+  },
+  "pl1900_atk": {
+    "key": "TXT_SB_NAME_PL1900_SP100",
+    "text": "精髓：龍人化強化"
+  },
+  "pl1900_def": {
+    "key": "TXT_SB_NAME_PL1900_SP000",
+    "text": "覺醒：神威一體強化"
+  },
+  "pl1900_lim": {
+    "key": "TXT_SB_NAME_PL1900_SP200",
+    "text": "奧祕：神能解放專精"
+  },
+  "pl2100_atk": {
+    "key": "TXT_SB_NAME_PL2100_SP100",
+    "text": "精髓：白輝之加護"
+  },
+  "pl2100_def": {
+    "key": "TXT_SB_NAME_PL2100_SP000",
+    "text": "覺醒：約定之十二羽翼"
+  },
+  "pl2100_lim": {
+    "key": "TXT_SB_NAME_PL2100_SP200",
+    "text": "奧祕：審判之鐘"
+  },
+  "pl2200_atk": {
+    "key": "TXT_SB_NAME_PL2200_SP100",
+    "text": "精髓：劍之雨"
+  },
+  "pl2200_def": {
+    "key": "TXT_SB_NAME_PL2200_SP000",
+    "text": "覺醒：劍神量條強化"
+  },
+  "pl2200_lim": {
+    "key": "TXT_SB_NAME_PL2200_SP200",
+    "text": "奧祕：劍神切換專精"
+  },
+  "pl2300_atk": {
+    "key": "TXT_SB_NAME_PL2300_SP100",
+    "text": "精髓：致命一擊強化"
+  },
+  "pl2300_def": {
+    "key": "TXT_SB_NAME_PL2300_SP000",
+    "text": "覺醒：多重鎖定射擊專精"
+  },
+  "pl2300_lim": {
+    "key": "TXT_SB_NAME_PL2300_SP200",
+    "text": "奧祕：二王的鬥諍專精"
+  },
+  "pl2400_atk": {
+    "key": "TXT_SB_NAME_PL2400_SP100",
+    "text": "精髓：大風車強化"
+  },
+  "pl2400_def": {
+    "key": "TXT_SB_NAME_PL2400_SP000",
+    "text": "覺醒：鎧散牙強化"
+  },
+  "pl2400_lim": {
+    "key": "TXT_SB_NAME_PL2400_SP200",
+    "text": "奧祕：荒事"
+  },
+  "pl2500_atk": {
+    "key": "TXT_SB_NAME_PL2500_SP100",
+    "text": "精髓：極致系列強化"
+  },
+  "pl2500_def": {
+    "key": "TXT_SB_NAME_PL2500_SP000",
+    "text": "覺醒：魔劍操舞強化"
+  },
+  "pl2500_lim": {
+    "key": "TXT_SB_NAME_PL2500_SP200",
+    "text": "奧祕：刃重結界"
+  },
+  "pl2600_atk": {
+    "key": "TXT_SB_NAME_PL2600_SP100",
+    "text": "精髓：三角時計強化"
+  },
+  "pl2600_def": {
+    "key": "TXT_SB_NAME_PL2600_SP000",
+    "text": "覺醒：吞噬因果專精"
+  },
+  "pl2600_lim": {
+    "key": "TXT_SB_NAME_PL2600_SP200",
+    "text": "奧祕：技能連擊"
+  },
+  "pl2700_atk": {
+    "key": "TXT_SB_NAME_PL2700_SP100",
+    "text": "精髓：雷轟"
+  },
+  "pl2700_def": {
+    "key": "TXT_SB_NAME_PL2700_SP000",
+    "text": "覺醒：近身射擊專精"
+  },
+  "pl2700_lim": {
+    "key": "TXT_SB_NAME_PL2700_SP200",
+    "text": "奧祕：完美射擊"
+  },
+  "pl2800_atk": {
+    "key": "TXT_SB_NAME_PL2800_SP100",
+    "text": "精髓：鮮烈之力"
+  },
+  "pl2800_def": {
+    "key": "TXT_SB_NAME_PL2800_SP000",
+    "text": "覺醒：戰勢強化"
+  },
+  "pl2800_lim": {
+    "key": "TXT_SB_NAME_PL2800_SP200",
+    "text": "奧祕：惡魔的甜言蜜語"
+  },
+  "pl2900_atk": {
+    "key": "TXT_SB_NAME_PL2900_SP100",
+    "text": "精髓：「黑」之侵蝕"
+  },
+  "pl2900_def": {
+    "key": "TXT_SB_NAME_PL2900_SP000",
+    "text": "覺醒：連技終擊強化"
+  },
+  "pl2900_lim": {
+    "key": "TXT_SB_NAME_PL2900_SP200",
+    "text": "奧祕：理外之闇禍"
+  }
+}

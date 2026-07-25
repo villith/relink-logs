@@ -1602,6 +1602,14 @@ fn connect_and_run_parser(app: AppHandle) {
                                     );
                                     state.on_quest_fail_event(event);
                                 }
+                                protocol::Message::OnTrialStart(_) => {
+                                    info!("training-room session start/teardown boundary");
+                                    state.on_trial_start_event();
+                                }
+                                protocol::Message::OnTrialEnd(_) => {
+                                    info!("training-room quit boundary");
+                                    state.on_trial_end_event();
+                                }
                                 protocol::Message::OnUpdateSBA(event) => {
                                     state.on_sba_update(event);
                                 }
