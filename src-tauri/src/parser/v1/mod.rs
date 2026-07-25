@@ -1646,6 +1646,15 @@ impl Parser {
         self.encounter
             .push_event(now, Message::DamageEvent(event.clone()));
 
+        // Recorded above, counted nowhere: the raw log is the source of truth,
+        // so turning the setting on and reparsing brings this hit back. The
+        // return also keeps it out of `derived_state.end_time`, matching the
+        // reparse path, and suppresses the `encounter-update` emit below —
+        // nothing the frontend renders changed.
+        if is_excluded(&event, &self.filters) {
+            return;
+        }
+
         let event = remap_dragon_form(&self.encounter.player_data, &event);
 
         let player_data = self
@@ -2555,6 +2564,47 @@ mod tests {
     // event before `update_from_damage_event` runs, so `cappable_hits`,
     // `capped_hits` and the overcap sums cannot diverge from `total_damage`
     // without the tests above failing first.
+
+    #[test]
+    fn live_damage_path_records_but_does_not_count_a_filtered_burst() {
+        let mut parser = Parser::default();
+
+        parser.on_damage_event(damage_from(PLAYER_HASH, 100, 1_000));
+        parser.on_damage_event(damage_from(PRIMAL_BURST_BODY, 80_000, 3_000));
+
+        assert_eq!(
+            parser.encounter.raw_event_log.len(),
+            2,
+            "the raw log keeps everything — it is the source of truth"
+        );
+        assert_eq!(parser.derived_state.total_damage, 1_000);
+        let player = parser.derived_state.party.get(&0).unwrap();
+        assert_eq!(player.total_damage, 1_000);
+        assert_eq!(player.skill_breakdown.len(), 1);
+    }
+
+    #[test]
+    fn live_damage_path_counts_a_burst_when_the_filter_is_on() {
+        let mut parser = Parser::default();
+        parser.filters = MeterFilters {
+            include_primal_burst: true,
+        };
+
+        parser.on_damage_event(damage_from(PLAYER_HASH, 100, 1_000));
+        parser.on_damage_event(damage_from(PRIMAL_BURST_BODY, 80_000, 3_000));
+
+        assert_eq!(parser.derived_state.total_damage, 4_000);
+        assert_eq!(
+            parser
+                .derived_state
+                .party
+                .get(&0)
+                .unwrap()
+                .skill_breakdown
+                .len(),
+            2
+        );
+    }
 
     #[test]
     fn excluded_damage_does_not_advance_the_encounter_end_time() {
