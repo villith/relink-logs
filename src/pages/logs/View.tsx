@@ -42,6 +42,7 @@ import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounter
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import {
   MeterColumns,
+  type CharacterType,
   type ComputedPlayerState,
   type EncounterState,
   type Overmastery,
@@ -89,6 +90,7 @@ import {
   translateOvermasteryId,
   translateQuestId,
   translateSigilId,
+  translateSkillboardBranch,
   translateSkillboardNode,
   translateSummonBonusId,
   translateSummonId,
@@ -2194,7 +2196,7 @@ function MasterTraitsRows({
                       {label}
                     </Text>
                   </UnstyledButton>
-                  <ActivationSummary tiers={grouped[playerIndex].tiers} />
+                  <ActivationSummary tiers={grouped[playerIndex].tiers} characterType={player.characterType} />
                 </Group>
               ) : (
                 <>
@@ -2229,7 +2231,7 @@ const CATEGORY_INITIAL_KEY: Record<SkillboardCategory, string> = {
 /** The whole board at a glance, for the section header: a column per branch
  * (E/I/C) holding one pip per Chaos tier, filled where that branch's
  * activation threshold is met. EX carries no threshold, so it has no pip. */
-function ActivationSummary({ tiers }: { tiers: SkillboardTier[] }) {
+function ActivationSummary({ tiers, characterType }: { tiers: SkillboardTier[]; characterType: CharacterType }) {
   return (
     <Group gap={10} wrap="nowrap">
       {SKILLBOARD_CATEGORIES.map((key) => {
@@ -2243,9 +2245,11 @@ function ActivationSummary({ tiers }: { tiers: SkillboardTier[] }) {
 
         return (
           <Stack key={key} gap={2} align="center">
-            <Text size="xs" fw={700} lh={1} c={fullySpecced ? PIP_SPENT_EDGE : "dimmed"}>
-              {t(CATEGORY_INITIAL_KEY[key])}
-            </Text>
+            <Tooltip label={translateSkillboardBranch(characterType, key, CATEGORY_LABEL_KEY[key])} withArrow>
+              <Text size="xs" fw={700} lh={1} c={fullySpecced ? PIP_SPENT_EDGE : "dimmed"}>
+                {t(CATEGORY_INITIAL_KEY[key])}
+              </Text>
+            </Tooltip>
             <Group gap={4} wrap="nowrap">
               {activated.map((isActivated, index) => (
                 <PointDiamond key={index} filled={isActivated} />

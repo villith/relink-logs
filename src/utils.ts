@@ -1022,6 +1022,19 @@ export const skillboardNodeKey = (characterType: CharacterType, id: number): str
   return `${character}_${id.toString(16).padStart(4, "0")}`;
 };
 
+/// The character's in-game name for one master-trait branch, prefix included
+/// ("Essence: Lightning Soldier") — every character names its three branches
+/// differently. Falls back to `fallbackKey` (the generic branch name) for
+/// characters the bundle doesn't cover, e.g. one added by a game update.
+export const translateSkillboardBranch = (
+  characterType: CharacterType,
+  category: SkillboardCategory,
+  fallbackKey: string
+): string => {
+  if (typeof characterType !== "string") return t(fallbackKey);
+  return t([`skillboard-branches:${characterType.toLowerCase()}_${category}.text`, fallbackKey]);
+};
+
 /// Translates one skillboard (master trait) node of a character to its
 /// human-readable effect text (e.g. "Charged Attacks: Charge Time -5%").
 export const translateSkillboardNode = (characterType: CharacterType, id: number): string => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import enBranches from "../src-tauri/lang/en/skillboard-branches.json";
 import enUi from "../src-tauri/lang/en/ui.json";
 import { EnemyState, EquippedSummon, PlayerState, Sigil, SkillState, WeaponInfo, WeaponState } from "./types";
 import {
@@ -842,5 +843,43 @@ describe("summon class names in en/ui.json", () => {
 
   it("provides the generic label every unnamed body class falls back to", () => {
     expect(enUi.skills.default["80000"]).toBeTruthy();
+  });
+});
+
+describe("master-trait branch names in en/skillboard-branches.json", () => {
+  const branches: Record<string, { key: string; text: string }> = enBranches;
+
+  it("names all three branches for every character", () => {
+    const byCharacter = new Map<string, string[]>();
+    for (const name of Object.keys(branches)) {
+      const [character, category] = name.split("_");
+      byCharacter.set(character, [...(byCharacter.get(character) ?? []), category].sort());
+    }
+
+    expect(byCharacter.size).toBe(29);
+    for (const [character, categories] of byCharacter) {
+      expect([character, categories]).toEqual([character, ["atk", "def", "lim"]]);
+    }
+  });
+
+  it("files each game key under the character and branch its id encodes", () => {
+    // TXT_SB_NAME_PL####_SP000/100/200 — that hundreds digit is the same
+    // category encoding the node ids use, so a mis-filed entry would put the
+    // wrong name on a branch.
+    for (const [name, entry] of Object.entries(branches)) {
+      const match = /^TXT_SB_NAME_PL(\d{4})_SP(\d{3})$/.exec(entry.key);
+      expect([entry.key, match !== null]).toEqual([entry.key, true]);
+
+      const [, character, spId] = match!;
+      const category = skillboardNodeMeta(Number(spId))!.category;
+      expect([entry.key, name]).toEqual([entry.key, `pl${character}_${category}`]);
+    }
+  });
+
+  it("carries the character's own branch titles", () => {
+    // Pl2700 = Eustace.
+    expect(branches["pl2700_atk"].text).toBe("Essence: Lightning Soldier");
+    expect(branches["pl2700_def"].text).toBe("Insight: Keep Your Foes Closer");
+    expect(branches["pl2700_lim"].text).toBe("Crux: Perfectionist");
   });
 });
