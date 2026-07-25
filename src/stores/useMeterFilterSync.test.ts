@@ -1,7 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const invoke = vi.fn((_command: string, _args?: unknown) => Promise.resolve());
+const invoke = vi.fn<[command: string, args?: unknown], Promise<void>>(() => Promise.resolve());
 vi.mock("@tauri-apps/api", () => ({ invoke: (...a: Parameters<typeof invoke>) => invoke(...a) }));
 
 import { useMeterSettingsStore } from "./useMeterSettingsStore";

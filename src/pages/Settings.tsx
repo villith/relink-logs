@@ -100,6 +100,7 @@ const SettingsPage = () => {
     streamer_mode,
     show_full_values,
     use_condensed_skills,
+    include_primal_burst,
     setMeterSettings,
     languages,
     handleLanguageChange,
@@ -201,6 +202,13 @@ const SettingsPage = () => {
               label={t("ui.use-condensed-skills")}
               checked={use_condensed_skills}
               onChange={(event) => setMeterSettings({ use_condensed_skills: event.currentTarget.checked })}
+            />
+          </Tooltip>
+          <Tooltip label={t("ui.include-primal-burst-description")}>
+            <Checkbox
+              label={t("ui.include-primal-burst")}
+              checked={include_primal_burst}
+              onChange={(event) => setMeterSettings({ include_primal_burst: event.currentTarget.checked })}
             />
           </Tooltip>
           <Tooltip label={t("ui.open-log-on-save-description")}>
