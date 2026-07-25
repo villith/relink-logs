@@ -20,9 +20,11 @@ use super::{
 };
 
 mod cap_detection;
+mod filters;
 mod player_state;
 mod skill_state;
 
+pub use filters::{is_excluded, MeterFilters};
 use player_state::PlayerState;
 
 pub struct AdjustedDamageInstance<'a> {
