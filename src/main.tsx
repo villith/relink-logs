@@ -5,6 +5,10 @@ import "@mantine/core/styles.css";
 import ReactDOM from "react-dom/client";
 import "./styles.css";
 
+// Populates the skill-name bridge map before the first render. The module's
+// top-level await blocks until the asset is read.
+import "@/assets/skill-name-sources";
+
 import { ModalsProvider } from "@mantine/modals";
 import { App } from "./App";
 

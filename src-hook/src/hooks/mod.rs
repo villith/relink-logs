@@ -26,6 +26,7 @@ mod death;
 pub mod diag;
 mod endless;
 mod ffi;
+mod gamehash;
 mod globals;
 mod loadprobe;
 mod player;

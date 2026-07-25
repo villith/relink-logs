@@ -28,6 +28,8 @@ import weaponTranscendenceData from "@/assets/weapon-transcendence.json";
 import i18next, { t } from "i18next";
 import { useEffect, useRef, type CSSProperties } from "react";
 
+import { abilitySourceKeys, stripTierSuffix, summonClassSource } from "./skillNameSources";
+
 export const EMPTY_ID = 2289754288;
 
 export const formatInPartyOrder = (party: Record<string, PlayerState>): ComputedPlayerState[] => {
@@ -316,6 +318,18 @@ export const skillboardLayoutFor = (characterType: CharacterType): { key: Skillb
     .map((tier) => ({ key: tier === "ex" ? ("ex" as const) : (Number(tier) as 1 | 2 | 3), ids: board[tier] }));
 };
 
+/** The three master-trait branches, in the order the board shows them. */
+export const SKILLBOARD_CATEGORIES = ["atk", "def", "lim"] as const;
+
+export type SkillboardCategory = (typeof SKILLBOARD_CATEGORIES)[number];
+
+/**
+ * Points that must be spent in one category of a tier to activate that
+ * category's bonus: 3 on Chaos I, 6 on Chaos II and III. EX has no activation
+ * threshold, so it returns 0 (no progress pips are drawn for it).
+ */
+export const skillboardActivationCost = (tier: number | "ex"): number => (tier === "ex" ? 0 : tier === 1 ? 3 : 6);
+
 export type ChecklistEntry = {
   /** Trait ids that count toward this entry (levels summed); ids[0] provides the display name. */
   ids: number[];
@@ -450,6 +464,54 @@ export const damageOverTimeKeys = (
   ];
 };
 
+/** Every summon and primal-burst hit reports this one action id, so the id alone
+ * can never name the row — the summon's body class is the only discriminator. */
+export const SUMMON_ATTACK_ACTION_ID = 80000;
+
+/** Lookup chain for a summon hit: the body class first, then the generic label.
+ *
+ * The class arrives as an unresolved `{ Unknown: hash }` character type, since
+ * `So####` bodies are not player characters. Named per class in
+ * `skills.summon-classes` (in ui.json, which is hand-maintained — the other lang
+ * files are regenerated from game data and would lose these).
+ *
+ * Only summons with their OWN body class can be named. Most share one of two
+ * generic bodies and collapse into a single row, which is why the generic label
+ * has to stay: naming that row after any one summon would be wrong. */
+export const summonSkillKeys = (childCharacterType: CharacterType): string[] => {
+  const generic = [`skills.default.${SUMMON_ATTACK_ACTION_ID}`, "skills.default.unknown-skill"];
+  if (typeof childCharacterType !== "object" || !Object.hasOwn(childCharacterType, "Unknown")) {
+    return generic;
+  }
+  const hash = childCharacterType.Unknown.toString(16).padStart(8, "0");
+  return [`skills.summon-classes.${hash}`, ...generic];
+};
+
+/** The body-class hash of a summon hit, or null when the source is a real
+ * character rather than an unresolved `So####` body. */
+const summonBodyHash = (childCharacterType: CharacterType): string | null => {
+  if (typeof childCharacterType !== "object" || !Object.hasOwn(childCharacterType, "Unknown")) return null;
+  return childCharacterType.Unknown.toString(16).padStart(8, "0");
+};
+
+/** The mapped name for a summon body class, or null.
+ *
+ * Summons cannot ride the `t()` chain the way ability rows do: 62 of the 77
+ * classes exist in `summons.json` only as tiered text ("Evyl Blackwyrm III"),
+ * one body class covers every tier, and `t()` returns text verbatim. So read the
+ * bundle directly — the shape `getLangBundle` establishes — and strip the suffix
+ * here.
+ */
+export const summonDisplayName = (bodyClassHash: string): string | null => {
+  const source = summonClassSource(bodyClassHash);
+  if (source === null) return null;
+
+  const text = getLangBundle(source.ns)[source.hash]?.text;
+  if (!text) return null;
+
+  return stripTierSuffix(text);
+};
+
 export const getSkillName = (characterType: CharacterType, skill: SkillState) => {
   switch (true) {
     case skill.actionType === "LinkAttack":
@@ -478,10 +540,29 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
       const actionType = skill.actionType as { Normal: number };
       const skillID = actionType["Normal"];
 
+      if (skillID === SUMMON_ATTACK_ACTION_ID) {
+        const bodyHash = summonBodyHash(skill.childCharacterType);
+
+        // A hand-authored ui.json label wins. `t()` returns the key itself for a
+        // missing key, so ask i18next directly rather than compare strings.
+        if (bodyHash !== null && i18next.exists(`skills.summon-classes.${bodyHash}`)) {
+          return t(`skills.summon-classes.${bodyHash}`);
+        }
+
+        const mapped = bodyHash === null ? null : summonDisplayName(bodyHash);
+        if (mapped !== null) return mapped;
+
+        return t(summonSkillKeys(skill.childCharacterType), { id: skillID });
+      }
+
       return t(
         [
           `skills.${skill.childCharacterType}.${skillID}`,
           `skills.${characterType}.${skillID}`,
+          // The generated abilities bundle, via the bridge map: ui.json keys rows
+          // by action id, abilities.json by ability hash. Sits behind the ui.json
+          // keys so a hand-authored label still wins.
+          ...abilitySourceKeys(String(characterType), String(skill.childCharacterType), skillID),
           `skills.default.${skillID}`,
           `skills.default.unknown-skill`,
         ],
@@ -887,13 +968,15 @@ export const translateQuestId = (id: number | null): string => {
   return t([`quests:${hash}.text`, "quest.unknown"], { id: hash });
 };
 
-/** The loaded `traits` resource bundle: active language first, `en` filling in
- * (matches i18next fallback), `{}` when neither is loaded yet. */
-export const getTraitsBundle = (): Record<string, { text?: string }> =>
-  (i18next.getResourceBundle(i18next.language, "traits") ?? i18next.getResourceBundle("en", "traits") ?? {}) as Record<
-    string,
-    { text?: string }
-  >;
+/** A loaded resource bundle: active language first, `en` filling in (matches
+ * i18next fallback), `{}` when neither is loaded yet. */
+export const getLangBundle = (namespace: string): Record<string, { text?: string }> =>
+  (i18next.getResourceBundle(i18next.language, namespace) ??
+    i18next.getResourceBundle("en", namespace) ??
+    {}) as Record<string, { text?: string }>;
+
+/** The loaded `traits` resource bundle. */
+export const getTraitsBundle = (): Record<string, { text?: string }> => getLangBundle("traits");
 
 /// Translates the trait ID to a human-readable string.
 export const translateTraitId = (id: number | null): string => {
@@ -981,6 +1064,19 @@ export const translateSummonBonusId = (id: number | null): string => {
 export const skillboardNodeKey = (characterType: CharacterType, id: number): string => {
   const character = typeof characterType === "string" ? characterType.toLowerCase() : "unknown";
   return `${character}_${id.toString(16).padStart(4, "0")}`;
+};
+
+/// The character's in-game name for one master-trait branch, prefix included
+/// ("Essence: Lightning Soldier") — every character names its three branches
+/// differently. Falls back to `fallbackKey` (the generic branch name) for
+/// characters the bundle doesn't cover, e.g. one added by a game update.
+export const translateSkillboardBranch = (
+  characterType: CharacterType,
+  category: SkillboardCategory,
+  fallbackKey: string
+): string => {
+  if (typeof characterType !== "string") return t(fallbackKey);
+  return t([`skillboard-branches:${characterType.toLowerCase()}_${category}.text`, fallbackKey]);
 };
 
 /// Translates one skillboard (master trait) node of a character to its
