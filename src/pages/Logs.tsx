@@ -1,3 +1,4 @@
+import { useMeterFilterSync } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import "./Logs.css";
 
@@ -57,6 +58,10 @@ const Layout = () => {
   // this Layout and its whole Outlet subtree.
   const open_log_on_save = useMeterSettingsStore((state) => state.open_log_on_save);
   const auto_check_updates = useMeterSettingsStore((state) => state.auto_check_updates);
+  // Mounted here and nowhere else: the logs window always exists, and a second
+  // mounting site would push the same value twice per toggle — each push makes
+  // the live parser replay its event log.
+  useMeterFilterSync();
   const { t } = useTranslation();
   const [version, setVersion] = useState("");
   useUpdateCheck(auto_check_updates);
