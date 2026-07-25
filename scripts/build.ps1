@@ -63,8 +63,9 @@ if (-not $SkipInstall) {
 # 2. Build the hook DLL (release) -> target/release/hook.dll
 #    This is the step missing from `npm run tauri build`; without it the release
 #    build cannot find the bundled resource.
-Invoke-Step "cargo build --release --package hook" {
-    cargo build --release --package hook
+Invoke-Step "cargo build --release --package hook --features eject" {
+    $env:HOOK_VERSION = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).package.version
+    cargo build --release --package hook --features eject
 }
 
 # 3. Place the DLL where the Tauri release resource glob expects it.

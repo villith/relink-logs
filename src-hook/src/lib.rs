@@ -57,7 +57,7 @@ impl Server {
         // Dev eject: a SEPARATE control endpoint carries the self-teardown
         // command (kept out of the toolbox tool RPC). Own task, same reason.
         #[cfg(feature = "eject")]
-        tokio::spawn(control::run());
+        tokio::spawn(control::run(self.tx.clone()));
         match transport::select_transport() {
             transport::Transport::NamedPipe => self.run_pipe().await,
             transport::Transport::Tcp => self.run_tcp().await,

@@ -17,8 +17,6 @@ use db::logs::LogEntry;
 use dll_syringe::{process::OwnedProcess, Syringe};
 #[cfg(windows)]
 use interprocess::os::windows::named_pipe::tokio::RecvPipeStream;
-#[cfg(windows)]
-use std::path::Path;
 use log::{info, LevelFilter};
 use parser::{
     constants::{CharacterType, EnemyType},
@@ -27,6 +25,8 @@ use parser::{
 use protocol::Message;
 use rusqlite::params_from_iter;
 use serde::{Deserialize, Serialize};
+#[cfg(windows)]
+use std::path::Path;
 use tauri::{
     api::dialog::blocking::FileDialogBuilder, AppHandle, CustomMenuItem, LogicalSize, Manager,
     Size, State, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem,
@@ -79,6 +79,7 @@ fn reset_encounter(state: State<ResetChannel>) {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 fn update_tray_labels(
     app: AppHandle,
     labels: State<TrayLabels>,
@@ -91,32 +92,62 @@ fn update_tray_labels(
     clickthrough: String,
     clickthrough_active: String,
     reset_windows: String,
+    reload_hook: String,
     quit: String,
 ) {
     let tray = app.tray_handle();
 
-    if let Ok(mut v) = labels.open_meter.lock() { *v = open_meter.clone(); }
-    if let Ok(mut v) = labels.open_logs.lock() { *v = open_logs.clone(); }
-    if let Ok(mut v) = labels.always_on_top.lock() { *v = always_on_top.clone(); }
-    if let Ok(mut v) = labels.always_on_top_active.lock() { *v = always_on_top_active.clone(); }
-    if let Ok(mut v) = labels.clickthrough.lock() { *v = clickthrough.clone(); }
-    if let Ok(mut v) = labels.clickthrough_active.lock() { *v = clickthrough_active.clone(); }
-    if let Ok(mut v) = labels.reset_windows.lock() { *v = reset_windows.clone(); }
-    if let Ok(mut v) = labels.quit.lock() { *v = quit.clone(); }
-
     let aot_active = always_on_top_state.0.load(Ordering::Acquire);
     let ct_active = clickthrough_state.0.load(Ordering::Acquire);
 
-    let _ = tray.get_item("open_meter").set_title(&open_meter);
-    let _ = tray.get_item("open_logs").set_title(&open_logs);
-    let _ = tray.get_item("always_on_top").set_title(
-        if aot_active { &always_on_top_active } else { &always_on_top }
-    );
-    let _ = tray.get_item("toggle_clickthrough").set_title(
-        if ct_active { &clickthrough_active } else { &clickthrough }
-    );
-    let _ = tray.get_item("reset_windows").set_title(&reset_windows);
-    let _ = tray.get_item("quit").set_title(&quit);
+    // `get_item` panics when the id isn't in the menu (tauri `app/tray.rs`:
+    // `panic!("item id not found")`). This runs on the main thread inside the
+    // webview IPC callback, so such a panic would unwind across FFI. The
+    // fallible variant makes a missing item a no-op — which is what lets us
+    // set `reload_hook` unconditionally even though the item only exists
+    // under `cfg(all(windows, debug_assertions))`.
+    let set = |id: &str, title: &str| {
+        if let Some(item) = tray.try_get_item(id) {
+            let _ = item.set_title(title);
+        }
+    };
+
+    let aot_title = if aot_active {
+        &always_on_top_active
+    } else {
+        &always_on_top
+    };
+    let ct_title = if ct_active {
+        &clickthrough_active
+    } else {
+        &clickthrough
+    };
+
+    set("open_meter", &open_meter);
+    set("open_logs", &open_logs);
+    set("always_on_top", aot_title);
+    set("toggle_clickthrough", ct_title);
+    set("reset_windows", &reset_windows);
+    set("reload_hook", &reload_hook);
+    set("quit", &quit);
+
+    // Cached so the toggles can re-render the ✓/no-✓ variants without a round
+    // trip to the frontend. `reload_hook` has no toggle state, so it isn't
+    // stored.
+    let store = |slot: &std::sync::Mutex<String>, value: String| {
+        if let Ok(mut v) = slot.lock() {
+            *v = value;
+        }
+    };
+
+    store(&labels.open_meter, open_meter);
+    store(&labels.open_logs, open_logs);
+    store(&labels.always_on_top, always_on_top);
+    store(&labels.always_on_top_active, always_on_top_active);
+    store(&labels.clickthrough, clickthrough);
+    store(&labels.clickthrough_active, clickthrough_active);
+    store(&labels.reset_windows, reset_windows);
+    store(&labels.quit, quit);
 }
 
 /// Toolbox / Synthesis Helper: snapshot the game's synthesis state (served
@@ -176,6 +207,32 @@ async fn fetch_synthesis_seed(
     hook: State<'_, HookStatus>,
 ) -> Result<Option<synthesis::SynthesisSeed>, String> {
     toolbox_rpc::synthesis_seed(&hook).await
+}
+
+/// Compute and broadcast the current hook status to both windows. Called on
+/// connect, disconnect, and around a refresh.
+fn emit_hook_status(app: &AppHandle) {
+    let snapshot = app.state::<HookStatus>().snapshot();
+    let _ = app.emit_all("hook-status", &snapshot);
+}
+
+/// Fold a `Hello` result into `HookStatus` and broadcast the new status. Shared
+/// by the connect loop and the dev re-handshake so the debug path can never
+/// drift from the real one.
+fn apply_hello(app: &AppHandle, info: toolbox_rpc::HelloInfo) {
+    app.state::<HookStatus>().apply_hello(info);
+    emit_hook_status(app);
+}
+
+/// Re-run the handshake and fold the result in. The only way the debug path
+/// should ever refresh hook status.
+async fn handshake_and_apply(app: &AppHandle) {
+    apply_hello(app, toolbox_rpc::hello().await);
+}
+
+#[tauri::command]
+fn get_hook_status(hook: State<'_, HookStatus>) -> toolbox_rpc::HookStatusSnapshot {
+    hook.snapshot()
 }
 
 /// Toolbox / Overmastery Predictor: is the game up, and which characters
@@ -930,8 +987,9 @@ fn reload_dbg(msg: &str) {
 #[cfg(windows)]
 fn find_hook_module(
     syringe: &Syringe,
-) -> std::io::Result<Option<dll_syringe::process::ProcessModule<dll_syringe::process::BorrowedProcess<'_>>>>
-{
+) -> std::io::Result<
+    Option<dll_syringe::process::ProcessModule<dll_syringe::process::BorrowedProcess<'_>>>,
+> {
     use dll_syringe::process::Process as _;
     let process = syringe.process();
     // A hook-dbg.dll lookup error falls through to hook.dll rather than
@@ -983,9 +1041,7 @@ fn eject_hook_until_gone(syringe: &Syringe) -> anyhow::Result<u32> {
                 // Clean unload (module gone → debug_assert passed).
                 Ok(Ok(())) => ejected += 1,
                 // A real eject error (not the survival assert): give up.
-                Ok(Err(e)) => {
-                    return Err(anyhow::Error::new(e).context("FreeLibrary of the hook"))
-                }
+                Ok(Err(e)) => return Err(anyhow::Error::new(e).context("FreeLibrary of the hook")),
                 // "ejected module survived": FreeLibrary ran, refcount still > 0.
                 Err(_) => ejected += 1,
             }
@@ -1010,20 +1066,29 @@ fn hook_module_present(syringe: &Syringe) -> bool {
 async fn check_and_perform_hook(app: AppHandle) {
     reload_dbg("check_and_perform_hook: (re)entered, polling for game process");
     loop {
-        // Dev hook reload in flight: the old module must be ejected and
-        // hook-dbg.dll refreshed before we may inject again (see reload_hook).
-        #[cfg(debug_assertions)]
+        // Hook reload/refresh in flight: the old module must be ejected (and,
+        // for a dev reload, hook-dbg.dll refreshed) before we may inject again.
         {
-            let mut waited = false;
-            while app.state::<HookStatus>().reloading.load(Ordering::Relaxed) {
-                if !waited {
-                    reload_dbg("check_and_perform_hook: reloading gate SET, waiting");
-                    waited = true;
+            let hook = app.state::<HookStatus>();
+            let mut waits: u32 = 0;
+            while hook.injection_gated() {
+                // Log the first wait + periodically: dev_hold_out is designed
+                // to hold indefinitely (see its doc comment), so a one-shot
+                // log here would leave a long hold invisible in
+                // reload-debug.log — exactly where a stranded session should
+                // leave a breadcrumb.
+                if waits == 0 || waits % 50 == 0 {
+                    reload_dbg(&format!(
+                        "check_and_perform_hook: gate SET, waiting (reloading={}, dev_hold_out={})",
+                        hook.reloading.load(Ordering::Relaxed),
+                        hook.dev_hold_out.load(Ordering::Relaxed)
+                    ));
                 }
+                waits += 1;
                 tokio::time::sleep(std::time::Duration::from_millis(100)).await;
             }
-            if waited {
-                reload_dbg("check_and_perform_hook: reloading gate CLEARED, proceeding");
+            if waits > 0 {
+                reload_dbg("check_and_perform_hook: gate CLEARED, proceeding");
             }
         }
 
@@ -1093,8 +1158,14 @@ async fn reload_hook(app: AppHandle) {
     {
         return; // a reload is already in flight
     }
+    // Same rule as refresh_hook: asking for a reload means asking for a working
+    // hook, so a debug hold-out left set must not survive it and block the
+    // re-inject that ends this flow.
+    app.state::<HookStatus>()
+        .dev_hold_out
+        .store(false, Ordering::Relaxed);
     reload_dbg("reload_hook: START (reloading gate set)");
-    let result = reload_hook_inner(&app).await;
+    let result = reload_hook_inner(&app, Some(Path::new("../target/release/hook.dll"))).await;
     app.state::<HookStatus>()
         .reloading
         .store(false, Ordering::SeqCst);
@@ -1111,8 +1182,8 @@ async fn reload_hook(app: AppHandle) {
     }
 }
 
-#[cfg(all(windows, debug_assertions))]
-async fn reload_hook_inner(app: &AppHandle) -> anyhow::Result<()> {
+#[cfg(windows)]
+async fn reload_hook_inner(app: &AppHandle, refresh_from: Option<&Path>) -> anyhow::Result<()> {
     use anyhow::{anyhow, bail, Context};
 
     reload_dbg("reload_hook_inner: sending Eject over control channel");
@@ -1124,11 +1195,7 @@ async fn reload_hook_inner(app: &AppHandle) -> anyhow::Result<()> {
     // ejecting would FreeLibrary a module with live threads, so refuse.
     let wait_start = std::time::Instant::now();
     let deadline = wait_start + std::time::Duration::from_secs(5);
-    while app
-        .state::<HookStatus>()
-        .connected
-        .load(Ordering::Relaxed)
-    {
+    while app.state::<HookStatus>().connected.load(Ordering::Relaxed) {
         if std::time::Instant::now() >= deadline {
             reload_dbg("reload_hook_inner: TIMEOUT — connected never went false within 5s (pipe did not close)");
             bail!("hook did not shut down within 5s; state unknown — restart the game");
@@ -1155,19 +1222,265 @@ async fn reload_hook_inner(app: &AppHandle) -> anyhow::Result<()> {
         )),
     }
 
-    // The file is unlocked now — refresh it from the dev build artifact.
-    // CWD is src-tauri under `npm run tauri dev`, matching the relative
-    // hook-dbg.dll path in check_and_perform_hook.
-    let artifact = Path::new("../target/release/hook.dll");
-    if artifact.exists() {
-        std::fs::copy(artifact, "hook-dbg.dll").context("refreshing hook-dbg.dll")?;
-        reload_dbg(&format!("reload_hook_inner: hook-dbg.dll refreshed from {artifact:?}"));
-    } else {
-        reload_dbg(&format!(
-            "reload_hook_inner: {artifact:?} NOT FOUND; will re-inject existing hook-dbg.dll"
-        ));
+    // Refresh the DLL to be re-injected, if a source path was given. Dev
+    // reload copies the cargo artifact over hook-dbg.dll; production refresh
+    // re-injects the installed hook.dll in place (no copy needed), passing None.
+    if let Some(src) = refresh_from {
+        if src.exists() {
+            std::fs::copy(src, "hook-dbg.dll").context("refreshing hook-dbg.dll")?;
+            reload_dbg(&format!(
+                "reload_hook_inner: hook-dbg.dll refreshed from {src:?}"
+            ));
+        } else {
+            // Missing dev artifact: re-inject the existing hook-dbg.dll rather
+            // than hard-failing (which would leave the game with no hook, since
+            // the old one is already ejected).
+            reload_dbg(&format!(
+                "reload_hook_inner: {src:?} NOT FOUND; re-injecting existing hook-dbg.dll"
+            ));
+        }
     }
     Ok(())
+}
+
+/// Production hook hot-swap: graceful eject + re-inject of the installed
+/// hook.dll, so an updated app can refresh the hook without a game restart.
+/// Gated on the running hook advertising the `eject` control channel — a
+/// pre-rollout hook cannot be safely ejected, so we tell the user to restart
+/// the game instead. Windows only (no injector under Proton).
+#[cfg(windows)]
+#[tauri::command]
+async fn refresh_hook(app: AppHandle) -> Result<(), String> {
+    let hook = app.state::<HookStatus>();
+    // A user reaching for Refresh wants a working hook; a stale debug hold-out
+    // must never outrank that. Clear it BEFORE the `connected` check: a held
+    // gate blocks injection, so `connected` is false in exactly the stranded
+    // case this exists to rescue, and clearing below the early return would
+    // never run there.
+    hook.dev_hold_out.store(false, Ordering::Relaxed);
+    if !hook.connected.load(Ordering::Relaxed) {
+        return Err("game-not-running".into());
+    }
+    if !hook.supports_eject.load(Ordering::Relaxed) {
+        return Err("hook-refresh-unsupported".into());
+    }
+    if hook.reloading.swap(true, Ordering::SeqCst) {
+        return Err("hook-refresh-in-progress".into());
+    }
+    emit_hook_status(&app);
+    // None => re-inject the installed hook.dll in place (no artifact copy).
+    let result = reload_hook_inner(&app, None).await;
+    app.state::<HookStatus>()
+        .reloading
+        .store(false, Ordering::SeqCst);
+    emit_hook_status(&app);
+    result.map_err(|e| format!("{e}"))
+}
+
+/// Non-Windows: no injector, so refresh is not available — restart the game.
+#[cfg(not(windows))]
+#[tauri::command]
+async fn refresh_hook(_app: AppHandle) -> Result<(), String> {
+    Err("hook-refresh-unsupported".into())
+}
+
+#[cfg(windows)]
+mod dev_debug {
+    //! Dev Debug tab: every command in this module drives the REAL hook over
+    //! the dev control channel. Nothing here fabricates frontend state — the
+    //! app derives hook status from real handshakes and the parser derives
+    //! encounter status from real frames. (The `#[cfg(not(windows))]` stubs
+    //! outside this module drive nothing: there is no control-channel client
+    //! there, so they only report the unavailable slug.)
+
+    use super::*;
+
+    /// Report a control-channel failure verbatim. `control_rpc` produces
+    /// distinct, actionable errors — "hook refused eject: …", "refusing to
+    /// broadcast an empty batch", an unexpected response, a connect refusal
+    /// (the common case: a release hook serves no control listener), a 2s
+    /// timeout — and collapsing all of them into one slug would make this
+    /// diagnostic tool less diagnostic than the layer beneath it. The raw
+    /// detail IS the diagnosis, and `backendErrorMessage` passes unmapped
+    /// strings through verbatim, so it reaches the user intact. Same choice
+    /// `refresh_hook` already makes for the reload toast.
+    fn control_failure(e: anyhow::Error) -> String {
+        log::warn!("debug control call failed: {e:?}");
+        format!("{e:#}")
+    }
+
+    /// Eject the live hook. With `hold`, keep it out of the process so the
+    /// resulting `Disconnected` stays put instead of self-healing in ~1s.
+    #[tauri::command]
+    pub async fn debug_eject_hook(app: AppHandle, hold: bool) -> Result<(), String> {
+        let hook = app.state::<HookStatus>();
+        hook.debug_precondition()?;
+        // A hold set while a refresh is in flight survives that refresh's
+        // clear — `refresh_hook`/`reload_hook` clear `dev_hold_out` at the
+        // START of the flow, so a hold stored mid-flight is never covered.
+        // The refresh then ends, `reloading` drops, and the gate stays shut
+        // with nothing left to open it: the injection loop waits forever and
+        // the badge reads "No game found". See `HookStatus::injection_gated`.
+        if hook.reloading.load(Ordering::Relaxed) {
+            return Err("hook-refresh-in-progress".into());
+        }
+        // Set the gate BEFORE ejecting, and clear it again if the eject fails.
+        // Storing it afterwards would leave a window between the hook dying
+        // and the flag landing in which the injection loop is free to
+        // re-inject, so the hold silently would not hold; clearing on error
+        // covers the reason the store was down here in the first place (a
+        // stuck gate after a failed eject). Setting it while still connected
+        // is harmless: the injection loop breaks out after spawning
+        // `connect_and_run_parser` and is only respawned once that task's pipe
+        // is gone, so nothing is reading the gate yet.
+        if hold {
+            hook.dev_hold_out.store(true, Ordering::Relaxed);
+        }
+        let result = gbfr_logs::control_rpc::eject().await;
+        if result.is_err() && hold {
+            hook.dev_hold_out.store(false, Ordering::Relaxed);
+        }
+        result.map_err(control_failure)
+    }
+
+    /// Release the hold-out gate; the injection loop reinjects on its own.
+    #[tauri::command]
+    pub fn debug_allow_reinject(app: AppHandle) -> Result<(), String> {
+        if !cfg!(debug_assertions) {
+            return Err("debug-only".into());
+        }
+        app.state::<HookStatus>()
+            .dev_hold_out
+            .store(false, Ordering::Relaxed);
+        Ok(())
+    }
+
+    /// Read the dev hold-out flag so the Debug page can show it. A SEPARATE
+    /// query, deliberately not a field on `HookStatusSnapshot`: putting it
+    /// there would undo the point, which is that the reported state stays
+    /// derived from real signals. Pull-only, no event — re-query this on
+    /// `hook-status`, because `refresh_hook`/`reload_hook` also clear the flag,
+    /// behind the page's back.
+    #[tauri::command]
+    pub fn debug_hold_out_state(app: AppHandle) -> Result<bool, String> {
+        if !cfg!(debug_assertions) {
+            return Err("debug-only".into());
+        }
+        Ok(app
+            .state::<HookStatus>()
+            .dev_hold_out
+            .load(Ordering::Relaxed))
+    }
+
+    /// Override the live hook's `Hello`, then re-run the handshake so the app
+    /// DERIVES the new state instead of being handed it. Each field is
+    /// independent: a `None` field keeps the hook's real value for that field
+    /// while the override stays installed. Removing the override entirely is a
+    /// different operation — `debug_clear_hello_override`.
+    #[tauri::command]
+    pub async fn debug_set_hello_override(
+        app: AppHandle,
+        hook_version: Option<String>,
+        protocol_version: Option<u32>,
+        supports_eject: Option<bool>,
+    ) -> Result<(), String> {
+        app.state::<HookStatus>().debug_precondition()?;
+        let o = protocol::control::HelloOverride {
+            hook_version,
+            protocol_version,
+            supports_eject,
+        };
+        gbfr_logs::control_rpc::set_hello_override(Some(o))
+            .await
+            .map_err(control_failure)?;
+        handshake_and_apply(&app).await;
+        Ok(())
+    }
+
+    /// Clear the override and re-handshake.
+    #[tauri::command]
+    pub async fn debug_clear_hello_override(app: AppHandle) -> Result<(), String> {
+        app.state::<HookStatus>().debug_precondition()?;
+        gbfr_logs::control_rpc::set_hello_override(None)
+            .await
+            .map_err(control_failure)?;
+        handshake_and_apply(&app).await;
+        Ok(())
+    }
+
+    /// Send one scenario batch to the hook, which rebroadcasts it on the real
+    /// event stream. Returns how many frames the hook QUEUED onto its
+    /// broadcast channel — not how many the app saw. 0 means nothing is
+    /// subscribed to the stream; a lagging receiver can still drop queued
+    /// frames (the channel holds 1024) and end the app's event-stream loop.
+    #[tauri::command]
+    pub async fn debug_broadcast_scenario(
+        app: AppHandle,
+        kind: gbfr_logs::debug_events::Scenario,
+    ) -> Result<u32, String> {
+        app.state::<HookStatus>().debug_precondition()?;
+        gbfr_logs::control_rpc::broadcast_events(gbfr_logs::debug_events::scenario(kind))
+            .await
+            .map_err(control_failure)
+    }
+}
+
+#[cfg(windows)]
+use dev_debug::{
+    debug_allow_reinject, debug_broadcast_scenario, debug_clear_hello_override, debug_eject_hook,
+    debug_hold_out_state, debug_set_hello_override,
+};
+
+// Non-Windows: no control channel client, so the Debug tab reports the same
+// slug the Toolbox uses for an unusable hook — the one string
+// `backendErrors.ts` still maps for these commands. The parameters are
+// declared and ignored rather than dropped: unused here, but they keep the
+// two sides' shapes visibly identical, so a rename or an added argument shows
+// up on this side too.
+#[cfg(not(windows))]
+#[tauri::command]
+async fn debug_eject_hook(_app: AppHandle, _hold: bool) -> Result<(), String> {
+    Err("hook-control-unavailable".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+fn debug_allow_reinject(_app: AppHandle) -> Result<(), String> {
+    Err("hook-control-unavailable".into())
+}
+
+/// Unlike its siblings this answers rather than errors: with no injection loop
+/// to hold out of, the flag can never be set here, so `false` is the truth.
+#[cfg(not(windows))]
+#[tauri::command]
+fn debug_hold_out_state(_app: AppHandle) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn debug_set_hello_override(
+    _app: AppHandle,
+    _hook_version: Option<String>,
+    _protocol_version: Option<u32>,
+    _supports_eject: Option<bool>,
+) -> Result<(), String> {
+    Err("hook-control-unavailable".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn debug_clear_hello_override(_app: AppHandle) -> Result<(), String> {
+    Err("hook-control-unavailable".into())
+}
+
+#[cfg(not(windows))]
+#[tauri::command]
+async fn debug_broadcast_scenario(
+    _app: AppHandle,
+    _kind: gbfr_logs::debug_events::Scenario,
+) -> Result<u32, String> {
+    Err("hook-control-unavailable".into())
 }
 
 // Linux: no injector. Refresh the dinput8 proxy in the game folder
@@ -1180,17 +1493,13 @@ async fn check_and_perform_hook(app: AppHandle) {
     let home = std::env::var_os("HOME").map(std::path::PathBuf::from);
     let bundled = app.path_resolver().resolve_resource("hook.dll");
     match (home, bundled) {
-        (Some(home), Some(bundled)) => {
-            match steam::discover(&steam::default_steam_roots(&home)) {
-                Some(game) => match deploy::deploy(&game.game_dir, &bundled) {
-                    Ok(_) => info!("proxy dinput8.dll is current in {:?}", game.game_dir),
-                    Err(e) => log::warn!("could not deploy the proxy DLL: {e:?}"),
-                },
-                None => log::warn!(
-                    "Steam install of the game not found; see Settings → Linux setup"
-                ),
-            }
-        }
+        (Some(home), Some(bundled)) => match steam::discover(&steam::default_steam_roots(&home)) {
+            Some(game) => match deploy::deploy(&game.game_dir, &bundled) {
+                Ok(_) => info!("proxy dinput8.dll is current in {:?}", game.game_dir),
+                Err(e) => log::warn!("could not deploy the proxy DLL: {e:?}"),
+            },
+            None => log::warn!("Steam install of the game not found; see Settings → Linux setup"),
+        },
         _ => log::warn!("no HOME or no bundled hook.dll; cannot deploy the proxy DLL"),
     }
 
@@ -1234,14 +1543,13 @@ fn connect_and_run_parser(app: AppHandle) {
 
                     let _ = app.emit_all("success-alert", "Connnected to game!");
 
-                    let hook_status = app.state::<HookStatus>();
-                    hook_status.connected.store(true, Ordering::Relaxed);
-                    // Hello up front, once per (re)connect: a stale Linux
-                    // proxy or pre-RPC hook shows as "outdated" instead of
-                    // per-command failures.
-                    hook_status
-                        .outdated
-                        .store(!toolbox_rpc::hello_ok().await, Ordering::Relaxed);
+                    app.state::<HookStatus>()
+                        .connected
+                        .store(true, Ordering::Relaxed);
+                    // Hello up front, once per (re)connect: a stale proxy or
+                    // pre-RPC hook shows as "outdated"; the reported version +
+                    // eject support drive the status badge and refresh gating.
+                    handshake_and_apply(&app).await;
 
                     let decoder = tokio_util::codec::LengthDelimitedCodec::new();
                     let mut reader = FramedRead::new(stream, decoder);
@@ -1293,6 +1601,14 @@ fn connect_and_run_parser(app: AppHandle) {
                                         event.quest_id
                                     );
                                     state.on_quest_fail_event(event);
+                                }
+                                protocol::Message::OnTrialStart(_) => {
+                                    info!("training-room session start/teardown boundary");
+                                    state.on_trial_start_event();
+                                }
+                                protocol::Message::OnTrialEnd(_) => {
+                                    info!("training-room quit boundary");
+                                    state.on_trial_end_event();
                                 }
                                 protocol::Message::OnUpdateSBA(event) => {
                                     state.on_sba_update(event);
@@ -1349,6 +1665,7 @@ fn connect_and_run_parser(app: AppHandle) {
                     app.state::<HookStatus>()
                         .connected
                         .store(false, Ordering::Relaxed);
+                    emit_hook_status(&app);
 
                     info!("Game has closed.");
 
@@ -1406,8 +1723,8 @@ fn system_tray_with_menu() -> SystemTray {
         .add_item(toggle_clickthrough)
         .add_item(reset_windows);
 
-    // Dev-only hook hot-reload. Tray strings don't go through i18next
-    // (backend); an English label is fine for a debug-only item.
+    // Dev-only hook hot-reload. The English label is the startup default;
+    // `update_tray_labels` localizes it once a webview has booted.
     #[cfg(all(windows, debug_assertions))]
     let menu = menu.add_item(CustomMenuItem::new("reload_hook", "Reload hook (dev)"));
 
@@ -1447,19 +1764,25 @@ fn toggle_always_on_top(
     }
     let _ = window.emit("on-pinned", new_state);
     let title = if new_state {
-        labels.always_on_top_active.lock()
+        labels
+            .always_on_top_active
+            .lock()
             .map(|g| g.clone())
             .unwrap_or_else(|_| "Always on top \u{2713}".into())
     } else {
-        labels.always_on_top.lock()
+        labels
+            .always_on_top
+            .lock()
             .map(|g| g.clone())
             .unwrap_or_else(|_| "Always on top".into())
     };
-    let _ = window
+    if let Some(item) = window
         .app_handle()
         .tray_handle()
-        .get_item("always_on_top")
-        .set_title(&title);
+        .try_get_item("always_on_top")
+    {
+        let _ = item.set_title(&title);
+    }
 }
 
 #[tauri::command]
@@ -1476,19 +1799,25 @@ fn toggle_clickthrough(
     }
     let _ = window.emit("on-clickthrough", new_state);
     let title = if new_state {
-        labels.clickthrough_active.lock()
+        labels
+            .clickthrough_active
+            .lock()
             .map(|g| g.clone())
             .unwrap_or_else(|_| "Clickthrough \u{2713}".into())
     } else {
-        labels.clickthrough.lock()
+        labels
+            .clickthrough
+            .lock()
             .map(|g| g.clone())
             .unwrap_or_else(|_| "Clickthrough".into())
     };
-    let _ = window
+    if let Some(item) = window
         .app_handle()
         .tray_handle()
-        .get_item("toggle_clickthrough")
-        .set_title(&title);
+        .try_get_item("toggle_clickthrough")
+    {
+        let _ = item.set_title(&title);
+    }
 }
 
 #[tauri::command]
@@ -1654,6 +1983,14 @@ fn main() {
             fetch_linux_setup_status,
             deploy_linux_hook,
             remove_linux_hook,
+            get_hook_status,
+            refresh_hook,
+            debug_eject_hook,
+            debug_allow_reinject,
+            debug_hold_out_state,
+            debug_set_hello_override,
+            debug_clear_hello_override,
+            debug_broadcast_scenario,
             update_tray_labels,
         ])
         .setup(|app| {

@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
+import { gameXxhash32 } from "../scripts/gbfr-hash.mjs";
+import skillNameSources from "../src-tauri/assets/skill-name-sources.json";
+import enAbilities from "../src-tauri/lang/en/abilities.json";
+import enEnemies from "../src-tauri/lang/en/enemies.json";
+import enBranches from "../src-tauri/lang/en/skillboard-branches.json";
+import enSummons from "../src-tauri/lang/en/summons.json";
+import enUi from "../src-tauri/lang/en/ui.json";
 import { EnemyState, EquippedSummon, PlayerState, Sigil, SkillState, WeaponInfo, WeaponState } from "./types";
 import {
   EMPTY_ID,
   OVERMASTERY_EFFECT_IDS,
+  SKILLBOARD_CATEGORIES,
   checklistLevel,
   checklistStatus,
   collectSigilsByCategory,
@@ -20,10 +28,12 @@ import {
   groupBonuses,
   humanizeNumbers,
   mergeTargetBreakdowns,
+  skillboardActivationCost,
   skillboardLayoutFor,
   skillboardNodeKey,
   skillboardNodeMeta,
   summonBonusValue,
+  summonSkillKeys,
   toHash,
   toHashString,
   traitMaxLevel,
@@ -344,6 +354,29 @@ describe("utils", () => {
     it("is empty for unknown characters", () => {
       expect(skillboardLayoutFor({ Unknown: 123 })).toEqual([]);
     });
+
+    it("splits every tier evenly across the three branches", () => {
+      // The board is uniform for all 29 characters: 4 nodes per branch on
+      // Chaos I, 8 on Chaos II/III — which is what the activation pips assume.
+      for (const tier of skillboardLayoutFor("Pl1600")) {
+        const perCategory = SKILLBOARD_CATEGORIES.map(
+          (category) => tier.ids.filter((id) => skillboardNodeMeta(id)?.category === category).length
+        );
+        expect(perCategory).toEqual([tier.ids.length / 3, tier.ids.length / 3, tier.ids.length / 3]);
+      }
+    });
+  });
+
+  describe("skillboardActivationCost", () => {
+    it("is 3 points on Chaos I and 6 on Chaos II/III", () => {
+      expect(skillboardActivationCost(1)).toBe(3);
+      expect(skillboardActivationCost(2)).toBe(6);
+      expect(skillboardActivationCost(3)).toBe(6);
+    });
+
+    it("is 0 for EX, which has no activation threshold", () => {
+      expect(skillboardActivationCost("ex")).toBe(0);
+    });
   });
 
   describe("checklistStatus", () => {
@@ -610,6 +643,15 @@ describe("utils", () => {
       expect(settings).toMatchObject({ logsActive: false, toolboxActive: false, settingsActive: true });
     });
 
+    it("marks the debug tab active on its page without claiming the Logs tab", () => {
+      expect(deriveNavState("/logs/debug")).toMatchObject({
+        debugActive: true,
+        logsActive: false,
+        questsActive: false,
+      });
+      expect(deriveNavState("/logs")).toMatchObject({ debugActive: false });
+    });
+
     it("keeps the quests/conflux sub-tab split and list-page detection", () => {
       expect(deriveNavState("/logs")).toMatchObject({ questsActive: true, confluxActive: false, onListPage: true });
       expect(deriveNavState("/logs/conflux")).toMatchObject({
@@ -761,5 +803,186 @@ describe("damageOverTimeKeys", () => {
       "skills.Pl0100.damage-over-time",
       "skills.default.damage-over-time",
     ]);
+  });
+});
+
+describe("summonSkillKeys", () => {
+  it("prefers the summon class name, then the generic summon label", () => {
+    // Every summon hit arrives as action id 80000 with the summon's body class as
+    // the child type, so the class hash is the only thing that can name the row.
+    expect(summonSkillKeys({ Unknown: 0xd2e5407a })).toEqual([
+      "skills.summon-classes.d2e5407a",
+      "skills.default.80000",
+      "skills.default.unknown-skill",
+    ]);
+  });
+
+  it("zero-pads the class hash to eight digits", () => {
+    // A hash with a leading zero (So5f01 = 0x0f617ff0) must not lose it, or the
+    // lookup silently misses and the row falls back to the generic label.
+    expect(summonSkillKeys({ Unknown: 0x0f617ff0 })[0]).toBe("skills.summon-classes.0f617ff0");
+  });
+
+  it("skips the class lookup for a named character type", () => {
+    expect(summonSkillKeys("Pl1800")).toEqual(["skills.default.80000", "skills.default.unknown-skill"]);
+  });
+});
+
+describe("summon class sources in skill-name-sources.json", () => {
+  const classes = skillNameSources["summon-classes"] as Record<
+    string,
+    { ns: string; hash: string; key: string; via?: string }
+  >;
+
+  it("keys every entry by a lowercase eight-digit hash", () => {
+    // A mistyped or unpadded key never resolves, and the only symptom in game is
+    // a row silently reading "Summon Attack" — invisible without this check.
+    const bad = Object.keys(classes).filter((k) => !/^[0-9a-f]{8}$/.test(k));
+
+    expect(bad).toEqual([]);
+    expect(Object.keys(classes).length).toBeGreaterThan(0);
+  });
+
+  it("names the summon body classes the hook can attribute", () => {
+    // The names themselves now come from each language's own summons.json; what
+    // this file pins is which body class points at which game entry.
+    // d2e5407a = Lucilius (So0000), 5395ce93 = Beelzebub (So9200).
+    expect(classes["d2e5407a"]?.key).toBe("TXT_SMN_So0000");
+    expect(classes["5395ce93"]?.key).toBe("TXT_SMN_So9200");
+  });
+
+  it("pairs every id-derived class with the So id that actually hashes to it", () => {
+    // A body class is XXHash32Custom("So####"). Checking that identity here is
+    // what stops a display-name collision from quietly mislabelling a row —
+    // two different summons, and some enemies, share names.
+    const mismatched = Object.entries(classes)
+      .filter(([, source]) => source.via === "id")
+      .filter(([classHash, source]) => {
+        const soId = /^TXT_SMN_(So[0-9a-f]{4})(?:_\d+)?$/.exec(source.key)?.[1];
+        return soId === undefined || gameXxhash32(soId) !== classHash;
+      })
+      .map(([classHash, source]) => `${classHash} -> ${source.key}`);
+
+    expect(mismatched).toEqual([]);
+  });
+
+  it("marks the classes identity could not resolve so a patch review can find them", () => {
+    // The Cat and Lilith bodies are not So#### summons, so they rest on a name
+    // match. Their text agrees with the same-named summon in every shipped
+    // language today, but that is a coincidence worth re-checking.
+    const byName = Object.entries(classes)
+      .filter(([, source]) => source.via === "name")
+      .map(([classHash]) => classHash)
+      .sort();
+
+    expect(byName).toEqual(["0f617ff0", "9f394f85"]);
+  });
+
+  it("points every entry at a hash that resolves in the generated bundle", () => {
+    // The regression net after a game patch renames a lang key.
+    const bundles: Record<string, Record<string, { text?: string }>> = {
+      summons: enSummons,
+      enemies: enEnemies,
+    };
+    const broken = Object.entries(classes).filter(([, source]) => !bundles[source.ns]?.[source.hash]?.text);
+
+    expect(broken).toEqual([]);
+  });
+
+  it("keeps the hand-coined class that no lang file names", () => {
+    // Silverslime/Goldslime is ours, so it stays in ui.json and never maps.
+    expect(classes["34894579"]).toBeUndefined();
+    expect((enUi.skills["summon-classes"] as Record<string, string>)["34894579"]).toBeTruthy();
+  });
+
+  it("provides the generic label every unnamed body class falls back to", () => {
+    expect(enUi.skills.default["80000"]).toBeTruthy();
+  });
+});
+
+describe("ability sources in skill-name-sources.json", () => {
+  const abilityBlocks = Object.entries(skillNameSources).filter(([block]) => block !== "summon-classes") as [
+    string,
+    Record<string, { ns: string; hash: string; key: string }>,
+  ][];
+
+  it("points every entry at a hash that resolves in en/abilities.json", () => {
+    const broken = abilityBlocks.flatMap(([block, entries]) =>
+      Object.entries(entries)
+        .filter(([, source]) => !(enAbilities as Record<string, { text?: string }>)[source.hash]?.text)
+        .map(([id]) => `${block}.${id}`)
+    );
+
+    expect(broken).toEqual([]);
+  });
+
+  it("scopes every ability key to its own character block", () => {
+    // The scoping is what disambiguates a name shared by two hashes; a key from
+    // another character would silently mislabel the row.
+    const mismatched = abilityBlocks.flatMap(([block, entries]) =>
+      Object.entries(entries)
+        .filter(([, source]) => !source.key.startsWith(`AB_${block.toUpperCase()}_`))
+        .map(([id, source]) => `${block}.${id} -> ${source.key}`)
+    );
+
+    expect(mismatched).toEqual([]);
+  });
+
+  it("never maps a row to a _CG cutscene variant", () => {
+    const cg = Object.values(skillNameSources)
+      .flatMap((entries) => Object.values(entries as Record<string, { key: string }>))
+      .filter((source) => source.key.endsWith("_CG"));
+
+    expect(cg).toEqual([]);
+  });
+
+  it("leaves no ui.json entry duplicating a mapped id", () => {
+    // ui.json holding a mapped id would shadow the translation for every
+    // language, which is the duplication this whole map exists to remove.
+    const duplicates = Object.entries(skillNameSources).flatMap(([block, entries]) =>
+      Object.keys(entries as Record<string, unknown>)
+        .filter((id) => (enUi.skills as Record<string, Record<string, unknown>>)[block]?.[id] !== undefined)
+        .map((id) => `${block}.${id}`)
+    );
+
+    expect(duplicates).toEqual([]);
+  });
+});
+
+describe("master-trait branch names in en/skillboard-branches.json", () => {
+  const branches: Record<string, { key: string; text: string }> = enBranches;
+
+  it("names all three branches for every character", () => {
+    const byCharacter = new Map<string, string[]>();
+    for (const name of Object.keys(branches)) {
+      const [character, category] = name.split("_");
+      byCharacter.set(character, [...(byCharacter.get(character) ?? []), category].sort());
+    }
+
+    expect(byCharacter.size).toBe(29);
+    for (const [character, categories] of byCharacter) {
+      expect([character, categories]).toEqual([character, ["atk", "def", "lim"]]);
+    }
+  });
+
+  it("files each game key under the character and branch its id encodes", () => {
+    // TXT_SB_NAME_PL####_SP000/100/200 — that hundreds digit is the same
+    // category encoding the node ids use, so a mis-filed entry would put the
+    // wrong name on a branch.
+    for (const [name, entry] of Object.entries(branches)) {
+      const match = /^TXT_SB_NAME_PL(\d{4})_SP(\d{3})$/.exec(entry.key);
+      expect([entry.key, match !== null]).toEqual([entry.key, true]);
+
+      const [, character, spId] = match!;
+      const category = skillboardNodeMeta(Number(spId))!.category;
+      expect([entry.key, name]).toEqual([entry.key, `pl${character}_${category}`]);
+    }
+  });
+
+  it("carries the character's own branch titles", () => {
+    // Pl2700 = Eustace.
+    expect(branches["pl2700_atk"].text).toBe("Essence: Lightning Soldier");
+    expect(branches["pl2700_def"].text).toBe("Insight: Keep Your Foes Closer");
+    expect(branches["pl2700_lim"].text).toBe("Crux: Perfectionist");
   });
 });

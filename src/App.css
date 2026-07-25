@@ -267,3 +267,19 @@
     display: none;
   }
 }
+
+/* Hook status tones in the overlay status slot. A leading dot glyph is always
+   present (through timer and idle states alike) so the connection state is
+   glanceable without a hover tooltip. */
+.encounter-status.hook-ok::before {
+  content: "● ";
+  color: #51cf66;
+}
+.encounter-status.hook-warn::before {
+  content: "● ";
+  color: #ffd43b;
+}
+.encounter-status.hook-idle::before {
+  content: "● ";
+  color: #868e96;
+}

@@ -26,20 +26,18 @@ mod death;
 pub mod diag;
 mod endless;
 mod ffi;
+mod gamehash;
 mod globals;
 mod loadprobe;
 mod player;
 mod quest;
 mod sba;
 mod stunnet;
+mod summon;
+mod trial;
 
-type GetEntityHashID0x58 = unsafe extern "system" fn(*const usize, *const u32) -> *const usize;
-
-/// Pl1900 (Id, human form) actor type hash.
-const ID_HUMAN_TYPE: u32 = 0x8056ABCD;
-/// Pl2000 (Id, dragon form) actor type hash.
-const ID_DRAGON_TYPE: u32 = 0xF5755C0E;
-const ID_DRAGON_PARENT_ENTITY_OFFSET: usize = 0x1CA98;
+pub(crate) type GetEntityHashID0x58 =
+    unsafe extern "system" fn(*const usize, *const u32) -> *const usize;
 
 /// Run one hook/global setup step, logging (and swallowing) any error so that a
 /// single broken signature does not prevent every other hook from installing.
@@ -156,6 +154,9 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         "quest_flow_end",
         quest::OnQuestFlowEndHook::new(tx.clone()).setup(&process),
     );
+    // Training room: no flow object and no quest load, so its own start/quit
+    // boundaries are the only thing that can close a training encounter.
+    try_step("trial", trial::TrialHooks::new(tx.clone()).setup(&process));
 
     /* Conflux / EndlessMode — emits run-start / buff / run-end messages so the parser can
     group a run's rooms + buffs (room-enter itself comes from quest_load_state above). The
@@ -218,6 +219,7 @@ pub fn teardown_hooks() {
     stunnet::disable();
     area::disable();
     quest::disable();
+    trial::disable();
     endless::disable();
     sba::disable();
     #[cfg(feature = "hookdiag")]
@@ -248,88 +250,10 @@ pub fn actor_idx(actor_ptr: *const usize) -> u32 {
     unsafe { (actor_ptr.byte_add(0x170) as *const u32).read() }
 }
 
-// Returns the parent entity of the source entity if necessary.
-#[inline(always)]
-pub fn get_source_parent(
-    source_type_id: u32,
-    source: *const usize,
-) -> Option<(u32, u32, *const usize)> {
-    match source_type_id {
-        // Pl0700Ghost -> Pl0700. v2.0.2 moved the owner-entity link 0xE48 -> 0xE58
-        // (live UNSRC scan 2026-07-20: entity hits at 0xE58 + periodic copies every
-        // 0x2C00; with the old offset ALL ghost damage — pet normals, Blaus Gespenst,
-        // Pendel, Strafe, ghost link attacks — was silently dropped).
-        0x2AF678E8 => {
-            let parent_instance = parent_specified_instance_at(source, 0xE58)?;
-
-            Some((
-                actor_type_id(parent_instance),
-                actor_idx(parent_instance),
-                parent_instance,
-            ))
-        }
-        // Pl0700GhostSatellite (Umlauf) -> Pl0700. v2.0.2 moved the owner-entity link
-        // 0x508 -> 0x4E8 (live UNSRC scan 2026-07-20 verify run: single entity hit at
-        // +0x4E8 — the same -0x20 shift as both Wp actors).
-        0x8364C8BC => {
-            let parent_instance = parent_specified_instance_at(source, 0x4E8)?;
-
-            Some((
-                actor_type_id(parent_instance),
-                actor_idx(parent_instance),
-                parent_instance,
-            ))
-        }
-        // Wp1890: Cagliostro's Ouroboros Dragon Sled -> Pl1800. Also the damage actor
-        // for Pain Train (action 1800) and Alexandria (action 1700) — with this link
-        // broken, BOTH skills silently vanished from the meter (the parser drops
-        // unknown-parent sources before the raw log, so old logs are unrecoverable).
-        // v2.0.2 moved the owner-entity link 0x578 -> 0x558 (live UNSRC scan
-        // 2026-07-20: entity hits at 0x4F0/0x558/0x2DB0/0x2F90; 0x558 is the old
-        // member shifted -0x20, 0x4F0 kept as guarded fallback).
-        0xC9F45042 => {
-            let parent_instance = parent_specified_instance_at(source, 0x558)
-                .or_else(|| parent_specified_instance_at(source, 0x4F0))?;
-            Some((
-                actor_type_id(parent_instance),
-                actor_idx(parent_instance),
-                parent_instance,
-            ))
-        }
-        // Pl2000: Id's Dragon Form -> Pl1900
-        ID_DRAGON_TYPE => {
-            let parent_instance =
-                parent_specified_instance_at(source, ID_DRAGON_PARENT_ENTITY_OFFSET)?;
-
-            let parent_idx = diag::read_ptr_guarded(parent_instance as usize, 0x170)? as u32;
-            Some((ID_HUMAN_TYPE, parent_idx, parent_instance))
-        }
-        // Wp2290: Seofon's Avatar (actions 900-904). v2.0.2 moved the owner-entity
-        // link 0x500 -> 0x4E0 — the same -0x20 shift as Wp1890's 0x578 -> 0x558 (live
-        // UNSRC scan 2026-07-20: entity hits at 0x4E0 + copies every 0x1200, plus
-        // 0x2DB0/0x2F90 which BOTH Wp scans shared — a weapon-actor base-class owner
-        // member, kept as the guarded fallback).
-        0x5B1AB457 => {
-            let parent_instance = parent_specified_instance_at(source, 0x4E0)
-                .or_else(|| parent_specified_instance_at(source, 0x2DB0))?;
-            Some((
-                actor_type_id(parent_instance),
-                actor_idx(parent_instance),
-                parent_instance,
-            ))
-        }
-        // Pl0600PlantRose
-        0x69C0CA71 => {
-            let parent_instance = parent_specified_instance_at(source, 0x7E0)?;
-            Some((
-                actor_type_id(parent_instance),
-                actor_idx(parent_instance),
-                parent_instance,
-            ))
-        }
-        _ => None,
-    }
-}
+pub use summon::get_source_parent;
+// Re-exported so the damage hook's Pl2000 identity publish and its own
+// specified-instance walk keep their existing `super::` call sites.
+pub(crate) use summon::{parent_specified_instance_at, ID_DRAGON_TYPE};
 
 /// The parent-resolved, PLAYER-UNIQUE attribution pair for a source actor:
 /// pets/avatars resolve to their owner first, then the (owner) actor's
@@ -359,76 +283,6 @@ pub fn player_slot_key_for_source(source: *const usize) -> Option<u32> {
         let (_, keyed) = player_keyed_parent(actor_type_id(source), actor_idx(source), source);
         player::is_player_slot_key(keyed).then_some(keyed)
     })
-}
-
-// Returns the specified instance of the parent entity.
-// ptr+offset: Entity
-// *(ptr+offset) + 0x70: m_pSpecifiedInstance (Pl0700, Pl1200, etc.)
-//
-// Both hops are SEH-guarded: these parent-link offsets are version-fragile, and a
-// stale one (or a pet/form instance smaller than the offset) previously meant a raw
-// deref of unmapped memory on the game thread — the silent-freeze class of bug. A
-// failed read just leaves the child actor ungrouped.
-#[inline(always)]
-fn parent_specified_instance_at(actor_ptr: *const usize, offset: usize) -> Option<*const usize> {
-    let entity = diag::read_ptr_guarded(actor_ptr as usize, offset)?;
-    if entity == 0 {
-        return None;
-    }
-
-    let parent = diag::read_ptr_guarded(entity, 0x70)?;
-    (parent != 0).then_some(parent as *const usize)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{parent_specified_instance_at, ID_DRAGON_PARENT_ENTITY_OFFSET};
-
-    #[test]
-    fn resolves_parent_through_the_entity_link() {
-        let parent = Box::new(0usize);
-        let parent_ptr = &*parent as *const usize;
-        let mut entity = vec![0u8; 0x78];
-        let mut actor = vec![0u8; ID_DRAGON_PARENT_ENTITY_OFFSET + std::mem::size_of::<usize>()];
-
-        unsafe {
-            entity
-                .as_mut_ptr()
-                .byte_add(0x70)
-                .cast::<*const usize>()
-                .write_unaligned(parent_ptr);
-            actor
-                .as_mut_ptr()
-                .byte_add(ID_DRAGON_PARENT_ENTITY_OFFSET)
-                .cast::<*const u8>()
-                .write_unaligned(entity.as_ptr());
-        }
-
-        assert_eq!(
-            parent_specified_instance_at(
-                actor.as_ptr().cast::<usize>(),
-                ID_DRAGON_PARENT_ENTITY_OFFSET,
-            ),
-            Some(parent_ptr)
-        );
-    }
-
-    #[test]
-    fn invalid_actor_address_fails_without_dereferencing() {
-        assert_eq!(
-            parent_specified_instance_at(1usize as *const usize, 0),
-            None
-        );
-    }
-
-    #[test]
-    fn null_entity_link_yields_no_parent() {
-        let actor = vec![0u8; 0x100];
-        assert_eq!(
-            parent_specified_instance_at(actor.as_ptr().cast(), 0x40),
-            None
-        );
-    }
 }
 
 #[cfg(test)]

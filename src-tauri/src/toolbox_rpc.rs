@@ -8,23 +8,126 @@ use protocol::toolbox::{
     ToolboxRequest, ToolboxResponse, TOOLBOX_PROTOCOL_VERSION, TOOLBOX_TCP_ADDR,
 };
 use protocol::toolbox::{OvermasterySnapshot, SynthesisSeed, SynthesisSnapshot};
+use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::time::Duration;
 
 /// Managed Tauri state, kept current by the event-stream connect loop in
-/// main.rs. Both flags default to false.
+/// main.rs. All flags default to false and `hook_version` to `None`.
 #[derive(Default)]
 pub struct HookStatus {
     /// True while the event stream is connected (the hook is alive).
     pub connected: AtomicBool,
-    /// True when the hook's Hello failed or reported another protocol
-    /// version — e.g. a stale Linux dinput8 proxy until the game restarts,
-    /// or a pre-RPC hook that refuses the connection outright.
+    /// True when the hook's Hello failed or reported another protocol version.
     pub outdated: AtomicBool,
-    /// Dev hook hot-reload in flight (debug builds only set it): the
-    /// injection loop must not re-inject until the old module is ejected and
-    /// hook-dbg.dll refreshed. See `reload_hook` in main.rs.
+    /// Dev/refresh hook teardown in flight: the injection loop must not
+    /// re-inject until the old module is ejected. See `reload_hook`/`refresh_hook`.
     pub reloading: AtomicBool,
+    /// The connected hook's build version, from its Hello. None until the
+    /// first successful Hello.
+    pub hook_version: Mutex<Option<String>>,
+    /// True when the connected hook advertised the `eject` control channel.
+    pub supports_eject: AtomicBool,
+    /// Dev-only: hold the hook OUT of the game process after an eject, so a
+    /// debug `Disconnected` stays put instead of self-healing when the
+    /// injection loop reinjects a second later. Deliberately NOT read by
+    /// `snapshot()` — the state stays derived, never dictated. Only
+    /// `check_and_perform_hook`'s Windows injection loop honors this; there is
+    /// no non-Windows injection loop to hold out of, so it's a no-op there.
+    /// `Relaxed` throughout (unlike `reloading`'s `SeqCst` swap, which claims
+    /// the gate against a concurrent `refresh_hook`): this flag has no
+    /// companion data to publish and nothing races to set it, so ordering
+    /// beyond atomicity buys nothing.
+    pub dev_hold_out: AtomicBool,
+}
+
+/// The user-facing hook state, computed by `HookStatus::snapshot`.
+#[derive(Serialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "camelCase")]
+pub enum HookState {
+    /// Pipe up, Hello OK, hook version matches the app.
+    Connected,
+    /// A refresh/reload is in flight.
+    Reconnecting,
+    /// Version differs from the app, or the protocol/Hello mismatched.
+    OutOfDate,
+    /// No hook / game not running.
+    Disconnected,
+}
+
+/// Snapshot pushed to the frontend (`hook-status` event, `get_hook_status`).
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct HookStatusSnapshot {
+    pub state: HookState,
+    pub hook_version: Option<String>,
+    pub app_version: String,
+    /// Whether `refresh_hook` can act (vs. "restart the game").
+    pub supports_eject: bool,
+}
+
+impl HookStatus {
+    /// Fold the atomics + the app's own version into the user-facing state.
+    pub fn snapshot(&self) -> HookStatusSnapshot {
+        let app_version = env!("CARGO_PKG_VERSION").to_string();
+        let hook_version = self.hook_version.lock().unwrap().clone();
+        let supports_eject = self.supports_eject.load(Ordering::Relaxed);
+
+        // A dev hook (or not-yet-known version) is never flagged on version
+        // difference alone; only a real, differing release version is.
+        let version_mismatch = match hook_version.as_deref() {
+            None | Some(protocol::toolbox::HOOK_DEV_VERSION) => false,
+            Some(v) => v != app_version,
+        };
+
+        let state = if self.reloading.load(Ordering::Relaxed) {
+            HookState::Reconnecting
+        } else if !self.connected.load(Ordering::Relaxed) {
+            HookState::Disconnected
+        } else if self.outdated.load(Ordering::Relaxed) || version_mismatch {
+            HookState::OutOfDate
+        } else {
+            HookState::Connected
+        };
+
+        HookStatusSnapshot { state, hook_version, app_version, supports_eject }
+    }
+
+    /// Shared precondition for the Debug tab's hook-driving commands: a dev
+    /// build (the control channel the hook serves only under its `eject`
+    /// feature) and a live hook. Both slugs are mapped to friendly copy in
+    /// src/backendErrors.ts. Lives here rather than in main.rs so the rule is
+    /// unit-testable without a Tauri app or a running game.
+    pub fn debug_precondition(&self) -> Result<(), String> {
+        if !cfg!(debug_assertions) {
+            return Err("debug-only".into());
+        }
+        if !self.connected.load(Ordering::Relaxed) {
+            return Err("game-not-running".into());
+        }
+        Ok(())
+    }
+
+    /// Whether the injection loop must hold off (re)injecting: a hook
+    /// reload/refresh is mid-flight, or a dev eject asked for the hook to stay
+    /// out. Extracted from `check_and_perform_hook`'s gate so the hazard the
+    /// two flags create together is an executable assertion (see the tests)
+    /// rather than only a comment: `reloading` clearing does NOT reopen the
+    /// gate while `dev_hold_out` is set, which is why `debug_eject_hook`
+    /// refuses to set a hold during a refresh.
+    pub fn injection_gated(&self) -> bool {
+        self.reloading.load(Ordering::Relaxed) || self.dev_hold_out.load(Ordering::Relaxed)
+    }
+
+    /// Fold a `Hello` result in. Shared by the connect loop and the dev
+    /// re-handshake so the debug path can never drift from the real one.
+    pub fn apply_hello(&self, info: HelloInfo) {
+        self.outdated.store(!info.ok, Ordering::Relaxed);
+        *self.hook_version.lock().unwrap() = info.hook_version;
+        self.supports_eject
+            .store(info.supports_eject, Ordering::Relaxed);
+    }
 }
 
 /// A wedged hook (or frozen game) must not hang a Tauri command.
@@ -40,14 +143,31 @@ pub async fn call(req: ToolboxRequest) -> Result<ToolboxResponse> {
     .await
 }
 
-/// True only when the hook answers Hello with OUR protocol version. Called
-/// by the connect loop each time the event stream (re)connects.
-pub async fn hello_ok() -> bool {
-    matches!(
-        call(ToolboxRequest::Hello).await,
-        Ok(ToolboxResponse::Hello { protocol_version })
-            if protocol_version == TOOLBOX_PROTOCOL_VERSION
-    )
+/// The parsed Hello handshake for the connect loop: whether the hook speaks
+/// our protocol, plus the version + eject support it reported.
+pub struct HelloInfo {
+    pub ok: bool,
+    pub hook_version: Option<String>,
+    pub supports_eject: bool,
+}
+
+pub async fn hello() -> HelloInfo {
+    match call(ToolboxRequest::Hello).await {
+        Ok(ToolboxResponse::Hello {
+            protocol_version,
+            hook_version,
+            supports_eject,
+        }) => HelloInfo {
+            ok: protocol_version == TOOLBOX_PROTOCOL_VERSION,
+            hook_version: Some(hook_version),
+            supports_eject,
+        },
+        _ => HelloInfo {
+            ok: false,
+            hook_version: None,
+            supports_eject: false,
+        },
+    }
 }
 
 /// Shared precondition for every toolbox command. `Ok(None)` = the event
@@ -134,5 +254,148 @@ mod tests {
             synthesis_snapshot(&hook).await,
             Err("hook-unreachable".to_string())
         );
+    }
+
+    fn connected_hook(hook_version: Option<&str>, supports_eject: bool) -> HookStatus {
+        let hook = HookStatus::default();
+        hook.connected.store(true, Ordering::Relaxed);
+        *hook.hook_version.lock().unwrap() = hook_version.map(String::from);
+        hook.supports_eject.store(supports_eject, Ordering::Relaxed);
+        hook
+    }
+
+    #[test]
+    fn snapshot_disconnected_when_pipe_down() {
+        assert_eq!(HookStatus::default().snapshot().state, HookState::Disconnected);
+    }
+
+    #[test]
+    fn snapshot_reconnecting_takes_precedence() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        hook.reloading.store(true, Ordering::Relaxed);
+        assert_eq!(hook.snapshot().state, HookState::Reconnecting);
+    }
+
+    #[test]
+    fn snapshot_connected_when_versions_match() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        assert_eq!(hook.snapshot().state, HookState::Connected);
+    }
+
+    #[test]
+    fn snapshot_out_of_date_on_version_difference() {
+        let hook = connected_hook(Some("0.0.1-old"), true);
+        assert_eq!(hook.snapshot().state, HookState::OutOfDate);
+    }
+
+    #[test]
+    fn snapshot_out_of_date_on_protocol_mismatch() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        hook.outdated.store(true, Ordering::Relaxed);
+        assert_eq!(hook.snapshot().state, HookState::OutOfDate);
+    }
+
+    #[test]
+    fn snapshot_dev_hook_never_flagged_on_version() {
+        let hook = connected_hook(Some(protocol::toolbox::HOOK_DEV_VERSION), true);
+        assert_eq!(hook.snapshot().state, HookState::Connected);
+    }
+
+    #[test]
+    fn apply_hello_failure_reads_out_of_date() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        hook.apply_hello(HelloInfo {
+            ok: false,
+            hook_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            supports_eject: true,
+        });
+        assert_eq!(hook.snapshot().state, HookState::OutOfDate);
+    }
+
+    #[test]
+    fn apply_hello_matching_version_reads_connected() {
+        let hook = connected_hook(None, false);
+        hook.apply_hello(HelloInfo {
+            ok: true,
+            hook_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+            supports_eject: true,
+        });
+        let snapshot = hook.snapshot();
+        assert_eq!(snapshot.state, HookState::Connected);
+        assert_eq!(
+            snapshot.hook_version.as_deref(),
+            Some(env!("CARGO_PKG_VERSION"))
+        );
+        assert!(snapshot.supports_eject);
+    }
+
+    /// The Debug tab's hook-driving commands all want the same two things.
+    /// Tests build with `debug_assertions` on, so the dev-build half is
+    /// satisfied here and the `connected` half is what's under test.
+    #[cfg(debug_assertions)]
+    #[test]
+    fn debug_precondition_requires_a_live_hook() {
+        assert_eq!(
+            HookStatus::default().debug_precondition(),
+            Err("game-not-running".to_string())
+        );
+        assert_eq!(connected_hook(None, false).debug_precondition(), Ok(()));
+    }
+
+    /// The release half of the same precondition: these commands drive the
+    /// hook over a channel only dev builds serve, so a release build refuses
+    /// before it ever looks at `connected`.
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn debug_precondition_refuses_release_builds() {
+        assert_eq!(
+            connected_hook(None, false).debug_precondition(),
+            Err("debug-only".to_string())
+        );
+    }
+
+    /// The injection loop's gate: either flag alone holds it.
+    #[test]
+    fn injection_gated_on_either_flag() {
+        let hook = HookStatus::default();
+        assert!(!hook.injection_gated());
+
+        hook.reloading.store(true, Ordering::Relaxed);
+        assert!(hook.injection_gated());
+
+        hook.dev_hold_out.store(true, Ordering::Relaxed);
+        assert!(hook.injection_gated());
+
+        hook.reloading.store(false, Ordering::Relaxed);
+        assert!(hook.injection_gated());
+    }
+
+    /// The interleave `debug_eject_hook`'s reloading check exists to prevent:
+    /// a hold set mid-refresh survives the refresh's clear, so when
+    /// `reloading` drops the gate is STILL closed and the injection loop
+    /// waits forever. Pinned as an assertion, not just a comment.
+    #[test]
+    fn a_hold_set_during_a_refresh_outlives_it() {
+        let hook = HookStatus::default();
+        hook.reloading.store(true, Ordering::Relaxed);
+        hook.dev_hold_out.store(true, Ordering::Relaxed);
+
+        // The refresh finishes and clears its own flag...
+        hook.reloading.store(false, Ordering::SeqCst);
+
+        // ...and the loop is still gated, with nothing left to clear it.
+        assert!(hook.injection_gated());
+    }
+
+    /// `dev_hold_out` keeps an ejected hook OUT of the process; it must not
+    /// colour the reported state, which stays derived from the real signals.
+    #[test]
+    fn dev_hold_out_does_not_change_the_reported_state() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        hook.dev_hold_out.store(true, Ordering::Relaxed);
+        assert_eq!(hook.snapshot().state, HookState::Connected);
+
+        hook.connected.store(false, Ordering::Relaxed);
+        assert_eq!(hook.snapshot().state, HookState::Disconnected);
     }
 }

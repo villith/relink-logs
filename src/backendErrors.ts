@@ -20,6 +20,15 @@ const TOOL_ERRORS = {
     "hook-outdated": "ui.toolbox.hook-outdated",
     "hook-unreachable": "ui.toolbox.hook-unreachable",
   },
+  hook: {
+    "game-not-running": "ui.hook-status.no-game",
+    "hook-refresh-unsupported": "ui.hook-status.refresh-unsupported",
+    "hook-refresh-in-progress": "ui.hook-status.reconnecting",
+    // Only the `#[cfg(not(windows))]` Debug-tab stubs return this literally;
+    // a real control-channel failure comes back as raw detail, unmapped.
+    "hook-control-unavailable": "ui.hook-status.control-unavailable",
+    "debug-only": "ui.hook-status.debug-only",
+  },
 } as const satisfies Record<string, Record<string, string>>;
 
 /** Friendly copy for a backend error, or the raw message when unmapped. */

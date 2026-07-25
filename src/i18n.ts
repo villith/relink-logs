@@ -25,7 +25,8 @@ export const SUPPORTED_LANGUAGES: { [key: string]: string } = {
   "it-IT": "Italiano",
 };
 
-const syncTrayLabels = async () => {
+/** Pushes the localized system-tray menu strings to the backend. */
+export const syncTrayLabels = async () => {
   if (!("__TAURI_IPC__" in window)) return;
   try {
     await invoke("update_tray_labels", {
@@ -36,6 +37,8 @@ const syncTrayLabels = async () => {
       clickthrough: i18n.t("ui.tray-clickthrough"),
       clickthroughActive: i18n.t("ui.tray-clickthrough-active"),
       resetWindows: i18n.t("ui.tray-reset-windows"),
+      // Only present in dev builds; the backend ignores it otherwise.
+      reloadHook: i18n.t("ui.tray-reload-hook"),
       quit: i18n.t("ui.tray-quit"),
     });
   } catch (e) {
@@ -68,6 +71,7 @@ i18n
       "summons",
       "summon-bonuses",
       "skillboard",
+      "skillboard-branches",
     ],
     defaultNS: "ui",
     fallbackLng: {

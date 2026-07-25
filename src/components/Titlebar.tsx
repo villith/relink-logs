@@ -8,6 +8,7 @@ import { useTranslation } from "react-i18next";
 
 import getVersion from "@/hooks/getVersion";
 import { EncounterState, PlayerData, SortDirection, SortType } from "@/types";
+import { useHookStatus } from "@/useHookStatus";
 import {
   exportFullEncounterToClipboard,
   exportScreenshotToClipboard,
@@ -73,29 +74,45 @@ const TeamDamageStats = ({ encounterState }: { encounterState: EncounterState })
 
 const EncounterStatus = ({ encounterState, elapsedTime }: { encounterState: EncounterState; elapsedTime: number }) => {
   const { t } = useTranslation();
-  if (encounterState.status === "Waiting") {
-    return (
-      <div data-tauri-drag-region className="encounter-status item">
-        {t("ui.status-waiting")}
-      </div>
-    );
-  } else if (encounterState.status === "InProgress") {
-    return (
-      <Fragment>
-        <div data-tauri-drag-region className="encounter-elapsedTime item stat-value">
-          {millisecondsToElapsedFormat(elapsedTime)}
-        </div>
-      </Fragment>
-    );
-  } else if (encounterState.status === "Stopped") {
-    return (
-      <Fragment>
-        <div data-tauri-drag-region className="encounter-elapsedTime item stat-value">
-          {millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime)}
-        </div>
-      </Fragment>
-    );
+  const hook = useHookStatus();
+
+  // Connection tone drives the always-present status dot (`.encounter-status`
+  // ::before glyph) and the label shown when no fight is on screen. An unknown
+  // or disconnected hook reads as idle "No game found".
+  let tone = "hook-idle";
+  let idleLabel = t("ui.hook-status.no-game");
+  if (hook?.state === "connected") {
+    tone = "hook-ok";
+    idleLabel = t("ui.hook-status.connected");
+  } else if (hook?.state === "reconnecting") {
+    tone = "hook-warn";
+    idleLabel = t("ui.hook-status.reconnecting");
+  } else if (hook?.state === "outOfDate") {
+    tone = "hook-warn";
+    idleLabel = t("ui.hook-status.out-of-date");
   }
+
+  // During a fight show the running timer; a finished fight shows its frozen
+  // final duration; otherwise (idle) show the connection label. The dot rides
+  // along in every case.
+  let body;
+  if (encounterState.status === "InProgress") {
+    body = <span className="stat-value">{millisecondsToElapsedFormat(elapsedTime)}</span>;
+  } else if (encounterState.totalDamage > 0) {
+    body = (
+      <span className="stat-value">
+        {millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime)}
+      </span>
+    );
+  } else {
+    body = idleLabel;
+  }
+
+  return (
+    <div data-tauri-drag-region className={`encounter-status item ${tone}`}>
+      {body}
+    </div>
+  );
 };
 
 export const Titlebar = ({

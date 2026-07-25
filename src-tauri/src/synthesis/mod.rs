@@ -170,15 +170,39 @@ fn excluded_sigils() -> &'static std::collections::HashSet<u32> {
     })
 }
 
-/// A sigil can be used in synthesis iff it has two real traits, both at level
-/// 11 or higher, and it is not a "special" sigil (gem.tbl flag; see
+const LEVEL_BASE: u32 = 11;
+const LEVEL_UPGRADED: u32 = 15;
+
+/// A sigil can be used in synthesis if it has two real traits, both at the
+/// base level or higher, and it is not a "special" sigil (gem.tbl flag; see
 /// `excluded_sigils`). Level rule confirmed live (2026-07-18).
 pub fn is_eligible(s: &SynthesisSigil) -> bool {
     s.trait1 != EMPTY_TRAIT
         && s.trait2 != EMPTY_TRAIT
-        && s.trait1_level >= 11
-        && s.trait2_level >= 11
+        && s.trait1_level >= LEVEL_BASE
+        && s.trait2_level >= LEVEL_BASE
         && !excluded_sigils().contains(&s.sigil_id)
+}
+
+/// True when material sigil `s` already matches-or-beats the result the
+/// synthesis would produce — the same trait pair (order-independent: a sigil is
+/// the same item whichever slot each trait sits in) at the same level or
+/// higher. Feeding such a sigil in gains nothing (same level) or is a strict
+/// downgrade (higher level), so `search` drops the pair.
+///
+/// The level comparison is `>=`, not `==`, so a *lower*-level copy of the
+/// result pair is still kept: pairing it can hit the lucky (level-15) upgrade,
+/// a real gain. That is the `require_lucky` case — the result is level 15, so a
+/// level-11 A+B in the box is worth recommending as material.
+fn is_redundant_material(result: &Prediction, s: &SynthesisSigil) -> bool {
+    let same_pair = (s.trait1 == result.trait1 && result.trait2 == Some(s.trait2))
+        || (result.trait2 == Some(s.trait1) && s.trait2 == result.trait1);
+    let result_level = if result.lucky {
+        LEVEL_UPGRADED
+    } else {
+        LEVEL_BASE
+    };
+    same_pair && sigil_level(s) >= result_level
 }
 
 /// The prediction-relevant identity of a sigil. Two sigils with the same key
@@ -246,7 +270,7 @@ pub fn search(snap: &SynthesisSnapshot, q: &SynthesisQuery) -> (Vec<SynthesisMat
             }
             tested += 1;
             let p = predict(snap, a, b);
-            if wanted(&p) {
+            if wanted(&p) && !is_redundant_material(&p, a) && !is_redundant_material(&p, b) {
                 matches.push(SynthesisMatch {
                     sigil_a: a.clone(),
                     sigil_b: b.clone(),
@@ -538,35 +562,135 @@ mod tests {
     }
 
     /// Matches are sorted cheapest-materials-first: by the pair's input sigil
-    /// levels, (11,11) before (11,15) before (15,15). Levels don't feed the
-    /// warm-up (only trait sums + record levels do), so this reuses the
-    /// all-three-pairs-match fixture with levels varied.
+    /// levels, (11,11) before (11,15) before (15,15), ties keeping discovery
+    /// order. Four sigils — two 0x200 sources and two 0x300 sources at mixed
+    /// levels — each pair into the non-owned (0x200,0x300) result, so every
+    /// viable pair is a genuine (non-redundant) match differing only in level
+    /// key. Trait levels don't feed the warm-up (only trait sums + record
+    /// levels do), so all four pairs still predict the target.
     #[test]
     fn search_sorts_matches_by_input_levels() {
-        let mut snap = SynthesisSnapshot {
-            rng_state: 3,
+        let snap = SynthesisSnapshot {
+            rng_state: 1,
             seed_counter: 1,
+            sigils: vec![
+                sigil(1, 0x200, 15, 0xA3, 15, 1),
+                sigil(2, 0x300, 15, 0xA4, 15, 2),
+                sigil(3, 0x200, 11, 0xA1, 11, 3),
+                sigil(4, 0x300, 11, 0xA2, 11, 4),
+            ],
             ..Default::default()
         };
-        snap.sigils = vec![
-            sigil(1, 0x100, 15, 0x110, 15, 1),
-            sigil(2, 0x100, 11, 0x120, 11, 1),
-            sigil(3, 0x100, 15, 0x130, 15, 1),
-        ];
         let q = SynthesisQuery {
-            trait1: 0x100,
-            trait2: None,
-            any_order: false,
+            trait1: 0x200,
+            trait2: Some(0x300),
+            any_order: true,
             require_lucky: false,
         };
         let (matches, _) = search(&snap, &q);
-        assert_eq!(matches.len(), 3);
-        // Discovery order is (1,2),(1,3),(2,3); level keys (11,15),(15,15),(11,15).
-        // Sorted: (1,2) then (2,3) then (1,3).
+        // Discovery order (1,2),(1,4),(2,3),(3,4) has level keys
+        // (15,15),(11,15),(11,15),(11,11). Sorted cheapest-first, ties keeping
+        // discovery order: (3,4), (1,4), (2,3), (1,2).
         let uids: Vec<(u32, u32)> = matches
             .iter()
             .map(|m| (m.sigil_a.uid, m.sigil_b.uid))
             .collect();
-        assert_eq!(uids, vec![(1, 2), (2, 3), (1, 3)]);
+        assert_eq!(uids, vec![(3, 4), (1, 4), (2, 3), (1, 2)]);
+    }
+
+    fn result(trait1: u32, trait2: Option<u32>, lucky: bool) -> Prediction {
+        Prediction {
+            trait1,
+            trait2,
+            lucky,
+        }
+    }
+
+    /// A same-level copy of the result pair is redundant material.
+    #[test]
+    fn redundant_material_same_pair_same_level() {
+        let r = result(0x200, Some(0x300), false); // normal roll -> level 11
+        let s = sigil(1, 0x200, 11, 0x300, 11, 5);
+        assert!(is_redundant_material(&r, &s));
+    }
+
+    /// Trait order does not matter — a B+A sigil is the same item as the A+B result.
+    #[test]
+    fn redundant_material_ignores_trait_order() {
+        let r = result(0x200, Some(0x300), false);
+        let s = sigil(1, 0x300, 11, 0x200, 11, 5);
+        assert!(is_redundant_material(&r, &s));
+    }
+
+    /// A lower-level copy is NOT redundant: pairing it can roll the level-15
+    /// upgrade, so it stays valid material. This is the require_lucky case —
+    /// the result is level 15, and a level-11 A+B in the box is still useful.
+    #[test]
+    fn redundant_material_keeps_lower_level_copy() {
+        let lucky = result(0x200, Some(0x300), true); // lucky roll -> level 15
+        let level_11 = sigil(1, 0x200, 11, 0x300, 11, 5);
+        assert!(!is_redundant_material(&lucky, &level_11));
+        // But a level-15 copy of a level-15 result IS redundant.
+        let level_15 = sigil(2, 0x200, 15, 0x300, 15, 5);
+        assert!(is_redundant_material(&lucky, &level_15));
+    }
+
+    /// A higher-level copy is redundant too: making a level-11 A+B when you
+    /// already own a level-15 A+B is a pure downgrade.
+    #[test]
+    fn redundant_material_hides_higher_level_downgrade() {
+        let normal = result(0x200, Some(0x300), false); // normal roll -> level 11
+        let level_15 = sigil(1, 0x200, 15, 0x300, 15, 5);
+        assert!(is_redundant_material(&normal, &level_15));
+    }
+
+    /// Different traits are never redundant.
+    #[test]
+    fn redundant_material_ignores_other_pairs() {
+        let r = result(0x200, Some(0x300), false);
+        let s = sigil(1, 0x200, 11, 0x400, 11, 5);
+        assert!(!is_redundant_material(&r, &s));
+    }
+
+    /// A single-trait result can't equal a two-trait material sigil.
+    #[test]
+    fn redundant_material_single_trait_result() {
+        let r = result(0x200, None, false);
+        let s = sigil(1, 0x200, 11, 0x300, 11, 5);
+        assert!(!is_redundant_material(&r, &s));
+    }
+
+    /// End to end: two level-11 copies of the (0x200,0x300) pair. Their one
+    /// pairing predicts that same pair at level 11 (rng chosen below), so the
+    /// result is a sigil you already own — search() must drop it even though
+    /// the traits match the query.
+    #[test]
+    fn search_drops_pair_whose_result_you_already_own() {
+        let snap = SynthesisSnapshot {
+            rng_state: 4,
+            seed_counter: 1,
+            sigils: vec![
+                sigil(1, 0x200, 11, 0x300, 11, 5),
+                sigil(2, 0x200, 11, 0x300, 11, 9),
+            ],
+            ..Default::default()
+        };
+        // Guard the fixture: the pair must genuinely predict the (0x200,0x300)
+        // pair at level 11, so its absence below is the redundancy filter at
+        // work and not an accidental non-match.
+        let p = predict(&snap, &snap.sigils[0], &snap.sigils[1]);
+        assert!(
+            is_redundant_material(&p, &snap.sigils[0]),
+            "fixture must produce a redundant pair; got {p:?}"
+        );
+        let q = SynthesisQuery {
+            trait1: 0x200,
+            trait2: Some(0x300),
+            any_order: true,
+            require_lucky: false,
+        };
+        let (matches, tested) = search(&snap, &q);
+        assert_eq!(tested, 1); // the pair was predicted...
+        assert!(matches.is_empty()); // ...but dropped as redundant.
     }
 }

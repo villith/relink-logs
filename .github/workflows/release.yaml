@@ -201,7 +201,12 @@ jobs:
           cache-on-failure: true
 
       - name: Build hook DLL
-        run: cargo build --release --package hook
+        env:
+          # The hook reports this via Hello so the app can detect a stale
+          # (pre-update) hook; `eject` ships the control channel that lets the
+          # app graceful-refresh the hook without a game restart.
+          HOOK_VERSION: ${{ needs.version.outputs.version }}
+        run: cargo build --release --package hook --features eject
 
       - name: Sign hook.dll
         uses: azure/trusted-signing-action@v2

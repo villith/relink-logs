@@ -25,7 +25,7 @@ import {
 import { modals } from "@mantine/modals";
 import { X } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LinuxSetupSection } from "./settings/LinuxSetupSection";
 import useChecklistSettings from "./useChecklistSettings";
@@ -88,7 +88,6 @@ export const ChecklistSection = ({
 const SettingsPage = () => {
   const { t, i18n } = useTranslation();
   const [debugMode, setDebugMode] = useState(false);
-  const [fullAssistUnlock, setFullAssistUnlock] = useState(false);
   const isLinux = useIsLinux();
 
   const {
@@ -123,29 +122,6 @@ const SettingsPage = () => {
       confirmProps: { color: "red" },
       onConfirm: () => deleteAllLogs(),
     });
-
-  // Dev-only: the hook reads this once when it is injected, so the checkbox reflects what
-  // the NEXT game launch will do. Backend state, not store state — the value lives in a
-  // file the injected hook reads, and the frontend is only a view of it.
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-
-    invoke<boolean>("get_full_assist_unlock")
-      .then(setFullAssistUnlock)
-      .catch((e) => console.error("Could not read the Full Assist unlock setting:", e));
-  }, []);
-
-  const toggleFullAssistUnlock = async () => {
-    const enabled = !fullAssistUnlock;
-    setFullAssistUnlock(enabled);
-
-    try {
-      await invoke("set_full_assist_unlock", { enabled });
-    } catch (e) {
-      console.error("Could not write the Full Assist unlock setting:", e);
-      setFullAssistUnlock(!enabled);
-    }
-  };
 
   const toggleDebugMode = () => {
     const enabled = !debugMode;
@@ -298,13 +274,6 @@ const SettingsPage = () => {
         </Box>
       </Fieldset>
       {isLinux && <LinuxSetupSection />}
-      {import.meta.env.DEV && (
-        <Fieldset legend={t("ui.dev-settings")} mt="md">
-          <Tooltip label={t("ui.full-assist-unlock-description")}>
-            <Checkbox label={t("ui.full-assist-unlock")} checked={fullAssistUnlock} onChange={toggleFullAssistUnlock} />
-          </Tooltip>
-        </Fieldset>
-      )}
     </Box>
   );
 };

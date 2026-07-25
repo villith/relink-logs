@@ -1,12 +1,12 @@
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import "./Logs.css";
 
+import HookStatusBadge from "@/components/HookStatusBadge";
 import NewChip from "@/components/NewChip";
 import UpdateAvailableButton from "@/components/UpdateAvailableButton";
 import { deriveNavState } from "@/utils";
 import { ActionIcon, AppShell, Button, Group, Text } from "@mantine/core";
-import { ArrowsCounterClockwise, Bug, Flag, Gear, House, ListDashes, Translate, Wrench } from "@phosphor-icons/react";
-import { invoke } from "@tauri-apps/api";
+import { Bug, Flag, Gear, House, ListDashes, Translate, Wrench } from "@phosphor-icons/react";
 import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/api/shell";
@@ -73,7 +73,7 @@ const Layout = () => {
 
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const { logsActive, toolboxActive, settingsActive, confluxActive, questsActive, onListPage } =
+  const { logsActive, toolboxActive, settingsActive, debugActive, confluxActive, questsActive, onListPage } =
     deriveNavState(pathname);
   // Live pathname for the encounter-saved listener (its closure would
   // otherwise hold the pathname from when the listener was attached).
@@ -133,26 +133,26 @@ const Layout = () => {
               <NavTab to="/logs/settings" icon={<Gear size="1rem" />} active={settingsActive}>
                 {t("ui.settings")}
               </NavTab>
+              {import.meta.env.DEV && (
+                <NavTab to="/logs/debug" icon={<Bug size="1rem" />} active={debugActive}>
+                  {t("ui.debug.title")}
+                </NavTab>
+              )}
             </Group>
-            <Group gap="xs" wrap="nowrap" justify="flex-end" style={{ flex: 1 }}>
-              <Button
+            {/* minWidth: 0 lets the hook-status badge truncate here instead of
+                pushing the nav tabs out of the header when space is tight. */}
+            <Group gap="xs" wrap="nowrap" justify="flex-end" style={{ flex: 1, minWidth: 0 }}>
+              <HookStatusBadge />
+              <ActionIcon
                 variant="subtle"
                 color="gray"
-                size="compact-sm"
-                leftSection={<ArrowsCounterClockwise size="1rem" />}
-                onClick={() => invoke("reset_meter_window")}
-              >
-                {t("ui.reset-overlay-layout")}
-              </Button>
-              <Button
-                variant="subtle"
-                color="gray"
-                size="compact-sm"
-                leftSection={<Translate size="1rem" />}
+                size="lg"
+                title={t("ui.submit-missing-label")}
+                aria-label={t("ui.submit-missing-label")}
                 onClick={() => open(`${GITHUB_URL}/issues/new?template=translation.yml`)}
               >
-                {t("ui.submit-missing-label")}
-              </Button>
+                <Translate size="1rem" />
+              </ActionIcon>
               <ActionIcon
                 variant="subtle"
                 color="gray"

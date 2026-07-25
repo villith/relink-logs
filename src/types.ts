@@ -210,7 +210,7 @@ export type EnemyState = {
   maxHp?: number | null;
 };
 
-export type EncounterStatus = "Waiting" | "InProgress" | "Stopped";
+export type EncounterStatus = "InProgress" | "Stopped";
 
 export type EncounterState = {
   /** Total damage dealt in the whole encounter */
@@ -279,15 +279,17 @@ export type Overmastery = {
 };
 
 /** The v2.0.2 record-inline stat block. Labels for hp/attack/stunPower/power
- * follow the pre-2.0 PlayerStats layout the block mirrors; unk50/unk58 are
- * still-unconfirmed slots. */
+ * follow the pre-2.0 PlayerStats layout the block mirrors; unk50 is the one
+ * still-unconfirmed slot. */
 export type RecordStats = {
   level: number;
   hp: number;
   attack: number;
   unk50: number;
   stunPower: number;
-  unk58: number;
+  /** Critical hit rate, percent. Read as an integer before 2026-07-24;
+   * older logs recover the correct value on reparse. */
+  criticalRate: number;
   power: number;
 };
 
@@ -350,7 +352,7 @@ export type PlayerData = {
   /** Unlocked skillboard (master trait) node effect ids; empty on older logs. */
   skillboard: number[];
   /** Record-inline stat block (v2.0.2 identity recovery); null on older logs.
-   * `unk50`/`unk58` are still-unlabeled slots (see the Rust-side docs). */
+   * `unk50` is the one still-unlabeled slot (see the Rust-side docs). */
   stats: RecordStats | null;
   /** Equipped weapon save-row snapshot (v2.0.2 identity recovery); null on older logs. */
   weaponState: WeaponState | null;
@@ -634,3 +636,12 @@ export type LinuxSetupStatus = {
   proxyStatus: "missing" | "current" | "outdated" | "foreign";
   launchOptions: string;
 };
+
+export type HookState = "connected" | "reconnecting" | "outOfDate" | "disconnected";
+
+export interface HookStatusSnapshot {
+  state: HookState;
+  hookVersion: string | null;
+  appVersion: string;
+  supportsEject: boolean;
+}

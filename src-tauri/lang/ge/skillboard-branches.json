@@ -1,0 +1,350 @@
+{
+  "pl0000_atk": {
+    "key": "TXT_SB_NAME_PL0000_SP100",
+    "text": "Essenz: Heilungsfähigkeiten +"
+  },
+  "pl0000_def": {
+    "key": "TXT_SB_NAME_PL0000_SP000",
+    "text": "Einsicht: Kunststufe +"
+  },
+  "pl0000_lim": {
+    "key": "TXT_SB_NAME_PL0000_SP200",
+    "text": "Enigma: Ersetzen +"
+  },
+  "pl0100_atk": {
+    "key": "TXT_SB_NAME_PL0100_SP100",
+    "text": "Essenz: Heilungsfähigkeiten +"
+  },
+  "pl0100_def": {
+    "key": "TXT_SB_NAME_PL0100_SP000",
+    "text": "Einsicht: Kunststufe +"
+  },
+  "pl0100_lim": {
+    "key": "TXT_SB_NAME_PL0100_SP200",
+    "text": "Enigma: Ersetzen +"
+  },
+  "pl0200_atk": {
+    "key": "TXT_SB_NAME_PL0200_SP100",
+    "text": "Essenz: Ares-Angriff"
+  },
+  "pl0200_def": {
+    "key": "TXT_SB_NAME_PL0200_SP000",
+    "text": "Einsicht: Ares-Dauer"
+  },
+  "pl0200_lim": {
+    "key": "TXT_SB_NAME_PL0200_SP200",
+    "text": "Enigma: Azurklinge"
+  },
+  "pl0300_atk": {
+    "key": "TXT_SB_NAME_PL0300_SP100",
+    "text": "Essenz: Sargmacher +"
+  },
+  "pl0300_def": {
+    "key": "TXT_SB_NAME_PL0300_SP000",
+    "text": "Einsicht: Volltreffer +"
+  },
+  "pl0300_lim": {
+    "key": "TXT_SB_NAME_PL0300_SP200",
+    "text": "Enigma: Kollateralschaden +"
+  },
+  "pl0400_atk": {
+    "key": "TXT_SB_NAME_PL0400_SP100",
+    "text": "Essenz: Magiekette"
+  },
+  "pl0400_def": {
+    "key": "TXT_SB_NAME_PL0400_SP000",
+    "text": "Einsicht: Konzentration +"
+  },
+  "pl0400_lim": {
+    "key": "TXT_SB_NAME_PL0400_SP200",
+    "text": "Enigma: Blühende Sieben +"
+  },
+  "pl0500_atk": {
+    "key": "TXT_SB_NAME_PL0500_SP100",
+    "text": "Essenz: Granatenschlag"
+  },
+  "pl0500_def": {
+    "key": "TXT_SB_NAME_PL0500_SP000",
+    "text": "Einsicht: Scharfschützenblick +"
+  },
+  "pl0500_lim": {
+    "key": "TXT_SB_NAME_PL0500_SP200",
+    "text": "Enigma: Giftgranate +"
+  },
+  "pl0600_atk": {
+    "key": "TXT_SB_NAME_PL0600_SP100",
+    "text": "Essenz: Stärkung/Schwächung"
+  },
+  "pl0600_def": {
+    "key": "TXT_SB_NAME_PL0600_SP000",
+    "text": "Einsicht: Elegie der Rosen"
+  },
+  "pl0600_lim": {
+    "key": "TXT_SB_NAME_PL0600_SP200",
+    "text": "Enigma: Rosen +"
+  },
+  "pl0700_atk": {
+    "key": "TXT_SB_NAME_PL0700_SP100",
+    "text": "Essenz: Einsamer Geist"
+  },
+  "pl0700_def": {
+    "key": "TXT_SB_NAME_PL0700_SP000",
+    "text": "Einsicht: Begleiter +"
+  },
+  "pl0700_lim": {
+    "key": "TXT_SB_NAME_PL0700_SP200",
+    "text": "Enigma: Unterstützung +"
+  },
+  "pl0800_atk": {
+    "key": "TXT_SB_NAME_PL0800_SP100",
+    "text": "Essenz: Ausweichen +"
+  },
+  "pl0800_def": {
+    "key": "TXT_SB_NAME_PL0800_SP000",
+    "text": "Einsicht: Perfekter Finisher +"
+  },
+  "pl0800_lim": {
+    "key": "TXT_SB_NAME_PL0800_SP200",
+    "text": "Enigma: Fähigkeiten-Turbo"
+  },
+  "pl0900_atk": {
+    "key": "TXT_SB_NAME_PL0900_SP100",
+    "text": "Essenz: Gemeinsam stark"
+  },
+  "pl0900_def": {
+    "key": "TXT_SB_NAME_PL0900_SP000",
+    "text": "Einsicht: Feindseligkeit +"
+  },
+  "pl0900_lim": {
+    "key": "TXT_SB_NAME_PL0900_SP200",
+    "text": "Enigma: Unerschütterlich"
+  },
+  "pl1000_atk": {
+    "key": "TXT_SB_NAME_PL1000_SP100",
+    "text": "Essenz: Scharlachklinge"
+  },
+  "pl1000_def": {
+    "key": "TXT_SB_NAME_PL1000_SP000",
+    "text": "Einsicht: Himmelssturm +"
+  },
+  "pl1000_lim": {
+    "key": "TXT_SB_NAME_PL1000_SP200",
+    "text": "Enigma: Himmelssturmabwehr +"
+  },
+  "pl1100_atk": {
+    "key": "TXT_SB_NAME_PL1100_SP100",
+    "text": "Essenz: Schadensfähigkeiten +"
+  },
+  "pl1100_def": {
+    "key": "TXT_SB_NAME_PL1100_SP000",
+    "text": "Einsicht: Perfekte Angriffe +"
+  },
+  "pl1100_lim": {
+    "key": "TXT_SB_NAME_PL1100_SP200",
+    "text": "Enigma: Stygische Klinge"
+  },
+  "pl1200_atk": {
+    "key": "TXT_SB_NAME_PL1200_SP100",
+    "text": "Essenz: Kopf-an-Kopf"
+  },
+  "pl1200_def": {
+    "key": "TXT_SB_NAME_PL1200_SP000",
+    "text": "Einsicht: Erhabene Haltung +"
+  },
+  "pl1200_lim": {
+    "key": "TXT_SB_NAME_PL1200_SP200",
+    "text": "Enigma: Unbezwingbar +"
+  },
+  "pl1300_atk": {
+    "key": "TXT_SB_NAME_PL1300_SP100",
+    "text": "Essenz: Schnelldurchlauf"
+  },
+  "pl1300_def": {
+    "key": "TXT_SB_NAME_PL1300_SP000",
+    "text": "Einsicht: Lehren des Schleiers"
+  },
+  "pl1300_lim": {
+    "key": "TXT_SB_NAME_PL1300_SP200",
+    "text": "Enigma: Konterstich"
+  },
+  "pl1400_atk": {
+    "key": "TXT_SB_NAME_PL1400_SP100",
+    "text": "Essenz: Sicherer Tod"
+  },
+  "pl1400_def": {
+    "key": "TXT_SB_NAME_PL1400_SP000",
+    "text": "Einsicht: Haltungswechsel +"
+  },
+  "pl1400_lim": {
+    "key": "TXT_SB_NAME_PL1400_SP200",
+    "text": "Enigma: Völlige Hingabe +"
+  },
+  "pl1500_atk": {
+    "key": "TXT_SB_NAME_PL1500_SP100",
+    "text": "Essenz: Löwenhaltung +"
+  },
+  "pl1500_def": {
+    "key": "TXT_SB_NAME_PL1500_SP000",
+    "text": "Einsicht: Rasende Faust +"
+  },
+  "pl1500_lim": {
+    "key": "TXT_SB_NAME_PL1500_SP200",
+    "text": "Enigma: Ultrafaust"
+  },
+  "pl1600_atk": {
+    "key": "TXT_SB_NAME_PL1600_SP100",
+    "text": "Essenz: Schadensfähigkeiten +"
+  },
+  "pl1600_def": {
+    "key": "TXT_SB_NAME_PL1600_SP000",
+    "text": "Einsicht: Loop-Kombo +"
+  },
+  "pl1600_lim": {
+    "key": "TXT_SB_NAME_PL1600_SP200",
+    "text": "Enigma: Konter +"
+  },
+  "pl1700_atk": {
+    "key": "TXT_SB_NAME_PL1700_SP100",
+    "text": "Essenz: Himmelssturm +"
+  },
+  "pl1700_def": {
+    "key": "TXT_SB_NAME_PL1700_SP000",
+    "text": "Einsicht: Volle Kombo +"
+  },
+  "pl1700_lim": {
+    "key": "TXT_SB_NAME_PL1700_SP200",
+    "text": "Enigma: Himmelssturmabwehr +"
+  },
+  "pl1800_atk": {
+    "key": "TXT_SB_NAME_PL1800_SP100",
+    "text": "Essenz: Zerfall +"
+  },
+  "pl1800_def": {
+    "key": "TXT_SB_NAME_PL1800_SP000",
+    "text": "Einsicht: Schwächungs-Boost"
+  },
+  "pl1800_lim": {
+    "key": "TXT_SB_NAME_PL1800_SP200",
+    "text": "Enigma: Heilunterstützung +"
+  },
+  "pl1900_atk": {
+    "key": "TXT_SB_NAME_PL1900_SP100",
+    "text": "Essenz: Drachenform +"
+  },
+  "pl1900_def": {
+    "key": "TXT_SB_NAME_PL1900_SP000",
+    "text": "Einsicht: Gottesmacht +"
+  },
+  "pl1900_lim": {
+    "key": "TXT_SB_NAME_PL1900_SP200",
+    "text": "Enigma: Vierfache Vergeltung +"
+  },
+  "pl2100_atk": {
+    "key": "TXT_SB_NAME_PL2100_SP100",
+    "text": "Essenz: Glänzender Schutz"
+  },
+  "pl2100_def": {
+    "key": "TXT_SB_NAME_PL2100_SP000",
+    "text": "Einsicht: Flügel des Gelübdes"
+  },
+  "pl2100_lim": {
+    "key": "TXT_SB_NAME_PL2100_SP200",
+    "text": "Enigma: Urteilsglocke"
+  },
+  "pl2200_atk": {
+    "key": "TXT_SB_NAME_PL2200_SP100",
+    "text": "Essenz: Klingenregen"
+  },
+  "pl2200_def": {
+    "key": "TXT_SB_NAME_PL2200_SP000",
+    "text": "Einsicht: Avatar-Leiste +"
+  },
+  "pl2200_lim": {
+    "key": "TXT_SB_NAME_PL2200_SP200",
+    "text": "Enigma: Avatar befehligen +"
+  },
+  "pl2300_atk": {
+    "key": "TXT_SB_NAME_PL2300_SP100",
+    "text": "Essenz: Trumpf +"
+  },
+  "pl2300_def": {
+    "key": "TXT_SB_NAME_PL2300_SP000",
+    "text": "Einsicht: Mehrfachziel-Hagel +"
+  },
+  "pl2300_lim": {
+    "key": "TXT_SB_NAME_PL2300_SP200",
+    "text": "Enigma: Krieg zweier Kronen +"
+  },
+  "pl2400_atk": {
+    "key": "TXT_SB_NAME_PL2400_SP100",
+    "text": "Essenz: Großes Windrad +"
+  },
+  "pl2400_def": {
+    "key": "TXT_SB_NAME_PL2400_SP000",
+    "text": "Einsicht: Zermalmer +"
+  },
+  "pl2400_lim": {
+    "key": "TXT_SB_NAME_PL2400_SP200",
+    "text": "Enigma: Gewalttat"
+  },
+  "pl2500_atk": {
+    "key": "TXT_SB_NAME_PL2500_SP100",
+    "text": "Essenz: Superieur-Waffen +"
+  },
+  "pl2500_def": {
+    "key": "TXT_SB_NAME_PL2500_SP000",
+    "text": "Einsicht: Klingenwalzer +"
+  },
+  "pl2500_lim": {
+    "key": "TXT_SB_NAME_PL2500_SP200",
+    "text": "Enigma: Schwertschleier-Schutz"
+  },
+  "pl2600_atk": {
+    "key": "TXT_SB_NAME_PL2600_SP100",
+    "text": "Essenz: Clock-o'-Delta +"
+  },
+  "pl2600_def": {
+    "key": "TXT_SB_NAME_PL2600_SP000",
+    "text": "Einsicht: Kausalitätenfresser +"
+  },
+  "pl2600_lim": {
+    "key": "TXT_SB_NAME_PL2600_SP200",
+    "text": "Enigma: Fähigkeitenketten"
+  },
+  "pl2700_atk": {
+    "key": "TXT_SB_NAME_PL2700_SP100",
+    "text": "Essenz: Donnerknall"
+  },
+  "pl2700_def": {
+    "key": "TXT_SB_NAME_PL2700_SP000",
+    "text": "Einsicht: Nahschuss +"
+  },
+  "pl2700_lim": {
+    "key": "TXT_SB_NAME_PL2700_SP200",
+    "text": "Enigma: Perfektionsschuss"
+  },
+  "pl2800_atk": {
+    "key": "TXT_SB_NAME_PL2800_SP100",
+    "text": "Essenz: Überwältigende Kraft"
+  },
+  "pl2800_def": {
+    "key": "TXT_SB_NAME_PL2800_SP000",
+    "text": "Einsicht: Haltungen +"
+  },
+  "pl2800_lim": {
+    "key": "TXT_SB_NAME_PL2800_SP200",
+    "text": "Enigma: Teufelsgeflüster"
+  },
+  "pl2900_atk": {
+    "key": "TXT_SB_NAME_PL2900_SP100",
+    "text": "Essenz: Schwarze Korrosion"
+  },
+  "pl2900_def": {
+    "key": "TXT_SB_NAME_PL2900_SP000",
+    "text": "Einsicht: Kombo-Finisher +"
+  },
+  "pl2900_lim": {
+    "key": "TXT_SB_NAME_PL2900_SP200",
+    "text": "Enigma: Unfassbare Finsternis"
+  }
+}
