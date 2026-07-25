@@ -537,7 +537,13 @@ fn export_damage_log_to_file(id: u32, options: ParseOptions) -> Result<(), Strin
             let inside_window = options.from_ms.map_or(true, |from| timestamp >= from)
                 && options.up_to_ms.map_or(true, |up_to| timestamp <= up_to);
 
-            if inside_window && v1::target_selected(timestamp, damage_event, &options.target_spans)
+            // Unlike the meter paths this walks the raw log directly rather than
+            // reparsing, so the filter has to be applied here by hand — an
+            // export is meant to be what the view shows, and a CSV that still
+            // contained rows the table excluded would not add up to it.
+            if inside_window
+                && !v1::is_excluded(damage_event, &options.filters)
+                && v1::target_selected(timestamp, damage_event, &options.target_spans)
             {
                 writeln!(
                     writer,
@@ -795,6 +801,11 @@ struct ParseOptions {
     /// Absent/None = from the start of the fight.
     #[serde(default)]
     from_ms: Option<i64>,
+    /// Which contested damage sources to count (see [`v1::MeterFilters`]).
+    /// Absent means the default, which excludes: a caller that has not opted in
+    /// must never silently get contested damage folded into its totals.
+    #[serde(default)]
+    filters: v1::MeterFilters,
 }
 
 // `(async)` so the decompress + full reparse runs off the main thread — this is
@@ -817,7 +828,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         &options.target_spans,
         options.from_ms,
         options.up_to_ms,
-        v1::MeterFilters::default(),
+        options.filters,
     );
 
     if options.state_only {
@@ -864,7 +875,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         DPS_INTERVAL,
         (duration / DPS_INTERVAL) as usize + 1,
         &options.target_spans,
-        v1::MeterFilters::default(),
+        options.filters,
     );
 
     let hp_chart = v1::build_target_hp_charts(
