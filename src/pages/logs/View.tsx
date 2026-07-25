@@ -628,6 +628,10 @@ export const ViewPage = () => {
       streamer_mode: state.streamer_mode,
     }))
   );
+  // Separate atomic selector rather than folding into the shallow group above:
+  // this one drives the backend fetches below, so it wants the tightest possible
+  // change signal — every change re-derives the whole log.
+  const includePrimalBurst = useMeterSettingsStore((state) => state.include_primal_burst);
   const { checklistBuild, checklistAi } = useChecklistStore(
     useShallow((state) => ({ checklistBuild: state.build, checklistAi: state.ai }))
   );
@@ -736,7 +740,10 @@ export const ViewPage = () => {
     const generation = ++loadGeneration.current;
     // A load resets the window, so any window fetch still in flight is stale too.
     windowGeneration.current += 1;
-    invoke("fetch_encounter_state", { id: Number(id), options: { targetSpans: selectedTargetSpans } })
+    invoke("fetch_encounter_state", {
+      id: Number(id),
+      options: { targetSpans: selectedTargetSpans, filters: { includePrimalBurst } },
+    })
       .then((result) => {
         if (generation !== loadGeneration.current) return;
         loadFromResponse(result as EncounterStateResponse);
@@ -748,7 +755,9 @@ export const ViewPage = () => {
         if (generation !== loadGeneration.current) return;
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
-  }, [id, selectedTargetSpans]);
+    // Keyed on the filter too: toggling it must re-derive the open log, charts
+    // included, not just the next one the user opens.
+  }, [id, selectedTargetSpans, includePrimalBurst]);
 
   // Brush release: commit the window and reparse the meter over exactly that
   // span. A window covering the whole track clears back to the (already
@@ -767,6 +776,7 @@ export const ViewPage = () => {
         id: Number(id),
         options: {
           targetSpans: selectedTargetSpans,
+          filters: { includePrimalBurst },
           fromMs: value[0] * DPS_BUCKET_MS,
           // Buckets are inclusive at BOTH ends in the charts, so the window the user sees
           // is [start, end] whole seconds. `fromMs` admits all of the first bucket, so the
@@ -791,7 +801,7 @@ export const ViewPage = () => {
           toast.error(`Failed to fetch encounter state: ${e}`);
         });
     },
-    [id, selectedTargetSpans, chartLen]
+    [id, selectedTargetSpans, chartLen, includePrimalBurst]
   );
 
   const resetWindow = useCallback(() => {
@@ -830,10 +840,11 @@ export const ViewPage = () => {
       id: Number(id),
       options: {
         targetSpans: selectedTargetSpans,
+        filters: { includePrimalBurst },
         ...(range ? { fromMs: range[0] * DPS_BUCKET_MS, upToMs: (range[1] + 1) * DPS_BUCKET_MS - 1 } : {}),
       },
     });
-  }, [id, selectedTargetSpans, range]);
+  }, [id, selectedTargetSpans, range, includePrimalBurst]);
 
   // Display labels for every target spawn segment, keyed by
   // `${name}#${instance}` — shared by the HP-chart legend and the target-filter
