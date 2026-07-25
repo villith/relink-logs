@@ -1520,6 +1520,40 @@ impl Parser {
         self.encounter.reset_player_data();
     }
 
+    /// A training session started, which also tears down the previous one.
+    /// Closes and saves any run that has damage, then opens a fresh encounter.
+    ///
+    /// Deliberately NOT gated on a quest id or the quest-complete flag: training
+    /// never runs `on_load_quest_state`, so both are stale from the previous
+    /// quest and would silently suppress every training save.
+    pub fn on_trial_start_event(&mut self) {
+        self.on_trial_end_event();
+        self.reset();
+    }
+
+    /// The player quit training. Closes and saves the run.
+    ///
+    /// The training room has no quest flow object, so this (and the start
+    /// teardown above) is the only boundary that can ever close a training
+    /// encounter. The in-progress gate makes the second of the quit hook's two
+    /// per-quit calls inert.
+    pub fn on_trial_end_event(&mut self) {
+        if self.status != ParserStatus::InProgress {
+            return;
+        }
+
+        self.update_status(ParserStatus::Stopped);
+        self.save_and_emit_encounter();
+
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
+        }
+
+        // Same rationale as the quest boundaries: actor indices are reused across
+        // sessions, so stale identities must die here (after the save above).
+        self.encounter.reset_player_data();
+    }
+
     /// Handles the retire/fail boundary (v2.0.2): fired the moment the player
     /// confirms retire/abandon (the game's retire-select flag hook) — quests that
     /// end this way show no result screen, so without this the log sat open until
@@ -3179,6 +3213,79 @@ mod tests {
             last_known_quest_id: quest_id,
             last_known_elapsed_time_in_secs: 0,
         }
+    }
+
+    #[test]
+    fn trial_end_saves_an_encounter_that_has_damage() {
+        // Training has no quest flow, so Quit Training is the ONLY boundary that
+        // can close the run — without it the log sat open until the next quest.
+        let mut parser = parser_with_memory_db();
+
+        parser.on_damage_event(a_damage_event());
+        assert_eq!(parser.status, ParserStatus::InProgress);
+
+        parser.on_trial_end_event();
+
+        assert_eq!(
+            parser.status,
+            ParserStatus::Stopped,
+            "trial end must close the encounter"
+        );
+        let conn = parser.db.as_ref().unwrap();
+        let (count, quest_id): (u32, Option<u32>) = conn
+            .query_row("SELECT COUNT(*), quest_id FROM logs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(count, 1, "training run saved at the quit boundary");
+        assert_eq!(quest_id, None, "training carries no quest id");
+    }
+
+    #[test]
+    fn trial_end_on_an_empty_encounter_is_a_no_op() {
+        // The quit hook fires up to twice per quit; a repeat must not panic or
+        // save an empty encounter.
+        let mut parser = parser_with_memory_db();
+
+        parser.on_trial_end_event();
+        parser.on_trial_end_event();
+
+        let conn = parser.db.as_ref().unwrap();
+        let count: u32 = conn
+            .query_row("SELECT COUNT(*) FROM logs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 0, "no damage means nothing to save");
+    }
+
+    #[test]
+    fn trial_start_closes_the_previous_run_and_opens_a_fresh_one() {
+        // The in-training Restart button never runs the quit choke point, so the
+        // start/teardown hook is what closes a restarted run.
+        let mut parser = parser_with_memory_db();
+        parser.on_damage_event(a_damage_event());
+
+        parser.on_trial_start_event();
+
+        {
+            let conn = parser.db.as_ref().unwrap();
+            let count: u32 = conn
+                .query_row("SELECT COUNT(*) FROM logs", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(count, 1, "the previous run is saved before restarting");
+        }
+        assert!(
+            parser.encounter.raw_event_log.is_empty(),
+            "trial start must open a fresh encounter"
+        );
+        assert_eq!(parser.derived_state.total_damage, 0);
+
+        // A second restart with nothing recorded since must not save an empty log.
+        parser.on_trial_start_event();
+        let conn = parser.db.as_ref().unwrap();
+        let count: u32 = conn
+            .query_row("SELECT COUNT(*) FROM logs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
     }
 
     #[test]

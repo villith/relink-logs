@@ -605,7 +605,12 @@ impl OnProcessDamageHook {
             damage_instance,
             Actor {
                 index: source_idx,
-                actor_type: source_type_id,
+                // See the main path: resolved so summons sharing a body class
+                // get their own row.
+                actor_type: super::summon::published_actor_type(
+                    source_type_id,
+                    source_specified_instance_ptr as *const usize,
+                ),
                 parent_index: source_parent_idx,
                 parent_actor_type: source_parent_type_id,
             },
@@ -979,6 +984,16 @@ impl OnProcessDamageHook {
             crate::hooks::diag::probe_pl2000_parent(source_specified_instance_ptr);
         }
 
+        // A summon body: dump the per-summon configuration it copied out of its
+        // own data record, so summons that share a generic body can be told
+        // apart. Every summon and primal-burst hit reports action id 80000 and
+        // only sixteen summons own a body class, so nothing in the event itself
+        // distinguishes the other fifty-eight.
+        #[cfg(feature = "hookdiag")]
+        if crate::hooks::summon::is_summon_body(source_type_id) {
+            crate::hooks::diag::probe_summon_body(source_specified_instance_ptr, source_type_id);
+        }
+
         // Unmapped-source probe (2026-07-20, Cagliostro Pain Train / Alexandria): a
         // source that neither maps to a parent nor is a player itself is exactly what
         // the parser silently drops, so these skills never reach the meter. Unbudgeted
@@ -1052,7 +1067,14 @@ impl OnProcessDamageHook {
             damage_instance,
             Actor {
                 index: source_idx,
-                actor_type: source_type_id,
+                // Resolved, not reported: summons sharing a generic body all
+                // report one class hash, so publishing it would merge them into
+                // a single meter row. Resolved only here — owner attribution
+                // above still needs the body class the game gave us.
+                actor_type: super::summon::published_actor_type(
+                    source_type_id,
+                    source_specified_instance_ptr as *const usize,
+                ),
                 parent_index: source_parent_idx,
                 parent_actor_type: source_parent_type_id,
             },
