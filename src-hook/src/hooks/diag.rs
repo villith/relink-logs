@@ -771,7 +771,191 @@ pub fn probe_unmapped_source_parent(instance: usize, type_id: u32) {
     );
 }
 
+/// Offsets of the two data blobs the summon body copies out of its `SummonData`
+/// record at spawn, read off the game's own reflection tables (the
+/// `createAttr` builders name every field and its offset within the blob):
+///
+/// | body offset | blob | field |
+/// |---|---|---|
+/// | `0x1010` | `SummonObjectData` | vtable |
+/// | `0x1020` | `SummonObjectData` | `id_` (int) |
+/// | `0x1024` | `SummonObjectData` | `createFlag_` |
+/// | `0x1134` | `SummonObjectData` | `attackName_` |
+/// | `0x1138` | `SummonObjectData` | `spAttackName_` |
+/// | `0x11B0` | `SummonUnitData` | vtable |
+/// | `0x11C0` | `SummonUnitData` | `id_` (int, `-1` until filled) |
+/// | `0x1200` | `SummonUnitData` | `fsmName_` (`std::string`) |
+/// | `0x1220` | `SummonUnitData` | `type_` (int) |
+///
+/// The whole body allocation is `0x1C10` bytes (from its factory), so every
+/// offset here is comfortably inside it.
+#[cfg(feature = "hookdiag")]
+mod summon_body {
+    pub const OBJECT_DATA_ID: usize = 0x1020;
+    pub const OBJECT_DATA_CREATE_FLAG: usize = 0x1024;
+    pub const OBJECT_DATA_ATTACK_NAME: usize = 0x1134;
+    pub const OBJECT_DATA_SP_ATTACK_NAME: usize = 0x1138;
+    pub const UNIT_DATA_ID: usize = 0x11C0;
+    pub const UNIT_DATA_FSM_NAME: usize = 0x1200;
+    pub const UNIT_DATA_TYPE: usize = 0x1220;
+    /// Allocation size of the body object.
+    pub const SIZE: usize = 0x1C10;
+}
+
+/// Reads an MSVC `std::string` laid out at `base + offset`: 16 bytes that are
+/// either the inline buffer or a heap pointer, then size, then capacity. A
+/// capacity above 15 means the text lives behind the pointer. Every read is
+/// guarded, so a stale offset yields `None` rather than faulting.
+#[cfg(feature = "hookdiag")]
+fn read_msvc_string(base: usize, offset: usize) -> Option<String> {
+    let size = read_ptr_guarded(base, offset + 0x10)?;
+    let capacity = read_ptr_guarded(base, offset + 0x18)?;
+    // A sane string is short and its capacity is at least its size; anything
+    // else means the offset is wrong and we should not chase the pointer.
+    if size > capacity || capacity > 0x1000 {
+        return None;
+    }
+    let bytes = if capacity > 15 {
+        let heap = read_ptr_guarded(base, offset)?;
+        read_bytes_guarded(heap, 0, size)?
+    } else {
+        read_bytes_guarded(base, offset, size)?
+    };
+    Some(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+/// Dumps the per-summon configuration a generic summon body carries, so two
+/// summons that share a body class can be told apart.
+///
+/// Sixteen summons own a body class and are named from that class hash alone;
+/// the rest share generic bodies (`BehaviorSummonObjectBase`, the slime family
+/// body) and collapse into one row each. This prints the named fields those
+/// bodies copy out of their own `SummonData` record — whichever differs between
+/// two summons sharing a body IS the identity we can publish.
+///
+/// Dumped once per DISTINCT body instance, not once per hit: a summon lands
+/// many hits a second, and a full-object guarded scan per hit is the wide
+/// instance scan that already had to be pulled from the damage path for
+/// stalling the game thread. One dump per spawn loses nothing — these fields
+/// are written at spawn and never change. There is no cap on how many distinct
+/// bodies dump.
+#[cfg(feature = "hookdiag")]
+pub fn probe_summon_body(instance: usize, type_id: u32) {
+    use std::sync::Mutex;
+    static SEEN: Mutex<Vec<usize>> = Mutex::new(Vec::new());
+    if instance == 0 {
+        return;
+    }
+    {
+        let Ok(mut seen) = SEEN.try_lock() else {
+            return;
+        };
+        if seen.contains(&instance) {
+            return;
+        }
+        seen.push(instance);
+    }
+
+    let named = format!(
+        "objdata.id_={} objdata.createFlag_={} objdata.attackName_={} \
+         objdata.spAttackName_={} unit.id_={} unit.type_={} unit.fsmName_={:?}",
+        read_u32_guarded(instance, summon_body::OBJECT_DATA_ID) as i32,
+        read_u32_guarded(instance, summon_body::OBJECT_DATA_CREATE_FLAG),
+        read_u32_guarded(instance, summon_body::OBJECT_DATA_ATTACK_NAME),
+        read_u32_guarded(instance, summon_body::OBJECT_DATA_SP_ATTACK_NAME),
+        read_u32_guarded(instance, summon_body::UNIT_DATA_ID) as i32,
+        read_u32_guarded(instance, summon_body::UNIT_DATA_TYPE) as i32,
+        read_msvc_string(instance, summon_body::UNIT_DATA_FSM_NAME),
+    );
+
+    // The whole object too: if the body stores its CONCRETE class hash anywhere
+    // (which is what we would rather publish than an opaque index), it shows up
+    // here as a u32 matching XXHash32Custom("So####").
+    let mut window = String::new();
+    let mut off = 0usize;
+    while off + 4 <= summon_body::SIZE {
+        let addr = instance + off;
+        if readable(addr, 4) {
+            let v = unsafe { (addr as *const u32).read_unaligned() };
+            if v != 0 {
+                window.push_str(&format!("+{off:#x}={v:#010x} "));
+            }
+        }
+        off += 4;
+    }
+
+    log::info!(
+        "SMNBODY t={} type={type_id:#010x} instance={instance:#x} {named}",
+        ms()
+    );
+    log::info!("SMNBODY t={} instance={instance:#x} u32s: {window}", ms());
+}
+
+#[cfg(all(test, feature = "hookdiag"))]
+mod summon_string_tests {
+    use super::read_msvc_string;
+
+    /// Builds an MSVC `std::string` at the start of a buffer: 16 bytes of
+    /// inline buffer or heap pointer, then size, then capacity.
+    fn write_string(buf: &mut [u8], text: &[u8], capacity: usize, heap: Option<usize>) {
+        match heap {
+            Some(ptr) => buf[..8].copy_from_slice(&ptr.to_le_bytes()),
+            None => buf[..text.len()].copy_from_slice(text),
+        }
+        buf[0x10..0x18].copy_from_slice(&text.len().to_le_bytes());
+        buf[0x18..0x20].copy_from_slice(&capacity.to_le_bytes());
+    }
+
+    #[test]
+    fn reads_a_short_string_out_of_the_inline_buffer() {
+        let mut buf = vec![0u8; 0x40];
+        write_string(&mut buf, b"So2100", 15, None);
+        assert_eq!(
+            read_msvc_string(buf.as_ptr() as usize, 0),
+            Some("So2100".into())
+        );
+    }
+
+    #[test]
+    fn follows_the_heap_pointer_once_the_capacity_outgrows_the_buffer() {
+        let text = b"SummonFsmWithAVeryLongName".to_vec();
+        let mut buf = vec![0u8; 0x40];
+        write_string(&mut buf, &text, 31, Some(text.as_ptr() as usize));
+        assert_eq!(
+            read_msvc_string(buf.as_ptr() as usize, 0),
+            Some(String::from_utf8(text).unwrap())
+        );
+    }
+
+    #[test]
+    fn rejects_a_size_larger_than_the_capacity() {
+        // A stale offset lands on arbitrary bytes; refusing to chase them is
+        // what keeps a wrong offset from being read as a heap pointer.
+        let mut buf = vec![0u8; 0x40];
+        buf[0x10..0x18].copy_from_slice(&99usize.to_le_bytes());
+        buf[0x18..0x20].copy_from_slice(&15usize.to_le_bytes());
+        assert_eq!(read_msvc_string(buf.as_ptr() as usize, 0), None);
+    }
+
+    #[test]
+    fn rejects_an_implausible_capacity() {
+        let mut buf = vec![0u8; 0x40];
+        buf[0x10..0x18].copy_from_slice(&8usize.to_le_bytes());
+        buf[0x18..0x20].copy_from_slice(&usize::MAX.to_le_bytes());
+        assert_eq!(read_msvc_string(buf.as_ptr() as usize, 0), None);
+    }
+
+    #[test]
+    fn unmapped_base_yields_nothing_without_dereferencing() {
+        assert_eq!(read_msvc_string(1, 0), None);
+    }
+}
+
 // No-op shims so call sites don't need their own cfg guards.
+#[cfg(not(feature = "hookdiag"))]
+#[inline(always)]
+#[allow(dead_code)]
+pub fn probe_summon_body(_instance: usize, _type_id: u32) {}
 #[cfg(not(feature = "hookdiag"))]
 #[inline(always)]
 #[allow(dead_code)]

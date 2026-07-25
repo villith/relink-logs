@@ -1,32 +1,14 @@
 import { Button, Group, Text } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { invoke } from "@tauri-apps/api";
-import { emit } from "@tauri-apps/api/event";
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
 import { backendErrorMessage } from "@/backendErrors";
 import { useEncounterStore } from "@/stores/useEncounterStore";
-import { HookState, HookStatusSnapshot } from "@/types";
+import { HookState } from "@/types";
 import { useHookStatus } from "@/useHookStatus";
-
-/** Dev Debug tab hook-state simulation: mimic a refresh purely in the frontend
- * (reconnecting → connected) instead of reinjecting a real hook, which would
- * act on true backend state rather than the simulated one. */
-const simulatedSnapshot = (state: HookState): HookStatusSnapshot => ({
-  state,
-  hookVersion: "debug",
-  appVersion: "debug",
-  supportsEject: true,
-  simulated: true,
-});
-
-const simulateRefresh = async () => {
-  await emit("hook-status", simulatedSnapshot("reconnecting"));
-  await new Promise((resolve) => setTimeout(resolve, 700));
-  await emit("hook-status", simulatedSnapshot("connected"));
-};
 
 const TONE: Record<HookState, string> = {
   connected: "#51cf66",
@@ -53,12 +35,7 @@ export default function HookStatusBadge() {
   const runRefresh = async () => {
     setBusy(true);
     try {
-      // A debug-simulated state has no real hook to reinject — fake the refresh.
-      if (hook.simulated) {
-        await simulateRefresh();
-      } else {
-        await invoke("refresh_hook");
-      }
+      await invoke("refresh_hook");
       toast.success(t("ui.hook-status.refreshed"));
     } catch (e) {
       const msg = backendErrorMessage(t, "hook", String(e)) ?? String(e);
@@ -84,22 +61,26 @@ export default function HookStatusBadge() {
     }
   };
 
+  const label = t(LABEL_KEY[hook.state]);
+
   return (
-    <Group gap={6} wrap="nowrap">
+    // The header is tight; the label truncates rather than overflowing, and
+    // the native title tooltip carries the full text (same as Report a bug).
+    <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
       {/* eslint-disable-next-line i18next/no-literal-string -- status glyph, not prose */}
-      <Text span style={{ color: TONE[hook.state], lineHeight: 1 }}>
+      <Text span style={{ color: TONE[hook.state], lineHeight: 1, flex: "none" }}>
         ●
       </Text>
-      <Text span size="sm" c="dimmed">
-        {t(LABEL_KEY[hook.state])}
+      <Text span size="sm" c="dimmed" truncate title={label}>
+        {label}
       </Text>
       {hook.state === "outOfDate" &&
         (hook.supportsEject ? (
-          <Button size="compact-xs" variant="light" loading={busy} onClick={onRefresh}>
+          <Button size="compact-xs" variant="light" loading={busy} onClick={onRefresh} style={{ flex: "none" }}>
             {t("ui.hook-status.refresh")}
           </Button>
         ) : (
-          <Text span size="xs" c="dimmed">
+          <Text span size="xs" c="dimmed" truncate title={t("ui.hook-status.restart-game")}>
             {t("ui.hook-status.restart-game")}
           </Text>
         ))}
