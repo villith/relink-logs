@@ -1140,6 +1140,10 @@ pub fn target_selected(
 /// window scrubber work in whole seconds — so `chart_len` must be sized from the
 /// FULL log duration even when a scrub cutoff truncates the derived state, or
 /// this indexes out of bounds.
+// Eight independent inputs with no natural grouping — the event log, who to
+// build rows for, the bucket geometry, and the two filters. Bundling them into
+// a struct would only move the same list somewhere less readable.
+#[allow(clippy::too_many_arguments)]
 pub fn build_player_dps_chart(
     events: &[(i64, Message)],
     player_data: &[Option<PlayerData>; 4],
@@ -2725,9 +2729,11 @@ mod tests {
 
     #[test]
     fn live_damage_path_counts_a_burst_when_the_filter_is_on() {
-        let mut parser = Parser::default();
-        parser.filters = MeterFilters {
-            include_primal_burst: true,
+        let mut parser = Parser {
+            filters: MeterFilters {
+                include_primal_burst: true,
+            },
+            ..Default::default()
         };
 
         parser.on_damage_event(damage_from(PLAYER_HASH, 100, 1_000));

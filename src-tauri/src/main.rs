@@ -78,6 +78,27 @@ fn reset_encounter(state: State<ResetChannel>) {
     }
 }
 
+/// The meter's damage-source filters, shared between the settings UI and the
+/// live parser.
+///
+/// `current` is read when a parser is constructed so it starts correct however
+/// the startup order falls out; `tx` tells an already-running parser to adopt a
+/// new value, reparse and re-emit, which is what makes toggling apply to the
+/// fight in progress rather than only to hits from here on.
+#[derive(Default)]
+struct MeterFilterState {
+    current: std::sync::Mutex<v1::MeterFilters>,
+    tx: std::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<v1::MeterFilters>>>,
+}
+
+#[tauri::command]
+fn set_meter_filters(state: State<MeterFilterState>, filters: v1::MeterFilters) {
+    *state.current.lock().unwrap() = filters;
+    if let Some(tx) = state.tx.lock().unwrap().as_ref() {
+        let _ = tx.send(filters);
+    }
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 fn update_tray_labels(
@@ -1524,9 +1545,16 @@ fn connect_and_run_parser(app: AppHandle) {
 
     let database = db::connect_to_db().expect("Could not connect to database");
     let mut state = v1::Parser::new(app.clone(), window.clone(), database);
+    // Seed from whatever the settings window has already pushed: this task can
+    // start either side of the frontend's first push, and the parser outlives
+    // game reconnects, so it must not depend on being pushed to again.
+    state.filters = *app.state::<MeterFilterState>().current.lock().unwrap();
 
     let (reset_tx, mut reset_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
     *app.state::<ResetChannel>().0.lock().unwrap() = Some(reset_tx);
+
+    let (filters_tx, mut filters_rx) = tokio::sync::mpsc::unbounded_channel::<v1::MeterFilters>();
+    *app.state::<MeterFilterState>().tx.lock().unwrap() = Some(filters_tx);
 
     tauri::async_runtime::spawn(async move {
         #[cfg(windows)]
@@ -1560,6 +1588,15 @@ fn connect_and_run_parser(app: AppHandle) {
                             },
                             Some(()) = reset_rx.recv() => {
                                 state.on_manual_reset();
+                                continue;
+                            }
+                            Some(filters) = filters_rx.recv() => {
+                                // Replay the raw log under the new rule so the
+                                // toggle applies to the fight in progress, not
+                                // just to hits from here on.
+                                state.filters = filters;
+                                state.reparse();
+                                let _ = window.emit("encounter-update", &state.derived_state);
                                 continue;
                             }
                         };
@@ -1947,6 +1984,7 @@ fn main() {
         .manage(ClickThrough(AtomicBool::new(false)))
         .manage(DebugMode(AtomicBool::new(false)))
         .manage(ResetChannel(std::sync::Mutex::new(None)))
+        .manage(MeterFilterState::default())
         .manage(HookStatus::default())
         .manage(TrayLabels::default())
         .system_tray(system_tray_with_menu())
@@ -1969,6 +2007,7 @@ fn main() {
             export_damage_log_to_file,
             set_debug_mode,
             reset_encounter,
+            set_meter_filters,
             fetch_synthesis_status,
             fetch_synthesis_seed,
             fetch_overmastery_status,
