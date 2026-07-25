@@ -5,6 +5,33 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.3
+
+### Features
+
+- The overlay and log window now show whether the parser is properly connected to the game
+- Every summon now gets its own named row in the meter instead of collapsing into a single unnamed
+entry
+- Master level traits in log details are now grouped by Essence/Insight/Crux and are easier to understand at a glance
+
+### Notes
+
+- The "Reset Overlay Layout" button was removed from the header. You can find a "Reset Windows" command by right-clicking on the tray icon instead
+
+### Bug Fixes
+
+- Sir Barrold now saves its log entries
+- Player stats now appear properly ( except level )
+- Stun power now shows properly ( +1 > +10, +1.2 > +12 )
+- Synthesis Helper will not suggest a sigil that is equal to the sigil you are trying to craft. [reported by
+lingsamuel](https://github.com/villith/relink-logs/issues/33)
+- The overlay no longer forces a minimum width
+
+### Language
+
+- The system tray menu is now localized and has a zh-CN translation [credit to Souma-Sumire](https://github.com/Souma-Sumire)
+- Further zh-CN skill translations [credit to Souma-Sumire](https://github.com/Souma-Sumire)
+
 ## 1.12.2
 
 ### Features
