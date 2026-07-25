@@ -840,51 +840,32 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     // sizing from the truncated duration would index out of bounds.
     let duration = parser.full_log_duration();
 
-    let mut player_dps: HashMap<u32, Vec<i32>> = HashMap::new();
-
     // Per-second buckets: the quest-details charts and the window scrubber both
     // work in whole seconds, so a bucket index IS the elapsed second.
     const DPS_INTERVAL: i64 = 1_000;
     const SBA_INTERVAL: i64 = 1_000;
-
-    for player in parser.derived_state.party.values() {
-        player_dps.insert(
-            player.index,
-            vec![0; (duration / DPS_INTERVAL) as usize + 1],
-        );
-    }
 
     let start_time = parser.start_time();
     // Dropdown entries are ALWAYS the unfiltered segmentation — the user picks
     // from everything the fight contained, whatever is currently selected.
     let target_entries = v1::segment_targets(&parser.encounter.raw_event_log, start_time);
 
-    for (timestamp, event) in parser.encounter.event_log() {
-        match event {
-            Message::DamageEvent(damage_event) => {
-                // Attribute dragon-form (Id/Pl2000) damage to the Id player, matching the
-                // remap the party table uses — otherwise `derived_state.party` (keyed by the
-                // remapped index) has no bucket for the raw Pl2000 index and the chart drops it.
-                let damage_event =
-                    v1::remap_dragon_form(&parser.encounter.player_data, damage_event);
-                let damage_event = &damage_event;
-
-                let index = ((timestamp - start_time) / DPS_INTERVAL) as usize;
-
-                if let Some(chart) = player_dps.get_mut(&damage_event.source.parent_index) {
-                    // Check to see if the target is in the list of targets to filter by.
-                    if v1::target_selected(
-                        timestamp - start_time,
-                        damage_event,
-                        &options.target_spans,
-                    ) {
-                        chart[index] += damage_event.damage;
-                    }
-                }
-            }
-            _ => continue,
-        }
-    }
+    let player_indices: Vec<u32> = parser
+        .derived_state
+        .party
+        .values()
+        .map(|player| player.index)
+        .collect();
+    let player_dps = v1::build_player_dps_chart(
+        &parser.encounter.raw_event_log,
+        &parser.encounter.player_data,
+        &player_indices,
+        start_time,
+        DPS_INTERVAL,
+        (duration / DPS_INTERVAL) as usize + 1,
+        &options.target_spans,
+        v1::MeterFilters::default(),
+    );
 
     let hp_chart = v1::build_target_hp_charts(
         &parser.encounter.raw_event_log,

@@ -1128,6 +1128,60 @@ pub fn target_selected(
 /// `segments` MUST be [`segment_targets`] of the same `events`/`start_time` —
 /// sharing the caller's segmentation (rather than recomputing it) is what
 /// guarantees the 1:1 chart↔dropdown parity.
+/// Per-player, per-second damage buckets for the logs page's DPS charts.
+///
+/// Lives here rather than inline in `fetch_encounter_state` so the filtering and
+/// target-span rules it shares with the meter can be tested without a database.
+/// `player_indices` are the derived party's keys: chart rows exist only for
+/// players the meter itself shows, and damage credited to anyone else is dropped
+/// rather than inventing a row for them.
+///
+/// A bucket index IS the elapsed second — both the quest-details charts and the
+/// window scrubber work in whole seconds — so `chart_len` must be sized from the
+/// FULL log duration even when a scrub cutoff truncates the derived state, or
+/// this indexes out of bounds.
+pub fn build_player_dps_chart(
+    events: &[(i64, Message)],
+    player_data: &[Option<PlayerData>; 4],
+    player_indices: &[u32],
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+    target_spans: &[TargetSpan],
+    filters: MeterFilters,
+) -> HashMap<u32, Vec<i32>> {
+    let mut player_dps: HashMap<u32, Vec<i32>> = player_indices
+        .iter()
+        .map(|index| (*index, vec![0; chart_len]))
+        .collect();
+
+    for (timestamp, event) in events {
+        let Message::DamageEvent(damage_event) = event else {
+            continue;
+        };
+
+        if is_excluded(damage_event, &filters) {
+            continue;
+        }
+
+        // Attribute dragon-form (Id/Pl2000) damage to the Id player, matching the
+        // remap the party table uses — otherwise the party (keyed by the remapped
+        // index) has no bucket for the raw Pl2000 index and the chart drops it.
+        let damage_event = remap_dragon_form(player_data, damage_event);
+
+        let Some(chart) = player_dps.get_mut(&damage_event.source.parent_index) else {
+            continue;
+        };
+
+        // Check to see if the target is in the list of targets to filter by.
+        if target_selected(timestamp - start_time, &damage_event, target_spans) {
+            chart[((timestamp - start_time) / interval) as usize] += damage_event.damage;
+        }
+    }
+
+    player_dps
+}
+
 pub fn build_target_hp_charts(
     events: &[(i64, Message)],
     segments: &[TargetSegment],
@@ -2564,6 +2618,92 @@ mod tests {
     // event before `update_from_damage_event` runs, so `cappable_hits`,
     // `capped_hits` and the overcap sums cannot diverge from `total_damage`
     // without the tests above failing first.
+
+    #[test]
+    fn dps_chart_buckets_damage_by_second_and_drops_filtered_hits() {
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (
+                2_500,
+                Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, 80_000, 3_000)),
+            ),
+            (
+                3_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 500)),
+            ),
+        ];
+
+        let chart = build_player_dps_chart(
+            &events,
+            &Default::default(),
+            &[0],
+            1_000,
+            1_000,
+            3,
+            &[],
+            MeterFilters::default(),
+        );
+
+        // Buckets are elapsed seconds from the start: hit 1 at 0s, the burst at
+        // 1.5s (dropped), hit 3 at 2s.
+        assert_eq!(chart.get(&0).unwrap(), &vec![1_000, 0, 500]);
+    }
+
+    #[test]
+    fn dps_chart_includes_a_burst_when_the_filter_is_on() {
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (
+                2_500,
+                Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, 80_000, 3_000)),
+            ),
+        ];
+
+        let chart = build_player_dps_chart(
+            &events,
+            &Default::default(),
+            &[0],
+            1_000,
+            1_000,
+            2,
+            &[],
+            MeterFilters {
+                include_primal_burst: true,
+            },
+        );
+
+        assert_eq!(chart.get(&0).unwrap(), &vec![1_000, 3_000]);
+    }
+
+    #[test]
+    fn dps_chart_rows_exist_only_for_the_given_players() {
+        let events = vec![(
+            1_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+        )];
+
+        let chart = build_player_dps_chart(
+            &events,
+            &Default::default(),
+            &[7],
+            1_000,
+            1_000,
+            1,
+            &[],
+            MeterFilters::default(),
+        );
+
+        // Player 0 dealt the damage but has no row requested, so it is dropped
+        // rather than invented — same as the pre-extraction loop.
+        assert_eq!(chart.len(), 1);
+        assert_eq!(chart.get(&7).unwrap(), &vec![0]);
+    }
 
     #[test]
     fn live_damage_path_records_but_does_not_count_a_filtered_burst() {
