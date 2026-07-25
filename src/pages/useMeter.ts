@@ -10,7 +10,7 @@ import {
 } from "@/types";
 import { usePrevious } from "@mantine/hooks";
 import { listen } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
@@ -33,6 +33,11 @@ export default function useMeter() {
   const [lastPartyData, setLastPartyData] = useState<Array<PlayerData | null>>([null, null, null, null]);
 
   const previousStatus = usePrevious(encounterState.status);
+
+  // Read through a ref so the listener effect below can register once and never
+  // re-run: a language change still reaches the toasts, but does not re-register.
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const [sortType, setSortType] = useState<SortType>(MeterColumns.TotalDamage);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -58,18 +63,18 @@ export default function useMeter() {
     });
 
     const encounterSavedListener = listen("encounter-saved", () => {
-      toast.success(t("ui.successful-save"));
+      toast.success(tRef.current("ui.successful-save"));
     });
 
     const encounterSavedErrorListener = listen("encounter-saved-error", (evt) => {
-      toast.error(t("ui.unsuccessful-save", { error: evt.payload }));
+      toast.error(tRef.current("ui.unsuccessful-save", { error: evt.payload }));
     });
 
     const onAreaEnterListener = listen("on-area-enter", (event: EncounterUpdateEvent) => {
       // A finished fight (has damage) stays on screen; an idle area reset (no
       // damage) blanks the overlay back to the default.
       setEncounterState(event.payload.totalDamage > 0 ? event.payload : DEFAULT_ENCOUNTER_STATE);
-      toast.success(t("ui.on-area-enter"));
+      toast.success(tRef.current("ui.on-area-enter"));
     });
 
     const onPartyUpdate = listen("encounter-party-update", (event: PartyUpdateEvent) => {
@@ -85,11 +90,15 @@ export default function useMeter() {
     });
 
     const onPinned = listen("on-pinned", (evt) => {
-      evt.payload ? toast.success(t("ui.on-pin-enabled")) : toast.success(t("ui.on-pin-disabled"));
+      evt.payload
+        ? toast.success(tRef.current("ui.on-pin-enabled"))
+        : toast.success(tRef.current("ui.on-pin-disabled"));
     });
 
     const onClickthrough = listen("on-clickthrough", (evt) => {
-      evt.payload ? toast.success(t("ui.on-clickthrough-enabled")) : toast.success(t("ui.on-clickthrough-disabled"));
+      evt.payload
+        ? toast.success(tRef.current("ui.on-clickthrough-enabled"))
+        : toast.success(tRef.current("ui.on-clickthrough-disabled"));
     });
 
     return () => {
@@ -103,7 +112,15 @@ export default function useMeter() {
       onPinned.then((f) => f());
       onClickthrough.then((f) => f());
     };
-  }, [partyData]);
+    // Deliberately NOT keyed on partyData: none of these handlers read it, the
+    // backend emits `encounter-party-update` once per damage hit, and Tauri v1's
+    // `listen` leaks a `window._<uid>` closure per call that `unlisten` never
+    // removes (transformCallback only deletes it for `once` callbacks). Keying
+    // on party data re-registered all nine at combat rate, and each leaked
+    // closure pinned that render's party + encounter state -- ~275k leaked
+    // callbacks and ~700MB of WebView2 growth over 70 minutes of combat.
+    // `t` is read through tRef so even a language change cannot re-register.
+  }, []);
 
   useEffect(() => {
     if (previousStatus === "InProgress" && encounterState.status === "Stopped") {
