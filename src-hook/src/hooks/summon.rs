@@ -490,6 +490,18 @@ mod tests {
                 String::from_utf8_lossy(id)
             );
         }
+
+        // The parser filters Primal Burst damage out of the meters using
+        // protocol's copy of these hashes. Assert the two lists are the same set
+        // so a body added here can never silently go unfiltered there.
+        let mut shared = protocol::PRIMAL_BURST_BODY_HASHES.to_vec();
+        shared.sort_unstable();
+        let mut expected = vec![0x5418_B8F8u32, 0x3277_6C5B, 0x870A_9DFE];
+        expected.sort_unstable();
+        assert_eq!(
+            shared, expected,
+            "protocol::PRIMAL_BURST_BODY_HASHES drifted from the bodies checked above"
+        );
     }
 
     #[test]
