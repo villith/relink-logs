@@ -175,9 +175,74 @@ const SUMMON_BODY_HASHES: &[u32] = &[
 /// True iff `type_id` is one of the summon body classes above. Only sixteen of
 /// the game's seventy-four summons own a body class; the rest share a generic
 /// one, so a true answer here does NOT identify which summon was called.
-#[cfg(feature = "hookdiag")]
 pub(crate) fn is_summon_body(type_id: u32) -> bool {
     SUMMON_BODY_HASHES.contains(&type_id)
+}
+
+/// `SummonUnitData.id_`, then `SummonObjectData.id_` as the cross-check. Both
+/// are named by the game's own reflection tables and both carried the same
+/// value on every body observed live (2026-07-24); reading the second only when
+/// the first fails costs nothing on the happy path.
+const SUMMON_UNIT_ID_OFFSET: usize = 0x11C0;
+const SUMMON_OBJECT_ID_OFFSET: usize = 0x1020;
+
+/// The high half of a summon body id, tagging it as a summon object. Anything
+/// else means the offset is stale and the low half is not a summon number.
+const SUMMON_ID_CATEGORY: u32 = 0x010D;
+
+/// The concrete summon behind a body, as its `So####` class hash.
+///
+/// A body id reads `0x010D_<summon><unit>`: the low byte selects the unit
+/// within the summon, the byte above it the summon. Live: Silverslime's body
+/// reports `0x010D2001` and Goldslime's `0x010D2101`, while BOTH report class
+/// hash `0x34894579` — the class can never separate them, this can. Every one
+/// of the game's seventy-four summon classes is `So####00`, so clearing the
+/// unit byte turns any unit's id into its summon's class id.
+///
+/// Returns `None` when the id does not look like a summon object, so a stale
+/// offset after a game patch leaves rows generic rather than misnamed.
+pub(crate) fn concrete_summon_class(source: *const usize) -> Option<u32> {
+    let id = match diag::read_u32_guarded(source as usize, SUMMON_UNIT_ID_OFFSET) {
+        id if id >> 16 == SUMMON_ID_CATEGORY => id,
+        _ => diag::read_u32_guarded(source as usize, SUMMON_OBJECT_ID_OFFSET),
+    };
+    if id >> 16 != SUMMON_ID_CATEGORY {
+        warn_stale_rva_once(&SUMMON_ID_WARNED, "summon body id offsets");
+        return None;
+    }
+
+    Some(crate::hooks::gamehash::game_xxhash32(&summon_class_id(
+        (id & 0xFF00) as u16,
+    )))
+}
+
+/// Renders a summon number as the `So####` id string the engine hashes.
+/// Lowercase hex, because that is how the game spells them (`So0d00`).
+fn summon_class_id(summon: u16) -> [u8; 6] {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut id = *b"So0000";
+    for (i, shift) in [12, 8, 4, 0].into_iter().enumerate() {
+        id[2 + i] = HEX[((summon >> shift) & 0xF) as usize];
+    }
+    id
+}
+
+/// One-shot latch for a body-id offset that stops looking like a summon id.
+static SUMMON_ID_WARNED: AtomicBool = AtomicBool::new(false);
+
+/// The actor type to publish for a damage source: the concrete summon's class
+/// hash when the source is a summon body we can resolve, else the type the
+/// game reported.
+///
+/// This is deliberately NOT folded into the type used for owner attribution —
+/// that still has to match `SUMMON_BODY_HASHES` to find the summoner, and a
+/// concrete hash is not in that table.
+#[inline(always)]
+pub fn published_actor_type(source_type_id: u32, source: *const usize) -> u32 {
+    if !is_summon_body(source_type_id) {
+        return source_type_id;
+    }
+    concrete_summon_class(source).unwrap_or(source_type_id)
 }
 
 /// Handle offsets on a summon body: index gate, then the entity pointer.
@@ -426,6 +491,113 @@ mod tests {
         assert_eq!(
             super::parent_specified_instance_at(1usize as *const usize, 0),
             None
+        );
+    }
+
+    /// A summon body with the given ids at the two reflection-named offsets.
+    fn summon_body(unit_id: u32, object_id: u32) -> Vec<u8> {
+        let mut body = vec![0u8; 0x1C10];
+        for (offset, id) in [
+            (super::SUMMON_UNIT_ID_OFFSET, unit_id),
+            (super::SUMMON_OBJECT_ID_OFFSET, object_id),
+        ] {
+            body[offset..offset + 4].copy_from_slice(&id.to_le_bytes());
+        }
+        body
+    }
+
+    #[test]
+    fn renders_a_summon_number_as_its_lowercase_id_string() {
+        // "So0d00", not "So0D00" — the hash is taken over the exact spelling,
+        // so a case slip yields a hash that names nothing.
+        assert_eq!(&super::summon_class_id(0x0d00), b"So0d00");
+        assert_eq!(&super::summon_class_id(0x2100), b"So2100");
+        assert_eq!(&super::summon_class_id(0x9200), b"So9200");
+    }
+
+    #[test]
+    fn resolves_the_two_slimes_that_share_one_body_class() {
+        // The live case this exists for: both bodies report class 0x34894579,
+        // and only the unit byte of the id tells them apart.
+        let silverslime = summon_body(0x010D_2001, 0x010D_2001);
+        let goldslime = summon_body(0x010D_2101, 0x010D_2101);
+
+        assert_eq!(
+            super::concrete_summon_class(silverslime.as_ptr().cast()),
+            Some(0x2D17_9019),
+            "So2000 Silverslime"
+        );
+        assert_eq!(
+            super::concrete_summon_class(goldslime.as_ptr().cast()),
+            Some(0x6BCA_42AB),
+            "So2100 Goldslime"
+        );
+    }
+
+    #[test]
+    fn falls_back_to_the_object_id_when_the_unit_id_is_unset() {
+        let body = summon_body(0, 0x010D_2101);
+        assert_eq!(
+            super::concrete_summon_class(body.as_ptr().cast()),
+            Some(0x6BCA_42AB)
+        );
+    }
+
+    #[test]
+    fn a_summon_that_owns_its_class_resolves_back_to_that_class() {
+        // Lucilius is one of the sixteen already named from its body class;
+        // resolution must not change what it publishes.
+        let body = summon_body(0x010D_0000, 0x010D_0000);
+        assert_eq!(
+            super::concrete_summon_class(body.as_ptr().cast()),
+            Some(0xD2E5_407A)
+        );
+    }
+
+    #[test]
+    fn an_id_without_the_summon_category_resolves_to_nothing() {
+        // What a stale offset looks like after a game patch: the bytes read
+        // fine but are not a summon id, and naming a row from them would be a
+        // confident lie. Generic beats wrong.
+        let body = summon_body(0xDEAD_BEEF, 0xDEAD_BEEF);
+        assert_eq!(super::concrete_summon_class(body.as_ptr().cast()), None);
+    }
+
+    #[test]
+    fn published_type_passes_non_summon_sources_through_untouched() {
+        let body = summon_body(0x010D_2101, 0x010D_2101);
+        // A player actor is not a summon body: publish exactly what was read,
+        // without even looking at the offsets.
+        assert_eq!(
+            super::published_actor_type(super::ID_DRAGON_TYPE, body.as_ptr().cast()),
+            super::ID_DRAGON_TYPE
+        );
+    }
+
+    #[test]
+    fn published_type_keeps_the_body_class_when_the_id_does_not_resolve() {
+        let body = summon_body(0, 0);
+        assert_eq!(
+            super::published_actor_type(0xB079_2857, body.as_ptr().cast()),
+            0xB079_2857,
+            "unresolved bodies must keep falling back to the generic label"
+        );
+    }
+
+    #[test]
+    fn published_type_swaps_a_shared_body_class_for_the_concrete_summon() {
+        let body = summon_body(0x010D_2001, 0x010D_2001);
+        assert_eq!(
+            super::published_actor_type(0x3489_4579, body.as_ptr().cast()),
+            0x2D17_9019
+        );
+    }
+
+    #[test]
+    fn published_type_survives_an_unmapped_source() {
+        assert_eq!(
+            super::published_actor_type(0xB079_2857, 1usize as *const usize),
+            0xB079_2857
         );
     }
 }
