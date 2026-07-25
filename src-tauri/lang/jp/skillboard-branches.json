@@ -1,0 +1,350 @@
+{
+  "pl0000_atk": {
+    "key": "TXT_SB_NAME_PL0000_SP100",
+    "text": "真髄：回復アビリティ強化"
+  },
+  "pl0000_def": {
+    "key": "TXT_SB_NAME_PL0000_SP000",
+    "text": "覚醒：Class Lv強化"
+  },
+  "pl0000_lim": {
+    "key": "TXT_SB_NAME_PL0000_SP200",
+    "text": "極意：かばう特化"
+  },
+  "pl0100_atk": {
+    "key": "TXT_SB_NAME_PL0100_SP100",
+    "text": "真髄：回復アビリティ強化"
+  },
+  "pl0100_def": {
+    "key": "TXT_SB_NAME_PL0100_SP000",
+    "text": "覚醒：Class Lv強化"
+  },
+  "pl0100_lim": {
+    "key": "TXT_SB_NAME_PL0100_SP200",
+    "text": "極意：かばう特化"
+  },
+  "pl0200_atk": {
+    "key": "TXT_SB_NAME_PL0200_SP100",
+    "text": "真髄：アレス強襲特化"
+  },
+  "pl0200_def": {
+    "key": "TXT_SB_NAME_PL0200_SP000",
+    "text": "覚醒：アレス持続特化"
+  },
+  "pl0200_lim": {
+    "key": "TXT_SB_NAME_PL0200_SP200",
+    "text": "極意：蒼刃"
+  },
+  "pl0300_atk": {
+    "key": "TXT_SB_NAME_PL0300_SP100",
+    "text": "真髄：コフィンメーカー強化"
+  },
+  "pl0300_def": {
+    "key": "TXT_SB_NAME_PL0300_SP000",
+    "text": "覚醒：ブルスナイプ強化"
+  },
+  "pl0300_lim": {
+    "key": "TXT_SB_NAME_PL0300_SP200",
+    "text": "極意：コラテラルダメージ特化"
+  },
+  "pl0400_atk": {
+    "key": "TXT_SB_NAME_PL0400_SP100",
+    "text": "真髄：魔法チェイン"
+  },
+  "pl0400_def": {
+    "key": "TXT_SB_NAME_PL0400_SP000",
+    "text": "覚醒：コンセントレーション強化"
+  },
+  "pl0400_lim": {
+    "key": "TXT_SB_NAME_PL0400_SP200",
+    "text": "極意：フラワリーセヴン特化"
+  },
+  "pl0500_atk": {
+    "key": "TXT_SB_NAME_PL0500_SP100",
+    "text": "真髄：グレネードパンチ"
+  },
+  "pl0500_def": {
+    "key": "TXT_SB_NAME_PL0500_SP000",
+    "text": "覚醒：エイムモード強化"
+  },
+  "pl0500_lim": {
+    "key": "TXT_SB_NAME_PL0500_SP200",
+    "text": "極意：ベノムグレネード強化"
+  },
+  "pl0600_atk": {
+    "key": "TXT_SB_NAME_PL0600_SP100",
+    "text": "真髄：強化＆弱体特化"
+  },
+  "pl0600_def": {
+    "key": "TXT_SB_NAME_PL0600_SP000",
+    "text": "覚醒：ローズ・レクイエム"
+  },
+  "pl0600_lim": {
+    "key": "TXT_SB_NAME_PL0600_SP200",
+    "text": "極意：薔薇強化"
+  },
+  "pl0700_atk": {
+    "key": "TXT_SB_NAME_PL0700_SP100",
+    "text": "真髄：孤高の幽霊"
+  },
+  "pl0700_def": {
+    "key": "TXT_SB_NAME_PL0700_SP000",
+    "text": "覚醒：ペット強化"
+  },
+  "pl0700_lim": {
+    "key": "TXT_SB_NAME_PL0700_SP200",
+    "text": "極意：支援特化"
+  },
+  "pl0800_atk": {
+    "key": "TXT_SB_NAME_PL0800_SP100",
+    "text": "真髄：回避強化"
+  },
+  "pl0800_def": {
+    "key": "TXT_SB_NAME_PL0800_SP000",
+    "text": "覚醒：ジャストフィニッシュ特化"
+  },
+  "pl0800_lim": {
+    "key": "TXT_SB_NAME_PL0800_SP200",
+    "text": "極意：ダメージアビリティ高速化"
+  },
+  "pl0900_atk": {
+    "key": "TXT_SB_NAME_PL0900_SP100",
+    "text": "真髄：ライズ・フォー・オール"
+  },
+  "pl0900_def": {
+    "key": "TXT_SB_NAME_PL0900_SP000",
+    "text": "覚醒：敵対心＋"
+  },
+  "pl0900_lim": {
+    "key": "TXT_SB_NAME_PL0900_SP200",
+    "text": "極意：不退転"
+  },
+  "pl1000_atk": {
+    "key": "TXT_SB_NAME_PL1000_SP100",
+    "text": "真髄：紅蓮の刃"
+  },
+  "pl1000_def": {
+    "key": "TXT_SB_NAME_PL1000_SP000",
+    "text": "覚醒：チャージ攻撃強化"
+  },
+  "pl1000_lim": {
+    "key": "TXT_SB_NAME_PL1000_SP200",
+    "text": "極意：チャージパリィ特化"
+  },
+  "pl1100_atk": {
+    "key": "TXT_SB_NAME_PL1100_SP100",
+    "text": "真髄：ダメージアビリティ強化"
+  },
+  "pl1100_def": {
+    "key": "TXT_SB_NAME_PL1100_SP000",
+    "text": "覚醒：ジャスト攻撃特化"
+  },
+  "pl1100_lim": {
+    "key": "TXT_SB_NAME_PL1100_SP200",
+    "text": "極意：死線の刃"
+  },
+  "pl1200_atk": {
+    "key": "TXT_SB_NAME_PL1200_SP100",
+    "text": "真髄：真っ向勝負"
+  },
+  "pl1200_def": {
+    "key": "TXT_SB_NAME_PL1200_SP000",
+    "text": "覚醒：ノーブル・スタンス強化"
+  },
+  "pl1200_lim": {
+    "key": "TXT_SB_NAME_PL1200_SP200",
+    "text": "極意：インビンシブル特化"
+  },
+  "pl1300_atk": {
+    "key": "TXT_SB_NAME_PL1300_SP100",
+    "text": "真髄：早駆け"
+  },
+  "pl1300_def": {
+    "key": "TXT_SB_NAME_PL1300_SP000",
+    "text": "覚醒：三幕の心得"
+  },
+  "pl1300_lim": {
+    "key": "TXT_SB_NAME_PL1300_SP200",
+    "text": "極意：霞返し"
+  },
+  "pl1400_atk": {
+    "key": "TXT_SB_NAME_PL1400_SP100",
+    "text": "真髄：一撃必殺"
+  },
+  "pl1400_def": {
+    "key": "TXT_SB_NAME_PL1400_SP000",
+    "text": "覚醒：構え切替強化"
+  },
+  "pl1400_lim": {
+    "key": "TXT_SB_NAME_PL1400_SP200",
+    "text": "極意：無二無三特化"
+  },
+  "pl1500_atk": {
+    "key": "TXT_SB_NAME_PL1500_SP100",
+    "text": "真髄：雄々見得特化"
+  },
+  "pl1500_def": {
+    "key": "TXT_SB_NAME_PL1500_SP000",
+    "text": "覚醒：超正拳突き"
+  },
+  "pl1500_lim": {
+    "key": "TXT_SB_NAME_PL1500_SP200",
+    "text": "極意：正拳絶技"
+  },
+  "pl1600_atk": {
+    "key": "TXT_SB_NAME_PL1600_SP100",
+    "text": "真髄：ダメージアビリティ強化"
+  },
+  "pl1600_def": {
+    "key": "TXT_SB_NAME_PL1600_SP000",
+    "text": "覚醒：エリアルコンボ強化"
+  },
+  "pl1600_lim": {
+    "key": "TXT_SB_NAME_PL1600_SP200",
+    "text": "極意：カウンター特化"
+  },
+  "pl1700_atk": {
+    "key": "TXT_SB_NAME_PL1700_SP100",
+    "text": "真髄：チャージ攻撃特化"
+  },
+  "pl1700_def": {
+    "key": "TXT_SB_NAME_PL1700_SP000",
+    "text": "覚醒：フルコンボ特化"
+  },
+  "pl1700_lim": {
+    "key": "TXT_SB_NAME_PL1700_SP200",
+    "text": "極意：チャージパリィ特化"
+  },
+  "pl1800_atk": {
+    "key": "TXT_SB_NAME_PL1800_SP100",
+    "text": "真髄：コラプス強化"
+  },
+  "pl1800_def": {
+    "key": "TXT_SB_NAME_PL1800_SP000",
+    "text": "覚醒：弱体コンボブースト"
+  },
+  "pl1800_lim": {
+    "key": "TXT_SB_NAME_PL1800_SP200",
+    "text": "極意：回復支援強化"
+  },
+  "pl1900_atk": {
+    "key": "TXT_SB_NAME_PL1900_SP100",
+    "text": "真髄：竜人化強化"
+  },
+  "pl1900_def": {
+    "key": "TXT_SB_NAME_PL1900_SP000",
+    "text": "覚醒：神威一体強化"
+  },
+  "pl1900_lim": {
+    "key": "TXT_SB_NAME_PL1900_SP200",
+    "text": "極意：ディア・ゴッド特化"
+  },
+  "pl2100_atk": {
+    "key": "TXT_SB_NAME_PL2100_SP100",
+    "text": "真髄：白輝の加護"
+  },
+  "pl2100_def": {
+    "key": "TXT_SB_NAME_PL2100_SP000",
+    "text": "覚醒：約束の十二枚羽"
+  },
+  "pl2100_lim": {
+    "key": "TXT_SB_NAME_PL2100_SP200",
+    "text": "極意：審判の鐘"
+  },
+  "pl2200_atk": {
+    "key": "TXT_SB_NAME_PL2200_SP100",
+    "text": "真髄：剣の雨"
+  },
+  "pl2200_def": {
+    "key": "TXT_SB_NAME_PL2200_SP000",
+    "text": "覚醒：剣神ゲージ強化"
+  },
+  "pl2200_lim": {
+    "key": "TXT_SB_NAME_PL2200_SP200",
+    "text": "極意：剣神切替特化"
+  },
+  "pl2300_atk": {
+    "key": "TXT_SB_NAME_PL2300_SP100",
+    "text": "真髄：クリンチャー強化"
+  },
+  "pl2300_def": {
+    "key": "TXT_SB_NAME_PL2300_SP000",
+    "text": "覚醒：マルチロックショット特化"
+  },
+  "pl2300_lim": {
+    "key": "TXT_SB_NAME_PL2300_SP200",
+    "text": "極意：二王の諍い特化"
+  },
+  "pl2400_atk": {
+    "key": "TXT_SB_NAME_PL2400_SP100",
+    "text": "真髄：大風車強化"
+  },
+  "pl2400_def": {
+    "key": "TXT_SB_NAME_PL2400_SP000",
+    "text": "覚醒：鎧散牙強化"
+  },
+  "pl2400_lim": {
+    "key": "TXT_SB_NAME_PL2400_SP200",
+    "text": "極意：荒事"
+  },
+  "pl2500_atk": {
+    "key": "TXT_SB_NAME_PL2500_SP100",
+    "text": "真髄：スペリオルシリーズ強化"
+  },
+  "pl2500_def": {
+    "key": "TXT_SB_NAME_PL2500_SP000",
+    "text": "覚醒：魔剣操舞強化"
+  },
+  "pl2500_lim": {
+    "key": "TXT_SB_NAME_PL2500_SP200",
+    "text": "極意：刃重結界"
+  },
+  "pl2600_atk": {
+    "key": "TXT_SB_NAME_PL2600_SP100",
+    "text": "真髄：クロック・オー・デルタ強化"
+  },
+  "pl2600_def": {
+    "key": "TXT_SB_NAME_PL2600_SP000",
+    "text": "覚醒：因果喰い特化"
+  },
+  "pl2600_lim": {
+    "key": "TXT_SB_NAME_PL2600_SP200",
+    "text": "極意：アビリティチェイン"
+  },
+  "pl2700_atk": {
+    "key": "TXT_SB_NAME_PL2700_SP100",
+    "text": "真髄：雷轟"
+  },
+  "pl2700_def": {
+    "key": "TXT_SB_NAME_PL2700_SP000",
+    "text": "覚醒：近接射撃特化"
+  },
+  "pl2700_lim": {
+    "key": "TXT_SB_NAME_PL2700_SP200",
+    "text": "極意：パーフェクトシュート"
+  },
+  "pl2800_atk": {
+    "key": "TXT_SB_NAME_PL2800_SP100",
+    "text": "真髄：鮮烈なる力"
+  },
+  "pl2800_def": {
+    "key": "TXT_SB_NAME_PL2800_SP000",
+    "text": "覚醒：スタンス強化"
+  },
+  "pl2800_lim": {
+    "key": "TXT_SB_NAME_PL2800_SP200",
+    "text": "極意：悪魔の甘言"
+  },
+  "pl2900_atk": {
+    "key": "TXT_SB_NAME_PL2900_SP100",
+    "text": "真髄：『黒』の侵蝕"
+  },
+  "pl2900_def": {
+    "key": "TXT_SB_NAME_PL2900_SP000",
+    "text": "覚醒：コンボフィニッシュ強化"
+  },
+  "pl2900_lim": {
+    "key": "TXT_SB_NAME_PL2900_SP200",
+    "text": "極意：理外の闇禍"
+  }
+}
