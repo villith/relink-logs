@@ -19,11 +19,14 @@ On top of the original gbfr-logs feature set, this project adds:
 - **Conflux (Endless mode) support** — a dedicated Conflux tab that groups runs into rooms with per-room meters.
 - **Toolbox: Synthesis Helper** — searches your sigil box for pairs that will synthesize into a target trait combination, using the game's actual synthesis logic.
 
-## How to install
+## Installation
 
-- Go to [Releases](https://github.com/villith/relink-logs/releases)
-- Download the latest .msi installer and run it.
-- Open Relink Logs after the game is already running.
+### Windows
+
+1. Go to [Releases](https://github.com/villith/relink-logs/releases)
+2. Download the latest .msi installer and run it.
+3. Open GBFR Logs
+4. Launch the game (interchangeable with previous step)
 
 ## Linux (Proton)
 
@@ -31,32 +34,22 @@ Relink Logs runs natively on Linux and meters the Windows game running under
 Steam's Proton. Steam Deck gaming mode is **not** supported (an external
 overlay cannot draw over gamescope).
 
-1. Download the AppImage from the releases page, make it executable
-   (`chmod +x`), and run it. It auto-updates itself on new releases.
-2. Launch Relink Logs, open **Settings → Linux setup**, and click
-   **Install hook** if it isn't already green.
-3. One-time: in Steam → Granblue Fantasy: Relink → Properties → Launch
-   Options, paste:
-   `WINEDLLOVERRIDES="dinput8=n,b" %command%`
-4. Launch the game. The meter connects automatically.
+1. Go to [Releases](https://github.com/villith/relink-logs/releases)
+2. Download the latest AppImage from the releases page
+3. Make it executable (`chmod +x`), and run it
+4. Launch Relink Logs, open **Settings → Linux setup**, and click **Install hook** if it isn't already green.
+5. One-time: in Steam → Granblue Fantasy: Relink → Properties → Launch Options, paste: `WINEDLLOVERRIDES="dinput8=n,b" %command%`
+   * For those using Reloaded II for mods, you may have already modified the Launch Options. The full Launch Options should now look like:
+`WINEDLLOVERRIDES="winmm=n,b;dinput8=n,b" %command%`
+6. Launch the game.
 
 Notes:
 
 - The overlay uses X11 (via XWayland on Wayland desktops). Always-on-top and
   clickthrough behavior can vary by compositor; X11 sessions are the most
-  reliable. If the overlay hides behind the game, see the FAQ entry below.
-- The Synthesis Helper and Overmastery Predictor toolbox tools are
-  Windows-only for now.
-- The hook file installed into the game folder is the same Authenticode-signed
-  `hook.dll` Windows uses, renamed to `dinput8.dll`. **Remove hook** in
-  Settings deletes it again.
-- On Linux the hook and app talk over localhost TCP instead of a named pipe;
-  unlike the pipe's ACLs, localhost has no peer authentication, so another
-  local process could in principle feed the meter fake events — worst case is
-  garbage in a log.
-- Ubuntu 24.04 ships only webkit2gtk-4.1, which the current build does not
-  target — a known limitation; Ubuntu 22.04 (and distros still shipping
-  webkit2gtk-4.0) are what the AppImage is built against.
+  reliable. If the overlay hides behind the game, see the FAQ entry
+- The hook file installed into the game folder is the same Authenticode-signed `hook.dll` Windows uses, renamed to `dinput8.dll`.
+  - Use **Remove hook** in Settings to delete it
 
 ## Found a translation problem or a bug?
 

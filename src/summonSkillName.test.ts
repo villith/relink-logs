@@ -1,12 +1,24 @@
 import i18n from "i18next";
 import { beforeAll, describe, expect, it } from "vitest";
 
+import { setSkillNameSources } from "./skillNameSources";
 import { SkillState } from "./types";
 import { getSkillName } from "./utils";
 
-/** The real lookup, against a minimal copy of the en/ui.json shape, so these
- * assert what a user actually reads in the meter rather than a key string. */
+/** The real lookup, against a minimal copy of the en/ui.json shape plus the
+ * generated bundles the bridge map points into, so these assert what a user
+ * actually reads in the meter rather than a key string. */
 beforeAll(async () => {
+  setSkillNameSources({
+    // 1700 has no ui.json label — only the map can name it.
+    Pl1800: { "1700": { ns: "abilities", hash: "ed1219cc", key: "AB_PL1800_07" } },
+    "summon-classes": {
+      // d2e5407a is ALSO in ui.json below, to prove the hand label wins.
+      d2e5407a: { ns: "summons", hash: "cccc3333", key: "TXT_SMN_So9800" },
+      "5395ce93": { ns: "summons", hash: "aaaa1111", key: "TXT_SMN_So9900" },
+    },
+  });
+
   await i18n.init({
     lng: "en",
     resources: {
@@ -17,6 +29,11 @@ beforeAll(async () => {
             default: { "80000": "Summon Attack/Primal Burst", "unknown-skill": "Skill {{id}}" },
             Pl1800: { "1234": "Pain Train" },
           },
+        },
+        abilities: { ed1219cc: { key: "AB_PL1800_07", text: "Alexandria" } },
+        summons: {
+          aaaa1111: { key: "TXT_SMN_So9900", text: "Beelzebub III" },
+          cccc3333: { key: "TXT_SMN_So9800", text: "Should Not Win II" },
         },
       },
     },
@@ -46,5 +63,39 @@ describe("getSkillName for summon hits", () => {
     // Only an unresolved (summon) child type takes the class path; a real
     // character keeps its own skill block.
     expect(getSkillName("Pl1800", summonHit(80000, "Pl1800"))).toBe("Summon Attack/Primal Burst");
+  });
+});
+
+describe("getSkillName via the bridge map", () => {
+  const hit = (id: number) => summonHit(id, "Pl1800");
+
+  it("names a mapped action id from the generated abilities bundle", () => {
+    // Nothing in ui.json names 1700; the map points it at AB_PL1800_07.
+    expect(getSkillName("Pl1800", hit(1700))).toBe("Alexandria");
+  });
+
+  it("lets a ui.json label win over the mapped ability name", () => {
+    // Hand-authored labels are reverse-engineered and intentionally differ from
+    // the game's own wording, so they sit ahead of the generated bundle.
+    expect(getSkillName("Pl1800", hit(1234))).toBe("Pain Train");
+  });
+
+  it("falls back to the unknown-skill label when nothing maps", () => {
+    expect(getSkillName("Pl1800", hit(4321))).toBe("Skill 4321");
+  });
+});
+
+describe("getSkillName for mapped summon body classes", () => {
+  const bodyHit = (bodyHash: number) => summonHit(80000, { Unknown: bodyHash });
+
+  it("names the row from the generated summons bundle, tier suffix stripped", () => {
+    // The bundle says "Beelzebub III"; one body class covers every tier, so the
+    // row must read "Beelzebub".
+    expect(getSkillName("Pl1800", bodyHit(0x5395ce93))).toBe("Beelzebub");
+  });
+
+  it("lets a ui.json label win over the mapped summon name", () => {
+    // d2e5407a is mapped to "Should Not Win II" but named in ui.json.
+    expect(getSkillName("Pl1800", bodyHit(0xd2e5407a))).toBe("Lucilius");
   });
 });

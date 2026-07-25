@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { gameXxhash32 } from "../scripts/gbfr-hash.mjs";
+import skillNameSources from "../src-tauri/assets/skill-name-sources.json";
+import enAbilities from "../src-tauri/lang/en/abilities.json";
+import enEnemies from "../src-tauri/lang/en/enemies.json";
 import enBranches from "../src-tauri/lang/en/skillboard-branches.json";
+import enSummons from "../src-tauri/lang/en/summons.json";
 import enUi from "../src-tauri/lang/en/ui.json";
 import { EnemyState, EquippedSummon, PlayerState, Sigil, SkillState, WeaponInfo, WeaponState } from "./types";
 import {
@@ -823,11 +828,15 @@ describe("summonSkillKeys", () => {
   });
 });
 
-describe("summon class names in en/ui.json", () => {
+describe("summon class sources in skill-name-sources.json", () => {
+  const classes = skillNameSources["summon-classes"] as Record<
+    string,
+    { ns: string; hash: string; key: string; via?: string }
+  >;
+
   it("keys every entry by a lowercase eight-digit hash", () => {
     // A mistyped or unpadded key never resolves, and the only symptom in game is
     // a row silently reading "Summon Attack" — invisible without this check.
-    const classes = enUi.skills["summon-classes"] as Record<string, string>;
     const bad = Object.keys(classes).filter((k) => !/^[0-9a-f]{8}$/.test(k));
 
     expect(bad).toEqual([]);
@@ -835,14 +844,108 @@ describe("summon class names in en/ui.json", () => {
   });
 
   it("names the summon body classes the hook can attribute", () => {
-    const classes = enUi.skills["summon-classes"] as Record<string, string>;
+    // The names themselves now come from each language's own summons.json; what
+    // this file pins is which body class points at which game entry.
+    // d2e5407a = Lucilius (So0000), 5395ce93 = Beelzebub (So9200).
+    expect(classes["d2e5407a"]?.key).toBe("TXT_SMN_So0000");
+    expect(classes["5395ce93"]?.key).toBe("TXT_SMN_So9200");
+  });
 
-    expect(classes["d2e5407a"]).toBe("Lucilius");
-    expect(classes["5395ce93"]).toBe("Beelzebub");
+  it("pairs every id-derived class with the So id that actually hashes to it", () => {
+    // A body class is XXHash32Custom("So####"). Checking that identity here is
+    // what stops a display-name collision from quietly mislabelling a row —
+    // two different summons, and some enemies, share names.
+    const mismatched = Object.entries(classes)
+      .filter(([, source]) => source.via === "id")
+      .filter(([classHash, source]) => {
+        const soId = /^TXT_SMN_(So[0-9a-f]{4})(?:_\d+)?$/.exec(source.key)?.[1];
+        return soId === undefined || gameXxhash32(soId) !== classHash;
+      })
+      .map(([classHash, source]) => `${classHash} -> ${source.key}`);
+
+    expect(mismatched).toEqual([]);
+  });
+
+  it("marks the classes identity could not resolve so a patch review can find them", () => {
+    // The Cat and Lilith bodies are not So#### summons, so they rest on a name
+    // match. Their text agrees with the same-named summon in every shipped
+    // language today, but that is a coincidence worth re-checking.
+    const byName = Object.entries(classes)
+      .filter(([, source]) => source.via === "name")
+      .map(([classHash]) => classHash)
+      .sort();
+
+    expect(byName).toEqual(["0f617ff0", "9f394f85"]);
+  });
+
+  it("points every entry at a hash that resolves in the generated bundle", () => {
+    // The regression net after a game patch renames a lang key.
+    const bundles: Record<string, Record<string, { text?: string }>> = {
+      summons: enSummons,
+      enemies: enEnemies,
+    };
+    const broken = Object.entries(classes).filter(([, source]) => !bundles[source.ns]?.[source.hash]?.text);
+
+    expect(broken).toEqual([]);
+  });
+
+  it("keeps the hand-coined class that no lang file names", () => {
+    // Silverslime/Goldslime is ours, so it stays in ui.json and never maps.
+    expect(classes["34894579"]).toBeUndefined();
+    expect((enUi.skills["summon-classes"] as Record<string, string>)["34894579"]).toBeTruthy();
   });
 
   it("provides the generic label every unnamed body class falls back to", () => {
     expect(enUi.skills.default["80000"]).toBeTruthy();
+  });
+});
+
+describe("ability sources in skill-name-sources.json", () => {
+  const abilityBlocks = Object.entries(skillNameSources).filter(([block]) => block !== "summon-classes") as [
+    string,
+    Record<string, { ns: string; hash: string; key: string }>,
+  ][];
+
+  it("points every entry at a hash that resolves in en/abilities.json", () => {
+    const broken = abilityBlocks.flatMap(([block, entries]) =>
+      Object.entries(entries)
+        .filter(([, source]) => !(enAbilities as Record<string, { text?: string }>)[source.hash]?.text)
+        .map(([id]) => `${block}.${id}`)
+    );
+
+    expect(broken).toEqual([]);
+  });
+
+  it("scopes every ability key to its own character block", () => {
+    // The scoping is what disambiguates a name shared by two hashes; a key from
+    // another character would silently mislabel the row.
+    const mismatched = abilityBlocks.flatMap(([block, entries]) =>
+      Object.entries(entries)
+        .filter(([, source]) => !source.key.startsWith(`AB_${block.toUpperCase()}_`))
+        .map(([id, source]) => `${block}.${id} -> ${source.key}`)
+    );
+
+    expect(mismatched).toEqual([]);
+  });
+
+  it("never maps a row to a _CG cutscene variant", () => {
+    const cg = Object.values(skillNameSources)
+      .flatMap((entries) => Object.values(entries as Record<string, { key: string }>))
+      .filter((source) => source.key.endsWith("_CG"));
+
+    expect(cg).toEqual([]);
+  });
+
+  it("leaves no ui.json entry duplicating a mapped id", () => {
+    // ui.json holding a mapped id would shadow the translation for every
+    // language, which is the duplication this whole map exists to remove.
+    const duplicates = Object.entries(skillNameSources).flatMap(([block, entries]) =>
+      Object.keys(entries as Record<string, unknown>)
+        .filter((id) => (enUi.skills as Record<string, Record<string, unknown>>)[block]?.[id] !== undefined)
+        .map((id) => `${block}.${id}`)
+    );
+
+    expect(duplicates).toEqual([]);
   });
 });
 
