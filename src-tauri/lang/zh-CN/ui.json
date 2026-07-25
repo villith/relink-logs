@@ -101,8 +101,19 @@
       "reset": "恢复默认"
     },
     "master-traits": {
-      "tier": "第 {{tier}} 阶",
-      "ex": "EX"
+      "tier": "{{tier}}阶",
+      "ex": "EX阶",
+      "category": {
+        "atk": "真谛",
+        "def": "觉醒",
+        "lim": "秘义",
+        "other": "其他"
+      },
+      "initial": {
+        "atk": "真谛",
+        "def": "觉醒",
+        "lim": "秘义"
+      }
     },
     "show-all": "显示全部",
     "show-less": "收起",
@@ -293,7 +304,47 @@
     "awakening-level": "觉醒 {{level}}/10",
     "transcendence-level": "超凡 {{stage}}/10",
     "weapon-stats": "Lv {{level}} / ATK {{attack}} / HP {{hp}}",
-    "per-second": "{{unit}}/s"
+    "per-second": "{{unit}}/s",
+    "hook-status": {
+      "connected": "已连接",
+      "reconnecting": "重新连接中…",
+      "out-of-date": "Hook 版本已过期",
+      "no-game": "未找到游戏进程",
+      "refresh": "刷新 Hook",
+      "restart-game": "重启游戏以更新 Hook",
+      "refresh-encounter-warning": "这会中断当前的战斗统计。确定要刷新 Hook 吗？",
+      "refresh-failed": "Hook 刷新失败: {{error}}",
+      "refresh-unsupported": "当前 Hook 不支持热刷新 — 请重启游戏以完成更新。",
+      "refreshed": "Hook 已刷新",
+      "control-unavailable": "无法连接到 Hook 的 dev control channel。",
+      "debug-only": "此操作仅在 debug build 中可用。"
+    },
+    "debug": {
+      "title": "调试",
+      "full-assist": "全自动辅助",
+      "hook-state": "Hook 状态",
+      "encounter-state": "战斗状态",
+      "hook-note": "这些操作直接作用于真实 Hook：eject 与 Hello override 指令通过 dev control channel 传输，reinject 则通过应用的真实 injection loop 运行。上方显示的版本与状态是 Hook 在上次 handshake 时报告的信息。",
+      "encounter-note": "这些按钮会向 Hook 的 event stream 排队发送真实事件，在战斗中触发会将其混合到实时战斗中。结束和重置都会停止当前战斗并将记录的伤害保存到日志历史中；结束还会为该日志标记 scenario 的虚构 quest id 与 timer。在 Conflux 挑战中，它们会作用于当前 run：Reset 会 finalise，End 仅标记 cleared。",
+      "action-failed": "{{action}} 失败: {{error}}",
+      "stale-hook-note": "需要已 inject 且为最新版本的 dev Hook：stale 的 hook-dbg.dll 无法解析这些请求。如果连接失败，请先 rebuild Hook 并使用托盘菜单中的 \"Reload hook (dev)\"。",
+      "hold-out-active": "Hook held out — reinjection 已暂停，因此即使游戏正在运行，状态也会显示为 \"未找到游戏进程\"。使用 \"Allow reinject\" (或刷新) 来解除暂停。",
+      "hook-refresh": "刷新 (真实 reinject)",
+      "hook-eject-hold": "Eject 并暂停注入",
+      "hook-allow-reinject": "允许 reinject",
+      "hook-eject-once": "Eject 一次 (自动恢复)",
+      "hook-force-out-of-date": "强制标记过期",
+      "hook-force-restart-required": "强制标记过期 (不 eject)",
+      "hook-clear-override": "清除 override",
+      "current-hook": "Hook 报告版本 {{version}} — 状态 {{state}}",
+      "encounter-start": "开始",
+      "encounter-tick": "心跳 (Tick)",
+      "encounter-end": "结束 (任务完成)",
+      "encounter-reset": "重置 (进入区域)",
+      "sent-frames_one": "已向 Hook 的 broadcast channel 排队发送 {{count}} 个事件",
+      "sent-frames_other": "已向 Hook 的 broadcast channel 排队发送 {{count}} 个事件",
+      "sent-nothing": "Hook 接受了 batch 但没有 listener — 这不应该发生。"
+    }
   },
   "characters": {
     "Pl2000": "伊德 (龙形态)",
@@ -619,6 +670,7 @@
       "108": "X5 (循环)",
       "109": "X6 (循环)",
       "150": "Y (收招)",
+      "151": "Y (精准收招)",
       "200": "Y",
       "300": "空中连击 1",
       "301": "空中连击 2",
@@ -861,6 +913,7 @@
       }
     },
     "Pl1600": {
+      "0": "能力 0",
       "100": "X",
       "101": "X2",
       "102": "X3",
@@ -916,6 +969,7 @@
       }
     },
     "Pl1800": {
+      "0": "能力 0",
       "100": "X1",
       "101": "X2",
       "102": "X3",
@@ -946,6 +1000,7 @@
       }
     },
     "Pl1900": {
+      "0": "能力 0",
       "4": "神威一体",
       "10": "圣迹再临 (神威)",
       "100": "X1",
@@ -1123,6 +1178,7 @@
       }
     },
     "Pl2300": {
+      "0": "能力 0",
       "100": "X1",
       "101": "蓄力X",
       "110": "X2",
@@ -1158,6 +1214,7 @@
       }
     },
     "Pl2400": {
+      "0": "能力 0",
       "100": "X1",
       "101": "X2",
       "102": "X3",
@@ -1205,7 +1262,8 @@
     "Pl0700Ghost": {
       "200": "召唤宠物",
       "1100": "蓝灵束缚",
-      "1400": "幽影幻步"
+      "1400": "幽影幻步",
+      "9995": "能力 9995"
     },
     "Pl2500": {
       "100": "X1",
@@ -1330,6 +1388,8 @@
       "315": "空中连击 收招 (逆位)",
       "400": "上挑攻击 (正位)",
       "401": "上挑攻击 (逆位)",
+      "410": "下落攻击 (正位)",
+      "411": "下落攻击 (逆位)",
       "900": "X1 (逆位)",
       "901": "X2 (逆位)",
       "902": "X3 (逆位)",
@@ -1400,9 +1460,10 @@
     },
     "default": {
       "700": "格挡 (?)",
-      "800": "高阶召唤",
+      "800": "奥义连锁",
       "5000": "标准弹 (以太炮)",
       "5010": "蓄能弹 (以太炮)",
+      "80000": "召唤攻击/高阶召唤",
       "99999": "极沌空处特效",
       "100000": "Holy Ladder (极沌空处)",
       "100001": "Chain Burst (极沌空处)",
@@ -1423,6 +1484,9 @@
       "damage-over-time-poison": "持续伤害（中毒）",
       "damage-over-time-burn": "持续伤害（灼热）",
       "damage-over-time-darkburn": "持续伤害（灾祸）"
+    },
+    "summon-classes": {
+      "34894579": "银史莱姆/金史莱姆"
     }
   },
   "enemies": {
