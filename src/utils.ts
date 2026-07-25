@@ -135,6 +135,12 @@ export const formatSummonBonusValue = (bonusId: number, bonusLevel: number): str
   return value === null ? null : `+${value.amount}${value.kind === "percent" ? "%" : ""}`;
 };
 
+/** A bonus magnitude in the game's own notation: "+1800", "+20%", "(Lvl. 3)". */
+export const formatBonusAmount = (value: BonusAmount): string =>
+  value.kind === "level"
+    ? `(Lvl. ${value.amount})`
+    : `+${Number(value.amount.toFixed(2))}${value.kind === "percent" ? "%" : ""}`;
+
 /** One contribution to a combined bonus line: an overmastery roll or a summon's equip bonus. */
 export type BonusSource = {
   kind: "overmastery" | "summon";
@@ -170,6 +176,197 @@ export const OVERMASTERY_EFFECT_IDS = [
   0x2989cae9, // Chain Burst Damage Up
   0x43d71e8f, // Healing Cap Up
 ];
+
+/**
+ * The effect kind of a predicted overmastery — limit_bonus_param's
+ * `DisplayNumberMultiplier` column, which despite the name is a format id:
+ * 0 = ATK, 1 = HP, 2 = Critical Hit Rate, 3 = Stun Power. 100+ are the
+ * damage-type specials (Skill/SBA/Chain Burst DMG Up, the cap ups, Healing
+ * Cap Up), all percentages.
+ */
+const OVERMASTERY_KIND_ATTACK = 0;
+const OVERMASTERY_KIND_HEALTH = 1;
+const OVERMASTERY_KIND_STUN_POWER = 3;
+
+/**
+ * Stun Power Up is the one effect the game stores at a tenth of the number it
+ * displays: the kind-3 ladder is [0.1, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.6, 2]
+ * and its Lv7 row (raw 1.0) reads "Stun Power Up +10" in game. It is a flat
+ * amount, not a percentage. summon_base_param carries the same x10 for the
+ * same effect in its `ValueDisplayMultiplier` column, which
+ * gen-summon-bonus-values.py already bakes into summon-bonus-values.json — so
+ * scaling here is what puts overmastery and summon Stun Power Up on one scale
+ * before a Builds-tab line sums them.
+ */
+const STUN_POWER_DISPLAY_MULTIPLIER = 10;
+
+/** Every Stun Power Up id — the 19 magnitude tiers of that one effect. */
+const STUN_POWER_OVERMASTERY_IDS = new Set([
+  0x2676f9d2, 0x2c1c933d, 0x3356dd03, 0x36f068fd, 0x3dae6494, 0x455d6a1c, 0x59fbb7d8, 0x6837e60c, 0x6cb38ef3,
+  0x7b05e679, 0x7b498c32, 0x9bf7878a, 0xa3545ca1, 0xa85495ba, 0xa901e065, 0xc11fdfbd, 0xd5169339, 0xd63dd12b,
+  0xf5c314a0,
+]);
+
+/**
+ * Overmastery ids whose value is a flat stat amount — every Attack Power Up,
+ * Health Up and Stun Power Up tier. All other ids display as percentages.
+ */
+const OVERMASTERY_FLAT_VALUE_IDS = new Set([
+  0x032a5217,
+  0x0781c7a2,
+  0x0b134a7f,
+  0x0cf5d0f3,
+  0x0db88f30,
+  0x0f25b474,
+  0x0febc993,
+  0x11023c6f,
+  0x124db819,
+  0x1268b903,
+  0x13c9452a,
+  0x155c25c3,
+  0x1cc2f730,
+  0x1e2b3db5,
+  0x24499a25,
+  0x254a08d4,
+  0x2d6c03eb,
+  0x2ea457f3,
+  0x303becc0,
+  0x3526fecb,
+  0x38f656e7,
+  0x394083bd,
+  0x3ac53494,
+  0x3ca4c8d5,
+  0x3d6600d9,
+  0x403be586,
+  0x409df671,
+  0x427b5e26,
+  0x437c055d,
+  0x44f04a7a,
+  0x49089d4f,
+  0x4ab91ea7,
+  0x4c0cbd32,
+  0x4ce64874,
+  0x4e2513df,
+  0x52a207b5,
+  0x5382923d,
+  0x53d358e0,
+  0x5767dd9f,
+  0x57bbc478,
+  0x59dce1e8,
+  0x5a51f0cb,
+  0x5a57dc07,
+  0x60835d4f,
+  0x60926b53,
+  0x61d4efa0,
+  0x6564c02b,
+  0x66092bc7,
+  0x67bde89b,
+  0x6e4f2f5e,
+  0x6fb47781,
+  0x7125942e,
+  0x7cbbb4e0,
+  0x7ccf98c5,
+  0x7e870ebe,
+  0x807e9e58,
+  0x829b8b5c,
+  0x834892b4,
+  0x85f0f318,
+  0x871d12cc,
+  0x874353d7,
+  0x8af65803,
+  0x8e66b68c,
+  0x8fe7fb0a,
+  0x911d4f18,
+  0x91265f66,
+  0x93572974,
+  0x937efb96,
+  0x95567556,
+  0x9a0988df,
+  0x9a29aa64,
+  0x9b6f164c,
+  0x9bfd4548,
+  0x9c6375cf,
+  0xa1dc63b3,
+  0xa257dac1,
+  0xa2bcf523,
+  0xa3460028,
+  0xa85b4af5,
+  0xaac23948,
+  0xab56bde3,
+  0xaccbece1,
+  0xaf0d8b97,
+  0xb83aa115,
+  0xbbe7992a,
+  0xbd488071,
+  0xbe8c17d4,
+  0xbf44c20b,
+  0xc1360291,
+  0xc265b03b,
+  0xc2d708c1,
+  0xc4925bd7,
+  0xc52d2245,
+  0xc5d68c62,
+  0xc6bdc7a6,
+  0xcb43ff8e,
+  0xcb63be55,
+  0xcb6bb434,
+  0xccef4492,
+  0xcd5d6315,
+  0xcf24e1a2,
+  0xcf6b267a,
+  0xd4b918ea,
+  0xd51958d1,
+  0xda546dfe,
+  0xdcbd8423,
+  0xddc29837,
+  0xde6a367a,
+  0xdf2cab83,
+  0xdf2eef09,
+  0xdfb00115,
+  0xe056ba80,
+  0xe7710898,
+  0xea5eaafc,
+  0xea99fa76,
+  0xee6100ca,
+  0xeefb4ade,
+  0xf004e9f2,
+  0xf203bb15,
+  0xf2111b99,
+  0xf5514f81,
+  0xf80e3310,
+  0xfa230938,
+  0xfa9bcf64,
+  0xfb276afd,
+  0xfe71865d,
+  ...STUN_POWER_OVERMASTERY_IDS,
+]);
+
+/** Raw stored value -> the magnitude the game shows for a Stun Power Up. */
+const stunPowerAmount = (value: number): BonusAmount => ({
+  kind: "flat",
+  amount: Math.round(value * STUN_POWER_DISPLAY_MULTIPLIER * 100) / 100,
+});
+
+/**
+ * Display magnitude of a predicted overmastery, from its effect kind — what
+ * the Overmastery Predictor shows against a rolled effect.
+ */
+export const overmasteryAmountFromKind = (kind: number, value: number): BonusAmount =>
+  kind === OVERMASTERY_KIND_STUN_POWER
+    ? stunPowerAmount(value)
+    : {
+        kind: kind === OVERMASTERY_KIND_ATTACK || kind === OVERMASTERY_KIND_HEALTH ? "flat" : "percent",
+        amount: value,
+      };
+
+/**
+ * Display magnitude of an overmastery read off a player's record, from its id
+ * — the Builds tab's path, where the kind isn't carried alongside the value.
+ */
+export const overmasteryAmountFromId = (id: number, value: number): BonusAmount =>
+  STUN_POWER_OVERMASTERY_IDS.has(id)
+    ? stunPowerAmount(value)
+    : { kind: OVERMASTERY_FLAT_VALUE_IDS.has(id) ? "flat" : "percent", amount: value };
 
 /**
  * Expands combined bonuses to the full canonical effect list: every name in
@@ -468,27 +665,18 @@ export const damageOverTimeKeys = (
  * can never name the row — the summon's body class is the only discriminator. */
 export const SUMMON_ATTACK_ACTION_ID = 80000;
 
-/** Lookup chain for a summon hit: the body class first, then the generic label.
- *
- * The class arrives as an unresolved `{ Unknown: hash }` character type, since
- * `So####` bodies are not player characters. Named per class in
- * `skills.summon-classes` (in ui.json, which is hand-maintained — the other lang
- * files are regenerated from game data and would lose these).
+/** The label for a summon hit whose body class nothing names.
  *
  * Only summons with their OWN body class can be named. Most share one of two
- * generic bodies and collapse into a single row, which is why the generic label
- * has to stay: naming that row after any one summon would be wrong. */
-export const summonSkillKeys = (childCharacterType: CharacterType): string[] => {
-  const generic = [`skills.default.${SUMMON_ATTACK_ACTION_ID}`, "skills.default.unknown-skill"];
-  if (typeof childCharacterType !== "object" || !Object.hasOwn(childCharacterType, "Unknown")) {
-    return generic;
-  }
-  const hash = childCharacterType.Unknown.toString(16).padStart(8, "0");
-  return [`skills.summon-classes.${hash}`, ...generic];
-};
+ * generic bodies and collapse into a single row, which is why this has to stay:
+ * naming that row after any one summon would be wrong. */
+const SUMMON_FALLBACK_KEYS = [`skills.default.${SUMMON_ATTACK_ACTION_ID}`, "skills.default.unknown-skill"];
 
 /** The body-class hash of a summon hit, or null when the source is a real
- * character rather than an unresolved `So####` body. */
+ * character rather than an unresolved `So####` body.
+ *
+ * The class arrives as an unresolved `{ Unknown: hash }` character type, since
+ * `So####` bodies are not player characters. */
 const summonBodyHash = (childCharacterType: CharacterType): string | null => {
   if (typeof childCharacterType !== "object" || !Object.hasOwn(childCharacterType, "Unknown")) return null;
   return childCharacterType.Unknown.toString(16).padStart(8, "0");
@@ -542,17 +730,10 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
 
       if (skillID === SUMMON_ATTACK_ACTION_ID) {
         const bodyHash = summonBodyHash(skill.childCharacterType);
-
-        // A hand-authored ui.json label wins. `t()` returns the key itself for a
-        // missing key, so ask i18next directly rather than compare strings.
-        if (bodyHash !== null && i18next.exists(`skills.summon-classes.${bodyHash}`)) {
-          return t(`skills.summon-classes.${bodyHash}`);
-        }
-
         const mapped = bodyHash === null ? null : summonDisplayName(bodyHash);
         if (mapped !== null) return mapped;
 
-        return t(summonSkillKeys(skill.childCharacterType), { id: skillID });
+        return t(SUMMON_FALLBACK_KEYS, { id: skillID });
       }
 
       return t(

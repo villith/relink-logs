@@ -3,9 +3,11 @@ import { gameXxhash32 } from "../scripts/gbfr-hash.mjs";
 import skillNameSources from "../src-tauri/assets/skill-name-sources.json";
 import enAbilities from "../src-tauri/lang/en/abilities.json";
 import enEnemies from "../src-tauri/lang/en/enemies.json";
+import enOvermasteries from "../src-tauri/lang/en/overmasteries.json";
 import enBranches from "../src-tauri/lang/en/skillboard-branches.json";
 import enSummons from "../src-tauri/lang/en/summons.json";
 import enUi from "../src-tauri/lang/en/ui.json";
+import { stripTierSuffix } from "./skillNameSources";
 import { EnemyState, EquippedSummon, PlayerState, Sigil, SkillState, WeaponInfo, WeaponState } from "./types";
 import {
   EMPTY_ID,
@@ -23,17 +25,19 @@ import {
   deriveNavState,
   deriveTranscendence,
   fillBonusGroups,
+  formatBonusAmount,
   formatSummonBonusValue,
   getBossHpTarget,
   groupBonuses,
   humanizeNumbers,
   mergeTargetBreakdowns,
+  overmasteryAmountFromId,
+  overmasteryAmountFromKind,
   skillboardActivationCost,
   skillboardLayoutFor,
   skillboardNodeKey,
   skillboardNodeMeta,
   summonBonusValue,
-  summonSkillKeys,
   toHash,
   toHashString,
   traitMaxLevel,
@@ -563,6 +567,73 @@ describe("utils", () => {
     });
   });
 
+  describe("overmastery display amounts", () => {
+    // limit_bonus_param stores Stun Power Up at a tenth of the number the game
+    // shows: the kind-3 ladder is [0.1, 0.1, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.6, 2]
+    // and Lv7 (raw 1.0) reads "Stun Power Up +10" in game.
+    it("scales Stun Power Up by 10 and shows it flat, not as a percent", () => {
+      expect(overmasteryAmountFromKind(3, 1)).toEqual({ kind: "flat", amount: 10 });
+      expect(overmasteryAmountFromKind(3, 2)).toEqual({ kind: "flat", amount: 20 });
+      // 0x2676f9d2 / 0x6cb38ef3 are Stun Power Up ids on the record path.
+      expect(overmasteryAmountFromId(0x2676f9d2, 1)).toEqual({ kind: "flat", amount: 10 });
+      expect(overmasteryAmountFromId(0x6cb38ef3, 0.4)).toEqual({ kind: "flat", amount: 4 });
+    });
+
+    it("agrees with the summon table, which pre-multiplies the same effect", () => {
+      // Both sides of a combined Builds line must share a scale before they sum.
+      expect(summonBonusValue(0xf7b0316f, 0)).toEqual({ kind: "flat", amount: 2 });
+      expect(overmasteryAmountFromKind(3, 0.2)).toEqual({ kind: "flat", amount: 2 });
+    });
+
+    it("keeps ATK / HP flat and every other effect a percent, unscaled", () => {
+      expect(overmasteryAmountFromKind(0, 1000)).toEqual({ kind: "flat", amount: 1000 });
+      expect(overmasteryAmountFromKind(1, 2000)).toEqual({ kind: "flat", amount: 2000 });
+      expect(overmasteryAmountFromKind(2, 20)).toEqual({ kind: "percent", amount: 20 });
+      // 100+ are the damage-type specials (Skill DMG Up, cap ups, Healing Cap Up).
+      expect(overmasteryAmountFromKind(104, 16)).toEqual({ kind: "percent", amount: 16 });
+    });
+
+    it("classifies recorded overmasteries by id", () => {
+      expect(overmasteryAmountFromId(0xc4925bd7, 1000)).toEqual({ kind: "flat", amount: 1000 }); // Attack Power Up
+      expect(overmasteryAmountFromId(0x52a207b5, 2000)).toEqual({ kind: "flat", amount: 2000 }); // Health Up
+      expect(overmasteryAmountFromId(0x45c65767, 20)).toEqual({ kind: "percent", amount: 20 }); // Crit Hit Rate Up
+      expect(overmasteryAmountFromId(0x9c555433, 16)).toEqual({ kind: "percent", amount: 16 }); // Skill DMG Cap Up
+    });
+
+    it("covers every Stun Power Up id the lang table knows", () => {
+      const stunIds = Object.entries(enOvermasteries)
+        .filter(([, entry]) => entry.text === "Stun Power Up")
+        .map(([id]) => parseInt(id, 16));
+
+      expect(stunIds).toHaveLength(19);
+      for (const id of stunIds) {
+        expect(overmasteryAmountFromId(id, 1)).toEqual({ kind: "flat", amount: 10 });
+      }
+    });
+
+    it("treats every Attack Power Up / Health Up id as flat", () => {
+      const flatIds = Object.entries(enOvermasteries)
+        .filter(([, entry]) => entry.text === "Attack Power Up" || entry.text === "Health Up")
+        .map(([id]) => parseInt(id, 16));
+
+      for (const id of flatIds) {
+        expect(overmasteryAmountFromId(id, 500)).toEqual({ kind: "flat", amount: 500 });
+      }
+    });
+  });
+
+  describe("formatBonusAmount", () => {
+    it("suffixes percents, leaves flat amounts bare, and parenthesises levels", () => {
+      expect(formatBonusAmount({ kind: "flat", amount: 1800 })).toBe("+1800");
+      expect(formatBonusAmount({ kind: "percent", amount: 20 })).toBe("+20%");
+      expect(formatBonusAmount({ kind: "level", amount: 3 })).toBe("(Lvl. 3)");
+    });
+
+    it("formats a Lv7 Stun Power Up as the game's +10", () => {
+      expect(formatBonusAmount(overmasteryAmountFromKind(3, 1))).toBe("+10");
+    });
+  });
+
   describe("computeOvercapPercentage", () => {
     it("is the game's (ΣbaseSum / ΣcapSum) * 100", () => {
       // base 1500 vs cap 1000 -> 150%
@@ -806,28 +877,6 @@ describe("damageOverTimeKeys", () => {
   });
 });
 
-describe("summonSkillKeys", () => {
-  it("prefers the summon class name, then the generic summon label", () => {
-    // Every summon hit arrives as action id 80000 with the summon's body class as
-    // the child type, so the class hash is the only thing that can name the row.
-    expect(summonSkillKeys({ Unknown: 0xd2e5407a })).toEqual([
-      "skills.summon-classes.d2e5407a",
-      "skills.default.80000",
-      "skills.default.unknown-skill",
-    ]);
-  });
-
-  it("zero-pads the class hash to eight digits", () => {
-    // A hash with a leading zero (So5f01 = 0x0f617ff0) must not lose it, or the
-    // lookup silently misses and the row falls back to the generic label.
-    expect(summonSkillKeys({ Unknown: 0x0f617ff0 })[0]).toBe("skills.summon-classes.0f617ff0");
-  });
-
-  it("skips the class lookup for a named character type", () => {
-    expect(summonSkillKeys("Pl1800")).toEqual(["skills.default.80000", "skills.default.unknown-skill"]);
-  });
-});
-
 describe("summon class sources in skill-name-sources.json", () => {
   const classes = skillNameSources["summon-classes"] as Record<
     string,
@@ -889,10 +938,18 @@ describe("summon class sources in skill-name-sources.json", () => {
     expect(broken).toEqual([]);
   });
 
-  it("keeps the hand-coined class that no lang file names", () => {
-    // Silverslime/Goldslime is ours, so it stays in ui.json and never maps.
+  it("names the slimes by identity, so no hand-coined class is left in ui.json", () => {
+    // 0x34894579 is the shared Silverslime/Goldslime body class, once labelled
+    // "Silverslime/Goldslime" by hand because it names neither summon. The hook
+    // now clears the body id's unit byte and publishes So2000 / So2100 instead,
+    // which map here — the hand label, and the whole ui.json block, are gone.
     expect(classes["34894579"]).toBeUndefined();
-    expect((enUi.skills["summon-classes"] as Record<string, string>)["34894579"]).toBeTruthy();
+    expect((enUi.skills as Record<string, unknown>)["summon-classes"]).toBeUndefined();
+
+    expect(classes["2d179019"]?.key).toBe("TXT_SMN_So2000_2");
+    expect(classes["6bca42ab"]?.key).toBe("TXT_SMN_So2100_2");
+    expect(stripTierSuffix(enSummons[classes["2d179019"].hash as keyof typeof enSummons].text)).toBe("Silverslime");
+    expect(stripTierSuffix(enSummons[classes["6bca42ab"].hash as keyof typeof enSummons].text)).toBe("Goldslime");
   });
 
   it("provides the generic label every unnamed body class falls back to", () => {
