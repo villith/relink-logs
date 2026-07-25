@@ -1484,9 +1484,6 @@
       "damage-over-time-poison": "持续伤害（中毒）",
       "damage-over-time-burn": "持续伤害（灼热）",
       "damage-over-time-darkburn": "持续伤害（灾祸）"
-    },
-    "summon-classes": {
-      "34894579": "银史莱姆/金史莱姆"
     }
   },
   "enemies": {
