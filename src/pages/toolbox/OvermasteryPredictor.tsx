@@ -1,4 +1,4 @@
-﻿import { humanizeNumbers, translateOvermasteryId } from "@/utils";
+﻿import { formatBonusAmount, humanizeNumbers, overmasteryAmountFromKind, translateOvermasteryId } from "@/utils";
 import { Alert, Button, Group, ScrollArea, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,8 +15,8 @@ import useOvermasteryPredictor, {
   wantedKindSet,
 } from "./useOvermasteryPredictor";
 
-/** Flat effects (ATK / HP) show bare values; everything else is a percent. */
-const formatValue = (m: OvermasteryMastery): string => `+${Math.round(m.value * 10) / 10}${m.kind >= 2 ? "%" : ""}`;
+/** The magnitude the game shows for a rolled effect: "+1000", "+20%", "+10". */
+const formatValue = (m: OvermasteryMastery): string => formatBonusAmount(overmasteryAmountFromKind(m.kind, m.value));
 
 type IndexedRoll = { roll: OvermasteryMastery[]; index: number };
 

@@ -13,9 +13,12 @@ beforeAll(async () => {
     // 1700 has no ui.json label — only the map can name it.
     Pl1800: { "1700": { ns: "abilities", hash: "ed1219cc", key: "AB_PL1800_07" } },
     "summon-classes": {
-      // d2e5407a is ALSO in ui.json below, to prove the hand label wins.
+      // d2e5407a is ALSO named in ui.json below, a leftover the map now overrules.
       d2e5407a: { ns: "summons", hash: "cccc3333", key: "TXT_SMN_So9800" },
       "5395ce93": { ns: "summons", hash: "aaaa1111", key: "TXT_SMN_So9900" },
+      // A class hash with a leading zero (So5f01), which only resolves if the
+      // lookup zero-pads to eight digits.
+      "0f617ff0": { ns: "summons", hash: "bbbb2222", key: "TXT_SMN_So5f00" },
     },
   });
 
@@ -25,7 +28,7 @@ beforeAll(async () => {
       en: {
         translation: {
           skills: {
-            "summon-classes": { d2e5407a: "Lucilius" },
+            "summon-classes": { d2e5407a: "Stale Hand Label" },
             default: { "80000": "Summon Attack/Primal Burst", "unknown-skill": "Skill {{id}}" },
             Pl1800: { "1234": "Pain Train" },
           },
@@ -33,7 +36,8 @@ beforeAll(async () => {
         abilities: { ed1219cc: { key: "AB_PL1800_07", text: "Alexandria" } },
         summons: {
           aaaa1111: { key: "TXT_SMN_So9900", text: "Beelzebub III" },
-          cccc3333: { key: "TXT_SMN_So9800", text: "Should Not Win II" },
+          bbbb2222: { key: "TXT_SMN_So5f00", text: "Cat" },
+          cccc3333: { key: "TXT_SMN_So9800", text: "Lucilius II" },
         },
       },
     },
@@ -94,8 +98,16 @@ describe("getSkillName for mapped summon body classes", () => {
     expect(getSkillName("Pl1800", bodyHit(0x5395ce93))).toBe("Beelzebub");
   });
 
-  it("lets a ui.json label win over the mapped summon name", () => {
-    // d2e5407a is mapped to "Should Not Win II" but named in ui.json.
+  it("ignores a leftover ui.json label for a mapped class", () => {
+    // ui.json used to hand-name summon classes and won over the map. Those names
+    // are gone from every shipped ui.json, so a stray entry is stale data, not an
+    // override: d2e5407a is labelled "Stale Hand Label" there and must not win.
     expect(getSkillName("Pl1800", bodyHit(0xd2e5407a))).toBe("Lucilius");
+  });
+
+  it("zero-pads the class hash, so a leading-zero class still resolves", () => {
+    // So5f01 = 0x0f617ff0; dropping the leading zero silently misses the map and
+    // the row falls back to the generic label.
+    expect(getSkillName("Pl1800", bodyHit(0x0f617ff0))).toBe("Cat");
   });
 });

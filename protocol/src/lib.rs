@@ -11,13 +11,37 @@ localhost TCP when the hook detects it is running under Wine/Proton (see TCP_ADD
 the parser must be compiled together to ensure that the serialization format is
 the same.
 
-The parser saves these messages in a different serialization format that provides
-forward-compatibility so that old logs can still be read by newer versions of the
-parser.
+The parser saves these messages in a different serialization format — CBOR, which
+unlike bincode keys every struct field by NAME — so that old logs can still be read
+by newer versions of the parser.
 
-Because of this, any changes to the protocol must be done carefully to ensure that
-the parser can still read old logs. This is done by adding new fields to the existing
-message types, or adding new message types that are ignored by the parser
+Because of this, any change to a message type must keep logs already on disk
+readable, and bincode will not warn you: it is positional, and the hook and parser
+ship together, so a change that round-trips fine on the wire can still make every
+stored log unloadable. Concretely:
+
+- A new `Option<T>` field is already safe: serde's missing-field path tries
+  `deserialize_option` first, so a key that is absent from an older log reads
+  back as `None` with no attribute needed.
+- A new field of any other type needs `#[serde(default)]`. Without it, every log
+  written before the field existed fails to load outright — that is what
+  `critical_rate: f32` did to 151 stored logs on 2026-07-24.
+- A new message variant costs nothing on disk (old logs never contain it), but
+  must still be APPENDED: bincode encodes the variant by index, so inserting one
+  mid-enum silently reassigns every later variant for any hook/app pair that did
+  not compile together (a stale `hook-dbg.dll` is the usual way that happens).
+- RENAMING a field is never compatible, because the old key is what is on disk,
+  and the two field kinds fail differently: a plain field errors out, while an
+  `Option` one silently reads `None` — data loss with no complaint. Give the new
+  name `#[serde(default)]`, plus `#[serde(alias = "<old key>")]` if the old value
+  is worth keeping. If the TYPE changed too, an alias alone is not enough —
+  cbor4ii dispatches on the stored value's own type and rejects a mismatch — so
+  recovery needs a hand-written `visit_seq`/`visit_map` impl serving the CBOR and
+  bincode paths differently. Usually not worth it.
+
+`src-tauri/src/parser/v1/mod.rs` owns the stored-format half of this contract; its
+`stored_log_compat` tests pin the shapes real logs were written with, and
+`cargo run -p gbfr-logs --example log_compat -- <logs.db>` sweeps a real database.
 
 The `toolbox` module carries the second channel: request/response RPC served
 by the hook (snapshots for the Toolbox tools). It shares the compiled-together
@@ -394,9 +418,13 @@ pub struct RecordStats {
     /// `record+0x5B54` — stun power (the block's only float, matching the old
     /// layout's stun_power f32).
     pub stun_power: f32,
-    /// `record+0x5B58` — critical hit rate in percent. Read as `u32` before
-    /// 2026-07-24; the retype is byte-compatible in bincode and recovers the
-    /// correct value from older logs on reparse.
+    /// `record+0x5B58` — critical hit rate in percent. Was `unk_58: u32` before
+    /// 2026-07-24, so logs older than that carry `unk_58` and no
+    /// `critical_rate` and this field has to stay optional (see the rename rule
+    /// in the crate docs). Their old value is not read back: it came from the
+    /// wire-replicated mirror block this struct stopped reading because it
+    /// holds stale town-filled values.
+    #[serde(default)]
     pub critical_rate: f32,
     /// `record+0x5B5C` — total power / power level candidate (town-filled).
     pub power: u32,
@@ -594,9 +622,12 @@ mod record_stats_tests {
     use super::RecordStats;
 
     /// The old field was `unk_58: u32`, but the game writes an f32 there and we
-    /// read it with an integer reader. Both are 4 bytes little-endian, so the
-    /// stored bytes are already a valid f32 bit pattern: retyping recovers the
-    /// correct value from logs written before this change, with no migration.
+    /// read it with an integer reader. Both are 4 bytes little-endian, so on
+    /// the positional bincode wire the retype is invisible.
+    ///
+    /// This says nothing about STORED logs: those are CBOR and key fields by
+    /// name, where the rename is breaking — see `stored_log_compat` in
+    /// `src-tauri/src/parser/v1/mod.rs`, which owns that half.
     #[test]
     fn old_unk_58_blob_decodes_as_critical_rate() {
         // A log written by the old code: crit was 21.5%, stored as the u32

@@ -262,6 +262,85 @@ describe("buildSkillNameSources", () => {
 
     expect(a).toBe(b);
   });
+
+  it("keeps entries the committed artifact already holds", () => {
+    // The names this derives from were deleted out of ui.json once mapped, so a
+    // re-derivation can only ever resolve a subset. Rebuilding must therefore add
+    // to the artifact, never replace it — otherwise one bare run wipes the map.
+    const existing = {
+      Pl0000: { 100: { ns: "abilities", hash: "deadbeef", key: "AB_PL0000_01" } },
+      Pl9999: { 5: { ns: "abilities", hash: "cafef00d", key: "AB_PL9999_01" } },
+    };
+
+    const { sources } = buildSkillNameSources({ skills: {} }, GENERATED, existing);
+
+    expect(sources).toEqual(existing);
+  });
+
+  it("adds freshly resolved leaves alongside what the artifact already holds", () => {
+    const existing = { Pl9999: { 5: { ns: "abilities", hash: "cafef00d", key: "AB_PL9999_01" } } };
+
+    const { sources } = buildSkillNameSources(UI, GENERATED, existing);
+
+    expect(sources.Pl9999).toEqual(existing.Pl9999);
+    expect(sources.Pl0000[1301]).toEqual({ ns: "abilities", hash: "967964c1", key: "AB_PL0000_05" });
+  });
+
+  it("orders a hex-keyed block the same way whatever order it arrives in", () => {
+    // Summon class ids are hex, so some parse as numbers ("69893920") and some
+    // do not ("0254b5ee"). Comparing those two ways in one pass is not a total
+    // order: re-sorting an already-sorted block permutes it, and every rebuild
+    // then churns the artifact. Ordering is decided per block, so a block that
+    // is not wholly numeric sorts lexically throughout.
+    const shuffled = {
+      "summon-classes": {
+        d2e5407a: { ns: "summons", hash: "1111aaaa", key: "TXT_SMN_So0000" },
+        "0254b5ee": { ns: "summons", hash: "3dd9ecee", key: "TXT_SMN_So2600_1" },
+        "5395ce93": { ns: "summons", hash: "2f15455c", key: "TXT_SMN_So9200" },
+      },
+    };
+
+    const sources = buildSkillNameSources({ skills: {} }, GENERATED, shuffled).sources;
+
+    expect(Object.keys(sources["summon-classes"])).toEqual(["0254b5ee", "5395ce93", "d2e5407a"]);
+  });
+
+  it("is idempotent: rebuilding its own output changes nothing", () => {
+    // Rebuilt output is fed back in as `existing` on the next run, so anything
+    // unstable here shows up as artifact churn on every rebuild forever. Note a
+    // hash like "69893920" is a valid array index, and JS puts those first in an
+    // object however they were inserted — the pass has to survive that.
+    const existing = {
+      "summon-classes": {
+        "69893920": { ns: "summons", hash: "5f3337b6", key: "TXT_SMN_So0d00_1" },
+        "0254b5ee": { ns: "summons", hash: "3dd9ecee", key: "TXT_SMN_So2600_1" },
+      },
+      Pl0000: { 1301: { ns: "abilities", hash: "967964c1", key: "AB_PL0000_05" } },
+    };
+
+    const once = buildSkillNameSources(UI, GENERATED, existing).sources;
+    const twice = buildSkillNameSources(UI, GENERATED, once).sources;
+
+    expect(JSON.stringify(twice)).toBe(JSON.stringify(once));
+  });
+
+  it("still orders an all-numeric block by value, not as text", () => {
+    const existing = { Pl0000: { 1301: { ns: "abilities" }, 100: { ns: "abilities" }, 90: { ns: "abilities" } } };
+
+    const { sources } = buildSkillNameSources({ skills: {} }, GENERATED, existing);
+
+    expect(Object.keys(sources.Pl0000)).toEqual(["90", "100", "1301"]);
+  });
+
+  it("lets a fresh derivation correct a stale entry for the same id", () => {
+    // A game patch that renames an ability is fixed by re-deriving it; the newly
+    // resolved hash has to win over the one already in the artifact.
+    const existing = { Pl0000: { 1301: { ns: "abilities", hash: "0bs0lete", key: "AB_PL0000_05" } } };
+
+    const { sources } = buildSkillNameSources(UI, GENERATED, existing);
+
+    expect(sources.Pl0000[1301]).toEqual({ ns: "abilities", hash: "967964c1", key: "AB_PL0000_05" });
+  });
 });
 
 const SOURCES = {

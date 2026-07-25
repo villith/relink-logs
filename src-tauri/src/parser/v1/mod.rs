@@ -1,4 +1,4 @@
-use std::{collections::HashMap, io::BufReader};
+use std::collections::HashMap;
 
 use anyhow::Result;
 use chrono::Utc;
@@ -246,10 +246,10 @@ impl From<protocol::EquippedSummon> for EquippedSummon {
 /// `hp`/`attack`/`stun_power`/`power` follow the pre-2.0 `PlayerStats` layout
 /// the block mirrors; `unk_50` is the one still-unconfirmed slot.
 ///
-/// `critical_rate` was stored as `unk_58: u32` before 2026-07-24. The game
-/// always wrote an f32 there, so the stored bytes are already a valid float bit
-/// pattern and the retype is byte-compatible in bincode — old logs recover the
-/// correct value on reparse, with no migration.
+/// `critical_rate` was stored as `unk_58: u32` before 2026-07-24, so logs older
+/// than that carry `unk58` and no `criticalRate` and the field has to stay
+/// optional or none of them load (see `stored_log_compat` below). Their old
+/// value is not carried over, and the builds panel hides a zero crit rate.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordStats {
@@ -258,6 +258,7 @@ pub struct RecordStats {
     pub attack: u32,
     pub unk_50: u32,
     pub stun_power: f32,
+    #[serde(default)]
     pub critical_rate: f32,
     pub power: u32,
 }
@@ -493,13 +494,18 @@ pub struct Encounter {
     pub raw_event_log: Vec<(i64, Message)>,
 }
 
+/// The stored-log encoding: CBOR, then zstd. The one place the on-disk format
+/// is defined, so a test can write a blob in an OLD struct shape and still be
+/// exercising today's real framing (see `stored_log_compat`).
+fn to_stored_blob<T: Serialize>(value: &T) -> Result<Vec<u8>> {
+    let cbor = cbor4ii::serde::to_vec(Vec::new(), value)?;
+    Ok(zstd::encode_all(cbor.as_slice(), 3)?)
+}
+
 impl Encounter {
     /// Compresses this encounter data into a binary blob.
     pub fn to_blob(&self) -> Result<Vec<u8>> {
-        let blob = cbor4ii::serde::to_vec(Vec::new(), &self)?;
-        let mut reader = BufReader::new(blob.as_slice());
-        let compressed_blob = zstd::encode_all(&mut reader, 3)?;
-        Ok(compressed_blob)
+        to_stored_blob(self)
     }
 
     /// Deserializes a binary blob into encounter instance.
@@ -4472,5 +4478,246 @@ mod tests {
         // Overcap %: Σbase = 100*1500 + 1000 = 151_000; Σcap = 101*1000.
         assert_eq!(player.overcap_base_sum, 151_000.0);
         assert_eq!(player.overcap_cap_sum, 101_000.0);
+    }
+}
+
+/// Stored logs are CBOR (see [`Encounter::to_blob`]), which keys every struct
+/// field by NAME — so renaming a field silently breaks every log already on
+/// disk unless the new name is optional. Bincode, the hook→parser wire, hides
+/// this: it is positional, and hook and parser ship together, so a rename that
+/// round-trips fine there can still be unreadable on disk. These tests pin the
+/// stored shapes real logs were written with.
+#[cfg(test)]
+mod stored_log_compat {
+    use serde::Serialize;
+
+    /// The parser's `RecordStats` as written before 2026-07-24, when
+    /// `unk_58: u32` was renamed to `critical_rate: f32`. `rename_all` matches
+    /// the real struct, so these are the keys that are actually on disk.
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct OldParserRecordStats {
+        level: u32,
+        hp: u32,
+        attack: u32,
+        unk_50: u32,
+        stun_power: f32,
+        unk_58: u32,
+        power: u32,
+    }
+
+    /// The same block as the protocol carries it inside `raw_event_log`'s
+    /// identity messages — no `rename_all` there, so its keys differ.
+    #[derive(Serialize)]
+    struct OldProtocolRecordStats {
+        level: u32,
+        hp: u32,
+        attack: u32,
+        unk_50: u32,
+        stun_power: f32,
+        unk_58: u32,
+        power: u32,
+    }
+
+    fn old_parser_stats() -> OldParserRecordStats {
+        OldParserRecordStats {
+            level: 10,
+            hp: 5000,
+            attack: 3000,
+            unk_50: 0,
+            stun_power: 12.5,
+            // The game writes an f32 here; the old reader stored its raw bits.
+            unk_58: 21.5f32.to_bits(),
+            power: 9999,
+        }
+    }
+
+    fn old_protocol_stats() -> OldProtocolRecordStats {
+        OldProtocolRecordStats {
+            level: 10,
+            hp: 5000,
+            attack: 3000,
+            unk_50: 0,
+            stun_power: 12.5,
+            unk_58: 21.5f32.to_bits(),
+            power: 9999,
+        }
+    }
+
+    #[test]
+    fn pre_rename_parser_record_stats_still_loads() {
+        let blob = cbor4ii::serde::to_vec(Vec::new(), &old_parser_stats()).expect("serialize");
+
+        let stats: super::RecordStats = cbor4ii::serde::from_slice(&blob).expect("deserialize");
+
+        assert_eq!(stats.level, 10);
+        assert_eq!(stats.stun_power, 12.5);
+        assert_eq!(stats.power, 9999);
+        // Not carried over from `unk58`, and the builds panel hides a zero.
+        assert_eq!(stats.critical_rate, 0.0);
+    }
+
+    #[test]
+    fn pre_rename_protocol_record_stats_still_loads() {
+        let blob = cbor4ii::serde::to_vec(Vec::new(), &old_protocol_stats()).expect("serialize");
+
+        let stats: protocol::RecordStats = cbor4ii::serde::from_slice(&blob).expect("deserialize");
+
+        assert_eq!(stats.level, 10);
+        assert_eq!(stats.power, 9999);
+        assert_eq!(stats.critical_rate, 0.0);
+    }
+
+    /// A whole stored encounter through the real entry point, not just the leaf
+    /// struct: zstd framing, `Encounter`'s own field names, and the block nested
+    /// behind `Option<RecordStats>`. Covers the player-data path only — the
+    /// protocol copy inside `raw_event_log` is pinned by the leaf test above.
+    #[test]
+    fn pre_rename_encounter_blob_still_loads() {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct OldPlayerData {
+            actor_index: u32,
+            display_name: String,
+            character_name: String,
+            character_type: super::CharacterType,
+            sigils: Vec<()>,
+            stats: OldParserRecordStats,
+            is_online: bool,
+            weapon_info: Option<()>,
+            overmastery_info: Option<()>,
+            player_stats: Option<()>,
+        }
+
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct OldEncounter {
+            player_data: [Option<OldPlayerData>; 4],
+            quest_id: Option<u32>,
+            quest_timer: Option<u32>,
+            event_log: Vec<()>,
+        }
+
+        let old = OldEncounter {
+            player_data: [
+                Some(OldPlayerData {
+                    actor_index: 0,
+                    display_name: "Scott".to_string(),
+                    character_name: "Scott".to_string(),
+                    character_type: super::CharacterType::Unknown(0),
+                    sigils: Vec::new(),
+                    stats: old_parser_stats(),
+                    is_online: false,
+                    weapon_info: None,
+                    overmastery_info: None,
+                    player_stats: None,
+                }),
+                None,
+                None,
+                None,
+            ],
+            quest_id: None,
+            quest_timer: None,
+            event_log: Vec::new(),
+        };
+
+        let blob = super::to_stored_blob(&old).expect("encode stored blob");
+
+        let parser = super::Parser::from_encounter_blob(&blob).expect("load stored encounter");
+
+        let player = parser.encounter.player_data[0]
+            .as_ref()
+            .expect("player present");
+        assert_eq!(player.display_name, "Scott");
+        assert_eq!(player.stats.as_ref().expect("stats present").level, 10);
+    }
+
+    /// `DamageEvent` as written before `base_damage` (2026-07-17) and the two
+    /// target-HP fields (2026-07-20) were added.
+    ///
+    /// These three carry no `#[serde(default)]`, and they do not need one: they
+    /// are `Option`, and serde's missing-field path tries `deserialize_option`
+    /// first, so an absent key reads back as `None`. That is the whole reason
+    /// `critical_rate` broke and these did not — it is a plain `f32`. The tests
+    /// below pin that distinction, because it is the thing that decides whether
+    /// a new field needs an attribute.
+    #[derive(Serialize)]
+    struct OldDamageEvent {
+        source: protocol::Actor,
+        target: protocol::Actor,
+        damage: i32,
+        flags: u64,
+        action_id: protocol::ActionType,
+        attack_rate: Option<f32>,
+        stun_value: Option<f32>,
+        damage_cap: Option<i32>,
+    }
+
+    /// Externally-tagged like `protocol::Message`, so this writes the same
+    /// `{"DamageEvent": {...}}` shape the real enum does.
+    #[derive(Serialize)]
+    enum OldMessage {
+        DamageEvent(OldDamageEvent),
+    }
+
+    fn old_damage_event() -> OldDamageEvent {
+        let actor = protocol::Actor {
+            index: 0,
+            actor_type: 0x2AF6_78E8,
+            parent_actor_type: 0x2AF6_78E8,
+            parent_index: 0,
+        };
+        OldDamageEvent {
+            source: actor.clone(),
+            target: actor,
+            damage: 500,
+            flags: 0,
+            action_id: protocol::ActionType::Normal(1),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+        }
+    }
+
+    #[test]
+    fn absent_option_fields_read_back_as_none() {
+        let blob = cbor4ii::serde::to_vec(Vec::new(), &old_damage_event()).expect("serialize");
+
+        let event: protocol::DamageEvent = cbor4ii::serde::from_slice(&blob).expect("deserialize");
+
+        assert_eq!(event.damage, 500);
+        assert_eq!(event.base_damage, None);
+        assert_eq!(event.target_current_hp, None);
+        assert_eq!(event.target_max_hp, None);
+    }
+
+    /// The same, through the real entry point and via BOTH routes a stored
+    /// damage event can arrive by: the deprecated `event_log` and today's
+    /// `raw_event_log`.
+    #[test]
+    fn pre_hp_fields_encounter_blob_still_loads() {
+        #[derive(Serialize)]
+        #[serde(rename_all = "camelCase")]
+        struct OldEventEncounter {
+            player_data: [Option<()>; 4],
+            quest_id: Option<u32>,
+            quest_timer: Option<u32>,
+            event_log: Vec<(i64, OldDamageEvent)>,
+            raw_event_log: Vec<(i64, OldMessage)>,
+        }
+
+        let blob = super::to_stored_blob(&OldEventEncounter {
+            player_data: [None, None, None, None],
+            quest_id: None,
+            quest_timer: None,
+            event_log: vec![(1, old_damage_event())],
+            raw_event_log: vec![(2, OldMessage::DamageEvent(old_damage_event()))],
+        })
+        .expect("encode stored blob");
+
+        let parser = super::Parser::from_encounter_blob(&blob).expect("load stored encounter");
+
+        assert_eq!(parser.encounter.event_log.len(), 1);
+        assert_eq!(parser.encounter.raw_event_log.len(), 1);
     }
 }

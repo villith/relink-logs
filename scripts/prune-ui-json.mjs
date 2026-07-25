@@ -12,8 +12,11 @@
  *   - `skills` leaves the bridge map now resolves.
  *
  * Kept in `characters`: Pl2000, Unknown, ai — no generated equivalent.
- * Kept in `skills.summon-classes`: Silverslime/Goldslime — hand-coined, in no
- * game lang file.
+ *
+ * `skills.summon-classes` is gone entirely. Its last leaf was the hand-coined
+ * "Silverslime/Goldslime", for the body class both share; the hook now clears
+ * the body id's unit byte and publishes So2000 / So2100, which the bridge map
+ * names separately.
  *
  * Run once: node scripts/prune-ui-json.mjs
  */
