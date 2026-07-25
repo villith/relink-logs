@@ -154,6 +154,14 @@ pub(crate) fn parent_specified_instance_at(
 const SUMMON_BODY_HASHES: &[u32] = &[
     0xD2E5407A, // So0000  Lucilius
     0x6D068BDE, // So0200  Rolan
+    // The three Primal Burst beasts. Alone among the game's 77 summon classes
+    // they carry a `TXT_SMN_So####_ASCE` burst-attack name and have no
+    // `summon.tbl` row — they cannot be equipped and called, so their damage is
+    // a Primal Burst (four back-to-back SBAs with the gauge available). Without
+    // an arm here their hits resolve to no summoner and the parser drops them.
+    0x5418B8F8, // So0300  Proto Bahamut (burst: Catastrophe)
+    0x32776C5B, // So0400  Proto Bahamut, Transcendent Blue (burst: Azure Ruin)
+    0x870A9DFE, // So0500  Excavallion (burst: Desert Flare)
     0x69893920, // So0d00  Goblin Soldier
     0x1D3EDC63, // So1100  Goblin Warrior
     0xAE913DE3, // So1100Base (generic summon body)
@@ -455,7 +463,33 @@ mod tests {
         hashes.sort_unstable();
         hashes.dedup();
         assert_eq!(before, hashes.len(), "duplicate hash in SUMMON_BODY_HASHES");
-        assert_eq!(before, 18, "expected 18 summon body classes");
+        assert_eq!(before, 21, "expected 21 summon body classes");
+    }
+
+    #[test]
+    fn primal_burst_classes_are_summon_bodies() {
+        // A Primal Burst is dealt by its own So class, not by the summon body an
+        // ordinary summon call uses. Without an arm here the hit resolves to no
+        // owner and the parser drops it, so Primal Burst damage never reaches a
+        // meter row at all. The expected hashes are the game's own — they key
+        // the `TXT_SMN_So####_ASCE` rows of its summon text table.
+        for (id, hash) in [
+            (&b"So0300"[..], 0x5418_B8F8u32), // Catastrophe
+            (&b"So0400"[..], 0x3277_6C5B),    // Azure Ruin
+            (&b"So0500"[..], 0x870A_9DFE),    // Desert Flare
+        ] {
+            assert_eq!(
+                crate::hooks::gamehash::game_xxhash32(id),
+                hash,
+                "{} hashed wrong",
+                String::from_utf8_lossy(id)
+            );
+            assert!(
+                super::is_summon_body(hash),
+                "{} missing from SUMMON_BODY_HASHES",
+                String::from_utf8_lossy(id)
+            );
+        }
     }
 
     #[test]

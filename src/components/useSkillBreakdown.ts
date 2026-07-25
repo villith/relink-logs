@@ -3,7 +3,60 @@ import { useShallow } from "zustand/react/shallow";
 import SkillGroupMapping from "@/assets/skill-groups";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, ComputedSkillGroup, ComputedSkillState } from "@/types";
-import { getSkillName } from "@/utils";
+import { PRIMAL_BURST_GROUP, getSkillName, isPrimalBurstHit } from "@/utils";
+
+/** Folds one more skill into an existing group row. */
+const mergedGroup = (group: ComputedSkillGroup, skill: ComputedSkillState): ComputedSkillGroup => ({
+  ...group,
+  hits: group.hits + skill.hits,
+  cappedHits: group.cappedHits + skill.cappedHits,
+  cappableHits: group.cappableHits + skill.cappableHits,
+  overcapBaseSum: group.overcapBaseSum + skill.overcapBaseSum,
+  overcapCapSum: group.overcapCapSum + skill.overcapCapSum,
+  percentage: group.percentage + skill.percentage,
+  totalStunValue: group.totalStunValue + skill.totalStunValue,
+  stunEligibleHits: (group.stunEligibleHits ?? 0) + (skill.stunEligibleHits ?? 0),
+  maxStunValue: Math.max(group.maxStunValue, skill.maxStunValue),
+  totalDamage: group.totalDamage + skill.totalDamage,
+  minDamage: Math.min(group?.minDamage || 0, skill.minDamage || 0),
+  maxDamage: Math.max(group?.maxDamage ?? Number.MIN_VALUE, skill.maxDamage || 0),
+  skills: [...(group.skills || []), skill],
+});
+
+/** Opens a group row around its first skill. */
+const newGroup = (group: string, skill: ComputedSkillState): ComputedSkillGroup => ({
+  actionType: { Group: group },
+  childCharacterType: skill.childCharacterType,
+  hits: skill.hits,
+  cappedHits: skill.cappedHits,
+  cappableHits: skill.cappableHits,
+  overcapBaseSum: skill.overcapBaseSum,
+  overcapCapSum: skill.overcapCapSum,
+  totalDamage: skill.totalDamage,
+  minDamage: skill.minDamage,
+  maxDamage: skill.maxDamage,
+  percentage: skill.percentage,
+  skills: [skill],
+  maxStunValue: skill.maxStunValue,
+  totalStunValue: skill.totalStunValue,
+  stunEligibleHits: skill.stunEligibleHits ?? 0,
+});
+
+/** The index of an open group row, or -1. `childCharacterType` scopes a
+ * character's own groups (a pet's skills group separately from its owner's);
+ * the Primal Burst group spans three body classes, so it matches on the group
+ * name alone. */
+const findGroupRow = (
+  rows: Array<ComputedSkillGroup | ComputedSkillState>,
+  group: string,
+  childCharacterType: ComputedSkillState["childCharacterType"] | null
+) =>
+  rows.findIndex((row) => {
+    if (typeof row.actionType !== "object" || !Object.hasOwn(row.actionType, "Group")) return false;
+    if ((row.actionType as { Group: string }).Group !== group) return false;
+
+    return childCharacterType === null || row.childCharacterType === childCharacterType;
+  });
 
 export const useSkillBreakdown = (player: ComputedPlayerState) => {
   const { useCondensedSkills } = useMeterSettingsStore(
@@ -29,6 +82,21 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
     const skills: Array<ComputedSkillGroup | ComputedSkillGroup> = [];
 
     for (const skill of computedSkills) {
+      // The three Primal Burst bodies are distinct classes sharing one action
+      // id, so the per-character map (action ids under a character) can never
+      // join them — they group on the body class instead.
+      if (isPrimalBurstHit(skill)) {
+        const index = findGroupRow(skills, PRIMAL_BURST_GROUP, null);
+
+        if (index >= 0) {
+          skills[index] = mergedGroup(skills[index] as ComputedSkillGroup, skill);
+        } else {
+          skills.push(newGroup(PRIMAL_BURST_GROUP, skill));
+        }
+
+        continue;
+      }
+
       const skillGroupIndex = typeof skill.childCharacterType !== "string" ? -1 : skill.childCharacterType;
       const skillGroupMapping = SkillGroupMapping[skillGroupIndex] || {};
 
@@ -37,57 +105,15 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
         let wasGroupedSkill = false;
 
         for (const group in skillGroupMapping) {
-          const groupActionType = { Group: group };
           const skillBelongsToGroup = skillGroupMapping[group].skills.includes(actionType.Normal);
 
           if (skillBelongsToGroup) {
-            const skillGroupIndex = skills.findIndex((skillGroup) => {
-              if (typeof skillGroup.actionType === "object" && Object.hasOwn(skillGroup.actionType, "Group")) {
-                const actionType = skillGroup.actionType as { Group: string };
-
-                return actionType.Group == group && skillGroup.childCharacterType == skill.childCharacterType;
-              } else {
-                return false;
-              }
-            });
+            const skillGroupIndex = findGroupRow(skills, group, skill.childCharacterType);
 
             if (skillGroupIndex >= 0) {
-              const skillGroup = skills[skillGroupIndex] as ComputedSkillGroup;
-
-              skills[skillGroupIndex] = {
-                ...skillGroup,
-                hits: skillGroup.hits + skill.hits,
-                cappedHits: skillGroup.cappedHits + skill.cappedHits,
-                cappableHits: skillGroup.cappableHits + skill.cappableHits,
-                overcapBaseSum: skillGroup.overcapBaseSum + skill.overcapBaseSum,
-                overcapCapSum: skillGroup.overcapCapSum + skill.overcapCapSum,
-                percentage: skillGroup.percentage + skill.percentage,
-                totalStunValue: skillGroup.totalStunValue + skill.totalStunValue,
-                stunEligibleHits: (skillGroup.stunEligibleHits ?? 0) + (skill.stunEligibleHits ?? 0),
-                maxStunValue: Math.max(skillGroup.maxStunValue, skill.maxStunValue),
-                totalDamage: skillGroup.totalDamage + skill.totalDamage,
-                minDamage: Math.min(skillGroup?.minDamage || 0, skill.minDamage || 0),
-                maxDamage: Math.max(skillGroup?.maxDamage ?? Number.MIN_VALUE, skill.maxDamage || 0),
-                skills: [...(skillGroup.skills || []), skill],
-              };
+              skills[skillGroupIndex] = mergedGroup(skills[skillGroupIndex] as ComputedSkillGroup, skill);
             } else {
-              skills.push({
-                actionType: groupActionType,
-                childCharacterType: skill.childCharacterType,
-                hits: skill.hits,
-                cappedHits: skill.cappedHits,
-                cappableHits: skill.cappableHits,
-                overcapBaseSum: skill.overcapBaseSum,
-                overcapCapSum: skill.overcapCapSum,
-                totalDamage: skill.totalDamage,
-                minDamage: skill.minDamage,
-                maxDamage: skill.maxDamage,
-                percentage: skill.percentage,
-                skills: [skill],
-                maxStunValue: skill.maxStunValue,
-                totalStunValue: skill.totalStunValue,
-                stunEligibleHits: skill.stunEligibleHits ?? 0,
-              });
+              skills.push(newGroup(group, skill));
             }
 
             wasGroupedSkill = true;

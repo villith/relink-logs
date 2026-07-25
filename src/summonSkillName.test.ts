@@ -29,7 +29,16 @@ beforeAll(async () => {
         translation: {
           skills: {
             "summon-classes": { d2e5407a: "Stale Hand Label" },
-            default: { "80000": "Summon Attack/Primal Burst", "unknown-skill": "Skill {{id}}" },
+            default: {
+              "80000": "Summon Attack/Primal Burst",
+              "unknown-skill": "Skill {{id}}",
+              "primal-bursts": {
+                "5418b8f8": "Catastrophe",
+                "32776c5b": "Azure Ruin",
+                "870a9dfe": "Desert Flare",
+              },
+              "skill-groups": { "primal-burst": "Primal Burst" },
+            },
             Pl1800: { "1234": "Pain Train" },
           },
         },
@@ -38,6 +47,18 @@ beforeAll(async () => {
           aaaa1111: { key: "TXT_SMN_So9900", text: "Beelzebub III" },
           bbbb2222: { key: "TXT_SMN_So5f00", text: "Cat" },
           cccc3333: { key: "TXT_SMN_So9800", text: "Lucilius II" },
+        },
+        // The generated class table: every summon class keyed by body-class hash.
+        "summon-classes": {
+          "5418b8f8": { key: "TXT_SMN_So0300", text: "Proto Bahamut" },
+          "1db19581": { key: "TXT_SMN_So4500", text: "Lilith" },
+          f065d8b8: { key: "TXT_SMN_So6400", text: "Wheel of Fate II" },
+        },
+        // The three beasts' burst attack names (TXT_SMN_So####_ASCE).
+        "primal-bursts": {
+          "5418b8f8": { key: "TXT_SMN_So0300_ASCE", text: "Catastrophe" },
+          "32776c5b": { key: "TXT_SMN_So0400_ASCE", text: "Azure Ruin" },
+          "870a9dfe": { key: "TXT_SMN_So0500_ASCE", text: "Desert Flare" },
         },
       },
     },
@@ -103,6 +124,33 @@ describe("getSkillName for mapped summon body classes", () => {
     // are gone from every shipped ui.json, so a stray entry is stale data, not an
     // override: d2e5407a is labelled "Stale Hand Label" there and must not win.
     expect(getSkillName("Pl1800", bodyHit(0xd2e5407a))).toBe("Lucilius");
+  });
+
+  it("names a class from the generated class table", () => {
+    // The class table is keyed by exactly what a hit reports, so it is the most
+    // direct source there is — no bridge hop.
+    expect(getSkillName("Pl1800", bodyHit(0x1db19581))).toBe("Lilith");
+  });
+
+  it("names a Primal Burst after the burst, not after the beast that performs it", () => {
+    // So0300's class row says "Proto Bahamut" — the beast — but the row a player
+    // reads is the burst it just watched: "Catastrophe".
+    expect(getSkillName("Pl1800", bodyHit(0x5418b8f8))).toBe("Catastrophe");
+  });
+
+  it("strips the tier suffix from a class-table name too", () => {
+    // One body class covers every tier of a summon, so "Wheel of Fate II" would
+    // mislabel the row the moment a different tier is equipped.
+    expect(getSkillName("Pl1800", bodyHit(0xf065d8b8))).toBe("Wheel of Fate");
+  });
+
+  it("names each of the three Primal Bursts", () => {
+    expect(getSkillName("Pl1800", bodyHit(0x32776c5b))).toBe("Azure Ruin");
+    expect(getSkillName("Pl1800", bodyHit(0x870a9dfe))).toBe("Desert Flare");
+  });
+
+  it("names the condensed Primal Burst group row", () => {
+    expect(getSkillName("Pl1800", { actionType: { Group: "primal-burst" } } as SkillState)).toBe("Primal Burst");
   });
 
   it("zero-pads the class hash, so a leading-zero class still resolves", () => {

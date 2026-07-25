@@ -69,6 +69,8 @@ i18n
       "quests",
       "enemies",
       "summons",
+      "summon-classes",
+      "primal-bursts",
       "summon-bonuses",
       "skillboard",
       "skillboard-branches",
