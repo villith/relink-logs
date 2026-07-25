@@ -20,6 +20,14 @@ export type SkillNameSource = {
   ns: SkillNameNamespace;
   hash: string;
   key: string;
+  /** How the generator resolved this entry, on summon classes only.
+   *
+   * `"id"` means the body-class hash equals XXHash32Custom of the mapped
+   * `So####` id — the entry is the summon it claims to be. `"name"` means no id
+   * hashed to the class, so it fell back to matching the display name; those two
+   * entries (the Cat and Lilith bodies) are the ones to re-check after a patch.
+   * Unused at runtime; carried for auditability. */
+  via?: "id" | "name";
 };
 
 export type SkillNameSources = {
@@ -50,11 +58,7 @@ export const getSkillNameSources = (): SkillNameSources => sources;
  * Returns an array so callers can splice it straight into an existing `t()`
  * fallback chain: empty means "nothing mapped, carry on".
  */
-export const abilitySourceKeys = (
-  characterType: string,
-  childCharacterType: string,
-  skillId: number
-): string[] => {
+export const abilitySourceKeys = (characterType: string, childCharacterType: string, skillId: number): string[] => {
   const id = String(skillId);
 
   for (const block of [childCharacterType, characterType]) {

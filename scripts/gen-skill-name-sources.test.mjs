@@ -52,7 +52,7 @@ const ABILITIES = {
   "2cf1038c": { key: "AB_PL0000_05_CG", text: "Arrow Rain" },
   "9fed6cf3": { key: "AB_PL0200_01", text: "Enchanted Lands" },
   eb3e3386: { key: "AB_PL0200_01_CG", text: "Enchanted Lands" },
-  "38278041": { key: "AB_PL2700_04_CG", text: "Acidrage  Howl" },
+  38278041: { key: "AB_PL2700_04_CG", text: "Acidrage  Howl" },
   "9abfc62c": { key: "AB_PL2700_04", text: "Acidrage Howl" },
 };
 
@@ -95,7 +95,11 @@ describe("pickAbilityHash", () => {
 });
 
 /** en/summons.json shape. Note So3f00 exists ONLY as tiered text — 62 of the 77
- * real body classes look like this, which is why the runtime strips the suffix. */
+ * real body classes look like this, which is why the runtime strips the suffix.
+ *
+ * The So ids are real, so gameXxhash32 resolves them to real class hashes:
+ *   So0000 -> d2e5407a, So9200 -> 5395ce93, So3f00 -> c3e77085, So0d00 -> 69893920
+ */
 const SUMMONS_EN = {
   "0033943a": { key: "TXT_SMN_So3f00_3", text: "Evyl Blackwyrm III" },
   aaaa0002: { key: "TXT_SMN_So3f00_2", text: "Evyl Blackwyrm II" },
@@ -103,6 +107,7 @@ const SUMMONS_EN = {
   a7eff558: { key: "TXT_SMN_So9200", text: "Beelzebub" },
   cccc0001: { key: "TXT_SMN_So4100_3", text: "Mechanized  Executioner III" },
   dddd0001: { key: "TXT_SMN_So5000", text: "Drift Apart" },
+  eeee0001: { key: "TXT_SMN_So0d00_1", text: "Goblin Soldier I" },
 };
 
 const SUMMONS_BY_LANG = {
@@ -119,68 +124,82 @@ const SUMMONS_BY_LANG = {
 
 const ENEMIES_EN = {
   ca4091c8: { key: "EM0004", text: "Goblin Soldier" },
+  // Only in enemies.json, mirroring the real Lilith body class.
+  b39eeab5: { key: "EM2400", text: "Lilith" },
 };
 
 describe("pickSummonHash", () => {
-  it("matches a name that exists only with a tier suffix", () => {
-    // Which tier wins does not matter: every tier strips to the same display
-    // text in every language, which candidatesAgree enforces. So the tie-break
-    // is simply the smallest hash, for determinism.
-    expect(pickSummonHash("Evyl Blackwyrm", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toEqual({
+  it("resolves a class by hashing So ids, not by matching the ui.json name", () => {
+    // c3e77085 == gameXxhash32("So3f00"). The label is deliberately wrong here:
+    // identity must win, because two different summons can share a display name.
+    expect(pickSummonHash("c3e77085", "A Totally Wrong Label", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toEqual({
       ns: "summons",
       hash: "0033943a",
       key: "TXT_SMN_So3f00_3",
+      via: "id",
     });
   });
 
   it("breaks a duplicate-key tie on the smaller hash", () => {
     // TXT_SMN_So9200 really ships at two hashes with identical text.
-    expect(pickSummonHash("Beelzebub", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toEqual({
+    expect(pickSummonHash("5395ce93", "Beelzebub", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toEqual({
       ns: "summons",
       hash: "2f15455c",
       key: "TXT_SMN_So9200",
+      via: "id",
     });
   });
 
-  it("matches through the double spaces in the game data", () => {
-    expect(pickSummonHash("Mechanized Executioner", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toEqual({
+  it("prefers a suffix-free entry over a tiered one for the same So id", () => {
+    const summons = { ...SUMMONS_EN, bbbb0000: { key: "TXT_SMN_So3f00", text: "Evyl Blackwyrm" } };
+
+    expect(pickSummonHash("c3e77085", "Evyl Blackwyrm", summons, ENEMIES_EN, { en: summons })).toEqual({
       ns: "summons",
-      hash: "cccc0001",
-      key: "TXT_SMN_So4100_3",
+      hash: "bbbb0000",
+      key: "TXT_SMN_So3f00",
+      via: "id",
     });
   });
 
-  it("falls back to enemies.json for a class named after an enemy", () => {
-    expect(pickSummonHash("Goblin Soldier", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toEqual({
-      ns: "enemies",
-      hash: "ca4091c8",
-      key: "EM0004",
-    });
-  });
-
-  it("returns null for a hand-coined name in no lang file", () => {
-    expect(pickSummonHash("Silverslime/Goldslime", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toBeNull();
-  });
-
-  it("skips a candidate set whose text disagrees in another language", () => {
-    // A hash pair that agrees in en but not in jp is not safely interchangeable.
+  it("skips a duplicate-key set whose text disagrees in another language", () => {
+    // Two hashes under one key are only interchangeable if they stay so after
+    // translation.
     const byLang = {
       en: SUMMONS_EN,
       jp: { ...SUMMONS_BY_LANG.jp, a7eff558: { key: "TXT_SMN_So9200", text: "別の名前" } },
     };
-    expect(pickSummonHash("Beelzebub", SUMMONS_EN, ENEMIES_EN, byLang)).toBeNull();
+
+    expect(pickSummonHash("5395ce93", "Beelzebub", SUMMONS_EN, ENEMIES_EN, byLang)).toBeNull();
   });
 
-  it("prefers a suffix-free candidate over a tiered one", () => {
-    const summons = {
-      ...SUMMONS_EN,
-      bbbb0000: { key: "TXT_SMN_So3f00", text: "Evyl Blackwyrm" },
-    };
-    expect(pickSummonHash("Evyl Blackwyrm", summons, ENEMIES_EN, { en: summons })).toEqual({
-      ns: "summons",
-      hash: "bbbb0000",
-      key: "TXT_SMN_So3f00",
+  it("falls back to a name match when no So id hashes to the class", () => {
+    // Real case: the Cat and Lilith bodies are not So#### summons, so identity
+    // cannot resolve them. Their name matches an enemy, whose text agrees with
+    // the summon of the same name in every language.
+    expect(pickSummonHash("ffffffff", "Lilith", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toEqual({
+      ns: "enemies",
+      hash: "b39eeab5",
+      key: "EM2400",
+      via: "name",
     });
+  });
+
+  it("returns null when the name fallback finds an entry missing from another language", () => {
+    // A hash absent from a shipped bundle cannot be relied on to translate.
+    expect(pickSummonHash("ffffffff", "Goblin Soldier", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toBeNull();
+  });
+
+  it("matches the name fallback through the double spaces in the game data", () => {
+    expect(pickSummonHash("ffffffff", "Mechanized Executioner", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toEqual({
+      ns: "summons",
+      hash: "cccc0001",
+      key: "TXT_SMN_So4100_3",
+      via: "name",
+    });
+  });
+
+  it("returns null for a hand-coined name in no lang file", () => {
+    expect(pickSummonHash("ffffffff", "Silverslime/Goldslime", SUMMONS_EN, ENEMIES_EN, SUMMONS_BY_LANG)).toBeNull();
   });
 });
 
@@ -188,7 +207,7 @@ const UI = {
   skills: {
     Pl0000: { 1301: "Arrow Rain", 100: "Attack 1" },
     Pl0200: { 1: "Enchanted Lands" },
-    "summon-classes": { "5395ce93": "Beelzebub", "34894579": "Silverslime/Goldslime" },
+    "summon-classes": { "5395ce93": "Beelzebub", 34894579: "Silverslime/Goldslime" },
     default: { 700: "Guard (?)" },
   },
 };
@@ -216,7 +235,7 @@ describe("buildSkillNameSources", () => {
     const { sources } = buildSkillNameSources(UI, GENERATED);
 
     expect(sources["summon-classes"]).toEqual({
-      "5395ce93": { ns: "summons", hash: "2f15455c", key: "TXT_SMN_So9200" },
+      "5395ce93": { ns: "summons", hash: "2f15455c", key: "TXT_SMN_So9200", via: "id" },
     });
   });
 

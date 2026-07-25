@@ -16,6 +16,8 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { gameXxhash32 } from "./gbfr-hash.mjs";
+
 /** Tier suffix on summon names. The ASCII form requires leading whitespace so a
  * name genuinely ending in "I" survives; the full-width form (zh-CN ships
  * "黑龙伊弗欧Ⅲ") carries no space. Mirrored in src/skillNameSources.ts — keep
@@ -56,17 +58,11 @@ export const pickAbilityHash = (characterBlock, label, abilities) => {
   return { ns: "abilities", hash, key: entry.key };
 };
 
-/** Candidates in a generated bundle whose tier-stripped text equals `wanted`,
- * best first: suffix-free text before tiered text, then smaller hash. */
+/** Candidates in a generated bundle whose tier-stripped text equals `wanted`. */
 const summonCandidates = (bundle, wanted) =>
   Object.entries(bundle)
     .filter(([, entry]) => stripTierSuffix(entry.text) === wanted)
-    .sort(([aHash, a], [bHash, b]) => {
-      const tiered =
-        Number(stripTierSuffix(a.text) !== normalizeName(a.text)) -
-        Number(stripTierSuffix(b.text) !== normalizeName(b.text));
-      return tiered !== 0 ? tiered : aHash.localeCompare(bHash);
-    });
+    .sort(byTierThenHash);
 
 /** True when every candidate resolves to the same stripped text in every
  * language that ships the bundle. Duplicate keys are only interchangeable if
@@ -77,21 +73,79 @@ const candidatesAgree = (hashes, byLang) =>
     return texts.size === 1 && !texts.has(null);
   });
 
-/** Resolves a ui.json summon-class label to a hash in a generated bundle.
- *
- * summons.json first, then enemies.json — a handful of classes are named after
- * an enemy rather than a summon. Returns null rather than guessing.
- */
-export const pickSummonHash = (label, summons, enemies, summonsByLang) => {
-  const wanted = stripTierSuffix(label);
+const SUMMON_KEY = /^TXT_SMN_(So[0-9a-f]{4})(?:_\d+)?$/;
 
-  const summonHits = summonCandidates(summons, wanted);
+/** summons.json entries grouped by the body-class hash of their `So####` id,
+ * best first: suffix-free text before tiered text, then smaller hash.
+ *
+ * A body class is `XXHash32Custom("So####")`, so this pairs a class with its
+ * summon by IDENTITY. Name matching cannot: two different summons ship the same
+ * display name, and the game reuses names for enemies too. */
+const summonEntriesByClass = (summons) => {
+  const byClass = new Map();
+
+  for (const [hash, entry] of Object.entries(summons)) {
+    const match = SUMMON_KEY.exec(entry.key);
+    if (match === null) continue;
+
+    const classHash = gameXxhash32(match[1]);
+    if (!byClass.has(classHash)) byClass.set(classHash, []);
+    byClass.get(classHash).push([hash, entry]);
+  }
+
+  for (const candidates of byClass.values()) candidates.sort(byTierThenHash);
+
+  return byClass;
+};
+
+/** Suffix-free text first, then smaller hash — every tier of one summon strips to
+ * the same display name, so which one wins only needs to be deterministic. */
+const byTierThenHash = ([aHash, a], [bHash, b]) => {
+  const tiered =
+    Number(stripTierSuffix(a.text) !== normalizeName(a.text)) -
+    Number(stripTierSuffix(b.text) !== normalizeName(b.text));
+  return tiered !== 0 ? tiered : aHash.localeCompare(bHash);
+};
+
+/** Resolves a summon body class to a hash in a generated bundle.
+ *
+ * Identity first: hash every `So####` id in summons.json and look for the class.
+ * Only when no id hashes to it — the Cat and Lilith bodies are not `So####`
+ * summons — fall back to matching the ui.json label by name, against summons.json
+ * then enemies.json. `via` records which path was taken so the two mechanisms
+ * stay distinguishable in review.
+ *
+ * Returns null rather than guessing.
+ */
+export const pickSummonHash = (classHash, label, summons, enemies, summonsByLang) => {
+  const byIdentity = summonEntriesByClass(summons).get(classHash);
+  if (byIdentity !== undefined) {
+    if (
+      !candidatesAgree(
+        byIdentity.map(([hash]) => hash),
+        summonsByLang
+      )
+    ) {
+      return null;
+    }
+
+    const [hash, entry] = byIdentity[0];
+    return { ns: "summons", hash, key: entry.key, via: "id" };
+  }
+
+  const summonHits = summonCandidates(summons, stripTierSuffix(label));
   if (summonHits.length > 0) {
-    const hashes = summonHits.map(([hash]) => hash);
-    if (!candidatesAgree(hashes, summonsByLang)) return null;
+    if (
+      !candidatesAgree(
+        summonHits.map(([hash]) => hash),
+        summonsByLang
+      )
+    ) {
+      return null;
+    }
 
     const [hash, entry] = summonHits[0];
-    return { ns: "summons", hash, key: entry.key };
+    return { ns: "summons", hash, key: entry.key, via: "name" };
   }
 
   const enemyHit = Object.entries(enemies)
@@ -99,7 +153,7 @@ export const pickSummonHash = (label, summons, enemies, summonsByLang) => {
     .sort(([a], [b]) => a.localeCompare(b))[0];
 
   if (enemyHit === undefined) return null;
-  return { ns: "enemies", hash: enemyHit[0], key: enemyHit[1].key };
+  return { ns: "enemies", hash: enemyHit[0], key: enemyHit[1].key, via: "name" };
 };
 
 /** Walks every string leaf under ui.json's `skills` and resolves what it can.
@@ -128,7 +182,9 @@ export const buildSkillNameSources = (ui, generated) => {
 
       const source =
         block === SUMMON_CLASSES
-          ? pickSummonHash(label, generated.summons, generated.enemies, generated.summonsByLang)
+          ? // The id IS the body-class hash for this block, which is what lets the
+            // summon half resolve by identity instead of by display name.
+            pickSummonHash(id, label, generated.summons, generated.enemies, generated.summonsByLang)
           : pickAbilityHash(block, label, generated.abilities);
 
       if (source === null) {
@@ -226,7 +282,9 @@ const reportDisagreements = (sources, uiByLang, generated) => {
         if (target === undefined) continue;
 
         if (stripTierSuffix(target) !== normalizeName(current)) {
-          console.log(`[gen] ${lang} skills.${block}.${id}: ${JSON.stringify(current)} -> game says ${JSON.stringify(stripTierSuffix(target))}`);
+          console.log(
+            `[gen] ${lang} skills.${block}.${id}: ${JSON.stringify(current)} -> game says ${JSON.stringify(stripTierSuffix(target))}`
+          );
         }
       }
     }
