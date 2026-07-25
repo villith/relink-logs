@@ -40,6 +40,32 @@ struct AlwaysOnTop(AtomicBool);
 struct ClickThrough(AtomicBool);
 struct DebugMode(AtomicBool);
 
+struct TrayLabels {
+    open_meter: std::sync::Mutex<String>,
+    open_logs: std::sync::Mutex<String>,
+    always_on_top: std::sync::Mutex<String>,
+    always_on_top_active: std::sync::Mutex<String>,
+    clickthrough: std::sync::Mutex<String>,
+    clickthrough_active: std::sync::Mutex<String>,
+    reset_windows: std::sync::Mutex<String>,
+    quit: std::sync::Mutex<String>,
+}
+
+impl Default for TrayLabels {
+    fn default() -> Self {
+        Self {
+            open_meter: std::sync::Mutex::new("Open Meter".into()),
+            open_logs: std::sync::Mutex::new("Open Logs".into()),
+            always_on_top: std::sync::Mutex::new("Always on top".into()),
+            always_on_top_active: std::sync::Mutex::new("Always on top \u{2713}".into()),
+            clickthrough: std::sync::Mutex::new("Clickthrough".into()),
+            clickthrough_active: std::sync::Mutex::new("Clickthrough \u{2713}".into()),
+            reset_windows: std::sync::Mutex::new("Reset Windows".into()),
+            quit: std::sync::Mutex::new("Quit".into()),
+        }
+    }
+}
+
 /// Sender half of the live parser's reset channel. `None` until a parser is
 /// connected; replaced on every reconnect (the parser is owned by the
 /// pipe-reading task, so commands reach it through this channel).
@@ -50,6 +76,47 @@ fn reset_encounter(state: State<ResetChannel>) {
     if let Some(tx) = state.0.lock().unwrap().as_ref() {
         let _ = tx.send(());
     }
+}
+
+#[tauri::command]
+fn update_tray_labels(
+    app: AppHandle,
+    labels: State<TrayLabels>,
+    always_on_top_state: State<AlwaysOnTop>,
+    clickthrough_state: State<ClickThrough>,
+    open_meter: String,
+    open_logs: String,
+    always_on_top: String,
+    always_on_top_active: String,
+    clickthrough: String,
+    clickthrough_active: String,
+    reset_windows: String,
+    quit: String,
+) {
+    let tray = app.tray_handle();
+
+    if let Ok(mut v) = labels.open_meter.lock() { *v = open_meter.clone(); }
+    if let Ok(mut v) = labels.open_logs.lock() { *v = open_logs.clone(); }
+    if let Ok(mut v) = labels.always_on_top.lock() { *v = always_on_top.clone(); }
+    if let Ok(mut v) = labels.always_on_top_active.lock() { *v = always_on_top_active.clone(); }
+    if let Ok(mut v) = labels.clickthrough.lock() { *v = clickthrough.clone(); }
+    if let Ok(mut v) = labels.clickthrough_active.lock() { *v = clickthrough_active.clone(); }
+    if let Ok(mut v) = labels.reset_windows.lock() { *v = reset_windows.clone(); }
+    if let Ok(mut v) = labels.quit.lock() { *v = quit.clone(); }
+
+    let aot_active = always_on_top_state.0.load(Ordering::Acquire);
+    let ct_active = clickthrough_state.0.load(Ordering::Acquire);
+
+    let _ = tray.get_item("open_meter").set_title(&open_meter);
+    let _ = tray.get_item("open_logs").set_title(&open_logs);
+    let _ = tray.get_item("always_on_top").set_title(
+        if aot_active { &always_on_top_active } else { &always_on_top }
+    );
+    let _ = tray.get_item("toggle_clickthrough").set_title(
+        if ct_active { &clickthrough_active } else { &clickthrough }
+    );
+    let _ = tray.get_item("reset_windows").set_title(&reset_windows);
+    let _ = tray.get_item("quit").set_title(&quit);
 }
 
 /// Toolbox / Synthesis Helper: snapshot the game's synthesis state (served
@@ -1422,7 +1489,11 @@ fn toggle_window_visibility(handle: &AppHandle, id: &str, focus: Option<bool>) {
 }
 
 #[tauri::command]
-fn toggle_always_on_top(window: tauri::Window, state: State<AlwaysOnTop>) {
+fn toggle_always_on_top(
+    window: tauri::Window,
+    state: State<AlwaysOnTop>,
+    labels: State<TrayLabels>,
+) {
     let always_on_top = &state.0;
     let new_state = !always_on_top.load(Ordering::Acquire);
     always_on_top.store(new_state, Ordering::Release);
@@ -1430,19 +1501,28 @@ fn toggle_always_on_top(window: tauri::Window, state: State<AlwaysOnTop>) {
         log::warn!("set_always_on_top({new_state}) failed: {e:?}");
     }
     let _ = window.emit("on-pinned", new_state);
+    let title = if new_state {
+        labels.always_on_top_active.lock()
+            .map(|g| g.clone())
+            .unwrap_or_else(|_| "Always on top \u{2713}".into())
+    } else {
+        labels.always_on_top.lock()
+            .map(|g| g.clone())
+            .unwrap_or_else(|_| "Always on top".into())
+    };
     let _ = window
         .app_handle()
         .tray_handle()
         .get_item("always_on_top")
-        .set_title(if new_state {
-            "Always on top ✓"
-        } else {
-            "Always on top"
-        });
+        .set_title(&title);
 }
 
 #[tauri::command]
-fn toggle_clickthrough(window: tauri::Window, state: State<ClickThrough>) {
+fn toggle_clickthrough(
+    window: tauri::Window,
+    state: State<ClickThrough>,
+    labels: State<TrayLabels>,
+) {
     let click_through = &state.0;
     let new_state = !click_through.load(Ordering::Acquire);
     click_through.store(new_state, Ordering::Release);
@@ -1450,15 +1530,20 @@ fn toggle_clickthrough(window: tauri::Window, state: State<ClickThrough>) {
         log::warn!("set_ignore_cursor_events({new_state}) failed: {e:?}");
     }
     let _ = window.emit("on-clickthrough", new_state);
+    let title = if new_state {
+        labels.clickthrough_active.lock()
+            .map(|g| g.clone())
+            .unwrap_or_else(|_| "Clickthrough \u{2713}".into())
+    } else {
+        labels.clickthrough.lock()
+            .map(|g| g.clone())
+            .unwrap_or_else(|_| "Clickthrough".into())
+    };
     let _ = window
         .app_handle()
         .tray_handle()
         .get_item("toggle_clickthrough")
-        .set_title(if new_state {
-            "Clickthrough ✓"
-        } else {
-            "Clickthrough"
-        });
+        .set_title(&title);
 }
 
 #[tauri::command]
@@ -1510,10 +1595,12 @@ fn menu_tray_handler(handle: &AppHandle, event: SystemTrayEvent) {
             "toggle_clickthrough" => toggle_clickthrough(
                 handle.get_window("main").unwrap(),
                 handle.state::<ClickThrough>(),
+                handle.state::<TrayLabels>(),
             ),
             "always_on_top" => toggle_always_on_top(
                 handle.get_window("main").unwrap(),
                 handle.state::<AlwaysOnTop>(),
+                handle.state::<TrayLabels>(),
             ),
             "reset_windows" => {
                 reset_window_to_default(handle, "main", false);
@@ -1590,6 +1677,7 @@ fn main() {
         .manage(DebugMode(AtomicBool::new(false)))
         .manage(ResetChannel(std::sync::Mutex::new(None)))
         .manage(HookStatus::default())
+        .manage(TrayLabels::default())
         .system_tray(system_tray_with_menu())
         .on_system_tray_event(menu_tray_handler)
         .on_window_event(|event| {
@@ -1605,6 +1693,7 @@ fn main() {
             delete_logs,
             delete_all_logs,
             toggle_always_on_top,
+            toggle_clickthrough,
             reset_meter_window,
             export_damage_log_to_file,
             set_debug_mode,
@@ -1622,6 +1711,7 @@ fn main() {
             remove_linux_hook,
             get_hook_status,
             refresh_hook,
+            update_tray_labels,
         ])
         .setup(|app| {
             // Perform the game hook check in a separate thread.
