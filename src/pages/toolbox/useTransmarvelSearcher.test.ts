@@ -230,4 +230,12 @@ describe("sanitizeWishlists", () => {
     const result = sanitizeWishlists({ sigils: [], stones: [entry] }, POOL);
     expect(result.stones).toEqual([entry]);
   });
+
+  it("drops the whole entry when a later slot is junk (no truncation)", () => {
+    const result = sanitizeWishlists(
+      { sigils: [], stones: [{ slots: [{ trait: "000000aa", minLevel: 5 }, { trait: "not-a-trait" }] }] },
+      POOL
+    );
+    expect(result.stones).toEqual([]);
+  });
 });

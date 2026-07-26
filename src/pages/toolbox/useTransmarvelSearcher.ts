@@ -8,7 +8,8 @@ import { toHashString } from "@/utils";
 import { invoke } from "@tauri-apps/api";
 import { useMemo, useState } from "react";
 
-/** A wished-for sigil, by trait only (any sigil rolling that trait, any level). */
+/** A wished-for sigil, by trait only (any sigil rolling that trait, any level).
+ * Matching keys on the sigil's trait1 only; the optional trait2 bonus roll is not matched. */
 export type SigilEntry = { trait: string };
 
 /** One position a wished-for wrightstone entry needs filled. */
