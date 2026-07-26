@@ -7,7 +7,7 @@ use anyhow::Result;
 use protocol::toolbox::{
     ToolboxRequest, ToolboxResponse, TOOLBOX_PROTOCOL_VERSION, TOOLBOX_TCP_ADDR,
 };
-use protocol::toolbox::{OvermasterySnapshot, SynthesisSeed, SynthesisSnapshot};
+use protocol::toolbox::{OvermasterySnapshot, SynthesisSeed, SynthesisSnapshot, TransmarvelSnapshot};
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -218,6 +218,16 @@ pub async fn overmastery_slot(hook: &HookStatus, slot: u32) -> Result<Option<u32
     match request(hook, ToolboxRequest::OvermasterySlot(slot)).await? {
         None => Ok(None),
         Some(ToolboxResponse::OvermasterySlot(r)) => r.map(Some),
+        Some(other) => Err(format!("unexpected toolbox response {other:?}")),
+    }
+}
+
+pub async fn transmarvel_snapshot(
+    hook: &HookStatus,
+) -> Result<Option<TransmarvelSnapshot>, String> {
+    match request(hook, ToolboxRequest::TransmarvelSnapshot).await? {
+        None => Ok(None),
+        Some(ToolboxResponse::TransmarvelSnapshot(r)) => r.map(Some),
         Some(other) => Err(format!("unexpected toolbox response {other:?}")),
     }
 }
