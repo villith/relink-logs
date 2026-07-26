@@ -264,8 +264,17 @@ mod tests {
                 }
             }
         }
-        assert!(t.gem_groups[0].items.iter().all(|i| i.second_trait_lot == 26));
-        assert!(t.gem_groups[1].items.iter().all(|i| i.second_trait_lot == 26));
+        // The row excludes the sigil's own trait's category (see the
+        // generator docstring): group 0 = Attack/Health/Crit/Stun V+, whose
+        // traits are all in the ATK/HP lot -> row 5.
+        assert!(t.gem_groups[0].items.iter().all(|i| i.second_trait_lot == 5));
+        // Group 1 holds all five categories; spot-check the spread.
+        let group1_rows: std::collections::HashSet<i32> = t.gem_groups[1]
+            .items
+            .iter()
+            .map(|i| i.second_trait_lot)
+            .collect();
+        assert!(group1_rows.is_superset(&[6, 7, 26, 27].into()), "{group1_rows:?}");
         // Character sigils roll from row 15; awakening _90s have fixed pairs.
         assert!(t.gem_groups[5].items.iter().all(|i| i.second_trait_lot == 15));
         assert!(t.gem_groups[8]
@@ -304,7 +313,7 @@ mod tests {
             TransmarvelOutcome::Sigil {
                 sigil_id: expect.item,
                 trait_level: expect.trait_level,
-                trait1: 0x7440_e869,
+                trait1: 0x4f13_5217,
                 trait2: Some(0xceb7_00ee),
             }
         );
@@ -401,6 +410,30 @@ mod tests {
         assert_eq!((item, rolls[5].draws), (0x7117_3866, 12)); // Vitality Wrightstone
         assert_eq!(gem(&rolls[6]), (0x0523_A202, Some(0xCFB4_8782), 5)); // The Black's Mark+ / SBA Sealed Res
         assert_eq!(gem(&rolls[7]), (0xE845_4459, Some(0x6018_372B), 5)); // Stamina V+ / Provoke
+    }
+
+    /// LIVE ground truth, 2026-07-26 third batch: 4 verified rolls from
+    /// 0xd2d9d59c that pinned the category-exclusion row rule — Autorevive
+    /// V+ (utility trait1 -> row 27) rolled Quick Cooldown, Celestial Lumen
+    /// V+ (no category -> gem.tbl row 6) rolled Low Profile, Health V+
+    /// (ATK/HP trait1 -> row 5) rolled ATK-Down Resistance.
+    #[test]
+    fn live_session_2026_07_26_batch3_category_rule_reproduced() {
+        let t = stock_tables();
+        let rolls = simulate(0xd2d9_d59c, t, 4);
+        let TransmarvelOutcome::Wrightstone { item, .. } = rolls[0].outcome else {
+            panic!("expected the wrightstone");
+        };
+        assert_eq!((item, rolls[0].draws), (0x7117_3866, 12)); // Vitality Wrightstone
+        let gem = |r: &TransmarvelRoll| match r.outcome {
+            TransmarvelOutcome::Sigil {
+                sigil_id, trait2, ..
+            } => (sigil_id, trait2, r.draws),
+            _ => panic!("expected a sigil, got {:?}", r.outcome),
+        };
+        assert_eq!(gem(&rolls[1]), (0xD340_651C, Some(0x318D_12E9), 5)); // Autorevive V+ / Quick Cooldown
+        assert_eq!(gem(&rolls[2]), (0x2049_2635, Some(0xDC60_7D75), 5)); // Celestial Lumen V+ / Low Profile
+        assert_eq!(gem(&rolls[3]), (0xE92E_E838, Some(0x4BF2_E191), 5)); // Health V+ / ATK-Down Resistance
     }
 
     /// The JSON contract src/types.ts mirrors — a rename here breaks the

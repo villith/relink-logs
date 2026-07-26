@@ -32,11 +32,14 @@ Output shape (camelCase, deserialized by transmarvel::TransmarvelTables):
   (skillLot, percent) options walked cumulatively by one draw, then one
   draw picks uniformly within the lot (all skill_lot weights are 1).
 
-  GACHA OVERRIDE (live-derived 2026-07-26): plain V+ sigils (the _24s in
-  lots 81216A95/9092654F) roll from skill_type_lot 26 in the transmarvel
-  path, NOT their gem.tbl value (5) — 3/3 live rolls prove 26 and rule out
-  5. Mechanism unknown (the number 26 appears nowhere in their gem.tbl
-  rows); revisit if a future roll contradicts.
+  ROW SELECTION (live-derived 2026-07-26, 11/11 observed 2nd traits): the
+  roll does NOT always use gem.tbl's SkillTypeLotIdForRandom2ndSkill.
+  When the sigil's own trait1 belongs to one of the five 2nd-trait
+  category lots, the game swaps to the skill_type_lot variant that
+  EXCLUDES that category (so a sigil can't roll its own trait's family):
+  ATK/HP/Crit/Stun -> 5, offense -> 6, defense -> 7, support -> 26,
+  utility -> 27. Sigils whose trait1 has no category (character sigils,
+  celestials, Stronghold, ...) use the gem.tbl row as-is.
 """
 
 import json
@@ -52,30 +55,39 @@ OUT_PATH = Path(__file__).resolve().parent.parent / "src-tauri" / "assets" / "tr
 # gacha.tbl row Key for the transmarvel tier (TXT_YOROZU_FORGING_HIGH).
 TRANSMARVEL_KEY = 0xFA21E311
 
-# Plain single-trait V+ lots whose 2nd-trait roll uses row 26 (see docstring).
-V_PLUS_LOTS = {0x81216A95, 0x9092654F}
-V_PLUS_TYPE_LOT = 26
+# The five 2nd-trait category lots (skill_lot keys). A trait's category =
+# the lot containing it; the exclusion row per category is the
+# skill_type_lot variant lacking that lot (see docstring).
+CATEGORY_EXCLUSION_ROWS = [
+    (0x4CE7152C, 5),  # ATK/HP/Crit Rate/Stun Power
+    (0xF865A223, 6),  # offense (Enmity, Stamina, DMG Cap, ...)
+    (0x8F952AC1, 7),  # defense (Garrison, resistances, Aegis, ...)
+    (0x46D6DFDE, 26),  # support (Regen, Quick Cooldown, Uplift, ...)
+    (0xD4078C7D, 27),  # utility (Guts, Autorevive, Provoke, ...)
+]
 
-# gem.tbl raw layout (v2.0.2): 64-byte rows of 16 u32s, first row's item
-# hash at file offset 76. Fields used here (verified against live rolls +
-# the decompiled grant path FUN_14033dbc0):
-#   [0] item id hash   [7] SkillTypeLotIdForRandom2ndSkill (-1 = none)
-#   [14] SkillId1 hash [15] SkillId2 hash (0x887ae0b0 = empty)
-GEM_ROW_START = 16  # header size; rows are contiguous 64B after it
+# gem.tbl raw layout (v2.0.2): 64-byte records; a record spans
+# [item_hash - 8, item_hash + 56). Fields used here (framing pinned by
+# locating known SkillId hashes of fixed-pair sigils):
+#   rel -8: SkillId1 hash   rel -4: SkillId2 hash (0x887ae0b0 = empty)
+#   rel  0: item id hash    rel +28: SkillTypeLotIdForRandom2ndSkill (-1 = none)
+GEM_ROW_START = 16  # header size; item hashes repeat every 64B after it + 8
 GEM_ROW_SIZE = 64
 EMPTY_KEY = 0x887AE0B0
 
 
 def load_gem_configs(gem_tbl: Path) -> dict:
-    """item hash -> (trait1, trait2, second_trait_lot) from raw gem.tbl."""
+    """item hash -> (trait1, trait2, gem.tbl type-lot id) from raw gem.tbl."""
     data = gem_tbl.read_bytes()
     out = {}
-    for off in range(GEM_ROW_START, len(data) - GEM_ROW_SIZE + 1, GEM_ROW_SIZE):
-        row = struct.unpack_from("<16I", data, off)
-        trait1 = 0 if row[14] == EMPTY_KEY else row[14]
-        trait2 = 0 if row[15] == EMPTY_KEY else row[15]
-        lot = row[7] if row[7] != 0xFFFFFFFF else -1
-        out[row[0]] = (trait1, trait2, lot)
+    # Item hashes repeat every 64B starting at GEM_ROW_START; skill1/skill2
+    # sit just before each (in the previous record's tail / header).
+    for off in range(GEM_ROW_START, len(data) - 56 + 1, GEM_ROW_SIZE):
+        rel = lambda d: struct.unpack_from("<I", data, off + d)[0]
+        trait1 = 0 if rel(-8) == EMPTY_KEY else rel(-8)
+        trait2 = 0 if rel(-4) == EMPTY_KEY else rel(-4)
+        lot = rel(28) if rel(28) != 0xFFFFFFFF else -1
+        out[rel(0)] = (trait1, trait2, lot)
     return out
 
 
@@ -85,6 +97,14 @@ def main() -> None:
     db = sqlite3.connect(sys.argv[1])
     db.row_factory = sqlite3.Row
     gem_configs = load_gem_configs(Path(sys.argv[1]).parent / "table" / "gem.tbl")
+
+    # trait hash -> its exclusion row (see CATEGORY_EXCLUSION_ROWS).
+    trait_category_row = {}
+    for row in db.execute("SELECT Key, SkillId FROM skill_lot ORDER BY rowid"):
+        key = cell_hash(row["Key"])
+        for lot, type_row in CATEGORY_EXCLUSION_ROWS:
+            if key == lot:
+                trait_category_row[cell_hash(row["SkillId"])] = type_row
 
     tier = None
     for row in db.execute(
@@ -103,8 +123,8 @@ def main() -> None:
         lot_key = cell_hash(row["Key"])
         item = cell_hash(row["ItemId"])
         trait1, trait2, second_lot = gem_configs.get(item, (0, 0, -1))
-        if lot_key in V_PLUS_LOTS:
-            second_lot = V_PLUS_TYPE_LOT
+        if second_lot >= 0 and trait1 in trait_category_row:
+            second_lot = trait_category_row[trait1]
         items_by_lot.setdefault(lot_key, []).append(
             {
                 "item": item,
