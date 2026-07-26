@@ -87,7 +87,7 @@ mod tests {
     fn default_filters_exclude_primal_burst() {
         let filters = MeterFilters::default();
         assert!(!filters.include_primal_burst, "off is the shipped default");
-        assert!(is_excluded(&hit(0x5418B8F8, 80000), &filters));
+        assert!(is_excluded(&hit(PRIMAL_BURST_BODY_HASHES[0], SUMMON_ATTACK_ACTION_ID), &filters));
     }
 
     #[test]
@@ -95,7 +95,7 @@ mod tests {
         let filters = MeterFilters::default();
         for body in PRIMAL_BURST_BODY_HASHES {
             assert!(
-                is_excluded(&hit(*body, 80000), &filters),
+                is_excluded(&hit(*body, SUMMON_ATTACK_ACTION_ID), &filters),
                 "body {body:#x} should be excluded"
             );
         }
@@ -108,7 +108,7 @@ mod tests {
         };
         for body in PRIMAL_BURST_BODY_HASHES {
             assert!(
-                !is_excluded(&hit(*body, 80000), &filters),
+                !is_excluded(&hit(*body, SUMMON_ATTACK_ACTION_ID), &filters),
                 "body {body:#x} should be counted"
             );
         }
@@ -119,7 +119,7 @@ mod tests {
         // Same action id, different body: a called summon is not a Primal Burst
         // and this toggle must not touch it.
         assert!(!is_excluded(
-            &hit(ORDINARY_SUMMON_BODY, 80000),
+            &hit(ORDINARY_SUMMON_BODY, SUMMON_ATTACK_ACTION_ID),
             &MeterFilters::default()
         ));
     }
@@ -127,7 +127,7 @@ mod tests {
     #[test]
     fn primal_burst_body_with_another_action_is_not_excluded() {
         assert!(!is_excluded(
-            &hit(0x5418B8F8, 200),
+            &hit(PRIMAL_BURST_BODY_HASHES[0], 200),
             &MeterFilters::default()
         ));
     }

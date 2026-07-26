@@ -2466,7 +2466,7 @@ impl From<v0::Parser> for Parser {
 
 #[cfg(test)]
 mod tests {
-    use protocol::{ActionType, Actor};
+    use protocol::{ActionType, Actor, SUMMON_ATTACK_ACTION_ID};
 
     use super::*;
 
@@ -2486,8 +2486,9 @@ mod tests {
     /// Zeta's character hash — any real player hash works; an `Unknown` parent
     /// is dropped by `should_ignore_damage_event` on the live path.
     const PLAYER_HASH: u32 = 0x28AC1108;
-    /// So0300 "(Primal Burst) Catastrophe".
-    const PRIMAL_BURST_BODY: u32 = 0x5418B8F8;
+    /// So0300 "(Primal Burst) Catastrophe" — taken from the shared list rather
+    /// than restated, so a hash correction after a game patch reaches the tests.
+    const PRIMAL_BURST_BODY: u32 = protocol::PRIMAL_BURST_BODY_HASHES[0];
 
     /// A hit on enemy 9 credited to player slot 0. `body` is the acting actor's
     /// class (the player's own hash for a normal hit, a Primal Burst body for a
@@ -2528,7 +2529,7 @@ mod tests {
         ));
         parser.encounter.raw_event_log.push((
             2_000,
-            Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, 80_000, 3_000)),
+            Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000)),
         ));
         parser
     }
@@ -2632,7 +2633,7 @@ mod tests {
             ),
             (
                 2_500,
-                Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, 80_000, 3_000)),
+                Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000)),
             ),
             (
                 3_000,
@@ -2665,7 +2666,7 @@ mod tests {
             ),
             (
                 2_500,
-                Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, 80_000, 3_000)),
+                Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000)),
             ),
         ];
 
@@ -2714,7 +2715,7 @@ mod tests {
         let mut parser = Parser::default();
 
         parser.on_damage_event(damage_from(PLAYER_HASH, 100, 1_000));
-        parser.on_damage_event(damage_from(PRIMAL_BURST_BODY, 80_000, 3_000));
+        parser.on_damage_event(damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000));
 
         assert_eq!(
             parser.encounter.raw_event_log.len(),
@@ -2737,7 +2738,7 @@ mod tests {
         };
 
         parser.on_damage_event(damage_from(PLAYER_HASH, 100, 1_000));
-        parser.on_damage_event(damage_from(PRIMAL_BURST_BODY, 80_000, 3_000));
+        parser.on_damage_event(damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000));
 
         assert_eq!(parser.derived_state.total_damage, 4_000);
         assert_eq!(
