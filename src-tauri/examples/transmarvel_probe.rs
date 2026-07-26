@@ -81,7 +81,7 @@ fn label(i: usize) -> String {
 /// any miss). Sigils and wrightstones live in different files.
 fn item_names() -> std::collections::HashMap<u32, String> {
     let mut out = std::collections::HashMap::new();
-    for file in ["sigils.json", "items.json"] {
+    for file in ["sigils.json", "items.json", "traits.json"] {
         let path = format!("{}/lang/en/{file}", env!("CARGO_MANIFEST_DIR"));
         let Ok(text) = std::fs::read_to_string(&path) else {
             continue;
@@ -191,10 +191,19 @@ fn main() -> anyhow::Result<()> {
                     Sigil {
                         sigil_id,
                         trait_level,
-                    } => match trait_level {
-                        0 => format!("GEM   {}", name(*sigil_id)),
-                        lvl => format!("GEM   {} (lvl {lvl})", name(*sigil_id)),
-                    },
+                        trait2,
+                        ..
+                    } => {
+                        let lvl = match trait_level {
+                            0 => String::new(),
+                            lvl => format!(" (lvl {lvl})"),
+                        };
+                        let second = match trait2 {
+                            Some(t) => format!(" + 2nd trait {}", name(*t)),
+                            None => String::new(),
+                        };
+                        format!("GEM   {}{lvl}{second}", name(*sigil_id))
+                    }
                     Wrightstone { item, .. } => {
                         format!("STONE {} (traits not yet modeled)", name(*item))
                     }
