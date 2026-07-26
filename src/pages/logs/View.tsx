@@ -74,6 +74,7 @@ import {
   formatInPartyOrder,
   formatSummonBonusValue,
   groupBonuses,
+  hasQuestElapsedTime,
   humanizeNumbers,
   millisecondsToElapsedFormat,
   openDamageCalculator,
@@ -1239,7 +1240,7 @@ export const ViewPage = () => {
               the first and last hit (what DPS is measured over), while this is
               the clear time the result screen reports, which also covers the
               run up to the boss. */}
-          {questTimer ? (
+          {hasQuestElapsedTime(questTimer) ? (
             <Box display="flex">
               <Text size="sm" fw={800}>
                 {t("ui.logs.quest-elapsed-time")}:

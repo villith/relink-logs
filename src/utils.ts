@@ -867,6 +867,21 @@ export const millisecondsToElapsedFormat = (ms: number): string => {
   return `${date.getUTCMinutes().toString().padStart(2, "0")}:${date.getUTCSeconds().toString().padStart(2, "0")}`;
 };
 
+/**
+ * The shortest in-game quest time worth believing, in seconds.
+ *
+ * Logs recorded before the quest timer was read from the right offset stored a
+ * constant 1s — the old read landed on an unrelated field — and 1s renders as a
+ * perfectly plausible-looking 00:01. Nothing the game can report is that short:
+ * across a real logs.db the bogus rows sit at 0 and 1 while the smallest genuine
+ * clear time is 92s.
+ */
+const MIN_QUEST_ELAPSED_SECS = 2;
+
+/// Whether a stored quest timer is a clear time the game actually reported.
+export const hasQuestElapsedTime = (seconds: number | null | undefined): seconds is number =>
+  seconds !== null && seconds !== undefined && seconds >= MIN_QUEST_ELAPSED_SECS;
+
 /// Captures a screenshot of the meter and copies it to the clipboard.
 export const exportScreenshotToClipboard = (selector = ".app") => {
   const app = document.querySelector(selector) as HTMLElement;

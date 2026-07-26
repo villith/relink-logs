@@ -3,6 +3,7 @@ import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { CharacterType, Log, LogSortType, SortDirection } from "@/types";
 import {
   epochToLocalTime,
+  hasQuestElapsedTime,
   millisecondsToElapsedFormat,
   translateCharacterType,
   translateEnemyType,
@@ -266,11 +267,12 @@ function LogEntry({
       <Table.Td>
         <Text size="xs">{millisecondsToElapsedFormat(log.duration)}</Text>
       </Table.Td>
-      {/* In-game time. Blank on logs recorded before the quest timer was read
-          correctly, and on fights the game never reported one for. */}
+      {/* In-game time. A dash on logs recorded before the quest timer was read
+          correctly, and on fights the game never reported one for — those
+          stored a constant 1s, which would otherwise read as a real 00:01. */}
       <Table.Td>
         <Text size="xs">
-          {log.questElapsedTime ? millisecondsToElapsedFormat(log.questElapsedTime * 1000) : ""}
+          {hasQuestElapsedTime(log.questElapsedTime) ? millisecondsToElapsedFormat(log.questElapsedTime * 1000) : "-"}
         </Text>
       </Table.Td>
       <Table.Td>
