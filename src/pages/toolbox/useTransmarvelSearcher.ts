@@ -1,0 +1,115 @@
+import pool from "@/assets/transmarvel-pool.json";
+import { assignable } from "@/pages/toolbox/matching";
+import type { TransmarvelRoll } from "@/types";
+import { toHashString } from "@/utils";
+
+/** A wished-for sigil, by trait only (any sigil rolling that trait, any level). */
+export type SigilEntry = { trait: string };
+
+/** One position a wished-for wrightstone entry needs filled. */
+export type WrightstoneSlot = { trait: string; minLevel: number };
+
+/** A wished-for wrightstone: every slot must land on its own distinct rolled
+ * position (see `stoneEntryMatches`/`comboSatisfies`). */
+export type WrightstoneEntry = { slots: WrightstoneSlot[] };
+
+/** The shape of the generated pool asset (src/assets/transmarvel-pool.json) —
+ * an explicit interface rather than `typeof pool` so test doubles built to
+ * the same shape type-check without fighting JSON's inferred literal types. */
+export interface TransmarvelPool {
+  sigils: { trait: string; sigilId: string }[];
+  wrightstones: {
+    levels: number[];
+    combos: { slots: { traits: string[]; levels: number[] }[] }[];
+  };
+}
+
+const POOL = pool as TransmarvelPool;
+
+/** Max slots a wishlist entry may specify — a gacha stone never has more than
+ * three trait positions. */
+const MAX_STONE_SLOTS = 3;
+
+/** True when each entry slot is satisfied by a DISTINCT rolled trait at or
+ * above its min level. `traits` are (trait hash, level) pairs off the roll. */
+export const stoneEntryMatches = (traits: [number, number][], entry: WrightstoneEntry): boolean =>
+  assignable(traits, entry.slots, (s, [trait, level]) => toHashString(trait) === s.trait && level >= s.minLevel);
+
+/** OR across both lists: the wishlists are "things I'd be happy to get". */
+export const rollHits = (roll: TransmarvelRoll, sigils: SigilEntry[], stones: WrightstoneEntry[]): boolean => {
+  if (roll.outcome.type === "sigil") {
+    const trait = toHashString(roll.outcome.trait1);
+    return sigils.some((e) => e.trait === trait);
+  }
+  const traits = roll.outcome.traits;
+  return stones.some((e) => stoneEntryMatches(traits, e));
+};
+
+/** True when some valid combo offers every slot's trait (distinct positions)
+ * with the slot's min level reachable. Same backtracking matcher: combo
+ * positions are the items, entry slots the filters. */
+export const comboSatisfies = (combo: TransmarvelPool["wrightstones"]["combos"][number], entry: WrightstoneEntry): boolean =>
+  assignable(combo.slots, entry.slots, (s, pos) => pos.traits.includes(s.trait) && pos.levels.some((l) => l >= s.minLevel));
+
+/** Validate a wishlist blob loaded from localStorage against the current pool
+ * (a game patch may have regenerated the pool and invalidated stored
+ * entries): keeps only entries whose shape and traits/levels are still valid,
+ * silently dropping the rest — no error, no partial-fix UI, it just stops
+ * offering what can no longer come up. */
+export const sanitizeWishlists = (
+  value: unknown,
+  p: TransmarvelPool = POOL
+): { sigils: SigilEntry[]; stones: WrightstoneEntry[] } => {
+  if (typeof value !== "object" || value === null) return { sigils: [], stones: [] };
+  const { sigils: rawSigils, stones: rawStones } = value as { sigils?: unknown; stones?: unknown };
+
+  const knownSigilTraits = new Set(p.sigils.map((s) => s.trait));
+  const seenSigilTraits = new Set<string>();
+  const sigils: SigilEntry[] = [];
+  if (Array.isArray(rawSigils)) {
+    for (const raw of rawSigils) {
+      if (typeof raw !== "object" || raw === null) continue;
+      const { trait } = raw as Record<string, unknown>;
+      if (typeof trait !== "string" || !knownSigilTraits.has(trait)) continue;
+      if (seenSigilTraits.has(trait)) continue;
+      seenSigilTraits.add(trait);
+      sigils.push({ trait });
+    }
+  }
+
+  const levelSet = new Set(p.wrightstones.levels);
+  const knownStoneTraits = new Set(p.wrightstones.combos.flatMap((c) => c.slots.flatMap((s) => s.traits)));
+  const stones: WrightstoneEntry[] = [];
+  if (Array.isArray(rawStones)) {
+    for (const raw of rawStones) {
+      if (typeof raw !== "object" || raw === null) continue;
+      const { slots: rawSlots } = raw as Record<string, unknown>;
+      if (!Array.isArray(rawSlots) || rawSlots.length === 0 || rawSlots.length > MAX_STONE_SLOTS) continue;
+
+      let valid = true;
+      const slots: WrightstoneSlot[] = [];
+      for (const rawSlot of rawSlots) {
+        if (typeof rawSlot !== "object" || rawSlot === null) {
+          valid = false;
+          break;
+        }
+        const { trait, minLevel } = rawSlot as Record<string, unknown>;
+        if (typeof trait !== "string" || !knownStoneTraits.has(trait)) {
+          valid = false;
+          break;
+        }
+        if (typeof minLevel !== "number" || !levelSet.has(minLevel)) {
+          valid = false;
+          break;
+        }
+        slots.push({ trait, minLevel });
+      }
+      if (!valid) continue;
+
+      const entry: WrightstoneEntry = { slots };
+      if (p.wrightstones.combos.some((c) => comboSatisfies(c, entry))) stones.push(entry);
+    }
+  }
+
+  return { sigils, stones };
+};
