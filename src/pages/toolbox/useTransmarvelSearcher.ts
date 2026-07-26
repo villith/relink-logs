@@ -1,7 +1,12 @@
 import pool from "@/assets/transmarvel-pool.json";
 import { assignable } from "@/pages/toolbox/matching";
-import type { TransmarvelRoll } from "@/types";
+import useGameStatus from "@/pages/toolbox/useGameStatus";
+import useStalenessWatch from "@/pages/toolbox/useStalenessWatch";
+import { useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
+import type { TransmarvelPrediction, TransmarvelRoll, TransmarvelStatus } from "@/types";
 import { toHashString } from "@/utils";
+import { invoke } from "@tauri-apps/api";
+import { useMemo, useState } from "react";
 
 /** A wished-for sigil, by trait only (any sigil rolling that trait, any level). */
 export type SigilEntry = { trait: string };
@@ -113,3 +118,62 @@ export const sanitizeWishlists = (
 
   return { sigils, stones };
 };
+
+/**
+ * State + handlers for the Transmarvel Searcher: persistent wishlists, live
+ * game status, prediction fetch, and staleness. Wishlist matching stays
+ * client-side so edits re-highlight without re-invoking the backend.
+ */
+export default function useTransmarvelSearcher() {
+  const { status, error, setError, loading } = useGameStatus<TransmarvelStatus>("fetch_transmarvel_status");
+  const [prediction, setPrediction] = useState<TransmarvelPrediction | null>(null);
+  const [predicting, setPredicting] = useState(false);
+  const [rolls, setRolls] = useState(50);
+  const [matchesOnly, setMatchesOnly] = useState(false);
+
+  const rawSigils = useTransmarvelWishlistStore((s) => s.sigils);
+  const rawStones = useTransmarvelWishlistStore((s) => s.stones);
+  const setSigils = useTransmarvelWishlistStore((s) => s.setSigils);
+  const setStones = useTransmarvelWishlistStore((s) => s.setStones);
+
+  // Stored entries can predate a game patch; validate on read, like
+  // overmastery's sanitizeSelection. Writes go through the setters unchanged
+  // (the pickers only offer valid values).
+  const { sigils, stones } = useMemo(() => sanitizeWishlists({ sigils: rawSigils, stones: rawStones }), [rawSigils, rawStones]);
+
+  /** While results are shown, watch the prediction's RNG slot; once the live
+   * state moves off the predicted one (the user rolled, or a quest reshuffled
+   * the stream), the list is stale. */
+  const [stale, setStale] = useStalenessWatch(prediction && !prediction.unpredictable ? prediction : null, async (watched) => {
+    const current = await invoke<number | null>("fetch_overmastery_seed", { slot: watched.slot });
+    return current !== null && current !== watched.slotState;
+  });
+
+  const predict = async () => {
+    setPredicting(true);
+    setError(null);
+    setStale(false);
+    try {
+      setPrediction(await invoke<TransmarvelPrediction>("predict_transmarvel", { query: { rolls } }));
+    } catch (e) {
+      setPrediction(null);
+      setError(String(e));
+    } finally {
+      setPredicting(false);
+    }
+  };
+
+  /** Roll list with hit flags; the page renders this directly. */
+  const results = useMemo(
+    () => (prediction?.rolls ?? []).map((roll, index) => ({ roll, index, hit: rollHits(roll, sigils, stones) })),
+    [prediction, sigils, stones]
+  );
+  const firstHit = useMemo(() => results.find((r) => r.hit)?.index ?? null, [results]);
+
+  return {
+    status, error, loading, prediction, predicting, stale,
+    rolls, setRolls, matchesOnly, setMatchesOnly,
+    sigils, setSigils, stones, setStones,
+    results, firstHit, predict,
+  };
+}
