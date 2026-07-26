@@ -2,499 +2,1102 @@
  "sigils": [
   {
    "trait": "05f2ecdc",
-   "sigilId": "6cba6b0d"
+   "sigilId": "6cba6b0d",
+   "trait2Lot": "26",
+   "extraTrait2": []
   },
   {
    "trait": "05fa4599",
-   "sigilId": "bcedf060"
+   "sigilId": "bcedf060",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "06719232",
-   "sigilId": "0523a202"
+   "sigilId": "0523a202",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "ed8d8ad8"
+   ]
   },
   {
    "trait": "09aa7db5",
-   "sigilId": "a4b849a0"
+   "sigilId": "a4b849a0",
+   "trait2Lot": "7",
+   "extraTrait2": []
   },
   {
    "trait": "0aa20846",
-   "sigilId": "b832e7a7"
+   "sigilId": "b832e7a7",
+   "trait2Lot": "7",
+   "extraTrait2": []
   },
   {
    "trait": "0cd6c625",
-   "sigilId": "119b24a8"
+   "sigilId": "e7624711",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "a3b49220"
+   ]
   },
   {
    "trait": "0de887a0",
-   "sigilId": "8b8085c0"
+   "sigilId": "8b8085c0",
+   "trait2Lot": "6",
+   "extraTrait2": []
   },
   {
    "trait": "0e42be1b",
-   "sigilId": "caae3f9c"
+   "sigilId": "caae3f9c",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "0f026cf0",
-   "sigilId": "3069c2fe"
+   "sigilId": "3069c2fe",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "11aae5f5",
-   "sigilId": "f6c0fca5"
+   "sigilId": "f6c0fca5",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "1470f860",
-   "sigilId": "eda2116a"
+   "sigilId": "eda2116a",
+   "trait2Lot": "7",
+   "extraTrait2": []
   },
   {
    "trait": "151e4674",
-   "sigilId": "98a6d249"
+   "sigilId": "9f08f697",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "a374fdf0"
+   ]
   },
   {
    "trait": "15806dfc",
-   "sigilId": "7e3a52a3"
+   "sigilId": "7e3a52a3",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "16eff868",
-   "sigilId": "fb9b6dd5"
+   "sigilId": "fb9b6dd5",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "1de14c65",
-   "sigilId": "282dbff0"
+   "sigilId": "282dbff0",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "26956f25"
+   ]
   },
   {
    "trait": "23d0f67f",
-   "sigilId": "01d1a6ce"
+   "sigilId": "01d1a6ce",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "c2a4c7a9"
+   ]
   },
   {
    "trait": "24883af3",
-   "sigilId": "3ed16fb2"
+   "sigilId": "3ed16fb2",
+   "trait2Lot": "27",
+   "extraTrait2": []
   },
   {
    "trait": "26956f25",
-   "sigilId": "f21404b1"
+   "sigilId": "f21404b1",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "29b07beb",
-   "sigilId": "1a57aef1"
+   "sigilId": "b143dae6",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "a63b89cd"
+   ]
   },
   {
    "trait": "2e65a774",
-   "sigilId": "673c5d8f"
+   "sigilId": "9d5bc5bf",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "16eff868"
+   ]
   },
   {
    "trait": "2fc8fbff",
-   "sigilId": "4ba4e4ac"
+   "sigilId": "e8454459",
+   "trait2Lot": "6",
+   "extraTrait2": [
+    "50079a1c"
+   ]
   },
   {
    "trait": "30773197",
-   "sigilId": "ba28c81c"
+   "sigilId": "ba28c81c",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "318d12e9",
-   "sigilId": "ab70208c"
+   "sigilId": "ab70208c",
+   "trait2Lot": "26",
+   "extraTrait2": []
   },
   {
    "trait": "36e3848d",
-   "sigilId": "74061b0c"
+   "sigilId": "74061b0c",
+   "trait2Lot": "6",
+   "extraTrait2": []
   },
   {
    "trait": "3bfed918",
-   "sigilId": "522004ab"
+   "sigilId": "522004ab",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "f8496336"
+   ]
   },
   {
    "trait": "3d8153a1",
-   "sigilId": "938db625"
+   "sigilId": "938db625",
+   "trait2Lot": "6",
+   "extraTrait2": []
   },
   {
    "trait": "3eb345d7",
-   "sigilId": "d8c61507"
+   "sigilId": "d8c61507",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "3f488339",
-   "sigilId": "a3021b5e"
+   "sigilId": "a3021b5e",
+   "trait2Lot": "6",
+   "extraTrait2": [
+    "50079a1c"
+   ]
   },
   {
    "trait": "451d814c",
-   "sigilId": "6cca1ff7"
+   "sigilId": "6cca1ff7",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "461a8e07",
-   "sigilId": "d4117ff3"
+   "sigilId": "d4117ff3",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "47384248",
-   "sigilId": "5a360ea8"
+   "sigilId": "64301e91",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "30773197"
+   ]
   },
   {
    "trait": "48a95b8d",
-   "sigilId": "6f1d0870"
+   "sigilId": "6f1d0870",
+   "trait2Lot": "7",
+   "extraTrait2": []
   },
   {
    "trait": "4c588c27",
-   "sigilId": "00612b10"
+   "sigilId": "00612b10",
+   "trait2Lot": "6",
+   "extraTrait2": []
   },
   {
    "trait": "4e5f6706",
-   "sigilId": "5d592fdd"
+   "sigilId": "5d592fdd",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "4f135217",
-   "sigilId": "bfdf838c"
+   "sigilId": "bfdf838c",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "50079a1c",
-   "sigilId": "08da7279"
+   "sigilId": "2d7f2e70",
+   "trait2Lot": "5",
+   "extraTrait2": []
   },
   {
    "trait": "522e2388",
-   "sigilId": "7c8580ca"
+   "sigilId": "7c8580ca",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "5463232f",
-   "sigilId": "7d318ff7"
+   "sigilId": "7d318ff7",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "451d814c"
+   ]
   },
   {
    "trait": "5559232f",
-   "sigilId": "9abd2da5"
+   "sigilId": "9abd2da5",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "57ab5b10",
-   "sigilId": "035a4ddd"
+   "sigilId": "035a4ddd",
+   "trait2Lot": "6",
+   "extraTrait2": []
   },
   {
    "trait": "6085da25",
-   "sigilId": "837b3d64"
+   "sigilId": "837b3d64",
+   "trait2Lot": "26",
+   "extraTrait2": []
   },
   {
    "trait": "6316cbeb",
-   "sigilId": "8a3819c0"
+   "sigilId": "8a3819c0",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "6ebfa176",
-   "sigilId": "4f01d6ca"
+   "sigilId": "b74c207b",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "f1d5dbd0"
+   ]
   },
   {
    "trait": "6ff05223",
-   "sigilId": "c06f4708"
+   "sigilId": "c06f4708",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "71f11a9b",
-   "sigilId": "9dc8305d"
+   "sigilId": "a492ffac",
+   "trait2Lot": "6",
+   "extraTrait2": [
+    "50079a1c"
+   ]
   },
   {
    "trait": "73220725",
-   "sigilId": "9300fadb"
+   "sigilId": "9300fadb",
+   "trait2Lot": "6",
+   "extraTrait2": []
   },
   {
    "trait": "7351d602",
-   "sigilId": "bf714a8a"
+   "sigilId": "bf714a8a",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "7440e869",
-   "sigilId": "e4f986d9"
+   "sigilId": "fb0f9037",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "cd124165"
+   ]
   },
   {
    "trait": "74aa75d6",
-   "sigilId": "d4ebb836"
+   "sigilId": "d4ebb836",
+   "trait2Lot": "7",
+   "extraTrait2": []
   },
   {
    "trait": "77c809f5",
-   "sigilId": "12dfd310"
+   "sigilId": "12dfd310",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "9230e3f5"
+   ]
   },
   {
    "trait": "79266456",
-   "sigilId": "eb766d87"
+   "sigilId": "eb766d87",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "7ad0c010",
-   "sigilId": "eaa911b2"
+   "sigilId": "eaa911b2",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "7b4fc47a",
-   "sigilId": "9f72bae0"
+   "sigilId": "9f72bae0",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "7b5b081d",
-   "sigilId": "d8a464f1"
+   "sigilId": "ec9ffe77",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "9ace140b"
+   ]
   },
   {
    "trait": "7ccff74f",
-   "sigilId": "329c4e1c"
+   "sigilId": "3ba37635",
+   "trait2Lot": "26",
+   "extraTrait2": []
   },
   {
    "trait": "7d75d904",
-   "sigilId": "23953fd4"
+   "sigilId": "f964a4ca",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "be3404b9"
+   ]
   },
   {
    "trait": "807b6684",
-   "sigilId": "2d70c37d"
+   "sigilId": "2d70c37d",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "81b293d9",
-   "sigilId": "ad8caefb"
+   "sigilId": "ad8caefb",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "8519ad4a",
-   "sigilId": "515e693c"
+   "sigilId": "515e693c",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "8572b8af",
-   "sigilId": "dbe503c7"
+   "sigilId": "dbe503c7",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "86cbcdc4",
-   "sigilId": "ab835493"
+   "sigilId": "c0b5128e",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "05fa4599"
+   ]
   },
   {
    "trait": "8b3bf60c",
-   "sigilId": "e89224a1"
+   "sigilId": "e89224a1",
+   "trait2Lot": "7",
+   "extraTrait2": []
   },
   {
    "trait": "8cdf9382",
-   "sigilId": "85d7b335"
+   "sigilId": "85d7b335",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "d1012d8c"
+   ]
   },
   {
    "trait": "8d78a19b",
-   "sigilId": "0bb9c188"
+   "sigilId": "0bb9c188",
+   "trait2Lot": "5",
+   "extraTrait2": []
   },
   {
    "trait": "921b6b0c",
-   "sigilId": "05aca892"
+   "sigilId": "05aca892",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "9230e3f5",
-   "sigilId": "ae9d89df"
+   "sigilId": "ae9d89df",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "9232dc17",
-   "sigilId": "d29cd8e0"
+   "sigilId": "d29cd8e0",
+   "trait2Lot": "6",
+   "extraTrait2": []
   },
   {
    "trait": "93a2093c",
-   "sigilId": "af8e7e7e"
+   "sigilId": "b98a0f22",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "7ad0c010"
+   ]
   },
   {
    "trait": "95f3fa86",
-   "sigilId": "d340651c"
+   "sigilId": "d340651c",
+   "trait2Lot": "27",
+   "extraTrait2": []
   },
   {
    "trait": "9a9dc170",
-   "sigilId": "a0f94f69"
+   "sigilId": "a0f94f69",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "522e2388"
+   ]
   },
   {
    "trait": "9ace140b",
-   "sigilId": "96d6fe5e"
+   "sigilId": "96d6fe5e",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "9afdfa9e",
-   "sigilId": "ac175924"
+   "sigilId": "ac175924",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "a339d642",
-   "sigilId": "e496d882"
+   "sigilId": "e496d882",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "a374fdf0",
-   "sigilId": "d48abdda"
+   "sigilId": "d48abdda",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "a38510e2",
-   "sigilId": "380a3ca8"
+   "sigilId": "380a3ca8",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "a3b49220",
-   "sigilId": "49651c89"
+   "sigilId": "49651c89",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "a63b89cd",
-   "sigilId": "a879208f"
+   "sigilId": "a879208f",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "a7726190",
-   "sigilId": "20492635"
+   "sigilId": "20492635",
+   "trait2Lot": "6",
+   "extraTrait2": []
   },
   {
    "trait": "a898e283",
-   "sigilId": "e14e1598"
+   "sigilId": "e14e1598",
+   "trait2Lot": "6",
+   "extraTrait2": []
   },
   {
    "trait": "aa83f548",
-   "sigilId": "1bbe919c"
+   "sigilId": "64d63823",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "921b6b0c"
+   ]
   },
   {
    "trait": "af513a9d",
-   "sigilId": "147da58b"
+   "sigilId": "147da58b",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "b064a634",
-   "sigilId": "98e9e6ef"
+   "sigilId": "98e9e6ef",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "b48eef48",
-   "sigilId": "9d88dea1"
+   "sigilId": "9d88dea1",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "11aae5f5"
+   ]
   },
   {
    "trait": "b5ff9fd3",
-   "sigilId": "04ac2281"
+   "sigilId": "04ac2281",
+   "trait2Lot": "26",
+   "extraTrait2": []
   },
   {
    "trait": "b85202bc",
-   "sigilId": "4c28585a"
+   "sigilId": "4c28585a",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "b953cc1e",
-   "sigilId": "51e98a7c"
+   "sigilId": "51e98a7c",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "ba504607",
-   "sigilId": "4cdce25b"
+   "sigilId": "4cdce25b",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "be3404b9",
-   "sigilId": "1a359b67"
+   "sigilId": "1a359b67",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "c00163b3",
-   "sigilId": "43f26a91"
+   "sigilId": "43f26a91",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "c2a4c7a9",
-   "sigilId": "21e10eb7"
+   "sigilId": "21e10eb7",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "c7d379f1",
-   "sigilId": "e21a4170"
+   "sigilId": "e21a4170",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "cd030268",
-   "sigilId": "33f01810"
+   "sigilId": "33f01810",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "a38510e2"
+   ]
   },
   {
    "trait": "cd124165",
-   "sigilId": "a59c9613"
+   "sigilId": "a59c9613",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "ceb700ee",
-   "sigilId": "39bea99b"
+   "sigilId": "791da8ed",
+   "trait2Lot": "5",
+   "extraTrait2": []
   },
   {
    "trait": "d029fe08",
-   "sigilId": "5bf84fd1"
+   "sigilId": "5bf84fd1",
+   "trait2Lot": "27",
+   "extraTrait2": []
   },
   {
    "trait": "d1012d8c",
-   "sigilId": "b5da3e80"
+   "sigilId": "b5da3e80",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "d176d262",
-   "sigilId": "95cc3cb8"
+   "sigilId": "9ec6c56d",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "461a8e07"
+   ]
   },
   {
    "trait": "d2c8e10a",
-   "sigilId": "2679a4f0"
+   "sigilId": "2679a4f0",
+   "trait2Lot": "26",
+   "extraTrait2": []
   },
   {
    "trait": "d40d1e9b",
-   "sigilId": "3ea4134b"
+   "sigilId": "3ea4134b",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "15806dfc"
+   ]
   },
   {
    "trait": "d76f4d24",
-   "sigilId": "bc53ce24"
+   "sigilId": "bc53ce24",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "d7f9bb88",
-   "sigilId": "b3ab43f3"
+   "sigilId": "b3ab43f3",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "d8f66c1c",
-   "sigilId": "a490badf"
+   "sigilId": "a490badf",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "d908223d",
-   "sigilId": "b441275d"
+   "sigilId": "e073ea65",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "7351d602"
+   ]
   },
   {
    "trait": "dade14dc",
-   "sigilId": "0713d928"
+   "sigilId": "0713d928",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "daefbb27",
-   "sigilId": "76d4716b"
+   "sigilId": "76d4716b",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "dba19768",
-   "sigilId": "41ac1082"
+   "sigilId": "41ac1082",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "dc584f60",
-   "sigilId": "54d8ea04"
+   "sigilId": "54d8ea04",
+   "trait2Lot": "6",
+   "extraTrait2": [
+    "50079a1c"
+   ]
   },
   {
    "trait": "e0abfdfe",
-   "sigilId": "9c2399da"
+   "sigilId": "9c2399da",
+   "trait2Lot": "7",
+   "extraTrait2": []
   },
   {
    "trait": "e60a735c",
-   "sigilId": "02472c43"
+   "sigilId": "b5725272",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "6ff05223"
+   ]
   },
   {
    "trait": "e69a4694",
-   "sigilId": "bb49c8f6"
+   "sigilId": "bb49c8f6",
+   "trait2Lot": "27",
+   "extraTrait2": []
   },
   {
    "trait": "e6b92e34",
-   "sigilId": "66f1b128"
+   "sigilId": "66f1b128",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "e6cdba9c",
-   "sigilId": "381bbe64"
+   "sigilId": "381bbe64",
+   "trait2Lot": "7",
+   "extraTrait2": []
   },
   {
    "trait": "e85ff8e0",
-   "sigilId": "8ecbb0a3"
+   "sigilId": "eb4ad96d",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "8572b8af"
+   ]
   },
   {
    "trait": "ec3cf174",
-   "sigilId": "02b1f8c0"
+   "sigilId": "14c58bf1",
+   "trait2Lot": "15",
+   "extraTrait2": [
+    "af513a9d"
+   ]
   },
   {
    "trait": "ed8d8ad8",
-   "sigilId": "0723f7ec"
+   "sigilId": "0723f7ec",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "ee85cd1f",
-   "sigilId": "332e9b30"
+   "sigilId": "332e9b30",
+   "trait2Lot": "6",
+   "extraTrait2": []
   },
   {
    "trait": "f1d5dbd0",
-   "sigilId": "44d48479"
+   "sigilId": "44d48479",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "f26baea5",
-   "sigilId": "7b4aab30"
+   "sigilId": "7b4aab30",
+   "trait2Lot": "26",
+   "extraTrait2": []
   },
   {
    "trait": "f372f096",
-   "sigilId": "b5b23f02"
+   "sigilId": "e92ee838",
+   "trait2Lot": "5",
+   "extraTrait2": []
   },
   {
    "trait": "f8496336",
-   "sigilId": "30a3f2ea"
+   "sigilId": "30a3f2ea",
+   "trait2Lot": "15",
+   "extraTrait2": []
   },
   {
    "trait": "fdd1ad24",
-   "sigilId": "cef31894"
+   "sigilId": "cef31894",
+   "trait2Lot": "15",
+   "extraTrait2": []
   }
  ],
- "wrightstones": {
-  "levels": [
-   5,
-   7,
-   10,
-   15,
-   20
+ "trait2Lots": {
+  "5": [
+   "0053599e",
+   "05f2ecdc",
+   "09aa7db5",
+   "0aa20846",
+   "1470f860",
+   "1c360c63",
+   "1dc9d7e7",
+   "2242921f",
+   "24883af3",
+   "29b292a8",
+   "2fc8fbff",
+   "318d12e9",
+   "3759a5b9",
+   "3c2b57b0",
+   "3f488339",
+   "3fec5f80",
+   "4bf2e191",
+   "4f1a3683",
+   "50b453dd",
+   "6018372b",
+   "6085da25",
+   "66de60b1",
+   "6b694d6d",
+   "71f11a9b",
+   "7c2e4d64",
+   "7c84a6b3",
+   "7ccff74f",
+   "7edd69d0",
+   "84078cb0",
+   "8b3bf60c",
+   "8d078597",
+   "8f502f0d",
+   "9389cc06",
+   "95f3fa86",
+   "9702860f",
+   "973b49af",
+   "a2fa9685",
+   "a7a45f28",
+   "a9d17f55",
+   "ac9674c1",
+   "b360801d",
+   "b5ff9fd3",
+   "b6e31f76",
+   "c0979a17",
+   "c35b111b",
+   "c86f3082",
+   "cfb48782",
+   "d2c8e10a",
+   "d54f8ca7",
+   "dc584f60",
+   "dc607d75",
+   "dd4a701e",
+   "e0abfdfe",
+   "e69a4694",
+   "e6cdba9c",
+   "eae321eb",
+   "f17850b9",
+   "f687c5ef",
+   "fb572681"
   ],
+  "6": [
+   "0053599e",
+   "05f2ecdc",
+   "09aa7db5",
+   "0aa20846",
+   "1470f860",
+   "1dc9d7e7",
+   "2242921f",
+   "24883af3",
+   "29b292a8",
+   "318d12e9",
+   "3759a5b9",
+   "4bf2e191",
+   "50b453dd",
+   "6018372b",
+   "6085da25",
+   "66de60b1",
+   "7c84a6b3",
+   "7ccff74f",
+   "7edd69d0",
+   "8b3bf60c",
+   "9389cc06",
+   "95f3fa86",
+   "9702860f",
+   "973b49af",
+   "a2fa9685",
+   "b5ff9fd3",
+   "b6e31f76",
+   "c86f3082",
+   "cfb48782",
+   "d2c8e10a",
+   "d54f8ca7",
+   "dc607d75",
+   "dd4a701e",
+   "e0abfdfe",
+   "e69a4694",
+   "e6cdba9c",
+   "f687c5ef",
+   "fb572681"
+  ],
+  "27": [
+   "05f2ecdc",
+   "09aa7db5",
+   "0aa20846",
+   "1470f860",
+   "1c360c63",
+   "1dc9d7e7",
+   "2242921f",
+   "29b292a8",
+   "2fc8fbff",
+   "318d12e9",
+   "3759a5b9",
+   "3c2b57b0",
+   "3f488339",
+   "3fec5f80",
+   "4bf2e191",
+   "4f1a3683",
+   "50079a1c",
+   "50b453dd",
+   "6085da25",
+   "66de60b1",
+   "6b694d6d",
+   "71f11a9b",
+   "7c2e4d64",
+   "7c84a6b3",
+   "7ccff74f",
+   "7edd69d0",
+   "84078cb0",
+   "8b3bf60c",
+   "8d078597",
+   "8d78a19b",
+   "8f502f0d",
+   "9389cc06",
+   "9702860f",
+   "973b49af",
+   "a2fa9685",
+   "a7a45f28",
+   "a9d17f55",
+   "ac9674c1",
+   "b360801d",
+   "b5ff9fd3",
+   "b6e31f76",
+   "c0979a17",
+   "c35b111b",
+   "ceb700ee",
+   "cfb48782",
+   "d2c8e10a",
+   "d54f8ca7",
+   "dc584f60",
+   "dd4a701e",
+   "e0abfdfe",
+   "e6cdba9c",
+   "eae321eb",
+   "f17850b9",
+   "f372f096",
+   "fb572681"
+  ],
+  "7": [
+   "0053599e",
+   "05f2ecdc",
+   "24883af3",
+   "318d12e9",
+   "6018372b",
+   "6085da25",
+   "7ccff74f",
+   "7edd69d0",
+   "9389cc06",
+   "95f3fa86",
+   "b5ff9fd3",
+   "c86f3082",
+   "d2c8e10a",
+   "dc607d75",
+   "e69a4694",
+   "f687c5ef"
+  ],
+  "26": [
+   "0053599e",
+   "09aa7db5",
+   "0aa20846",
+   "1470f860",
+   "1c360c63",
+   "1dc9d7e7",
+   "2242921f",
+   "24883af3",
+   "29b292a8",
+   "2fc8fbff",
+   "3759a5b9",
+   "3c2b57b0",
+   "3f488339",
+   "3fec5f80",
+   "4bf2e191",
+   "4f1a3683",
+   "50079a1c",
+   "50b453dd",
+   "6018372b",
+   "66de60b1",
+   "6b694d6d",
+   "71f11a9b",
+   "7c2e4d64",
+   "7c84a6b3",
+   "84078cb0",
+   "8b3bf60c",
+   "8d078597",
+   "8d78a19b",
+   "8f502f0d",
+   "95f3fa86",
+   "9702860f",
+   "973b49af",
+   "a2fa9685",
+   "a7a45f28",
+   "a9d17f55",
+   "ac9674c1",
+   "b360801d",
+   "b6e31f76",
+   "c0979a17",
+   "c35b111b",
+   "c86f3082",
+   "ceb700ee",
+   "cfb48782",
+   "d54f8ca7",
+   "dc584f60",
+   "dc607d75",
+   "dd4a701e",
+   "e0abfdfe",
+   "e69a4694",
+   "e6cdba9c",
+   "eae321eb",
+   "f17850b9",
+   "f372f096",
+   "f687c5ef",
+   "fb572681"
+  ],
+  "15": [
+   "0053599e",
+   "05f2ecdc",
+   "09aa7db5",
+   "0aa20846",
+   "1470f860",
+   "1c360c63",
+   "1dc9d7e7",
+   "2242921f",
+   "24883af3",
+   "29b292a8",
+   "2fc8fbff",
+   "318d12e9",
+   "3759a5b9",
+   "3c2b57b0",
+   "3f488339",
+   "3fec5f80",
+   "4bf2e191",
+   "4f1a3683",
+   "50079a1c",
+   "50b453dd",
+   "6018372b",
+   "6085da25",
+   "66de60b1",
+   "6b694d6d",
+   "71f11a9b",
+   "7c2e4d64",
+   "7c84a6b3",
+   "7ccff74f",
+   "7edd69d0",
+   "84078cb0",
+   "8b3bf60c",
+   "8d078597",
+   "8d78a19b",
+   "8f502f0d",
+   "9389cc06",
+   "95f3fa86",
+   "9702860f",
+   "973b49af",
+   "a2fa9685",
+   "a7a45f28",
+   "a9d17f55",
+   "ac9674c1",
+   "b360801d",
+   "b5ff9fd3",
+   "b6e31f76",
+   "c0979a17",
+   "c35b111b",
+   "c86f3082",
+   "ceb700ee",
+   "cfb48782",
+   "d2c8e10a",
+   "d54f8ca7",
+   "dc584f60",
+   "dc607d75",
+   "dd4a701e",
+   "e0abfdfe",
+   "e69a4694",
+   "e6cdba9c",
+   "eae321eb",
+   "f17850b9",
+   "f372f096",
+   "f687c5ef",
+   "fb572681"
+  ]
+ },
+ "wrightstones": {
   "combos": [
    {
+    "item": "bcdbc4b6",
+    "family": "ceb700ee",
+    "tier": 0,
+    "chancePercent": 74.9,
     "slots": [
      {
       "traits": [
@@ -664,6 +1267,10 @@
     ]
    },
    {
+    "item": "3ef6def5",
+    "family": "8d78a19b",
+    "tier": 0,
+    "chancePercent": 74.9,
     "slots": [
      {
       "traits": [
@@ -833,6 +1440,10 @@
     ]
    },
    {
+    "item": "be6124ad",
+    "family": "f372f096",
+    "tier": 0,
+    "chancePercent": 74.9,
     "slots": [
      {
       "traits": [
@@ -1002,6 +1613,10 @@
     ]
    },
    {
+    "item": "0bd373a4",
+    "family": "6b694d6d",
+    "tier": 0,
+    "chancePercent": 74.9,
     "slots": [
      {
       "traits": [
@@ -1171,6 +1786,10 @@
     ]
    },
    {
+    "item": "09e6f629",
+    "family": "ceb700ee",
+    "tier": 1,
+    "chancePercent": 25.0,
     "slots": [
      {
       "traits": [
@@ -1337,6 +1956,10 @@
     ]
    },
    {
+    "item": "71173866",
+    "family": "8d78a19b",
+    "tier": 1,
+    "chancePercent": 25.0,
     "slots": [
      {
       "traits": [
@@ -1503,6 +2126,10 @@
     ]
    },
    {
+    "item": "667ee1d3",
+    "family": "f372f096",
+    "tier": 1,
+    "chancePercent": 25.0,
     "slots": [
      {
       "traits": [
@@ -1669,6 +2296,10 @@
     ]
    },
    {
+    "item": "202a0db9",
+    "family": "6b694d6d",
+    "tier": 1,
+    "chancePercent": 25.0,
     "slots": [
      {
       "traits": [
@@ -1835,6 +2466,10 @@
     ]
    },
    {
+    "item": "3cb3eb94",
+    "family": "ceb700ee",
+    "tier": 2,
+    "chancePercent": 0.1,
     "slots": [
      {
       "traits": [
@@ -1863,6 +2498,10 @@
     ]
    },
    {
+    "item": "31291925",
+    "family": "8d78a19b",
+    "tier": 2,
+    "chancePercent": 0.1,
     "slots": [
      {
       "traits": [
@@ -1891,6 +2530,10 @@
     ]
    },
    {
+    "item": "b359b5b2",
+    "family": "f372f096",
+    "tier": 2,
+    "chancePercent": 0.1,
     "slots": [
      {
       "traits": [
@@ -1919,6 +2562,10 @@
     ]
    },
    {
+    "item": "f6e684fa",
+    "family": "6b694d6d",
+    "tier": 2,
+    "chancePercent": 0.1,
     "slots": [
      {
       "traits": [

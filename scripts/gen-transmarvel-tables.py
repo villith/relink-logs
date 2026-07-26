@@ -56,17 +56,29 @@ Output shape (camelCase, deserialized by transmarvel::TransmarvelTables):
 Second output, src/assets/transmarvel-pool.json (camelCase, consumed by the
 Toolbox wishlist pickers, NOT by the Rust predictor): a frontend-shaped
 slice of the same data —
-  sigils      — one entry per distinct droppable gem trait (trait1),
-                deduped, each paired with a representative sigil item id
-                (ties broken by lowest item hash; several rarities of a
-                gem share one trait1 and one display name).
-  wrightstones.levels  — the sorted union of every level any stone combo
-                can roll (reconciled ground truth: [5, 7, 10, 15, 20]).
+  sigils      — one entry per distinct droppable gem trait (trait1). The
+                representative sigilId is the lowest item hash among the
+                trait1's REGULAR (rolled-2nd-trait) items, so the picker
+                shows the plain sigil name, never a fixed-pair variant
+                (both can share a display name, e.g. "Attack Power V+").
+                trait2Lot keys into trait2Lots (the rolled 2nd-trait
+                candidate set); extraTrait2 lists fixed-pair (_14/_90)
+                trait2s NOT already in that lot (character-sigil pairs,
+                and ATK for a few V+ items). Valid 2nd traits for a
+                sigil = trait2Lots[trait2Lot] ∪ extraTrait2.
+  trait2Lots  — skill_type_lot row key -> sorted trait hashes reachable
+                from it (shared across sigils via this indirection; only
+                6 rows are in use).
   wrightstones.combos  — one entry per gacha stone item (12 = 4 families x
-                3 tiers), each 3 slots in order (trait 1, slot A, slot B).
-                Trait 1 is always a single fixed family trait; its levels
-                come from stoneConfigs' trait1Level (if fixed) or
-                trait1LevelLot's nonzero weights. Each of slots A/B is
+                3 tiers): item (the gacha item hash — the frontend's match
+                key against a predicted roll's `item`), family (the fixed
+                trait-1 hash, shared by the family's 3 tiers), tier (rate-
+                group table order, 0 = worst; weights asserted [7490,
+                2500, 10] so the order is really worst→best), chancePercent
+                (weight/100), and 3 slots in order (trait 1, slot A,
+                slot B). Trait 1 is always the single fixed family trait;
+                its levels come from stoneConfigs' trait1Level (if fixed)
+                or trait1LevelLot's nonzero weights. Each of slots A/B is
                 either fixed (stoneConfigs slot.skill != 0: a singleton
                 trait+level, the top 0.1% tier) or rolled (gate chance
                 asserted == 100; traits = the union of skill_lot hashes
@@ -196,22 +208,56 @@ def build_pool(
     skill_level_lots: dict,
 ) -> dict:
     """Frontend-shaped pool for the wishlist pickers (see docstring)."""
-    # sigils: distinct droppable gem traits, deduped, each paired with a
-    # representative sigil item id (lowest hash of the items sharing it).
-    trait_sigil = {}
+    # sigils: one entry per distinct trait1. Regular (rolled-2nd) items supply
+    # the representative sigilId (lowest hash) and the rolled lot; fixed-pair
+    # items (_14/_90) contribute extra valid 2nd traits not already in the lot.
+    sigil_info = {}
     for g in gem_groups:
         for i in g["items"]:
             assert i["trait1"] != 0, f"gem item {i['item']:08x} has no trait1"
-            cur = trait_sigil.get(i["trait1"])
-            if cur is None or i["item"] < cur:
-                trait_sigil[i["trait1"]] = i["item"]
-    sigils = [
-        {"trait": f"{trait:08x}", "sigilId": f"{item:08x}"}
-        for trait, item in sorted(trait_sigil.items(), key=lambda kv: f"{kv[0]:08x}")
-    ]
+            d = sigil_info.setdefault(i["trait1"], {"lot": None, "fixed": set(), "rep": None})
+            if i["secondTraitLot"] >= 0:
+                assert d["lot"] in (None, i["secondTraitLot"]), (
+                    f"conflicting rolled lots for trait1 {i['trait1']:08x}"
+                )
+                d["lot"] = i["secondTraitLot"]
+                if d["rep"] is None or i["item"] < d["rep"]:
+                    d["rep"] = i["item"]
+            else:
+                assert i["trait2"] != 0, (
+                    f"item {i['item']:08x}: no rolled lot and no fixed trait2"
+                )
+                d["fixed"].add(i["trait2"])
 
+    lot_traits = {}
+    for t1, d in sigil_info.items():
+        assert d["lot"] is not None and d["rep"] is not None, (
+            f"trait1 {t1:08x} has no regular (rolled-2nd) item"
+        )
+        if d["lot"] not in lot_traits:
+            traits = set()
+            for lot_key, _pct in skill_type_rows[d["lot"]]:
+                traits.update(skill_lots[lot_key])
+            lot_traits[d["lot"]] = traits
+
+    sigils = [
+        {
+            "trait": f"{t1:08x}",
+            "sigilId": f"{d['rep']:08x}",
+            "trait2Lot": str(d["lot"]),
+            "extraTrait2": sorted(f"{t:08x}" for t in d["fixed"] - lot_traits[d["lot"]]),
+        }
+        for t1, d in sorted(sigil_info.items(), key=lambda kv: f"{kv[0]:08x}")
+    ]
+    trait2_lots = {str(k): sorted(f"{t:08x}" for t in v) for k, v in lot_traits.items()}
+
+    # combos: one per gacha stone item; tier = rate-group order (worst→best),
+    # pinned by the weight order so a table reshuffle can't silently flip it.
+    assert [g["weight"] for g in stone_groups] == [7490, 2500, 10], (
+        "stone tier weights changed — re-verify tier ordering"
+    )
     combos = []
-    for g in stone_groups:
+    for tier, g in enumerate(stone_groups):
         for i in g["items"]:
             cfg = stone_configs[i["item"]]
             if cfg["trait1Level"] != 0:
@@ -245,14 +291,24 @@ def build_pool(
             assert max(slots_out[2]["levels"]) <= min(slots_out[1]["levels"]), (
                 f"slot B levels exceed slot A cap for stone {i['item']:08x}"
             )
-            combos.append({"slots": slots_out})
+            combos.append(
+                {
+                    "item": f"{i['item']:08x}",
+                    "family": f"{cfg['trait1']:08x}",
+                    "tier": tier,
+                    "chancePercent": g["weight"] / 100,
+                    "slots": slots_out,
+                }
+            )
 
     assert len(combos) == 12, f"expected 12 stone combos, got {len(combos)}"
+    families = {c["family"] for c in combos}
+    assert len(families) == 4, f"expected 4 stone families, got {len(families)}"
+    for fam in families:
+        tiers = sorted(c["tier"] for c in combos if c["family"] == fam)
+        assert tiers == [0, 1, 2], f"family {fam} missing a tier: {tiers}"
 
-    levels = sorted({lvl for c in combos for s in c["slots"] for lvl in s["levels"]})
-    assert levels == [5, 7, 10, 15, 20], f"unexpected wrightstone level set: {levels}"
-
-    return {"sigils": sigils, "wrightstones": {"levels": levels, "combos": combos}}
+    return {"sigils": sigils, "trait2Lots": trait2_lots, "wrightstones": {"combos": combos}}
 
 
 def main() -> None:
@@ -409,8 +465,8 @@ def main() -> None:
     POOL_PATH.write_text(json.dumps(pool, indent=1) + "\n", encoding="utf-8")
     print(
         f"wrote {POOL_PATH} — {len(pool['sigils'])} sigil traits, "
-        f"{len(pool['wrightstones']['combos'])} wrightstone combos, "
-        f"levels {pool['wrightstones']['levels']}"
+        f"{len(pool['trait2Lots'])} 2nd-trait lots, "
+        f"{len(pool['wrightstones']['combos'])} wrightstone combos"
     )
 
 
