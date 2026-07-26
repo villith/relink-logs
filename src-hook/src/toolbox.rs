@@ -66,6 +66,7 @@ struct Globals {
     base: u64,
     synthesis: game_reader::synthesis::SynthesisRvas,
     overmastery: game_reader::overmastery::OvermasteryRvas,
+    transmarvel: game_reader::transmarvel::TransmarvelRvas,
 }
 
 /// Resolve the toolbox globals by sigscanning the loaded exe image, once per
@@ -86,6 +87,8 @@ fn globals() -> Result<&'static Globals, String> {
                 synthesis: game_reader::synthesis::resolve_rvas(view)
                     .map_err(|e| e.to_string())?,
                 overmastery: game_reader::overmastery::resolve_rvas(view)
+                    .map_err(|e| e.to_string())?,
+                transmarvel: game_reader::transmarvel::resolve_rvas(view)
                     .map_err(|e| e.to_string())?,
             })
         })
@@ -146,6 +149,13 @@ fn handle_request(req: ToolboxRequest) -> ToolboxResponse {
                         g.overmastery,
                         slot,
                     )
+                })
+            }))
+        }
+        ToolboxRequest::TransmarvelSnapshot => {
+            ToolboxResponse::TransmarvelSnapshot(globals().and_then(|g| {
+                guarded(|| {
+                    game_reader::transmarvel::take_snapshot(&InProcMem, g.base, g.transmarvel)
                 })
             }))
         }
@@ -254,6 +264,18 @@ mod tests {
     fn snapshot_against_a_non_game_binary_is_an_error_response() {
         let ToolboxResponse::SynthesisSnapshot(result) =
             handle_request(ToolboxRequest::SynthesisSnapshot)
+        else {
+            panic!("wrong variant");
+        };
+        assert!(result.is_err());
+    }
+
+    /// Same contract for the transmarvel arm: sigscan failure in the test
+    /// binary must become an error response, never a panic.
+    #[test]
+    fn transmarvel_snapshot_against_a_non_game_binary_is_an_error_response() {
+        let ToolboxResponse::TransmarvelSnapshot(result) =
+            handle_request(ToolboxRequest::TransmarvelSnapshot)
         else {
             panic!("wrong variant");
         };
