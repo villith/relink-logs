@@ -1241,16 +1241,6 @@ pub fn target_selected(
         })
 }
 
-/// Build the quest-details enemy HP charts: one series per [`TargetSegment`]
-/// with HP data passing the filter, largest max-HP first (stable, so same-size
-/// series keep spawn order), capped at [`HP_CHART_MAX_SERIES`]. Series carry
-/// the segment's `instance` number, so chart labels match the target dropdown.
-/// Within a bucket the last report wins. Old logs carry no HP data and yield
-/// no series.
-///
-/// `segments` MUST be [`segment_targets`] of the same `events`/`start_time` —
-/// sharing the caller's segmentation (rather than recomputing it) is what
-/// guarantees the 1:1 chart↔dropdown parity.
 /// Per-player, per-second damage buckets for the logs page's DPS charts.
 ///
 /// Lives here rather than inline in `fetch_encounter_state` so the filtering and
@@ -1309,6 +1299,16 @@ pub fn build_player_dps_chart(
     player_dps
 }
 
+/// Build the quest-details enemy HP charts: one series per [`TargetSegment`]
+/// with HP data passing the filter, largest max-HP first (stable, so same-size
+/// series keep spawn order), capped at [`HP_CHART_MAX_SERIES`]. Series carry
+/// the segment's `instance` number, so chart labels match the target dropdown.
+/// Within a bucket the last report wins. Old logs carry no HP data and yield
+/// no series.
+///
+/// `segments` MUST be [`segment_targets`] of the same `events`/`start_time` —
+/// sharing the caller's segmentation (rather than recomputing it) is what
+/// guarantees the 1:1 chart↔dropdown parity.
 pub fn build_target_hp_charts(
     events: &[(i64, Message)],
     segments: &[TargetSegment],
