@@ -6,7 +6,7 @@ use protocol::{
     ActionType, AreaEnterEvent, ConfluxBuffAcquiredEvent, ConfluxRoomEnterEvent, ConfluxRunEndEvent,
     DamageEvent, Message, OnAttemptSBAEvent, OnContinueSBAChainEvent, OnDeathEvent,
     OnPerformSBAEvent, OnPlayerStunEvent, OnUpdateSBAEvent, PlayerIdentityEvent, PlayerLoadEvent,
-    QuestCompleteEvent,
+    QuestCompleteEvent, QuestElapsedTimeEvent,
 };
 
 use crate::db::runs::{finalize_run, insert_run, ConfluxBuffDelta};
@@ -19,6 +19,8 @@ use super::{
     v0,
 };
 
+#[cfg(any(test, feature = "diag"))]
+pub mod audit;
 mod cap_detection;
 mod filters;
 mod player_state;
@@ -563,6 +565,12 @@ pub struct DerivedEncounterState {
     start_time: i64,
     /// Timestamp of the last damage event (or the last known damage event if the encounter is still in progress)
     end_time: i64,
+    /// True once the DPS window has been anchored, either by the encounter's
+    /// first counted damage event or by an explicit scrub window. Guards and
+    /// stun procs open an encounter but must not anchor it — see
+    /// [`Self::extend_window`].
+    #[serde(skip)]
+    window_anchored: bool,
     /// The total damage done in the encounter
     total_damage: u64,
     /// The total DPS done in the encounter
@@ -623,6 +631,7 @@ impl Default for DerivedEncounterState {
         Self {
             start_time: 0,
             end_time: 0,
+            window_anchored: false,
             total_damage: 0,
             dps: 0.0,
             total_stun_value: 0.0,
@@ -646,6 +655,10 @@ impl DerivedEncounterState {
         (self.end_time - self.start_time).max(1)
     }
 
+    fn duration_secs(&self) -> f64 {
+        self.duration() as f64 / 1000.0
+    }
+
     fn utc_start_time(&self) -> Result<chrono::DateTime<Utc>> {
         chrono::DateTime::from_timestamp_millis(self.start_time)
             .ok_or(anyhow::anyhow!("Failed to convert start time to DateTime"))
@@ -653,6 +666,33 @@ impl DerivedEncounterState {
 
     fn start(&mut self, now: i64) {
         self.start_time = now;
+        self.end_time = now;
+    }
+
+    /// Opens the window at an explicitly chosen point (the logs-page scrubber)
+    /// so [`Self::extend_window`] leaves its start alone — the user picked that
+    /// range and the first hit inside it must not override them.
+    fn start_pinned(&mut self, now: i64) {
+        self.start(now);
+        self.window_anchored = true;
+    }
+
+    /// Extends the DPS window to `now`, opening it if this is the encounter's
+    /// first damage.
+    ///
+    /// **Only damage moves this window.** A Perfect Guard, a stun proc or a
+    /// Quickening guard can open an *encounter* — they are real events and
+    /// belong in the log (see `ensure_encounter_started`) — but they are not
+    /// damage, and dividing a fight's damage by time in which nobody attacked
+    /// understates DPS. A fight that opens with a long defensive phase
+    /// (Lucilius' Paradise Lost is ~30s of it) would otherwise be measured over
+    /// a window that began before the first hit, and a guard landing after the
+    /// boss dies would stretch it at the other end.
+    fn extend_window(&mut self, now: i64) {
+        if !self.window_anchored {
+            self.window_anchored = true;
+            self.start_time = now;
+        }
         self.end_time = now;
     }
 
@@ -688,14 +728,14 @@ impl DerivedEncounterState {
     }
 
     fn process_damage_event(&mut self, now: i64, damage_instance: &AdjustedDamageInstance) {
-        self.end_time = now;
+        self.extend_window(now);
         self.total_damage += damage_instance.event.damage as u64;
-        self.dps = self.total_damage as f64 / ((self.duration()) as f64 / 1000.0);
+        self.dps = self.total_damage as f64 / self.duration_secs();
 
         // Update stun value (delta path; see refresh_total_stun for the dedupe rule).
         self.stun_delta_sum += damage_instance.stun_damage;
         self.refresh_total_stun();
-        self.stun_per_second = self.total_stun_value / ((self.duration()) as f64 / 1000.0);
+        self.stun_per_second = self.total_stun_value / self.duration_secs();
 
         // Add actor to party if not already present (folding in any stun/guard
         // state held pending for the slot).
@@ -737,8 +777,9 @@ impl DerivedEncounterState {
         target.update_from_damage_event(damage_instance);
 
         // Update everyone's DPS
+        let duration_secs = self.duration_secs();
         for player in self.party.values_mut() {
-            player.update_dps(now, self.start_time);
+            player.update_rates(duration_secs);
         }
     }
 
@@ -756,7 +797,7 @@ impl DerivedEncounterState {
 
         self.stun_message_sum += amount;
         self.refresh_total_stun();
-        let duration_secs = (self.duration()) as f64 / 1000.0;
+        let duration_secs = self.duration_secs();
         self.stun_per_second = self.total_stun_value / duration_secs;
 
         if let Some(player) = self.party.get_mut(&actor_index) {
@@ -837,7 +878,7 @@ impl DerivedEncounterState {
 
         self.stun_delta_sum += amount;
         self.refresh_total_stun();
-        let duration_secs = (self.duration()) as f64 / 1000.0;
+        let duration_secs = self.duration_secs();
         self.stun_per_second = self.total_stun_value / duration_secs;
 
         if let Some(character_type) = character_type_for_slot_key(player_data, actor_index) {
@@ -894,7 +935,7 @@ impl DerivedEncounterState {
     ) {
         self.stun_delta_sum += amount;
         self.refresh_total_stun();
-        let duration_secs = (self.duration()) as f64 / 1000.0;
+        let duration_secs = self.duration_secs();
         self.stun_per_second = self.total_stun_value / duration_secs;
 
         if let Some(character_type) = character_type_for_slot_key(player_data, actor_index) {
@@ -1059,6 +1100,32 @@ const RESPAWN_QUIET_GAP_MS: i64 = 30_000;
 /// order. Events without HP data still open/extend segments (DoT-only spans,
 /// old logs) — they just can't trigger respawn boundaries.
 pub fn segment_targets(events: &[(i64, Message)], start_time: i64) -> Vec<TargetSegment> {
+    segment_targets_inner(events, start_time, false).0
+}
+
+/// [`segment_targets`], plus which segment each event belongs to (`None` for
+/// non-damage events), parallel to `events`.
+///
+/// Callers that must partition the event stream by segment need this rather than
+/// the timestamps: a phase change opens a new segment at the SAME millisecond as
+/// the outgoing segment's last event, so a time-based split files the new pool's
+/// damage against the old one.
+pub fn segment_targets_indexed(
+    events: &[(i64, Message)],
+    start_time: i64,
+) -> (Vec<TargetSegment>, Vec<Option<usize>>) {
+    segment_targets_inner(events, start_time, true)
+}
+
+/// The shared segmenter. `track` is opt-in because the assignment vector costs
+/// one entry per event and only the audit tooling reads it — the interactive
+/// callers (`fetch_encounter_state` on every log open, target-filter change and
+/// filter toggle) would otherwise allocate and populate it just to drop it.
+fn segment_targets_inner(
+    events: &[(i64, Message)],
+    start_time: i64,
+    track: bool,
+) -> (Vec<TargetSegment>, Vec<Option<usize>>) {
     struct KeyState {
         position: usize,
         max: Option<u64>,
@@ -1068,8 +1135,13 @@ pub fn segment_targets(events: &[(i64, Message)], start_time: i64) -> Vec<Target
 
     let mut segments: Vec<TargetSegment> = Vec::new();
     let mut live: HashMap<u32, KeyState> = HashMap::new();
+    let mut assignment: Vec<Option<usize>> = if track {
+        vec![None; events.len()]
+    } else {
+        Vec::new()
+    };
 
-    for (timestamp, message) in events {
+    for (event_index, (timestamp, message)) in events.iter().enumerate() {
         let Message::DamageEvent(event) = message else {
             continue;
         };
@@ -1110,7 +1182,13 @@ pub fn segment_targets(events: &[(i64, Message)], start_time: i64) -> Vec<Target
                     last_ts: rel_ts,
                 },
             );
+            if track {
+                assignment[event_index] = Some(segments.len() - 1);
+            }
         } else if let Some(state) = live.get_mut(&key) {
+            if track {
+                assignment[event_index] = Some(state.position);
+            }
             let segment = &mut segments[state.position];
             segment.end_ms = rel_ts;
             // `last_ts` is the quiet-gap clock, so EVERY event touching this key resets
@@ -1144,7 +1222,7 @@ pub fn segment_targets(events: &[(i64, Message)], start_time: i64) -> Vec<Target
         }
     }
 
-    segments
+    (segments, assignment)
 }
 
 /// Whether a damage event's target passes the quest-details filter: with no
@@ -1163,16 +1241,6 @@ pub fn target_selected(
         })
 }
 
-/// Build the quest-details enemy HP charts: one series per [`TargetSegment`]
-/// with HP data passing the filter, largest max-HP first (stable, so same-size
-/// series keep spawn order), capped at [`HP_CHART_MAX_SERIES`]. Series carry
-/// the segment's `instance` number, so chart labels match the target dropdown.
-/// Within a bucket the last report wins. Old logs carry no HP data and yield
-/// no series.
-///
-/// `segments` MUST be [`segment_targets`] of the same `events`/`start_time` —
-/// sharing the caller's segmentation (rather than recomputing it) is what
-/// guarantees the 1:1 chart↔dropdown parity.
 /// Per-player, per-second damage buckets for the logs page's DPS charts.
 ///
 /// Lives here rather than inline in `fetch_encounter_state` so the filtering and
@@ -1231,6 +1299,16 @@ pub fn build_player_dps_chart(
     player_dps
 }
 
+/// Build the quest-details enemy HP charts: one series per [`TargetSegment`]
+/// with HP data passing the filter, largest max-HP first (stable, so same-size
+/// series keep spawn order), capped at [`HP_CHART_MAX_SERIES`]. Series carry
+/// the segment's `instance` number, so chart labels match the target dropdown.
+/// Within a bucket the last report wins. Old logs carry no HP data and yield
+/// no series.
+///
+/// `segments` MUST be [`segment_targets`] of the same `events`/`start_time` —
+/// sharing the caller's segmentation (rather than recomputing it) is what
+/// guarantees the 1:1 chart↔dropdown parity.
 pub fn build_target_hp_charts(
     events: &[(i64, Message)],
     segments: &[TargetSegment],
@@ -1421,7 +1499,13 @@ impl Parser {
         // finished (frozen clock, latched party).
         self.derived_state.status = self.status;
         let from = from_ms.map(|from| log_start + from);
-        self.derived_state.start(from.unwrap_or(log_start));
+        match from {
+            // An explicit scrub range owns its own start; without one the
+            // window opens on the first hit (see `extend_window`), so this is
+            // only a provisional value for an encounter that has no damage yet.
+            Some(from) => self.derived_state.start_pinned(from),
+            None => self.derived_state.start(log_start),
+        }
         let cutoff = up_to_ms.map(|up_to| log_start + up_to);
 
         for (timestamp, event) in self.encounter.event_log() {
@@ -1431,22 +1515,25 @@ impl Parser {
             if from.is_some_and(|from| *timestamp < from) {
                 continue;
             }
-            // Ahead of the `end_time` assignment, not inside the DamageEvent arm
-            // below: an excluded hit must not stretch the encounter window
-            // either, or a fight ending on a filtered Primal Burst would keep
-            // that timestamp as its DPS denominator. This also matches the live
-            // path, which never reaches `process_damage_event` for an excluded
-            // hit and so never advances `end_time` from one.
+            // Ahead of the window extension in the DamageEvent arm below: an
+            // excluded hit must not stretch the encounter window either, or a
+            // fight ending on a filtered Primal Burst would keep that timestamp
+            // as its DPS denominator. This also matches the live path, which
+            // never reaches `process_damage_event` for an excluded hit and so
+            // never moves the window from one.
             if let Message::DamageEvent(event) = event {
                 if is_excluded(event, &filters) {
                     self.derived_state.note_excluded_damage(event);
                     continue;
                 }
             }
-            self.derived_state.end_time = *timestamp;
-
             match event {
                 Message::DamageEvent(event) => {
+                    // Ahead of the target-selection check, so filtering to one
+                    // target narrows WHOSE damage counts without also redefining
+                    // the window that damage is measured over.
+                    self.derived_state.extend_window(*timestamp);
+
                     if target_selected(*timestamp - log_start, event, target_spans) {
                         let event = remap_dragon_form(&self.encounter.player_data, event);
 
@@ -1609,6 +1696,37 @@ impl Parser {
         }
     }
 
+    /// Handles one tick of the in-game quest timer — the clock the result
+    /// screen reports as the clear time.
+    ///
+    /// This is display data only; DPS is measured against wall clock. Its value
+    /// is that a fight which never reaches a result screen (a wipe, a retire)
+    /// still gets an in-game time, where `on_quest_complete_event` alone would
+    /// leave it blank.
+    ///
+    /// It lives on the encounter rather than in the raw event log because the
+    /// encounter is what gets serialised — the log would only be re-deriving a
+    /// field that is already stored.
+    pub fn on_quest_elapsed_time(&mut self, event: QuestElapsedTimeEvent) {
+        self.record_in_game_time(event.elapsed_time_in_secs);
+    }
+
+    /// Folds in an in-game-time reading, keeping the largest seen. The quest
+    /// timer only advances within a quest, so a smaller value means the manager
+    /// was reset or torn down (the next quest loading, a mid-teardown read) and
+    /// must not overwrite what this encounter was actually fought over.
+    fn record_in_game_time(&mut self, elapsed_time_in_secs: u32) {
+        if elapsed_time_in_secs == 0
+            || self
+                .encounter
+                .quest_timer
+                .is_some_and(|known| known >= elapsed_time_in_secs)
+        {
+            return;
+        }
+        self.encounter.quest_timer = Some(elapsed_time_in_secs);
+    }
+
     pub fn on_quest_complete_event(&mut self, event: QuestCompleteEvent) {
         // Rooms and runs have their own save path (on_conflux_room_enter /
         // finalize_active_run), so a completion during an active run must not save the
@@ -1625,9 +1743,13 @@ impl Parser {
         // whatever id we already know instead of overwriting it with "unknown".
         if event.quest_id != 0 {
             self.encounter.quest_id = Some(event.quest_id);
-            self.encounter.quest_timer = Some(event.elapsed_time_in_secs);
         }
         self.encounter.quest_completed = true;
+
+        // The frozen clear time is the authoritative in-game time for the run.
+        // Recorded regardless of the quest id above: an unknown id is no reason
+        // to throw away a known clear time.
+        self.record_in_game_time(event.elapsed_time_in_secs);
 
         if self.status == ParserStatus::InProgress {
             self.update_status(ParserStatus::Stopped);
@@ -2923,6 +3045,175 @@ mod tests {
         parser.reparse();
 
         assert_eq!(parser.derived_state.end_time, 1_000);
+    }
+
+    /// A parser holding two hits 4s apart in wall-clock time, 1000 damage in
+    /// total, credited to player slot 0. The wall-clock denominator is 4s, so
+    /// any in-game time other than 4s makes the two DPS figures distinguishable.
+    fn parser_with_a_four_second_fight() -> Parser {
+        let mut parser = Parser::default();
+        parser.encounter.raw_event_log.push((
+            1_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 400)),
+        ));
+        parser.encounter.raw_event_log.push((
+            5_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 600)),
+        ));
+        parser
+    }
+
+    fn a_tick(secs: u32) -> QuestElapsedTimeEvent {
+        QuestElapsedTimeEvent {
+            elapsed_time_in_secs: secs,
+        }
+    }
+
+    /// A fight that never reaches a result screen — a wipe, a retire — still
+    /// gets an in-game time, because the ticker reported one while it ran.
+    /// Sourcing it only from the completion event would leave every failed
+    /// attempt blank, which is most of a progression session.
+    #[test]
+    fn a_tick_records_the_in_game_time_without_a_completion() {
+        let mut parser = Parser::default();
+
+        parser.on_quest_elapsed_time(a_tick(47));
+
+        assert_eq!(parser.encounter.quest_timer, Some(47));
+    }
+
+    /// The result screen's frozen clear time is the authoritative number and
+    /// lands after the last tick the ticker managed to send.
+    #[test]
+    fn the_clear_time_supersedes_the_last_tick() {
+        let mut parser = Parser::default();
+        parser.on_quest_elapsed_time(a_tick(230));
+
+        parser.on_quest_complete_event(QuestCompleteEvent {
+            quest_id: 0x1234,
+            elapsed_time_in_secs: 232,
+        });
+
+        assert_eq!(parser.encounter.quest_timer, Some(232));
+    }
+
+    /// An unknown quest id is no reason to throw away a known clear time.
+    #[test]
+    fn the_clear_time_survives_an_unknown_quest_id() {
+        let mut parser = Parser::default();
+
+        parser.on_quest_complete_event(QuestCompleteEvent {
+            quest_id: 0,
+            elapsed_time_in_secs: 180,
+        });
+
+        assert_eq!(parser.encounter.quest_timer, Some(180));
+        assert_eq!(parser.encounter.quest_id, None, "id stays unknown");
+    }
+
+    /// The quest timer only advances within a quest, so a lower reading means
+    /// the manager was reset or torn down and must not overwrite the time this
+    /// encounter was actually fought over.
+    #[test]
+    fn the_in_game_time_never_goes_backwards() {
+        let mut parser = Parser::default();
+
+        parser.on_quest_elapsed_time(a_tick(200));
+        parser.on_quest_elapsed_time(a_tick(5));
+        parser.on_quest_elapsed_time(a_tick(0));
+
+        assert_eq!(parser.encounter.quest_timer, Some(200));
+    }
+
+    fn a_perfect_guard(actor_index: u32) -> Message {
+        Message::OnPerfectGuardStun(OnPlayerStunEvent {
+            actor_index,
+            stun_amount: 25.0,
+        })
+    }
+
+    /// A guard is a real encounter event and belongs in the log, but it is not
+    /// damage — dividing a fight's damage by a window that opened before anyone
+    /// attacked understates DPS. Lucilius is the worst case: Paradise Lost is
+    /// ~30s of guarding and dodging before the first hit lands.
+    #[test]
+    fn the_dps_window_opens_at_the_first_hit_not_at_an_earlier_guard() {
+        let mut state = DerivedEncounterState::default();
+        // The encounter opened on a guard, 30s before anyone attacked.
+        state.start(0);
+        state.process_perfect_guard_stun(0, &no_identities(), 0xF000_0000, 25.0);
+
+        for (at, damage) in [(30_000i64, 400), (230_000, 600)] {
+            let mut event = a_damage_event();
+            event.source.parent_index = 0xF000_0000;
+            event.damage = damage;
+            let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+            state.process_damage_event(at, &instance);
+        }
+
+        assert_eq!(state.start_time, 30_000, "window opens at the first hit");
+        assert_eq!(state.duration(), 200_000);
+        assert_eq!(state.dps, 5.0, "1000 damage over 200s, not over 230s");
+    }
+
+    /// The same defect at the other end: the quest runs on after the boss dies,
+    /// and a trailing guard would stretch the window the damage is divided by.
+    #[test]
+    fn a_guard_after_the_last_hit_does_not_extend_the_dps_window() {
+        let mut parser = parser_with_a_four_second_fight();
+        parser
+            .encounter
+            .raw_event_log
+            .push((30_000, a_perfect_guard(0)));
+
+        parser.reparse();
+
+        assert_eq!(parser.derived_state.end_time, 5_000);
+        assert_eq!(parser.derived_state.duration(), 4_000);
+    }
+
+    /// The reparse path has to reach the same window as the live path, or a
+    /// saved log would disagree with the meter that recorded it.
+    #[test]
+    fn reparse_opens_the_dps_window_at_the_first_hit_not_at_an_earlier_guard() {
+        let mut parser = Parser::default();
+        parser
+            .encounter
+            .raw_event_log
+            .push((1_000, a_perfect_guard(0)));
+        parser.encounter.raw_event_log.push((
+            5_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 400)),
+        ));
+        parser.encounter.raw_event_log.push((
+            9_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 600)),
+        ));
+
+        parser.reparse();
+
+        assert_eq!(parser.derived_state.start_time, 5_000);
+        assert_eq!(parser.derived_state.duration(), 4_000);
+    }
+
+    /// The scrubber picks the window explicitly, so the first-hit anchor must
+    /// leave it alone — otherwise dragging the handle to a quiet stretch would
+    /// silently snap back to the first hit inside it.
+    #[test]
+    fn an_explicit_scrub_window_keeps_its_own_start() {
+        let mut parser = Parser::default();
+        parser
+            .encounter
+            .raw_event_log
+            .push((1_000, a_perfect_guard(0)));
+        parser.encounter.raw_event_log.push((
+            5_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 400)),
+        ));
+
+        parser.reparse_with_options_window(&[], Some(0), Some(6_000));
+
+        assert_eq!(parser.derived_state.start_time, 1_000, "window start wins");
     }
 
     fn a_damage_event() -> DamageEvent {

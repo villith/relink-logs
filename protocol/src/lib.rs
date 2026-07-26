@@ -577,6 +577,15 @@ pub struct OnQuestFailEvent {
     pub quest_id: u32,
 }
 
+/// A tick of the in-game quest timer, in whole seconds since the quest loaded.
+/// The same clock the result screen reports as the clear time, so it excludes
+/// loading and pauses — which is what makes it a better DPS denominator than
+/// wall-clock elapsed time.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct QuestElapsedTimeEvent {
+    pub elapsed_time_in_secs: u32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
     OnAreaEnter(AreaEnterEvent),
@@ -633,6 +642,13 @@ pub enum Message {
     /// Fired when the player clicks Quit Training. Appended last per the
     /// append-only rule.
     OnTrialEnd(TrialLifecycleEvent),
+    /// The in-game quest timer (IGT) ticked over to a new whole second. Sent
+    /// from the per-frame quest-sequence tick roughly once a second while a
+    /// quest is loaded, so the parser can use in-game time — not wall clock —
+    /// as the DPS denominator while the fight is still running. The frozen
+    /// clear time still arrives separately on `OnQuestComplete`. Appended last
+    /// per the append-only rule.
+    OnQuestElapsedTime(QuestElapsedTimeEvent),
 }
 
 #[cfg(test)]
