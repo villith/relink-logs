@@ -127,13 +127,37 @@ pub fn predict_roll(state: &mut u32, t: &TransmarvelTables) -> TransmarvelRoll {
             traits: Vec::new(),
         }
     };
-    drop(draw);
     TransmarvelRoll { outcome, draws }
 }
 
 /// Simulate `rolls` consecutive rolls starting from `state`.
 pub fn simulate(mut state: u32, t: &TransmarvelTables, rolls: u32) -> Vec<TransmarvelRoll> {
     (0..rolls).map(|_| predict_roll(&mut state, t)).collect()
+}
+
+/// Status for the tool's banner (mirrored in src/types.ts).
+#[derive(Serialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct TransmarvelStatus {
+    pub game_running: bool,
+    pub rng_unpredictable: bool,
+}
+
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+pub struct TransmarvelQuery {
+    pub rolls: u32,
+}
+
+#[derive(Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct TransmarvelPrediction {
+    pub rolls: Vec<TransmarvelRoll>,
+    /// The RNG slot predictions came from — the frontend staleness watch
+    /// polls it via the generic `fetch_overmastery_seed(slot)`.
+    pub slot: u32,
+    pub slot_state: u32,
+    pub unpredictable: bool,
 }
 
 /// The stock v2.0.2 tables, baked from the game's gacha .tbl files by
@@ -230,6 +254,45 @@ mod tests {
             .iter()
             .flat_map(|g| &g.items)
             .any(|i| i.item == item));
+    }
+
+    /// The JSON contract src/types.ts mirrors — a rename here breaks the
+    /// frontend silently, so pin the exact serialized shape.
+    #[test]
+    fn prediction_serializes_to_the_frontend_contract() {
+        let p = TransmarvelPrediction {
+            rolls: vec![
+                TransmarvelRoll {
+                    outcome: TransmarvelOutcome::Sigil {
+                        sigil_id: 1,
+                        trait_level: 2,
+                    },
+                    draws: 3,
+                },
+                TransmarvelRoll {
+                    outcome: TransmarvelOutcome::Wrightstone {
+                        item: 4,
+                        traits: vec![(5, 6)],
+                    },
+                    draws: 7,
+                },
+            ],
+            slot: 8,
+            slot_state: 9,
+            unpredictable: false,
+        };
+        assert_eq!(
+            serde_json::to_value(&p).unwrap(),
+            serde_json::json!({
+                "rolls": [
+                    { "outcome": { "type": "sigil", "sigilId": 1, "traitLevel": 2 }, "draws": 3 },
+                    { "outcome": { "type": "wrightstone", "item": 4, "traits": [[5, 6]] }, "draws": 7 },
+                ],
+                "slot": 8,
+                "slotState": 9,
+                "unpredictable": false,
+            })
+        );
     }
 
     /// Consecutive rolls continue the same stream: simulating two rolls from
