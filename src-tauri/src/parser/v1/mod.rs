@@ -1414,6 +1414,12 @@ impl Parser {
         let filters = self.filters;
         let log_start = self.start_time();
         self.derived_state = Default::default();
+        // `Default` means Stopped, but a reparse says nothing about whether the
+        // fight is over — the live path reparses on a filter toggle mid-fight.
+        // `ensure_encounter_started` only runs at the START of an encounter, so
+        // without this the overlay would render the rest of the fight as
+        // finished (frozen clock, latched party).
+        self.derived_state.status = self.status;
         let from = from_ms.map(|from| log_start + from);
         self.derived_state.start(from.unwrap_or(log_start));
         let cutoff = up_to_ms.map(|up_to| log_start + up_to);
@@ -2747,6 +2753,30 @@ mod tests {
         assert_eq!(
             player.total_stun_value, 100.0,
             "with the burst counted, both messages count"
+        );
+    }
+
+    #[test]
+    fn reparsing_a_live_fight_leaves_it_in_progress() {
+        // Toggling a filter mid-fight reparses. `reparse` rebuilds derived state
+        // from Default, whose status is Stopped, so without re-applying the
+        // parser's own status the overlay would switch to its finished-fight
+        // rendering (frozen clock, latched party) for the rest of the fight —
+        // `ensure_encounter_started` never runs again inside one encounter.
+        let mut parser = Parser::default();
+        parser.on_damage_event(damage_from(PLAYER_HASH, 100, 1_000));
+        assert_eq!(
+            parser.derived_state.status,
+            ParserStatus::InProgress,
+            "the first hit should open the encounter"
+        );
+
+        parser.reparse();
+
+        assert_eq!(
+            parser.derived_state.status,
+            ParserStatus::InProgress,
+            "a reparse must not report the fight as finished"
         );
     }
 
