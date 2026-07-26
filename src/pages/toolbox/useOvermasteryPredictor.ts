@@ -2,6 +2,7 @@ import characterIdHashes from "@/assets/character-id-hashes.json";
 import overmasteryCategories from "@/assets/overmastery-categories.json";
 import useGameStatus from "@/pages/toolbox/useGameStatus";
 import useStalenessWatch from "@/pages/toolbox/useStalenessWatch";
+import { assignable } from "@/pages/toolbox/matching";
 import { useOvermasterySelectionsStore } from "@/stores/useOvermasterySelectionsStore";
 import { CharacterType, OvermasteryMastery, OvermasteryPrediction, OvermasteryStatus } from "@/types";
 import { toHashString, translateCharacterType, translateOvermasteryId } from "@/utils";
@@ -52,27 +53,6 @@ export const activeFilters = (slots: WantedSlot[]): WantedFilter[] =>
   slots
     .filter((s) => s.kind !== null || s.minLevel !== null)
     .map((s) => ({ kind: s.kind === null ? null : parseInt(s.kind, 10), minLevel: s.minLevel }));
-
-/** True when each filter can be assigned its own distinct rolled effect
- * accepted by `ok` (backtracking assignment; rolls and filters are <= 4). */
-const assignable = (
-  roll: OvermasteryMastery[],
-  filters: WantedFilter[],
-  ok: (f: WantedFilter, m: OvermasteryMastery) => boolean
-): boolean => {
-  const used = new Array<boolean>(roll.length).fill(false);
-  const assign = (fi: number): boolean => {
-    if (fi === filters.length) return true;
-    for (let ri = 0; ri < roll.length; ri++) {
-      if (used[ri] || !ok(filters[fi], roll[ri])) continue;
-      used[ri] = true;
-      if (assign(fi + 1)) return true;
-      used[ri] = false;
-    }
-    return false;
-  };
-  return assign(0);
-};
 
 /** True when every filter is met by a distinct rolled effect at its min level or higher. */
 export const rollMatches = (roll: OvermasteryMastery[], filters: WantedFilter[]): boolean =>
