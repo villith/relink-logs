@@ -12,7 +12,7 @@ import {
   visibleColumns,
 } from "@/types";
 
-import { getSkillName } from "@/utils";
+import { getSkillName, isSkillGroup } from "@/utils";
 import { SkillGroupRow } from "./SkillGroupRow";
 import { SkillRow } from "./SkillRow";
 import { useSkillBreakdown } from "./useSkillBreakdown";
@@ -34,10 +34,8 @@ const renderSkillRow = (
   durationSeconds: number,
   live?: boolean
 ) => {
-  const isSkillGroup = typeof skillData.actionType === "object" && Object.hasOwn(skillData.actionType, "Group");
-
-  if (isSkillGroup) {
-    const skillGroup = skillData as ComputedSkillGroup;
+  if (isSkillGroup(skillData)) {
+    const skillGroup = skillData;
 
     return (
       <SkillGroupRow

@@ -5,6 +5,8 @@ import toast from "react-hot-toast";
 import {
   CharacterType,
   ComputedPlayerState,
+  ComputedSkillGroup,
+  ComputedSkillState,
   EncounterState,
   EnemyState,
   EnemyType,
@@ -72,6 +74,18 @@ export const getBossHpTarget = (targets: Record<number, EnemyState>): EnemyState
 
 export const isSupplementaryAction = (actionType: SkillState["actionType"]): boolean =>
   typeof actionType === "object" && Object.hasOwn(actionType, "SupplementaryDamage");
+
+/**
+ * Whether a breakdown row is a frontend-merged group rather than a single skill.
+ *
+ * Narrows `actionType` too, so callers get `row.actionType.Group` without
+ * re-casting — the shape test and the cast were previously written out
+ * separately at each use.
+ */
+export const isSkillGroup = (
+  row: ComputedSkillGroup | ComputedSkillState
+): row is ComputedSkillGroup & { actionType: { Group: string } } =>
+  typeof row.actionType === "object" && Object.hasOwn(row.actionType, "Group");
 
 /**
  * Only Normal skill hits can trigger supplementary damage — Link Attacks, Skybound

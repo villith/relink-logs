@@ -3,7 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 import SkillGroupMapping from "@/assets/skill-groups";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, ComputedSkillGroup, ComputedSkillState } from "@/types";
-import { PRIMAL_BURST_GROUP, getSkillName, isPrimalBurstHit } from "@/utils";
+import { PRIMAL_BURST_GROUP, getSkillName, isPrimalBurstHit, isSkillGroup } from "@/utils";
 
 /** Folds one more skill into an existing group row. */
 const mergedGroup = (group: ComputedSkillGroup, skill: ComputedSkillState): ComputedSkillGroup => ({
@@ -52,11 +52,26 @@ const findGroupRow = (
   childCharacterType: ComputedSkillState["childCharacterType"] | null
 ) =>
   rows.findIndex((row) => {
-    if (typeof row.actionType !== "object" || !Object.hasOwn(row.actionType, "Group")) return false;
-    if ((row.actionType as { Group: string }).Group !== group) return false;
+    if (!isSkillGroup(row) || row.actionType.Group !== group) return false;
 
     return childCharacterType === null || row.childCharacterType === childCharacterType;
   });
+
+/** Merges `skill` into its group row, opening the row if this is its first skill. */
+const upsertGroup = (
+  rows: Array<ComputedSkillGroup>,
+  group: string,
+  skill: ComputedSkillState,
+  childCharacterType: ComputedSkillState["childCharacterType"] | null
+) => {
+  const index = findGroupRow(rows, group, childCharacterType);
+
+  if (index >= 0) {
+    rows[index] = mergedGroup(rows[index], skill);
+  } else {
+    rows.push(newGroup(group, skill));
+  }
+};
 
 export const useSkillBreakdown = (player: ComputedPlayerState) => {
   const { useCondensedSkills } = useMeterSettingsStore(
@@ -86,14 +101,7 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
       // id, so the per-character map (action ids under a character) can never
       // join them — they group on the body class instead.
       if (isPrimalBurstHit(skill)) {
-        const index = findGroupRow(skills, PRIMAL_BURST_GROUP, null);
-
-        if (index >= 0) {
-          skills[index] = mergedGroup(skills[index] as ComputedSkillGroup, skill);
-        } else {
-          skills.push(newGroup(PRIMAL_BURST_GROUP, skill));
-        }
-
+        upsertGroup(skills, PRIMAL_BURST_GROUP, skill, null);
         continue;
       }
 
@@ -108,14 +116,7 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
           const skillBelongsToGroup = skillGroupMapping[group].skills.includes(actionType.Normal);
 
           if (skillBelongsToGroup) {
-            const skillGroupIndex = findGroupRow(skills, group, skill.childCharacterType);
-
-            if (skillGroupIndex >= 0) {
-              skills[skillGroupIndex] = mergedGroup(skills[skillGroupIndex] as ComputedSkillGroup, skill);
-            } else {
-              skills.push(newGroup(group, skill));
-            }
-
+            upsertGroup(skills, group, skill, skill.childCharacterType);
             wasGroupedSkill = true;
 
             break;
