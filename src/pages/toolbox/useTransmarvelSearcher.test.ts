@@ -224,7 +224,10 @@ describe("sanitizeWishlists", () => {
 
   it("drops sigil entries with junk shapes", () => {
     const result = sanitizeWishlists(
-      { sigils: [null, "nope", {}, { trait: 5 }, { notTrait: "000000aa" }, { trait: "000000aa", trait2: 7 }], stones: [] },
+      {
+        sigils: [null, "nope", {}, { trait: 5 }, { notTrait: "000000aa" }, { trait: "000000aa", trait2: 7 }],
+        stones: [],
+      },
       POOL_DOUBLE
     );
     // trait2: 7 (non-string) normalizes to null rather than dropping the entry.
@@ -280,7 +283,10 @@ describe("sanitizeWishlists", () => {
   });
 
   it("drops junk stone shapes", () => {
-    const result = sanitizeWishlists({ sigils: [], stones: [null, "nope", {}, { family: 5, minTier: 0 }] }, POOL_DOUBLE);
+    const result = sanitizeWishlists(
+      { sigils: [], stones: [null, "nope", {}, { family: 5, minTier: 0 }] },
+      POOL_DOUBLE
+    );
     expect(result.stones).toEqual([]);
   });
 });

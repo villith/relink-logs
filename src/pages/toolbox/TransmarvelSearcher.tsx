@@ -1,9 +1,10 @@
 import { backendErrorMessage } from "@/backendErrors";
 import type { TransmarvelOutcome } from "@/types";
-import { translateSigilId, translateTraitId } from "@/utils";
+import { translateSigilId, translateTraitId, translateWrightstoneId } from "@/utils";
 import {
   ActionIcon,
   Alert,
+  Badge,
   Button,
   Checkbox,
   Group,
@@ -18,30 +19,54 @@ import {
 import { X } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
-import useTransmarvelSearcher, { comboSatisfies, POOL, WrightstoneEntry } from "./useTransmarvelSearcher";
+import useTransmarvelSearcher, {
+  familyCombos,
+  POOL,
+  sigilTrait2Options,
+  slotTraitOptions,
+  WrightstoneEntry,
+} from "./useTransmarvelSearcher";
 
 /** Pool traits are stored as lowercase hex strings (the wishlist's key
  * shape); rolled outcomes carry the trait as a number. */
 const hex = (h: string) => parseInt(h, 16);
 
-/** Human name for one rolled outcome. */
+/** Mantine Select reserves null for "no selection", so the optional slots'
+ * "match anything" choice needs its own sentinel value. */
+const ANY = "any";
+
+/** One tier-0 combo per family, in pool order — drives the Type picker
+ * (value = family, label = the stone's item name, shared by its tiers). */
+const FAMILIES = POOL.wrightstones.combos.filter((c) => c.tier === 0);
+
+/** A slot's level set, compact: "10–15" or "20". */
+const levelRange = (levels: number[]) =>
+  levels.length > 1 ? `${Math.min(...levels)}–${Math.max(...levels)}` : String(levels[0]);
+
+/** Synthesis-style result cell: name line + dimmed trait/level line. */
 const OutcomeCell = ({ outcome, hit }: { outcome: TransmarvelOutcome; hit: boolean }) => {
   const { t } = useTranslation();
-  if (outcome.type === "sigil") {
-    const label = [translateSigilId(outcome.sigilId), outcome.traitLevel > 0 ? t("ui.level-short", { level: outcome.traitLevel }) : null]
-      .filter(Boolean)
-      .join(" ");
-    const trait2 = outcome.trait2 !== null ? t("ui.toolbox.tm-second-trait", { trait: translateTraitId(outcome.trait2) }) : null;
-    return (
-      <Text size="xs" fw={hit ? 700 : undefined}>
-        {[label, trait2].filter(Boolean).join(" / ")}
-      </Text>
-    );
-  }
+  const name = outcome.type === "sigil" ? translateSigilId(outcome.sigilId) : translateWrightstoneId(outcome.item);
+  const line =
+    outcome.type === "sigil"
+      ? [
+          `${translateTraitId(outcome.trait1)} ${t("ui.level-short", { level: outcome.traitLevel })}`,
+          outcome.trait2 !== null ? translateTraitId(outcome.trait2) : null,
+        ]
+          .filter(Boolean)
+          .join(" / ")
+      : outcome.traits
+          .map(([trait, level]) => `${translateTraitId(trait)} ${t("ui.level-short", { level })}`)
+          .join(" / ");
   return (
-    <Text size="xs" fw={hit ? 700 : undefined}>
-      {outcome.traits.map(([trait, level]) => `${translateTraitId(trait)} ${t("ui.level-short", { level })}`).join(" / ")}
-    </Text>
+    <Stack gap={0}>
+      <Text size="sm" fw={hit ? 700 : undefined}>
+        {name}
+      </Text>
+      <Text size="xs" c="dimmed">
+        {line}
+      </Text>
+    </Stack>
   );
 };
 
@@ -69,57 +94,56 @@ const TransmarvelSearcher = () => {
 
   const errorMessage = backendErrorMessage(t, "transmarvel", error);
   const busy = loading || predicting;
+  const anyOption = { value: ANY, label: t("ui.toolbox.tm-any-option", "Any") };
 
-  // Sigil picker: pool traits not already wishlisted.
-  const sigilOptions = POOL.sigils
-    .filter((s) => !sigils.some((e) => e.trait === s.trait))
-    .map((s) => ({ value: s.trait, label: translateTraitId(hex(s.trait)) }));
+  const sigilOptions = POOL.sigils.map((s) => ({ value: s.trait, label: translateSigilId(hex(s.trait)) }));
+  const traitOption = (trait: string) => ({ value: trait, label: translateTraitId(hex(trait)) });
 
-  // Wrightstone slot pickers, constrained to valid combinations given the
-  // entry's other slots: offer trait T for slot i iff some combo satisfies
-  // the entry with slot i set to T (levels at their minimum).
-  const slotTraitOptions = (entry: WrightstoneEntry, slotIndex: number) => {
-    const seen = new Set<string>();
-    for (const combo of POOL.wrightstones.combos) {
-      for (const trait of combo.slots.flatMap((s) => s.traits)) {
-        if (seen.has(trait)) continue;
-        const slots = entry.slots.map((s, i) => (i === slotIndex ? { trait, minLevel: POOL.wrightstones.levels[0] } : s));
-        if (slots.length === slotIndex) slots.push({ trait, minLevel: POOL.wrightstones.levels[0] });
-        const candidate: WrightstoneEntry = { slots };
-        if (POOL.wrightstones.combos.some((c) => comboSatisfies(c, candidate))) seen.add(trait);
-      }
+  /** True when another sigil entry already wishes this exact pair — edits
+   * that would collide are ignored, because sanitize-on-read would silently
+   * dedupe the row away otherwise. */
+  const pairExists = (trait: string, trait2: string | null, except: number) =>
+    sigils.some((e, i) => i !== except && e.trait === trait && e.trait2 === trait2);
+
+  const changeSigil = (index: number, trait: string) => {
+    const current = sigils[index].trait2;
+    let trait2 = current !== null && sigilTrait2Options(trait).includes(current) ? current : null;
+    if (pairExists(trait, trait2, index)) {
+      if (trait2 === null) return;
+      trait2 = null;
+      if (pairExists(trait, null, index)) return;
     }
-    return [...seen].map((trait) => ({ value: trait, label: translateTraitId(hex(trait)) }));
+    setSigils(sigils.map((e, i) => (i === index ? { trait, trait2 } : e)));
   };
 
-  // Levels reachable by `trait` at slot i, other slots held as-is: some combo
-  // must satisfy the entry with slot i set to {trait, minLevel: L}.
-  const validLevelsFor = (entry: WrightstoneEntry, slotIndex: number, trait: string): number[] =>
-    POOL.wrightstones.levels.filter((level) => {
-      const candidate: WrightstoneEntry = {
-        slots: entry.slots.map((s, i) => (i === slotIndex ? { trait, minLevel: level } : s)),
-      };
-      return POOL.wrightstones.combos.some((c) => comboSatisfies(c, candidate));
-    });
-
-  // Min-level picker, constrained the same way as slotTraitOptions: offer
-  // level L for slot i iff some combo satisfies the entry with slot i's
-  // minLevel set to L (trait unchanged, other slots held as-is).
-  const slotLevelOptions = (entry: WrightstoneEntry, slotIndex: number): number[] =>
-    validLevelsFor(entry, slotIndex, entry.slots[slotIndex].trait);
-
-  // Keep the slot's current minLevel across a trait change if the new trait
-  // can still reach it; otherwise clamp down to the largest level the new
-  // trait still reaches below it; otherwise (every reachable level is above
-  // the current one) jump up to the smallest. Guarantees the entry always
-  // satisfies some combo, so sanitizeWishlists never drops it.
-  const clampLevel = (validLevels: number[], currentLevel: number): number => {
-    if (validLevels.includes(currentLevel)) return currentLevel;
-    const lower = validLevels.filter((l) => l < currentLevel);
-    return lower.length ? Math.max(...lower) : Math.min(...validLevels);
+  const changeSigilTrait2 = (index: number, trait2: string | null) => {
+    if (pairExists(sigils[index].trait, trait2, index)) return;
+    setSigils(sigils.map((e, i) => (i === index ? { ...e, trait2 } : e)));
   };
 
-  const setStone = (index: number, entry: WrightstoneEntry) => setStones(stones.map((s, i) => (i === index ? entry : s)));
+  /** First sigil not already wishlisted with "any 2nd trait" — the add
+   * button's default entry. */
+  const addableSigil = POOL.sigils.find((s) => !sigils.some((e) => e.trait === s.trait && e.trait2 === null));
+
+  /** Apply a patch to a stone entry, clearing any slot pick the patched
+   * type/rarity no longer offers (rather than letting sanitize-on-read drop
+   * the whole entry). */
+  const changeStone = (index: number, patch: Partial<WrightstoneEntry>) => {
+    const next = { ...stones[index], ...patch };
+    if (next.slot2 !== null && !slotTraitOptions(next.family, next.minTier, 1).includes(next.slot2)) next.slot2 = null;
+    if (next.slot3 !== null && !slotTraitOptions(next.family, next.minTier, 2).includes(next.slot3)) next.slot3 = null;
+    setStones(stones.map((e, i) => (i === index ? next : e)));
+  };
+
+  const rarityOptions = (family: string) =>
+    familyCombos(family).map((combo) => ({
+      value: String(combo.tier),
+      label: t("ui.toolbox.tm-rarity-option", {
+        chance: combo.chancePercent,
+        levels: combo.slots.map((s) => levelRange(s.levels)).join(" / "),
+      }),
+    }));
+
   const shown = matchesOnly ? results.filter((r) => r.hit) : results;
 
   return (
@@ -132,77 +156,95 @@ const TransmarvelSearcher = () => {
       {error && <Alert color="red">{errorMessage}</Alert>}
       {stale && <Alert color="orange">{t("ui.toolbox.stale-results")}</Alert>}
       <Group align="flex-start" gap="xl" wrap="nowrap">
-        <Stack gap="sm" style={{ flexShrink: 0 }} w={430}>
+        <Stack gap="sm" style={{ flexShrink: 0 }} w={480}>
           <Title order={6}>{t("ui.toolbox.tm-sigil-wishlist", "Sigil wishlist")}</Title>
-          {sigils.map((entry) => (
-            <Group key={entry.trait} gap="xs" wrap="nowrap">
-              <Text size="sm" style={{ flexGrow: 1 }}>
-                {translateTraitId(hex(entry.trait))}
-              </Text>
+          {sigils.map((entry, index) => (
+            <Group key={index} gap="xs" align="flex-end" wrap="nowrap">
+              <Select
+                label={t("ui.toolbox.tm-sigil", "Sigil")}
+                searchable
+                data={sigilOptions}
+                value={entry.trait}
+                onChange={(trait) => trait && changeSigil(index, trait)}
+                allowDeselect={false}
+                disabled={busy}
+                w={220}
+              />
+              <Select
+                label={t("ui.toolbox.tm-2nd-trait", "2nd trait")}
+                searchable
+                data={[anyOption, ...sigilTrait2Options(entry.trait).map(traitOption)]}
+                value={entry.trait2 ?? ANY}
+                onChange={(value) => value && changeSigilTrait2(index, value === ANY ? null : value)}
+                allowDeselect={false}
+                disabled={busy}
+                w={200}
+              />
               <ActionIcon
                 variant="subtle"
                 aria-label={t("ui.toolbox.tm-remove", "Remove")}
-                onClick={() => setSigils(sigils.filter((e) => e.trait !== entry.trait))}
+                onClick={() => setSigils(sigils.filter((_, i) => i !== index))}
               >
                 <X />
               </ActionIcon>
             </Group>
           ))}
-          <Select
-            placeholder={t("ui.toolbox.tm-add-sigil", "Add sigil...")}
-            searchable
-            data={sigilOptions}
-            value={null}
-            onChange={(trait) => trait && setSigils([...sigils, { trait }])}
-            disabled={busy}
-          />
+          <Button
+            variant="light"
+            disabled={busy || !addableSigil}
+            onClick={() => addableSigil && setSigils([...sigils, { trait: addableSigil.trait, trait2: null }])}
+          >
+            {t("ui.toolbox.tm-add-sigil", "Add sigil")}
+          </Button>
           <Title order={6}>{t("ui.toolbox.tm-stone-wishlist", "Wrightstone wishlist")}</Title>
           {stones.map((entry, index) => (
-            <Group key={index} align="flex-end" gap="xs" wrap="wrap">
-              {entry.slots.map((slot, si) => (
-                <Group key={si} gap="xs" align="flex-end" wrap="nowrap">
-                  <Select
-                    label={t("ui.toolbox.tm-stone-trait-slot", { n: si + 1 })}
-                    searchable
-                    data={slotTraitOptions(entry, si)}
-                    value={slot.trait}
-                    onChange={(trait) => {
-                      if (!trait) return;
-                      const minLevel = clampLevel(validLevelsFor(entry, si, trait), slot.minLevel);
-                      setStone(index, { slots: entry.slots.map((s, i) => (i === si ? { trait, minLevel } : s)) });
-                    }}
-                    allowDeselect={false}
-                    disabled={busy}
-                    w={200}
-                  />
-                  <Select
-                    label={t("ui.toolbox.tm-min-level", "Min level")}
-                    data={slotLevelOptions(entry, si).map(String)}
-                    value={String(slot.minLevel)}
-                    onChange={(v) =>
-                      v && setStone(index, { slots: entry.slots.map((s, i) => (i === si ? { ...s, minLevel: parseInt(v, 10) } : s)) })
-                    }
-                    allowDeselect={false}
-                    disabled={busy}
-                    w={90}
-                  />
-                </Group>
-              ))}
-              {entry.slots.length < 3 && (
-                <Button
-                  variant="subtle"
-                  size="compact-sm"
-                  disabled={busy}
-                  onClick={() => {
-                    const opts = slotTraitOptions(entry, entry.slots.length);
-                    if (opts.length) {
-                      setStone(index, { slots: [...entry.slots, { trait: opts[0].value, minLevel: POOL.wrightstones.levels[0] }] });
-                    }
-                  }}
-                >
-                  {t("ui.toolbox.tm-add-stone-slot", "Add trait")}
-                </Button>
-              )}
+            <Group key={index} gap="xs" align="flex-end" wrap="wrap">
+              <Select
+                label={t("ui.toolbox.tm-stone-type", "Type")}
+                data={FAMILIES.map((c) => ({ value: c.family, label: translateWrightstoneId(hex(c.item)) }))}
+                value={entry.family}
+                onChange={(family) => family && changeStone(index, { family })}
+                allowDeselect={false}
+                disabled={busy}
+                w={220}
+              />
+              <Select
+                label={t("ui.toolbox.tm-min-rarity", "Min rarity")}
+                data={rarityOptions(entry.family)}
+                value={String(entry.minTier)}
+                onChange={(tier) => tier && changeStone(index, { minTier: parseInt(tier, 10) })}
+                allowDeselect={false}
+                disabled={busy}
+                w={200}
+              />
+              <Stack gap={2}>
+                <Text size="xs" fw={500}>
+                  {t("ui.toolbox.tm-trait-1", "Trait 1")}
+                </Text>
+                <Text size="sm" c="dimmed">
+                  {translateTraitId(hex(entry.family))}
+                </Text>
+              </Stack>
+              <Select
+                label={t("ui.toolbox.tm-slot-2", "Slot 2")}
+                searchable
+                data={[anyOption, ...slotTraitOptions(entry.family, entry.minTier, 1).map(traitOption)]}
+                value={entry.slot2 ?? ANY}
+                onChange={(value) => value && changeStone(index, { slot2: value === ANY ? null : value })}
+                allowDeselect={false}
+                disabled={busy}
+                w={200}
+              />
+              <Select
+                label={t("ui.toolbox.tm-slot-3", "Slot 3")}
+                searchable
+                data={[anyOption, ...slotTraitOptions(entry.family, entry.minTier, 2).map(traitOption)]}
+                value={entry.slot3 ?? ANY}
+                onChange={(value) => value && changeStone(index, { slot3: value === ANY ? null : value })}
+                allowDeselect={false}
+                disabled={busy}
+                w={200}
+              />
               <ActionIcon
                 variant="subtle"
                 aria-label={t("ui.toolbox.tm-remove", "Remove")}
@@ -215,12 +257,7 @@ const TransmarvelSearcher = () => {
           <Button
             variant="light"
             disabled={busy}
-            onClick={() =>
-              setStones([
-                ...stones,
-                { slots: [{ trait: POOL.wrightstones.combos[0].slots[0].traits[0], minLevel: POOL.wrightstones.levels[0] }] },
-              ])
-            }
+            onClick={() => setStones([...stones, { family: FAMILIES[0].family, minTier: 0, slot2: null, slot3: null }])}
           >
             {t("ui.toolbox.tm-add-stone", "Add wrightstone")}
           </Button>
@@ -242,7 +279,12 @@ const TransmarvelSearcher = () => {
           </Group>
         </Stack>
         {prediction && !prediction.unpredictable && (
-          <ScrollArea.Autosize mah="calc(100vh - 150px)" type="auto" style={{ flexGrow: 1, minWidth: 0 }} offsetScrollbars>
+          <ScrollArea.Autosize
+            mah="calc(100vh - 150px)"
+            type="auto"
+            style={{ flexGrow: 1, minWidth: 0 }}
+            offsetScrollbars
+          >
             <Stack gap="xs">
               <Text size="xs" c="dimmed">
                 {t("ui.toolbox.tm-results-caveat")}
@@ -257,20 +299,22 @@ const TransmarvelSearcher = () => {
                 checked={matchesOnly}
                 onChange={(e) => setMatchesOnly(e.currentTarget.checked)}
               />
-              <Table withRowBorders={false} stickyHeader w="600px">
+              <Table striped highlightOnHover stickyHeader>
                 <Table.Thead>
                   <Table.Tr>
-                    <Table.Th w={90}>{t("ui.toolbox.tm-col-roll", "Roll #")}</Table.Th>
-                    <Table.Th>{t("ui.toolbox.tm-col-outcome", "Outcome")}</Table.Th>
+                    <Table.Th w={70}>{t("ui.toolbox.tm-col-roll", "Roll #")}</Table.Th>
+                    <Table.Th>{t("ui.toolbox.tm-col-result", "Result")}</Table.Th>
+                    <Table.Th w={80}>{t("ui.toolbox.tm-col-match", "Match")}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
-                <Table.Tbody fz="xs">
+                <Table.Tbody>
                   {shown.map(({ roll, index, hit }) => (
                     <Table.Tr key={index}>
                       <Table.Td>#{index + 1}</Table.Td>
                       <Table.Td>
                         <OutcomeCell outcome={roll.outcome} hit={hit} />
                       </Table.Td>
+                      <Table.Td>{hit && <Badge color="green">{t("ui.toolbox.tm-match-yes", "✓")}</Badge>}</Table.Td>
                     </Table.Tr>
                   ))}
                 </Table.Tbody>

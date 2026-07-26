@@ -52,7 +52,12 @@ export const familyCombos = (family: string, p: TransmarvelPool = POOL) =>
 /** Traits a stone position (1 = 2nd slot, 2 = 3rd slot) can carry across
  * every tier at or above the minimum — at min rarity 0.1% this collapses to
  * the tier's fixed trait. */
-export const slotTraitOptions = (family: string, minTier: number, position: 1 | 2, p: TransmarvelPool = POOL): string[] => {
+export const slotTraitOptions = (
+  family: string,
+  minTier: number,
+  position: 1 | 2,
+  p: TransmarvelPool = POOL
+): string[] => {
   const traits = new Set<string>();
   for (const combo of familyCombos(family, p))
     if (combo.tier >= minTier) for (const trait of combo.slots[position].traits) traits.add(trait);
@@ -80,7 +85,8 @@ export const rollHits = (
   if (!combo) return false;
   const traits = roll.outcome.traits;
   return stones.some(
-    (e) => combo.family === e.family && combo.tier >= e.minTier && slotHit(e.slot2, traits[1]) && slotHit(e.slot3, traits[2])
+    (e) =>
+      combo.family === e.family && combo.tier >= e.minTier && slotHit(e.slot2, traits[1]) && slotHit(e.slot3, traits[2])
   );
 };
 
@@ -152,15 +158,21 @@ export default function useTransmarvelSearcher() {
   // Stored entries can predate a game patch; validate on read, like
   // overmastery's sanitizeSelection. Writes go through the setters unchanged
   // (the pickers only offer valid values).
-  const { sigils, stones } = useMemo(() => sanitizeWishlists({ sigils: rawSigils, stones: rawStones }), [rawSigils, rawStones]);
+  const { sigils, stones } = useMemo(
+    () => sanitizeWishlists({ sigils: rawSigils, stones: rawStones }),
+    [rawSigils, rawStones]
+  );
 
   /** While results are shown, watch the prediction's RNG slot; once the live
    * state moves off the predicted one (the user rolled, or a quest reshuffled
    * the stream), the list is stale. */
-  const [stale, setStale] = useStalenessWatch(prediction && !prediction.unpredictable ? prediction : null, async (watched) => {
-    const current = await invoke<number | null>("fetch_overmastery_seed", { slot: watched.slot });
-    return current !== null && current !== watched.slotState;
-  });
+  const [stale, setStale] = useStalenessWatch(
+    prediction && !prediction.unpredictable ? prediction : null,
+    async (watched) => {
+      const current = await invoke<number | null>("fetch_overmastery_seed", { slot: watched.slot });
+      return current !== null && current !== watched.slotState;
+    }
+  );
 
   const predict = async () => {
     setPredicting(true);
