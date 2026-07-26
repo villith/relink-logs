@@ -8,8 +8,10 @@ import { toHashString } from "@/utils";
 import { invoke } from "@tauri-apps/api";
 import { useMemo, useState } from "react";
 
-/** A wished-for sigil, by trait only (any sigil rolling that trait, any level).
- * Matching keys on the sigil's trait1 only; the optional trait2 bonus roll is not matched. */
+/** A wished-for sigil, by trait only (any sigil rolling that trait, any
+ * level). The wishlist means "traits I'd be happy to get": matching keys on
+ * the sigil's trait1 OR its rolled trait2 — a gem carrying the wished trait
+ * as its 2nd trait counts as a hit too. */
 export type SigilEntry = { trait: string };
 
 /** One position a wished-for wrightstone entry needs filled. */
@@ -30,7 +32,7 @@ export interface TransmarvelPool {
   };
 }
 
-const POOL = pool as TransmarvelPool;
+export const POOL = pool as TransmarvelPool;
 
 /** Max slots a wishlist entry may specify — a gacha stone never has more than
  * three trait positions. */
@@ -41,11 +43,13 @@ const MAX_STONE_SLOTS = 3;
 export const stoneEntryMatches = (traits: [number, number][], entry: WrightstoneEntry): boolean =>
   assignable(traits, entry.slots, (s, [trait, level]) => toHashString(trait) === s.trait && level >= s.minLevel);
 
-/** OR across both lists: the wishlists are "things I'd be happy to get". */
+/** OR across both lists, and for sigils OR across trait1/trait2: the
+ * wishlists are "things I'd be happy to get". */
 export const rollHits = (roll: TransmarvelRoll, sigils: SigilEntry[], stones: WrightstoneEntry[]): boolean => {
   if (roll.outcome.type === "sigil") {
-    const trait = toHashString(roll.outcome.trait1);
-    return sigils.some((e) => e.trait === trait);
+    const trait1 = toHashString(roll.outcome.trait1);
+    const trait2 = roll.outcome.trait2 !== null ? toHashString(roll.outcome.trait2) : null;
+    return sigils.some((e) => e.trait === trait1 || e.trait === trait2);
   }
   const traits = roll.outcome.traits;
   return stones.some((e) => stoneEntryMatches(traits, e));

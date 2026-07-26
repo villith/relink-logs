@@ -25,6 +25,7 @@ const TEMPLATES: Record<string, string> = {
   "ui.toolbox.tm-first-hit": "First wishlist hit at roll #{{n}}",
   "ui.toolbox.tm-no-hits": "No wishlist hits in the next {{rolls}} rolls.",
   "ui.toolbox.tm-stone-trait-slot": "Trait {{n}}",
+  "ui.toolbox.tm-second-trait": "2nd: {{trait}}",
   "ui.level-short": "Lv{{level}}",
 };
 vi.mock("react-i18next", async (importOriginal) => ({
@@ -46,6 +47,7 @@ vi.mock("react-i18next", async (importOriginal) => ({
 
 import { useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
 
+import { comboSatisfies, POOL, type WrightstoneEntry } from "./useTransmarvelSearcher";
 import TransmarvelSearcher from "./TransmarvelSearcher";
 
 const renderPage = () =>
@@ -61,6 +63,22 @@ const WISHLISTED = pool.sigils[0]; // { trait: "05f2ecdc", sigilId: "6cba6b0d" }
 const OTHER = pool.sigils[1]; // { trait: "05fa4599", sigilId: "bcedf060" }
 
 const status: TransmarvelStatus = { gameRunning: true, rngUnpredictable: false };
+
+// Found programmatically off the real pool rather than hardcoded, so a
+// pool regeneration can't silently invalidate the picks: the highest min
+// level a single-slot entry wanting `trait` (at any assignable combo
+// position) can reach.
+const maxLevelFor = (trait: string): number =>
+  Math.max(
+    ...POOL.wrightstones.levels.filter((level) =>
+      POOL.wrightstones.combos.some((c) => comboSatisfies(c, { slots: [{ trait, minLevel: level }] } as WrightstoneEntry))
+    )
+  );
+const ALL_STONE_TRAITS = [...new Set(POOL.wrightstones.combos.flatMap((c) => c.slots.flatMap((s) => s.traits)))];
+// A "family" trait: one of the fixed slot-0 traits that reaches the pool's max level (20).
+const FAMILY_TRAIT = ALL_STONE_TRAITS.find((trait) => maxLevelFor(trait) === Math.max(...POOL.wrightstones.levels))!;
+// A rolled-pool trait that caps below the family tier's max (15, not 20).
+const CAPPED_TRAIT = ALL_STONE_TRAITS.find((trait) => maxLevelFor(trait) === 15)!;
 
 const prediction: TransmarvelPrediction = {
   rolls: [
@@ -271,5 +289,86 @@ describe("TransmarvelSearcher", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("does not offer a level a slot's trait can't reach (caps at 15, not the pool's max of 20)", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    useTransmarvelWishlistStore.setState({ sigils: [], stones: [{ slots: [{ trait: CAPPED_TRAIT, minLevel: 15 }] }] });
+
+    renderPage();
+
+    const levelInput = (await screen.findByLabelText("Min level", { selector: "input" })) as HTMLInputElement;
+    await waitFor(() => expect(levelInput.getAttribute("disabled")).toBeNull());
+    fireEvent.click(levelInput);
+
+    const offered = [...document.querySelectorAll('[role="option"]')].map((el) => el.getAttribute("value"));
+    expect(offered).toContain("15");
+    expect(offered).not.toContain("20");
+  });
+
+  it("clamps the min level (rather than dropping the entry) when a trait change makes the current level unreachable", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    useTransmarvelWishlistStore.setState({ sigils: [], stones: [{ slots: [{ trait: FAMILY_TRAIT, minLevel: 20 }] }] });
+
+    renderPage();
+
+    const traitInput = (await screen.findByLabelText("Trait 1", { selector: "input" })) as HTMLInputElement;
+    await waitFor(() => expect(traitInput.getAttribute("disabled")).toBeNull());
+    fireEvent.click(traitInput);
+
+    const option = document.querySelector(`[role="option"][value="${CAPPED_TRAIT}"]`) as HTMLElement;
+    expect(option).toBeTruthy();
+    fireEvent.click(option);
+
+    // The entry survives — still exactly one stone wishlist row, not silently dropped.
+    expect(screen.getAllByLabelText("Trait 1", { selector: "input" })).toHaveLength(1);
+    // The old min level (20) is unreachable by the new trait; clamp down to its max (15).
+    const levelInput = screen.getByLabelText("Min level", { selector: "input" }) as HTMLInputElement;
+    expect(levelInput.value).toBe("15");
+  });
+
+  it("shows the sigil's rolled trait level and 2nd trait when present", async () => {
+    const sigilPrediction: TransmarvelPrediction = {
+      rolls: [
+        {
+          outcome: {
+            type: "sigil",
+            sigilId: parseInt(OTHER.sigilId, 16),
+            traitLevel: 15,
+            trait1: parseInt(OTHER.trait, 16),
+            trait2: parseInt(WISHLISTED.trait, 16),
+          },
+          draws: 5,
+        },
+      ],
+      slot: 4,
+      slotState: 12345,
+      unpredictable: false,
+    };
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "predict_transmarvel") return Promise.resolve(sigilPrediction);
+      if (command === "fetch_overmastery_seed") return Promise.resolve(sigilPrediction.slotState);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    renderPage();
+
+    const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
+    await waitFor(() => expect(predictButton.disabled).toBe(false));
+    await act(async () => {
+      fireEvent.click(predictButton);
+    });
+
+    // Both traits translate to the same fallback text in this test setup (no
+    // real trait/sigil translations loaded) — the format's literal pieces
+    // (" Lv15", " / 2nd: ") are what this test pins.
+    expect(await screen.findByText("ui.unknown-id Lv15 / 2nd: ui.unknown-id")).toBeTruthy();
   });
 });

@@ -73,8 +73,8 @@ describe("stoneEntryMatches", () => {
 });
 
 describe("rollHits", () => {
-  const sigilRoll = (trait1: number): TransmarvelRoll => ({
-    outcome: { type: "sigil", sigilId: 0x000001aa, traitLevel: 10, trait1, trait2: null },
+  const sigilRoll = (trait1: number, trait2: number | null = null): TransmarvelRoll => ({
+    outcome: { type: "sigil", sigilId: 0x000001aa, traitLevel: 10, trait1, trait2 },
     draws: 5,
   });
   const stoneRoll = (traits: [number, number][]): TransmarvelRoll => ({
@@ -86,6 +86,16 @@ describe("rollHits", () => {
     const sigils: SigilEntry[] = [{ trait: "000000aa" }];
     expect(rollHits(sigilRoll(0x000000aa), sigils, [])).toBe(true);
     expect(rollHits(sigilRoll(0x000000bb), sigils, [])).toBe(false);
+  });
+
+  it("sigil roll also hits when the wished trait arrives as the rolled trait2, not trait1", () => {
+    const sigils: SigilEntry[] = [{ trait: "000000bb" }];
+    expect(rollHits(sigilRoll(0x000000aa, 0x000000bb), sigils, [])).toBe(true);
+  });
+
+  it("sigil roll misses when the wished trait matches neither trait1 nor trait2", () => {
+    const sigils: SigilEntry[] = [{ trait: "000000cc" }];
+    expect(rollHits(sigilRoll(0x000000aa, 0x000000bb), sigils, [])).toBe(false);
   });
 
   it("wrightstone roll hits iff ANY wishlist stone entry matches (OR across the list)", () => {

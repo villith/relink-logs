@@ -1,4 +1,3 @@
-import pool from "@/assets/transmarvel-pool.json";
 import { backendErrorMessage } from "@/backendErrors";
 import type { TransmarvelOutcome } from "@/types";
 import { translateSigilId, translateTraitId } from "@/utils";
@@ -19,9 +18,7 @@ import {
 import { X } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
-import useTransmarvelSearcher, { comboSatisfies, TransmarvelPool, WrightstoneEntry } from "./useTransmarvelSearcher";
-
-const POOL = pool as TransmarvelPool;
+import useTransmarvelSearcher, { comboSatisfies, POOL, WrightstoneEntry } from "./useTransmarvelSearcher";
 
 /** Pool traits are stored as lowercase hex strings (the wishlist's key
  * shape); rolled outcomes carry the trait as a number. */
@@ -31,9 +28,13 @@ const hex = (h: string) => parseInt(h, 16);
 const OutcomeCell = ({ outcome, hit }: { outcome: TransmarvelOutcome; hit: boolean }) => {
   const { t } = useTranslation();
   if (outcome.type === "sigil") {
+    const label = [translateSigilId(outcome.sigilId), outcome.traitLevel > 0 ? t("ui.level-short", { level: outcome.traitLevel }) : null]
+      .filter(Boolean)
+      .join(" ");
+    const trait2 = outcome.trait2 !== null ? t("ui.toolbox.tm-second-trait", { trait: translateTraitId(outcome.trait2) }) : null;
     return (
       <Text size="xs" fw={hit ? 700 : undefined}>
-        {translateSigilId(outcome.sigilId)}
+        {[label, trait2].filter(Boolean).join(" / ")}
       </Text>
     );
   }
@@ -91,6 +92,33 @@ const TransmarvelSearcher = () => {
     return [...seen].map((trait) => ({ value: trait, label: translateTraitId(hex(trait)) }));
   };
 
+  // Levels reachable by `trait` at slot i, other slots held as-is: some combo
+  // must satisfy the entry with slot i set to {trait, minLevel: L}.
+  const validLevelsFor = (entry: WrightstoneEntry, slotIndex: number, trait: string): number[] =>
+    POOL.wrightstones.levels.filter((level) => {
+      const candidate: WrightstoneEntry = {
+        slots: entry.slots.map((s, i) => (i === slotIndex ? { trait, minLevel: level } : s)),
+      };
+      return POOL.wrightstones.combos.some((c) => comboSatisfies(c, candidate));
+    });
+
+  // Min-level picker, constrained the same way as slotTraitOptions: offer
+  // level L for slot i iff some combo satisfies the entry with slot i's
+  // minLevel set to L (trait unchanged, other slots held as-is).
+  const slotLevelOptions = (entry: WrightstoneEntry, slotIndex: number): number[] =>
+    validLevelsFor(entry, slotIndex, entry.slots[slotIndex].trait);
+
+  // Keep the slot's current minLevel across a trait change if the new trait
+  // can still reach it; otherwise clamp down to the largest level the new
+  // trait still reaches below it; otherwise (every reachable level is above
+  // the current one) jump up to the smallest. Guarantees the entry always
+  // satisfies some combo, so sanitizeWishlists never drops it.
+  const clampLevel = (validLevels: number[], currentLevel: number): number => {
+    if (validLevels.includes(currentLevel)) return currentLevel;
+    const lower = validLevels.filter((l) => l < currentLevel);
+    return lower.length ? Math.max(...lower) : Math.min(...validLevels);
+  };
+
   const setStone = (index: number, entry: WrightstoneEntry) => setStones(stones.map((s, i) => (i === index ? entry : s)));
   const shown = matchesOnly ? results.filter((r) => r.hit) : results;
 
@@ -138,16 +166,18 @@ const TransmarvelSearcher = () => {
                     searchable
                     data={slotTraitOptions(entry, si)}
                     value={slot.trait}
-                    onChange={(trait) =>
-                      trait && setStone(index, { slots: entry.slots.map((s, i) => (i === si ? { ...s, trait } : s)) })
-                    }
+                    onChange={(trait) => {
+                      if (!trait) return;
+                      const minLevel = clampLevel(validLevelsFor(entry, si, trait), slot.minLevel);
+                      setStone(index, { slots: entry.slots.map((s, i) => (i === si ? { trait, minLevel } : s)) });
+                    }}
                     allowDeselect={false}
                     disabled={busy}
                     w={200}
                   />
                   <Select
                     label={t("ui.toolbox.tm-min-level", "Min level")}
-                    data={POOL.wrightstones.levels.map(String)}
+                    data={slotLevelOptions(entry, si).map(String)}
                     value={String(slot.minLevel)}
                     onChange={(v) =>
                       v && setStone(index, { slots: entry.slots.map((s, i) => (i === si ? { ...s, minLevel: parseInt(v, 10) } : s)) })
