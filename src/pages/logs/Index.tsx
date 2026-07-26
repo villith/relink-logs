@@ -165,6 +165,16 @@ export const IndexPage = () => {
                     {t("ui.logs.duration")}
                   </SortableColumn>
                 </Table.Th>
+                <Table.Th>
+                  <SortableColumn
+                    column="quest-elapsed-time"
+                    sortType={filters.sortType}
+                    sortDirection={filters.sortDirection}
+                    onClick={() => toggleSort("quest-elapsed-time")}
+                  >
+                    {t("ui.logs.quest-elapsed-time")}
+                  </SortableColumn>
+                </Table.Th>
                 <Table.Th>{t("ui.logs.name")}</Table.Th>
                 <Table.Th></Table.Th>
               </Table.Tr>
@@ -255,6 +265,13 @@ function LogEntry({
       </Table.Td>
       <Table.Td>
         <Text size="xs">{millisecondsToElapsedFormat(log.duration)}</Text>
+      </Table.Td>
+      {/* In-game time. Blank on logs recorded before the quest timer was read
+          correctly, and on fights the game never reported one for. */}
+      <Table.Td>
+        <Text size="xs">
+          {log.questElapsedTime ? millisecondsToElapsedFormat(log.questElapsedTime * 1000) : ""}
+        </Text>
       </Table.Td>
       <Table.Td>
         <Text size="xs">{names}</Text>

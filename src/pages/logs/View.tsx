@@ -650,6 +650,7 @@ export const ViewPage = () => {
     targetEntries,
     selectedTargetSpans,
     questId,
+    questTimer,
     questCompleted,
     roomIndex,
     playerData,
@@ -667,6 +668,7 @@ export const ViewPage = () => {
     selectedTargetSpans: state.selectedTargetSpans,
     playerData: state.players,
     questId: state.questId,
+    questTimer: state.questTimer,
     questCompleted: state.questCompleted,
     roomIndex: state.roomIndex,
     setSelectedTargetSpans: state.setSelectedTargetSpans,
@@ -1232,6 +1234,21 @@ export const ViewPage = () => {
               {millisecondsToElapsedFormat(encounter.endTime - encounter.startTime)}
             </Text>
           </Box>
+          {/* The game's own quest timer, shown whenever it reported one. Kept
+              distinct from Duration above: Duration is wall-clock time between
+              the first and last hit (what DPS is measured over), while this is
+              the clear time the result screen reports, which also covers the
+              run up to the boss. */}
+          {questTimer ? (
+            <Box display="flex">
+              <Text size="sm" fw={800}>
+                {t("ui.logs.quest-elapsed-time")}:
+              </Text>
+              <Text size="sm" fs="italic" ml={4}>
+                {millisecondsToElapsedFormat(questTimer * 1000)}
+              </Text>
+            </Box>
+          ) : null}
           <Box display="flex">
             <Text size="sm" fw={800}>
               {t("ui.logs.total-damage")}:
