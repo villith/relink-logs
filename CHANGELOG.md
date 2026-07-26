@@ -7,31 +7,33 @@ markdown in the app.
 
 ## 1.12.3
 
-### Features
-
-- The overlay and log window now show whether the parser is properly connected to the game
-- Every summon now gets its own named row in the meter instead of collapsing into a single unnamed
-entry
-- Master level traits in log details are now grouped by Essence/Insight/Crux and are easier to understand at a glance
-
 ### Notes
 
 - Primal Burst damage support has been added in this build but is being **excluded** from meters by default. You can turn it on in the settings tab. There is a [poll](https://github.com/villith/relink-logs/discussions/49) available to decide on how Primal Burst should be included in the meters.
 - The "Reset Overlay Layout" button was removed from the header. You can find a "Reset Windows" command by right-clicking on the tray icon instead
 
+### Features
+
+- The overlay and log window now show whether the parser is properly connected to the game
+- Master level traits in log details are now grouped by Essence/Insight/Crux and are easier to understand at a glance
+
 ### Bug Fixes
 
+- Fixed a memory leak that was causing issues particularly if you played with Coffinmaker Rackam.
 - Sir Barrold now saves its log entries
 - Player stats now appear properly ( except level )
 - Stun power now shows properly ( +1 > +10, +1.2 > +12 )
 - Synthesis Helper will not suggest a sigil that is equal to the sigil you are trying to craft. [reported by
 lingsamuel](https://github.com/villith/relink-logs/issues/33)
 - The overlay no longer forces a minimum width
+- In-Game Time is now properly saved for each quest ( is not retroactive )
 
 ### Language
 
 - The system tray menu is now localized and has a zh-CN translation [credit to Souma-Sumire](https://github.com/Souma-Sumire)
 - Further zh-CN skill translations [credit to Souma-Sumire](https://github.com/Souma-Sumire)
+- Djeeta abilities should appear correctly now
+- Most summons should be named
 
 ## 1.12.2
 
