@@ -62,11 +62,18 @@ pub struct AuditInterval {
     /// Whether `hp_before` came from the segment's max HP rather than an
     /// observed sample. Anchors carry an assumption; see [`AuditOptions`].
     pub is_anchor: bool,
-    /// Whether this target hangs off another actor (a breakable part or a
-    /// summon), rather than being its own parent.
-    pub is_part: bool,
 }
 
+/// Corpus tallies.
+///
+/// There is deliberately no body-versus-breakable-part split here. Hitting a
+/// part can drain the body's pool too, so separating the two would be worth
+/// having — but the wire carries no such link for a TARGET. The hook fills a
+/// target's `parent_index` with `actor_idx()`, the target's OWN game index, and
+/// its `index` with a folded instance pointer, so `parent_index != index` holds
+/// for every target alike and says nothing about parentage. An earlier split
+/// keyed on that comparison silently classified the entire corpus as parts; see
+/// `target_index_encoding_does_not_change_the_totals`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct AuditTotals {
     pub logged_damage: i64,
@@ -74,18 +81,6 @@ pub struct AuditTotals {
     pub overkill: i64,
     pub healed: i64,
     pub under_logged: i64,
-    /// The share of `under_logged` charged to targets that hang off a parent.
-    /// Hitting a part can drain the body's pool too, so this portion is an
-    /// attribution artifact rather than evidence of a missing hit.
-    pub under_logged_on_parts: i64,
-    /// The share of `healed` charged to targets that hang off a parent, where a
-    /// repaired part or a reused index mimics regeneration.
-    pub healed_on_parts: i64,
-    /// HP loss observed on whole enemies — the population where "logged damage
-    /// equals HP lost" actually holds, and the one the verdict is built on.
-    pub whole_enemy_hp_removed: i64,
-    pub whole_enemy_under_logged: i64,
-    pub whole_enemy_healed: i64,
     pub unmeasured_damage: i64,
     /// Damage logged into opening intervals whose max-HP anchor the data
     /// contradicts. Neither confirmed nor blamed on the meter.
@@ -104,11 +99,6 @@ impl std::ops::AddAssign for AuditTotals {
             overkill,
             healed,
             under_logged,
-            under_logged_on_parts,
-            healed_on_parts,
-            whole_enemy_hp_removed,
-            whole_enemy_under_logged,
-            whole_enemy_healed,
             unmeasured_damage,
             anchor_unverified_damage,
             matched_intervals,
@@ -119,11 +109,6 @@ impl std::ops::AddAssign for AuditTotals {
         self.overkill += overkill;
         self.healed += healed;
         self.under_logged += under_logged;
-        self.under_logged_on_parts += under_logged_on_parts;
-        self.healed_on_parts += healed_on_parts;
-        self.whole_enemy_hp_removed += whole_enemy_hp_removed;
-        self.whole_enemy_under_logged += whole_enemy_under_logged;
-        self.whole_enemy_healed += whole_enemy_healed;
         self.unmeasured_damage += unmeasured_damage;
         self.anchor_unverified_damage += anchor_unverified_damage;
         self.matched_intervals += matched_intervals;
@@ -132,12 +117,6 @@ impl std::ops::AddAssign for AuditTotals {
 }
 
 impl AuditTotals {
-    /// Unexplained HP loss on whole enemies, before the corpus discounts
-    /// enemies it has shown to regenerate.
-    pub fn whole_enemy_unexplained(&self) -> i64 {
-        self.whole_enemy_under_logged + self.whole_enemy_healed
-    }
-
     /// Pessimistic accuracy: every heal counts as unexplained. The corpus sweep
     /// refines this by discounting enemies it has shown to regenerate.
     ///
@@ -191,9 +170,6 @@ pub struct EnemyStats {
     pub intervals: usize,
     pub healed_intervals: usize,
     pub healed_damage: i64,
-    /// The portion of `healed_damage` observed on whole enemies rather than
-    /// parts — the only portion the verdict may spend.
-    pub whole_enemy_healed: i64,
     pub under_logged: i64,
     pub hp_removed: i64,
 }
@@ -204,14 +180,12 @@ impl std::ops::AddAssign for EnemyStats {
             intervals,
             healed_intervals,
             healed_damage,
-            whole_enemy_healed,
             under_logged,
             hp_removed,
         } = rhs;
         self.intervals += intervals;
         self.healed_intervals += healed_intervals;
         self.healed_damage += healed_damage;
-        self.whole_enemy_healed += whole_enemy_healed;
         self.under_logged += under_logged;
         self.hp_removed += hp_removed;
     }
@@ -297,12 +271,7 @@ pub fn audit_encounter(
             continue;
         };
 
-        intervals.push(close_interval(
-            segment,
-            state,
-            Some(current),
-            event.target.parent_index != event.target.index,
-        ));
+        intervals.push(close_interval(segment, state, Some(current)));
 
         state.hp_before = Some(current);
         state.is_anchor = false;
@@ -317,12 +286,7 @@ pub fn audit_encounter(
         if state.pending == 0 {
             continue;
         }
-        intervals.push(close_interval(
-            &segments[position],
-            state,
-            None,
-            state.parent_index.is_some_and(|parent| parent != segments[position].id),
-        ));
+        intervals.push(close_interval(&segments[position], state, None));
     }
 
     let mut totals = AuditTotals::default();
@@ -334,33 +298,15 @@ pub fn audit_encounter(
         // the denominator the verdict divides by.
         if interval.bucket != Bucket::AnchorUnverified {
             if let (Some(before), Some(after)) = (interval.hp_before, interval.hp_after) {
-                let removed = (before as i64 - after as i64).max(0);
-                totals.hp_removed += removed;
-                if !interval.is_part {
-                    totals.whole_enemy_hp_removed += removed;
-                }
+                totals.hp_removed += (before as i64 - after as i64).max(0);
             }
         }
 
         match interval.bucket {
             Bucket::Matched => totals.matched_intervals += 1,
             Bucket::Overkill => totals.overkill += interval.residual,
-            Bucket::Healed => {
-                totals.healed += interval.residual;
-                if interval.is_part {
-                    totals.healed_on_parts += interval.residual;
-                } else {
-                    totals.whole_enemy_healed += interval.residual;
-                }
-            }
-            Bucket::UnderLogged => {
-                totals.under_logged += -interval.residual;
-                if interval.is_part {
-                    totals.under_logged_on_parts += -interval.residual;
-                } else {
-                    totals.whole_enemy_under_logged += -interval.residual;
-                }
-            }
+            Bucket::Healed => totals.healed += interval.residual,
+            Bucket::UnderLogged => totals.under_logged += -interval.residual,
             Bucket::Unmeasured => totals.unmeasured_damage += interval.logged,
             Bucket::AnchorUnverified => totals.anchor_unverified_damage += interval.logged,
         }
@@ -386,7 +332,6 @@ fn close_interval(
     segment: &super::TargetSegment,
     state: &Open,
     hp_after: Option<u64>,
-    is_part: bool,
 ) -> AuditInterval {
     let Open {
         hp_before,
@@ -436,7 +381,6 @@ fn close_interval(
         residual,
         bucket,
         is_anchor,
-        is_part,
     }
 }
 
@@ -501,9 +445,6 @@ pub fn per_enemy_stats(audit: &EncounterAudit) -> Vec<(EnemyType, EnemyStats)> {
             Bucket::Healed => {
                 entry.healed_intervals += 1;
                 entry.healed_damage += interval.residual;
-                if !interval.is_part {
-                    entry.whole_enemy_healed += interval.residual;
-                }
             }
             Bucket::UnderLogged => entry.under_logged += -interval.residual,
             _ => {}
@@ -784,10 +725,10 @@ mod tests {
         assert_eq!(outliers, vec![EnemyType::Unknown(1)]);
     }
 
-    /// The regen classifier judges an enemy type on all its heals, but the
-    /// verdict may only spend whole-enemy ones, so the two are tallied apart.
+    /// Every heal against an enemy type feeds that type's regen classifier,
+    /// whichever target reported it.
     #[test]
-    fn per_enemy_stats_separate_whole_enemy_heals_from_part_heals() {
+    fn per_enemy_stats_collect_every_heal_for_the_type() {
         let mut events = vec![
             hit(0, 5, 100, Some((900, 1000))),
             hit(1_000, 5, 100, Some((850, 1000))),
@@ -796,7 +737,6 @@ mod tests {
         ];
         for (_, message) in events.iter_mut().skip(2) {
             if let Message::DamageEvent(event) = message {
-                event.target.parent_index = 7;
                 event.target.parent_actor_type = 5;
             }
         }
@@ -808,8 +748,38 @@ mod tests {
             .find(|(enemy_type, _)| *enemy_type == EnemyType::Unknown(5))
             .expect("both targets report the same enemy type");
 
-        assert_eq!(body.healed_damage, 130, "all heals feed the classifier");
-        assert_eq!(body.whole_enemy_healed, 50, "only the body's heal is spendable");
+        assert_eq!(body.healed_damage, 130);
+        assert_eq!(body.healed_intervals, 2);
+    }
+
+    /// The hook gives a target a per-spawn `index` folded from its instance
+    /// pointer while `parent_index` carries the same actor's game index, so the
+    /// two differ for EVERY target — a lone boss included. A total that moves
+    /// when only that encoding changes is measuring the wire format rather than
+    /// the meter.
+    #[test]
+    fn target_index_encoding_does_not_change_the_totals() {
+        let sample = || {
+            vec![
+                hit(0, 5, 100, Some((900, 1000))),
+                hit(1_000, 5, 100, Some((700, 1000))),
+            ]
+        };
+
+        let legacy = audit(&sample());
+
+        let mut events = sample();
+        for (_, message) in events.iter_mut() {
+            if let Message::DamageEvent(event) = message {
+                event.target.index = 0xB1A5_7E00;
+            }
+        }
+        let production = audit(&events);
+
+        assert_eq!(
+            production.totals, legacy.totals,
+            "the same fight must audit the same under either index encoding"
+        );
     }
 
     /// Sibling parts reporting an identical max HP under one parent are the
@@ -840,83 +810,19 @@ mod tests {
         );
     }
 
-    /// Hitting a breakable part can drain the body's pool as well as the part's.
-    /// Damage logged against the part then shows up as HP the BODY lost without
-    /// matching logged damage — an attribution artifact, not a missing hit. The
-    /// audit splits the two so the headline is not quietly built on it.
+    /// Two targets under-logging in the same fight both count. Neither is
+    /// discounted as a "part": nothing on the wire says either one is.
     #[test]
-    fn under_logging_is_split_between_parts_and_bodies() {
-        let mut events = vec![
-            // A body: its own parent.
+    fn under_logging_on_every_target_counts() {
+        let audit = audit(&[
             hit(0, 5, 100, Some((900, 1000))),
             hit(1_000, 5, 100, Some((700, 1000))),
-            // A part hanging off a different parent.
             hit(2_000, 10, 100, Some((900, 1000))),
             hit(3_000, 10, 100, Some((650, 1000))),
-        ];
-        for (_, message) in events.iter_mut().skip(2) {
-            if let Message::DamageEvent(event) = message {
-                event.target.parent_index = 7;
-            }
-        }
-
-        let audit = audit(&events);
+        ]);
 
         assert_eq!(audit.totals.under_logged, 250);
-        assert_eq!(
-            audit.totals.under_logged_on_parts, 150,
-            "the part's shortfall is tracked apart from the body's"
-        );
-        assert!(!audit.intervals[1].is_part);
-        assert!(audit.intervals[3].is_part);
-    }
-
-    /// Heals need the same split for the same reason: a part whose pool refills
-    /// on repair, or whose index is reused by a sibling, reads as regeneration
-    /// that the enemy never performed.
-    #[test]
-    fn healing_is_split_between_parts_and_bodies() {
-        let mut events = vec![
-            hit(0, 5, 100, Some((900, 1000))),
-            hit(1_000, 5, 100, Some((850, 1000))),
-            hit(2_000, 10, 100, Some((900, 1000))),
-            hit(3_000, 10, 100, Some((880, 1000))),
-        ];
-        for (_, message) in events.iter_mut().skip(2) {
-            if let Message::DamageEvent(event) = message {
-                event.target.parent_index = 7;
-            }
-        }
-
-        let audit = audit(&events);
-
-        assert_eq!(audit.totals.healed, 130);
-        assert_eq!(audit.totals.healed_on_parts, 80);
-    }
-
-    /// The trustworthy population: intervals measured sample-to-sample on a
-    /// whole enemy. Everything the audit cannot vouch for is excluded rather
-    /// than averaged in.
-    #[test]
-    fn whole_enemy_totals_exclude_parts_and_anchors() {
-        let mut events = vec![
-            hit(0, 5, 100, Some((900, 1000))),
-            hit(1_000, 5, 100, Some((700, 1000))),
-            hit(2_000, 10, 100, Some((900, 1000))),
-            hit(3_000, 10, 100, Some((650, 1000))),
-        ];
-        for (_, message) in events.iter_mut().skip(2) {
-            if let Message::DamageEvent(event) = message {
-                event.target.parent_index = 7;
-            }
-        }
-
-        let audit = audit(&events);
-
-        // Body: a corroborated anchor removing 100, then an observed interval
-        // removing 200 of which only 100 was logged. The part's 350 is excluded.
-        assert_eq!(audit.totals.whole_enemy_hp_removed, 300);
-        assert_eq!(audit.totals.whole_enemy_unexplained(), 100);
+        assert_eq!(audit.totals.hp_removed, 650);
     }
 
     /// Every damage event's damage must be accounted for exactly once, whichever

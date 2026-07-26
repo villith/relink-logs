@@ -186,8 +186,8 @@ fn main() -> Result<()> {
 
         let mut healed_by_enemy: Vec<(EnemyType, i64)> = Vec::new();
         for (enemy_type, stats) in per_enemy_stats(&audit) {
-            if stats.whole_enemy_healed > 0 {
-                healed_by_enemy.push((enemy_type, stats.whole_enemy_healed));
+            if stats.healed_damage > 0 {
+                healed_by_enemy.push((enemy_type, stats.healed_damage));
             }
             merge_enemy(&mut corpus.per_enemy, enemy_type, stats);
         }
@@ -204,10 +204,10 @@ fn main() -> Result<()> {
             id,
             quest_id: encounter.quest_id,
             logged: totals.logged_damage,
-            // Ranked on the same trustworthy population as the verdict, so the
-            // worst-offender list points at logs worth opening.
-            hp_removed: totals.whole_enemy_hp_removed,
-            under_logged: totals.whole_enemy_under_logged,
+            // Ranked on the same population as the verdict, so the worst-offender
+            // list points at logs worth opening.
+            hp_removed: totals.hp_removed,
+            under_logged: totals.under_logged,
             healed_by_enemy,
             unmeasured: totals.unmeasured_damage,
         });
@@ -231,18 +231,6 @@ fn main() -> Result<()> {
         .map(|(_, stats, _)| stats.healed_damage)
         .sum();
     let healed_unclassified = corpus.totals.healed - healed_known;
-
-    // The verdict spends only what the audit can vouch for: HP loss observed
-    // sample-to-sample on a whole enemy, minus regeneration the corpus has
-    // shown that enemy to perform.
-    let whole_healed_known: i64 = corpus
-        .per_enemy
-        .iter()
-        .filter(|(enemy_type, _, _)| outliers.contains(enemy_type))
-        .map(|(_, stats, _)| stats.whole_enemy_healed)
-        .sum();
-    let whole_unexplained =
-        corpus.totals.whole_enemy_under_logged + (corpus.totals.whole_enemy_healed - whole_healed_known);
 
     report(
         &db_path,
@@ -279,14 +267,6 @@ fn main() -> Result<()> {
             "  damage logging is correct only within {pct:.4}%  (threshold {threshold_pct:.4}% — FAIL)"
         );
     }
-    if let Some(whole) = fraction(whole_unexplained, corpus.totals.whole_enemy_hp_removed) {
-        println!(
-            "  restricted to targets that are their own parent: {:.4}% over {} HP",
-            whole * 100.0,
-            commas(corpus.totals.whole_enemy_hp_removed)
-        );
-    }
-
     if pct <= threshold_pct {
         Ok(())
     } else {
@@ -344,19 +324,6 @@ fn report(
         commas(corpus.totals.under_logged),
         share_of(corpus.totals.under_logged, corpus.totals.hp_removed)
     );
-    // Split by the only distinction the log actually carries: whether the
-    // target has a parent actor. Most targets in real logs do, so this is a
-    // diagnostic, not a clean/dirty partition.
-    println!(
-        "    ...targets with a parent {}{}",
-        commas(corpus.totals.under_logged_on_parts),
-        share_of(corpus.totals.under_logged_on_parts, corpus.totals.hp_removed)
-    );
-    println!(
-        "    ...own-parent targets .. {}  (of {} HP)",
-        commas(corpus.totals.whole_enemy_under_logged),
-        commas(corpus.totals.whole_enemy_hp_removed)
-    );
     println!(
         "  unmeasured damage ........ {}{}",
         commas(corpus.totals.unmeasured_damage),
@@ -406,7 +373,14 @@ fn report(
 
     println!();
     if worst.is_empty() {
-        println!("WORST LOGS: none — every log reconciled exactly");
+        // Distinguish "nothing left unexplained" from "nothing was measurable" —
+        // an empty list read as a clean bill of health once already, while the
+        // verdict on the same run said FAIL.
+        if corpus.totals.hp_removed > 0 {
+            println!("WORST LOGS: none — every measurable log reconciled exactly");
+        } else {
+            println!("WORST LOGS: none measurable — no log in this corpus carried HP data");
+        }
     } else {
         println!("WORST LOGS BY UNEXPLAINED SHARE");
         for summary in worst.iter().take(15) {
