@@ -84,5 +84,6 @@ fn variant(event: &Message) -> &'static str {
         Message::OnStunEffect(_) => "OnStunEffect",
         Message::OnTrialStart(_) => "OnTrialStart",
         Message::OnTrialEnd(_) => "OnTrialEnd",
+        Message::OnQuestElapsedTime(_) => "OnQuestElapsedTime",
     }
 }

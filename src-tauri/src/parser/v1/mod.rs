@@ -6,7 +6,7 @@ use protocol::{
     ActionType, AreaEnterEvent, ConfluxBuffAcquiredEvent, ConfluxRoomEnterEvent, ConfluxRunEndEvent,
     DamageEvent, Message, OnAttemptSBAEvent, OnContinueSBAChainEvent, OnDeathEvent,
     OnPerformSBAEvent, OnPlayerStunEvent, OnUpdateSBAEvent, PlayerIdentityEvent, PlayerLoadEvent,
-    QuestCompleteEvent,
+    QuestCompleteEvent, QuestElapsedTimeEvent,
 };
 
 use crate::db::runs::{finalize_run, insert_run, ConfluxBuffDelta};
@@ -1609,6 +1609,37 @@ impl Parser {
         }
     }
 
+    /// Handles one tick of the in-game quest timer — the clock the result
+    /// screen reports as the clear time.
+    ///
+    /// This is display data only; DPS is measured against wall clock. Its value
+    /// is that a fight which never reaches a result screen (a wipe, a retire)
+    /// still gets an in-game time, where `on_quest_complete_event` alone would
+    /// leave it blank.
+    ///
+    /// It lives on the encounter rather than in the raw event log because the
+    /// encounter is what gets serialised — the log would only be re-deriving a
+    /// field that is already stored.
+    pub fn on_quest_elapsed_time(&mut self, event: QuestElapsedTimeEvent) {
+        self.record_in_game_time(event.elapsed_time_in_secs);
+    }
+
+    /// Folds in an in-game-time reading, keeping the largest seen. The quest
+    /// timer only advances within a quest, so a smaller value means the manager
+    /// was reset or torn down (the next quest loading, a mid-teardown read) and
+    /// must not overwrite what this encounter was actually fought over.
+    fn record_in_game_time(&mut self, elapsed_time_in_secs: u32) {
+        if elapsed_time_in_secs == 0
+            || self
+                .encounter
+                .quest_timer
+                .is_some_and(|known| known >= elapsed_time_in_secs)
+        {
+            return;
+        }
+        self.encounter.quest_timer = Some(elapsed_time_in_secs);
+    }
+
     pub fn on_quest_complete_event(&mut self, event: QuestCompleteEvent) {
         // Rooms and runs have their own save path (on_conflux_room_enter /
         // finalize_active_run), so a completion during an active run must not save the
@@ -1625,9 +1656,13 @@ impl Parser {
         // whatever id we already know instead of overwriting it with "unknown".
         if event.quest_id != 0 {
             self.encounter.quest_id = Some(event.quest_id);
-            self.encounter.quest_timer = Some(event.elapsed_time_in_secs);
         }
         self.encounter.quest_completed = true;
+
+        // The frozen clear time is the authoritative in-game time for the run.
+        // Recorded regardless of the quest id above: an unknown id is no reason
+        // to throw away a known clear time.
+        self.record_in_game_time(event.elapsed_time_in_secs);
 
         if self.status == ParserStatus::InProgress {
             self.update_status(ParserStatus::Stopped);
@@ -2923,6 +2958,68 @@ mod tests {
         parser.reparse();
 
         assert_eq!(parser.derived_state.end_time, 1_000);
+    }
+
+    fn a_tick(secs: u32) -> QuestElapsedTimeEvent {
+        QuestElapsedTimeEvent {
+            elapsed_time_in_secs: secs,
+        }
+    }
+
+    /// A fight that never reaches a result screen — a wipe, a retire — still
+    /// gets an in-game time, because the ticker reported one while it ran.
+    /// Sourcing it only from the completion event would leave every failed
+    /// attempt blank, which is most of a progression session.
+    #[test]
+    fn a_tick_records_the_in_game_time_without_a_completion() {
+        let mut parser = Parser::default();
+
+        parser.on_quest_elapsed_time(a_tick(47));
+
+        assert_eq!(parser.encounter.quest_timer, Some(47));
+    }
+
+    /// The result screen's frozen clear time is the authoritative number and
+    /// lands after the last tick the ticker managed to send.
+    #[test]
+    fn the_clear_time_supersedes_the_last_tick() {
+        let mut parser = Parser::default();
+        parser.on_quest_elapsed_time(a_tick(230));
+
+        parser.on_quest_complete_event(QuestCompleteEvent {
+            quest_id: 0x1234,
+            elapsed_time_in_secs: 232,
+        });
+
+        assert_eq!(parser.encounter.quest_timer, Some(232));
+    }
+
+    /// An unknown quest id is no reason to throw away a known clear time.
+    #[test]
+    fn the_clear_time_survives_an_unknown_quest_id() {
+        let mut parser = Parser::default();
+
+        parser.on_quest_complete_event(QuestCompleteEvent {
+            quest_id: 0,
+            elapsed_time_in_secs: 180,
+        });
+
+        assert_eq!(parser.encounter.quest_timer, Some(180));
+        assert_eq!(parser.encounter.quest_id, None, "id stays unknown");
+    }
+
+    /// The quest timer only advances within a quest, so a lower reading means
+    /// the manager was reset or torn down and must not overwrite the time this
+    /// encounter was actually fought over.
+    #[test]
+    fn the_in_game_time_never_goes_backwards() {
+        let mut parser = Parser::default();
+
+        parser.on_quest_elapsed_time(a_tick(200));
+        parser.on_quest_elapsed_time(a_tick(5));
+        parser.on_quest_elapsed_time(a_tick(0));
+
+        assert_eq!(parser.encounter.quest_timer, Some(200));
     }
 
     fn a_damage_event() -> DamageEvent {

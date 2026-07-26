@@ -1635,6 +1635,9 @@ fn connect_and_run_parser(app: AppHandle) {
                                 protocol::Message::OnQuestComplete(event) => {
                                     state.on_quest_complete_event(event);
                                 }
+                                protocol::Message::OnQuestElapsedTime(event) => {
+                                    state.on_quest_elapsed_time(event);
+                                }
                                 protocol::Message::OnQuestFail(event) => {
                                     info!(
                                         "quest retire/fail boundary: quest_id={:#x}",
