@@ -135,8 +135,8 @@ pub enum TransmarvelOutcome {
     #[serde(rename_all = "camelCase")]
     Wrightstone {
         item: u32,
-        /// (trait hash, level) — empty until the grant-path trait roll is
-        /// reverse-engineered; the stone item itself is still exact.
+        /// (trait hash, level) pairs, in slot order — always populated
+        /// (0..=3 entries; exactly 3 for every gacha stone).
         traits: Vec<(u32, u32)>,
     },
 }
