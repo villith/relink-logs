@@ -4,18 +4,23 @@
 //! ui::fsm::action::GemGacha's exec virtual FUN_141bb6610 — see
 //! docs/superpowers/specs/2026-07-26-transmarvel-searcher-design.md).
 //! Per roll the game overrides every RNG draw to slot 4 (transmarvel's
-//! per-tier slot) and consumes three draws: gem-vs-wrightstone, rate group,
-//! item within the group's lot. The hook takes the slot state in-process
-//! (game-reader crate, served over the toolbox RPC channel); everything here
-//! is deterministic and unit-testable.
+//! per-tier slot): three pick draws (gem-vs-wrightstone, rate group, item
+//! within the group's lot), then grant-path draws the pick doesn't depend
+//! on — 2 trailing for a gem, 9 for a wrightstone (its 3 traits ×
+//! type/trait/level, fed by the skill_*_lot tables). Trailing counts are
+//! empirical: a live 8-roll session (2026-07-26, 54 draws total) reproduces
+//! exactly with 5-draw gems and 12-draw stones, and only with those. The
+//! hook takes the slot state in-process (game-reader crate, served over the
+//! toolbox RPC channel); everything here is deterministic and unit-testable.
 //!
-//! Two knowingly-unmodeled inputs, pending live reconciliation:
-//! - Wrightstone trait/level rolls happen in the grant path (skill_*_lot
-//!   tables) and their draw count is unmeasured, so predictions after a
-//!   wrightstone outcome may need resyncing.
-//! - The availability filter drops quest-locked items and owned uniques
-//!   (character sigils); the simulation currently assumes everything is
-//!   available.
+//! Knowingly unmodeled, pending more live data:
+//! - Wrightstone traits/levels themselves (the 9 draws advance the stream
+//!   correctly but aren't decoded into trait values yet). Both observed
+//!   stones were the base tier; the rarer tiers' draw counts are assumed
+//!   equal until seen live.
+//! - The availability filter (quest gates, owned uniques). The live session
+//!   matched with NO filtering — including character sigils — so it is
+//!   deliberately left out until a roll proves otherwise.
 
 use serde::{Deserialize, Serialize};
 
@@ -127,6 +132,13 @@ pub fn predict_roll(state: &mut u32, t: &TransmarvelTables) -> TransmarvelRoll {
             traits: Vec::new(),
         }
     };
+
+    // Grant-path draws (see module docs): they don't affect the item pick
+    // above but do advance the stream for the NEXT roll.
+    let trailing = if is_gem { 2 } else { 9 };
+    for _ in 0..trailing {
+        draw();
+    }
     TransmarvelRoll { outcome, draws }
 }
 
@@ -209,6 +221,7 @@ mod tests {
     ///   d2 = 0x45000201 % 10000 = 8417              -> walks past 640+4940+20+
     ///        420+280+1000+1000 = 8300 into group 7 (F527EF32, 28 items)
     ///   d3 = 0x451080a1 % 1400 = 809, 809/50 = 16   -> item index 16
+    /// then 2 trailing gem grant draws advance the stream to 5 total.
     /// NOTE: pins the simulation's arithmetic, not the game — live validation
     /// of the full pipeline is the Phase 1 exit criterion.
     #[test]
@@ -216,8 +229,12 @@ mod tests {
         let t = stock_tables();
         let mut s = 1u32;
         let roll = predict_roll(&mut s, t);
-        assert_eq!(s, 0x451080a1);
-        assert_eq!(roll.draws, 3);
+        let mut expect_state = 1u32;
+        for _ in 0..5 {
+            expect_state = xorshift32(expect_state);
+        }
+        assert_eq!(s, expect_state);
+        assert_eq!(roll.draws, 5);
         assert_eq!(t.gem_groups[7].lot, 0xF527EF32);
         let expect = &t.gem_groups[7].items[16];
         assert_eq!(
@@ -244,7 +261,7 @@ mod tests {
         }
         let mut s = seed;
         let roll = predict_roll(&mut s, t);
-        assert_eq!(roll.draws, 3);
+        assert_eq!(roll.draws, 12);
         let TransmarvelOutcome::Wrightstone { item, traits } = roll.outcome else {
             panic!("expected a wrightstone, got {:?}", roll.outcome);
         };
@@ -254,6 +271,42 @@ mod tests {
             .iter()
             .flat_map(|g| &g.items)
             .any(|i| i.item == item));
+    }
+
+    /// LIVE ground truth, 2026-07-26 (game v2.0.2): 8 consecutive real rolls
+    /// at Siero's from slot-4 state 0x39633789, all outcomes user-verified,
+    /// slot advanced by exactly 54 draws to 0xa3738437. Items by lang name:
+    /// Vitality Wrightstone ×2, Attack Power V+, War Elemental+, Aegis V+,
+    /// Supreme Primarch's Nimbus+, Spirit Edge's Rally+, Ebony's Presence+.
+    #[test]
+    fn live_session_2026_07_26_reproduced() {
+        let t = stock_tables();
+        let rolls = simulate(0x3963_3789, t, 8);
+        let got: Vec<(u32, u32)> = rolls
+            .iter()
+            .map(|r| match r.outcome {
+                TransmarvelOutcome::Sigil { sigil_id, .. } => (sigil_id, r.draws),
+                TransmarvelOutcome::Wrightstone { item, .. } => (item, r.draws),
+            })
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                (0x3EF6_DEF5, 12), // Vitality Wrightstone
+                (0x2D7F_2E70, 5),  // Attack Power V+
+                (0x3EF6_DEF5, 12), // Vitality Wrightstone
+                (0x0061_2B10, 5),  // War Elemental+
+                (0x9C23_99DA, 5),  // Aegis V+
+                (0x7E3A_52A3, 5),  // Supreme Primarch's Nimbus+
+                (0x12DF_D310, 5),  // Spirit Edge's Rally+
+                (0xFB0F_9037, 5),  // Ebony's Presence+
+            ]
+        );
+        let mut s = 0x3963_3789u32;
+        for _ in 0..54 {
+            s = xorshift32(s);
+        }
+        assert_eq!(s, 0xa373_8437, "54 draws end at the observed post-state");
     }
 
     /// The JSON contract src/types.ts mirrors — a rename here breaks the
