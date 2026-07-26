@@ -122,3 +122,11 @@ pub fn rpm_overmastery_snapshot() -> Result<Option<protocol::toolbox::Overmaster
         game_reader::overmastery::take_snapshot(mem, base, rvas)
     })
 }
+
+/// RPM transmarvel snapshot (probe ground truth). `Ok(None)` = game not running.
+pub fn rpm_transmarvel_snapshot() -> Result<Option<game_reader::transmarvel::TransmarvelSnapshot>> {
+    with_game_pe(|pe, mem, base| {
+        let rvas = game_reader::transmarvel::resolve_rvas(pe)?;
+        game_reader::transmarvel::take_snapshot(mem, base, rvas)
+    })
+}

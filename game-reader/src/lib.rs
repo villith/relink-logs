@@ -14,6 +14,7 @@ use pelite::pe64::Pe;
 
 pub mod overmastery;
 pub mod synthesis;
+pub mod transmarvel;
 
 /// The game process/module name (shared by the injector and the probes).
 pub const GAME_EXE: &str = "granblue_fantasy_relink.exe";

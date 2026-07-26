@@ -22,7 +22,7 @@ pub const TOOLBOX_TCP_ADDR: &str = "127.0.0.1:39372";
 /// each time the event stream connects: on Linux the deployed dinput8 proxy
 /// can be older than the app until the game restarts, and a bincode mismatch
 /// is silent garbage — better "restart the game" than wrong predictions.
-pub const TOOLBOX_PROTOCOL_VERSION: u32 = 2;
+pub const TOOLBOX_PROTOCOL_VERSION: u32 = 3;
 
 /// Version a hook reports when built outside a release (no `HOOK_VERSION`
 /// build env). The app treats this as a dev hook and never flags it as
@@ -38,6 +38,10 @@ pub enum ToolboxRequest {
     OvermasterySnapshot,
     /// Current state of one RNG slot (< RNG_SLOT_COUNT), for staleness polls.
     OvermasterySlot(u32),
+    /// Everything a transmarvel prediction depends on. Staleness polling
+    /// reuses `OvermasterySlot` (a generic RNG-slot read) with the
+    /// prediction's slot.
+    TransmarvelSnapshot,
 }
 
 /// One variant per request. Payload `Err` strings are user-facing (shown by
@@ -57,6 +61,7 @@ pub enum ToolboxResponse {
     SynthesisSeed(Result<SynthesisSeed, String>),
     OvermasterySnapshot(Result<OvermasterySnapshot, String>),
     OvermasterySlot(Result<u32, String>),
+    TransmarvelSnapshot(Result<TransmarvelSnapshot, String>),
 }
 
 /// One sigil in the box. camelCase because the app also serializes these to
@@ -115,6 +120,18 @@ pub struct OvermasterySnapshot {
     pub roster: Vec<u32>,
 }
 
+/// Everything a transmarvel prediction depends on beyond the static tables.
+/// camelCase for the same free-JSON reason as `SynthesisSigil`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TransmarvelSnapshot {
+    /// xorshift32 state of the transmarvel RNG slot at snapshot time.
+    pub rng_state: u32,
+    /// Slot override word (0xffffffff when idle; anything else means a roll
+    /// is mid-flight and predictions would race it).
+    pub slot_override: u32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -152,5 +169,22 @@ mod tests {
         // record_level MUST cross the wire (it feeds the warm-up pairKey);
         // this catches anyone re-adding the old #[serde(skip)].
         assert_eq!(back.sigils[0].record_level, 5);
+
+        let req = ToolboxRequest::TransmarvelSnapshot;
+        let bytes = bincode::serialize(&req).unwrap();
+        assert_eq!(bincode::deserialize::<ToolboxRequest>(&bytes).unwrap(), req);
+
+        let snap = TransmarvelSnapshot {
+            rng_state: 0xdead_beef,
+            slot_override: u32::MAX,
+        };
+        let resp = ToolboxResponse::TransmarvelSnapshot(Ok(snap));
+        let bytes = bincode::serialize(&resp).unwrap();
+        let ToolboxResponse::TransmarvelSnapshot(Ok(back)) =
+            bincode::deserialize::<ToolboxResponse>(&bytes).unwrap()
+        else {
+            panic!("wrong variant");
+        };
+        assert_eq!(back, snap);
     }
 }
