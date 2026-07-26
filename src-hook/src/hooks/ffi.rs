@@ -36,13 +36,39 @@ pub struct DamageInstance {
     pub base_damage: f32,   // 0x2D4 pre-cap base damage (uncapped); capped <=> base > cap
 }
 
-#[derive(Debug)]
+/// v2.0.2 (Endless Ragnarok) layout. The base pointer is the quest manager
+/// singleton itself (`OnLoadQuestState`'s a1) — the pre-2.0 `a1+0x1D8`
+/// sub-struct is gone, so every field below is an offset from the manager.
+///
+/// `quest_id` @ +0xDC8 is Ghidra-confirmed (the hooked loader reads
+/// `*(uint*)(rcx + 0xdc8)` and FNV-1a-hashes it for the quest-table lookup).
+///
+/// `elapsed_time` @ +0xAC8 is the in-game quest timer (IGT), the same number
+/// the result screen shows as the clear time. Pre-2.0 it was +0x64C *within*
+/// the old sub-struct; when the base was rebased to the manager that relative
+/// offset was kept by mistake, so the hook had been reading mgr+0x1414 (a
+/// constant 1). The 2026-07-15 diag scan could not have caught it: it swept
+/// forward from the old base (mgr+0xDC8), and the real field sits 0x300 bytes
+/// *before* that.
+#[derive(Debug, Clone, Copy)]
 #[repr(C)]
 pub struct QuestState {
-    pub quest_id: u32,        // 0x00
-    padding_640: [u8; 0x648], // 0x004 - 0x64C
-    pub elapsed_time: u32,    // 0x64C
+    padding_00: [u8; 0xAC8], // 0x000 - 0xAC8
+    /// In-game quest timer in whole seconds; frozen once the quest ends.
+    pub elapsed_time: u32, // 0xAC8
+    padding_acc: [u8; 0x10], // 0xACC - 0xADC
+    /// Quest-complete latch: 0 while playing, 1 once the quest ends and the
+    /// clear time above is final. Reset to 0 on the next quest load.
+    pub freeze_flag: u8, // 0xADC
+    padding_add: [u8; 0x2EB], // 0xADD - 0xDC8
+    pub quest_id: u32,       // 0xDC8
 }
+
+/// Offset of [`QuestState::elapsed_time`] from the quest manager, for the
+/// guarded per-frame read that does not want a full struct copy.
+pub const QUEST_ELAPSED_TIME_OFFSET: usize = 0xAC8;
+/// Offset of [`QuestState::quest_id`] from the quest manager.
+pub const QUEST_ID_OFFSET: usize = 0xDC8;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -225,6 +251,19 @@ mod tests {
         let header: Box<[usize; 4]> = Box::new([UNMAPPED_PTR, 0, 8, 0x20]);
         let vbuffer = VBuffer(header.as_ptr() as *const usize);
         assert!(vbuffer.checked_raw().is_none());
+    }
+
+    /// Pin the quest-manager offsets. `elapsed_time` is the DPS denominator's
+    /// source, and the struct's leading padding makes a silent drift easy —
+    /// the pre-fix build read the timer 0x94C bytes past its real home.
+    #[test]
+    fn quest_state_field_offsets() {
+        use std::mem::offset_of;
+        assert_eq!(offset_of!(QuestState, elapsed_time), QUEST_ELAPSED_TIME_OFFSET);
+        assert_eq!(offset_of!(QuestState, elapsed_time), 0xAC8);
+        assert_eq!(offset_of!(QuestState, freeze_flag), 0xADC);
+        assert_eq!(offset_of!(QuestState, quest_id), QUEST_ID_OFFSET);
+        assert_eq!(offset_of!(QuestState, quest_id), 0xDC8);
     }
 
     #[test]

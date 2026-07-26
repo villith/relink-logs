@@ -602,7 +602,10 @@
       "link-attack": "連結攻擊",
       "skybound-arts": "奧義傷害",
       "damage-over-time": "持續傷害 (DoT)",
-      "unknown-skill": "能力 {{id}}"
+      "unknown-skill": "能力 {{id}}",
+      "skill-groups": {
+        "primal-burst": "ASCEND CHAIN"
+      }
     }
   },
   "enemies": {

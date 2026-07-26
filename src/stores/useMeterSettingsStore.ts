@@ -25,6 +25,12 @@ interface MeterSettings {
   streamer_mode: boolean;
   show_full_values: boolean;
   use_condensed_skills: boolean;
+  /** Count Primal Burst damage toward the meters. Off by default: whether a
+   * Primal Burst belongs in a DPS number is still an open question, so the app
+   * leaves it out until the user says otherwise. Mirrors the backend's
+   * `MeterFilters.includePrimalBurst`, which is what actually does the
+   * filtering — this is only the switch. */
+  include_primal_burst: boolean;
   open_log_on_save: boolean;
   auto_check_updates: boolean;
   /** Version the user chose "Skip" for in the update prompt: the automatic
@@ -53,6 +59,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   streamer_mode: false,
   show_full_values: false,
   use_condensed_skills: true,
+  include_primal_burst: false,
   open_log_on_save: true,
   auto_check_updates: true,
   skipped_update_version: null,

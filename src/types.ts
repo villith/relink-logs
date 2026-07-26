@@ -42,6 +42,18 @@ export type TargetSpan = {
 };
 
 /**
+ * Which contested damage sources the meters count (mirrors the Rust
+ * `MeterFilters`, camelCase to match its serde rename).
+ *
+ * Sits beside `TargetSpan` because the two travel together as the parser's
+ * `ParseOptions`. Build one with `useMeterFilters` rather than writing the
+ * object literal at each call site — every flag has to reach all of them.
+ */
+export type MeterFilters = {
+  includePrimalBurst: boolean;
+};
+
+/**
  * One enemy HP pool charted on the quest-details view (mirrors the Rust
  * `HpChartSeries`). `instance` is 1-based among charted pools sharing the same
  * enemy type, for disambiguating duplicate labels; `values` holds post-hit HP%

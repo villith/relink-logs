@@ -9,7 +9,7 @@ use crate::{
     hooks::{
         diag::{read_ptr_guarded, read_u32_guarded},
         endless::{ENDLESS_FLOW_TYPE, FLOW_TYPE_OFFSET},
-        ffi::QuestState,
+        ffi::{QuestState, QUEST_ELAPSED_TIME_OFFSET, QUEST_ID_OFFSET},
         globals::QUEST_STATE_PTR,
     },
     process::Process,
@@ -122,28 +122,36 @@ impl OnLoadQuestHook {
         let reception_flow = unsafe { a1.byte_add(0x210).read() };
         let flow_type = read_u32_guarded(reception_flow, FLOW_TYPE_OFFSET);
         if flow_type != ENDLESS_FLOW_TYPE {
-            let incoming_quest_state = a1 as usize + 0xDC8;
+            let incoming_quest_state = a1 as usize;
             let _ = self.tx.send(Message::OnAreaEnter(protocol::AreaEnterEvent {
-                last_known_quest_id: read_u32_guarded(incoming_quest_state, 0),
-                last_known_elapsed_time_in_secs: read_u32_guarded(incoming_quest_state, 0x64C),
+                last_known_quest_id: read_u32_guarded(incoming_quest_state, QUEST_ID_OFFSET),
+                last_known_elapsed_time_in_secs: read_u32_guarded(
+                    incoming_quest_state,
+                    QUEST_ELAPSED_TIME_OFFSET,
+                ),
             }));
         }
 
         let ret = unsafe { OnLoadQuestState.call(a1) };
-        // v2.0.2: the QuestState block moved from manager+0x1D8 to manager+0xDC8.
-        // Confirmed via Ghidra decompile of FUN_14063ecb0 (this hooked function): it
-        // reads the quest id as `*(uint*)(rcx + 0xdc8)` and FNV-1a-hashes it for the
-        // quest-table lookup; its caller (FUN_141bfcdd0) validates the same dword with
-        // a quest-id mask (`& 0xf00000`). The old +0x1D8 slot now holds a static
-        // POINTER — reading it as a u32 produced the constant bogus id 0xFADBB940
-        // stamped on every saved log.
-        let quest_state_ptr = unsafe { a1.byte_add(0xDC8) } as *mut QuestState;
+        // v2.0.2: the pre-2.0 QuestState sub-struct at manager+0x1D8 is gone — the
+        // manager singleton IS the block, and its fields are absolute offsets from
+        // `a1` (see ffi::QuestState). Confirmed via Ghidra decompile of FUN_14063ecb0
+        // (this hooked function): it reads the quest id as `*(uint*)(rcx + 0xdc8)` and
+        // FNV-1a-hashes it for the quest-table lookup; its caller (FUN_141bfcdd0)
+        // validates the same dword with a quest-id mask (`& 0xf00000`). The old +0x1D8
+        // slot now holds a static POINTER — reading it as a u32 produced the constant
+        // bogus id 0xFADBB940 stamped on every saved log.
+        let quest_state_ptr = a1 as *mut QuestState;
 
         if quest_state_ptr.is_null() {
             return ret;
         }
 
         QUEST_STATE_PTR.store(quest_state_ptr, std::sync::atomic::Ordering::Relaxed);
+
+        // A fresh quest restarts the timer from 0; re-arm the publish latch so
+        // the new quest's first tick is never swallowed as a duplicate.
+        reset_elapsed_time_latch();
 
         // NOTE: the Conflux ROOM-ENTER signal is emitted by the reception-flow dispatcher
         // (hooks/endless.rs), NOT here — that hook fires once per room with the manager
@@ -242,18 +250,20 @@ impl OnQuestCompleteHook {
                 (quest_state.quest_id, quest_state.elapsed_time)
             };
 
-            // v2.0.2 IGT verification: the QuestState base moved (0x1D8 -> 0xDC8,
-            // Ghidra-confirmed via the quest-id read), but elapsed_time @ +0x64C within
-            // the struct is only INFERRED — and DISPROVEN by the 2026-07-15 session:
-            // the whole 0x640..0x660 neighborhood read 1 at both quest ends. Scan the
-            // full struct window instead, logging u32s in a plausible timer range
-            // (seconds ~ hundreds, frames ~ tens of thousands, ms ~ hundreds of
-            // thousands); match against the on-screen IGT to pin the real offset.
+            // IGT cross-check. The timer is now read at mgr+0xAC8 (see
+            // ffi::QuestState); the earlier +0x64C-from-the-old-base read was
+            // disproven by the 2026-07-15 session, whose scan started AT the old
+            // base and so never covered the real field. This scan starts at the
+            // manager itself and covers both, logging u32s in a plausible timer
+            // range (seconds ~ hundreds, frames ~ tens of thousands, ms ~ hundreds
+            // of thousands) so one live quest can confirm 0xAC8 against the
+            // on-screen clear time.
             #[cfg(feature = "hookdiag")]
             {
                 let base = quest_state_ptr as usize;
+                let freeze = read_u32_guarded(base, 0xADC) & 0xFF;
                 let mut dump = String::new();
-                for off in (0usize..0x800).step_by(4) {
+                for off in (0usize..0x1600).step_by(4) {
                     let v = read_u32_guarded(base, off);
                     if (2..30_000_000).contains(&v) {
                         dump.push_str(&format!("+{off:#x}={v} "));
@@ -261,7 +271,7 @@ impl OnQuestCompleteHook {
                 }
                 crate::hooks::diag::ev!(
                     "quest_end_igt",
-                    "quest_id={quest_id:#x} elapsed@0x64C={timer} candidates: {dump}"
+                    "quest_id={quest_id:#x} elapsed@0xAC8={timer} freeze={freeze} candidates: {dump}"
                 );
             }
 
@@ -394,6 +404,22 @@ const FLOW_STATE_QUEST_END_UNSIGNALED: u32 = 0x1e;
 const NO_FLOW: u32 = 0xffff_ffff;
 static LAST_FLOW_STATE: AtomicU32 = AtomicU32::new(NO_FLOW);
 
+/// Last in-game quest timer value published to the parser, so the per-frame
+/// tick only sends an event when the whole-second counter actually moves
+/// (~1 message/sec instead of ~60). `u32::MAX` = nothing published yet.
+static LAST_ELAPSED_TIME: AtomicU32 = AtomicU32::new(u32::MAX);
+
+/// Upper bound on a believable quest timer, in seconds. Quests cap well below
+/// this; anything larger means the manager slot is stale or mid-teardown, and
+/// publishing it would poison the DPS denominator.
+const MAX_PLAUSIBLE_ELAPSED_SECS: u32 = 24 * 60 * 60;
+
+/// Clears the published-timer latch so the next quest's first tick is always
+/// sent, even if it happens to land on the same second as the last one.
+pub(super) fn reset_elapsed_time_latch() {
+    LAST_ELAPSED_TIME.store(u32::MAX, Ordering::Relaxed);
+}
+
 impl OnQuestFlowEndHook {
     pub fn new(tx: event::Tx) -> Self {
         OnQuestFlowEndHook { tx }
@@ -421,15 +447,35 @@ impl OnQuestFlowEndHook {
         Ok(())
     }
 
-    /// One guarded read per frame: mgr (QUEST_STATE_PTR - 0xDC8) → flow at +0x210
-    /// → state at +0x2d8; emit only on a transition into the end state from a
-    /// real in-quest state (NO_FLOW → anything is a (re)load, never an end).
+    /// Two guarded reads per frame off the quest manager (QUEST_STATE_PTR):
+    /// the flow state at +0x210 → +0x2d8, and the in-game quest timer.
+    ///
+    /// Flow state: emit only on a transition into the end state from a real
+    /// in-quest state (NO_FLOW → anything is a (re)load, never an end).
+    ///
+    /// Timer: the parser needs IGT ticking during the fight (it is the live
+    /// meter's DPS denominator), not just the frozen value at quest end, so
+    /// publish it whenever the whole-second counter moves. This is the only
+    /// per-frame place that already holds the manager pointer.
     fn poll_flow_state(tx: &event::Tx) {
-        let quest_state_ptr = QUEST_STATE_PTR.load(Ordering::Relaxed) as usize;
-        if quest_state_ptr == 0 {
+        // QUEST_STATE_PTR is the quest manager itself, so every offset below is
+        // measured straight from it (see ffi::QuestState).
+        let mgr = QUEST_STATE_PTR.load(Ordering::Relaxed) as usize;
+        if mgr == 0 {
             return;
         }
-        let mgr = quest_state_ptr - 0xDC8;
+
+        let elapsed = read_u32_guarded(mgr, QUEST_ELAPSED_TIME_OFFSET);
+        if elapsed <= MAX_PLAUSIBLE_ELAPSED_SECS
+            && LAST_ELAPSED_TIME.swap(elapsed, Ordering::Relaxed) != elapsed
+        {
+            let _ = tx.send(Message::OnQuestElapsedTime(
+                protocol::QuestElapsedTimeEvent {
+                    elapsed_time_in_secs: elapsed,
+                },
+            ));
+        }
+
         let state = match read_ptr_guarded(mgr, 0x210) {
             Some(flow) if flow != 0 => read_u32_guarded(flow, 0x2d8),
             _ => NO_FLOW,
@@ -444,7 +490,7 @@ impl OnQuestFlowEndHook {
             #[cfg(feature = "console")]
             println!("quest flow entered end state 0x1e (fail/abandon boundary)");
 
-            let quest_id = read_u32_guarded(quest_state_ptr, 0);
+            let quest_id = read_u32_guarded(mgr, QUEST_ID_OFFSET);
             let _ = tx.send(Message::OnQuestFail(protocol::OnQuestFailEvent { quest_id }));
         }
     }

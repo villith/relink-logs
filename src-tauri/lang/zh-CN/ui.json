@@ -1483,7 +1483,10 @@
       "stun-effect-0": "眩晕效果",
       "damage-over-time-poison": "持续伤害（中毒）",
       "damage-over-time-burn": "持续伤害（灼热）",
-      "damage-over-time-darkburn": "持续伤害（灾祸）"
+      "damage-over-time-darkburn": "持续伤害（灾祸）",
+      "skill-groups": {
+        "primal-burst": "高阶召唤"
+      }
     }
   },
   "enemies": {

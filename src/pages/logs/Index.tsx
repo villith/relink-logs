@@ -3,6 +3,7 @@ import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { CharacterType, Log, LogSortType, SortDirection } from "@/types";
 import {
   epochToLocalTime,
+  hasQuestElapsedTime,
   millisecondsToElapsedFormat,
   translateCharacterType,
   translateEnemyType,
@@ -165,6 +166,16 @@ export const IndexPage = () => {
                     {t("ui.logs.duration")}
                   </SortableColumn>
                 </Table.Th>
+                <Table.Th>
+                  <SortableColumn
+                    column="quest-elapsed-time"
+                    sortType={filters.sortType}
+                    sortDirection={filters.sortDirection}
+                    onClick={() => toggleSort("quest-elapsed-time")}
+                  >
+                    {t("ui.logs.quest-elapsed-time")}
+                  </SortableColumn>
+                </Table.Th>
                 <Table.Th>{t("ui.logs.name")}</Table.Th>
                 <Table.Th></Table.Th>
               </Table.Tr>
@@ -255,6 +266,14 @@ function LogEntry({
       </Table.Td>
       <Table.Td>
         <Text size="xs">{millisecondsToElapsedFormat(log.duration)}</Text>
+      </Table.Td>
+      {/* In-game time. A dash on logs recorded before the quest timer was read
+          correctly, and on fights the game never reported one for — those
+          stored a constant 1s, which would otherwise read as a real 00:01. */}
+      <Table.Td>
+        <Text size="xs">
+          {hasQuestElapsedTime(log.questElapsedTime) ? millisecondsToElapsedFormat(log.questElapsedTime * 1000) : "-"}
+        </Text>
       </Table.Td>
       <Table.Td>
         <Text size="xs">{names}</Text>

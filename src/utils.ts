@@ -5,6 +5,8 @@ import toast from "react-hot-toast";
 import {
   CharacterType,
   ComputedPlayerState,
+  ComputedSkillGroup,
+  ComputedSkillState,
   EncounterState,
   EnemyState,
   EnemyType,
@@ -72,6 +74,18 @@ export const getBossHpTarget = (targets: Record<number, EnemyState>): EnemyState
 
 export const isSupplementaryAction = (actionType: SkillState["actionType"]): boolean =>
   typeof actionType === "object" && Object.hasOwn(actionType, "SupplementaryDamage");
+
+/**
+ * Whether a breakdown row is a frontend-merged group rather than a single skill.
+ *
+ * Narrows `actionType` too, so callers get `row.actionType.Group` without
+ * re-casting — the shape test and the cast were previously written out
+ * separately at each use.
+ */
+export const isSkillGroup = (
+  row: ComputedSkillGroup | ComputedSkillState
+): row is ComputedSkillGroup & { actionType: { Group: string } } =>
+  typeof row.actionType === "object" && Object.hasOwn(row.actionType, "Group");
 
 /**
  * Only Normal skill hits can trigger supplementary damage — Link Attacks, Skybound
@@ -665,12 +679,52 @@ export const damageOverTimeKeys = (
  * can never name the row — the summon's body class is the only discriminator. */
 export const SUMMON_ATTACK_ACTION_ID = 80000;
 
+/** The generated lang namespace keyed by summon body-class hash
+ * (`lang/<locale>/summon-classes.json`, written by GBFRDataTools' `gen-langfiles`).
+ * Same name as the bridge map's block because both mean "keyed by body class";
+ * this one needs no bridge, being keyed by the hash a hit already carries. */
+export const SUMMON_CLASSES_NAMESPACE = "summon-classes";
+
+/** The generated lang namespace of Primal Burst attack names, keyed by the same
+ * body-class hash (`TXT_SMN_So####_ASCE` rows). Exactly three classes have one —
+ * which is what makes those three the Primal Burst beasts. */
+export const PRIMAL_BURSTS_NAMESPACE = "primal-bursts";
+
 /** The label for a summon hit whose body class nothing names.
  *
  * Only summons with their OWN body class can be named. Most share one of two
  * generic bodies and collapse into a single row, which is why this has to stay:
  * naming that row after any one summon would be wrong. */
 const SUMMON_FALLBACK_KEYS = [`skills.default.${SUMMON_ATTACK_ACTION_ID}`, "skills.default.unknown-skill"];
+
+/** The body classes a Primal Burst is dealt by — `So0300` Proto Bahamut,
+ * `So0400` Proto Bahamut, Transcendent Blue and `So0500` Excavallion.
+ *
+ * What marks exactly these three: they are the only summon classes carrying a
+ * `TXT_SMN_So####_ASCE` burst-attack row (Catastrophe / Azure Ruin / Desert
+ * Flare), and the only ones with no `summon.tbl` row — they cannot be equipped
+ * and called like an ordinary summon, so their damage IS the burst. Mirrors
+ * `LangCategoryRules.PrimalBursts`; kept as a literal so grouping survives a
+ * locale whose generated bundle has not loaded yet.
+ *
+ * Grouped into one row because which beast answers a burst is incidental —
+ * what the meter is reporting is the Primal Burst. */
+export const PRIMAL_BURST_CLASSES: readonly string[] = ["5418b8f8", "32776c5b", "870a9dfe"];
+
+/** The skill-group key the three bodies condense into. */
+export const PRIMAL_BURST_GROUP = "primal-burst";
+
+/** True for a summon hit dealt by one of the Primal Burst bodies. Owns the
+ * hash-format detail (lowercase, zero-padded to eight) so callers never
+ * re-derive it. */
+export const isPrimalBurstHit = (skill: SkillState): boolean => {
+  if (typeof skill.actionType !== "object" || !Object.hasOwn(skill.actionType, "Normal")) return false;
+  if ((skill.actionType as { Normal: number }).Normal !== SUMMON_ATTACK_ACTION_ID) return false;
+
+  const bodyHash = summonBodyHash(skill.childCharacterType);
+
+  return bodyHash !== null && PRIMAL_BURST_CLASSES.includes(bodyHash);
+};
 
 /** The body-class hash of a summon hit, or null when the source is a real
  * character rather than an unresolved `So####` body.
@@ -691,6 +745,17 @@ const summonBodyHash = (childCharacterType: CharacterType): string | null => {
  * here.
  */
 export const summonDisplayName = (bodyClassHash: string): string | null => {
+  // A Primal Burst is named after the burst, not the beast: So0300's class row
+  // reads "Proto Bahamut", but what the player just watched is "Catastrophe".
+  const burst = getLangBundle(PRIMAL_BURSTS_NAMESPACE)[bodyClassHash]?.text;
+  if (burst) return stripTierSuffix(burst);
+
+  // The generated class table is keyed by exactly what a hit reports, so it
+  // needs no bridge hop and covers all 77 classes. The bridge below still owns
+  // the two unit-variant ids (So4502, So5f01) that have no class row.
+  const fromClassTable = getLangBundle(SUMMON_CLASSES_NAMESPACE)[bodyClassHash]?.text;
+  if (fromClassTable) return stripTierSuffix(fromClassTable);
+
   const source = summonClassSource(bodyClassHash);
   if (source === null) return null;
 
@@ -802,6 +867,21 @@ export const millisecondsToElapsedFormat = (ms: number): string => {
   return `${date.getUTCMinutes().toString().padStart(2, "0")}:${date.getUTCSeconds().toString().padStart(2, "0")}`;
 };
 
+/**
+ * The shortest in-game quest time worth believing, in seconds.
+ *
+ * Logs recorded before the quest timer was read from the right offset stored a
+ * constant 1s — the old read landed on an unrelated field — and 1s renders as a
+ * perfectly plausible-looking 00:01. Nothing the game can report is that short:
+ * across a real logs.db the bogus rows sit at 0 and 1 while the smallest genuine
+ * clear time is 92s.
+ */
+const MIN_QUEST_ELAPSED_SECS = 2;
+
+/// Whether a stored quest timer is a clear time the game actually reported.
+export const hasQuestElapsedTime = (seconds: number | null | undefined): seconds is number =>
+  seconds !== null && seconds !== undefined && seconds >= MIN_QUEST_ELAPSED_SECS;
+
 /// Captures a screenshot of the meter and copies it to the clipboard.
 export const exportScreenshotToClipboard = (selector = ".app") => {
   const app = document.querySelector(selector) as HTMLElement;
@@ -907,6 +987,18 @@ export const openDamageCalculator = (playerData: PlayerData) => {
   open(`https://relink-damage.vercel.app/?logsdata=${data}`);
 };
 
+/// The encounter summary row shared by both clipboard exports.
+const encounterSummaryCsv = (encounterState: EncounterState): string => {
+  const header = "Encounter Time, Total Damage, Total DPS";
+  const values = [
+    millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime),
+    encounterState.totalDamage,
+    Math.round(encounterState.dps),
+  ].join(", ");
+
+  return [header, values].join("\n");
+};
+
 /// Exports the encounter data to the clipboard in a simple format (CSV)
 export const exportSimpleEncounterToClipboard = (
   sortType: SortType,
@@ -916,14 +1008,7 @@ export const exportSimpleEncounterToClipboard = (
 ) => {
   if (encounterState.totalDamage === 0) return toast.error("Nothing to copy!");
 
-  const encounterHeader = "Encounter Time, Total Damage, Total DPS";
-  const encounterValues = [
-    millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime),
-    encounterState.totalDamage,
-    Math.round(encounterState.dps),
-  ].join(", ");
-
-  const encounterData = [encounterHeader, encounterValues].join("\n");
+  const encounterData = encounterSummaryCsv(encounterState);
 
   const orderedPlayers = formatInPartyOrder(encounterState.party);
 
@@ -977,14 +1062,7 @@ export const exportFullEncounterToClipboard = (
 ) => {
   if (encounterState.totalDamage === 0) return toast.error("Nothing to copy!");
 
-  const encounterHeader = "Encounter Time, Total Damage, Total DPS";
-  const encounterValues = [
-    millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime),
-    encounterState.totalDamage,
-    Math.round(encounterState.dps),
-  ].join(", ");
-
-  const encounterData = [encounterHeader, encounterValues].join("\n");
+  const encounterData = encounterSummaryCsv(encounterState);
 
   const playerHeader = "Name, DMG, DPS, %";
   const orderedPlayers = formatInPartyOrder(encounterState.party);

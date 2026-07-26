@@ -1,0 +1,310 @@
+{
+  "0254b5ee": {
+    "key": "TXT_SMN_So2600",
+    "text": "Flammenwirbel"
+  },
+  "0705d996": {
+    "key": "TXT_SMN_So5300",
+    "text": "Die Familie Zathba"
+  },
+  "0959266a": {
+    "key": "TXT_SMN_So2300",
+    "text": "Stiller Beobachter"
+  },
+  "0d471e7d": {
+    "key": "TXT_SMN_So3900",
+    "text": "Urtümlicher Drache"
+  },
+  "16818eac": {
+    "key": "TXT_SMN_So0f00",
+    "text": "Azurhäuptling"
+  },
+  "18617d59": {
+    "key": "TXT_SMN_So4e00",
+    "text": "Albacore"
+  },
+  "1cff5fcd": {
+    "key": "TXT_SMN_So3700",
+    "text": "Behemoth"
+  },
+  "1d3edc63": {
+    "key": "TXT_SMN_So1100",
+    "text": "Goblinkrieger"
+  },
+  "1db19581": {
+    "key": "TXT_SMN_So4500",
+    "text": "Lilith"
+  },
+  "21cadc5f": {
+    "key": "TXT_SMN_So5500",
+    "text": "Schwertschleier- Verbindung"
+  },
+  "2b97a2ce": {
+    "key": "TXT_SMN_So5200",
+    "text": "Korps der Silberwölfe"
+  },
+  "2d179019": {
+    "key": "TXT_SMN_So2000",
+    "text": "Silberschleimchen"
+  },
+  "3113d005": {
+    "key": "TXT_SMN_So3c00",
+    "text": "Erddrache Corvell"
+  },
+  "32776c5b": {
+    "key": "TXT_SMN_So0400",
+    "text": "Proto-Bahamut Invictus"
+  },
+  "34e1145f": {
+    "key": "TXT_SMN_So1800",
+    "text": "Scarmiglione"
+  },
+  "37014e25": {
+    "key": "TXT_SMN_So0e00",
+    "text": "Goblin- Gladiator"
+  },
+  "43c9fec2": {
+    "key": "TXT_SMN_So3200",
+    "text": "Droita-Mutter (Überfall)"
+  },
+  "49c45df3": {
+    "key": "TXT_SMN_So2900",
+    "text": "Dunkelwirbel"
+  },
+  "4b381318": {
+    "key": "TXT_SMN_So1a00",
+    "text": "Hornvogel"
+  },
+  "52a9d192": {
+    "key": "TXT_SMN_So4900",
+    "text": "Furkan"
+  },
+  "531631e9": {
+    "key": "TXT_SMN_So2500",
+    "text": "Nazarbonju"
+  },
+  "535f95e7": {
+    "key": "TXT_SMN_So3a00",
+    "text": "Feuerdrache Vrazarek"
+  },
+  "537706eb": {
+    "key": "TXT_SMN_So2b00",
+    "text": "Wassergeist"
+  },
+  "5395ce93": {
+    "key": "TXT_SMN_So9200",
+    "text": "Beelzebub"
+  },
+  "5418b8f8": {
+    "key": "TXT_SMN_So0300",
+    "text": "Proto-Bahamut"
+  },
+  "58b51943": {
+    "key": "TXT_SMN_So3600",
+    "text": "Obsidian- Raubvogel"
+  },
+  "58ec7bb8": {
+    "key": "TXT_SMN_So5f00",
+    "text": "Katze"
+  },
+  "6093301c": {
+    "key": "TXT_SMN_So5600",
+    "text": "Mellose-Mönch"
+  },
+  "65294c5c": {
+    "key": "TXT_SMN_So4c00",
+    "text": "Managarmr Nihil"
+  },
+  "65b83854": {
+    "key": "TXT_SMN_So1c00",
+    "text": "Wyvern-Ältester"
+  },
+  "665d2fc8": {
+    "key": "TXT_SMN_So3800",
+    "text": "Ennugi"
+  },
+  "6939a97c": {
+    "key": "TXT_SMN_So2400",
+    "text": "Ahriman"
+  },
+  "69893920": {
+    "key": "TXT_SMN_So0d00",
+    "text": "Goblin-Soldat"
+  },
+  "6bca42ab": {
+    "key": "TXT_SMN_So2100",
+    "text": "Goldschleimchen"
+  },
+  "6d068bde": {
+    "key": "TXT_SMN_So0200",
+    "text": "Rolan"
+  },
+  "6d40c206": {
+    "key": "TXT_SMN_So1b00",
+    "text": "Wyvern"
+  },
+  "6e56d634": {
+    "key": "TXT_SMN_So5900",
+    "text": "Schiedsrichter"
+  },
+  "752dca7d": {
+    "key": "TXT_SMN_So4b00",
+    "text": "Managarmr"
+  },
+  "7872194f": {
+    "key": "TXT_SMN_So3500",
+    "text": "Greif"
+  },
+  "7b3551e1": {
+    "key": "TXT_SMN_So1000",
+    "text": "Scharlachvandale"
+  },
+  "84314abe": {
+    "key": "TXT_SMN_So4000",
+    "text": "Finsterschleicher"
+  },
+  "84c0427c": {
+    "key": "TXT_SMN_So1900",
+    "text": "Wolfsbestie"
+  },
+  "870a9dfe": {
+    "key": "TXT_SMN_So0500",
+    "text": "Excavallion"
+  },
+  "874eec5d": {
+    "key": "TXT_SMN_So4700",
+    "text": "Volkan Bolla"
+  },
+  "882083af": {
+    "key": "TXT_SMN_So3e00",
+    "text": "Weißer Drache Radis"
+  },
+  "8a5b51ee": {
+    "key": "TXT_SMN_So3b00",
+    "text": "Eisdrache Wilinus"
+  },
+  "8acdf47e": {
+    "key": "TXT_SMN_So5100",
+    "text": "Verteidigungskorps von Folca"
+  },
+  "8b15c6c3": {
+    "key": "TXT_SMN_So3d00",
+    "text": "Winddrache Elusious"
+  },
+  "8bbd28fe": {
+    "key": "TXT_SMN_So4d00",
+    "text": "Unheimliche Form"
+  },
+  "9194760e": {
+    "key": "TXT_SMN_So1300",
+    "text": "Roter Tod"
+  },
+  "925ade1b": {
+    "key": "TXT_SMN_So4f00",
+    "text": "Hoffnungsv. Himmelsbewohner"
+  },
+  "9551483a": {
+    "key": "TXT_SMN_So2a00",
+    "text": "Feuergeist"
+  },
+  "a22e16cf": {
+    "key": "TXT_SMN_So5700",
+    "text": "Crew-Allianz Rafale"
+  },
+  "a2a61bc2": {
+    "key": "TXT_SMN_So4600",
+    "text": "Pyet-A"
+  },
+  "a76211e2": {
+    "key": "TXT_SMN_So6300",
+    "text": "Kleinzange"
+  },
+  "a98f78db": {
+    "key": "TXT_SMN_So3100",
+    "text": "Droita-Mutter"
+  },
+  "b384382f": {
+    "key": "TXT_SMN_So5000",
+    "text": "Erwartungsv. Himmelsbewohner"
+  },
+  "b4ae6c1f": {
+    "key": "TXT_SMN_So4a00",
+    "text": "Furkan Nihil"
+  },
+  "b79cbcaa": {
+    "key": "TXT_SMN_So1200",
+    "text": "Löwenklaue"
+  },
+  "bc9838e1": {
+    "key": "TXT_SMN_So4800",
+    "text": "Volkan Bolla Nihil"
+  },
+  "bf4b37f7": {
+    "key": "TXT_SMN_So2200",
+    "text": "Cyaegha"
+  },
+  "c279ef2a": {
+    "key": "TXT_SMN_So4100",
+    "text": "Strafender Automat"
+  },
+  "c3e77085": {
+    "key": "TXT_SMN_So3f00",
+    "text": "Schwarzer Drache Evyl"
+  },
+  "cb814562": {
+    "key": "TXT_SMN_So5400",
+    "text": "Wächter von Saatholm"
+  },
+  "cc7bf116": {
+    "key": "TXT_SMN_So3400",
+    "text": "Rubinpuppe "
+  },
+  "d0137d04": {
+    "key": "TXT_SMN_So4200",
+    "text": "Meuterer-Automat"
+  },
+  "d2e5407a": {
+    "key": "TXT_SMN_So0000",
+    "text": "Lucilius"
+  },
+  "d4bbed75": {
+    "key": "TXT_SMN_So1f00",
+    "text": "Flammdil"
+  },
+  "d5635566": {
+    "key": "TXT_SMN_So4400",
+    "text": "Sandschnitter"
+  },
+  "dfec5706": {
+    "key": "TXT_SMN_So1d00",
+    "text": "Steindil"
+  },
+  "e05ecfb8": {
+    "key": "TXT_SMN_So2800",
+    "text": "Lichtwirbel"
+  },
+  "ef34022f": {
+    "key": "TXT_SMN_So1600",
+    "text": "Gerasene"
+  },
+  "f065d8b8": {
+    "key": "TXT_SMN_So6400",
+    "text": "Reinkarniertes Orakel"
+  },
+  "f0f1eb6d": {
+    "key": "TXT_SMN_So2700",
+    "text": "Wasserwirbel"
+  },
+  "f6fbd915": {
+    "key": "TXT_SMN_So4300",
+    "text": "Kobra"
+  },
+  "f9c7f702": {
+    "key": "TXT_SMN_So1e00",
+    "text": "Eisdil"
+  },
+  "fed43afa": {
+    "key": "TXT_SMN_So3300",
+    "text": "Steingolem"
+  }
+}

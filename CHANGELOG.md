@@ -16,6 +16,7 @@ entry
 
 ### Notes
 
+- Primal Burst damage support has been added in this build but is being **excluded** from meters by default. You can turn it on in the settings tab. There is a [poll](https://github.com/villith/relink-logs/discussions/49) available to decide on how Primal Burst should be included in the meters.
 - The "Reset Overlay Layout" button was removed from the header. You can find a "Reset Windows" command by right-clicking on the tray icon instead
 
 ### Bug Fixes

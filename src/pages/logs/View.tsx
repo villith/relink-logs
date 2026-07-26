@@ -39,6 +39,7 @@ import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { Table as MeterTable } from "@/components/Table";
 import { useChecklistStore } from "@/stores/useChecklistStore";
 import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
+import { useMeterFilters } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import {
   MeterColumns,
@@ -73,6 +74,7 @@ import {
   formatInPartyOrder,
   formatSummonBonusValue,
   groupBonuses,
+  hasQuestElapsedTime,
   humanizeNumbers,
   millisecondsToElapsedFormat,
   openDamageCalculator,
@@ -628,6 +630,10 @@ export const ViewPage = () => {
       streamer_mode: state.streamer_mode,
     }))
   );
+  // Separate atomic selector rather than folding into the shallow group above:
+  // this one drives the backend fetches below, so it wants the tightest possible
+  // change signal — every change re-derives the whole log.
+  const filters = useMeterFilters();
   const { checklistBuild, checklistAi } = useChecklistStore(
     useShallow((state) => ({ checklistBuild: state.build, checklistAi: state.ai }))
   );
@@ -645,6 +651,7 @@ export const ViewPage = () => {
     targetEntries,
     selectedTargetSpans,
     questId,
+    questTimer,
     questCompleted,
     roomIndex,
     playerData,
@@ -662,6 +669,7 @@ export const ViewPage = () => {
     selectedTargetSpans: state.selectedTargetSpans,
     playerData: state.players,
     questId: state.questId,
+    questTimer: state.questTimer,
     questCompleted: state.questCompleted,
     roomIndex: state.roomIndex,
     setSelectedTargetSpans: state.setSelectedTargetSpans,
@@ -736,7 +744,10 @@ export const ViewPage = () => {
     const generation = ++loadGeneration.current;
     // A load resets the window, so any window fetch still in flight is stale too.
     windowGeneration.current += 1;
-    invoke("fetch_encounter_state", { id: Number(id), options: { targetSpans: selectedTargetSpans } })
+    invoke("fetch_encounter_state", {
+      id: Number(id),
+      options: { targetSpans: selectedTargetSpans, filters },
+    })
       .then((result) => {
         if (generation !== loadGeneration.current) return;
         loadFromResponse(result as EncounterStateResponse);
@@ -748,7 +759,9 @@ export const ViewPage = () => {
         if (generation !== loadGeneration.current) return;
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
-  }, [id, selectedTargetSpans]);
+    // Keyed on the filter too: toggling it must re-derive the open log, charts
+    // included, not just the next one the user opens.
+  }, [id, selectedTargetSpans, filters]);
 
   // Brush release: commit the window and reparse the meter over exactly that
   // span. A window covering the whole track clears back to the (already
@@ -767,6 +780,7 @@ export const ViewPage = () => {
         id: Number(id),
         options: {
           targetSpans: selectedTargetSpans,
+          filters,
           fromMs: value[0] * DPS_BUCKET_MS,
           // Buckets are inclusive at BOTH ends in the charts, so the window the user sees
           // is [start, end] whole seconds. `fromMs` admits all of the first bucket, so the
@@ -791,7 +805,7 @@ export const ViewPage = () => {
           toast.error(`Failed to fetch encounter state: ${e}`);
         });
     },
-    [id, selectedTargetSpans, chartLen]
+    [id, selectedTargetSpans, chartLen, filters]
   );
 
   const resetWindow = useCallback(() => {
@@ -830,10 +844,11 @@ export const ViewPage = () => {
       id: Number(id),
       options: {
         targetSpans: selectedTargetSpans,
+        filters,
         ...(range ? { fromMs: range[0] * DPS_BUCKET_MS, upToMs: (range[1] + 1) * DPS_BUCKET_MS - 1 } : {}),
       },
     });
-  }, [id, selectedTargetSpans, range]);
+  }, [id, selectedTargetSpans, range, filters]);
 
   // Display labels for every target spawn segment, keyed by
   // `${name}#${instance}` — shared by the HP-chart legend and the target-filter
@@ -1220,6 +1235,21 @@ export const ViewPage = () => {
               {millisecondsToElapsedFormat(encounter.endTime - encounter.startTime)}
             </Text>
           </Box>
+          {/* The game's own quest timer, shown whenever it reported one. Kept
+              distinct from Duration above: Duration is wall-clock time between
+              the first and last hit (what DPS is measured over), while this is
+              the clear time the result screen reports, which also covers the
+              run up to the boss. */}
+          {hasQuestElapsedTime(questTimer) ? (
+            <Box display="flex">
+              <Text size="sm" fw={800}>
+                {t("ui.logs.quest-elapsed-time")}:
+              </Text>
+              <Text size="sm" fs="italic" ml={4}>
+                {millisecondsToElapsedFormat(questTimer * 1000)}
+              </Text>
+            </Box>
+          ) : null}
           <Box display="flex">
             <Text size="sm" fw={800}>
               {t("ui.logs.total-damage")}:

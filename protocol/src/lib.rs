@@ -84,6 +84,24 @@ pub const TCP_ADDR: &str = "127.0.0.1:39371";
 /// definitions.
 pub const PLAYER_SLOT_INDEX_BASE: u32 = 0xF000_0000;
 
+/// The body classes a Primal Burst is dealt by — `So0300` / `So0400` / `So0500`,
+/// which the game's own summon table names "(Primal Burst) Catastrophe / Azure
+/// Ruin / Desert Flare".
+///
+/// A Primal Burst is dealt by its own `So` class rather than by the body an
+/// ordinary summon call spawns, so the body is what tells the two apart: both
+/// report [`SUMMON_ATTACK_ACTION_ID`] as their action id. Shared here so the
+/// hook's summon-owner resolution and the parser's meter filters classify from
+/// one list.
+pub const PRIMAL_BURST_BODY_HASHES: &[u32] = &[
+    0x5418B8F8, // So0300  Catastrophe
+    0x32776C5B, // So0400  Azure Ruin
+    0x870A9DFE, // So0500  Desert Flare
+];
+
+/// The action id every summon hit and every Primal Burst reports.
+pub const SUMMON_ATTACK_ACTION_ID: u32 = 80000;
+
 /// The per-player event key for a party slot (0..=3).
 pub fn player_slot_key(party_index: u8) -> u32 {
     PLAYER_SLOT_INDEX_BASE | (party_index.min(3) as u32)
@@ -559,6 +577,15 @@ pub struct OnQuestFailEvent {
     pub quest_id: u32,
 }
 
+/// A tick of the in-game quest timer, in whole seconds since the quest loaded.
+/// The same clock the result screen reports as the clear time, so it excludes
+/// loading and pauses — which is what makes it a better DPS denominator than
+/// wall-clock elapsed time.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct QuestElapsedTimeEvent {
+    pub elapsed_time_in_secs: u32,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Message {
     OnAreaEnter(AreaEnterEvent),
@@ -615,6 +642,13 @@ pub enum Message {
     /// Fired when the player clicks Quit Training. Appended last per the
     /// append-only rule.
     OnTrialEnd(TrialLifecycleEvent),
+    /// The in-game quest timer (IGT) ticked over to a new whole second. Sent
+    /// from the per-frame quest-sequence tick roughly once a second while a
+    /// quest is loaded, so the parser can use in-game time — not wall clock —
+    /// as the DPS denominator while the fight is still running. The frozen
+    /// clear time still arrives separately on `OnQuestComplete`. Appended last
+    /// per the append-only rule.
+    OnQuestElapsedTime(QuestElapsedTimeEvent),
 }
 
 #[cfg(test)]

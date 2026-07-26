@@ -29,6 +29,7 @@ import {
   formatSummonBonusValue,
   getBossHpTarget,
   groupBonuses,
+  hasQuestElapsedTime,
   humanizeNumbers,
   mergeTargetBreakdowns,
   overmasteryAmountFromId,
@@ -644,6 +645,25 @@ describe("utils", () => {
 
     it("is null when there are no cappable hits (no cap sum)", () => {
       expect(computeOvercapPercentage({ overcapBaseSum: 0, overcapCapSum: 0 })).toBeNull();
+    });
+  });
+
+  describe("hasQuestElapsedTime", () => {
+    it("accepts a clear time the game really reported", () => {
+      expect(hasQuestElapsedTime(92)).toBe(true);
+    });
+
+    it("rejects the constant 1s stored before the timer offset was fixed", () => {
+      // The hook read the quest timer from the wrong offset and got 1 for every
+      // quest, which rendered as a plausible-looking 00:01. A real logs.db has
+      // 386 such rows against a smallest real clear time of 92s.
+      expect(hasQuestElapsedTime(1)).toBe(false);
+    });
+
+    it("rejects a quest the game never reported a time for", () => {
+      expect(hasQuestElapsedTime(0)).toBe(false);
+      expect(hasQuestElapsedTime(null)).toBe(false);
+      expect(hasQuestElapsedTime(undefined)).toBe(false);
     });
   });
 
