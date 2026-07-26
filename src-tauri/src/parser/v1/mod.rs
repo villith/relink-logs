@@ -1,9 +1,9 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Result;
 use chrono::Utc;
 use protocol::{
-    AreaEnterEvent, ConfluxBuffAcquiredEvent, ConfluxRoomEnterEvent, ConfluxRunEndEvent,
+    ActionType, AreaEnterEvent, ConfluxBuffAcquiredEvent, ConfluxRoomEnterEvent, ConfluxRunEndEvent,
     DamageEvent, Message, OnAttemptSBAEvent, OnContinueSBAChainEvent, OnDeathEvent,
     OnPerformSBAEvent, OnPlayerStunEvent, OnUpdateSBAEvent, PlayerIdentityEvent, PlayerLoadEvent,
     QuestCompleteEvent,
@@ -599,6 +599,17 @@ pub struct DerivedEncounterState {
     /// survive.
     #[serde(skip)]
     pending_player_stun_effect: HashMap<u32, Vec<f64>>,
+    /// Players whose most recent stun-capable hit was filtered out of the meters
+    /// (see [`is_excluded`]).
+    ///
+    /// A network stun message carries no action id, so it is attributed to the
+    /// player's last stun-capable skill. That makes dropping the damage of an
+    /// excluded hit insufficient online: its message would survive, keep its
+    /// stun in the totals, and be credited to whichever skill came BEFORE the
+    /// excluded one. Set on an excluded hit and cleared by the next counted one,
+    /// mirroring the attribution it shadows.
+    #[serde(skip)]
+    stun_suppressed_players: HashSet<u32>,
     /// Status of the parser
     status: ParserStatus,
     /// Derived party stats
@@ -622,6 +633,7 @@ impl Default for DerivedEncounterState {
             pending_player_pg_stun: HashMap::new(),
             pending_player_pg_quickening: HashMap::new(),
             pending_player_stun_effect: HashMap::new(),
+            stun_suppressed_players: HashSet::new(),
             status: ParserStatus::Stopped,
             party: HashMap::new(),
             targets: HashMap::new(),
@@ -658,6 +670,23 @@ impl DerivedEncounterState {
             .max_by_key(|target| target.total_damage)
     }
 
+    /// Records that a filtered-out hit landed, so the network stun message
+    /// trailing it is dropped instead of being credited to the previous skill.
+    ///
+    /// Mirrors the attribution rule in `PlayerState::update_from_damage_event`:
+    /// echoes and DoT ticks cannot proc stun, so they never own a message and
+    /// must not shadow the hit that does.
+    fn note_excluded_damage(&mut self, event: &DamageEvent) {
+        if matches!(
+            event.action_id,
+            ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)
+        ) {
+            return;
+        }
+
+        self.stun_suppressed_players.insert(event.source.parent_index);
+    }
+
     fn process_damage_event(&mut self, now: i64, damage_instance: &AdjustedDamageInstance) {
         self.end_time = now;
         self.total_damage += damage_instance.event.damage as u64;
@@ -681,6 +710,16 @@ impl DerivedEncounterState {
 
         // Update player stats from damage event.
         source_player.update_from_damage_event(damage_instance);
+
+        // A counted stun-capable hit takes ownership of the next message back
+        // from any excluded hit before it (see `note_excluded_damage`).
+        if !matches!(
+            damage_instance.event.action_id,
+            ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)
+        ) {
+            self.stun_suppressed_players
+                .remove(&damage_instance.event.source.parent_index);
+        }
 
         // Update target stats from damage event.
         let target = self
@@ -709,6 +748,12 @@ impl DerivedEncounterState {
     /// Totals are max(delta, messages) at both encounter and player level, so a
     /// mode where both paths fire (solo loopback) can never double-count.
     fn process_stun_message(&mut self, timestamp: i64, actor_index: u32, amount: f64) {
+        // This message belongs to a hit the meters are not counting, so it is
+        // dropped outright rather than attributed to the skill before it.
+        if self.stun_suppressed_players.contains(&actor_index) {
+            return;
+        }
+
         self.stun_message_sum += amount;
         self.refresh_total_stun();
         let duration_secs = (self.duration()) as f64 / 1000.0;
@@ -1388,6 +1433,7 @@ impl Parser {
             // hit and so never advances `end_time` from one.
             if let Message::DamageEvent(event) = event {
                 if is_excluded(event, &filters) {
+                    self.derived_state.note_excluded_damage(event);
                     continue;
                 }
             }
@@ -1710,6 +1756,7 @@ impl Parser {
         // reparse path, and suppresses the `encounter-update` emit below —
         // nothing the frontend renders changed.
         if is_excluded(&event, &self.filters) {
+            self.derived_state.note_excluded_damage(&event);
             return;
         }
 
@@ -2616,6 +2663,90 @@ mod tests {
         assert!(
             excluded.derived_state.stun_delta_sum < included.derived_state.stun_delta_sum,
             "the encounter-wide stun total must drop the burst as well"
+        );
+    }
+
+    /// [`damage_from`] with no per-hit stun delta — the online shape, where the
+    /// accumulator reads 0 and stun arrives as `OnPlayerStun` messages instead.
+    fn stunless_damage_from(body: u32, action: u32, damage: i32) -> DamageEvent {
+        DamageEvent {
+            stun_value: None,
+            ..damage_from(body, action, damage)
+        }
+    }
+
+    /// An online-shaped log: an ordinary hit and a Primal Burst, each followed
+    /// by the network stun message it produced.
+    fn parser_with_online_burst_stun() -> Parser {
+        let mut parser = Parser::default();
+        let log = &mut parser.encounter.raw_event_log;
+        log.push((
+            1_000,
+            Message::DamageEvent(stunless_damage_from(PLAYER_HASH, 100, 1_000)),
+        ));
+        log.push((
+            1_100,
+            Message::OnPlayerStun(OnPlayerStunEvent {
+                actor_index: 0,
+                stun_amount: 30.0,
+            }),
+        ));
+        log.push((
+            2_000,
+            Message::DamageEvent(stunless_damage_from(
+                PRIMAL_BURST_BODY,
+                SUMMON_ATTACK_ACTION_ID,
+                3_000,
+            )),
+        ));
+        log.push((
+            2_100,
+            Message::OnPlayerStun(OnPlayerStunEvent {
+                actor_index: 0,
+                stun_amount: 70.0,
+            }),
+        ));
+        parser
+    }
+
+    #[test]
+    fn excluded_burst_drops_the_stun_message_trailing_it() {
+        // Online, stun arrives as an action-id-free network message attributed
+        // to the player's last stun-capable skill. Excluding the burst's damage
+        // without excluding its message would leave the stun in the total AND
+        // credit it to whatever skill preceded the burst.
+        let mut parser = parser_with_online_burst_stun();
+        parser.reparse();
+
+        let player = parser.derived_state.party.get(&0).unwrap();
+        assert_eq!(
+            player.total_stun_value, 30.0,
+            "only the ordinary hit's stun message should count"
+        );
+
+        let normal = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(100))
+            .expect("the ordinary hit should have a row");
+        assert_eq!(
+            normal.total_stun_value, 30.0,
+            "the burst's stun must not be credited to the preceding skill"
+        );
+    }
+
+    #[test]
+    fn included_burst_keeps_the_stun_message_trailing_it() {
+        let mut parser = parser_with_online_burst_stun();
+        parser.filters = MeterFilters {
+            include_primal_burst: true,
+        };
+        parser.reparse();
+
+        let player = parser.derived_state.party.get(&0).unwrap();
+        assert_eq!(
+            player.total_stun_value, 100.0,
+            "with the burst counted, both messages count"
         );
     }
 
