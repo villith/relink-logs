@@ -160,4 +160,116 @@ describe("TransmarvelSearcher", () => {
     expect(screen.queryByText("#1")).toBeNull();
     expect(screen.getByText("#2")).toBeTruthy();
   });
+
+  it("renders the translated error banner and no results table when predict rejects", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      // Real Tauri commands returning `Err(String)` reject the JS promise with
+      // that string directly — matches TOOL_ERRORS' "transmarvel" domain key.
+      if (command === "predict_transmarvel") return Promise.reject("hook-unreachable");
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    renderPage();
+
+    const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
+    await waitFor(() => expect(predictButton.disabled).toBe(false));
+
+    await act(async () => {
+      fireEvent.click(predictButton);
+    });
+
+    // Mocked t() with no fallback/interpolation arg just echoes the key back,
+    // so the mapped copy key IS the expected banner text here.
+    expect(await screen.findByText("ui.toolbox.hook-unreachable")).toBeTruthy();
+    expect(screen.queryByRole("table")).toBeNull();
+    expect(screen.queryByText("#1")).toBeNull();
+  });
+
+  it("disables the Predict button and rolls input while a prediction is in flight", async () => {
+    let resolvePredict!: (value: TransmarvelPrediction) => void;
+    const deferred = new Promise<TransmarvelPrediction>((resolve) => {
+      resolvePredict = resolve;
+    });
+
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "predict_transmarvel") return deferred;
+      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    renderPage();
+
+    const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
+    await waitFor(() => expect(predictButton.disabled).toBe(false));
+    const rollsInput = screen.getByLabelText("Rolls to simulate", { selector: "input" }) as HTMLInputElement;
+    expect(rollsInput.disabled).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(predictButton);
+    });
+
+    expect(predictButton.disabled).toBe(true);
+    expect(rollsInput.disabled).toBe(true);
+
+    await act(async () => {
+      resolvePredict(prediction);
+      await deferred;
+    });
+
+    await waitFor(() => expect(predictButton.disabled).toBe(false));
+    expect(rollsInput.disabled).toBe(false);
+  });
+
+  it("shows the stale-results alert once the watched RNG slot moves off the predicted state", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "predict_transmarvel") return Promise.resolve(prediction);
+      // Deliberately different from prediction.slotState so the staleness
+      // watch's poll reports "moved" instead of matching (see the passing
+      // "predicts, renders both rolls" test above for the matching case).
+      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState + 1);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    // Fake timers must be active BEFORE the staleness watch's effect runs
+    // and calls setInterval — switching to fake timers after the fact
+    // doesn't retroactively hijack an interval already scheduled against
+    // the real clock.
+    vi.useFakeTimers();
+    try {
+      renderPage();
+
+      // Flush the mount-time fetch_transmarvel_status microtask chain;
+      // fake timers only replace timer functions, not promise resolution,
+      // so this doesn't need any timer advance.
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      const predictButton = screen.getByRole("button", { name: "Predict" }) as HTMLButtonElement;
+      expect(predictButton.disabled).toBe(false);
+
+      await act(async () => {
+        fireEvent.click(predictButton);
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(screen.getByText("#1")).toBeTruthy();
+      expect(screen.queryByText("ui.toolbox.stale-results")).toBeNull();
+
+      // useStalenessWatch polls every 5s via setInterval; advance fake time
+      // and let the in-flight fetch_overmastery_seed promise settle in between.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+
+      expect(screen.getByText("ui.toolbox.stale-results")).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
