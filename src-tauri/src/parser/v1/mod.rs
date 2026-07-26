@@ -19,6 +19,8 @@ use super::{
     v0,
 };
 
+#[cfg(any(test, feature = "diag"))]
+pub mod audit;
 mod cap_detection;
 mod filters;
 mod player_state;
@@ -1098,6 +1100,32 @@ const RESPAWN_QUIET_GAP_MS: i64 = 30_000;
 /// order. Events without HP data still open/extend segments (DoT-only spans,
 /// old logs) — they just can't trigger respawn boundaries.
 pub fn segment_targets(events: &[(i64, Message)], start_time: i64) -> Vec<TargetSegment> {
+    segment_targets_inner(events, start_time, false).0
+}
+
+/// [`segment_targets`], plus which segment each event belongs to (`None` for
+/// non-damage events), parallel to `events`.
+///
+/// Callers that must partition the event stream by segment need this rather than
+/// the timestamps: a phase change opens a new segment at the SAME millisecond as
+/// the outgoing segment's last event, so a time-based split files the new pool's
+/// damage against the old one.
+pub fn segment_targets_indexed(
+    events: &[(i64, Message)],
+    start_time: i64,
+) -> (Vec<TargetSegment>, Vec<Option<usize>>) {
+    segment_targets_inner(events, start_time, true)
+}
+
+/// The shared segmenter. `track` is opt-in because the assignment vector costs
+/// one entry per event and only the audit tooling reads it — the interactive
+/// callers (`fetch_encounter_state` on every log open, target-filter change and
+/// filter toggle) would otherwise allocate and populate it just to drop it.
+fn segment_targets_inner(
+    events: &[(i64, Message)],
+    start_time: i64,
+    track: bool,
+) -> (Vec<TargetSegment>, Vec<Option<usize>>) {
     struct KeyState {
         position: usize,
         max: Option<u64>,
@@ -1107,8 +1135,13 @@ pub fn segment_targets(events: &[(i64, Message)], start_time: i64) -> Vec<Target
 
     let mut segments: Vec<TargetSegment> = Vec::new();
     let mut live: HashMap<u32, KeyState> = HashMap::new();
+    let mut assignment: Vec<Option<usize>> = if track {
+        vec![None; events.len()]
+    } else {
+        Vec::new()
+    };
 
-    for (timestamp, message) in events {
+    for (event_index, (timestamp, message)) in events.iter().enumerate() {
         let Message::DamageEvent(event) = message else {
             continue;
         };
@@ -1149,7 +1182,13 @@ pub fn segment_targets(events: &[(i64, Message)], start_time: i64) -> Vec<Target
                     last_ts: rel_ts,
                 },
             );
+            if track {
+                assignment[event_index] = Some(segments.len() - 1);
+            }
         } else if let Some(state) = live.get_mut(&key) {
+            if track {
+                assignment[event_index] = Some(state.position);
+            }
             let segment = &mut segments[state.position];
             segment.end_ms = rel_ts;
             // `last_ts` is the quiet-gap clock, so EVERY event touching this key resets
@@ -1183,7 +1222,7 @@ pub fn segment_targets(events: &[(i64, Message)], start_time: i64) -> Vec<Target
         }
     }
 
-    segments
+    (segments, assignment)
 }
 
 /// Whether a damage event's target passes the quest-details filter: with no
