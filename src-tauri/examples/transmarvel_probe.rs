@@ -7,6 +7,7 @@
 //!   cargo run -p gbfr-logs --example transmarvel_probe -- dump
 //!   cargo run -p gbfr-logs --example transmarvel_probe -- save <file>
 //!   cargo run -p gbfr-logs --example transmarvel_probe -- diff <file>
+//!   cargo run -p gbfr-logs --example transmarvel_probe -- predict [n]
 //!
 //! Slot-identification protocol (record results in the phase-1 notes file):
 //!   0. At Siero's transmarvel screen, `save idle.txt`, wait ~30s WITHOUT
@@ -76,6 +77,32 @@ fn label(i: usize) -> String {
     }
 }
 
+/// Item hash -> English name, from the lang files (best effort — raw hash on
+/// any miss). Sigils and wrightstones live in different files.
+fn item_names() -> std::collections::HashMap<u32, String> {
+    let mut out = std::collections::HashMap::new();
+    for file in ["sigils.json", "items.json"] {
+        let path = format!("{}/lang/en/{file}", env!("CARGO_MANIFEST_DIR"));
+        let Ok(text) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(map) = serde_json::from_str::<
+            std::collections::HashMap<String, serde_json::Value>,
+        >(&text) else {
+            continue;
+        };
+        for (hash, entry) in map {
+            if let (Ok(hash), Some(name)) = (
+                u32::from_str_radix(&hash, 16),
+                entry.get("text").and_then(|t| t.as_str()),
+            ) {
+                out.insert(hash, name.to_string());
+            }
+        }
+    }
+    out
+}
+
 fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.first().map(String::as_str) {
@@ -134,7 +161,48 @@ fn main() -> anyhow::Result<()> {
             }
             println!("({changed} entries changed; unchanged omitted)");
         }
-        _ => eprintln!("usage: transmarvel_probe dump | save <file> | diff <file>"),
+        Some("predict") => {
+            let n: u32 = args.get(1).map(|s| s.parse()).transpose()?.unwrap_or(5);
+            let snap = game_mem::rpm_transmarvel_snapshot()?
+                .ok_or_else(|| anyhow::anyhow!("game not running (run as admin)"))?;
+            if snap.slot_override != u32::MAX {
+                println!("slot_override {:#x} — roll mid-flight, retry", snap.slot_override);
+                return Ok(());
+            }
+            if snap.rng_state == 0 {
+                println!("state 0 — game will reseed from entropy; unpredictable");
+                return Ok(());
+            }
+            let names = item_names();
+            let name = |hash: u32| {
+                names
+                    .get(&hash)
+                    .cloned()
+                    .unwrap_or_else(|| format!("{hash:08x}"))
+            };
+            println!("slot 0x04 state {:08x}", snap.rng_state);
+            let t = gbfr_logs::transmarvel::stock_tables();
+            for (i, roll) in gbfr_logs::transmarvel::simulate(snap.rng_state, t, n)
+                .iter()
+                .enumerate()
+            {
+                use gbfr_logs::transmarvel::TransmarvelOutcome::*;
+                let what = match &roll.outcome {
+                    Sigil {
+                        sigil_id,
+                        trait_level,
+                    } => match trait_level {
+                        0 => format!("GEM   {}", name(*sigil_id)),
+                        lvl => format!("GEM   {} (lvl {lvl})", name(*sigil_id)),
+                    },
+                    Wrightstone { item, .. } => {
+                        format!("STONE {} (traits not yet modeled)", name(*item))
+                    }
+                };
+                println!("roll #{}: {what} (+{} draws)", i + 1, roll.draws);
+            }
+        }
+        _ => eprintln!("usage: transmarvel_probe dump | save <file> | diff <file> | predict [n]"),
     }
     Ok(())
 }

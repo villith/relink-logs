@@ -1,0 +1,1472 @@
+{
+ "gemChancePercent": 75,
+ "wrightstoneChancePercent": 25,
+ "gemGroups": [
+  {
+   "lot": 2166450837,
+   "weight": 640,
+   "items": [
+    {
+     "item": 763309680,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3912165432,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 196723080,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2031986925,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    }
+   ]
+  },
+  {
+   "lot": 2425513295,
+   "weight": 4940,
+   "items": [
+    {
+     "item": 2734824286,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3896853593,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1423501828,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2761097132,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3142174966,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3901891745,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2205891940,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1000568373,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3544212764,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1824156429,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 78389889,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1053913010,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2619578842,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3986821482,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2763540896,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 645506288,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 941342308,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3572217910,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3090343847,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2876252300,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    }
+   ]
+  },
+  {
+   "lot": 524601693,
+   "weight": 20,
+   "items": [
+    {
+     "item": 3048357634,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1167971010,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 968796571,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 4062351526,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1269097644,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2966117476,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2647142493,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3815094609,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 849104412,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    }
+   ]
+  },
+  {
+   "lot": 1850910362,
+   "weight": 420,
+   "items": [
+    {
+     "item": 6368016,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 4223768,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 56249821,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 4223768,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 858692400,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 4223768,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2475537957,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 4223768,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1864173680,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 4223768,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    }
+   ]
+  },
+  {
+   "lot": 914857687,
+   "weight": 280,
+   "items": [
+    {
+     "item": 2340455872,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 4227841,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 541664821,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 4227841,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3533494496,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 4227841,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1946557196,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 4227841,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3779990936,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 4227841,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1543000017,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 4227841,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2466314971,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 4227841,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2068491056,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 4227841,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    }
+   ]
+  },
+  {
+   "lot": 3013045144,
+   "weight": 1000,
+   "items": [
+    {
+     "item": 871372816,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1377830059,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2668164759,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2642992801,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1691760675,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 30516942,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3765693029,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2245505845,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2640037311,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3044168306,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3233092238,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2700693353,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3881977617,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2974014182,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2100400119,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 348490737,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3112832802,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3075219579,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 4212101175,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 316658448,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3947551085,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1050940235,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 674086896,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 3969908343,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 2663826797,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 4184122570,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 1680875153,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 86221314,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    }
+   ]
+  },
+  {
+   "lot": 151981713,
+   "weight": 1000,
+   "items": [
+    {
+     "item": 940194984,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 816050922,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3565862362,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 4139842725,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 95201426,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 568397495,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3211872906,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3050978944,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 4221267413,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3228518152,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3169710176,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2089124042,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1231363209,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2826510479,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1825185783,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 343778699,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3936948658,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1154778233,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2778502675,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2929560031,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3689219015,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2117751459,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 4061398193,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 2530672222,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 3557916659,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 439720807,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 3123234844,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 119797740,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    }
+   ]
+  },
+  {
+   "lot": 4113035058,
+   "weight": 1000,
+   "items": [
+    {
+     "item": 118741288,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2887211300,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3159608868,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1139960465,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3400417180,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1365141820,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1277712474,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 812237566,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3835091074,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3472038036,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2318932416,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2760948447,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1289544283,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3793371504,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1727115560,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1993634155,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3219096460,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3014345715,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2675096288,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2911678203,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1566126045,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2565465839,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1101795458,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 3950407047,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 1374259836,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 3636860167,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 762364797,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 2596089253,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    }
+   ]
+  },
+  {
+   "lot": 1523887533,
+   "weight": 700,
+   "items": [
+    {
+     "item": 1386668697,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2597993984,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2561069641,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3803414757,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 465473948,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2614217764,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3024168797,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3785038181,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1732009359,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 38218819,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2877510803,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2934932291,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 295380136,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 441954033,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3457603211,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 45217984,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2945351294,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1325520586,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3841558233,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 148533881,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3048357634,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1167971010,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 968796571,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1789807503,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2395713699,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3099872606,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 2304424950,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 3634652401,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 2513190072,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 596983764,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 1513492136,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    },
+    {
+     "item": 2829110271,
+     "weight": 50,
+     "traitLevel": 15,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": true
+    }
+   ]
+  }
+ ],
+ "stoneGroups": [
+  {
+   "lot": 4213691107,
+   "weight": 7490,
+   "items": [
+    {
+     "item": 3168519350,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1056366325,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3194037421,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 198407076,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    }
+   ]
+  },
+  {
+   "lot": 3536639212,
+   "weight": 2500,
+   "items": [
+    {
+     "item": 166131241,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1897347174,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 1719591379,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 539626937,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    }
+   ]
+  },
+  {
+   "lot": 3172777756,
+   "weight": 10,
+   "items": [
+    {
+     "item": 1018424212,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 824776997,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 3009000882,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    },
+    {
+     "item": 4142302458,
+     "weight": 50,
+     "traitLevel": 0,
+     "questIdMin": 0,
+     "questIdMax": 0,
+     "needsEndlessRagnarok": false
+    }
+   ]
+  }
+ ]
+}
