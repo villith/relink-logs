@@ -563,6 +563,12 @@ pub struct DerivedEncounterState {
     start_time: i64,
     /// Timestamp of the last damage event (or the last known damage event if the encounter is still in progress)
     end_time: i64,
+    /// True once the DPS window has been anchored, either by the encounter's
+    /// first counted damage event or by an explicit scrub window. Guards and
+    /// stun procs open an encounter but must not anchor it — see
+    /// [`Self::extend_window`].
+    #[serde(skip)]
+    window_anchored: bool,
     /// The total damage done in the encounter
     total_damage: u64,
     /// The total DPS done in the encounter
@@ -623,6 +629,7 @@ impl Default for DerivedEncounterState {
         Self {
             start_time: 0,
             end_time: 0,
+            window_anchored: false,
             total_damage: 0,
             dps: 0.0,
             total_stun_value: 0.0,
@@ -646,6 +653,10 @@ impl DerivedEncounterState {
         (self.end_time - self.start_time).max(1)
     }
 
+    fn duration_secs(&self) -> f64 {
+        self.duration() as f64 / 1000.0
+    }
+
     fn utc_start_time(&self) -> Result<chrono::DateTime<Utc>> {
         chrono::DateTime::from_timestamp_millis(self.start_time)
             .ok_or(anyhow::anyhow!("Failed to convert start time to DateTime"))
@@ -653,6 +664,33 @@ impl DerivedEncounterState {
 
     fn start(&mut self, now: i64) {
         self.start_time = now;
+        self.end_time = now;
+    }
+
+    /// Opens the window at an explicitly chosen point (the logs-page scrubber)
+    /// so [`Self::extend_window`] leaves its start alone — the user picked that
+    /// range and the first hit inside it must not override them.
+    fn start_pinned(&mut self, now: i64) {
+        self.start(now);
+        self.window_anchored = true;
+    }
+
+    /// Extends the DPS window to `now`, opening it if this is the encounter's
+    /// first damage.
+    ///
+    /// **Only damage moves this window.** A Perfect Guard, a stun proc or a
+    /// Quickening guard can open an *encounter* — they are real events and
+    /// belong in the log (see `ensure_encounter_started`) — but they are not
+    /// damage, and dividing a fight's damage by time in which nobody attacked
+    /// understates DPS. A fight that opens with a long defensive phase
+    /// (Lucilius' Paradise Lost is ~30s of it) would otherwise be measured over
+    /// a window that began before the first hit, and a guard landing after the
+    /// boss dies would stretch it at the other end.
+    fn extend_window(&mut self, now: i64) {
+        if !self.window_anchored {
+            self.window_anchored = true;
+            self.start_time = now;
+        }
         self.end_time = now;
     }
 
@@ -688,14 +726,14 @@ impl DerivedEncounterState {
     }
 
     fn process_damage_event(&mut self, now: i64, damage_instance: &AdjustedDamageInstance) {
-        self.end_time = now;
+        self.extend_window(now);
         self.total_damage += damage_instance.event.damage as u64;
-        self.dps = self.total_damage as f64 / ((self.duration()) as f64 / 1000.0);
+        self.dps = self.total_damage as f64 / self.duration_secs();
 
         // Update stun value (delta path; see refresh_total_stun for the dedupe rule).
         self.stun_delta_sum += damage_instance.stun_damage;
         self.refresh_total_stun();
-        self.stun_per_second = self.total_stun_value / ((self.duration()) as f64 / 1000.0);
+        self.stun_per_second = self.total_stun_value / self.duration_secs();
 
         // Add actor to party if not already present (folding in any stun/guard
         // state held pending for the slot).
@@ -737,8 +775,9 @@ impl DerivedEncounterState {
         target.update_from_damage_event(damage_instance);
 
         // Update everyone's DPS
+        let duration_secs = self.duration_secs();
         for player in self.party.values_mut() {
-            player.update_dps(now, self.start_time);
+            player.update_rates(duration_secs);
         }
     }
 
@@ -756,7 +795,7 @@ impl DerivedEncounterState {
 
         self.stun_message_sum += amount;
         self.refresh_total_stun();
-        let duration_secs = (self.duration()) as f64 / 1000.0;
+        let duration_secs = self.duration_secs();
         self.stun_per_second = self.total_stun_value / duration_secs;
 
         if let Some(player) = self.party.get_mut(&actor_index) {
@@ -837,7 +876,7 @@ impl DerivedEncounterState {
 
         self.stun_delta_sum += amount;
         self.refresh_total_stun();
-        let duration_secs = (self.duration()) as f64 / 1000.0;
+        let duration_secs = self.duration_secs();
         self.stun_per_second = self.total_stun_value / duration_secs;
 
         if let Some(character_type) = character_type_for_slot_key(player_data, actor_index) {
@@ -894,7 +933,7 @@ impl DerivedEncounterState {
     ) {
         self.stun_delta_sum += amount;
         self.refresh_total_stun();
-        let duration_secs = (self.duration()) as f64 / 1000.0;
+        let duration_secs = self.duration_secs();
         self.stun_per_second = self.total_stun_value / duration_secs;
 
         if let Some(character_type) = character_type_for_slot_key(player_data, actor_index) {
@@ -1421,7 +1460,13 @@ impl Parser {
         // finished (frozen clock, latched party).
         self.derived_state.status = self.status;
         let from = from_ms.map(|from| log_start + from);
-        self.derived_state.start(from.unwrap_or(log_start));
+        match from {
+            // An explicit scrub range owns its own start; without one the
+            // window opens on the first hit (see `extend_window`), so this is
+            // only a provisional value for an encounter that has no damage yet.
+            Some(from) => self.derived_state.start_pinned(from),
+            None => self.derived_state.start(log_start),
+        }
         let cutoff = up_to_ms.map(|up_to| log_start + up_to);
 
         for (timestamp, event) in self.encounter.event_log() {
@@ -1431,22 +1476,25 @@ impl Parser {
             if from.is_some_and(|from| *timestamp < from) {
                 continue;
             }
-            // Ahead of the `end_time` assignment, not inside the DamageEvent arm
-            // below: an excluded hit must not stretch the encounter window
-            // either, or a fight ending on a filtered Primal Burst would keep
-            // that timestamp as its DPS denominator. This also matches the live
-            // path, which never reaches `process_damage_event` for an excluded
-            // hit and so never advances `end_time` from one.
+            // Ahead of the window extension in the DamageEvent arm below: an
+            // excluded hit must not stretch the encounter window either, or a
+            // fight ending on a filtered Primal Burst would keep that timestamp
+            // as its DPS denominator. This also matches the live path, which
+            // never reaches `process_damage_event` for an excluded hit and so
+            // never moves the window from one.
             if let Message::DamageEvent(event) = event {
                 if is_excluded(event, &filters) {
                     self.derived_state.note_excluded_damage(event);
                     continue;
                 }
             }
-            self.derived_state.end_time = *timestamp;
-
             match event {
                 Message::DamageEvent(event) => {
+                    // Ahead of the target-selection check, so filtering to one
+                    // target narrows WHOSE damage counts without also redefining
+                    // the window that damage is measured over.
+                    self.derived_state.extend_window(*timestamp);
+
                     if target_selected(*timestamp - log_start, event, target_spans) {
                         let event = remap_dragon_form(&self.encounter.player_data, event);
 
@@ -2960,6 +3008,22 @@ mod tests {
         assert_eq!(parser.derived_state.end_time, 1_000);
     }
 
+    /// A parser holding two hits 4s apart in wall-clock time, 1000 damage in
+    /// total, credited to player slot 0. The wall-clock denominator is 4s, so
+    /// any in-game time other than 4s makes the two DPS figures distinguishable.
+    fn parser_with_a_four_second_fight() -> Parser {
+        let mut parser = Parser::default();
+        parser.encounter.raw_event_log.push((
+            1_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 400)),
+        ));
+        parser.encounter.raw_event_log.push((
+            5_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 600)),
+        ));
+        parser
+    }
+
     fn a_tick(secs: u32) -> QuestElapsedTimeEvent {
         QuestElapsedTimeEvent {
             elapsed_time_in_secs: secs,
@@ -3020,6 +3084,97 @@ mod tests {
         parser.on_quest_elapsed_time(a_tick(0));
 
         assert_eq!(parser.encounter.quest_timer, Some(200));
+    }
+
+    fn a_perfect_guard(actor_index: u32) -> Message {
+        Message::OnPerfectGuardStun(OnPlayerStunEvent {
+            actor_index,
+            stun_amount: 25.0,
+        })
+    }
+
+    /// A guard is a real encounter event and belongs in the log, but it is not
+    /// damage — dividing a fight's damage by a window that opened before anyone
+    /// attacked understates DPS. Lucilius is the worst case: Paradise Lost is
+    /// ~30s of guarding and dodging before the first hit lands.
+    #[test]
+    fn the_dps_window_opens_at_the_first_hit_not_at_an_earlier_guard() {
+        let mut state = DerivedEncounterState::default();
+        // The encounter opened on a guard, 30s before anyone attacked.
+        state.start(0);
+        state.process_perfect_guard_stun(0, &no_identities(), 0xF000_0000, 25.0);
+
+        for (at, damage) in [(30_000i64, 400), (230_000, 600)] {
+            let mut event = a_damage_event();
+            event.source.parent_index = 0xF000_0000;
+            event.damage = damage;
+            let instance = AdjustedDamageInstance::from_damage_event(&event, None);
+            state.process_damage_event(at, &instance);
+        }
+
+        assert_eq!(state.start_time, 30_000, "window opens at the first hit");
+        assert_eq!(state.duration(), 200_000);
+        assert_eq!(state.dps, 5.0, "1000 damage over 200s, not over 230s");
+    }
+
+    /// The same defect at the other end: the quest runs on after the boss dies,
+    /// and a trailing guard would stretch the window the damage is divided by.
+    #[test]
+    fn a_guard_after_the_last_hit_does_not_extend_the_dps_window() {
+        let mut parser = parser_with_a_four_second_fight();
+        parser
+            .encounter
+            .raw_event_log
+            .push((30_000, a_perfect_guard(0)));
+
+        parser.reparse();
+
+        assert_eq!(parser.derived_state.end_time, 5_000);
+        assert_eq!(parser.derived_state.duration(), 4_000);
+    }
+
+    /// The reparse path has to reach the same window as the live path, or a
+    /// saved log would disagree with the meter that recorded it.
+    #[test]
+    fn reparse_opens_the_dps_window_at_the_first_hit_not_at_an_earlier_guard() {
+        let mut parser = Parser::default();
+        parser
+            .encounter
+            .raw_event_log
+            .push((1_000, a_perfect_guard(0)));
+        parser.encounter.raw_event_log.push((
+            5_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 400)),
+        ));
+        parser.encounter.raw_event_log.push((
+            9_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 600)),
+        ));
+
+        parser.reparse();
+
+        assert_eq!(parser.derived_state.start_time, 5_000);
+        assert_eq!(parser.derived_state.duration(), 4_000);
+    }
+
+    /// The scrubber picks the window explicitly, so the first-hit anchor must
+    /// leave it alone — otherwise dragging the handle to a quiet stretch would
+    /// silently snap back to the first hit inside it.
+    #[test]
+    fn an_explicit_scrub_window_keeps_its_own_start() {
+        let mut parser = Parser::default();
+        parser
+            .encounter
+            .raw_event_log
+            .push((1_000, a_perfect_guard(0)));
+        parser.encounter.raw_event_log.push((
+            5_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 400)),
+        ));
+
+        parser.reparse_with_options_window(&[], Some(0), Some(6_000));
+
+        assert_eq!(parser.derived_state.start_time, 1_000, "window start wins");
     }
 
     fn a_damage_event() -> DamageEvent {

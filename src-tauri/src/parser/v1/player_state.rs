@@ -197,9 +197,11 @@ impl PlayerState {
         self.total_stun_value = self.stun_delta_sum.max(self.stun_message_sum);
     }
 
-    pub fn update_dps(&mut self, now: i64, start_time: i64) {
-        self.dps = self.total_damage as f64 / ((now - start_time) as f64 / 1000.0);
-        self.stun_per_second = self.total_stun_value / ((now - start_time) as f64 / 1000.0);
+    /// Recomputes this player's rates against the encounter's duration, so a
+    /// party row and the team total are always divided by the same clock.
+    pub fn update_rates(&mut self, duration_secs: f64) {
+        self.dps = self.total_damage as f64 / duration_secs;
+        self.stun_per_second = self.total_stun_value / duration_secs;
     }
 
     // @todo(false): maybe Ferry specific stuff can be removed/abstracted if some extra flags are found or the attribution is fixed
@@ -326,7 +328,7 @@ mod tests {
         let mut player_state = empty_player();
         player_state.total_damage = 100;
 
-        player_state.update_dps(1000, 0);
+        player_state.update_rates(1.0);
 
         assert_eq!(player_state.dps, 100.0);
     }
