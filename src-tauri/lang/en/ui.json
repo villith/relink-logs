@@ -78,7 +78,7 @@
     "use-condensed-skills": "Use Condensed Skill Names",
     "use-condensed-skills-description": "Groups various skills into one entry (e.g. Attack 1, Attack 2 would condense into just \"Attack\")",
     "include-primal-burst": "Include Primal Burst Damage",
-    "include-primal-burst-description": "Counts Primal Burst damage in the meters. When off, Primal Burst hits are left out of every damage total, stun total and DPS chart. Saved logs are re-read either way, so changing this updates old logs too.",
+    "include-primal-burst-description": "Counts Primal Burst damage in the meters.",
     "open-log-on-save": "Open Log on Save",
     "open-log-on-save-description": "Automatically open the log after saving an encounter.",
     "auto-check-updates": "Check for Updates Automatically",
