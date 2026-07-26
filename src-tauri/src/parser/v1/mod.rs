@@ -1345,7 +1345,7 @@ impl Parser {
 
     /// Reparses derived state from the current encounter.
     pub fn reparse(&mut self) {
-        self.reparse_with_options_window(&[], None, None, self.filters);
+        self.reparse_with_options_window(&[], None, None);
     }
 
     /// [`Self::reparse`] restricted to a window: the derived state covers only
@@ -1357,16 +1357,16 @@ impl Parser {
     /// `target_spans` filters by per-spawn segment (see [`target_selected`])
     /// so individual summons are selectable; empty = everything.
     ///
-    /// `filters` drops contested damage sources (see [`is_excluded`]) from every
-    /// derived total. The raw log is untouched, so reparsing with a different
-    /// value restores them.
+    /// [`Self::filters`] drops contested damage sources (see [`is_excluded`])
+    /// from every derived total. The raw log is untouched, so setting a
+    /// different value and reparsing restores them.
     pub fn reparse_with_options_window(
         &mut self,
         target_spans: &[TargetSpan],
         from_ms: Option<i64>,
         up_to_ms: Option<i64>,
-        filters: MeterFilters,
     ) {
+        let filters = self.filters;
         let log_start = self.start_time();
         self.derived_state = Default::default();
         let from = from_ms.map(|from| log_start + from);
@@ -3511,12 +3511,12 @@ mod tests {
                 .push_event(base + offset, Message::DamageEvent(event));
         }
 
-        parser.reparse_with_options_window(&[], None, Some(5_000), MeterFilters::default());
+        parser.reparse_with_options_window(&[], None, Some(5_000));
         assert_eq!(parser.derived_state.total_damage, 300);
         assert_eq!(parser.derived_state.end_time, base + 4_000);
 
         // No cutoff = the full fight (same as a plain reparse).
-        parser.reparse_with_options_window(&[], None, None, MeterFilters::default());
+        parser.reparse_with_options_window(&[], None, None);
         assert_eq!(parser.derived_state.total_damage, 700);
     }
 
@@ -3536,18 +3536,18 @@ mod tests {
                 .push_event(base + offset, Message::DamageEvent(event));
         }
 
-        parser.reparse_with_options_window(&[], Some(2_000), Some(5_000), MeterFilters::default());
+        parser.reparse_with_options_window(&[], Some(2_000), Some(5_000));
         assert_eq!(parser.derived_state.total_damage, 200);
         assert_eq!(parser.derived_state.start_time, base + 2_000);
         assert_eq!(parser.derived_state.end_time, base + 4_000);
 
         // No lower bound = same as the cutoff-only reparse.
-        parser.reparse_with_options_window(&[], None, Some(5_000), MeterFilters::default());
+        parser.reparse_with_options_window(&[], None, Some(5_000));
         assert_eq!(parser.derived_state.total_damage, 300);
         assert_eq!(parser.derived_state.start_time, base);
 
         // An empty window stays at zero rather than picking up stale state.
-        parser.reparse_with_options_window(&[], Some(1_000), Some(3_000), MeterFilters::default());
+        parser.reparse_with_options_window(&[], Some(1_000), Some(3_000));
         assert_eq!(parser.derived_state.total_damage, 0);
     }
 
@@ -3572,7 +3572,7 @@ mod tests {
             }),
         );
 
-        parser.reparse_with_options_window(&[], None, Some(3_000), MeterFilters::default());
+        parser.reparse_with_options_window(&[], None, Some(3_000));
         let chart = parser.generate_sba_chart(1_000);
 
         let row = chart.get(&0).expect("player row");

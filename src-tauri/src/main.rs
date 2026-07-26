@@ -845,12 +845,8 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     // @TODO(false): If we deserialize from an older version, we should save it back into the DB as the newer format.
     let mut parser = parser::deserialize_version(&blob, version).map_err(|e| e.to_string())?;
 
-    parser.reparse_with_options_window(
-        &options.target_spans,
-        options.from_ms,
-        options.up_to_ms,
-        options.filters,
-    );
+    parser.filters = options.filters;
+    parser.reparse_with_options_window(&options.target_spans, options.from_ms, options.up_to_ms);
 
     if options.state_only {
         // Only the fields the scrub commit actually consumes; everything else stays at its
