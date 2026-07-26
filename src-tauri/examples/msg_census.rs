@@ -25,19 +25,24 @@ fn main() -> Result<()> {
     }
 
     let conn = Connection::open(&db_path)?;
-    let mut stmt = conn.prepare("SELECT id, data FROM logs ORDER BY id")?;
-    let rows: Vec<(i64, Vec<u8>)> = stmt
-        .query_map([], |row| {
-            Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?))
-        })?
-        .collect::<Result<_, _>>()?;
 
-    let cutoff = rows.len().saturating_sub(recent);
+    // The `--recent` cutoff needs the row count, but not the rows: collecting
+    // them would hold every decompressed blob in the table at once when the
+    // loop below only ever needs one.
+    let total: usize = conn.query_row("SELECT COUNT(*) FROM logs", [], |row| row.get(0))?;
+    let cutoff = total.saturating_sub(recent);
+
+    let mut stmt = conn.prepare("SELECT id, data FROM logs ORDER BY id")?;
+    let rows = stmt.query_map([], |row| {
+        Ok((row.get::<_, i64>(0)?, row.get::<_, Vec<u8>>(1)?))
+    })?;
+
     let mut all: BTreeMap<&'static str, usize> = BTreeMap::new();
     let mut newest: BTreeMap<&'static str, usize> = BTreeMap::new();
 
-    for (i, (_, blob)) in rows.iter().enumerate() {
-        let mut encounter = match Encounter::from_blob(blob) {
+    for (i, row) in rows.enumerate() {
+        let (_, blob) = row?;
+        let mut encounter = match Encounter::from_blob(&blob) {
             Ok(e) => e,
             Err(_) => continue,
         };
@@ -51,7 +56,7 @@ fn main() -> Result<()> {
         }
     }
 
-    println!("logs: {} (newest {recent} counted separately)\n", rows.len());
+    println!("logs: {total} (newest {recent} counted separately)\n");
     println!("{:<28} {:>12} {:>12}", "message", "all logs", "newest");
     for (name, count) in &all {
         println!(

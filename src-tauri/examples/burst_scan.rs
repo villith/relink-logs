@@ -10,10 +10,8 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use gbfr_logs::parser::constants::CharacterType;
 use gbfr_logs::parser::v1::Encounter;
-use protocol::{ActionType, Message};
+use protocol::{ActionType, Message, SUMMON_ATTACK_ACTION_ID as SUMMON_ACTION};
 use rusqlite::Connection;
-
-const SUMMON_ACTION: u32 = 80000;
 
 #[derive(Default, Clone)]
 struct Stat {
@@ -76,7 +74,7 @@ fn main() -> Result<()> {
         encounter.repopulate_event_log();
         logs_scanned += 1;
 
-        let events: Vec<(i64, Message)> = encounter.event_log().cloned().collect();
+        let events = &encounter.raw_event_log;
 
         // --- SBA usages: one per (player, burst of SBA hits) ---------------
         // key = source parent (the player), value = last SBA hit timestamp.
@@ -86,7 +84,7 @@ fn main() -> Result<()> {
         // --- summon bursts: action 80000 hits grouped by 5s idle gaps ------
         let mut summon_bursts: Vec<(i64, i64, Stat, Vec<u32>)> = Vec::new();
 
-        for (ts, event) in &events {
+        for (ts, event) in events {
             let Message::DamageEvent(dmg) = event else {
                 continue;
             };
@@ -243,7 +241,7 @@ fn main() -> Result<()> {
             if members.len() < 2 {
                 continue;
             }
-            for (ts, event) in &events {
+            for (ts, event) in events {
                 if *ts < *end || *ts > *end + window_ms {
                     continue;
                 }

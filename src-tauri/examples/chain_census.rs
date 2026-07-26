@@ -23,22 +23,23 @@ fn main() -> Result<()> {
 
     let conn = Connection::open(&db_path)?;
     let mut stmt = conn.prepare("SELECT id, time, data FROM logs ORDER BY id")?;
-    let rows: Vec<(i64, i64, Vec<u8>)> = stmt
-        .query_map([], |row| {
-            Ok((
-                row.get::<_, i64>(0)?,
-                row.get::<_, i64>(1)?,
-                row.get::<_, Vec<u8>>(2)?,
-            ))
-        })?
-        .collect::<Result<_, _>>()?;
+    // Streamed, not collected: one decompressed blob at a time instead of the
+    // whole table (hundreds of MB on a real logs.db) resident at once.
+    let rows = stmt.query_map([], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, Vec<u8>>(2)?,
+        ))
+    })?;
 
     println!(
         "{:>6} {:>14} {:>8} {:>8} {:>8} {:>8}",
         "log", "time", "attempt", "perform", "continue", "summon"
     );
-    for (id, time, blob) in &rows {
-        let mut encounter = match Encounter::from_blob(blob) {
+    for row in rows {
+        let (id, time, blob) = row?;
+        let mut encounter = match Encounter::from_blob(&blob) {
             Ok(e) => e,
             Err(_) => continue,
         };
@@ -50,7 +51,7 @@ fn main() -> Result<()> {
                 Message::OnPerformSBA(_) => perform += 1,
                 Message::OnContinueSBAChain(_) => cont += 1,
                 Message::DamageEvent(d)
-                    if d.action_id == protocol::ActionType::Normal(80000) =>
+                    if d.action_id == protocol::ActionType::Normal(protocol::SUMMON_ATTACK_ACTION_ID) =>
                 {
                     summon += 1
                 }

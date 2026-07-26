@@ -9,10 +9,8 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use gbfr_logs::parser::constants::CharacterType;
 use gbfr_logs::parser::v1::Encounter;
-use protocol::{ActionType, Message};
+use protocol::{ActionType, Message, SUMMON_ATTACK_ACTION_ID as SUMMON_ACTION};
 use rusqlite::Connection;
-
-const SUMMON_ACTION: u32 = 80000;
 
 fn main() -> Result<()> {
     let mut db_path = PathBuf::from("src-tauri/logs.db");
@@ -46,11 +44,11 @@ fn main() -> Result<()> {
             Err(_) => continue,
         };
         encounter.repopulate_event_log();
-        let events: Vec<(i64, Message)> = encounter.event_log().cloned().collect();
+        let events = &encounter.raw_event_log;
 
         // Windows: anchor events grouped by 5s idle gaps.
         let mut bursts: Vec<(i64, i64)> = Vec::new();
-        for (ts, event) in &events {
+        for (ts, event) in events {
             let is_anchor = match (anchor.as_str(), event) {
                 ("summon", Message::DamageEvent(dmg)) => {
                     dmg.action_id == ActionType::Normal(SUMMON_ACTION)
@@ -73,7 +71,7 @@ fn main() -> Result<()> {
         for (start, end) in &bursts {
             println!("\n=== log {log_id} burst {start}..{end} ===");
             let mut last_line: Option<(String, i64, usize, i64)> = None;
-            for (ts, event) in &events {
+            for (ts, event) in events {
                 if *ts < start - before || *ts > end + after {
                     continue;
                 }
