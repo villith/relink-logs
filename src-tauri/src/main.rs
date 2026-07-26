@@ -93,7 +93,17 @@ struct MeterFilterState {
 
 #[tauri::command]
 fn set_meter_filters(state: State<MeterFilterState>, filters: v1::MeterFilters) {
-    *state.current.lock().unwrap() = filters;
+    {
+        // A send costs the live parser a full replay of the fight so far, so an
+        // unchanged value must not reach the channel. The frontend pushes on
+        // mount as well as on change, which makes a redundant call the normal
+        // case rather than the exceptional one.
+        let mut current = state.current.lock().unwrap();
+        if *current == filters {
+            return;
+        }
+        *current = filters;
+    }
     if let Some(tx) = state.tx.lock().unwrap().as_ref() {
         let _ = tx.send(filters);
     }
