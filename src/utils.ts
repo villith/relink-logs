@@ -972,6 +972,18 @@ export const openDamageCalculator = (playerData: PlayerData) => {
   open(`https://relink-damage.vercel.app/?logsdata=${data}`);
 };
 
+/// The encounter summary row shared by both clipboard exports.
+const encounterSummaryCsv = (encounterState: EncounterState): string => {
+  const header = "Encounter Time, Total Damage, Total DPS";
+  const values = [
+    millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime),
+    encounterState.totalDamage,
+    Math.round(encounterState.dps),
+  ].join(", ");
+
+  return [header, values].join("\n");
+};
+
 /// Exports the encounter data to the clipboard in a simple format (CSV)
 export const exportSimpleEncounterToClipboard = (
   sortType: SortType,
@@ -981,14 +993,7 @@ export const exportSimpleEncounterToClipboard = (
 ) => {
   if (encounterState.totalDamage === 0) return toast.error("Nothing to copy!");
 
-  const encounterHeader = "Encounter Time, Total Damage, Total DPS";
-  const encounterValues = [
-    millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime),
-    encounterState.totalDamage,
-    Math.round(encounterState.dps),
-  ].join(", ");
-
-  const encounterData = [encounterHeader, encounterValues].join("\n");
+  const encounterData = encounterSummaryCsv(encounterState);
 
   const orderedPlayers = formatInPartyOrder(encounterState.party);
 
@@ -1042,14 +1047,7 @@ export const exportFullEncounterToClipboard = (
 ) => {
   if (encounterState.totalDamage === 0) return toast.error("Nothing to copy!");
 
-  const encounterHeader = "Encounter Time, Total Damage, Total DPS";
-  const encounterValues = [
-    millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime),
-    encounterState.totalDamage,
-    Math.round(encounterState.dps),
-  ].join(", ");
-
-  const encounterData = [encounterHeader, encounterValues].join("\n");
+  const encounterData = encounterSummaryCsv(encounterState);
 
   const playerHeader = "Name, DMG, DPS, %";
   const orderedPlayers = formatInPartyOrder(encounterState.party);
