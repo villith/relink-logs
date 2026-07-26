@@ -6,7 +6,8 @@ import type { SigilEntry, WrightstoneEntry } from "@/pages/toolbox/useTransmarve
 import { withStorageDOMEvents } from "./useMeterSettingsStore";
 
 interface TransmarvelWishlistState {
-  /** Trait-only sigil wishlist; deduped by trait. */
+  /** Sigil wishlist: (sigil trait1, optional 2nd trait) pairs; deduped by
+   * the pair on read. */
   sigils: SigilEntry[];
   /** Wrightstone wishlist; entries validated against the pool on read
    * (`sanitizeWishlists`), not here. */

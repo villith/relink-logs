@@ -1,5 +1,4 @@
 import pool from "@/assets/transmarvel-pool.json";
-import { assignable } from "@/pages/toolbox/matching";
 import useGameStatus from "@/pages/toolbox/useGameStatus";
 import useStalenessWatch from "@/pages/toolbox/useStalenessWatch";
 import { useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
@@ -8,64 +7,90 @@ import { toHashString } from "@/utils";
 import { invoke } from "@tauri-apps/api";
 import { useMemo, useState } from "react";
 
-/** A wished-for sigil, by trait only (any sigil rolling that trait, any
- * level). The wishlist means "traits I'd be happy to get": matching keys on
- * the sigil's trait1 OR its rolled trait2 — a gem carrying the wished trait
- * as its 2nd trait counts as a hit too. */
-export type SigilEntry = { trait: string };
+/** A wished-for sigil: the sigil (by its trait1) plus an optional 2nd trait.
+ * `trait2: null` means any 2nd trait is fine. Matching is by trait content —
+ * a hit needs the rolled trait1 to match and, when specified, the rolled
+ * trait2 too. */
+export type SigilEntry = { trait: string; trait2: string | null };
 
-/** One position a wished-for wrightstone entry needs filled. */
-export type WrightstoneSlot = { trait: string; minLevel: number };
-
-/** A wished-for wrightstone: every slot must land on its own distinct rolled
- * position (see `stoneEntryMatches`/`comboSatisfies`). */
-export type WrightstoneEntry = { slots: WrightstoneSlot[] };
+/** A wished-for wrightstone: the type (family = its fixed trait-1 hash), a
+ * minimum rarity tier (that tier or better hits), and optional per-position
+ * 2nd/3rd traits (`null` = any; position matters — levels are determined by
+ * rarity + position, so there is nothing else to specify). */
+export type WrightstoneEntry = { family: string; minTier: number; slot2: string | null; slot3: string | null };
 
 /** The shape of the generated pool asset (src/assets/transmarvel-pool.json) —
  * an explicit interface rather than `typeof pool` so test doubles built to
  * the same shape type-check without fighting JSON's inferred literal types. */
 export interface TransmarvelPool {
-  sigils: { trait: string; sigilId: string }[];
+  sigils: { trait: string; sigilId: string; trait2Lot: string; extraTrait2: string[] }[];
+  trait2Lots: Record<string, string[]>;
   wrightstones: {
-    levels: number[];
-    combos: { slots: { traits: string[]; levels: number[] }[] }[];
+    combos: {
+      item: string;
+      family: string;
+      tier: number;
+      chancePercent: number;
+      slots: { traits: string[]; levels: number[] }[];
+    }[];
   };
 }
 
 export const POOL = pool as TransmarvelPool;
 
-/** Max slots a wishlist entry may specify — a gacha stone never has more than
- * three trait positions. */
-const MAX_STONE_SLOTS = 3;
+/** Valid 2nd traits for a sigil: its rolled lot plus fixed-pair extras. */
+export const sigilTrait2Options = (trait: string, p: TransmarvelPool = POOL): string[] => {
+  const sigil = p.sigils.find((s) => s.trait === trait);
+  if (!sigil) return [];
+  return [...(p.trait2Lots[sigil.trait2Lot] ?? []), ...sigil.extraTrait2];
+};
 
-/** True when each entry slot is satisfied by a DISTINCT rolled trait at or
- * above its min level. `traits` are (trait hash, level) pairs off the roll. */
-export const stoneEntryMatches = (traits: [number, number][], entry: WrightstoneEntry): boolean =>
-  assignable(traits, entry.slots, (s, [trait, level]) => toHashString(trait) === s.trait && level >= s.minLevel);
+/** A family's combos in tier order (worst -> best). */
+export const familyCombos = (family: string, p: TransmarvelPool = POOL) =>
+  p.wrightstones.combos.filter((c) => c.family === family).sort((a, b) => a.tier - b.tier);
 
-/** OR across both lists, and for sigils OR across trait1/trait2: the
- * wishlists are "things I'd be happy to get". */
-export const rollHits = (roll: TransmarvelRoll, sigils: SigilEntry[], stones: WrightstoneEntry[]): boolean => {
+/** Traits a stone position (1 = 2nd slot, 2 = 3rd slot) can carry across
+ * every tier at or above the minimum — at min rarity 0.1% this collapses to
+ * the tier's fixed trait. */
+export const slotTraitOptions = (family: string, minTier: number, position: 1 | 2, p: TransmarvelPool = POOL): string[] => {
+  const traits = new Set<string>();
+  for (const combo of familyCombos(family, p))
+    if (combo.tier >= minTier) for (const trait of combo.slots[position].traits) traits.add(trait);
+  return [...traits].sort();
+};
+
+const slotHit = (want: string | null, rolled: [number, number] | undefined): boolean =>
+  want === null || (rolled !== undefined && toHashString(rolled[0]) === want);
+
+/** OR across both wishlists ("things I'd be happy to get"); levels are never
+ * checked — a stone's levels follow from its item (rarity) and position. */
+export const rollHits = (
+  roll: TransmarvelRoll,
+  sigils: SigilEntry[],
+  stones: WrightstoneEntry[],
+  p: TransmarvelPool = POOL
+): boolean => {
   if (roll.outcome.type === "sigil") {
     const trait1 = toHashString(roll.outcome.trait1);
     const trait2 = roll.outcome.trait2 !== null ? toHashString(roll.outcome.trait2) : null;
-    return sigils.some((e) => e.trait === trait1 || e.trait === trait2);
+    return sigils.some((e) => e.trait === trait1 && (e.trait2 === null || e.trait2 === trait2));
   }
+  const item = toHashString(roll.outcome.item);
+  const combo = p.wrightstones.combos.find((c) => c.item === item);
+  if (!combo) return false;
   const traits = roll.outcome.traits;
-  return stones.some((e) => stoneEntryMatches(traits, e));
+  return stones.some(
+    (e) => combo.family === e.family && combo.tier >= e.minTier && slotHit(e.slot2, traits[1]) && slotHit(e.slot3, traits[2])
+  );
 };
-
-/** True when some valid combo offers every slot's trait (distinct positions)
- * with the slot's min level reachable. Same backtracking matcher: combo
- * positions are the items, entry slots the filters. */
-export const comboSatisfies = (combo: TransmarvelPool["wrightstones"]["combos"][number], entry: WrightstoneEntry): boolean =>
-  assignable(combo.slots, entry.slots, (s, pos) => pos.traits.includes(s.trait) && pos.levels.some((l) => l >= s.minLevel));
 
 /** Validate a wishlist blob loaded from localStorage against the current pool
  * (a game patch may have regenerated the pool and invalidated stored
- * entries): keeps only entries whose shape and traits/levels are still valid,
+ * entries): keeps only entries whose shape and traits/tiers are still valid,
  * silently dropping the rest — no error, no partial-fix UI, it just stops
- * offering what can no longer come up. */
+ * offering what can no longer come up. Legacy shapes: trait-only sigil
+ * entries upgrade to "any 2nd trait"; pre-rework slots-shaped stone entries
+ * are dropped. */
 export const sanitizeWishlists = (
   value: unknown,
   p: TransmarvelPool = POOL
@@ -73,51 +98,34 @@ export const sanitizeWishlists = (
   if (typeof value !== "object" || value === null) return { sigils: [], stones: [] };
   const { sigils: rawSigils, stones: rawStones } = value as { sigils?: unknown; stones?: unknown };
 
-  const knownSigilTraits = new Set(p.sigils.map((s) => s.trait));
-  const seenSigilTraits = new Set<string>();
   const sigils: SigilEntry[] = [];
+  const seenPairs = new Set<string>();
   if (Array.isArray(rawSigils)) {
     for (const raw of rawSigils) {
       if (typeof raw !== "object" || raw === null) continue;
-      const { trait } = raw as Record<string, unknown>;
-      if (typeof trait !== "string" || !knownSigilTraits.has(trait)) continue;
-      if (seenSigilTraits.has(trait)) continue;
-      seenSigilTraits.add(trait);
-      sigils.push({ trait });
+      const { trait, trait2: rawTrait2 } = raw as Record<string, unknown>;
+      if (typeof trait !== "string" || !p.sigils.some((s) => s.trait === trait)) continue;
+      const trait2 = typeof rawTrait2 === "string" ? rawTrait2 : null;
+      if (trait2 !== null && !sigilTrait2Options(trait, p).includes(trait2)) continue;
+      const key = `${trait}|${trait2}`;
+      if (seenPairs.has(key)) continue;
+      seenPairs.add(key);
+      sigils.push({ trait, trait2 });
     }
   }
 
-  const levelSet = new Set(p.wrightstones.levels);
-  const knownStoneTraits = new Set(p.wrightstones.combos.flatMap((c) => c.slots.flatMap((s) => s.traits)));
   const stones: WrightstoneEntry[] = [];
   if (Array.isArray(rawStones)) {
     for (const raw of rawStones) {
       if (typeof raw !== "object" || raw === null) continue;
-      const { slots: rawSlots } = raw as Record<string, unknown>;
-      if (!Array.isArray(rawSlots) || rawSlots.length === 0 || rawSlots.length > MAX_STONE_SLOTS) continue;
-
-      let valid = true;
-      const slots: WrightstoneSlot[] = [];
-      for (const rawSlot of rawSlots) {
-        if (typeof rawSlot !== "object" || rawSlot === null) {
-          valid = false;
-          break;
-        }
-        const { trait, minLevel } = rawSlot as Record<string, unknown>;
-        if (typeof trait !== "string" || !knownStoneTraits.has(trait)) {
-          valid = false;
-          break;
-        }
-        if (typeof minLevel !== "number" || !levelSet.has(minLevel)) {
-          valid = false;
-          break;
-        }
-        slots.push({ trait, minLevel });
-      }
-      if (!valid) continue;
-
-      const entry: WrightstoneEntry = { slots };
-      if (p.wrightstones.combos.some((c) => comboSatisfies(c, entry))) stones.push(entry);
+      const { family, minTier, slot2: rawSlot2, slot3: rawSlot3 } = raw as Record<string, unknown>;
+      if (typeof family !== "string" || typeof minTier !== "number" || !Number.isInteger(minTier)) continue;
+      if (!familyCombos(family, p).some((c) => c.tier === minTier)) continue;
+      const slot2 = typeof rawSlot2 === "string" ? rawSlot2 : null;
+      const slot3 = typeof rawSlot3 === "string" ? rawSlot3 : null;
+      if (slot2 !== null && !slotTraitOptions(family, minTier, 1, p).includes(slot2)) continue;
+      if (slot3 !== null && !slotTraitOptions(family, minTier, 2, p).includes(slot3)) continue;
+      stones.push({ family, minTier, slot2, slot3 });
     }
   }
 
@@ -176,9 +184,22 @@ export default function useTransmarvelSearcher() {
   const firstHit = useMemo(() => results.find((r) => r.hit)?.index ?? null, [results]);
 
   return {
-    status, error, loading, prediction, predicting, stale,
-    rolls, setRolls, matchesOnly, setMatchesOnly,
-    sigils, setSigils, stones, setStones,
-    results, firstHit, predict,
+    status,
+    error,
+    loading,
+    prediction,
+    predicting,
+    stale,
+    rolls,
+    setRolls,
+    matchesOnly,
+    setMatchesOnly,
+    sigils,
+    setSigils,
+    stones,
+    setStones,
+    results,
+    firstHit,
+    predict,
   };
 }
