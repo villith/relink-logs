@@ -52,6 +52,31 @@ Output shape (camelCase, deserialized by transmarvel::TransmarvelTables):
   ATK/HP/Crit/Stun -> 5, offense -> 6, defense -> 7, support -> 26,
   utility -> 27. Sigils whose trait1 has no category (character sigils,
   celestials, Stronghold, ...) use the gem.tbl row as-is.
+
+Second output, src/assets/transmarvel-pool.json (camelCase, consumed by the
+Toolbox wishlist pickers, NOT by the Rust predictor): a frontend-shaped
+slice of the same data —
+  sigils      — one entry per distinct droppable gem trait (trait1),
+                deduped, each paired with a representative sigil item id
+                (ties broken by lowest item hash; several rarities of a
+                gem share one trait1 and one display name).
+  wrightstones.levels  — the sorted union of every level any stone combo
+                can roll (reconciled ground truth: [5, 7, 10, 15, 20]).
+  wrightstones.combos  — one entry per gacha stone item (12 = 4 families x
+                3 tiers), each 3 slots in order (trait 1, slot A, slot B).
+                Trait 1 is always a single fixed family trait; its levels
+                come from stoneConfigs' trait1Level (if fixed) or
+                trait1LevelLot's nonzero weights. Each of slots A/B is
+                either fixed (stoneConfigs slot.skill != 0: a singleton
+                trait+level, the top 0.1% tier) or rolled (gate chance
+                asserted == 100; traits = the union of skill_lot hashes
+                reachable from the stone's typeRow in skillTypeRows — this
+                union already excludes the family's own trait, since the
+                typeRow is the category-exclusion variant per the ROW
+                SELECTION note above; levels = the slot's levelLot nonzero
+                weights). The roller caps each slot's level at the
+                previous trait's level, which the stock level sets never
+                actually constrain — asserted here rather than modeled.
 """
 
 import json
@@ -63,6 +88,9 @@ from pathlib import Path
 from gbfr_hash import cell_hash
 
 OUT_PATH = Path(__file__).resolve().parent.parent / "src-tauri" / "assets" / "transmarvel-tables.json"
+# Frontend copy: the wishlist pickers' constrained option pool (sigil traits,
+# wrightstone trait/level combos) — see module docstring's second half.
+POOL_PATH = Path(__file__).resolve().parent.parent / "src" / "assets" / "transmarvel-pool.json"
 
 # gacha.tbl row Key for the transmarvel tier (TXT_YOROZU_FORGING_HIGH).
 TRANSMARVEL_KEY = 0xFA21E311
@@ -151,6 +179,80 @@ def load_gem_configs(gem_tbl: Path) -> dict:
         lot = rel(28) if rel(28) != 0xFFFFFFFF else -1
         out[rel(0)] = (trait1, trait2, lot)
     return out
+
+
+def lot_levels(lot_key: int, skill_level_lots: dict) -> list:
+    """1-based levels with nonzero weight in a skill_level_lot row."""
+    weights = skill_level_lots[lot_key]
+    return sorted(i + 1 for i, w in enumerate(weights) if w > 0)
+
+
+def build_pool(
+    gem_groups: list,
+    stone_groups: list,
+    stone_configs: dict,
+    skill_type_rows: dict,
+    skill_lots: dict,
+    skill_level_lots: dict,
+) -> dict:
+    """Frontend-shaped pool for the wishlist pickers (see docstring)."""
+    # sigils: distinct droppable gem traits, deduped, each paired with a
+    # representative sigil item id (lowest hash of the items sharing it).
+    trait_sigil = {}
+    for g in gem_groups:
+        for i in g["items"]:
+            assert i["trait1"] != 0, f"gem item {i['item']:08x} has no trait1"
+            cur = trait_sigil.get(i["trait1"])
+            if cur is None or i["item"] < cur:
+                trait_sigil[i["trait1"]] = i["item"]
+    sigils = [
+        {"trait": f"{trait:08x}", "sigilId": f"{item:08x}"}
+        for trait, item in sorted(trait_sigil.items(), key=lambda kv: f"{kv[0]:08x}")
+    ]
+
+    combos = []
+    for g in stone_groups:
+        for i in g["items"]:
+            cfg = stone_configs[i["item"]]
+            if cfg["trait1Level"] != 0:
+                trait1_levels = [cfg["trait1Level"]]
+            else:
+                trait1_levels = lot_levels(cfg["trait1LevelLot"], skill_level_lots)
+            slots_out = [{"traits": [f"{cfg['trait1']:08x}"], "levels": trait1_levels}]
+
+            for slot in cfg["slots"]:
+                if slot["skill"] != 0:
+                    slots_out.append(
+                        {"traits": [f"{slot['skill']:08x}"], "levels": [slot["fixedLevel"]]}
+                    )
+                else:
+                    assert slot["chance"] == 100, "rolled slot gate chance != 100"
+                    traits = set()
+                    for lot_key, _pct in skill_type_rows[cfg["typeRow"]]:
+                        traits.update(skill_lots[lot_key])
+                    slots_out.append(
+                        {
+                            "traits": sorted(f"{t:08x}" for t in traits),
+                            "levels": lot_levels(slot["levelLot"], skill_level_lots),
+                        }
+                    )
+
+            # Pin the level-cap claim: the stock level sets never let the
+            # roller's previous-trait cap actually remove an option.
+            assert max(slots_out[1]["levels"]) <= min(slots_out[0]["levels"]), (
+                f"slot A levels exceed trait1 cap for stone {i['item']:08x}"
+            )
+            assert max(slots_out[2]["levels"]) <= min(slots_out[1]["levels"]), (
+                f"slot B levels exceed slot A cap for stone {i['item']:08x}"
+            )
+            combos.append({"slots": slots_out})
+
+    assert len(combos) == 12, f"expected 12 stone combos, got {len(combos)}"
+
+    levels = sorted({lvl for c in combos for s in c["slots"] for lvl in s["levels"]})
+    assert levels == [5, 7, 10, 15, 20], f"unexpected wrightstone level set: {levels}"
+
+    return {"sigils": sigils, "wrightstones": {"levels": levels, "combos": combos}}
 
 
 def main() -> None:
@@ -299,6 +401,16 @@ def main() -> None:
         f"{len(out['stoneGroups'])} stone groups ({n_stone} items), "
         f"{len(skill_type_rows)} type rows, {len(skill_lots)} skill lots, "
         f"{len(stone_configs)} stone configs, {len(skill_level_lots)} level lots"
+    )
+
+    pool = build_pool(
+        gem_groups, stone_groups, stone_configs, skill_type_rows, skill_lots, skill_level_lots
+    )
+    POOL_PATH.write_text(json.dumps(pool, indent=1) + "\n", encoding="utf-8")
+    print(
+        f"wrote {POOL_PATH} — {len(pool['sigils'])} sigil traits, "
+        f"{len(pool['wrightstones']['combos'])} wrightstone combos, "
+        f"levels {pool['wrightstones']['levels']}"
     )
 
 
