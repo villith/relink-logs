@@ -412,28 +412,34 @@ mod tests {
         assert_eq!(gem(&rolls[7]), (0xE845_4459, Some(0x6018_372B), 5)); // Stamina V+ / Provoke
     }
 
-    /// LIVE ground truth, 2026-07-26 third batch: 4 verified rolls from
+    /// LIVE ground truth, 2026-07-26 third batch: 8 verified rolls from
     /// 0xd2d9d59c that pinned the category-exclusion row rule — Autorevive
     /// V+ (utility trait1 -> row 27) rolled Quick Cooldown, Celestial Lumen
     /// V+ (no category -> gem.tbl row 6) rolled Low Profile, Health V+
-    /// (ATK/HP trait1 -> row 5) rolled ATK-Down Resistance.
+    /// (ATK/HP trait1 -> row 5) rolled ATK-Down Resistance, and the two
+    /// defense-trait sigils (-> row 7) rolled Cascade and Autorevive.
     #[test]
     fn live_session_2026_07_26_batch3_category_rule_reproduced() {
         let t = stock_tables();
-        let rolls = simulate(0xd2d9_d59c, t, 4);
-        let TransmarvelOutcome::Wrightstone { item, .. } = rolls[0].outcome else {
-            panic!("expected the wrightstone");
+        let rolls = simulate(0xd2d9_d59c, t, 8);
+        let stone = |r: &TransmarvelRoll| match r.outcome {
+            TransmarvelOutcome::Wrightstone { item, .. } => (item, r.draws),
+            _ => panic!("expected a wrightstone, got {:?}", r.outcome),
         };
-        assert_eq!((item, rolls[0].draws), (0x7117_3866, 12)); // Vitality Wrightstone
         let gem = |r: &TransmarvelRoll| match r.outcome {
             TransmarvelOutcome::Sigil {
                 sigil_id, trait2, ..
             } => (sigil_id, trait2, r.draws),
             _ => panic!("expected a sigil, got {:?}", r.outcome),
         };
+        assert_eq!(stone(&rolls[0]), (0x7117_3866, 12)); // Vitality Wrightstone
         assert_eq!(gem(&rolls[1]), (0xD340_651C, Some(0x318D_12E9), 5)); // Autorevive V+ / Quick Cooldown
         assert_eq!(gem(&rolls[2]), (0x2049_2635, Some(0xDC60_7D75), 5)); // Celestial Lumen V+ / Low Profile
         assert_eq!(gem(&rolls[3]), (0xE92E_E838, Some(0x4BF2_E191), 5)); // Health V+ / ATK-Down Resistance
+        assert_eq!(stone(&rolls[4]), (0x0BD3_73A4, 12)); // Sequestration Wrightstone
+        assert_eq!(gem(&rolls[5]), (0xB832_E7A7, Some(0x05F2_ECDC), 5)); // Improved Guard V+ / Cascade
+        assert_eq!(stone(&rolls[6]), (0xBCDB_C4B6, 12)); // Dread Wrightstone
+        assert_eq!(gem(&rolls[7]), (0x381B_BE64, Some(0x95F3_FA86), 5)); // Garrison V+ / Autorevive
     }
 
     /// The JSON contract src/types.ts mirrors — a rename here breaks the
