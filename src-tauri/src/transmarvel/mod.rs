@@ -10,17 +10,22 @@
 //! the grant (FUN_14033dbc0 -> FUN_140305770, v2.0.2) walks the item's
 //! skill_type_lot row with one draw and picks uniformly inside the chosen
 //! skill_lot with the next; sigils with a fixed pair or no 2nd trait
-//! (`-1`) draw nothing. A wrightstone takes 9 trailing draws (3 traits ×
-//! 3). All of this is live-validated: two 8-roll sessions (2026-07-26)
-//! reproduce every item AND every rolled gem 2nd trait (7/7), with exact
-//! total draw accounting (54 and 47).
+//! (`-1`) draw nothing. All of this is live-validated: two 8-roll sessions
+//! (2026-07-26) reproduce every item AND every rolled gem 2nd trait (7/7),
+//! with exact total draw accounting (54 and 47).
+//!
+//! A wrightstone's grant (FUN_140357250 → functor FUN_140359d60 →
+//! FUN_140359e00, solved offline against a recorded 9-draw grant stream)
+//! rolls its three traits from the item's item_pendulum.tbl config: trait 1
+//! is a fixed family skill whose level walks a skill_level_lot row (1 draw,
+//! or 0 when the config fixes it), then two slots each draw a %100 gate,
+//! pick their skill exactly like the gem 2nd trait (2 draws through the
+//! config's skill_type_lot row), and walk their own skill_level_lot row
+//! CAPPED at the previous trait's level (descending levels). The rolled
+//! gacha tiers consume 9 grant draws; the top 0.1% tier is fully fixed and
+//! consumes NONE (3 draws total for the roll).
 //!
 //! Knowingly unmodeled, pending more RE:
-//! - Wrightstone trait VALUES: the 9 draws advance the stream correctly but
-//!   the picks go through availability-filtered, weighted skill.tbl walks
-//!   (plus the player's owned-unique exclusions) that are not yet decoded.
-//!   Both observed stones were base-tier; rarer tiers' draw counts are
-//!   assumed equal until seen live.
 //! - The item availability filter (quest gates, owned uniques). The live
 //!   sessions matched with NO filtering — including duplicate character
 //!   sigils — so it is deliberately left out until a roll proves otherwise.
@@ -67,6 +72,33 @@ pub struct RateGroup {
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct StoneSlot {
+    /// Fixed skill hash; 0 = rolled through the config's type row.
+    pub skill: u32,
+    /// Fixed level; 0 = rolled from `level_lot`.
+    pub fixed_level: u32,
+    /// Gate percent for a rolled skill (draw % 100 < chance to roll it).
+    pub chance: u32,
+    /// skill_level_lot key for a rolled level.
+    pub level_lot: i32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StoneConfig {
+    /// Trait 1: fixed per stone family (Dread→Stun Power, Vitality→Crit
+    /// Rate, Fortification→HP, Sequestration→Weak Point DMG).
+    pub trait1: u32,
+    /// Trait 1 fixed level; 0 = rolled from `trait1_level_lot`.
+    pub trait1_level: u32,
+    pub trait1_level_lot: i32,
+    /// skill_type_lot row both rolled slots pick their skill from.
+    pub type_row: i32,
+    pub slots: [StoneSlot; 2],
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TransmarvelTables {
     pub gem_chance_percent: u32,
     pub wrightstone_chance_percent: u32,
@@ -79,6 +111,12 @@ pub struct TransmarvelTables {
     /// skill_lot groups: lot hash -> trait hashes in table order (weights
     /// all 1, so the pick is uniform by index).
     pub skill_lots: HashMap<u32, Vec<u32>>,
+    /// skill_level_lot rows: key -> chance weight per level 1..=20, walked
+    /// cumulatively by one draw (capped at the previous trait's level for
+    /// the stone slots).
+    pub skill_level_lots: HashMap<i32, Vec<u32>>,
+    /// Wrightstone trait-roll configs from item_pendulum.tbl, by item hash.
+    pub stone_configs: HashMap<u32, StoneConfig>,
 }
 
 #[derive(Serialize, Debug, Clone, PartialEq)]
@@ -124,6 +162,38 @@ fn weighted_pick<'a, T>(mut r: u32, entries: impl Iterator<Item = (&'a T, u32)>)
     None
 }
 
+/// The 2-draw skill pick shared by gem 2nd traits and stone slots
+/// (FUN_140305770): one draw walks the type row's percents cumulatively,
+/// one picks uniformly by index inside the chosen skill_lot.
+fn pick_skill(t: &TransmarvelTables, type_row: i32, mut draw: impl FnMut() -> u32) -> u32 {
+    let opts = &t.skill_type_rows[&type_row];
+    let total: u32 = opts.iter().map(|&(_, p)| p).sum();
+    let lot = weighted_pick(draw() % total, opts.iter().map(|o| (o, o.1)))
+        .expect("weighted_pick with r < total always lands")
+        .0;
+    let skills = &t.skill_lots[&lot];
+    skills[draw() as usize % skills.len()]
+}
+
+/// One draw walking the first `cap` weights of a skill_level_lot row
+/// cumulatively; the game skips the draw entirely on a zero total (cannot
+/// happen with stock tables), mirrored here by returning `None`.
+fn level_walk(weights: &[u32], cap: u32, mut draw: impl FnMut() -> u32) -> Option<u32> {
+    let ws = &weights[..weights.len().min(cap as usize)];
+    let total: u32 = ws.iter().sum();
+    if total == 0 {
+        return None;
+    }
+    let mut r = draw() % total;
+    for (i, &w) in ws.iter().enumerate() {
+        if r < w {
+            return Some(i as u32 + 1);
+        }
+        r -= w;
+    }
+    unreachable!("r < total lands within the walk")
+}
+
 /// Simulate one transmarvel roll. Advances `state` exactly as RNG slot 4
 /// would (the roll's slot override redirects every draw there).
 pub fn predict_roll(state: &mut u32, t: &TransmarvelTables) -> TransmarvelRoll {
@@ -151,16 +221,10 @@ pub fn predict_roll(state: &mut u32, t: &TransmarvelTables) -> TransmarvelRoll {
     let outcome = if is_gem {
         // Random 2nd trait (see module docs): one draw walks the item's
         // skill_type_lot row, one picks uniformly inside the chosen lot.
-        let trait2 = match t.skill_type_rows.get(&item.second_trait_lot) {
-            Some(opts) if item.second_trait_lot >= 0 => {
-                let total: u32 = opts.iter().map(|&(_, p)| p).sum();
-                let lot = weighted_pick(draw() % total, opts.iter().map(|o| (o, o.1)))
-                    .expect("weighted_pick with r < total always lands")
-                    .0;
-                let skills = &t.skill_lots[&lot];
-                Some(skills[draw() as usize % skills.len()])
-            }
-            _ => (item.trait2 != 0).then_some(item.trait2),
+        let trait2 = if item.second_trait_lot >= 0 {
+            Some(pick_skill(t, item.second_trait_lot, &mut draw))
+        } else {
+            (item.trait2 != 0).then_some(item.trait2)
         };
         TransmarvelOutcome::Sigil {
             sigil_id: item.item,
@@ -169,14 +233,41 @@ pub fn predict_roll(state: &mut u32, t: &TransmarvelTables) -> TransmarvelRoll {
             trait2,
         }
     } else {
-        // Wrightstone grant draws: 3 traits x 3; values not yet decoded but
-        // the stream advance is exact (live-validated).
-        for _ in 0..9 {
-            draw();
+        // Wrightstone grant: trait 1 fixed + level, then two gated slots
+        // with cascading level caps (see module docs). 9 draws for the
+        // rolled tiers, 0 for the fully fixed top tier — live-validated
+        // draw accounting for the rolled tiers.
+        let cfg = &t.stone_configs[&item.item];
+        let mut traits = Vec::with_capacity(3);
+        let lvl0 = if cfg.trait1_level != 0 {
+            cfg.trait1_level
+        } else {
+            level_walk(&t.skill_level_lots[&cfg.trait1_level_lot], 20, &mut draw).unwrap_or(0)
+        };
+        traits.push((cfg.trait1, lvl0));
+        let mut cap = lvl0;
+        for slot in &cfg.slots {
+            let skill = if slot.skill != 0 {
+                slot.skill
+            } else {
+                if draw() % 100 >= slot.chance {
+                    continue; // gate failed: slot skipped, results compact
+                }
+                pick_skill(t, cfg.type_row, &mut draw)
+            };
+            let level = if slot.fixed_level != 0 {
+                slot.fixed_level
+            } else if cap > 1 {
+                level_walk(&t.skill_level_lots[&slot.level_lot], cap, &mut draw).unwrap_or(cap)
+            } else {
+                cap // a level-1 (or 0) cap leaves nothing to roll
+            };
+            traits.push((skill, level));
+            cap = level;
         }
         TransmarvelOutcome::Wrightstone {
             item: item.item,
-            traits: Vec::new(),
+            traits,
         }
     };
     TransmarvelRoll { outcome, draws }
@@ -334,16 +425,21 @@ mod tests {
         }
         let mut s = seed;
         let roll = predict_roll(&mut s, t);
-        assert_eq!(roll.draws, 12);
         let TransmarvelOutcome::Wrightstone { item, traits } = roll.outcome else {
             panic!("expected a wrightstone, got {:?}", roll.outcome);
         };
-        assert!(traits.is_empty());
         assert!(t
             .stone_groups
             .iter()
             .flat_map(|g| &g.items)
             .any(|i| i.item == item));
+        // Rolled tiers take 3 + 9 draws; the fixed top tier only the 3 picks.
+        let top_tier = t.stone_groups[2].items.iter().any(|i| i.item == item);
+        assert_eq!(roll.draws, if top_tier { 3 } else { 12 });
+        // Stock gates are 100% (or the slot is fixed), so all 3 traits land,
+        // at non-increasing levels.
+        assert_eq!(traits.len(), 3);
+        assert!(traits.windows(2).all(|w| w[0].1 >= w[1].1), "{traits:?}");
     }
 
     /// LIVE ground truth, 2026-07-26 (game v2.0.2): 8 consecutive real rolls
@@ -440,6 +536,52 @@ mod tests {
         assert_eq!(gem(&rolls[5]), (0xB832_E7A7, Some(0x05F2_ECDC), 5)); // Improved Guard V+ / Cascade
         assert_eq!(stone(&rolls[6]), (0xBCDB_C4B6, 12)); // Dread Wrightstone
         assert_eq!(gem(&rolls[7]), (0x381B_BE64, Some(0x95F3_FA86), 5)); // Garrison V+ / Autorevive
+    }
+
+    /// LIVE ground truth: the batch-2 stone (item 0x71173866) from its
+    /// pre-roll state rolled Crit Rate 20 / Weak Point DMG 15 /
+    /// Greater Aegis 10 (9 grant draws starting at 0x7804fd61).
+    #[test]
+    fn live_stone_traits_reproduced() {
+        let t = stock_tables();
+        // 25 draws (5 gems x5) precede the stone in that session; simulate
+        // the whole prefix so the test pins the stream, not an offset.
+        let rolls = simulate(0xa373_8437, t, 6);
+        let TransmarvelOutcome::Wrightstone { item, ref traits } = rolls[5].outcome else {
+            panic!("expected the wrightstone");
+        };
+        assert_eq!(item, 0x7117_3866);
+        assert_eq!(
+            *traits,
+            vec![(0x8d78_a19b, 20), (0x6b69_4d6d, 15), (0x48a9_5b8d, 10)]
+        );
+    }
+
+    /// The 0.1% tier stones (rows 70-73 of item_pendulum.tbl) are fully
+    /// fixed: family trait @20, Aegis @15, ATK @10 — and consume ZERO grant
+    /// draws (3 total), unlike the 12-draw rolled tiers.
+    #[test]
+    fn top_tier_stone_is_fixed_and_draws_3() {
+        let t = stock_tables();
+        let mut seed = 1u32;
+        let roll = loop {
+            let mut s = seed;
+            let roll = predict_roll(&mut s, t);
+            if let TransmarvelOutcome::Wrightstone { item, .. } = roll.outcome {
+                if t.stone_groups[2].items.iter().any(|i| i.item == item) {
+                    break roll;
+                }
+            }
+            seed += 1;
+        };
+        assert_eq!(roll.draws, 3);
+        let TransmarvelOutcome::Wrightstone { ref traits, .. } = roll.outcome else {
+            unreachable!();
+        };
+        assert_eq!(traits.len(), 3);
+        assert_eq!(traits[0].1, 20);
+        assert_eq!(traits[1], (0xE0AB_FDFE, 15)); // Aegis
+        assert_eq!(traits[2], (0x5007_9A1C, 10)); // ATK
     }
 
     /// The JSON contract src/types.ts mirrors — a rename here breaks the

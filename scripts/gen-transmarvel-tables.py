@@ -10,8 +10,9 @@ are baked at build time and only the RNG state is read from the live game.
 Pipeline (re-run after a game update):
   1. GBFRDataTools extract -i <data.i> -f system/table/gacha.tbl -o <dir>
      (same for gacha_rate_group.tbl, gacha_lot.tbl, skill_type_lot.tbl,
-      skill_lot.tbl; gem.tbl is extracted too but parsed RAW below — the
-      sqlite converter misaligns its v2.0.2 columns)
+      skill_lot.tbl, skill_level_lot.tbl; gem.tbl and item_pendulum.tbl are
+      extracted too but parsed RAW below — the sqlite converter misaligns
+      gem.tbl's v2.0.2 columns, and item_pendulum's framing is pinned here)
   2. GBFRDataTools tbl-to-sqlite -i <dir>/system/table -v 2.0.2
   3. python scripts/gen-transmarvel-tables.py <dir>/system/db.sqlite
      (expects gem.tbl at <dir>/../table/gem.tbl next to the sqlite input)
@@ -31,6 +32,17 @@ Output shape (camelCase, deserialized by transmarvel::TransmarvelTables):
   skillTypeRows / skillLots — the 2nd-trait roll's tables: type row key ->
   (skillLot, percent) options walked cumulatively by one draw, then one
   draw picks uniformly within the lot (all skill_lot weights are 1).
+
+  stoneConfigs / skillLevelLots — the wrightstone trait roll
+  (FUN_140357250 -> functor FUN_140359d60 -> FUN_140359e00 v2.0.2, solved
+  offline against a recorded 9-draw grant): per stone item, trait 1 is a
+  FIXED family skill whose level is rolled (one draw walking the first 20
+  weights of its skill_level_lot row), then two slots each roll gate
+  (1 draw, %100 < chance), skill (2 draws: type-row walk + uniform pick in
+  the skill_lot, same shape as the gem 2nd trait), and level (1 draw
+  walking the slot's skill_level_lot row CAPPED at the previous trait's
+  level — hence descending levels). Fixed fields (top 0.1% tier) skip
+  their draws entirely: a top stone consumes 0 grant draws.
 
   ROW SELECTION (live-derived 2026-07-26, 11/11 observed 2nd traits): the
   roll does NOT always use gem.tbl's SkillTypeLotIdForRandom2ndSkill.
@@ -76,6 +88,56 @@ GEM_ROW_SIZE = 64
 EMPTY_KEY = 0x887AE0B0
 
 
+# item_pendulum.tbl raw layout (v2.0.2): u32 row count at offset 0, then
+# 56-byte rows (14 u32s) from offset 8. Framing pinned by the four gacha
+# stone-item hashes at word 8 of rows 62-73. Words:
+#   w0/w1  slot A/B skill hash (EMPTY_KEY = rolled)
+#   w2/w3  slot A/B fixed level (0 = rolled)
+#   w4/w5  slot A/B gate ChancePercent
+#   w6/w7  slot A/B skill_level_lot key (int)
+#   w8     item id hash (the record key)
+#   w9     trait-1 fixed skill hash (per stone family)
+#   w10    trait-1 fixed level (0 = rolled)
+#   w11    trait-1 skill_level_lot key (int)
+#   w12    skill_type_lot row key (int) for both rolled slots
+#   w13    family index
+PENDULUM_ROW_START = 8
+PENDULUM_ROW_SIZE = 56
+
+
+def load_stone_configs(pendulum_tbl: Path) -> dict:
+    """item hash -> stone trait-roll config from raw item_pendulum.tbl."""
+    data = pendulum_tbl.read_bytes()
+    (count,) = struct.unpack_from("<I", data, 0)
+    assert PENDULUM_ROW_START + count * PENDULUM_ROW_SIZE == len(data), (
+        "item_pendulum.tbl framing changed"
+    )
+    out = {}
+    for k in range(count):
+        w = struct.unpack_from("<14I", data, PENDULUM_ROW_START + k * PENDULUM_ROW_SIZE)
+        out[w[8]] = {
+            "trait1": w[9],
+            "trait1Level": w[10],
+            "trait1LevelLot": w[11],
+            "typeRow": w[12],
+            "slots": [
+                {
+                    "skill": 0 if w[0] == EMPTY_KEY else w[0],
+                    "fixedLevel": w[2],
+                    "chance": w[4],
+                    "levelLot": w[6],
+                },
+                {
+                    "skill": 0 if w[1] == EMPTY_KEY else w[1],
+                    "fixedLevel": w[3],
+                    "chance": w[5],
+                    "levelLot": w[7],
+                },
+            ],
+        }
+    return out
+
+
 def load_gem_configs(gem_tbl: Path) -> dict:
     """item hash -> (trait1, trait2, gem.tbl type-lot id) from raw gem.tbl."""
     data = gem_tbl.read_bytes()
@@ -97,6 +159,9 @@ def main() -> None:
     db = sqlite3.connect(sys.argv[1])
     db.row_factory = sqlite3.Row
     gem_configs = load_gem_configs(Path(sys.argv[1]).parent / "table" / "gem.tbl")
+    pendulum_configs = load_stone_configs(
+        Path(sys.argv[1]).parent / "table" / "item_pendulum.tbl"
+    )
 
     # trait hash -> its exclusion row (see CATEGORY_EXCLUSION_ROWS).
     trait_category_row = {}
@@ -157,13 +222,32 @@ def main() -> None:
     gem_groups = groups(tier["GemRateGroup"])
     stone_groups = groups(tier["WrightstoneRateGroup"])
 
-    # The 2nd-trait roll tables, limited to the type rows the gem pool can
-    # reach (plus their skill lots).
+    # Stone trait configs, limited to the items the gacha can grant.
+    stone_configs = {}
+    used_level_lots = set()
+    for g in stone_groups:
+        for i in g["items"]:
+            cfg = pendulum_configs.get(i["item"])
+            assert cfg is not None, f"stone item {i['item']:08x} not in item_pendulum.tbl"
+            stone_configs[i["item"]] = cfg
+            if cfg["trait1Level"] == 0:
+                used_level_lots.add(cfg["trait1LevelLot"])
+            for slot in cfg["slots"]:
+                if slot["fixedLevel"] == 0:
+                    used_level_lots.add(slot["levelLot"])
+
+    # The trait roll tables, limited to the type rows the gem pool's 2nd
+    # traits and the stone slots can reach (plus their skill lots).
     used_rows = {
         i["secondTraitLot"]
         for g in gem_groups
         for i in g["items"]
         if i["secondTraitLot"] >= 0
+    }
+    used_rows |= {
+        cfg["typeRow"]
+        for cfg in stone_configs.values()
+        if any(s["skill"] == 0 for s in cfg["slots"])
     }
     skill_type_rows = {}
     used_lots = set()
@@ -189,6 +273,14 @@ def main() -> None:
             skill_lots.setdefault(key, []).append(cell_hash(row["SkillId"]))
     assert used_lots == skill_lots.keys(), "type rows reference unknown skill lots"
 
+    skill_level_lots = {}
+    for row in db.execute("SELECT * FROM skill_level_lot ORDER BY rowid"):
+        if row["Key"] in used_level_lots:
+            skill_level_lots[row["Key"]] = [row[f"Lvl{i}Chance"] for i in range(1, 21)]
+    missing = used_level_lots - skill_level_lots.keys()
+    assert not missing, f"stone configs reference unknown level lots {missing}"
+    assert all(sum(w) > 0 for w in skill_level_lots.values()), "empty level lot"
+
     out = {
         "gemChancePercent": tier["GemChancePercent"],
         "wrightstoneChancePercent": tier["WrightstoneChancePercent"],
@@ -196,6 +288,8 @@ def main() -> None:
         "stoneGroups": stone_groups,
         "skillTypeRows": skill_type_rows,
         "skillLots": skill_lots,
+        "skillLevelLots": skill_level_lots,
+        "stoneConfigs": stone_configs,
     }
     OUT_PATH.write_text(json.dumps(out, indent=1) + "\n", encoding="utf-8")
     n_gem = sum(len(g["items"]) for g in out["gemGroups"])
@@ -203,7 +297,8 @@ def main() -> None:
     print(
         f"wrote {OUT_PATH} — {len(out['gemGroups'])} gem groups ({n_gem} items), "
         f"{len(out['stoneGroups'])} stone groups ({n_stone} items), "
-        f"{len(skill_type_rows)} type rows, {len(skill_lots)} skill lots"
+        f"{len(skill_type_rows)} type rows, {len(skill_lots)} skill lots, "
+        f"{len(stone_configs)} stone configs, {len(skill_level_lots)} level lots"
     )
 
 

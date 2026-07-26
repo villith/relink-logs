@@ -204,8 +204,13 @@ fn main() -> anyhow::Result<()> {
                         };
                         format!("GEM   {}{lvl}{second}", name(*sigil_id))
                     }
-                    Wrightstone { item, .. } => {
-                        format!("STONE {} (traits not yet modeled)", name(*item))
+                    Wrightstone { item, traits } => {
+                        let traits = traits
+                            .iter()
+                            .map(|&(t, lvl)| format!("{} {lvl}", name(t)))
+                            .collect::<Vec<_>>()
+                            .join(" / ");
+                        format!("STONE {}: {traits}", name(*item))
                     }
                 };
                 println!("roll #{}: {what} (+{} draws)", i + 1, roll.draws);
