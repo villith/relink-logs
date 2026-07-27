@@ -5,6 +5,12 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.5
+
+### Language
+
+- Additional zh-CN translations. [credit to Souma-Sumire](https://github.com/Souma-Sumire)
+
 ## 1.12.4
 
 ### Features
