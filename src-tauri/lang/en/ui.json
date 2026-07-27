@@ -353,7 +353,8 @@
       "tm-match-yes": "✓",
       "tm-first-hit": "First wishlist hit at roll #{{n}}",
       "tm-no-hits": "No wishlist hits in the next {{rolls}} rolls.",
-      "tm-results-caveat": "Predictions assume your next RNG-consuming action is a transmarvel roll."
+      "tm-results-caveat": "Predictions assume your next RNG-consuming action is a transmarvel roll.",
+      "tm-truncated": "Showing the first {{shown}} of {{total}} rolls."
     },
     "weapon-awakening": "Awakening",
     "wrightstone": "Wrightstone",

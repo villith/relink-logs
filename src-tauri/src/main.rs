@@ -354,7 +354,8 @@ async fn predict_transmarvel(
     query: transmarvel::TransmarvelQuery,
     hook: State<'_, HookStatus>,
 ) -> Result<transmarvel::TransmarvelPrediction, String> {
-    let rolls = query.rolls.min(500);
+    // Mirrors the frontend's MAX_ROLLS (TransmarvelSearcher.tsx).
+    let rolls = query.rolls.min(50_000);
     let snap = toolbox_rpc::transmarvel_snapshot(&hook)
         .await?
         .ok_or_else(|| "game-not-running".to_string())?;

@@ -38,6 +38,15 @@ const hex = (h: string) => parseInt(h, 16);
  * "match anything" choice needs its own sentinel value. */
 const ANY = "any";
 
+/** Most rolls one prediction may simulate (mirrored by the backend clamp in
+ * predict_transmarvel). */
+export const MAX_ROLLS = 50000;
+
+/** Most result rows actually rendered — a full 50k-row table would hang the
+ * webview. Matching and the first-hit line still cover every roll; the
+ * truncation is reported under the table. */
+export const MAX_SHOWN_ROWS = 1000;
+
 /** One tier-0 combo per family, in pool order — drives the Type picker
  * (value = family, label = the stone's item name, shared by its tiers). */
 const FAMILIES = POOL.wrightstones.combos.filter((c) => c.tier === 0);
@@ -164,7 +173,8 @@ const TransmarvelSearcher = () => {
       };
     });
 
-  const shown = matchesOnly ? results.filter((r) => r.hit) : results;
+  const filtered = matchesOnly ? results.filter((r) => r.hit) : results;
+  const shown = filtered.slice(0, MAX_SHOWN_ROWS);
 
   return (
     <Stack gap="md" pr="md">
@@ -292,7 +302,7 @@ const TransmarvelSearcher = () => {
               value={rolls === 0 ? "" : String(rolls)}
               onChange={(e) => {
                 const digits = e.currentTarget.value.replace(/\D/g, "");
-                setRolls(digits === "" ? 0 : Math.min(parseInt(digits, 10), 500));
+                setRolls(digits === "" ? 0 : Math.min(parseInt(digits, 10), MAX_ROLLS));
               }}
               disabled={busy}
               w={130}
@@ -343,6 +353,11 @@ const TransmarvelSearcher = () => {
                   ))}
                 </Table.Tbody>
               </Table>
+              {filtered.length > shown.length && (
+                <Text size="xs" c="dimmed">
+                  {t("ui.toolbox.tm-truncated", { shown: shown.length, total: filtered.length })}
+                </Text>
+              )}
             </Stack>
           </ScrollArea.Autosize>
         )}

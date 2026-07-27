@@ -25,6 +25,7 @@ const TEMPLATES: Record<string, string> = {
   "ui.toolbox.tm-no-hits": "No wishlist hits in the next {{rolls}} rolls.",
   "ui.toolbox.tm-rarity-option": "Lv {{levels}}",
   "ui.toolbox.tm-rarity-option-fixed": "Lv {{levels}} ({{traits}})",
+  "ui.toolbox.tm-truncated": "Showing the first {{shown}} of {{total}} rolls.",
   "ui.level-short": "Lv{{level}}",
 };
 vi.mock("react-i18next", async (importOriginal) => ({
@@ -58,7 +59,7 @@ vi.mock("@/utils", async (importOriginal) => ({
 import { useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
 
 import { POPULAR_TRAITS } from "./traitOptions";
-import TransmarvelSearcher from "./TransmarvelSearcher";
+import TransmarvelSearcher, { MAX_ROLLS, MAX_SHOWN_ROWS } from "./TransmarvelSearcher";
 import { familyCombos, POOL, sigilTrait2Options } from "./useTransmarvelSearcher";
 
 const renderPage = () =>
@@ -377,6 +378,48 @@ describe("TransmarvelSearcher", () => {
     expect(useTransmarvelWishlistStore.getState().stones).toEqual([
       { family: FAMILY, minTier: 2, slot2: null, slot3: null },
     ]);
+  });
+
+  it("caps the rolls input at 50,000", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    renderPage();
+
+    const rollsInput = (await screen.findByLabelText("Rolls to simulate", { selector: "input" })) as HTMLInputElement;
+    fireEvent.change(rollsInput, { target: { value: "60000" } });
+    expect(rollsInput.value).toBe(String(MAX_ROLLS));
+    expect(MAX_ROLLS).toBe(50000);
+  });
+
+  it("renders at most the row cap and reports the truncation", async () => {
+    const total = MAX_SHOWN_ROWS + 5;
+    const manyRolls: TransmarvelPrediction = {
+      rolls: Array.from({ length: total }, () => prediction.rolls[0]),
+      slot: 4,
+      slotState: 12345,
+      unpredictable: false,
+    };
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "predict_transmarvel") return Promise.resolve(manyRolls);
+      if (command === "fetch_overmastery_seed") return Promise.resolve(manyRolls.slotState);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    renderPage();
+
+    const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
+    await waitFor(() => expect(predictButton.disabled).toBe(false));
+    await act(async () => {
+      fireEvent.click(predictButton);
+    });
+
+    expect(await screen.findByText(`#${MAX_SHOWN_ROWS}`)).toBeTruthy();
+    expect(screen.queryByText(`#${MAX_SHOWN_ROWS + 1}`)).toBeNull();
+    expect(screen.getByText(`Showing the first ${MAX_SHOWN_ROWS} of ${total} rolls.`)).toBeTruthy();
   });
 
   it("renders results synthesis-style: name line plus dimmed trait/level line", async () => {
