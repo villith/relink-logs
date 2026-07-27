@@ -8,8 +8,10 @@ import {
   rollHits,
   sanitizeWishlists,
   SigilEntry,
+  sigilFirstHits,
   sigilTrait2Options,
   slotTraitOptions,
+  stoneFirstHits,
   TransmarvelPool,
   WrightstoneEntry,
 } from "./useTransmarvelSearcher";
@@ -173,6 +175,50 @@ describe("rollHits", () => {
   it("empty wishlists hit nothing", () => {
     expect(rollHits(sigilRoll(0x000000aa), [], [], POOL_DOUBLE)).toBe(false);
     expect(rollHits(f1Tier0(), [], [], POOL_DOUBLE)).toBe(false);
+  });
+});
+
+describe("per-entry first hits", () => {
+  const sigilRoll = (trait1: number, trait2: number | null = null): TransmarvelRoll => ({
+    outcome: { type: "sigil", sigilId: 0x000001aa, traitLevel: 10, trait1, trait2 },
+    draws: 5,
+  });
+  const stoneRoll = (item: number, traits: [number, number][]): TransmarvelRoll => ({
+    outcome: { type: "wrightstone", item, traits },
+    draws: 12,
+  });
+  const rolls: TransmarvelRoll[] = [
+    sigilRoll(0x000000bb), // roll 0
+    stoneRoll(0x00000101, [
+      [0x000000f1, 10],
+      [0x000000cc, 7],
+      [0x000000dd, 5],
+    ]), // roll 1: f1 tier 0
+    sigilRoll(0x000000aa, 0x000000cc), // roll 2
+  ];
+
+  it("maps each sigil entry to the first roll it alone hits, null when it never hits", () => {
+    const entries: SigilEntry[] = [
+      { trait: "000000aa", trait2: null }, // hits roll 2
+      { trait: "000000bb", trait2: null }, // hits roll 0
+      { trait: "000000aa", trait2: "000000dd" }, // wrong 2nd trait: never
+    ];
+    expect(sigilFirstHits(rolls, entries, POOL_DOUBLE)).toEqual([2, 0, null]);
+  });
+
+  it("maps each stone entry independently of the other entries", () => {
+    const entries: WrightstoneEntry[] = [
+      { family: "000000f1", minTier: 0, slot2: null, slot3: null }, // hits roll 1
+      { family: "000000f1", minTier: 1, slot2: null, slot3: null }, // rolled tier below min: never
+      { family: "000000f2", minTier: 0, slot2: null, slot3: null }, // wrong family: never
+    ];
+    expect(stoneFirstHits(rolls, entries, POOL_DOUBLE)).toEqual([1, null, null]);
+  });
+
+  it("handles empty rolls and empty wishlists", () => {
+    expect(sigilFirstHits([], [{ trait: "000000aa", trait2: null }], POOL_DOUBLE)).toEqual([null]);
+    expect(sigilFirstHits(rolls, [], POOL_DOUBLE)).toEqual([]);
+    expect(stoneFirstHits(rolls, [], POOL_DOUBLE)).toEqual([]);
   });
 });
 

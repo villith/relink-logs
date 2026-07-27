@@ -90,6 +90,28 @@ export const rollHits = (
   );
 };
 
+/** For each entry, the first roll index (0-based) at which that entry ALONE
+ * hits — null when it never does. Drives the per-row hit badges. */
+export const sigilFirstHits = (
+  rolls: TransmarvelRoll[],
+  sigils: SigilEntry[],
+  p: TransmarvelPool = POOL
+): (number | null)[] =>
+  sigils.map((entry) => {
+    const index = rolls.findIndex((roll) => rollHits(roll, [entry], [], p));
+    return index === -1 ? null : index;
+  });
+
+export const stoneFirstHits = (
+  rolls: TransmarvelRoll[],
+  stones: WrightstoneEntry[],
+  p: TransmarvelPool = POOL
+): (number | null)[] =>
+  stones.map((entry) => {
+    const index = rolls.findIndex((roll) => rollHits(roll, [], [entry], p));
+    return index === -1 ? null : index;
+  });
+
 /** Validate a wishlist blob loaded from localStorage against the current pool
  * (a game patch may have regenerated the pool and invalidated stored
  * entries): keeps only entries whose shape and traits/tiers are still valid,
@@ -194,6 +216,8 @@ export default function useTransmarvelSearcher() {
     [prediction, sigils, stones]
   );
   const firstHit = useMemo(() => results.find((r) => r.hit)?.index ?? null, [results]);
+  const sigilHits = useMemo(() => sigilFirstHits(prediction?.rolls ?? [], sigils), [prediction, sigils]);
+  const stoneHits = useMemo(() => stoneFirstHits(prediction?.rolls ?? [], stones), [prediction, stones]);
 
   return {
     status,
@@ -212,6 +236,8 @@ export default function useTransmarvelSearcher() {
     setStones,
     results,
     firstHit,
+    sigilHits,
+    stoneHits,
     predict,
   };
 }
