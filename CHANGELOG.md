@@ -5,6 +5,23 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.4
+
+### Features
+
+- Added a new toolbox tool: Transmarvel Wishlist
+  - Build a wishlist of sigils/wrightstones that you want from Transmarvel
+  - This tool will tell you if any of your Transmarvel rolls will contain your wishlist items
+  - This **does not** manipulate the results of Transmarvel, it is meant to be an alternative to save scumming
+
+### Bug Fixes
+
+- The app now ignores some common keyboard shortcuts that are not relevant (Ctrl+J, Ctrl+P, Ctrl+U). [credit to Souma-Sumire](https://github.com/Souma-Sumire)
+
+### Language
+
+- Additional zh-CN translations. [credit to Souma-Sumire](https://github.com/Souma-Sumire)
+
 ## 1.12.3
 
 ### Notes
