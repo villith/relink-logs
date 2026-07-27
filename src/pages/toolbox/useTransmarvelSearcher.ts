@@ -228,7 +228,7 @@ export const sanitizeWishlists = (
 };
 
 /**
- * State + handlers for the Transmarvel Searcher: persistent wishlists, live
+ * State + handlers for the Transmarvel Wishlist: persistent wishlists, live
  * game status, prediction fetch, and staleness. Wishlist matching stays
  * client-side so edits re-highlight without re-invoking the backend.
  */

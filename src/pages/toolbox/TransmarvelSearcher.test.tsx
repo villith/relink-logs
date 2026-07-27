@@ -170,7 +170,7 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    expect(await screen.findByText("Transmarvel Searcher")).toBeTruthy();
+    expect(await screen.findByText("Transmarvel Wishlist")).toBeTruthy();
     expect(await screen.findByText("ui.toolbox.tm-game-not-running")).toBeTruthy();
   });
 

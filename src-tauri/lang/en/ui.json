@@ -326,7 +326,7 @@
       "om-col-value": "Value",
       "om-col-lvl": "Lvl",
       "om-below-level": "Matching, but below minimum level",
-      "transmarvel-searcher": "Transmarvel Searcher",
+      "transmarvel-wishlist": "Transmarvel Wishlist",
       "tm-game-not-running": "Game is not running. Start the game and open this tool again.",
       "tm-unpredictable": "The RNG state is uninitialized — do one transmarvel roll first, then predictions will work.",
       "tm-add-sigil": "Add Sigil",

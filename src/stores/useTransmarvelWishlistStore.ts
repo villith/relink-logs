@@ -16,7 +16,7 @@ interface TransmarvelWishlistState {
   setStones: (stones: WrightstoneEntry[]) => void;
 }
 
-/** Persists the Transmarvel Searcher wishlists (account-wide, not
+/** Persists the Transmarvel Wishlist entries (account-wide, not
  * per-character — transmarvel is a shared shop). */
 export const useTransmarvelWishlistStore = create<TransmarvelWishlistState>()(
   persist(

@@ -283,7 +283,7 @@ const TransmarvelSearcher = () => {
 
   return (
     <Stack gap="md" pr="md">
-      <Title order={4}>{t("ui.toolbox.transmarvel-searcher", "Transmarvel Searcher")}</Title>
+      <Title order={4}>{t("ui.toolbox.transmarvel-wishlist", "Transmarvel Wishlist")}</Title>
       {status && !status.gameRunning && <Alert color="yellow">{t("ui.toolbox.tm-game-not-running")}</Alert>}
       {(status?.rngUnpredictable || prediction?.unpredictable) && (
         <Alert color="orange">{t("ui.toolbox.tm-unpredictable")}</Alert>

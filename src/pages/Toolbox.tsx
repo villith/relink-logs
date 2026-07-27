@@ -34,10 +34,10 @@ const TOOLS: {
   },
   {
     to: "/logs/toolbox/transmarvel",
-    labelKey: "ui.toolbox.transmarvel-searcher",
-    labelFallback: "Transmarvel Searcher",
+    labelKey: "ui.toolbox.transmarvel-wishlist",
+    labelFallback: "Transmarvel Wishlist",
     icon: MagicWand,
-    newId: "transmarvel-searcher",
+    newId: "transmarvel-wishlist",
   },
 ];
 

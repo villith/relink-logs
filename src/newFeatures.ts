@@ -14,7 +14,7 @@ export type NewWindow = { from?: string; until?: string };
 export const NEW_FEATURES = {
   toolbox: { from: "1.10.0", until: "1.12.0" },
   "overmastery-predictor": { from: "1.10.0", until: "1.12.0" },
-  "transmarvel-searcher": { from: "1.13.0", until: "1.15.0" },
+  "transmarvel-wishlist": { from: "1.13.0", until: "1.15.0" },
 } as const satisfies Record<string, NewWindow>;
 
 export type NewFeatureId = keyof typeof NEW_FEATURES;

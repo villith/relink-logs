@@ -640,7 +640,7 @@ export type OvermasteryPrediction = {
   mspCost: number;
 };
 
-/** Toolbox / Transmarvel Searcher — mirrors src-tauri/src/transmarvel/mod.rs. */
+/** Toolbox / Transmarvel Wishlist — mirrors src-tauri/src/transmarvel/mod.rs. */
 export type TransmarvelStatus = {
   gameRunning: boolean;
   rngUnpredictable: boolean;
