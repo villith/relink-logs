@@ -132,6 +132,9 @@ describe("TransmarvelSearcher", () => {
   beforeEach(() => {
     invoke.mockReset();
     useTransmarvelWishlistStore.setState({ sigils: [], stones: [] });
+    // Mantine's useLocalStorage would otherwise leak the persisted roll
+    // count between tests.
+    window.localStorage.clear();
   });
 
   it("shows the title and the game-not-running alert when the game isn't running", async () => {
@@ -147,7 +150,7 @@ describe("TransmarvelSearcher", () => {
     expect(await screen.findByText("ui.toolbox.tm-game-not-running")).toBeTruthy();
   });
 
-  it("predicts, renders both rolls, and reports the first wishlist hit with a match badge", async () => {
+  it("auto-predicts on open, renders both rolls, and reports the first wishlist hit", async () => {
     invoke.mockImplementation((command: string, args?: Record<string, unknown>) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(prediction);
@@ -159,13 +162,7 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
-    await waitFor(() => expect(predictButton.disabled).toBe(false));
-
-    await act(async () => {
-      fireEvent.click(predictButton);
-    });
-
+    // No click: the mount-time auto-predict fetches the rolls itself.
     expect(await screen.findByText("#1")).toBeTruthy();
     // "#2" may appear twice: the table's roll column and the entry's hit badge.
     expect((await screen.findAllByText("#2")).length).toBeGreaterThanOrEqual(1);
@@ -184,12 +181,6 @@ describe("TransmarvelSearcher", () => {
     useTransmarvelWishlistStore.setState({ sigils: [{ trait: WISHLISTED.trait, trait2: null }], stones: [] });
 
     renderPage();
-
-    const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
-    await waitFor(() => expect(predictButton.disabled).toBe(false));
-    await act(async () => {
-      fireEvent.click(predictButton);
-    });
 
     expect(await screen.findByText("#1")).toBeTruthy();
     expect((await screen.findAllByText("#2")).length).toBeGreaterThanOrEqual(1);
@@ -214,13 +205,7 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
-    await waitFor(() => expect(predictButton.disabled).toBe(false));
-
-    await act(async () => {
-      fireEvent.click(predictButton);
-    });
-
+    // The failing prediction is the mount-time auto-run — no click needed.
     // Mocked t() with no fallback/interpolation arg just echoes the key back,
     // so the mapped copy key IS the expected banner text here.
     expect(await screen.findByText("ui.toolbox.hook-unreachable")).toBeTruthy();
@@ -244,14 +229,9 @@ describe("TransmarvelSearcher", () => {
     renderPage();
 
     const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
-    await waitFor(() => expect(predictButton.disabled).toBe(false));
     const rollsInput = screen.getByLabelText("Rolls to simulate", { selector: "input" }) as HTMLInputElement;
-    expect(rollsInput.disabled).toBe(false);
-
-    await act(async () => {
-      fireEvent.click(predictButton);
-    });
-
+    // The mount-time auto-predict is holding the deferred open: everything
+    // stays disabled from the initial status load straight through the run.
     expect(predictButton.disabled).toBe(true);
     expect(rollsInput.disabled).toBe(true);
 
@@ -283,19 +263,13 @@ describe("TransmarvelSearcher", () => {
     try {
       renderPage();
 
-      // Flush the mount-time fetch_transmarvel_status microtask chain;
-      // fake timers only replace timer functions, not promise resolution,
-      // so this doesn't need any timer advance.
+      // Flush the mount-time microtask chains: fetch_transmarvel_status,
+      // then the auto-predict effect's predict_transmarvel; fake timers only
+      // replace timer functions, not promise resolution, so this doesn't
+      // need any timer advance.
       await act(async () => {
         await Promise.resolve();
         await Promise.resolve();
-      });
-
-      const predictButton = screen.getByRole("button", { name: "Predict" }) as HTMLButtonElement;
-      expect(predictButton.disabled).toBe(false);
-
-      await act(async () => {
-        fireEvent.click(predictButton);
         await Promise.resolve();
         await Promise.resolve();
       });
@@ -528,12 +502,6 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
-    await waitFor(() => expect(predictButton.disabled).toBe(false));
-    await act(async () => {
-      fireEvent.click(predictButton);
-    });
-
     expect(await screen.findByText("First wishlist hit at roll #2")).toBeTruthy();
     // "#2" appears twice: the table's roll column and the sigil entry's badge.
     expect(screen.getAllByText("#2")).toHaveLength(2);
@@ -556,6 +524,35 @@ describe("TransmarvelSearcher", () => {
     await screen.findByLabelText("Sigil", { selector: "input" });
     expect(screen.queryByText("—")).toBeNull();
     expect(screen.queryByText(/^#\d+$/)).toBeNull();
+  });
+
+  it("does not auto-predict when the game is not running", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("ui.toolbox.tm-game-not-running")).toBeTruthy();
+    expect(invoke).not.toHaveBeenCalledWith("predict_transmarvel", expect.anything());
+    expect(screen.queryByRole("table")).toBeNull();
+  });
+
+  it("restores the persisted roll count and auto-predicts with it", async () => {
+    window.localStorage.setItem("transmarvel-rolls", "123");
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "predict_transmarvel") return Promise.resolve(prediction);
+      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    renderPage();
+
+    const rollsInput = (await screen.findByLabelText("Rolls to simulate", { selector: "input" })) as HTMLInputElement;
+    expect(rollsInput.value).toBe("123");
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("predict_transmarvel", { query: { rolls: 123 } }));
   });
 
   it("shows empty-wishlist hints when both lists are empty", async () => {

@@ -4,8 +4,9 @@ import useStalenessWatch from "@/pages/toolbox/useStalenessWatch";
 import { useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
 import type { TransmarvelPrediction, TransmarvelRoll, TransmarvelStatus } from "@/types";
 import { toHashString } from "@/utils";
+import { useLocalStorage } from "@mantine/hooks";
 import { invoke } from "@tauri-apps/api";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /** A wished-for sigil: the sigil (by its trait1) plus an optional 2nd trait.
  * `trait2: null` means any 2nd trait is fine. Matching is by trait content —
@@ -169,7 +170,13 @@ export default function useTransmarvelSearcher() {
   const { status, error, setError, loading } = useGameStatus<TransmarvelStatus>("fetch_transmarvel_status");
   const [prediction, setPrediction] = useState<TransmarvelPrediction | null>(null);
   const [predicting, setPredicting] = useState(false);
-  const [rolls, setRolls] = useState(50);
+  // getInitialValueInEffect: false — the stored count must be present on the
+  // first render so the mount-time auto-predict below can't race it.
+  const [rolls, setRolls] = useLocalStorage<number>({
+    key: "transmarvel-rolls",
+    defaultValue: 50,
+    getInitialValueInEffect: false,
+  });
   const [matchesOnly, setMatchesOnly] = useState(false);
 
   const rawSigils = useTransmarvelWishlistStore((s) => s.sigils);
@@ -209,6 +216,18 @@ export default function useTransmarvelSearcher() {
       setPredicting(false);
     }
   };
+
+  /** One automatic prediction per mount, as soon as the status confirms the
+   * game is running with predictable RNG — the wishlist badges appear with
+   * zero clicks. Focus-driven status re-reads never re-fire it. */
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (autoRan.current || prediction !== null || rolls < 1) return;
+    if (!status?.gameRunning || status.rngUnpredictable) return;
+    autoRan.current = true;
+    void predict();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires on status arrival only
+  }, [status]);
 
   /** Roll list with hit flags; the page renders this directly. */
   const results = useMemo(
