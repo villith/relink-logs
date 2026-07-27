@@ -105,13 +105,12 @@ const OutcomeCell = ({ outcome, hit }: { outcome: TransmarvelOutcome; hit: boole
 };
 
 /** Card props for one wishlist entry: entries the prediction actually hits
- * carry a green tint, so a wishlist scans at a glance without every row
+ * are outlined in green, so a wishlist scans at a glance without every row
  * having to say whether it hit. */
 const entryCardProps = (hasHits: boolean) => ({
   withBorder: true,
   p: "xs" as const,
   "data-hits": hasHits || undefined,
-  bg: hasHits ? "var(--mantine-color-green-light)" : undefined,
   style: hasHits ? { borderColor: "var(--mantine-color-green-outline)" } : undefined,
 });
 
