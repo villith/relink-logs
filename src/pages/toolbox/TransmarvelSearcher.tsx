@@ -20,6 +20,8 @@ import {
 import { X } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
+import { orderedTraitOptions } from "./traitOptions";
+
 import useTransmarvelSearcher, {
   familyCombos,
   POOL,
@@ -97,8 +99,15 @@ const TransmarvelSearcher = () => {
   const busy = loading || predicting;
   const anyOption = { value: ANY, label: t("ui.toolbox.tm-any-option", "Any") };
 
-  const sigilOptions = POOL.sigils.map((s) => ({ value: s.trait, label: translateSigilId(hex(s.sigilId)) }));
-  const traitOption = (trait: string) => ({ value: trait, label: translateTraitId(hex(trait)) });
+  const sigilOptions = POOL.sigils
+    .map((s) => ({ value: s.trait, label: translateSigilId(hex(s.sigilId)) }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+  /** Trait selects share the synthesis picker's ordering: popular first,
+   * then alphabetical behind a divider. */
+  const traitSelectData = (traits: string[]) => [
+    anyOption,
+    ...orderedTraitOptions(traits, (trait) => translateTraitId(hex(trait))),
+  ];
 
   /** True when another sigil entry already wishes this exact pair — edits
    * that would collide are ignored, because sanitize-on-read would silently
@@ -194,7 +203,7 @@ const TransmarvelSearcher = () => {
                 <Select
                   label={t("ui.toolbox.tm-2nd-trait", "2nd trait")}
                   searchable
-                  data={[anyOption, ...sigilTrait2Options(entry.trait).map(traitOption)]}
+                  data={traitSelectData(sigilTrait2Options(entry.trait))}
                   value={entry.trait2 ?? ANY}
                   onChange={(value) => value && changeSigilTrait2(index, value === ANY ? null : value)}
                   allowDeselect={false}
@@ -251,7 +260,7 @@ const TransmarvelSearcher = () => {
                 <Select
                   label={t("ui.toolbox.tm-slot-2", "Slot 2")}
                   searchable
-                  data={[anyOption, ...slotTraitOptions(entry.family, entry.minTier, 1).map(traitOption)]}
+                  data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 1))}
                   value={entry.slot2 ?? ANY}
                   onChange={(value) => value && changeStone(index, { slot2: value === ANY ? null : value })}
                   allowDeselect={false}
@@ -260,7 +269,7 @@ const TransmarvelSearcher = () => {
                 <Select
                   label={t("ui.toolbox.tm-slot-3", "Slot 3")}
                   searchable
-                  data={[anyOption, ...slotTraitOptions(entry.family, entry.minTier, 2).map(traitOption)]}
+                  data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 2))}
                   value={entry.slot3 ?? ANY}
                   onChange={(value) => value && changeStone(index, { slot3: value === ANY ? null : value })}
                   allowDeselect={false}

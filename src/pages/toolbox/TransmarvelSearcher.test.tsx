@@ -57,6 +57,7 @@ vi.mock("@/utils", async (importOriginal) => ({
 
 import { useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
 
+import { POPULAR_TRAITS } from "./traitOptions";
 import TransmarvelSearcher from "./TransmarvelSearcher";
 import { familyCombos, POOL, sigilTrait2Options } from "./useTransmarvelSearcher";
 
@@ -309,7 +310,7 @@ describe("TransmarvelSearcher", () => {
     }
   });
 
-  it("offers only valid 2nd-trait combinations for the selected sigil", async () => {
+  it("offers only valid 2nd-trait combinations, popular first then alphabetical", async () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       return Promise.reject(new Error(`unexpected command ${command}`));
@@ -322,7 +323,14 @@ describe("TransmarvelSearcher", () => {
     await waitFor(() => expect(trait2Input.getAttribute("disabled")).toBeNull());
     fireEvent.click(trait2Input);
 
-    expect(optionsOf(trait2Input)).toEqual(["any", ...sigilTrait2Options(EXTRA_SIGIL.trait)]);
+    // Synthesis-picker ordering: Any, then the popular traits present among
+    // the valid candidates (fixed order), then the rest sorted by label —
+    // the deterministic mock labels ("trait:<hex>") make that hex order.
+    const candidates = sigilTrait2Options(EXTRA_SIGIL.trait);
+    const popular = POPULAR_TRAITS.filter((p) => candidates.includes(p));
+    expect(popular.length).toBeGreaterThan(0);
+    const rest = candidates.filter((c) => !popular.includes(c)).sort();
+    expect(optionsOf(trait2Input)).toEqual(["any", ...popular, ...rest]);
   });
 
   it("locks the stone slot pickers to the fixed traits at min rarity 0.1%", async () => {
@@ -422,6 +430,12 @@ describe("TransmarvelSearcher", () => {
     const sigilInput = (await screen.findByLabelText("Sigil", { selector: "input" })) as HTMLInputElement;
     // The selected option's label is what the closed Select displays.
     expect(sigilInput.value).toBe(`sigil:${WISHLISTED.sigilId}`);
+
+    // Options are alphabetized by that displayed name — under the mock
+    // labels ("sigil:<item hex>"), that's item-hash order.
+    fireEvent.click(sigilInput);
+    const expected = [...POOL.sigils].sort((a, b) => a.sigilId.localeCompare(b.sigilId)).map((s) => s.trait);
+    expect(optionsOf(sigilInput)).toEqual(expected);
   });
 
   it("labels rarities by their level layout alone, naming the top tier's fixed traits", async () => {
