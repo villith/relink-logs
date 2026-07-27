@@ -265,9 +265,16 @@ describe("TransmarvelSearcher", () => {
 
     const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
     const rollsInput = screen.getByLabelText("Rolls to simulate", { selector: "input" }) as HTMLInputElement;
-    // The mount-time auto-predict is holding the deferred open: everything
-    // stays disabled from the initial status load straight through the run.
-    expect(predictButton.disabled).toBe(true);
+    // The mount-time auto-predict holds the deferred open, so once the
+    // controls latch disabled they stay disabled until we resolve it below.
+    // Wait for that state instead of sampling it: the auto-predict is kicked
+    // off by an effect, and React flushes passive effects after the commit
+    // that clears `loading`, so which render the assertion lands on is
+    // scheduler-dependent — sampling read disabled on Windows and enabled on
+    // Linux CI. Waiting for the prediction to be in flight first keeps this
+    // asserting the in-flight hold rather than the initial status load.
+    await waitFor(() => expect(invoke).toHaveBeenCalledWith("predict_transmarvel", { query: { rolls: 50 } }));
+    await waitFor(() => expect(predictButton.disabled).toBe(true));
     expect(rollsInput.disabled).toBe(true);
 
     await act(async () => {
