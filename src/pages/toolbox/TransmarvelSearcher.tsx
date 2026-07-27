@@ -54,7 +54,7 @@ export const MAX_SHOWN_ROWS = 1000;
 /** Fixed widths shared by entry rows and their caption headers so the
  * captions line up as columns. */
 const TYPE_W = 170;
-const RARITY_W = 110;
+const RARITY_W = 132;
 const REMOVE_W = 28;
 /** Roll-number gutter inside an entry's results block. */
 const ROLL_NO_W = 44;
@@ -100,6 +100,17 @@ const OutcomeCell = ({ outcome, hit }: { outcome: TransmarvelOutcome; hit: boole
   );
 };
 
+/** Card props for one wishlist entry: entries the prediction actually hits
+ * carry a green tint, so a wishlist scans at a glance without every row
+ * having to say whether it hit. */
+const entryCardProps = (hasHits: boolean) => ({
+  withBorder: true,
+  p: "xs" as const,
+  "data-hits": hasHits || undefined,
+  bg: hasHits ? "var(--mantine-color-green-light)" : undefined,
+  style: hasHits ? { borderColor: "var(--mantine-color-green-outline)" } : undefined,
+});
+
 /** What one entry matches, listed under its own row: roll # + the traits that
  * roll produces (a wildcard "Any" entry can't show them any other way). The
  * left rule and tight top margin tie the block to the row above it. */
@@ -108,11 +119,6 @@ const EntryResults = ({ hits, rolls }: { hits: EntryHits; rolls: TransmarvelRoll
   const outcomeLine = useOutcomeLine();
   return (
     <Stack gap={2} mt={4} ml="xs" pl="sm" style={{ borderLeft: "2px solid var(--mantine-color-default-border)" }}>
-      {hits.total === 0 && (
-        <Text size="xs" c="dimmed">
-          {t("ui.toolbox.tm-entry-no-hit")}
-        </Text>
-      )}
       {hits.indices.map((index) => (
         <Group key={index} gap="sm" wrap="nowrap">
           <Text size="xs" c="dimmed" w={ROLL_NO_W} ta="right" style={{ flexShrink: 0 }}>
@@ -156,7 +162,6 @@ const TransmarvelSearcher = () => {
 
   const errorMessage = backendErrorMessage(t, "transmarvel", error);
   const busy = loading || predicting;
-  const hasPrediction = prediction !== null && !prediction.unpredictable;
 
   // Tabs are controlled so a tab switch re-renders this component and the
   // measuring effect below re-runs.
@@ -289,7 +294,7 @@ const TransmarvelSearcher = () => {
             {sigils.map((entry, index) => {
               const hits = sigilHits[index] ?? NO_HITS;
               return (
-                <Paper key={index} withBorder p="xs">
+                <Paper key={index} {...entryCardProps(hits.total > 0)}>
                   <Group gap="xs" wrap="nowrap" mb={2}>
                     <Text size="xs" c="dimmed" style={{ flex: 1 }}>
                       {t("ui.toolbox.tm-sigil", "Sigil")}
@@ -330,7 +335,7 @@ const TransmarvelSearcher = () => {
                     {/* Keeps the selects clear of the card's remove button. */}
                     <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
                   </Group>
-                  {hasPrediction && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
+                  {hits.total > 0 && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
                 </Paper>
               );
             })}
@@ -355,7 +360,7 @@ const TransmarvelSearcher = () => {
             {stones.map((entry, index) => {
               const hits = stoneHits[index] ?? NO_HITS;
               return (
-                <Paper key={index} withBorder p="xs">
+                <Paper key={index} {...entryCardProps(hits.total > 0)}>
                   <Group gap="xs" wrap="nowrap" mb={2}>
                     <Text size="xs" c="dimmed" w={TYPE_W}>
                       {t("ui.toolbox.tm-stone-type", "Type")}
@@ -420,7 +425,7 @@ const TransmarvelSearcher = () => {
                     {/* Keeps the selects clear of the card's remove button. */}
                     <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
                   </Group>
-                  {hasPrediction && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
+                  {hits.total > 0 && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
                 </Paper>
               );
             })}

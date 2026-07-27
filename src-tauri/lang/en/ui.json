@@ -351,7 +351,6 @@
       "tm-no-hits": "No wishlist hits in the next {{rolls}} rolls.",
       "tm-entry-hit": "#{{n}}",
       "tm-entry-more": "+{{count}} more in Full Results",
-      "tm-entry-no-hit": "No hits in the simulated rolls",
       "tm-no-sigils": "Add sigils you want to roll for.",
       "tm-no-stones": "Add wrightstones you want to roll for.",
       "tm-results-caveat": "Predictions assume your next RNG-consuming action is a transmarvel roll.",

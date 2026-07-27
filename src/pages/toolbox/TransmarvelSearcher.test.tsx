@@ -534,7 +534,7 @@ describe("TransmarvelSearcher", () => {
     expect(labels).toEqual(["15/10/7", "20/15/10"]);
   });
 
-  it("lists an entry's hits under its row and says so when it never hits", async () => {
+  it("lists and highlights an entry that hits, leaving one that never hits plain", async () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(prediction);
@@ -553,7 +553,9 @@ describe("TransmarvelSearcher", () => {
     // The wishlist tab is active, so its panel is the visible one.
     const wishlist = await screen.findByRole("tabpanel");
     await waitFor(() => expect(within(wishlist).getAllByText("#2")).toHaveLength(1));
-    expect(within(wishlist).getByText("ui.toolbox.tm-entry-no-hit")).toBeTruthy();
+    // Exactly one of the two entry cards is marked as hitting; the other
+    // shows nothing at all rather than a "no hits" line.
+    expect(wishlist.querySelectorAll("[data-hits]")).toHaveLength(1);
   });
 
   it("expands a hitting entry by default, listing each matching roll's outcome", async () => {
@@ -593,8 +595,8 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    await screen.findByLabelText("Sigil", { selector: "input" });
-    expect(screen.queryByText("ui.toolbox.tm-entry-no-hit")).toBeNull();
+    const wishlist = await screen.findByRole("tabpanel");
+    expect(wishlist.querySelectorAll("[data-hits]")).toHaveLength(0);
     expect(screen.queryByText(/^#\d+$/)).toBeNull();
   });
 
