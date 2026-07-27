@@ -49,19 +49,15 @@ export const MAX_SHOWN_ROWS = 1000;
 
 /** Fixed widths shared by entry rows and their caption headers so the
  * captions line up as columns. */
-const TRAIT2_W = 230;
 const TYPE_W = 170;
 const RARITY_W = 190;
 const REMOVE_W = 28;
 const HIT_W = 64;
 
 /** One tier-0 combo per family, in pool order — drives the Type picker
- * (value = family, label = the stone's item name, shared by its tiers). */
+ * (value = family, label = the family trait's name — the item names only
+ * append a redundant "Wrightstone"). */
 const FAMILIES = POOL.wrightstones.combos.filter((c) => c.tier === 0);
-
-/** A slot's level set, compact: "10–15" or "20". */
-const levelRange = (levels: number[]) =>
-  levels.length > 1 ? `${Math.min(...levels)}–${Math.max(...levels)}` : String(levels[0]);
 
 /** Synthesis-style result cell: name line + dimmed trait/level line. */
 const OutcomeCell = ({ outcome, hit }: { outcome: TransmarvelOutcome; hit: boolean }) => {
@@ -183,24 +179,17 @@ const TransmarvelSearcher = () => {
     setStones(stones.map((e, i) => (i === index ? next : e)));
   };
 
-  // Rarity options are labeled by their level layout alone ("Lv 20/15/10");
-  // the top tier shares tier 1's levels, so it's distinguished by naming its
-  // fixed slot traits instead of quoting drop chances.
+  // Rarity options are labeled by the max level per slot ("20/15/10"). The
+  // fully-fixed 0.1% tier shares tier 1's levels and is folded into it —
+  // minTier semantics already include better tiers (sanitizeWishlists clamps
+  // stored top-tier entries to match).
   const rarityOptions = (family: string) =>
-    familyCombos(family).map((combo) => {
-      const levels = combo.slots.map((s) => levelRange(s.levels)).join("/");
-      const fixedSlots = combo.slots.slice(1).filter((s) => s.traits.length === 1);
-      return {
+    familyCombos(family)
+      .filter((combo) => combo.tier <= 1)
+      .map((combo) => ({
         value: String(combo.tier),
-        label:
-          fixedSlots.length === 2
-            ? t("ui.toolbox.tm-rarity-option-fixed", {
-                levels,
-                traits: fixedSlots.map((s) => translateTraitId(hex(s.traits[0]))).join(" / "),
-              })
-            : t("ui.toolbox.tm-rarity-option", { levels }),
-      };
-    });
+        label: combo.slots.map((s) => String(Math.max(...s.levels))).join("/"),
+      }));
 
   const filtered = matchesOnly ? results.filter((r) => r.hit) : results;
   const shown = filtered.slice(0, MAX_SHOWN_ROWS);
@@ -214,25 +203,25 @@ const TransmarvelSearcher = () => {
       )}
       {error && <Alert color="red">{errorMessage}</Alert>}
       {stale && <Alert color="orange">{t("ui.toolbox.stale-results")}</Alert>}
-      <Group align="flex-end" gap="sm">
-        <TextInput
-          label={t("ui.toolbox.tm-rolls", "Rolls to simulate")}
-          inputMode="numeric"
-          value={rolls === 0 ? "" : String(rolls)}
-          onChange={(e) => {
-            const digits = e.currentTarget.value.replace(/\D/g, "");
-            setRolls(digits === "" ? 0 : Math.min(parseInt(digits, 10), MAX_ROLLS));
-          }}
-          disabled={busy}
-          w={130}
-        />
-        <Button onClick={predict} loading={predicting} disabled={busy || rolls < 1}>
-          {t("ui.toolbox.tm-predict", "Predict")}
-        </Button>
-      </Group>
       <Group align="flex-start" gap="xl" wrap="nowrap">
         <Stack gap="xs" style={{ flexShrink: 0 }} w={760}>
-          <Group justify="space-between" align="center">
+          <Group align="flex-end" gap="sm">
+            <TextInput
+              label={t("ui.toolbox.tm-rolls", "Rolls to simulate")}
+              inputMode="numeric"
+              value={rolls === 0 ? "" : String(rolls)}
+              onChange={(e) => {
+                const digits = e.currentTarget.value.replace(/\D/g, "");
+                setRolls(digits === "" ? 0 : Math.min(parseInt(digits, 10), MAX_ROLLS));
+              }}
+              disabled={busy}
+              w={130}
+            />
+            <Button onClick={predict} loading={predicting} disabled={busy || rolls < 1}>
+              {t("ui.toolbox.tm-predict", "Predict")}
+            </Button>
+          </Group>
+          <Group justify="space-between" align="center" mt="sm">
             <Title order={6}>{t("ui.toolbox.tm-sigil-wishlist", "Sigil wishlist")}</Title>
             <Button
               size="compact-sm"
@@ -250,10 +239,10 @@ const TransmarvelSearcher = () => {
           )}
           {sigils.length > 0 && (
             <Group gap="xs" wrap="nowrap">
-              <Text size="xs" c="dimmed" style={{ flexGrow: 1 }}>
+              <Text size="xs" c="dimmed" style={{ flex: 1 }}>
                 {t("ui.toolbox.tm-sigil", "Sigil")}
               </Text>
-              <Text size="xs" c="dimmed" w={TRAIT2_W}>
+              <Text size="xs" c="dimmed" style={{ flex: 1 }}>
                 {t("ui.toolbox.tm-2nd-trait", "2nd trait")}
               </Text>
               <Box w={REMOVE_W} />
@@ -270,7 +259,7 @@ const TransmarvelSearcher = () => {
                 onChange={(trait) => trait && changeSigil(index, trait)}
                 allowDeselect={false}
                 disabled={busy}
-                style={{ flexGrow: 1 }}
+                style={{ flex: 1 }}
               />
               <Select
                 aria-label={t("ui.toolbox.tm-2nd-trait", "2nd trait")}
@@ -280,7 +269,7 @@ const TransmarvelSearcher = () => {
                 onChange={(value) => value && changeSigilTrait2(index, value === ANY ? null : value)}
                 allowDeselect={false}
                 disabled={busy}
-                w={TRAIT2_W}
+                style={{ flex: 1 }}
               />
               <ActionIcon
                 variant="subtle"
@@ -332,7 +321,7 @@ const TransmarvelSearcher = () => {
             <Group key={index} gap="xs" wrap="nowrap">
               <Select
                 aria-label={t("ui.toolbox.tm-stone-type", "Type")}
-                data={FAMILIES.map((c) => ({ value: c.family, label: translateWrightstoneId(hex(c.item)) }))}
+                data={FAMILIES.map((c) => ({ value: c.family, label: translateTraitId(hex(c.family)) }))}
                 value={entry.family}
                 onChange={(family) => family && changeStone(index, { family })}
                 allowDeselect={false}
@@ -390,9 +379,7 @@ const TransmarvelSearcher = () => {
               <Text size="xs" c="dimmed">
                 {t("ui.toolbox.tm-results-caveat")}
               </Text>
-              {firstHit !== null ? (
-                <Text size="sm">{t("ui.toolbox.tm-first-hit", { n: firstHit + 1 })}</Text>
-              ) : (
+              {firstHit === null && (
                 <Text size="sm">{t("ui.toolbox.tm-no-hits", { rolls: prediction.rolls.length })}</Text>
               )}
               <Checkbox
@@ -405,17 +392,15 @@ const TransmarvelSearcher = () => {
                   <Table.Tr>
                     <Table.Th w={70}>{t("ui.toolbox.tm-col-roll", "Roll #")}</Table.Th>
                     <Table.Th>{t("ui.toolbox.tm-col-result", "Result")}</Table.Th>
-                    <Table.Th w={80}>{t("ui.toolbox.tm-col-match", "Match")}</Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
                   {shown.map(({ roll, index, hit }) => (
                     <Table.Tr key={index}>
-                      <Table.Td>#{index + 1}</Table.Td>
+                      <Table.Td fw={hit ? 700 : undefined}>#{index + 1}</Table.Td>
                       <Table.Td>
                         <OutcomeCell outcome={roll.outcome} hit={hit} />
                       </Table.Td>
-                      <Table.Td>{hit && <Badge color="green">{t("ui.toolbox.tm-match-yes", "✓")}</Badge>}</Table.Td>
                     </Table.Tr>
                   ))}
                 </Table.Tbody>

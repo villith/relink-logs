@@ -312,20 +312,38 @@ describe("sanitizeWishlists", () => {
     expect(result.stones).toEqual([]);
   });
 
-  it("drops stone entries whose slot trait is not offered at any tier >= minTier", () => {
-    // "cc" is rolled-only; at minTier 2 the slots are fixed to "ae"/"a7".
+  it("clamps a stored top-tier (0.1%) minTier down to 1 — the picker folds that tier into 20/15/10", () => {
     const result = sanitizeWishlists(
       {
         sigils: [],
         stones: [
           { family: "000000f1", minTier: 2, slot2: "000000cc", slot3: null },
-          { family: "000000f1", minTier: 2, slot2: null, slot3: "000000cc" },
           { family: "000000f1", minTier: 2, slot2: "000000ae", slot3: "000000a7" },
         ],
       },
       POOL_DOUBLE
     );
-    expect(result.stones).toEqual([{ family: "000000f1", minTier: 2, slot2: "000000ae", slot3: "000000a7" }]);
+    // Slot picks validate against the clamped tier's widened range: "cc" is
+    // rolled at tier 1, "ae"/"a7" only exist at tier 2 — all stay valid.
+    expect(result.stones).toEqual([
+      { family: "000000f1", minTier: 1, slot2: "000000cc", slot3: null },
+      { family: "000000f1", minTier: 1, slot2: "000000ae", slot3: "000000a7" },
+    ]);
+  });
+
+  it("drops stone entries whose slot trait is not offered at any tier >= minTier", () => {
+    // "ee" is a sigil-only trait — never rolled on any f1 stone slot.
+    const result = sanitizeWishlists(
+      {
+        sigils: [],
+        stones: [
+          { family: "000000f1", minTier: 0, slot2: "000000ee", slot3: null },
+          { family: "000000f1", minTier: 0, slot2: null, slot3: "000000ee" },
+        ],
+      },
+      POOL_DOUBLE
+    );
+    expect(result.stones).toEqual([]);
   });
 
   it("drops junk stone shapes", () => {

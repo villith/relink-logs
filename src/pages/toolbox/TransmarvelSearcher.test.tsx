@@ -1,5 +1,5 @@
 import { MantineProvider } from "@mantine/core";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import "@/i18n";
@@ -21,10 +21,7 @@ vi.mock("@tauri-apps/api/path", () => ({ resolveResource: vi.fn().mockResolvedVa
 // strings this page renders — needed so "first hit at roll #2" is actually
 // assertable rather than just the raw key.
 const TEMPLATES: Record<string, string> = {
-  "ui.toolbox.tm-first-hit": "First wishlist hit at roll #{{n}}",
   "ui.toolbox.tm-no-hits": "No wishlist hits in the next {{rolls}} rolls.",
-  "ui.toolbox.tm-rarity-option": "Lv {{levels}}",
-  "ui.toolbox.tm-rarity-option-fixed": "Lv {{levels}} ({{traits}})",
   "ui.toolbox.tm-truncated": "Showing the first {{shown}} of {{total}} rolls.",
   "ui.toolbox.tm-entry-hit": "#{{n}}",
   "ui.level-short": "Lv{{level}}",
@@ -61,7 +58,7 @@ import { useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStor
 
 import { POPULAR_TRAITS } from "./traitOptions";
 import TransmarvelSearcher, { MAX_ROLLS, MAX_SHOWN_ROWS } from "./TransmarvelSearcher";
-import { familyCombos, POOL, sigilTrait2Options } from "./useTransmarvelSearcher";
+import { familyCombos, POOL, sigilTrait2Options, slotTraitOptions } from "./useTransmarvelSearcher";
 
 const renderPage = () =>
   render(
@@ -90,11 +87,8 @@ const EXTRA_SIGIL = POOL.sigils.find((s) => s.extraTrait2.length > 0)!;
 // hardcoded so a regeneration can't silently invalidate the picks.
 const FAMILY = POOL.wrightstones.combos.find((c) => c.tier === 0)!.family;
 const TIERS = familyCombos(FAMILY, POOL);
-// The top (0.1%) tier's fixed slot traits, and a rolled-only trait that the
-// top tier does NOT offer at position 1 — used to force the reset-to-Any.
+// The top (0.1%) tier's fixed slot-2 trait.
 const TOP_SLOT2 = TIERS[2].slots[1].traits[0];
-const TOP_SLOT3 = TIERS[2].slots[2].traits[0];
-const ROLLED_SLOT2 = TIERS[0].slots[1].traits.find((t) => t !== TOP_SLOT2)!;
 
 const status: TransmarvelStatus = { gameRunning: true, rngUnpredictable: false };
 // For tests exercising only the pickers/inputs: no auto-predict, no busy hold.
@@ -164,11 +158,17 @@ describe("TransmarvelSearcher", () => {
 
     // No click: the mount-time auto-predict fetches the rolls itself.
     expect(await screen.findByText("#1")).toBeTruthy();
-    // "#2" may appear twice: the table's roll column and the entry's hit badge.
-    expect((await screen.findAllByText("#2")).length).toBeGreaterThanOrEqual(1);
-    expect(await screen.findByText("First wishlist hit at roll #2")).toBeTruthy();
-    // Exactly one row matches, marked with the badge in the Match column.
-    expect(screen.getAllByText("✓")).toHaveLength(1);
+    // "#2" appears twice: the table's roll column and the entry's hit badge.
+    expect(await screen.findAllByText("#2")).toHaveLength(2);
+    // No Match column any more — the matched row is bolded instead. Scoped
+    // to the table because the sigil picker's mounted dropdown carries the
+    // same names as option labels.
+    expect(screen.queryByText("✓")).toBeNull();
+    const table = screen.getByRole("table");
+    const matchedName = within(table).getByText(`sigil:${WISHLISTED.sigilId}`);
+    expect(matchedName.style.fontWeight).toBe("700");
+    const unmatchedName = within(table).getByText(`sigil:${OTHER.sigilId}`);
+    expect(unmatchedName.style.fontWeight).not.toBe("700");
   });
 
   it("hides the non-matching row when 'Show matches only' is toggled on", async () => {
@@ -312,7 +312,7 @@ describe("TransmarvelSearcher", () => {
     expect(optionsOf(trait2Input)).toEqual(["any", ...popular, ...rest]);
   });
 
-  it("locks the stone slot pickers to the fixed traits at min rarity 0.1%", async () => {
+  it("clamps a stored 0.1% min rarity into the 20/15/10 option and widens the slot pickers", async () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
@@ -324,37 +324,57 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    const slot2Input = (await screen.findByLabelText("Slot 2", { selector: "input" })) as HTMLInputElement;
-    await waitFor(() => expect(slot2Input.getAttribute("disabled")).toBeNull());
-    fireEvent.click(slot2Input);
+    // The sanitized entry reads back as minTier 1, whose label the closed
+    // rarity select displays.
+    const rarityInput = (await screen.findByLabelText("Min rarity", { selector: "input" })) as HTMLInputElement;
+    expect(rarityInput.value).toBe("20/15/10");
 
-    expect(optionsOf(slot2Input)).toEqual(["any", TOP_SLOT2]);
+    // Slot options span every tier >= 1, so the top tier's fixed trait is
+    // offered alongside the rolled ones.
+    const slot2Input = screen.getByLabelText("Slot 2", { selector: "input" }) as HTMLInputElement;
+    fireEvent.click(slot2Input);
+    const values = optionsOf(slot2Input);
+    expect(new Set(values)).toEqual(new Set(["any", ...slotTraitOptions(FAMILY, 1, 1)]));
+    expect(values).toContain(TOP_SLOT2);
   });
 
-  it("resets a slot pick to Any when raising the min rarity makes it unavailable", async () => {
+  it("resets a slot pick to Any when changing the type makes it unavailable", async () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
+    // A slot-2 trait of FAMILY that some other family never rolls there —
+    // switching the entry's type to that family must clear the pick. (Some
+    // traits are universal, so the pair is found dynamically.)
+    const families = [...new Set(POOL.wrightstones.combos.map((c) => c.family))];
+    let pick: { trait: string; other: string } | undefined;
+    for (const trait of TIERS[0].slots[1].traits) {
+      const other = families.find((f) => f !== FAMILY && !slotTraitOptions(f, 0, 1).includes(trait));
+      if (other) {
+        pick = { trait, other };
+        break;
+      }
+    }
+    expect(pick).toBeTruthy();
     useTransmarvelWishlistStore.setState({
       sigils: [],
-      stones: [{ family: FAMILY, minTier: 0, slot2: ROLLED_SLOT2, slot3: null }],
+      stones: [{ family: FAMILY, minTier: 0, slot2: pick!.trait, slot3: null }],
     });
 
     renderPage();
 
-    const rarityInput = (await screen.findByLabelText("Min rarity", { selector: "input" })) as HTMLInputElement;
-    await waitFor(() => expect(rarityInput.getAttribute("disabled")).toBeNull());
-    fireEvent.click(rarityInput);
+    const typeInput = (await screen.findByLabelText("Type", { selector: "input" })) as HTMLInputElement;
+    await waitFor(() => expect(typeInput.getAttribute("disabled")).toBeNull());
+    fireEvent.click(typeInput);
 
-    const listbox = document.getElementById(rarityInput.getAttribute("aria-controls")!)!;
-    const topTier = listbox.querySelector('[role="option"][value="2"]') as HTMLElement;
-    expect(topTier).toBeTruthy();
-    fireEvent.click(topTier);
+    const listbox = document.getElementById(typeInput.getAttribute("aria-controls")!)!;
+    const option = listbox.querySelector(`[role="option"][value="${pick!.other}"]`) as HTMLElement;
+    expect(option).toBeTruthy();
+    fireEvent.click(option);
 
     // The entry survives with the stale slot pick cleared, not dropped.
     expect(useTransmarvelWishlistStore.getState().stones).toEqual([
-      { family: FAMILY, minTier: 2, slot2: null, slot3: null },
+      { family: pick!.other, minTier: 0, slot2: null, slot3: null },
     ]);
   });
 
@@ -459,7 +479,7 @@ describe("TransmarvelSearcher", () => {
     expect(optionsOf(sigilInput)).toEqual(expected);
   });
 
-  it("labels rarities by their level layout alone, naming the top tier's fixed traits", async () => {
+  it("labels rarities by max level per slot, folding the 0.1% tier away", async () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
@@ -479,11 +499,7 @@ describe("TransmarvelSearcher", () => {
     // that changes them should fail here loudly.
     const listbox = document.getElementById(rarityInput.getAttribute("aria-controls")!)!;
     const labels = [...listbox.querySelectorAll('[role="option"]')].map((el) => el.textContent);
-    expect(labels).toEqual([
-      "Lv 10–15/7–10/5–7",
-      "Lv 20/15/10",
-      `Lv 20/15/10 (trait:${TOP_SLOT2} / trait:${TOP_SLOT3})`,
-    ]);
+    expect(labels).toEqual(["15/10/7", "20/15/10"]);
   });
 
   it("shows a first-hit badge on hitting entries and a dash on entries that never hit", async () => {
@@ -502,9 +518,8 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    expect(await screen.findByText("First wishlist hit at roll #2")).toBeTruthy();
     // "#2" appears twice: the table's roll column and the sigil entry's badge.
-    expect(screen.getAllByText("#2")).toHaveLength(2);
+    expect(await screen.findAllByText("#2")).toHaveLength(2);
     // The stone entry renders the dimmed no-hit dash.
     expect(screen.getByText("—")).toBeTruthy();
   });

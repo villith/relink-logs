@@ -147,9 +147,13 @@ export const sanitizeWishlists = (
   if (Array.isArray(rawStones)) {
     for (const raw of rawStones) {
       if (typeof raw !== "object" || raw === null) continue;
-      const { family, minTier, slot2: rawSlot2, slot3: rawSlot3 } = raw as Record<string, unknown>;
-      if (typeof family !== "string" || typeof minTier !== "number" || !Number.isInteger(minTier)) continue;
-      if (!familyCombos(family, p).some((c) => c.tier === minTier)) continue;
+      const { family, minTier: rawMinTier, slot2: rawSlot2, slot3: rawSlot3 } = raw as Record<string, unknown>;
+      if (typeof family !== "string" || typeof rawMinTier !== "number" || !Number.isInteger(rawMinTier)) continue;
+      if (!familyCombos(family, p).some((c) => c.tier === rawMinTier)) continue;
+      // The picker folds the fully-fixed top tier (0.1%) into tier 1 — its
+      // levels are identical and minTier semantics already include better
+      // tiers — so stored top-tier entries clamp down to match.
+      const minTier = Math.min(rawMinTier, 1);
       const slot2 = typeof rawSlot2 === "string" ? rawSlot2 : null;
       const slot3 = typeof rawSlot3 === "string" ? rawSlot3 : null;
       if (slot2 !== null && !slotTraitOptions(family, minTier, 1, p).includes(slot2)) continue;
