@@ -188,7 +188,7 @@
       "date": "日期",
       "name": "名称",
       "primary-target": "敌人",
-      "duration": "时长",
+      "duration": "战斗时长",
       "total-damage": "总伤害",
       "damage-per-second": "DPS",
       "enemy-hp": "敌人 HP",
@@ -217,7 +217,7 @@
       "rooms": "区域数",
       "cleared": "已完成",
       "in-progress": "进行中",
-      "quest-elapsed-time": "IGT",
+      "quest-elapsed-time": "任务用时",
       "sba-chart": "奥义图表",
       "quest-status": "任务状态",
       "overview": "总览",
@@ -344,7 +344,9 @@
       "sent-frames_one": "已向 Hook 的 broadcast channel 排队发送 {{count}} 个事件",
       "sent-frames_other": "已向 Hook 的 broadcast channel 排队发送 {{count}} 个事件",
       "sent-nothing": "Hook 接受了 batch 但没有 listener — 这不应该发生。"
-    }
+    },
+    "include-primal-burst": "包含高阶召唤伤害",
+    "include-primal-burst-description": "将高阶召唤的伤害计入悬浮窗。"
   },
   "characters": {
     "Pl2000": "伊德 (龙形态)",
