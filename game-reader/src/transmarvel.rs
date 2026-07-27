@@ -1,7 +1,7 @@
 //! Read-only snapshot of the game's transmarvel RNG state.
 
-use crate::{resolve_rng_rva, MemRead, RNG_SLOT_COUNT, RNG_SLOT_OVERRIDE};
-use anyhow::{bail, Result};
+use crate::{deref_rng, resolve_rng_rva, MemRead, RNG_SLOT_COUNT, RNG_SLOT_OVERRIDE};
+use anyhow::Result;
 use pelite::pe64::Pe;
 pub use protocol::toolbox::TransmarvelSnapshot;
 
@@ -28,10 +28,7 @@ pub fn take_snapshot(
     base: u64,
     rvas: TransmarvelRvas,
 ) -> Result<TransmarvelSnapshot> {
-    let rng = mem.u64(base + rvas.rng as u64)?;
-    if rng == 0 {
-        bail!("rng global not initialized yet (still on title screen?)");
-    }
+    let rng = deref_rng(mem, base, rvas.rng)?;
     Ok(TransmarvelSnapshot {
         rng_state: mem.u32(rng + TM_SLOT * 4)?,
         slot_override: mem.u32(rng + RNG_SLOT_OVERRIDE)?,

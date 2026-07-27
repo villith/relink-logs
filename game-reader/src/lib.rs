@@ -32,6 +32,17 @@ pub const RNG_SLOT_COUNT: usize = 0x83;
 pub const RNG_SLOT_OVERRIDE: u64 = 0x20c;
 const _: () = assert!(RNG_SLOT_OVERRIDE == RNG_SLOT_COUNT as u64 * 4);
 
+/// Dereference the RNG slot-array global to the array itself. The global is
+/// null until the game leaves the title screen, so every RNG-backed tool has
+/// to report that the same way.
+pub fn deref_rng(mem: &impl MemRead, base: u64, rng_rva: u32) -> Result<u64> {
+    let rng = mem.u64(base + rng_rva as u64)?;
+    if rng == 0 {
+        bail!("rng global not initialized yet (still on title screen?)");
+    }
+    Ok(rng)
+}
+
 /// One step of the game's per-slot RNG. Returns the new state, which is also
 /// the drawn value.
 #[inline]

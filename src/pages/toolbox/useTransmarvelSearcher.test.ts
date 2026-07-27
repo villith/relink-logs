@@ -9,16 +9,13 @@ import {
   TransmarvelPool,
   WrightstoneEntry,
   familyCombos,
-  fixedPairSigil,
+  matchRolls,
   parseSigilPickerValue,
-  rollHits,
   sanitizeWishlists,
-  sigilEntryHits,
   sigilPickerOptions,
   sigilPickerValue,
   sigilTrait2Options,
   slotTraitOptions,
-  stoneEntryHits,
 } from "./useTransmarvelSearcher";
 
 /** Minimal pool double shaped like the real generated asset
@@ -105,15 +102,6 @@ describe("sigilTrait2Options", () => {
 });
 
 describe("fixed-pair sigils", () => {
-  it("resolves a trait pair to the item that ships it, and nothing for a rolled pair", () => {
-    expect(fixedPairSigil("000000aa", "000000ee", POOL_DOUBLE)).toBe("000009ee");
-    expect(fixedPairSigil("000000aa", "000000cc", POOL_DOUBLE)).toBe("000009cc");
-    // "dd" only ever arrives as a rolled 2nd trait — no dedicated item.
-    expect(fixedPairSigil("000000aa", "000000dd", POOL_DOUBLE)).toBeNull();
-    expect(fixedPairSigil("000000bb", "000000ee", POOL_DOUBLE)).toBeNull();
-    expect(fixedPairSigil("ffffffff", "000000ee", POOL_DOUBLE)).toBeNull();
-  });
-
   it("encodes and parses a pair's picker value", () => {
     expect(sigilPickerValue("000000aa", "000000ee")).toBe("000000aa:000000ee");
     expect(parseSigilPickerValue("000000aa:000000ee")).toEqual({ trait: "000000aa", trait2: "000000ee" });
@@ -148,7 +136,7 @@ describe("slotTraitOptions", () => {
   });
 });
 
-describe("rollHits", () => {
+describe("roll matching", () => {
   const sigilRoll = (trait1: number, trait2: number | null = null): TransmarvelRoll => ({
     outcome: { type: "sigil", sigilId: 0x000001aa, traitLevel: 10, trait1, trait2 },
     draws: 5,
@@ -164,65 +152,68 @@ describe("rollHits", () => {
       [slot2, 99],
       [slot3, 99],
     ]);
+  /** Does this single roll match the wishlists? (OR across both.) */
+  const hits = (roll: TransmarvelRoll, sigils: SigilEntry[], stones: WrightstoneEntry[]) =>
+    matchRolls([roll], sigils, stones, POOL_DOUBLE).results[0].hit;
 
   it("sigil entry with trait2 null hits any 2nd trait, including none", () => {
     const sigils: SigilEntry[] = [{ trait: "000000aa", trait2: null }];
-    expect(rollHits(sigilRoll(0x000000aa), sigils, [], POOL_DOUBLE)).toBe(true);
-    expect(rollHits(sigilRoll(0x000000aa, 0x000000cc), sigils, [], POOL_DOUBLE)).toBe(true);
-    expect(rollHits(sigilRoll(0x000000bb), sigils, [], POOL_DOUBLE)).toBe(false);
+    expect(hits(sigilRoll(0x000000aa), sigils, [])).toBe(true);
+    expect(hits(sigilRoll(0x000000aa, 0x000000cc), sigils, [])).toBe(true);
+    expect(hits(sigilRoll(0x000000bb), sigils, [])).toBe(false);
   });
 
   it("sigil entry with a specific trait2 hits only that exact pair", () => {
     const sigils: SigilEntry[] = [{ trait: "000000aa", trait2: "000000cc" }];
-    expect(rollHits(sigilRoll(0x000000aa, 0x000000cc), sigils, [], POOL_DOUBLE)).toBe(true);
-    expect(rollHits(sigilRoll(0x000000aa, 0x000000dd), sigils, [], POOL_DOUBLE)).toBe(false);
-    expect(rollHits(sigilRoll(0x000000aa), sigils, [], POOL_DOUBLE)).toBe(false);
+    expect(hits(sigilRoll(0x000000aa, 0x000000cc), sigils, [])).toBe(true);
+    expect(hits(sigilRoll(0x000000aa, 0x000000dd), sigils, [])).toBe(false);
+    expect(hits(sigilRoll(0x000000aa), sigils, [])).toBe(false);
   });
 
   it("a wished trait arriving only as another sigil's rolled trait2 does NOT hit", () => {
     const sigils: SigilEntry[] = [{ trait: "000000bb", trait2: null }];
-    expect(rollHits(sigilRoll(0x000000aa, 0x000000bb), sigils, [], POOL_DOUBLE)).toBe(false);
+    expect(hits(sigilRoll(0x000000aa, 0x000000bb), sigils, [])).toBe(false);
   });
 
   it("stone entry with both slots Any hits any roll of its family at or above the min tier", () => {
     const entry: WrightstoneEntry = { family: "000000f1", minTier: 0, slot2: null, slot3: null };
-    expect(rollHits(f1Tier0(), [], [entry], POOL_DOUBLE)).toBe(true);
+    expect(hits(f1Tier0(), [], [entry])).toBe(true);
   });
 
   it("stone entry misses a different family even with matching traits", () => {
     const entry: WrightstoneEntry = { family: "000000f2", minTier: 0, slot2: null, slot3: null };
-    expect(rollHits(f1Tier0(), [], [entry], POOL_DOUBLE)).toBe(false);
+    expect(hits(f1Tier0(), [], [entry])).toBe(false);
   });
 
   it("stone entry misses below its min tier and hits above it", () => {
     const entry: WrightstoneEntry = { family: "000000f1", minTier: 1, slot2: null, slot3: null };
-    expect(rollHits(f1Tier0(), [], [entry], POOL_DOUBLE)).toBe(false);
+    expect(hits(f1Tier0(), [], [entry])).toBe(false);
     const tier2Roll = stoneRoll(0x00000103, [
       [0x000000f1, 20],
       [0x000000ae, 15],
       [0x000000a7, 10],
     ]);
-    expect(rollHits(tier2Roll, [], [entry], POOL_DOUBLE)).toBe(true);
+    expect(hits(tier2Roll, [], [entry])).toBe(true);
   });
 
   it("a specified slot trait must match its own rolled position, not the other slot", () => {
     const wantsSlot2 = { family: "000000f1", minTier: 0, slot2: "000000dd", slot3: null };
     // "dd" rolled at position 3, not position 2 — slot2 is unsatisfied.
-    expect(rollHits(f1Tier0(0x000000cc, 0x000000dd), [], [wantsSlot2], POOL_DOUBLE)).toBe(false);
-    expect(rollHits(f1Tier0(0x000000dd, 0x000000cc), [], [wantsSlot2], POOL_DOUBLE)).toBe(true);
+    expect(hits(f1Tier0(0x000000cc, 0x000000dd), [], [wantsSlot2])).toBe(false);
+    expect(hits(f1Tier0(0x000000dd, 0x000000cc), [], [wantsSlot2])).toBe(true);
     const wantsSlot3 = { family: "000000f1", minTier: 0, slot2: null, slot3: "000000cc" };
-    expect(rollHits(f1Tier0(0x000000cc, 0x000000dd), [], [wantsSlot3], POOL_DOUBLE)).toBe(false);
-    expect(rollHits(f1Tier0(0x000000dd, 0x000000cc), [], [wantsSlot3], POOL_DOUBLE)).toBe(true);
+    expect(hits(f1Tier0(0x000000cc, 0x000000dd), [], [wantsSlot3])).toBe(false);
+    expect(hits(f1Tier0(0x000000dd, 0x000000cc), [], [wantsSlot3])).toBe(true);
   });
 
   it("a stone roll whose item is not in the pool never hits", () => {
     const entry: WrightstoneEntry = { family: "000000f1", minTier: 0, slot2: null, slot3: null };
-    expect(rollHits(stoneRoll(0xdeadbeef, [[0x000000f1, 10]]), [], [entry], POOL_DOUBLE)).toBe(false);
+    expect(hits(stoneRoll(0xdeadbeef, [[0x000000f1, 10]]), [], [entry])).toBe(false);
   });
 
   it("empty wishlists hit nothing", () => {
-    expect(rollHits(sigilRoll(0x000000aa), [], [], POOL_DOUBLE)).toBe(false);
-    expect(rollHits(f1Tier0(), [], [], POOL_DOUBLE)).toBe(false);
+    expect(hits(sigilRoll(0x000000aa), [], [])).toBe(false);
+    expect(hits(f1Tier0(), [], [])).toBe(false);
   });
 });
 
@@ -254,7 +245,7 @@ describe("per-entry hits", () => {
       { trait: "000000bb", trait2: null }, // roll 0
       { trait: "000000aa", trait2: "000000ee" }, // never
     ];
-    expect(sigilEntryHits(rolls, entries, POOL_DOUBLE)).toEqual([
+    expect(matchRolls(rolls, entries, [], POOL_DOUBLE).sigilHits).toEqual([
       { indices: [2, 3], total: 2 },
       { indices: [2], total: 1 },
       { indices: [0], total: 1 },
@@ -268,7 +259,7 @@ describe("per-entry hits", () => {
       { family: "000000f1", minTier: 1, slot2: null, slot3: null }, // rolled tier below min: never
       { family: "000000f2", minTier: 0, slot2: null, slot3: null }, // wrong family: never
     ];
-    expect(stoneEntryHits(rolls, entries, POOL_DOUBLE)).toEqual([
+    expect(matchRolls(rolls, [], entries, POOL_DOUBLE).stoneHits).toEqual([
       { indices: [1], total: 1 },
       { indices: [], total: 0 },
       { indices: [], total: 0 },
@@ -278,7 +269,7 @@ describe("per-entry hits", () => {
   it("caps the listed indices but still counts every hit", () => {
     const many = Array.from({ length: MAX_ENTRY_HITS + 5 }, () => f1Tier0);
     const entry: WrightstoneEntry = { family: "000000f1", minTier: 0, slot2: null, slot3: null };
-    const [hits] = stoneEntryHits(many, [entry], POOL_DOUBLE);
+    const [hits] = matchRolls(many, [], [entry], POOL_DOUBLE).stoneHits;
     expect(hits.total).toBe(MAX_ENTRY_HITS + 5);
     expect(hits.indices).toHaveLength(MAX_ENTRY_HITS);
     expect(hits.indices[0]).toBe(0);
@@ -286,9 +277,11 @@ describe("per-entry hits", () => {
   });
 
   it("handles empty rolls and empty wishlists", () => {
-    expect(sigilEntryHits([], [{ trait: "000000aa", trait2: null }], POOL_DOUBLE)).toEqual([{ indices: [], total: 0 }]);
-    expect(sigilEntryHits(rolls, [], POOL_DOUBLE)).toEqual([]);
-    expect(stoneEntryHits(rolls, [], POOL_DOUBLE)).toEqual([]);
+    expect(matchRolls([], [{ trait: "000000aa", trait2: null }], [], POOL_DOUBLE).sigilHits).toEqual([
+      { indices: [], total: 0 },
+    ]);
+    expect(matchRolls(rolls, [], [], POOL_DOUBLE).sigilHits).toEqual([]);
+    expect(matchRolls(rolls, [], [], POOL_DOUBLE).stoneHits).toEqual([]);
   });
 });
 

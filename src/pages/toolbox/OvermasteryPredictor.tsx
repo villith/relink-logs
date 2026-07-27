@@ -1,10 +1,14 @@
 ﻿import { formatBonusAmount, humanizeNumbers, overmasteryAmountFromKind, translateOvermasteryId } from "@/utils";
-import { Alert, Button, Group, ScrollArea, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import { Button, Group, ScrollArea, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { backendErrorMessage } from "@/backendErrors";
 import { OvermasteryMastery } from "@/types";
+
+import { ANY, anyOption } from "./traitOptions";
+
+import ToolPage from "./ToolPage";
 
 import useOvermasteryPredictor, {
   emptySlots,
@@ -67,13 +71,6 @@ const RollTable = ({ rolls, mspCost, wanted }: { rolls: IndexedRoll[]; mspCost: 
 /** Descending so the common "high level" goals are next to Any. */
 const LEVEL_OPTIONS = Array.from({ length: 10 }, (_, i) => String(10 - i));
 
-/** Sentinel select value for the "Any" wildcard (stored as null in the form). */
-const ANY = "any";
-const anyOption = (t: (key: string, fallback: string) => string) => ({
-  value: ANY,
-  label: t("ui.toolbox.om-any", "Any"),
-});
-
 const OvermasteryPredictor = () => {
   const { t } = useTranslation();
   const {
@@ -120,12 +117,13 @@ const OvermasteryPredictor = () => {
   }, [prediction, filters, wanted]);
 
   return (
-    <Stack gap="md" pr="md">
-      <Title order={4}>{t("ui.toolbox.overmastery-predictor", "Overmastery Predictor")}</Title>
-      {status && !status.gameRunning && <Alert color="yellow">{t("ui.toolbox.om-game-not-running")}</Alert>}
-      {prediction?.unpredictable && <Alert color="orange">{t("ui.toolbox.om-unpredictable")}</Alert>}
-      {error && <Alert color="red">{errorMessage}</Alert>}
-      {stale && <Alert color="orange">{t("ui.toolbox.stale-results")}</Alert>}
+    <ToolPage
+      title={t("ui.toolbox.overmastery-predictor", "Overmastery Predictor")}
+      gameNotRunning={status && !status.gameRunning ? t("ui.toolbox.om-game-not-running") : null}
+      unpredictable={prediction?.unpredictable ? t("ui.toolbox.om-unpredictable") : null}
+      error={error ? errorMessage : null}
+      stale={stale}
+    >
       <Group align="flex-start" gap="xl" wrap="nowrap">
         <Stack gap="sm" style={{ flexShrink: 0 }}>
           <Select
@@ -216,7 +214,7 @@ const OvermasteryPredictor = () => {
           </ScrollArea.Autosize>
         )}
       </Group>
-    </Stack>
+    </ToolPage>
   );
 };
 

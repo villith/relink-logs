@@ -1,7 +1,7 @@
 //! Read-only snapshot of the game's meditation RNG state: the RNG slot array
 //! and the character roster vector (character -> slot index).
 
-use crate::{resolve_rng_rva, scan_unique_rva, MemRead, RNG_SLOT_COUNT};
+use crate::{deref_rng, resolve_rng_rva, scan_unique_rva, MemRead, RNG_SLOT_COUNT};
 use anyhow::{bail, Result};
 use pelite::pe64::Pe;
 pub use protocol::toolbox::OvermasterySnapshot;
@@ -28,14 +28,6 @@ pub fn resolve_rvas<'a>(pe: impl Pe<'a>) -> Result<OvermasteryRvas> {
     })
 }
 
-fn deref_rng(mem: &impl MemRead, base: u64, rvas: OvermasteryRvas) -> Result<u64> {
-    let rng = mem.u64(base + rvas.rng as u64)?;
-    if rng == 0 {
-        bail!("rng global not initialized yet (still on title screen?)");
-    }
-    Ok(rng)
-}
-
 /// Light read of one RNG slot's state (`slot` < `RNG_SLOT_COUNT`) for
 /// staleness polling — a single 4-byte read, no roster walk.
 pub fn take_slot_state(
@@ -47,7 +39,7 @@ pub fn take_slot_state(
     if slot as usize >= RNG_SLOT_COUNT {
         bail!("slot {slot:#x} out of range");
     }
-    let rng = deref_rng(mem, base, rvas)?;
+    let rng = deref_rng(mem, base, rvas.rng)?;
     mem.u32(rng + slot as u64 * 4)
 }
 
@@ -57,7 +49,7 @@ pub fn take_snapshot(
     base: u64,
     rvas: OvermasteryRvas,
 ) -> Result<OvermasterySnapshot> {
-    let rng = deref_rng(mem, base, rvas)?;
+    let rng = deref_rng(mem, base, rvas.rng)?;
 
     let mut block = vec![0u8; RNG_SLOT_COUNT * 4 + 4];
     mem.read(rng, &mut block)?;

@@ -12,8 +12,13 @@ interface TransmarvelWishlistState {
   /** Wrightstone wishlist; entries validated against the pool on read
    * (`sanitizeWishlists`), not here. */
   stones: WrightstoneEntry[];
+  /** How many upcoming rolls a prediction simulates. Persisted here rather
+   * than on its own so the whole tool's state hydrates synchronously from one
+   * place — the mount-time auto-predict reads it on the first render. */
+  rolls: number;
   setSigils: (sigils: SigilEntry[]) => void;
   setStones: (stones: WrightstoneEntry[]) => void;
+  setRolls: (rolls: number) => void;
 }
 
 /** Persists the Transmarvel Wishlist entries (account-wide, not
@@ -23,8 +28,10 @@ export const useTransmarvelWishlistStore = create<TransmarvelWishlistState>()(
     (set) => ({
       sigils: [],
       stones: [],
+      rolls: 50,
       setSigils: (sigils) => set({ sigils }),
       setStones: (stones) => set({ stones }),
+      setRolls: (rolls) => set({ rolls }),
     }),
     { name: "transmarvel-wishlists", version: 1 }
   )

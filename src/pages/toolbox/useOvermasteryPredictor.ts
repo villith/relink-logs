@@ -1,8 +1,8 @@
 import characterIdHashes from "@/assets/character-id-hashes.json";
 import overmasteryCategories from "@/assets/overmastery-categories.json";
-import useGameStatus from "@/pages/toolbox/useGameStatus";
-import useStalenessWatch from "@/pages/toolbox/useStalenessWatch";
 import { assignable } from "@/pages/toolbox/matching";
+import useGameStatus from "@/pages/toolbox/useGameStatus";
+import useRngSlotStaleness from "@/pages/toolbox/useRngSlotStaleness";
 import { useOvermasterySelectionsStore } from "@/stores/useOvermasterySelectionsStore";
 import { CharacterType, OvermasteryMastery, OvermasteryPrediction, OvermasteryStatus } from "@/types";
 import { toHashString, translateCharacterType, translateOvermasteryId } from "@/utils";
@@ -186,16 +186,7 @@ export default function useOvermasteryPredictor() {
   const selections = useOvermasterySelectionsStore((s) => s.selections);
   const saveSelection = useOvermasterySelectionsStore((s) => s.save);
 
-  /** While results are shown, watch the prediction's RNG slot: if the live
-   * state moves off the one the rolls were computed from (the character
-   * rolled, or a quest reshuffled the stream), the list is stale. */
-  const [stale, setStale] = useStalenessWatch(
-    prediction && !prediction.unpredictable ? prediction : null,
-    async (watched) => {
-      const current = await invoke<number | null>("fetch_overmastery_seed", { slot: watched.slot });
-      return current !== null && current !== watched.slotState;
-    }
-  );
+  const [stale, setStale] = useRngSlotStaleness(prediction);
 
   /** Selecting a character restores their saved tier + wanted slots (empty
    * slots when nothing usable is stored) and drops the previous character's

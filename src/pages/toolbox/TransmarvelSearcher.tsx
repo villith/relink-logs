@@ -3,7 +3,6 @@ import type { TransmarvelOutcome, TransmarvelRoll } from "@/types";
 import { translateSigilId, translateTraitId, translateWrightstoneId } from "@/utils";
 import {
   ActionIcon,
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -16,18 +15,19 @@ import {
   Tabs,
   Text,
   TextInput,
-  Title,
 } from "@mantine/core";
 import { X } from "@phosphor-icons/react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { orderedTraitOptions } from "./traitOptions";
+import { ANY, anyOption, orderedTraitOptions } from "./traitOptions";
+
+import ToolPage from "./ToolPage";
 
 import useTransmarvelSearcher, {
   EntryHits,
   familyCombos,
-  NO_HITS,
+  MAX_WISHED_TIER,
   parseSigilPickerValue,
   POOL,
   SigilEntry,
@@ -41,10 +41,6 @@ import useTransmarvelSearcher, {
 /** Pool traits are stored as lowercase hex strings (the wishlist's key
  * shape); rolled outcomes carry the trait as a number. */
 const hex = (h: string) => parseInt(h, 16);
-
-/** Mantine Select reserves null for "no selection", so the optional slots'
- * "match anything" choice needs its own sentinel value. */
-const ANY = "any";
 
 /** Most rolls one prediction may simulate (mirrored by the backend clamp in
  * predict_transmarvel). */
@@ -152,8 +148,89 @@ const EntryResults = ({ hits, rolls }: { hits: EntryHits; rolls: TransmarvelRoll
   );
 };
 
+/** Props a column hands its control, so a column's label and width are
+ * declared once and shared by the caption above and the control below. */
+type ColumnProps = { "aria-label": string; w?: number; style?: React.CSSProperties };
+
+/** One column of a wishlist entry row. Omit `width` to share the leftover
+ * space with the other flexible columns. */
+type EntryColumn<E> = {
+  label: string;
+  width?: number;
+  control: (entry: E, index: number, props: ColumnProps) => React.ReactNode;
+};
+
+const columnSizing = (width?: number) => (width === undefined ? { style: { flex: 1 } } : { w: width });
+
+/** A wishlist tab: an add button, an empty-state hint, and a card per entry
+ * whose caption row and control row are both driven by `columns`. The two
+ * wishlists differ only in their columns and their add/remove handlers. */
+const WishlistTab = <E,>({
+  entries,
+  hits,
+  rolls,
+  columns,
+  addLabel,
+  addDisabled,
+  onAdd,
+  emptyHint,
+  removeLabel,
+  onRemove,
+}: {
+  entries: E[];
+  hits: EntryHits[];
+  rolls: TransmarvelRoll[] | null;
+  columns: EntryColumn<E>[];
+  addLabel: string;
+  addDisabled: boolean;
+  onAdd: () => void;
+  emptyHint: string;
+  removeLabel: string;
+  onRemove: (index: number) => void;
+}) => (
+  <Stack gap="xs">
+    <Group justify="flex-end">
+      <Button size="compact-sm" variant="light" disabled={addDisabled} onClick={onAdd}>
+        {addLabel}
+      </Button>
+    </Group>
+    {entries.length === 0 && (
+      <Text size="sm" c="dimmed">
+        {emptyHint}
+      </Text>
+    )}
+    {entries.map((entry, index) => {
+      const entryHits = hits[index];
+      return (
+        <Paper key={index} {...entryCardProps(entryHits.total > 0)}>
+          <Group gap="xs" wrap="nowrap" mb={2}>
+            {columns.map((column) => (
+              <Text key={column.label} size="xs" c="dimmed" {...columnSizing(column.width)}>
+                {column.label}
+              </Text>
+            ))}
+            <ActionIcon variant="subtle" size="sm" aria-label={removeLabel} onClick={() => onRemove(index)}>
+              <X />
+            </ActionIcon>
+          </Group>
+          <Group gap="xs" wrap="nowrap">
+            {columns.map((column) => (
+              <Fragment key={column.label}>
+                {column.control(entry, index, { "aria-label": column.label, ...columnSizing(column.width) })}
+              </Fragment>
+            ))}
+            {/* Keeps the controls clear of the card's remove button. */}
+            <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
+          </Group>
+          {entryHits.total > 0 && rolls && <EntryResults hits={entryHits} rolls={rolls} />}
+        </Paper>
+      );
+    })}
+  </Stack>
+);
+
 const TransmarvelSearcher = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const {
     status,
     error,
@@ -170,7 +247,7 @@ const TransmarvelSearcher = () => {
     stones,
     setStones,
     results,
-    firstHit,
+    hasHits,
     sigilHits,
     stoneHits,
     predict,
@@ -196,12 +273,16 @@ const TransmarvelSearcher = () => {
     if (!node || node.offsetParent === null) return;
     setResultsMah(`calc(100vh - ${Math.ceil(node.getBoundingClientRect().top) + 16}px)`);
   });
-  const anyOption = { value: ANY, label: t("ui.toolbox.tm-any-option", "Any") };
+  /** Every rollable sigil by name, fixed-pair sigils included — rebuilt only
+   * on a language switch, which relabels (and re-sorts) it. */
+  const sigilOptions = useMemo(() => sigilPickerOptions((sigilId) => translateSigilId(hex(sigilId))), [i18n.language]);
+  const sigilOptionValues = useMemo(() => new Set(sigilOptions.map((o) => o.value)), [sigilOptions]);
 
-  /** Every rollable sigil by name, fixed-pair sigils included — built each
-   * render so a language switch relabels (and re-sorts) it. */
-  const sigilOptions = sigilPickerOptions((sigilId) => translateSigilId(hex(sigilId)));
-  const sigilOptionValues = new Set(sigilOptions.map((o) => o.value));
+  /** Stone types by name — relabelled on a language switch, like the sigils. */
+  const familyOptions = useMemo(
+    () => FAMILIES.map((c) => ({ value: c.family, label: stoneTypeName(c.item) })),
+    [i18n.language]
+  );
 
   /** The option representing an entry: its pair sigil when the wished traits
    * are exactly one the game ships as its own item, else the plain sigil. */
@@ -214,7 +295,7 @@ const TransmarvelSearcher = () => {
   /** Trait selects share the synthesis picker's ordering: popular first,
    * then alphabetical behind a divider. */
   const traitSelectData = (traits: string[]) => [
-    anyOption,
+    anyOption(t),
     ...orderedTraitOptions(traits, (trait) => translateTraitId(hex(trait))),
   ];
 
@@ -261,20 +342,111 @@ const TransmarvelSearcher = () => {
     setStones(stones.map((e, i) => (i === index ? next : e)));
   };
 
-  // Rarity options are labeled by the max level per slot ("20/15/10"). The
-  // fully-fixed 0.1% tier shares tier 1's levels and is folded into it —
-  // minTier semantics already include better tiers (sanitizeWishlists clamps
-  // stored top-tier entries to match).
+  // Rarity options are labeled by the max level per slot ("20/15/10").
   const rarityOptions = (family: string) =>
     familyCombos(family)
-      .filter((combo) => combo.tier <= 1)
+      .filter((combo) => combo.tier <= MAX_WISHED_TIER)
       .map((combo) => ({
         value: String(combo.tier),
         label: combo.slots.map((s) => String(Math.max(...s.levels))).join("/"),
       }));
 
-  const filtered = matchesOnly ? results.filter((r) => r.hit) : results;
-  const shown = filtered.slice(0, MAX_SHOWN_ROWS);
+  // Memoized because this walks up to 50,000 rows and the component
+  // re-renders on every keystroke, tab switch and Select interaction.
+  const sigilColumns: EntryColumn<SigilEntry>[] = [
+    {
+      label: t("ui.toolbox.tm-sigil", "Sigil"),
+      control: (entry, index, props) => (
+        <Select
+          {...props}
+          searchable
+          data={sigilOptions}
+          value={sigilValue(entry)}
+          onChange={(value) => value && changeSigil(index, value)}
+          allowDeselect={false}
+          disabled={busy}
+        />
+      ),
+    },
+    {
+      label: t("ui.toolbox.tm-2nd-trait", "2nd Trait"),
+      control: (entry, index, props) => (
+        <Select
+          {...props}
+          searchable
+          data={traitSelectData(sigilTrait2Options(entry.trait))}
+          value={entry.trait2 ?? ANY}
+          onChange={(value) => value && changeSigilTrait2(index, value === ANY ? null : value)}
+          allowDeselect={false}
+          // A fixed-pair sigil ships both traits, so its 2nd is not a choice
+          // — the picker shows it, locked.
+          disabled={busy || sigilValue(entry) !== entry.trait}
+        />
+      ),
+    },
+  ];
+
+  const stoneColumns: EntryColumn<WrightstoneEntry>[] = [
+    {
+      label: t("ui.toolbox.tm-stone-type", "Type"),
+      width: TYPE_W,
+      control: (entry, index, props) => (
+        <Select
+          {...props}
+          data={familyOptions}
+          value={entry.family}
+          onChange={(family) => family && changeStone(index, { family })}
+          allowDeselect={false}
+          disabled={busy}
+        />
+      ),
+    },
+    {
+      label: t("ui.toolbox.tm-min-rarity", "Lvls"),
+      width: RARITY_W,
+      control: (entry, index, props) => (
+        <Select
+          {...props}
+          data={rarityOptions(entry.family)}
+          value={String(entry.minTier)}
+          onChange={(tier) => tier && changeStone(index, { minTier: parseInt(tier, 10) })}
+          allowDeselect={false}
+          disabled={busy}
+        />
+      ),
+    },
+    {
+      label: t("ui.toolbox.tm-slot-2", "Trait 2"),
+      control: (entry, index, props) => (
+        <Select
+          {...props}
+          searchable
+          data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 1))}
+          value={entry.slot2 ?? ANY}
+          onChange={(value) => value && changeStone(index, { slot2: value === ANY ? null : value })}
+          allowDeselect={false}
+          disabled={busy}
+        />
+      ),
+    },
+    {
+      label: t("ui.toolbox.tm-slot-3", "Trait 3"),
+      control: (entry, index, props) => (
+        <Select
+          {...props}
+          searchable
+          data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 2))}
+          value={entry.slot3 ?? ANY}
+          onChange={(value) => value && changeStone(index, { slot3: value === ANY ? null : value })}
+          allowDeselect={false}
+          disabled={busy}
+        />
+      ),
+    },
+  ];
+
+  const filtered = useMemo(() => (matchesOnly ? results.filter((r) => r.hit) : results), [results, matchesOnly]);
+  const shown = useMemo(() => filtered.slice(0, MAX_SHOWN_ROWS), [filtered]);
 
   /** Each list's tab counts the entries the prediction hits, so the other
    * list still reports itself while you work in this one. */
@@ -282,14 +454,13 @@ const TransmarvelSearcher = () => {
   const matchedStones = stoneHits.filter((h) => h.total > 0).length;
 
   return (
-    <Stack gap="md" pr="md">
-      <Title order={4}>{t("ui.toolbox.transmarvel-wishlist", "Transmarvel Wishlist")}</Title>
-      {status && !status.gameRunning && <Alert color="yellow">{t("ui.toolbox.tm-game-not-running")}</Alert>}
-      {(status?.rngUnpredictable || prediction?.unpredictable) && (
-        <Alert color="orange">{t("ui.toolbox.tm-unpredictable")}</Alert>
-      )}
-      {error && <Alert color="red">{errorMessage}</Alert>}
-      {stale && <Alert color="orange">{t("ui.toolbox.stale-results")}</Alert>}
+    <ToolPage
+      title={t("ui.toolbox.transmarvel-wishlist", "Transmarvel Wishlist")}
+      gameNotRunning={status && !status.gameRunning ? t("ui.toolbox.tm-game-not-running") : null}
+      unpredictable={status?.rngUnpredictable || prediction?.unpredictable ? t("ui.toolbox.tm-unpredictable") : null}
+      error={error ? errorMessage : null}
+      stale={stale}
+    >
       <Group align="flex-start" gap="xl" wrap="nowrap">
         <Group align="flex-end" gap="sm" style={{ flexShrink: 0 }}>
           <TextInput
@@ -318,165 +489,32 @@ const TransmarvelSearcher = () => {
             <Tabs.Tab value="results">{t("ui.toolbox.tm-tab-results", "Full Results")}</Tabs.Tab>
           </Tabs.List>
           <Tabs.Panel value="sigils" pt="sm">
-            <Stack gap="xs">
-              <Group justify="flex-end">
-                <Button
-                  size="compact-sm"
-                  variant="light"
-                  disabled={busy || !addableSigil}
-                  onClick={() => addableSigil && setSigils([...sigils, { trait: addableSigil.trait, trait2: null }])}
-                >
-                  {t("ui.toolbox.tm-add-sigil", "Add sigil")}
-                </Button>
-              </Group>
-              {sigils.length === 0 && (
-                <Text size="sm" c="dimmed">
-                  {t("ui.toolbox.tm-no-sigils", "Add sigils you want to roll for.")}
-                </Text>
-              )}
-              {sigils.map((entry, index) => {
-                const hits = sigilHits[index] ?? NO_HITS;
-                // A fixed-pair sigil ships both traits, so its 2nd is not a
-                // choice — the picker shows it, locked.
-                const pinned = sigilValue(entry) !== entry.trait;
-                return (
-                  <Paper key={index} {...entryCardProps(hits.total > 0)}>
-                    <Group gap="xs" wrap="nowrap" mb={2}>
-                      <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                        {t("ui.toolbox.tm-sigil", "Sigil")}
-                      </Text>
-                      <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                        {t("ui.toolbox.tm-2nd-trait", "2nd Trait")}
-                      </Text>
-                      <ActionIcon
-                        variant="subtle"
-                        size="sm"
-                        aria-label={t("ui.toolbox.tm-remove", "Remove")}
-                        onClick={() => setSigils(sigils.filter((_, i) => i !== index))}
-                      >
-                        <X />
-                      </ActionIcon>
-                    </Group>
-                    <Group gap="xs" wrap="nowrap">
-                      <Select
-                        aria-label={t("ui.toolbox.tm-sigil", "Sigil")}
-                        searchable
-                        data={sigilOptions}
-                        value={sigilValue(entry)}
-                        onChange={(value) => value && changeSigil(index, value)}
-                        allowDeselect={false}
-                        disabled={busy}
-                        style={{ flex: 1 }}
-                      />
-                      <Select
-                        aria-label={t("ui.toolbox.tm-2nd-trait", "2nd Trait")}
-                        searchable
-                        data={traitSelectData(sigilTrait2Options(entry.trait))}
-                        value={entry.trait2 ?? ANY}
-                        onChange={(value) => value && changeSigilTrait2(index, value === ANY ? null : value)}
-                        allowDeselect={false}
-                        disabled={busy || pinned}
-                        style={{ flex: 1 }}
-                      />
-                      {/* Keeps the selects clear of the card's remove button. */}
-                      <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
-                    </Group>
-                    {hits.total > 0 && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
-                  </Paper>
-                );
-              })}
-            </Stack>
+            <WishlistTab
+              entries={sigils}
+              hits={sigilHits}
+              rolls={prediction?.rolls ?? null}
+              columns={sigilColumns}
+              addLabel={t("ui.toolbox.tm-add-sigil", "Add sigil")}
+              addDisabled={busy || !addableSigil}
+              onAdd={() => addableSigil && setSigils([...sigils, { trait: addableSigil.trait, trait2: null }])}
+              emptyHint={t("ui.toolbox.tm-no-sigils", "Add sigils you want to roll for.")}
+              removeLabel={t("ui.toolbox.tm-remove", "Remove")}
+              onRemove={(index) => setSigils(sigils.filter((_, i) => i !== index))}
+            />
           </Tabs.Panel>
           <Tabs.Panel value="stones" pt="sm">
-            <Stack gap="xs">
-              <Group justify="flex-end">
-                <Button
-                  size="compact-sm"
-                  variant="light"
-                  disabled={busy}
-                  onClick={() => setStones([...stones, DEFAULT_STONE])}
-                >
-                  {t("ui.toolbox.tm-add-stone", "Add wrightstone")}
-                </Button>
-              </Group>
-              {stones.length === 0 && (
-                <Text size="sm" c="dimmed">
-                  {t("ui.toolbox.tm-no-stones", "Add wrightstones you want to roll for.")}
-                </Text>
-              )}
-              {stones.map((entry, index) => {
-                const hits = stoneHits[index] ?? NO_HITS;
-                return (
-                  <Paper key={index} {...entryCardProps(hits.total > 0)}>
-                    <Group gap="xs" wrap="nowrap" mb={2}>
-                      <Text size="xs" c="dimmed" w={TYPE_W}>
-                        {t("ui.toolbox.tm-stone-type", "Type")}
-                      </Text>
-                      <Text size="xs" c="dimmed" w={RARITY_W}>
-                        {t("ui.toolbox.tm-min-rarity", "Lvls")}
-                      </Text>
-                      <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                        {t("ui.toolbox.tm-slot-2", "Trait 2")}
-                      </Text>
-                      <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                        {t("ui.toolbox.tm-slot-3", "Trait 3")}
-                      </Text>
-                      <ActionIcon
-                        variant="subtle"
-                        size="sm"
-                        aria-label={t("ui.toolbox.tm-remove", "Remove")}
-                        onClick={() => setStones(stones.filter((_, i) => i !== index))}
-                      >
-                        <X />
-                      </ActionIcon>
-                    </Group>
-                    <Group gap="xs" wrap="nowrap">
-                      <Select
-                        aria-label={t("ui.toolbox.tm-stone-type", "Type")}
-                        data={FAMILIES.map((c) => ({ value: c.family, label: stoneTypeName(c.item) }))}
-                        value={entry.family}
-                        onChange={(family) => family && changeStone(index, { family })}
-                        allowDeselect={false}
-                        disabled={busy}
-                        w={TYPE_W}
-                      />
-                      <Select
-                        aria-label={t("ui.toolbox.tm-min-rarity", "Lvls")}
-                        data={rarityOptions(entry.family)}
-                        value={String(entry.minTier)}
-                        onChange={(tier) => tier && changeStone(index, { minTier: parseInt(tier, 10) })}
-                        allowDeselect={false}
-                        disabled={busy}
-                        w={RARITY_W}
-                      />
-                      <Select
-                        aria-label={t("ui.toolbox.tm-slot-2", "Trait 2")}
-                        searchable
-                        data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 1))}
-                        value={entry.slot2 ?? ANY}
-                        onChange={(value) => value && changeStone(index, { slot2: value === ANY ? null : value })}
-                        allowDeselect={false}
-                        disabled={busy}
-                        style={{ flex: 1 }}
-                      />
-                      <Select
-                        aria-label={t("ui.toolbox.tm-slot-3", "Trait 3")}
-                        searchable
-                        data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 2))}
-                        value={entry.slot3 ?? ANY}
-                        onChange={(value) => value && changeStone(index, { slot3: value === ANY ? null : value })}
-                        allowDeselect={false}
-                        disabled={busy}
-                        style={{ flex: 1 }}
-                      />
-                      {/* Keeps the selects clear of the card's remove button. */}
-                      <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
-                    </Group>
-                    {hits.total > 0 && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
-                  </Paper>
-                );
-              })}
-            </Stack>
+            <WishlistTab
+              entries={stones}
+              hits={stoneHits}
+              rolls={prediction?.rolls ?? null}
+              columns={stoneColumns}
+              addLabel={t("ui.toolbox.tm-add-stone", "Add wrightstone")}
+              addDisabled={busy}
+              onAdd={() => setStones([...stones, DEFAULT_STONE])}
+              emptyHint={t("ui.toolbox.tm-no-stones", "Add wrightstones you want to roll for.")}
+              removeLabel={t("ui.toolbox.tm-remove", "Remove")}
+              onRemove={(index) => setStones(stones.filter((_, i) => i !== index))}
+            />
           </Tabs.Panel>
           <Tabs.Panel value="results" pt="sm">
             {prediction && !prediction.unpredictable && (
@@ -486,7 +524,7 @@ const TransmarvelSearcher = () => {
                     <Text size="xs" c="dimmed">
                       {t("ui.toolbox.tm-results-caveat")}
                     </Text>
-                    {firstHit === null && (
+                    {!hasHits && (
                       <Text size="sm">{t("ui.toolbox.tm-no-hits", { rolls: prediction.rolls.length })}</Text>
                     )}
                     <Checkbox
@@ -524,7 +562,7 @@ const TransmarvelSearcher = () => {
           </Tabs.Panel>
         </Tabs>
       </Group>
-    </Stack>
+    </ToolPage>
   );
 };
 

@@ -155,9 +155,9 @@ const stoneLine = (slot2: string) => `trait:${FAMILY} Lv10 / trait:${slot2} Lv7 
 describe("TransmarvelSearcher", () => {
   beforeEach(() => {
     invoke.mockReset();
-    useTransmarvelWishlistStore.setState({ sigils: [], stones: [] });
-    // Mantine's useLocalStorage would otherwise leak the persisted roll
-    // count between tests.
+    // The store is a module-level singleton, so its persisted state (roll
+    // count included) would otherwise leak between tests.
+    useTransmarvelWishlistStore.setState({ sigils: [], stones: [], rolls: 50 });
     window.localStorage.clear();
   });
 
@@ -731,7 +731,7 @@ describe("TransmarvelSearcher", () => {
   });
 
   it("restores the persisted roll count and auto-predicts with it", async () => {
-    window.localStorage.setItem("transmarvel-rolls", "123");
+    useTransmarvelWishlistStore.setState({ rolls: 123 });
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(prediction);
