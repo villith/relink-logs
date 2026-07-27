@@ -91,27 +91,41 @@ export const rollHits = (
   );
 };
 
-/** For each entry, the first roll index (0-based) at which that entry ALONE
- * hits — null when it never does. Drives the per-row hit badges. */
-export const sigilFirstHits = (
+/** Most hit rolls listed under one wishlist entry. A wildcard entry ("any"
+ * 2nd trait / slot) can match hundreds of rolls; the rest are counted only,
+ * and the Full Results tab still carries every roll. */
+export const MAX_ENTRY_HITS = 10;
+
+/** One entry's hits: the first `MAX_ENTRY_HITS` roll indices (0-based) that
+ * entry ALONE matches, plus how many it matches overall. */
+export type EntryHits = { indices: number[]; total: number };
+
+export const NO_HITS: EntryHits = { indices: [], total: 0 };
+
+const collectHits = (rolls: TransmarvelRoll[], hit: (roll: TransmarvelRoll) => boolean): EntryHits => {
+  const indices: number[] = [];
+  let total = 0;
+  rolls.forEach((roll, index) => {
+    if (!hit(roll)) return;
+    total += 1;
+    if (indices.length < MAX_ENTRY_HITS) indices.push(index);
+  });
+  return { indices, total };
+};
+
+/** Per-entry hits, in wishlist order — drives each row's badge and its
+ * expanded list of matching rolls. */
+export const sigilEntryHits = (
   rolls: TransmarvelRoll[],
   sigils: SigilEntry[],
   p: TransmarvelPool = POOL
-): (number | null)[] =>
-  sigils.map((entry) => {
-    const index = rolls.findIndex((roll) => rollHits(roll, [entry], [], p));
-    return index === -1 ? null : index;
-  });
+): EntryHits[] => sigils.map((entry) => collectHits(rolls, (roll) => rollHits(roll, [entry], [], p)));
 
-export const stoneFirstHits = (
+export const stoneEntryHits = (
   rolls: TransmarvelRoll[],
   stones: WrightstoneEntry[],
   p: TransmarvelPool = POOL
-): (number | null)[] =>
-  stones.map((entry) => {
-    const index = rolls.findIndex((roll) => rollHits(roll, [], [entry], p));
-    return index === -1 ? null : index;
-  });
+): EntryHits[] => stones.map((entry) => collectHits(rolls, (roll) => rollHits(roll, [], [entry], p)));
 
 /** Validate a wishlist blob loaded from localStorage against the current pool
  * (a game patch may have regenerated the pool and invalidated stored
@@ -238,8 +252,8 @@ export default function useTransmarvelSearcher() {
     [prediction, sigils, stones]
   );
   const firstHit = useMemo(() => results.find((r) => r.hit)?.index ?? null, [results]);
-  const sigilHits = useMemo(() => sigilFirstHits(prediction?.rolls ?? [], sigils), [prediction, sigils]);
-  const stoneHits = useMemo(() => stoneFirstHits(prediction?.rolls ?? [], stones), [prediction, stones]);
+  const sigilHits = useMemo(() => sigilEntryHits(prediction?.rolls ?? [], sigils), [prediction, sigils]);
+  const stoneHits = useMemo(() => stoneEntryHits(prediction?.rolls ?? [], stones), [prediction, stones]);
 
   return {
     status,

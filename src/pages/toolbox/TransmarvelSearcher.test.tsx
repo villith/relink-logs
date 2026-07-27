@@ -24,6 +24,8 @@ const TEMPLATES: Record<string, string> = {
   "ui.toolbox.tm-no-hits": "No wishlist hits in the next {{rolls}} rolls.",
   "ui.toolbox.tm-truncated": "Showing the first {{shown}} of {{total}} rolls.",
   "ui.toolbox.tm-entry-hit": "#{{n}}",
+  "ui.toolbox.tm-entry-hit-multi": "#{{n}} +{{count}}",
+  "ui.toolbox.tm-entry-more": "+{{count}} more in Full Results",
   "ui.level-short": "Lv{{level}}",
 };
 vi.mock("react-i18next", async (importOriginal) => ({
@@ -122,6 +124,32 @@ const prediction: TransmarvelPrediction = {
   unpredictable: false,
 };
 
+// Two tier-0 rolls of FAMILY differing in their 2nd-slot trait — the case a
+// wildcard ("Any") entry is meant to disambiguate.
+const SLOT2_A = TIERS[0].slots[1].traits[0];
+const SLOT2_B = TIERS[0].slots[1].traits.find((t) => t !== SLOT2_A)!;
+const SLOT3 = TIERS[0].slots[2].traits[0];
+const stoneRoll = (slot2: string) => ({
+  outcome: {
+    type: "wrightstone" as const,
+    item: parseInt(TIERS[0].item, 16),
+    traits: [
+      [parseInt(FAMILY, 16), 10],
+      [parseInt(slot2, 16), 7],
+      [parseInt(SLOT3, 16), 5],
+    ] as [number, number][],
+  },
+  draws: 12,
+});
+const stonePrediction: TransmarvelPrediction = {
+  rolls: [stoneRoll(SLOT2_A), stoneRoll(SLOT2_B)],
+  slot: 4,
+  slotState: 12345,
+  unpredictable: false,
+};
+/** The dimmed outcome line the page builds for one of those rolls. */
+const stoneLine = (slot2: string) => `trait:${FAMILY} Lv10 / trait:${slot2} Lv7 / trait:${SLOT3} Lv5`;
+
 describe("TransmarvelSearcher", () => {
   beforeEach(() => {
     invoke.mockReset();
@@ -157,19 +185,19 @@ describe("TransmarvelSearcher", () => {
     renderPage();
 
     // No Predict click: the mount-time auto-predict fetches the rolls itself.
-    expect(await screen.findByText("#1")).toBeTruthy();
     // The roll table lives in the Full Results tab; activate it so role
     // queries can see it (the hidden panel is out of the accessibility tree).
+    await screen.findByText("#1");
     await act(async () => {
       fireEvent.click(screen.getByRole("tab", { name: "Full Results" }));
     });
-    // "#2" appears twice: the table's roll column and the entry's hit badge.
-    expect(await screen.findAllByText("#2")).toHaveLength(2);
     // No Match column any more — the matched row is bolded instead. Scoped
-    // to the table because the sigil picker's mounted dropdown carries the
-    // same names as option labels.
+    // to the table because the sigil picker's mounted dropdown and the
+    // wishlist's own hit list repeat these strings.
     expect(screen.queryByText("✓")).toBeNull();
     const table = screen.getByRole("table");
+    expect(within(table).getByText("#1")).toBeTruthy();
+    expect(within(table).getByText("#2")).toBeTruthy();
     const matchedName = within(table).getByText(`sigil:${WISHLISTED.sigilId}`);
     expect(matchedName.style.fontWeight).toBe("700");
     const unmatchedName = within(table).getByText(`sigil:${OTHER.sigilId}`);
@@ -523,10 +551,64 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    // "#2" appears twice: the table's roll column and the sigil entry's badge.
-    expect(await screen.findAllByText("#2")).toHaveLength(2);
-    // The stone entry renders the dimmed no-hit dash.
-    expect(screen.getByText("—")).toBeTruthy();
+    // The wishlist tab is active, so its panel is the visible one. "#2"
+    // shows twice for the sigil entry: its badge and its one expanded hit.
+    const wishlist = await screen.findByRole("tabpanel");
+    await waitFor(() => expect(within(wishlist).getAllByText("#2")).toHaveLength(2));
+    // The stone entry never hits: dimmed dash, no hit list.
+    expect(within(wishlist).getByText("—")).toBeTruthy();
+  });
+
+  it("expands a hitting entry by default, listing each matching roll's outcome", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "predict_transmarvel") return Promise.resolve(stonePrediction);
+      if (command === "fetch_overmastery_seed") return Promise.resolve(stonePrediction.slotState);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    // A wildcard entry: both rolls match, and only the expanded list reveals
+    // which 2nd-slot trait each one actually carries.
+    useTransmarvelWishlistStore.setState({
+      sigils: [],
+      stones: [{ family: FAMILY, minTier: 0, slot2: null, slot3: null }],
+    });
+
+    renderPage();
+
+    const wishlist = await screen.findByRole("tabpanel");
+    // Badge summarizes: first hit plus how many more.
+    expect(await within(wishlist).findByText("#1 +1")).toBeTruthy();
+    // Both hits are listed with their own roll # and resolved traits.
+    expect(within(wishlist).getByText(stoneLine(SLOT2_A))).toBeTruthy();
+    expect(within(wishlist).getByText(stoneLine(SLOT2_B))).toBeTruthy();
+  });
+
+  it("collapses and re-expands an entry when its hit badge is clicked", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "predict_transmarvel") return Promise.resolve(stonePrediction);
+      if (command === "fetch_overmastery_seed") return Promise.resolve(stonePrediction.slotState);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    useTransmarvelWishlistStore.setState({
+      sigils: [],
+      stones: [{ family: FAMILY, minTier: 0, slot2: null, slot3: null }],
+    });
+
+    renderPage();
+
+    const wishlist = await screen.findByRole("tabpanel");
+    const badge = await within(wishlist).findByText("#1 +1");
+
+    await act(async () => {
+      fireEvent.click(badge);
+    });
+    expect(within(wishlist).queryByText(stoneLine(SLOT2_A))).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(badge);
+    });
+    expect(within(wishlist).getByText(stoneLine(SLOT2_A))).toBeTruthy();
   });
 
   it("shows no hit badges or dashes before any prediction", async () => {

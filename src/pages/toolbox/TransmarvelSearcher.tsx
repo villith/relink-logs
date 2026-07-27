@@ -1,5 +1,5 @@
 import { backendErrorMessage } from "@/backendErrors";
-import type { TransmarvelOutcome } from "@/types";
+import type { TransmarvelOutcome, TransmarvelRoll } from "@/types";
 import { translateSigilId, translateTraitId, translateWrightstoneId } from "@/utils";
 import {
   ActionIcon,
@@ -25,8 +25,11 @@ import { useTranslation } from "react-i18next";
 import { orderedTraitOptions } from "./traitOptions";
 
 import useTransmarvelSearcher, {
+  EntryHits,
   familyCombos,
+  NO_HITS,
   POOL,
+  SigilEntry,
   sigilTrait2Options,
   slotTraitOptions,
   WrightstoneEntry,
@@ -54,7 +57,7 @@ export const MAX_SHOWN_ROWS = 1000;
 const TYPE_W = 170;
 const RARITY_W = 110;
 const REMOVE_W = 28;
-const HIT_W = 64;
+const HIT_W = 96;
 
 /** One tier-0 combo per family, in pool order — drives the Type picker
  * (value = family, label = the stone's item name minus the redundant
@@ -67,12 +70,11 @@ const stoneTypeName = (item: string) =>
     .replace(/\s*wrightstone\s*/i, " ")
     .trim();
 
-/** Synthesis-style result cell: name line + dimmed trait line. Sigil traits
- * share one level, so none is shown; stone levels differ per slot. */
-const OutcomeCell = ({ outcome, hit }: { outcome: TransmarvelOutcome; hit: boolean }) => {
+/** A rolled outcome's traits, one line. Sigil traits share a single level so
+ * none is shown; a stone's slots carry their own. */
+const useOutcomeLine = () => {
   const { t } = useTranslation();
-  const name = outcome.type === "sigil" ? translateSigilId(outcome.sigilId) : translateWrightstoneId(outcome.item);
-  const line =
+  return (outcome: TransmarvelOutcome) =>
     outcome.type === "sigil"
       ? [translateTraitId(outcome.trait1), outcome.trait2 !== null ? translateTraitId(outcome.trait2) : null]
           .filter(Boolean)
@@ -80,33 +82,87 @@ const OutcomeCell = ({ outcome, hit }: { outcome: TransmarvelOutcome; hit: boole
       : outcome.traits
           .map(([trait, level]) => `${translateTraitId(trait)} ${t("ui.level-short", { level })}`)
           .join(" / ");
+};
+
+/** Synthesis-style result cell: name line + dimmed trait line. */
+const OutcomeCell = ({ outcome, hit }: { outcome: TransmarvelOutcome; hit: boolean }) => {
+  const outcomeLine = useOutcomeLine();
+  const name = outcome.type === "sigil" ? translateSigilId(outcome.sigilId) : translateWrightstoneId(outcome.item);
   return (
     <Stack gap={0}>
       <Text size="sm" fw={hit ? 700 : undefined}>
         {name}
       </Text>
       <Text size="xs" c="dimmed">
-        {line}
+        {outcomeLine(outcome)}
       </Text>
     </Stack>
   );
 };
 
-/** Trailing cell of an entry row: the entry's own first-hit roll # once a
- * prediction exists, a dimmed dash when it never hits, blank otherwise. */
-const HitCell = ({ hitIndex, hasPrediction }: { hitIndex: number | null; hasPrediction: boolean }) => {
+/** Trailing cell of an entry row: the entry's first-hit roll # (plus how many
+ * more it matches) once a prediction exists, a dimmed dash when it never
+ * hits, blank otherwise. The badge toggles the row's hit list. */
+const HitCell = ({
+  hits,
+  hasPrediction,
+  expanded,
+  onToggle,
+}: {
+  hits: EntryHits;
+  hasPrediction: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+}) => {
   const { t } = useTranslation();
+  const first = hits.indices[0];
   return (
     <Box w={HIT_W} style={{ flexShrink: 0, textAlign: "center" }}>
       {hasPrediction &&
-        (hitIndex !== null ? (
-          <Badge color="green">{t("ui.toolbox.tm-entry-hit", { n: hitIndex + 1 })}</Badge>
+        (hits.total > 0 ? (
+          <Badge
+            component="button"
+            type="button"
+            color="green"
+            style={{ cursor: "pointer" }}
+            onClick={onToggle}
+            aria-expanded={expanded}
+            title={t("ui.toolbox.tm-entry-toggle")}
+          >
+            {hits.total > 1
+              ? t("ui.toolbox.tm-entry-hit-multi", { n: first + 1, count: hits.total - 1 })
+              : t("ui.toolbox.tm-entry-hit", { n: first + 1 })}
+          </Badge>
         ) : (
           <Text size="sm" c="dimmed" title={t("ui.toolbox.tm-entry-no-hit")}>
             {/* eslint-disable-next-line i18next/no-literal-string -- bare glyph */}—
           </Text>
         ))}
     </Box>
+  );
+};
+
+/** The rolls one entry matches: roll # + what that roll actually produces,
+ * which is what a wildcard ("Any") entry cannot show on its own. */
+const EntryHitList = ({ hits, rolls }: { hits: EntryHits; rolls: TransmarvelRoll[] }) => {
+  const { t } = useTranslation();
+  const outcomeLine = useOutcomeLine();
+  return (
+    <Stack gap={2} pl="md" pb={6}>
+      {hits.indices.map((index) => (
+        <Group key={index} gap="xs" wrap="nowrap">
+          <Text size="xs" c="dimmed" w={44} ta="right" style={{ flexShrink: 0 }}>
+            {t("ui.toolbox.tm-entry-hit", { n: index + 1 })}
+          </Text>
+          <Text size="xs">{outcomeLine(rolls[index].outcome)}</Text>
+        </Group>
+      ))}
+      {hits.total > hits.indices.length && (
+        <Text size="xs" c="dimmed" pl={52}>
+          {t("ui.toolbox.tm-entry-more", { count: hits.total - hits.indices.length })}
+        </Text>
+      )}
+    </Stack>
   );
 };
 
@@ -141,6 +197,18 @@ const TransmarvelSearcher = () => {
   // Tabs are controlled so a tab switch re-renders this component and the
   // measuring effect below re-runs.
   const [tab, setTab] = useState<string | null>("wishlist");
+
+  /** Hit lists are open by default, so this tracks what the user closed
+   * rather than what they opened. Keys are the entry's content (not its
+   * index), so removing a row can't transfer a collapse to its neighbour and
+   * an edited row reopens with its new hits. */
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
+  const toggleCollapsed = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
   /** Anchor the results scroll area to the viewport bottom by measuring its
    * actual top edge. A fixed calc() offset drifts whenever the content above
    * (alerts, controls, tab list) changes, letting the page overflow and grow
@@ -217,6 +285,10 @@ const TransmarvelSearcher = () => {
   const filtered = matchesOnly ? results.filter((r) => r.hit) : results;
   const shown = filtered.slice(0, MAX_SHOWN_ROWS);
 
+  const sigilKey = (e: SigilEntry) => `s|${e.trait}|${e.trait2 ?? ""}`;
+  const stoneKey = (e: WrightstoneEntry) => `w|${e.family}|${e.minTier}|${e.slot2 ?? ""}|${e.slot3 ?? ""}`;
+  const isOpen = (key: string, hits: EntryHits) => hasPrediction && hits.total > 0 && !collapsed.has(key);
+
   return (
     <Stack gap="md" pr="md">
       <Title order={4}>{t("ui.toolbox.transmarvel-searcher", "Transmarvel Searcher")}</Title>
@@ -279,38 +351,50 @@ const TransmarvelSearcher = () => {
                 </Text>
               </Group>
             )}
-            {sigils.map((entry, index) => (
-              <Group key={index} gap="xs" wrap="nowrap">
-                <Select
-                  aria-label={t("ui.toolbox.tm-sigil", "Sigil")}
-                  searchable
-                  data={sigilOptions}
-                  value={entry.trait}
-                  onChange={(trait) => trait && changeSigil(index, trait)}
-                  allowDeselect={false}
-                  disabled={busy}
-                  style={{ flex: 1 }}
-                />
-                <Select
-                  aria-label={t("ui.toolbox.tm-2nd-trait", "2nd trait")}
-                  searchable
-                  data={traitSelectData(sigilTrait2Options(entry.trait))}
-                  value={entry.trait2 ?? ANY}
-                  onChange={(value) => value && changeSigilTrait2(index, value === ANY ? null : value)}
-                  allowDeselect={false}
-                  disabled={busy}
-                  style={{ flex: 1 }}
-                />
-                <ActionIcon
-                  variant="subtle"
-                  aria-label={t("ui.toolbox.tm-remove", "Remove")}
-                  onClick={() => setSigils(sigils.filter((_, i) => i !== index))}
-                >
-                  <X />
-                </ActionIcon>
-                <HitCell hitIndex={sigilHits[index]} hasPrediction={hasPrediction} />
-              </Group>
-            ))}
+            {sigils.map((entry, index) => {
+              const key = sigilKey(entry);
+              const hits = sigilHits[index] ?? NO_HITS;
+              return (
+                <Box key={index}>
+                  <Group gap="xs" wrap="nowrap">
+                    <Select
+                      aria-label={t("ui.toolbox.tm-sigil", "Sigil")}
+                      searchable
+                      data={sigilOptions}
+                      value={entry.trait}
+                      onChange={(trait) => trait && changeSigil(index, trait)}
+                      allowDeselect={false}
+                      disabled={busy}
+                      style={{ flex: 1 }}
+                    />
+                    <Select
+                      aria-label={t("ui.toolbox.tm-2nd-trait", "2nd trait")}
+                      searchable
+                      data={traitSelectData(sigilTrait2Options(entry.trait))}
+                      value={entry.trait2 ?? ANY}
+                      onChange={(value) => value && changeSigilTrait2(index, value === ANY ? null : value)}
+                      allowDeselect={false}
+                      disabled={busy}
+                      style={{ flex: 1 }}
+                    />
+                    <ActionIcon
+                      variant="subtle"
+                      aria-label={t("ui.toolbox.tm-remove", "Remove")}
+                      onClick={() => setSigils(sigils.filter((_, i) => i !== index))}
+                    >
+                      <X />
+                    </ActionIcon>
+                    <HitCell
+                      hits={hits}
+                      hasPrediction={hasPrediction}
+                      expanded={isOpen(key, hits)}
+                      onToggle={() => toggleCollapsed(key)}
+                    />
+                  </Group>
+                  {isOpen(key, hits) && prediction && <EntryHitList hits={hits} rolls={prediction.rolls} />}
+                </Box>
+              );
+            })}
             <Group justify="space-between" align="center" mt="sm">
               <Title order={6}>{t("ui.toolbox.tm-stone-wishlist", "Wrightstone wishlist")}</Title>
               <Button
@@ -347,56 +431,68 @@ const TransmarvelSearcher = () => {
                 <Box w={HIT_W} />
               </Group>
             )}
-            {stones.map((entry, index) => (
-              <Group key={index} gap="xs" wrap="nowrap">
-                <Select
-                  aria-label={t("ui.toolbox.tm-stone-type", "Type")}
-                  data={FAMILIES.map((c) => ({ value: c.family, label: stoneTypeName(c.item) }))}
-                  value={entry.family}
-                  onChange={(family) => family && changeStone(index, { family })}
-                  allowDeselect={false}
-                  disabled={busy}
-                  w={TYPE_W}
-                />
-                <Select
-                  aria-label={t("ui.toolbox.tm-min-rarity", "Min rarity")}
-                  data={rarityOptions(entry.family)}
-                  value={String(entry.minTier)}
-                  onChange={(tier) => tier && changeStone(index, { minTier: parseInt(tier, 10) })}
-                  allowDeselect={false}
-                  disabled={busy}
-                  w={RARITY_W}
-                />
-                <Select
-                  aria-label={t("ui.toolbox.tm-slot-2", "Slot 2")}
-                  searchable
-                  data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 1))}
-                  value={entry.slot2 ?? ANY}
-                  onChange={(value) => value && changeStone(index, { slot2: value === ANY ? null : value })}
-                  allowDeselect={false}
-                  disabled={busy}
-                  style={{ flex: 1 }}
-                />
-                <Select
-                  aria-label={t("ui.toolbox.tm-slot-3", "Slot 3")}
-                  searchable
-                  data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 2))}
-                  value={entry.slot3 ?? ANY}
-                  onChange={(value) => value && changeStone(index, { slot3: value === ANY ? null : value })}
-                  allowDeselect={false}
-                  disabled={busy}
-                  style={{ flex: 1 }}
-                />
-                <ActionIcon
-                  variant="subtle"
-                  aria-label={t("ui.toolbox.tm-remove", "Remove")}
-                  onClick={() => setStones(stones.filter((_, i) => i !== index))}
-                >
-                  <X />
-                </ActionIcon>
-                <HitCell hitIndex={stoneHits[index]} hasPrediction={hasPrediction} />
-              </Group>
-            ))}
+            {stones.map((entry, index) => {
+              const key = stoneKey(entry);
+              const hits = stoneHits[index] ?? NO_HITS;
+              return (
+                <Box key={index}>
+                  <Group gap="xs" wrap="nowrap">
+                    <Select
+                      aria-label={t("ui.toolbox.tm-stone-type", "Type")}
+                      data={FAMILIES.map((c) => ({ value: c.family, label: stoneTypeName(c.item) }))}
+                      value={entry.family}
+                      onChange={(family) => family && changeStone(index, { family })}
+                      allowDeselect={false}
+                      disabled={busy}
+                      w={TYPE_W}
+                    />
+                    <Select
+                      aria-label={t("ui.toolbox.tm-min-rarity", "Min rarity")}
+                      data={rarityOptions(entry.family)}
+                      value={String(entry.minTier)}
+                      onChange={(tier) => tier && changeStone(index, { minTier: parseInt(tier, 10) })}
+                      allowDeselect={false}
+                      disabled={busy}
+                      w={RARITY_W}
+                    />
+                    <Select
+                      aria-label={t("ui.toolbox.tm-slot-2", "Slot 2")}
+                      searchable
+                      data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 1))}
+                      value={entry.slot2 ?? ANY}
+                      onChange={(value) => value && changeStone(index, { slot2: value === ANY ? null : value })}
+                      allowDeselect={false}
+                      disabled={busy}
+                      style={{ flex: 1 }}
+                    />
+                    <Select
+                      aria-label={t("ui.toolbox.tm-slot-3", "Slot 3")}
+                      searchable
+                      data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 2))}
+                      value={entry.slot3 ?? ANY}
+                      onChange={(value) => value && changeStone(index, { slot3: value === ANY ? null : value })}
+                      allowDeselect={false}
+                      disabled={busy}
+                      style={{ flex: 1 }}
+                    />
+                    <ActionIcon
+                      variant="subtle"
+                      aria-label={t("ui.toolbox.tm-remove", "Remove")}
+                      onClick={() => setStones(stones.filter((_, i) => i !== index))}
+                    >
+                      <X />
+                    </ActionIcon>
+                    <HitCell
+                      hits={hits}
+                      hasPrediction={hasPrediction}
+                      expanded={isOpen(key, hits)}
+                      onToggle={() => toggleCollapsed(key)}
+                    />
+                  </Group>
+                  {isOpen(key, hits) && prediction && <EntryHitList hits={hits} rolls={prediction.rolls} />}
+                </Box>
+              );
+            })}
           </Stack>
         </Tabs.Panel>
         <Tabs.Panel value="results" pt="sm">

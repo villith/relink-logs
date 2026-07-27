@@ -4,14 +4,15 @@ import type { TransmarvelRoll } from "@/types";
 
 import {
   familyCombos,
+  MAX_ENTRY_HITS,
   POOL,
   rollHits,
   sanitizeWishlists,
   SigilEntry,
-  sigilFirstHits,
+  sigilEntryHits,
   sigilTrait2Options,
   slotTraitOptions,
-  stoneFirstHits,
+  stoneEntryHits,
   TransmarvelPool,
   WrightstoneEntry,
 } from "./useTransmarvelSearcher";
@@ -178,7 +179,7 @@ describe("rollHits", () => {
   });
 });
 
-describe("per-entry first hits", () => {
+describe("per-entry hits", () => {
   const sigilRoll = (trait1: number, trait2: number | null = null): TransmarvelRoll => ({
     outcome: { type: "sigil", sigilId: 0x000001aa, traitLevel: 10, trait1, trait2 },
     draws: 5,
@@ -187,38 +188,62 @@ describe("per-entry first hits", () => {
     outcome: { type: "wrightstone", item, traits },
     draws: 12,
   });
+  const f1Tier0 = stoneRoll(0x00000101, [
+    [0x000000f1, 10],
+    [0x000000cc, 7],
+    [0x000000dd, 5],
+  ]);
   const rolls: TransmarvelRoll[] = [
     sigilRoll(0x000000bb), // roll 0
-    stoneRoll(0x00000101, [
-      [0x000000f1, 10],
-      [0x000000cc, 7],
-      [0x000000dd, 5],
-    ]), // roll 1: f1 tier 0
+    f1Tier0, // roll 1
     sigilRoll(0x000000aa, 0x000000cc), // roll 2
+    sigilRoll(0x000000aa, 0x000000dd), // roll 3
   ];
 
-  it("maps each sigil entry to the first roll it alone hits, null when it never hits", () => {
+  it("lists every roll a sigil entry hits, with the total", () => {
     const entries: SigilEntry[] = [
-      { trait: "000000aa", trait2: null }, // hits roll 2
-      { trait: "000000bb", trait2: null }, // hits roll 0
-      { trait: "000000aa", trait2: "000000dd" }, // wrong 2nd trait: never
+      { trait: "000000aa", trait2: null }, // any 2nd trait: rolls 2 and 3
+      { trait: "000000aa", trait2: "000000cc" }, // exact pair: roll 2 only
+      { trait: "000000bb", trait2: null }, // roll 0
+      { trait: "000000aa", trait2: "000000ee" }, // never
     ];
-    expect(sigilFirstHits(rolls, entries, POOL_DOUBLE)).toEqual([2, 0, null]);
+    expect(sigilEntryHits(rolls, entries, POOL_DOUBLE)).toEqual([
+      { indices: [2, 3], total: 2 },
+      { indices: [2], total: 1 },
+      { indices: [0], total: 1 },
+      { indices: [], total: 0 },
+    ]);
   });
 
-  it("maps each stone entry independently of the other entries", () => {
+  it("lists each stone entry's hits independently of the other entries", () => {
     const entries: WrightstoneEntry[] = [
       { family: "000000f1", minTier: 0, slot2: null, slot3: null }, // hits roll 1
       { family: "000000f1", minTier: 1, slot2: null, slot3: null }, // rolled tier below min: never
       { family: "000000f2", minTier: 0, slot2: null, slot3: null }, // wrong family: never
     ];
-    expect(stoneFirstHits(rolls, entries, POOL_DOUBLE)).toEqual([1, null, null]);
+    expect(stoneEntryHits(rolls, entries, POOL_DOUBLE)).toEqual([
+      { indices: [1], total: 1 },
+      { indices: [], total: 0 },
+      { indices: [], total: 0 },
+    ]);
+  });
+
+  it("caps the listed indices but still counts every hit", () => {
+    const many = Array.from({ length: MAX_ENTRY_HITS + 5 }, () => f1Tier0);
+    const entry: WrightstoneEntry = { family: "000000f1", minTier: 0, slot2: null, slot3: null };
+    const [hits] = stoneEntryHits(many, [entry], POOL_DOUBLE);
+    expect(hits.total).toBe(MAX_ENTRY_HITS + 5);
+    expect(hits.indices).toHaveLength(MAX_ENTRY_HITS);
+    expect(hits.indices[0]).toBe(0);
+    expect(hits.indices.at(-1)).toBe(MAX_ENTRY_HITS - 1);
   });
 
   it("handles empty rolls and empty wishlists", () => {
-    expect(sigilFirstHits([], [{ trait: "000000aa", trait2: null }], POOL_DOUBLE)).toEqual([null]);
-    expect(sigilFirstHits(rolls, [], POOL_DOUBLE)).toEqual([]);
-    expect(stoneFirstHits(rolls, [], POOL_DOUBLE)).toEqual([]);
+    expect(sigilEntryHits([], [{ trait: "000000aa", trait2: null }], POOL_DOUBLE)).toEqual([
+      { indices: [], total: 0 },
+    ]);
+    expect(sigilEntryHits(rolls, [], POOL_DOUBLE)).toEqual([]);
+    expect(stoneEntryHits(rolls, [], POOL_DOUBLE)).toEqual([]);
   });
 });
 
