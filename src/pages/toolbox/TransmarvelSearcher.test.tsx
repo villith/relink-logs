@@ -26,6 +26,7 @@ const TEMPLATES: Record<string, string> = {
   "ui.toolbox.tm-rarity-option": "Lv {{levels}}",
   "ui.toolbox.tm-rarity-option-fixed": "Lv {{levels}} ({{traits}})",
   "ui.toolbox.tm-truncated": "Showing the first {{shown}} of {{total}} rolls.",
+  "ui.toolbox.tm-entry-hit": "#{{n}}",
   "ui.level-short": "Lv{{level}}",
 };
 vi.mock("react-i18next", async (importOriginal) => ({
@@ -96,6 +97,8 @@ const TOP_SLOT3 = TIERS[2].slots[2].traits[0];
 const ROLLED_SLOT2 = TIERS[0].slots[1].traits.find((t) => t !== TOP_SLOT2)!;
 
 const status: TransmarvelStatus = { gameRunning: true, rngUnpredictable: false };
+// For tests exercising only the pickers/inputs: no auto-predict, no busy hold.
+const statusOff: TransmarvelStatus = { gameRunning: false, rngUnpredictable: false };
 
 const prediction: TransmarvelPrediction = {
   rolls: [
@@ -164,7 +167,8 @@ describe("TransmarvelSearcher", () => {
     });
 
     expect(await screen.findByText("#1")).toBeTruthy();
-    expect(await screen.findByText("#2")).toBeTruthy();
+    // "#2" may appear twice: the table's roll column and the entry's hit badge.
+    expect((await screen.findAllByText("#2")).length).toBeGreaterThanOrEqual(1);
     expect(await screen.findByText("First wishlist hit at roll #2")).toBeTruthy();
     // Exactly one row matches, marked with the badge in the Match column.
     expect(screen.getAllByText("✓")).toHaveLength(1);
@@ -188,7 +192,7 @@ describe("TransmarvelSearcher", () => {
     });
 
     expect(await screen.findByText("#1")).toBeTruthy();
-    expect(await screen.findByText("#2")).toBeTruthy();
+    expect((await screen.findAllByText("#2")).length).toBeGreaterThanOrEqual(1);
 
     const matchesOnly = await screen.findByLabelText("Show matches only");
     await act(async () => {
@@ -196,7 +200,7 @@ describe("TransmarvelSearcher", () => {
     });
 
     expect(screen.queryByText("#1")).toBeNull();
-    expect(screen.getByText("#2")).toBeTruthy();
+    expect(screen.getAllByText("#2").length).toBeGreaterThanOrEqual(1);
   });
 
   it("renders the translated error banner and no results table when predict rejects", async () => {
@@ -313,7 +317,7 @@ describe("TransmarvelSearcher", () => {
 
   it("offers only valid 2nd-trait combinations, popular first then alphabetical", async () => {
     invoke.mockImplementation((command: string) => {
-      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
     useTransmarvelWishlistStore.setState({ sigils: [{ trait: EXTRA_SIGIL.trait, trait2: null }], stones: [] });
@@ -336,7 +340,7 @@ describe("TransmarvelSearcher", () => {
 
   it("locks the stone slot pickers to the fixed traits at min rarity 0.1%", async () => {
     invoke.mockImplementation((command: string) => {
-      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
     useTransmarvelWishlistStore.setState({
@@ -355,7 +359,7 @@ describe("TransmarvelSearcher", () => {
 
   it("resets a slot pick to Any when raising the min rarity makes it unavailable", async () => {
     invoke.mockImplementation((command: string) => {
-      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
     useTransmarvelWishlistStore.setState({
@@ -382,7 +386,7 @@ describe("TransmarvelSearcher", () => {
 
   it("caps the rolls input at 50,000", async () => {
     invoke.mockImplementation((command: string) => {
-      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
 
@@ -463,7 +467,7 @@ describe("TransmarvelSearcher", () => {
 
   it("labels sigil picker entries by their item name, not their trait id", async () => {
     invoke.mockImplementation((command: string) => {
-      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
     useTransmarvelWishlistStore.setState({ sigils: [{ trait: WISHLISTED.trait, trait2: null }], stones: [] });
@@ -483,7 +487,7 @@ describe("TransmarvelSearcher", () => {
 
   it("labels rarities by their level layout alone, naming the top tier's fixed traits", async () => {
     invoke.mockImplementation((command: string) => {
-      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
     useTransmarvelWishlistStore.setState({
@@ -506,5 +510,63 @@ describe("TransmarvelSearcher", () => {
       "Lv 20/15/10",
       `Lv 20/15/10 (trait:${TOP_SLOT2} / trait:${TOP_SLOT3})`,
     ]);
+  });
+
+  it("shows a first-hit badge on hitting entries and a dash on entries that never hit", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "predict_transmarvel") return Promise.resolve(prediction);
+      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    // The sigil entry hits roll #2; the prediction contains no stone rolls,
+    // so the stone entry can never hit.
+    useTransmarvelWishlistStore.setState({
+      sigils: [{ trait: WISHLISTED.trait, trait2: null }],
+      stones: [{ family: FAMILY, minTier: 0, slot2: null, slot3: null }],
+    });
+
+    renderPage();
+
+    const predictButton = (await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement;
+    await waitFor(() => expect(predictButton.disabled).toBe(false));
+    await act(async () => {
+      fireEvent.click(predictButton);
+    });
+
+    expect(await screen.findByText("First wishlist hit at roll #2")).toBeTruthy();
+    // "#2" appears twice: the table's roll column and the sigil entry's badge.
+    expect(screen.getAllByText("#2")).toHaveLength(2);
+    // The stone entry renders the dimmed no-hit dash.
+    expect(screen.getByText("—")).toBeTruthy();
+  });
+
+  it("shows no hit badges or dashes before any prediction", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    useTransmarvelWishlistStore.setState({
+      sigils: [{ trait: WISHLISTED.trait, trait2: null }],
+      stones: [{ family: FAMILY, minTier: 0, slot2: null, slot3: null }],
+    });
+
+    renderPage();
+
+    await screen.findByLabelText("Sigil", { selector: "input" });
+    expect(screen.queryByText("—")).toBeNull();
+    expect(screen.queryByText(/^#\d+$/)).toBeNull();
+  });
+
+  it("shows empty-wishlist hints when both lists are empty", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    renderPage();
+
+    expect(await screen.findByText("Add sigils you want to roll for.")).toBeTruthy();
+    expect(screen.getByText("Add wrightstones you want to roll for.")).toBeTruthy();
   });
 });
