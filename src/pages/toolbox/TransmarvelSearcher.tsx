@@ -181,7 +181,7 @@ const TransmarvelSearcher = () => {
 
   // Tabs are controlled so a tab switch re-renders this component and the
   // measuring effect below re-runs.
-  const [tab, setTab] = useState<string | null>("wishlist");
+  const [tab, setTab] = useState<string | null>("sigils");
 
   /** Anchor the results scroll area to the viewport bottom by measuring its
    * actual top edge. A fixed calc() offset drifts whenever the content above
@@ -276,6 +276,11 @@ const TransmarvelSearcher = () => {
   const filtered = matchesOnly ? results.filter((r) => r.hit) : results;
   const shown = filtered.slice(0, MAX_SHOWN_ROWS);
 
+  /** Each list's tab counts the entries the prediction hits, so the other
+   * list still reports itself while you work in this one. */
+  const matchedSigils = sigilHits.filter((h) => h.total > 0).length;
+  const matchedStones = stoneHits.filter((h) => h.total > 0).length;
+
   return (
     <Stack gap="md" pr="md">
       <Title order={4}>{t("ui.toolbox.transmarvel-searcher", "Transmarvel Searcher")}</Title>
@@ -285,231 +290,240 @@ const TransmarvelSearcher = () => {
       )}
       {error && <Alert color="red">{errorMessage}</Alert>}
       {stale && <Alert color="orange">{t("ui.toolbox.stale-results")}</Alert>}
-      <Group align="flex-end" gap="sm">
-        <TextInput
-          label={t("ui.toolbox.tm-rolls", "Rolls to simulate")}
-          inputMode="numeric"
-          value={rolls === 0 ? "" : String(rolls)}
-          onChange={(e) => {
-            const digits = e.currentTarget.value.replace(/\D/g, "");
-            setRolls(digits === "" ? 0 : Math.min(parseInt(digits, 10), MAX_ROLLS));
-          }}
-          disabled={busy}
-          w={130}
-        />
-        <Button onClick={predict} loading={predicting} disabled={busy || rolls < 1}>
-          {t("ui.toolbox.tm-predict", "Predict")}
-        </Button>
-      </Group>
-      <Tabs value={tab} onChange={setTab}>
-        <Tabs.List>
-          <Tabs.Tab value="wishlist">{t("ui.toolbox.tm-tab-wishlist", "Wishlist")}</Tabs.Tab>
-          <Tabs.Tab value="results">{t("ui.toolbox.tm-tab-results", "Full Results")}</Tabs.Tab>
-        </Tabs.List>
-        <Tabs.Panel value="wishlist" pt="sm">
-          <Stack gap="xs">
-            <Group justify="space-between" align="center">
-              <Title order={6}>{t("ui.toolbox.tm-sigil-wishlist", "Sigil wishlist")}</Title>
-              <Button
-                size="compact-sm"
-                variant="light"
-                disabled={busy || !addableSigil}
-                onClick={() => addableSigil && setSigils([...sigils, { trait: addableSigil.trait, trait2: null }])}
-              >
-                {t("ui.toolbox.tm-add-sigil", "Add sigil")}
-              </Button>
-            </Group>
-            {sigils.length === 0 && (
-              <Text size="sm" c="dimmed">
-                {t("ui.toolbox.tm-no-sigils", "Add sigils you want to roll for.")}
-              </Text>
-            )}
-            {sigils.map((entry, index) => {
-              const hits = sigilHits[index] ?? NO_HITS;
-              // A fixed-pair sigil ships both traits, so its 2nd is not a
-              // choice — the picker shows it, locked.
-              const pinned = sigilValue(entry) !== entry.trait;
-              return (
-                <Paper key={index} {...entryCardProps(hits.total > 0)}>
-                  <Group gap="xs" wrap="nowrap" mb={2}>
-                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                      {t("ui.toolbox.tm-sigil", "Sigil")}
-                    </Text>
-                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                      {t("ui.toolbox.tm-2nd-trait", "2nd Trait")}
-                    </Text>
-                    <ActionIcon
-                      variant="subtle"
-                      size="sm"
-                      aria-label={t("ui.toolbox.tm-remove", "Remove")}
-                      onClick={() => setSigils(sigils.filter((_, i) => i !== index))}
-                    >
-                      <X />
-                    </ActionIcon>
-                  </Group>
-                  <Group gap="xs" wrap="nowrap">
-                    <Select
-                      aria-label={t("ui.toolbox.tm-sigil", "Sigil")}
-                      searchable
-                      data={sigilOptions}
-                      value={sigilValue(entry)}
-                      onChange={(value) => value && changeSigil(index, value)}
-                      allowDeselect={false}
-                      disabled={busy}
-                      style={{ flex: 1 }}
-                    />
-                    <Select
-                      aria-label={t("ui.toolbox.tm-2nd-trait", "2nd Trait")}
-                      searchable
-                      data={traitSelectData(sigilTrait2Options(entry.trait))}
-                      value={entry.trait2 ?? ANY}
-                      onChange={(value) => value && changeSigilTrait2(index, value === ANY ? null : value)}
-                      allowDeselect={false}
-                      disabled={busy || pinned}
-                      style={{ flex: 1 }}
-                    />
-                    {/* Keeps the selects clear of the card's remove button. */}
-                    <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
-                  </Group>
-                  {hits.total > 0 && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
-                </Paper>
-              );
-            })}
-            <Group justify="space-between" align="center" mt="sm">
-              <Title order={6}>{t("ui.toolbox.tm-stone-wishlist", "Wrightstone wishlist")}</Title>
-              <Button
-                size="compact-sm"
-                variant="light"
-                disabled={busy}
-                onClick={() => setStones([...stones, DEFAULT_STONE])}
-              >
-                {t("ui.toolbox.tm-add-stone", "Add wrightstone")}
-              </Button>
-            </Group>
-            {stones.length === 0 && (
-              <Text size="sm" c="dimmed">
-                {t("ui.toolbox.tm-no-stones", "Add wrightstones you want to roll for.")}
-              </Text>
-            )}
-            {stones.map((entry, index) => {
-              const hits = stoneHits[index] ?? NO_HITS;
-              return (
-                <Paper key={index} {...entryCardProps(hits.total > 0)}>
-                  <Group gap="xs" wrap="nowrap" mb={2}>
-                    <Text size="xs" c="dimmed" w={TYPE_W}>
-                      {t("ui.toolbox.tm-stone-type", "Type")}
-                    </Text>
-                    <Text size="xs" c="dimmed" w={RARITY_W}>
-                      {t("ui.toolbox.tm-min-rarity", "Lvls")}
-                    </Text>
-                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                      {t("ui.toolbox.tm-slot-2", "Trait 2")}
-                    </Text>
-                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                      {t("ui.toolbox.tm-slot-3", "Trait 3")}
-                    </Text>
-                    <ActionIcon
-                      variant="subtle"
-                      size="sm"
-                      aria-label={t("ui.toolbox.tm-remove", "Remove")}
-                      onClick={() => setStones(stones.filter((_, i) => i !== index))}
-                    >
-                      <X />
-                    </ActionIcon>
-                  </Group>
-                  <Group gap="xs" wrap="nowrap">
-                    <Select
-                      aria-label={t("ui.toolbox.tm-stone-type", "Type")}
-                      data={FAMILIES.map((c) => ({ value: c.family, label: stoneTypeName(c.item) }))}
-                      value={entry.family}
-                      onChange={(family) => family && changeStone(index, { family })}
-                      allowDeselect={false}
-                      disabled={busy}
-                      w={TYPE_W}
-                    />
-                    <Select
-                      aria-label={t("ui.toolbox.tm-min-rarity", "Lvls")}
-                      data={rarityOptions(entry.family)}
-                      value={String(entry.minTier)}
-                      onChange={(tier) => tier && changeStone(index, { minTier: parseInt(tier, 10) })}
-                      allowDeselect={false}
-                      disabled={busy}
-                      w={RARITY_W}
-                    />
-                    <Select
-                      aria-label={t("ui.toolbox.tm-slot-2", "Trait 2")}
-                      searchable
-                      data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 1))}
-                      value={entry.slot2 ?? ANY}
-                      onChange={(value) => value && changeStone(index, { slot2: value === ANY ? null : value })}
-                      allowDeselect={false}
-                      disabled={busy}
-                      style={{ flex: 1 }}
-                    />
-                    <Select
-                      aria-label={t("ui.toolbox.tm-slot-3", "Trait 3")}
-                      searchable
-                      data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 2))}
-                      value={entry.slot3 ?? ANY}
-                      onChange={(value) => value && changeStone(index, { slot3: value === ANY ? null : value })}
-                      allowDeselect={false}
-                      disabled={busy}
-                      style={{ flex: 1 }}
-                    />
-                    {/* Keeps the selects clear of the card's remove button. */}
-                    <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
-                  </Group>
-                  {hits.total > 0 && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
-                </Paper>
-              );
-            })}
-          </Stack>
-        </Tabs.Panel>
-        <Tabs.Panel value="results" pt="sm">
-          {prediction && !prediction.unpredictable && (
-            <Box ref={resultsRef}>
-              <ScrollArea.Autosize mah={resultsMah} type="auto" offsetScrollbars>
-                <Stack gap="xs">
-                  <Text size="xs" c="dimmed">
-                    {t("ui.toolbox.tm-results-caveat")}
-                  </Text>
-                  {firstHit === null && (
-                    <Text size="sm">{t("ui.toolbox.tm-no-hits", { rolls: prediction.rolls.length })}</Text>
-                  )}
-                  <Checkbox
-                    label={t("ui.toolbox.tm-matches-only", "Show matches only")}
-                    checked={matchesOnly}
-                    onChange={(e) => setMatchesOnly(e.currentTarget.checked)}
-                  />
-                  <Table striped highlightOnHover stickyHeader>
-                    <Table.Thead>
-                      <Table.Tr>
-                        <Table.Th w={70}>{t("ui.toolbox.tm-col-roll", "Roll #")}</Table.Th>
-                        <Table.Th>{t("ui.toolbox.tm-col-result", "Result")}</Table.Th>
-                      </Table.Tr>
-                    </Table.Thead>
-                    <Table.Tbody>
-                      {shown.map(({ roll, index, hit }) => (
-                        <Table.Tr key={index}>
-                          <Table.Td fw={hit ? 700 : undefined}>#{index + 1}</Table.Td>
-                          <Table.Td>
-                            <OutcomeCell outcome={roll.outcome} hit={hit} />
-                          </Table.Td>
-                        </Table.Tr>
-                      ))}
-                    </Table.Tbody>
-                  </Table>
-                  {filtered.length > shown.length && (
+      <Group align="flex-start" gap="xl" wrap="nowrap">
+        <Group align="flex-end" gap="sm" style={{ flexShrink: 0 }}>
+          <TextInput
+            label={t("ui.toolbox.tm-rolls", "Rolls to simulate")}
+            inputMode="numeric"
+            value={rolls === 0 ? "" : String(rolls)}
+            onChange={(e) => {
+              const digits = e.currentTarget.value.replace(/\D/g, "");
+              setRolls(digits === "" ? 0 : Math.min(parseInt(digits, 10), MAX_ROLLS));
+            }}
+            disabled={busy}
+            w={130}
+          />
+          <Button onClick={predict} loading={predicting} disabled={busy || rolls < 1}>
+            {t("ui.toolbox.tm-predict", "Predict")}
+          </Button>
+        </Group>
+        <Tabs value={tab} onChange={setTab} style={{ flexGrow: 1, minWidth: 0 }}>
+          <Tabs.List>
+            <Tabs.Tab value="sigils">
+              {t("ui.toolbox.tm-tab-sigils", { hit: matchedSigils, total: sigils.length })}
+            </Tabs.Tab>
+            <Tabs.Tab value="stones">
+              {t("ui.toolbox.tm-tab-stones", { hit: matchedStones, total: stones.length })}
+            </Tabs.Tab>
+            <Tabs.Tab value="results">{t("ui.toolbox.tm-tab-results", "Full Results")}</Tabs.Tab>
+          </Tabs.List>
+          <Tabs.Panel value="sigils" pt="sm">
+            <Stack gap="xs">
+              <Group justify="flex-end">
+                <Button
+                  size="compact-sm"
+                  variant="light"
+                  disabled={busy || !addableSigil}
+                  onClick={() => addableSigil && setSigils([...sigils, { trait: addableSigil.trait, trait2: null }])}
+                >
+                  {t("ui.toolbox.tm-add-sigil", "Add sigil")}
+                </Button>
+              </Group>
+              {sigils.length === 0 && (
+                <Text size="sm" c="dimmed">
+                  {t("ui.toolbox.tm-no-sigils", "Add sigils you want to roll for.")}
+                </Text>
+              )}
+              {sigils.map((entry, index) => {
+                const hits = sigilHits[index] ?? NO_HITS;
+                // A fixed-pair sigil ships both traits, so its 2nd is not a
+                // choice — the picker shows it, locked.
+                const pinned = sigilValue(entry) !== entry.trait;
+                return (
+                  <Paper key={index} {...entryCardProps(hits.total > 0)}>
+                    <Group gap="xs" wrap="nowrap" mb={2}>
+                      <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                        {t("ui.toolbox.tm-sigil", "Sigil")}
+                      </Text>
+                      <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                        {t("ui.toolbox.tm-2nd-trait", "2nd Trait")}
+                      </Text>
+                      <ActionIcon
+                        variant="subtle"
+                        size="sm"
+                        aria-label={t("ui.toolbox.tm-remove", "Remove")}
+                        onClick={() => setSigils(sigils.filter((_, i) => i !== index))}
+                      >
+                        <X />
+                      </ActionIcon>
+                    </Group>
+                    <Group gap="xs" wrap="nowrap">
+                      <Select
+                        aria-label={t("ui.toolbox.tm-sigil", "Sigil")}
+                        searchable
+                        data={sigilOptions}
+                        value={sigilValue(entry)}
+                        onChange={(value) => value && changeSigil(index, value)}
+                        allowDeselect={false}
+                        disabled={busy}
+                        style={{ flex: 1 }}
+                      />
+                      <Select
+                        aria-label={t("ui.toolbox.tm-2nd-trait", "2nd Trait")}
+                        searchable
+                        data={traitSelectData(sigilTrait2Options(entry.trait))}
+                        value={entry.trait2 ?? ANY}
+                        onChange={(value) => value && changeSigilTrait2(index, value === ANY ? null : value)}
+                        allowDeselect={false}
+                        disabled={busy || pinned}
+                        style={{ flex: 1 }}
+                      />
+                      {/* Keeps the selects clear of the card's remove button. */}
+                      <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
+                    </Group>
+                    {hits.total > 0 && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
+                  </Paper>
+                );
+              })}
+            </Stack>
+          </Tabs.Panel>
+          <Tabs.Panel value="stones" pt="sm">
+            <Stack gap="xs">
+              <Group justify="flex-end">
+                <Button
+                  size="compact-sm"
+                  variant="light"
+                  disabled={busy}
+                  onClick={() => setStones([...stones, DEFAULT_STONE])}
+                >
+                  {t("ui.toolbox.tm-add-stone", "Add wrightstone")}
+                </Button>
+              </Group>
+              {stones.length === 0 && (
+                <Text size="sm" c="dimmed">
+                  {t("ui.toolbox.tm-no-stones", "Add wrightstones you want to roll for.")}
+                </Text>
+              )}
+              {stones.map((entry, index) => {
+                const hits = stoneHits[index] ?? NO_HITS;
+                return (
+                  <Paper key={index} {...entryCardProps(hits.total > 0)}>
+                    <Group gap="xs" wrap="nowrap" mb={2}>
+                      <Text size="xs" c="dimmed" w={TYPE_W}>
+                        {t("ui.toolbox.tm-stone-type", "Type")}
+                      </Text>
+                      <Text size="xs" c="dimmed" w={RARITY_W}>
+                        {t("ui.toolbox.tm-min-rarity", "Lvls")}
+                      </Text>
+                      <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                        {t("ui.toolbox.tm-slot-2", "Trait 2")}
+                      </Text>
+                      <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                        {t("ui.toolbox.tm-slot-3", "Trait 3")}
+                      </Text>
+                      <ActionIcon
+                        variant="subtle"
+                        size="sm"
+                        aria-label={t("ui.toolbox.tm-remove", "Remove")}
+                        onClick={() => setStones(stones.filter((_, i) => i !== index))}
+                      >
+                        <X />
+                      </ActionIcon>
+                    </Group>
+                    <Group gap="xs" wrap="nowrap">
+                      <Select
+                        aria-label={t("ui.toolbox.tm-stone-type", "Type")}
+                        data={FAMILIES.map((c) => ({ value: c.family, label: stoneTypeName(c.item) }))}
+                        value={entry.family}
+                        onChange={(family) => family && changeStone(index, { family })}
+                        allowDeselect={false}
+                        disabled={busy}
+                        w={TYPE_W}
+                      />
+                      <Select
+                        aria-label={t("ui.toolbox.tm-min-rarity", "Lvls")}
+                        data={rarityOptions(entry.family)}
+                        value={String(entry.minTier)}
+                        onChange={(tier) => tier && changeStone(index, { minTier: parseInt(tier, 10) })}
+                        allowDeselect={false}
+                        disabled={busy}
+                        w={RARITY_W}
+                      />
+                      <Select
+                        aria-label={t("ui.toolbox.tm-slot-2", "Trait 2")}
+                        searchable
+                        data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 1))}
+                        value={entry.slot2 ?? ANY}
+                        onChange={(value) => value && changeStone(index, { slot2: value === ANY ? null : value })}
+                        allowDeselect={false}
+                        disabled={busy}
+                        style={{ flex: 1 }}
+                      />
+                      <Select
+                        aria-label={t("ui.toolbox.tm-slot-3", "Trait 3")}
+                        searchable
+                        data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 2))}
+                        value={entry.slot3 ?? ANY}
+                        onChange={(value) => value && changeStone(index, { slot3: value === ANY ? null : value })}
+                        allowDeselect={false}
+                        disabled={busy}
+                        style={{ flex: 1 }}
+                      />
+                      {/* Keeps the selects clear of the card's remove button. */}
+                      <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
+                    </Group>
+                    {hits.total > 0 && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
+                  </Paper>
+                );
+              })}
+            </Stack>
+          </Tabs.Panel>
+          <Tabs.Panel value="results" pt="sm">
+            {prediction && !prediction.unpredictable && (
+              <Box ref={resultsRef}>
+                <ScrollArea.Autosize mah={resultsMah} type="auto" offsetScrollbars>
+                  <Stack gap="xs">
                     <Text size="xs" c="dimmed">
-                      {t("ui.toolbox.tm-truncated", { shown: shown.length, total: filtered.length })}
+                      {t("ui.toolbox.tm-results-caveat")}
                     </Text>
-                  )}
-                </Stack>
-              </ScrollArea.Autosize>
-            </Box>
-          )}
-        </Tabs.Panel>
-      </Tabs>
+                    {firstHit === null && (
+                      <Text size="sm">{t("ui.toolbox.tm-no-hits", { rolls: prediction.rolls.length })}</Text>
+                    )}
+                    <Checkbox
+                      label={t("ui.toolbox.tm-matches-only", "Show matches only")}
+                      checked={matchesOnly}
+                      onChange={(e) => setMatchesOnly(e.currentTarget.checked)}
+                    />
+                    <Table striped highlightOnHover stickyHeader>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th w={70}>{t("ui.toolbox.tm-col-roll", "Roll #")}</Table.Th>
+                          <Table.Th>{t("ui.toolbox.tm-col-result", "Result")}</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {shown.map(({ roll, index, hit }) => (
+                          <Table.Tr key={index}>
+                            <Table.Td fw={hit ? 700 : undefined}>#{index + 1}</Table.Td>
+                            <Table.Td>
+                              <OutcomeCell outcome={roll.outcome} hit={hit} />
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                    {filtered.length > shown.length && (
+                      <Text size="xs" c="dimmed">
+                        {t("ui.toolbox.tm-truncated", { shown: shown.length, total: filtered.length })}
+                      </Text>
+                    )}
+                  </Stack>
+                </ScrollArea.Autosize>
+              </Box>
+            )}
+          </Tabs.Panel>
+        </Tabs>
+      </Group>
     </Stack>
   );
 };

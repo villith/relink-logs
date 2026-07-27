@@ -25,6 +25,8 @@ const TEMPLATES: Record<string, string> = {
   "ui.toolbox.tm-truncated": "Showing the first {{shown}} of {{total}} rolls.",
   "ui.toolbox.tm-entry-hit": "#{{n}}",
   "ui.toolbox.tm-entry-more": "+{{count}} more in Full Results",
+  "ui.toolbox.tm-tab-sigils": "Sigils ({{hit}}/{{total}})",
+  "ui.toolbox.tm-tab-stones": "Wrightstones ({{hit}}/{{total}})",
   "ui.level-short": "Lv{{level}}",
 };
 vi.mock("react-i18next", async (importOriginal) => ({
@@ -586,8 +588,9 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    const add = await screen.findByRole("button", { name: "Add wrightstone" });
-    fireEvent.click(add);
+    // The Add button lives in the Wrightstones tab's panel.
+    fireEvent.click(await screen.findByRole("tab", { name: /^Wrightstones/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Add wrightstone" }));
 
     // Live v2.0.2 hashes: the Fortification family (trait 1 = HP) and the
     // Supplementary DMG trait. A pool regeneration that retires either should
@@ -595,6 +598,28 @@ describe("TransmarvelSearcher", () => {
     expect(useTransmarvelWishlistStore.getState().stones).toEqual([
       { family: "f372f096", minTier: 1, slot2: "57ab5b10", slot3: null },
     ]);
+  });
+
+  it("counts matched entries per list in its tab title", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      if (command === "predict_transmarvel") return Promise.resolve(prediction);
+      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    // Two sigils, one of which hits; one stone, which can't (no stone rolls).
+    useTransmarvelWishlistStore.setState({
+      sigils: [
+        { trait: WISHLISTED.trait, trait2: null },
+        { trait: OTHER.trait, trait2: TOP_SLOT2 },
+      ],
+      stones: [{ family: FAMILY, minTier: 0, slot2: null, slot3: null }],
+    });
+
+    renderPage();
+
+    expect(await screen.findByRole("tab", { name: "Sigils (1/2)" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Wrightstones (0/1)" })).toBeTruthy();
   });
 
   it("labels rarities by max level per slot, folding the 0.1% tier away", async () => {
@@ -636,12 +661,17 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    // The wishlist tab is active, so its panel is the visible one.
-    const wishlist = await screen.findByRole("tabpanel");
-    await waitFor(() => expect(within(wishlist).getAllByText("#2")).toHaveLength(1));
-    // Exactly one of the two entry cards is marked as hitting; the other
-    // shows nothing at all rather than a "no hits" line.
-    expect(wishlist.querySelectorAll("[data-hits]")).toHaveLength(1);
+    // The Sigils tab opens first, so its panel is the visible one.
+    const sigilsPanel = await screen.findByRole("tabpanel");
+    await waitFor(() => expect(within(sigilsPanel).getAllByText("#2")).toHaveLength(1));
+    expect(sigilsPanel.querySelectorAll("[data-hits]")).toHaveLength(1);
+
+    // The stone entry can't hit: its card goes unmarked, and nothing renders
+    // under its row rather than a "no hits" line.
+    fireEvent.click(screen.getByRole("tab", { name: /^Wrightstones/ }));
+    const stonesPanel = screen.getByRole("tabpanel");
+    expect(stonesPanel.querySelectorAll("[data-hits]")).toHaveLength(0);
+    expect(within(stonesPanel).queryByText(/^#\d+$/)).toBeNull();
   });
 
   it("expands a hitting entry by default, listing each matching roll's outcome", async () => {
@@ -660,13 +690,14 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    const wishlist = await screen.findByRole("tabpanel");
+    fireEvent.click(await screen.findByRole("tab", { name: /^Wrightstones/ }));
+    const stonesPanel = screen.getByRole("tabpanel");
     // Both hits are listed with their own roll # and resolved traits — the
     // 2nd-slot trait each one carries is the whole point of the wildcard.
-    expect(await within(wishlist).findByText(stoneLine(SLOT2_A))).toBeTruthy();
-    expect(within(wishlist).getByText(stoneLine(SLOT2_B))).toBeTruthy();
-    expect(within(wishlist).getByText("#1")).toBeTruthy();
-    expect(within(wishlist).getByText("#2")).toBeTruthy();
+    expect(await within(stonesPanel).findByText(stoneLine(SLOT2_A))).toBeTruthy();
+    expect(within(stonesPanel).getByText(stoneLine(SLOT2_B))).toBeTruthy();
+    expect(within(stonesPanel).getByText("#1")).toBeTruthy();
+    expect(within(stonesPanel).getByText("#2")).toBeTruthy();
   });
 
   it("shows no per-entry results before any prediction", async () => {
