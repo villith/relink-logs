@@ -226,8 +226,7 @@ export default function useTransmarvelSearcher() {
     if (!status?.gameRunning || status.rngUnpredictable) return;
     autoRan.current = true;
     void predict();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fires on status arrival only
-  }, [status]);
+  }, [status]); // deliberately status-only: fires on status arrival, not on edits
 
   /** Roll list with hit flags; the page renders this directly. */
   const results = useMemo(
