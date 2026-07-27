@@ -28,7 +28,11 @@ import useTransmarvelSearcher, {
   EntryHits,
   familyCombos,
   NO_HITS,
+  parseSigilPickerValue,
   POOL,
+  SigilEntry,
+  sigilPickerOptions,
+  sigilPickerValue,
   sigilTrait2Options,
   slotTraitOptions,
   WrightstoneEntry,
@@ -182,9 +186,19 @@ const TransmarvelSearcher = () => {
   });
   const anyOption = { value: ANY, label: t("ui.toolbox.tm-any-option", "Any") };
 
-  const sigilOptions = POOL.sigils
-    .map((s) => ({ value: s.trait, label: translateSigilId(hex(s.sigilId)) }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+  /** Every rollable sigil by name, fixed-pair sigils included — built each
+   * render so a language switch relabels (and re-sorts) it. */
+  const sigilOptions = sigilPickerOptions((sigilId) => translateSigilId(hex(sigilId)));
+  const sigilOptionValues = new Set(sigilOptions.map((o) => o.value));
+
+  /** The option representing an entry: its pair sigil when the wished traits
+   * are exactly one the game ships as its own item, else the plain sigil. */
+  const sigilValue = ({ trait, trait2 }: SigilEntry) => {
+    if (trait2 === null) return trait;
+    const paired = sigilPickerValue(trait, trait2);
+    return sigilOptionValues.has(paired) ? paired : trait;
+  };
+
   /** Trait selects share the synthesis picker's ordering: popular first,
    * then alphabetical behind a divider. */
   const traitSelectData = (traits: string[]) => [
@@ -198,11 +212,18 @@ const TransmarvelSearcher = () => {
   const pairExists = (trait: string, trait2: string | null, except: number) =>
     sigils.some((e, i) => i !== except && e.trait === trait && e.trait2 === trait2);
 
-  const changeSigil = (index: number, trait: string) => {
-    const current = sigils[index].trait2;
-    let trait2 = current !== null && sigilTrait2Options(trait).includes(current) ? current : null;
+  const changeSigil = (index: number, value: string) => {
+    const picked = parseSigilPickerValue(value);
+    const trait = picked.trait;
+    // A fixed-pair sigil pins its 2nd trait. A plain one keeps the current
+    // pick when the new sigil can still roll it — except when that pick came
+    // from a pair the user just chose to move off, since keeping it would
+    // re-pin the row to the sigil they navigated away from.
+    const entry = sigils[index];
+    const current = sigilValue(entry) === entry.trait ? entry.trait2 : null;
+    let trait2 = picked.trait2 ?? (current !== null && sigilTrait2Options(trait).includes(current) ? current : null);
     if (pairExists(trait, trait2, index)) {
-      if (trait2 === null) return;
+      if (trait2 === null || picked.trait2 !== null) return;
       trait2 = null;
       if (pairExists(trait, null, index)) return;
     }
@@ -293,6 +314,9 @@ const TransmarvelSearcher = () => {
             )}
             {sigils.map((entry, index) => {
               const hits = sigilHits[index] ?? NO_HITS;
+              // A fixed-pair sigil ships both traits, so its 2nd is not a
+              // choice — the picker shows it, locked.
+              const pinned = sigilValue(entry) !== entry.trait;
               return (
                 <Paper key={index} {...entryCardProps(hits.total > 0)}>
                   <Group gap="xs" wrap="nowrap" mb={2}>
@@ -300,7 +324,7 @@ const TransmarvelSearcher = () => {
                       {t("ui.toolbox.tm-sigil", "Sigil")}
                     </Text>
                     <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                      {t("ui.toolbox.tm-2nd-trait", "2nd trait")}
+                      {t("ui.toolbox.tm-2nd-trait", "2nd Trait")}
                     </Text>
                     <ActionIcon
                       variant="subtle"
@@ -316,20 +340,20 @@ const TransmarvelSearcher = () => {
                       aria-label={t("ui.toolbox.tm-sigil", "Sigil")}
                       searchable
                       data={sigilOptions}
-                      value={entry.trait}
-                      onChange={(trait) => trait && changeSigil(index, trait)}
+                      value={sigilValue(entry)}
+                      onChange={(value) => value && changeSigil(index, value)}
                       allowDeselect={false}
                       disabled={busy}
                       style={{ flex: 1 }}
                     />
                     <Select
-                      aria-label={t("ui.toolbox.tm-2nd-trait", "2nd trait")}
+                      aria-label={t("ui.toolbox.tm-2nd-trait", "2nd Trait")}
                       searchable
                       data={traitSelectData(sigilTrait2Options(entry.trait))}
                       value={entry.trait2 ?? ANY}
                       onChange={(value) => value && changeSigilTrait2(index, value === ANY ? null : value)}
                       allowDeselect={false}
-                      disabled={busy}
+                      disabled={busy || pinned}
                       style={{ flex: 1 }}
                     />
                     {/* Keeps the selects clear of the card's remove button. */}

@@ -62,10 +62,12 @@ slice of the same data —
                 shows the plain sigil name, never a fixed-pair variant
                 (both can share a display name, e.g. "Attack Power V+").
                 trait2Lot keys into trait2Lots (the rolled 2nd-trait
-                candidate set); extraTrait2 lists fixed-pair (_14/_90)
-                trait2s NOT already in that lot (character-sigil pairs,
-                and ATK for a few V+ items). Valid 2nd traits for a
-                sigil = trait2Lots[trait2Lot] ∪ extraTrait2.
+                candidate set); fixedPairs lists EVERY fixed-pair
+                (_14/_90) item for this trait1 as {trait2, sigilId} —
+                its own item hash, so the picker can name the pair
+                ("Rose's Awakening+") instead of only its two traits.
+                Valid 2nd traits for a sigil = trait2Lots[trait2Lot] ∪
+                the fixedPairs trait2s.
   trait2Lots  — skill_type_lot row key -> sorted trait hashes reachable
                 from it (shared across sigils via this indirection; only
                 6 rows are in use).
@@ -215,7 +217,7 @@ def build_pool(
     for g in gem_groups:
         for i in g["items"]:
             assert i["trait1"] != 0, f"gem item {i['item']:08x} has no trait1"
-            d = sigil_info.setdefault(i["trait1"], {"lot": None, "fixed": set(), "rep": None})
+            d = sigil_info.setdefault(i["trait1"], {"lot": None, "pairs": {}, "rep": None})
             if i["secondTraitLot"] >= 0:
                 assert d["lot"] in (None, i["secondTraitLot"]), (
                     f"conflicting rolled lots for trait1 {i['trait1']:08x}"
@@ -227,7 +229,10 @@ def build_pool(
                 assert i["trait2"] != 0, (
                     f"item {i['item']:08x}: no rolled lot and no fixed trait2"
                 )
-                d["fixed"].add(i["trait2"])
+                # Same pair can ship as more than one item (the _14/_90
+                # variants); keep the lowest hash, as for `rep`.
+                prev = d["pairs"].get(i["trait2"])
+                d["pairs"][i["trait2"]] = i["item"] if prev is None else min(prev, i["item"])
 
     lot_traits = {}
     for t1, d in sigil_info.items():
@@ -245,7 +250,10 @@ def build_pool(
             "trait": f"{t1:08x}",
             "sigilId": f"{d['rep']:08x}",
             "trait2Lot": str(d["lot"]),
-            "extraTrait2": sorted(f"{t:08x}" for t in d["fixed"] - lot_traits[d["lot"]]),
+            "fixedPairs": [
+                {"trait2": f"{t2:08x}", "sigilId": f"{item:08x}"}
+                for t2, item in sorted(d["pairs"].items(), key=lambda kv: f"{kv[0]:08x}")
+            ],
         }
         for t1, d in sorted(sigil_info.items(), key=lambda kv: f"{kv[0]:08x}")
     ]
@@ -311,9 +319,51 @@ def build_pool(
     return {"sigils": sigils, "trait2Lots": trait2_lots, "wrightstones": {"combos": combos}}
 
 
+def write_pool(
+    gem_groups: list,
+    stone_groups: list,
+    stone_configs: dict,
+    skill_type_rows: dict,
+    skill_lots: dict,
+    skill_level_lots: dict,
+) -> None:
+    pool = build_pool(
+        gem_groups, stone_groups, stone_configs, skill_type_rows, skill_lots, skill_level_lots
+    )
+    POOL_PATH.write_text(json.dumps(pool, indent=1) + "\n", encoding="utf-8")
+    pairs = sum(len(s["fixedPairs"]) for s in pool["sigils"])
+    print(
+        f"wrote {POOL_PATH} — {len(pool['sigils'])} sigil traits ({pairs} fixed pairs), "
+        f"{len(pool['trait2Lots'])} 2nd-trait lots, "
+        f"{len(pool['wrightstones']['combos'])} wrightstone combos"
+    )
+
+
+def rebuild_pool_from_tables() -> None:
+    """Rebuild only the frontend pool, from the committed tables asset.
+
+    The pool is a pure function of transmarvel-tables.json, so reshaping it
+    doesn't need the game data extracted again — only a table change does.
+    JSON object keys come back as strings; build_pool indexes them by the
+    int keys the tables use.
+    """
+    tables = json.loads(OUT_PATH.read_text(encoding="utf-8"))
+    write_pool(
+        tables["gemGroups"],
+        tables["stoneGroups"],
+        {int(k): v for k, v in tables["stoneConfigs"].items()},
+        {int(k): v for k, v in tables["skillTypeRows"].items()},
+        {int(k): v for k, v in tables["skillLots"].items()},
+        {int(k): v for k, v in tables["skillLevelLots"].items()},
+    )
+
+
 def main() -> None:
+    if len(sys.argv) == 2 and sys.argv[1] == "--pool-only":
+        rebuild_pool_from_tables()
+        return
     if len(sys.argv) != 2:
-        sys.exit(f"usage: {sys.argv[0]} <db.sqlite> (see module docstring)")
+        sys.exit(f"usage: {sys.argv[0]} <db.sqlite> | --pool-only (see module docstring)")
     db = sqlite3.connect(sys.argv[1])
     db.row_factory = sqlite3.Row
     gem_configs = load_gem_configs(Path(sys.argv[1]).parent / "table" / "gem.tbl")
@@ -459,14 +509,8 @@ def main() -> None:
         f"{len(stone_configs)} stone configs, {len(skill_level_lots)} level lots"
     )
 
-    pool = build_pool(
+    write_pool(
         gem_groups, stone_groups, stone_configs, skill_type_rows, skill_lots, skill_level_lots
-    )
-    POOL_PATH.write_text(json.dumps(pool, indent=1) + "\n", encoding="utf-8")
-    print(
-        f"wrote {POOL_PATH} — {len(pool['sigils'])} sigil traits, "
-        f"{len(pool['trait2Lots'])} 2nd-trait lots, "
-        f"{len(pool['wrightstones']['combos'])} wrightstone combos"
     )
 
 

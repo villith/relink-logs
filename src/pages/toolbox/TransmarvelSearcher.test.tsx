@@ -81,8 +81,9 @@ const optionsOf = (input: HTMLInputElement): (string | null)[] => {
 // keeps the seeded wishlist entry instead of silently dropping it.
 const WISHLISTED = POOL.sigils[0];
 const OTHER = POOL.sigils[1];
-// A sigil whose fixed-pair extra widens its 2nd-trait options beyond the lot.
-const EXTRA_SIGIL = POOL.sigils.find((s) => s.extraTrait2.length > 0)!;
+// A sigil whose fixed pair widens its 2nd-trait options beyond the lot.
+const EXTRA_SIGIL = POOL.sigils.find((s) => s.fixedPairs.length > 0)!;
+const EXTRA_PAIR = EXTRA_SIGIL.fixedPairs[0];
 
 // One stone family with its three tiers, found off the real pool rather than
 // hardcoded so a regeneration can't silently invalidate the picks.
@@ -330,7 +331,7 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    const trait2Input = (await screen.findByLabelText("2nd trait", { selector: "input" })) as HTMLInputElement;
+    const trait2Input = (await screen.findByLabelText("2nd Trait", { selector: "input" })) as HTMLInputElement;
     await waitFor(() => expect(trait2Input.getAttribute("disabled")).toBeNull());
     fireEvent.click(trait2Input);
 
@@ -504,11 +505,77 @@ describe("TransmarvelSearcher", () => {
     // The selected option's label is what the closed Select displays.
     expect(sigilInput.value).toBe(`sigil:${WISHLISTED.sigilId}`);
 
+    // Every plain sigil plus every fixed-pair sigil gets an option (the mock
+    // gives each item hash its own label, so none collapse as duplicates).
+    fireEvent.click(sigilInput);
+    const values = optionsOf(sigilInput);
+    expect(values).toHaveLength(POOL.sigils.length + POOL.sigils.flatMap((s) => s.fixedPairs).length);
+    expect(values).toContain(WISHLISTED.trait);
+
     // Options are alphabetized by that displayed name — under the mock
     // labels ("sigil:<item hex>"), that's item-hash order.
+    const listbox = document.getElementById(sigilInput.getAttribute("aria-controls")!)!;
+    const labels = [...listbox.querySelectorAll('[role="option"]')].map((el) => el.textContent!);
+    expect(labels).toEqual([...labels].sort((a, b) => a.localeCompare(b)));
+  });
+
+  it("offers fixed-pair sigils by their own name and pins both traits when picked", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    useTransmarvelWishlistStore.setState({ sigils: [{ trait: WISHLISTED.trait, trait2: null }], stones: [] });
+
+    renderPage();
+
+    const sigilInput = (await screen.findByLabelText("Sigil", { selector: "input" })) as HTMLInputElement;
     fireEvent.click(sigilInput);
-    const expected = [...POOL.sigils].sort((a, b) => a.sigilId.localeCompare(b.sigilId)).map((s) => s.trait);
-    expect(optionsOf(sigilInput)).toEqual(expected);
+
+    // The pair sigil is its own option, keyed by both traits.
+    const pairValue = `${EXTRA_SIGIL.trait}:${EXTRA_PAIR.trait2}`;
+    expect(optionsOf(sigilInput)).toContain(pairValue);
+    const listbox = document.getElementById(sigilInput.getAttribute("aria-controls")!)!;
+    const option = listbox.querySelector(`[role="option"][value="${pairValue}"]`) as HTMLElement;
+    // Labeled by the pair item's own name, not its trait-1 sigil's.
+    expect(option.textContent).toBe(`sigil:${EXTRA_PAIR.sigilId}`);
+
+    fireEvent.click(option);
+
+    // Picking it writes both traits...
+    expect(useTransmarvelWishlistStore.getState().sigils).toEqual([
+      { trait: EXTRA_SIGIL.trait, trait2: EXTRA_PAIR.trait2 },
+    ]);
+    // ...and the 2nd trait is locked to the pair's trait.
+    const trait2Input = screen.getByLabelText("2nd Trait", { selector: "input" }) as HTMLInputElement;
+    expect(trait2Input.value).toBe(`trait:${EXTRA_PAIR.trait2}`);
+    expect(trait2Input.getAttribute("disabled")).not.toBeNull();
+  });
+
+  it("releases the pinned 2nd trait when the plain sigil is picked again", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    useTransmarvelWishlistStore.setState({
+      sigils: [{ trait: EXTRA_SIGIL.trait, trait2: EXTRA_PAIR.trait2 }],
+      stones: [],
+    });
+
+    renderPage();
+
+    const sigilInput = (await screen.findByLabelText("Sigil", { selector: "input" })) as HTMLInputElement;
+    // The pair sigil's own name is what a pinned entry displays.
+    expect(sigilInput.value).toBe(`sigil:${EXTRA_PAIR.sigilId}`);
+    fireEvent.click(sigilInput);
+
+    const listbox = document.getElementById(sigilInput.getAttribute("aria-controls")!)!;
+    fireEvent.click(listbox.querySelector(`[role="option"][value="${EXTRA_SIGIL.trait}"]`) as HTMLElement);
+
+    // Choosing the plain sigil drops the pair's fixed 2nd trait rather than
+    // silently keeping it (which would leave the row locked and unchanged).
+    expect(useTransmarvelWishlistStore.getState().sigils).toEqual([{ trait: EXTRA_SIGIL.trait, trait2: null }]);
+    const trait2Input = screen.getByLabelText("2nd Trait", { selector: "input" }) as HTMLInputElement;
+    expect(trait2Input.getAttribute("disabled")).toBeNull();
   });
 
   it("labels rarities by max level per slot, folding the 0.1% tier away", async () => {

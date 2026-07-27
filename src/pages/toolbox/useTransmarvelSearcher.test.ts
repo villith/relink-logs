@@ -3,18 +3,22 @@ import { describe, expect, it } from "vitest";
 import type { TransmarvelRoll } from "@/types";
 
 import {
-  familyCombos,
   MAX_ENTRY_HITS,
   POOL,
+  SigilEntry,
+  TransmarvelPool,
+  WrightstoneEntry,
+  familyCombos,
+  fixedPairSigil,
+  parseSigilPickerValue,
   rollHits,
   sanitizeWishlists,
-  SigilEntry,
   sigilEntryHits,
+  sigilPickerOptions,
+  sigilPickerValue,
   sigilTrait2Options,
   slotTraitOptions,
   stoneEntryHits,
-  TransmarvelPool,
-  WrightstoneEntry,
 } from "./useTransmarvelSearcher";
 
 /** Minimal pool double shaped like the real generated asset
@@ -25,8 +29,18 @@ import {
  * ("f2") for family-mismatch cases. */
 const POOL_DOUBLE: TransmarvelPool = {
   sigils: [
-    { trait: "000000aa", sigilId: "000001aa", trait2Lot: "5", extraTrait2: ["000000ee"] },
-    { trait: "000000bb", sigilId: "000001bb", trait2Lot: "5", extraTrait2: [] },
+    {
+      trait: "000000aa",
+      sigilId: "000001aa",
+      trait2Lot: "5",
+      fixedPairs: [
+        // Own name ("Awakening"-style): reachable as its own picker option.
+        { trait2: "000000ee", sigilId: "000009ee" },
+        // Pairs a trait the rolled lot already offers.
+        { trait2: "000000cc", sigilId: "000009cc" },
+      ],
+    },
+    { trait: "000000bb", sigilId: "000001bb", trait2Lot: "5", fixedPairs: [] },
   ],
   trait2Lots: { "5": ["000000cc", "000000dd"] },
   wrightstones: {
@@ -80,13 +94,46 @@ const POOL_DOUBLE: TransmarvelPool = {
 };
 
 describe("sigilTrait2Options", () => {
-  it("returns the rolled lot plus fixed-pair extras", () => {
+  it("returns the rolled lot plus fixed-pair traits, without repeating an overlap", () => {
     expect(sigilTrait2Options("000000aa", POOL_DOUBLE)).toEqual(["000000cc", "000000dd", "000000ee"]);
     expect(sigilTrait2Options("000000bb", POOL_DOUBLE)).toEqual(["000000cc", "000000dd"]);
   });
 
   it("returns empty for an unknown trait", () => {
     expect(sigilTrait2Options("ffffffff", POOL_DOUBLE)).toEqual([]);
+  });
+});
+
+describe("fixed-pair sigils", () => {
+  it("resolves a trait pair to the item that ships it, and nothing for a rolled pair", () => {
+    expect(fixedPairSigil("000000aa", "000000ee", POOL_DOUBLE)).toBe("000009ee");
+    expect(fixedPairSigil("000000aa", "000000cc", POOL_DOUBLE)).toBe("000009cc");
+    // "dd" only ever arrives as a rolled 2nd trait — no dedicated item.
+    expect(fixedPairSigil("000000aa", "000000dd", POOL_DOUBLE)).toBeNull();
+    expect(fixedPairSigil("000000bb", "000000ee", POOL_DOUBLE)).toBeNull();
+    expect(fixedPairSigil("ffffffff", "000000ee", POOL_DOUBLE)).toBeNull();
+  });
+
+  it("encodes and parses a pair's picker value", () => {
+    expect(sigilPickerValue("000000aa", "000000ee")).toBe("000000aa:000000ee");
+    expect(parseSigilPickerValue("000000aa:000000ee")).toEqual({ trait: "000000aa", trait2: "000000ee" });
+    expect(parseSigilPickerValue("000000aa")).toEqual({ trait: "000000aa", trait2: null });
+  });
+
+  it("offers each distinctly named pair its own option, sorted with the plain sigils by label", () => {
+    // "cc"'s pair item shares the plain sigil's name, the way the generic
+    // "Health V+" pairs do in the real pool; only the distinct one earns a row.
+    const names: Record<string, string> = {
+      "000001aa": "Attack",
+      "000001bb": "Barrier",
+      "000009ee": "Awakened Attack",
+      "000009cc": "Attack",
+    };
+    expect(sigilPickerOptions((id) => names[id], POOL_DOUBLE)).toEqual([
+      { value: "000000aa", label: "Attack" },
+      { value: "000000aa:000000ee", label: "Awakened Attack" },
+      { value: "000000bb", label: "Barrier" },
+    ]);
   });
 });
 
@@ -239,9 +286,7 @@ describe("per-entry hits", () => {
   });
 
   it("handles empty rolls and empty wishlists", () => {
-    expect(sigilEntryHits([], [{ trait: "000000aa", trait2: null }], POOL_DOUBLE)).toEqual([
-      { indices: [], total: 0 },
-    ]);
+    expect(sigilEntryHits([], [{ trait: "000000aa", trait2: null }], POOL_DOUBLE)).toEqual([{ indices: [], total: 0 }]);
     expect(sigilEntryHits(rolls, [], POOL_DOUBLE)).toEqual([]);
     expect(stoneEntryHits(rolls, [], POOL_DOUBLE)).toEqual([]);
   });
@@ -381,13 +426,21 @@ describe("sanitizeWishlists", () => {
 });
 
 describe("real pool asset", () => {
-  it("has the expected sigil shape: 121 traits, lots resolve, extras disjoint from their lot", () => {
+  it("has the expected sigil shape: 121 traits, lots resolve, pairs carry their own item", () => {
     expect(POOL.sigils).toHaveLength(121);
     for (const sigil of POOL.sigils) {
       const lot = POOL.trait2Lots[sigil.trait2Lot];
       expect(lot, `sigil ${sigil.trait} lot ${sigil.trait2Lot}`).toBeDefined();
-      for (const extra of sigil.extraTrait2) expect(lot).not.toContain(extra);
+      for (const pair of sigil.fixedPairs) {
+        // A pair's item is a sigil in its own right, never the plain one.
+        expect(pair.sigilId, `pair ${sigil.trait}/${pair.trait2}`).not.toBe(sigil.sigilId);
+        expect(pair.trait2).toMatch(/^[0-9a-f]{8}$/);
+        expect(pair.sigilId).toMatch(/^[0-9a-f]{8}$/);
+      }
     }
+    // The fixed-pair items the game ships at this gacha tier.
+    const pairs = POOL.sigils.flatMap((s) => s.fixedPairs);
+    expect(pairs).toHaveLength(38);
   });
 
   it("has 4 stone families x 3 tiers with fixed trait-1 and top-tier fixed slots", () => {

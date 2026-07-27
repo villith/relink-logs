@@ -24,7 +24,15 @@ export type WrightstoneEntry = { family: string; minTier: number; slot2: string 
  * an explicit interface rather than `typeof pool` so test doubles built to
  * the same shape type-check without fighting JSON's inferred literal types. */
 export interface TransmarvelPool {
-  sigils: { trait: string; sigilId: string; trait2Lot: string; extraTrait2: string[] }[];
+  /** `fixedPairs` are the items that ship both traits fixed — the sigil the
+   * game names in its own right ("Rose's Awakening+"), carrying its own item
+   * hash so the picker can offer it by name. */
+  sigils: {
+    trait: string;
+    sigilId: string;
+    trait2Lot: string;
+    fixedPairs: { trait2: string; sigilId: string }[];
+  }[];
   trait2Lots: Record<string, string[]>;
   wrightstones: {
     combos: {
@@ -39,12 +47,52 @@ export interface TransmarvelPool {
 
 export const POOL = pool as TransmarvelPool;
 
-/** Valid 2nd traits for a sigil: its rolled lot plus fixed-pair extras. */
+/** Valid 2nd traits for a sigil: its rolled lot plus the traits its
+ * fixed-pair items ship (a pair can repeat a lot trait, hence the dedupe). */
 export const sigilTrait2Options = (trait: string, p: TransmarvelPool = POOL): string[] => {
   const sigil = p.sigils.find((s) => s.trait === trait);
   if (!sigil) return [];
-  return [...(p.trait2Lots[sigil.trait2Lot] ?? []), ...sigil.extraTrait2];
+  return [...new Set([...(p.trait2Lots[sigil.trait2Lot] ?? []), ...sigil.fixedPairs.map((f) => f.trait2)])];
 };
+
+/** The item hash of the sigil that ships this exact trait pair fixed, or null
+ * when the pair only ever arrives as a rolled 2nd trait. */
+export const fixedPairSigil = (trait: string, trait2: string, p: TransmarvelPool = POOL): string | null =>
+  p.sigils.find((s) => s.trait === trait)?.fixedPairs.find((f) => f.trait2 === trait2)?.sigilId ?? null;
+
+/** Sigil-picker option values: a bare trait1 for a normal sigil, `t1:t2` for
+ * a fixed-pair sigil (which pins the 2nd trait along with the first). */
+const PAIR_SEP = ":";
+
+export const sigilPickerValue = (trait: string, trait2: string) => `${trait}${PAIR_SEP}${trait2}`;
+
+export const parseSigilPickerValue = (value: string): { trait: string; trait2: string | null } => {
+  const [trait, trait2] = value.split(PAIR_SEP);
+  return { trait, trait2: trait2 ?? null };
+};
+
+/**
+ * The sigil picker's options: every rollable sigil by name, plus the
+ * fixed-pair sigils that carry a name of their own. The generic pairs (e.g.
+ * "Health V+" with a fixed Stamina) reuse their plain sigil's name, so
+ * listing them would show the same label twice — they stay reachable by
+ * picking the plain sigil and that 2nd trait, which is the same wish.
+ */
+export const sigilPickerOptions = (
+  translate: (sigilId: string) => string,
+  p: TransmarvelPool = POOL
+): { value: string; label: string }[] =>
+  p.sigils
+    .flatMap((s) => {
+      const label = translate(s.sigilId);
+      return [
+        { value: s.trait, label },
+        ...s.fixedPairs
+          .map((f) => ({ value: sigilPickerValue(s.trait, f.trait2), label: translate(f.sigilId) }))
+          .filter((o) => o.label !== label),
+      ];
+    })
+    .sort((a, b) => a.label.localeCompare(b.label));
 
 /** A family's combos in tier order (worst -> best). */
 export const familyCombos = (family: string, p: TransmarvelPool = POOL) =>

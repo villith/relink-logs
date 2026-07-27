@@ -4,791 +4,917 @@
    "trait": "05f2ecdc",
    "sigilId": "6cba6b0d",
    "trait2Lot": "26",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "05fa4599",
    "sigilId": "bcedf060",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "06719232",
    "sigilId": "0523a202",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "ed8d8ad8"
+   "fixedPairs": [
+    {
+     "trait2": "ed8d8ad8",
+     "sigilId": "a8a0cbff"
+    }
    ]
   },
   {
    "trait": "09aa7db5",
    "sigilId": "a4b849a0",
    "trait2Lot": "7",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "0aa20846",
    "sigilId": "b832e7a7",
    "trait2Lot": "7",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "0cd6c625",
    "sigilId": "e7624711",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "a3b49220"
+   "fixedPairs": [
+    {
+     "trait2": "a3b49220",
+     "sigilId": "119b24a8"
+    }
    ]
   },
   {
    "trait": "0de887a0",
    "sigilId": "8b8085c0",
    "trait2Lot": "6",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "0e42be1b",
    "sigilId": "caae3f9c",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "0f026cf0",
    "sigilId": "3069c2fe",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "11aae5f5",
    "sigilId": "f6c0fca5",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "1470f860",
    "sigilId": "eda2116a",
    "trait2Lot": "7",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "151e4674",
    "sigilId": "9f08f697",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "a374fdf0"
+   "fixedPairs": [
+    {
+     "trait2": "a374fdf0",
+     "sigilId": "98a6d249"
+    }
    ]
   },
   {
    "trait": "15806dfc",
    "sigilId": "7e3a52a3",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "16eff868",
    "sigilId": "fb9b6dd5",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "1de14c65",
    "sigilId": "282dbff0",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "26956f25"
+   "fixedPairs": [
+    {
+     "trait2": "26956f25",
+     "sigilId": "895abbf6"
+    }
    ]
   },
   {
    "trait": "23d0f67f",
    "sigilId": "01d1a6ce",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "c2a4c7a9"
+   "fixedPairs": [
+    {
+     "trait2": "c2a4c7a9",
+     "sigilId": "9bd1cc24"
+    }
    ]
   },
   {
    "trait": "24883af3",
    "sigilId": "3ed16fb2",
    "trait2Lot": "27",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "26956f25",
    "sigilId": "f21404b1",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "29b07beb",
    "sigilId": "b143dae6",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "a63b89cd"
+   "fixedPairs": [
+    {
+     "trait2": "a63b89cd",
+     "sigilId": "1a57aef1"
+    }
    ]
   },
   {
    "trait": "2e65a774",
    "sigilId": "9d5bc5bf",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "16eff868"
+   "fixedPairs": [
+    {
+     "trait2": "16eff868",
+     "sigilId": "673c5d8f"
+    }
    ]
   },
   {
    "trait": "2fc8fbff",
    "sigilId": "e8454459",
    "trait2Lot": "6",
-   "extraTrait2": [
-    "50079a1c"
+   "fixedPairs": [
+    {
+     "trait2": "50079a1c",
+     "sigilId": "4ba4e4ac"
+    }
    ]
   },
   {
    "trait": "30773197",
    "sigilId": "ba28c81c",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "318d12e9",
    "sigilId": "ab70208c",
    "trait2Lot": "26",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "36e3848d",
    "sigilId": "74061b0c",
    "trait2Lot": "6",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "3bfed918",
    "sigilId": "522004ab",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "f8496336"
+   "fixedPairs": [
+    {
+     "trait2": "f8496336",
+     "sigilId": "9ada3e00"
+    }
    ]
   },
   {
    "trait": "3d8153a1",
    "sigilId": "938db625",
    "trait2Lot": "6",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "3eb345d7",
    "sigilId": "d8c61507",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "3f488339",
    "sigilId": "a3021b5e",
    "trait2Lot": "6",
-   "extraTrait2": [
-    "50079a1c"
+   "fixedPairs": [
+    {
+     "trait2": "50079a1c",
+     "sigilId": "f22290a6"
+    }
    ]
   },
   {
    "trait": "451d814c",
    "sigilId": "6cca1ff7",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "461a8e07",
    "sigilId": "d4117ff3",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "47384248",
    "sigilId": "64301e91",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "30773197"
+   "fixedPairs": [
+    {
+     "trait2": "30773197",
+     "sigilId": "5a360ea8"
+    }
    ]
   },
   {
    "trait": "48a95b8d",
    "sigilId": "6f1d0870",
    "trait2Lot": "7",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "4c588c27",
    "sigilId": "00612b10",
    "trait2Lot": "6",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "4e5f6706",
    "sigilId": "5d592fdd",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "4f135217",
    "sigilId": "bfdf838c",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "50079a1c",
    "sigilId": "2d7f2e70",
    "trait2Lot": "5",
-   "extraTrait2": []
+   "fixedPairs": [
+    {
+     "trait2": "2fc8fbff",
+     "sigilId": "08da7279"
+    }
+   ]
   },
   {
    "trait": "522e2388",
    "sigilId": "7c8580ca",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "5463232f",
    "sigilId": "7d318ff7",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "451d814c"
+   "fixedPairs": [
+    {
+     "trait2": "451d814c",
+     "sigilId": "ce16d68b"
+    }
    ]
   },
   {
    "trait": "5559232f",
    "sigilId": "9abd2da5",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "57ab5b10",
    "sigilId": "035a4ddd",
    "trait2Lot": "6",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "6085da25",
    "sigilId": "837b3d64",
    "trait2Lot": "26",
-   "extraTrait2": []
+   "fixedPairs": [
+    {
+     "trait2": "50079a1c",
+     "sigilId": "e365b951"
+    }
+   ]
   },
   {
    "trait": "6316cbeb",
    "sigilId": "8a3819c0",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "6ebfa176",
    "sigilId": "b74c207b",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "f1d5dbd0"
+   "fixedPairs": [
+    {
+     "trait2": "f1d5dbd0",
+     "sigilId": "4f01d6ca"
+    }
    ]
   },
   {
    "trait": "6ff05223",
    "sigilId": "c06f4708",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "71f11a9b",
    "sigilId": "a492ffac",
    "trait2Lot": "6",
-   "extraTrait2": [
-    "50079a1c"
+   "fixedPairs": [
+    {
+     "trait2": "50079a1c",
+     "sigilId": "9dc8305d"
+    }
    ]
   },
   {
    "trait": "73220725",
    "sigilId": "9300fadb",
    "trait2Lot": "6",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "7351d602",
    "sigilId": "bf714a8a",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "7440e869",
    "sigilId": "fb0f9037",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "cd124165"
+   "fixedPairs": [
+    {
+     "trait2": "cd124165",
+     "sigilId": "e4f986d9"
+    }
    ]
   },
   {
    "trait": "74aa75d6",
    "sigilId": "d4ebb836",
    "trait2Lot": "7",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "77c809f5",
    "sigilId": "12dfd310",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "9230e3f5"
+   "fixedPairs": [
+    {
+     "trait2": "9230e3f5",
+     "sigilId": "6aae4b8f"
+    }
    ]
   },
   {
    "trait": "79266456",
    "sigilId": "eb766d87",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "7ad0c010",
    "sigilId": "eaa911b2",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "7b4fc47a",
    "sigilId": "9f72bae0",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "7b5b081d",
    "sigilId": "ec9ffe77",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "9ace140b"
+   "fixedPairs": [
+    {
+     "trait2": "9ace140b",
+     "sigilId": "d8a464f1"
+    }
    ]
   },
   {
    "trait": "7ccff74f",
    "sigilId": "3ba37635",
    "trait2Lot": "26",
-   "extraTrait2": []
+   "fixedPairs": [
+    {
+     "trait2": "50079a1c",
+     "sigilId": "329c4e1c"
+    }
+   ]
   },
   {
    "trait": "7d75d904",
    "sigilId": "f964a4ca",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "be3404b9"
+   "fixedPairs": [
+    {
+     "trait2": "be3404b9",
+     "sigilId": "23953fd4"
+    }
    ]
   },
   {
    "trait": "807b6684",
    "sigilId": "2d70c37d",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "81b293d9",
    "sigilId": "ad8caefb",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "8519ad4a",
    "sigilId": "515e693c",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "8572b8af",
    "sigilId": "dbe503c7",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "86cbcdc4",
    "sigilId": "c0b5128e",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "05fa4599"
+   "fixedPairs": [
+    {
+     "trait2": "05fa4599",
+     "sigilId": "ab835493"
+    }
    ]
   },
   {
    "trait": "8b3bf60c",
    "sigilId": "e89224a1",
    "trait2Lot": "7",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "8cdf9382",
    "sigilId": "85d7b335",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "d1012d8c"
+   "fixedPairs": [
+    {
+     "trait2": "d1012d8c",
+     "sigilId": "e19b1965"
+    }
    ]
   },
   {
    "trait": "8d78a19b",
    "sigilId": "0bb9c188",
    "trait2Lot": "5",
-   "extraTrait2": []
+   "fixedPairs": [
+    {
+     "trait2": "2fc8fbff",
+     "sigilId": "459dd2c2"
+    }
+   ]
   },
   {
    "trait": "921b6b0c",
    "sigilId": "05aca892",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "9230e3f5",
    "sigilId": "ae9d89df",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "9232dc17",
    "sigilId": "d29cd8e0",
    "trait2Lot": "6",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "93a2093c",
    "sigilId": "b98a0f22",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "7ad0c010"
+   "fixedPairs": [
+    {
+     "trait2": "7ad0c010",
+     "sigilId": "af8e7e7e"
+    }
    ]
   },
   {
    "trait": "95f3fa86",
    "sigilId": "d340651c",
    "trait2Lot": "27",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "9a9dc170",
    "sigilId": "a0f94f69",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "522e2388"
+   "fixedPairs": [
+    {
+     "trait2": "522e2388",
+     "sigilId": "aeef8343"
+    }
    ]
   },
   {
    "trait": "9ace140b",
    "sigilId": "96d6fe5e",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "9afdfa9e",
    "sigilId": "ac175924",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "a339d642",
    "sigilId": "e496d882",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "a374fdf0",
    "sigilId": "d48abdda",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "a38510e2",
    "sigilId": "380a3ca8",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "a3b49220",
    "sigilId": "49651c89",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "a63b89cd",
    "sigilId": "a879208f",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "a7726190",
    "sigilId": "20492635",
    "trait2Lot": "6",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "a898e283",
    "sigilId": "e14e1598",
    "trait2Lot": "6",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "aa83f548",
    "sigilId": "64d63823",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "921b6b0c"
+   "fixedPairs": [
+    {
+     "trait2": "921b6b0c",
+     "sigilId": "1bbe919c"
+    }
    ]
   },
   {
    "trait": "af513a9d",
    "sigilId": "147da58b",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "b064a634",
    "sigilId": "98e9e6ef",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "b48eef48",
    "sigilId": "9d88dea1",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "11aae5f5"
+   "fixedPairs": [
+    {
+     "trait2": "11aae5f5",
+     "sigilId": "e2b380e5"
+    }
    ]
   },
   {
    "trait": "b5ff9fd3",
    "sigilId": "04ac2281",
    "trait2Lot": "26",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "b85202bc",
    "sigilId": "4c28585a",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "b953cc1e",
    "sigilId": "51e98a7c",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "ba504607",
    "sigilId": "4cdce25b",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "be3404b9",
    "sigilId": "1a359b67",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "c00163b3",
    "sigilId": "43f26a91",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "c2a4c7a9",
    "sigilId": "21e10eb7",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "c7d379f1",
    "sigilId": "e21a4170",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "cd030268",
    "sigilId": "33f01810",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "a38510e2"
+   "fixedPairs": [
+    {
+     "trait2": "a38510e2",
+     "sigilId": "52a6e299"
+    }
    ]
   },
   {
    "trait": "cd124165",
    "sigilId": "a59c9613",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "ceb700ee",
    "sigilId": "791da8ed",
    "trait2Lot": "5",
-   "extraTrait2": []
+   "fixedPairs": [
+    {
+     "trait2": "2fc8fbff",
+     "sigilId": "39bea99b"
+    }
+   ]
   },
   {
    "trait": "d029fe08",
    "sigilId": "5bf84fd1",
    "trait2Lot": "27",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "d1012d8c",
    "sigilId": "b5da3e80",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "d176d262",
    "sigilId": "9ec6c56d",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "461a8e07"
+   "fixedPairs": [
+    {
+     "trait2": "461a8e07",
+     "sigilId": "95cc3cb8"
+    }
    ]
   },
   {
    "trait": "d2c8e10a",
    "sigilId": "2679a4f0",
    "trait2Lot": "26",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "d40d1e9b",
    "sigilId": "3ea4134b",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "15806dfc"
+   "fixedPairs": [
+    {
+     "trait2": "15806dfc",
+     "sigilId": "b8c44d5e"
+    }
    ]
   },
   {
    "trait": "d76f4d24",
    "sigilId": "bc53ce24",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "d7f9bb88",
    "sigilId": "b3ab43f3",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "d8f66c1c",
    "sigilId": "a490badf",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "d908223d",
    "sigilId": "e073ea65",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "7351d602"
+   "fixedPairs": [
+    {
+     "trait2": "7351d602",
+     "sigilId": "b441275d"
+    }
    ]
   },
   {
    "trait": "dade14dc",
    "sigilId": "0713d928",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "daefbb27",
    "sigilId": "76d4716b",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "dba19768",
    "sigilId": "41ac1082",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "dc584f60",
    "sigilId": "54d8ea04",
    "trait2Lot": "6",
-   "extraTrait2": [
-    "50079a1c"
+   "fixedPairs": [
+    {
+     "trait2": "50079a1c",
+     "sigilId": "b0cb5c64"
+    }
    ]
   },
   {
    "trait": "e0abfdfe",
    "sigilId": "9c2399da",
    "trait2Lot": "7",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "e60a735c",
    "sigilId": "b5725272",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "6ff05223"
+   "fixedPairs": [
+    {
+     "trait2": "6ff05223",
+     "sigilId": "02472c43"
+    }
    ]
   },
   {
    "trait": "e69a4694",
    "sigilId": "bb49c8f6",
    "trait2Lot": "27",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "e6b92e34",
    "sigilId": "66f1b128",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "e6cdba9c",
    "sigilId": "381bbe64",
    "trait2Lot": "7",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "e85ff8e0",
    "sigilId": "eb4ad96d",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "8572b8af"
+   "fixedPairs": [
+    {
+     "trait2": "8572b8af",
+     "sigilId": "8ecbb0a3"
+    }
    ]
   },
   {
    "trait": "ec3cf174",
    "sigilId": "14c58bf1",
    "trait2Lot": "15",
-   "extraTrait2": [
-    "af513a9d"
+   "fixedPairs": [
+    {
+     "trait2": "af513a9d",
+     "sigilId": "02b1f8c0"
+    }
    ]
   },
   {
    "trait": "ed8d8ad8",
    "sigilId": "0723f7ec",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "ee85cd1f",
    "sigilId": "332e9b30",
    "trait2Lot": "6",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "f1d5dbd0",
    "sigilId": "44d48479",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "f26baea5",
    "sigilId": "7b4aab30",
    "trait2Lot": "26",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "f372f096",
    "sigilId": "e92ee838",
    "trait2Lot": "5",
-   "extraTrait2": []
+   "fixedPairs": [
+    {
+     "trait2": "2fc8fbff",
+     "sigilId": "b5b23f02"
+    }
+   ]
   },
   {
    "trait": "f8496336",
    "sigilId": "30a3f2ea",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   },
   {
    "trait": "fdd1ad24",
    "sigilId": "cef31894",
    "trait2Lot": "15",
-   "extraTrait2": []
+   "fixedPairs": []
   }
  ],
  "trait2Lots": {
