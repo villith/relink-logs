@@ -23,7 +23,8 @@ vi.mock("@tauri-apps/api/path", () => ({ resolveResource: vi.fn().mockResolvedVa
 const TEMPLATES: Record<string, string> = {
   "ui.toolbox.tm-first-hit": "First wishlist hit at roll #{{n}}",
   "ui.toolbox.tm-no-hits": "No wishlist hits in the next {{rolls}} rolls.",
-  "ui.toolbox.tm-rarity-option": "{{chance}}% — Lv {{levels}}",
+  "ui.toolbox.tm-rarity-option": "Lv {{levels}}",
+  "ui.toolbox.tm-rarity-option-fixed": "Lv {{levels}} ({{traits}})",
   "ui.level-short": "Lv{{level}}",
 };
 vi.mock("react-i18next", async (importOriginal) => ({
@@ -41,6 +42,17 @@ vi.mock("react-i18next", async (importOriginal) => ({
     },
     i18n: { language: "en" },
   }),
+}));
+
+// Deterministic name translations, so label bugs are actually catchable:
+// with only the echo-everything i18n above, translateSigilId(WRONG_ID) and
+// translateSigilId(RIGHT_ID) both render "ui.unknown-id", and a swapped
+// argument can never fail an assertion.
+vi.mock("@/utils", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  translateSigilId: (id: number | null) => `sigil:${(id ?? 0).toString(16).padStart(8, "0")}`,
+  translateTraitId: (id: number | null) => `trait:${(id ?? 0).toString(16).padStart(8, "0")}`,
+  translateWrightstoneId: (id: number | null) => `stone:${(id ?? 0).toString(16).padStart(8, "0")}`,
 }));
 
 import { useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
@@ -78,6 +90,7 @@ const TIERS = familyCombos(FAMILY, POOL);
 // The top (0.1%) tier's fixed slot traits, and a rolled-only trait that the
 // top tier does NOT offer at position 1 — used to force the reset-to-Any.
 const TOP_SLOT2 = TIERS[2].slots[1].traits[0];
+const TOP_SLOT3 = TIERS[2].slots[2].traits[0];
 const ROLLED_SLOT2 = TIERS[0].slots[1].traits.find((t) => t !== TOP_SLOT2)!;
 
 const status: TransmarvelStatus = { gameRunning: true, rngUnpredictable: false };
@@ -391,9 +404,50 @@ describe("TransmarvelSearcher", () => {
       fireEvent.click(predictButton);
     });
 
-    // Both traits translate to the same fallback text in this test setup (no
-    // real trait/sigil translations loaded) — the dimmed line's literal
-    // format (" Lv15 / ") is what this test pins.
-    expect(await screen.findByText("ui.unknown-id Lv15 / ui.unknown-id")).toBeTruthy();
+    // Name line = the rolled sigil's item name; dimmed line = trait1 with its
+    // level, then the 2nd trait.
+    expect(await screen.findByText(`sigil:${OTHER.sigilId}`)).toBeTruthy();
+    expect(screen.getByText(`trait:${OTHER.trait} Lv15 / trait:${WISHLISTED.trait}`)).toBeTruthy();
+  });
+
+  it("labels sigil picker entries by their item name, not their trait id", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    useTransmarvelWishlistStore.setState({ sigils: [{ trait: WISHLISTED.trait, trait2: null }], stones: [] });
+
+    renderPage();
+
+    const sigilInput = (await screen.findByLabelText("Sigil", { selector: "input" })) as HTMLInputElement;
+    // The selected option's label is what the closed Select displays.
+    expect(sigilInput.value).toBe(`sigil:${WISHLISTED.sigilId}`);
+  });
+
+  it("labels rarities by their level layout alone, naming the top tier's fixed traits", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+    useTransmarvelWishlistStore.setState({
+      sigils: [],
+      stones: [{ family: FAMILY, minTier: 0, slot2: null, slot3: null }],
+    });
+
+    renderPage();
+
+    const rarityInput = (await screen.findByLabelText("Min rarity", { selector: "input" })) as HTMLInputElement;
+    await waitFor(() => expect(rarityInput.getAttribute("disabled")).toBeNull());
+    fireEvent.click(rarityInput);
+
+    // Hardcoded level layouts pin the live game data (v2.0.2); a regeneration
+    // that changes them should fail here loudly.
+    const listbox = document.getElementById(rarityInput.getAttribute("aria-controls")!)!;
+    const labels = [...listbox.querySelectorAll('[role="option"]')].map((el) => el.textContent);
+    expect(labels).toEqual([
+      "Lv 10–15/7–10/5–7",
+      "Lv 20/15/10",
+      `Lv 20/15/10 (trait:${TOP_SLOT2} / trait:${TOP_SLOT3})`,
+    ]);
   });
 });
