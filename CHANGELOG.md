@@ -17,6 +17,7 @@ markdown in the app.
 ### Bug Fixes
 
 - The app now ignores some common keyboard shortcuts that are not relevant (Ctrl+J, Ctrl+P, Ctrl+U). [credit to Souma-Sumire](https://github.com/Souma-Sumire)
+- The connection status message should no longer incorrectly say "Hook out of date" in some cases
 
 ### Language
 

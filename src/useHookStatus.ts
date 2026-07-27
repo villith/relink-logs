@@ -13,8 +13,13 @@ export function useHookStatus(): HookStatusSnapshot | null {
   const [status, setStatus] = useState<HookStatusSnapshot | null>(null);
 
   useEffect(() => {
+    // The seed is a starting point, not an update: it only applies while
+    // nothing else has. `get_hook_status` can resolve AFTER an event, and
+    // events are rare (connect/disconnect/refresh/heartbeat change), so
+    // letting a late seed win would pin a stale badge until the next one —
+    // possibly for the rest of the session.
     invoke<HookStatusSnapshot>("get_hook_status")
-      .then(setStatus)
+      .then((seed) => setStatus((current) => current ?? seed))
       .catch(() => {});
     const unlisten = listen<HookStatusSnapshot>("hook-status", (e) => setStatus(e.payload));
     return () => {

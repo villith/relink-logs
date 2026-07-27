@@ -6,23 +6,9 @@ import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
 import { backendErrorMessage } from "@/backendErrors";
+import { ACTIONABLE_HOOK_STATES, HOOK_DOT_COLOR, HOOK_LABEL_KEY } from "@/hookState";
 import { useEncounterStore } from "@/stores/useEncounterStore";
-import { HookState } from "@/types";
 import { useHookStatus } from "@/useHookStatus";
-
-const TONE: Record<HookState, string> = {
-  connected: "#51cf66",
-  reconnecting: "#ffd43b",
-  outOfDate: "#ffd43b",
-  disconnected: "#868e96",
-};
-
-const LABEL_KEY: Record<HookState, string> = {
-  connected: "ui.hook-status.connected",
-  reconnecting: "ui.hook-status.reconnecting",
-  outOfDate: "ui.hook-status.out-of-date",
-  disconnected: "ui.hook-status.no-game",
-};
 
 /** Hook connection/version status + actions, shown in the logs header. */
 export default function HookStatusBadge() {
@@ -61,20 +47,20 @@ export default function HookStatusBadge() {
     }
   };
 
-  const label = t(LABEL_KEY[hook.state]);
+  const label = t(HOOK_LABEL_KEY[hook.state]);
 
   return (
     // The header is tight; the label truncates rather than overflowing, and
     // the native title tooltip carries the full text (same as Report a bug).
     <Group gap={6} wrap="nowrap" style={{ minWidth: 0 }}>
       {/* eslint-disable-next-line i18next/no-literal-string -- status glyph, not prose */}
-      <Text span style={{ color: TONE[hook.state], lineHeight: 1, flex: "none" }}>
+      <Text span style={{ color: HOOK_DOT_COLOR[hook.state], lineHeight: 1, flex: "none" }}>
         ●
       </Text>
       <Text span size="sm" c="dimmed" truncate title={label}>
         {label}
       </Text>
-      {hook.state === "outOfDate" &&
+      {ACTIONABLE_HOOK_STATES.includes(hook.state) &&
         (hook.supportsEject ? (
           <Button size="compact-xs" variant="light" loading={busy} onClick={onRefresh} style={{ flex: "none" }}>
             {t("ui.hook-status.refresh")}

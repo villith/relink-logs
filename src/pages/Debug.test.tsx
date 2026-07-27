@@ -56,6 +56,7 @@ const HOOK_BUTTONS = [
   "ui.debug.hook-force-out-of-date",
   "ui.debug.hook-force-restart-required",
   "ui.debug.hook-clear-override",
+  "ui.debug.hook-clear-override-quietly",
 ];
 
 const ENCOUNTER_BUTTONS = [
@@ -130,7 +131,13 @@ describe("Debug page", () => {
     expect(invoke).toHaveBeenCalledWith("debug_set_hello_override", { hookVersion: "0.0.1", supportsEject: false });
 
     await click("ui.debug.hook-clear-override");
-    expect(invoke).toHaveBeenCalledWith("debug_clear_hello_override", undefined);
+    expect(invoke).toHaveBeenCalledWith("debug_clear_hello_override", { resync: true });
+
+    // Same command, deliberately NOT resynced: it leaves the app holding the
+    // stale verdict so the heartbeat's recovery is observable on the badge
+    // instead of being masked by an immediate app-side refresh.
+    await click("ui.debug.hook-clear-override-quietly");
+    expect(invoke).toHaveBeenCalledWith("debug_clear_hello_override", { resync: false });
   });
 
   it("sends each encounter scenario by name", async () => {

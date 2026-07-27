@@ -31,6 +31,31 @@ describe("useHookStatus", () => {
     expect(invoke).toHaveBeenCalledWith("get_hook_status");
   });
 
+  /// The seed is a starting point, not an update: `get_hook_status` resolving
+  /// late must not overwrite a fresher event payload. Events only fire on
+  /// connect/disconnect/refresh, so a clobbered value sits there until the
+  /// next one — potentially the rest of the session.
+  it("does not let a late seed clobber an event that already arrived", async () => {
+    let resolveSeed: (v: unknown) => void = () => {};
+    invoke.mockReturnValue(new Promise((r) => (resolveSeed = r)));
+    const { result } = renderHook(() => useHookStatus());
+
+    await waitFor(() => expect(listeners["hook-status"]).toBeTruthy());
+    act(() => {
+      listeners["hook-status"]({
+        payload: { state: "connected", hookVersion: "1.0.0", appVersion: "1.0.0", supportsEject: true },
+      });
+    });
+    await waitFor(() => expect(result.current?.state).toBe("connected"));
+
+    // The stale in-flight seed finally lands.
+    await act(async () => {
+      resolveSeed({ state: "outOfDate", hookVersion: "0.9.0", appVersion: "1.0.0", supportsEject: false });
+    });
+
+    expect(result.current?.state).toBe("connected");
+  });
+
   it("updates when a hook-status event arrives", async () => {
     invoke.mockResolvedValue({
       state: "disconnected",

@@ -671,7 +671,10 @@ export type LinuxSetupStatus = {
   launchOptions: string;
 };
 
-export type HookState = "connected" | "reconnecting" | "outOfDate" | "disconnected";
+/** Mirrors `HookState` in src-tauri/src/toolbox_rpc.rs. `unresponsive` is
+ * "connected, but the hook is not answering the toolbox channel" — its version
+ * is unknown, which is NOT the same claim as `outOfDate`. */
+export type HookState = "connected" | "reconnecting" | "outOfDate" | "unresponsive" | "disconnected";
 
 export interface HookStatusSnapshot {
   state: HookState;
