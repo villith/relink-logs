@@ -156,8 +156,13 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    // No click: the mount-time auto-predict fetches the rolls itself.
+    // No Predict click: the mount-time auto-predict fetches the rolls itself.
     expect(await screen.findByText("#1")).toBeTruthy();
+    // The roll table lives in the Full Results tab; activate it so role
+    // queries can see it (the hidden panel is out of the accessibility tree).
+    await act(async () => {
+      fireEvent.click(screen.getByRole("tab", { name: "Full Results" }));
+    });
     // "#2" appears twice: the table's roll column and the entry's hit badge.
     expect(await screen.findAllByText("#2")).toHaveLength(2);
     // No Match column any more — the matched row is bolded instead. Scoped

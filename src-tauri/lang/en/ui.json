@@ -343,6 +343,8 @@
       "tm-remove": "Remove",
       "tm-rolls": "Rolls to simulate",
       "tm-predict": "Predict",
+      "tm-tab-wishlist": "Wishlist",
+      "tm-tab-results": "Full Results",
       "tm-matches-only": "Show matches only",
       "tm-col-roll": "Roll #",
       "tm-col-result": "Result",
