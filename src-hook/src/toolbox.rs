@@ -174,8 +174,18 @@ async fn serve(stream: BoxStream) {
     }
 }
 
-pub async fn run() {
-    transport::serve_rpc(TOOLBOX_PIPE_NAME, TOOLBOX_TCP_ADDR, "toolbox", serve).await;
+/// `ready` fires once the channel is connectable — the event server waits on
+/// it so the app can never accept the event stream (and immediately fire its
+/// `Hello`) before this listener exists.
+pub async fn run(ready: tokio::sync::oneshot::Sender<()>) {
+    transport::serve_rpc(
+        TOOLBOX_PIPE_NAME,
+        TOOLBOX_TCP_ADDR,
+        "toolbox",
+        serve,
+        Some(ready),
+    )
+    .await;
 }
 
 /// Every test that touches `HELLO_OVERRIDE` takes this: the store is

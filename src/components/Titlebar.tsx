@@ -6,6 +6,7 @@ import { Fragment, useCallback } from "react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
+import { HOOK_LABEL_KEY, HOOK_TONE_CLASS } from "@/hookState";
 import getVersion from "@/hooks/getVersion";
 import { EncounterState, PlayerData, SortDirection, SortType } from "@/types";
 import { useHookStatus } from "@/useHookStatus";
@@ -78,19 +79,10 @@ const EncounterStatus = ({ encounterState, elapsedTime }: { encounterState: Enco
 
   // Connection tone drives the always-present status dot (`.encounter-status`
   // ::before glyph) and the label shown when no fight is on screen. An unknown
-  // or disconnected hook reads as idle "No game found".
-  let tone = "hook-idle";
-  let idleLabel = t("ui.hook-status.no-game");
-  if (hook?.state === "connected") {
-    tone = "hook-ok";
-    idleLabel = t("ui.hook-status.connected");
-  } else if (hook?.state === "reconnecting") {
-    tone = "hook-warn";
-    idleLabel = t("ui.hook-status.reconnecting");
-  } else if (hook?.state === "outOfDate") {
-    tone = "hook-warn";
-    idleLabel = t("ui.hook-status.out-of-date");
-  }
+  // hook (status not read yet) reads as the disconnected "No game found".
+  const state = hook?.state ?? "disconnected";
+  const tone = HOOK_TONE_CLASS[state];
+  const idleLabel = t(HOOK_LABEL_KEY[state]);
 
   // During a fight show the running timer; a finished fight shows its frozen
   // final duration; otherwise (idle) show the connection label. The dot rides

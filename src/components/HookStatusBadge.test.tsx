@@ -39,14 +39,21 @@ describe("HookStatusBadge", () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it("shows a Refresh button when out of date and eject-capable", () => {
-    status = { state: "outOfDate", hookVersion: "0.9.0", appVersion: "1.0.0", supportsEject: true };
+  // Every actionable state offers the same fix. `unresponsive` earns its place
+  // here because the eject support it carries is the last ANSWERED value,
+  // which a failed handshake no longer wipes — so Refresh stays reachable.
+  const ACTIONABLE = ["outOfDate", "unresponsive"] as const;
+  const LABEL = { outOfDate: "ui.hook-status.out-of-date", unresponsive: "ui.hook-status.unresponsive" };
+
+  it.each(ACTIONABLE)("shows a Refresh button when %s and eject-capable", (state) => {
+    status = { state, hookVersion: "0.9.0", appVersion: "1.0.0", supportsEject: true };
     renderBadge(<HookStatusBadge />);
     expect(screen.getByRole("button", { name: "ui.hook-status.refresh" })).toBeTruthy();
+    expect(screen.getByTitle(LABEL[state])).toBeTruthy();
   });
 
-  it("shows restart-game copy when out of date and NOT eject-capable", () => {
-    status = { state: "outOfDate", hookVersion: "0.9.0", appVersion: "1.0.0", supportsEject: false };
+  it.each(ACTIONABLE)("shows restart-game copy when %s and NOT eject-capable", (state) => {
+    status = { state, hookVersion: "0.9.0", appVersion: "1.0.0", supportsEject: false };
     renderBadge(<HookStatusBadge />);
     expect(screen.queryByRole("button", { name: "ui.hook-status.refresh" })).toBeNull();
     expect(screen.getByText("ui.hook-status.restart-game")).toBeTruthy();

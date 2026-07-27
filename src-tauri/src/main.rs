@@ -247,18 +247,45 @@ fn emit_hook_status(app: &AppHandle) {
     let _ = app.emit_all("hook-status", &snapshot);
 }
 
-/// Fold a `Hello` result into `HookStatus` and broadcast the new status. Shared
-/// by the connect loop and the dev re-handshake so the debug path can never
-/// drift from the real one.
-fn apply_hello(app: &AppHandle, info: toolbox_rpc::HelloInfo) {
-    app.state::<HookStatus>().apply_hello(info);
+/// Re-run the handshake (with its retries) and broadcast the result. Shared by
+/// the connect loop and the dev re-handshake so those two cannot drift; the
+/// heartbeat folds through the same `apply_hello` but skips the retries (see
+/// `hook_heartbeat`).
+async fn handshake_and_apply(app: &AppHandle) {
+    toolbox_rpc::handshake(&app.state::<HookStatus>()).await;
     emit_hook_status(app);
 }
 
-/// Re-run the handshake and fold the result in. The only way the debug path
-/// should ever refresh hook status.
-async fn handshake_and_apply(app: &AppHandle) {
-    apply_hello(app, toolbox_rpc::hello().await);
+/// Periodic re-probe while the event stream is up.
+///
+/// The connect-time handshake is one shot, so without this ANY undelivered
+/// handshake — a toolbox pipe that lost the startup race with the event pipe,
+/// a busy pipe instance, a 2s timeout — pinned its verdict until the game
+/// closed, because a fresh event-stream connection was the only other trigger.
+/// One RPC per interval, and it only wakes the webviews when the derived
+/// status actually changed.
+///
+/// Deliberately `hello` and not `handshake`: this loop IS the retry, so the
+/// backoff ladder would only spend four RPCs (and up to ~10s) per tick to
+/// reach the same verdict the next tick re-checks anyway.
+async fn hook_heartbeat(app: AppHandle) {
+    loop {
+        tokio::time::sleep(toolbox_rpc::HEARTBEAT_INTERVAL).await;
+
+        let hook = app.state::<HookStatus>();
+        // Nothing to ask when the stream is down. A teardown in flight is
+        // EXPECTED to fail the RPC, so probing there would manufacture an
+        // `Unresponsive` for a hook we are ourselves ejecting.
+        if !hook.connected.load(Ordering::Relaxed) || hook.injection_gated() {
+            continue;
+        }
+
+        let before = hook.snapshot();
+        hook.apply_hello(toolbox_rpc::hello().await);
+        if hook.snapshot() != before {
+            emit_hook_status(&app);
+        }
+    }
 }
 
 #[tauri::command]
@@ -1459,14 +1486,24 @@ mod dev_debug {
         Ok(())
     }
 
-    /// Clear the override and re-handshake.
+    /// Clear the override on the hook. `resync` then re-runs the handshake so
+    /// the app picks the change up at once.
+    ///
+    /// Passing `false` is what makes `hook_heartbeat` observable: every other
+    /// path refreshes the status itself, which masks whether the periodic
+    /// re-probe runs at all. Left un-resynced the app holds a now-stale
+    /// verdict, so the badge should sit on its old state and turn green on its
+    /// own within `HEARTBEAT_INTERVAL` — and if it does not, the heartbeat is
+    /// broken.
     #[tauri::command]
-    pub async fn debug_clear_hello_override(app: AppHandle) -> Result<(), String> {
+    pub async fn debug_clear_hello_override(app: AppHandle, resync: bool) -> Result<(), String> {
         app.state::<HookStatus>().debug_precondition()?;
         gbfr_logs::control_rpc::set_hello_override(None)
             .await
             .map_err(control_failure)?;
-        handshake_and_apply(&app).await;
+        if resync {
+            handshake_and_apply(&app).await;
+        }
         Ok(())
     }
 
@@ -1532,7 +1569,7 @@ async fn debug_set_hello_override(
 
 #[cfg(not(windows))]
 #[tauri::command]
-async fn debug_clear_hello_override(_app: AppHandle) -> Result<(), String> {
+async fn debug_clear_hello_override(_app: AppHandle, _resync: bool) -> Result<(), String> {
     Err("hook-control-unavailable".into())
 }
 
@@ -1612,13 +1649,25 @@ fn connect_and_run_parser(app: AppHandle) {
 
                     let _ = app.emit_all("success-alert", "Connnected to game!");
 
-                    app.state::<HookStatus>()
-                        .connected
-                        .store(true, Ordering::Relaxed);
-                    // Hello up front, once per (re)connect: a stale proxy or
-                    // pre-RPC hook shows as "outdated"; the reported version +
-                    // eject support drive the status badge and refresh gating.
-                    handshake_and_apply(&app).await;
+                    // Marks connected AND drops the previous hook's verdict —
+                    // a version answer belongs to the module that gave it.
+                    app.state::<HookStatus>().on_connect();
+                    // Hello up front, once per (re)connect: the reported
+                    // version + eject support drive the status badge and
+                    // refresh gating. If it cannot be delivered the state says
+                    // exactly that ("not answering", not "out of date") and
+                    // `hook_heartbeat` keeps asking.
+                    //
+                    // Spawned, NOT awaited: nothing below needs the result, and
+                    // its retry ladder can run ~10s against a wedged toolbox
+                    // channel — which would be ~10s of frames sitting unread in
+                    // the event pipe purely to settle a status badge. A late
+                    // result is harmless: `snapshot()` gates on `connected`, so
+                    // one landing after a disconnect cannot resurrect the badge.
+                    let handshake_app = app.clone();
+                    tauri::async_runtime::spawn(async move {
+                        handshake_and_apply(&handshake_app).await;
+                    });
 
                     let decoder = tokio_util::codec::LengthDelimitedCodec::new();
                     let mut reader = FramedRead::new(stream, decoder);
@@ -2081,6 +2130,9 @@ fn main() {
         .setup(|app| {
             // Perform the game hook check in a separate thread.
             tauri::async_runtime::spawn(check_and_perform_hook(app.handle()));
+            // Outlives individual connections on purpose: it must also run for
+            // a hook that was already mapped when the app started.
+            tauri::async_runtime::spawn(hook_heartbeat(app.handle()));
 
             Ok(())
         })

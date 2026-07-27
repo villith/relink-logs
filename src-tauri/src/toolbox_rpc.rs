@@ -2,6 +2,11 @@
 //! plus [`HookStatus`] — what the commands consult before calling so that
 //! "game not running", "hook outdated", and "hook unreachable" each surface
 //! as the right thing in the UI.
+//!
+//! Those three stay distinct on purpose. A handshake that cannot be DELIVERED
+//! establishes nothing about the hook's version, so it reports
+//! [`HookState::Unresponsive`] and is retried (and re-probed by the heartbeat
+//! in main.rs) rather than latching a version verdict nobody gave us.
 
 use anyhow::Result;
 use protocol::toolbox::{
@@ -19,8 +24,16 @@ use std::time::Duration;
 pub struct HookStatus {
     /// True while the event stream is connected (the hook is alive).
     pub connected: AtomicBool,
-    /// True when the hook's Hello failed or reported another protocol version.
+    /// True when the hook ANSWERED a Hello on a different protocol version.
+    /// Set only by an answer — an undelivered handshake leaves it alone (see
+    /// `unresponsive`), because "I could not ask" is not evidence of a
+    /// version, and treating it as one is what pinned healthy hooks at
+    /// "out of date" for a whole session.
     pub outdated: AtomicBool,
+    /// True when the last handshake could not be delivered at all: the toolbox
+    /// pipe was missing/busy, the RPC timed out, or the reply was undecodable.
+    /// Distinct from `outdated` and cleared by the next answer.
+    pub unresponsive: AtomicBool,
     /// Dev/refresh hook teardown in flight: the injection loop must not
     /// re-inject until the old module is ejected. See `reload_hook`/`refresh_hook`.
     pub reloading: AtomicBool,
@@ -50,14 +63,63 @@ pub enum HookState {
     Connected,
     /// A refresh/reload is in flight.
     Reconnecting,
-    /// Version differs from the app, or the protocol/Hello mismatched.
+    /// The hook answered on another protocol version, or reported a release
+    /// version differing from the app's.
     OutOfDate,
+    /// Event stream up, but the hook is not answering the toolbox channel.
+    /// Its version is UNKNOWN here — deliberately not folded into
+    /// `OutOfDate`, which asserts something we have not been told.
+    Unresponsive,
     /// No hook / game not running.
     Disconnected,
 }
 
+/// What a handshake concluded. The split exists so a transport failure can
+/// never masquerade as a version verdict: only `Answered` carries facts about
+/// the hook, and whether those facts mean "out of date" is derived in
+/// [`HookStatus::apply_hello`].
+#[derive(Debug)]
+pub enum HelloOutcome {
+    /// The hook answered. `protocol_version` is what IT speaks, which may or
+    /// may not be ours.
+    Answered {
+        hook_version: String,
+        supports_eject: bool,
+        protocol_version: u32,
+    },
+    /// No answer. Carries the reason purely so the log can say which — the
+    /// distinction it used to lose is the whole point of this enum.
+    Unreachable(String),
+}
+
+/// How many extra attempts a handshake gets before we settle on
+/// `Unresponsive`. The first try is not a retry, so a full run is
+/// `1 + HANDSHAKE_RETRIES` calls.
+const HANDSHAKE_RETRIES: u32 = 3;
+
+/// Backoff before handshake attempt `attempt` (0-based, counting retries
+/// only), or `None` when there is nothing to gain by asking again.
+///
+/// Retry is for `Unreachable` alone: a hook that answered has given its
+/// verdict, and re-asking cannot change it. Kept a free function so the policy
+/// is unit-testable without a runtime or a game.
+fn retry_delay(outcome: &HelloOutcome, attempt: u32) -> Option<Duration> {
+    match outcome {
+        HelloOutcome::Unreachable(_) if attempt < HANDSHAKE_RETRIES => {
+            Some(Duration::from_millis(250 * 2_u64.pow(attempt)))
+        }
+        _ => None,
+    }
+}
+
+/// How often `hook_heartbeat` (main.rs) re-probes while connected. That loop
+/// is what makes a verdict self-correcting; see it for the why.
+pub const HEARTBEAT_INTERVAL: Duration = Duration::from_secs(30);
+
 /// Snapshot pushed to the frontend (`hook-status` event, `get_hook_status`).
-#[derive(Serialize, Clone)]
+/// `PartialEq` so the heartbeat can emit only on a real change instead of
+/// waking both webviews every interval.
+#[derive(Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct HookStatusSnapshot {
     pub state: HookState,
@@ -81,12 +143,17 @@ impl HookStatus {
             Some(v) => v != app_version,
         };
 
+        // `outdated` outranks `unresponsive`: a version verdict came from the
+        // hook itself and stays true even once it stops answering, whereas
+        // `unresponsive` only ever means "unknown".
         let state = if self.reloading.load(Ordering::Relaxed) {
             HookState::Reconnecting
         } else if !self.connected.load(Ordering::Relaxed) {
             HookState::Disconnected
         } else if self.outdated.load(Ordering::Relaxed) || version_mismatch {
             HookState::OutOfDate
+        } else if self.unresponsive.load(Ordering::Relaxed) {
+            HookState::Unresponsive
         } else {
             HookState::Connected
         };
@@ -120,13 +187,54 @@ impl HookStatus {
         self.reloading.load(Ordering::Relaxed) || self.dev_hold_out.load(Ordering::Relaxed)
     }
 
-    /// Fold a `Hello` result in. Shared by the connect loop and the dev
-    /// re-handshake so the debug path can never drift from the real one.
-    pub fn apply_hello(&self, info: HelloInfo) {
-        self.outdated.store(!info.ok, Ordering::Relaxed);
-        *self.hook_version.lock().unwrap() = info.hook_version;
-        self.supports_eject
-            .store(info.supports_eject, Ordering::Relaxed);
+    /// Start-of-connection reset: a verdict belongs to the hook that produced
+    /// it, so it must not survive into the next connection's pre-handshake
+    /// window (up to `RPC_TIMEOUT` long, and readable there by every
+    /// `get_hook_status` a page mount fires). The reported version and eject
+    /// support are deliberately KEPT: they are refreshed within milliseconds
+    /// by the handshake, and dropping them would flash "restart the game" at
+    /// the user on every reconnect.
+    pub fn on_connect(&self) {
+        self.outdated.store(false, Ordering::Relaxed);
+        self.unresponsive.store(false, Ordering::Relaxed);
+        self.connected.store(true, Ordering::Relaxed);
+    }
+
+    /// Fold a handshake outcome in. Shared by the connect loop, the heartbeat
+    /// and the dev re-handshake so no path can drift from the others.
+    ///
+    /// Only an ANSWER writes `hook_version`/`supports_eject`. An undelivered
+    /// handshake leaves every known fact standing and reports only what it
+    /// actually established: that the hook is not answering.
+    pub fn apply_hello(&self, outcome: HelloOutcome) {
+        let (hook_version, supports_eject, protocol_version) = match outcome {
+            HelloOutcome::Answered {
+                hook_version,
+                supports_eject,
+                protocol_version,
+            } => (hook_version, supports_eject, protocol_version),
+            HelloOutcome::Unreachable(why) => {
+                // The one line that used to be missing entirely: without it
+                // there is no way, live or after the fact, to tell a real
+                // version mismatch from a pipe that was not up yet.
+                log::warn!("hook handshake undeliverable ({why}); version left unknown");
+                self.unresponsive.store(true, Ordering::Relaxed);
+                return;
+            }
+        };
+
+        let outdated = protocol_version != TOOLBOX_PROTOCOL_VERSION;
+        if outdated {
+            log::warn!(
+                "hook toolbox protocol {protocol_version} != ours {TOOLBOX_PROTOCOL_VERSION} \
+                 (hook {hook_version}): the mapped hook is out of date"
+            );
+        }
+
+        self.outdated.store(outdated, Ordering::Relaxed);
+        self.unresponsive.store(false, Ordering::Relaxed);
+        *self.hook_version.lock().unwrap() = Some(hook_version);
+        self.supports_eject.store(supports_eject, Ordering::Relaxed);
     }
 }
 
@@ -143,30 +251,42 @@ pub async fn call(req: ToolboxRequest) -> Result<ToolboxResponse> {
     .await
 }
 
-/// The parsed Hello handshake for the connect loop: whether the hook speaks
-/// our protocol, plus the version + eject support it reported.
-pub struct HelloInfo {
-    pub ok: bool,
-    pub hook_version: Option<String>,
-    pub supports_eject: bool,
-}
-
-pub async fn hello() -> HelloInfo {
+/// Run one handshake. Every failure mode reports WHY, so the caller can retry
+/// the transient ones and the log can name the cause.
+pub async fn hello() -> HelloOutcome {
     match call(ToolboxRequest::Hello).await {
         Ok(ToolboxResponse::Hello {
             protocol_version,
             hook_version,
             supports_eject,
-        }) => HelloInfo {
-            ok: protocol_version == TOOLBOX_PROTOCOL_VERSION,
-            hook_version: Some(hook_version),
+        }) => HelloOutcome::Answered {
+            hook_version,
             supports_eject,
+            protocol_version,
         },
-        _ => HelloInfo {
-            ok: false,
-            hook_version: None,
-            supports_eject: false,
-        },
+        // A different variant back is a broken peer, not an old one: it
+        // answered the wrong question, so we learned nothing about its version.
+        Ok(other) => HelloOutcome::Unreachable(format!("unexpected reply {other:?}")),
+        Err(e) => HelloOutcome::Unreachable(format!("{e:#}")),
+    }
+}
+
+/// Handshake with bounded retry, then fold the result in.
+///
+/// The retry is the difference between "a toolbox pipe that was not up yet
+/// costs one mislabelled session" and "costs 250ms".
+pub async fn handshake(hook: &HookStatus) {
+    for attempt in 0.. {
+        let outcome = hello().await;
+        let Some(delay) = retry_delay(&outcome, attempt) else {
+            hook.apply_hello(outcome);
+            return;
+        };
+        log::info!(
+            "hook handshake attempt {} undeliverable; retrying in {delay:?}",
+            attempt + 1
+        );
+        tokio::time::sleep(delay).await;
     }
 }
 
@@ -303,25 +423,30 @@ mod tests {
         assert_eq!(hook.snapshot().state, HookState::Connected);
     }
 
-    #[test]
-    fn apply_hello_failure_reads_out_of_date() {
-        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
-        hook.apply_hello(HelloInfo {
-            ok: false,
-            hook_version: Some(env!("CARGO_PKG_VERSION").to_string()),
+    /// A hook that answered, either on our protocol version or on another one.
+    fn answered(ok: bool) -> HelloOutcome {
+        HelloOutcome::Answered {
+            hook_version: env!("CARGO_PKG_VERSION").to_string(),
             supports_eject: true,
-        });
+            protocol_version: if ok {
+                TOOLBOX_PROTOCOL_VERSION
+            } else {
+                TOOLBOX_PROTOCOL_VERSION + 1
+            },
+        }
+    }
+
+    #[test]
+    fn protocol_mismatch_reads_out_of_date() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        hook.apply_hello(answered(false));
         assert_eq!(hook.snapshot().state, HookState::OutOfDate);
     }
 
     #[test]
     fn apply_hello_matching_version_reads_connected() {
         let hook = connected_hook(None, false);
-        hook.apply_hello(HelloInfo {
-            ok: true,
-            hook_version: Some(env!("CARGO_PKG_VERSION").to_string()),
-            supports_eject: true,
-        });
+        hook.apply_hello(answered(true));
         let snapshot = hook.snapshot();
         assert_eq!(snapshot.state, HookState::Connected);
         assert_eq!(
@@ -329,6 +454,80 @@ mod tests {
             Some(env!("CARGO_PKG_VERSION"))
         );
         assert!(snapshot.supports_eject);
+    }
+
+    /// The bug this whole outcome split exists for: a handshake that could not
+    /// be DELIVERED says nothing about the hook's version, so it must not
+    /// claim the hook is out of date.
+    #[test]
+    fn an_undeliverable_handshake_is_not_an_out_of_date_hook() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        hook.apply_hello(HelloOutcome::Unreachable("os error 2".into()));
+        assert_eq!(hook.snapshot().state, HookState::Unresponsive);
+    }
+
+    /// ...and it must not destroy what the last real answer told us. Wiping
+    /// `supports_eject` here is what used to hide the Refresh button (and make
+    /// `refresh_hook` refuse) in exactly the case where the state was bogus.
+    #[test]
+    fn an_undeliverable_handshake_keeps_the_last_known_facts() {
+        let hook = connected_hook(None, false);
+        hook.apply_hello(answered(true));
+        hook.apply_hello(HelloOutcome::Unreachable("rpc timed out".into()));
+
+        let snapshot = hook.snapshot();
+        assert_eq!(
+            snapshot.hook_version.as_deref(),
+            Some(env!("CARGO_PKG_VERSION"))
+        );
+        assert!(snapshot.supports_eject);
+    }
+
+    /// The un-latching contract the heartbeat depends on: whatever a previous
+    /// handshake concluded, a later successful one fully clears it.
+    #[test]
+    fn a_later_successful_hello_clears_both_verdicts() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+
+        hook.apply_hello(answered(false));
+        assert_eq!(hook.snapshot().state, HookState::OutOfDate);
+        hook.apply_hello(HelloOutcome::Unreachable("os error 2".into()));
+        assert_eq!(hook.snapshot().state, HookState::OutOfDate);
+
+        hook.apply_hello(answered(true));
+        assert_eq!(hook.snapshot().state, HookState::Connected);
+    }
+
+    /// A verdict belongs to the connection that produced it. Carrying one over
+    /// leaves the pre-handshake window of the NEXT connection reporting the
+    /// last hook's answer — which `get_hook_status` (called on every page
+    /// mount) will happily paint.
+    #[test]
+    fn a_new_connection_starts_without_the_previous_verdict() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        hook.apply_hello(answered(false));
+        hook.apply_hello(HelloOutcome::Unreachable("os error 2".into()));
+
+        hook.on_connect();
+        assert_eq!(hook.snapshot().state, HookState::Connected);
+    }
+
+    /// Retry is for the transient outcome only: a hook that ANSWERED has given
+    /// its verdict, and asking again cannot change it.
+    #[test]
+    fn only_an_undeliverable_handshake_is_retried() {
+        assert!(retry_delay(&HelloOutcome::Unreachable("x".into()), 0).is_some());
+        assert!(retry_delay(&answered(true), 0).is_none());
+        assert!(retry_delay(&answered(false), 0).is_none());
+    }
+
+    /// ...and retry is bounded, so a genuinely dead channel settles on
+    /// `Unresponsive` instead of probing forever.
+    #[test]
+    fn retries_are_bounded() {
+        let unreachable = HelloOutcome::Unreachable("x".into());
+        assert!(retry_delay(&unreachable, HANDSHAKE_RETRIES - 1).is_some());
+        assert!(retry_delay(&unreachable, HANDSHAKE_RETRIES).is_none());
     }
 
     /// The Debug tab's hook-driving commands all want the same two things.

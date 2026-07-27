@@ -53,11 +53,26 @@ impl Server {
     async fn run(&self) {
         // The toolbox RPC channel is independent of the event stream and
         // must not die with a client, so it gets its own task.
-        tokio::spawn(toolbox::run());
+        let (toolbox_ready, wait_for_toolbox) = tokio::sync::oneshot::channel();
+        tokio::spawn(toolbox::run(toolbox_ready));
         // Dev eject: a SEPARATE control endpoint carries the self-teardown
         // command (kept out of the toolbox tool RPC). Own task, same reason.
         #[cfg(feature = "eject")]
         tokio::spawn(control::run(self.tx.clone()));
+
+        // Order matters: the app fires its `Hello` on the toolbox channel the
+        // instant the EVENT stream below accepts it, so publishing the event
+        // pipe first leaves a window where a healthy hook cannot answer.
+        // Bounded, and a dropped sender resolves immediately: under Wine
+        // `run_tcp` retries a taken port every 5s, and event delivery must
+        // never wait on that.
+        if tokio::time::timeout(std::time::Duration::from_secs(2), wait_for_toolbox)
+            .await
+            .is_err()
+        {
+            warn!("toolbox channel not ready within 2s; starting the event server anyway");
+        }
+
         match transport::select_transport() {
             transport::Transport::NamedPipe => self.run_pipe().await,
             transport::Transport::Tcp => self.run_tcp().await,

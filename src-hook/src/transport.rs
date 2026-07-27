@@ -33,19 +33,33 @@ pub type BoxStream = std::pin::Pin<Box<dyn RpcStream>>;
 /// control channels: named pipe on native Windows, localhost TCP under
 /// Wine/Proton (and `GBFR_LOGS_FORCE_TCP=1`). Each accepted connection is
 /// handed to `serve` on its own task; `label` tags the log lines.
-pub async fn serve_rpc<F, Fut>(pipe_name: &str, tcp_addr: &str, label: &str, serve: F)
-where
+///
+/// `ready`, when given, is signalled once the channel is actually connectable
+/// — never merely once this task has started. Dropping it (a listener that
+/// could not be created) wakes the waiter too, so nobody blocks on a channel
+/// that will never exist.
+pub async fn serve_rpc<F, Fut>(
+    pipe_name: &str,
+    tcp_addr: &str,
+    label: &str,
+    serve: F,
+    ready: Option<tokio::sync::oneshot::Sender<()>>,
+) where
     F: Fn(BoxStream) -> Fut + Clone + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
     match select_transport() {
-        Transport::NamedPipe => run_pipe(pipe_name, label, serve).await,
-        Transport::Tcp => run_tcp(tcp_addr, label, serve).await,
+        Transport::NamedPipe => run_pipe(pipe_name, label, serve, ready).await,
+        Transport::Tcp => run_tcp(tcp_addr, label, serve, ready).await,
     }
 }
 
-async fn run_pipe<F, Fut>(pipe_name: &str, label: &str, serve: F)
-where
+async fn run_pipe<F, Fut>(
+    pipe_name: &str,
+    label: &str,
+    serve: F,
+    ready: Option<tokio::sync::oneshot::Sender<()>>,
+) where
     F: Fn(BoxStream) -> Fut + Clone + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
@@ -62,6 +76,11 @@ where
         }
     };
     info!("{label}: listening on {pipe_name}");
+    // The instance exists now, so a client can connect even before the first
+    // `accept()` below parks on it.
+    if let Some(ready) = ready {
+        let _ = ready.send(());
+    }
     loop {
         match listener.accept().await {
             Ok(stream) => {
@@ -75,8 +94,12 @@ where
 
 // Same bind-retry rationale as the event listener: a taken port must not
 // permanently disable the channel for the session.
-async fn run_tcp<F, Fut>(tcp_addr: &str, label: &str, serve: F)
-where
+async fn run_tcp<F, Fut>(
+    tcp_addr: &str,
+    label: &str,
+    serve: F,
+    ready: Option<tokio::sync::oneshot::Sender<()>>,
+) where
     F: Fn(BoxStream) -> Fut + Clone + Send + 'static,
     Fut: Future<Output = ()> + Send + 'static,
 {
@@ -90,6 +113,9 @@ where
         }
     };
     info!("{label}: listening on {tcp_addr}");
+    if let Some(ready) = ready {
+        let _ = ready.send(());
+    }
     loop {
         match listener.accept().await {
             Ok((stream, _addr)) => {
@@ -160,5 +186,32 @@ mod tests {
     #[test]
     fn is_wine_is_false_on_real_windows() {
         assert!(!is_wine());
+    }
+
+    /// The app fires its Hello the instant the EVENT pipe accepts, so the
+    /// toolbox channel has to be up first — and "up" has to mean connectable,
+    /// not merely spawned. A ready signal that fires before its listener
+    /// exists hands the app an ERROR_FILE_NOT_FOUND on a perfectly healthy
+    /// hook, which is the startup race behind the bogus status.
+    #[tokio::test]
+    async fn ready_fires_only_once_the_listener_accepts_connections() {
+        use interprocess::os::windows::named_pipe::{pipe_mode, tokio::DuplexPipeStream};
+
+        let path = r"\\.\pipe\gbfr-logs-test-ready";
+        let (ready_tx, ready_rx) = tokio::sync::oneshot::channel();
+        tokio::spawn(serve_rpc(
+            path,
+            "127.0.0.1:39399",
+            "test",
+            |_stream| async {},
+            Some(ready_tx),
+        ));
+
+        ready_rx.await.expect("listener never signalled ready");
+
+        // Would fail with os error 2 if `ready` outran the pipe's creation.
+        DuplexPipeStream::<pipe_mode::Bytes>::connect_by_path(path)
+            .await
+            .expect("ready fired before the pipe was connectable");
     }
 }

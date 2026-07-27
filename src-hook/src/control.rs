@@ -88,6 +88,9 @@ pub async fn run(tx: crate::event::Tx) {
         HOOK_CONTROL_TCP_ADDR,
         "control",
         move |stream| serve(tx.clone(), stream),
+        // Nothing waits on this one: the app only reaches for the control
+        // channel on an explicit dev action, long after startup.
+        None,
     )
     .await;
 }

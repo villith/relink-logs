@@ -69,6 +69,18 @@ const HOOK_ROWS: HookAction[][] = [
       color: "green",
       labelKey: "ui.debug.hook-clear-override",
       command: "debug_clear_hello_override",
+      args: { resync: true },
+    },
+    // Same clear, but the app is NOT resynced, so it keeps the now-stale
+    // verdict. The badge should turn green on its own within the heartbeat
+    // interval — the only way to watch that loop work, since every other path
+    // refreshes the status itself.
+    {
+      key: "clear-override-quietly",
+      color: "green",
+      labelKey: "ui.debug.hook-clear-override-quietly",
+      command: "debug_clear_hello_override",
+      args: { resync: false },
     },
   ],
 ];
