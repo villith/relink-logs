@@ -19,6 +19,7 @@ import {
   Title,
 } from "@mantine/core";
 import { X } from "@phosphor-icons/react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { orderedTraitOptions } from "./traitOptions";
@@ -66,16 +67,14 @@ const stoneTypeName = (item: string) =>
     .replace(/\s*wrightstone\s*/i, " ")
     .trim();
 
-/** Synthesis-style result cell: name line + dimmed trait/level line. */
+/** Synthesis-style result cell: name line + dimmed trait line. Sigil traits
+ * share one level, so none is shown; stone levels differ per slot. */
 const OutcomeCell = ({ outcome, hit }: { outcome: TransmarvelOutcome; hit: boolean }) => {
   const { t } = useTranslation();
   const name = outcome.type === "sigil" ? translateSigilId(outcome.sigilId) : translateWrightstoneId(outcome.item);
   const line =
     outcome.type === "sigil"
-      ? [
-          `${translateTraitId(outcome.trait1)} ${t("ui.level-short", { level: outcome.traitLevel })}`,
-          outcome.trait2 !== null ? translateTraitId(outcome.trait2) : null,
-        ]
+      ? [translateTraitId(outcome.trait1), outcome.trait2 !== null ? translateTraitId(outcome.trait2) : null]
           .filter(Boolean)
           .join(" / ")
       : outcome.traits
@@ -138,6 +137,23 @@ const TransmarvelSearcher = () => {
   const errorMessage = backendErrorMessage(t, "transmarvel", error);
   const busy = loading || predicting;
   const hasPrediction = prediction !== null && !prediction.unpredictable;
+
+  // Tabs are controlled so a tab switch re-renders this component and the
+  // measuring effect below re-runs.
+  const [tab, setTab] = useState<string | null>("wishlist");
+  /** Anchor the results scroll area to the viewport bottom by measuring its
+   * actual top edge. A fixed calc() offset drifts whenever the content above
+   * (alerts, controls, tab list) changes, letting the page overflow and grow
+   * a root scrollbar. Runs after every render; the setState bails out when
+   * the value hasn't changed, and the measurement is skipped while the
+   * results tab is hidden (offsetParent is null under display:none). */
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const [resultsMah, setResultsMah] = useState("calc(100vh - 290px)");
+  useEffect(() => {
+    const node = resultsRef.current;
+    if (!node || node.offsetParent === null) return;
+    setResultsMah(`calc(100vh - ${Math.ceil(node.getBoundingClientRect().top) + 16}px)`);
+  });
   const anyOption = { value: ANY, label: t("ui.toolbox.tm-any-option", "Any") };
 
   const sigilOptions = POOL.sigils
@@ -226,7 +242,7 @@ const TransmarvelSearcher = () => {
           {t("ui.toolbox.tm-predict", "Predict")}
         </Button>
       </Group>
-      <Tabs defaultValue="wishlist">
+      <Tabs value={tab} onChange={setTab}>
         <Tabs.List>
           <Tabs.Tab value="wishlist">{t("ui.toolbox.tm-tab-wishlist", "Wishlist")}</Tabs.Tab>
           <Tabs.Tab value="results">{t("ui.toolbox.tm-tab-results", "Full Results")}</Tabs.Tab>
@@ -385,44 +401,46 @@ const TransmarvelSearcher = () => {
         </Tabs.Panel>
         <Tabs.Panel value="results" pt="sm">
           {prediction && !prediction.unpredictable && (
-            <ScrollArea.Autosize mah="calc(100vh - 220px)" type="auto" offsetScrollbars>
-              <Stack gap="xs">
-                <Text size="xs" c="dimmed">
-                  {t("ui.toolbox.tm-results-caveat")}
-                </Text>
-                {firstHit === null && (
-                  <Text size="sm">{t("ui.toolbox.tm-no-hits", { rolls: prediction.rolls.length })}</Text>
-                )}
-                <Checkbox
-                  label={t("ui.toolbox.tm-matches-only", "Show matches only")}
-                  checked={matchesOnly}
-                  onChange={(e) => setMatchesOnly(e.currentTarget.checked)}
-                />
-                <Table striped highlightOnHover stickyHeader>
-                  <Table.Thead>
-                    <Table.Tr>
-                      <Table.Th w={70}>{t("ui.toolbox.tm-col-roll", "Roll #")}</Table.Th>
-                      <Table.Th>{t("ui.toolbox.tm-col-result", "Result")}</Table.Th>
-                    </Table.Tr>
-                  </Table.Thead>
-                  <Table.Tbody>
-                    {shown.map(({ roll, index, hit }) => (
-                      <Table.Tr key={index}>
-                        <Table.Td fw={hit ? 700 : undefined}>#{index + 1}</Table.Td>
-                        <Table.Td>
-                          <OutcomeCell outcome={roll.outcome} hit={hit} />
-                        </Table.Td>
-                      </Table.Tr>
-                    ))}
-                  </Table.Tbody>
-                </Table>
-                {filtered.length > shown.length && (
+            <Box ref={resultsRef}>
+              <ScrollArea.Autosize mah={resultsMah} type="auto" offsetScrollbars>
+                <Stack gap="xs">
                   <Text size="xs" c="dimmed">
-                    {t("ui.toolbox.tm-truncated", { shown: shown.length, total: filtered.length })}
+                    {t("ui.toolbox.tm-results-caveat")}
                   </Text>
-                )}
-              </Stack>
-            </ScrollArea.Autosize>
+                  {firstHit === null && (
+                    <Text size="sm">{t("ui.toolbox.tm-no-hits", { rolls: prediction.rolls.length })}</Text>
+                  )}
+                  <Checkbox
+                    label={t("ui.toolbox.tm-matches-only", "Show matches only")}
+                    checked={matchesOnly}
+                    onChange={(e) => setMatchesOnly(e.currentTarget.checked)}
+                  />
+                  <Table striped highlightOnHover stickyHeader>
+                    <Table.Thead>
+                      <Table.Tr>
+                        <Table.Th w={70}>{t("ui.toolbox.tm-col-roll", "Roll #")}</Table.Th>
+                        <Table.Th>{t("ui.toolbox.tm-col-result", "Result")}</Table.Th>
+                      </Table.Tr>
+                    </Table.Thead>
+                    <Table.Tbody>
+                      {shown.map(({ roll, index, hit }) => (
+                        <Table.Tr key={index}>
+                          <Table.Td fw={hit ? 700 : undefined}>#{index + 1}</Table.Td>
+                          <Table.Td>
+                            <OutcomeCell outcome={roll.outcome} hit={hit} />
+                          </Table.Td>
+                        </Table.Tr>
+                      ))}
+                    </Table.Tbody>
+                  </Table>
+                  {filtered.length > shown.length && (
+                    <Text size="xs" c="dimmed">
+                      {t("ui.toolbox.tm-truncated", { shown: shown.length, total: filtered.length })}
+                    </Text>
+                  )}
+                </Stack>
+              </ScrollArea.Autosize>
+            </Box>
           )}
         </Tabs.Panel>
       </Tabs>

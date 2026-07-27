@@ -458,10 +458,10 @@ describe("TransmarvelSearcher", () => {
       fireEvent.click(predictButton);
     });
 
-    // Name line = the rolled sigil's item name; dimmed line = trait1 with its
-    // level, then the 2nd trait.
+    // Name line = the rolled sigil's item name; dimmed line = both traits,
+    // no levels (sigil traits share one level, so showing it is noise).
     expect(await screen.findByText(`sigil:${OTHER.sigilId}`)).toBeTruthy();
-    expect(screen.getByText(`trait:${OTHER.trait} Lv15 / trait:${WISHLISTED.trait}`)).toBeTruthy();
+    expect(screen.getByText(`trait:${OTHER.trait} / trait:${WISHLISTED.trait}`)).toBeTruthy();
   });
 
   it("labels sigil picker entries by their item name, not their trait id", async () => {
