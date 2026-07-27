@@ -578,6 +578,25 @@ describe("TransmarvelSearcher", () => {
     expect(trait2Input.getAttribute("disabled")).toBeNull();
   });
 
+  it("starts a new wrightstone at Fortification 20/15/10 with Supplementary DMG", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    renderPage();
+
+    const add = await screen.findByRole("button", { name: "Add wrightstone" });
+    fireEvent.click(add);
+
+    // Live v2.0.2 hashes: the Fortification family (trait 1 = HP) and the
+    // Supplementary DMG trait. A pool regeneration that retires either should
+    // fail here rather than silently seed an entry sanitize would drop.
+    expect(useTransmarvelWishlistStore.getState().stones).toEqual([
+      { family: "f372f096", minTier: 1, slot2: "57ab5b10", slot3: null },
+    ]);
+  });
+
   it("labels rarities by max level per slot, folding the 0.1% tier away", async () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);

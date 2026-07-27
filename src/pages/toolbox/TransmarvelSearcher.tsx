@@ -68,6 +68,19 @@ const ROLL_NO_W = 44;
  * "Wrightstone", e.g. "Dread"). */
 const FAMILIES = POOL.wrightstones.combos.filter((c) => c.tier === 0);
 
+/** What a new wrightstone row starts as: Fortification at 20/15/10 with
+ * Supplementary DMG in slot 2 — the roll people actually hunt, rather than
+ * the worst rarity of whichever family sorts first. Falls back to a bare
+ * entry if a pool regeneration retires that family, rarity, or trait, since
+ * sanitize-on-read would otherwise drop the row and Add would do nothing. */
+const DEFAULT_STONE: WrightstoneEntry = (() => {
+  const preferred: WrightstoneEntry = { family: "f372f096", minTier: 1, slot2: "57ab5b10", slot3: null };
+  const offered =
+    familyCombos(preferred.family).some((c) => c.tier === preferred.minTier) &&
+    slotTraitOptions(preferred.family, preferred.minTier, 1).includes(preferred.slot2!);
+  return offered ? preferred : { family: FAMILIES[0].family, minTier: 0, slot2: null, slot3: null };
+})();
+
 /** "Dread Wrightstone" -> "Dread"; non-English names pass through whole. */
 const stoneTypeName = (item: string) =>
   translateWrightstoneId(hex(item))
@@ -368,9 +381,7 @@ const TransmarvelSearcher = () => {
                 size="compact-sm"
                 variant="light"
                 disabled={busy}
-                onClick={() =>
-                  setStones([...stones, { family: FAMILIES[0].family, minTier: 0, slot2: null, slot3: null }])
-                }
+                onClick={() => setStones([...stones, DEFAULT_STONE])}
               >
                 {t("ui.toolbox.tm-add-stone", "Add wrightstone")}
               </Button>
