@@ -118,7 +118,16 @@ pub fn rpm_synthesis_snapshot() -> Result<Option<protocol::toolbox::SynthesisSna
 /// RPM overmastery snapshot (probe ground truth). `Ok(None)` = game not running.
 pub fn rpm_overmastery_snapshot() -> Result<Option<protocol::toolbox::OvermasterySnapshot>> {
     with_game_pe(|pe, mem, base| {
+        let rng = game_reader::resolve_rng_rva(pe)?;
         let rvas = game_reader::overmastery::resolve_rvas(pe)?;
-        game_reader::overmastery::take_snapshot(mem, base, rvas)
+        game_reader::overmastery::take_snapshot(mem, base, rng, rvas)
+    })
+}
+
+/// RPM read of one RNG slot (probe ground truth). `Ok(None)` = game not running.
+pub fn rpm_rng_slot(slot: u32) -> Result<Option<game_reader::RngSlotState>> {
+    with_game_pe(|pe, mem, base| {
+        let rng = game_reader::resolve_rng_rva(pe)?;
+        game_reader::read_rng_slot(mem, base, rng, slot)
     })
 }

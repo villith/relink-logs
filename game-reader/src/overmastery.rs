@@ -1,7 +1,7 @@
 //! Read-only snapshot of the game's meditation RNG state: the RNG slot array
 //! and the character roster vector (character -> slot index).
 
-use crate::{resolve_rng_rva, scan_unique_rva, MemRead, RNG_SLOT_COUNT};
+use crate::{deref_rng, scan_unique_rva, MemRead, RNG_SLOT_COUNT};
 use anyhow::{bail, Result};
 use pelite::pe64::Pe;
 pub use protocol::toolbox::OvermasterySnapshot;
@@ -13,51 +13,30 @@ const ROSTER_SIG: &str = "81 f9 76 ba ac a4 74 ? 81 f9 b2 b1 26 2a 75 ? 8d 0c 9b
 
 const MAX_ROSTER: u64 = 64;
 
-/// The two globals overmastery needs, as module-relative RVAs.
+/// The global overmastery needs on top of the shared RNG array, as a
+/// module-relative RVA. The RNG global itself is resolved once by the caller
+/// (`resolve_rng_rva`) and shared with every other RNG-backed tool, so a game
+/// patch that moves it has ONE failure site.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OvermasteryRvas {
-    pub rng: u32,
     pub roster: u32,
 }
 
-/// Sigscan for the RNG and roster globals (PeFile or PeView alike).
+/// Sigscan for the roster global (PeFile or PeView alike).
 pub fn resolve_rvas<'a>(pe: impl Pe<'a>) -> Result<OvermasteryRvas> {
     Ok(OvermasteryRvas {
-        rng: resolve_rng_rva(pe)?,
         roster: scan_unique_rva(pe, ROSTER_SIG, "roster")?,
     })
-}
-
-fn deref_rng(mem: &impl MemRead, base: u64, rvas: OvermasteryRvas) -> Result<u64> {
-    let rng = mem.u64(base + rvas.rng as u64)?;
-    if rng == 0 {
-        bail!("rng global not initialized yet (still on title screen?)");
-    }
-    Ok(rng)
-}
-
-/// Light read of one RNG slot's state (`slot` < `RNG_SLOT_COUNT`) for
-/// staleness polling — a single 4-byte read, no roster walk.
-pub fn take_slot_state(
-    mem: &impl MemRead,
-    base: u64,
-    rvas: OvermasteryRvas,
-    slot: u32,
-) -> Result<u32> {
-    if slot as usize >= RNG_SLOT_COUNT {
-        bail!("slot {slot:#x} out of range");
-    }
-    let rng = deref_rng(mem, base, rvas)?;
-    mem.u32(rng + slot as u64 * 4)
 }
 
 /// Take a meditation RNG snapshot.
 pub fn take_snapshot(
     mem: &impl MemRead,
     base: u64,
+    rng_rva: u32,
     rvas: OvermasteryRvas,
 ) -> Result<OvermasterySnapshot> {
-    let rng = deref_rng(mem, base, rvas)?;
+    let rng = deref_rng(mem, base, rng_rva)?;
 
     let mut block = vec![0u8; RNG_SLOT_COUNT * 4 + 4];
     mem.read(rng, &mut block)?;
@@ -104,17 +83,15 @@ mod tests {
     use crate::{FakeMem, RNG_SLOT_OVERRIDE};
 
     const BASE: u64 = 0x1_4000_0000;
-    const RVAS: OvermasteryRvas = OvermasteryRvas {
-        rng: 0x2000,
-        roster: 0x3000,
-    };
+    const RNG_RVA: u32 = 0x2000;
+    const RVAS: OvermasteryRvas = OvermasteryRvas { roster: 0x3000 };
     const RNG: u64 = 0x6000_0000;
     const ROSTER_OBJ: u64 = 0x8000_0000;
     const IDS: u64 = 0x8000_1000;
 
     fn valid_world() -> FakeMem {
         let mut m = FakeMem::default();
-        m.put_u64(BASE + RVAS.rng as u64, RNG);
+        m.put_u64(BASE + RNG_RVA as u64, RNG);
         for i in 0..RNG_SLOT_COUNT {
             m.put_u32(RNG + i as u64 * 4, i as u32 + 100);
         }
@@ -129,7 +106,7 @@ mod tests {
 
     #[test]
     fn snapshot_reads_slots_override_and_roster() {
-        let snap = take_snapshot(&valid_world(), BASE, RVAS).unwrap();
+        let snap = take_snapshot(&valid_world(), BASE, RNG_RVA, RVAS).unwrap();
         assert_eq!(snap.slots.len(), RNG_SLOT_COUNT);
         assert_eq!(snap.slots[0x81], 0x81 + 100);
         assert_eq!(snap.slot_override, u32::MAX);
@@ -140,25 +117,19 @@ mod tests {
     fn torn_roster_vector_fails() {
         let mut m = valid_world();
         m.put_u64(ROSTER_OBJ + 0x10, IDS - 8); // end < begin
-        let err = take_snapshot(&m, BASE, RVAS).unwrap_err().to_string();
-        assert!(err.contains("torn"), "{err}");
-    }
-
-    #[test]
-    fn slot_state_reads_one_slot_and_bounds_checks() {
-        let m = valid_world();
-        assert_eq!(take_slot_state(&m, BASE, RVAS, 2).unwrap(), 102);
-        let err = take_slot_state(&m, BASE, RVAS, RNG_SLOT_COUNT as u32)
+        let err = take_snapshot(&m, BASE, RNG_RVA, RVAS)
             .unwrap_err()
             .to_string();
-        assert!(err.contains("out of range"), "{err}");
+        assert!(err.contains("torn"), "{err}");
     }
 
     #[test]
     fn null_rng_global_fails_with_title_screen_hint() {
         let mut m = valid_world();
-        m.put_u64(BASE + RVAS.rng as u64, 0);
-        let err = take_snapshot(&m, BASE, RVAS).unwrap_err().to_string();
+        m.put_u64(BASE + RNG_RVA as u64, 0);
+        let err = take_snapshot(&m, BASE, RNG_RVA, RVAS)
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("title screen"), "{err}");
     }
 }

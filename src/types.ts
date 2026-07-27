@@ -640,6 +640,28 @@ export type OvermasteryPrediction = {
   mspCost: number;
 };
 
+/** Toolbox / Transmarvel Wishlist — mirrors src-tauri/src/transmarvel/mod.rs. */
+export type TransmarvelStatus = {
+  gameRunning: boolean;
+  rngUnpredictable: boolean;
+};
+
+export type TransmarvelOutcome =
+  | { type: "sigil"; sigilId: number; traitLevel: number; trait1: number; trait2: number | null }
+  | { type: "wrightstone"; item: number; traits: [number, number][] };
+
+export type TransmarvelRoll = {
+  outcome: TransmarvelOutcome;
+  draws: number;
+};
+
+export type TransmarvelPrediction = {
+  rolls: TransmarvelRoll[];
+  slot: number;
+  slotState: number;
+  unpredictable: boolean;
+};
+
 /** Mirror of LinuxSetupStatus in src-tauri/src/main.rs. */
 export type LinuxSetupStatus = {
   steamFound: boolean;

@@ -67,6 +67,10 @@ diag = []
 name = "damage_audit"
 required-features = ["diag"]
 
+[[example]]
+name = "gap_probe"
+required-features = ["diag"]
+
 [target.'cfg(windows)'.dependencies]
 dll-syringe = "0.15.2"
 interprocess = { version = "^2.0", features = ["tokio"] }

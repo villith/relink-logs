@@ -1,4 +1,5 @@
 import synthesisTraits from "@/assets/synthesis-traits.json";
+import { orderedTraitOptions, TraitOptions } from "@/pages/toolbox/traitOptions";
 import useGameStatus from "@/pages/toolbox/useGameStatus";
 import useStalenessWatch from "@/pages/toolbox/useStalenessWatch";
 import { useSynthesisFormStore } from "@/stores/useSynthesisFormStore";
@@ -28,27 +29,13 @@ export type SynthesisQueryPayload = {
   requireLucky: boolean;
 };
 
-/** The traits people search for most, leading the picker in this order:
- * Stun Power, HP, Supplementary DMG, DMG Cap, Nimble Onslaught, Uplift. */
-const POPULAR_TRAITS = ["ceb700ee", "f372f096", "57ab5b10", "dc584f60", "d2c8e10a", "b5ff9fd3"];
-
-export type TraitOption = { value: string; label: string };
-export type TraitOptions = (TraitOption | { group: string; items: TraitOption[] })[];
-
-/** Traits bundle -> select options for synthesizable traits only: the
- * popular picks first (fixed order), then everything else alphabetically
- * inside a whitespace-labelled group — Mantine renders that label as a bare
- * divider line, which is all we want between the two blocks. */
-export const buildTraitOptions = (bundle: Record<string, { text?: string }>): TraitOptions => {
-  const option = (hex: string) => ({ value: hex, label: bundle[hex]?.text as string });
-  const available = (hex: string) => Boolean(bundle[hex]?.text) && SYNTHESIS_TRAITS.has(hex);
-  const popular = POPULAR_TRAITS.filter(available).map(option);
-  const rest = Object.keys(bundle)
-    .filter((hex) => available(hex) && !POPULAR_TRAITS.includes(hex))
-    .map(option)
-    .sort((a, b) => a.label.localeCompare(b.label));
-  return [...popular, { group: " ", items: rest }];
-};
+/** Traits bundle -> select options for synthesizable traits only, in the
+ * shared popular-first-then-alphabetical order (see traitOptions.ts). */
+export const buildTraitOptions = (bundle: Record<string, { text?: string }>): TraitOptions =>
+  orderedTraitOptions(
+    Object.keys(bundle).filter((hex) => Boolean(bundle[hex]?.text) && SYNTHESIS_TRAITS.has(hex)),
+    (hex) => bundle[hex]?.text as string
+  );
 
 /** Fresh form state: lvl-15-only results, exact slot order. */
 export const initialForm: SynthesisForm = {

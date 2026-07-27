@@ -3,7 +3,7 @@ import { isNew, NewFeatureId } from "@/newFeatures";
 import { useIsLinux } from "@/platform";
 import { Box, Divider, Flex, Indicator, NavLink } from "@mantine/core";
 import { useLocalStorage } from "@mantine/hooks";
-import { CaretDoubleLeft, CaretDoubleRight, Flask, Sparkle } from "@phosphor-icons/react";
+import { CaretDoubleLeft, CaretDoubleRight, Flask, MagicWand, Sparkle } from "@phosphor-icons/react";
 // `Icon` is a type-only export — a value import survives today only because
 // esbuild elides it, and would break under verbatimModuleSyntax.
 import type { Icon } from "@phosphor-icons/react";
@@ -31,6 +31,13 @@ const TOOLS: {
     labelFallback: "Overmastery Predictor",
     icon: Sparkle,
     newId: "overmastery-predictor",
+  },
+  {
+    to: "/logs/toolbox/transmarvel",
+    labelKey: "ui.toolbox.transmarvel-wishlist",
+    labelFallback: "Transmarvel Wishlist",
+    icon: MagicWand,
+    newId: "transmarvel-wishlist",
   },
 ];
 

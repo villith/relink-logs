@@ -22,7 +22,7 @@ pub const TOOLBOX_TCP_ADDR: &str = "127.0.0.1:39372";
 /// each time the event stream connects: on Linux the deployed dinput8 proxy
 /// can be older than the app until the game restarts, and a bincode mismatch
 /// is silent garbage — better "restart the game" than wrong predictions.
-pub const TOOLBOX_PROTOCOL_VERSION: u32 = 2;
+pub const TOOLBOX_PROTOCOL_VERSION: u32 = 3;
 
 /// Version a hook reports when built outside a release (no `HOOK_VERSION`
 /// build env). The app treats this as a dev hook and never flags it as
@@ -36,8 +36,12 @@ pub enum ToolboxRequest {
     SynthesisSnapshot,
     SynthesisSeed,
     OvermasterySnapshot,
-    /// Current state of one RNG slot (< RNG_SLOT_COUNT), for staleness polls.
-    OvermasterySlot(u32),
+    /// One RNG slot (< RNG_SLOT_COUNT) plus the slot-override word. Every
+    /// RNG-backed tool reads the stream the same way, so there is one
+    /// request rather than a variant per tool: transmarvel predicts from
+    /// slot 4's state and needs the override to know a roll isn't mid-flight,
+    /// and the tools' staleness polls re-read their own slot's state.
+    RngSlot(u32),
 }
 
 /// One variant per request. Payload `Err` strings are user-facing (shown by
@@ -56,7 +60,7 @@ pub enum ToolboxResponse {
     SynthesisSnapshot(Result<SynthesisSnapshot, String>),
     SynthesisSeed(Result<SynthesisSeed, String>),
     OvermasterySnapshot(Result<OvermasterySnapshot, String>),
-    OvermasterySlot(Result<u32, String>),
+    RngSlot(Result<RngSlotState, String>),
 }
 
 /// One sigil in the box. camelCase because the app also serializes these to
@@ -115,6 +119,19 @@ pub struct OvermasterySnapshot {
     pub roster: Vec<u32>,
 }
 
+/// One RNG slot's live state. Everything a transmarvel prediction depends on
+/// beyond the static tables, and a superset of what a staleness poll needs.
+/// camelCase for the same free-JSON reason as `SynthesisSigil`.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RngSlotState {
+    /// xorshift32 state of the requested slot at snapshot time.
+    pub state: u32,
+    /// Slot override word (0xffffffff when idle; anything else means a roll
+    /// is mid-flight and predictions would race it).
+    pub slot_override: u32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -123,7 +140,7 @@ mod tests {
     /// serialization contract.
     #[test]
     fn request_and_response_round_trip_through_bincode() {
-        let req = ToolboxRequest::OvermasterySlot(0x42);
+        let req = ToolboxRequest::RngSlot(0x42);
         let bytes = bincode::serialize(&req).unwrap();
         assert_eq!(bincode::deserialize::<ToolboxRequest>(&bytes).unwrap(), req);
 
@@ -152,5 +169,38 @@ mod tests {
         // record_level MUST cross the wire (it feeds the warm-up pairKey);
         // this catches anyone re-adding the old #[serde(skip)].
         assert_eq!(back.sigils[0].record_level, 5);
+
+        let snap = RngSlotState {
+            state: 0xdead_beef,
+            slot_override: u32::MAX,
+        };
+        let resp = ToolboxResponse::RngSlot(Ok(snap));
+        let bytes = bincode::serialize(&resp).unwrap();
+        let ToolboxResponse::RngSlot(Ok(back)) =
+            bincode::deserialize::<ToolboxResponse>(&bytes).unwrap()
+        else {
+            panic!("wrong variant");
+        };
+        assert_eq!(back, snap);
+    }
+
+    /// One generic slot read serves both tools: the transmarvel prediction
+    /// wants the state AND the override word, the staleness polls want only
+    /// the state. Pinned because collapsing the two old per-tool variants
+    /// into this one is the reason the wire moved to v3.
+    #[test]
+    fn rng_slot_request_carries_the_slot_and_answers_with_state_plus_override() {
+        let req = ToolboxRequest::RngSlot(4);
+        let bytes = bincode::serialize(&req).unwrap();
+        assert_eq!(bincode::deserialize::<ToolboxRequest>(&bytes).unwrap(), req);
+
+        let resp = ToolboxResponse::RngSlot(Err("still on title screen?".into()));
+        let bytes = bincode::serialize(&resp).unwrap();
+        let ToolboxResponse::RngSlot(Err(msg)) =
+            bincode::deserialize::<ToolboxResponse>(&bytes).unwrap()
+        else {
+            panic!("wrong variant");
+        };
+        assert_eq!(msg, "still on title screen?");
     }
 }

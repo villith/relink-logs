@@ -1,9 +1,11 @@
 import { translateSigilId, translateTraitId } from "@/utils";
-import { Alert, Badge, Button, Checkbox, Group, ScrollArea, Select, Stack, Table, Text, Title } from "@mantine/core";
+import { Badge, Button, Checkbox, Group, ScrollArea, Select, Stack, Table, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
 import { backendErrorMessage } from "@/backendErrors";
+
 import { SynthesisMatch, SynthesisSigil } from "@/types";
+import ToolPage from "./ToolPage";
 
 import useSynthesisHelper from "./useSynthesisHelper";
 
@@ -61,14 +63,13 @@ const SynthesisHelper = () => {
   const errorMessage = backendErrorMessage(t, "synthesis", error);
 
   return (
-    <Stack gap="md" pr="md">
-      <Title order={4}>{t("ui.toolbox.synthesis-helper", "Synthesis Helper")}</Title>
-      {status && !status.gameRunning && <Alert color="yellow">{t("ui.toolbox.game-not-running")}</Alert>}
-      {(status?.rngUnpredictable || response?.rngUnpredictable) && (
-        <Alert color="orange">{t("ui.toolbox.rng-unpredictable")}</Alert>
-      )}
-      {error && <Alert color="red">{errorMessage}</Alert>}
-      {stale && <Alert color="orange">{t("ui.toolbox.stale-results")}</Alert>}
+    <ToolPage
+      title={t("ui.toolbox.synthesis-helper", "Synthesis Helper")}
+      gameNotRunning={status && !status.gameRunning ? t("ui.toolbox.game-not-running") : null}
+      unpredictable={status?.rngUnpredictable || response?.rngUnpredictable ? t("ui.toolbox.rng-unpredictable") : null}
+      error={error ? errorMessage : null}
+      stale={stale}
+    >
       <Group align="flex-start" gap="xl" wrap="nowrap">
         <Stack gap="sm" style={{ flexShrink: 0 }}>
           <Select
@@ -164,7 +165,7 @@ const SynthesisHelper = () => {
           </ScrollArea.Autosize>
         )}
       </Group>
-    </Stack>
+    </ToolPage>
   );
 };
 

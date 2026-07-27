@@ -20,3 +20,4 @@ pub mod parser;
 pub mod rpc;
 pub mod synthesis;
 pub mod toolbox_rpc;
+pub mod transmarvel;

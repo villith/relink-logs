@@ -11,9 +11,11 @@
 use anyhow::{bail, Context, Result};
 use pelite::pattern;
 use pelite::pe64::Pe;
+pub use protocol::toolbox::RngSlotState;
 
 pub mod overmastery;
 pub mod synthesis;
+pub mod transmarvel;
 
 /// The game process/module name (shared by the injector and the probes).
 pub const GAME_EXE: &str = "granblue_fantasy_relink.exe";
@@ -30,6 +32,37 @@ pub const RNG_SLOT_COUNT: usize = 0x83;
 /// idle; anything else redirects every draw to that slot).
 pub const RNG_SLOT_OVERRIDE: u64 = 0x20c;
 const _: () = assert!(RNG_SLOT_OVERRIDE == RNG_SLOT_COUNT as u64 * 4);
+
+/// Dereference the RNG slot-array global to the array itself. The global is
+/// null until the game leaves the title screen, so every RNG-backed tool has
+/// to report that the same way.
+pub fn deref_rng(mem: &impl MemRead, base: u64, rng_rva: u32) -> Result<u64> {
+    let rng = mem.u64(base + rng_rva as u64)?;
+    if rng == 0 {
+        bail!("rng global not initialized yet (still on title screen?)");
+    }
+    Ok(rng)
+}
+
+/// Read one RNG slot's state plus the slot-override word — the single live
+/// read every RNG-backed Toolbox tool needs. Transmarvel predicts from its
+/// slot's state and uses the override to know no roll is mid-flight; the
+/// staleness polls re-read their own slot and ignore the override.
+pub fn read_rng_slot(
+    mem: &impl MemRead,
+    base: u64,
+    rng_rva: u32,
+    slot: u32,
+) -> Result<RngSlotState> {
+    if slot as usize >= RNG_SLOT_COUNT {
+        bail!("slot {slot:#x} out of range");
+    }
+    let rng = deref_rng(mem, base, rng_rva)?;
+    Ok(RngSlotState {
+        state: mem.u32(rng + slot as u64 * 4)?,
+        slot_override: mem.u32(rng + RNG_SLOT_OVERRIDE)?,
+    })
+}
 
 /// One step of the game's per-slot RNG. Returns the new state, which is also
 /// the drawn value.
@@ -168,6 +201,46 @@ mod tests {
             s = xorshift32(s);
             assert_eq!(s, e);
         }
+    }
+
+    const RNG_BASE: u64 = 0x1_4000_0000;
+    const RNG_RVA: u32 = 0x2000;
+    const RNG_ARRAY: u64 = 0x6000_0000;
+
+    fn rng_world() -> FakeMem {
+        let mut m = FakeMem::default();
+        m.put_u64(RNG_BASE + RNG_RVA as u64, RNG_ARRAY);
+        m.put_u32(RNG_ARRAY + 4 * 4, 0xdead_beef);
+        m.put_u32(RNG_ARRAY + RNG_SLOT_OVERRIDE, 0xffff_ffff);
+        m
+    }
+
+    /// The one read every RNG-backed tool shares: a slot's state plus the
+    /// override word, so a prediction can tell an idle stream from a roll
+    /// that is mid-flight.
+    #[test]
+    fn reads_a_slots_state_and_the_override_word() {
+        let got = read_rng_slot(&rng_world(), RNG_BASE, RNG_RVA, 4).unwrap();
+        assert_eq!(got.state, 0xdead_beef);
+        assert_eq!(got.slot_override, 0xffff_ffff);
+    }
+
+    #[test]
+    fn out_of_range_slot_is_rejected_before_any_read() {
+        let err = read_rng_slot(&rng_world(), RNG_BASE, RNG_RVA, RNG_SLOT_COUNT as u32)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("out of range"), "{err}");
+    }
+
+    #[test]
+    fn uninitialized_rng_global_reports_the_title_screen() {
+        let mut m = FakeMem::default();
+        m.put_u64(RNG_BASE + RNG_RVA as u64, 0);
+        let err = read_rng_slot(&m, RNG_BASE, RNG_RVA, 4)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains("not initialized"), "{err}");
     }
 
     #[test]

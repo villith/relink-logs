@@ -64,6 +64,9 @@ impl MemRead for InProcMem {
 
 struct Globals {
     base: u64,
+    /// The RNG slot array, resolved ONCE and shared by every RNG-backed tool
+    /// — a game patch that moves it has one failure site, not one per tool.
+    rng: u32,
     synthesis: game_reader::synthesis::SynthesisRvas,
     overmastery: game_reader::overmastery::OvermasteryRvas,
 }
@@ -83,6 +86,7 @@ fn globals() -> Result<&'static Globals, String> {
             let view = unsafe { PeView::module(base as *const u8) };
             Ok(Globals {
                 base,
+                rng: game_reader::resolve_rng_rva(view).map_err(|e| e.to_string())?,
                 synthesis: game_reader::synthesis::resolve_rvas(view)
                     .map_err(|e| e.to_string())?,
                 overmastery: game_reader::overmastery::resolve_rvas(view)
@@ -133,22 +137,18 @@ fn handle_request(req: ToolboxRequest) -> ToolboxResponse {
         ToolboxRequest::OvermasterySnapshot => {
             ToolboxResponse::OvermasterySnapshot(globals().and_then(|g| {
                 guarded(|| {
-                    game_reader::overmastery::take_snapshot(&InProcMem, g.base, g.overmastery)
-                })
-            }))
-        }
-        ToolboxRequest::OvermasterySlot(slot) => {
-            ToolboxResponse::OvermasterySlot(globals().and_then(|g| {
-                guarded(|| {
-                    game_reader::overmastery::take_slot_state(
+                    game_reader::overmastery::take_snapshot(
                         &InProcMem,
                         g.base,
+                        g.rng,
                         g.overmastery,
-                        slot,
                     )
                 })
             }))
         }
+        ToolboxRequest::RngSlot(slot) => ToolboxResponse::RngSlot(globals().and_then(|g| {
+            guarded(|| game_reader::read_rng_slot(&InProcMem, g.base, g.rng, slot))
+        })),
     }
 }
 
@@ -254,6 +254,19 @@ mod tests {
     fn snapshot_against_a_non_game_binary_is_an_error_response() {
         let ToolboxResponse::SynthesisSnapshot(result) =
             handle_request(ToolboxRequest::SynthesisSnapshot)
+        else {
+            panic!("wrong variant");
+        };
+        assert!(result.is_err());
+    }
+
+    /// Same contract for the RNG-slot arm (the read behind both the
+    /// transmarvel prediction and every staleness poll): sigscan failure in
+    /// the test binary must become an error response, never a panic.
+    #[test]
+    fn rng_slot_against_a_non_game_binary_is_an_error_response() {
+        let ToolboxResponse::RngSlot(result) =
+            handle_request(ToolboxRequest::RngSlot(game_reader::transmarvel::TM_SLOT))
         else {
             panic!("wrong variant");
         };

@@ -12,6 +12,7 @@ import { IndexPage as LogIndexPage } from "./pages/logs/Index";
 import { ViewPage as LogViewPage } from "./pages/logs/View";
 import OvermasteryPredictor from "./pages/toolbox/OvermasteryPredictor";
 import SynthesisHelper from "./pages/toolbox/SynthesisHelper";
+import TransmarvelSearcher from "./pages/toolbox/TransmarvelSearcher";
 import { registerShortcutBlocker } from "./utils";
 
 import "./App.css";
@@ -32,6 +33,7 @@ export const App = () => {
             <Route index element={<Navigate to="synthesis" replace />} />
             <Route path="synthesis" element={<SynthesisHelper />} />
             <Route path="overmastery" element={<OvermasteryPredictor />} />
+            <Route path="transmarvel" element={<TransmarvelSearcher />} />
           </Route>
           <Route path=":id" element={<LogViewPage />} />
           <Route path="settings" element={<SettingsPage />} />

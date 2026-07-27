@@ -20,6 +20,14 @@ const TOOL_ERRORS = {
     "hook-outdated": "ui.toolbox.hook-outdated",
     "hook-unreachable": "ui.toolbox.hook-unreachable",
   },
+  transmarvel: {
+    "game-not-running": "ui.toolbox.tm-game-not-running",
+    // Same wording applies verbatim ("the game is mid-roll"), so this reuses
+    // overmastery's copy key rather than duplicating the string.
+    "rng-override-active": "ui.toolbox.om-rng-override-active",
+    "hook-outdated": "ui.toolbox.hook-outdated",
+    "hook-unreachable": "ui.toolbox.hook-unreachable",
+  },
   hook: {
     "game-not-running": "ui.hook-status.no-game",
     "hook-refresh-unsupported": "ui.hook-status.refresh-unsupported",
