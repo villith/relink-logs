@@ -8,6 +8,7 @@ import {
   Button,
   Checkbox,
   Group,
+  Paper,
   ScrollArea,
   Select,
   Stack,
@@ -268,7 +269,7 @@ const TransmarvelSearcher = () => {
           <Tabs.Tab value="results">{t("ui.toolbox.tm-tab-results", "Full Results")}</Tabs.Tab>
         </Tabs.List>
         <Tabs.Panel value="wishlist" pt="sm">
-          <Stack gap="xs" w={760}>
+          <Stack gap="xs">
             <Group justify="space-between" align="center">
               <Title order={6}>{t("ui.toolbox.tm-sigil-wishlist", "Sigil wishlist")}</Title>
               <Button
@@ -285,21 +286,26 @@ const TransmarvelSearcher = () => {
                 {t("ui.toolbox.tm-no-sigils", "Add sigils you want to roll for.")}
               </Text>
             )}
-            {sigils.length > 0 && (
-              <Group gap="xs" wrap="nowrap">
-                <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                  {t("ui.toolbox.tm-sigil", "Sigil")}
-                </Text>
-                <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                  {t("ui.toolbox.tm-2nd-trait", "2nd trait")}
-                </Text>
-                <Box w={REMOVE_W} />
-              </Group>
-            )}
             {sigils.map((entry, index) => {
               const hits = sigilHits[index] ?? NO_HITS;
               return (
-                <Box key={index} mb={6}>
+                <Paper key={index} withBorder p="xs">
+                  <Group gap="xs" wrap="nowrap" mb={2}>
+                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                      {t("ui.toolbox.tm-sigil", "Sigil")}
+                    </Text>
+                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                      {t("ui.toolbox.tm-2nd-trait", "2nd trait")}
+                    </Text>
+                    <ActionIcon
+                      variant="subtle"
+                      size="sm"
+                      aria-label={t("ui.toolbox.tm-remove", "Remove")}
+                      onClick={() => setSigils(sigils.filter((_, i) => i !== index))}
+                    >
+                      <X />
+                    </ActionIcon>
+                  </Group>
                   <Group gap="xs" wrap="nowrap">
                     <Select
                       aria-label={t("ui.toolbox.tm-sigil", "Sigil")}
@@ -321,16 +327,11 @@ const TransmarvelSearcher = () => {
                       disabled={busy}
                       style={{ flex: 1 }}
                     />
-                    <ActionIcon
-                      variant="subtle"
-                      aria-label={t("ui.toolbox.tm-remove", "Remove")}
-                      onClick={() => setSigils(sigils.filter((_, i) => i !== index))}
-                    >
-                      <X />
-                    </ActionIcon>
+                    {/* Keeps the selects clear of the card's remove button. */}
+                    <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
                   </Group>
                   {hasPrediction && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
-                </Box>
+                </Paper>
               );
             })}
             <Group justify="space-between" align="center" mt="sm">
@@ -351,27 +352,32 @@ const TransmarvelSearcher = () => {
                 {t("ui.toolbox.tm-no-stones", "Add wrightstones you want to roll for.")}
               </Text>
             )}
-            {stones.length > 0 && (
-              <Group gap="xs" wrap="nowrap">
-                <Text size="xs" c="dimmed" w={TYPE_W}>
-                  {t("ui.toolbox.tm-stone-type", "Type")}
-                </Text>
-                <Text size="xs" c="dimmed" w={RARITY_W}>
-                  {t("ui.toolbox.tm-min-rarity", "Lvls")}
-                </Text>
-                <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                  {t("ui.toolbox.tm-slot-2", "Trait 2")}
-                </Text>
-                <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                  {t("ui.toolbox.tm-slot-3", "Trait 3")}
-                </Text>
-                <Box w={REMOVE_W} />
-              </Group>
-            )}
             {stones.map((entry, index) => {
               const hits = stoneHits[index] ?? NO_HITS;
               return (
-                <Box key={index} mb={6}>
+                <Paper key={index} withBorder p="xs">
+                  <Group gap="xs" wrap="nowrap" mb={2}>
+                    <Text size="xs" c="dimmed" w={TYPE_W}>
+                      {t("ui.toolbox.tm-stone-type", "Type")}
+                    </Text>
+                    <Text size="xs" c="dimmed" w={RARITY_W}>
+                      {t("ui.toolbox.tm-min-rarity", "Lvls")}
+                    </Text>
+                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                      {t("ui.toolbox.tm-slot-2", "Trait 2")}
+                    </Text>
+                    <Text size="xs" c="dimmed" style={{ flex: 1 }}>
+                      {t("ui.toolbox.tm-slot-3", "Trait 3")}
+                    </Text>
+                    <ActionIcon
+                      variant="subtle"
+                      size="sm"
+                      aria-label={t("ui.toolbox.tm-remove", "Remove")}
+                      onClick={() => setStones(stones.filter((_, i) => i !== index))}
+                    >
+                      <X />
+                    </ActionIcon>
+                  </Group>
                   <Group gap="xs" wrap="nowrap">
                     <Select
                       aria-label={t("ui.toolbox.tm-stone-type", "Type")}
@@ -411,16 +417,11 @@ const TransmarvelSearcher = () => {
                       disabled={busy}
                       style={{ flex: 1 }}
                     />
-                    <ActionIcon
-                      variant="subtle"
-                      aria-label={t("ui.toolbox.tm-remove", "Remove")}
-                      onClick={() => setStones(stones.filter((_, i) => i !== index))}
-                    >
-                      <X />
-                    </ActionIcon>
+                    {/* Keeps the selects clear of the card's remove button. */}
+                    <Box w={REMOVE_W} style={{ flexShrink: 0 }} />
                   </Group>
                   {hasPrediction && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
-                </Box>
+                </Paper>
               );
             })}
           </Stack>
