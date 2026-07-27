@@ -1,0 +1,8 @@
+# Generated assets. Their formatting is whatever the generator emits, so
+# Prettier must not own it — otherwise regenerating (e.g.
+# `python scripts/gen-transmarvel-tables.py --pool-only`) silently breaks
+# `npm run format-check` in CI.
+#
+# Note CI's format-check checks JSON under src/ too: the `--ext js,jsx,ts,tsx`
+# in the npm script is not a real Prettier flag and is ignored.
+src/assets/transmarvel-pool.json
