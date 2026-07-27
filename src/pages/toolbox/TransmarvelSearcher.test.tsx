@@ -179,7 +179,7 @@ describe("TransmarvelSearcher", () => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(prediction);
       // Staleness watch: keep it matching so results never flip stale mid-test.
-      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState);
+      if (command === "fetch_rng_slot") return Promise.resolve(prediction.slotState);
       return Promise.reject(new Error(`unexpected command ${command} ${JSON.stringify(args)}`));
     });
     useTransmarvelWishlistStore.setState({ sigils: [{ trait: WISHLISTED.trait, trait2: null }], stones: [] });
@@ -210,7 +210,7 @@ describe("TransmarvelSearcher", () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(prediction);
-      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState);
+      if (command === "fetch_rng_slot") return Promise.resolve(prediction.slotState);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
     useTransmarvelWishlistStore.setState({ sigils: [{ trait: WISHLISTED.trait, trait2: null }], stones: [] });
@@ -257,7 +257,7 @@ describe("TransmarvelSearcher", () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return deferred;
-      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState);
+      if (command === "fetch_rng_slot") return Promise.resolve(prediction.slotState);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
 
@@ -293,7 +293,7 @@ describe("TransmarvelSearcher", () => {
       // Deliberately different from prediction.slotState so the staleness
       // watch's poll reports "moved" instead of matching (see the passing
       // "predicts, renders both rolls" test above for the matching case).
-      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState + 1);
+      if (command === "fetch_rng_slot") return Promise.resolve(prediction.slotState + 1);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
 
@@ -320,7 +320,7 @@ describe("TransmarvelSearcher", () => {
       expect(screen.queryByText("ui.toolbox.stale-results")).toBeNull();
 
       // useStalenessWatch polls every 5s via setInterval; advance fake time
-      // and let the in-flight fetch_overmastery_seed promise settle in between.
+      // and let the in-flight fetch_rng_slot promise settle in between.
       await act(async () => {
         await vi.advanceTimersByTimeAsync(5000);
       });
@@ -445,7 +445,7 @@ describe("TransmarvelSearcher", () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(manyRolls);
-      if (command === "fetch_overmastery_seed") return Promise.resolve(manyRolls.slotState);
+      if (command === "fetch_rng_slot") return Promise.resolve(manyRolls.slotState);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
 
@@ -483,7 +483,7 @@ describe("TransmarvelSearcher", () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(sigilPrediction);
-      if (command === "fetch_overmastery_seed") return Promise.resolve(sigilPrediction.slotState);
+      if (command === "fetch_rng_slot") return Promise.resolve(sigilPrediction.slotState);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
 
@@ -611,7 +611,7 @@ describe("TransmarvelSearcher", () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(prediction);
-      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState);
+      if (command === "fetch_rng_slot") return Promise.resolve(prediction.slotState);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
     // Two sigils, one of which hits; one stone, which can't (no stone rolls).
@@ -656,7 +656,7 @@ describe("TransmarvelSearcher", () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(prediction);
-      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState);
+      if (command === "fetch_rng_slot") return Promise.resolve(prediction.slotState);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
     // The sigil entry hits roll #2; the prediction contains no stone rolls,
@@ -685,7 +685,7 @@ describe("TransmarvelSearcher", () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(stonePrediction);
-      if (command === "fetch_overmastery_seed") return Promise.resolve(stonePrediction.slotState);
+      if (command === "fetch_rng_slot") return Promise.resolve(stonePrediction.slotState);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
     // A wildcard entry: both rolls match, and only the expanded list reveals
@@ -742,7 +742,7 @@ describe("TransmarvelSearcher", () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(prediction);
-      if (command === "fetch_overmastery_seed") return Promise.resolve(prediction.slotState);
+      if (command === "fetch_rng_slot") return Promise.resolve(prediction.slotState);
       return Promise.reject(new Error(`unexpected command ${command}`));
     });
 

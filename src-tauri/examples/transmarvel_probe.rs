@@ -163,13 +163,13 @@ fn main() -> anyhow::Result<()> {
         }
         Some("predict") => {
             let n: u32 = args.get(1).map(|s| s.parse()).transpose()?.unwrap_or(5);
-            let snap = game_mem::rpm_transmarvel_snapshot()?
+            let snap = game_mem::rpm_rng_slot(gbfr_logs::transmarvel::TM_SLOT)?
                 .ok_or_else(|| anyhow::anyhow!("game not running (run as admin)"))?;
             if snap.slot_override != u32::MAX {
                 println!("slot_override {:#x} — roll mid-flight, retry", snap.slot_override);
                 return Ok(());
             }
-            if snap.rng_state == 0 {
+            if snap.state == 0 {
                 println!("state 0 — game will reseed from entropy; unpredictable");
                 return Ok(());
             }
@@ -180,9 +180,9 @@ fn main() -> anyhow::Result<()> {
                     .cloned()
                     .unwrap_or_else(|| format!("{hash:08x}"))
             };
-            println!("slot 0x04 state {:08x}", snap.rng_state);
+            println!("slot 0x04 state {:08x}", snap.state);
             let t = gbfr_logs::transmarvel::stock_tables();
-            for (i, roll) in gbfr_logs::transmarvel::simulate(snap.rng_state, t, n)
+            for (i, roll) in gbfr_logs::transmarvel::simulate(snap.state, t, n)
                 .iter()
                 .enumerate()
             {

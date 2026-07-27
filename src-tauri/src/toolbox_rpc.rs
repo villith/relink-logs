@@ -5,9 +5,9 @@
 
 use anyhow::Result;
 use protocol::toolbox::{
-    ToolboxRequest, ToolboxResponse, TOOLBOX_PROTOCOL_VERSION, TOOLBOX_TCP_ADDR,
+    RngSlotState, ToolboxRequest, ToolboxResponse, TOOLBOX_PROTOCOL_VERSION, TOOLBOX_TCP_ADDR,
 };
-use protocol::toolbox::{OvermasterySnapshot, SynthesisSeed, SynthesisSnapshot, TransmarvelSnapshot};
+use protocol::toolbox::{OvermasterySnapshot, SynthesisSeed, SynthesisSnapshot};
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -214,20 +214,12 @@ pub async fn overmastery_snapshot(hook: &HookStatus) -> Result<Option<Overmaster
     }
 }
 
-pub async fn overmastery_slot(hook: &HookStatus, slot: u32) -> Result<Option<u32>, String> {
-    match request(hook, ToolboxRequest::OvermasterySlot(slot)).await? {
+/// One RNG slot's live state. Serves the transmarvel prediction (which wants
+/// both fields) and every tool's staleness poll (which wants only `state`).
+pub async fn rng_slot(hook: &HookStatus, slot: u32) -> Result<Option<RngSlotState>, String> {
+    match request(hook, ToolboxRequest::RngSlot(slot)).await? {
         None => Ok(None),
-        Some(ToolboxResponse::OvermasterySlot(r)) => r.map(Some),
-        Some(other) => Err(format!("unexpected toolbox response {other:?}")),
-    }
-}
-
-pub async fn transmarvel_snapshot(
-    hook: &HookStatus,
-) -> Result<Option<TransmarvelSnapshot>, String> {
-    match request(hook, ToolboxRequest::TransmarvelSnapshot).await? {
-        None => Ok(None),
-        Some(ToolboxResponse::TransmarvelSnapshot(r)) => r.map(Some),
+        Some(ToolboxResponse::RngSlot(r)) => r.map(Some),
         Some(other) => Err(format!("unexpected toolbox response {other:?}")),
     }
 }

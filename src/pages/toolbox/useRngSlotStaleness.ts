@@ -16,13 +16,12 @@ export type RngSlotPrediction = {
  * moves off the one the rolls were computed from (the player rolled, or a
  * quest reshuffled the stream).
  *
- * The backend command is named `fetch_overmastery_seed` for the tool that
- * needed it first, but it is a generic single-slot read — keeping the call
- * here means the tools don't each hardcode that mismatch.
+ * The backend read is generic (`ToolboxRequest::RngSlot`), so both tools poll
+ * through this one hook rather than each issuing the call themselves.
  */
 export default function useRngSlotStaleness<T extends RngSlotPrediction>(prediction: T | null) {
   return useStalenessWatch(prediction && !prediction.unpredictable ? prediction : null, async (watched) => {
-    const current = await invoke<number | null>("fetch_overmastery_seed", { slot: watched.slot });
+    const current = await invoke<number | null>("fetch_rng_slot", { slot: watched.slot });
     return current !== null && current !== watched.slotState;
   });
 }

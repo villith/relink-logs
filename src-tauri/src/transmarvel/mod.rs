@@ -36,7 +36,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub use game_reader::transmarvel::{TransmarvelSnapshot, TM_SLOT};
+pub use game_reader::transmarvel::TM_SLOT;
 pub use game_reader::xorshift32;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -297,7 +297,7 @@ pub struct TransmarvelQuery {
 pub struct TransmarvelPrediction {
     pub rolls: Vec<TransmarvelRoll>,
     /// The RNG slot predictions came from — the frontend staleness watch
-    /// polls it via the generic `fetch_overmastery_seed(slot)`.
+    /// polls it via the generic `fetch_rng_slot(slot)`.
     pub slot: u32,
     pub slot_state: u32,
     pub unpredictable: bool,

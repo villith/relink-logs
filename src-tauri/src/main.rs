@@ -320,14 +320,11 @@ async fn predict_overmastery(
 
 /// Toolbox: current RNG state of one slot, for staleness polling against a
 /// prediction's `slot_state`. Shared by the Overmastery Predictor and the
-/// Transmarvel Searcher (both predictions carry their `slot`). `None` = game
+/// Transmarvel Wishlist (both predictions carry their `slot`). `None` = game
 /// not running (staleness unknowable, not stale).
 #[tauri::command(async)]
-async fn fetch_overmastery_seed(
-    slot: u32,
-    hook: State<'_, HookStatus>,
-) -> Result<Option<u32>, String> {
-    toolbox_rpc::overmastery_slot(&hook, slot).await
+async fn fetch_rng_slot(slot: u32, hook: State<'_, HookStatus>) -> Result<Option<u32>, String> {
+    Ok(toolbox_rpc::rng_slot(&hook, slot).await?.map(|s| s.state))
 }
 
 /// Toolbox / Transmarvel Searcher: is the game up and the RNG predictable.
@@ -335,14 +332,14 @@ async fn fetch_overmastery_seed(
 async fn fetch_transmarvel_status(
     hook: State<'_, HookStatus>,
 ) -> Result<transmarvel::TransmarvelStatus, String> {
-    match toolbox_rpc::transmarvel_snapshot(&hook).await? {
+    match toolbox_rpc::rng_slot(&hook, transmarvel::TM_SLOT).await? {
         None => Ok(transmarvel::TransmarvelStatus {
             game_running: false,
             rng_unpredictable: false,
         }),
         Some(snap) => Ok(transmarvel::TransmarvelStatus {
             game_running: true,
-            rng_unpredictable: snap.rng_state == 0,
+            rng_unpredictable: snap.state == 0,
         }),
     }
 }
@@ -356,17 +353,17 @@ async fn predict_transmarvel(
 ) -> Result<transmarvel::TransmarvelPrediction, String> {
     // Mirrors the frontend's MAX_ROLLS (TransmarvelSearcher.tsx).
     let rolls = query.rolls.min(50_000);
-    let snap = toolbox_rpc::transmarvel_snapshot(&hook)
+    let snap = toolbox_rpc::rng_slot(&hook, transmarvel::TM_SLOT)
         .await?
         .ok_or_else(|| "game-not-running".to_string())?;
     if snap.slot_override != u32::MAX {
         return Err("rng-override-active".to_string());
     }
     Ok(transmarvel::TransmarvelPrediction {
-        rolls: transmarvel::simulate(snap.rng_state, transmarvel::stock_tables(), rolls),
-        slot: transmarvel::TM_SLOT as u32,
-        slot_state: snap.rng_state,
-        unpredictable: snap.rng_state == 0,
+        rolls: transmarvel::simulate(snap.state, transmarvel::stock_tables(), rolls),
+        slot: transmarvel::TM_SLOT,
+        slot_state: snap.state,
+        unpredictable: snap.state == 0,
     })
 }
 
@@ -2062,7 +2059,7 @@ fn main() {
             fetch_synthesis_seed,
             fetch_overmastery_status,
             predict_overmastery,
-            fetch_overmastery_seed,
+            fetch_rng_slot,
             fetch_transmarvel_status,
             predict_transmarvel,
             search_synthesis,
