@@ -4,7 +4,6 @@ import { translateSigilId, translateTraitId, translateWrightstoneId } from "@/ut
 import {
   ActionIcon,
   Alert,
-  Badge,
   Box,
   Button,
   Checkbox,
@@ -29,7 +28,6 @@ import useTransmarvelSearcher, {
   familyCombos,
   NO_HITS,
   POOL,
-  SigilEntry,
   sigilTrait2Options,
   slotTraitOptions,
   WrightstoneEntry,
@@ -57,7 +55,8 @@ export const MAX_SHOWN_ROWS = 1000;
 const TYPE_W = 170;
 const RARITY_W = 110;
 const REMOVE_W = 28;
-const HIT_W = 96;
+/** Roll-number gutter inside an entry's results block. */
+const ROLL_NO_W = 44;
 
 /** One tier-0 combo per family, in pool order — drives the Type picker
  * (value = family, label = the stone's item name minus the redundant
@@ -100,65 +99,29 @@ const OutcomeCell = ({ outcome, hit }: { outcome: TransmarvelOutcome; hit: boole
   );
 };
 
-/** Trailing cell of an entry row: the entry's first-hit roll # (plus how many
- * more it matches) once a prediction exists, a dimmed dash when it never
- * hits, blank otherwise. The badge toggles the row's hit list. */
-const HitCell = ({
-  hits,
-  hasPrediction,
-  expanded,
-  onToggle,
-}: {
-  hits: EntryHits;
-  hasPrediction: boolean;
-  expanded: boolean;
-  onToggle: () => void;
-}) => {
-  const { t } = useTranslation();
-  const first = hits.indices[0];
-  return (
-    <Box w={HIT_W} style={{ flexShrink: 0, textAlign: "center" }}>
-      {hasPrediction &&
-        (hits.total > 0 ? (
-          <Badge
-            component="button"
-            type="button"
-            color="green"
-            style={{ cursor: "pointer" }}
-            onClick={onToggle}
-            aria-expanded={expanded}
-            title={t("ui.toolbox.tm-entry-toggle")}
-          >
-            {hits.total > 1
-              ? t("ui.toolbox.tm-entry-hit-multi", { n: first + 1, count: hits.total - 1 })
-              : t("ui.toolbox.tm-entry-hit", { n: first + 1 })}
-          </Badge>
-        ) : (
-          <Text size="sm" c="dimmed" title={t("ui.toolbox.tm-entry-no-hit")}>
-            {/* eslint-disable-next-line i18next/no-literal-string -- bare glyph */}—
-          </Text>
-        ))}
-    </Box>
-  );
-};
-
-/** The rolls one entry matches: roll # + what that roll actually produces,
- * which is what a wildcard ("Any") entry cannot show on its own. */
-const EntryHitList = ({ hits, rolls }: { hits: EntryHits; rolls: TransmarvelRoll[] }) => {
+/** What one entry matches, listed under its own row: roll # + the traits that
+ * roll produces (a wildcard "Any" entry can't show them any other way). The
+ * left rule and tight top margin tie the block to the row above it. */
+const EntryResults = ({ hits, rolls }: { hits: EntryHits; rolls: TransmarvelRoll[] }) => {
   const { t } = useTranslation();
   const outcomeLine = useOutcomeLine();
   return (
-    <Stack gap={2} pl="md" pb={6}>
+    <Stack gap={2} mt={4} ml="xs" pl="sm" style={{ borderLeft: "2px solid var(--mantine-color-default-border)" }}>
+      {hits.total === 0 && (
+        <Text size="xs" c="dimmed">
+          {t("ui.toolbox.tm-entry-no-hit")}
+        </Text>
+      )}
       {hits.indices.map((index) => (
-        <Group key={index} gap="xs" wrap="nowrap">
-          <Text size="xs" c="dimmed" w={44} ta="right" style={{ flexShrink: 0 }}>
+        <Group key={index} gap="sm" wrap="nowrap">
+          <Text size="xs" c="dimmed" w={ROLL_NO_W} ta="right" style={{ flexShrink: 0 }}>
             {t("ui.toolbox.tm-entry-hit", { n: index + 1 })}
           </Text>
           <Text size="xs">{outcomeLine(rolls[index].outcome)}</Text>
         </Group>
       ))}
       {hits.total > hits.indices.length && (
-        <Text size="xs" c="dimmed" pl={52}>
+        <Text size="xs" c="dimmed" pl={ROLL_NO_W + 12}>
           {t("ui.toolbox.tm-entry-more", { count: hits.total - hits.indices.length })}
         </Text>
       )}
@@ -198,17 +161,6 @@ const TransmarvelSearcher = () => {
   // measuring effect below re-runs.
   const [tab, setTab] = useState<string | null>("wishlist");
 
-  /** Hit lists are open by default, so this tracks what the user closed
-   * rather than what they opened. Keys are the entry's content (not its
-   * index), so removing a row can't transfer a collapse to its neighbour and
-   * an edited row reopens with its new hits. */
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
-  const toggleCollapsed = (key: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (!next.delete(key)) next.add(key);
-      return next;
-    });
   /** Anchor the results scroll area to the viewport bottom by measuring its
    * actual top edge. A fixed calc() offset drifts whenever the content above
    * (alerts, controls, tab list) changes, letting the page overflow and grow
@@ -285,10 +237,6 @@ const TransmarvelSearcher = () => {
   const filtered = matchesOnly ? results.filter((r) => r.hit) : results;
   const shown = filtered.slice(0, MAX_SHOWN_ROWS);
 
-  const sigilKey = (e: SigilEntry) => `s|${e.trait}|${e.trait2 ?? ""}`;
-  const stoneKey = (e: WrightstoneEntry) => `w|${e.family}|${e.minTier}|${e.slot2 ?? ""}|${e.slot3 ?? ""}`;
-  const isOpen = (key: string, hits: EntryHits) => hasPrediction && hits.total > 0 && !collapsed.has(key);
-
   return (
     <Stack gap="md" pr="md">
       <Title order={4}>{t("ui.toolbox.transmarvel-searcher", "Transmarvel Searcher")}</Title>
@@ -346,16 +294,12 @@ const TransmarvelSearcher = () => {
                   {t("ui.toolbox.tm-2nd-trait", "2nd trait")}
                 </Text>
                 <Box w={REMOVE_W} />
-                <Text size="xs" c="dimmed" w={HIT_W} ta="center" style={{ flexShrink: 0 }}>
-                  {t("ui.toolbox.tm-col-roll", "Roll #")}
-                </Text>
               </Group>
             )}
             {sigils.map((entry, index) => {
-              const key = sigilKey(entry);
               const hits = sigilHits[index] ?? NO_HITS;
               return (
-                <Box key={index}>
+                <Box key={index} mb={6}>
                   <Group gap="xs" wrap="nowrap">
                     <Select
                       aria-label={t("ui.toolbox.tm-sigil", "Sigil")}
@@ -384,14 +328,8 @@ const TransmarvelSearcher = () => {
                     >
                       <X />
                     </ActionIcon>
-                    <HitCell
-                      hits={hits}
-                      hasPrediction={hasPrediction}
-                      expanded={isOpen(key, hits)}
-                      onToggle={() => toggleCollapsed(key)}
-                    />
                   </Group>
-                  {isOpen(key, hits) && prediction && <EntryHitList hits={hits} rolls={prediction.rolls} />}
+                  {hasPrediction && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
                 </Box>
               );
             })}
@@ -419,23 +357,21 @@ const TransmarvelSearcher = () => {
                   {t("ui.toolbox.tm-stone-type", "Type")}
                 </Text>
                 <Text size="xs" c="dimmed" w={RARITY_W}>
-                  {t("ui.toolbox.tm-min-rarity", "Min rarity")}
+                  {t("ui.toolbox.tm-min-rarity", "Lvls")}
                 </Text>
                 <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                  {t("ui.toolbox.tm-slot-2", "Slot 2")}
+                  {t("ui.toolbox.tm-slot-2", "Trait 2")}
                 </Text>
                 <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-                  {t("ui.toolbox.tm-slot-3", "Slot 3")}
+                  {t("ui.toolbox.tm-slot-3", "Trait 3")}
                 </Text>
                 <Box w={REMOVE_W} />
-                <Box w={HIT_W} />
               </Group>
             )}
             {stones.map((entry, index) => {
-              const key = stoneKey(entry);
               const hits = stoneHits[index] ?? NO_HITS;
               return (
-                <Box key={index}>
+                <Box key={index} mb={6}>
                   <Group gap="xs" wrap="nowrap">
                     <Select
                       aria-label={t("ui.toolbox.tm-stone-type", "Type")}
@@ -447,7 +383,7 @@ const TransmarvelSearcher = () => {
                       w={TYPE_W}
                     />
                     <Select
-                      aria-label={t("ui.toolbox.tm-min-rarity", "Min rarity")}
+                      aria-label={t("ui.toolbox.tm-min-rarity", "Lvls")}
                       data={rarityOptions(entry.family)}
                       value={String(entry.minTier)}
                       onChange={(tier) => tier && changeStone(index, { minTier: parseInt(tier, 10) })}
@@ -456,7 +392,7 @@ const TransmarvelSearcher = () => {
                       w={RARITY_W}
                     />
                     <Select
-                      aria-label={t("ui.toolbox.tm-slot-2", "Slot 2")}
+                      aria-label={t("ui.toolbox.tm-slot-2", "Trait 2")}
                       searchable
                       data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 1))}
                       value={entry.slot2 ?? ANY}
@@ -466,7 +402,7 @@ const TransmarvelSearcher = () => {
                       style={{ flex: 1 }}
                     />
                     <Select
-                      aria-label={t("ui.toolbox.tm-slot-3", "Slot 3")}
+                      aria-label={t("ui.toolbox.tm-slot-3", "Trait 3")}
                       searchable
                       data={traitSelectData(slotTraitOptions(entry.family, entry.minTier, 2))}
                       value={entry.slot3 ?? ANY}
@@ -482,14 +418,8 @@ const TransmarvelSearcher = () => {
                     >
                       <X />
                     </ActionIcon>
-                    <HitCell
-                      hits={hits}
-                      hasPrediction={hasPrediction}
-                      expanded={isOpen(key, hits)}
-                      onToggle={() => toggleCollapsed(key)}
-                    />
                   </Group>
-                  {isOpen(key, hits) && prediction && <EntryHitList hits={hits} rolls={prediction.rolls} />}
+                  {hasPrediction && prediction && <EntryResults hits={hits} rolls={prediction.rolls} />}
                 </Box>
               );
             })}

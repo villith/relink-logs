@@ -24,7 +24,6 @@ const TEMPLATES: Record<string, string> = {
   "ui.toolbox.tm-no-hits": "No wishlist hits in the next {{rolls}} rolls.",
   "ui.toolbox.tm-truncated": "Showing the first {{shown}} of {{total}} rolls.",
   "ui.toolbox.tm-entry-hit": "#{{n}}",
-  "ui.toolbox.tm-entry-hit-multi": "#{{n}} +{{count}}",
   "ui.toolbox.tm-entry-more": "+{{count}} more in Full Results",
   "ui.level-short": "Lv{{level}}",
 };
@@ -345,7 +344,7 @@ describe("TransmarvelSearcher", () => {
     expect(optionsOf(trait2Input)).toEqual(["any", ...popular, ...rest]);
   });
 
-  it("clamps a stored 0.1% min rarity into the 20/15/10 option and widens the slot pickers", async () => {
+  it("clamps a stored 0.1% Lvls into the 20/15/10 option and widens the slot pickers", async () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
@@ -359,12 +358,12 @@ describe("TransmarvelSearcher", () => {
 
     // The sanitized entry reads back as minTier 1, whose label the closed
     // rarity select displays.
-    const rarityInput = (await screen.findByLabelText("Min rarity", { selector: "input" })) as HTMLInputElement;
+    const rarityInput = (await screen.findByLabelText("Lvls", { selector: "input" })) as HTMLInputElement;
     expect(rarityInput.value).toBe("20/15/10");
 
     // Slot options span every tier >= 1, so the top tier's fixed trait is
     // offered alongside the rolled ones.
-    const slot2Input = screen.getByLabelText("Slot 2", { selector: "input" }) as HTMLInputElement;
+    const slot2Input = screen.getByLabelText("Trait 2", { selector: "input" }) as HTMLInputElement;
     fireEvent.click(slot2Input);
     const values = optionsOf(slot2Input);
     expect(new Set(values)).toEqual(new Set(["any", ...slotTraitOptions(FAMILY, 1, 1)]));
@@ -524,7 +523,7 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    const rarityInput = (await screen.findByLabelText("Min rarity", { selector: "input" })) as HTMLInputElement;
+    const rarityInput = (await screen.findByLabelText("Lvls", { selector: "input" })) as HTMLInputElement;
     await waitFor(() => expect(rarityInput.getAttribute("disabled")).toBeNull());
     fireEvent.click(rarityInput);
 
@@ -535,7 +534,7 @@ describe("TransmarvelSearcher", () => {
     expect(labels).toEqual(["15/10/7", "20/15/10"]);
   });
 
-  it("shows a first-hit badge on hitting entries and a dash on entries that never hit", async () => {
+  it("lists an entry's hits under its row and says so when it never hits", async () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(status);
       if (command === "predict_transmarvel") return Promise.resolve(prediction);
@@ -551,12 +550,10 @@ describe("TransmarvelSearcher", () => {
 
     renderPage();
 
-    // The wishlist tab is active, so its panel is the visible one. "#2"
-    // shows twice for the sigil entry: its badge and its one expanded hit.
+    // The wishlist tab is active, so its panel is the visible one.
     const wishlist = await screen.findByRole("tabpanel");
-    await waitFor(() => expect(within(wishlist).getAllByText("#2")).toHaveLength(2));
-    // The stone entry never hits: dimmed dash, no hit list.
-    expect(within(wishlist).getByText("—")).toBeTruthy();
+    await waitFor(() => expect(within(wishlist).getAllByText("#2")).toHaveLength(1));
+    expect(within(wishlist).getByText("ui.toolbox.tm-entry-no-hit")).toBeTruthy();
   });
 
   it("expands a hitting entry by default, listing each matching roll's outcome", async () => {
@@ -576,42 +573,15 @@ describe("TransmarvelSearcher", () => {
     renderPage();
 
     const wishlist = await screen.findByRole("tabpanel");
-    // Badge summarizes: first hit plus how many more.
-    expect(await within(wishlist).findByText("#1 +1")).toBeTruthy();
-    // Both hits are listed with their own roll # and resolved traits.
-    expect(within(wishlist).getByText(stoneLine(SLOT2_A))).toBeTruthy();
+    // Both hits are listed with their own roll # and resolved traits — the
+    // 2nd-slot trait each one carries is the whole point of the wildcard.
+    expect(await within(wishlist).findByText(stoneLine(SLOT2_A))).toBeTruthy();
     expect(within(wishlist).getByText(stoneLine(SLOT2_B))).toBeTruthy();
+    expect(within(wishlist).getByText("#1")).toBeTruthy();
+    expect(within(wishlist).getByText("#2")).toBeTruthy();
   });
 
-  it("collapses and re-expands an entry when its hit badge is clicked", async () => {
-    invoke.mockImplementation((command: string) => {
-      if (command === "fetch_transmarvel_status") return Promise.resolve(status);
-      if (command === "predict_transmarvel") return Promise.resolve(stonePrediction);
-      if (command === "fetch_overmastery_seed") return Promise.resolve(stonePrediction.slotState);
-      return Promise.reject(new Error(`unexpected command ${command}`));
-    });
-    useTransmarvelWishlistStore.setState({
-      sigils: [],
-      stones: [{ family: FAMILY, minTier: 0, slot2: null, slot3: null }],
-    });
-
-    renderPage();
-
-    const wishlist = await screen.findByRole("tabpanel");
-    const badge = await within(wishlist).findByText("#1 +1");
-
-    await act(async () => {
-      fireEvent.click(badge);
-    });
-    expect(within(wishlist).queryByText(stoneLine(SLOT2_A))).toBeNull();
-
-    await act(async () => {
-      fireEvent.click(badge);
-    });
-    expect(within(wishlist).getByText(stoneLine(SLOT2_A))).toBeTruthy();
-  });
-
-  it("shows no hit badges or dashes before any prediction", async () => {
+  it("shows no per-entry results before any prediction", async () => {
     invoke.mockImplementation((command: string) => {
       if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
       return Promise.reject(new Error(`unexpected command ${command}`));
@@ -624,7 +594,7 @@ describe("TransmarvelSearcher", () => {
     renderPage();
 
     await screen.findByLabelText("Sigil", { selector: "input" });
-    expect(screen.queryByText("—")).toBeNull();
+    expect(screen.queryByText("ui.toolbox.tm-entry-no-hit")).toBeNull();
     expect(screen.queryByText(/^#\d+$/)).toBeNull();
   });
 

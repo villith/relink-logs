@@ -51,8 +51,8 @@ export const familyCombos = (family: string, p: TransmarvelPool = POOL) =>
   p.wrightstones.combos.filter((c) => c.family === family).sort((a, b) => a.tier - b.tier);
 
 /** Traits a stone position (1 = 2nd slot, 2 = 3rd slot) can carry across
- * every tier at or above the minimum — at min rarity 0.1% this collapses to
- * the tier's fixed trait. */
+ * every tier at or above the minimum — at the 0.1% tier this collapses to
+ * that tier's fixed trait. */
 export const slotTraitOptions = (
   family: string,
   minTier: number,
