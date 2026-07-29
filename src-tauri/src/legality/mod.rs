@@ -14,6 +14,8 @@ use serde::Serialize;
 
 use crate::parser::constants::CharacterType;
 
+pub mod wrightstone;
+
 /// Everything the rules need from a player, borrowed rather than cloned.
 #[derive(Debug, Default)]
 pub struct BuildSnapshot<'a> {
@@ -66,6 +68,9 @@ pub enum Subject {
 }
 
 /// Observed and allowed values, kept numeric for the UI to format.
+///
+/// The paired [`Rule`], not the JSON shape, says how to read the number:
+/// `Level`, `Count` and `TraitId` all serialize as bare numbers.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase", untagged)]
 pub enum Value {
