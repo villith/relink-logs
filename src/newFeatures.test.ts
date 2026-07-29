@@ -16,6 +16,14 @@ describe("compareVersions", () => {
     expect(compareVersions("2.0.0", "1.99.99")).toBeGreaterThan(0);
     expect(compareVersions("1.9.10", "1.9.9")).toBeGreaterThan(0); // numeric, not lexicographic
   });
+
+  it("reads an RC build as its base release", () => {
+    // Every build between stable releases is `X.Y.Z-N`; parsing "4-5" as a
+    // number would poison the comparison with NaN and hide every chip.
+    expect(compareVersions("1.12.4-5", "1.12.4")).toBe(0);
+    expect(compareVersions("1.12.4-5", "1.12.5")).toBeLessThan(0);
+    expect(compareVersions("1.12.4-5", "1.12.3")).toBeGreaterThan(0);
+  });
 });
 
 describe("isNewVersion", () => {
@@ -26,6 +34,12 @@ describe("isNewVersion", () => {
     expect(isNewVersion(range, "1.9.7")).toBe(true);
     expect(isNewVersion(range, "1.9.8")).toBe(true);
     expect(isNewVersion(range, "1.9.9")).toBe(false);
+  });
+
+  it("an RC of the release that ships a feature is inside the window", () => {
+    expect(isNewVersion({ from: "1.12.4", until: "1.12.5" }, "1.12.4-5")).toBe(true);
+    expect(isNewVersion({ from: "1.12.4", until: "1.12.5" }, "1.12.3-8")).toBe(false);
+    expect(isNewVersion({ from: "1.12.4", until: "1.12.5" }, "1.12.6-1")).toBe(false);
   });
 
   it("range bounds are optional", () => {

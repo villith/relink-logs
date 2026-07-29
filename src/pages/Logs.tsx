@@ -5,6 +5,7 @@ import "./Logs.css";
 import HookStatusBadge from "@/components/HookStatusBadge";
 import NewChip from "@/components/NewChip";
 import UpdateAvailableButton from "@/components/UpdateAvailableButton";
+import { useIsLinux } from "@/platform";
 import { deriveNavState } from "@/utils";
 import { ActionIcon, AppShell, Button, Group, Text } from "@mantine/core";
 import { Bug, Flag, Gear, House, ListDashes, Translate, Wrench } from "@phosphor-icons/react";
@@ -15,6 +16,7 @@ import { useEffect, useRef, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { TOOLS, toolboxNewIds } from "./Toolbox";
 
 import { useUpdateStatusStore } from "@/stores/useUpdateStatusStore";
 
@@ -63,6 +65,7 @@ const Layout = () => {
   // the live parser replay its event log.
   useMeterFilterSync();
   const { t } = useTranslation();
+  const isLinux = useIsLinux();
   const [version, setVersion] = useState("");
   useUpdateCheck(auto_check_updates);
   const updateStatus = useUpdateStatusStore((state) => state.status);
@@ -132,7 +135,7 @@ const Layout = () => {
               <NavTab to="/logs/toolbox" icon={<Wrench size="1rem" />} active={toolboxActive}>
                 <Group gap={6} wrap="nowrap">
                   {t("ui.toolbox.title")}
-                  <NewChip id="toolbox" />
+                  <NewChip id={toolboxNewIds(TOOLS, isLinux)} />
                 </Group>
               </NavTab>
               <NavTab to="/logs/settings" icon={<Gear size="1rem" />} active={settingsActive}>

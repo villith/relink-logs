@@ -7,10 +7,12 @@ export const NEW_CHIP_COLOR = "teal";
 
 /** "New" chip marking a recently shipped feature; renders nothing without an
  * `id` or once the app version moves past the release listed for it in
- * NEW_FEATURES. */
-const NewChip = ({ id }: { id?: NewFeatureId }) => {
+ * NEW_FEATURES. Several ids stand for a section that is new when anything
+ * inside it is — a nav tab covering a page full of features, say. */
+const NewChip = ({ id }: { id?: NewFeatureId | NewFeatureId[] }) => {
   const { t } = useTranslation();
-  if (!id || !isNew(id)) return null;
+  const ids = id === undefined ? [] : Array.isArray(id) ? id : [id];
+  if (!ids.some(isNew)) return null;
   return (
     <Badge size="xs" variant="filled" color={NEW_CHIP_COLOR}>
       {t("ui.new-chip", "New")}

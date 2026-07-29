@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next";
 import { Link, Outlet, useLocation } from "react-router-dom";
 
 /** The tools in the side menu. `newId` (optional) keys into NEW_FEATURES. */
-const TOOLS: {
+export const TOOLS: {
   to: string;
   labelKey: string;
   labelFallback: string;
@@ -46,6 +46,15 @@ const TOOLS: {
  * any future platform-gated tool. */
 export const visibleTools = <T extends { windowsOnly?: boolean }>(tools: T[], isLinux: boolean): T[] =>
   tools.filter((tool) => !(isLinux && tool.windowsOnly));
+
+/** Every feature the Toolbox tab stands for: the toolbox itself plus the tools
+ * reachable inside it. The tab is the only "New" marker visible before opening
+ * the toolbox, so a newly shipped *tool* has to light it up too — the toolbox's
+ * own window expires long before the tools added later do. */
+export const toolboxNewIds = <T extends { newId?: NewFeatureId; windowsOnly?: boolean }>(
+  tools: T[],
+  isLinux: boolean
+): NewFeatureId[] => ["toolbox", ...visibleTools(tools, isLinux).flatMap(({ newId }) => (newId ? [newId] : []))];
 
 /** Toolbox: collapsible tool menu on the left (icon-only when collapsed,
  * with a chip-colored dot standing in for a visible "New" chip), the
