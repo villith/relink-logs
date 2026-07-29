@@ -156,7 +156,18 @@
       "sigils-section": "Sigils checklist",
       "ai-section": "AI checklist",
       "add-trait": "Add trait...",
-      "reset": "Reset to defaults"
+      "reset": "Reset to defaults",
+      "new-group": "New group",
+      "new-group-name": "New group",
+      "group-name-placeholder": "Group name",
+      "rename-group": "Rename group",
+      "sort-az": "Sort A-Z",
+      "delete-group": "Delete group",
+      "delete-group-title": "Delete group",
+      "delete-group-confirm": "This will delete \"{{name}}\" and its {{count}} entries from your checklist.",
+      "reorder-group": "Reorder group",
+      "reorder-entry": "Reorder entry",
+      "group-enabled": "Show this group"
     },
     "master-traits": {
       "tier": "Tier {{tier}}",
