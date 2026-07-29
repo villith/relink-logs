@@ -15,6 +15,7 @@ use serde::Serialize;
 use crate::parser::constants::CharacterType;
 
 pub mod master_traits;
+pub mod overmastery_rules;
 pub mod wrightstone;
 
 /// Everything the rules need from a player, borrowed rather than cloned.
@@ -107,6 +108,7 @@ pub fn audit(build: &BuildSnapshot) -> Vec<Finding> {
         build.character_type,
         build.skillboard,
     ));
+    findings.extend(overmastery_rules::audit_overmastery(build.overmastery_info));
     findings
 }
 
