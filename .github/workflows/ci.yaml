@@ -19,14 +19,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
       - name: Cache node_modules
         id: node-modules
         uses: actions/cache@v4
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
       - run: npm ci
         if: steps.node-modules.outputs.cache-hit != 'true'
   typescript:
@@ -37,12 +37,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Restore node_modules
         uses: actions/cache/restore@v4
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
           fail-on-cache-miss: true
       - name: Typescript
         run: npm run tsc
@@ -54,12 +54,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Restore node_modules
         uses: actions/cache/restore@v4
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
           fail-on-cache-miss: true
       - name: ESLint
         run: npm run lint
@@ -71,12 +71,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Restore node_modules
         uses: actions/cache/restore@v4
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
           fail-on-cache-miss: true
       - name: Prettier
         run: npm run format-check
@@ -88,12 +88,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - name: Restore node_modules
         uses: actions/cache/restore@v4
         with:
           path: node_modules
-          key: node-modules-${{ runner.os }}-node20-${{ hashFiles('package-lock.json') }}
+          key: node-modules-${{ runner.os }}-node24-${{ hashFiles('package-lock.json') }}
           fail-on-cache-miss: true
       - name: Vitest
         run: npm test
@@ -139,7 +139,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       # webkit2gtk pinned to 2.36 to match release.yaml (see the rationale
       # there) — checking against the same version the AppImage bundles means
       # a 2.36 API incompatibility fails the PR, not the release run.

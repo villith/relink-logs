@@ -81,13 +81,7 @@ const ChecklistSettings = () => {
                     >
                       {/* A bordered, tinted band: the header has the same controls as
                        * an entry row, so it needs to be separated by more than spacing. */}
-                      <Card.Section
-                        withBorder
-                        inheritPadding
-                        py="xs"
-                        mb="xs"
-                        bg="var(--mantine-color-dark-6)"
-                      >
+                      <Card.Section withBorder inheritPadding py="xs" mb="xs" bg="var(--mantine-color-dark-6)">
                         <Group gap="xs" wrap="nowrap">
                           <Box
                             component="span"

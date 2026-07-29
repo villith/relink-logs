@@ -232,9 +232,7 @@ describe("persisted v1 rehydration", () => {
       "checklist-settings",
       JSON.stringify({
         state: {
-          groups: [
-            { id: "g-1", name: "Offense", kind: "custom", enabled: false, manualOrder: true, entries: [] },
-          ],
+          groups: [{ id: "g-1", name: "Offense", kind: "custom", enabled: false, manualOrder: true, entries: [] }],
         },
         version: 2,
       })

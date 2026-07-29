@@ -14,7 +14,8 @@
     "tauri": "tauri",
     "test": "vitest",
     "bump": "node scripts/bump-version.mjs",
-    "clean:target": "node scripts/clean-target.mjs"
+    "clean:target": "node scripts/clean-target.mjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans": "^5.0.1",
@@ -43,7 +44,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^1.6.3",
     "@testing-library/react": "^15.0.6",
-    "@types/node": "^20.11.30",
+    "@types/node": "^24.13.3",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@typescript-eslint/eslint-plugin": "^7.1.0",
@@ -53,7 +54,9 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-i18next": "^6.1.5",
     "eslint-plugin-react": "^7.33.2",
+    "husky": "^9.1.7",
     "jsdom": "^24.0.0",
+    "lint-staged": "^15.5.2",
     "postcss": "^8.4.35",
     "postcss-preset-mantine": "^1.13.0",
     "postcss-simple-vars": "^7.0.1",

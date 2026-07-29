@@ -697,9 +697,7 @@ export const ViewPage = () => {
   const visibleChecklistGroups = useMemo(
     () =>
       checklistGroups
-        .filter(
-          (group) => group.enabled && (group.kind === "computed" || group.entries.some((entry) => entry.enabled))
-        )
+        .filter((group) => group.enabled && (group.kind === "computed" || group.entries.some((entry) => entry.enabled)))
         .map((group) => ({
           ...group,
           entries: orderedChecklistEntries(
@@ -1847,15 +1845,23 @@ export const ViewPage = () => {
                               <Text size="xs" fw={600} c="dimmed" mt={4}>
                                 {checklistGroupName(group)}
                               </Text>
-                              {group.kind === "computed" ? (
-                                COMPUTED_SIGIL_ROWS.map(({ label, categories }) => (
-                                  <SigilCategoryRow key={label} player={player} categories={categories} label={label} />
-                                ))
-                              ) : (
-                                group.entries.map((entry) => (
-                                  <ChecklistEntryRow key={entry.ids[0]} player={player} traits={traits} entry={entry} />
-                                ))
-                              )}
+                              {group.kind === "computed"
+                                ? COMPUTED_SIGIL_ROWS.map(({ label, categories }) => (
+                                    <SigilCategoryRow
+                                      key={label}
+                                      player={player}
+                                      categories={categories}
+                                      label={label}
+                                    />
+                                  ))
+                                : group.entries.map((entry) => (
+                                    <ChecklistEntryRow
+                                      key={entry.ids[0]}
+                                      player={player}
+                                      traits={traits}
+                                      entry={entry}
+                                    />
+                                  ))}
                             </Box>
                           ))}
                         </Table.Td>

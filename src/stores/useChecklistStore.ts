@@ -126,9 +126,7 @@ export const useChecklistStore = create<ChecklistState>()(
         })),
       remove: (groupId, firstId) =>
         set((state) => ({
-          groups: withEntries(state.groups, groupId, (entries) =>
-            entries.filter((entry) => entry.ids[0] !== firstId)
-          ),
+          groups: withEntries(state.groups, groupId, (entries) => entries.filter((entry) => entry.ids[0] !== firstId)),
         })),
       add: (groupId, traitId, level) =>
         set((state) => ({
