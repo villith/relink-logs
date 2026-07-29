@@ -27,31 +27,59 @@ pub fn max_level_of(weights: &[u32]) -> Option<u32> {
         .map(|index| index as u32 + 1)
 }
 
+/// The three level-lot ids a stone config's slots roll from, slot 0 first.
+fn slot_lots(config: &transmarvel::StoneConfig) -> [i32; 3] {
+    [
+        config.trait1_level_lot,
+        config.slots[0].level_lot,
+        config.slots[1].level_lot,
+    ]
+}
+
+/// The max level a single level-lot id permits. Lot `0` is the sentinel the
+/// top (0.1%) tier uses for its fully-fixed slots, so it legitimately has no
+/// row in `skill_level_lots`; anything else missing is a schema drift in the
+/// baked tables, not absent live data, and must fail loudly rather than
+/// silently under-deriving the ceiling (see the module-level safety note).
+fn ceiling_for_lot(tables: &transmarvel::TransmarvelTables, lot: i32) -> u32 {
+    if lot == 0 {
+        0
+    } else {
+        tables
+            .skill_level_lots
+            .get(&lot)
+            .and_then(|weights| max_level_of(weights))
+            .unwrap_or_else(|| panic!("stock wrightstone lot {lot} missing from skill_level_lots"))
+    }
+}
+
+/// The per-slot ceiling across a set of stone configs: the max is safe here
+/// only because `0` is a non-contributing sentinel (real trait levels start
+/// at 1, so `0` can never win the `.max()`).
+fn ceilings_for<'a>(
+    tables: &transmarvel::TransmarvelTables,
+    configs: impl Iterator<Item = &'a transmarvel::StoneConfig>,
+) -> [u32; 3] {
+    let mut ceilings = [0_u32; 3];
+    for config in configs {
+        for (slot, lot) in slot_lots(config).into_iter().enumerate() {
+            ceilings[slot] = ceilings[slot].max(ceiling_for_lot(tables, lot));
+        }
+    }
+    ceilings
+}
+
 /// Derived once from the baked transmarvel tables.
 pub fn stock_rules() -> &'static WrightstoneRules {
     static RULES: std::sync::OnceLock<WrightstoneRules> = std::sync::OnceLock::new();
     RULES.get_or_init(|| {
         let tables = transmarvel::stock_tables();
-        let mut family_traits = HashSet::new();
-        let mut slot_ceilings = [0_u32; 3];
-
-        for config in tables.stone_configs.values() {
-            family_traits.insert(config.trait1);
-
-            let lots = [
-                config.trait1_level_lot,
-                config.slots[0].level_lot,
-                config.slots[1].level_lot,
-            ];
-            for (slot, lot) in lots.iter().enumerate() {
-                let ceiling = tables
-                    .skill_level_lots
-                    .get(lot)
-                    .and_then(|weights| max_level_of(weights))
-                    .unwrap_or(0);
-                slot_ceilings[slot] = slot_ceilings[slot].max(ceiling);
-            }
-        }
+        let family_traits: HashSet<u32> = tables
+            .stone_configs
+            .values()
+            .map(|config| config.trait1)
+            .collect();
+        let slot_ceilings = ceilings_for(tables, tables.stone_configs.values());
 
         WrightstoneRules {
             family_traits,
@@ -83,6 +111,32 @@ mod tests {
         assert_eq!(stock_rules().slot_ceilings, [20, 15, 10]);
     }
 
+    /// The global ceiling takes a max across all 12 configs per slot, which
+    /// is only sound if no family has a genuinely lower cap hiding behind a
+    /// higher-capped sibling. Assert every family derives the identical
+    /// ceiling the global one does; a divergence here would mean the
+    /// single-global-ceiling model itself is wrong, not just this test.
+    #[test]
+    fn family_ceilings_agree_with_the_global_ceiling() {
+        let tables = transmarvel::stock_tables();
+        let global = stock_rules().slot_ceilings;
+
+        let mut by_family: std::collections::HashMap<u32, Vec<&transmarvel::StoneConfig>> =
+            std::collections::HashMap::new();
+        for config in tables.stone_configs.values() {
+            by_family.entry(config.trait1).or_default().push(config);
+        }
+        assert_eq!(by_family.len(), 4);
+
+        for (trait1, configs) in by_family {
+            let family_ceilings = ceilings_for(tables, configs.into_iter());
+            assert_eq!(
+                family_ceilings, global,
+                "family {trait1:08x} ceiling {family_ceilings:?} diverges from the global {global:?}"
+            );
+        }
+    }
+
     #[test]
     fn max_level_reads_highest_set_bit() {
         // Weight at index 9 means level 10; index 14 means level 15.
@@ -91,5 +145,8 @@ mod tests {
         weights[14] = 1;
         assert_eq!(max_level_of(&weights), Some(15));
         assert_eq!(max_level_of(&[0; 20]), None);
+        // The contract is general over any length, not just the stock
+        // 20-wide row.
+        assert_eq!(max_level_of(&[0, 1, 0, 0, 1, 0, 0]), Some(5));
     }
 }
