@@ -193,3 +193,57 @@ describe("useChecklistStore groups", () => {
     expect(groupById("build").entries).toHaveLength(13);
   });
 });
+
+describe("persisted v1 rehydration", () => {
+  it("migrates a real v1 payload through the persist middleware", async () => {
+    // The shape the shipped app writes at version 1: two lists, no groups.
+    localStorage.setItem(
+      "checklist-settings",
+      JSON.stringify({
+        state: {
+          build: [
+            { ids: [0x4c588c27], level: 15, enabled: true },
+            { ids: [0xdc584f60, 0x0151cf9e], level: 55, enabled: false },
+            { ids: [0x12345678], level: 20, enabled: true },
+          ],
+          ai: [{ ids: [0xa8a3163b], level: 15, enabled: true }],
+        },
+        version: 1,
+      })
+    );
+
+    await useChecklistStore.persist.rehydrate();
+
+    const { groups } = useChecklistStore.getState();
+    expect(groups.map((group) => group.id)).toEqual(["build", "computed", "ai"]);
+    expect(groups.every((group) => group.enabled && !group.manualOrder)).toBe(true);
+    expect(groupById("build").entries).toEqual([
+      { ids: [0x4c588c27], level: 15, enabled: true },
+      { ids: [0xdc584f60, 0x0151cf9e], level: 55, enabled: false },
+      { ids: [0x12345678], level: 20, enabled: true },
+    ]);
+    expect(groupById("ai").entries).toEqual([{ ids: [0xa8a3163b], level: 15, enabled: true }]);
+    // The actions must survive the merge, or the editor is dead on arrival.
+    expect(typeof useChecklistStore.getState().addGroup).toBe("function");
+  });
+
+  it("leaves an already-migrated v2 payload alone", async () => {
+    localStorage.setItem(
+      "checklist-settings",
+      JSON.stringify({
+        state: {
+          groups: [
+            { id: "g-1", name: "Offense", kind: "custom", enabled: false, manualOrder: true, entries: [] },
+          ],
+        },
+        version: 2,
+      })
+    );
+
+    await useChecklistStore.persist.rehydrate();
+
+    expect(useChecklistStore.getState().groups).toEqual([
+      { id: "g-1", name: "Offense", kind: "custom", enabled: false, manualOrder: true, entries: [] },
+    ]);
+  });
+});
