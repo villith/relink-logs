@@ -598,6 +598,10 @@ export const moveItem = <T>(items: T[], from: number, to: number): T[] => {
   return next;
 };
 
+/** One reusable collator rather than a fresh one per `localeCompare` call —
+ * these sorts run per render over lists that grow with the user's config. */
+const nameCollator = new Intl.Collator();
+
 /**
  * A group's entries in display order. Order is resolved here, at render,
  * rather than stored: the traits bundle loads asynchronously (src/i18n.ts), so
@@ -605,11 +609,23 @@ export const moveItem = <T>(items: T[], from: number, to: number): T[] => {
  * alphabetical order a user expects is the one in their own language.
  */
 export const orderedChecklistEntries = <T extends ChecklistEntry>(entries: T[], manualOrder: boolean): T[] => {
-  // t() yields undefined before i18next has initialized; an entry whose name
-  // cannot be resolved sorts first rather than throwing mid-render.
-  const name = (entry: ChecklistEntry): string => translateTraitId(entry.ids[0]) ?? "";
-  return manualOrder ? entries : [...entries].sort((a, b) => name(a).localeCompare(name(b)));
+  if (manualOrder) return entries;
+  // Each name is translated once and carried through the sort: comparing on
+  // the fly would run two i18next lookups per comparison, i.e. O(n log n)
+  // lookups for n entries. t() yields undefined before i18next has
+  // initialized; an entry whose name cannot be resolved sorts first rather
+  // than throwing mid-render.
+  return entries
+    .map((entry) => ({ entry, name: translateTraitId(entry.ids[0]) ?? "" }))
+    .sort((a, b) => nameCollator.compare(a.name, b.name))
+    .map(({ entry }) => entry);
 };
+
+/** A group's display name: a user-set literal beats the seeded i18n key, which
+ * beats the raw id. Shared so the Builds tab and the settings editor cannot
+ * disagree about what a group is called. */
+export const checklistGroupName = (group: { id: string; name?: string; nameKey?: string }): string =>
+  group.name ?? (group.nameKey ? t(group.nameKey) : group.id);
 
 /**
  * The in-game sigil types, in the game's category order (skill.tbl category
@@ -636,6 +652,16 @@ export const traitMaxLevel = (traitId: number): number | null =>
 
 /** The Computed checklist rows all target 5 sigils of their type. */
 export const SIGIL_CATEGORY_TARGET = 5;
+
+/** The derived rows the computed checklist group stands for, in display order.
+ * Shared by the Builds tab (which renders them against a player's sigils) and
+ * the settings editor (which previews them as disabled rows), so the two views
+ * of the same group cannot list different rows. */
+export const COMPUTED_SIGIL_ROWS: { label: string; categories: SigilCategory[] }[] = [
+  { label: "ui.checklist.basic-sigils", categories: ["basic"] },
+  { label: "ui.checklist.attack-sigils", categories: ["attack"] },
+  { label: "ui.checklist.defense-support-sigils", categories: ["defense", "support"] },
+];
 
 /**
  * The equipped sigils of the given types. A sigil's type is its FIRST trait's
@@ -1521,6 +1547,13 @@ export const deriveNavState = (pathname: string) => {
   const onListPage = pathname === "/logs" || confluxActive;
   return { logsActive, toolboxActive, settingsActive, debugActive, confluxActive, questsActive, onListPage };
 };
+
+/** Narrows a tab name carried in the URL to one the page can actually show.
+ * Tabs come back from the query string, which outlives the data behind them —
+ * a log with no player data disables its equipment/builds tabs, and selecting a
+ * disabled tab would leave the page with no panel rendered at all. */
+export const resolveAvailableTab = <T extends string>(tab: string | null, available: readonly T[], fallback: T): T =>
+  available.includes(tab as T) ? (tab as T) : fallback;
 
 /// Hook that returns the previous value of a variable.
 export const usePrevious = <T>(value: T): T | undefined => {

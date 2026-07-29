@@ -1,15 +1,10 @@
 import useChecklistSettings from "@/pages/useChecklistSettings";
 import { type ChecklistGroup } from "@/stores/useChecklistStore";
-import { SIGIL_CATEGORY_TARGET, orderedChecklistEntries, translateTraitId } from "@/utils";
+import { COMPUTED_SIGIL_ROWS, SIGIL_CATEGORY_TARGET, orderedChecklistEntries, translateTraitId } from "@/utils";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
 import { ActionIcon, Box, Checkbox, Flex, NumberInput, Select, Text } from "@mantine/core";
 import { DotsSixVertical, X } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
-
-/** The derived rows the computed group stands for, in render order. Their labels
- * are the same keys the Builds tab uses for the equivalent rows, and they all
- * target the same sigil count. */
-const COMPUTED_ROWS = ["ui.checklist.basic-sigils", "ui.checklist.attack-sigils", "ui.checklist.defense-support-sigils"];
 
 /** The grab handle. Rendered for every row so the lists line up; only a
  * draggable row actually takes hold of it. */
@@ -101,10 +96,10 @@ export const ChecklistSection = ({
   if (group.kind === "computed") {
     return (
       <Box pl="md">
-        {COMPUTED_ROWS.map((key) => (
-          <Flex key={key} align="center" gap="xs" mt={4}>
+        {COMPUTED_SIGIL_ROWS.map(({ label }) => (
+          <Flex key={label} align="center" gap="xs" mt={4}>
             <EntryRow
-              label={t(key)}
+              label={t(label)}
               level={SIGIL_CATEGORY_TARGET}
               enabled
               disabled

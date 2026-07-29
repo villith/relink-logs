@@ -2082,20 +2082,14 @@ fn log_progress_probe(record: *const usize) {
 /// first 16 pairs to expose the weapon/equipment progression state.
 #[cfg(feature = "hookdiag")]
 fn log_instance_resolve(mgr: usize, id: u32, src_off: usize) {
-    use crate::hooks::diag::{read_ptr_guarded, read_u32_guarded};
-
-    fn read_u64_guarded(base: usize, off: usize) -> u64 {
-        let lo = crate::hooks::diag::read_u32_guarded(base, off) as u64;
-        let hi = crate::hooks::diag::read_u32_guarded(base, off + 4) as u64;
-        (hi << 32) | lo
-    }
+    use crate::hooks::diag::{read_ptr_guarded, read_u32_guarded, read_u64_guarded};
 
     const PRIME: u64 = 0x100000001B3;
     let mut h: u64 = 0xCBF29CE484222325;
     for b in id.to_le_bytes() {
         h = (h ^ b as u64).wrapping_mul(PRIME);
     }
-    let mask = read_u64_guarded(mgr, 0x128);
+    let mask = read_u64_guarded(mgr, 0x128).unwrap_or(0);
     let (Some(buckets), Some(end_node)) =
         (read_ptr_guarded(mgr, 0x110), read_ptr_guarded(mgr, 0x100))
     else {

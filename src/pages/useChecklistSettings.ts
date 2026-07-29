@@ -1,7 +1,7 @@
 import { useChecklistStore } from "@/stores/useChecklistStore";
 import { getTraitsBundle } from "@/utils";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useShallow } from "zustand/react/shallow";
 
 /** Level assigned to entries added from the Settings picker. */
 export const NEW_ENTRY_LEVEL = 15;
@@ -15,38 +15,31 @@ export default function useChecklistSettings() {
   // list); this call is kept so the component re-renders via bindI18nStore
   // when the bundle loads or the language changes.
   useTranslation("traits");
-  const store = useChecklistStore(
-    useShallow((state) => ({
-      groups: state.groups,
-      setLevel: state.setLevel,
-      toggle: state.toggle,
-      remove: state.remove,
-      add: state.add,
-      addGroup: state.addGroup,
-      renameGroup: state.renameGroup,
-      removeGroup: state.removeGroup,
-      toggleGroup: state.toggleGroup,
-      reorderGroups: state.reorderGroups,
-      reorderEntries: state.reorderEntries,
-      moveEntry: state.moveEntry,
-      sortGroup: state.sortGroup,
-      reset: state.reset,
-    }))
+  // `groups` is the store's only state — every other member is an action, whose
+  // identity zustand fixes at creation — so subscribing to the whole store is
+  // exactly as narrow as listing the actions one by one, and does not need
+  // editing each time one is added.
+  const store = useChecklistStore();
+
+  // Every known trait as a Select option ("<hex>" value, translated label),
+  // sorted once per bundle rather than once per group per render: only the
+  // per-group exclusion below differs between the pickers.
+  const bundle = getTraitsBundle();
+  const allTraitOptions = useMemo(
+    () =>
+      Object.entries(bundle)
+        .filter(([, value]) => Boolean(value?.text))
+        .map(([hex, value]) => ({ value: hex, label: value.text as string, id: parseInt(hex, 16) }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [bundle]
   );
 
-  // All known traits as Select options ("<hex>" value, translated label), minus
-  // traits already present in ANY entry's id group of THAT group (matching the
-  // store's add() no-op semantics, which also reject secondary group members).
-  // Recomputed per render — the bundle only changes on language switch and the
-  // lists are small.
+  // Minus traits already present in ANY entry's id group of THAT group (matching
+  // the store's add() no-op semantics, which also reject secondary group members).
   const traitOptions = (groupId: string): { value: string; label: string }[] => {
-    const bundle = getTraitsBundle();
     const group = store.groups.find((item) => item.id === groupId);
     const present = new Set((group?.entries ?? []).flatMap((entry) => entry.ids));
-    return Object.entries(bundle)
-      .filter(([hex, value]) => Boolean(value?.text) && !present.has(parseInt(hex, 16)))
-      .map(([hex, value]) => ({ value: hex, label: value.text as string }))
-      .sort((a, b) => a.label.localeCompare(b.label));
+    return allTraitOptions.filter((option) => !present.has(option.id)).map(({ value, label }) => ({ value, label }));
   };
 
   const addTrait = (groupId: string, hex: string | null) => {

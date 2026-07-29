@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { reorderColumns, toggleColumn } from "./useColumnControls";
+import { toggleColumn } from "./useColumnControls";
 
+// Column reordering goes through `moveItem` (src/utils.ts), which is covered there.
 describe("column helpers", () => {
-  it("reorderColumns moves an item from one index to another", () => {
-    expect(reorderColumns(["a", "b", "c"], 0, 2)).toEqual(["b", "c", "a"]);
-  });
-
   it("toggleColumn flips visibility of the matching column and keeps its position", () => {
     const settings = [
       { id: "a", visible: true },

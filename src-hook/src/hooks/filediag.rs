@@ -30,18 +30,32 @@ mod imp {
         static OnCreateFileA: unsafe extern "system" fn(*const u8, u32, u32, usize, u32, u32, usize) -> usize;
     }
 
-    fn interesting(lower: &str) -> bool {
-        lower.contains("quest")
-            || lower.contains("endless")
-            || lower.contains("system\\table")
-            || lower.contains("system/table")
+    /// The path fragments worth logging. All ASCII, which is what lets the tests below
+    /// run over the caller's raw buffer.
+    const NEEDLES: [&str; 4] = ["quest", "endless", "system\\table", "system/table"];
+
+    /// These detours cover EVERY file the process opens — thousands a second during asset
+    /// streaming — and reject essentially all of them. So the interest test runs over the
+    /// caller's buffer, case-insensitively and in place; only a path that already matched
+    /// is decoded into a `String` to be logged.
+    fn interesting_bytes(path: &[u8]) -> bool {
+        NEEDLES.iter().any(|needle| {
+            let n = needle.as_bytes();
+            path.len() >= n.len() && path.windows(n.len()).any(|window| window.eq_ignore_ascii_case(n))
+        })
     }
 
-    fn log_open(api: &str, path: &str) {
-        let lower = path.to_ascii_lowercase();
-        if interesting(&lower) {
-            log::info!("HOOKDIAG ev=file_open api={api} path={path}");
-        }
+    fn interesting_wide(path: &[u16]) -> bool {
+        NEEDLES.iter().any(|needle| {
+            let n = needle.as_bytes();
+            path.len() >= n.len()
+                && path.windows(n.len()).any(|window| {
+                    window
+                        .iter()
+                        .zip(n)
+                        .all(|(&unit, byte)| unit < 0x80 && (unit as u8).eq_ignore_ascii_case(byte))
+                })
+        })
     }
 
     fn on_create_file_w(
@@ -60,10 +74,13 @@ mod imp {
                 while *name.add(len) != 0 && len < 1024 {
                     len += 1;
                 }
-                log_open(
-                    "W",
-                    &String::from_utf16_lossy(std::slice::from_raw_parts(name, len)),
-                );
+                let path = std::slice::from_raw_parts(name, len);
+                if interesting_wide(path) {
+                    log::info!(
+                        "HOOKDIAG ev=file_open api=W path={}",
+                        String::from_utf16_lossy(path)
+                    );
+                }
             }
         }
         unsafe { OnCreateFileW.call(name, access, share, sa, disp, flags, templ) }
@@ -85,10 +102,13 @@ mod imp {
                 while *name.add(len) != 0 && len < 1024 {
                     len += 1;
                 }
-                log_open(
-                    "A",
-                    &String::from_utf8_lossy(std::slice::from_raw_parts(name, len)),
-                );
+                let path = std::slice::from_raw_parts(name, len);
+                if interesting_bytes(path) {
+                    log::info!(
+                        "HOOKDIAG ev=file_open api=A path={}",
+                        String::from_utf8_lossy(path)
+                    );
+                }
             }
         }
         unsafe { OnCreateFileA.call(name, access, share, sa, disp, flags, templ) }

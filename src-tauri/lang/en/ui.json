@@ -41,7 +41,9 @@
     "settings": "Settings",
     "settings-nav": {
       "general": "General",
-      "meters": "Meters",
+      "meters": "Meters"
+    },
+    "nav-rail": {
       "collapse-menu": "Collapse menu",
       "expand-menu": "Expand menu"
     },
@@ -338,8 +340,6 @@
       "om-rng-override-active": "The game is mid-roll right now — try again in a second.",
       "om-invalid-tier": "That overmastery level isn't one the game offers.",
       "om-slot-out-of-range": "This character sits outside the game's overmastery RNG table — their rolls can't be predicted.",
-      "collapse-menu": "Collapse menu",
-      "expand-menu": "Expand menu",
       "stale-results": "The game's RNG has changed since these results were computed — they may no longer be accurate. Run it again for a fresh list.",
       "om-no-match": "No matching roll in the next {{rolls}} — try more rolls or a lower minimum level.",
       "om-results-caveat": "Each line is one future overmastery roll for this character and level, in order. Rolling with a different character or level doesn't consume these; completing a quest may reshuffle them — predict again after.",

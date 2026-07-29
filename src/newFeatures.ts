@@ -48,3 +48,15 @@ export const isNewVersion = ({ from, until }: NewWindow, appVersion: string): bo
 
 /** True when the feature `id` should wear its "New" chip in this build. */
 export const isNew = (id: NewFeatureId): boolean => isNewVersion(NEW_FEATURES[id], APP_VERSION);
+
+/**
+ * Every feature a header tab stands for: the section itself (`ownId`) plus the
+ * entries reachable inside it. A collapsed section's tab is the only "New"
+ * marker visible before opening it, so a newly shipped entry has to light the
+ * tab up too — the section's own window expires long before the entries added
+ * later do. Pass the sections already filtered for the platform.
+ */
+export const sectionNewIds = (ownId: NewFeatureId, sections: { newId?: NewFeatureId }[]): NewFeatureId[] => [
+  ownId,
+  ...sections.flatMap(({ newId }) => (newId ? [newId] : [])),
+];

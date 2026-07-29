@@ -36,6 +36,7 @@ import {
   orderedChecklistEntries,
   overmasteryAmountFromId,
   overmasteryAmountFromKind,
+  resolveAvailableTab,
   skillboardActivationCost,
   skillboardLayoutFor,
   skillboardNodeKey,
@@ -821,6 +822,22 @@ describe("utils", () => {
       });
       expect(deriveNavState("/logs/123")).toMatchObject({ questsActive: true, onListPage: false });
       expect(deriveNavState("/logs/settings")).toMatchObject({ questsActive: false, onListPage: false });
+    });
+  });
+
+  describe("resolveAvailableTab", () => {
+    it("keeps a tab that is available", () => {
+      expect(resolveAvailableTab("builds", ["overview", "sba", "equipment", "builds"], "overview")).toBe("builds");
+    });
+
+    it("falls back when the remembered tab is currently unavailable", () => {
+      // A log with no player data disables the equipment/builds tabs; without
+      // the fallback the page would render with no tab selected at all.
+      expect(resolveAvailableTab("builds", ["overview", "sba"], "overview")).toBe("overview");
+    });
+
+    it("falls back on an unknown tab name", () => {
+      expect(resolveAvailableTab("nonsense", ["overview", "sba"], "overview")).toBe("overview");
     });
   });
 });

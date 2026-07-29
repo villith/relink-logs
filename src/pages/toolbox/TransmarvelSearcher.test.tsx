@@ -1,5 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import "@/i18n";
@@ -63,10 +64,14 @@ import { POPULAR_TRAITS } from "./traitOptions";
 import TransmarvelSearcher, { MAX_ROLLS, MAX_SHOWN_ROWS } from "./TransmarvelSearcher";
 import { familyCombos, POOL, sigilTrait2Options, slotTraitOptions } from "./useTransmarvelSearcher";
 
+/** The page's tab selection lives in the URL, so it needs a nuqs adapter —
+ * the testing one stands in for the router-backed adapter the app installs. */
 const renderPage = () =>
   render(
     <MantineProvider>
-      <TransmarvelSearcher />
+      <NuqsTestingAdapter>
+        <TransmarvelSearcher />
+      </NuqsTestingAdapter>
     </MantineProvider>
   );
 

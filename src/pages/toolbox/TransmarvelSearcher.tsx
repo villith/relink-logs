@@ -20,6 +20,8 @@ import { X } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { useTabParam } from "@/hooks/useTabParam";
+
 import { ANY, anyOption, orderedTraitOptions } from "./traitOptions";
 
 import ToolPage from "./ToolPage";
@@ -229,6 +231,9 @@ const WishlistTab = <E,>({
   </Stack>
 );
 
+/** The searcher's tabs, in display order. */
+const TRANSMARVEL_TABS = ["sigils", "stones", "results"] as const;
+
 const TransmarvelSearcher = () => {
   const { t, i18n } = useTranslation();
   const {
@@ -257,8 +262,9 @@ const TransmarvelSearcher = () => {
   const busy = loading || predicting;
 
   // Tabs are controlled so a tab switch re-renders this component and the
-  // measuring effect below re-runs.
-  const [tab, setTab] = useState<string | null>("sigils");
+  // measuring effect below re-runs. The selection lives in the URL so leaving
+  // the toolbox and coming back returns to it.
+  const [tab, setTab] = useTabParam(TRANSMARVEL_TABS, "sigils");
 
   /** Anchor the results scroll area to the viewport bottom by measuring its
    * actual top edge. A fixed calc() offset drifts whenever the content above

@@ -1,6 +1,6 @@
 import useChecklistSettings from "@/pages/useChecklistSettings";
 import { type ChecklistGroup } from "@/stores/useChecklistStore";
-import { moveItem, orderedChecklistEntries } from "@/utils";
+import { checklistGroupName, moveItem, orderedChecklistEntries } from "@/utils";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import { ActionIcon, Box, Button, Card, Checkbox, Group, Stack, Text, TextInput, Title, Tooltip } from "@mantine/core";
 import { modals } from "@mantine/modals";
@@ -17,8 +17,6 @@ const ChecklistSettings = () => {
   const { t } = useTranslation();
   const checklist = useChecklistSettings();
   const [editing, setEditing] = useState<string | null>(null);
-
-  const groupName = (group: ChecklistGroup) => group.name ?? (group.nameKey ? t(group.nameKey) : group.id);
 
   // Reads as an action while the group is manually ordered, and as the current
   // state once it is not — the same button covers both.
@@ -55,7 +53,7 @@ const ChecklistSettings = () => {
     modals.openConfirmModal({
       title: t("ui.checklist-settings.delete-group-title", "Delete group"),
       children: t("ui.checklist-settings.delete-group-confirm", {
-        name: groupName(group),
+        name: checklistGroupName(group),
         count: group.entries.length,
       }),
       labels: { confirm: t("ui.delete-btn"), cancel: t("ui.cancel-btn") },
@@ -107,7 +105,7 @@ const ChecklistSettings = () => {
                               autoFocus
                               size="sm"
                               flex={1}
-                              defaultValue={groupName(group)}
+                              defaultValue={checklistGroupName(group)}
                               placeholder={t("ui.checklist-settings.group-name-placeholder", "Group name")}
                               onBlur={(event) => {
                                 checklist.renameGroup(group.id, event.currentTarget.value);
@@ -132,7 +130,7 @@ const ChecklistSettings = () => {
                               onClick={() => setEditing(group.id)}
                             >
                               <Text fw={700} size="sm" tt="uppercase">
-                                {groupName(group)}
+                                {checklistGroupName(group)}
                               </Text>
                             </Button>
                           )}
