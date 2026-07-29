@@ -33,6 +33,9 @@ pub struct BuildSnapshot<'a> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Rule {
+    /// `observed`/`allowed` are `Value::Levels` in true physical slot order
+    /// (primary, secondary1, secondary2) — index, not sorted rank, is what
+    /// each level is checked against.
     WrightstoneTraitLevel,
     WrightstonePrimaryTrait,
     SigilTraitLevel,

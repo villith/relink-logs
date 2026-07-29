@@ -294,12 +294,15 @@ mod tests {
         assert_eq!(findings[0].allowed, Value::Levels(vec![20, 15, 10]));
     }
 
-    /// The primary need not be the highest-leveled trait; only its own
-    /// slot's ceiling matters. Sorting (the old rule) would have wrongly
-    /// flagged this legitimate build by comparing secondary1's 15 against
-    /// slot 0's cap instead of its own.
+    /// The primary need not be the highest-leveled trait: here the max (15)
+    /// falls on secondary1, not the primary. This guards against a
+    /// plausible positional bug — assuming the primary slot always carries
+    /// the highest engraved level (true of the canonical maxed example, but
+    /// not in general) and checking that assumed value in place of
+    /// `wrightstone_traits[0].level`, rather than each slot's own level
+    /// against its own ceiling.
     #[test]
-    fn primary_below_its_own_ceiling_is_not_flagged_by_higher_secondaries() {
+    fn primary_slot_level_is_checked_against_its_own_ceiling_not_the_max() {
         let state = stone(&[(0xf372f096, 5), (0xdc584f60, 15), (0x57ab5b10, 10)]);
         assert_eq!(audit_wrightstone(Some(&state)), vec![]);
     }
