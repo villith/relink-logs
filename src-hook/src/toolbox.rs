@@ -78,17 +78,14 @@ fn globals() -> Result<&'static Globals, String> {
     static GLOBALS: OnceLock<Result<Globals, String>> = OnceLock::new();
     GLOBALS
         .get_or_init(|| {
-            let module = unsafe {
-                windows::Win32::System::LibraryLoader::GetModuleHandleW(None)
-            }
-            .map_err(|e| format!("GetModuleHandleW: {e:?}"))?;
+            let module = unsafe { windows::Win32::System::LibraryLoader::GetModuleHandleW(None) }
+                .map_err(|e| format!("GetModuleHandleW: {e:?}"))?;
             let base = module.0 as u64;
             let view = unsafe { PeView::module(base as *const u8) };
             Ok(Globals {
                 base,
                 rng: game_reader::resolve_rng_rva(view).map_err(|e| e.to_string())?,
-                synthesis: game_reader::synthesis::resolve_rvas(view)
-                    .map_err(|e| e.to_string())?,
+                synthesis: game_reader::synthesis::resolve_rvas(view).map_err(|e| e.to_string())?,
                 overmastery: game_reader::overmastery::resolve_rvas(view)
                     .map_err(|e| e.to_string())?,
             })
@@ -126,11 +123,11 @@ fn handle_request(req: ToolboxRequest) -> ToolboxResponse {
                     .unwrap_or(cfg!(feature = "eject")),
             }
         }
-        ToolboxRequest::SynthesisSnapshot => ToolboxResponse::SynthesisSnapshot(
-            globals().and_then(|g| {
+        ToolboxRequest::SynthesisSnapshot => {
+            ToolboxResponse::SynthesisSnapshot(globals().and_then(|g| {
                 guarded(|| game_reader::synthesis::take_snapshot(&InProcMem, g.base, g.synthesis))
-            }),
-        ),
+            }))
+        }
         ToolboxRequest::SynthesisSeed => ToolboxResponse::SynthesisSeed(globals().and_then(|g| {
             guarded(|| game_reader::synthesis::take_seed_state(&InProcMem, g.base, g.synthesis))
         })),
@@ -146,9 +143,11 @@ fn handle_request(req: ToolboxRequest) -> ToolboxResponse {
                 })
             }))
         }
-        ToolboxRequest::RngSlot(slot) => ToolboxResponse::RngSlot(globals().and_then(|g| {
-            guarded(|| game_reader::read_rng_slot(&InProcMem, g.base, g.rng, slot))
-        })),
+        ToolboxRequest::RngSlot(slot) => {
+            ToolboxResponse::RngSlot(globals().and_then(|g| {
+                guarded(|| game_reader::read_rng_slot(&InProcMem, g.base, g.rng, slot))
+            }))
+        }
     }
 }
 

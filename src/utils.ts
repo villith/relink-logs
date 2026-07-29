@@ -548,22 +548,84 @@ export type ChecklistEntry = {
   level: number;
 };
 
-export type ChecklistGroups = { build: ChecklistEntry[]; ai: ChecklistEntry[] };
+/** "custom" groups hold user-editable entries; the single "computed" group
+ * renders the derived sigil-category rows, whose entries the user cannot
+ * change. */
+export type ChecklistGroupKind = "custom" | "computed";
+
+/** A checklist group as shipped in the defaults asset, before the store adds
+ * the user's own flags (enabled, manualOrder, name). */
+export type ChecklistGroupDef = {
+  /** Stable key: "build" | "computed" | "ai" for seeded groups, "g-<n>" for new ones. */
+  id: string;
+  /** i18n key for a seeded group's name; cleared once the user renames it. */
+  nameKey?: string;
+  kind: ChecklistGroupKind;
+  entries: ChecklistEntry[];
+};
 
 /**
  * The shipped default checklist criteria (assets/checklist-default.json):
  * the endgame requirements shown in the Builds tab, checked against a
- * player's combined trait totals (wrightstone + summons + sigils). `build`
- * is the main sigils checklist; `ai` applies to AI-controlled party members
- * (no damage penalty from Glass Cannon). The JSON stores trait ids as the
- * lowercase hex strings used by the lang files; this converts them to the
- * numeric ids the parser emits.
+ * player's combined trait totals (wrightstone + summons + sigils). The seeded
+ * groups are the main sigils checklist, the derived sigil-category rows, and
+ * one for AI-controlled party members (no damage penalty from Glass Cannon).
+ * The JSON stores trait ids as the lowercase hex strings used by the lang
+ * files; this converts them to the numeric ids the parser emits.
  */
-export const defaultChecklist = (): ChecklistGroups => {
-  const parse = (entries: { ids: string[]; level: number }[]): ChecklistEntry[] =>
-    entries.map((entry) => ({ ids: entry.ids.map((id) => parseInt(id, 16)), level: entry.level }));
-  return { build: parse(checklistDefault.build), ai: parse(checklistDefault.ai) };
+export const defaultChecklist = (): ChecklistGroupDef[] =>
+  (
+    checklistDefault.groups as {
+      id: string;
+      nameKey: string;
+      kind: string;
+      entries: { ids: string[]; level: number }[];
+    }[]
+  ).map((group) => ({
+    id: group.id,
+    nameKey: group.nameKey,
+    kind: group.kind as ChecklistGroupKind,
+    entries: group.entries.map((entry) => ({ ids: entry.ids.map((id) => parseInt(id, 16)), level: entry.level })),
+  }));
+
+/** A copy of `items` with the element at `from` moved to `to`. Out-of-range or
+ * no-op moves return the input unchanged, so a stray drag cannot corrupt a list. */
+export const moveItem = <T>(items: T[], from: number, to: number): T[] => {
+  if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return items;
+  const next = items.slice();
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
 };
+
+/** One reusable collator rather than a fresh one per `localeCompare` call —
+ * these sorts run per render over lists that grow with the user's config. */
+const nameCollator = new Intl.Collator();
+
+/**
+ * A group's entries in display order. Order is resolved here, at render,
+ * rather than stored: the traits bundle loads asynchronously (src/i18n.ts), so
+ * names are not resolvable when the persisted store rehydrates, and the
+ * alphabetical order a user expects is the one in their own language.
+ */
+export const orderedChecklistEntries = <T extends ChecklistEntry>(entries: T[], manualOrder: boolean): T[] => {
+  if (manualOrder) return entries;
+  // Each name is translated once and carried through the sort: comparing on
+  // the fly would run two i18next lookups per comparison, i.e. O(n log n)
+  // lookups for n entries. t() yields undefined before i18next has
+  // initialized; an entry whose name cannot be resolved sorts first rather
+  // than throwing mid-render.
+  return entries
+    .map((entry) => ({ entry, name: translateTraitId(entry.ids[0]) ?? "" }))
+    .sort((a, b) => nameCollator.compare(a.name, b.name))
+    .map(({ entry }) => entry);
+};
+
+/** A group's display name: a user-set literal beats the seeded i18n key, which
+ * beats the raw id. Shared so the Builds tab and the settings editor cannot
+ * disagree about what a group is called. */
+export const checklistGroupName = (group: { id: string; name?: string; nameKey?: string }): string =>
+  group.name ?? (group.nameKey ? t(group.nameKey) : group.id);
 
 /**
  * The in-game sigil types, in the game's category order (skill.tbl category
@@ -590,6 +652,16 @@ export const traitMaxLevel = (traitId: number): number | null =>
 
 /** The Computed checklist rows all target 5 sigils of their type. */
 export const SIGIL_CATEGORY_TARGET = 5;
+
+/** The derived rows the computed checklist group stands for, in display order.
+ * Shared by the Builds tab (which renders them against a player's sigils) and
+ * the settings editor (which previews them as disabled rows), so the two views
+ * of the same group cannot list different rows. */
+export const COMPUTED_SIGIL_ROWS: { label: string; categories: SigilCategory[] }[] = [
+  { label: "ui.checklist.basic-sigils", categories: ["basic"] },
+  { label: "ui.checklist.attack-sigils", categories: ["attack"] },
+  { label: "ui.checklist.defense-support-sigils", categories: ["defense", "support"] },
+];
 
 /**
  * The equipped sigils of the given types. A sigil's type is its FIRST trait's
@@ -1475,6 +1547,13 @@ export const deriveNavState = (pathname: string) => {
   const onListPage = pathname === "/logs" || confluxActive;
   return { logsActive, toolboxActive, settingsActive, debugActive, confluxActive, questsActive, onListPage };
 };
+
+/** Narrows a tab name carried in the URL to one the page can actually show.
+ * Tabs come back from the query string, which outlives the data behind them —
+ * a log with no player data disables its equipment/builds tabs, and selecting a
+ * disabled tab would leave the page with no panel rendered at all. */
+export const resolveAvailableTab = <T extends string>(tab: string | null, available: readonly T[], fallback: T): T =>
+  available.includes(tab as T) ? (tab as T) : fallback;
 
 /// Hook that returns the previous value of a variable.
 export const usePrevious = <T>(value: T): T | undefined => {

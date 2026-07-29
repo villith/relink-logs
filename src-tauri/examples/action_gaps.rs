@@ -68,7 +68,10 @@ fn main() -> Result<()> {
         }
     }
 
-    eprintln!("scanned {scanned} logs, {} distinct (character, action) pairs", seen.len());
+    eprintln!(
+        "scanned {scanned} logs, {} distinct (character, action) pairs",
+        seen.len()
+    );
     for ((who, id), s) in &seen {
         println!("{who}\t{id}\t{}\t{}\t{}", s.hits, s.logs.len(), s.total);
     }

@@ -29,11 +29,11 @@ use std::{
 
 use anyhow::{Context, Result};
 use gbfr_logs::parser::constants::EnemyType;
-use gbfr_logs::parser::v1::Encounter;
 use gbfr_logs::parser::v1::audit::{
     audit_encounter, classify_regen_outliers, per_enemy_stats, AuditOptions, AuditTotals,
     EnemyStats, REGEN_MIN_INTERVAL_SHARE, REGEN_MIN_LOGS,
 };
+use gbfr_logs::parser::v1::Encounter;
 use rusqlite::{Connection, OpenFlags};
 
 /// Per-log roll-up, kept so the report can name the worst offenders.
@@ -90,7 +90,10 @@ fn main() -> Result<()> {
             "--db" => db_path = args.next().context("--db needs a path")?.into(),
             "--log" => only_log = Some(args.next().context("--log needs an id")?.parse()?),
             "--threshold" => {
-                threshold_pct = args.next().context("--threshold needs a percent")?.parse()?
+                threshold_pct = args
+                    .next()
+                    .context("--threshold needs a percent")?
+                    .parse()?
             }
             "--csv" => csv_path = Some(args.next().context("--csv needs a path")?.into()),
             "--no-anchor" => options.anchor_at_max_hp = false,
@@ -302,8 +305,14 @@ fn report(
 
     println!();
     println!("CORPUS TOTALS");
-    println!("  logged damage ............ {}", commas(corpus.totals.logged_damage));
-    println!("  HP removed (measured) .... {}", commas(corpus.totals.hp_removed));
+    println!(
+        "  logged damage ............ {}",
+        commas(corpus.totals.logged_damage)
+    );
+    println!(
+        "  HP removed (measured) .... {}",
+        commas(corpus.totals.hp_removed)
+    );
     println!(
         "  overkill (explained) ..... {}{}",
         commas(corpus.totals.overkill),
@@ -332,7 +341,10 @@ fn report(
     println!(
         "  unverifiable anchors ..... {}{}",
         commas(corpus.totals.anchor_unverified_damage),
-        share_of(corpus.totals.anchor_unverified_damage, corpus.totals.logged_damage)
+        share_of(
+            corpus.totals.anchor_unverified_damage,
+            corpus.totals.logged_damage
+        )
     );
     println!(
         "  intervals ................ {} ({} exact)",
@@ -429,7 +441,9 @@ fn report(
 
     if !corpus.shared_pools.is_empty() {
         println!();
-        println!("SHARED-POOL SUSPECTS (sibling parts reporting one max HP — ExEmGroupHp is unverified)");
+        println!(
+            "SHARED-POOL SUSPECTS (sibling parts reporting one max HP — ExEmGroupHp is unverified)"
+        );
         for ((parent, max), (indices, logs)) in corpus.shared_pools.iter().take(10) {
             println!(
                 "  parent {parent}  max {}  parts {:?}  in {logs} logs",

@@ -87,7 +87,10 @@ mod tests {
     fn default_filters_exclude_primal_burst() {
         let filters = MeterFilters::default();
         assert!(!filters.include_primal_burst, "off is the shipped default");
-        assert!(is_excluded(&hit(PRIMAL_BURST_BODY_HASHES[0], SUMMON_ATTACK_ACTION_ID), &filters));
+        assert!(is_excluded(
+            &hit(PRIMAL_BURST_BODY_HASHES[0], SUMMON_ATTACK_ACTION_ID),
+            &filters
+        ));
     }
 
     #[test]

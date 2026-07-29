@@ -32,8 +32,11 @@ import {
   hasQuestElapsedTime,
   humanizeNumbers,
   mergeTargetBreakdowns,
+  moveItem,
+  orderedChecklistEntries,
   overmasteryAmountFromId,
   overmasteryAmountFromKind,
+  resolveAvailableTab,
   skillboardActivationCost,
   skillboardLayoutFor,
   skillboardNodeKey,
@@ -42,6 +45,7 @@ import {
   toHash,
   toHashString,
   traitMaxLevel,
+  translateTraitId,
   type BonusSource,
 } from "./utils";
 
@@ -260,7 +264,9 @@ describe("utils", () => {
   describe("checklistLevel", () => {
     it("sums combined-trait levels across an entry's id group", () => {
       // DMG Cap counts the generic trait plus the colored character variants.
-      const dmgCap = defaultChecklist().build.find((entry) => entry.ids.includes(0xdc584f60))!;
+      const dmgCap = defaultChecklist()
+        .find((group) => group.id === "build")!
+        .entries.find((entry) => entry.ids.includes(0xdc584f60))!;
       const traits = [
         { id: 0xdc584f60, level: 45 },
         { id: 0xaefeb1bc, level: 20 },
@@ -270,7 +276,9 @@ describe("utils", () => {
     });
 
     it("is 0 when none of the entry's ids are present", () => {
-      const warElemental = defaultChecklist().build.find((entry) => entry.ids.includes(0x4c588c27))!;
+      const warElemental = defaultChecklist()
+        .find((group) => group.id === "build")!
+        .entries.find((entry) => entry.ids.includes(0x4c588c27))!;
       expect(checklistLevel([{ id: 0xdc584f60, level: 45 }], warElemental)).toBe(0);
     });
   });
@@ -453,12 +461,74 @@ describe("utils", () => {
   });
 
   describe("defaultChecklist", () => {
-    it("parses the bundled JSON, converting hex ids to numbers", () => {
-      const { build, ai } = defaultChecklist();
-      expect(build).toHaveLength(13);
-      expect(ai).toEqual([{ ids: [0xa8a3163b], level: 15 }]);
-      const dmgCap = build.find((entry) => entry.ids.length > 1)!;
-      expect(dmgCap).toEqual({ ids: [0xdc584f60, 0x0151cf9e, 0x3b71af12, 0xaefeb1bc, 0xfff8cf64], level: 65 });
+    it("seeds three groups in Builds-tab order", () => {
+      const groups = defaultChecklist();
+      expect(groups.map((group) => group.id)).toEqual(["build", "computed", "ai"]);
+      expect(groups.map((group) => group.kind)).toEqual(["custom", "computed", "custom"]);
+    });
+
+    it("carries the i18n key for each seeded group name", () => {
+      expect(defaultChecklist().map((group) => group.nameKey)).toEqual([
+        "ui.checklist.sigils",
+        "ui.checklist.computed",
+        "ui.checklist.ai",
+      ]);
+    });
+
+    it("parses hex trait ids into numbers and keeps multi-id entries intact", () => {
+      const build = defaultChecklist().find((group) => group.id === "build")!;
+      expect(build.entries).toHaveLength(13);
+      const dmgCap = build.entries.find((entry) => entry.ids[0] === 0xdc584f60)!;
+      expect(dmgCap.ids).toEqual([0xdc584f60, 0x0151cf9e, 0x3b71af12, 0xaefeb1bc, 0xfff8cf64]);
+      expect(dmgCap.level).toBe(65);
+      expect(defaultChecklist().find((group) => group.id === "ai")!.entries).toEqual([
+        { ids: [0xa8a3163b], level: 15 },
+      ]);
+    });
+
+    it("gives the computed group no entries", () => {
+      expect(defaultChecklist().find((group) => group.id === "computed")!.entries).toEqual([]);
+    });
+  });
+
+  describe("moveItem", () => {
+    it("moves an item forward", () => {
+      expect(moveItem(["a", "b", "c"], 0, 2)).toEqual(["b", "c", "a"]);
+    });
+
+    it("moves an item backward", () => {
+      expect(moveItem(["a", "b", "c"], 2, 0)).toEqual(["c", "a", "b"]);
+    });
+
+    it("returns the input untouched for a no-op or out-of-range move", () => {
+      const items = ["a", "b", "c"];
+      expect(moveItem(items, 1, 1)).toEqual(items);
+      expect(moveItem(items, 5, 0)).toEqual(items);
+      expect(moveItem(items, 0, -1)).toEqual(items);
+    });
+  });
+
+  describe("orderedChecklistEntries", () => {
+    const entries = [
+      { ids: [0xdc584f60], level: 65 },
+      { ids: [0x95f3fa86], level: 15 },
+    ];
+
+    it("keeps stored order when the group is manually ordered", () => {
+      expect(orderedChecklistEntries(entries, true)).toEqual(entries);
+    });
+
+    it("sorts by translated trait name otherwise", () => {
+      // translateTraitId falls back to the hex id when the traits bundle is not
+      // loaded in tests, so assert against that same ordering rule.
+      const names = orderedChecklistEntries(entries, false).map((entry) => translateTraitId(entry.ids[0]) ?? "");
+      expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b)));
+    });
+
+    it("does not mutate the input array", () => {
+      const input = [...entries];
+      orderedChecklistEntries(input, false);
+      expect(input).toEqual(entries);
     });
   });
 
@@ -752,6 +822,22 @@ describe("utils", () => {
       });
       expect(deriveNavState("/logs/123")).toMatchObject({ questsActive: true, onListPage: false });
       expect(deriveNavState("/logs/settings")).toMatchObject({ questsActive: false, onListPage: false });
+    });
+  });
+
+  describe("resolveAvailableTab", () => {
+    it("keeps a tab that is available", () => {
+      expect(resolveAvailableTab("builds", ["overview", "sba", "equipment", "builds"], "overview")).toBe("builds");
+    });
+
+    it("falls back when the remembered tab is currently unavailable", () => {
+      // A log with no player data disables the equipment/builds tabs; without
+      // the fallback the page would render with no tab selected at all.
+      expect(resolveAvailableTab("builds", ["overview", "sba"], "overview")).toBe("overview");
+    });
+
+    it("falls back on an unknown tab name", () => {
+      expect(resolveAvailableTab("nonsense", ["overview", "sba"], "overview")).toBe("overview");
     });
   });
 });

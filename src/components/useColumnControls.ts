@@ -3,6 +3,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { ColumnSetting } from "@/types";
+import { moveItem } from "@/utils";
 
 export type ColumnControls = {
   /** Every column of the set, in display order (both shown and hidden). */
@@ -10,14 +11,6 @@ export type ColumnControls = {
   /** Flip a column's visibility, keeping its position in the list. */
   onToggle: (id: string) => void;
   onReorder: (result: DropResult) => void;
-};
-
-/** Move the item at `startIndex` to `endIndex`, returning a new array. */
-export const reorderColumns = <T>(list: T[], startIndex: number, endIndex: number): T[] => {
-  const result = Array.from(list);
-  const [removed] = result.splice(startIndex, 1);
-  result.splice(endIndex, 0, removed);
-  return result;
 };
 
 /** Flip `visible` for the matching column, leaving order (and every other
@@ -46,7 +39,7 @@ export const useColumnControls = () => {
     onReorder: (result) => {
       if (!result.destination) return;
       setMeterSettings({
-        [key]: reorderColumns(settings, result.source.index, result.destination.index),
+        [key]: moveItem(settings, result.source.index, result.destination.index),
       } as Partial<Parameters<typeof setMeterSettings>[0]>);
     },
     onToggle: (id) => {

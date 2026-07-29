@@ -4,7 +4,7 @@
   "version": "1.12.5-2",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/build-hook-dev.mjs && vite",
+    "dev": "node scripts/clean-target.mjs --quiet && node scripts/build-hook-dev.mjs && vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint ./src",
@@ -13,7 +13,9 @@
     "format-check": "prettier --check --ignore-unknown --ext js,jsx,ts,tsx src ./src",
     "tauri": "tauri",
     "test": "vitest",
-    "bump": "node scripts/bump-version.mjs"
+    "bump": "node scripts/bump-version.mjs",
+    "clean:target": "node scripts/clean-target.mjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans": "^5.0.1",
@@ -30,6 +32,7 @@
     "i18next-browser-languagedetector": "^7.2.0",
     "i18next-resources-to-backend": "^1.2.0",
     "jsurl": "0.1.5",
+    "nuqs": "^2.9.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
@@ -41,7 +44,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^1.6.3",
     "@testing-library/react": "^15.0.6",
-    "@types/node": "^20.11.30",
+    "@types/node": "^24.13.3",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
     "@typescript-eslint/eslint-plugin": "^7.1.0",
@@ -51,7 +54,9 @@
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-i18next": "^6.1.5",
     "eslint-plugin-react": "^7.33.2",
+    "husky": "^9.1.7",
     "jsdom": "^24.0.0",
+    "lint-staged": "^15.5.2",
     "postcss": "^8.4.35",
     "postcss-preset-mantine": "^1.13.0",
     "postcss-simple-vars": "^7.0.1",

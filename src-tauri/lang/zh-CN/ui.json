@@ -25,6 +25,10 @@
     "language": "语言",
     "meter-settings": "悬浮窗配置",
     "settings": "配置",
+    "nav-rail": {
+      "collapse-menu": "收起菜单",
+      "expand-menu": "展开菜单"
+    },
     "logs-tab": "日志",
     "new-chip": "New",
     "github": "GitHub",
@@ -265,8 +269,6 @@
       "om-rng-override-active": "游戏正在进行操作，请稍后再试。",
       "om-invalid-tier": "该等级的上限突破不存在。",
       "om-slot-out-of-range": "该角色不在游戏上限突破随机数表范围内，无法预测其结果。",
-      "collapse-menu": "收起菜单",
-      "expand-menu": "展开菜单",
       "stale-results": "游戏随机数已改变，当前结果可能不再准确，请重新运行以获取最新结果。",
       "om-no-match": "在接下来的 {{rolls}} 次中没有匹配结果，请尝试增加次数或降低最低等级要求。",
       "om-results-caveat": "每行表示该角色在此等级的一次未来上限突破结果，按顺序排列。使用不同角色或等级进行的操作不会消耗这些结果；完成任务后可能会重新排列 — 请在完成任务后重新预测。",

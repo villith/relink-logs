@@ -37,6 +37,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { Table as MeterTable } from "@/components/Table";
+import { useTabParam } from "@/hooks/useTabParam";
 import { useChecklistStore } from "@/stores/useChecklistStore";
 import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
 import { useMeterFilters } from "@/stores/useMeterFilterSync";
@@ -52,11 +53,13 @@ import {
   type SortType,
 } from "@/types";
 import {
+  COMPUTED_SIGIL_ROWS,
   EMPTY_ID,
   OVERMASTERY_EFFECT_IDS,
   PLAYER_COLORS,
   SIGIL_CATEGORY_TARGET,
   SKILLBOARD_CATEGORIES,
+  checklistGroupName,
   checklistLevel,
   checklistStatus,
   collectSigilsByCategory,
@@ -78,6 +81,7 @@ import {
   humanizeNumbers,
   millisecondsToElapsedFormat,
   openDamageCalculator,
+  orderedChecklistEntries,
   overmasteryAmountFromId,
   resolvePlayerColor,
   skillboardActivationCost,
@@ -616,8 +620,10 @@ const AbilitiesRow = ({ playerData }: { playerData: PlayerData[] }) => {
   );
 };
 
-const byTraitName = (a: ChecklistEntry, b: ChecklistEntry) =>
-  translateTraitId(a.ids[0]).localeCompare(translateTraitId(b.ids[0]));
+/** The quest-detail tabs, and the subset selectable on a log that carries no
+ * player data (older logs, and every log before its state has loaded). */
+const VIEW_TABS = ["overview", "sba", "equipment", "builds"] as const;
+const DATALESS_VIEW_TABS = ["overview", "sba"] as const;
 
 export const ViewPage = () => {
   const { color_1, color_2, color_3, color_4, show_display_names, streamer_mode } = useMeterSettingsStore(
@@ -634,9 +640,7 @@ export const ViewPage = () => {
   // this one drives the backend fetches below, so it wants the tightest possible
   // change signal — every change re-derives the whole log.
   const filters = useMeterFilters();
-  const { checklistBuild, checklistAi } = useChecklistStore(
-    useShallow((state) => ({ checklistBuild: state.build, checklistAi: state.ai }))
-  );
+  const checklistGroups = useChecklistStore(useShallow((state) => state.groups));
   const { t, i18n } = useTranslation();
   const { id } = useParams();
 
@@ -675,16 +679,34 @@ export const ViewPage = () => {
     setSelectedTargetSpans: state.setSelectedTargetSpans,
     loadFromResponse: state.loadFromResponse,
   }));
+  // The open tab lives in the URL, so leaving this page and coming back through
+  // the Logs tab returns to it. Equipment and Builds are disabled without
+  // player data, so they only become selectable once it has loaded.
+  const [tab, setTab] = useTabParam(playerData.length === 0 ? DATALESS_VIEW_TABS : VIEW_TABS, "overview");
   // Builds tab: the combined traits scan all of a player's equipment, and two
   // rows (checklist + sigil traits) need them — computed once per player here.
   const combinedTraitsByPlayer = useMemo(
     () => new Map(playerData.map((player) => [player.actorIndex, computeCombinedTraits(player)])),
     [playerData]
   );
-  // The enabled checklist entries are the same for every player column — filter
-  // and sort them once per render instead of once per player.
-  const buildEntries = checklistBuild.filter((entry) => entry.enabled).sort(byTraitName);
-  const aiEntries = checklistAi.filter((entry) => entry.enabled).sort(byTraitName);
+  // The visible groups are the same for every player column — filter and order
+  // them once instead of once per player. A group survives if it is switched on
+  // and either derives its rows (computed) or has an enabled entry. Memoized on
+  // the language too: the alphabetical order is by translated trait name, and
+  // this page re-renders on every pointermove of an overview scrub.
+  const visibleChecklistGroups = useMemo(
+    () =>
+      checklistGroups
+        .filter((group) => group.enabled && (group.kind === "computed" || group.entries.some((entry) => entry.enabled)))
+        .map((group) => ({
+          ...group,
+          entries: orderedChecklistEntries(
+            group.entries.filter((entry) => entry.enabled),
+            group.manualOrder
+          ),
+        })),
+    [checklistGroups, i18n.language]
+  );
 
   const [sortType, setSortType] = useState<SortType>(MeterColumns.TotalDamage);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -1262,7 +1284,7 @@ export const ViewPage = () => {
 
         <Divider my="sm" />
 
-        <Tabs defaultValue="overview" variant="outline" keepMounted={false}>
+        <Tabs value={tab} onChange={setTab} variant="outline" keepMounted={false}>
           <Tabs.List>
             <Tabs.Tab value="overview">{t("ui.logs.overview")}</Tabs.Tab>
             <Tabs.Tab value="sba">{t("ui.logs.sba-chart")}</Tabs.Tab>
@@ -1818,40 +1840,30 @@ export const ViewPage = () => {
                           <Text size="xs" fw={700}>
                             {t("ui.player-checklist")}
                           </Text>
-                          {buildEntries.length > 0 && (
-                            <>
-                              <Text size="xs" fw={600} c="dimmed">
-                                {t("ui.checklist.sigils")}
-                              </Text>
-                              {buildEntries.map((entry) => (
-                                <ChecklistEntryRow key={entry.ids[0]} player={player} traits={traits} entry={entry} />
-                              ))}
-                            </>
-                          )}
-                          <Text size="xs" fw={600} c="dimmed" mt={4}>
-                            {t("ui.checklist.computed")}
-                          </Text>
-                          <SigilCategoryRow player={player} categories={["basic"]} label="ui.checklist.basic-sigils" />
-                          <SigilCategoryRow
-                            player={player}
-                            categories={["attack"]}
-                            label="ui.checklist.attack-sigils"
-                          />
-                          <SigilCategoryRow
-                            player={player}
-                            categories={["defense", "support"]}
-                            label="ui.checklist.defense-support-sigils"
-                          />
-                          {aiEntries.length > 0 && (
-                            <>
+                          {visibleChecklistGroups.map((group) => (
+                            <Box key={group.id}>
                               <Text size="xs" fw={600} c="dimmed" mt={4}>
-                                {t("ui.checklist.ai")}
+                                {checklistGroupName(group)}
                               </Text>
-                              {aiEntries.map((entry) => (
-                                <ChecklistEntryRow key={entry.ids[0]} player={player} traits={traits} entry={entry} />
-                              ))}
-                            </>
-                          )}
+                              {group.kind === "computed"
+                                ? COMPUTED_SIGIL_ROWS.map(({ label, categories }) => (
+                                    <SigilCategoryRow
+                                      key={label}
+                                      player={player}
+                                      categories={categories}
+                                      label={label}
+                                    />
+                                  ))
+                                : group.entries.map((entry) => (
+                                    <ChecklistEntryRow
+                                      key={entry.ids[0]}
+                                      player={player}
+                                      traits={traits}
+                                      entry={entry}
+                                    />
+                                  ))}
+                            </Box>
+                          ))}
                         </Table.Td>
                       );
                     })}

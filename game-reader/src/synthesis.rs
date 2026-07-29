@@ -77,7 +77,11 @@ fn deref_globals(mem: &impl MemRead, base: u64, rvas: SynthesisRvas) -> Result<(
 
 /// Light read of just the synthesis seed identity (RNG slot 0x81 state +
 /// manager seed counter) for staleness polling — no map walks.
-pub fn take_seed_state(mem: &impl MemRead, base: u64, rvas: SynthesisRvas) -> Result<SynthesisSeed> {
+pub fn take_seed_state(
+    mem: &impl MemRead,
+    base: u64,
+    rvas: SynthesisRvas,
+) -> Result<SynthesisSeed> {
     let (mgr, rng) = deref_globals(mem, base, rvas)?;
     Ok(SynthesisSeed {
         rng_state: mem.u32(rng + RNG_SYNTH_STATE)?,

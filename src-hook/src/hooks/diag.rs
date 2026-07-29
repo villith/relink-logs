@@ -105,7 +105,12 @@ pub fn ev_str(label: &str, vals: &str) {
 pub fn log_addr(label: &str, addr: usize) {
     let base = MODULE_BASE.load(Ordering::Relaxed);
     if base != 0 && addr > base {
-        log::info!("HOOKDIAG t={} {label} abs={:#x} rva={:#x}", ms(), addr, addr - base);
+        log::info!(
+            "HOOKDIAG t={} {label} abs={:#x} rva={:#x}",
+            ms(),
+            addr,
+            addr - base
+        );
     } else {
         log::info!("HOOKDIAG t={} {label} abs={:#x} (rva n/a)", ms(), addr);
     }
@@ -139,7 +144,11 @@ pub fn log_callers_depth(label: &str, max: usize) {
         }
         frames.len() < max
     });
-    log::info!("HOOKDIAG t={} callers[{label}] rvas: {}", ms(), frames.join(" "));
+    log::info!(
+        "HOOKDIAG t={} callers[{label}] rvas: {}",
+        ms(),
+        frames.join(" ")
+    );
 }
 
 /// Returns true only if `[addr, addr+len)` is readable memory (guards every deref so the
@@ -208,6 +217,25 @@ pub fn read_ptr_guarded(base: usize, offset: usize) -> Option<usize> {
         return None;
     }
     Some(unsafe { (addr as *const usize).read_unaligned() })
+}
+
+/// Read a `u64` at `base + offset`, returning `None` if `base` is null or the location isn't
+/// committed/readable. VirtualQuery-guarded — can NEVER fault the game. Distinct from
+/// [`read_ptr_guarded`] only in intent: this is for values that happen to be 64-bit (scene-map
+/// uuids, hash-table masks) rather than for pointers to follow.
+///
+/// Part of the reader family rather than the diag probes, but every caller today is
+/// hookdiag-gated — so it reads as dead in a plain build.
+#[allow(dead_code)]
+pub fn read_u64_guarded(base: usize, offset: usize) -> Option<u64> {
+    if base == 0 {
+        return None;
+    }
+    let addr = base.wrapping_add(offset);
+    if !readable(addr, 8) {
+        return None;
+    }
+    Some(unsafe { (addr as *const u64).read_unaligned() })
 }
 
 /// Read `len` raw bytes at `base + offset`, returning `None` if `base` is null or any part
@@ -293,8 +321,176 @@ pub fn probe_u32_window(label: &str, base: usize, len: usize) {
     log::info!(
         "HOOKDIAG t={} probe[{label}] base={base:#x} len={len:#x} u32s: {}",
         ms(),
-        if out.is_empty() { "(all zero/unreadable)".into() } else { out }
+        if out.is_empty() {
+            "(all zero/unreadable)".into()
+        } else {
+            out
+        }
     );
+}
+
+/// One hit: a needle (or generic-shape) match at an offset in the scanned window, or behind
+/// a pointer found in it. Carried as data rather than a formatted string so the dedup and
+/// the output cap can discard it without ever having allocated one — a noisy page produces
+/// tens of thousands of these for a 400-hit budget.
+#[cfg(feature = "hookdiag")]
+struct NeedleHit<'a> {
+    /// Offset of the pointer this hit was found behind, or `None` for an inline hit.
+    via: Option<usize>,
+    off: usize,
+    value: u32,
+    name: &'a str,
+}
+
+/// Scan a large object for a fixed set of u32 needle values (plus the generic
+/// `0x0002xxxx` packed-enemy-id shape) and one level of pointer chasing, logging
+/// `+off=value(name)` inline and `+srcOff->blk+off=value(name)` behind a pointer, for every
+/// hit not already logged under this label.
+///
+/// Built for the Conflux boss-source hunt: the 408KB `EndlessModeQuestManager` must hold the
+/// drawn boss's identity SOMEWHERE (packed `0x20000|EM`, or the XXHash32 actor-type hash),
+/// and a full delta probe of that window would log an unusable first-visit snapshot, so we
+/// look only for the known identity encodings. The flat scan found NO identity inline (live
+/// capture 2026-07-28, room 847010/Rock Golem), so every plausible heap pointer in the window
+/// (aligned u64s in user-space range) also has its first `BLK` bytes scanned.
+///
+/// Page-wise `readable()` guard; dedup set bounds re-logging; per-call output cap bounds a
+/// pathological page. A `scanstats` line makes an empty result diagnosable (scanned-but-empty
+/// vs didn't-run). hookdiag-only.
+#[cfg(feature = "hookdiag")]
+pub fn scan_u32_needles_deep(label: &str, base: usize, len: usize, needles: &[(u32, &str)]) {
+    use std::collections::{HashMap, HashSet};
+    use std::sync::Mutex;
+    /// `(via, off, value)` — one hit, in the form the dedup keys on.
+    type HitKey = (Option<usize>, usize, u32);
+    // Keyed by label so the per-hit key costs no allocation: one String per distinct label,
+    // not one per hit.
+    static SEEN: Mutex<Option<HashMap<String, HashSet<HitKey>>>> = Mutex::new(None);
+    const BLK: usize = 0x400;
+    const MAX_BLOCKS: usize = 2000;
+    if base == 0 {
+        return;
+    }
+    let mut lookup: HashMap<u32, &str> = HashMap::with_capacity(needles.len());
+    // Low byte of every needle. The scan below classifies ~614k words against a needle set of
+    // a few dozen that almost never matches, so this gates the (SipHash) map probe behind one
+    // array index — while still consulting the map FIRST, since a needle may itself have the
+    // generic `0x0002xxxx` shape and must keep its own name.
+    let mut needle_byte = [false; 256];
+    for (v, n) in needles {
+        lookup.insert(*v, *n);
+        needle_byte[(*v & 0xff) as usize] = true;
+    }
+    let classify = |v: u32| -> Option<&str> {
+        if needle_byte[(v & 0xff) as usize] {
+            if let Some(name) = lookup.get(&v) {
+                return Some(name);
+            }
+        }
+        // Any 0x0002xxxx word: the packed-enemy-id shape with an id we didn't anticipate.
+        // Logged with a generic tag so nothing slips through.
+        if (v >> 16) == 2 && (v & 0xffff) != 0 {
+            Some("generic2x")
+        } else {
+            None
+        }
+    };
+    let mut hits: Vec<NeedleHit> = Vec::new();
+    let mut inline_hits = 0usize;
+    let mut pointers: Vec<(usize, usize)> = Vec::new(); // (src offset, target)
+    let mut ptr_seen: HashSet<usize> = HashSet::new();
+    let (mut pages, mut pages_ok) = (0u32, 0u32);
+    let mut page = 0usize;
+    while page < len {
+        let chunk = (len - page).min(0x1000);
+        let addr = base + page;
+        pages += 1;
+        if readable(addr, chunk) {
+            pages_ok += 1;
+            let mut off = 0usize;
+            while off + 4 <= chunk {
+                let v = unsafe { ((addr + off) as *const u32).read_unaligned() };
+                if let Some(name) = classify(v) {
+                    hits.push(NeedleHit {
+                        via: None,
+                        off: page + off,
+                        value: v,
+                        name,
+                    });
+                    inline_hits += 1;
+                }
+                // Aligned u64 = pointer candidate (user-space heap range, 8-aligned target).
+                if (page + off) % 8 == 0 && off + 8 <= chunk {
+                    let p = unsafe { ((addr + off) as *const u64).read_unaligned() } as usize;
+                    if p >= 0x10000
+                        && p < 0x0000_8000_0000_0000
+                        && p % 8 == 0
+                        && pointers.len() < MAX_BLOCKS
+                        && ptr_seen.insert(p)
+                    {
+                        pointers.push((page + off, p));
+                    }
+                }
+                off += 4;
+            }
+        }
+        page += 0x1000;
+    }
+    let mut blocks_ok = 0u32;
+    for (src, p) in &pointers {
+        if !readable(*p, BLK) {
+            continue;
+        }
+        blocks_ok += 1;
+        let mut off = 0usize;
+        while off + 4 <= BLK {
+            let v = unsafe { ((*p + off) as *const u32).read_unaligned() };
+            if let Some(name) = classify(v) {
+                hits.push(NeedleHit {
+                    via: Some(*src),
+                    off,
+                    value: v,
+                    name,
+                });
+            }
+            off += 4;
+        }
+    }
+    ev_str(
+        "scanstats",
+        &format!(
+            "label={label} base={base:#x} pages={pages} readable={pages_ok} ptrs={} blocks_ok={blocks_ok} inline_hits={inline_hits} blk_hits={}",
+            pointers.len(),
+            hits.len() - inline_hits
+        ),
+    );
+    let mut guard = SEEN.lock().unwrap();
+    let seen = guard
+        .get_or_insert_with(HashMap::new)
+        .entry(label.to_string())
+        .or_default();
+    let mut out = String::new();
+    let mut n = 0;
+    for hit in hits {
+        if !seen.insert((hit.via, hit.off, hit.value)) {
+            continue;
+        }
+        match hit.via {
+            Some(src) => out.push_str(&format!(
+                "+{src:#x}->blk+{:#x}={:#x}({}) ",
+                hit.off, hit.value, hit.name
+            )),
+            None => out.push_str(&format!("+{:#x}={:#x}({}) ", hit.off, hit.value, hit.name)),
+        }
+        n += 1;
+        if n >= 400 {
+            out.push_str("...cap");
+            break;
+        }
+    }
+    if !out.is_empty() {
+        ev_str("needlescan", &format!("label={label} base={base:#x} {out}"));
+    }
 }
 
 /// Like `probe_u32_window`, but re-dumps the SAME object across repeated hits, logging only
@@ -351,7 +547,11 @@ pub fn probe_u32_window_delta(label: &str, base: usize, len: usize) {
             log::info!(
                 "HOOKDIAG t={} probe_delta[{label}] base={base:#x} first: {}",
                 ms(),
-                if out.is_empty() { "(all zero/unreadable)".into() } else { out }
+                if out.is_empty() {
+                    "(all zero/unreadable)".into()
+                } else {
+                    out
+                }
             );
             map.insert(key, cur);
         }
@@ -380,7 +580,11 @@ pub fn probe_u32_window_delta(label: &str, base: usize, len: usize) {
             log::info!(
                 "HOOKDIAG t={} probe_delta[{label}] base={base:#x} delta: {}",
                 ms(),
-                if out.is_empty() { "(no change)".into() } else { out }
+                if out.is_empty() {
+                    "(no change)".into()
+                } else {
+                    out
+                }
             );
             map.insert(key, cur);
         }
@@ -560,7 +764,11 @@ pub fn probe_player_instance(instance: usize) {
     }
     log::info!(
         "HOOKDIAG probe instance={instance:#x} direct_names: {}",
-        if direct.is_empty() { "(none)".into() } else { direct }
+        if direct.is_empty() {
+            "(none)".into()
+        } else {
+            direct
+        }
     );
 
     // 2. Names behind pointer fields — the SigilList is reached via a pointer in the instance.
@@ -582,7 +790,11 @@ pub fn probe_player_instance(instance: usize) {
     }
     log::info!(
         "HOOKDIAG probe instance={instance:#x} behind_ptr_names: {}",
-        if behind.is_empty() { "(none)".into() } else { behind }
+        if behind.is_empty() {
+            "(none)".into()
+        } else {
+            behind
+        }
     );
 }
 
@@ -597,7 +809,10 @@ pub fn note_player_instance(instance: usize) {
     let known = KNOWN.get_or_init(|| Mutex::new(HashSet::new()));
     let mut known = known.lock().expect("player instance set lock poisoned");
     if known.len() < 128 && known.insert(instance) {
-        log::info!("IDDIAG player instance noted: {instance:#x} ({} known)", known.len());
+        log::info!(
+            "IDDIAG player instance noted: {instance:#x} ({} known)",
+            known.len()
+        );
         // Publish an updated snapshot for the probe (rebuilt only when the set grows,
         // so the per-damage-event fast path is one lock + one HashSet probe).
         let snapshot: Vec<usize> = known.iter().copied().collect();
@@ -767,7 +982,11 @@ pub fn probe_unmapped_source_parent(instance: usize, type_id: u32) {
     log::info!(
         "UNSRC parent scan type={type_id:#010x} instance={instance:#x} known_players={} hits: {}",
         known.len(),
-        if hits.is_empty() { "(none)".into() } else { hits }
+        if hits.is_empty() {
+            "(none)".into()
+        } else {
+            hits
+        }
     );
 }
 

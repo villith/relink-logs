@@ -19,10 +19,20 @@ export const NEW_FEATURES = {
 
 export type NewFeatureId = keyof typeof NEW_FEATURES;
 
+/** Numeric release parts, dropping any prerelease/build suffix: every build
+ * between stable releases is `X.Y.Z-N`, and `Number("4-5")` is NaN — which
+ * would poison every comparison below and silently hide all chips on exactly
+ * the builds that ship a new feature first. RC N of X.Y.Z reads as X.Y.Z. */
+const releaseParts = (version: string): number[] =>
+  version
+    .split(/[-+]/)[0]
+    .split(".")
+    .map((part) => Number(part) || 0);
+
 /** -1 / 0 / 1 numeric comparison of dotted version strings. */
 export const compareVersions = (a: string, b: string): number => {
-  const pa = a.split(".").map(Number);
-  const pb = b.split(".").map(Number);
+  const pa = releaseParts(a);
+  const pb = releaseParts(b);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
     const d = (pa[i] ?? 0) - (pb[i] ?? 0);
     if (d !== 0) return Math.sign(d);
@@ -38,3 +48,15 @@ export const isNewVersion = ({ from, until }: NewWindow, appVersion: string): bo
 
 /** True when the feature `id` should wear its "New" chip in this build. */
 export const isNew = (id: NewFeatureId): boolean => isNewVersion(NEW_FEATURES[id], APP_VERSION);
+
+/**
+ * Every feature a header tab stands for: the section itself (`ownId`) plus the
+ * entries reachable inside it. A collapsed section's tab is the only "New"
+ * marker visible before opening it, so a newly shipped entry has to light the
+ * tab up too — the section's own window expires long before the entries added
+ * later do. Pass the sections already filtered for the platform.
+ */
+export const sectionNewIds = (ownId: NewFeatureId, sections: { newId?: NewFeatureId }[]): NewFeatureId[] => [
+  ownId,
+  ...sections.flatMap(({ newId }) => (newId ? [newId] : [])),
+];

@@ -114,7 +114,10 @@ impl Server {
             match tokio::net::TcpListener::bind(protocol::TCP_ADDR).await {
                 Ok(listener) => break listener,
                 Err(e) => {
-                    warn!("Could not bind {}: {e:?}; retrying in 5s", protocol::TCP_ADDR);
+                    warn!(
+                        "Could not bind {}: {e:?}; retrying in 5s",
+                        protocol::TCP_ADDR
+                    );
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 }
             }

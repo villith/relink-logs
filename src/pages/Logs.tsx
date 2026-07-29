@@ -1,10 +1,13 @@
 import { useMeterFilterSync } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
+import { NavTabKey, tabKeyForPath, targetFor, useNavMemoryStore } from "@/stores/useNavMemoryStore";
 import "./Logs.css";
 
 import HookStatusBadge from "@/components/HookStatusBadge";
 import NewChip from "@/components/NewChip";
 import UpdateAvailableButton from "@/components/UpdateAvailableButton";
+import { sectionNewIds } from "@/newFeatures";
+import { useIsLinux } from "@/platform";
 import { deriveNavState } from "@/utils";
 import { ActionIcon, AppShell, Button, Group, Text } from "@mantine/core";
 import { Bug, Flag, Gear, House, ListDashes, Translate, Wrench } from "@phosphor-icons/react";
@@ -15,6 +18,7 @@ import { useEffect, useRef, useState } from "react";
 import { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { TOOLS, visibleTools } from "./Toolbox";
 
 import { useUpdateStatusStore } from "@/stores/useUpdateStatusStore";
 
@@ -63,6 +67,7 @@ const Layout = () => {
   // the live parser replay its event log.
   useMeterFilterSync();
   const { t } = useTranslation();
+  const isLinux = useIsLinux();
   const [version, setVersion] = useState("");
   useUpdateCheck(auto_check_updates);
   const updateStatus = useUpdateStatusStore((state) => state.status);
@@ -77,9 +82,20 @@ const Layout = () => {
         : ` (${t("ui.version-update-available-unknown")})`;
 
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const { logsActive, toolboxActive, settingsActive, debugActive, confluxActive, questsActive, onListPage } =
     deriveNavState(pathname);
+
+  // Each header tab returns to the page it was left on — the quest detail, the
+  // settings section, the tool — instead of restarting at its section root.
+  const rememberLocation = useNavMemoryStore((state) => state.remember);
+  const navLocations = useNavMemoryStore((state) => state.locations);
+  const activeTab = tabKeyForPath(pathname);
+  const tabTarget = (key: NavTabKey) => targetFor(navLocations, key, activeTab);
+
+  useEffect(() => {
+    rememberLocation(pathname, search);
+  }, [pathname, search, rememberLocation]);
   // Live pathname for the encounter-saved listener (its closure would
   // otherwise hold the pathname from when the listener was attached).
   const pathnameRef = useRef(pathname);
@@ -126,20 +142,20 @@ const Layout = () => {
               <UpdateAvailableButton />
             </Group>
             <Group h="100%" gap="xs" wrap="nowrap" justify="center">
-              <NavTab to="/logs" icon={<ListDashes size="1rem" />} active={logsActive}>
+              <NavTab to={tabTarget("logs")} icon={<ListDashes size="1rem" />} active={logsActive}>
                 {t("ui.logs-tab")}
               </NavTab>
-              <NavTab to="/logs/toolbox" icon={<Wrench size="1rem" />} active={toolboxActive}>
+              <NavTab to={tabTarget("toolbox")} icon={<Wrench size="1rem" />} active={toolboxActive}>
                 <Group gap={6} wrap="nowrap">
                   {t("ui.toolbox.title")}
-                  <NewChip id="toolbox" />
+                  <NewChip id={sectionNewIds("toolbox", visibleTools(TOOLS, isLinux))} />
                 </Group>
               </NavTab>
-              <NavTab to="/logs/settings" icon={<Gear size="1rem" />} active={settingsActive}>
+              <NavTab to={tabTarget("settings")} icon={<Gear size="1rem" />} active={settingsActive}>
                 {t("ui.settings")}
               </NavTab>
               {import.meta.env.DEV && (
-                <NavTab to="/logs/debug" icon={<Bug size="1rem" />} active={debugActive}>
+                <NavTab to={tabTarget("debug")} icon={<Bug size="1rem" />} active={debugActive}>
                   {t("ui.debug.title")}
                 </NavTab>
               )}

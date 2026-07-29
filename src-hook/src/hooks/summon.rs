@@ -344,8 +344,7 @@ pub fn get_source_parent(
     source: *const usize,
 ) -> Option<(u32, u32, *const usize)> {
     if source_type_id == ID_DRAGON_TYPE {
-        let parent_instance =
-            parent_specified_instance_at(source, ID_DRAGON_PARENT_ENTITY_OFFSET)?;
+        let parent_instance = parent_specified_instance_at(source, ID_DRAGON_PARENT_ENTITY_OFFSET)?;
         let parent_idx = diag::read_ptr_guarded(parent_instance as usize, 0x170)? as u32;
         return Some((ID_HUMAN_TYPE, parent_idx, parent_instance));
     }
@@ -392,7 +391,10 @@ mod tests {
 
     #[test]
     fn gated_offset_rejects_an_unmapped_actor_without_dereferencing() {
-        assert_eq!(gated_parent_offset(1usize as *const usize, 0x10, 0x18), None);
+        assert_eq!(
+            gated_parent_offset(1usize as *const usize, 0x10, 0x18),
+            None
+        );
     }
 
     #[test]

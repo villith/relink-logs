@@ -243,7 +243,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       # Install exactly the toolchain pinned in rust-toolchain.toml. No
@@ -370,7 +370,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       # webkit2gtk is pinned to the jammy release pocket (2.36): the AppImage
@@ -474,7 +474,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       # The release body doubles as the updater prompt's patch notes: it is
       # copied into latest.json as `notes` below. Stable versions are

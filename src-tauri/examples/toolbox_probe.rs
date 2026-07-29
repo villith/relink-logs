@@ -16,10 +16,16 @@ use protocol::toolbox::{ToolboxRequest, ToolboxResponse, TOOLBOX_PROTOCOL_VERSIO
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     match toolbox_rpc::call(ToolboxRequest::Hello).await? {
-        ToolboxResponse::Hello { protocol_version, .. } => {
+        ToolboxResponse::Hello {
+            protocol_version, ..
+        } => {
             println!(
                 "hello: hook v{protocol_version}, app v{TOOLBOX_PROTOCOL_VERSION} => {}",
-                if protocol_version == TOOLBOX_PROTOCOL_VERSION { "OK" } else { "MISMATCH" }
+                if protocol_version == TOOLBOX_PROTOCOL_VERSION {
+                    "OK"
+                } else {
+                    "MISMATCH"
+                }
             );
         }
         other => bail!("unexpected hello response: {other:?}"),
@@ -51,8 +57,15 @@ async fn main() -> Result<()> {
         (Ok(a), Ok(Some(b))) => {
             println!(
                 "overmastery: rpc {} roster / override {:#x}, rpm {} roster / override {:#x} => {}",
-                a.roster.len(), a.slot_override, b.roster.len(), b.slot_override,
-                if a == b { "IDENTICAL" } else { "DIFFER (RNG may have ticked; re-run)" }
+                a.roster.len(),
+                a.slot_override,
+                b.roster.len(),
+                b.slot_override,
+                if a == b {
+                    "IDENTICAL"
+                } else {
+                    "DIFFER (RNG may have ticked; re-run)"
+                }
             );
         }
         _ => println!("overmastery: rpc={rpc_om:?}\n             rpm={rpm_om:?}"),

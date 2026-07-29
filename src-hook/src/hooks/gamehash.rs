@@ -21,8 +21,12 @@ pub fn game_xxhash32(data: &[u8]) -> u32 {
     let len = data.len();
 
     let mut hash = if len >= 16 {
-        let (mut v1, mut v2, mut v3, mut v4) =
-            (0x2557_311Bu32, 0x871F_B76Au32, 0x0133_ECF3u32, 0x62FC_7342u32);
+        let (mut v1, mut v2, mut v3, mut v4) = (
+            0x2557_311Bu32,
+            0x871F_B76Au32,
+            0x0133_ECF3u32,
+            0x62FC_7342u32,
+        );
         loop {
             for lane in [&mut v1, &mut v2, &mut v3, &mut v4] {
                 let word = u32::from_le_bytes(data[pos..pos + 4].try_into().expect("4 bytes"));

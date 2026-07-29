@@ -39,6 +39,15 @@
     "language": "Language",
     "meter-settings": "Meter Settings",
     "settings": "Settings",
+    "settings-nav": {
+      "general": "General",
+      "meters": "Meters"
+    },
+    "nav-rail": {
+      "collapse-menu": "Collapse menu",
+      "expand-menu": "Expand menu"
+    },
+    "color-placeholder": "Color",
     "logs-tab": "Logs",
     "new-chip": "New",
     "github": "GitHub",
@@ -149,7 +158,19 @@
       "sigils-section": "Sigils checklist",
       "ai-section": "AI checklist",
       "add-trait": "Add trait...",
-      "reset": "Reset to defaults"
+      "reset": "Reset to defaults",
+      "new-group": "New group",
+      "new-group-name": "New group",
+      "group-name-placeholder": "Group name",
+      "rename-group": "Rename group",
+      "sort-az": "Sort A-Z",
+      "sorted-az": "Sorted A-Z",
+      "delete-group": "Delete group",
+      "delete-group-title": "Delete group",
+      "delete-group-confirm": "This will delete \"{{name}}\" and its {{count}} entries from your checklist.",
+      "reorder-group": "Reorder group",
+      "reorder-entry": "Reorder entry",
+      "group-enabled": "Show this group"
     },
     "master-traits": {
       "tier": "Tier {{tier}}",
@@ -246,6 +267,7 @@
       "window-full": "Full fight",
       "window-of": "{{selected}} of {{total}} selected",
       "window-reset": "Show full fight",
+      "delete-logs-title": "Delete logs",
       "delete-all-logs-confirmation": "This will delete all logs from the database. This action cannot be undone.",
       "delete-selected-logs-confirmation_one": "This will delete {{count}} log from the database. This action cannot be undone.",
       "delete-selected-logs-confirmation_other": "This will delete {{count}} logs from the database. This action cannot be undone.",
@@ -318,8 +340,6 @@
       "om-rng-override-active": "The game is mid-roll right now — try again in a second.",
       "om-invalid-tier": "That overmastery level isn't one the game offers.",
       "om-slot-out-of-range": "This character sits outside the game's overmastery RNG table — their rolls can't be predicted.",
-      "collapse-menu": "Collapse menu",
-      "expand-menu": "Expand menu",
       "stale-results": "The game's RNG has changed since these results were computed — they may no longer be accurate. Run it again for a fresh list.",
       "om-no-match": "No matching roll in the next {{rolls}} — try more rolls or a lower minimum level.",
       "om-results-caveat": "Each line is one future overmastery roll for this character and level, in order. Rolling with a different character or level doesn't consume these; completing a quest may reshuffle them — predict again after.",

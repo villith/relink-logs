@@ -51,7 +51,8 @@ fn main() -> Result<()> {
                 Message::OnPerformSBA(_) => perform += 1,
                 Message::OnContinueSBAChain(_) => cont += 1,
                 Message::DamageEvent(d)
-                    if d.action_id == protocol::ActionType::Normal(protocol::SUMMON_ATTACK_ACTION_ID) =>
+                    if d.action_id
+                        == protocol::ActionType::Normal(protocol::SUMMON_ATTACK_ACTION_ID) =>
                 {
                     summon += 1
                 }
