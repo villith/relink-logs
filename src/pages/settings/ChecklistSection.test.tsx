@@ -3,8 +3,8 @@ import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
-import { ChecklistSection } from "./Settings";
-import type useChecklistSettings from "./useChecklistSettings";
+import type useChecklistSettings from "@/pages/useChecklistSettings";
+import { ChecklistSection } from "./ChecklistSection";
 
 type Entry = { ids: number[]; level: number; enabled: boolean };
 

@@ -1,14 +1,14 @@
-﻿import NewChip, { NEW_CHIP_COLOR } from "@/components/NewChip";
-import { isNew, NewFeatureId } from "@/newFeatures";
+import CollapsibleNavRail from "@/components/CollapsibleNavRail";
+import { NewFeatureId } from "@/newFeatures";
 import { useIsLinux } from "@/platform";
-import { Box, Divider, Flex, Indicator, NavLink } from "@mantine/core";
+import { Box, Flex } from "@mantine/core";
 import { useLocalStorage } from "@mantine/hooks";
-import { CaretDoubleLeft, CaretDoubleRight, Flask, MagicWand, Sparkle } from "@phosphor-icons/react";
+import { Flask, MagicWand, Sparkle } from "@phosphor-icons/react";
 // `Icon` is a type-only export — a value import survives today only because
 // esbuild elides it, and would break under verbatimModuleSyntax.
 import type { Icon } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
-import { Link, Outlet, useLocation } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 
 /** The tools in the side menu. `newId` (optional) keys into NEW_FEATURES. */
 export const TOOLS: {
@@ -56,65 +56,27 @@ export const toolboxNewIds = <T extends { newId?: NewFeatureId; windowsOnly?: bo
   isLinux: boolean
 ): NewFeatureId[] => ["toolbox", ...visibleTools(tools, isLinux).flatMap(({ newId }) => (newId ? [newId] : []))];
 
-/** Toolbox: collapsible tool menu on the left (icon-only when collapsed,
- * with a chip-colored dot standing in for a visible "New" chip), the
- * selected tool on the right. */
+/** Toolbox: collapsible tool menu on the left, the selected tool on the right. */
 const ToolboxPage = () => {
   const { t } = useTranslation();
-  const { pathname } = useLocation();
   const [collapsed, setCollapsed] = useLocalStorage({ key: "toolbox-menu-collapsed", defaultValue: false });
   const isLinux = useIsLinux();
-  const tools = visibleTools(TOOLS, isLinux);
-
-  // Hard-fixed row height: the label's line box (~40.8px row) vs icon-only
-  // (40px row) would otherwise shift everything a fraction on collapse.
-  const rowStyles = {
-    root: { height: 42 },
-    body: collapsed ? { display: "none" as const } : undefined,
-  };
-  const toggleLabel = t(collapsed ? "ui.toolbox.expand-menu" : "ui.toolbox.collapse-menu");
+  const items = visibleTools(TOOLS, isLinux).map(({ to, labelKey, labelFallback, icon, newId }) => ({
+    to,
+    label: t(labelKey, labelFallback),
+    icon,
+    newId,
+  }));
 
   return (
     <Flex gap="md" align="flex-start">
-      <Box w={collapsed ? 56 : 300} style={{ flexShrink: 0 }}>
-        {tools.map(({ to, labelKey, labelFallback, icon: ToolIcon, newId }) => {
-          const label = t(labelKey, labelFallback);
-          return (
-            <NavLink
-              key={to}
-              component={Link}
-              to={to}
-              label={collapsed ? undefined : label}
-              title={collapsed ? label : undefined}
-              leftSection={
-                <Indicator color={NEW_CHIP_COLOR} size={8} offset={1} disabled={!collapsed || !newId || !isNew(newId)}>
-                  <ToolIcon size="1.5rem" style={{ display: "block" }} />
-                </Indicator>
-              }
-              rightSection={collapsed ? undefined : <NewChip id={newId} />}
-              active={pathname.startsWith(to)}
-              styles={rowStyles}
-            />
-          );
-        })}
-        <Divider my={4} />
-        <NavLink
-          component="button"
-          onClick={() => setCollapsed(!collapsed)}
-          label={collapsed ? undefined : toggleLabel}
-          title={toggleLabel}
-          aria-label={toggleLabel}
-          c="dimmed"
-          leftSection={
-            collapsed ? (
-              <CaretDoubleRight size="1.5rem" style={{ display: "block" }} />
-            ) : (
-              <CaretDoubleLeft size="1.5rem" style={{ display: "block" }} />
-            )
-          }
-          styles={rowStyles}
-        />
-      </Box>
+      <CollapsibleNavRail
+        items={items}
+        collapsed={collapsed}
+        onToggle={() => setCollapsed(!collapsed)}
+        expandLabel={t("ui.toolbox.expand-menu")}
+        collapseLabel={t("ui.toolbox.collapse-menu")}
+      />
       <Box style={{ flexGrow: 1, minWidth: 0 }}>
         <Outlet />
       </Box>

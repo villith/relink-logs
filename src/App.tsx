@@ -10,6 +10,9 @@ import ToolboxPage from "./pages/Toolbox";
 import { ConfluxIndexPage } from "./pages/logs/ConfluxIndex";
 import { IndexPage as LogIndexPage } from "./pages/logs/Index";
 import { ViewPage as LogViewPage } from "./pages/logs/View";
+import ChecklistSettings from "./pages/settings/ChecklistSettings";
+import GeneralSettings from "./pages/settings/GeneralSettings";
+import MeterSettings from "./pages/settings/MeterSettings";
 import OvermasteryPredictor from "./pages/toolbox/OvermasteryPredictor";
 import SynthesisHelper from "./pages/toolbox/SynthesisHelper";
 import TransmarvelSearcher from "./pages/toolbox/TransmarvelSearcher";
@@ -36,7 +39,12 @@ export const App = () => {
             <Route path="transmarvel" element={<TransmarvelSearcher />} />
           </Route>
           <Route path=":id" element={<LogViewPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings" element={<SettingsPage />}>
+            <Route index element={<Navigate to="general" replace />} />
+            <Route path="general" element={<GeneralSettings />} />
+            <Route path="meters" element={<MeterSettings />} />
+            <Route path="checklist" element={<ChecklistSettings />} />
+          </Route>
           {import.meta.env.DEV && <Route path="debug" element={<DebugPage />} />}
         </Route>
       </Routes>
