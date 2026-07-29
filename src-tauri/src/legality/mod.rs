@@ -112,9 +112,28 @@ pub fn audit(build: &BuildSnapshot) -> Vec<Finding> {
     findings
 }
 
+/// Audit a parsed player.
+///
+/// `PlayerData` stores the parser's own mirrors of the `protocol` types these
+/// rules read, so the fields are converted into owned `protocol` values that
+/// live for the length of the call and the snapshot borrows from those.
+pub fn audit_player(player: &crate::parser::v1::PlayerData) -> Vec<Finding> {
+    let inputs = player.legality_inputs();
+    audit(&BuildSnapshot {
+        character_type: Some(inputs.character_type),
+        sigils: &inputs.sigils,
+        summons: &inputs.summons,
+        skillboard: &inputs.skillboard,
+        weapon_state: inputs.weapon_state.as_ref(),
+        overmastery_info: inputs.overmastery_info.as_ref(),
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::parser::v1::PlayerData;
 
     /// A build with nothing readable must produce no findings at all. This is
     /// the governing principle: absence of evidence is never evidence.
@@ -122,5 +141,11 @@ mod tests {
     fn empty_build_yields_no_findings() {
         let build = BuildSnapshot::default();
         assert_eq!(audit(&build), vec![]);
+    }
+
+    #[test]
+    fn audits_a_player_through_the_snapshot_bridge() {
+        let player = PlayerData::default();
+        assert_eq!(audit_player(&player), vec![]);
     }
 }

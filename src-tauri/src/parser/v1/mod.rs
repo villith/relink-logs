@@ -434,6 +434,132 @@ pub struct PlayerData {
     player_stats: Option<PlayerStats>,
 }
 
+/// Hand-written rather than derived because `CharacterType` has no `Default`
+/// and giving it one would assert a default character for the whole crate.
+/// An unknown hash is the honest stand-in for "no character read yet".
+impl Default for PlayerData {
+    fn default() -> Self {
+        Self {
+            actor_index: 0,
+            display_name: String::new(),
+            character_name: String::new(),
+            character_type: CharacterType::Unknown(0),
+            sigils: Vec::new(),
+            summons: Vec::new(),
+            abilities: Vec::new(),
+            weapon_key: String::new(),
+            master_level: 0,
+            skillboard: Vec::new(),
+            stats: None,
+            weapon_state: None,
+            is_online: false,
+            weapon_info: None,
+            overmastery_info: None,
+            player_stats: None,
+        }
+    }
+}
+
+/// Owned `protocol`-typed copies of the fields the legality rules read.
+///
+/// The rules are written against `protocol` types so they stay independent of
+/// this module's persisted on-disk format, but `PlayerData` stores the parser's
+/// own mirrors of those types. This carries the converted values so a
+/// `BuildSnapshot` can borrow from them for the length of one audit.
+pub struct LegalityInputs {
+    pub character_type: CharacterType,
+    pub sigils: Vec<protocol::Sigil>,
+    pub summons: Vec<protocol::EquippedSummon>,
+    pub skillboard: Vec<u32>,
+    pub weapon_state: Option<protocol::WeaponState>,
+    pub overmastery_info: Option<protocol::OvermasteryInfo>,
+}
+
+impl From<&WeaponTraitPair> for protocol::WeaponTraitPair {
+    fn from(pair: &WeaponTraitPair) -> Self {
+        Self {
+            id: pair.id,
+            level: pair.level,
+        }
+    }
+}
+
+impl From<&Overmastery> for protocol::Overmastery {
+    fn from(mastery: &Overmastery) -> Self {
+        Self {
+            id: mastery.id,
+            flags: mastery.flags,
+            value: mastery.value,
+        }
+    }
+}
+
+impl From<&Sigil> for protocol::Sigil {
+    fn from(sigil: &Sigil) -> Self {
+        Self {
+            first_trait_id: sigil.first_trait_id,
+            first_trait_level: sigil.first_trait_level,
+            second_trait_id: sigil.second_trait_id,
+            second_trait_level: sigil.second_trait_level,
+            sigil_id: sigil.sigil_id,
+            equipped_character: sigil.equipped_character,
+            sigil_level: sigil.sigil_level,
+            acquisition_count: sigil.acquisition_count,
+            notification_enum: sigil.notification_enum,
+        }
+    }
+}
+
+impl From<&EquippedSummon> for protocol::EquippedSummon {
+    fn from(summon: &EquippedSummon) -> Self {
+        Self {
+            summon_id: summon.summon_id,
+            main_trait_id: summon.main_trait_id,
+            main_trait_level: summon.main_trait_level,
+            bonus_id: summon.bonus_id,
+            bonus_level: summon.bonus_level,
+        }
+    }
+}
+
+impl From<&WeaponState> for protocol::WeaponState {
+    fn from(state: &WeaponState) -> Self {
+        Self {
+            weapon_id: state.weapon_id,
+            exp: state.exp,
+            star_level: state.star_level,
+            plus_marks: state.plus_marks,
+            awakening_level: state.awakening_level,
+            wrightstone_id: state.wrightstone_id,
+            wrightstone_traits: state.wrightstone_traits.iter().map(Into::into).collect(),
+            innate_traits: state.innate_traits.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<&OvermasteryInfo> for protocol::OvermasteryInfo {
+    fn from(info: &OvermasteryInfo) -> Self {
+        Self {
+            overmasteries: info.overmasteries.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl PlayerData {
+    /// Convert the fields the legality rules need into `protocol` types. Lives
+    /// here because `PlayerData`'s fields are private to this module.
+    pub fn legality_inputs(&self) -> LegalityInputs {
+        LegalityInputs {
+            character_type: self.character_type,
+            sigils: self.sigils.iter().map(Into::into).collect(),
+            summons: self.summons.iter().map(Into::into).collect(),
+            skillboard: self.skillboard.clone(),
+            weapon_state: self.weapon_state.as_ref().map(Into::into),
+            overmastery_info: self.overmastery_info.as_ref().map(Into::into),
+        }
+    }
+}
+
 /// Derived breakdown for an enemy target
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
