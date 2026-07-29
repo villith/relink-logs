@@ -1,32 +1,167 @@
 import useChecklistSettings from "@/pages/useChecklistSettings";
-import { Button, Stack, Title } from "@mantine/core";
+import { type ChecklistGroup } from "@/stores/useChecklistStore";
+import { moveItem, orderedChecklistEntries } from "@/utils";
+import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
+import { ActionIcon, Box, Button, Card, Checkbox, Group, Stack, TextInput, Title, Tooltip } from "@mantine/core";
+import { modals } from "@mantine/modals";
+import { DotsSixVertical, SortAscending, Trash } from "@phosphor-icons/react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ChecklistSection } from "./ChecklistSection";
 
-/** Settings → Checklist: the Builds-tab checklist criteria, one editable group
- * for the player's own sigils and one for AI companions. */
+/** Settings → Checklist: the Builds-tab criteria as an ordered list of groups.
+ * One DragDropContext spans both nesting levels, which is what lets an entry be
+ * dragged from one group into another; the distinct droppable `type` values stop
+ * a group being dropped into an entry list. */
 const ChecklistSettings = () => {
   const { t } = useTranslation();
   const checklist = useChecklistSettings();
+  const [editing, setEditing] = useState<string | null>(null);
+
+  const groupName = (group: ChecklistGroup) => group.name ?? (group.nameKey ? t(group.nameKey) : group.id);
+
+  const onDragEnd = ({ source, destination, type, draggableId }: DropResult) => {
+    if (!destination) return;
+    if (type === "group") {
+      checklist.reorderGroups(source.index, destination.index);
+      return;
+    }
+    const firstId = Number(draggableId.split("::")[1]);
+    const target = checklist.groups.find((group) => group.id === destination.droppableId);
+    if (!target) return;
+    // Indexes report positions in the DISPLAYED list, which in auto mode is not
+    // the stored array — so send the resulting id order rather than raw indexes.
+    const order = orderedChecklistEntries(target.entries, target.manualOrder).map((entry) => entry.ids[0]);
+    if (source.droppableId === destination.droppableId) {
+      checklist.reorderEntries(destination.droppableId, moveItem(order, source.index, destination.index));
+      return;
+    }
+    order.splice(destination.index, 0, firstId);
+    checklist.moveEntry(source.droppableId, destination.droppableId, firstId, order);
+  };
+
+  const confirmRemove = (group: ChecklistGroup) => {
+    if (group.entries.length === 0) {
+      checklist.removeGroup(group.id);
+      return;
+    }
+    modals.openConfirmModal({
+      title: t("ui.checklist-settings.delete-group-title", "Delete group"),
+      children: t("ui.checklist-settings.delete-group-confirm", {
+        name: groupName(group),
+        count: group.entries.length,
+      }),
+      labels: { confirm: t("ui.delete-btn"), cancel: t("ui.cancel-btn") },
+      confirmProps: { color: "red" },
+      onConfirm: () => checklist.removeGroup(group.id),
+    });
+  };
 
   return (
     <Stack gap="md" pr="md">
       <Title order={4}>{t("ui.checklist-settings.title")}</Title>
-      <ChecklistSection
-        group="build"
-        legend={t("ui.checklist-settings.sigils-section")}
-        addPlaceholder={t("ui.checklist-settings.add-trait")}
-        checklist={checklist}
-      />
-      <ChecklistSection
-        group="ai"
-        legend={t("ui.checklist-settings.ai-section")}
-        addPlaceholder={t("ui.checklist-settings.add-trait")}
-        checklist={checklist}
-      />
-      <Button variant="default" onClick={checklist.reset} style={{ alignSelf: "flex-start" }}>
-        {t("ui.checklist-settings.reset")}
-      </Button>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <Droppable droppableId="checklist-groups" type="group">
+          {(droppableProvided) => (
+            <Stack gap="sm" ref={droppableProvided.innerRef} {...droppableProvided.droppableProps}>
+              {checklist.groups.map((group, index) => (
+                <Draggable key={group.id} draggableId={`group::${group.id}`} index={index}>
+                  {(draggableProvided) => (
+                    <Card
+                      ref={draggableProvided.innerRef}
+                      {...draggableProvided.draggableProps}
+                      withBorder
+                      padding="sm"
+                      style={draggableProvided.draggableProps.style}
+                    >
+                      <Group gap="xs" wrap="nowrap" mb="xs">
+                        <Box
+                          component="span"
+                          aria-label={t("ui.checklist-settings.reorder-group", "Reorder group")}
+                          style={{ cursor: "grab", display: "flex", color: "var(--mantine-color-dark-2)" }}
+                          {...draggableProvided.dragHandleProps}
+                        >
+                          <DotsSixVertical size={16} />
+                        </Box>
+                        <Tooltip label={t("ui.checklist-settings.group-enabled", "Show this group")}>
+                          <Checkbox checked={group.enabled} onChange={() => checklist.toggleGroup(group.id)} />
+                        </Tooltip>
+                        {editing === group.id ? (
+                          <TextInput
+                            autoFocus
+                            size="xs"
+                            flex={1}
+                            defaultValue={groupName(group)}
+                            placeholder={t("ui.checklist-settings.group-name-placeholder", "Group name")}
+                            onBlur={(event) => {
+                              checklist.renameGroup(group.id, event.currentTarget.value);
+                              setEditing(null);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter") event.currentTarget.blur();
+                              if (event.key === "Escape") setEditing(null);
+                            }}
+                          />
+                        ) : (
+                          <Button
+                            variant="subtle"
+                            size="compact-sm"
+                            flex={1}
+                            justify="flex-start"
+                            title={t("ui.checklist-settings.rename-group", "Rename group")}
+                            onClick={() => setEditing(group.id)}
+                          >
+                            {groupName(group)}
+                          </Button>
+                        )}
+                        {group.kind === "custom" && (
+                          <>
+                            <Tooltip label={t("ui.checklist-settings.sort-az", "Sort A-Z")}>
+                              <ActionIcon
+                                variant="subtle"
+                                color="gray"
+                                aria-label={t("ui.checklist-settings.sort-az", "Sort A-Z")}
+                                onClick={() => checklist.sortGroup(group.id)}
+                              >
+                                <SortAscending size={16} />
+                              </ActionIcon>
+                            </Tooltip>
+                            <ActionIcon
+                              variant="subtle"
+                              color="red"
+                              aria-label={t("ui.checklist-settings.delete-group", "Delete group")}
+                              onClick={() => confirmRemove(group)}
+                            >
+                              <Trash size={16} />
+                            </ActionIcon>
+                          </>
+                        )}
+                      </Group>
+                      <ChecklistSection
+                        group={group}
+                        addPlaceholder={t("ui.checklist-settings.add-trait")}
+                        checklist={checklist}
+                      />
+                    </Card>
+                  )}
+                </Draggable>
+              ))}
+              {droppableProvided.placeholder}
+            </Stack>
+          )}
+        </Droppable>
+      </DragDropContext>
+      <Group gap="sm">
+        <Button
+          variant="default"
+          onClick={() => setEditing(checklist.addGroup(t("ui.checklist-settings.new-group-name", "New group")))}
+        >
+          {t("ui.checklist-settings.new-group", "New group")}
+        </Button>
+        <Button variant="default" onClick={checklist.reset}>
+          {t("ui.checklist-settings.reset")}
+        </Button>
+      </Group>
     </Stack>
   );
 };
