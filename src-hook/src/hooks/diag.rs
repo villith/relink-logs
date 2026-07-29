@@ -297,6 +297,174 @@ pub fn probe_u32_window(label: &str, base: usize, len: usize) {
     );
 }
 
+/// Scan a large object for a fixed set of u32 needle values (plus the generic
+/// `0x0002xxxx` packed-enemy-id shape), logging `+off=value(name)` for every hit whose
+/// (label,base,off)->value wasn't already logged. Built for the Conflux boss-source hunt:
+/// the 408KB `EndlessModeQuestManager` must hold the drawn boss's identity SOMEWHERE
+/// (packed `0x20000|EM`, or the XXHash32 actor-type hash); a full delta probe of that
+/// window would log an unusable first-visit snapshot, so instead we look only for the
+/// known identity encodings. Page-wise `readable()` guard; dedup map bounds re-logging;
+/// per-call output cap bounds a pathological page. hookdiag-only.
+#[cfg(feature = "hookdiag")]
+pub fn scan_u32_needles(label: &str, base: usize, len: usize, needles: &[(u32, &str)]) {
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+    static SEEN: Mutex<Option<HashMap<(String, usize, usize), u32>>> = Mutex::new(None);
+    if base == 0 {
+        return;
+    }
+    let mut lookup: HashMap<u32, &str> = HashMap::with_capacity(needles.len());
+    for (v, n) in needles {
+        lookup.insert(*v, *n);
+    }
+    let mut hits: Vec<(usize, u32, &str)> = Vec::new();
+    let mut page = 0usize;
+    while page < len {
+        let chunk = (len - page).min(0x1000);
+        let addr = base + page;
+        if readable(addr, chunk) {
+            let mut off = 0usize;
+            while off + 4 <= chunk {
+                let v = unsafe { ((addr + off) as *const u32).read_unaligned() };
+                if let Some(name) = lookup.get(&v) {
+                    hits.push((page + off, v, name));
+                } else if (v >> 16) == 2 && (v & 0xffff) != 0 {
+                    // Any 0x0002xxxx word: the packed-enemy-id shape with an id we didn't
+                    // anticipate. Logged with a generic tag so nothing slips through.
+                    hits.push((page + off, v, "generic2x"));
+                }
+                off += 4;
+            }
+        }
+        page += 0x1000;
+    }
+    let mut guard = SEEN.lock().unwrap();
+    let map = guard.get_or_insert_with(HashMap::new);
+    let mut out = String::new();
+    let mut n = 0;
+    for (off, v, name) in hits {
+        let key = (label.to_string(), base, off);
+        if map.get(&key) == Some(&v) {
+            continue;
+        }
+        map.insert(key, v);
+        out.push_str(&format!("+{off:#x}={v:#x}({name}) "));
+        n += 1;
+        if n >= 300 {
+            out.push_str("...cap");
+            break;
+        }
+    }
+    if !out.is_empty() {
+        ev_str("needlescan", &format!("label={label} base={base:#x} {out}"));
+    }
+}
+
+/// `scan_u32_needles` + one level of pointer chasing: the flat scan of the
+/// EndlessModeQuestManager found NO boss identity inline (live capture 2026-07-28, room
+/// 847010/Rock Golem), so the drawn-room state must live behind heap pointers (vectors).
+/// This variant additionally collects every plausible heap pointer in the window (aligned
+/// u64s in user-space range), scans the first `BLK` bytes behind each, and reports hits as
+/// `+srcOff->blk+off=value(name)`. A `scanstats` line makes an empty result diagnosable
+/// (scanned-but-empty vs didn't-run). hookdiag-only.
+#[cfg(feature = "hookdiag")]
+pub fn scan_u32_needles_deep(label: &str, base: usize, len: usize, needles: &[(u32, &str)]) {
+    use std::collections::{HashMap, HashSet};
+    use std::sync::Mutex;
+    static SEEN: Mutex<Option<HashSet<(String, String)>>> = Mutex::new(None);
+    const BLK: usize = 0x400;
+    const MAX_BLOCKS: usize = 2000;
+    if base == 0 {
+        return;
+    }
+    let mut lookup: HashMap<u32, &str> = HashMap::with_capacity(needles.len());
+    for (v, n) in needles {
+        lookup.insert(*v, *n);
+    }
+    let classify = |v: u32| -> Option<&str> {
+        if let Some(name) = lookup.get(&v) {
+            Some(name)
+        } else if (v >> 16) == 2 && (v & 0xffff) != 0 {
+            Some("generic2x")
+        } else {
+            None
+        }
+    };
+    let mut raw_hits: Vec<String> = Vec::new();
+    let mut pointers: Vec<(usize, usize)> = Vec::new(); // (src offset, target)
+    let mut ptr_seen: HashSet<usize> = HashSet::new();
+    let (mut pages, mut pages_ok) = (0u32, 0u32);
+    let mut page = 0usize;
+    while page < len {
+        let chunk = (len - page).min(0x1000);
+        let addr = base + page;
+        pages += 1;
+        if readable(addr, chunk) {
+            pages_ok += 1;
+            let mut off = 0usize;
+            while off + 4 <= chunk {
+                let v = unsafe { ((addr + off) as *const u32).read_unaligned() };
+                if let Some(name) = classify(v) {
+                    raw_hits.push(format!("+{:#x}={v:#x}({name})", page + off));
+                }
+                // Aligned u64 = pointer candidate (user-space heap range, 8-aligned target).
+                if (page + off) % 8 == 0 && off + 8 <= chunk {
+                    let p = unsafe { ((addr + off) as *const u64).read_unaligned() } as usize;
+                    if p >= 0x10000 && p < 0x0000_8000_0000_0000 && p % 8 == 0
+                        && pointers.len() < MAX_BLOCKS && ptr_seen.insert(p)
+                    {
+                        pointers.push((page + off, p));
+                    }
+                }
+                off += 4;
+            }
+        }
+        page += 0x1000;
+    }
+    let mut blk_hits: Vec<String> = Vec::new();
+    let mut blocks_ok = 0u32;
+    for (src, p) in &pointers {
+        if !readable(*p, BLK) {
+            continue;
+        }
+        blocks_ok += 1;
+        let mut off = 0usize;
+        while off + 4 <= BLK {
+            let v = unsafe { ((*p + off) as *const u32).read_unaligned() };
+            if let Some(name) = classify(v) {
+                blk_hits.push(format!("+{src:#x}->blk+{off:#x}={v:#x}({name})"));
+            }
+            off += 4;
+        }
+    }
+    ev_str(
+        "scanstats",
+        &format!(
+            "label={label} base={base:#x} pages={pages} readable={pages_ok} ptrs={} blocks_ok={blocks_ok} inline_hits={} blk_hits={}",
+            pointers.len(), raw_hits.len(), blk_hits.len()
+        ),
+    );
+    let mut guard = SEEN.lock().unwrap();
+    let seen = guard.get_or_insert_with(HashSet::new);
+    let mut out = String::new();
+    let mut n = 0;
+    for h in raw_hits.into_iter().chain(blk_hits.into_iter()) {
+        if !seen.insert((label.to_string(), h.clone())) {
+            continue;
+        }
+        out.push_str(&h);
+        out.push(' ');
+        n += 1;
+        if n >= 400 {
+            out.push_str("...cap");
+            break;
+        }
+    }
+    if !out.is_empty() {
+        ev_str("needlescan", &format!("label={label} base={base:#x} {out}"));
+    }
+}
+
 /// Like `probe_u32_window`, but re-dumps the SAME object across repeated hits, logging only
 /// the offsets whose value CHANGED since the previous visit (`+off:old->new`). This is what
 /// `probe_u32_window` (dedup-by-address, one-shot) cannot do: on a long-lived object — e.g.

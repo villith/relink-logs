@@ -26,6 +26,7 @@ mod death;
 pub mod diag;
 mod endless;
 mod ffi;
+mod filediag;
 mod gamehash;
 mod globals;
 mod loadprobe;
@@ -115,6 +116,10 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
 
     // hookdiag-only: probe to re-derive the broken player_load address from a live stage
     // load (see loadprobe.rs). No-op without the feature.
+    // hookdiag-only: CreateFileW/A open tracing to verify which loose external files
+    // the game actually reads (see filediag.rs). No-op without the feature.
+    try_step("filediag", filediag::setup());
+
     try_step(
         "loadprobe",
         loadprobe::OnComponentLookupProbe::new().setup(&process),
