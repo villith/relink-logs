@@ -548,21 +548,67 @@ export type ChecklistEntry = {
   level: number;
 };
 
-export type ChecklistGroups = { build: ChecklistEntry[]; ai: ChecklistEntry[] };
+/** "custom" groups hold user-editable entries; the single "computed" group
+ * renders the derived sigil-category rows, whose entries the user cannot
+ * change. */
+export type ChecklistGroupKind = "custom" | "computed";
+
+/** A checklist group as shipped in the defaults asset, before the store adds
+ * the user's own flags (enabled, manualOrder, name). */
+export type ChecklistGroupDef = {
+  /** Stable key: "build" | "computed" | "ai" for seeded groups, "g-<n>" for new ones. */
+  id: string;
+  /** i18n key for a seeded group's name; cleared once the user renames it. */
+  nameKey?: string;
+  kind: ChecklistGroupKind;
+  entries: ChecklistEntry[];
+};
 
 /**
  * The shipped default checklist criteria (assets/checklist-default.json):
  * the endgame requirements shown in the Builds tab, checked against a
- * player's combined trait totals (wrightstone + summons + sigils). `build`
- * is the main sigils checklist; `ai` applies to AI-controlled party members
- * (no damage penalty from Glass Cannon). The JSON stores trait ids as the
- * lowercase hex strings used by the lang files; this converts them to the
- * numeric ids the parser emits.
+ * player's combined trait totals (wrightstone + summons + sigils). The seeded
+ * groups are the main sigils checklist, the derived sigil-category rows, and
+ * one for AI-controlled party members (no damage penalty from Glass Cannon).
+ * The JSON stores trait ids as the lowercase hex strings used by the lang
+ * files; this converts them to the numeric ids the parser emits.
  */
-export const defaultChecklist = (): ChecklistGroups => {
-  const parse = (entries: { ids: string[]; level: number }[]): ChecklistEntry[] =>
-    entries.map((entry) => ({ ids: entry.ids.map((id) => parseInt(id, 16)), level: entry.level }));
-  return { build: parse(checklistDefault.build), ai: parse(checklistDefault.ai) };
+export const defaultChecklist = (): ChecklistGroupDef[] =>
+  (
+    checklistDefault.groups as {
+      id: string;
+      nameKey: string;
+      kind: string;
+      entries: { ids: string[]; level: number }[];
+    }[]
+  ).map((group) => ({
+    id: group.id,
+    nameKey: group.nameKey,
+    kind: group.kind as ChecklistGroupKind,
+    entries: group.entries.map((entry) => ({ ids: entry.ids.map((id) => parseInt(id, 16)), level: entry.level })),
+  }));
+
+/** A copy of `items` with the element at `from` moved to `to`. Out-of-range or
+ * no-op moves return the input unchanged, so a stray drag cannot corrupt a list. */
+export const moveItem = <T>(items: T[], from: number, to: number): T[] => {
+  if (from === to || from < 0 || to < 0 || from >= items.length || to >= items.length) return items;
+  const next = items.slice();
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+};
+
+/**
+ * A group's entries in display order. Order is resolved here, at render,
+ * rather than stored: the traits bundle loads asynchronously (src/i18n.ts), so
+ * names are not resolvable when the persisted store rehydrates, and the
+ * alphabetical order a user expects is the one in their own language.
+ */
+export const orderedChecklistEntries = <T extends ChecklistEntry>(entries: T[], manualOrder: boolean): T[] => {
+  // t() yields undefined before i18next has initialized; an entry whose name
+  // cannot be resolved sorts first rather than throwing mid-render.
+  const name = (entry: ChecklistEntry): string => translateTraitId(entry.ids[0]) ?? "";
+  return manualOrder ? entries : [...entries].sort((a, b) => name(a).localeCompare(name(b)));
 };
 
 /**
