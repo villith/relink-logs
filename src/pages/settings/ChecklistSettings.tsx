@@ -20,6 +20,13 @@ const ChecklistSettings = () => {
 
   const groupName = (group: ChecklistGroup) => group.name ?? (group.nameKey ? t(group.nameKey) : group.id);
 
+  // Reads as an action while the group is manually ordered, and as the current
+  // state once it is not — the same button covers both.
+  const sortLabel = (group: ChecklistGroup) =>
+    group.manualOrder
+      ? t("ui.checklist-settings.sort-az", "Sort A-Z")
+      : t("ui.checklist-settings.sorted-az", "Sorted A-Z");
+
   const onDragEnd = ({ source, destination, type, draggableId }: DropResult) => {
     if (!destination) return;
     if (type === "group") {
@@ -116,11 +123,13 @@ const ChecklistSettings = () => {
                         )}
                         {group.kind === "custom" && (
                           <>
-                            <Tooltip label={t("ui.checklist-settings.sort-az", "Sort A-Z")}>
+                            {/* Lit green while the group is in alphabetical mode — the
+                             * button reports the current ordering as much as it sets it. */}
+                            <Tooltip label={sortLabel(group)}>
                               <ActionIcon
-                                variant="subtle"
-                                color="gray"
-                                aria-label={t("ui.checklist-settings.sort-az", "Sort A-Z")}
+                                variant={group.manualOrder ? "subtle" : "light"}
+                                color={group.manualOrder ? "gray" : "green"}
+                                aria-label={sortLabel(group)}
                                 onClick={() => checklist.sortGroup(group.id)}
                               >
                                 <SortAscending size={16} />

@@ -162,6 +162,7 @@
       "group-name-placeholder": "Group name",
       "rename-group": "Rename group",
       "sort-az": "Sort A-Z",
+      "sorted-az": "Sorted A-Z",
       "delete-group": "Delete group",
       "delete-group-title": "Delete group",
       "delete-group-confirm": "This will delete \"{{name}}\" and its {{count}} entries from your checklist.",
