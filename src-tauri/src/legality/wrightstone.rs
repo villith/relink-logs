@@ -3,7 +3,9 @@
 //! Both rules avoid the wrightstone item id on purpose: remote players sync
 //! the stone's trait pairs but never its id, so an id-based rule would accuse
 //! honest players. Instead the primary trait must be one of the four family
-//! traits, and the trait levels sorted descending must fit under 20/15/10.
+//! traits, and each of the three trait levels — in their true, physical slot
+//! order (primary, secondary1, secondary2) — must fit under that slot's own
+//! ceiling (20/15/10).
 
 use std::collections::HashSet;
 
@@ -108,12 +110,20 @@ pub fn audit_wrightstone(state: Option<&WeaponState>) -> Vec<Finding> {
     let rules = stock_rules();
     let mut findings = Vec::new();
 
-    let mut levels: Vec<u32> = state
+    // Traits arrive in true physical slot order — index 0 is the primary
+    // (cap 20), 1 is secondary1 (cap 15), 2 is secondary2 (cap 10). This is
+    // confirmed independently by `WeaponState`'s doc comment and by the
+    // hook's fixed read order; a shorter vector (already rejected above by
+    // the length guard) is the only way slot identity could be lost, so
+    // once three pairs arrive, index really does mean slot. The check is
+    // therefore positional, NOT sorted: a low primary must not be allowed
+    // to "absorb" a secondary slot's excess by comparing against the wrong
+    // ceiling once shuffled.
+    let levels: Vec<u32> = state
         .wrightstone_traits
         .iter()
         .map(|pair| pair.level)
         .collect();
-    levels.sort_unstable_by(|a, b| b.cmp(a));
 
     if levels
         .iter()
@@ -143,12 +153,18 @@ pub fn audit_wrightstone(state: Option<&WeaponState>) -> Vec<Finding> {
         .collect();
 
     if primaries.is_empty() {
+        // Ties on level break arbitrarily (`max_by_key` keeps the LAST
+        // maximal element), so which id gets reported here can depend on
+        // arrival order. That's fine: it's the ABSENCE of any family trait
+        // among the three — not which one happens to have the highest
+        // level — that makes the stone impossible, so the reported id is
+        // just a witness, not the reasoning.
         let highest = state
             .wrightstone_traits
             .iter()
             .max_by_key(|pair| pair.level)
             .map(|pair| pair.id)
-            .unwrap_or(0);
+            .expect("length guard above already ensures exactly STONE_TRAIT_COUNT elements");
         let mut allowed: Vec<u32> = rules.family_traits.iter().copied().collect();
         allowed.sort_unstable();
 
@@ -263,11 +279,43 @@ mod tests {
         assert_eq!(findings[0].allowed, Value::Levels(vec![20, 15, 10]));
     }
 
-    /// Trait order must not matter: the same three traits shuffled are legal.
+    /// Slot position decides legality, not sorted value: this fixture put a
+    /// level-20 trait in the secondary1 slot (cap 15), which only passed
+    /// under the old sorted comparison — a low primary (10) was absorbing
+    /// the excess. Positional checking must flag it.
     #[test]
-    fn ignores_trait_ordering() {
+    fn flags_a_secondary_slot_above_its_own_ceiling() {
         let state = stone(&[(0x57ab5b10, 10), (0xf372f096, 20), (0xdc584f60, 15)]);
+        let findings = audit_wrightstone(Some(&state));
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::WrightstoneTraitLevel);
+        assert_eq!(findings[0].severity, Severity::Impossible);
+        assert_eq!(findings[0].observed, Value::Levels(vec![10, 20, 15]));
+        assert_eq!(findings[0].allowed, Value::Levels(vec![20, 15, 10]));
+    }
+
+    /// The primary need not be the highest-leveled trait; only its own
+    /// slot's ceiling matters. Sorting (the old rule) would have wrongly
+    /// flagged this legitimate build by comparing secondary1's 15 against
+    /// slot 0's cap instead of its own.
+    #[test]
+    fn primary_below_its_own_ceiling_is_not_flagged_by_higher_secondaries() {
+        let state = stone(&[(0xf372f096, 5), (0xdc584f60, 15), (0x57ab5b10, 10)]);
         assert_eq!(audit_wrightstone(Some(&state)), vec![]);
+    }
+
+    /// Both rules are independent and can fire on the same stone: an
+    /// over-cap secondary1 level alongside a stone with no family trait at
+    /// all. Order follows the rule order in `audit_wrightstone`.
+    #[test]
+    fn flags_both_rules_on_one_stone() {
+        let state = stone(&[(0xdc584f60, 25), (0x57ab5b10, 15), (0x95f3fa86, 10)]);
+        let findings = audit_wrightstone(Some(&state));
+        assert_eq!(findings.len(), 2);
+        assert_eq!(findings[0].rule, Rule::WrightstoneTraitLevel);
+        assert_eq!(findings[0].observed, Value::Levels(vec![25, 15, 10]));
+        assert_eq!(findings[1].rule, Rule::WrightstonePrimaryTrait);
+        assert_eq!(findings[1].observed, Value::TraitId(0xdc584f60));
     }
 
     /// DMG Cap is a real trait but never a stone family's primary.
