@@ -78,6 +78,7 @@ import {
   humanizeNumbers,
   millisecondsToElapsedFormat,
   openDamageCalculator,
+  orderedChecklistEntries,
   overmasteryAmountFromId,
   resolvePlayerColor,
   skillboardActivationCost,
@@ -616,9 +617,6 @@ const AbilitiesRow = ({ playerData }: { playerData: PlayerData[] }) => {
   );
 };
 
-const byTraitName = (a: ChecklistEntry, b: ChecklistEntry) =>
-  translateTraitId(a.ids[0]).localeCompare(translateTraitId(b.ids[0]));
-
 export const ViewPage = () => {
   const { color_1, color_2, color_3, color_4, show_display_names, streamer_mode } = useMeterSettingsStore(
     useShallow((state) => ({
@@ -634,9 +632,7 @@ export const ViewPage = () => {
   // this one drives the backend fetches below, so it wants the tightest possible
   // change signal — every change re-derives the whole log.
   const filters = useMeterFilters();
-  const { checklistBuild, checklistAi } = useChecklistStore(
-    useShallow((state) => ({ checklistBuild: state.build, checklistAi: state.ai }))
-  );
+  const checklistGroups = useChecklistStore(useShallow((state) => state.groups));
   const { t, i18n } = useTranslation();
   const { id } = useParams();
 
@@ -681,10 +677,18 @@ export const ViewPage = () => {
     () => new Map(playerData.map((player) => [player.actorIndex, computeCombinedTraits(player)])),
     [playerData]
   );
-  // The enabled checklist entries are the same for every player column — filter
-  // and sort them once per render instead of once per player.
-  const buildEntries = checklistBuild.filter((entry) => entry.enabled).sort(byTraitName);
-  const aiEntries = checklistAi.filter((entry) => entry.enabled).sort(byTraitName);
+  // The visible groups are the same for every player column — filter and order
+  // them once per render instead of once per player. A group survives if it is
+  // switched on and either derives its rows (computed) or has an enabled entry.
+  const visibleChecklistGroups = checklistGroups
+    .filter((group) => group.enabled && (group.kind === "computed" || group.entries.some((entry) => entry.enabled)))
+    .map((group) => ({
+      ...group,
+      entries: orderedChecklistEntries(
+        group.entries.filter((entry) => entry.enabled),
+        group.manualOrder
+      ),
+    }));
 
   const [sortType, setSortType] = useState<SortType>(MeterColumns.TotalDamage);
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -1818,40 +1822,41 @@ export const ViewPage = () => {
                           <Text size="xs" fw={700}>
                             {t("ui.player-checklist")}
                           </Text>
-                          {buildEntries.length > 0 && (
-                            <>
-                              <Text size="xs" fw={600} c="dimmed">
-                                {t("ui.checklist.sigils")}
-                              </Text>
-                              {buildEntries.map((entry) => (
-                                <ChecklistEntryRow key={entry.ids[0]} player={player} traits={traits} entry={entry} />
-                              ))}
-                            </>
-                          )}
-                          <Text size="xs" fw={600} c="dimmed" mt={4}>
-                            {t("ui.checklist.computed")}
-                          </Text>
-                          <SigilCategoryRow player={player} categories={["basic"]} label="ui.checklist.basic-sigils" />
-                          <SigilCategoryRow
-                            player={player}
-                            categories={["attack"]}
-                            label="ui.checklist.attack-sigils"
-                          />
-                          <SigilCategoryRow
-                            player={player}
-                            categories={["defense", "support"]}
-                            label="ui.checklist.defense-support-sigils"
-                          />
-                          {aiEntries.length > 0 && (
-                            <>
+                          {visibleChecklistGroups.map((group) => (
+                            <Box key={group.id}>
                               <Text size="xs" fw={600} c="dimmed" mt={4}>
-                                {t("ui.checklist.ai")}
+                                {group.name ?? (group.nameKey ? t(group.nameKey) : group.id)}
                               </Text>
-                              {aiEntries.map((entry) => (
-                                <ChecklistEntryRow key={entry.ids[0]} player={player} traits={traits} entry={entry} />
-                              ))}
-                            </>
-                          )}
+                              {group.kind === "computed" ? (
+                                <>
+                                  <SigilCategoryRow
+                                    player={player}
+                                    categories={["basic"]}
+                                    label="ui.checklist.basic-sigils"
+                                  />
+                                  <SigilCategoryRow
+                                    player={player}
+                                    categories={["attack"]}
+                                    label="ui.checklist.attack-sigils"
+                                  />
+                                  <SigilCategoryRow
+                                    player={player}
+                                    categories={["defense", "support"]}
+                                    label="ui.checklist.defense-support-sigils"
+                                  />
+                                </>
+                              ) : (
+                                group.entries.map((entry) => (
+                                  <ChecklistEntryRow
+                                    key={entry.ids[0]}
+                                    player={player}
+                                    traits={traits}
+                                    entry={entry}
+                                  />
+                                ))
+                              )}
+                            </Box>
+                          ))}
                         </Table.Td>
                       );
                     })}

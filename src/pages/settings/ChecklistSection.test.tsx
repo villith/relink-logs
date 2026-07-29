@@ -15,7 +15,7 @@ const FIXED_OPTIONS = [
 ];
 
 /** Stateful harness whose `checklist` stub mimics useChecklistSettings()'s shape/behavior. */
-const Harness = ({ kind = "custom" as ChecklistGroup["kind"] }) => {
+const Harness = ({ kind = "custom" }: { kind?: ChecklistGroup["kind"] }) => {
   const [entries, setEntries] = useState<Entry[]>([]);
   const group: ChecklistGroup = {
     id: "build",
