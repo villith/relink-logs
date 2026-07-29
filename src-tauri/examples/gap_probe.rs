@@ -107,8 +107,7 @@ fn main() -> Result<()> {
                 .iter()
                 .filter_map(|(ts, message)| match message {
                     Message::DamageEvent(event)
-                        if matches!(event.action_id, ActionType::SBA)
-                            && ts - base <= *start_ms =>
+                        if matches!(event.action_id, ActionType::SBA) && ts - base <= *start_ms =>
                     {
                         Some(ts - base)
                     }
@@ -169,7 +168,11 @@ fn main() -> Result<()> {
             }
             let inside = rel >= start_ms && rel <= end_ms;
             let marker = if inside { ">>" } else { "  " };
-            println!("{marker} {:9.3}s  {}", rel as f64 / 1000.0, describe(message));
+            println!(
+                "{marker} {:9.3}s  {}",
+                rel as f64 / 1000.0,
+                describe(message)
+            );
         }
         println!();
     }
@@ -192,14 +195,20 @@ fn describe(message: &Message) -> String {
             event.flags,
             event.target_current_hp,
         ),
-        Message::OnUpdateSBA(e) => format!("SBA-UPDATE     actor={:08X} sba={}", e.actor_index, e.sba_value),
+        Message::OnUpdateSBA(e) => format!(
+            "SBA-UPDATE     actor={:08X} sba={}",
+            e.actor_index, e.sba_value
+        ),
         Message::OnAttemptSBA(e) => format!("SBA-ATTEMPT    actor={:08X}", e.actor_index),
         Message::OnPerformSBA(e) => format!("SBA-PERFORM    actor={:08X}", e.actor_index),
         Message::OnContinueSBAChain(e) => {
             format!("SBA-CHAIN      actor={:08X}", e.actor_index)
         }
         Message::OnDeathEvent(e) => format!("DEATH          actor={:08X}", e.actor_index),
-        Message::OnPlayerStun(e) => format!("STUN           actor={:08X} {}", e.actor_index, e.stun_amount),
+        Message::OnPlayerStun(e) => format!(
+            "STUN           actor={:08X} {}",
+            e.actor_index, e.stun_amount
+        ),
         Message::OnAreaEnter(_) => "AREA-ENTER".to_string(),
         Message::OnQuestComplete(_) => "QUEST-COMPLETE".to_string(),
         other => format!("{other:?}"),

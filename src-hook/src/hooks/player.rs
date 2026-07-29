@@ -902,14 +902,11 @@ pub fn identity_event_for_actor(
         // resolved to a single donor (duplicated builds). Slot separates
         // same-character players; the online flag keeps a local AI town record on
         // the same slot from donating its build to a remote player.
-        let cached = identities()
-            .lock()
-            .ok()
-            .and_then(|store| {
-                store
-                    .equipment_donor(party_index, identity.is_online)
-                    .cloned()
-            });
+        let cached = identities().lock().ok().and_then(|store| {
+            store
+                .equipment_donor(party_index, identity.is_online)
+                .cloned()
+        });
         let equip = cached.unwrap_or_else(|| identity.clone());
         return Some(PlayerIdentityEvent {
             character_name: identity.character_name,
@@ -1269,7 +1266,8 @@ fn read_weapon_state(record: *const usize) -> Option<protocol::WeaponState> {
     let base = record as usize;
     let (mut state, table_key, src, innate_off) =
         parse_at(base, RECORD_WEAPON_STATE_OFFSET, RECORD_INNATE_OFFSET).or_else(|| {
-            let blob = read_ptr_guarded(base, RECORD_WEAPON_BLOB_OFFSET).filter(|b| *b > 0x10000)?;
+            let blob =
+                read_ptr_guarded(base, RECORD_WEAPON_BLOB_OFFSET).filter(|b| *b > 0x10000)?;
             parse_at(blob, BLOB_WEAPON_STATE_OFFSET, BLOB_INNATE_OFFSET)
         })?;
 
@@ -1356,7 +1354,8 @@ fn resolve_innate_skills(module: usize, skill_key: u32) -> Option<Vec<u32>> {
     let table = read_ptr_guarded(module, WEAPON_TABLE_RVA).filter(|t| *t != 0)?;
     for row in 0..WS_TABLE_ROWS {
         for col in 0..WS_TABLE_COLS {
-            let entry = table + WS_TABLE_BASE + row * WS_TABLE_ROW_STRIDE + col * WS_TABLE_COL_STRIDE;
+            let entry =
+                table + WS_TABLE_BASE + row * WS_TABLE_ROW_STRIDE + col * WS_TABLE_COL_STRIDE;
             if read_u32_guarded(entry, 0) != skill_key {
                 continue;
             }
@@ -1396,14 +1395,19 @@ fn read_record_skillboard(record: *const usize) -> Vec<u32> {
     if charid == 0 || charid == EMPTY_SIGIL_HASH {
         return Vec::new();
     }
-    let Some(char_node) =
-        game_hashmap_find(mgr, SB_CHAR_MAP_END, SB_CHAR_MAP_BUCKETS, SB_CHAR_MAP_MASK, charid)
-    else {
+    let Some(char_node) = game_hashmap_find(
+        mgr,
+        SB_CHAR_MAP_END,
+        SB_CHAR_MAP_BUCKETS,
+        SB_CHAR_MAP_MASK,
+        charid,
+    ) else {
         return Vec::new();
     };
-    let (Some(begin), Some(end)) =
-        (read_ptr_guarded(char_node, 0x18), read_ptr_guarded(char_node, 0x20))
-    else {
+    let (Some(begin), Some(end)) = (
+        read_ptr_guarded(char_node, 0x18),
+        read_ptr_guarded(char_node, 0x20),
+    ) else {
         return Vec::new();
     };
     if begin == 0 || end < begin {
@@ -1421,8 +1425,7 @@ fn read_record_skillboard(record: *const usize) -> Vec<u32> {
         .filter_map(|n| {
             let e = RECORD_NODE_ARRAY_OFFSET + n * RECORD_NODE_ARRAY_STRIDE;
             let id = read_u32_guarded(base, e);
-            (id != 0 && id != EMPTY_SIGIL_HASH)
-                .then(|| (id, read_u32_guarded(base, e + 4)))
+            (id != 0 && id != EMPTY_SIGIL_HASH).then(|| (id, read_u32_guarded(base, e + 4)))
         })
         .collect();
     if unlock.is_empty() {
@@ -1435,9 +1438,13 @@ fn read_record_skillboard(record: *const usize) -> Vec<u32> {
         if key == 0 || key == EMPTY_SIGIL_HASH {
             continue;
         }
-        let Some(node) =
-            game_hashmap_find(mgr, SB_NODE_MAP_END, SB_NODE_MAP_BUCKETS, SB_NODE_MAP_MASK, key)
-        else {
+        let Some(node) = game_hashmap_find(
+            mgr,
+            SB_NODE_MAP_END,
+            SB_NODE_MAP_BUCKETS,
+            SB_NODE_MAP_MASK,
+            key,
+        ) else {
             continue;
         };
         let Some(row) = read_ptr_guarded(node, 0x18).filter(|v| *v > 0x10000) else {
@@ -1473,9 +1480,7 @@ fn read_record_skillboard(record: *const usize) -> Vec<u32> {
 /// [`protocol::Overmastery::flags`] (bit N → level N+1) with `value` left 0.0 —
 /// the loadout stores only id+level, not the in-game computed magnitude. Empty
 /// slots hold the [`EMPTY_SIGIL_HASH`] sentinel and are dropped. Guarded reads.
-fn read_loadout_overmasteries_and_level(
-    record: *const usize,
-) -> (Vec<protocol::Overmastery>, u32) {
+fn read_loadout_overmasteries_and_level(record: *const usize) -> (Vec<protocol::Overmastery>, u32) {
     use crate::hooks::diag::{read_ptr_guarded, read_u32_guarded};
 
     let Some(loadout) = read_ptr_guarded(record as usize, RECORD_LOADOUT_OFFSET) else {
@@ -1625,8 +1630,7 @@ unsafe fn read_player_identity(snapshot: *const u8) -> Option<StoredPlayerIdenti
 /// anything implausible — the 13th entry overlaps fields the pre-2.0 struct used
 /// differently, so a strict filter keeps a mispopulated slot from leaking junk.
 unsafe fn read_snapshot_sigils(snapshot: *const u8) -> Vec<protocol::Sigil> {
-    let entries =
-        std::slice::from_raw_parts(snapshot as *const SigilEntry, SNAPSHOT_SIGIL_COUNT);
+    let entries = std::slice::from_raw_parts(snapshot as *const SigilEntry, SNAPSHOT_SIGIL_COUNT);
 
     entries
         .iter()
@@ -1865,7 +1869,10 @@ fn log_progress_probe(record: *const usize) {
         .step_by(4)
         .map(|off| format!("{:08x}", read_u32_guarded(mgr, off)))
         .collect();
-    log::info!("MLDIAG mgr24980={mgr:#x} @12A230..12A270: {}", row.join(" "));
+    log::info!(
+        "MLDIAG mgr24980={mgr:#x} @12A230..12A270: {}",
+        row.join(" ")
+    );
 
     // The dispatcher also resolves the record's charid in a map at
     // DAT_147c24980 +0x40 (end) / +0x50 (buckets) / +0x68 (mask); the value
@@ -1935,7 +1942,10 @@ fn log_progress_probe(record: *const usize) {
         .step_by(4)
         .map(|off| format!("{:08x}", read_u32_guarded(base, off)))
         .collect();
-    log::info!("MLDIAG record={base:#x} derived@5B2C..5B70: {}", derived.join(" "));
+    log::info!(
+        "MLDIAG record={base:#x} derived@5B2C..5B70: {}",
+        derived.join(" ")
+    );
 
     // Per-character progression: CharaPower keeps a charid-keyed map at
     // +0xAA8 (end) / +0xAB8 (buckets) / +0xAD0 (mask) — the same
@@ -1969,13 +1979,19 @@ fn log_progress_probe(record: *const usize) {
                 .step_by(4)
                 .map(|off| format!("{:08x}", read_u32_guarded(node, off)))
                 .collect();
-            log::info!("MLDIAG charid={charid:#010x} cpnode={node:#x} @14..94: {}", head.join(" "));
+            log::info!(
+                "MLDIAG charid={charid:#010x} cpnode={node:#x} @14..94: {}",
+                head.join(" ")
+            );
             if let Some(val) = read_ptr_guarded(node, 0x18) {
                 if val > 0x10000 {
                     let v: Vec<String> = (0..0x20_usize)
                         .map(|i| format!("{:08x}", read_u32_guarded(val, i * 4)))
                         .collect();
-                    log::info!("MLDIAG charid={charid:#010x} cpval={val:#x} @0..80: {}", v.join(" "));
+                    log::info!(
+                        "MLDIAG charid={charid:#010x} cpval={val:#x} @0..80: {}",
+                        v.join(" ")
+                    );
                 }
             }
             // Hunt the per-character master level (party = 50/40/38/47):
@@ -2010,8 +2026,7 @@ fn log_progress_probe(record: *const usize) {
     // burned the whole game-relaunch cycle. Rescan on a slow periodic stride
     // whenever loaded data is present (~50ms per scan, negligible).
     static SCAN_TICK: AtomicU32 = AtomicU32::new(0);
-    if read_u32_guarded(base, 0x5AC0) != 0
-        && SCAN_TICK.fetch_add(1, Ordering::Relaxed) % 1024 == 0
+    if read_u32_guarded(base, 0x5AC0) != 0 && SCAN_TICK.fetch_add(1, Ordering::Relaxed) % 1024 == 0
     {
         for global in [0x7c23f48_usize, 0x7c24980, 0x7c24a78] {
             let Some(agg) = read_ptr_guarded(module, global) else {
@@ -2204,9 +2219,7 @@ fn log_skillboard_probe(record: *const usize) {
 /// blob pointer plus a periodic override.
 #[cfg(feature = "hookdiag")]
 fn log_weapon_probe(record: *const usize) {
-    use crate::hooks::diag::{
-        first_n_per_key, read_ptr_guarded, read_u32_guarded, MODULE_BASE,
-    };
+    use crate::hooks::diag::{first_n_per_key, read_ptr_guarded, read_u32_guarded, MODULE_BASE};
     use std::sync::atomic::{AtomicU32, Ordering};
 
     static SEEN: std::sync::Mutex<Vec<(usize, u32)>> = std::sync::Mutex::new(Vec::new());
@@ -2252,7 +2265,10 @@ fn log_weapon_probe(record: *const usize) {
             .step_by(4)
             .map(|off| format!("{:08x}", read_u32_guarded(base, off)))
             .collect();
-        log::info!("WPDIAG record={base:#x} keys@5AF0..5B70: {}", neigh.join(" "));
+        log::info!(
+            "WPDIAG record={base:#x} keys@5AF0..5B70: {}",
+            neigh.join(" ")
+        );
         if let Some(snap) = read_ptr_guarded(base, 0x5E60) {
             if snap != 0 {
                 let tail: Vec<String> = (0x1D4..0x250_usize)
@@ -2290,7 +2306,10 @@ fn log_weapon_probe(record: *const usize) {
             let stats: Vec<String> = (0..0x20_usize)
                 .map(|i| format!("{:08x}", read_u32_guarded(blob, 0x5ED8 + i * 4)))
                 .collect();
-            log::info!("WPDIAG blob={blob:#x} stats@5ED8..5F58: {}", stats.join(" "));
+            log::info!(
+                "WPDIAG blob={blob:#x} stats@5ED8..5F58: {}",
+                stats.join(" ")
+            );
         }
     }
 
@@ -2379,7 +2398,10 @@ fn log_weapon_probe(record: *const usize) {
                     .step_by(4)
                     .map(|off| format!("{:08x}", read_u32_guarded(arr, e + off)))
                     .collect();
-                log::info!("WPDIAG charid={charid:#010x} wpn[{w}]@60..C8: {}", row.join(" "));
+                log::info!(
+                    "WPDIAG charid={charid:#010x} wpn[{w}]@60..C8: {}",
+                    row.join(" ")
+                );
             }
             // 07-17 live run: arrays resolved but read all-empty at +0x60.
             // Discriminate wrong-offset vs truly-empty: dump slot 0 raw and
@@ -2388,7 +2410,10 @@ fn log_weapon_probe(record: *const usize) {
             let raw0: Vec<String> = (0..0x64_usize)
                 .map(|i| format!("{:08x}", read_u32_guarded(arr, i * 4)))
                 .collect();
-            log::info!("WPDIAG charid={charid:#010x} arr[0]@0..190: {}", raw0.join(" "));
+            log::info!(
+                "WPDIAG charid={charid:#010x} arr[0]@0..190: {}",
+                raw0.join(" ")
+            );
             let nonzero = (0..0x2EE0_usize)
                 .step_by(4)
                 .filter(|&off| read_u32_guarded(arr, off) != 0)
@@ -2440,7 +2465,10 @@ fn log_loadout_probe(record: *const usize) {
                 .step_by(8)
                 .map(|off| format!("{:x}", read_ptr_guarded(base, off).unwrap_or(0)))
                 .collect();
-            log::info!("LODIAG record={base:#x} mode={mode} loadout=NULL ptrs@5DC8..5E48: {}", ptrs.join(" "));
+            log::info!(
+                "LODIAG record={base:#x} mode={mode} loadout=NULL ptrs@5DC8..5E48: {}",
+                ptrs.join(" ")
+            );
             if let Some(keys) = read_ptr_guarded(base, 0x5DD0) {
                 if keys != 0 {
                     let ks: Vec<String> = (0..16usize)
@@ -2466,7 +2494,10 @@ fn log_loadout_probe(record: *const usize) {
     for i in 0..4usize {
         let id = read_u32_guarded(loadout, 0x3208 + i * 8);
         let flags = read_u32_guarded(loadout, 0x320C + i * 8);
-        log::info!("LODIAG pair[{i}]@{:#x} id={id:#010x} flags={flags:#010x}", 0x3208 + i * 8);
+        log::info!(
+            "LODIAG pair[{i}]@{:#x} id={id:#010x} flags={flags:#010x}",
+            0x3208 + i * 8
+        );
     }
 
     // Stat/equip block between the id pairs and the sigil array.
@@ -2545,7 +2576,13 @@ mod tests {
     // +0x94, a zero word at +0xF0, and the id-repeating {id, level} pair
     // array at +0xF4 carrying the live-confirmed levels 32/22/12/1.
     fn innate_buffer(pair_ids: [u32; 4]) -> Vec<u8> {
-        let ids = [0x1e1cecce_u32, 0xa8a3163b, 0xdc584f60, 0x57e8a93f, EMPTY_SIGIL_HASH];
+        let ids = [
+            0x1e1cecce_u32,
+            0xa8a3163b,
+            0xdc584f60,
+            0x57e8a93f,
+            EMPTY_SIGIL_HASH,
+        ];
         let levels = [32_u32, 22, 12, 1];
         let mut buf = vec![0u8; 0x200];
         for (i, id) in ids.iter().enumerate() {
@@ -2565,7 +2602,12 @@ mod tests {
         let pairs: Vec<(u32, u32)> = traits.iter().map(|t| (t.id, t.level)).collect();
         assert_eq!(
             pairs,
-            vec![(0x1e1cecce, 32), (0xa8a3163b, 22), (0xdc584f60, 12), (0x57e8a93f, 1)]
+            vec![
+                (0x1e1cecce, 32),
+                (0xa8a3163b, 22),
+                (0xdc584f60, 12),
+                (0x57e8a93f, 1)
+            ]
         );
     }
 
@@ -2580,7 +2622,12 @@ mod tests {
     }
 
     /// A minimal claimable identity; only the fields the donor tests assert on.
-    fn identity(name: &str, party_index: u8, is_online: bool, master_level: u32) -> StoredPlayerIdentity {
+    fn identity(
+        name: &str,
+        party_index: u8,
+        is_online: bool,
+        master_level: u32,
+    ) -> StoredPlayerIdentity {
         StoredPlayerIdentity {
             character_name: CString::new("").unwrap(),
             display_name: CString::new(name).unwrap(),

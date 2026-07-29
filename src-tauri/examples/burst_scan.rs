@@ -193,7 +193,11 @@ fn main() -> Result<()> {
             let offsets: Vec<String> = users
                 .iter()
                 .map(|(dt, who)| {
-                    format!("{}@-{:.1}s", CharacterType::from_hash(who.0), *dt as f64 / 1000.0)
+                    format!(
+                        "{}@-{:.1}s",
+                        CharacterType::from_hash(who.0),
+                        *dt as f64 / 1000.0
+                    )
                 })
                 .collect();
             println!(

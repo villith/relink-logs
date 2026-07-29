@@ -202,9 +202,7 @@ pub const REGEN_MIN_INTERVAL_SHARE: f64 = 0.05;
 ///
 /// Nothing is hardcoded here. Naming Lucilius in the source would hide whichever
 /// enemy regenerates next.
-pub fn classify_regen_outliers(
-    per_enemy: &[(EnemyType, EnemyStats, usize)],
-) -> Vec<EnemyType> {
+pub fn classify_regen_outliers(per_enemy: &[(EnemyType, EnemyStats, usize)]) -> Vec<EnemyType> {
     per_enemy
         .iter()
         .filter(|(_, stats, logs_with_heals)| {

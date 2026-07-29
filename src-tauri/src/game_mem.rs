@@ -89,8 +89,10 @@ pub fn open_game() -> Result<Option<(Mem, u64, PathBuf)>> {
     let Some(pid) = find_game_pid()? else {
         return Ok(None);
     };
-    let mem = Mem(unsafe { OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid) }
-        .context("OpenProcess (run as admin?)")?);
+    let mem = Mem(
+        unsafe { OpenProcess(PROCESS_VM_READ | PROCESS_QUERY_INFORMATION, false, pid) }
+            .context("OpenProcess (run as admin?)")?,
+    );
     let (base, exe) = module_base(pid)?;
     Ok(Some((mem, base, exe)))
 }

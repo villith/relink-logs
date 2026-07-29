@@ -271,8 +271,8 @@ pub fn player_keyed_parent(
     source_idx: u32,
     source: *const usize,
 ) -> (u32, u32) {
-    let (parent_type_id, parent_idx, parent_ptr) = get_source_parent(source_type_id, source)
-        .unwrap_or((source_type_id, source_idx, source));
+    let (parent_type_id, parent_idx, parent_ptr) =
+        get_source_parent(source_type_id, source).unwrap_or((source_type_id, source_idx, source));
 
     let keyed_idx = player::player_slot_key_for_actor(parent_ptr).unwrap_or(parent_idx);
     (parent_type_id, keyed_idx)

@@ -105,7 +105,12 @@ pub fn ev_str(label: &str, vals: &str) {
 pub fn log_addr(label: &str, addr: usize) {
     let base = MODULE_BASE.load(Ordering::Relaxed);
     if base != 0 && addr > base {
-        log::info!("HOOKDIAG t={} {label} abs={:#x} rva={:#x}", ms(), addr, addr - base);
+        log::info!(
+            "HOOKDIAG t={} {label} abs={:#x} rva={:#x}",
+            ms(),
+            addr,
+            addr - base
+        );
     } else {
         log::info!("HOOKDIAG t={} {label} abs={:#x} (rva n/a)", ms(), addr);
     }
@@ -139,7 +144,11 @@ pub fn log_callers_depth(label: &str, max: usize) {
         }
         frames.len() < max
     });
-    log::info!("HOOKDIAG t={} callers[{label}] rvas: {}", ms(), frames.join(" "));
+    log::info!(
+        "HOOKDIAG t={} callers[{label}] rvas: {}",
+        ms(),
+        frames.join(" ")
+    );
 }
 
 /// Returns true only if `[addr, addr+len)` is readable memory (guards every deref so the
@@ -312,7 +321,11 @@ pub fn probe_u32_window(label: &str, base: usize, len: usize) {
     log::info!(
         "HOOKDIAG t={} probe[{label}] base={base:#x} len={len:#x} u32s: {}",
         ms(),
-        if out.is_empty() { "(all zero/unreadable)".into() } else { out }
+        if out.is_empty() {
+            "(all zero/unreadable)".into()
+        } else {
+            out
+        }
     );
 }
 
@@ -398,7 +411,12 @@ pub fn scan_u32_needles_deep(label: &str, base: usize, len: usize, needles: &[(u
             while off + 4 <= chunk {
                 let v = unsafe { ((addr + off) as *const u32).read_unaligned() };
                 if let Some(name) = classify(v) {
-                    hits.push(NeedleHit { via: None, off: page + off, value: v, name });
+                    hits.push(NeedleHit {
+                        via: None,
+                        off: page + off,
+                        value: v,
+                        name,
+                    });
                     inline_hits += 1;
                 }
                 // Aligned u64 = pointer candidate (user-space heap range, 8-aligned target).
@@ -428,7 +446,12 @@ pub fn scan_u32_needles_deep(label: &str, base: usize, len: usize, needles: &[(u
         while off + 4 <= BLK {
             let v = unsafe { ((*p + off) as *const u32).read_unaligned() };
             if let Some(name) = classify(v) {
-                hits.push(NeedleHit { via: Some(*src), off, value: v, name });
+                hits.push(NeedleHit {
+                    via: Some(*src),
+                    off,
+                    value: v,
+                    name,
+                });
             }
             off += 4;
         }
@@ -524,7 +547,11 @@ pub fn probe_u32_window_delta(label: &str, base: usize, len: usize) {
             log::info!(
                 "HOOKDIAG t={} probe_delta[{label}] base={base:#x} first: {}",
                 ms(),
-                if out.is_empty() { "(all zero/unreadable)".into() } else { out }
+                if out.is_empty() {
+                    "(all zero/unreadable)".into()
+                } else {
+                    out
+                }
             );
             map.insert(key, cur);
         }
@@ -553,7 +580,11 @@ pub fn probe_u32_window_delta(label: &str, base: usize, len: usize) {
             log::info!(
                 "HOOKDIAG t={} probe_delta[{label}] base={base:#x} delta: {}",
                 ms(),
-                if out.is_empty() { "(no change)".into() } else { out }
+                if out.is_empty() {
+                    "(no change)".into()
+                } else {
+                    out
+                }
             );
             map.insert(key, cur);
         }
@@ -733,7 +764,11 @@ pub fn probe_player_instance(instance: usize) {
     }
     log::info!(
         "HOOKDIAG probe instance={instance:#x} direct_names: {}",
-        if direct.is_empty() { "(none)".into() } else { direct }
+        if direct.is_empty() {
+            "(none)".into()
+        } else {
+            direct
+        }
     );
 
     // 2. Names behind pointer fields — the SigilList is reached via a pointer in the instance.
@@ -755,7 +790,11 @@ pub fn probe_player_instance(instance: usize) {
     }
     log::info!(
         "HOOKDIAG probe instance={instance:#x} behind_ptr_names: {}",
-        if behind.is_empty() { "(none)".into() } else { behind }
+        if behind.is_empty() {
+            "(none)".into()
+        } else {
+            behind
+        }
     );
 }
 
@@ -770,7 +809,10 @@ pub fn note_player_instance(instance: usize) {
     let known = KNOWN.get_or_init(|| Mutex::new(HashSet::new()));
     let mut known = known.lock().expect("player instance set lock poisoned");
     if known.len() < 128 && known.insert(instance) {
-        log::info!("IDDIAG player instance noted: {instance:#x} ({} known)", known.len());
+        log::info!(
+            "IDDIAG player instance noted: {instance:#x} ({} known)",
+            known.len()
+        );
         // Publish an updated snapshot for the probe (rebuilt only when the set grows,
         // so the per-damage-event fast path is one lock + one HashSet probe).
         let snapshot: Vec<usize> = known.iter().copied().collect();
@@ -940,7 +982,11 @@ pub fn probe_unmapped_source_parent(instance: usize, type_id: u32) {
     log::info!(
         "UNSRC parent scan type={type_id:#010x} instance={instance:#x} known_players={} hits: {}",
         known.len(),
-        if hits.is_empty() { "(none)".into() } else { hits }
+        if hits.is_empty() {
+            "(none)".into()
+        } else {
+            hits
+        }
     );
 }
 

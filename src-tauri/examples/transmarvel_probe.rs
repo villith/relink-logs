@@ -86,9 +86,9 @@ fn item_names() -> std::collections::HashMap<u32, String> {
         let Ok(text) = std::fs::read_to_string(&path) else {
             continue;
         };
-        let Ok(map) = serde_json::from_str::<
-            std::collections::HashMap<String, serde_json::Value>,
-        >(&text) else {
+        let Ok(map) =
+            serde_json::from_str::<std::collections::HashMap<String, serde_json::Value>>(&text)
+        else {
             continue;
         };
         for (hash, entry) in map {
@@ -166,7 +166,10 @@ fn main() -> anyhow::Result<()> {
             let snap = game_mem::rpm_rng_slot(gbfr_logs::transmarvel::TM_SLOT)?
                 .ok_or_else(|| anyhow::anyhow!("game not running (run as admin)"))?;
             if snap.slot_override != u32::MAX {
-                println!("slot_override {:#x} — roll mid-flight, retry", snap.slot_override);
+                println!(
+                    "slot_override {:#x} — roll mid-flight, retry",
+                    snap.slot_override
+                );
                 return Ok(());
             }
             if snap.state == 0 {

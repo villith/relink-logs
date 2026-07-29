@@ -381,7 +381,9 @@ impl OnProcessDamageHook {
                 }
             }
             Err(e) => {
-                log::warn!("process_damage_bypass: sig failed, direct-apply damage untracked: {e:?}");
+                log::warn!(
+                    "process_damage_bypass: sig failed, direct-apply damage untracked: {e:?}"
+                );
             }
         }
 
@@ -706,8 +708,12 @@ impl OnProcessDamageHook {
             .is_some();
             let source_is_player =
                 super::player::player_slot_key_for_actor(src as *const usize).is_some();
-            (target_is_player && !source_is_player)
-                .then(|| (src, crate::hooks::diag::snapshot_f32_window(src, 0x000, 0x1800)))
+            (target_is_player && !source_is_player).then(|| {
+                (
+                    src,
+                    crate::hooks::diag::snapshot_f32_window(src, 0x000, 0x1800),
+                )
+            })
         });
 
         // Stun re-derivation probe (kept for the next patch): snapshot a float window
@@ -1457,7 +1463,11 @@ mod tests {
         // Guard bit missing → not a marker.
         assert!(!is_quickening_marker(0, 0x4000200, EM8300_THE_WORLD));
         // A supp echo of the marker must not double-count the guard.
-        assert!(!is_quickening_marker(0, 0x4000220 | (1 << 15), EM8300_THE_WORLD));
+        assert!(!is_quickening_marker(
+            0,
+            0x4000220 | (1 << 15),
+            EM8300_THE_WORLD
+        ));
         assert!(!is_quickening_marker(u32::MAX, 0x4000220, EM8300_THE_WORLD));
     }
 

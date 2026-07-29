@@ -67,7 +67,10 @@ fn main() {
         }
         if count <= MAX_DUMP {
             let cursor_rva = addrs[1];
-            print!("  match #{count}: match_rva=0x{:x} cursor_rva=0x{:x}", addrs[0], cursor_rva);
+            print!(
+                "  match #{count}: match_rva=0x{:x} cursor_rva=0x{:x}",
+                addrs[0], cursor_rva
+            );
             // Dump 24 bytes BEFORE and 48 bytes starting at the match, to aid re-derivation
             // (function sigs often need the caller context that precedes the anchor).
             if addrs[0] >= 24 {

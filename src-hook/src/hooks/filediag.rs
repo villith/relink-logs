@@ -41,7 +41,10 @@ mod imp {
     fn interesting_bytes(path: &[u8]) -> bool {
         NEEDLES.iter().any(|needle| {
             let n = needle.as_bytes();
-            path.len() >= n.len() && path.windows(n.len()).any(|window| window.eq_ignore_ascii_case(n))
+            path.len() >= n.len()
+                && path
+                    .windows(n.len())
+                    .any(|window| window.eq_ignore_ascii_case(n))
         })
     }
 
@@ -122,16 +125,10 @@ mod imp {
             let a = GetProcAddress(k32, PCSTR(b"CreateFileA\0".as_ptr()))
                 .ok_or_else(|| anyhow!("CreateFileA not found"))?;
             OnCreateFileW
-                .initialize(
-                    std::mem::transmute::<_, CreateFileWFn>(w),
-                    on_create_file_w,
-                )?
+                .initialize(std::mem::transmute::<_, CreateFileWFn>(w), on_create_file_w)?
                 .enable()?;
             OnCreateFileA
-                .initialize(
-                    std::mem::transmute::<_, CreateFileAFn>(a),
-                    on_create_file_a,
-                )?
+                .initialize(std::mem::transmute::<_, CreateFileAFn>(a), on_create_file_a)?
                 .enable()?;
         }
         Ok(())

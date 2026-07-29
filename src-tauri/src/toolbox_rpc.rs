@@ -9,10 +9,10 @@
 //! in main.rs) rather than latching a version verdict nobody gave us.
 
 use anyhow::Result;
+use protocol::toolbox::{OvermasterySnapshot, SynthesisSeed, SynthesisSnapshot};
 use protocol::toolbox::{
     RngSlotState, ToolboxRequest, ToolboxResponse, TOOLBOX_PROTOCOL_VERSION, TOOLBOX_TCP_ADDR,
 };
-use protocol::toolbox::{OvermasterySnapshot, SynthesisSeed, SynthesisSnapshot};
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -158,7 +158,12 @@ impl HookStatus {
             HookState::Connected
         };
 
-        HookStatusSnapshot { state, hook_version, app_version, supports_eject }
+        HookStatusSnapshot {
+            state,
+            hook_version,
+            app_version,
+            supports_eject,
+        }
     }
 
     /// Shared precondition for the Debug tab's hook-driving commands: a dev
@@ -294,7 +299,10 @@ pub async fn handshake(hook: &HookStatus) {
 /// stream is down, which the tools present as "game not running". The two
 /// error slugs are mapped to friendly copy in src/backendErrors.ts; remote
 /// error strings (e.g. "still on title screen?") pass through verbatim.
-async fn request(hook: &HookStatus, req: ToolboxRequest) -> Result<Option<ToolboxResponse>, String> {
+async fn request(
+    hook: &HookStatus,
+    req: ToolboxRequest,
+) -> Result<Option<ToolboxResponse>, String> {
     if !hook.connected.load(Ordering::Relaxed) {
         return Ok(None);
     }
@@ -326,7 +334,9 @@ pub async fn synthesis_seed(hook: &HookStatus) -> Result<Option<SynthesisSeed>, 
     }
 }
 
-pub async fn overmastery_snapshot(hook: &HookStatus) -> Result<Option<OvermasterySnapshot>, String> {
+pub async fn overmastery_snapshot(
+    hook: &HookStatus,
+) -> Result<Option<OvermasterySnapshot>, String> {
     match request(hook, ToolboxRequest::OvermasterySnapshot).await? {
         None => Ok(None),
         Some(ToolboxResponse::OvermasterySnapshot(r)) => r.map(Some),
@@ -388,7 +398,10 @@ mod tests {
 
     #[test]
     fn snapshot_disconnected_when_pipe_down() {
-        assert_eq!(HookStatus::default().snapshot().state, HookState::Disconnected);
+        assert_eq!(
+            HookStatus::default().snapshot().state,
+            HookState::Disconnected
+        );
     }
 
     #[test]

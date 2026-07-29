@@ -259,7 +259,10 @@ mod tests {
     #[test]
     fn quest_state_field_offsets() {
         use std::mem::offset_of;
-        assert_eq!(offset_of!(QuestState, elapsed_time), QUEST_ELAPSED_TIME_OFFSET);
+        assert_eq!(
+            offset_of!(QuestState, elapsed_time),
+            QUEST_ELAPSED_TIME_OFFSET
+        );
         assert_eq!(offset_of!(QuestState, elapsed_time), 0xAC8);
         assert_eq!(offset_of!(QuestState, freeze_flag), 0xADC);
         assert_eq!(offset_of!(QuestState, quest_id), QUEST_ID_OFFSET);
@@ -273,7 +276,10 @@ mod tests {
         header[0] = usize::from_le_bytes(*b"Gran\0\0\0\0");
         let vbuffer = VBuffer(header.as_ptr() as *const usize);
         assert_eq!(
-            vbuffer.checked_raw().expect("inline name must resolve").as_bytes(),
+            vbuffer
+                .checked_raw()
+                .expect("inline name must resolve")
+                .as_bytes(),
             b"Gran"
         );
     }

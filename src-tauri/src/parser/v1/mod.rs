@@ -3,10 +3,10 @@ use std::collections::{HashMap, HashSet};
 use anyhow::Result;
 use chrono::Utc;
 use protocol::{
-    ActionType, AreaEnterEvent, ConfluxBuffAcquiredEvent, ConfluxRoomEnterEvent, ConfluxRunEndEvent,
-    DamageEvent, Message, OnAttemptSBAEvent, OnContinueSBAChainEvent, OnDeathEvent,
-    OnPerformSBAEvent, OnPlayerStunEvent, OnUpdateSBAEvent, PlayerIdentityEvent, PlayerLoadEvent,
-    QuestCompleteEvent, QuestElapsedTimeEvent,
+    ActionType, AreaEnterEvent, ConfluxBuffAcquiredEvent, ConfluxRoomEnterEvent,
+    ConfluxRunEndEvent, DamageEvent, Message, OnAttemptSBAEvent, OnContinueSBAChainEvent,
+    OnDeathEvent, OnPerformSBAEvent, OnPlayerStunEvent, OnUpdateSBAEvent, PlayerIdentityEvent,
+    PlayerLoadEvent, QuestCompleteEvent, QuestElapsedTimeEvent,
 };
 
 use crate::db::runs::{finalize_run, insert_run, ConfluxBuffDelta};
@@ -724,7 +724,8 @@ impl DerivedEncounterState {
             return;
         }
 
-        self.stun_suppressed_players.insert(event.source.parent_index);
+        self.stun_suppressed_players
+            .insert(event.source.parent_index);
     }
 
     fn process_damage_event(&mut self, now: i64, damage_instance: &AdjustedDamageInstance) {
@@ -2704,7 +2705,11 @@ mod tests {
         ));
         parser.encounter.raw_event_log.push((
             2_000,
-            Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000)),
+            Message::DamageEvent(damage_from(
+                PRIMAL_BURST_BODY,
+                SUMMON_ATTACK_ACTION_ID,
+                3_000,
+            )),
         ));
         parser
     }
@@ -2782,8 +2787,18 @@ mod tests {
         };
         included.reparse();
 
-        let excluded_stun = excluded.derived_state.party.get(&0).unwrap().total_stun_value;
-        let included_stun = included.derived_state.party.get(&0).unwrap().total_stun_value;
+        let excluded_stun = excluded
+            .derived_state
+            .party
+            .get(&0)
+            .unwrap()
+            .total_stun_value;
+        let included_stun = included
+            .derived_state
+            .party
+            .get(&0)
+            .unwrap()
+            .total_stun_value;
         assert!(
             included_stun > excluded_stun,
             "burst stun should be counted only when the burst is: {included_stun} vs {excluded_stun}"
@@ -2916,7 +2931,11 @@ mod tests {
             ),
             (
                 2_500,
-                Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000)),
+                Message::DamageEvent(damage_from(
+                    PRIMAL_BURST_BODY,
+                    SUMMON_ATTACK_ACTION_ID,
+                    3_000,
+                )),
             ),
             (
                 3_000,
@@ -2949,7 +2968,11 @@ mod tests {
             ),
             (
                 2_500,
-                Message::DamageEvent(damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000)),
+                Message::DamageEvent(damage_from(
+                    PRIMAL_BURST_BODY,
+                    SUMMON_ATTACK_ACTION_ID,
+                    3_000,
+                )),
             ),
         ];
 
@@ -2998,7 +3021,11 @@ mod tests {
         let mut parser = Parser::default();
 
         parser.on_damage_event(damage_from(PLAYER_HASH, 100, 1_000));
-        parser.on_damage_event(damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000));
+        parser.on_damage_event(damage_from(
+            PRIMAL_BURST_BODY,
+            SUMMON_ATTACK_ACTION_ID,
+            3_000,
+        ));
 
         assert_eq!(
             parser.encounter.raw_event_log.len(),
@@ -3021,7 +3048,11 @@ mod tests {
         };
 
         parser.on_damage_event(damage_from(PLAYER_HASH, 100, 1_000));
-        parser.on_damage_event(damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000));
+        parser.on_damage_event(damage_from(
+            PRIMAL_BURST_BODY,
+            SUMMON_ATTACK_ACTION_ID,
+            3_000,
+        ));
 
         assert_eq!(parser.derived_state.total_damage, 4_000);
         assert_eq!(

@@ -324,9 +324,7 @@ impl OnQuestRetireHook {
 
             unsafe {
                 let func: OnSetRetireSelectFunc = std::mem::transmute(on_set_retire_select);
-                OnSetRetireSelect.initialize(func, move |is_retire| {
-                    Self::run(&tx, is_retire)
-                })?;
+                OnSetRetireSelect.initialize(func, move |is_retire| Self::run(&tx, is_retire))?;
                 OnSetRetireSelect.enable()?;
             }
         } else {
@@ -352,7 +350,9 @@ impl OnQuestRetireHook {
             } else {
                 unsafe { (*quest_state_ptr).quest_id }
             };
-            let _ = tx.send(Message::OnQuestFail(protocol::OnQuestFailEvent { quest_id }));
+            let _ = tx.send(Message::OnQuestFail(protocol::OnQuestFailEvent {
+                quest_id,
+            }));
         }
 
         unsafe { OnSetRetireSelect.call(is_retire) }
@@ -491,7 +491,9 @@ impl OnQuestFlowEndHook {
             println!("quest flow entered end state 0x1e (fail/abandon boundary)");
 
             let quest_id = read_u32_guarded(mgr, QUEST_ID_OFFSET);
-            let _ = tx.send(Message::OnQuestFail(protocol::OnQuestFailEvent { quest_id }));
+            let _ = tx.send(Message::OnQuestFail(protocol::OnQuestFailEvent {
+                quest_id,
+            }));
         }
     }
 }

@@ -14,19 +14,8 @@ use super::{actor_idx, actor_type_id, globals::SBA_OFFSET};
 // is a float added into the gauge math; params 7-11 gate branches). The old 6-arg
 // declaration truncated param_6 (f32) to u8 and never marshalled params 7-11, so re-calling
 // the original corrupted the in-game gauge (it went negative). We pass all eleven through.
-type OnSBAUpdateFunc = unsafe extern "system" fn(
-    *const usize,
-    f32,
-    u32,
-    u8,
-    u8,
-    f32,
-    u8,
-    u8,
-    u8,
-    u8,
-    u8,
-) -> usize;
+type OnSBAUpdateFunc =
+    unsafe extern "system" fn(*const usize, f32, u32, u8, u8, f32, u8, u8, u8, u8, u8) -> usize;
 type OnSBAAttemptFunc = unsafe extern "system" fn(*const usize, f32) -> usize;
 type OnCheckSBACollisionFunc = unsafe extern "system" fn(*const usize, f32) -> usize;
 type OnContinueSBAChainFunc = unsafe extern "system" fn(*const usize, *const usize) -> usize;
@@ -333,9 +322,12 @@ impl OnHandleSBAUpdateHook {
 
             unsafe {
                 let func: OnSBAUpdateFunc = std::mem::transmute(on_sba_update_original);
-                OnSBAUpdate.initialize(func, move |a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11| {
-                    cloned_self.run(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11)
-                })?;
+                OnSBAUpdate.initialize(
+                    func,
+                    move |a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11| {
+                        cloned_self.run(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11)
+                    },
+                )?;
                 OnSBAUpdate.enable()?;
             }
         } else {

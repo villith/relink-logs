@@ -85,8 +85,12 @@ fn main() -> Result<()> {
                         dmg.source.index,
                         dmg.source.parent_index,
                     ),
-                    Message::OnPerformSBA(e) => format!(">> OnPerformSBA actor={:#x}", e.actor_index),
-                    Message::OnAttemptSBA(e) => format!(">> OnAttemptSBA actor={:#x}", e.actor_index),
+                    Message::OnPerformSBA(e) => {
+                        format!(">> OnPerformSBA actor={:#x}", e.actor_index)
+                    }
+                    Message::OnAttemptSBA(e) => {
+                        format!(">> OnAttemptSBA actor={:#x}", e.actor_index)
+                    }
                     Message::OnContinueSBAChain(e) => {
                         format!(">> OnContinueSBAChain actor={:#x}", e.actor_index)
                     }

@@ -224,10 +224,12 @@ impl OnNetworkStunHook {
 
         if applied > 0.0 {
             if let Some(actor_index) = source_slot_key {
-                let _ = self.tx.send(Message::OnPlayerStun(protocol::OnPlayerStunEvent {
-                    actor_index,
-                    stun_amount: applied,
-                }));
+                let _ = self
+                    .tx
+                    .send(Message::OnPlayerStun(protocol::OnPlayerStunEvent {
+                        actor_index,
+                        stun_amount: applied,
+                    }));
             }
         }
 

@@ -206,7 +206,11 @@ pub fn predict_roll(state: &mut u32, t: &TransmarvelTables) -> TransmarvelRoll {
 
     // Draw 1: gem vs wrightstone.
     let is_gem = draw() % 100 < t.gem_chance_percent;
-    let groups = if is_gem { &t.gem_groups } else { &t.stone_groups };
+    let groups = if is_gem {
+        &t.gem_groups
+    } else {
+        &t.stone_groups
+    };
 
     // Draw 2: rate group, cumulative over the group weights (sum 10000).
     let total: u32 = groups.iter().map(|g| g.weight).sum();
@@ -328,11 +332,17 @@ mod tests {
         assert_eq!(t.gem_groups.iter().map(|g| g.weight).sum::<u32>(), 10000);
         assert_eq!(t.stone_groups.iter().map(|g| g.weight).sum::<u32>(), 10000);
         assert_eq!(
-            t.gem_groups.iter().map(|g| g.items.len()).collect::<Vec<_>>(),
+            t.gem_groups
+                .iter()
+                .map(|g| g.items.len())
+                .collect::<Vec<_>>(),
             vec![4, 20, 9, 5, 8, 28, 28, 28, 32]
         );
         assert_eq!(
-            t.stone_groups.iter().map(|g| g.items.len()).collect::<Vec<_>>(),
+            t.stone_groups
+                .iter()
+                .map(|g| g.items.len())
+                .collect::<Vec<_>>(),
             vec![4, 4, 4]
         );
         // Group order is the cumulative pick's walk order — pin it.
@@ -358,16 +368,25 @@ mod tests {
         // The row excludes the sigil's own trait's category (see the
         // generator docstring): group 0 = Attack/Health/Crit/Stun V+, whose
         // traits are all in the ATK/HP lot -> row 5.
-        assert!(t.gem_groups[0].items.iter().all(|i| i.second_trait_lot == 5));
+        assert!(t.gem_groups[0]
+            .items
+            .iter()
+            .all(|i| i.second_trait_lot == 5));
         // Group 1 holds all five categories; spot-check the spread.
         let group1_rows: std::collections::HashSet<i32> = t.gem_groups[1]
             .items
             .iter()
             .map(|i| i.second_trait_lot)
             .collect();
-        assert!(group1_rows.is_superset(&[6, 7, 26, 27].into()), "{group1_rows:?}");
+        assert!(
+            group1_rows.is_superset(&[6, 7, 26, 27].into()),
+            "{group1_rows:?}"
+        );
         // Character sigils roll from row 15; awakening _90s have fixed pairs.
-        assert!(t.gem_groups[5].items.iter().all(|i| i.second_trait_lot == 15));
+        assert!(t.gem_groups[5]
+            .items
+            .iter()
+            .all(|i| i.second_trait_lot == 15));
         assert!(t.gem_groups[8]
             .items
             .iter()
