@@ -20,7 +20,13 @@ import sqlite3
 import sys
 from pathlib import Path
 
-OUT_PATH = Path(__file__).resolve().parent.parent / "src" / "assets" / "skillboard-layout.json"
+ROOT = Path(__file__).resolve().parent.parent
+# Written twice: the frontend renders the master-traits table from src/assets,
+# and the legality rules embed the src-tauri copy with include_str!.
+OUT_PATHS = (
+    ROOT / "src" / "assets" / "skillboard-layout.json",
+    ROOT / "src-tauri" / "assets" / "skillboard-layout.json",
+)
 
 TIER_BY_GROUP = {"CHAOS1": "1", "CHAOS2": "2", "CHAOS3": "3", "EX": "ex"}
 
@@ -52,9 +58,11 @@ def main() -> None:
     if unknown_groups:
         print(f"WARN: skipped unknown SkillboardGroupId values: {sorted(unknown_groups)}")
 
-    OUT_PATH.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
+    for out_path in OUT_PATHS:
+        out_path.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     total = sum(len(ids) for board in out.values() for ids in board.values())
-    print(f"wrote {total} nodes across {len(out)} characters to {OUT_PATH}")
+    paths = ", ".join(str(p) for p in OUT_PATHS)
+    print(f"wrote {total} nodes across {len(out)} characters to {paths}")
 
 
 if __name__ == "__main__":
