@@ -74,9 +74,26 @@ describe("ChecklistSection add-trait search", () => {
 });
 
 describe("ChecklistSection computed variant", () => {
-  it("renders the three derived rows and no trait picker", () => {
+  it("renders three rows shaped like any other group's, with every control disabled", () => {
     render(<Harness kind="computed" />);
-    expect(screen.queryByPlaceholderText("Add trait...")).toBeNull();
-    expect(screen.getAllByRole("listitem")).toHaveLength(3);
+
+    // Same row markup as a custom group — a checkbox and a level input each —
+    // so the two kinds of group read as one list.
+    const checkboxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
+    expect(checkboxes).toHaveLength(3);
+    expect(checkboxes.every((checkbox) => checkbox.disabled)).toBe(true);
+
+    // Three level inputs plus the trait picker, none of them writable.
+    const inputs = screen.getAllByRole("textbox") as HTMLInputElement[];
+    expect(inputs).toHaveLength(4);
+    expect(inputs.every((input) => input.disabled)).toBe(true);
+
+    // The picker stays for visual parity but cannot be opened.
+    expect((screen.getByPlaceholderText("Add trait...") as HTMLInputElement).disabled).toBe(true);
+  });
+
+  it("offers no drag handles, since derived rows cannot be reordered", () => {
+    render(<Harness kind="computed" />);
+    expect(screen.queryByLabelText("Reorder entry")).toBeNull();
   });
 });

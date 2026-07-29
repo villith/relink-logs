@@ -2,7 +2,7 @@ import useChecklistSettings from "@/pages/useChecklistSettings";
 import { type ChecklistGroup } from "@/stores/useChecklistStore";
 import { moveItem, orderedChecklistEntries } from "@/utils";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
-import { ActionIcon, Box, Button, Card, Checkbox, Group, Stack, TextInput, Title, Tooltip } from "@mantine/core";
+import { ActionIcon, Box, Button, Card, Checkbox, Group, Stack, Text, TextInput, Title, Tooltip } from "@mantine/core";
 import { modals } from "@mantine/modals";
 import { DotsSixVertical, SortAscending, Trash } from "@phosphor-icons/react";
 import { useState } from "react";
@@ -81,71 +81,87 @@ const ChecklistSettings = () => {
                       padding="sm"
                       style={draggableProvided.draggableProps.style}
                     >
-                      <Group gap="xs" wrap="nowrap" mb="xs">
-                        <Box
-                          component="span"
-                          aria-label={t("ui.checklist-settings.reorder-group", "Reorder group")}
-                          style={{ cursor: "grab", display: "flex", color: "var(--mantine-color-dark-2)" }}
-                          {...draggableProvided.dragHandleProps}
-                        >
-                          <DotsSixVertical size={16} />
-                        </Box>
-                        <Tooltip label={t("ui.checklist-settings.group-enabled", "Show this group")}>
-                          <Checkbox checked={group.enabled} onChange={() => checklist.toggleGroup(group.id)} />
-                        </Tooltip>
-                        {editing === group.id ? (
-                          <TextInput
-                            autoFocus
-                            size="xs"
-                            flex={1}
-                            defaultValue={groupName(group)}
-                            placeholder={t("ui.checklist-settings.group-name-placeholder", "Group name")}
-                            onBlur={(event) => {
-                              checklist.renameGroup(group.id, event.currentTarget.value);
-                              setEditing(null);
-                            }}
-                            onKeyDown={(event) => {
-                              if (event.key === "Enter") event.currentTarget.blur();
-                              if (event.key === "Escape") setEditing(null);
-                            }}
-                          />
-                        ) : (
-                          <Button
-                            variant="subtle"
-                            size="compact-sm"
-                            flex={1}
-                            justify="flex-start"
-                            title={t("ui.checklist-settings.rename-group", "Rename group")}
-                            onClick={() => setEditing(group.id)}
+                      {/* A bordered, tinted band: the header has the same controls as
+                       * an entry row, so it needs to be separated by more than spacing. */}
+                      <Card.Section
+                        withBorder
+                        inheritPadding
+                        py="xs"
+                        mb="xs"
+                        bg="var(--mantine-color-dark-6)"
+                      >
+                        <Group gap="xs" wrap="nowrap">
+                          <Box
+                            component="span"
+                            aria-label={t("ui.checklist-settings.reorder-group", "Reorder group")}
+                            style={{ cursor: "grab", display: "flex", color: "var(--mantine-color-dark-2)" }}
+                            {...draggableProvided.dragHandleProps}
                           >
-                            {groupName(group)}
-                          </Button>
-                        )}
-                        {group.kind === "custom" && (
-                          <>
-                            {/* Lit green while the group is in alphabetical mode — the
-                             * button reports the current ordering as much as it sets it. */}
-                            <Tooltip label={sortLabel(group)}>
-                              <ActionIcon
-                                variant={group.manualOrder ? "subtle" : "light"}
-                                color={group.manualOrder ? "gray" : "green"}
-                                aria-label={sortLabel(group)}
-                                onClick={() => checklist.sortGroup(group.id)}
-                              >
-                                <SortAscending size={16} />
-                              </ActionIcon>
-                            </Tooltip>
-                            <ActionIcon
+                            <DotsSixVertical size={20} weight="bold" />
+                          </Box>
+                          <Tooltip label={t("ui.checklist-settings.group-enabled", "Show this group")}>
+                            <Checkbox checked={group.enabled} onChange={() => checklist.toggleGroup(group.id)} />
+                          </Tooltip>
+                          {editing === group.id ? (
+                            <TextInput
+                              autoFocus
+                              size="sm"
+                              flex={1}
+                              defaultValue={groupName(group)}
+                              placeholder={t("ui.checklist-settings.group-name-placeholder", "Group name")}
+                              onBlur={(event) => {
+                                checklist.renameGroup(group.id, event.currentTarget.value);
+                                setEditing(null);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") event.currentTarget.blur();
+                                if (event.key === "Escape") setEditing(null);
+                              }}
+                            />
+                          ) : (
+                            <Button
                               variant="subtle"
-                              color="red"
-                              aria-label={t("ui.checklist-settings.delete-group", "Delete group")}
-                              onClick={() => confirmRemove(group)}
+                              color="gray"
+                              size="compact-md"
+                              flex={1}
+                              justify="flex-start"
+                              // Zero horizontal padding: a subtle Button's own inset
+                              // would push the name out of line with the controls.
+                              px={0}
+                              title={t("ui.checklist-settings.rename-group", "Rename group")}
+                              onClick={() => setEditing(group.id)}
                             >
-                              <Trash size={16} />
-                            </ActionIcon>
-                          </>
-                        )}
-                      </Group>
+                              <Text fw={700} size="sm" tt="uppercase">
+                                {groupName(group)}
+                              </Text>
+                            </Button>
+                          )}
+                          {group.kind === "custom" && (
+                            <>
+                              {/* Lit green while the group is in alphabetical mode — the
+                               * button reports the current ordering as much as it sets it. */}
+                              <Tooltip label={sortLabel(group)}>
+                                <ActionIcon
+                                  variant={group.manualOrder ? "subtle" : "light"}
+                                  color={group.manualOrder ? "gray" : "green"}
+                                  aria-label={sortLabel(group)}
+                                  onClick={() => checklist.sortGroup(group.id)}
+                                >
+                                  <SortAscending size={16} />
+                                </ActionIcon>
+                              </Tooltip>
+                              <ActionIcon
+                                variant="subtle"
+                                color="red"
+                                aria-label={t("ui.checklist-settings.delete-group", "Delete group")}
+                                onClick={() => confirmRemove(group)}
+                              >
+                                <Trash size={16} />
+                              </ActionIcon>
+                            </>
+                          )}
+                        </Group>
+                      </Card.Section>
                       <ChecklistSection
                         group={group}
                         addPlaceholder={t("ui.checklist-settings.add-trait")}
