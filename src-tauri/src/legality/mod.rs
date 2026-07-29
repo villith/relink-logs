@@ -97,8 +97,9 @@ pub struct Finding {
 
 /// Every legality finding for one build, in rule order.
 pub fn audit(build: &BuildSnapshot) -> Vec<Finding> {
-    let _ = build;
-    Vec::new()
+    let mut findings = Vec::new();
+    findings.extend(wrightstone::audit_wrightstone(build.weapon_state));
+    findings
 }
 
 #[cfg(test)]
