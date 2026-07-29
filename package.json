@@ -4,7 +4,7 @@
   "version": "1.12.5-2",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/build-hook-dev.mjs && vite",
+    "dev": "node scripts/clean-target.mjs --quiet && node scripts/build-hook-dev.mjs && vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint ./src",
@@ -13,7 +13,8 @@
     "format-check": "prettier --check --ignore-unknown --ext js,jsx,ts,tsx src ./src",
     "tauri": "tauri",
     "test": "vitest",
-    "bump": "node scripts/bump-version.mjs"
+    "bump": "node scripts/bump-version.mjs",
+    "clean:target": "node scripts/clean-target.mjs"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans": "^5.0.1",
@@ -30,6 +31,7 @@
     "i18next-browser-languagedetector": "^7.2.0",
     "i18next-resources-to-backend": "^1.2.0",
     "jsurl": "0.1.5",
+    "nuqs": "^2.9.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-hot-toast": "^2.4.1",
