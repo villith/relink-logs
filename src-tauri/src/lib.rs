@@ -14,6 +14,7 @@ pub mod db;
 pub mod debug_events;
 #[cfg(windows)]
 pub mod game_mem;
+pub mod legality;
 pub mod linux_support;
 pub mod overmastery;
 pub mod parser;
