@@ -53,13 +53,16 @@
   background: var(--mantine-color-blue-light-color);
 }
 
+/* Live numbers must not shift the header as they tick over mid-fight. Segments
+   are user-authored text now, so we can no longer wrap just the values in a
+   monospace span — tabular figures on the whole item keep digits aligned
+   without forcing monospace letterforms onto literal text like the app name. */
 .titlebar .item {
-  padding-right: 3px;
+  padding: 0 3px;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-/* Every glyph of a live number gets the same advance width, so the header
-   sections stop jittering as values tick over mid-fight. */
 .titlebar .stat-value {
   font-family: ui-monospace, "Cascadia Mono", "Segoe UI Mono", Consolas, monospace;
   font-variant-numeric: tabular-nums;
@@ -81,12 +84,11 @@
   padding-right: 5px;
 }
 
-.version {
-  padding: 0 3px;
-}
-
-.version-number {
-  color: #696969;
+/* A separator only separates. Segments that render empty are not in the DOM at
+   all, so :first-child is the first VISIBLE segment — the leading dot
+   disappears with whatever used to precede it. */
+.titlebar-left .item:first-child::before {
+  content: none;
 }
 
 .status {
@@ -286,18 +288,12 @@
   padding: 4px;
 }
 
-/* The absolute HP readout is the first thing to go on narrow overlays — the
-   fixed-width slots would otherwise push the window buttons out of reach. */
-@media only screen and (max-width: 480px) {
-  .encounter-bossHp .unit {
-    display: none;
-  }
-}
-
+/* Header segments the user flagged as low-priority give up their space first —
+   the window buttons must stay reachable on a narrow overlay. This replaces
+   the old per-section rules: segments are user-defined, so there is no fixed
+   `.encounter-totalDamage` to target any more. */
 @media only screen and (max-width: 325px) {
-  .encounter-totalDamage,
-  .encounter-totalDps,
-  .encounter-bossHp {
+  .titlebar .item.hide-narrow {
     display: none;
   }
 

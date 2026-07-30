@@ -2,12 +2,14 @@ import { ActionIcon, Menu, Tooltip } from "@mantine/core";
 import { ArrowCounterClockwise, Camera, ClipboardText, Minus, PushPinSimple } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
 import { appWindow } from "@tauri-apps/api/window";
-import { Fragment, useCallback } from "react";
+import { useCallback } from "react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
 import { HOOK_LABEL_KEY, HOOK_TONE_CLASS } from "@/hookState";
 import getVersion from "@/hooks/getVersion";
+import type { TemplateTokens } from "@/labelTemplate";
+import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { EncounterState, PlayerData, SortDirection, SortType } from "@/types";
 import { useHookStatus } from "@/useHookStatus";
 import {
@@ -18,93 +20,83 @@ import {
   humanizeNumbers,
   millisecondsToElapsedFormat,
 } from "@/utils";
+import { HeaderSegments } from "./HeaderSegments";
 
-const BossHpStats = ({ encounterState }: { encounterState: EncounterState }) => {
-  const boss = getBossHpTarget(encounterState.targets);
-  if (!boss) return null;
+/** Every token an overlay header segment may use. Exported for the settings
+ * editor, which lists them and flags anything else as a typo. */
+export const HEADER_TOKENS = [
+  "app",
+  "version",
+  "damage",
+  "dps",
+  "hpPercent",
+  "hpCurrent",
+  "hpMax",
+  "time",
+  "status",
+] as const;
 
-  const currentHp = boss.currentHp as number;
-  const maxHp = boss.maxHp as number;
-  const percent = (currentHp / maxHp) * 100;
-  const [current, currentUnit] = humanizeNumbers(currentHp);
-  const [max, maxUnit] = humanizeNumbers(maxHp);
-
-  return (
-    <div data-tauri-drag-region className="encounter-bossHp item">
-      HP <span className="stat-value">{percent.toFixed(1)}%</span>
-      <span className="unit font-sm">
-        {" "}
-        (
-        <span className="stat-value">
-          {current}
-          {currentUnit}
-        </span>{" "}
-        /{" "}
-        <span className="stat-value">
-          {max}
-          {maxUnit}
-        </span>
-        )
-      </span>
-    </div>
-  );
-};
-
-const TeamDamageStats = ({ encounterState }: { encounterState: EncounterState }) => {
-  const { t } = useTranslation();
-  const [teamDps, dpsUnit] = humanizeNumbers(encounterState.dps);
-  const [totalTeamDmg, dmgUnit] = humanizeNumbers(encounterState.totalDamage);
-
-  return (
-    <Fragment>
-      <div data-tauri-drag-region className="encounter-totalDamage item">
-        <span className="stat-value">
-          {totalTeamDmg}
-          <span className="unit font-sm">{dmgUnit}</span>
-        </span>
-      </div>
-      <div data-tauri-drag-region className="encounter-totalDps item">
-        <span className="stat-value">
-          {teamDps}
-          <span className="unit font-sm">{t("ui.per-second", { unit: dpsUnit })}</span>
-        </span>
-      </div>
-    </Fragment>
-  );
-};
-
-const EncounterStatus = ({ encounterState, elapsedTime }: { encounterState: EncounterState; elapsedTime: number }) => {
+/**
+ * Header token values for the current encounter.
+ *
+ * An absent value is the empty string, never a placeholder: empty is what
+ * collapses its whole segment, which is how team damage stays hidden until
+ * damage lands and boss HP until a target reports one.
+ */
+const useHeaderTokens = (
+  encounterState: EncounterState,
+  elapsedTime: number,
+  version: string
+): { tokens: TemplateTokens; toneClass: string } => {
   const { t } = useTranslation();
   const hook = useHookStatus();
+  const boss = getBossHpTarget(encounterState.targets);
 
-  // Connection tone drives the always-present status dot (`.encounter-status`
-  // ::before glyph) and the label shown when no fight is on screen. An unknown
-  // hook (status not read yet) reads as the disconnected "No game found".
+  // An unknown hook (status not read yet) reads as the disconnected "No game found".
   const state = hook?.state ?? "disconnected";
-  const tone = HOOK_TONE_CLASS[state];
-  const idleLabel = t(HOOK_LABEL_KEY[state]);
 
-  // During a fight show the running timer; a finished fight shows its frozen
-  // final duration; otherwise (idle) show the connection label. The dot rides
-  // along in every case.
-  let body;
+  const hasDamage = encounterState.totalDamage > 0;
+  const [totalDamage, damageUnit] = humanizeNumbers(encounterState.totalDamage);
+  const [dps, dpsUnit] = humanizeNumbers(encounterState.dps);
+
+  // During a fight the running timer; a finished fight its frozen final
+  // duration; idle, nothing at all — so a {time} segment disappears rather than
+  // showing 00:00.
+  let time = "";
   if (encounterState.status === "InProgress") {
-    body = <span className="stat-value">{millisecondsToElapsedFormat(elapsedTime)}</span>;
-  } else if (encounterState.totalDamage > 0) {
-    body = (
-      <span className="stat-value">
-        {millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime)}
-      </span>
-    );
-  } else {
-    body = idleLabel;
+    time = millisecondsToElapsedFormat(elapsedTime);
+  } else if (hasDamage) {
+    time = millisecondsToElapsedFormat(encounterState.endTime - encounterState.startTime);
   }
 
-  return (
-    <div data-tauri-drag-region className={`encounter-status item ${tone}`}>
-      {body}
-    </div>
-  );
+  let hpPercent = "";
+  let hpCurrent = "";
+  let hpMax = "";
+  if (boss && boss.currentHp != null && boss.maxHp != null) {
+    const [current, currentUnit] = humanizeNumbers(boss.currentHp);
+    const [max, maxUnit] = humanizeNumbers(boss.maxHp);
+    hpPercent = `${((boss.currentHp / boss.maxHp) * 100).toFixed(1)}%`;
+    hpCurrent = `${current}${currentUnit}`;
+    hpMax = `${max}${maxUnit}`;
+  }
+
+  return {
+    tokens: {
+      // eslint-disable-next-line i18next/no-literal-string -- app name, never translated
+      app: "Relink Logs",
+      version,
+      damage: hasDamage ? `${totalDamage}${damageUnit}` : "",
+      dps: hasDamage ? `${dps}${dpsUnit}` : "",
+      hpPercent,
+      hpCurrent,
+      hpMax,
+      time,
+      // The one token that always renders something: the timer when there is a
+      // fight to time, otherwise how the hook is doing.
+      status: time || t(HOOK_LABEL_KEY[state]),
+    },
+    toneClass: HOOK_TONE_CLASS[state],
+  };
 };
 
 export const Titlebar = ({
@@ -122,6 +114,8 @@ export const Titlebar = ({
 }) => {
   const { t } = useTranslation();
   const { version } = getVersion();
+  const header_segments = useMeterSettingsStore((state) => state.header_segments);
+  const { tokens, toneClass } = useHeaderTokens(encounterState, elapsedTime, version);
 
   const onMinimize = () => {
     appWindow.minimize();
@@ -145,15 +139,10 @@ export const Titlebar = ({
   return (
     <div data-tauri-drag-region className="titlebar transparent-bg font-sm">
       <div data-tauri-drag-region className="titlebar-left">
-        {/* eslint-disable-next-line i18next/no-literal-string -- app name, never translated */}
-        <div data-tauri-drag-region className="version">
-          Relink Logs <span className="version-number">{version}</span>
-        </div>
-        {encounterState.totalDamage > 0 && <TeamDamageStats encounterState={encounterState} />}
-        <BossHpStats encounterState={encounterState} />
+        <HeaderSegments segments={header_segments} side="left" tokens={tokens} toneClass={toneClass} />
       </div>
       <div data-tauri-drag-region className="titlebar-right">
-        <EncounterStatus encounterState={encounterState} elapsedTime={elapsedTime} />
+        <HeaderSegments segments={header_segments} side="right" tokens={tokens} toneClass={toneClass} />
         <Menu shadow="md" trigger="hover" openDelay={100} closeDelay={400}>
           <Menu.Target>
             <ActionIcon aria-label="Clipboard" variant="transparent" color="light">
