@@ -23,8 +23,24 @@ const EMPTY_MARK = String.fromCharCode(0);
 
 export type TemplateTokens = Record<string, string>;
 
+/**
+ * Every `{token}` match in a template, in order.
+ *
+ * Walks a COPY of the pattern rather than TOKEN_PATTERN itself. `matchAll`
+ * never writes `lastIndex` back to the regex it is given, but it does *read*
+ * it — so one stray `.exec()` or `.test()` on the shared global elsewhere in
+ * this module would leave it dirty and make the next walk silently start
+ * mid-string, dropping every token before that offset with no error. Copying
+ * the RegExp rather than its `.source` keeps whatever flags TOKEN_PATTERN
+ * gains later; `.source` alone would quietly drop a `u` and stop matching
+ * non-ASCII token names.
+ *
+ * Both walkers below go through here, so neither can drift from the other.
+ */
+const matchTokens = (template: string): RegExpMatchArray[] => [...template.matchAll(new RegExp(TOKEN_PATTERN))];
+
 /** Every `{token}` name in a template, in order, including repeats. */
-const tokenNames = (template: string): string[] => [...template.matchAll(TOKEN_PATTERN)].map((match) => match[1]);
+const tokenNames = (template: string): string[] => matchTokens(template).map((match) => match[1]);
 
 /** One piece of a split template: literal text, or a `{token}` placeholder. */
 export type TemplatePart = { type: "text"; value: string } | { type: "token"; name: string };
@@ -42,12 +58,12 @@ export const splitTemplate = (template: string): TemplatePart[] => {
   const parts: TemplatePart[] = [];
   let cursor = 0;
 
-  // A fresh regex per call: TOKEN_PATTERN is global, and sharing its lastIndex
-  // across calls would make the function stateful.
-  const pattern = new RegExp(TOKEN_PATTERN.source, "g");
-
-  for (const match of template.matchAll(pattern)) {
-    const start = match.index ?? 0;
+  for (const match of matchTokens(template)) {
+    // `matchAll` always populates `index`; the assertion is only to satisfy
+    // RegExpMatchArray's optional typing. Defaulting to 0 instead would be
+    // actively harmful — the cursor would jump backwards and silently eat the
+    // preceding text run rather than failing where we could see it.
+    const start = match.index!;
     if (start > cursor) parts.push({ type: "text", value: template.slice(cursor, start) });
     parts.push({ type: "token", name: match[1] });
     cursor = start + match[0].length;

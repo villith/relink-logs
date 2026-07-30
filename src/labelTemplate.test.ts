@@ -102,4 +102,51 @@ describe("splitTemplate", () => {
   it("does not care whether a token is a known one", () => {
     expect(splitTemplate("{bogus}")).toEqual([{ type: "token", name: "bogus" }]);
   });
+
+  /**
+   * The whole reason the stored template format survives a trip through the
+   * chip editor: split then rejoin has to be the identity. One property test
+   * catches every cursor-arithmetic mistake at once — a dropped text run, an
+   * off-by-one slice, a surrogate pair cut in half.
+   */
+  it("round-trips: rejoining the parts reproduces the template", () => {
+    const rejoin = (template: string) =>
+      splitTemplate(template)
+        .map((part) => (part.type === "text" ? part.value : `{${part.name}}`))
+        .join("");
+
+    const cases = [
+      "",
+      "plain",
+      "{a}",
+      "{a}{b}",
+      "HP {a}",
+      "{a} left",
+      "{x} {x}",
+      "{a",
+      "a}",
+      "{{a}}",
+      "{ a }",
+      "{1bad}",
+      "100% {} {x}",
+      "🎉{a}🎉",
+      "[{slot}] {name} ({character})",
+      "HP {hpPercent} ({hpCurrent} / {hpMax})",
+    ];
+
+    for (const template of cases) expect(rejoin(template)).toBe(template);
+  });
+
+  /**
+   * splitTemplate and unknownTokens walk the same pattern through the same
+   * private helper. If someone gives one of them its own walk, this catches the
+   * drift — which is the entire reason the parser lives in this module.
+   */
+  it("agrees with unknownTokens about which names are tokens", () => {
+    const template = "[{slot}] {name} ({character}) {bogus} {1bad}";
+    const found = splitTemplate(template).flatMap((part) => (part.type === "token" ? [part.name] : []));
+
+    expect(found).toEqual(["slot", "name", "character", "bogus"]);
+    expect(unknownTokens(template, ["slot", "name", "character"])).toEqual(["bogus"]);
+  });
 });
