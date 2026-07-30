@@ -12,24 +12,61 @@
 use protocol::{EquippedSummon, OvermasteryInfo, Sigil, WeaponState};
 use serde::Serialize;
 
-use crate::parser::constants::CharacterType;
-
 pub mod master_traits;
 pub mod overmastery_rules;
 pub mod sigils;
+pub mod summon_bonus_values;
 pub mod summons;
 pub mod wrightstone;
 
-/// Everything the rules need from a player, borrowed rather than cloned.
-#[derive(Debug, Default)]
-pub struct BuildSnapshot<'a> {
-    pub character_type: Option<CharacterType>,
-    pub sigils: &'a [Sigil],
-    pub summons: &'a [EquippedSummon],
+/// The engine's empty-id sentinel (`EMPTY_SIGIL_HASH` in the hook), shared by
+/// every rule module so the four copies cannot drift apart.
+pub const EMPTY_ID: u32 = game_reader::EMPTY_KEY;
+
+/// An empty slot reaches us as either a plain zero or the engine sentinel, so
+/// both must count as empty.
+///
+/// No id normalisation exists anywhere in the hook — do not go looking for one
+/// and conclude the `0` arm is dead. The two paths differ in filtering, not in
+/// rewriting: `read_snapshot_sigils` (`src-hook/src/hooks/player.rs:1632`)
+/// DROPS sentinel entries outright, while the `PlayerLoadEvent` path
+/// (`player.rs:153`) copies all twelve raw slots (`SigilList::sigils`,
+/// `src-hook/src/hooks/ffi.rs:90`) through untouched. That unfiltered path is
+/// why either spelling of "empty" can arrive verbatim. (The one
+/// `if v == EMPTY_SIGIL_HASH { 0 }` closure in the hook, at `player.rs:1145`,
+/// is inside `read_record_stats` and applies to HP/attack stat words — never
+/// to ids.)
+///
+/// Treating only one as empty either audits empty slots (false accusations) or
+/// skips real ones. Narrowing this guard to the sentinel alone would let a
+/// zeroed second-trait slot reach the locked-pair and single-trait rules,
+/// where an empty slot would be accused as a wrong or extra trait. The
+/// overmastery rule needs it for the same reason: a production audit found 16
+/// findings observing exactly this id, so the hook's own filter is not
+/// airtight and an empty slot must be missing data, never an accusation.
+pub fn is_empty(id: u32) -> bool {
+    id == 0 || id == EMPTY_ID
+}
+
+/// The hex8 spelling every generated legality table keys its rows by.
+pub(crate) fn parse_hex(value: &str) -> Option<u32> {
+    u32::from_str_radix(value, 16).ok()
+}
+
+/// Everything the rules need from a player.
+///
+/// Owned rather than borrowed: `PlayerData` stores the parser's own mirrors of
+/// these `protocol` types, so an audit has to convert them anyway. It lives
+/// here rather than in the parser so the rules stay testable without one —
+/// `PlayerData::legality_inputs` is merely the bridge that fills it in.
+#[derive(Debug, Default, Clone)]
+pub struct LegalityInputs {
+    pub sigils: Vec<Sigil>,
+    pub summons: Vec<EquippedSummon>,
+    pub weapon_state: Option<WeaponState>,
+    pub overmastery_info: Option<OvermasteryInfo>,
     /// Unlocked skillboard (master trait) node effect ids.
-    pub skillboard: &'a [u32],
-    pub weapon_state: Option<&'a WeaponState>,
-    pub overmastery_info: Option<&'a OvermasteryInfo>,
+    pub skillboard: Vec<u32>,
 }
 
 /// Which rule fired. Serialized so a future UI can translate it; rules never
@@ -41,16 +78,29 @@ pub enum Rule {
     /// (primary, secondary1, secondary2) — index, not sorted rank, is what
     /// each level is checked against.
     WrightstoneTraitLevel,
-    WrightstonePrimaryTrait,
+    /// A sigil carrying BOTH traits with a level above its own ceiling
+    /// (default 15; raised only where the table declares it).
     SigilTraitLevel,
-    SigilSecondTrait,
-    SigilFirstTrait,
-    MasterTraitUnknownNode,
-    MasterTraitCount,
+    /// A character sigil (X's Awakening+ et al.) whose fixed trait pair was
+    /// tampered with.
+    SigilLockedPair,
+    /// A quest-locked (crab) trait on a sigil that cannot carry it.
+    SigilQuestLockedTrait,
+    /// A second trait on a sigil that can only ever hold one (Stout Heart).
+    SigilSingleTraitOnly,
     OvermasteryValue,
     OvermasteryAllMaxed,
-    SummonPerfect,
+    /// A summon trait that is not a candidate of that summon's lot — an
+    /// outcome the chances table prices at zero.
+    SummonTrait,
+    /// Two or more ROLLED summons equipped with both slots at the top of
+    /// their level windows. Always `Improbable` — a report, never proof
+    /// (26 of 72 census players own such a set; see `summons`'s module docs).
     SummonPerfectCount,
+    /// More master traits unlocked than the game's 50-slot skillboard storage
+    /// can hold. Only the COUNT is judged; node ids are not (the membership
+    /// rule was removed for its staleness-driven false accusations).
+    MasterTraitCount,
 }
 
 /// Proof versus suspicion. Never collapse these into one flag.
@@ -71,21 +121,47 @@ pub enum Subject {
     Sigil(usize),
     Summon(usize),
     Overmastery(usize),
+    /// The whole overmastery set at once — the all-maxed rule's claim is
+    /// about all four slots together, so pointing at slot 0 misrepresents it.
+    Overmasteries,
+    /// The whole equipped summon set — the perfect-count rule's claim is
+    /// about how many together, so pointing at one summon misrepresents it.
+    Summons,
+    /// The whole unlocked master-trait set — the count rule's claim is about
+    /// the set's size, not any one node.
     MasterTraits,
 }
 
 /// Observed and allowed values, kept numeric for the UI to format.
 ///
-/// The paired [`Rule`], not the JSON shape, says how to read the number:
-/// `Level`, `Count` and `TraitId` all serialize as bare numbers.
+/// Serialized TAGGED (`{"kind": "traitId", "value": …}`) so a UI can tell an
+/// id apart from a level and translate it to a name — with the old untagged
+/// bare numbers the two were indistinguishable and the audit page could only
+/// print them verbatim.
+///
+/// Ids carry their CATALOGUE in the tag, one variant per namespace. The rule
+/// that builds the finding is the only thing that knows which catalogue an id
+/// came from, so it says so here; a UI that had to infer it from the paired
+/// [`Rule`] renders the wrong names the moment a rule is added and nobody
+/// remembers to teach the UI about it.
 #[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase", untagged)]
+#[serde(rename_all = "camelCase", tag = "kind", content = "value")]
 pub enum Value {
     Level(u32),
     Levels(Vec<u32>),
     Count(usize),
+    /// An ordinary trait id (the `traits` lang namespace).
     TraitId(u32),
     TraitIds(Vec<u32>),
+    /// A sigil ITEM id — `SigilQuestLockedTrait` names the sigils a
+    /// quest-locked trait may live on, not traits.
+    SigilIds(Vec<u32>),
+    /// A summon equip-bonus id (`summon_base_param.tbl`), a namespace disjoint
+    /// from ordinary trait ids.
+    SummonBonusId(u32),
+    SummonBonusIds(Vec<u32>),
+    /// An overmastery id.
+    OvermasteryId(u32),
     Amount(f32),
     None,
 }
@@ -103,34 +179,23 @@ pub struct Finding {
 }
 
 /// Every legality finding for one build, in rule order.
-pub fn audit(build: &BuildSnapshot) -> Vec<Finding> {
+pub fn audit(build: &LegalityInputs) -> Vec<Finding> {
     let mut findings = Vec::new();
-    findings.extend(wrightstone::audit_wrightstone(build.weapon_state));
-    findings.extend(sigils::audit_sigils(build.sigils));
-    findings.extend(master_traits::audit_master_traits(
-        build.character_type,
-        build.skillboard,
+    findings.extend(wrightstone::audit_wrightstone(build.weapon_state.as_ref()));
+    findings.extend(sigils::audit_sigils(&build.sigils));
+    findings.extend(overmastery_rules::audit_overmastery(
+        build.overmastery_info.as_ref(),
     ));
-    findings.extend(overmastery_rules::audit_overmastery(build.overmastery_info));
-    findings.extend(summons::audit_summons(build.summons));
+    findings.extend(summons::audit_summons(&build.summons));
+    findings.extend(master_traits::audit_master_traits(&build.skillboard));
     findings
 }
 
-/// Audit a parsed player.
-///
-/// `PlayerData` stores the parser's own mirrors of the `protocol` types these
-/// rules read, so the fields are converted into owned `protocol` values that
-/// live for the length of the call and the snapshot borrows from those.
+/// Audit a parsed player. A caller that also needs the inputs afterwards (to
+/// resolve a finding's subject, say) should build them once with
+/// [`crate::parser::v1::PlayerData::legality_inputs`] and call [`audit`].
 pub fn audit_player(player: &crate::parser::v1::PlayerData) -> Vec<Finding> {
-    let inputs = player.legality_inputs();
-    audit(&BuildSnapshot {
-        character_type: Some(inputs.character_type),
-        sigils: &inputs.sigils,
-        summons: &inputs.summons,
-        skillboard: &inputs.skillboard,
-        weapon_state: inputs.weapon_state.as_ref(),
-        overmastery_info: inputs.overmastery_info.as_ref(),
-    })
+    audit(&player.legality_inputs())
 }
 
 #[cfg(test)]
@@ -145,7 +210,7 @@ mod tests {
     /// the governing principle: absence of evidence is never evidence.
     #[test]
     fn empty_build_yields_no_findings() {
-        let build = BuildSnapshot::default();
+        let build = LegalityInputs::default();
         assert_eq!(audit(&build), vec![]);
     }
 
@@ -162,38 +227,19 @@ mod tests {
         assert_eq!(audit_player(&player), vec![]);
     }
 
-    /// Owned backing store for the legal fixture. [`BuildSnapshot`] borrows
-    /// every field, so the values have to outlive the snapshot; keeping them in
-    /// one struct also lets a test perturb a single field and re-audit.
-    struct LegalBuild {
-        sigils: Vec<Sigil>,
-        summons: Vec<EquippedSummon>,
-        skillboard: Vec<u32>,
-        weapon_state: WeaponState,
-        overmastery_info: OvermasteryInfo,
-    }
-
-    impl LegalBuild {
-        fn snapshot(&self) -> BuildSnapshot<'_> {
-            BuildSnapshot {
-                character_type: Some(CharacterType::Pl0000),
-                sigils: &self.sigils,
-                summons: &self.summons,
-                skillboard: &self.skillboard,
-                weapon_state: Some(&self.weapon_state),
-                overmastery_info: Some(&self.overmastery_info),
-            }
-        }
-    }
-
-    /// A build a real player could own, assembled so that every one of the five
-    /// rule modules has complete data to judge and none of them may object.
-    /// Each value is justified against the asset it was read out of:
+    /// A build a real player could own, assembled so that every one of the
+    /// four rule modules has complete data to judge and none of them may
+    /// object. Each value is justified against the asset it was read out of:
     ///
-    /// * **Sigil** — War Elemental `00612b10`. `sigil-legality.json` gives it
-    ///   `trait1: 4c588c27`, `rollsSecond: true` and `trait2Lot: 6`, and no
-    ///   `maxLevel`, so both trait levels are capped at the default 15. Steady
-    ///   Focus `0053599e` is one of lot 6's 38 traits.
+    /// * **Sigils** — one representative of every sigil class a rule watches.
+    ///   War Elemental `00612b10` (two traits at the default ceiling of 15;
+    ///   Steady Focus is a trait it is seen with in the wild). Thunderwolf's
+    ///   Awakening+ `23953fd4` carrying exactly its locked pair (Recharge
+    ///   `7d75d904`, Acuity `be3404b9`). Crabby Resonance `1c4d37e4` carrying
+    ///   its own quest-locked trait `082033cb` — single trait at 45, far past
+    ///   15, which is legal because single-trait levels are never judged.
+    ///   Stout Heart `cb5f29c1` with its one trait `a1a8e39d` and an empty
+    ///   second slot.
     /// * **Wrightstone** — HP `f372f096` is the Fortification family's primary
     ///   trait, and the three pairs are in **physical slot order** against the
     ///   derived 20/15/10 ceilings. Re-ordering them makes the fixture illegal:
@@ -201,58 +247,88 @@ mod tests {
     /// * **Overmasteries** — all four ids and ladders read from
     ///   `overmastery-tables.json`: Attack `c4925bd7` tops at 1000, Health
     ///   `52a207b5` at 2000, Crit `45c65767` at 20, Stun `6cb38ef3` at 2.0.
-    ///   Three sit at their maximum and Stun deliberately does not, so rule 9
-    ///   must stay quiet. Stun's 0.6 is a real rung (index 4), NOT a zero —
-    ///   a zero now reads as "magnitude never measured" and would skip the
-    ///   ladder comparison entirely, leaving the fixture green for the wrong
-    ///   reason.
-    /// * **Skillboard** — the first 50 real node ids off Gran's own board, so
-    ///   rule 6 finds every one of them and rule 7 sits exactly at the cap.
-    /// * **Summons** — Lucilius `6e5968fc` and Goldslime III `439cdb88`, both
-    ///   `rolled: true`. Levels are inside each candidate's own window and
-    ///   below its top, judged against that candidate and nothing else (the
-    ///   per-tier model was proven wrong and removed): Lucilius main `5c862e13`
-    ///   rolls 11-15 and carries 13; its bonus `2ea9ca80` rolls 5-9 and carries
-    ///   6. Goldslime III main `5e422ae5` rolls 11-15 and carries 12; its bonus
-    ///   `a3539fbb` rolls 6-9 and carries 7. Neither side is top-of-window, so
-    ///   rule 10 cannot fire and rule 11 has nothing to compound.
-    fn legal_build() -> LegalBuild {
-        let mut skillboard: Vec<u32> = master_traits::board_nodes(CharacterType::Pl0000)
-            .into_iter()
-            .collect();
-        skillboard.sort_unstable();
-        skillboard.truncate(master_traits::MAX_MASTER_TRAITS);
-
-        LegalBuild {
-            sigils: vec![Sigil {
-                first_trait_id: 0x4c58_8c27,
-                first_trait_level: 15,
-                second_trait_id: 0x0053_599e,
-                second_trait_level: 10,
-                sigil_id: 0x0061_2b10,
-                equipped_character: 0,
-                sigil_level: 15,
-                acquisition_count: 1,
-                notification_enum: 0,
-            }],
+    ///   Three sit at their maximum and Stun deliberately does not, so the
+    ///   all-maxed rule must stay quiet. Stun's 0.6 is a real rung (index 4),
+    ///   NOT a zero — a zero reads as "magnitude never measured" and would
+    ///   skip the ladder comparison entirely, leaving the fixture green for
+    ///   the wrong reason.
+    /// * **Summons** — Lucilius `6e5968fc` and Behemoth III `e4b7dcf9`, both
+    ///   `rolled: true`, both on the perfect-count WATCH LIST, each carrying
+    ///   a genuine candidate of its own lots: Lucilius main `5c862e13` with
+    ///   bonus `2ea9ca80`, Behemoth III main `b5ff9fd3` (Uplift) with bonus
+    ///   `a3539fbb`. Lucilius sits at the TOP of both windows on purpose:
+    ///   ONE perfect summon is legal and unreported (42 of 72 census players
+    ///   own one). Behemoth deliberately sits one step below its bonus top
+    ///   (8 of 9) so the perfect COUNT stays at one and the >=2 report must
+    ///   stay quiet — the summon twin of Stun's deliberately-unmaxed
+    ///   overmastery above.
+    /// * **Skillboard** — exactly the 50-node maximum the game's own storage
+    ///   holds. The ids are arbitrary on purpose: only the COUNT is judged.
+    fn legal_build() -> LegalityInputs {
+        LegalityInputs {
+            sigils: vec![
+                Sigil {
+                    first_trait_id: 0x4c58_8c27,
+                    first_trait_level: 15,
+                    second_trait_id: 0x0053_599e,
+                    second_trait_level: 10,
+                    sigil_id: 0x0061_2b10,
+                    equipped_character: 0,
+                    sigil_level: 15,
+                    acquisition_count: 1,
+                    notification_enum: 0,
+                },
+                Sigil {
+                    first_trait_id: 0x7d75_d904,
+                    first_trait_level: 15,
+                    second_trait_id: 0xbe34_04b9,
+                    second_trait_level: 15,
+                    sigil_id: 0x2395_3fd4,
+                    equipped_character: 0,
+                    sigil_level: 15,
+                    acquisition_count: 1,
+                    notification_enum: 0,
+                },
+                Sigil {
+                    first_trait_id: 0x0820_33cb,
+                    first_trait_level: 45,
+                    second_trait_id: 0,
+                    second_trait_level: 0,
+                    sigil_id: 0x1c4d_37e4,
+                    equipped_character: 0,
+                    sigil_level: 45,
+                    acquisition_count: 1,
+                    notification_enum: 0,
+                },
+                Sigil {
+                    first_trait_id: 0xa1a8_e39d,
+                    first_trait_level: 15,
+                    second_trait_id: 0,
+                    second_trait_level: 0,
+                    sigil_id: 0xcb5f_29c1,
+                    equipped_character: 0,
+                    sigil_level: 15,
+                    acquisition_count: 1,
+                    notification_enum: 0,
+                },
+            ],
             summons: vec![
                 EquippedSummon {
                     summon_id: 0x6e59_68fc,
                     main_trait_id: 0x5c86_2e13,
-                    main_trait_level: 13,
+                    main_trait_level: 15,
                     bonus_id: 0x2ea9_ca80,
-                    bonus_level: 6,
+                    bonus_level: 9,
                 },
                 EquippedSummon {
-                    summon_id: 0x439c_db88,
-                    main_trait_id: 0x5e42_2ae5,
-                    main_trait_level: 12,
+                    summon_id: 0xe4b7_dcf9,
+                    main_trait_id: 0xb5ff_9fd3,
+                    main_trait_level: 15,
                     bonus_id: 0xa353_9fbb,
-                    bonus_level: 7,
+                    bonus_level: 8,
                 },
             ],
-            skillboard,
-            weapon_state: WeaponState {
+            weapon_state: Some(WeaponState {
                 weapon_id: 0,
                 exp: 0,
                 star_level: 0,
@@ -274,8 +350,8 @@ mod tests {
                     },
                 ],
                 innate_traits: Vec::new(),
-            },
-            overmastery_info: OvermasteryInfo {
+            }),
+            overmastery_info: Some(OvermasteryInfo {
                 overmasteries: vec![
                     Overmastery {
                         id: 0xc492_5bd7,
@@ -298,8 +374,26 @@ mod tests {
                         value: 0.6,
                     },
                 ],
-            },
+            }),
+            skillboard: (0..master_traits::MAX_MASTER_TRAITS as u32).collect(),
         }
+    }
+
+    /// The fixture always equips a stone and a full overmastery set; these
+    /// keep the perturbation cases below reading as one assignment each.
+    fn stone(build: &mut LegalityInputs) -> &mut WeaponState {
+        build
+            .weapon_state
+            .as_mut()
+            .expect("the legal fixture equips a wrightstone")
+    }
+
+    fn masteries(build: &mut LegalityInputs) -> &mut Vec<Overmastery> {
+        &mut build
+            .overmastery_info
+            .as_mut()
+            .expect("the legal fixture rolls four overmasteries")
+            .overmasteries
     }
 
     /// **The standing guard against false accusation.** Every rule runs at once
@@ -313,15 +407,7 @@ mod tests {
     /// real players, and 109 sigils whose second-trait lot is merely unknown).
     #[test]
     fn a_fully_legal_build_yields_no_findings() {
-        let build = legal_build();
-        assert_eq!(
-            build.skillboard.len(),
-            master_traits::MAX_MASTER_TRAITS,
-            "the fixture no longer holds a full skillboard, so rule 7 is not \
-             being exercised at its cap"
-        );
-
-        let findings = audit(&build.snapshot());
+        let findings = audit(&legal_build());
         assert_eq!(
             findings,
             vec![],
@@ -339,119 +425,103 @@ mod tests {
     /// proving the rule saw the fixture's data and judged it rather than
     /// skipping it as unreadable.
     ///
-    /// All eleven rules, so the guard covers the whole module and not merely
-    /// one rule per file. Two cases are worth reading closely:
-    ///
-    /// * **Rule 9** — nudging Stun alone to the top of its ladder fires
-    ///   `OvermasteryAllMaxed`, which can only happen if the other three
-    ///   magnitudes were read, matched against their own ladders AND recognised
-    ///   as maxed. One assertion covers all four slots.
-    /// * **Rule 7** — the perturbation duplicates a node already on the board
-    ///   rather than inventing one, so the count is the only thing that changed
-    ///   and rule 6 stays quiet.
+    /// All ten rules, so the guard covers the whole module and not merely
+    /// one rule per file. One case worth reading closely: nudging Stun alone
+    /// to the top of its ladder fires `OvermasteryAllMaxed`, which can only
+    /// happen if the other three magnitudes were read, matched against their
+    /// own ladders AND recognised as maxed — one assertion covers all four
+    /// slots.
     #[test]
     fn the_legal_fixture_reaches_every_rule() {
-        // Rule 1, then rule 2: an over-cap primary level, then a stone carrying
-        // no family trait at all.
+        // Wrightstone: an over-cap primary level.
         let mut build = legal_build();
-        build.weapon_state.wrightstone_traits[0].level = 25;
+        stone(&mut build).wrightstone_traits[0].level = 25;
         assert!(
             fires(&build, Rule::WrightstoneTraitLevel),
-            "rule 1 never judged the fixture's stone"
+            "the level rule never judged the fixture's stone"
         );
 
-        let mut build = legal_build();
-        build.weapon_state.wrightstone_traits[0].id = NOT_A_FAMILY_TRAIT;
-        assert!(
-            fires(&build, Rule::WrightstonePrimaryTrait),
-            "rule 2 never judged the fixture's stone"
-        );
-
-        // Rules 3, 4 and 5. DMG Cap is a real trait that lot 6 cannot grant and
-        // that War Elemental's id does not encode, so it discriminates on both
-        // the second-trait and first-trait rules rather than merely rejecting
-        // garbage.
+        // Sigils: an over-cap level on the two-trait sigil, a broken locked
+        // pair, a crab trait astray on War Elemental, and a second trait on
+        // Stout Heart.
         let mut build = legal_build();
         build.sigils[0].first_trait_level = 30;
         assert!(
             fires(&build, Rule::SigilTraitLevel),
-            "rule 3 never judged the fixture's sigil"
+            "the level rule never judged the fixture's sigil"
         );
 
         let mut build = legal_build();
-        build.sigils[0].second_trait_id = DMG_CAP;
+        build.sigils[1].second_trait_id = DMG_CAP;
         assert!(
-            fires(&build, Rule::SigilSecondTrait),
-            "rule 4 never judged the fixture's sigil"
+            fires(&build, Rule::SigilLockedPair),
+            "the locked-pair rule never judged the fixture's Awakening+ sigil"
         );
 
         let mut build = legal_build();
-        build.sigils[0].first_trait_id = DMG_CAP;
+        build.sigils[0].second_trait_id = CRABBY_RESONANCE;
         assert!(
-            fires(&build, Rule::SigilFirstTrait),
-            "rule 5 never judged the fixture's sigil"
+            fires(&build, Rule::SigilQuestLockedTrait),
+            "the quest-locked rule never judged the fixture's sigils"
         );
 
-        // Rules 6 and 7.
         let mut build = legal_build();
-        build.skillboard.push(NO_SUCH_NODE);
+        build.sigils[3].second_trait_id = DMG_CAP;
         assert!(
-            fires(&build, Rule::MasterTraitUnknownNode),
-            "rule 6 never judged the fixture's skillboard"
+            fires(&build, Rule::SigilSingleTraitOnly),
+            "the single-trait rule never judged the fixture's Stout Heart"
         );
 
+        // Overmasteries. Stun's ladder runs …0.6, 0.8… so 0.7 falls between
+        // two rungs, and 2.0 is its top.
         let mut build = legal_build();
-        let already_unlocked = build.skillboard[0];
-        build.skillboard.push(already_unlocked);
-        assert!(
-            fires(&build, Rule::MasterTraitCount),
-            "rule 7 never judged the fixture's skillboard"
-        );
-
-        // Rules 8 and 9. Stun's ladder runs …0.6, 0.8… so 0.7 falls between two
-        // rungs, and 2.0 is its top.
-        let mut build = legal_build();
-        build.overmastery_info.overmasteries[3].value = 0.7;
+        masteries(&mut build)[3].value = 0.7;
         assert!(
             fires(&build, Rule::OvermasteryValue),
-            "rule 8 never judged the fixture's magnitudes"
+            "the ladder rule never judged the fixture's magnitudes"
         );
 
         let mut build = legal_build();
-        build.overmastery_info.overmasteries[3].value = 2.0;
+        masteries(&mut build)[3].value = 2.0;
         assert!(
             fires(&build, Rule::OvermasteryAllMaxed),
-            "rule 9 never read the fixture's magnitudes"
+            "the all-maxed rule never read the fixture's magnitudes"
         );
 
-        // Rules 10 and 11: lift both summons to the top of their own candidates'
-        // windows, which is the only thing separating the fixture from perfect.
+        // Summons: a trait Lucilius' main lot cannot grant.
         let mut build = legal_build();
-        build.summons[0].main_trait_level = 15;
-        build.summons[0].bonus_level = 9;
-        build.summons[1].main_trait_level = 15;
+        build.summons[0].main_trait_id = DMG_CAP;
+        assert!(
+            fires(&build, Rule::SummonTrait),
+            "the membership rule never judged the fixture's summons"
+        );
+
+        // Nudging Behemoth's bonus alone to its top makes a SECOND perfect
+        // watched summon, which can only fire if Lucilius' top-of-window
+        // state was also read and recognised — the summon twin of the Stun
+        // case above.
+        let mut build = legal_build();
         build.summons[1].bonus_level = 9;
         assert!(
-            fires(&build, Rule::SummonPerfect),
-            "rule 10 never judged the fixture's summons"
-        );
-        assert!(
             fires(&build, Rule::SummonPerfectCount),
-            "both fixture summons reached rule 10 but rule 11 did not compound them"
+            "the perfect-count report never read the fixture's summons"
+        );
+
+        // Master traits: one node past the 50-slot storage.
+        let mut build = legal_build();
+        build.skillboard.push(50);
+        assert!(
+            fires(&build, Rule::MasterTraitCount),
+            "the count rule never judged the fixture's skillboard"
         );
     }
 
-    /// DMG Cap: a real trait, but not one lot 6 grants and not one War
-    /// Elemental's id encodes.
+    /// DMG Cap: a real trait, out of place everywhere the cases above use it.
     const DMG_CAP: u32 = 0xdc58_4f60;
-    /// A trait id belonging to none of the four wrightstone families.
-    const NOT_A_FAMILY_TRAIT: u32 = 0x9999_0001;
-    /// A skillboard node id that sits on no character's board.
-    const NO_SUCH_NODE: u32 = 999_999;
+    /// The Crabby Resonance quest-locked trait.
+    const CRABBY_RESONANCE: u32 = 0x0820_33cb;
 
-    fn fires(build: &LegalBuild, rule: Rule) -> bool {
-        audit(&build.snapshot())
-            .iter()
-            .any(|finding| finding.rule == rule)
+    fn fires(build: &LegalityInputs, rule: Rule) -> bool {
+        audit(build).iter().any(|finding| finding.rule == rule)
     }
 }
