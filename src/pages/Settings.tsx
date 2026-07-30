@@ -2,7 +2,7 @@ import NavRailLayout, { type NavRailSection } from "@/components/NavRailLayout";
 import { Gauge, ListChecks, SlidersHorizontal } from "@phosphor-icons/react";
 
 /** The sections in the settings side menu, in display order. */
-const SETTINGS_SECTIONS: NavRailSection[] = [
+export const SETTINGS_SECTIONS: NavRailSection[] = [
   {
     to: "/logs/settings/general",
     labelKey: "ui.settings-nav.general",
@@ -20,6 +20,7 @@ const SETTINGS_SECTIONS: NavRailSection[] = [
     labelKey: "ui.checklist-settings.title",
     labelFallback: "Checklist",
     icon: ListChecks,
+    newId: "checklist-settings",
   },
 ];
 

@@ -1831,43 +1831,45 @@ export const ViewPage = () => {
                     ))}
                   </Table.Tr>
                   <AbilitiesRow playerData={playerData} />
-                  <Table.Tr>
-                    {playerData.map((player) => {
-                      const traits = combinedTraitsByPlayer.get(player.actorIndex) ?? [];
+                  {visibleChecklistGroups.length > 0 && (
+                    <Table.Tr>
+                      {playerData.map((player) => {
+                        const traits = combinedTraitsByPlayer.get(player.actorIndex) ?? [];
 
-                      return (
-                        <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
-                          <Text size="xs" fw={700}>
-                            {t("ui.player-checklist")}
-                          </Text>
-                          {visibleChecklistGroups.map((group) => (
-                            <Box key={group.id}>
-                              <Text size="xs" fw={600} c="dimmed" mt={4}>
-                                {checklistGroupName(group)}
-                              </Text>
-                              {group.kind === "computed"
-                                ? COMPUTED_SIGIL_ROWS.map(({ label, categories }) => (
-                                    <SigilCategoryRow
-                                      key={label}
-                                      player={player}
-                                      categories={categories}
-                                      label={label}
-                                    />
-                                  ))
-                                : group.entries.map((entry) => (
-                                    <ChecklistEntryRow
-                                      key={entry.ids[0]}
-                                      player={player}
-                                      traits={traits}
-                                      entry={entry}
-                                    />
-                                  ))}
-                            </Box>
-                          ))}
-                        </Table.Td>
-                      );
-                    })}
-                  </Table.Tr>
+                        return (
+                          <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
+                            <Text size="xs" fw={700}>
+                              {t("ui.player-checklist")}
+                            </Text>
+                            {visibleChecklistGroups.map((group) => (
+                              <Box key={group.id}>
+                                <Text size="xs" fw={600} c="dimmed" mt={4}>
+                                  {checklistGroupName(group)}
+                                </Text>
+                                {group.kind === "computed"
+                                  ? COMPUTED_SIGIL_ROWS.map(({ label, categories }) => (
+                                      <SigilCategoryRow
+                                        key={label}
+                                        player={player}
+                                        categories={categories}
+                                        label={label}
+                                      />
+                                    ))
+                                  : group.entries.map((entry) => (
+                                      <ChecklistEntryRow
+                                        key={entry.ids[0]}
+                                        player={player}
+                                        traits={traits}
+                                        entry={entry}
+                                      />
+                                    ))}
+                              </Box>
+                            ))}
+                          </Table.Td>
+                        );
+                      })}
+                    </Table.Tr>
+                  )}
                   <Table.Tr>
                     {playerData.map((player) => {
                       const overmasteries = (player.overmasteryInfo?.overmasteries || []).filter(
