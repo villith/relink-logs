@@ -14,6 +14,7 @@ import { ViewPage as LogViewPage } from "./pages/logs/View";
 import ChecklistSettings from "./pages/settings/ChecklistSettings";
 import GeneralSettings from "./pages/settings/GeneralSettings";
 import MeterSettings from "./pages/settings/MeterSettings";
+import BuildAudit from "./pages/toolbox/BuildAudit";
 import OvermasteryPredictor from "./pages/toolbox/OvermasteryPredictor";
 import SynthesisHelper from "./pages/toolbox/SynthesisHelper";
 import TransmarvelSearcher from "./pages/toolbox/TransmarvelSearcher";
@@ -41,6 +42,7 @@ export const App = () => {
               <Route path="synthesis" element={<SynthesisHelper />} />
               <Route path="overmastery" element={<OvermasteryPredictor />} />
               <Route path="transmarvel" element={<TransmarvelSearcher />} />
+              <Route path="audit" element={<BuildAudit />} />
             </Route>
             <Route path=":id" element={<LogViewPage />} />
             <Route path="settings" element={<SettingsPage />}>

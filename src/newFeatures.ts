@@ -17,6 +17,7 @@ export const NEW_FEATURES = {
   "overmastery-predictor": { from: "1.10.0", until: "1.12.0" },
   "transmarvel-wishlist": { from: "1.12.4", until: "1.12.5" },
   "checklist-settings": { from: "1.12.5", until: "1.12.6" },
+  "build-audit": { from: "1.12.5", until: "1.12.7" },
 } as const satisfies Record<string, NewWindow>;
 
 export type NewFeatureId = keyof typeof NEW_FEATURES;

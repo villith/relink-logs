@@ -1,6 +1,6 @@
 import NavRailLayout, { type NavRailSection } from "@/components/NavRailLayout";
 import { useIsLinux } from "@/platform";
-import { Flask, MagicWand, Sparkle } from "@phosphor-icons/react";
+import { Flask, MagicWand, ShieldWarning, Sparkle } from "@phosphor-icons/react";
 
 /** The tools in the side menu. `newId` (optional) keys into NEW_FEATURES. */
 export const TOOLS: (NavRailSection & { windowsOnly?: boolean })[] = [
@@ -23,6 +23,13 @@ export const TOOLS: (NavRailSection & { windowsOnly?: boolean })[] = [
     labelFallback: "Transmarvel Wishlist",
     icon: MagicWand,
     newId: "transmarvel-wishlist",
+  },
+  {
+    to: "/logs/toolbox/audit",
+    labelKey: "ui.toolbox.build-audit",
+    labelFallback: "Build Audit",
+    icon: ShieldWarning,
+    newId: "build-audit",
   },
 ];
 
