@@ -66,7 +66,7 @@ use std::collections::HashMap;
 use protocol::EquippedSummon;
 use serde::Deserialize;
 
-use super::{is_empty, parse_hex, Finding, Rule, Severity, Subject, Value};
+use super::{is_empty, parse_hex, summon_bonus_values, Finding, Rule, Severity, Subject, Value};
 
 /// One candidate of a summon's main-trait or equip-bonus lot, as generated.
 #[derive(Debug, Clone, Deserialize)]
@@ -330,6 +330,34 @@ fn perfect_config_odds(entry: &SummonEntry, summon: &EquippedSummon) -> Option<f
     Some(main * bonus)
 }
 
+/// The highest magnitude any bonus of `effect` can display on a summon of this
+/// name, each candidate taken at the top of its own level window.
+///
+/// `None` when the name group grants no bonus of that effect at all — a
+/// ceiling that cannot be stated must not be stated, and [`Rule::SummonBonusSource`]
+/// already owns the case where the id itself is wrong.
+///
+/// The window top is taken across the whole `group` rather than the one summon
+/// id, so the ceiling agrees with the allowed-id union: a guaranteed variant
+/// holding its rolled sibling's bonus is measured against the sibling's window,
+/// which is the window that bonus was actually rolled in.
+fn effect_ceiling(group: &[u32], allowed: &[u32], effect: &str) -> Option<f64> {
+    allowed
+        .iter()
+        .filter(|id| summon_bonus_values::effect_of(**id) == Some(effect))
+        .filter_map(|id| {
+            let top = group
+                .iter()
+                .filter_map(|summon_id| stock_summons().get(summon_id))
+                .filter_map(|entry| entry.bonuses.top_level(*id))
+                .max()?;
+            summon_bonus_values::magnitude(*id, top)
+        })
+        .fold(None, |best: Option<f64>, value| {
+            Some(best.map_or(value, |best: f64| best.max(value)))
+        })
+}
+
 /// The zero-probability trait check, plus the perfect-count report. Unknown
 /// summon ids and empty trait slots are missing data and stay silent; levels
 /// are never judged for legality (the count report reads them, but a level it
@@ -373,6 +401,29 @@ pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
                 allowed: Value::SummonBonusIds(allowed_bonuses.clone()),
                 odds: None,
             });
+        }
+
+        // The magnitude the bonus displays, against the most this summon could
+        // ever show for that effect. Both halves are `Option` on purpose: an
+        // unread level prices nothing, and an effect the summon never grants
+        // has no ceiling — either way there is no claim to make.
+        if let (Some(effect), Some(observed)) = (
+            summon_bonus_values::effect_of(summon.bonus_id),
+            summon_bonus_values::magnitude(summon.bonus_id, summon.bonus_level),
+        ) {
+            let group = &rules.name_group[&summon.summon_id];
+            if let Some(ceiling) = effect_ceiling(group, allowed_bonuses, effect) {
+                if observed > ceiling {
+                    findings.push(Finding {
+                        rule: Rule::SummonBonusMagnitude,
+                        severity: Severity::Impossible,
+                        subject: Subject::Summon(index),
+                        observed: Value::Amount(observed as f32),
+                        allowed: Value::Amount(ceiling as f32),
+                        odds: None,
+                    });
+                }
+            }
         }
     }
 
@@ -833,6 +884,106 @@ mod tests {
                 .iter()
                 .any(|finding| finding.rule == Rule::SummonBonusSource),
             "the off-lot bonus itself should still be accused"
+        );
+    }
+
+    /// THE REPORTED CASE (炎顺帝, log 537): a Behemoth III showing Healing Cap
+    /// Up +75%. Its own lots top that effect out at +50% (the standard
+    /// `2270bc40` at level 9), so the NUMBER is beyond reach whichever id
+    /// produced it.
+    ///
+    /// This build fires BOTH summon-bonus rules, which is honest rather than
+    /// noisy: the id is one no Behemoth III can hold, and separately the
+    /// magnitude is one no Behemoth III can display. Either alone would be a
+    /// finding; a UI that shows only the first would understate it.
+    #[test]
+    fn a_magnitude_above_the_summons_ceiling_is_impossible() {
+        let equipped = [summon(
+            BEHEMOTH_III_ROLLED,
+            (UPLIFT, 15),
+            (BOSS_SET_HEALING_CAP, 9),
+        )];
+        let findings = audit_summons(&equipped);
+
+        let magnitude = findings
+            .iter()
+            .find(|finding| finding.rule == Rule::SummonBonusMagnitude)
+            .expect("the magnitude rule should fire on +75% against a +50% ceiling");
+        assert_eq!(magnitude.severity, Severity::Impossible);
+        assert_eq!(magnitude.subject, Subject::Summon(0));
+        assert_eq!(magnitude.observed, Value::Amount(75.0));
+        assert_eq!(magnitude.allowed, Value::Amount(50.0));
+
+        assert!(
+            findings
+                .iter()
+                .any(|finding| finding.rule == Rule::SummonBonusSource),
+            "the id is off-union too, so the source rule should also fire"
+        );
+    }
+
+    /// THE CONSERVATIVE HALF (Kahs, log 549). A magnitude the summon CAN
+    /// display stays silent however odd the id that produced it: this
+    /// Behemoth III shows Normal Attack DMG Cap Up +50%, which its own
+    /// `a66241c9` reaches at the top of its window. Only the source rule may
+    /// speak — the magnitude claim would be unprovable, and an unprovable
+    /// claim is not made.
+    #[test]
+    fn a_reachable_magnitude_is_silent_however_odd_the_id() {
+        let equipped = [summon(
+            BEHEMOTH_III_ROLLED,
+            (UPLIFT, 15),
+            (BOSS_SET_NA_DMG_CAP, 6),
+        )];
+        let findings = audit_summons(&equipped);
+        assert!(
+            !findings
+                .iter()
+                .any(|finding| finding.rule == Rule::SummonBonusMagnitude),
+            "a magnitude Behemoth III can display was called impossible"
+        );
+    }
+
+    /// THE PRODUCTION REGRESSION GUARD, restated for magnitudes. Every
+    /// above-window level in the whole census is the `-1` unread sentinel, and
+    /// it prices nothing — so an unread bonus must stay silent rather than
+    /// read as an enormous magnitude and accuse the honest players who carry
+    /// one.
+    #[test]
+    fn an_unread_level_has_no_magnitude_and_is_silent() {
+        for level in [u32::MAX, 99, 10] {
+            let equipped = [summon(
+                BEHEMOTH_III_ROLLED,
+                (UPLIFT, 15),
+                (BEHEMOTH_BONUS, level),
+            )];
+            assert!(
+                !audit_summons(&equipped)
+                    .iter()
+                    .any(|finding| finding.rule == Rule::SummonBonusMagnitude),
+                "level {level} was priced as a magnitude"
+            );
+        }
+    }
+
+    /// A summon whose lots grant NO bonus of the observed effect has no
+    /// statable ceiling, so the magnitude rule must stay quiet and leave the
+    /// claim to the source rule. Vrazarek Firewyrm III's guaranteed variant
+    /// grants exactly one bonus, so every other effect is unpriceable for it.
+    #[test]
+    fn an_effect_the_summon_never_grants_has_no_ceiling_to_exceed() {
+        const STANDARD_HEALING_CAP: u32 = 0x2270_bc40;
+        let equipped = [summon(
+            VRAZAREK_III,
+            (DMG_CAP, 15),
+            (STANDARD_HEALING_CAP, 9),
+        )];
+        let findings = audit_summons(&equipped);
+        assert!(
+            !findings
+                .iter()
+                .any(|finding| finding.rule == Rule::SummonBonusMagnitude),
+            "a ceiling was invented for an effect this summon cannot grant"
         );
     }
 

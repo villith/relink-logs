@@ -97,6 +97,14 @@ pub enum Rule {
     /// Eleven of the 22 bonus ids belong to four boss summons alone, so one of
     /// those on any other summon is off-table however ordinary it displays.
     SummonBonusSource,
+    /// An equip bonus DISPLAYING a magnitude higher than any bonus of that
+    /// effect in the summon's own lots can reach.
+    ///
+    /// Judged on the number, not the level. A level is unjudgeable —
+    /// below-window reads and the `-1` sentinel both occur on honest builds —
+    /// but a number past the summon's ceiling is off-table, and an unread
+    /// level prices nothing so it cannot reach this rule at all.
+    SummonBonusMagnitude,
     /// Two or more ROLLED summons equipped with both slots at the top of
     /// their level windows. Always `Improbable` — a report, never proof
     /// (26 of 72 census players own such a set; see `summons`'s module docs).
@@ -500,6 +508,32 @@ mod tests {
             "the membership rule never judged the fixture's summons"
         );
 
+        // Summon bonuses: a boss-set id no Behemoth III can grant, and the
+        // same id at its top, where it displays +75% against Behemoth III's
+        // +50% ceiling. The first case must NOT fire the magnitude rule (level
+        // 5 of the boss table displays +45%, which is under the ceiling) — so
+        // the two assertions also prove the rules are separable rather than
+        // one rule firing twice.
+        let mut build = legal_build();
+        build.summons[1].bonus_id = BOSS_SET_HEALING_CAP;
+        build.summons[1].bonus_level = 5;
+        assert!(
+            fires(&build, Rule::SummonBonusSource),
+            "the bonus-source rule never judged the fixture's summons"
+        );
+        assert!(
+            !fires(&build, Rule::SummonBonusMagnitude),
+            "a magnitude under the ceiling was accused"
+        );
+
+        let mut build = legal_build();
+        build.summons[1].bonus_id = BOSS_SET_HEALING_CAP;
+        build.summons[1].bonus_level = 9;
+        assert!(
+            fires(&build, Rule::SummonBonusMagnitude),
+            "the magnitude rule never judged the fixture's summons"
+        );
+
         // Nudging Behemoth's bonus alone to its top makes a SECOND perfect
         // watched summon, which can only fire if Lucilius' top-of-window
         // state was also read and recognised — the summon twin of the Stun
@@ -522,6 +556,9 @@ mod tests {
 
     /// DMG Cap: a real trait, out of place everywhere the cases above use it.
     const DMG_CAP: u32 = 0xdc58_4f60;
+    /// The boss-set Healing Cap Up, granted by Rolan, Lucilius, Beelzebub and
+    /// Lilith alone and reaching +75% where the standard set stops at +50%.
+    const BOSS_SET_HEALING_CAP: u32 = 0x2ea9_ca80;
     /// The Crabby Resonance quest-locked trait.
     const CRABBY_RESONANCE: u32 = 0x0820_33cb;
 
