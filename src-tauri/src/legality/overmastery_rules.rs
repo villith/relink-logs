@@ -75,7 +75,10 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
                 rule: Rule::OvermasteryValue,
                 severity: Severity::Impossible,
                 subject: Subject::Overmastery(index),
-                observed: Value::Amount(mastery.value),
+                // The id is what was rejected, not the magnitude — and the
+                // magnitude may not even have been read. Matches
+                // `wrightstone`'s idiom for an id outside the catalogue.
+                observed: Value::TraitId(mastery.id),
                 allowed: Value::None,
                 odds: None,
             });
@@ -121,7 +124,11 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
             severity: Severity::Improbable,
             subject: Subject::Overmastery(0),
             observed: Value::Count(OVERMASTERY_SLOT_COUNT),
-            allowed: Value::Count(OVERMASTERY_SLOT_COUNT),
+            // Nothing is being exceeded here: four maxed slots are a legal
+            // roll, merely an improbable one, so there is no allowed value to
+            // name and `odds` is the payload. The previous `Count(4)` on both
+            // sides conveyed nothing.
+            allowed: Value::None,
             odds: Some(best_max_level_chance().powi(OVERMASTERY_SLOT_COUNT as i32)),
         });
     }
@@ -182,6 +189,10 @@ mod tests {
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::OvermasteryValue);
         assert_eq!(findings[0].allowed, Value::None);
+        // The id is what was rejected, not the magnitude, so the id is what
+        // the finding must carry — otherwise a UI can never name the
+        // offending overmastery.
+        assert_eq!(findings[0].observed, Value::TraitId(0xdeadbeef));
     }
 
     #[test]
@@ -199,6 +210,11 @@ mod tests {
         let odds = findings[0].odds.expect("maxed roll reports odds");
         // 0.18^4 on a large meditation.
         assert!((odds - 0.18_f64.powi(4)).abs() < 1e-9, "odds were {odds}");
+        // All four slots are at maximum, which is the observation. There is
+        // no ceiling being exceeded — the roll is legal, merely improbable —
+        // so `allowed` names nothing and `odds` carries the real payload.
+        assert_eq!(findings[0].observed, Value::Count(OVERMASTERY_SLOT_COUNT));
+        assert_eq!(findings[0].allowed, Value::None);
     }
 
     #[test]

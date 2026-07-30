@@ -1,4 +1,37 @@
 //! Master-trait (skillboard) legality, rules 6 and 7.
+//!
+//! # Staleness risk: this rule drifts toward accusation
+//!
+//! `skillboard-layout.json` is a baked snapshot of 29 characters' boards, not
+//! a live read. For a character the asset knows, ANY node id it lacks becomes
+//! [`Severity::Impossible`] — so the drift is one-directional: the asset can
+//! only ever get more incomplete than the game, and every gap becomes a false
+//! accusation rather than a missed detection. A game patch that adds a node to
+//! Gran's EX tier accuses every player who unlocks it, and nothing in this
+//! crate would notice.
+//!
+//! Two ways the asset can be incomplete even against today's game:
+//!
+//! - `scripts/gen-skillboard-layout.py` SKIPS any `SkillboardGroupId` outside
+//!   `{CHAOS1, CHAOS2, CHAOS3, EX}`, recording only a `WARN` on stdout and
+//!   continuing to write the file. A patch introducing a new group silently
+//!   omits every node in it, and each one then reads as impossible.
+//! - The asset has no `pl2000` (Id Transformation) board at all. That is safe
+//!   only because an unknown character yields an empty board and
+//!   [`audit_master_traits`] returns early — adding a partial `pl2000` entry
+//!   would be far worse than having none.
+//!
+//! The rest of the codebase already treats this drift as expected and benign:
+//! `src/pages/logs/View.tsx` places unlocked ids the layout does not know by a
+//! legacy id-band heuristic "rather than dropping them". This rule is the only
+//! consumer that turns the same drift into an accusation.
+//!
+//! Empirically clean as of 2026-07-29: across 1087 real player rows in this
+//! repo's `logs.db`, zero unknown nodes, no row above 50 unlocked, and every
+//! `characterType` resolved to a board. So this is a latent risk to revisit on
+//! the next game patch, not a live bug — but a game-version gate on these
+//! rules, or regenerating the asset as part of the patch checklist, is the
+//! obvious mitigation when one lands.
 
 use std::collections::{HashMap, HashSet};
 
@@ -52,7 +85,11 @@ pub fn audit_master_traits(character: Option<CharacterType>, skillboard: &[u32])
                 severity: Severity::Impossible,
                 subject: Subject::MasterTraits,
                 observed: Value::TraitId(unlocked),
-                allowed: Value::Count(nodes.len()),
+                // The board size is not what this id was measured against;
+                // reporting it would state a falsehood ("only N are
+                // allowed"). Matches the sibling idiom in
+                // `overmastery_rules` for the same not-in-the-catalogue shape.
+                allowed: Value::None,
                 odds: None,
             });
         }
@@ -85,6 +122,11 @@ mod tests {
         assert_eq!(findings[0].rule, Rule::MasterTraitUnknownNode);
         assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].observed, Value::TraitId(999999));
+        // The board SIZE is not what this node is measured against, and
+        // reporting it renders as "you have node 999999, only 102 are
+        // allowed" — a false statement. There is no allowed value to name;
+        // the id is simply not in the catalogue.
+        assert_eq!(findings[0].allowed, Value::None);
     }
 
     #[test]

@@ -24,10 +24,24 @@ const DEFAULT_SIGIL_TRAIT_MAX_LEVEL: u32 = 15;
 /// `EMPTY_KEY` in game-reader).
 const EMPTY_SIGIL_HASH: u32 = 0x887a_e0b0;
 
-/// An empty slot reaches us as either a plain zero or the engine sentinel:
-/// the hook normalises `0x887AE0B0` to `0` on one path but passes it straight
-/// through on others, so both must count as empty. Treating only one as empty
-/// either audits empty slots (false accusations) or skips real ones.
+/// An empty slot reaches us as either a plain zero or the engine sentinel, so
+/// both must count as empty.
+///
+/// No sigil-**id** normalisation exists anywhere in the hook — do not go
+/// looking for one and conclude the `0` arm is dead. The two paths differ in
+/// filtering, not in rewriting: `read_snapshot_sigils`
+/// (`src-hook/src/hooks/player.rs:1632`) DROPS sentinel entries outright, while
+/// the `PlayerLoadEvent` path (`player.rs:153`) copies all twelve raw slots
+/// (`SigilList::sigils`, `src-hook/src/hooks/ffi.rs:90`) through untouched. That
+/// unfiltered path is why either spelling of "empty" can arrive verbatim. (The
+/// one `if v == EMPTY_SIGIL_HASH { 0 }` closure in the hook, at
+/// `player.rs:1145`, is inside `read_record_stats` and applies to HP/attack
+/// stat words — never to ids.)
+///
+/// Treating only one as empty either audits empty slots (false accusations) or
+/// skips real ones. Narrowing this guard to the sentinel alone would let a
+/// zeroed second-trait slot reach rule 4, where `lot_traits(..).contains(&0)`
+/// is false and the empty slot gets accused.
 fn is_empty(id: u32) -> bool {
     id == 0 || id == EMPTY_SIGIL_HASH
 }
@@ -64,6 +78,12 @@ pub enum SecondTrait {
     /// The trait rolls from this skill_type_lot id.
     Lot(i32),
     /// The table named a lot we cannot resolve — missing data, stay silent.
+    ///
+    /// The silence is correct, but it is not coverage: rule 4 audits 925 of
+    /// the 1034 sigils and the other 109 are exempt from it entirely, so a
+    /// clean report for a player holding one of those means "not checked",
+    /// not "checked and legitimate". Worth remembering once a UI renders "no
+    /// legality findings" per player.
     Unresolvable,
 }
 
@@ -251,6 +271,11 @@ mod tests {
     /// rows — they must stay silent, not be mistaken for single-trait sigils.
     const UNRESOLVED_LOT_SIGIL: u32 = 0x95a4_1365;
     const UNRESOLVED_LOT_TRAIT1: u32 = 0x1c36_0c63;
+    /// Immortal Shell, one of the eleven sigils whose entry raises the trait
+    /// ceiling above the default 15 — this one to 20, corroborated by
+    /// `trait-max-levels.json`. It takes no second trait.
+    const IMMORTAL_SHELL_SIGIL: u32 = 0x4943_4696;
+    const IMMORTAL_SHELL_TRAIT: u32 = 0xbf78_fbfc;
     /// A sigil whose entry fixes its pair outright — no lot involved.
     const FIXED_PAIR_SIGIL: u32 = 0x0045_57b8;
     const FIXED_PAIR_TRAIT1: u32 = 0xa8a3_163b;
@@ -447,7 +472,12 @@ mod tests {
         assert_eq!(
             (nothing, unresolvable, lot, fixed),
             (514, 109, 176, 235),
-            "second-trait state split drifted"
+            "second-trait state split drifted. These four numbers mirror \
+             EXPECTED_SECOND_TRAIT_STATES in scripts/gen-sigil-legality.py, \
+             which aborts on the same drift — if you legitimately validated \
+             more lots by growing transmarvel-pool.json, `unresolved` falls \
+             and `lot` rises by the same amount, and BOTH the script's \
+             constant and this tuple must be updated in that same commit"
         );
     }
 
@@ -520,6 +550,50 @@ mod tests {
                 "second-trait sentinel {sentinel:08x} was audited"
             );
         }
+    }
+
+    /// The raised-ceiling branch audited end to end, not merely loaded.
+    ///
+    /// Every other fixture here uses a default-15 sigil, so substituting
+    /// [`DEFAULT_SIGIL_TRAIT_MAX_LEVEL`] for `entry.max_level` in the rule
+    /// left the whole suite green while an honest player holding this sigil
+    /// at trait level 20 was told `allowed: Level(15)`. The raised ceiling is
+    /// the one branch of rule 3 that can false-accuse, so it is pinned from
+    /// both sides: legal at the ceiling, flagged one step above it.
+    #[test]
+    fn audits_a_sigil_whose_ceiling_the_table_raises() {
+        assert_eq!(
+            stock_sigils()
+                .get(&IMMORTAL_SHELL_SIGIL)
+                .expect("the raised-ceiling sigil is in the table")
+                .max_level,
+            20,
+            "this fixture is only meaningful while the table raises this \
+             sigil's ceiling above the default"
+        );
+
+        let at_ceiling = [sigil(
+            IMMORTAL_SHELL_SIGIL,
+            (IMMORTAL_SHELL_TRAIT, 20),
+            (0, 0),
+        )];
+        assert_eq!(
+            audit_sigils(&at_ceiling),
+            vec![],
+            "accused a legal trait level of 20 on a sigil whose ceiling is 20"
+        );
+
+        let above = [sigil(
+            IMMORTAL_SHELL_SIGIL,
+            (IMMORTAL_SHELL_TRAIT, 21),
+            (0, 0),
+        )];
+        let findings = audit_sigils(&above);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::SigilTraitLevel);
+        assert_eq!(findings[0].severity, Severity::Impossible);
+        assert_eq!(findings[0].observed, Value::Level(21));
+        assert_eq!(findings[0].allowed, Value::Level(20));
     }
 
     /// The eleven entries that carry `maxLevel` raise the ceiling above the

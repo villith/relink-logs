@@ -52,9 +52,11 @@ can never roll its own trait's family (ATK/HP/Crit/Stun -> 5, offense -> 6,
 defense -> 7, support -> 26, utility -> 27).
 
 The raw ids bear this out: gem.tbl yields lots 2, 3, 4, 5, 6, 7, 15, 16, 26, 27,
-but only 5, 6, 7, 15, 26, 27 exist as real lots — the others (e.g. sigil
-381bbe64, whose raw lot is 4 while its effective lot is 7) would resolve to
-nothing and silently disable the rule.
+but 2, 3, 4 and 16 are not real lots at all — skillTypeRows defines only
+5, 6, 7, 15, 22, 23, 24, 25, 26, 27 (the 22-25 rows are the wrightstone ones,
+which no sigil draws from). So those four raw ids (e.g. sigil 381bbe64, whose
+raw lot is 4 while its effective lot is 7) would resolve to nothing and silently
+disable the rule.
 
 Because the swap is a function of trait1, this generator takes the EFFECTIVE lot
 per trait1 from transmarvel-pool.json — values that are already live-validated —
