@@ -17,6 +17,12 @@ export default function useSettings() {
     include_primal_burst,
     open_log_on_save,
     auto_check_updates,
+    player_label_template,
+    header_segments,
+    bar_fill_mode,
+    bar_texture,
+    bar_height,
+    bar_spacing,
     setMeterSettings,
   } = useMeterSettingsStore((state) => ({
     color_1: state.color_1,
@@ -32,6 +38,12 @@ export default function useSettings() {
     include_primal_burst: state.include_primal_burst,
     open_log_on_save: state.open_log_on_save,
     auto_check_updates: state.auto_check_updates,
+    player_label_template: state.player_label_template,
+    header_segments: state.header_segments,
+    bar_fill_mode: state.bar_fill_mode,
+    bar_texture: state.bar_texture,
+    bar_height: state.bar_height,
+    bar_spacing: state.bar_spacing,
     setMeterSettings: state.set,
   }));
 
@@ -61,6 +73,12 @@ export default function useSettings() {
     languages,
     open_log_on_save,
     auto_check_updates,
+    player_label_template,
+    header_segments,
+    bar_fill_mode,
+    bar_texture,
+    bar_height,
+    bar_spacing,
     handleLanguageChange,
   };
 }

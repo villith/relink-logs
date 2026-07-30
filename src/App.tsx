@@ -13,7 +13,7 @@ import { IndexPage as LogIndexPage } from "./pages/logs/Index";
 import { ViewPage as LogViewPage } from "./pages/logs/View";
 import ChecklistSettings from "./pages/settings/ChecklistSettings";
 import GeneralSettings from "./pages/settings/GeneralSettings";
-import MeterSettings from "./pages/settings/MeterSettings";
+import MeterSettings from "./pages/settings/meters/MeterSettings";
 import BuildAudit from "./pages/toolbox/BuildAudit";
 import OvermasteryPredictor from "./pages/toolbox/OvermasteryPredictor";
 import SynthesisHelper from "./pages/toolbox/SynthesisHelper";
