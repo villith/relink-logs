@@ -2,7 +2,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import SkillGroupMapping from "@/assets/skill-groups";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
-import { ComputedPlayerState, ComputedSkillGroup, ComputedSkillState } from "@/types";
+import { ComputedPlayerState, ComputedSkillGroup, ComputedSkillState, CustomSkillGroup } from "@/types";
 import { PRIMAL_BURST_GROUP, getSkillName, isPrimalBurstHit, isSkillGroup } from "@/utils";
 
 /** Folds one more skill into an existing group row. */
@@ -73,10 +73,20 @@ const upsertGroup = (
   }
 };
 
+/** Finds the first custom rule that claims this Normal action id, or null. */
+const findCustomRule = (customGroups: CustomSkillGroup[], actionId: number): CustomSkillGroup | null => {
+  for (const rule of customGroups) {
+    if (rule.skillIds.includes(actionId)) return rule;
+  }
+  return null;
+};
+
 export const useSkillBreakdown = (player: ComputedPlayerState) => {
-  const { useCondensedSkills } = useMeterSettingsStore(
+  const { useCondensedSkills, customSkillGroups, disabledPresetGroups } = useMeterSettingsStore(
     useShallow((state) => ({
       useCondensedSkills: state.use_condensed_skills,
+      customSkillGroups: state.custom_skill_groups,
+      disabledPresetGroups: state.disabled_preset_groups ?? [],
     }))
   );
 
@@ -94,7 +104,17 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
   let skillsToShow: Array<ComputedSkillGroup | ComputedSkillState> = computedSkills;
 
   if (useCondensedSkills && typeof player.characterType == "string") {
-    const skills: Array<ComputedSkillGroup | ComputedSkillGroup> = [];
+    const charKey = player.characterType;
+    const skills: Array<ComputedSkillGroup | ComputedSkillState> = [];
+
+    // Filter active custom rules for this character
+    const activeCustomRules = customSkillGroups.filter((r) => r.characterType === charKey && r.enabled !== false);
+
+    // Build a set of action IDs claimed by active custom rules for this character
+    const customClaimedIds = new Set<number>();
+    for (const rule of activeCustomRules) {
+      for (const id of rule.skillIds) customClaimedIds.add(id);
+    }
 
     for (const skill of computedSkills) {
       // The three Primal Burst bodies are distinct classes sharing one action
@@ -110,10 +130,29 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
 
       if (typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "Normal")) {
         const actionType = skill.actionType as { Normal: number };
+        const actionId = actionType.Normal;
+
+        // 1. Active custom rules take priority over the static mapping.
+        if (customClaimedIds.has(actionId)) {
+          const rule = findCustomRule(activeCustomRules, actionId);
+          if (rule) {
+            // The group key encodes the display name so getSkillName can
+            // recover it without accessing the store (see utils.ts).
+            upsertGroup(skills, `custom::${rule.name}`, skill, skill.childCharacterType);
+            continue;
+          }
+        }
+
+        // 2. Fall back to the static skill-groups.json mapping (unless disabled).
         let wasGroupedSkill = false;
 
         for (const group in skillGroupMapping) {
-          const skillBelongsToGroup = skillGroupMapping[group].skills.includes(actionType.Normal);
+          const presetIdentifier = `${skillGroupIndex}::${group}`;
+          if (disabledPresetGroups.includes(presetIdentifier)) {
+            continue;
+          }
+
+          const skillBelongsToGroup = skillGroupMapping[group].skills.includes(actionId);
 
           if (skillBelongsToGroup) {
             upsertGroup(skills, group, skill, skill.childCharacterType);

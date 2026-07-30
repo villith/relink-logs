@@ -86,6 +86,25 @@ export type ActionType =
   | { Normal: number }
   | { Group: string };
 
+/**
+ * A user-defined rule that merges a set of skills into one group row when
+ * "condensed skills" is enabled. Persisted in the meter-settings store.
+ */
+export type CustomSkillGroup = {
+  /** UUID that uniquely identifies this rule (used as the Group key prefix). */
+  id: string;
+  /** The character type this rule applies to, e.g. "Pl0000". */
+  characterType: string;
+  /** The display name shown in the skill-breakdown table for this group. */
+  name: string;
+  /** The Normal action IDs to collapse into this group. */
+  skillIds: number[];
+  /** Whether this custom group is currently active. Defaults to true. */
+  enabled?: boolean;
+  /** If this rule modifies/overrides a built-in group, holds its key (e.g. "normal-attack"). */
+  presetKey?: string;
+};
+
 /** Per-enemy-type share of one skill's damage (mirrors the Rust
  * `SkillTargetState`); same-type spawns merge into one entry. Computed under
  * the active target/time filters, like the rest of the derived state. */

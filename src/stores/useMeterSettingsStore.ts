@@ -3,6 +3,7 @@ import {
   ALL_SKILL_COLUMNS,
   buildColumns,
   ColumnSetting,
+  CustomSkillGroup,
   DEFAULT_LOGS_COLUMNS,
   DEFAULT_LOGS_SKILL_COLUMNS,
   DEFAULT_OVERLAY_COLUMNS,
@@ -145,6 +146,11 @@ interface MeterSettings {
   bar_height: number;
   /** Vertical gap between meter rows in px. */
   bar_spacing: number;
+  /** User-defined condensed-skill group rules (applied on top of the static
+   * skill-groups.json mapping when use_condensed_skills is on). */
+  custom_skill_groups: CustomSkillGroup[];
+  /** Keys of built-in preset groups that have been disabled by the user ("${charKey}::${presetKey}"). */
+  disabled_preset_groups: string[];
 }
 
 interface MeterStateFunctions {
@@ -189,6 +195,8 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   header_buttons: { ...DEFAULT_HEADER_BUTTONS },
   ...DEFAULT_OVERLAY_SIZE,
   ...DEFAULT_BAR_APPEARANCE,
+  custom_skill_groups: [],
+  disabled_preset_groups: [],
 };
 
 /* Cross-window sync lives in `durableStorage`: every write goes to settings.db,
@@ -207,8 +215,10 @@ export const useMeterSettingsStore = create<MeterSettings & MeterStateFunctions>
     }),
     {
       name: "meter-settings",
-      version: 2,
+      version: 3,
       ...durablePersistOptions<MeterSettings & MeterStateFunctions>(),
+      // v3 added custom_skill_groups (was absent in v2 — filled with [] on
+      // first hydration via the merge step below; migrate is a no-op for v2).
       // v2 changed column lists from an ordered array of *shown* columns
       // (string[]) to the full set of columns each tagged visible/hidden
       // (ColumnSetting[]), so hiding a column keeps its position. Convert any
@@ -280,6 +290,16 @@ export const useMeterSettingsStore = create<MeterSettings & MeterStateFunctions>
           settingsOr(merged.logs_skill_columns, DEFAULT_LOGS_SKILL_COLUMNS),
           ALL_SKILL_COLUMNS
         );
+
+        // Ensure custom_skill_groups is always a valid array (absent in v2
+        // stores; the spread above copies it from `current` but a malformed
+        // persisted value could slip through).
+        if (!Array.isArray(merged.custom_skill_groups)) {
+          merged.custom_skill_groups = [];
+        }
+        if (!Array.isArray(merged.disabled_preset_groups)) {
+          merged.disabled_preset_groups = [];
+        }
 
         return merged;
       },

@@ -1,6 +1,8 @@
 import useSettings from "@/pages/useSettings";
-import { Checkbox, Tooltip } from "@mantine/core";
+import { Button, Checkbox, Tooltip } from "@mantine/core";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import { CustomSkillGroupEditor } from "../CustomSkillGroupEditor";
 import { SettingsSection } from "../SettingsSection";
 
 /** What the meter counts and how it writes the numbers down. Unlike the colour
@@ -9,6 +11,7 @@ import { SettingsSection } from "../SettingsSection";
 export const ValuesSection = () => {
   const { t } = useTranslation();
   const { show_full_values, use_condensed_skills, include_primal_burst, setMeterSettings } = useSettings();
+  const [editorOpen, setEditorOpen] = useState(false);
 
   return (
     <SettingsSection title={t("ui.meter-values-section")}>
@@ -26,6 +29,24 @@ export const ValuesSection = () => {
           onChange={(event) => setMeterSettings({ use_condensed_skills: event.currentTarget.checked })}
         />
       </Tooltip>
+      {/* The custom-group button is a sibling of the checkbox above it: it sits
+          on its own line, indented by the checkbox's own width (1.25rem) plus
+          the label gap (--mantine-spacing-sm), so the button text lines up
+          with the checkbox label above it instead of the tick box. */}
+      <Button
+        size="compact-sm"
+        variant="light"
+        color="blue"
+        disabled={!use_condensed_skills}
+        onClick={() => setEditorOpen(true)}
+        style={{
+          alignSelf: "flex-start",
+          marginLeft: "calc(1.25rem + var(--mantine-spacing-sm))",
+        }}
+      >
+        {t("ui.custom-skill-groups")}
+      </Button>
+      <CustomSkillGroupEditor opened={editorOpen} onClose={() => setEditorOpen(false)} />
       <Tooltip label={t("ui.include-primal-burst-description")}>
         <Checkbox
           label={t("ui.include-primal-burst")}
