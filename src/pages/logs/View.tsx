@@ -36,8 +36,10 @@ import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 
 import { ColumnsPopover } from "@/components/ColumnsPopover";
+import { LegalityMark, LegalityPlayerName } from "@/components/LegalityMark";
 import { Table as MeterTable } from "@/components/Table";
 import { useTabParam } from "@/hooks/useTabParam";
+import { findingsForSubject } from "@/legality";
 import { useChecklistStore } from "@/stores/useChecklistStore";
 import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
 import { useMeterFilters } from "@/stores/useMeterFilterSync";
@@ -47,6 +49,7 @@ import {
   type CharacterType,
   type ComputedPlayerState,
   type EncounterState,
+  type LegalityFinding,
   type Overmastery,
   type PlayerData,
   type SortDirection,
@@ -1459,12 +1462,14 @@ export const ViewPage = () => {
               <Table striped layout="fixed">
                 <Table.Tbody>
                   <Table.Tr>
-                    {playerData.map((player) => {
+                    {playerData.map((player, playerIndex) => {
                       return (
                         <Table.Td key={player.actorIndex} flex={1}>
                           <Flex direction="row" wrap="nowrap" align="center">
                             <Text fw={700} size="xl" mr="5">
-                              {formatPlayerDisplayName(player, show_display_names && !streamer_mode, false)}
+                              <LegalityPlayerName findings={legality[playerIndex] ?? []} player={player}>
+                                {formatPlayerDisplayName(player, show_display_names && !streamer_mode, false)}
+                              </LegalityPlayerName>
                             </Text>
                             <Tooltip label={t("ui.copy-character-data-to-clipboard")} color="dark">
                               <ActionIcon
@@ -1571,13 +1576,19 @@ export const ViewPage = () => {
                     })}
                   </Table.Tr>
                   <Table.Tr>
-                    {playerData.map((player) => {
+                    {playerData.map((player, playerIndex) => {
                       const overmasteries = player.overmasteryInfo?.overmasteries || [];
+                      const findings = legality[playerIndex] ?? [];
 
                       return (
                         <Table.Td key={player.actorIndex}>
                           <Text size="xs" fw={700}>
-                            {t("ui.player-overmasteries")}
+                            <LegalityMark
+                              findings={findingsForSubject(findings, "overmasteries")}
+                              subjectName={t("ui.player-overmasteries")}
+                            >
+                              {t("ui.player-overmasteries")}
+                            </LegalityMark>
                           </Text>
                           {Array.from(Array(4).keys()).map((overmasteryIndex) => {
                             const overmastery = overmasteries[overmasteryIndex];
@@ -1588,7 +1599,12 @@ export const ViewPage = () => {
                                 empty={!overmastery || (overmastery.value === 0 && overmastery.flags === 0)}
                               >
                                 <Text size="xs" fs="italic" fw={300}>
-                                  {formatOvermastery(overmastery)}
+                                  <LegalityMark
+                                    findings={findingsForSubject(findings, "overmastery", overmasteryIndex)}
+                                    subjectName={formatOvermastery(overmastery)}
+                                  >
+                                    {formatOvermastery(overmastery)}
+                                  </LegalityMark>
                                 </Text>
                               </Placeholder>
                             );
@@ -1599,7 +1615,7 @@ export const ViewPage = () => {
                   </Table.Tr>
                   <AbilitiesRow playerData={playerData} />
                   <Table.Tr>
-                    {playerData.map((player) => {
+                    {playerData.map((player, playerIndex) => {
                       return (
                         <Table.Td key={player.actorIndex}>
                           <Text size="xs" fw={700}>
@@ -1663,7 +1679,12 @@ export const ViewPage = () => {
                                 player.weaponState.wrightstoneTraits.length > 0) && (
                                 <>
                                   <Text size="xs" fw={700}>
-                                    {translateWrightstoneId(player.weaponState.wrightstoneId)}
+                                    <LegalityMark
+                                      findings={findingsForSubject(legality[playerIndex] ?? [], "wrightstone")}
+                                      subjectName={translateWrightstoneId(player.weaponState.wrightstoneId)}
+                                    >
+                                      {translateWrightstoneId(player.weaponState.wrightstoneId)}
+                                    </LegalityMark>
                                   </Text>
                                   {player.weaponState.wrightstoneTraits.map((trait) => (
                                     <Text size="xs" fs="italic" fw={300} key={trait.id}>
@@ -1745,19 +1766,30 @@ export const ViewPage = () => {
                     })}
                   </Table.Tr>
                   <Table.Tr>
-                    {playerData.map((player) => {
+                    {playerData.map((player, playerIndex) => {
                       const summons = player.summons ?? [];
+                      const findings = legality[playerIndex] ?? [];
 
                       return (
                         <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
                           <Text size="xs" fw={700}>
-                            {t("ui.player-summons")}
+                            <LegalityMark
+                              findings={findingsForSubject(findings, "summons")}
+                              subjectName={t("ui.player-summons")}
+                            >
+                              {t("ui.player-summons")}
+                            </LegalityMark>
                           </Text>
                           <Placeholder empty={summons.length === 0}>
                             {summons.map((summon, summonIndex) => (
                               <Box key={summonIndex} mt={summonIndex > 0 ? 4 : 0}>
                                 <Text size="xs" fw={600}>
-                                  {translateSummonId(summon.summonId)}
+                                  <LegalityMark
+                                    findings={findingsForSubject(findings, "summon", summonIndex)}
+                                    subjectName={translateSummonId(summon.summonId)}
+                                  >
+                                    {translateSummonId(summon.summonId)}
+                                  </LegalityMark>
                                 </Text>
                                 <Text size="xs" fs="italic" fw={300} pl={8}>
                                   - {translateTraitId(summon.mainTraitId)}{" "}
@@ -1777,6 +1809,7 @@ export const ViewPage = () => {
                   </Table.Tr>
                   <MasterTraitsRows
                     playerData={playerData}
+                    legality={legality}
                     expandedTiers={expandedMasterTraitTiers}
                     expandedCategories={expandedMasterTraitCategories}
                     onToggleTier={toggleMasterTraitTier}
@@ -1784,8 +1817,15 @@ export const ViewPage = () => {
                     onToggleAll={setAllMasterTraitTiers}
                   />
                   <Table.Tr>
-                    {playerData.map((player) => {
-                      const sigils = (player.sigils ?? []).filter((sigil) => sigil.sigilId !== EMPTY_ID);
+                    {playerData.map((player, playerIndex) => {
+                      // A finding indexes into the player's UNFILTERED sigil
+                      // list, so the empty slots are dropped with their original
+                      // positions in hand — otherwise a finding lands on
+                      // whichever sigil happened to shift into that place.
+                      const sigils = (player.sigils ?? [])
+                        .map((sigil, slot) => ({ sigil, slot }))
+                        .filter(({ sigil }) => sigil.sigilId !== EMPTY_ID);
+                      const findings = legality[playerIndex] ?? [];
 
                       return (
                         <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
@@ -1794,10 +1834,15 @@ export const ViewPage = () => {
                             {sigils.length > 0 && ` (${sigils.length})`}
                           </Text>
                           <Placeholder empty={sigils.length === 0}>
-                            {sigils.map((sigil, sigilIndex) => (
+                            {sigils.map(({ sigil, slot }, sigilIndex) => (
                               <Box key={sigilIndex} mt={sigilIndex > 0 ? 4 : 0}>
                                 <Text size="xs" fw={600}>
-                                  {translateSigilId(sigil.sigilId)} {t("ui.trait-level", { level: sigil.sigilLevel })}
+                                  <LegalityMark
+                                    findings={findingsForSubject(findings, "sigil", slot)}
+                                    subjectName={translateSigilId(sigil.sigilId)}
+                                  >
+                                    {translateSigilId(sigil.sigilId)} {t("ui.trait-level", { level: sigil.sigilLevel })}
+                                  </LegalityMark>
                                 </Text>
                                 <Text size="xs" fs="italic" fw={300} pl={8}>
                                   - {translateTraitId(sigil.firstTraitId)}{" "}
@@ -1825,10 +1870,12 @@ export const ViewPage = () => {
               <Table striped layout="fixed">
                 <Table.Tbody>
                   <Table.Tr>
-                    {playerData.map((player) => (
+                    {playerData.map((player, playerIndex) => (
                       <Table.Td key={player.actorIndex} flex={1}>
                         <Text fw={700} size="xl">
-                          {formatPlayerDisplayName(player, show_display_names && !streamer_mode, false)}
+                          <LegalityPlayerName findings={legality[playerIndex] ?? []} player={player}>
+                            {formatPlayerDisplayName(player, show_display_names && !streamer_mode, false)}
+                          </LegalityPlayerName>
                         </Text>
                       </Table.Td>
                     ))}
@@ -1874,7 +1921,8 @@ export const ViewPage = () => {
                     </Table.Tr>
                   )}
                   <Table.Tr>
-                    {playerData.map((player) => {
+                    {playerData.map((player, playerIndex) => {
+                      const findings = legality[playerIndex] ?? [];
                       const overmasteries = (player.overmasteryInfo?.overmasteries || []).filter(
                         (overmastery) => overmastery.value !== 0 || overmastery.flags !== 0
                       );
@@ -1914,7 +1962,19 @@ export const ViewPage = () => {
                       return (
                         <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
                           <Text size="xs" fw={700}>
-                            {t("ui.player-overmasteries")}
+                            {/* Both whole-set reports land here: this row merges
+                                overmasteries and summon equip bonuses into one
+                                list, so it is the only place either claim has a
+                                heading to attach to. */}
+                            <LegalityMark
+                              findings={[
+                                ...findingsForSubject(findings, "overmasteries"),
+                                ...findingsForSubject(findings, "summons"),
+                              ]}
+                              subjectName={t("ui.player-overmasteries")}
+                            >
+                              {t("ui.player-overmasteries")}
+                            </LegalityMark>
                           </Text>
                           <Placeholder empty={combined.length === 0}>
                             {allEffects.map((bonus) => (
@@ -1948,6 +2008,7 @@ export const ViewPage = () => {
                   </Table.Tr>
                   <MasterTraitsRows
                     playerData={playerData}
+                    legality={legality}
                     expandedTiers={expandedMasterTraitTiers}
                     expandedCategories={expandedMasterTraitCategories}
                     onToggleTier={toggleMasterTraitTier}
@@ -2073,6 +2134,7 @@ const UNSTRIPED = { backgroundColor: "transparent" } as const;
  * the page so toggling a tier expands/collapses it for every player at once. */
 function MasterTraitsRows({
   playerData,
+  legality,
   expandedTiers,
   expandedCategories,
   onToggleTier,
@@ -2080,6 +2142,8 @@ function MasterTraitsRows({
   onToggleAll,
 }: {
   playerData: PlayerData[];
+  /** Findings per player, aligned with `playerData`. */
+  legality: LegalityFinding[][];
   /** Tiers and branches both start collapsed, so these hold the open ones. */
   expandedTiers: Set<string>;
   expandedCategories: Set<string>;
@@ -2204,8 +2268,19 @@ function MasterTraitsRows({
     <>
       <Table.Tr style={UNSTRIPED}>
         {playerData.map((player, playerIndex) => {
-          const label =
+          const rawLabel =
             t("ui.player-master-traits") + (grouped[playerIndex].total > 0 ? ` (${grouped[playerIndex].total})` : "");
+          // The count rule's claim is about the SET's size, so the section
+          // header is the only honest place to put it — no single node is at
+          // fault.
+          const label = (
+            <LegalityMark
+              findings={findingsForSubject(legality[playerIndex] ?? [], "masterTraits")}
+              subjectName={t("ui.player-master-traits")}
+            >
+              {rawLabel}
+            </LegalityMark>
+          );
 
           return (
             <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>

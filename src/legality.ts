@@ -11,7 +11,8 @@
 
 import { TFunction } from "i18next";
 
-import { LegalityFinding, LegalitySeverity, LegalitySubject, LegalityValue } from "./types";
+import { LegalityFinding, LegalitySeverity, LegalitySubject, LegalityValue, PlayerData } from "./types";
+import { translateSigilId, translateSummonId } from "./utils";
 
 /** The worst severity in a set, or null when nothing fired.
  *
@@ -83,3 +84,29 @@ export const describeFinding = (t: TFunction, finding: LegalityFinding, subjectN
     allowed: scalar(finding.allowed),
     denominator: denominator(finding.odds),
   });
+
+/**
+ * The translated name of the equipment a finding points at, resolved from the
+ * player who owns it.
+ *
+ * A tooltip on one item already knows what it is, but a tooltip on a player's
+ * NAME covers their whole build and has to name each item itself — otherwise
+ * every line reads "… can grant at most +50%" with nothing in front of it.
+ *
+ * Whole-set and unindexed subjects have no single item to name and resolve to
+ * an empty string; their sentences are written not to need one.
+ */
+export const subjectNameFor = (player: PlayerData, finding: LegalityFinding): string => {
+  const { kind, index } = finding.subject;
+  if (index === undefined) return "";
+
+  if (kind === "sigil") {
+    const sigil = player.sigils?.[index];
+    return sigil ? translateSigilId(sigil.sigilId) : "";
+  }
+  if (kind === "summon") {
+    const summon = player.summons?.[index];
+    return summon ? translateSummonId(summon.summonId) : "";
+  }
+  return "";
+};
