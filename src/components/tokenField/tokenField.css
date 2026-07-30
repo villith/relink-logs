@@ -1,12 +1,15 @@
 /* The field is a Mantine-styled box wrapping a ProseMirror contenteditable, so
    it has to reproduce Input's border/focus treatment rather than inherit it. */
 .token-field {
-  min-height: 36px;
-  padding: 6px 12px;
+  min-height: 34px;
+  padding: 5px 10px;
   border: 1px solid var(--mantine-color-dark-4);
   border-radius: var(--mantine-radius-sm);
   background-color: var(--mantine-color-dark-6);
-  font-size: var(--mantine-font-size-sm);
+  /* A literal length, NOT var(--mantine-font-size-sm): this app's theme sets
+     sm/md/lg/xl to unitless strings ("12"), which is not a valid CSS length, so
+     the declaration would be dropped and the field would inherit 16px. */
+  font-size: 14px;
   line-height: 1.55;
 }
 
@@ -18,6 +21,13 @@
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* The editor's only paragraph would otherwise carry the UA default
+   `margin: 1em 0` — 32px of empty space inside every field, which is most of a
+   row in the header segment list. */
+.token-field .ProseMirror p {
+  margin: 0;
 }
 
 /* The placeholder, driven by the Placeholder extension's data attribute. */

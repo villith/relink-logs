@@ -21,7 +21,7 @@ const EXTENSIONS = [
   Document.extend({ content: "paragraph" }),
   Paragraph,
   Text,
-  TokenNode,
+  TokenNode.configure({ allowed: ALLOWED }),
   UndoRedo,
   Dropcursor,
   Placeholder.configure({ placeholder: "" }),
@@ -113,6 +113,60 @@ describe("TokenNode round trip", () => {
     editor.commands.focus("end");
     editor.commands.insertToken("hpPercent");
     expect(editor.getText()).toBe("HP {hpPercent}");
+    editor.destroy();
+  });
+});
+
+/**
+ * Types text the way ProseMirror does, one character at a time through
+ * `handleTextInput` — the hook input rules attach to.
+ *
+ * `insertText` alone would NOT do: it bypasses that hook, so a rule could be
+ * broken and every test that used it would still pass.
+ */
+const typeText = (editor: Editor, text: string) => {
+  for (const char of text) {
+    const { from, to } = editor.state.selection;
+    // The fifth argument is the transaction ProseMirror would apply by itself;
+    // input rules take it as their fallback.
+    const plainInsert = () => editor.state.tr.insertText(char, from, to);
+    const handled = editor.view.someProp("handleTextInput", (rule) => rule(editor.view, from, to, char, plainInsert));
+    if (!handled) editor.view.dispatch(editor.state.tr.insertText(char, from, to));
+  }
+};
+
+describe("TokenNode input rule", () => {
+  it("turns a typed {name} into a chip", () => {
+    const editor = editorWith(templateToDoc("", ALLOWED));
+    editor.commands.focus("end");
+    typeText(editor, "{app}");
+    expect(editor.getHTML()).toContain('data-token="app"');
+    expect(editor.getText()).toBe("{app}");
+    editor.destroy();
+  });
+
+  it("marks a typed token outside the whitelist as unknown", () => {
+    const editor = editorWith(templateToDoc("", ALLOWED));
+    editor.commands.focus("end");
+    typeText(editor, "{bogus}");
+    expect(editor.getHTML()).toContain('data-unknown="true"');
+    editor.destroy();
+  });
+
+  it("leaves a shape the token grammar rejects as plain text", () => {
+    const editor = editorWith(templateToDoc("", ALLOWED));
+    editor.commands.focus("end");
+    typeText(editor, "{1bad}");
+    expect(editor.getHTML()).not.toContain("data-token");
+    expect(editor.getText()).toBe("{1bad}");
+    editor.destroy();
+  });
+
+  it("keeps typing around an existing token intact", () => {
+    const editor = editorWith(templateToDoc("HP ", ALLOWED));
+    editor.commands.focus("end");
+    typeText(editor, "{hpPercent} left");
+    expect(editor.getText()).toBe("HP {hpPercent} left");
     editor.destroy();
   });
 });

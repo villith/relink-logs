@@ -1,4 +1,4 @@
-import { mergeAttributes, Node } from "@tiptap/core";
+import { mergeAttributes, Node, nodeInputRule } from "@tiptap/core";
 
 /** How a dragged token travels between the palette and a field. A custom MIME
  * type rather than `text/plain` so the field's drop handler can tell one of our
@@ -35,8 +35,19 @@ declare module "@tiptap/core" {
  * each node's `renderText`, and so does the clipboard serializer, so copying a
  * chip as plain text also yields `{name}`.
  */
-export const TokenNode = Node.create({
+export type TokenNodeOptions = {
+  /** The names this field accepts. Only the input rule reads it — a typed token
+   * has to know whether it is one of them to mark itself, and the node is the
+   * only place that runs while typing. Configure it per field. */
+  allowed: readonly string[];
+};
+
+export const TokenNode = Node.create<TokenNodeOptions>({
   name: "token",
+
+  addOptions() {
+    return { allowed: [] };
+  },
 
   inline: true,
   group: "inline",
@@ -94,6 +105,35 @@ export const TokenNode = Node.create({
 
   renderText({ node }) {
     return `{${node.attrs.name}}`;
+  },
+
+  /**
+   * Typing `{name}` becomes a chip the moment the closing brace lands.
+   *
+   * Without this, the third of the three documented ways to add a token —
+   * drag, click, type — produces literal text that only turns into a chip on
+   * the next mount, so the field silently disagrees with itself about what a
+   * token looks like. Input rules do not fire on paste, which is the behaviour
+   * we want: pasted text is left exactly as pasted.
+   */
+  addInputRules() {
+    return [
+      nodeInputRule({
+        // The capture spans the BRACES TOO, and that is not cosmetic:
+        // `nodeInputRule` replaces the range of `match[1]`, not of `match[0]`,
+        // so capturing only the name leaves the braces behind and `{app}` types
+        // out as `{` + chip + `}` — which serializes to `{{app}}`.
+        //
+        // Anchored to the caret, and the same grammar as TOKEN_PATTERN: a name
+        // this rejects could not survive the stored-string round trip anyway.
+        find: /(\{[a-zA-Z][a-zA-Z0-9]*\})$/,
+        type: this.type,
+        getAttributes: (match) => {
+          const name = match[1].slice(1, -1);
+          return { name, unknown: !this.options.allowed.includes(name) };
+        },
+      }),
+    ];
   },
 
   addCommands() {

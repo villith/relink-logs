@@ -45,7 +45,10 @@ export const TokenField = ({ label, value, onChange, tokens, placeholder, hideLa
         OneLineDocument,
         Paragraph,
         Text,
-        TokenNode,
+        // Per-field, so a typed `{name}` can mark itself unknown against THIS
+        // field's whitelist. The editor is rebuilt when `tokens` changes, so the
+        // configured copy never goes stale.
+        TokenNode.configure({ allowed: tokens }),
         UndoRedo,
         Dropcursor.configure({ width: 2 }),
         Placeholder.configure({ placeholder: placeholder ?? "" }),
