@@ -2,7 +2,7 @@ import { HEADER_TOKENS } from "@/components/Titlebar";
 import useSettings from "@/pages/useSettings";
 import type { HeaderSegment } from "@/stores/useMeterSettingsStore";
 import { moveItem } from "@/utils";
-import { ActionIcon, Button, Code, Group, Paper, Select, Stack, Switch, Text } from "@mantine/core";
+import { ActionIcon, Box, Button, Code, Group, Paper, Select, Stack, Switch, Text } from "@mantine/core";
 import { ArrowDown, ArrowUp, Trash } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 import { TemplateField } from "./TemplateField";
@@ -66,14 +66,19 @@ export const HeaderSegmentsEditor = () => {
       </Group>
       {header_segments.map((segment, index) => (
         <Paper key={segment.id} p="xs" withBorder>
-          <Group align="flex-start" gap="xs" wrap="nowrap">
-            <TemplateField
-              label={t("ui.header-segment-template")}
-              value={segment.template}
-              onChange={(template) => patch(index, { template })}
-              tokens={HEADER_TOKENS}
-              sample={SAMPLE}
-            />
+          {/* Wraps rather than forcing one line: this editor now lives in a
+              column beside the preview, and a nowrap row would squeeze the
+              template input — the field that actually needs the width. */}
+          <Group align="flex-start" gap="xs" wrap="wrap">
+            <Box style={{ flex: "1 1 260px", minWidth: 220 }}>
+              <TemplateField
+                label={t("ui.header-segment-template")}
+                value={segment.template}
+                onChange={(template) => patch(index, { template })}
+                tokens={HEADER_TOKENS}
+                sample={SAMPLE}
+              />
+            </Box>
             <Select
               label={t("ui.header-segment-side")}
               w={110}
