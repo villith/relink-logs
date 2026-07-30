@@ -1,14 +1,14 @@
 import useSettings from "@/pages/useSettings";
 import { useIsLinux } from "@/platform";
 import { BAR_TEXTURES, type BarFillMode } from "@/stores/useMeterSettingsStore";
-import { Select, SimpleGrid, Slider, Stack, Text } from "@mantine/core";
+import { Select, SimpleGrid, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { LabelledSlider } from "./LabelledSlider";
 
 /** How the meter's damage bars are drawn: fill rule, texture, row size. */
 export const BarAppearanceSection = () => {
   const { t } = useTranslation();
-  const { bar_fill_mode, bar_texture, bar_height, bar_spacing, transparency, setMeterSettings } = useSettings();
+  const { bar_fill_mode, bar_texture, bar_height, bar_spacing, setMeterSettings } = useSettings();
 
   // Textures are a Windows-only nicety: they are gradients delivered through a
   // CSS custom property, and verifying that path on WebKitGTK is not worth it
@@ -66,14 +66,6 @@ export const BarAppearanceSection = () => {
         unit="px"
         value={bar_spacing}
         onChange={(value) => setMeterSettings({ bar_spacing: value })}
-      />
-      <Text size="sm">{t("ui.meter-transparency")}</Text>
-      <Slider
-        min={0}
-        max={1}
-        step={0.005}
-        defaultValue={transparency}
-        onChangeEnd={(value) => setMeterSettings({ transparency: value })}
       />
     </Stack>
   );

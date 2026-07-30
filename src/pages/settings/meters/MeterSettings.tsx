@@ -1,12 +1,9 @@
-import { ColumnEditor } from "@/components/ColumnEditor";
-import { useColumnControls } from "@/components/useColumnControls";
-import { Box, Divider, Flex, SegmentedControl, SimpleGrid, Stack, Text, Title } from "@mantine/core";
+import { Box, Divider, Flex, SegmentedControl, SimpleGrid, Stack, Title } from "@mantine/core";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { BarAppearanceSection } from "./BarAppearanceSection";
 import { ColorsSection } from "./ColorsSection";
-import { HeaderSegmentsEditor } from "./HeaderSegmentsEditor";
 import { LabelsSection } from "./LabelsSection";
 import { MeterPreview } from "./MeterPreview";
 import { NamesSection } from "./NamesSection";
@@ -43,7 +40,6 @@ const ScopedPreview = () => {
  * stack, preview first, since there is no room for a side-by-side. */
 const MeterSettings = () => {
   const { t } = useTranslation();
-  const { overlayPlayer, overlaySkill } = useColumnControls();
 
   return (
     <Stack gap="md" pr="md">
@@ -59,33 +55,12 @@ const MeterSettings = () => {
           <BarAppearanceSection />
           <Divider />
           <LabelsSection />
-          <HeaderSegmentsEditor />
           <Divider />
           {/* These two are short checkbox lists, so they still pair up fine. */}
           <SimpleGrid cols={{ base: 1, md: 2 }} spacing="lg">
             <NamesSection />
             <ValuesSection />
           </SimpleGrid>
-          <Divider />
-          <Text size="md" fw={700}>
-            {t("ui.overlay-columns-section")}
-          </Text>
-          <ColumnEditor
-            title={t("ui.player-row")}
-            droppableId="overlay-player-columns"
-            translationPrefix="ui.meter-columns"
-            items={overlayPlayer.items}
-            onToggle={overlayPlayer.onToggle}
-            onReorder={overlayPlayer.onReorder}
-          />
-          <ColumnEditor
-            title={t("ui.skill-breakdown")}
-            droppableId="overlay-skill-columns"
-            translationPrefix="ui.skill-columns"
-            items={overlaySkill.items}
-            onToggle={overlaySkill.onToggle}
-            onReorder={overlaySkill.onReorder}
-          />
         </Stack>
         {/* Sticky against the page scroll: the settings shell puts no overflow
             container between here and the window, so `top` is measured from the
