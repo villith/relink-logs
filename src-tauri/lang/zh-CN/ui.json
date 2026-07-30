@@ -102,7 +102,19 @@
       "sigils-section": "因子检查清单",
       "ai-section": "AI 检查清单",
       "add-trait": "添加特性...",
-      "reset": "恢复默认"
+      "reset": "恢复默认",
+      "new-group": "新建分组",
+      "new-group-name": "新建分组",
+      "group-name-placeholder": "分组名称",
+      "rename-group": "重命名分组",
+      "sort-az": "按名称排序",
+      "sorted-az": "已按名称排序",
+      "delete-group": "删除分组",
+      "delete-group-title": "删除分组",
+      "delete-group-confirm": "将删除 \"{{name}}\" 及其包含的 {{count}} 个项目。",
+      "reorder-group": "整理分组",
+      "reorder-entry": "整理项目",
+      "group-enabled": "显示此分组"
     },
     "master-traits": {
       "tier": "{{tier}}阶",
@@ -227,7 +239,8 @@
       "overview": "总览",
       "equipment": "角色配置",
       "builds": "装备配置",
-      "ai-companion": "AI"
+      "ai-companion": "AI",
+      "delete-logs-title": "删除日志"
     },
     "toolbox": {
       "title": "工具箱",
@@ -377,7 +390,12 @@
       "hook-clear-override-quietly": "清除覆盖（不重新握手）"
     },
     "include-primal-burst": "包含高阶召唤伤害",
-    "include-primal-burst-description": "将高阶召唤的伤害计入悬浮窗。"
+    "include-primal-burst-description": "将高阶召唤的伤害计入悬浮窗。",
+    "settings-nav": {
+      "general": "通用",
+      "meters": "悬浮窗"
+    },
+    "color-placeholder": "颜色"
   },
   "characters": {
     "Pl2000": "伊德 (龙形态)",
