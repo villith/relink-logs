@@ -464,16 +464,9 @@ impl Default for PlayerData {
 ///
 /// The rules are written against `protocol` types so they stay independent of
 /// this module's persisted on-disk format, but `PlayerData` stores the parser's
-/// own mirrors of those types. This carries the converted values so a
-/// `BuildSnapshot` can borrow from them for the length of one audit.
-pub struct LegalityInputs {
-    pub character_type: CharacterType,
-    pub sigils: Vec<protocol::Sigil>,
-    pub summons: Vec<protocol::EquippedSummon>,
-    pub skillboard: Vec<u32>,
-    pub weapon_state: Option<protocol::WeaponState>,
-    pub overmastery_info: Option<protocol::OvermasteryInfo>,
-}
+/// own mirrors of those types. The struct itself lives with the rules that read
+/// it; the `From` impls below and [`PlayerData::legality_inputs`] are the bridge.
+pub use crate::legality::LegalityInputs;
 
 impl From<&WeaponTraitPair> for protocol::WeaponTraitPair {
     fn from(pair: &WeaponTraitPair) -> Self {
@@ -550,12 +543,11 @@ impl PlayerData {
     /// here because `PlayerData`'s fields are private to this module.
     pub fn legality_inputs(&self) -> LegalityInputs {
         LegalityInputs {
-            character_type: self.character_type,
             sigils: self.sigils.iter().map(Into::into).collect(),
             summons: self.summons.iter().map(Into::into).collect(),
-            skillboard: self.skillboard.clone(),
             weapon_state: self.weapon_state.as_ref().map(Into::into),
             overmastery_info: self.overmastery_info.as_ref().map(Into::into),
+            skillboard: self.skillboard.clone(),
         }
     }
 
@@ -2730,8 +2722,9 @@ impl Parser {
                         quest_completed,
                         run_id,
                         room_index,
-                        total_damage
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+                        total_damage,
+                        legality_rules_version
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
                 params![
                     "",
                     start_datetime.timestamp_millis(),
@@ -2752,16 +2745,118 @@ impl Parser {
                     self.encounter.quest_completed,
                     run_id,
                     room_index,
-                    total_damage
+                    total_damage,
+                    // Stamped here rather than left for the startup sweep: an
+                    // unstamped log reads as stale, so every fresh save would
+                    // be re-audited on the next launch and the write below
+                    // would be wasted work.
+                    crate::legality::RULES_VERSION
                 ],
             )?;
 
             let id = conn.last_insert_rowid();
 
+            // Audit while the equipment is in hand. Re-running the rules later
+            // means decompressing and reparsing this blob again, which is the
+            // whole cost the stored findings exist to avoid.
+            for (player_index, player) in self.encounter.player_data.iter().enumerate() {
+                let Some(player) = player else { continue };
+                let findings = crate::legality::audit(&player.legality_inputs());
+                if findings.is_empty() {
+                    continue;
+                }
+                crate::db::legality::write_findings(
+                    conn,
+                    id,
+                    player_index,
+                    player.display_name(),
+                    &player.character_type().to_string(),
+                    &findings,
+                )?;
+            }
+
             return Ok(Some(id));
         }
 
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod legality_save_tests {
+    use super::*;
+
+    /// Saving an encounter audits its players and stores the verdicts, so the
+    /// log view and the audit page never have to re-run the rules.
+    ///
+    /// Also pins the STAMP. Without it every freshly saved log would look
+    /// stale to the startup sweep and be re-audited on the next launch — the
+    /// sweep would never converge and the write here would be pointless work.
+    #[test]
+    fn saving_an_encounter_stores_its_findings_and_stamps_the_rules_version() {
+        let mut parser = super::tests::parser_with_memory_db();
+
+        // Behemoth III with the boss-set Healing Cap Up at its top: +75%
+        // against a +50% ceiling, so both summon-bonus rules fire.
+        let mut player = PlayerData {
+            display_name: "炎顺帝".to_string(),
+            ..Default::default()
+        };
+        player.summons = vec![EquippedSummon {
+            summon_id: 0xe4b7_dcf9,
+            main_trait_id: 0xb5ff_9fd3,
+            main_trait_level: 15,
+            bonus_id: 0x2ea9_ca80,
+            bonus_level: 9,
+        }];
+        parser.encounter.player_data[2] = Some(player);
+
+        let log_id = parser
+            .save_encounter_to_db()
+            .expect("save succeeds")
+            .expect("a log row was written");
+
+        let conn = parser.db.as_ref().expect("the fixture holds a connection");
+        let stored = crate::db::legality::findings_for_log(conn, log_id).expect("read findings");
+        assert_eq!(stored.len(), 2, "both summon-bonus rules should be stored");
+        assert!(stored.iter().all(|row| row.player_index == 2));
+        assert!(stored.iter().all(|row| row.display_name == "炎顺帝"));
+
+        let stamp: Option<u32> = conn
+            .query_row(
+                "SELECT legality_rules_version FROM logs WHERE id = ?",
+                [log_id],
+                |row| row.get(0),
+            )
+            .expect("read the stamp");
+        assert_eq!(stamp, Some(crate::legality::RULES_VERSION));
+    }
+
+    /// A legal party stores nothing but is still stamped, so the sweep leaves
+    /// it alone. An unstamped clean log would be re-audited forever.
+    #[test]
+    fn a_clean_encounter_stores_no_findings_but_is_still_stamped() {
+        let mut parser = super::tests::parser_with_memory_db();
+        parser.encounter.player_data[0] = Some(PlayerData::default());
+
+        let log_id = parser
+            .save_encounter_to_db()
+            .expect("save succeeds")
+            .expect("a log row was written");
+
+        let conn = parser.db.as_ref().expect("the fixture holds a connection");
+        assert!(crate::db::legality::findings_for_log(conn, log_id)
+            .expect("read findings")
+            .is_empty());
+
+        let stamp: Option<u32> = conn
+            .query_row(
+                "SELECT legality_rules_version FROM logs WHERE id = ?",
+                [log_id],
+                |row| row.get(0),
+            )
+            .expect("read the stamp");
+        assert_eq!(stamp, Some(crate::legality::RULES_VERSION));
     }
 }
 
@@ -2787,13 +2882,13 @@ mod tests {
 
     use super::*;
 
-    fn parser_with_memory_db() -> Parser {
+    /// The REAL migration list, not a hand-copied one. It used to be a copy,
+    /// which meant a schema the save path depends on could be added without
+    /// these tests noticing — and the save path now also writes findings, so
+    /// a copy would have been missing a whole table.
+    pub(super) fn parser_with_memory_db() -> Parser {
         let mut conn = rusqlite::Connection::open_in_memory().unwrap();
-        let migrations = rusqlite_migration::Migrations::new(vec![
-            rusqlite_migration::M::up("CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY, name TEXT NOT NULL, time INTEGER NOT NULL, duration INTEGER NOT NULL, data BLOB NOT NULL, version INTEGER NOT NULL DEFAULT 0, primary_target INTEGER, p1_name TEXT, p1_type TEXT, p2_name TEXT, p2_type TEXT, p3_name TEXT, p3_type TEXT, p4_name TEXT, p4_type TEXT, quest_id INTEGER, quest_elapsed_time INTEGER, quest_completed BOOLEAN, run_id INTEGER, room_index INTEGER, total_damage INTEGER)"),
-            rusqlite_migration::M::up("CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, start_time INTEGER NOT NULL, end_time INTEGER, duration INTEGER, room_count INTEGER NOT NULL DEFAULT 0, completed BOOLEAN, buffs TEXT)"),
-        ]);
-        migrations.to_latest(&mut conn).unwrap();
+        crate::db::migrations().to_latest(&mut conn).unwrap();
         Parser {
             db: Some(conn),
             ..Default::default()
@@ -5719,7 +5814,7 @@ mod stored_log_compat {
     }
 }
 
-/// The `PlayerData` -> `BuildSnapshot` bridge, tested with data in it.
+/// The `PlayerData` -> `LegalityInputs` bridge, tested with data in it.
 ///
 /// `legality_inputs` lives here because `PlayerData`'s fields are private to
 /// this module, and it is exercised nowhere else — `audit_player` has no
@@ -5740,14 +5835,14 @@ mod legality_bridge_tests {
 
     /// War Elemental's sigil id, whose intrinsic first trait is `4c588c27`.
     const WAR_ELEMENTAL_SIGIL: u32 = 0x0061_2b10;
+    const WAR_ELEMENTAL_TRAIT: u32 = 0x4c58_8c27;
     const STEADY_FOCUS: u32 = 0x0053_599e;
-    /// A real trait, but not War Elemental's — so rule 5 fires.
+    /// A real trait, used where an out-of-place one is needed.
     const DMG_CAP: u32 = 0xdc58_4f60;
     /// The Fortification family's primary trait (a legal wrightstone primary).
     const HP_TRAIT: u32 = 0xf372_f096;
     const SUPPLEMENTARY_DMG: u32 = 0x57ab_5b10;
-    /// Wheel of Fate III, with its main/bonus candidates at the top of their
-    /// own windows — a "perfect" roll.
+    /// Wheel of Fate III — DMG Cap is not a candidate of any of its lots.
     const WHEEL_OF_FATE_III: u32 = 0x47e2_ae71;
     const CRIT_RATE_UP: u32 = 0x00d1_71e0;
     /// Overmastery ids: Attack, Health, Critical Hit Rate, Stun Power.
@@ -5758,12 +5853,12 @@ mod legality_bridge_tests {
 
     fn populated_player() -> PlayerData {
         PlayerData {
-            // Gran, so the skillboard rule has a board to check against.
             character_type: CharacterType::Pl0000,
-            // Rule 5: this sigil id does not encode DMG Cap as its first trait.
+            // SigilTraitLevel: two traits present, first at 30 over the
+            // ceiling of 15.
             sigils: vec![Sigil {
-                first_trait_id: DMG_CAP,
-                first_trait_level: 15,
+                first_trait_id: WAR_ELEMENTAL_TRAIT,
+                first_trait_level: 30,
                 second_trait_id: STEADY_FOCUS,
                 second_trait_level: 10,
                 sigil_id: WAR_ELEMENTAL_SIGIL,
@@ -5772,16 +5867,14 @@ mod legality_bridge_tests {
                 acquisition_count: 1,
                 notification_enum: 0,
             }],
-            // Rule 10: top of window on both sides.
+            // SummonTrait: DMG Cap is not a candidate of the Wheel's main lot.
             summons: vec![EquippedSummon {
                 summon_id: WHEEL_OF_FATE_III,
-                main_trait_id: SUPPLEMENTARY_DMG,
+                main_trait_id: DMG_CAP,
                 main_trait_level: 15,
                 bonus_id: CRIT_RATE_UP,
                 bonus_level: 9,
             }],
-            // Rule 6: 999999 is on no board.
-            skillboard: vec![999999],
             // Rule 1: the primary slot's ceiling is 20.
             weapon_state: Some(WeaponState {
                 weapon_id: 0,
@@ -5832,6 +5925,8 @@ mod legality_bridge_tests {
                     },
                 ],
             }),
+            // MasterTraitCount: one node past the 50-slot storage.
+            skillboard: (0..=50).collect(),
             ..Default::default()
         }
     }
@@ -5846,13 +5941,13 @@ mod legality_bridge_tests {
         assert_eq!(
             rules,
             vec![
-                Rule::WrightstoneTraitLevel,  // weapon_state
-                Rule::SigilFirstTrait,        // sigils
-                Rule::MasterTraitUnknownNode, // skillboard (+ character_type)
-                Rule::OvermasteryValue,       // overmastery_info
-                Rule::SummonPerfect,          // summons
+                Rule::WrightstoneTraitLevel, // weapon_state
+                Rule::SigilTraitLevel,       // sigils
+                Rule::OvermasteryValue,      // overmastery_info
+                Rule::SummonTrait,           // summons
+                Rule::MasterTraitCount,      // skillboard
             ],
-            "a field stopped crossing the PlayerData -> BuildSnapshot bridge"
+            "a field stopped crossing the PlayerData -> LegalityInputs bridge"
         );
     }
 

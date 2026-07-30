@@ -10,7 +10,7 @@ use std::{
 
 use anyhow::Context;
 use gbfr_logs::toolbox_rpc::{self, HookStatus};
-use gbfr_logs::{db, overmastery, parser, synthesis, transmarvel};
+use gbfr_logs::{db, legality, overmastery, parser, synthesis, transmarvel};
 
 use db::logs::LogEntry;
 #[cfg(windows)]
@@ -857,7 +857,8 @@ fn fetch_conflux_runs(page: Option<u32>) -> Result<ConfluxSearchResult, String> 
 mod legality_audit {
     use super::*;
 
-    use gbfr_logs::legality::{self, Finding};
+    use gbfr_logs::legality::{self, Finding, LegalityInputs, Subject};
+    use gbfr_logs::parser::v1;
 
     /// One audited player in one encounter. Emitted only when at least one rule
     /// fired — this view is about what fired, not about coverage.
@@ -873,7 +874,177 @@ mod legality_audit {
         display_name: String,
         character_name: String,
         character_type: CharacterType,
-        findings: Vec<Finding>,
+        findings: Vec<AuditFinding>,
+    }
+
+    /// A finding plus what its subject actually is, so the page can render
+    /// the flagged item the way the Builds tab does (names and levels)
+    /// instead of a bare slot index that sends the reader into the log.
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct AuditFinding {
+        #[serde(flatten)]
+        finding: Finding,
+        /// `None` only if the subject index no longer resolves — impossible
+        /// today (findings are built from these same inputs), but a stale
+        /// index must degrade to the old bare display, not panic.
+        context: Option<SubjectContext>,
+    }
+
+    /// The equipment the finding's `subject` points at, mirrored with the
+    /// ids the frontend's translate helpers already resolve to names.
+    ///
+    /// The `protocol` types these mirror are serialized snake_case (their
+    /// field names are the stored logs' CBOR keys, so they cannot be renamed),
+    /// hence the camelCase copies here rather than reusing them directly.
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase", tag = "kind")]
+    pub enum SubjectContext {
+        Sigil(ContextSigil),
+        Summon(ContextSummon),
+        Overmastery(ContextOvermastery),
+        /// The whole four-slot set, for `Subject::Overmasteries` findings.
+        #[serde(rename_all = "camelCase")]
+        OvermasterySet {
+            overmasteries: Vec<ContextOvermastery>,
+        },
+        /// The whole equipped set, for `Subject::Summons` findings. Lists
+        /// every equipped summon — the count's claim is about the set, and
+        /// which members are the perfect ones is visible from their levels.
+        #[serde(rename_all = "camelCase")]
+        SummonSet {
+            summons: Vec<ContextSummon>,
+        },
+        #[serde(rename_all = "camelCase")]
+        Wrightstone {
+            traits: Vec<ContextTraitPair>,
+        },
+        /// The whole unlocked master-trait set, for `Subject::MasterTraits`
+        /// findings. Only the size is carried: the count is the claim, and a
+        /// hundred-id node list has nothing readable to render.
+        #[serde(rename_all = "camelCase")]
+        MasterTraits {
+            unlocked: usize,
+        },
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ContextTraitPair {
+        id: u32,
+        level: u32,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ContextSigil {
+        sigil_id: u32,
+        first_trait_id: u32,
+        first_trait_level: u32,
+        second_trait_id: u32,
+        second_trait_level: u32,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ContextOvermastery {
+        id: u32,
+        value: f32,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ContextSummon {
+        summon_id: u32,
+        main_trait_id: u32,
+        main_trait_level: u32,
+        bonus_id: u32,
+        bonus_level: u32,
+    }
+
+    impl From<&protocol::WeaponTraitPair> for ContextTraitPair {
+        fn from(pair: &protocol::WeaponTraitPair) -> Self {
+            Self {
+                id: pair.id,
+                level: pair.level,
+            }
+        }
+    }
+
+    impl From<&protocol::Sigil> for ContextSigil {
+        fn from(sigil: &protocol::Sigil) -> Self {
+            Self {
+                sigil_id: sigil.sigil_id,
+                first_trait_id: sigil.first_trait_id,
+                first_trait_level: sigil.first_trait_level,
+                second_trait_id: sigil.second_trait_id,
+                second_trait_level: sigil.second_trait_level,
+            }
+        }
+    }
+
+    impl From<&protocol::Overmastery> for ContextOvermastery {
+        fn from(mastery: &protocol::Overmastery) -> Self {
+            Self {
+                id: mastery.id,
+                value: mastery.value,
+            }
+        }
+    }
+
+    impl From<&protocol::EquippedSummon> for ContextSummon {
+        fn from(summon: &protocol::EquippedSummon) -> Self {
+            Self {
+                summon_id: summon.summon_id,
+                main_trait_id: summon.main_trait_id,
+                main_trait_level: summon.main_trait_level,
+                bonus_id: summon.bonus_id,
+                bonus_level: summon.bonus_level,
+            }
+        }
+    }
+
+    fn subject_context(inputs: &LegalityInputs, subject: Subject) -> Option<SubjectContext> {
+        match subject {
+            Subject::Sigil(index) => inputs
+                .sigils
+                .get(index)
+                .map(Into::into)
+                .map(SubjectContext::Sigil),
+            Subject::Summon(index) => inputs
+                .summons
+                .get(index)
+                .map(Into::into)
+                .map(SubjectContext::Summon),
+            Subject::Overmastery(index) => inputs
+                .overmastery_info
+                .as_ref()
+                .and_then(|info| info.overmasteries.get(index))
+                .map(Into::into)
+                .map(SubjectContext::Overmastery),
+            Subject::Overmasteries => {
+                inputs
+                    .overmastery_info
+                    .as_ref()
+                    .map(|info| SubjectContext::OvermasterySet {
+                        overmasteries: info.overmasteries.iter().map(Into::into).collect(),
+                    })
+            }
+            Subject::Wrightstone => {
+                inputs
+                    .weapon_state
+                    .as_ref()
+                    .map(|state| SubjectContext::Wrightstone {
+                        traits: state.wrightstone_traits.iter().map(Into::into).collect(),
+                    })
+            }
+            Subject::Summons => Some(SubjectContext::SummonSet {
+                summons: inputs.summons.iter().map(Into::into).collect(),
+            }),
+            Subject::MasterTraits => Some(SubjectContext::MasterTraits {
+                unlocked: inputs.skillboard.len(),
+            }),
+        }
     }
 
     #[derive(Debug, Serialize)]
@@ -925,11 +1096,22 @@ mod legality_audit {
                 }
             };
 
-            // Deliberately NOT `reparse_with_options_window`: the rules read only
-            // the stored `PlayerData`, which deserialization already hands over.
-            // Replaying every event log would cost the whole history for nothing.
-            let parser = match parser::deserialize_version(&blob, version) {
-                Ok(parser) => parser,
+            // The rules read only the stored `PlayerData`, so a v1 blob is
+            // deserialized straight into its `Encounter` — deliberately NOT
+            // through `deserialize_version`, whose v1 arm runs a full
+            // `reparse()` (party, DPS, stun, per-target breakdowns) over the
+            // whole raw event log and then hands back derived state nothing
+            // here reads. That is the dominant cost of this walk, and it grows
+            // with encounter length. Legacy v0 rows still take the upgrade
+            // path, which is the only thing that can read them.
+            let encounter = match version {
+                1 => v1::Encounter::from_blob(&blob).map_err(|e| e.to_string()),
+                _ => parser::deserialize_version(&blob, version)
+                    .map(|parser| parser.encounter)
+                    .map_err(|e| e.to_string()),
+            };
+            let encounter = match encounter {
+                Ok(encounter) => encounter,
                 Err(e) => {
                     log::warn!("legality audit: skipping log {log_id}: {e:#}");
                     logs_skipped += 1;
@@ -937,13 +1119,25 @@ mod legality_audit {
                 }
             };
 
-            let quest_id = parser.encounter.quest_id;
-            for (player_index, player) in parser.encounter.player_data.iter().enumerate() {
+            let quest_id = encounter.quest_id;
+            for (player_index, player) in encounter.player_data.iter().enumerate() {
                 let Some(player) = player else { continue };
-                let findings = legality::audit_player(player);
+                // Built once and kept: the rules read it, and then each
+                // finding's subject index is resolved back through it to the
+                // item it names.
+                let inputs = player.legality_inputs();
+                let findings = legality::audit(&inputs);
                 if findings.is_empty() {
                     continue;
                 }
+
+                let findings = findings
+                    .into_iter()
+                    .map(|finding| AuditFinding {
+                        context: subject_context(&inputs, finding.subject),
+                        finding,
+                    })
+                    .collect();
 
                 entries.push(LegalityAuditEntry {
                     log_id,
@@ -964,8 +1158,115 @@ mod legality_audit {
             logs_skipped,
         })
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use gbfr_logs::legality::{Rule, Severity, Value};
+
+        /// The JSON contract `pages/logs/Legality.tsx` renders from, pinned:
+        /// the finding's fields flatten to the top level, `observed`/`allowed`
+        /// are tagged `{kind, value}`, and `context` names the subject with
+        /// the ids the frontend translate helpers resolve.
+        #[test]
+        fn the_audit_finding_json_shape_is_what_the_page_reads() {
+            // Built through the `From` impl the command itself uses, so the
+            // assertions below cover the conversion as well as the shape.
+            let equipped = protocol::Sigil {
+                sigil_id: 0x2395_3fd4,
+                first_trait_id: 0x7d75_d904,
+                first_trait_level: 15,
+                second_trait_id: 0x0053_599e,
+                second_trait_level: 15,
+                equipped_character: 0,
+                sigil_level: 15,
+                acquisition_count: 1,
+                notification_enum: 0,
+            };
+            let audit = AuditFinding {
+                context: Some(SubjectContext::Sigil((&equipped).into())),
+                finding: Finding {
+                    rule: Rule::SigilLockedPair,
+                    severity: Severity::Impossible,
+                    subject: Subject::Sigil(3),
+                    observed: Value::TraitId(0x0053_599e),
+                    allowed: Value::TraitIds(vec![0xbe34_04b9]),
+                    odds: None,
+                },
+            };
+
+            let json = serde_json::to_value(&audit).expect("serializes");
+            assert_eq!(json["rule"], "sigilLockedPair");
+            assert_eq!(json["severity"], "impossible");
+            assert_eq!(json["subject"]["kind"], "sigil");
+            assert_eq!(json["subject"]["index"], 3);
+            assert_eq!(json["observed"]["kind"], "traitId");
+            assert_eq!(json["observed"]["value"], 0x0053_599e_u32);
+            assert_eq!(json["allowed"]["kind"], "traitIds");
+            assert_eq!(json["context"]["kind"], "sigil");
+            assert_eq!(json["context"]["sigilId"], 0x2395_3fd4_u32);
+            assert_eq!(json["context"]["secondTraitLevel"], 15);
+
+            let none = serde_json::to_value(Value::None).expect("serializes");
+            assert_eq!(none["kind"], "none");
+        }
+    }
 }
 use legality_audit::audit_all_logs;
+
+/// How far the startup legality sweep has got, for the audit page's banner.
+/// `done == total` means it has finished.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegalitySweepProgress {
+    done: usize,
+    total: usize,
+}
+
+/// Re-audits every log the current rules have not judged, reporting progress to
+/// the logs window.
+///
+/// Errors are logged, never surfaced: a sweep that fails leaves the stored
+/// findings exactly as they were, and the next launch tries again. It must not
+/// be able to take the app down with it.
+fn sweep_stale_legality(app: &tauri::AppHandle) {
+    let mut conn = match db::connect_to_db() {
+        Ok(conn) => conn,
+        Err(error) => {
+            log::warn!("legality sweep: could not open the database: {error:#}");
+            return;
+        }
+    };
+
+    // Emitted at most once a second: a 692-log sweep would otherwise push
+    // hundreds of events at a window that only renders a percentage.
+    let mut last_emit = std::time::Instant::now();
+    let result = legality::sweep::sweep_stale_logs(&mut conn, |progress| {
+        let finished = progress.done == progress.total;
+        if finished || last_emit.elapsed() >= std::time::Duration::from_secs(1) {
+            last_emit = std::time::Instant::now();
+            let _ = app.emit_to(
+                "logs",
+                "legality-sweep-progress",
+                LegalitySweepProgress {
+                    done: progress.done,
+                    total: progress.total,
+                },
+            );
+        }
+    });
+
+    match result {
+        Ok(outcome) if outcome.rescanned > 0 || outcome.unreadable > 0 => {
+            info!(
+                "legality sweep: re-audited {} logs ({} unreadable)",
+                outcome.rescanned, outcome.unreadable
+            );
+        }
+        Ok(_) => {}
+        Err(error) => log::warn!("legality sweep failed: {error:#}"),
+    }
+}
 
 #[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -2254,6 +2555,13 @@ fn main() {
             // Outlives individual connections on purpose: it must also run for
             // a hook that was already mapped when the app started.
             tauri::async_runtime::spawn(hook_heartbeat(app.handle()));
+
+            // Re-audit any log the current rules have not judged — every log
+            // recorded before the legality work, and every log at all after a
+            // rule changes. On its own thread so a rules bump never delays the
+            // window appearing.
+            let handle = app.handle();
+            std::thread::spawn(move || sweep_stale_legality(&handle));
 
             Ok(())
         })

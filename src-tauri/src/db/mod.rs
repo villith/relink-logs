@@ -12,7 +12,7 @@ pub mod runs;
 ///
 /// Split out of [`setup_db`] so a test can apply the real list to an in-memory
 /// database instead of the user's `logs.db`.
-fn migrations() -> Migrations<'static> {
+pub(crate) fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
         M::up(
             r#"CREATE TABLE IF NOT EXISTS logs (

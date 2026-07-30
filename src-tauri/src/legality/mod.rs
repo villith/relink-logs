@@ -17,6 +17,7 @@ pub mod overmastery_rules;
 pub mod sigils;
 pub mod summon_bonus_values;
 pub mod summons;
+pub mod sweep;
 pub mod wrightstone;
 
 /// The engine's empty-id sentinel (`EMPTY_SIGIL_HASH` in the hook), shared by
