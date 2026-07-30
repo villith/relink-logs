@@ -45,21 +45,31 @@
 //!   time — the user chose to see that list, knowing its size.
 //! * Guaranteed-variant summons (`rolled: false`) are excluded: their fixed
 //!   config is a probability-1 drop, not a roll.
-//! * A bonus from the parallel id set (not in this summon's own lots) does
-//!   not count as perfect — its window is unknown, so it cannot be "top".
+//! * A bonus outside this summon's own lots does not count as perfect — its
+//!   window is unknown, so it cannot be "top". That keeps a modded summon
+//!   from inflating a probability the report would then price as if it had
+//!   been rolled.
 //! * The reported odds are the product of each counted summon's single-draw
 //!   config probability. That is the honest table price of the draws, but it
 //!   OVERSTATES rarity for a farmer who rolls hundreds of times and equips
 //!   the best — which is exactly why the severity is a suspicion, not proof.
 //!
-//! # Why levels are deliberately NOT judged
+//! # Why levels are deliberately NOT judged, but magnitudes are
 //!
 //! Production data shows honest players carrying bonus levels the table
 //! prices at zero: an unread sentinel (`4294967295`, i.e. `-1`) and levels
 //! below the candidate's window (a level-3 bonus in a 5-9 window) both occur
 //! on a confirmed-legitimate build. Whatever those levels mean — partial
 //! reads, or an acquisition path the table does not model — judging them
-//! accuses honest players, so only trait MEMBERSHIP is checked.
+//! accuses honest players, so no rule here judges a level.
+//!
+//! [`Rule::SummonBonusMagnitude`] judges the NUMBER the bonus displays, which
+//! is a different claim and safe where the level one is not. The census
+//! settles it: every above-window level in 692 logs is the unread sentinel,
+//! and a sentinel indexes off the end of the value list, so it displays
+//! nothing and the rule never sees it. Below-window levels display SMALLER
+//! numbers, which no ceiling can be exceeded by. What remains is a magnitude
+//! the summon has no way to produce.
 
 use std::collections::HashMap;
 
