@@ -25,10 +25,21 @@ v2.0.2 layout (64-byte rows, 8-byte row-count header):
   +0x24  i32 trait-2 lot id (-1 = this sigil takes no rolled second trait)
   +0x38  u8  "special" flag (1 = synthesis-excluded)
 
-Output shape: { "<sigilIdHex8>": {trait1, trait2, trait2Lot, maxLevel?, special} }
+Output shape:
+  { "<sigilIdHex8>": {trait1, trait2, trait2Lot, rollsSecond, maxLevel?, special} }
 `trait2Lot` keys into `trait2Lots` in transmarvel-pool.json rather than being
 inlined, so each lot keeps one definition. `maxLevel` is OPTIONAL — see
 MAX-LEVEL POLICY below; the Rust rule defaults to DEFAULT_MAX_LEVEL when absent.
+
+`rollsSecond` is gem.tbl's own answer to "does this sigil roll a second trait
+at all", and it exists because `trait2Lot: null` alone is AMBIGUOUS: it means
+either "takes no second trait" (514 rows) or "rolls one, but we could not
+validate which lot" (109 rows). Those two demand OPPOSITE rule behaviour — the
+first makes any present second trait impossible, the second must stay silent —
+so collapsing them, as this generator originally did, falsely accuses the 109.
+Read the three states as: `trait2` set -> fixed pair; else `trait2Lot` set ->
+rolls from that lot; else `rollsSecond` -> rolls from an UNKNOWN lot, stay
+silent; else -> genuinely takes no second trait.
 
 TRAIT-2 LOT POLICY
 ------------------
@@ -48,8 +59,11 @@ nothing and silently disable the rule.
 Because the swap is a function of trait1, this generator takes the EFFECTIVE lot
 per trait1 from transmarvel-pool.json — values that are already live-validated —
 and applies it to every gem row carrying that trait1. Rows whose trait1 is
-absent from the pool get `trait2Lot: null` and the rule stays silent for them,
-which is the correct outcome: an unvalidated lot guess could falsely accuse.
+absent from the pool get `trait2Lot: null` but keep `rollsSecond: true`, so the
+rule stays silent for them, which is the correct outcome: an unvalidated lot
+guess could falsely accuse. That flag is load-bearing, not decorative — without
+it those 109 rows are indistinguishable from the 514 that truly take no second
+trait, and the rule flags every one of them as impossible.
 We deliberately do NOT re-implement the category swap here; duplicating it
 unvalidated is exactly how a wrong lot would slip in.
 
@@ -121,6 +135,25 @@ EXPECTED_CROSS_TAB = {
     (True, False): 285,  # rolls a second trait from a lot
     (False, True): 235,  # fixed pair, no roll
     (False, False): 0,  # impossible
+}
+
+# The four states the OUTPUT distinguishes, after the effective-lot join. This
+# is a companion to EXPECTED_CROSS_TAB, not a replacement: that one pins
+# gem.tbl's raw shape, this one pins what survives the join with
+# transmarvel-pool.json — the step where the 285 roll-capable rows split into
+# 176 that resolved a live-validated lot and 109 that did not.
+#
+# The 109 is the number that must never silently become 0 by being folded into
+# "none": that fold is what falsely accuses players holding those sigils.
+#
+# If you legitimately validate more lots, `unresolved` drops and `lot` rises by
+# the same amount; update BOTH numbers deliberately in the same commit that
+# grows the pool. An abort here is the guardrail working, not a nuisance.
+EXPECTED_SECOND_TRAIT_STATES = {
+    "none": 514,  # takes no second trait — a present one is impossible
+    "unresolved": 109,  # rolls one from a lot we cannot name — stay silent
+    "lot": 176,  # rolls one from a known, live-validated lot
+    "fixed": 235,  # the item fixes the pair outright
 }
 
 # Traits whose cap is genuinely known to exceed the default, for reporting.
@@ -205,6 +238,10 @@ def main() -> None:
             "trait1": hex8(trait1),
             "trait2": None if trait2 in (EMPTY_TRAIT, INVALID) else hex8(trait2),
             "trait2Lot": effective_lots.get(hex8(trait1)) if rolls_second else None,
+            # Emitted for EVERY row, including the false ones: a flag that is
+            # only present when true is an absent-vs-false ambiguity of exactly
+            # the kind this field was added to remove.
+            "rollsSecond": rolls_second,
             "special": special,
         }
         level = max_level_for(trait1)
@@ -248,6 +285,27 @@ def main() -> None:
             f"{len(mismatched)} lot mismatches — the wrong column was read"
         )
 
+    # The three-state split must survive the join, or the rule silently
+    # re-collapses "rolls an unknown lot" into "takes none" and accuses the
+    # players holding those sigils. See EXPECTED_SECOND_TRAIT_STATES.
+    def second_trait_state(entry: dict) -> str:
+        if entry["trait2"] is not None:
+            return "fixed"
+        if entry["trait2Lot"] is not None:
+            return "lot"
+        return "unresolved" if entry["rollsSecond"] else "none"
+
+    states = {name: 0 for name in EXPECTED_SECOND_TRAIT_STATES}
+    for entry in out.values():
+        state = second_trait_state(entry)
+        states[state] = states.get(state, 0) + 1
+    if states != EXPECTED_SECOND_TRAIT_STATES:
+        sys.exit(
+            f"second-trait states are {states}, expected {EXPECTED_SECOND_TRAIT_STATES} — "
+            "either the columns moved or the transmarvel pool changed; do NOT relax this "
+            "without checking which sigils changed state"
+        )
+
     out_path = root / "src-tauri" / "assets" / "sigil-legality.json"
     out_path.write_text(json.dumps(out, indent=1, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -256,6 +314,7 @@ def main() -> None:
     rolls = sum(1 for _, _, _, lot, _ in rows if lot != NO_LOT)
     print(f"wrote {out_path} — {len(out)} sigils")
     print(f"cross-tab verified: {EXPECTED_CROSS_TAB}")
+    print(f"second-trait states verified: {states}")
     print(f"pool cross-check: missing 0 lot mismatches 0 ({len(pool['sigils'])} sigils)")
     print(
         f"{with_lot}/{rolls} rows that roll a second trait resolved an effective lot; "

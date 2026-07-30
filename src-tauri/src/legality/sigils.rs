@@ -41,7 +41,14 @@ struct RawEntry {
     /// A second trait the item fixes, hex8; `null` when it rolls or has none.
     trait2: Option<String>,
     /// The skill_type_lot id a rolled second trait comes from, decimal.
+    /// `null` is AMBIGUOUS on its own — see `rolls_second`.
     trait2_lot: Option<String>,
+    /// Whether gem.tbl says this sigil rolls a second trait at all. This is
+    /// what disambiguates `trait2Lot: null`: 514 rows genuinely take no
+    /// second trait, while 109 roll one from a lot the generator could not
+    /// validate. Without this flag the two are indistinguishable and the
+    /// second group gets falsely accused.
+    rolls_second: bool,
     /// Highest trait level, only when it exceeds
     /// [`DEFAULT_SIGIL_TRAIT_MAX_LEVEL`].
     max_level: Option<u32>,
@@ -130,6 +137,10 @@ pub fn stock_sigils() -> &'static HashMap<u32, SigilEntry> {
                         Ok(lot_id) if lot_traits(lot_id).is_some() => SecondTrait::Lot(lot_id),
                         _ => SecondTrait::Unresolvable,
                     },
+                    // No lot named: only `rollsSecond` can say whether that
+                    // means "takes none" or "rolls from a lot we cannot
+                    // name". Defaulting this to `Nothing` accuses the 109.
+                    (None, None) if entry.rolls_second => SecondTrait::Unresolvable,
                     (None, None) => SecondTrait::Nothing,
                 };
                 Some((
@@ -235,6 +246,11 @@ mod tests {
     /// no second trait at all.
     const NO_SECOND_SIGIL: u32 = 0x0027_7247;
     const NO_SECOND_TRAIT1: u32 = 0xf26b_aea5;
+    /// A sigil that DOES roll a second trait, but whose lot the generator
+    /// could not validate, so the table names no lot for it. One of 109 such
+    /// rows — they must stay silent, not be mistaken for single-trait sigils.
+    const UNRESOLVED_LOT_SIGIL: u32 = 0x95a4_1365;
+    const UNRESOLVED_LOT_TRAIT1: u32 = 0x1c36_0c63;
     /// A sigil whose entry fixes its pair outright — no lot involved.
     const FIXED_PAIR_SIGIL: u32 = 0x0045_57b8;
     const FIXED_PAIR_TRAIT1: u32 = 0xa8a3_163b;
@@ -372,6 +388,69 @@ mod tests {
         assert_eq!(findings[0].observed, Value::TraitId(STEADY_FOCUS));
     }
 
+    /// The regression this module exists to prevent. `trait2Lot: null` is
+    /// ambiguous in the raw table — it covers both "takes no second trait"
+    /// (514 rows) and "rolls one from a lot we could not validate" (109
+    /// rows). Reading the second group as the first flags a legitimately
+    /// rolled second trait as impossible. `rollsSecond` separates them.
+    #[test]
+    fn stays_silent_when_the_sigil_rolls_a_second_trait_from_an_unknown_lot() {
+        for second in [STEADY_FOCUS, DMG_CAP] {
+            let equipped = [sigil(
+                UNRESOLVED_LOT_SIGIL,
+                (UNRESOLVED_LOT_TRAIT1, 15),
+                (second, 15),
+            )];
+            assert_eq!(
+                audit_sigils(&equipped),
+                vec![],
+                "accused a sigil whose lot is merely unknown (second trait {second:08x})"
+            );
+        }
+    }
+
+    /// An unknown lot silences rule 4 ONLY. The level ceiling is a property
+    /// of the sigil, not of whichever lot the trait came from, so it still
+    /// applies — silence about one rule must not become silence about all.
+    #[test]
+    fn an_unknown_lot_silences_the_trait_rule_but_not_the_level_rule() {
+        let equipped = [sigil(
+            UNRESOLVED_LOT_SIGIL,
+            (UNRESOLVED_LOT_TRAIT1, 15),
+            (DMG_CAP, 30),
+        )];
+        let findings = audit_sigils(&equipped);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::SigilTraitLevel);
+        assert_eq!(findings[0].observed, Value::Level(30));
+        assert_eq!(findings[0].allowed, Value::Level(15));
+    }
+
+    /// The three states must stay distinct in the loaded table, in the exact
+    /// proportions the generator's own guardrail pins. Were `Unresolvable` to
+    /// collapse back into `Nothing`, 109 sigils would be falsely accused and
+    /// the single test above could be deleted without anything else noticing.
+    #[test]
+    fn the_table_keeps_all_three_second_trait_states_distinct() {
+        let mut nothing = 0;
+        let mut unresolvable = 0;
+        let mut lot = 0;
+        let mut fixed = 0;
+        for entry in stock_sigils().values() {
+            match entry.second {
+                SecondTrait::Nothing => nothing += 1,
+                SecondTrait::Unresolvable => unresolvable += 1,
+                SecondTrait::Lot(_) => lot += 1,
+                SecondTrait::Fixed(_) => fixed += 1,
+            }
+        }
+        assert_eq!(
+            (nothing, unresolvable, lot, fixed),
+            (514, 109, 176, 235),
+            "second-trait state split drifted"
+        );
+    }
+
     #[test]
     fn empty_sigil_list_is_silent() {
         assert_eq!(audit_sigils(&[]), vec![]);
@@ -385,11 +464,37 @@ mod tests {
         assert_eq!(audit_sigils(&equipped), vec![]);
     }
 
+    /// The `is_empty` predicate itself, tested directly because the
+    /// `sigil_id` call site below cannot discriminate it (see that test).
+    #[test]
+    fn is_empty_recognises_both_sentinels_and_nothing_else() {
+        assert!(is_empty(0));
+        assert!(is_empty(EMPTY_SIGIL_HASH));
+        assert!(!is_empty(WAR_ELEMENTAL));
+        assert!(!is_empty(DMG_CAP));
+    }
+
     /// Both empty-slot sentinels must be skipped — the plain zero and the
     /// engine's `0x887AE0B0`.
+    ///
+    /// HONEST LIMITATION: this test does NOT defend the `is_empty` guard on
+    /// `sigil_id`. Deleting that guard outright would leave it passing,
+    /// because neither sentinel is a key in the table and the `table.get()`
+    /// miss skips them anyway — the assertion below pins exactly that, so
+    /// the reason this passes is recorded rather than assumed. Should a
+    /// future table ever key a sentinel, that assertion fails and this test
+    /// becomes genuinely discriminating; until then the teeth for sentinel
+    /// handling live in `is_empty_recognises_both_sentinels_and_nothing_else`
+    /// and in `empty_second_trait_slots_are_silent_for_both_sentinels`, whose
+    /// second-trait call site has no such backstop.
     #[test]
     fn empty_sigil_slots_are_silent_for_both_sentinels() {
         for sentinel in [0_u32, EMPTY_SIGIL_HASH] {
+            assert!(
+                !stock_sigils().contains_key(&sentinel),
+                "sentinel {sentinel:08x} is now a real table key — the is_empty guard on \
+                 sigil_id has become load-bearing and this test must be made to prove it"
+            );
             let equipped = [sigil(sentinel, (DMG_CAP, 99), (DMG_CAP, 99))];
             assert_eq!(
                 audit_sigils(&equipped),
