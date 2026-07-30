@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderTemplate, unknownTokens } from "./labelTemplate";
+import { renderTemplate, splitTemplate, unknownTokens } from "./labelTemplate";
 
 describe("renderTemplate", () => {
   it("substitutes known tokens", () => {
@@ -68,5 +68,38 @@ describe("unknownTokens", () => {
 
   it("does not report a token twice", () => {
     expect(unknownTokens("{x} {x}", [])).toEqual(["x"]);
+  });
+});
+
+describe("splitTemplate", () => {
+  it("splits text and tokens in order", () => {
+    expect(splitTemplate("HP {hpPercent} left")).toEqual([
+      { type: "text", value: "HP " },
+      { type: "token", name: "hpPercent" },
+      { type: "text", value: " left" },
+    ]);
+  });
+
+  it("returns a single text part when there are no tokens", () => {
+    expect(splitTemplate("plain")).toEqual([{ type: "text", value: "plain" }]);
+  });
+
+  it("returns nothing for an empty template", () => {
+    expect(splitTemplate("")).toEqual([]);
+  });
+
+  it("emits adjacent tokens with no empty text between them", () => {
+    expect(splitTemplate("{a}{b}")).toEqual([
+      { type: "token", name: "a" },
+      { type: "token", name: "b" },
+    ]);
+  });
+
+  it("leaves shapes the token pattern rejects as literal text", () => {
+    expect(splitTemplate("100% {} {1bad}")).toEqual([{ type: "text", value: "100% {} {1bad}" }]);
+  });
+
+  it("does not care whether a token is a known one", () => {
+    expect(splitTemplate("{bogus}")).toEqual([{ type: "token", name: "bogus" }]);
   });
 });

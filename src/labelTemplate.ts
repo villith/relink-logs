@@ -26,6 +26,37 @@ export type TemplateTokens = Record<string, string>;
 /** Every `{token}` name in a template, in order, including repeats. */
 const tokenNames = (template: string): string[] => [...template.matchAll(TOKEN_PATTERN)].map((match) => match[1]);
 
+/** One piece of a split template: literal text, or a `{token}` placeholder. */
+export type TemplatePart = { type: "text"; value: string } | { type: "token"; name: string };
+
+/**
+ * Splits a template into its literal and token parts, in order.
+ *
+ * Deliberately whitelist-agnostic: an unrecognized name still comes back as a
+ * token, so the editor can show it as a broken chip rather than the parser
+ * quietly turning it back into text the user cannot see is wrong.
+ *
+ * Empty text runs are omitted, so `{a}{b}` yields two parts, not three.
+ */
+export const splitTemplate = (template: string): TemplatePart[] => {
+  const parts: TemplatePart[] = [];
+  let cursor = 0;
+
+  // A fresh regex per call: TOKEN_PATTERN is global, and sharing its lastIndex
+  // across calls would make the function stateful.
+  const pattern = new RegExp(TOKEN_PATTERN.source, "g");
+
+  for (const match of template.matchAll(pattern)) {
+    const start = match.index ?? 0;
+    if (start > cursor) parts.push({ type: "text", value: template.slice(cursor, start) });
+    parts.push({ type: "token", name: match[1] });
+    cursor = start + match[0].length;
+  }
+
+  if (cursor < template.length) parts.push({ type: "text", value: template.slice(cursor) });
+  return parts;
+};
+
 /**
  * Token names used in `template` that aren't in `allowed` — what the settings
  * editor warns about. Deduplicated, so a repeated typo is reported once.
