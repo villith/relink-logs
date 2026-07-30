@@ -3,6 +3,7 @@ import { useIsLinux } from "@/platform";
 import { BAR_TEXTURES, type BarFillMode } from "@/stores/useMeterSettingsStore";
 import { Select, SimpleGrid, Slider, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import { LabelledSlider } from "./LabelledSlider";
 
 /** How the meter's damage bars are drawn: fill rule, texture, row size. */
 export const BarAppearanceSection = () => {
@@ -21,10 +22,15 @@ export const BarAppearanceSection = () => {
       <Text size="md" fw={700}>
         {t("ui.bar-appearance-section")}
       </Text>
+      {/* The fill-mode description sits here rather than on its Select: as a
+          two-line `description` it made that Select 60px taller than the one
+          beside it, so the pair no longer lined up. */}
+      <Text size="xs" c="dimmed">
+        {t("ui.bar-fill-mode-description")}
+      </Text>
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
         <Select
           label={t("ui.bar-fill-mode")}
-          description={t("ui.bar-fill-mode-description")}
           data={[
             { value: "total", label: t("ui.bar-fill-total") },
             { value: "relative", label: t("ui.bar-fill-relative") },
@@ -43,23 +49,23 @@ export const BarAppearanceSection = () => {
           />
         )}
       </SimpleGrid>
-      <Text size="sm">{t("ui.bar-height")}</Text>
-      <Slider
+      <LabelledSlider
+        label={t("ui.bar-height")}
         min={16}
         max={48}
         step={1}
-        label={(value) => `${value}px`}
-        defaultValue={bar_height}
-        onChangeEnd={(value) => setMeterSettings({ bar_height: value })}
+        unit="px"
+        value={bar_height}
+        onChange={(value) => setMeterSettings({ bar_height: value })}
       />
-      <Text size="sm">{t("ui.bar-spacing")}</Text>
-      <Slider
+      <LabelledSlider
+        label={t("ui.bar-spacing")}
         min={0}
         max={8}
         step={1}
-        label={(value) => `${value}px`}
-        defaultValue={bar_spacing}
-        onChangeEnd={(value) => setMeterSettings({ bar_spacing: value })}
+        unit="px"
+        value={bar_spacing}
+        onChange={(value) => setMeterSettings({ bar_spacing: value })}
       />
       <Text size="sm">{t("ui.meter-transparency")}</Text>
       <Slider
