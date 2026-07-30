@@ -104,6 +104,7 @@
     "template-preview": "Preview:",
     "template-preview-empty": "(empty — this label will not be shown)",
     "template-tokens": "Available:",
+    "token-insert-hint": "Drag into a field, or click to add it to the last field you used",
     "template-unknown-tokens": "Unknown: {{tokens}}",
     "header-segments-section": "Overlay Header",
     "header-segments-description": "Each piece is shown only when it has something to display.",

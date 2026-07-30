@@ -1,0 +1,57 @@
+/* The field is a Mantine-styled box wrapping a ProseMirror contenteditable, so
+   it has to reproduce Input's border/focus treatment rather than inherit it. */
+.token-field {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--mantine-color-dark-4);
+  border-radius: var(--mantine-radius-sm);
+  background-color: var(--mantine-color-dark-6);
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.55;
+}
+
+.token-field:focus-within {
+  border-color: var(--mantine-color-blue-filled);
+}
+
+.token-field .ProseMirror {
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* The placeholder, driven by the Placeholder extension's data attribute. */
+.token-field .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--mantine-color-dimmed);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.token-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 1px;
+  border-radius: var(--mantine-radius-sm);
+  background-color: var(--mantine-color-blue-light);
+  color: var(--mantine-color-blue-2);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 0.85em;
+  white-space: nowrap;
+  cursor: grab;
+  user-select: none;
+}
+
+/* A token the field does not recognize. Colour alone would not carry this, so
+   the chip is also struck through — the same information without relying on
+   hue. */
+.token-chip[data-unknown="true"] {
+  background-color: var(--mantine-color-red-light);
+  color: var(--mantine-color-red-2);
+  text-decoration: line-through;
+}
+
+.token-chip.ProseMirror-selectednode {
+  outline: 2px solid var(--mantine-color-blue-filled);
+}
