@@ -154,8 +154,30 @@ pub fn stock_summons() -> &'static HashMap<u32, SummonEntry> {
 }
 
 /// A summon sitting at the top of BOTH of its own candidates' level windows.
+///
+/// # The published odds answer a narrower question than the trigger
+///
+/// The trigger is "each side sits at the top of **whichever** candidate this
+/// summon happens to carry" — it does not require any particular candidate.
+/// [`chance`](PerfectRoll::chance) is `P(this candidate AND its top level)`,
+/// which prices in a candidate draw the trigger never asked for, so it is
+/// always the rarer of the two numbers. Across the stock table the gap runs
+/// **11x to 99x**: `47e2ae71` Wheel of Fate III publishes 1 in 1,320 against a
+/// true fire rate of 1 in 22 (59x), and `6e5968fc` Lucilius publishes 1 in
+/// 18,333 against 1 in 185 (99x). Both figures are reproducible from this
+/// file's own weights.
+///
+/// A UI must therefore NEVER render this as "how unlikely is it that this
+/// player owns a perfect summon". Measured over 8,904 production summon
+/// records, [`Rule::SummonPerfect`] fires on **88.9%** of player-encounters,
+/// because real players farm and reroll toward top-level traits rather than
+/// accepting a random draw.
+///
+/// Re-pricing the trigger is a pending design decision, not an oversight —
+/// the arithmetic below is deliberately left alone.
 struct PerfectRoll {
-    /// The probability of having rolled exactly this configuration.
+    /// `P(this exact configuration)`: this candidate drawn AND its top level
+    /// rolled. NOT `P(the rule fires)` — see the note on the type.
     chance: f64,
     /// The two ceilings it reached, `[main trait, equip bonus]`, read out of
     /// the table so the finding names the windows it judged against.
@@ -229,6 +251,16 @@ pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
         // — what the rule reports is precisely that the observed levels ARE
         // the ceilings. `allowed` comes from the table rather than being
         // echoed from the input, so it names the windows judged against.
+        //
+        // READ `odds` CAREFULLY BEFORE RENDERING IT. It is
+        // `P(this exact configuration)` — this candidate drawn AND its top
+        // level — and NOT `P(this rule fires)`, which is what a reader assumes
+        // when a finding publishes a probability. The trigger above accepts
+        // whichever candidate the summon carries, so the true fire rate is 11x
+        // to 99x commoner than this number across the stock table, and 88.9% of
+        // production player-encounters trip this rule. Phrasing it as "the odds
+        // this player came by their summon honestly" is a false accusation
+        // dressed as arithmetic. See `PerfectRoll` for the measurements.
         findings.push(Finding {
             rule: Rule::SummonPerfect,
             severity: Severity::Improbable,
@@ -241,6 +273,20 @@ pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
 
     // Rule 11: one perfect summon is luck; several compound. Independent
     // draws, so the joint probability is the product.
+    //
+    // The product inherits rule 10's narrowing and multiplies it. What it
+    // describes is `P(these specific summons rolled these specific
+    // configurations)`, NOT `P(this player got lucky N times)` — and the second
+    // reading is the one a UI will reach for. A player holding the two
+    // commonest farm targets in the production corpus (`439cdb88` Goldslime III
+    // and `9384a5d3` Radis Whitewyrm III, both on their fixed-15 main
+    // candidate) is handed "1 in 302,439" when the chance of both tripping the
+    // rule is 1 in 494 — a 612x overstatement, and rule 11 fires on 52.9% of
+    // production player-encounters. Reproducible from this file's weights.
+    //
+    // The arithmetic stays as-is pending a design decision on whether to
+    // re-price the trigger; this comment exists so it cannot be over-read in
+    // the meantime.
     if perfect.len() > 1 {
         findings.push(Finding {
             rule: Rule::SummonPerfectCount,
