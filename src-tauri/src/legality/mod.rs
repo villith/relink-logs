@@ -10,7 +10,7 @@
 //! traits but never the item id), so a zero is missing data, not a value.
 
 use protocol::{EquippedSummon, OvermasteryInfo, Sigil, WeaponState};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 pub mod master_traits;
 pub mod overmastery_rules;
@@ -22,6 +22,18 @@ pub mod wrightstone;
 /// The engine's empty-id sentinel (`EMPTY_SIGIL_HASH` in the hook), shared by
 /// every rule module so the four copies cannot drift apart.
 pub const EMPTY_ID: u32 = game_reader::EMPTY_KEY;
+
+/// Which generation of the rules produced a stored finding.
+///
+/// Findings are written to `legality_findings` when an encounter is saved, so
+/// a rule change leaves every existing log judged by rules nobody is running
+/// any more. Bumping this marks those logs stale and the startup sweep
+/// re-audits them.
+///
+/// `the_rules_version_matches_what_the_rules_currently_say` pins this against
+/// a snapshot of what the rules actually output, so a change that would
+/// silently strand old verdicts fails the build instead.
+pub const RULES_VERSION: u32 = 1;
 
 /// An empty slot reaches us as either a plain zero or the engine sentinel, so
 /// both must count as empty.
@@ -71,7 +83,7 @@ pub struct LegalityInputs {
 
 /// Which rule fired. Serialized so a future UI can translate it; rules never
 /// produce human-readable strings themselves.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Rule {
     /// `observed`/`allowed` are `Value::Levels` in true physical slot order
@@ -116,7 +128,7 @@ pub enum Rule {
 }
 
 /// Proof versus suspicion. Never collapse these into one flag.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum Severity {
     /// The game's tables cannot produce this value.
@@ -126,7 +138,7 @@ pub enum Severity {
 }
 
 /// What the finding points at, so a UI can anchor it later.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind", content = "index")]
 pub enum Subject {
     Wrightstone,
@@ -156,7 +168,7 @@ pub enum Subject {
 /// came from, so it says so here; a UI that had to infer it from the paired
 /// [`Rule`] renders the wrong names the moment a rule is added and nobody
 /// remembers to teach the UI about it.
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind", content = "value")]
 pub enum Value {
     Level(u32),
@@ -178,7 +190,7 @@ pub enum Value {
     None,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Finding {
     pub rule: Rule,
@@ -551,6 +563,55 @@ mod tests {
         assert!(
             fires(&build, Rule::MasterTraitCount),
             "the count rule never judged the fixture's skillboard"
+        );
+    }
+
+    /// THE STALENESS GUARD for [`RULES_VERSION`].
+    ///
+    /// Findings are STORED, so a rule change that does not bump the version
+    /// leaves every log in the database judged by the old rules with nothing
+    /// to notice it — the failure would be silent and permanent. This pins
+    /// what the rules actually say about one deliberately illegal build, so
+    /// any change to their output fails here and forces a deliberate bump.
+    ///
+    /// When it fails: read the diff, confirm the new output is what you meant,
+    /// paste it in, and bump `RULES_VERSION`. Both, always — the snapshot
+    /// alone would hide exactly the staleness this exists to catch.
+    #[test]
+    fn the_rules_version_matches_what_the_rules_currently_say() {
+        let mut build = legal_build();
+        build.summons[1].bonus_id = BOSS_SET_HEALING_CAP;
+        build.summons[1].bonus_level = 9;
+        build.sigils[0].first_trait_level = 30;
+        masteries(&mut build)[3].value = 0.7;
+
+        let snapshot: Vec<String> = audit(&build)
+            .iter()
+            .map(|finding| {
+                format!(
+                    "{:?}/{:?} {:?} {:?} -> {:?}",
+                    finding.rule,
+                    finding.severity,
+                    finding.subject,
+                    finding.observed,
+                    finding.allowed
+                )
+            })
+            .collect();
+
+        assert_eq!(
+            (RULES_VERSION, snapshot.join("\n").as_str()),
+            (
+                1,
+                "SigilTraitLevel/Impossible Sigil(0) Level(30) -> Level(15)\n\
+                 OvermasteryValue/Impossible Overmastery(3) Amount(0.7) -> Amount(2.0)\n\
+                 SummonBonusSource/Impossible Summon(1) SummonBonusId(782879360) -> \
+                 SummonBonusIds([13726176, 577813568, 804999327, 1513740315, 1716424242, \
+                 1964215585, 2740166587, 2791457225, 2828012672, 3159265995, 4155519343])\n\
+                 SummonBonusMagnitude/Impossible Summon(1) Amount(75.0) -> Amount(50.0)"
+            ),
+            "the rules changed what they say — update this snapshot AND bump \
+             RULES_VERSION, or every stored log keeps the old verdicts forever"
         );
     }
 
