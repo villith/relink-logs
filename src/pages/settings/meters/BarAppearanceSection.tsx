@@ -1,7 +1,7 @@
 import useSettings from "@/pages/useSettings";
 import { useIsLinux } from "@/platform";
-import { BAR_TEXTURES, type BarFillMode } from "@/stores/useMeterSettingsStore";
-import { Select, SimpleGrid, Stack, Text } from "@mantine/core";
+import { BAR_TEXTURES, DEFAULT_BAR_APPEARANCE, type BarFillMode } from "@/stores/useMeterSettingsStore";
+import { Anchor, Group, Select, SimpleGrid, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { LabelledSlider } from "./LabelledSlider";
 
@@ -17,11 +17,18 @@ export const BarAppearanceSection = () => {
   // on every overlay launch. A Linux-only user simply never leaves "solid".
   const isLinux = useIsLinux();
 
+  const reset = () => setMeterSettings({ ...DEFAULT_BAR_APPEARANCE });
+
   return (
     <Stack gap="xs">
-      <Text size="md" fw={700}>
-        {t("ui.bar-appearance-section")}
-      </Text>
+      <Group justify="space-between">
+        <Text size="md" fw={700}>
+          {t("ui.bar-appearance-section")}
+        </Text>
+        <Anchor component="button" type="button" size="xs" onClick={reset}>
+          {t("ui.reset-to-defaults")}
+        </Anchor>
+      </Group>
       {/* The fill-mode description sits here rather than on its Select: as a
           two-line `description` it made that Select 60px taller than the one
           beside it, so the pair no longer lined up. */}

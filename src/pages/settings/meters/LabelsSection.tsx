@@ -1,7 +1,8 @@
 import { TokenPalette, TokenPaletteProvider } from "@/components/tokenField/TokenPalette";
 import useSettings from "@/pages/useSettings";
+import { DEFAULT_PLAYER_LABEL } from "@/stores/useMeterSettingsStore";
 import { PLAYER_LABEL_TOKENS } from "@/utils";
-import { Stack, Text } from "@mantine/core";
+import { Anchor, Group, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { TemplateField } from "./TemplateField";
 
@@ -13,12 +14,19 @@ export const LabelsSection = () => {
   const { t } = useTranslation();
   const { player_label_template, setMeterSettings } = useSettings();
 
+  const reset = () => setMeterSettings({ player_label_template: DEFAULT_PLAYER_LABEL });
+
   return (
     <TokenPaletteProvider>
       <Stack gap="xs">
-        <Text size="md" fw={700}>
-          {t("ui.meter-labels-section")}
-        </Text>
+        <Group justify="space-between">
+          <Text size="md" fw={700}>
+            {t("ui.meter-labels-section")}
+          </Text>
+          <Anchor component="button" type="button" size="xs" onClick={reset}>
+            {t("ui.reset-to-defaults")}
+          </Anchor>
+        </Group>
         <TemplateField
           label={t("ui.player-label-template")}
           value={player_label_template}

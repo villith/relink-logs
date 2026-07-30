@@ -2,10 +2,10 @@ import { HEADER_TOKENS } from "@/components/Titlebar";
 import { TokenField } from "@/components/tokenField/TokenField";
 import { TokenPalette, TokenPaletteProvider } from "@/components/tokenField/TokenPalette";
 import useSettings from "@/pages/useSettings";
-import type { HeaderSegment } from "@/stores/useMeterSettingsStore";
+import { DEFAULT_HEADER_SEGMENTS, type HeaderSegment } from "@/stores/useMeterSettingsStore";
 import { moveItem } from "@/utils";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
-import { ActionIcon, Box, Button, Group, SegmentedControl, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Anchor, Box, Button, Group, SegmentedControl, Stack, Text, Tooltip } from "@mantine/core";
 import { ArrowsInLineHorizontal, DotsSixVertical, Trash } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
@@ -39,12 +39,19 @@ export const HeaderSegmentsEditor = () => {
       },
     ]);
 
+  const reset = () => update([...DEFAULT_HEADER_SEGMENTS]);
+
   return (
     <TokenPaletteProvider>
       <Stack gap="xs">
-        <Text size="md" fw={700}>
-          {t("ui.header-segments-section")}
-        </Text>
+        <Group justify="space-between">
+          <Text size="md" fw={700}>
+            {t("ui.header-segments-section")}
+          </Text>
+          <Anchor component="button" type="button" size="xs" onClick={reset}>
+            {t("ui.reset-to-defaults")}
+          </Anchor>
+        </Group>
         <Text size="xs" c="dimmed">
           {t("ui.header-segments-description")}
         </Text>

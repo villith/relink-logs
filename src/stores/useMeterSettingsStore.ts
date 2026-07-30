@@ -101,6 +101,15 @@ interface MeterStateFunctions {
  * page can offer a reset without restating them. */
 export const DEFAULT_METER_COLORS = ["#FF5630", "#F2D90A", "#36B37E", "#00B8D9"] as const;
 
+/** Default bar geometry, exported so the settings page can offer a reset
+ * without restating the numbers. */
+export const DEFAULT_BAR_APPEARANCE = {
+  bar_fill_mode: "total" as BarFillMode,
+  bar_texture: "solid",
+  bar_height: 27,
+  bar_spacing: 0,
+};
+
 const DEFAULT_METER_SETTINGS: MeterSettings = {
   color_1: DEFAULT_METER_COLORS[0],
   color_2: DEFAULT_METER_COLORS[1],
@@ -122,10 +131,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   logs_skill_columns: [...DEFAULT_LOGS_SKILL_COLUMNS],
   player_label_template: DEFAULT_PLAYER_LABEL,
   header_segments: [...DEFAULT_HEADER_SEGMENTS],
-  bar_fill_mode: "total",
-  bar_texture: "solid",
-  bar_height: 27,
-  bar_spacing: 0,
+  ...DEFAULT_BAR_APPEARANCE,
 };
 
 /* Cross-window sync. The overlay and the logs/settings window are separate
