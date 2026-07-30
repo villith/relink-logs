@@ -10,6 +10,7 @@ import SettingsPage from "./pages/Settings";
 import ToolboxPage from "./pages/Toolbox";
 import { ConfluxIndexPage } from "./pages/logs/ConfluxIndex";
 import { IndexPage as LogIndexPage } from "./pages/logs/Index";
+import { LegalityPage } from "./pages/logs/Legality";
 import { ViewPage as LogViewPage } from "./pages/logs/View";
 import ChecklistSettings from "./pages/settings/ChecklistSettings";
 import GeneralSettings from "./pages/settings/GeneralSettings";
@@ -50,6 +51,8 @@ export const App = () => {
               <Route path="checklist" element={<ChecklistSettings />} />
             </Route>
             {import.meta.env.DEV && <Route path="debug" element={<DebugPage />} />}
+            {/* Dev-only throwaway diagnostic for src-tauri/src/legality. */}
+            {import.meta.env.DEV && <Route path="legality" element={<LegalityPage />} />}
           </Route>
         </Routes>
       </NuqsAdapter>

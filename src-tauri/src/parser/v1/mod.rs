@@ -558,6 +558,21 @@ impl PlayerData {
             overmastery_info: self.overmastery_info.as_ref().map(Into::into),
         }
     }
+
+    /// Who this row is, for a caller that has to label an audited player.
+    /// Here for the same reason `legality_inputs` is: the fields are private to
+    /// this module, and the serde shape is a storage format, not an API.
+    pub fn display_name(&self) -> &str {
+        &self.display_name
+    }
+
+    pub fn character_name(&self) -> &str {
+        &self.character_name
+    }
+
+    pub fn character_type(&self) -> CharacterType {
+        self.character_type
+    }
 }
 
 /// Derived breakdown for an enemy target

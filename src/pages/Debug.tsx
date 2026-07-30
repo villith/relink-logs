@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
+import { Link } from "react-router-dom";
 
 import { backendErrorMessage } from "@/backendErrors";
 import { useHookStatus } from "@/useHookStatus";
@@ -207,6 +208,19 @@ const DebugPage = () => {
         <Tooltip label={t("ui.full-assist-unlock-description")}>
           <Checkbox label={t("ui.full-assist-unlock")} checked={fullAssistUnlock} onChange={toggleFullAssistUnlock} />
         </Tooltip>
+      </Fieldset>
+
+      {/* Dev-only throwaway: the only way into the legality audit page, which
+          has no tab of its own. Goes when that page does. */}
+      <Fieldset legend={t("ui.legality.title")} mt="md">
+        <Group gap="xs">
+          <Button variant="light" component={Link} to="/logs/legality">
+            {t("ui.legality.open")}
+          </Button>
+          <Text size="xs" c="dimmed">
+            {t("ui.legality.description")}
+          </Text>
+        </Group>
       </Fieldset>
 
       <Fieldset legend={t("ui.debug.hook-state")} mt="md">

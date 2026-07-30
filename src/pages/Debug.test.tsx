@@ -1,5 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const invoke = vi.fn();
@@ -35,10 +36,14 @@ let scenarioFrames = 3;
 /** Commands that should reject, mapped to the slug they reject with. */
 let failures: Record<string, string> = {};
 
+// MemoryRouter because the page links out to the dev-only legality audit; a
+// bare render has no router context for that link to resolve against.
 const renderPage = () =>
   render(
     <MantineProvider>
-      <DebugPage />
+      <MemoryRouter>
+        <DebugPage />
+      </MemoryRouter>
     </MantineProvider>
   );
 

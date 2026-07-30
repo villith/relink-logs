@@ -682,3 +682,55 @@ export interface HookStatusSnapshot {
   appVersion: string;
   supportsEject: boolean;
 }
+
+/** DEV-ONLY DIAGNOSTIC — mirrors `mod legality_audit` in src-tauri/src/main.rs
+ * and the `legality` module's `Finding`. Goes when the /logs/legality page does. */
+
+/** `legality::Rule`, serde camelCase. Left as a bare string: these are data,
+ * and the page renders them verbatim rather than translating per rule. */
+export type LegalityRule = string;
+
+/** `legality::Severity`. `impossible` is proof, `improbable` is suspicion —
+ * never collapse them. */
+export type LegalitySeverity = "impossible" | "improbable";
+
+/** `legality::Subject`, an internally tagged enum: `index` is absent for the
+ * variants that carry none (`wrightstone`, `masterTraits`). */
+export type LegalitySubject = {
+  kind: string;
+  index?: number;
+};
+
+/** `legality::Value`, an *untagged* enum — it arrives as a bare number, an
+ * array of numbers, or null. The paired rule says how to read it; this page
+ * does not try to. */
+export type LegalityValue = number | number[] | null;
+
+export type LegalityFinding = {
+  rule: LegalityRule;
+  severity: LegalitySeverity;
+  subject: LegalitySubject;
+  observed: LegalityValue;
+  allowed: LegalityValue;
+  /** Probability of occurring legitimately, present only for `improbable`. */
+  odds: number | null;
+};
+
+export type LegalityAuditEntry = {
+  logId: number;
+  /** Milliseconds since the UNIX epoch. */
+  time: number;
+  questId: number | null;
+  /** Party slot (0-3) in the stored encounter. */
+  playerIndex: number;
+  displayName: string;
+  characterName: string;
+  characterType: CharacterType;
+  findings: LegalityFinding[];
+};
+
+export type LegalityAuditResult = {
+  entries: LegalityAuditEntry[];
+  logsScanned: number;
+  logsSkipped: number;
+};

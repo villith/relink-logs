@@ -848,6 +848,125 @@ fn fetch_conflux_runs(page: Option<u32>) -> Result<ConfluxSearchResult, String> 
     })
 }
 
+/// DEV-ONLY DIAGNOSTIC — not a product feature.
+///
+/// Walks every stored log, runs the build-legality rules over each stored
+/// player, and returns what fired, so the rules can be eyeballed against real
+/// data before anything is built on top of them. Nothing here is persisted or
+/// versioned; it exists to be deleted along with the `/logs/legality` page.
+mod legality_audit {
+    use super::*;
+
+    use gbfr_logs::legality::{self, Finding};
+
+    /// One audited player in one encounter. Emitted only when at least one rule
+    /// fired — this view is about what fired, not about coverage.
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct LegalityAuditEntry {
+        log_id: u64,
+        /// Milliseconds since the UNIX epoch, as the `logs` row stores it.
+        time: i64,
+        quest_id: Option<u32>,
+        /// Party slot (0-3) this player occupied in the stored encounter.
+        player_index: usize,
+        display_name: String,
+        character_name: String,
+        character_type: CharacterType,
+        findings: Vec<Finding>,
+    }
+
+    #[derive(Debug, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub struct LegalityAuditResult {
+        entries: Vec<LegalityAuditEntry>,
+        /// Rows read out of `logs`, including the ones that failed to load.
+        logs_scanned: usize,
+        /// Rows that could not be read or deserialized. Reported rather than
+        /// silently dropped: a short list with no count is indistinguishable
+        /// from a clean one, which would make a partial result invisible.
+        logs_skipped: usize,
+    }
+
+    // `(async)` so the whole-database walk runs off the main thread.
+    #[tauri::command(async)]
+    pub fn audit_all_logs() -> Result<LegalityAuditResult, String> {
+        let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare("SELECT id, time, data, version FROM logs ORDER BY time DESC")
+            .map_err(|e| e.to_string())?;
+
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((
+                    row.get::<_, u64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, Vec<u8>>(2)?,
+                    row.get::<_, u8>(3)?,
+                ))
+            })
+            .map_err(|e| e.to_string())?;
+
+        let mut entries = Vec::new();
+        let mut logs_scanned = 0usize;
+        let mut logs_skipped = 0usize;
+
+        for row in rows {
+            logs_scanned += 1;
+
+            // One unreadable row must not end the walk — the point of the run is
+            // the whole database, so a bad row is counted, not fatal.
+            let (log_id, time, blob, version) = match row {
+                Ok(row) => row,
+                Err(e) => {
+                    log::warn!("legality audit: skipping unreadable log row: {e:#}");
+                    logs_skipped += 1;
+                    continue;
+                }
+            };
+
+            // Deliberately NOT `reparse_with_options_window`: the rules read only
+            // the stored `PlayerData`, which deserialization already hands over.
+            // Replaying every event log would cost the whole history for nothing.
+            let parser = match parser::deserialize_version(&blob, version) {
+                Ok(parser) => parser,
+                Err(e) => {
+                    log::warn!("legality audit: skipping log {log_id}: {e:#}");
+                    logs_skipped += 1;
+                    continue;
+                }
+            };
+
+            let quest_id = parser.encounter.quest_id;
+            for (player_index, player) in parser.encounter.player_data.iter().enumerate() {
+                let Some(player) = player else { continue };
+                let findings = legality::audit_player(player);
+                if findings.is_empty() {
+                    continue;
+                }
+
+                entries.push(LegalityAuditEntry {
+                    log_id,
+                    time,
+                    quest_id,
+                    player_index,
+                    display_name: player.display_name().to_string(),
+                    character_name: player.character_name().to_string(),
+                    character_type: player.character_type(),
+                    findings,
+                });
+            }
+        }
+
+        Ok(LegalityAuditResult {
+            entries,
+            logs_scanned,
+            logs_skipped,
+        })
+    }
+}
+use legality_audit::audit_all_logs;
+
 #[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct EncounterStateResponse {
@@ -2095,6 +2214,8 @@ fn main() {
             fetch_encounter_state,
             fetch_logs,
             fetch_conflux_runs,
+            // Dev-only diagnostic; goes when `mod legality_audit` does.
+            audit_all_logs,
             delete_logs,
             delete_all_logs,
             toggle_always_on_top,

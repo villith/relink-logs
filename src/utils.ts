@@ -1540,7 +1540,10 @@ export const toHashString = (num: number | undefined): string => (num ? num.toSt
 export const deriveNavState = (pathname: string) => {
   const toolboxActive = pathname.startsWith("/logs/toolbox");
   const settingsActive = pathname.startsWith("/logs/settings");
-  const debugActive = pathname.startsWith("/logs/debug");
+  // `/logs/legality` is a dev-only diagnostic reached from the Debug page, so it
+  // belongs to the Debug tab: without this the Logs tab would light up for it and
+  // then remember it as the place to return to.
+  const debugActive = pathname.startsWith("/logs/debug") || pathname.startsWith("/logs/legality");
   const logsActive = !toolboxActive && !settingsActive && !debugActive;
   const confluxActive = pathname.startsWith("/logs/conflux");
   const questsActive = logsActive && !confluxActive;
