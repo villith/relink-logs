@@ -1279,6 +1279,11 @@ struct EncounterStateResponse {
     /// 0-based room index when this log is a Conflux room, else None. Lets the
     /// detail view suppress quest-status/elapsed-time (meaningless for a room).
     room_index: Option<u32>,
+    /// Stored build-legality findings, one vector per party slot so it lines up
+    /// with `players` by index. Read from the table rather than recomputed:
+    /// the startup sweep keeps them current, and opening a log must not pay
+    /// for an audit.
+    legality: [Vec<legality::Finding>; 4],
     /// Per-spawn selectable targets for the filter dropdown, in first-hit
     /// order — 1:1 with the HP chart's series (same instance numbers).
     target_entries: Vec<v1::TargetSegment>,
@@ -1337,6 +1342,23 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         .query_row([id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
         .map_err(|e| e.to_string())?;
 
+    // Regrouped from the flat stored rows into one vector per party slot, so
+    // the response lines up with `players` by index. A log the sweep has not
+    // reached yet simply has no rows and reads as clean, which is the honest
+    // answer until it has been judged.
+    let mut findings: [Vec<legality::Finding>; 4] = Default::default();
+    match db::legality::findings_for_log(&conn, id as i64) {
+        Ok(stored) => {
+            for row in stored {
+                if let Some(slot) = findings.get_mut(row.player_index) {
+                    slot.push(row.finding);
+                }
+            }
+        }
+        // Never fatal: a log still opens without its verdicts.
+        Err(error) => log::warn!("could not read legality findings for log {id}: {error:#}"),
+    }
+
     // @TODO(false): If we deserialize from an older version, we should save it back into the DB as the newer format.
     let mut parser = parser::deserialize_version(&blob, version).map_err(|e| e.to_string())?;
 
@@ -1354,6 +1376,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             quest_timer: parser.encounter.quest_timer,
             quest_completed: parser.encounter.quest_completed,
             room_index,
+            legality: findings,
             ..Default::default()
         });
     }
@@ -1429,6 +1452,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         quest_timer: parser.encounter.quest_timer,
         quest_completed: parser.encounter.quest_completed,
         room_index,
+        legality: findings,
         dps_chart: player_dps,
         hp_chart,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
@@ -1438,6 +1462,16 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         death_events,
         target_entries,
     })
+}
+
+/// Every flagged player across the whole database, for the Toolbox audit page.
+///
+/// Reads stored verdicts, so this is a join and a group rather than a re-audit
+/// of every log. `(async)` regardless: it still walks every finding.
+#[tauri::command(async)]
+fn fetch_legality_players() -> Result<Vec<db::legality::FlaggedPlayer>, String> {
+    let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+    db::legality::flagged_players(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -2517,6 +2551,7 @@ fn main() {
             fetch_conflux_runs,
             // Dev-only diagnostic; goes when `mod legality_audit` does.
             audit_all_logs,
+            fetch_legality_players,
             delete_logs,
             delete_all_logs,
             toggle_always_on_top,

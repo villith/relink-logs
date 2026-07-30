@@ -2241,7 +2241,24 @@ impl Parser {
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-party-update", &self.encounter.player_data);
+            // A live fight has no stored row to read verdicts from, so the
+            // meter's colouring is derived here. This runs on an equipment
+            // snapshot, not per damage hit — both callers of this function are
+            // player-load events — so auditing four builds is free.
+            let _ = window.emit("encounter-legality-update", &self.party_legality());
         }
+    }
+
+    /// Findings per party slot, in `player_data` order. Empty vectors for
+    /// absent or clean players, so a caller can index by slot without
+    /// tracking which slots exist.
+    pub fn party_legality(&self) -> [Vec<crate::legality::Finding>; 4] {
+        std::array::from_fn(|slot| {
+            self.encounter.player_data[slot]
+                .as_ref()
+                .map(|player| crate::legality::audit(&player.legality_inputs()))
+                .unwrap_or_default()
+        })
     }
 
     /// Handles one per-hit stun message from the network stun-apply hook — the
