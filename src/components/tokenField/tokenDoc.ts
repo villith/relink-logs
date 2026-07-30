@@ -15,7 +15,9 @@ export const templateToDoc = (template: string, allowed: readonly string[]): JSO
       : { type: "token", attrs: { name: part.name, unknown: !allowed.includes(part.name) } }
   );
 
-  // An empty paragraph is spelled by omitting `content` entirely — an empty
-  // array fails schema validation for an `inline*` content expression.
+  // The empty case omits `content` rather than passing `[]`. ProseMirror
+  // accepts either — they load identically — but `editor.getJSON()` only ever
+  // emits the absent key, so matching it keeps this function's output directly
+  // comparable to the editor's for a dirty check.
   return { type: "doc", content: [content.length > 0 ? { type: "paragraph", content } : { type: "paragraph" }] };
 };
