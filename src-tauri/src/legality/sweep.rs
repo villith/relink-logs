@@ -7,8 +7,10 @@
 //! re-audits the ones that do not match (including every pre-legality log,
 //! whose stamp is NULL).
 //!
-//! A full pass over a real 692-log database measures about 1.4s in release, so
-//! this is a startup sweep rather than a migration the user has to sit through.
+//! A full pass over a real 692-log database measures about 10s in release —
+//! 1.4s of that is reading and auditing, the rest is writing the verdicts — so
+//! this is a background startup sweep rather than a migration the user has to
+//! sit through. It only happens once per rules version.
 
 use anyhow::Result;
 use log::warn;

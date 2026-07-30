@@ -142,6 +142,13 @@ mod tests {
     }
 }
 
+/// [`migrations`], for the diagnostic examples — they migrate a COPY of a real
+/// `logs.db` rather than the one the app writes, so they cannot go through
+/// [`setup_db`], which hard-codes the app's own data directory.
+pub fn migrations_for_diagnostics() -> Migrations<'static> {
+    migrations()
+}
+
 /// Connect to database.
 pub fn connect_to_db() -> Result<Connection> {
     let conn = Connection::open(crate::data_paths::data_dir().join("logs.db"))?;

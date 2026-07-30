@@ -15,14 +15,66 @@ use rusqlite::{Connection, OpenFlags};
 
 use gbfr_logs::legality::{self, Severity};
 
+/// Migrates a copy of a real database, runs the startup sweep over it, and
+/// prints what the Toolbox audit page would show — the whole stored path,
+/// against production data.
+fn run_sweep(db_path: &std::path::Path) -> Result<()> {
+    let mut conn = Connection::open(db_path)?;
+    gbfr_logs::db::migrations_for_diagnostics().to_latest(&mut conn)?;
+
+    let outcome = legality::sweep::sweep_stale_logs(&mut conn, |_| ())?;
+    println!(
+        "sweep: {} logs re-audited, {} unreadable",
+        outcome.rescanned, outcome.unreadable
+    );
+
+    let repeat = legality::sweep::sweep_stale_logs(&mut conn, |_| ())?;
+    println!(
+        "second sweep (should be a no-op): {} re-audited, {} unreadable\n",
+        repeat.rescanned, repeat.unreadable
+    );
+
+    for player in gbfr_logs::db::legality::flagged_players(&conn)? {
+        println!(
+            "{}  [{}]  {}  {} encounter(s), {} finding(s)",
+            if player.impossible {
+                "IMPOSSIBLE"
+            } else {
+                "improbable"
+            },
+            player.character_type,
+            player.display_name,
+            player.encounters,
+            player.findings.len()
+        );
+        for row in &player.findings {
+            println!(
+                "      {:?}/{:?}  log {}",
+                row.finding.rule, row.finding.severity, row.log_id
+            );
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let mut db_path = PathBuf::from("src-tauri/logs.db");
+    let mut sweep = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--db" => db_path = args.next().context("--db needs a path")?.into(),
+            // Exercises the STORED path end to end instead of auditing in
+            // memory: migrate, sweep, then read back what the audit page would
+            // show. Writes to the database, so point it at a copy.
+            "--sweep" => sweep = true,
             other => anyhow::bail!("unknown arg: {other}"),
         }
+    }
+
+    if sweep {
+        return run_sweep(&db_path);
     }
 
     let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;

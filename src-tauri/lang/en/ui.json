@@ -156,10 +156,25 @@
       "observed": "Observed",
       "allowed": "Allowed",
       "odds": "Odds",
+      "odds-value": "1 in {{denominator}}",
       "encounter": "Encounter",
       "open-log": "Log {{id}}",
       "truncated": "Showing {{shown}} of {{total}} findings for this player.",
-      "show-all": "Show all"
+      "show-all": "Show all",
+      "more-ids": "{{names}} +{{count}} more",
+      "master-traits": "{{count}} master traits unlocked",
+      "rules": {
+        "wrightstoneTraitLevel": "Wrightstone trait level over the 20/15/10 cap",
+        "sigilTraitLevel": "Two-trait sigil above its level cap",
+        "sigilLockedPair": "Locked trait pair carries a different trait",
+        "sigilQuestLockedTrait": "Quest-locked trait on a sigil that can't have it",
+        "sigilSingleTraitOnly": "Second trait on a single-trait sigil",
+        "overmasteryValue": "Overmastery value the game can't roll",
+        "overmasteryAllMaxed": "All four overmasteries at maximum",
+        "summonTrait": "Summon trait outside its roll pool",
+        "summonPerfectCount": "Two or more perfect summons equipped",
+        "masterTraitCount": "More than 50 master traits unlocked"
+      }
     },
     "weapon": "Weapon",
     "player-stats": "Player Stats",
