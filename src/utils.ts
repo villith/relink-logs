@@ -30,7 +30,9 @@ import i18next, { t } from "i18next";
 import { useEffect, useRef, type CSSProperties } from "react";
 import summonBonusValues from "../src-tauri/assets/summon-bonus-values.json";
 
+import { renderTemplate } from "./labelTemplate";
 import { abilitySourceKeys, stripTierSuffix, summonClassSource } from "./skillNameSources";
+import { DEFAULT_PLAYER_LABEL, type BarFillMode } from "./stores/useMeterSettingsStore";
 
 export const EMPTY_ID = 2289754288;
 
@@ -985,7 +987,8 @@ export const translateCharacterType = (characterType: CharacterType): string =>
 ///
 /// AI companions have their `displayName` blanked by the hook (their identity
 /// snapshot carries the LOCAL player's name, which isn't theirs), so an empty name
-/// on a resolved slot means "AI" — rendered as `CharacterType (AI)`. Real players
+/// on a resolved slot means "AI" — rendered as `AI (CharacterType)`, i.e. the marker
+/// stands in for the missing name so the label keeps its usual shape. Real players
 /// (local or remote) always carry a name. When `showName` is off (streamer mode) we
 /// hide real names but must NOT mislabel them as AI, so the marker keys on the empty
 /// name, not on the toggle.
@@ -997,26 +1000,62 @@ export const formatCharacterLabel = (
   const type = translateCharacterType(characterType);
 
   if (displayName === "") {
-    return `${type} (${t("ui:characters.ai")})`;
+    return `${t("ui:characters.ai")} (${type})`;
   }
 
   return showName ? `${displayName} (${type})` : type;
 };
 
-/// Formats the player name and translates the player's character type.
+/** The tokens a player-name template may use. Exported so the settings editor
+ * can list them and flag anything else as a typo. */
+export const PLAYER_LABEL_TOKENS = ["slot", "name", "character"] as const;
+
+/**
+ * Token values for one meter row.
+ *
+ * `name` is empty when there is nothing nameable to show — an unresolved slot,
+ * or a real player whose name the user has hidden. Empty is meaningful here: it
+ * is what triggers the template engine's collapse rules, so `{name}
+ * ({character})` loses its parentheses rather than rendering them around
+ * nothing. An AI companion is NOT empty — it resolves to the "AI" marker,
+ * because the label still has something to say about that slot.
+ */
+export const playerLabelTokens = (
+  partySlotIndex: number,
+  partySlotData: PlayerData | null,
+  player: ComputedPlayerState,
+  showDisplayNames: boolean
+): Record<string, string> => {
+  let name = "";
+  if (partySlotData) {
+    if (partySlotData.displayName === "") {
+      name = t("ui:characters.ai");
+    } else if (showDisplayNames) {
+      name = partySlotData.displayName;
+    }
+  }
+
+  return {
+    slot: partySlotData ? String(partySlotIndex + 1) : "Guest",
+    name,
+    character: translateCharacterType(player.characterType),
+  };
+};
+
+/// Formats the player name and translates the player's character type, arranged
+/// by the user's own label template (see src/labelTemplate.ts). Callers that
+/// have no access to the store omit `template` and get the shipped default,
+/// which renders exactly what this function rendered before it was templated.
 export const translatedPlayerName = (
   partySlotIndex: number,
   partySlotData: PlayerData | null,
   player?: ComputedPlayerState,
-  show_display_names: boolean = true
+  show_display_names: boolean = true,
+  template: string = DEFAULT_PLAYER_LABEL
 ) => {
   if (!player) return "Guest";
 
-  const name = partySlotData
-    ? formatCharacterLabel(player.characterType, partySlotData.displayName, show_display_names)
-    : translateCharacterType(player.characterType);
-
-  return `[${partySlotData ? partySlotIndex + 1 : "Guest"}]` + " " + name;
+  return renderTemplate(template, playerLabelTokens(partySlotIndex, partySlotData, player, show_display_names));
 };
 
 export const sortPlayers = (players: ComputedPlayerState[], sortType: SortType, sortDirection: SortDirection) => {
@@ -1230,6 +1269,18 @@ export const resolvePlayerColor = (
 /// (see .player-row/.skill-row in App.css). The bar must NOT be a positioned
 /// child element: relative/z-index layering on table internals is undefined
 /// CSS that WebKitGTK (Linux) resolves by painting the bar over the cell text.
+/// The width a row's bar should be painted at, as a percentage.
+///
+/// In `relative` mode the largest row in a table fills its bar and every other
+/// row is scaled against it, which makes the differences between the middle
+/// rows readable. It changes the painted width ONLY — the percentage in the
+/// column stays a true share of the total, because that one is data.
+///
+/// A zero `maxPercentage` (nothing has dealt damage yet) falls through to the
+/// raw percentage rather than dividing by zero.
+export const barWidth = (percentage: number, maxPercentage: number, mode: BarFillMode): number =>
+  mode === "relative" && maxPercentage > 0 ? (percentage / maxPercentage) * 100 : percentage;
+
 export const damageBarStyle = (color: string, percentage: number): CSSProperties => {
   const width = Number.isFinite(percentage) ? Math.min(100, Math.max(0, percentage)) : 0;
   return {

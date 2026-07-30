@@ -1,5 +1,13 @@
+import type { BarFillMode } from "@/stores/useMeterSettingsStore";
 import { CharacterType, ComputedSkillState, SkillColumns } from "@/types";
-import { NO_TARGETS, computeOvercapPercentage, damageBarStyle, getSkillName, mergeTargetBreakdowns } from "@/utils";
+import {
+  NO_TARGETS,
+  barWidth,
+  computeOvercapPercentage,
+  damageBarStyle,
+  getSkillName,
+  mergeTargetBreakdowns,
+} from "@/utils";
 import { useMemo } from "react";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
 import { renderSkillCell } from "./renderSkillCell";
@@ -13,6 +21,9 @@ export type SkillRowProps = {
   columns: SkillColumns[];
   /** Encounter duration in seconds, for the stun-per-second column. */
   durationSeconds?: number;
+  /** The largest percentage in this breakdown — what `relative` fill scales against. */
+  maxPercentage: number;
+  fillMode: BarFillMode;
   nested?: boolean;
   /** Live overlay rows skip the per-enemy tooltip (quest view only). */
   live?: boolean;
@@ -24,6 +35,8 @@ export const SkillRow = ({
   color,
   columns,
   durationSeconds = 0,
+  maxPercentage,
+  fillMode,
   nested,
   live,
 }: SkillRowProps) => {
@@ -63,7 +76,10 @@ export const SkillRow = ({
       showFullValues={showFullValues}
       color={color}
     >
-      <tr className={`skill-row ${nested ? "nested" : ""}`} style={damageBarStyle(color, skill.percentage)}>
+      <tr
+        className={`skill-row ${nested ? "nested" : ""}`}
+        style={damageBarStyle(color, barWidth(skill.percentage, maxPercentage, fillMode))}
+      >
         <td className={`text-left row-data ${nested ? "nested" : ""}`}>{getSkillName(characterType, skill)}</td>
         {columns.map(renderCell)}
       </tr>

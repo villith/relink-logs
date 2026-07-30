@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useMeterSettingsStore } from "../stores/useMeterSettingsStore";
@@ -36,15 +36,20 @@ export const Table = ({
   setSortDirection: (sortDirection: SortDirection) => void;
 }) => {
   const { t } = useTranslation();
-  const { streamerMode, show_full_values, overlay_columns, logs_columns } = useMeterSettingsStore(
-    useShallow((state) => ({
-      useCondensedSkills: state.use_condensed_skills,
-      streamerMode: state.streamer_mode,
-      show_full_values: state.show_full_values,
-      overlay_columns: state.overlay_columns,
-      logs_columns: state.logs_columns,
-    }))
-  );
+  const { streamerMode, show_full_values, overlay_columns, logs_columns, barFillMode, barTexture, barHeight, barGap } =
+    useMeterSettingsStore(
+      useShallow((state) => ({
+        useCondensedSkills: state.use_condensed_skills,
+        streamerMode: state.streamer_mode,
+        show_full_values: state.show_full_values,
+        overlay_columns: state.overlay_columns,
+        logs_columns: state.logs_columns,
+        barFillMode: state.bar_fill_mode,
+        barTexture: state.bar_texture,
+        barHeight: state.bar_height,
+        barGap: state.bar_spacing,
+      }))
+    );
 
   const partyOrderPlayers = formatInPartyOrder(encounterState.party);
   let players: Array<ComputedPlayerState> = partyOrderPlayers.map((playerData) => {
@@ -64,6 +69,10 @@ export const Table = ({
     // Otherwise, show all players.
     return streamerMode ? partySlotIndex === 0 : true;
   });
+
+  // Taken AFTER the streamer-mode filter: with only the streamer's own row on
+  // screen, a relative bar that always reads 100% is the intended result.
+  const maxPercentage = players.reduce((max, player) => Math.max(max, player.percentage || 0), 0);
 
   // Encounter duration in seconds — the same span (last damage − first damage)
   // the parser divides by for player.stunPerSecond, so per-skill SPS stays
@@ -88,7 +97,18 @@ export const Table = ({
   );
 
   return (
-    <table className={`player-table table w-full ${show_full_values ? "full-values" : ""}`}>
+    // The bar custom properties are set on the OUTER table and inherit down the
+    // DOM, so the nested skill-breakdown table picks them up with no wiring of
+    // its own.
+    <table
+      className={`player-table table w-full bar-texture-${barTexture} ${show_full_values ? "full-values" : ""}`}
+      style={
+        {
+          "--meter-row-height": `${barHeight}px`,
+          "--meter-row-gap": `${barGap}px`,
+        } as CSSProperties
+      }
+    >
       <thead className="header transparent-bg">
         <tr>
           <th className="header-name" onClick={() => toggleSort(MeterColumns.Name)}>
@@ -114,6 +134,8 @@ export const Table = ({
             partyData={partyData}
             durationSeconds={durationSeconds}
             legality={legality}
+            maxPercentage={maxPercentage}
+            fillMode={barFillMode}
           />
         ))}
       </tbody>

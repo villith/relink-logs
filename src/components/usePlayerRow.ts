@@ -31,6 +31,7 @@ export const usePlayerRow = (
     logs_columns,
     highlight_illegal_builds,
     streamer_mode,
+    player_label_template,
   } = useMeterSettingsStore(
     useShallow((state) => ({
       color_1: state.color_1,
@@ -43,6 +44,7 @@ export const usePlayerRow = (
       logs_columns: state.logs_columns,
       highlight_illegal_builds: state.highlight_illegal_builds,
       streamer_mode: state.streamer_mode,
+      player_label_template: state.player_label_template,
     }))
   );
 
@@ -117,5 +119,6 @@ export const usePlayerRow = (
     partySlotIndex,
     showFullValues: show_full_values,
     showDisplayNames: show_display_names,
+    playerLabelTemplate: player_label_template,
   };
 };

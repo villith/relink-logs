@@ -1,8 +1,9 @@
 import { CaretDown, CaretUp } from "@phosphor-icons/react";
 import { Fragment, useMemo } from "react";
 
+import type { BarFillMode } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, LegalityFinding, PlayerData } from "@/types";
-import { NO_TARGETS, damageBarStyle, mergeTargetBreakdowns, translatedPlayerName } from "@/utils";
+import { NO_TARGETS, barWidth, damageBarStyle, mergeTargetBreakdowns, translatedPlayerName } from "@/utils";
 
 import { SkillBreakdown } from "./SkillBreakdown";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
@@ -14,6 +15,8 @@ export const PlayerRow = ({
   partyData,
   durationSeconds = 0,
   legality,
+  maxPercentage,
+  fillMode,
 }: {
   live?: boolean;
   player: ComputedPlayerState;
@@ -21,6 +24,9 @@ export const PlayerRow = ({
   durationSeconds?: number;
   /** Build-legality findings per party slot, aligned with `partyData`. */
   legality?: LegalityFinding[][];
+  /** The largest percentage among the rows on screen — what `relative` fill scales against. */
+  maxPercentage: number;
+  fillMode: BarFillMode;
 }) => {
   const {
     color,
@@ -31,8 +37,17 @@ export const PlayerRow = ({
     partySlotIndex,
     showDisplayNames,
     showFullValues,
+    playerLabelTemplate,
     matchColumnTypeToValue,
   } = usePlayerRow(live, player, partyData, legality);
+
+  const label = translatedPlayerName(
+    partySlotIndex,
+    partyData[partySlotIndex],
+    player,
+    showDisplayNames,
+    playerLabelTemplate
+  );
 
   const targetBreakdown = useMemo(
     () => (live ? NO_TARGETS : mergeTargetBreakdowns(player.skillBreakdown.map((skill) => skill.targets))),
@@ -41,15 +56,10 @@ export const PlayerRow = ({
 
   return (
     <Fragment>
-      <SkillTargetTooltip
-        label={translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player, showDisplayNames)}
-        targets={targetBreakdown}
-        showFullValues={showFullValues}
-        color={color}
-      >
+      <SkillTargetTooltip label={label} targets={targetBreakdown} showFullValues={showFullValues} color={color}>
         <tr
           className={`player-row ${isOpen ? "transparent-bg" : ""}`}
-          style={damageBarStyle(color, player.percentage)}
+          style={damageBarStyle(color, barWidth(player.percentage, maxPercentage, fillMode))}
           onClick={() => setIsOpen(!isOpen)}
         >
           {/* `color` is an inline style rather than a class: the meter's rows
@@ -59,7 +69,7 @@ export const PlayerRow = ({
             className="text-left row-data"
             style={legalityColor ? { color: `var(--mantine-color-${legalityColor}-5)` } : undefined}
           >
-            {translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player, showDisplayNames)}
+            {label}
           </td>
           {columns.map((column) => {
             const columnValue = matchColumnTypeToValue(showFullValues, column);

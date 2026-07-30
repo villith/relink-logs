@@ -13,6 +13,7 @@ import {
   EMPTY_ID,
   OVERMASTERY_EFFECT_IDS,
   SKILLBOARD_CATEGORIES,
+  barWidth,
   checklistLevel,
   checklistStatus,
   collectSigilsByCategory,
@@ -1147,5 +1148,26 @@ describe("master-trait branch names in en/skillboard-branches.json", () => {
     expect(branches["pl2700_atk"].text).toBe("Essence: Lightning Soldier");
     expect(branches["pl2700_def"].text).toBe("Insight: Keep Your Foes Closer");
     expect(branches["pl2700_lim"].text).toBe("Crux: Perfectionist");
+  });
+});
+
+describe("barWidth", () => {
+  it("returns the raw percentage in total mode", () => {
+    expect(barWidth(42, 80, "total")).toBe(42);
+  });
+
+  it("ignores the max entirely in total mode", () => {
+    expect(barWidth(42, 0, "total")).toBe(42);
+  });
+
+  it("scales against the largest row in relative mode", () => {
+    expect(barWidth(40, 80, "relative")).toBe(50);
+    expect(barWidth(80, 80, "relative")).toBe(100);
+  });
+
+  it("falls back to the raw percentage when there is no max to scale against", () => {
+    // Nothing has dealt damage yet: divide-by-zero would render NaN%.
+    expect(barWidth(0, 0, "relative")).toBe(0);
+    expect(barWidth(12, 0, "relative")).toBe(12);
   });
 });

@@ -1,5 +1,13 @@
+import type { BarFillMode } from "@/stores/useMeterSettingsStore";
 import { CharacterType, ComputedSkillGroup, SkillColumns } from "@/types";
-import { NO_TARGETS, computeOvercapPercentage, damageBarStyle, getSkillName, mergeTargetBreakdowns } from "@/utils";
+import {
+  NO_TARGETS,
+  barWidth,
+  computeOvercapPercentage,
+  damageBarStyle,
+  getSkillName,
+  mergeTargetBreakdowns,
+} from "@/utils";
 import { CaretDown, CaretUp } from "@phosphor-icons/react";
 import { useMemo } from "react";
 import { SkillRow } from "./SkillRow";
@@ -15,11 +23,23 @@ export type SkillRowProps = {
   columns: SkillColumns[];
   /** Encounter duration in seconds, for the stun-per-second column. */
   durationSeconds?: number;
+  /** The largest percentage in this breakdown — what `relative` fill scales against. */
+  maxPercentage: number;
+  fillMode: BarFillMode;
   /** Live overlay rows skip the per-enemy tooltip (quest view only). */
   live?: boolean;
 };
 
-export const SkillGroupRow = ({ characterType, group, color, columns, durationSeconds = 0, live }: SkillRowProps) => {
+export const SkillGroupRow = ({
+  characterType,
+  group,
+  color,
+  columns,
+  durationSeconds = 0,
+  maxPercentage,
+  fillMode,
+  live,
+}: SkillRowProps) => {
   const groupRow = useSkillGroupRow(group);
   const { showFullValues, expanded, setExpanded, sortedSkills } = groupRow;
 
@@ -43,7 +63,7 @@ export const SkillGroupRow = ({ characterType, group, color, columns, durationSe
       >
         <tr
           className="skill-row group"
-          style={damageBarStyle(color, group.percentage)}
+          style={damageBarStyle(color, barWidth(group.percentage, maxPercentage, fillMode))}
           onClick={() => setExpanded(!expanded)}
         >
           <td className="text-left row-data">
@@ -62,6 +82,8 @@ export const SkillGroupRow = ({ characterType, group, color, columns, durationSe
             color={color}
             columns={columns}
             durationSeconds={durationSeconds}
+            maxPercentage={maxPercentage}
+            fillMode={fillMode}
             nested
             live={live}
           />

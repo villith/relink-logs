@@ -40,6 +40,8 @@ const renderRow = (
             color="#ff0000"
             columns={columns}
             durationSeconds={durationSeconds}
+            maxPercentage={100}
+            fillMode="total"
             live
           />
         </tbody>
