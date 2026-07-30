@@ -14,6 +14,7 @@ import { ViewPage as LogViewPage } from "./pages/logs/View";
 import ChecklistSettings from "./pages/settings/ChecklistSettings";
 import GeneralSettings from "./pages/settings/GeneralSettings";
 import MeterSettings from "./pages/settings/meters/MeterSettings";
+import OverlaySettings from "./pages/settings/overlay/OverlaySettings";
 import BuildAudit from "./pages/toolbox/BuildAudit";
 import OvermasteryPredictor from "./pages/toolbox/OvermasteryPredictor";
 import SynthesisHelper from "./pages/toolbox/SynthesisHelper";
@@ -49,6 +50,7 @@ export const App = () => {
               <Route index element={<Navigate to="general" replace />} />
               <Route path="general" element={<GeneralSettings />} />
               <Route path="meters" element={<MeterSettings />} />
+              <Route path="overlay" element={<OverlaySettings />} />
               <Route path="checklist" element={<ChecklistSettings />} />
             </Route>
             {import.meta.env.DEV && <Route path="debug" element={<DebugPage />} />}

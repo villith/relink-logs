@@ -40,10 +40,12 @@
     "tray-quit": "Quit",
     "language": "Language",
     "meter-settings": "Meter Settings",
+    "overlay-settings": "Overlay Settings",
     "settings": "Settings",
     "settings-nav": {
       "general": "General",
-      "meters": "Meters"
+      "meters": "Meters",
+      "overlay": "Overlay"
     },
     "nav-rail": {
       "collapse-menu": "Collapse menu",

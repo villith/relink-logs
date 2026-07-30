@@ -1,5 +1,5 @@
 import NavRailLayout, { type NavRailSection } from "@/components/NavRailLayout";
-import { Gauge, ListChecks, SlidersHorizontal } from "@phosphor-icons/react";
+import { Gauge, ListChecks, Monitor, SlidersHorizontal } from "@phosphor-icons/react";
 
 /** The sections in the settings side menu, in display order. */
 export const SETTINGS_SECTIONS: NavRailSection[] = [
@@ -14,6 +14,12 @@ export const SETTINGS_SECTIONS: NavRailSection[] = [
     labelKey: "ui.settings-nav.meters",
     labelFallback: "Meters",
     icon: Gauge,
+  },
+  {
+    to: "/logs/settings/overlay",
+    labelKey: "ui.settings-nav.overlay",
+    labelFallback: "Overlay",
+    icon: Monitor,
   },
   {
     to: "/logs/settings/checklist",
