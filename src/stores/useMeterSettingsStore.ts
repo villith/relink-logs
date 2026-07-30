@@ -97,11 +97,15 @@ interface MeterStateFunctions {
   set: (settings: Partial<MeterSettings>) => void;
 }
 
+/** The four default party-slot colours, in slot order. Exported so the settings
+ * page can offer a reset without restating them. */
+export const DEFAULT_METER_COLORS = ["#FF5630", "#F2D90A", "#36B37E", "#00B8D9"] as const;
+
 const DEFAULT_METER_SETTINGS: MeterSettings = {
-  color_1: "#FF5630",
-  color_2: "#F2D90A",
-  color_3: "#36B37E",
-  color_4: "#00B8D9",
+  color_1: DEFAULT_METER_COLORS[0],
+  color_2: DEFAULT_METER_COLORS[1],
+  color_3: DEFAULT_METER_COLORS[2],
+  color_4: DEFAULT_METER_COLORS[3],
   transparency: 0.2,
   show_display_names: true,
   streamer_mode: false,
