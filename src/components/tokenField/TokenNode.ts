@@ -40,13 +40,16 @@ export type TokenNodeOptions = {
    * has to know whether it is one of them to mark itself, and the node is the
    * only place that runs while typing. Configure it per field. */
   allowed: readonly string[];
+  /** Accessible name for a chip's remove button. Passed in rather than looked
+   * up here because the node is created outside React, where `t` is not. */
+  removeLabel: string;
 };
 
 export const TokenNode = Node.create<TokenNodeOptions>({
   name: "token",
 
   addOptions() {
-    return { allowed: [] };
+    return { allowed: [], removeLabel: "Remove" };
   },
 
   inline: true,
@@ -105,6 +108,63 @@ export const TokenNode = Node.create<TokenNodeOptions>({
 
   renderText({ node }) {
     return `{${node.attrs.name}}`;
+  },
+
+  /**
+   * The on-screen chip: its name, plus a button that removes it.
+   *
+   * A node view rather than plain `renderHTML` because a button needs a live
+   * click handler. This affects only what is DRAWN — `getHTML`, `getText` and
+   * the clipboard still go through `renderHTML`/`renderText`, so the stored
+   * string and the paste guard are untouched by anything here.
+   *
+   * Without the button the only ways to remove a token are backspace and
+   * select-then-delete, neither of which the chip advertises.
+   */
+  addNodeView() {
+    return ({ node, getPos, editor }) => {
+      const dom = document.createElement("span");
+      dom.className = "token-chip";
+      dom.setAttribute("data-token", node.attrs.name);
+      if (node.attrs.unknown) dom.setAttribute("data-unknown", "true");
+      // A leaf inside a contenteditable: without this the caret can be placed
+      // among the chip's own characters and typing would edit the label text.
+      dom.contentEditable = "false";
+
+      const label = document.createElement("span");
+      label.className = "token-chip-label";
+      label.textContent = `{${node.attrs.name}}`;
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "token-chip-remove";
+      remove.textContent = "×";
+      remove.title = this.options.removeLabel;
+      remove.setAttribute("aria-label", `${this.options.removeLabel}: {${node.attrs.name}}`);
+      // The chip is `draggable`, so a mousedown on the button would otherwise
+      // begin dragging the chip instead of arming the click.
+      remove.addEventListener("mousedown", (event) => event.preventDefault());
+      remove.addEventListener("click", (event) => {
+        event.preventDefault();
+        const pos = typeof getPos === "function" ? getPos() : null;
+        if (typeof pos !== "number") return;
+        editor
+          .chain()
+          .focus()
+          .deleteRange({ from: pos, to: pos + node.nodeSize })
+          .run();
+      });
+
+      dom.append(label, remove);
+
+      return {
+        dom,
+        // ONLY the remove button's events are withheld from ProseMirror.
+        // Returning true unconditionally would also swallow the chip's own drag,
+        // which `draggable: true` exists to allow.
+        stopEvent: (event) => event.target instanceof Element && event.target.closest(".token-chip-remove") !== null,
+      };
+    };
   },
 
   /**

@@ -1,4 +1,5 @@
 import { TokenPalette, TokenPaletteProvider } from "@/components/tokenField/TokenPalette";
+import { usedTokens } from "@/labelTemplate";
 import useSettings from "@/pages/useSettings";
 import { DEFAULT_PLAYER_LABEL } from "@/stores/useMeterSettingsStore";
 import { PLAYER_LABEL_TOKENS } from "@/utils";
@@ -15,6 +16,7 @@ export const LabelsSection = () => {
   const { player_label_template, setMeterSettings } = useSettings();
 
   const reset = () => setMeterSettings({ player_label_template: DEFAULT_PLAYER_LABEL });
+  const used = usedTokens([player_label_template]);
 
   return (
     <TokenPaletteProvider>
@@ -32,9 +34,10 @@ export const LabelsSection = () => {
           value={player_label_template}
           onChange={(value) => setMeterSettings({ player_label_template: value })}
           tokens={PLAYER_LABEL_TOKENS}
+          used={used}
           sample={SAMPLE}
         />
-        <TokenPalette tokens={PLAYER_LABEL_TOKENS} />
+        <TokenPalette tokens={PLAYER_LABEL_TOKENS} used={used} />
         <Text size="xs" c="dimmed">
           {t("ui.player-label-hint")}
         </Text>

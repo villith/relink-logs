@@ -9,6 +9,8 @@ export type TemplateFieldProps = {
   onChange: (value: string) => void;
   /** Token names this field accepts — anything else is flagged as a typo. */
   tokens: readonly string[];
+  /** Tokens already spent in this section; a drop of one is refused. */
+  used?: readonly string[];
   /** Sample values for the inline preview. Omit where a live preview of the
    * whole thing is already on screen; a second copy of it is noise. */
   sample?: TemplateTokens;
@@ -21,13 +23,13 @@ export type TemplateFieldProps = {
  * token now renders as a struck-through red chip in place, which says the same
  * thing where the problem actually is.
  */
-export const TemplateField = ({ label, value, onChange, tokens, sample }: TemplateFieldProps) => {
+export const TemplateField = ({ label, value, onChange, tokens, used, sample }: TemplateFieldProps) => {
   const { t } = useTranslation();
   const preview = sample ? renderTemplate(value, sample) : null;
 
   return (
     <Stack gap={4} style={{ flex: 1 }}>
-      <TokenField label={label} value={value} onChange={onChange} tokens={tokens} />
+      <TokenField label={label} value={value} onChange={onChange} tokens={tokens} used={used} />
       {preview !== null && (
         <Group gap="xs">
           <Text size="xs" c="dimmed">

@@ -4,7 +4,8 @@ import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
 import { Dropcursor, Placeholder, UndoRedo } from "@tiptap/extensions";
 import { EditorContent, useEditor } from "@tiptap/react";
-import { useEffect } from "react";
+import { useEffect, useState, type DragEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { TOKEN_MIME, TokenNode } from "./TokenNode";
 import { useTokenPalette } from "./TokenPalette";
 import { templateToDoc } from "./tokenDoc";
@@ -26,6 +27,9 @@ export type TokenFieldProps = {
    * label on each one is noise — the accessible name still has to be there,
    * which is why this hides the label rather than removing it. */
   hideLabel?: boolean;
+  /** Tokens already placed somewhere in this editor's section. A drop of one of
+   * these is refused, so a token cannot be spent twice. */
+  used?: readonly string[];
 };
 
 /**
@@ -36,8 +40,11 @@ export type TokenFieldProps = {
  * the document back into the `{token}` string that gets persisted, so the
  * stored format is unchanged.
  */
-export const TokenField = ({ label, value, onChange, tokens, placeholder, hideLabel }: TokenFieldProps) => {
+export const TokenField = ({ label, value, onChange, tokens, placeholder, hideLabel, used = [] }: TokenFieldProps) => {
+  const { t } = useTranslation();
   const { setActiveEditor } = useTokenPalette();
+  const [dropTarget, setDropTarget] = useState(false);
+  const removeLabel = t("ui.token-remove");
 
   const editor = useEditor(
     {
@@ -48,7 +55,7 @@ export const TokenField = ({ label, value, onChange, tokens, placeholder, hideLa
         // Per-field, so a typed `{name}` can mark itself unknown against THIS
         // field's whitelist. The editor is rebuilt when `tokens` changes, so the
         // configured copy never goes stale.
-        TokenNode.configure({ allowed: tokens }),
+        TokenNode.configure({ allowed: tokens, removeLabel }),
         UndoRedo,
         Dropcursor.configure({ width: 2 }),
         Placeholder.configure({ placeholder: placeholder ?? "" }),
@@ -85,21 +92,6 @@ export const TokenField = ({ label, value, onChange, tokens, placeholder, hideLa
         // on a multi-line paste, silently and with no feedback — paste
         // "one\ntwo" and only "one" arrives. Flatten instead of losing it.
         transformPastedText: (text) => text.replace(/\s*\n\s*/g, " "),
-        // ProseMirror-level so we can claim the event and stop the default
-        // text-insert path. posAtCoords resolves the drop point to a document
-        // position — the browser's own caret-from-point, but in doc space.
-        handleDrop: (view, event) => {
-          const name = event.dataTransfer?.getData(TOKEN_MIME);
-          if (!name) return false;
-
-          const at = view.posAtCoords({ left: event.clientX, top: event.clientY });
-          if (!at) return false;
-
-          const node = view.state.schema.nodes.token.create({ name, unknown: !tokens.includes(name) });
-          view.dispatch(view.state.tr.insert(at.pos, node));
-          event.preventDefault();
-          return true;
-        },
       },
       onUpdate: ({ editor: instance }) => onChange(instance.getText()),
       onFocus: ({ editor: instance }) => setActiveEditor(instance),
@@ -119,8 +111,50 @@ export const TokenField = ({ label, value, onChange, tokens, placeholder, hideLa
     }
   }, [editor, value, tokens]);
 
+  /**
+   * Accepts the drag, which is what makes the WHOLE box a drop target.
+   *
+   * ProseMirror only accepts drops over its own element, and that element is
+   * inset by the field's padding — a ~6px band top and bottom and ~11px each
+   * side of what looks like one uniform input. Releasing there produced no drop
+   * event at all, so the token silently went nowhere. The handler sits on the
+   * wrapper so the bordered box the user aims at is the box that accepts.
+   */
+  const allowDrop = (event: DragEvent<HTMLDivElement>) => {
+    if (!event.dataTransfer.types.includes(TOKEN_MIME)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    setDropTarget(true);
+  };
+
+  const dropToken = (event: DragEvent<HTMLDivElement>) => {
+    setDropTarget(false);
+    const name = event.dataTransfer.getData(TOKEN_MIME);
+    if (!name || !editor || editor.isDestroyed) return;
+    event.preventDefault();
+    // The palette already refuses to drag a spent token; this is the same rule
+    // enforced where the insert actually happens.
+    if (used.includes(name)) return;
+
+    const unknown = !tokens.includes(name);
+    const at = editor.view.posAtCoords({ left: event.clientX, top: event.clientY });
+    // No document position under the pointer means the drop landed on the
+    // padding. "Into this box" means the end of the text, not nowhere.
+    if (at) {
+      editor.chain().focus().insertContentAt(at.pos, { type: "token", attrs: { name, unknown } }).run();
+    } else {
+      editor.chain().focus("end").insertToken(name, unknown).run();
+    }
+  };
+
   const field = (
-    <div className="token-field">
+    <div
+      className={dropTarget ? "token-field is-drop-target" : "token-field"}
+      onDragOver={allowDrop}
+      onDragEnter={allowDrop}
+      onDragLeave={() => setDropTarget(false)}
+      onDrop={dropToken}
+    >
       <EditorContent editor={editor} />
     </div>
   );

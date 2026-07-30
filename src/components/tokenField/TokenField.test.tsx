@@ -29,6 +29,17 @@ describe("TokenField", () => {
   it("round-trips the template it was given", () => {
     const onChange = vi.fn();
     renderField(<TokenField label="Format" value="HP {app} ok" tokens={TOKENS} onChange={onChange} />);
-    expect(screen.getByRole("textbox").textContent).toBe("HP {app} ok");
+    // Minus the chips' remove buttons, which are controls rather than content.
+    // The authoritative round-trip is editor.getText(), covered in TokenNode.test.ts.
+    const visible = screen.getByRole("textbox").cloneNode(true) as HTMLElement;
+    visible.querySelectorAll(".token-chip-remove").forEach((button) => button.remove());
+    expect(visible.textContent).toBe("HP {app} ok");
+  });
+
+  it("gives every chip a remove button", () => {
+    const { container } = renderField(
+      <TokenField label="Format" value="{app} v{version}" tokens={TOKENS} onChange={() => {}} />
+    );
+    expect(container.querySelectorAll(".token-chip .token-chip-remove")).toHaveLength(2);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderTemplate, splitTemplate, unknownTokens } from "./labelTemplate";
+import { renderTemplate, splitTemplate, unknownTokens, usedTokens } from "./labelTemplate";
 
 describe("renderTemplate", () => {
   it("substitutes known tokens", () => {
@@ -68,6 +68,24 @@ describe("unknownTokens", () => {
 
   it("does not report a token twice", () => {
     expect(unknownTokens("{x} {x}", [])).toEqual(["x"]);
+  });
+});
+
+describe("usedTokens", () => {
+  it("collects the tokens across several templates", () => {
+    expect(usedTokens(["{a} text", "{b}"])).toEqual(["a", "b"]);
+  });
+
+  it("reports a token once however many templates use it", () => {
+    expect(usedTokens(["{a} {a}", "{a}"])).toEqual(["a"]);
+  });
+
+  it("ignores shapes the token grammar rejects", () => {
+    expect(usedTokens(["100% {} {1bad}"])).toEqual([]);
+  });
+
+  it("returns nothing for empty templates", () => {
+    expect(usedTokens(["", ""])).toEqual([]);
   });
 });
 

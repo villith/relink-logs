@@ -82,6 +82,18 @@ export const unknownTokens = (template: string, allowed: readonly string[]): str
 ];
 
 /**
+ * Every token name used across a group of templates, deduplicated.
+ *
+ * What the settings palette needs to grey out a token that is already placed:
+ * the overlay header is one header split into segments, so a token spent in any
+ * one of them is spent for all of them. Takes the whole group rather than one
+ * template precisely so the caller cannot forget a field.
+ */
+export const usedTokens = (templates: readonly string[]): string[] => [
+  ...new Set(templates.flatMap((template) => tokenNames(template))),
+];
+
+/**
  * Renders a template against its token values.
  *
  * A token missing from `tokens` is left LITERAL (`{typo}` renders as `{typo}`):

@@ -1,8 +1,10 @@
-import { Code, Group, Text, UnstyledButton } from "@mantine/core";
+import { Group, Text, UnstyledButton } from "@mantine/core";
+import { DotsSixVertical } from "@phosphor-icons/react";
 import type { Editor } from "@tiptap/core";
 import { createContext, useContext, useMemo, useRef, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { TOKEN_MIME } from "./TokenNode";
+import "./tokenField.css";
 
 type TokenPaletteContextValue = {
   setActiveEditor: (editor: Editor) => void;
@@ -45,6 +47,13 @@ export const TokenPaletteProvider = ({ children }: { children: ReactNode }) => {
   return <TokenPaletteContext.Provider value={value}>{children}</TokenPaletteContext.Provider>;
 };
 
+export type TokenPaletteProps = {
+  tokens: readonly string[];
+  /** Tokens already placed in this section's fields. Shown spent rather than
+   * hidden, so the list of what exists does not change shape as you build. */
+  used?: readonly string[];
+};
+
 /**
  * The list of tokens a field accepts, as chips.
  *
@@ -52,8 +61,12 @@ export const TokenPaletteProvider = ({ children }: { children: ReactNode }) => {
  * and click appends it to whichever field was last focused. Click is not a
  * lesser fallback — it is the only path available from the keyboard, and it is
  * what most people will reach for.
+ *
+ * Each chip carries a grip glyph. A plain code-styled box reads as a label —
+ * something to look at, not something to pick up — and the drag affordance was
+ * being missed entirely.
  */
-export const TokenPalette = ({ tokens }: { tokens: readonly string[] }) => {
+export const TokenPalette = ({ tokens, used = [] }: TokenPaletteProps) => {
   const { t } = useTranslation();
   const { insert } = useTokenPalette();
 
@@ -62,26 +75,33 @@ export const TokenPalette = ({ tokens }: { tokens: readonly string[] }) => {
       <Text size="xs" c="dimmed">
         {t("ui.template-tokens")}
       </Text>
-      {tokens.map((token) => (
-        // A button wrapping the Code rather than `Code component="button"`:
-        // Mantine's Code is typed to <code>'s element props, so it rejects
-        // `type="button"` — and a chip that submits a surrounding form is the
-        // kind of bug that only shows up once one exists.
-        <UnstyledButton
-          key={token}
-          type="button"
-          draggable
-          title={t("ui.token-insert-hint")}
-          style={{ cursor: "grab" }}
-          onDragStart={(event) => {
-            event.dataTransfer.setData(TOKEN_MIME, token);
-            event.dataTransfer.effectAllowed = "copy";
-          }}
-          onClick={() => insert(token)}
-        >
-          <Code>{`{${token}}`}</Code>
-        </UnstyledButton>
-      ))}
+      {tokens.map((token) => {
+        const spent = used.includes(token);
+        return (
+          // A button wrapping the chip rather than `Code component="button"`:
+          // Mantine's Code is typed to <code>'s element props, so it rejects
+          // `type="button"` — and a chip that submits a surrounding form is the
+          // kind of bug that only shows up once one exists.
+          <UnstyledButton
+            key={token}
+            type="button"
+            // `draggable` is set from the same flag that disables the click, so
+            // a spent token cannot be re-added by either route.
+            draggable={!spent}
+            disabled={spent}
+            className={spent ? "token-source is-spent" : "token-source"}
+            title={spent ? t("ui.token-already-used") : t("ui.token-insert-hint")}
+            onDragStart={(event) => {
+              event.dataTransfer.setData(TOKEN_MIME, token);
+              event.dataTransfer.effectAllowed = "copy";
+            }}
+            onClick={() => insert(token)}
+          >
+            <DotsSixVertical size={12} weight="bold" className="token-source-grip" />
+            <span className="token-source-name">{`{${token}}`}</span>
+          </UnstyledButton>
+        );
+      })}
     </Group>
   );
 };

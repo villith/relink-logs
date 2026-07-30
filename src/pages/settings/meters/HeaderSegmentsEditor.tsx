@@ -1,6 +1,7 @@
 import { HEADER_TOKENS } from "@/components/Titlebar";
 import { TokenField } from "@/components/tokenField/TokenField";
 import { TokenPalette, TokenPaletteProvider } from "@/components/tokenField/TokenPalette";
+import { usedTokens } from "@/labelTemplate";
 import useSettings from "@/pages/useSettings";
 import { DEFAULT_HEADER_SEGMENTS, type HeaderSegment } from "@/stores/useMeterSettingsStore";
 import { moveItem } from "@/utils";
@@ -41,6 +42,10 @@ export const HeaderSegmentsEditor = () => {
 
   const reset = () => update([...DEFAULT_HEADER_SEGMENTS]);
 
+  // The header is one header split into pieces, so a token spent in any segment
+  // is spent for all of them.
+  const used = usedTokens(header_segments.map((segment) => segment.template));
+
   return (
     <TokenPaletteProvider>
       <Stack gap="xs">
@@ -55,7 +60,7 @@ export const HeaderSegmentsEditor = () => {
         <Text size="xs" c="dimmed">
           {t("ui.header-segments-description")}
         </Text>
-        <TokenPalette tokens={HEADER_TOKENS} />
+        <TokenPalette tokens={HEADER_TOKENS} used={used} />
         <DragDropContext
           onDragEnd={(result) => {
             if (!result.destination) return;
@@ -89,6 +94,7 @@ export const HeaderSegmentsEditor = () => {
                             value={segment.template}
                             onChange={(template) => patch(index, { template })}
                             tokens={HEADER_TOKENS}
+                            used={used}
                           />
                         </Box>
                         <SegmentedControl
