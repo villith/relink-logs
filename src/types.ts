@@ -683,28 +683,45 @@ export interface HookStatusSnapshot {
   supportsEject: boolean;
 }
 
-/** DEV-ONLY DIAGNOSTIC — mirrors `mod legality_audit` in src-tauri/src/main.rs
- * and the `legality` module's `Finding`. Goes when the /logs/legality page does. */
+/* Build legality. Mirrors `src-tauri/src/legality`'s `Finding` and the stored
+ * rows `src-tauri/src/db/legality.rs` serves. */
 
-/** `legality::Rule`, serde camelCase. Left as a bare string: these are data,
- * and the page renders them verbatim rather than translating per rule. */
-export type LegalityRule = string;
+/** `legality::Rule`, spelled as a closed union so adding or renaming a rule in
+ * Rust fails `tsc` here rather than silently rendering an untranslated id.
+ * Each name must have a `ui.legality.rules.<name>` key. */
+export type LegalityRule =
+  | "wrightstoneTraitLevel"
+  | "sigilTraitLevel"
+  | "sigilLockedPair"
+  | "sigilQuestLockedTrait"
+  | "sigilSingleTraitOnly"
+  | "overmasteryValue"
+  | "overmasteryAllMaxed"
+  | "summonTrait"
+  | "summonBonusSource"
+  | "summonBonusMagnitude"
+  | "summonPerfectCount"
+  | "masterTraitCount";
 
 /** `legality::Severity`. `impossible` is proof, `improbable` is suspicion —
  * never collapse them. */
 export type LegalitySeverity = "impossible" | "improbable";
 
 /** `legality::Subject`, an internally tagged enum: `index` is absent for the
- * variants that carry none (`wrightstone`, `masterTraits`). */
+ * variants that carry none (`wrightstone`). */
 export type LegalitySubject = {
-  kind: string;
+  kind: "wrightstone" | "sigil" | "summon" | "overmastery" | "overmasteries" | "summons" | "masterTraits";
   index?: number;
 };
 
-/** `legality::Value`, an *untagged* enum — it arrives as a bare number, an
- * array of numbers, or null. The paired rule says how to read it; this page
- * does not try to. */
-export type LegalityValue = number | number[] | null;
+/** `legality::Value`, adjacently tagged so ids and levels are told apart. Ids
+ * carry their CATALOGUE in the tag — one kind per namespace — so the renderer
+ * never has to infer which translate helper resolves them from the paired
+ * rule. */
+export type LegalityValue =
+  | { kind: "level" | "count" | "amount" | "traitId" | "summonBonusId" | "overmasteryId"; value: number }
+  | { kind: "levels" | "traitIds" | "sigilIds" | "summonBonusIds"; value: number[] }
+  | { kind: "none" };
 
 export type LegalityFinding = {
   rule: LegalityRule;
@@ -716,21 +733,34 @@ export type LegalityFinding = {
   odds: number | null;
 };
 
-export type LegalityAuditEntry = {
+/** One stored finding with the encounter it came from — `db::legality::PlayerFinding`. */
+export type LegalityPlayerFinding = {
   logId: number;
   /** Milliseconds since the UNIX epoch. */
   time: number;
-  questId: number | null;
-  /** Party slot (0-3) in the stored encounter. */
-  playerIndex: number;
-  displayName: string;
-  characterName: string;
-  characterType: CharacterType;
-  findings: LegalityFinding[];
+  finding: LegalityFinding;
 };
 
-export type LegalityAuditResult = {
-  entries: LegalityAuditEntry[];
-  logsScanned: number;
-  logsSkipped: number;
+/** Everything the audit page shows for one person — `db::legality::FlaggedPlayer`.
+ *
+ * Grouped by name AND character, so one human on one character is a single row
+ * however many party slots they have occupied. */
+export type LegalityFlaggedPlayer = {
+  displayName: string;
+  characterType: CharacterType;
+  /** True when any finding is `impossible` — the page's red/yellow split. */
+  impossible: boolean;
+  /** Distinct encounters flagged, not findings: repetition across fights is
+   * what separates a real mod from a one-off misread. */
+  encounters: number;
+  /** Most recent flagged encounter, milliseconds since the UNIX epoch. */
+  lastSeen: number;
+  findings: LegalityPlayerFinding[];
+};
+
+/** Progress of the startup rescan — `LegalitySweepProgress` in main.rs, pushed
+ * on the `legality-sweep-progress` event. `done === total` means finished. */
+export type LegalitySweepProgress = {
+  done: number;
+  total: number;
 };
