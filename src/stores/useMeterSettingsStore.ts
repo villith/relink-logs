@@ -15,6 +15,39 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { create, Mutate, StoreApi } from "zustand";
 import { persist } from "zustand/middleware";
 
+/** How a row's bar is sized. `total`: the width is the row's share of the whole.
+ * `relative`: the largest row fills its bar and the rest scale against it, which
+ * makes differences between the middle rows readable. Affects the painted bar
+ * ONLY — the percentage column is always a true share, because that one is data. */
+export type BarFillMode = "total" | "relative";
+
+/** One piece of the overlay header. Rendered as its own `.item` div, so it keeps
+ * the CSS dot separator and the Tauri drag region; a segment whose template
+ * renders empty is not rendered at all, which is what makes team damage and boss
+ * HP appear only once they have something to report. */
+export type HeaderSegment = {
+  id: string;
+  side: "left" | "right";
+  template: string;
+  /** Dropped on very narrow overlays, where the window buttons need the room. */
+  hideWhenNarrow: boolean;
+};
+
+/** Built-in bar textures. Stored as a plain string rather than a union so a
+ * future user-supplied source (`file:…`) needs no settings migration. */
+export const BAR_TEXTURES = ["solid", "smooth", "gloss", "glaze", "charcoal", "fade", "striped"] as const;
+
+export const DEFAULT_PLAYER_LABEL = "[{slot}] {name} ({character})";
+
+/** Seeded to reproduce the header exactly as it read before it was customizable. */
+export const DEFAULT_HEADER_SEGMENTS: HeaderSegment[] = [
+  { id: "brand", side: "left", template: "{app} {version}", hideWhenNarrow: false },
+  { id: "damage", side: "left", template: "{damage}", hideWhenNarrow: true },
+  { id: "dps", side: "left", template: "{dps}/s", hideWhenNarrow: true },
+  { id: "hp", side: "left", template: "HP {hpPercent} ({hpCurrent} / {hpMax})", hideWhenNarrow: true },
+  { id: "status", side: "right", template: "{status}", hideWhenNarrow: false },
+];
+
 interface MeterSettings {
   color_1: string;
   color_2: string;
@@ -48,6 +81,16 @@ interface MeterSettings {
   logs_columns: ColumnSetting<MeterColumns>[];
   /** Customizable skill-breakdown value columns for the main (logs) window. */
   logs_skill_columns: ColumnSetting<SkillColumns>[];
+  /** Template for the meter's player-name cell. See src/labelTemplate.ts. */
+  player_label_template: string;
+  /** The overlay header, as an ordered list of independently-templated pieces. */
+  header_segments: HeaderSegment[];
+  bar_fill_mode: BarFillMode;
+  bar_texture: string;
+  /** Meter row height in px. */
+  bar_height: number;
+  /** Vertical gap between meter rows in px. */
+  bar_spacing: number;
 }
 
 interface MeterStateFunctions {
@@ -73,6 +116,12 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   overlay_skill_columns: [...DEFAULT_OVERLAY_SKILL_COLUMNS],
   logs_columns: [...DEFAULT_LOGS_COLUMNS],
   logs_skill_columns: [...DEFAULT_LOGS_SKILL_COLUMNS],
+  player_label_template: DEFAULT_PLAYER_LABEL,
+  header_segments: [...DEFAULT_HEADER_SEGMENTS],
+  bar_fill_mode: "total",
+  bar_texture: "solid",
+  bar_height: 27,
+  bar_spacing: 0,
 };
 
 /* Cross-window sync. The overlay and the logs/settings window are separate
