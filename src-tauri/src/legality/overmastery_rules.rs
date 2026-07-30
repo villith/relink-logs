@@ -2,7 +2,7 @@
 
 use protocol::OvermasteryInfo;
 
-use super::{Finding, Rule, Severity, Subject, Value};
+use super::{is_empty, Finding, Rule, Severity, Subject, Value};
 use crate::overmastery::stock_tables;
 
 /// The game always rolls four overmasteries; fewer means a partial read.
@@ -17,21 +17,27 @@ const EPSILON: f32 = 1e-3;
 /// Chance that one slot rolls the top level, taking the most favourable
 /// meditation size — the reading most generous to the player. Stock tables
 /// weight the top level at 100/100/1800 of 10000, so this is 0.18.
+///
+/// Derived once: it is a fold over the whole `level_weights` grid and the
+/// answer is a property of the baked tables, not of the build being audited.
 fn best_max_level_chance() -> f64 {
-    let tables = stock_tables();
-    let sizes = tables.level_weights.first().map_or(0, |row| row.len());
+    static CHANCE: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CHANCE.get_or_init(|| {
+        let tables = stock_tables();
+        let sizes = tables.level_weights.first().map_or(0, |row| row.len());
 
-    (0..sizes)
-        .map(|size| {
-            let total: u32 = tables.level_weights.iter().map(|row| row[size]).sum();
-            let top = tables.level_weights.last().map_or(0, |row| row[size]);
-            if total == 0 {
-                0.0
-            } else {
-                f64::from(top) / f64::from(total)
-            }
-        })
-        .fold(0.0_f64, f64::max)
+        (0..sizes)
+            .map(|size| {
+                let total: u32 = tables.level_weights.iter().map(|row| row[size]).sum();
+                let top = tables.level_weights.last().map_or(0, |row| row[size]);
+                if total == 0 {
+                    0.0
+                } else {
+                    f64::from(top) / f64::from(total)
+                }
+            })
+            .fold(0.0_f64, f64::max)
+    })
 }
 
 /// Whether a slot's magnitude was never read, rather than read as small.
@@ -66,11 +72,20 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
 
     let tables = stock_tables();
     let mut findings = Vec::new();
-    let mut all_maxed = true;
+    // COUNTED, not a flag cleared on every rejection path. The rule fires only
+    // when all four slots are affirmatively proven maxed, so a path that forgets
+    // to speak fails CLOSED (no finding). A `bool` set false on each rejection
+    // fails OPEN — one forgotten branch is a false accusation, which is the one
+    // outcome this module exists to prevent.
+    let mut maxed_slots = 0usize;
 
     for (index, mastery) in info.overmasteries.iter().enumerate() {
+        // An empty/unread slot is missing data, not an unknown id.
+        if is_empty(mastery.id) {
+            continue;
+        }
+
         let Some(param) = tables.params.get(&mastery.id) else {
-            all_maxed = false;
             findings.push(Finding {
                 rule: Rule::OvermasteryValue,
                 severity: Severity::Impossible,
@@ -78,7 +93,7 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
                 // The id is what was rejected, not the magnitude — and the
                 // magnitude may not even have been read. Matches
                 // `wrightstone`'s idiom for an id outside the catalogue.
-                observed: Value::TraitId(mastery.id),
+                observed: Value::OvermasteryId(mastery.id),
                 allowed: Value::None,
                 odds: None,
             });
@@ -90,7 +105,6 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
         // above still applies. Everything below judges the magnitude, and
         // there is no magnitude to judge.
         if magnitude_unread(mastery.value) {
-            all_maxed = false;
             continue;
         }
 
@@ -100,7 +114,6 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
             .any(|&step| (step - mastery.value).abs() < EPSILON);
 
         if !on_ladder {
-            all_maxed = false;
             findings.push(Finding {
                 rule: Rule::OvermasteryValue,
                 severity: Severity::Impossible,
@@ -113,16 +126,16 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
         }
 
         let top = param.values[param.values.len() - 1];
-        if (top - mastery.value).abs() >= EPSILON {
-            all_maxed = false;
+        if (top - mastery.value).abs() < EPSILON {
+            maxed_slots += 1;
         }
     }
 
-    if all_maxed {
+    if maxed_slots == OVERMASTERY_SLOT_COUNT {
         findings.push(Finding {
             rule: Rule::OvermasteryAllMaxed,
             severity: Severity::Improbable,
-            subject: Subject::Overmastery(0),
+            subject: Subject::Overmasteries,
             observed: Value::Count(OVERMASTERY_SLOT_COUNT),
             // Nothing is being exceeded here: four maxed slots are a legal
             // roll, merely an improbable one, so there is no allowed value to
@@ -192,7 +205,7 @@ mod tests {
         // The id is what was rejected, not the magnitude, so the id is what
         // the finding must carry — otherwise a UI can never name the
         // offending overmastery.
-        assert_eq!(findings[0].observed, Value::TraitId(0xdeadbeef));
+        assert_eq!(findings[0].observed, Value::OvermasteryId(0xdeadbeef));
     }
 
     #[test]
@@ -207,6 +220,9 @@ mod tests {
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::OvermasteryAllMaxed);
         assert_eq!(findings[0].severity, Severity::Improbable);
+        // The claim is about the whole set, so the subject is the whole set —
+        // pointing at slot 0 made the audit page display a single overmastery.
+        assert_eq!(findings[0].subject, Subject::Overmasteries);
         let odds = findings[0].odds.expect("maxed roll reports odds");
         // 0.18^4 on a large meditation.
         assert!((odds - 0.18_f64.powi(4)).abs() < 1e-9, "odds were {odds}");
@@ -283,6 +299,23 @@ mod tests {
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::OvermasteryValue);
         assert_eq!(findings[0].subject, Subject::Overmastery(0));
+    }
+
+    /// The production false positive this guard exists for: 16 findings in a
+    /// real database observed id `887ae0b0`, the engine empty sentinel,
+    /// because the rule assumed the hook's sentinel filter is airtight. An
+    /// empty slot must be silent — including the plain-zero spelling — and
+    /// "all four maxed" cannot be concluded across it.
+    #[test]
+    fn sentinel_ids_are_missing_data_not_unknown_ids() {
+        for sentinel in [0x887a_e0b0_u32, 0] {
+            let info = info(&[(sentinel, 0.0), (HEALTH, 2000.0), (CRIT, 20.0), (STUN, 2.0)]);
+            assert_eq!(
+                audit_overmastery(Some(&info)),
+                vec![],
+                "sentinel id {sentinel:08x} was accused (or all-maxed fired past it)"
+            );
+        }
     }
 
     /// No ladder in `overmastery-tables.json` contains 0.0 — the smallest

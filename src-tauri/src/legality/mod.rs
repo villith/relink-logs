@@ -93,6 +93,10 @@ pub enum Rule {
     /// A summon trait that is not a candidate of that summon's lot — an
     /// outcome the chances table prices at zero.
     SummonTrait,
+    /// An equip bonus no summon sharing this one's display name can grant.
+    /// Eleven of the 22 bonus ids belong to four boss summons alone, so one of
+    /// those on any other summon is off-table however ordinary it displays.
+    SummonBonusSource,
     /// Two or more ROLLED summons equipped with both slots at the top of
     /// their level windows. Always `Improbable` — a report, never proof
     /// (26 of 72 census players own such a set; see `summons`'s module docs).

@@ -1,25 +1,85 @@
-//! Summon legality, rules 10 and 11.
+//! Summon legality: the zero-probability trait check.
+//!
+//! A summon may only carry a main trait, and an equip bonus, that summons of
+//! its NAME can grant. Anything else is an outcome the game's tables price at
+//! exactly zero, so it is [`Severity::Impossible`].
+//!
+//! # Why the checks are per NAME, not per lot
+//!
+//! The per-id lot bindings in summon.tbl are real but not stable enough to
+//! accuse over. Every boss summon exists under TWO ids — a rolled one with the
+//! full candidate pool and a "guaranteed" variant whose lots fix one config
+//! (first-clear style) — and players verifiably hold the guaranteed id with
+//! ROLLED traits (a `90bd4ac0` Lucilius carrying Berserker Echo,
+//! user-confirmed legitimate). Judging each id against only its own lots
+//! accuses every such owner, so both allowed lists are the union across all
+//! ids sharing the summon's (English) display name.
+//!
+//! The BONUS side used to be looser still — any real bonus id was accepted on
+//! any summon — on the strength of production sightings of "Behemoth III with
+//! `2ea9ca80`/`9245dfa4`". That relaxation was a mistake worth remembering:
+//! those sightings were two modded builds, so the rule had been calibrated on
+//! its own quarry and could no longer see it. A 692-log census
+//! (`examples/legality_bonus_probe.rs`) found 5 off-lot bonuses in 4526
+//! readings — three of them guaranteed-variant boss summons, which the name
+//! union covers, and two of them Behemoth III carrying a boss-set id, which it
+//! does not. Eleven of the 22 bonus ids are granted by exactly four summons
+//! (Rolan, Lucilius, Beelzebub, Lilith) and reach higher magnitudes for the
+//! same eleven effects, so one of those elsewhere is genuinely off-table.
+//!
+//! # The perfect-summon COUNT report (user-requested 2026-07-30)
+//!
+//! A second rule reports — never accuses — an equipped set carrying
+//! [`PERFECT_SUMMON_FLAG_COUNT`] or more "perfect" summons: a ROLLED summon
+//! whose main trait and equip bonus both sit at the top of their level
+//! windows in the summon's own lots. Only the six endgame boss summons in
+//! [`PERFECT_WATCHED_NAMES`] are counted (user-scoped 2026-07-30: nobody
+//! farms perfection on anything else, so a maxed common summon is noise, not
+//! signal). It is [`Severity::Improbable`] and can never be `Impossible`,
+//! because measured production data forbids it:
+//!
+//! * A single perfect summon is ordinary — 42 of 72 real players in the
+//!   production census own at least one (the rarest single config is only
+//!   1 in 18,333, and a confirmed-legitimate player owns it). The rule
+//!   therefore only speaks at two or more, where 26 of 72 stood at census
+//!   time — the user chose to see that list, knowing its size.
+//! * Guaranteed-variant summons (`rolled: false`) are excluded: their fixed
+//!   config is a probability-1 drop, not a roll.
+//! * A bonus from the parallel id set (not in this summon's own lots) does
+//!   not count as perfect — its window is unknown, so it cannot be "top".
+//! * The reported odds are the product of each counted summon's single-draw
+//!   config probability. That is the honest table price of the draws, but it
+//!   OVERSTATES rarity for a farmer who rolls hundreds of times and equips
+//!   the best — which is exactly why the severity is a suspicion, not proof.
+//!
+//! # Why levels are deliberately NOT judged
+//!
+//! Production data shows honest players carrying bonus levels the table
+//! prices at zero: an unread sentinel (`4294967295`, i.e. `-1`) and levels
+//! below the candidate's window (a level-3 bonus in a 5-9 window) both occur
+//! on a confirmed-legitimate build. Whatever those levels mean — partial
+//! reads, or an acquisition path the table does not model — judging them
+//! accuses honest players, so only trait MEMBERSHIP is checked.
 
 use std::collections::HashMap;
 
 use protocol::EquippedSummon;
 use serde::Deserialize;
 
-use super::{Finding, Rule, Severity, Subject, Value};
+use super::{is_empty, parse_hex, Finding, Rule, Severity, Subject, Value};
 
 /// One candidate of a summon's main-trait or equip-bonus lot, as generated.
 #[derive(Debug, Clone, Deserialize)]
 struct RawCandidate {
     /// This candidate's share of its lot's total weight.
     weight: u32,
-    /// `(level, weight)` pairs, ascending — so the last is the top.
+    /// `(level, weight)` pairs, ascending.
     levels: Vec<(u32, u32)>,
 }
 
 /// One row of `summon-legality.json`, as generated. `tier` is deliberately
-/// unread: the per-tier level windows the plan first assumed do not exist, and
-/// judging a level against its tier rather than its candidate produces false
-/// accusations (see the tests).
+/// unread: per-tier level windows do not exist (proven by the removed
+/// per-tier model), and levels are not judged at all — see the module docs.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RawEntry {
@@ -28,87 +88,79 @@ struct RawEntry {
     bonuses: HashMap<String, RawCandidate>,
 }
 
-/// One candidate with its level curve, weights intact so the reported odds are
-/// the game's real ones rather than a uniform-draw approximation.
+/// One candidate's share of its lot and its level curve.
 #[derive(Debug, Clone)]
 pub struct Candidate {
     weight: u32,
     levels: Vec<(u32, u32)>,
 }
 
-impl Candidate {
-    /// The top of THIS candidate's window — the last entry, the file being
-    /// generated ascending.
-    fn top(&self) -> Option<(u32, u32)> {
-        self.levels.last().copied()
-    }
-
-    fn level_total(&self) -> u32 {
-        self.levels.iter().map(|&(_, weight)| weight).sum()
-    }
-
-    /// P(top level | this candidate), or `None` when the curve is empty or
-    /// weightless — missing data, never a certainty.
-    fn top_chance(&self) -> Option<f64> {
-        let (_, weight) = self.top()?;
-        let total = self.level_total();
-        (total > 0).then(|| f64::from(weight) / f64::from(total))
-    }
-}
-
 /// One lot: the candidates for a summon's main trait or its equip bonus.
-///
-/// Totals are summed rather than read from the file, which deliberately omits
-/// them because they vary (10000, 9999 or 9998 — the table's own rounding).
 #[derive(Debug, Clone)]
 pub struct Lot {
-    total: u32,
     candidates: HashMap<u32, Candidate>,
 }
 
 impl Lot {
-    fn get(&self, id: u32) -> Option<&Candidate> {
-        self.candidates.get(&id)
+    /// The weight the chances table gives `level` on candidate `id`. `None`
+    /// when the id is not a candidate of this lot at all; `Some(0)` when it
+    /// is, but the level lies outside that candidate's window. Diagnostics
+    /// only — no rule judges levels (see the module docs).
+    pub fn level_weight(&self, id: u32, level: u32) -> Option<u32> {
+        let candidate = self.candidates.get(&id)?;
+        Some(
+            candidate
+                .levels
+                .iter()
+                .find(|&&(step, _)| step == level)
+                .map_or(0, |&(_, weight)| weight),
+        )
     }
 
-    /// P(candidate, level = its top). The verified draw model is
-    /// `candidateWeight/Σ candidateWeights × levelWeight/Σ levelWeights`:
-    /// each curve's weight sum equals the lot weight of exactly the candidates
-    /// sharing it, so "pick candidate then level" and a joint draw agree.
-    fn top_chance(&self, id: u32) -> Option<f64> {
-        let candidate = self.get(id)?;
-        if self.total == 0 {
+    /// The top of a candidate's level window: its highest level with a
+    /// non-zero weight. `None` when the id is not a candidate, or the
+    /// candidate grants no level at all.
+    pub fn top_level(&self, id: u32) -> Option<u32> {
+        let candidate = self.candidates.get(&id)?;
+        candidate
+            .levels
+            .iter()
+            .rev()
+            .find(|&&(_, weight)| weight > 0)
+            .map(|&(level, _)| level)
+    }
+
+    /// Probability of ONE roll of this lot landing exactly `(id, level)`.
+    /// `None` when the outcome is off-table or the table degenerates (zero
+    /// total weight) — a price it cannot state must not be stated as zero.
+    pub fn config_odds(&self, id: u32, level: u32) -> Option<f64> {
+        let candidate = self.candidates.get(&id)?;
+        let level_weight = candidate
+            .levels
+            .iter()
+            .find(|&&(step, _)| step == level)
+            .map(|&(_, weight)| weight)?;
+        let lot_total: u64 = self.candidates.values().map(|c| u64::from(c.weight)).sum();
+        let level_total: u64 = candidate.levels.iter().map(|&(_, w)| u64::from(w)).sum();
+        if lot_total == 0 || level_total == 0 || level_weight == 0 {
             return None;
         }
-        let share = f64::from(candidate.weight) / f64::from(self.total);
-        Some(share * candidate.top_chance()?)
-    }
-
-    /// The most likely top-of-window outcome in this lot, used only to prove
-    /// the certainty invariant in the tests.
-    #[cfg(test)]
-    fn best_top_chance(&self) -> Option<f64> {
-        self.candidates
-            .keys()
-            .filter_map(|&id| self.top_chance(id))
-            .fold(None, |best: Option<f64>, chance| {
-                Some(best.map_or(chance, |best| best.max(chance)))
-            })
+        Some(
+            (f64::from(candidate.weight) / lot_total as f64)
+                * (f64::from(level_weight) / level_total as f64),
+        )
     }
 }
 
 /// The acquisition roll space of one summon.
 #[derive(Debug, Clone)]
 pub struct SummonEntry {
-    /// `false` means the summon fixes BOTH its main trait and its equip bonus
-    /// — one candidate, one level, probability exactly 1.0 on each side.
+    /// `false` means the summon fixes BOTH its main trait and its equip
+    /// bonus — the lots then hold exactly one candidate each, so the
+    /// membership rule covers fixed summons with no special casing.
     pub rolled: bool,
     pub main_traits: Lot,
     pub bonuses: Lot,
-}
-
-fn parse_hex(value: &str) -> Option<u32> {
-    u32::from_str_radix(value, 16).ok()
 }
 
 fn build_lot(raw: HashMap<String, RawCandidate>) -> Lot {
@@ -124,8 +176,7 @@ fn build_lot(raw: HashMap<String, RawCandidate>) -> Lot {
             ))
         })
         .collect();
-    let total = candidates.values().map(|candidate| candidate.weight).sum();
-    Lot { total, candidates }
+    Lot { candidates }
 }
 
 /// The baked summon table, keyed by summon id. A row whose id will not parse
@@ -153,147 +204,201 @@ pub fn stock_summons() -> &'static HashMap<u32, SummonEntry> {
     })
 }
 
-/// A summon sitting at the top of BOTH of its own candidates' level windows.
-///
-/// # The published odds answer a narrower question than the trigger
-///
-/// The trigger is "each side sits at the top of **whichever** candidate this
-/// summon happens to carry" — it does not require any particular candidate.
-/// [`chance`](PerfectRoll::chance) is `P(this candidate AND its top level)`,
-/// which prices in a candidate draw the trigger never asked for, so it is
-/// always the rarer of the two numbers. Across the stock table the gap runs
-/// **11x to 99x**: `47e2ae71` Wheel of Fate III publishes 1 in 1,320 against a
-/// true fire rate of 1 in 22 (59x), and `6e5968fc` Lucilius publishes 1 in
-/// 18,333 against 1 in 185 (99x). Both figures are reproducible from this
-/// file's own weights.
-///
-/// A UI must therefore NEVER render this as "how unlikely is it that this
-/// player owns a perfect summon". Measured over 8,904 production summon
-/// records, [`Rule::SummonPerfect`] fires on **88.9%** of player-encounters,
-/// because real players farm and reroll toward top-level traits rather than
-/// accepting a random draw.
-///
-/// Re-pricing the trigger is a pending design decision, not an oversight —
-/// the arithmetic below is deliberately left alone.
-struct PerfectRoll {
-    /// `P(this exact configuration)`: this candidate drawn AND its top level
-    /// rolled. NOT `P(the rule fires)` — see the note on the type.
-    chance: f64,
-    /// The two ceilings it reached, `[main trait, equip bonus]`, read out of
-    /// the table so the finding names the windows it judged against.
-    ceilings: Vec<u32>,
+/// One row of `lang/en/summons.json`, read only for its display name — the
+/// grouping key that joins a boss summon's rolled and guaranteed ids.
+#[derive(Debug, Clone, Deserialize)]
+struct RawName {
+    text: String,
 }
 
-/// Whether this summon is perfect, and if so how unlikely that was. `None`
-/// means "not perfect, or not knowable" — the two cases a rule must treat
-/// alike, since neither justifies a finding:
-///
-///   * the summon fixes its trait and bonus (`rolled: false`), so the
-///     configuration is guaranteed rather than lucky;
-///   * the equipped trait or bonus is not a candidate the lot lists, so the
-///     level has no window to be measured against;
-///   * either level differs from its candidate's top. A level BELOW the top is
-///     an ordinary roll. A level ABOVE it is outside the acquisition window,
-///     but whether a summon can be improved after acquisition is unconfirmed
-///     gameplay behaviour, so it is not reported either.
-fn perfect_roll(entry: &SummonEntry, summon: &EquippedSummon) -> Option<PerfectRoll> {
-    // Guard one: the 37 unrolled summons hand every owner the same trait and
-    // bonus. Top-of-window is true of them by construction, so a naive rule
-    // accuses everyone who owns one.
-    if !entry.rolled {
-        return None;
-    }
+/// The summons the perfect-count report watches, by English display name so
+/// each boss's rolled AND guaranteed ids are covered (only rolled ones can
+/// ever count as perfect — the name is the stable identity across the pair).
+const PERFECT_WATCHED_NAMES: [&str; 6] = [
+    "Rolan",
+    "Lilith",
+    "Lucilius",
+    "Beelzebub",
+    "Vrazarek Firewyrm III",
+    "Behemoth III",
+];
 
-    // Every level and probability below comes from the candidate the summon
-    // actually carries — never from its tier, whose windows do not exist.
-    let main = entry.main_traits.get(summon.main_trait_id)?;
-    let bonus = entry.bonuses.get(summon.bonus_id)?;
-    let (main_top, _) = main.top()?;
-    let (bonus_top, _) = bonus.top()?;
-    if main_top != summon.main_trait_level || bonus_top != summon.bonus_level {
-        return None;
-    }
+/// What the membership rules judge against — see the module docs for why
+/// these are unions rather than per-id lots.
+struct SummonRules {
+    /// Allowed main-trait ids per summon id: the union over every summon id
+    /// sharing this one's English display name (ids the lang file does not
+    /// name fall back to their own pool).
+    allowed_mains: HashMap<u32, Vec<u32>>,
+    /// Allowed equip-bonus ids per summon id, unioned over the same name group
+    /// and for the same reason: a guaranteed variant's own lot fixes one
+    /// config, but players legitimately hold it carrying its rolled sibling's
+    /// bonuses.
+    allowed_bonuses: HashMap<u32, Vec<u32>>,
+    /// Every summon id sharing this one's display name, itself included. The
+    /// magnitude ceiling is taken across the whole group, so it agrees with
+    /// the union above rather than judging against a narrower window.
+    name_group: HashMap<u32, Vec<u32>>,
+    /// Summon ids whose display name is on [`PERFECT_WATCHED_NAMES`].
+    perfect_watched: std::collections::HashSet<u32>,
+}
 
-    let chance = entry.main_traits.top_chance(summon.main_trait_id)?
-        * entry.bonuses.top_chance(summon.bonus_id)?;
+fn summon_rules() -> &'static SummonRules {
+    static RULES: std::sync::OnceLock<SummonRules> = std::sync::OnceLock::new();
+    RULES.get_or_init(|| {
+        let names: HashMap<String, RawName> =
+            serde_json::from_str(include_str!("../../lang/en/summons.json"))
+                .expect("summons.json matches the lang shape");
 
-    // Guard two, on the probability itself. Today the two guards are
-    // equivalent — `only_unrolled_summons_can_be_certain` proves every
-    // unrolled summon is certain and no rolled one can be — but the flag is a
-    // property of the generator while this is a property of the odds we are
-    // about to publish, and reporting a certainty as improbable is exactly the
-    // false accusation this module exists to prevent.
-    (chance < 1.0).then_some(PerfectRoll {
-        chance,
-        ceilings: vec![main_top, bonus_top],
+        // Group summon ids by display name; an unnamed id groups alone under
+        // its own hex spelling, so it still gets exactly its own pool.
+        let mut groups: HashMap<String, Vec<u32>> = HashMap::new();
+        for &id in stock_summons().keys() {
+            let key = format!("{id:08x}");
+            let name = names.get(&key).map_or(key, |raw| raw.text.clone());
+            groups.entry(name).or_default().push(id);
+        }
+
+        let mut allowed_mains = HashMap::new();
+        for ids in groups.values() {
+            let mut union: Vec<u32> = ids
+                .iter()
+                .flat_map(|id| stock_summons()[id].main_traits.candidates.keys().copied())
+                .collect();
+            union.sort_unstable();
+            union.dedup();
+            for &id in ids {
+                allowed_mains.insert(id, union.clone());
+            }
+        }
+
+        let mut allowed_bonuses = HashMap::new();
+        let mut name_group = HashMap::new();
+        for ids in groups.values() {
+            let mut union: Vec<u32> = ids
+                .iter()
+                .flat_map(|id| stock_summons()[id].bonuses.candidates.keys().copied())
+                .collect();
+            union.sort_unstable();
+            union.dedup();
+            for &id in ids {
+                allowed_bonuses.insert(id, union.clone());
+                name_group.insert(id, ids.clone());
+            }
+        }
+
+        let perfect_watched = groups
+            .iter()
+            .filter(|(name, _)| PERFECT_WATCHED_NAMES.contains(&name.as_str()))
+            .flat_map(|(_, ids)| ids.iter().copied())
+            .collect();
+
+        SummonRules {
+            allowed_mains,
+            allowed_bonuses,
+            name_group,
+            perfect_watched,
+        }
     })
 }
 
-/// Rules 10 and 11. Both are [`Severity::Improbable`] and never
-/// [`Severity::Impossible`](super::Severity::Impossible): a perfect summon is
-/// legal, merely rare. These rules report odds, they do not accuse.
+/// How many perfect summons an equipped set must carry before the count is
+/// reported. One is ordinary (42 of 72 census players own one); the user set
+/// the reporting threshold at two.
+pub const PERFECT_SUMMON_FLAG_COUNT: usize = 2;
+
+/// The single-draw price of this summon's exact config, or `None` when the
+/// summon does not count as "perfect": a guaranteed variant (its fixed config
+/// is a probability-1 drop, not a roll), a slot below the top of its window,
+/// or a trait/bonus outside the summon's own lots (its window is unknown).
+fn perfect_config_odds(entry: &SummonEntry, summon: &EquippedSummon) -> Option<f64> {
+    if !entry.rolled {
+        return None;
+    }
+    if entry.main_traits.top_level(summon.main_trait_id)? != summon.main_trait_level {
+        return None;
+    }
+    if entry.bonuses.top_level(summon.bonus_id)? != summon.bonus_level {
+        return None;
+    }
+    let main = entry
+        .main_traits
+        .config_odds(summon.main_trait_id, summon.main_trait_level)?;
+    let bonus = entry
+        .bonuses
+        .config_odds(summon.bonus_id, summon.bonus_level)?;
+    Some(main * bonus)
+}
+
+/// The zero-probability trait check, plus the perfect-count report. Unknown
+/// summon ids and empty trait slots are missing data and stay silent; levels
+/// are never judged for legality (the count report reads them, but a level it
+/// cannot price simply doesn't count as perfect).
 pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
-    let table = stock_summons();
+    let rules = summon_rules();
     let mut findings = Vec::new();
-    let mut perfect = Vec::new();
 
     for (index, summon) in summons.iter().enumerate() {
-        let Some(entry) = table.get(&summon.summon_id) else {
+        // Allowed mains exist exactly for the table's ids, so this lookup is
+        // also the unknown-summon guard.
+        let Some(allowed_mains) = rules.allowed_mains.get(&summon.summon_id) else {
             continue;
         };
-        let Some(roll) = perfect_roll(entry, summon) else {
-            continue;
-        };
-        perfect.push(roll.chance);
 
-        // `observed` and `allowed` are both `[main trait level, equip bonus
-        // level]` and are equal by construction, as with `OvermasteryAllMaxed`
-        // — what the rule reports is precisely that the observed levels ARE
-        // the ceilings. `allowed` comes from the table rather than being
-        // echoed from the input, so it names the windows judged against.
-        //
-        // READ `odds` CAREFULLY BEFORE RENDERING IT. It is
-        // `P(this exact configuration)` — this candidate drawn AND its top
-        // level — and NOT `P(this rule fires)`, which is what a reader assumes
-        // when a finding publishes a probability. The trigger above accepts
-        // whichever candidate the summon carries, so the true fire rate is 11x
-        // to 99x commoner than this number across the stock table, and 88.9% of
-        // production player-encounters trip this rule. Phrasing it as "the odds
-        // this player came by their summon honestly" is a false accusation
-        // dressed as arithmetic. See `PerfectRoll` for the measurements.
-        findings.push(Finding {
-            rule: Rule::SummonPerfect,
-            severity: Severity::Improbable,
-            subject: Subject::Summon(index),
-            observed: Value::Levels(vec![summon.main_trait_level, summon.bonus_level]),
-            allowed: Value::Levels(roll.ceilings),
-            odds: Some(roll.chance),
-        });
+        // Both allowed lists are built sorted and deduped, so both lookups
+        // are binary searches.
+        if !is_empty(summon.main_trait_id)
+            && allowed_mains.binary_search(&summon.main_trait_id).is_err()
+        {
+            findings.push(Finding {
+                rule: Rule::SummonTrait,
+                severity: Severity::Impossible,
+                subject: Subject::Summon(index),
+                observed: Value::TraitId(summon.main_trait_id),
+                allowed: Value::TraitIds(allowed_mains.clone()),
+                odds: None,
+            });
+        }
+
+        // Built alongside `allowed_mains` from the same groups, so the lookup
+        // above has already proven this one resolves.
+        let allowed_bonuses = &rules.allowed_bonuses[&summon.summon_id];
+
+        if !is_empty(summon.bonus_id) && allowed_bonuses.binary_search(&summon.bonus_id).is_err() {
+            findings.push(Finding {
+                rule: Rule::SummonBonusSource,
+                severity: Severity::Impossible,
+                subject: Subject::Summon(index),
+                observed: Value::SummonBonusId(summon.bonus_id),
+                allowed: Value::SummonBonusIds(allowed_bonuses.clone()),
+                odds: None,
+            });
+        }
     }
 
-    // Rule 11: one perfect summon is luck; several compound. Independent
-    // draws, so the joint probability is the product.
-    //
-    // The product inherits rule 10's narrowing and multiplies it. What it
-    // describes is `P(these specific summons rolled these specific
-    // configurations)`, NOT `P(this player got lucky N times)` — and the second
-    // reading is the one a UI will reach for. A player holding the two
-    // commonest farm targets in the production corpus (`439cdb88` Goldslime III
-    // and `9384a5d3` Radis Whitewyrm III, both on their fixed-15 main
-    // candidate) is handed "1 in 302,439" when the chance of both tripping the
-    // rule is 1 in 494 — a 612x overstatement, and rule 11 fires on 52.9% of
-    // production player-encounters. Reproducible from this file's weights.
-    //
-    // The arithmetic stays as-is pending a design decision on whether to
-    // re-price the trigger; this comment exists so it cannot be over-read in
-    // the meantime.
-    if perfect.len() > 1 {
+    // The perfect-count report (see the module docs). Only the watched boss
+    // summons are counted; the odds multiply the counted summons' single-draw
+    // prices — the honest table price of the draws, knowingly blind to
+    // farming, which is why this is Improbable.
+    let perfect: Vec<f64> = summons
+        .iter()
+        .filter(|summon| rules.perfect_watched.contains(&summon.summon_id))
+        .filter_map(|summon| {
+            stock_summons()
+                .get(&summon.summon_id)
+                .and_then(|entry| perfect_config_odds(entry, summon))
+        })
+        .collect();
+
+    if perfect.len() >= PERFECT_SUMMON_FLAG_COUNT {
         findings.push(Finding {
             rule: Rule::SummonPerfectCount,
             severity: Severity::Improbable,
-            subject: Subject::Summon(0),
+            subject: Subject::Summons,
             observed: Value::Count(perfect.len()),
-            allowed: Value::Count(1),
+            // Nothing is exceeded: the set is legal, merely improbable, so
+            // `odds` is the payload (the `OvermasteryAllMaxed` idiom).
+            allowed: Value::None,
             odds: Some(perfect.iter().product()),
         });
     }
@@ -304,36 +409,47 @@ pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::legality::EMPTY_ID;
     use crate::legality::{Rule, Severity, Subject, Value};
 
-    /// Wheel of Fate III: tier 3, rolled. Main lot total 9998, bonus lot
-    /// total 9999.
+    /// Wheel of Fate III: tier 3, rolled.
     const WHEEL_OF_FATE_III: u32 = 0x47e2_ae71;
-    /// Its main candidate Supplementary DMG: weight 3066, levels 11..=15 with
-    /// the top weighted 1000 of 9200 — so level 15 is the top of ITS window.
+    /// One of its main candidates.
     const SUPPLEMENTARY_DMG: u32 = 0x57ab_5b10;
-    /// Its bonus candidate Critical Hit Rate Up: weight 909, levels 6..=9 at
-    /// 2500 each — top bonus index 9.
+    /// One of its bonus candidates.
     const CRIT_RATE_UP: u32 = 0x00d1_71e0;
-    /// P(main 57ab5b10 @15) x P(bonus 00d171e0 @9), computed from the table's
-    /// own weights: 0.033333 x 0.022727 = 1 in 1320.0.
-    const WHEEL_PERFECT_ODDS: f64 = 0.000_757_562_579_709_617_9;
 
-    /// Goldslime II: tier 2, rolled, and one of the 21 lots carrying a second
-    /// curve. Its special main candidate is fixed at level 15 — far outside
-    /// the 7-10 window the other three candidates roll in.
-    const GOLDSLIME_II: u32 = 0x3166_41a4;
-    const WAR_ELEMENTAL: u32 = 0x4c58_8c27;
-    /// P(main 4c588c27 @15) = 300/9999 x 300/300 = 0.030003, times
-    /// P(bonus 00d171e0 @5) = 909/9999 x 3340/10000 = 0.030364.
-    const GOLDSLIME_PERFECT_ODDS: f64 = 0.000_911_000_190_928_183_7;
-
-    /// Vrazarek Firewyrm III: `rolled: false`. It GUARANTEES DMG Cap at level
-    /// 15 with equip bonus index 4 — probability exactly 1.0, top of window
-    /// on both sides by construction.
+    /// Vrazarek Firewyrm III: `rolled: false`. It guarantees DMG Cap with
+    /// bonus `bc4e92cb` — its lots hold exactly one candidate each.
     const VRAZAREK_III: u32 = 0x9f0e_cf8b;
     const DMG_CAP: u32 = 0xdc58_4f60;
     const VRAZAREK_BONUS: u32 = 0xbc4e_92cb;
+
+    /// A real trait no Wheel of Fate III lot lists (it is Vrazarek's bonus).
+    const NOT_A_WHEEL_TRAIT: u32 = 0xbc4e_92cb;
+
+    /// Goldslime III: rolled, main window 11-15, bonus window 6-9. NOT on
+    /// the perfect watch list.
+    const GOLDSLIME_III: u32 = 0x439c_db88;
+    const GOLDSLIME_MAIN: u32 = 0x5e42_2ae5;
+    const GOLDSLIME_BONUS: u32 = 0xa353_9fbb;
+
+    /// Two perfect-watch bosses (rolled ids) with real candidates of their
+    /// own lots: Alpha 11-15 / NA DMG Cap 5-9 on Lucilius, Uplift 11-15 /
+    /// Healing Cap 6-9 on Behemoth III.
+    const LUCILIUS_ROLLED: u32 = 0x6e59_68fc;
+    const ALPHA: u32 = 0xdbe1_d775;
+    const LUCILIUS_NA_DMG_CAP: u32 = 0x9245_dfa4;
+    const BEHEMOTH_III_ROLLED: u32 = 0xe4b7_dcf9;
+    const UPLIFT: u32 = 0xb5ff_9fd3;
+    const BEHEMOTH_BONUS: u32 = 0xa353_9fbb;
+
+    /// Two of the eleven boss-only equip bonuses, granted by Rolan, Lucilius,
+    /// Beelzebub and Lilith alone. `2ea9ca80` reaches Healing Cap Up +75%
+    /// where the standard set stops at +50%; `9245dfa4` reaches Normal Attack
+    /// DMG Cap Up +100% but displays a perfectly ordinary +50% at level 6.
+    const BOSS_SET_HEALING_CAP: u32 = 0x2ea9_ca80;
+    const BOSS_SET_NA_DMG_CAP: u32 = 0x9245_dfa4;
 
     fn summon(summon_id: u32, main: (u32, u32), bonus: (u32, u32)) -> EquippedSummon {
         EquippedSummon {
@@ -345,20 +461,8 @@ mod tests {
         }
     }
 
-    fn wheel_perfect() -> EquippedSummon {
-        summon(
-            WHEEL_OF_FATE_III,
-            (SUPPLEMENTARY_DMG, 15),
-            (CRIT_RATE_UP, 9),
-        )
-    }
-
-    fn goldslime_perfect() -> EquippedSummon {
-        summon(GOLDSLIME_II, (WAR_ELEMENTAL, 15), (CRIT_RATE_UP, 5))
-    }
-
     /// The table itself, pinned so a regeneration that lost rows or collapsed
-    /// the rolled/fixed split cannot silently disable both rules.
+    /// the rolled/fixed split cannot silently disable the rule.
     #[test]
     fn the_table_loads_every_summon_and_keeps_the_rolled_split() {
         let table = stock_summons();
@@ -367,107 +471,369 @@ mod tests {
         assert_eq!((rolled, table.len() - rolled), (152, 37));
     }
 
-    /// The justification for the p = 1.0 guard, checked against the table
-    /// rather than assumed: every `rolled: false` summon has exactly one
-    /// configuration and it is certain, while NO `rolled: true` summon can
-    /// reach certainty on any top-of-window path. If a future table breaks
-    /// that equivalence, the probability guard is what still holds.
     #[test]
-    fn only_unrolled_summons_can_be_certain() {
-        for (id, entry) in stock_summons() {
-            let best = entry
-                .main_traits
-                .best_top_chance()
-                .zip(entry.bonuses.best_top_chance())
-                .map(|(main, bonus)| main * bonus)
-                .expect("every summon has at least one candidate per side");
-            if entry.rolled {
-                assert!(best < 1.0, "rolled summon {id:08x} can be certain: {best}");
-            } else {
-                assert!(
-                    (best - 1.0).abs() < f64::EPSILON,
-                    "fixed summon {id:08x} is not certain: {best}"
-                );
-            }
+    fn a_legal_roll_is_silent() {
+        let equipped = [summon(
+            WHEEL_OF_FATE_III,
+            (SUPPLEMENTARY_DMG, 13),
+            (CRIT_RATE_UP, 7),
+        )];
+        assert_eq!(audit_summons(&equipped), vec![]);
+    }
+
+    /// The rule itself, on both sides of the summon. `NOT_A_WHEEL_TRAIT` is a
+    /// bonus id — bonus and trait ids are disjoint in the tables, so it can
+    /// never be in any name-union of mains; a trait id in the bonus slot is
+    /// the mirror case.
+    #[test]
+    fn a_trait_outside_every_pool_is_impossible() {
+        let bad_main = [summon(
+            WHEEL_OF_FATE_III,
+            (NOT_A_WHEEL_TRAIT, 13),
+            (CRIT_RATE_UP, 7),
+        )];
+        let findings = audit_summons(&bad_main);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::SummonTrait);
+        assert_eq!(findings[0].severity, Severity::Impossible);
+        assert_eq!(findings[0].subject, Subject::Summon(0));
+        assert_eq!(findings[0].observed, Value::TraitId(NOT_A_WHEEL_TRAIT));
+        let Value::TraitIds(allowed) = &findings[0].allowed else {
+            panic!("allowed should list the name-union of main candidates");
+        };
+        assert!(allowed.contains(&SUPPLEMENTARY_DMG));
+
+        let bad_bonus = [summon(
+            WHEEL_OF_FATE_III,
+            (SUPPLEMENTARY_DMG, 13),
+            (SUPPLEMENTARY_DMG, 7),
+        )];
+        let findings = audit_summons(&bad_bonus);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::SummonBonusSource);
+        assert_eq!(
+            findings[0].observed,
+            Value::SummonBonusId(SUPPLEMENTARY_DMG)
+        );
+        let Value::SummonBonusIds(allowed) = &findings[0].allowed else {
+            panic!("allowed should list this summon's own bonus candidates");
+        };
+        assert!(allowed.contains(&CRIT_RATE_UP) && allowed.contains(&VRAZAREK_BONUS));
+    }
+
+    /// A guaranteed-variant summon still cannot carry a main trait no summon
+    /// of its name rolls. Supplementary DMG is a real, common main elsewhere
+    /// but on no Vrazarek Firewyrm III — pinned as a precondition so this
+    /// test dies loudly if a table regeneration changes that.
+    #[test]
+    fn a_fixed_summon_is_still_bounded_by_its_name_union() {
+        let legal = [summon(VRAZAREK_III, (DMG_CAP, 15), (VRAZAREK_BONUS, 4))];
+        assert_eq!(audit_summons(&legal), vec![]);
+
+        let modded = [summon(
+            VRAZAREK_III,
+            (SUPPLEMENTARY_DMG, 15),
+            (VRAZAREK_BONUS, 4),
+        )];
+        let findings = audit_summons(&modded);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::SummonTrait);
+        assert_eq!(findings[0].observed, Value::TraitId(SUPPLEMENTARY_DMG));
+        let Value::TraitIds(allowed) = &findings[0].allowed else {
+            panic!("allowed should list the name-union of main candidates");
+        };
+        assert!(allowed.contains(&DMG_CAP));
+    }
+
+    /// THE PRODUCTION REGRESSION (user-confirmed false positive): the
+    /// guaranteed Lucilius id `90bd4ac0` fixes Gamma in its own lots, but
+    /// players legitimately hold it with the ROLLED pool's traits — Berserker
+    /// Echo among them. The allowed mains are the union across every id
+    /// named "Lucilius", so this must be silent.
+    #[test]
+    fn a_guaranteed_variant_inherits_its_rolled_siblings_pool() {
+        const LUCILIUS_GUARANTEED: u32 = 0x90bd_4ac0;
+        const BERSERKER_ECHO: u32 = 0xee85_cd1f;
+        const LUCILIUS_SET_SKILL_CAP: u32 = 0xce70_c58a;
+        let equipped = [summon(
+            LUCILIUS_GUARANTEED,
+            (BERSERKER_ECHO, 15),
+            (LUCILIUS_SET_SKILL_CAP, 7),
+        )];
+        assert_eq!(
+            audit_summons(&equipped),
+            vec![],
+            "a legitimate Lucilius with Berserker Echo was accused"
+        );
+    }
+
+    /// THE PRODUCTION CASE (Kahs, log 549): a Behemoth III carrying a
+    /// boss-set bonus. Only Rolan, Lucilius, Beelzebub and Lilith grant those
+    /// eleven ids, so no Behemoth III can hold one — however ordinary its
+    /// magnitude looks. This one displays +50%, which Behemoth III's own
+    /// Normal Attack DMG Cap Up does reach, so ONLY the source rule may speak.
+    #[test]
+    fn a_bonus_no_summon_of_this_name_grants_is_impossible() {
+        let equipped = [summon(
+            BEHEMOTH_III_ROLLED,
+            (UPLIFT, 15),
+            (BOSS_SET_NA_DMG_CAP, 6),
+        )];
+        let findings = audit_summons(&equipped);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::SummonBonusSource);
+        assert_eq!(findings[0].severity, Severity::Impossible);
+        assert_eq!(findings[0].subject, Subject::Summon(0));
+        assert_eq!(
+            findings[0].observed,
+            Value::SummonBonusId(BOSS_SET_NA_DMG_CAP)
+        );
+        let Value::SummonBonusIds(allowed) = &findings[0].allowed else {
+            panic!("allowed should list this summon's own bonus candidates");
+        };
+        assert!(
+            allowed.contains(&BEHEMOTH_BONUS) && !allowed.contains(&BOSS_SET_NA_DMG_CAP),
+            "allowed should be this summon's name-union, not every bonus id in the game"
+        );
+    }
+
+    /// THE FALSE-ACCUSATION GUARD (Dai Weaboo, log 549) — the legitimate half
+    /// of the evidence that used to justify accepting any bonus anywhere.
+    ///
+    /// A guaranteed-variant boss summon's own lot fixes ONE config, but
+    /// players verifiably hold it carrying its ROLLED sibling's traits and
+    /// bonuses (the same user-confirmed phenomenon `allowed_mains` exists
+    /// for). The bonus union is per NAME for exactly that reason, so all three
+    /// of this player's guaranteed bosses must be silent.
+    #[test]
+    fn a_guaranteed_variant_inherits_its_rolled_siblings_bonus_pool() {
+        const LUCILIUS_GUARANTEED: u32 = 0x90bd_4ac0;
+        const BEELZEBUB_GUARANTEED: u32 = 0x2f15_455c;
+        const LILITH_GUARANTEED: u32 = 0x855d_018c;
+        const BERSERKER_ECHO: u32 = 0xee85_cd1f;
+        const SUPPLEMENTARY_DMG_MAIN: u32 = 0x3d81_53a1;
+        const LUCILIUS_SKILL_DMG_CAP: u32 = 0xce70_c58a;
+
+        let equipped = [
+            summon(
+                LUCILIUS_GUARANTEED,
+                (BERSERKER_ECHO, 15),
+                (LUCILIUS_SKILL_DMG_CAP, 9),
+            ),
+            summon(
+                BEELZEBUB_GUARANTEED,
+                (SUPPLEMENTARY_DMG_MAIN, 15),
+                (BOSS_SET_NA_DMG_CAP, 9),
+            ),
+            summon(
+                LILITH_GUARANTEED,
+                (0x4c58_8c27, 15),
+                (BOSS_SET_NA_DMG_CAP, 9),
+            ),
+        ];
+        assert_eq!(
+            audit_summons(&equipped),
+            vec![],
+            "a legitimate guaranteed-variant boss summon was accused over its bonus"
+        );
+    }
+
+    /// THE PRODUCTION REGRESSION GUARD: levels are never judged, however
+    /// impossible the chances table prices them. Confirmed-legitimate builds
+    /// carry an unread sentinel level (`-1` as u32) and levels below the
+    /// candidate's window; flagging any of these accuses honest players.
+    #[test]
+    fn levels_are_never_judged_even_when_the_table_prices_them_at_zero() {
+        for level in [0, 3, 99, u32::MAX] {
+            let equipped = [summon(
+                WHEEL_OF_FATE_III,
+                (SUPPLEMENTARY_DMG, level),
+                (CRIT_RATE_UP, level),
+            )];
+            assert_eq!(
+                audit_summons(&equipped),
+                vec![],
+                "a summon was accused over its level {level}"
+            );
         }
     }
 
-    /// Rule 10, positive. The odds are the finding's whole point, so the real
-    /// number is asserted, not merely its presence.
+    /// ONE top-of-window ("perfect") roll is LEGAL and must be silent even on
+    /// a watched boss — 42 of 72 census players own a perfect summon; the
+    /// count report starts at two.
     #[test]
-    fn flags_a_perfect_summon_with_its_true_odds() {
-        let findings = audit_summons(&[wheel_perfect()]);
+    fn a_single_perfect_roll_is_not_a_finding() {
+        let equipped = [summon(
+            LUCILIUS_ROLLED,
+            (ALPHA, 15),
+            (LUCILIUS_NA_DMG_CAP, 9),
+        )];
+        assert_eq!(audit_summons(&equipped), vec![]);
+    }
+
+    /// The user-requested report: two perfect watched bosses together are
+    /// worth a row. Improbable with the multiplied single-draw price — never
+    /// proof.
+    #[test]
+    fn two_perfect_watched_summons_are_reported_as_improbable() {
+        let equipped = [
+            summon(LUCILIUS_ROLLED, (ALPHA, 15), (LUCILIUS_NA_DMG_CAP, 9)),
+            summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BEHEMOTH_BONUS, 9)),
+        ];
+        let findings = audit_summons(&equipped);
         assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule, Rule::SummonPerfect);
+        assert_eq!(findings[0].rule, Rule::SummonPerfectCount);
         assert_eq!(findings[0].severity, Severity::Improbable);
-        assert_eq!(findings[0].subject, Subject::Summon(0));
-        assert_eq!(findings[0].observed, Value::Levels(vec![15, 9]));
-        assert_eq!(findings[0].allowed, Value::Levels(vec![15, 9]));
-        let odds = findings[0].odds.expect("a perfect summon reports odds");
+        assert_eq!(findings[0].subject, Subject::Summons);
+        assert_eq!(findings[0].observed, Value::Count(2));
+        assert_eq!(findings[0].allowed, Value::None);
+        let odds = findings[0].odds.expect("the odds are the payload");
         assert!(
-            (odds - WHEEL_PERFECT_ODDS).abs() < 1e-12,
-            "odds were {odds}, expected {WHEEL_PERFECT_ODDS} (1 in {})",
-            1.0 / odds
+            odds > 0.0 && odds < 1e-4,
+            "odds {odds} should be tiny but non-zero"
         );
-        assert!((1.0 / odds - 1320.0).abs() < 0.1, "1 in {}", 1.0 / odds);
     }
 
-    /// Rule 10, negative. Maxing one side is not perfection.
+    /// THE SCOPE (user, 2026-07-30): nobody farms perfection outside the six
+    /// watched bosses, so a pair of maxed common summons — which fired before
+    /// the scoping — is noise and must be silent.
     #[test]
-    fn half_maxed_summons_yield_no_findings() {
-        let mid_bonus = summon(
-            WHEEL_OF_FATE_III,
-            (SUPPLEMENTARY_DMG, 15),
-            (CRIT_RATE_UP, 8),
-        );
-        assert_eq!(audit_summons(&[mid_bonus]), vec![]);
-
-        let mid_main = summon(
-            WHEEL_OF_FATE_III,
-            (SUPPLEMENTARY_DMG, 14),
-            (CRIT_RATE_UP, 9),
-        );
-        assert_eq!(audit_summons(&[mid_main]), vec![]);
+    fn perfect_summons_outside_the_watch_list_are_never_reported() {
+        let equipped = [
+            summon(
+                WHEEL_OF_FATE_III,
+                (SUPPLEMENTARY_DMG, 15),
+                (CRIT_RATE_UP, 9),
+            ),
+            summon(GOLDSLIME_III, (GOLDSLIME_MAIN, 15), (GOLDSLIME_BONUS, 9)),
+        ];
+        assert_eq!(audit_summons(&equipped), vec![]);
     }
 
-    /// Rule 11. Two perfect summons compound, and the count finding is
-    /// emitted exactly once alongside the per-summon ones.
+    /// THE LANG-DRIFT GUARD for the mains union.
+    ///
+    /// `allowed_mains` is joined on the ENGLISH display name read out of
+    /// `lang/en/summons.json` — an autogenerated file that a game update
+    /// overwrites (see CLAUDE.md). If a regeneration re-spells or re-splits a
+    /// boss name, the join quietly falls back to per-id lots and the union
+    /// narrows to exactly the false-accusation mode it exists to prevent.
+    /// Nothing else would fail: the table-shape tests count rows, and the
+    /// behavioural test below covers only Lucilius.
+    ///
+    /// So pin the join itself — each boss's rolled and guaranteed ids must
+    /// still resolve to ONE shared pool, and that pool must be strictly larger
+    /// than the guaranteed id's own single-config lot (which is what proves a
+    /// join happened rather than each id standing alone).
     #[test]
-    fn two_perfect_summons_compound_into_one_count_finding() {
-        let findings = audit_summons(&[wheel_perfect(), goldslime_perfect()]);
-        let counts: Vec<_> = findings
-            .iter()
-            .filter(|finding| finding.rule == Rule::SummonPerfectCount)
-            .collect();
-        assert_eq!(counts.len(), 1);
-        assert_eq!(counts[0].severity, Severity::Improbable);
-        assert_eq!(counts[0].subject, Subject::Summon(0));
-        assert_eq!(counts[0].observed, Value::Count(2));
-        assert_eq!(counts[0].allowed, Value::Count(1));
+    fn the_name_join_still_unions_each_boss_pair() {
+        const PAIRS: [(u32, u32); 2] = [
+            (LUCILIUS_ROLLED, 0x90bd_4ac0),
+            (BEHEMOTH_III_ROLLED, 0x239f_769f),
+        ];
+        let rules = summon_rules();
+        for (rolled, guaranteed) in PAIRS {
+            let rolled_mains = rules
+                .allowed_mains
+                .get(&rolled)
+                .unwrap_or_else(|| panic!("rolled id {rolled:08x} is not in the table"));
+            let guaranteed_mains = rules
+                .allowed_mains
+                .get(&guaranteed)
+                .unwrap_or_else(|| panic!("guaranteed id {guaranteed:08x} is not in the table"));
+            assert_eq!(
+                rolled_mains, guaranteed_mains,
+                "{rolled:08x} and {guaranteed:08x} no longer share a mains union — the \
+                 lang name join broke, and every owner of the guaranteed id with rolled \
+                 traits is now falsely accused"
+            );
+            let own_lot = stock_summons()[&guaranteed].main_traits.candidates.len();
+            assert!(
+                guaranteed_mains.len() > own_lot,
+                "{guaranteed:08x}'s union ({}) is no larger than its own lot ({own_lot}) — \
+                 the name join silently did nothing",
+                guaranteed_mains.len()
+            );
+        }
+    }
 
-        let expected = WHEEL_PERFECT_ODDS * GOLDSLIME_PERFECT_ODDS;
-        let odds = counts[0].odds.expect("the count finding reports odds");
-        assert!(
-            (odds - expected).abs() < 1e-18,
-            "odds were {odds}, expected {expected}"
-        );
+    /// The watch list must resolve against the real tables: each of the six
+    /// names owns a rolled and a guaranteed id, so a lang regeneration that
+    /// loses the names would silently disable the report — pin the size and
+    /// the two ids the tests roll with.
+    #[test]
+    fn the_watch_list_resolves_to_all_six_bosses() {
+        let watched = &summon_rules().perfect_watched;
+        assert_eq!(watched.len(), PERFECT_WATCHED_NAMES.len() * 2);
+        assert!(watched.contains(&LUCILIUS_ROLLED));
+        assert!(watched.contains(&BEHEMOTH_III_ROLLED));
+        assert!(watched.contains(&VRAZAREK_III));
+    }
 
+    /// A guaranteed-variant summon at its fixed config is a probability-1
+    /// drop, not a roll — it must never count toward the perfect total, even
+    /// though Vrazarek Firewyrm III is on the watch list.
+    #[test]
+    fn a_guaranteed_summons_fixed_config_is_not_perfect() {
+        let equipped = [
+            summon(VRAZAREK_III, (DMG_CAP, 15), (VRAZAREK_BONUS, 4)),
+            summon(LUCILIUS_ROLLED, (ALPHA, 15), (LUCILIUS_NA_DMG_CAP, 9)),
+        ];
         assert_eq!(
+            audit_summons(&equipped),
+            vec![],
+            "a guaranteed drop was counted as a perfect roll"
+        );
+    }
+
+    /// One slot below its window top means the summon is not perfect, on
+    /// either side.
+    #[test]
+    fn a_slot_below_its_window_top_is_not_perfect() {
+        for (main_level, bonus_level) in [(14, 9), (15, 8)] {
+            let equipped = [
+                summon(
+                    LUCILIUS_ROLLED,
+                    (ALPHA, main_level),
+                    (LUCILIUS_NA_DMG_CAP, bonus_level),
+                ),
+                summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BEHEMOTH_BONUS, 9)),
+            ];
+            assert_eq!(
+                audit_summons(&equipped),
+                vec![],
+                "levels {main_level}/{bonus_level} were counted as perfect"
+            );
+        }
+    }
+
+    /// An off-lot bonus has no window in this summon's own lots, so its "top"
+    /// is unknowable and the summon cannot be counted perfect — even on a
+    /// watched boss, next to a genuinely perfect one.
+    ///
+    /// The counting guard and the source rule are different claims and both
+    /// must hold: the bonus is accused (it is off-table), and the perfect
+    /// COUNT stays at one so the improbability report keeps quiet. Accusing
+    /// and counting are separate because a modded summon must not be able to
+    /// inflate a probability the report then prices as if it were rolled.
+    #[test]
+    fn an_off_lot_bonus_never_counts_toward_the_perfect_total() {
+        let equipped = [
+            summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BOSS_SET_HEALING_CAP, 9)),
+            summon(LUCILIUS_ROLLED, (ALPHA, 15), (LUCILIUS_NA_DMG_CAP, 9)),
+        ];
+        let findings = audit_summons(&equipped);
+        assert!(
+            !findings
+                .iter()
+                .any(|finding| finding.rule == Rule::SummonPerfectCount),
+            "an off-lot bonus was counted as a perfect roll"
+        );
+        assert!(
             findings
                 .iter()
-                .filter(|finding| finding.rule == Rule::SummonPerfect)
-                .count(),
-            2
+                .any(|finding| finding.rule == Rule::SummonBonusSource),
+            "the off-lot bonus itself should still be accused"
         );
-    }
-
-    /// One perfect summon is not a count finding.
-    #[test]
-    fn a_single_perfect_summon_produces_no_count_finding() {
-        let findings = audit_summons(&[wheel_perfect()]);
-        assert!(findings
-            .iter()
-            .all(|finding| finding.rule != Rule::SummonPerfectCount));
     }
 
     #[test]
@@ -475,99 +841,48 @@ mod tests {
         assert_eq!(audit_summons(&[]), vec![]);
     }
 
-    /// A summon the table does not know says nothing about legality, however
-    /// maxed it looks. An empty slot (id 0) is the same case.
-    ///
-    /// HONEST LIMITATION: a flag-everything mutant of `perfect_chance` leaves
-    /// this test passing, because the table lookup misses before any rule
-    /// runs. The precondition is asserted rather than assumed, so should a
-    /// future table ever key these ids the assertion — not silence — is what
-    /// fails first.
+    /// A summon the table does not know says nothing about legality. An
+    /// empty slot (id 0) is the same case.
     #[test]
-    fn unknown_summon_id_is_silent_even_with_maxed_levels() {
+    fn unknown_summon_id_is_silent() {
         for id in [0xdead_beef_u32, 0] {
             assert!(
                 !stock_summons().contains_key(&id),
                 "{id:08x} is a table key"
             );
-            let equipped = [summon(id, (SUPPLEMENTARY_DMG, 15), (CRIT_RATE_UP, 9))];
+            let equipped = [summon(id, (0xdead_beef, 15), (0xdead_beef, 9))];
             assert_eq!(audit_summons(&equipped), vec![], "audited summon {id:08x}");
         }
     }
 
-    /// The false-accusation guard this module exists for. Vrazarek Firewyrm
-    /// III hands every owner a level-15 DMG Cap trait and bonus index 4; a
-    /// naive top-of-window rule reports the game's own guaranteed summon as
-    /// improbable.
+    /// An empty trait slot is missing data under either sentinel, not a
+    /// trait the lot cannot grant.
     #[test]
-    fn the_guaranteed_summon_is_never_flagged() {
-        let equipped = [summon(VRAZAREK_III, (DMG_CAP, 15), (VRAZAREK_BONUS, 4))];
-        assert_eq!(audit_summons(&equipped), vec![]);
-
-        // Nor does pairing it with a real perfect summon manufacture a count
-        // finding out of one genuine perfect roll.
-        let with_perfect = [
-            summon(VRAZAREK_III, (DMG_CAP, 15), (VRAZAREK_BONUS, 4)),
-            wheel_perfect(),
-        ];
-        let findings = audit_summons(&with_perfect);
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule, Rule::SummonPerfect);
-        assert_eq!(findings[0].subject, Subject::Summon(1));
+    fn empty_trait_slots_are_silent_for_both_sentinels() {
+        for sentinel in [0_u32, EMPTY_ID] {
+            let equipped = [summon(WHEEL_OF_FATE_III, (sentinel, 13), (sentinel, 7))];
+            assert_eq!(
+                audit_summons(&equipped),
+                vec![],
+                "empty trait sentinel {sentinel:08x} was audited"
+            );
+        }
     }
 
-    /// The regression guard against the dead per-tier model. Goldslime II is
-    /// tier 2, whose ordinary candidates roll 7-10, but its special candidate
-    /// is fixed at 15. Judged against the tier the level looks out of range;
-    /// judged against the candidate it is exactly top-of-window, and the odds
-    /// come from that candidate's own 300/9999 share.
+    /// `level_weight`, the diagnostic primitive: `None` off-lot, `Some(0)`
+    /// off-window, the real weight in-window.
     #[test]
-    fn a_special_candidate_is_judged_against_its_own_window() {
-        let findings = audit_summons(&[goldslime_perfect()]);
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule, Rule::SummonPerfect);
-        assert_eq!(findings[0].severity, Severity::Improbable);
-        assert_eq!(findings[0].observed, Value::Levels(vec![15, 5]));
-        let odds = findings[0].odds.expect("a perfect summon reports odds");
-        assert!(
-            (odds - GOLDSLIME_PERFECT_ODDS).abs() < 1e-12,
-            "odds were {odds}, expected {GOLDSLIME_PERFECT_ODDS}"
+    fn level_weight_distinguishes_off_lot_from_off_window() {
+        let entry = &stock_summons()[&WHEEL_OF_FATE_III];
+        assert_eq!(entry.main_traits.level_weight(NOT_A_WHEEL_TRAIT, 15), None);
+        assert_eq!(
+            entry.main_traits.level_weight(SUPPLEMENTARY_DMG, u32::MAX),
+            Some(0)
         );
-
-        // An ordinary candidate of the same summon tops out at 10, not 15 —
-        // the window belongs to the candidate, not the tier.
-        let ordinary = summon(GOLDSLIME_II, (0x5e42_2ae5, 10), (CRIT_RATE_UP, 5));
-        let findings = audit_summons(&[ordinary]);
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].observed, Value::Levels(vec![10, 5]));
-    }
-
-    /// A trait id the summon's lot does not list is missing data, not proof.
-    /// The level is meaningless without a candidate to measure it against, so
-    /// the only honest answer is silence.
-    #[test]
-    fn a_trait_absent_from_the_summons_lot_is_silent() {
-        let unknown_main = [summon(WHEEL_OF_FATE_III, (DMG_CAP, 15), (CRIT_RATE_UP, 9))];
-        assert_eq!(audit_summons(&unknown_main), vec![]);
-
-        let unknown_bonus = [summon(
-            WHEEL_OF_FATE_III,
-            (SUPPLEMENTARY_DMG, 15),
-            (DMG_CAP, 9),
-        )];
-        assert_eq!(audit_summons(&unknown_bonus), vec![]);
-    }
-
-    /// A level above the candidate's top is out of the acquisition window,
-    /// but whether a summon can be improved after acquisition is unconfirmed
-    /// gameplay behaviour — so it is NOT perfection and NOT an accusation.
-    #[test]
-    fn a_level_above_the_window_is_not_reported() {
-        let equipped = [summon(
-            WHEEL_OF_FATE_III,
-            (SUPPLEMENTARY_DMG, 99),
-            (CRIT_RATE_UP, 99),
-        )];
-        assert_eq!(audit_summons(&equipped), vec![]);
+        let in_window = entry
+            .main_traits
+            .level_weight(SUPPLEMENTARY_DMG, 15)
+            .expect("supplementary dmg is a wheel candidate");
+        assert!(in_window > 0);
     }
 }

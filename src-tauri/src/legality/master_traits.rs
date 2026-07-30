@@ -1,176 +1,82 @@
-//! Master-trait (skillboard) legality, rules 6 and 7.
+//! Master-trait (skillboard) legality: the unlocked-node count cap.
 //!
-//! # Staleness risk: this rule drifts toward accusation
+//! One rule: a player cannot have more than 50 master traits unlocked. The cap
+//! is corroborated by two independent game structures (the network profile
+//! blob's skillboard is exactly 50 u32 node ids, and the loadout preset store
+//! holds 50 node keys — both documented in `src-hook/src/hooks/player.rs`),
+//! while boards themselves hold 90+ nodes, so 50 is a real constraint rather
+//! than the board size restated.
 //!
-//! `skillboard-layout.json` is a baked snapshot of 29 characters' boards, not
-//! a live read. For a character the asset knows, ANY node id it lacks becomes
-//! [`Severity::Impossible`] — so the drift is one-directional: the asset can
-//! only ever get more incomplete than the game, and every gap becomes a false
-//! accusation rather than a missed detection. A game patch that adds a node to
-//! Gran's EX tier accuses every player who unlocks it, and nothing in this
-//! crate would notice.
+//! The board-membership rule (`MasterTraitUnknownNode`) stays removed: it
+//! judged ids against a baked `skillboard-layout.json` snapshot whose drift is
+//! one-directional — every node a game patch adds becomes a false accusation
+//! until the asset is regenerated.
 //!
-//! Two ways the asset can be incomplete even against today's game:
-//!
-//! - `scripts/gen-skillboard-layout.py` SKIPS any `SkillboardGroupId` outside
-//!   `{CHAOS1, CHAOS2, CHAOS3, EX}`, recording only a `WARN` on stdout and
-//!   continuing to write the file. A patch introducing a new group silently
-//!   omits every node in it, and each one then reads as impossible.
-//! - The asset has no `pl2000` (Id Transformation) board at all. That is safe
-//!   only because an unknown character yields an empty board and
-//!   [`audit_master_traits`] returns early — adding a partial `pl2000` entry
-//!   would be far worse than having none.
-//!
-//! The rest of the codebase already treats this drift as expected and benign:
-//! `src/pages/logs/View.tsx` places unlocked ids the layout does not know by a
-//! legacy id-band heuristic "rather than dropping them". This rule is the only
-//! consumer that turns the same drift into an accusation.
-//!
-//! Empirically clean as of 2026-07-29: across 1087 real player rows in this
-//! repo's `logs.db`, zero unknown nodes, no row above 50 unlocked, and every
-//! `characterType` resolved to a board. So this is a latent risk to revisit on
-//! the next game patch, not a live bug — but a game-version gate on these
-//! rules, or regenerating the asset as part of the patch checklist, is the
-//! obvious mitigation when one lands.
-
-use std::collections::{HashMap, HashSet};
+//! Known caveat, accepted by design: the hook's solo skillboard read
+//! (`read_record_skillboard`) derives unlocks from the record's 400-entry
+//! unlock-bit array and is capped at 128, not 50 — the 50 cap is a property of
+//! the game's own storage, not of the read path. If a game patch ever lets a
+//! legitimate build exceed 50 unlocked nodes, this rule misfires and must be
+//! recalibrated.
 
 use super::{Finding, Rule, Severity, Subject, Value};
-use crate::parser::constants::CharacterType;
 
-/// The most master traits a player can unlock, confirmed by the user.
+/// The most master traits a player can unlock, confirmed by the user and by
+/// the game's own 50-slot skillboard storage.
 pub const MAX_MASTER_TRAITS: usize = 50;
 
-/// `pl####` -> tier key -> node effect ids, from skillboard_layout.tbl.
-type Layout = HashMap<String, HashMap<String, Vec<u32>>>;
-
-fn layout() -> &'static Layout {
-    static LAYOUT: std::sync::OnceLock<Layout> = std::sync::OnceLock::new();
-    LAYOUT.get_or_init(|| {
-        serde_json::from_str(include_str!("../../assets/skillboard-layout.json"))
-            .expect("skillboard-layout.json matches the layout shape")
-    })
-}
-
-/// Every node id on a character's board, across all tiers. Empty for a
-/// character the table does not know.
-pub fn board_nodes(character: CharacterType) -> HashSet<u32> {
-    layout()
-        .get(&character.to_string().to_lowercase())
-        .map(|tiers| tiers.values().flatten().copied().collect())
-        .unwrap_or_default()
-}
-
-/// Rules 6 and 7. Silent without a character, without a known board, or
-/// without any unlocked nodes.
-pub fn audit_master_traits(character: Option<CharacterType>, skillboard: &[u32]) -> Vec<Finding> {
-    let Some(character) = character else {
-        return Vec::new();
-    };
-    if skillboard.is_empty() {
+/// The count cap. Silent on an empty read — absence of evidence is never
+/// evidence.
+pub fn audit_master_traits(skillboard: &[u32]) -> Vec<Finding> {
+    if skillboard.len() <= MAX_MASTER_TRAITS {
         return Vec::new();
     }
 
-    let nodes = board_nodes(character);
-    if nodes.is_empty() {
-        return Vec::new();
-    }
-
-    let mut findings = Vec::new();
-
-    for &unlocked in skillboard {
-        if !nodes.contains(&unlocked) {
-            findings.push(Finding {
-                rule: Rule::MasterTraitUnknownNode,
-                severity: Severity::Impossible,
-                subject: Subject::MasterTraits,
-                observed: Value::TraitId(unlocked),
-                // The board size is not what this id was measured against;
-                // reporting it would state a falsehood ("only N are
-                // allowed"). Matches the sibling idiom in
-                // `overmastery_rules` for the same not-in-the-catalogue shape.
-                allowed: Value::None,
-                odds: None,
-            });
-        }
-    }
-
-    if skillboard.len() > MAX_MASTER_TRAITS {
-        findings.push(Finding {
-            rule: Rule::MasterTraitCount,
-            severity: Severity::Impossible,
-            subject: Subject::MasterTraits,
-            observed: Value::Count(skillboard.len()),
-            allowed: Value::Count(MAX_MASTER_TRAITS),
-            odds: None,
-        });
-    }
-
-    findings
+    vec![Finding {
+        rule: Rule::MasterTraitCount,
+        severity: Severity::Impossible,
+        subject: Subject::MasterTraits,
+        observed: Value::Count(skillboard.len()),
+        allowed: Value::Count(MAX_MASTER_TRAITS),
+        odds: None,
+    }]
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::constants::CharacterType;
 
-    /// Node 10 sits in Gran's tier 1; 999999 sits on no board at all.
     #[test]
-    fn flags_a_node_absent_from_the_board() {
-        let findings = audit_master_traits(Some(CharacterType::Pl0000), &[10, 999999]);
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule, Rule::MasterTraitUnknownNode);
-        assert_eq!(findings[0].severity, Severity::Impossible);
-        assert_eq!(findings[0].observed, Value::TraitId(999999));
-        // The board SIZE is not what this node is measured against, and
-        // reporting it renders as "you have node 999999, only 102 are
-        // allowed" — a false statement. There is no allowed value to name;
-        // the id is simply not in the catalogue.
-        assert_eq!(findings[0].allowed, Value::None);
+    fn stays_silent_on_an_empty_skillboard() {
+        assert_eq!(audit_master_traits(&[]), vec![]);
     }
 
     #[test]
-    fn accepts_a_board_of_fifty_real_nodes() {
-        let nodes = board_nodes(CharacterType::Pl0000);
-        let equipped: Vec<u32> = nodes.iter().copied().take(MAX_MASTER_TRAITS).collect();
-        assert_eq!(equipped.len(), MAX_MASTER_TRAITS);
-        assert_eq!(
-            audit_master_traits(Some(CharacterType::Pl0000), &equipped),
-            vec![]
-        );
+    fn accepts_exactly_fifty_unlocked() {
+        let equipped: Vec<u32> = (0..MAX_MASTER_TRAITS as u32).collect();
+        assert_eq!(audit_master_traits(&equipped), vec![]);
     }
 
     #[test]
     fn flags_more_than_fifty_unlocked() {
-        let nodes = board_nodes(CharacterType::Pl0000);
-        let equipped: Vec<u32> = nodes.iter().copied().take(MAX_MASTER_TRAITS + 1).collect();
-        let findings = audit_master_traits(Some(CharacterType::Pl0000), &equipped);
+        let equipped: Vec<u32> = (0..=MAX_MASTER_TRAITS as u32).collect();
+        let findings = audit_master_traits(&equipped);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::MasterTraitCount);
+        assert_eq!(findings[0].severity, Severity::Impossible);
+        assert_eq!(findings[0].subject, Subject::MasterTraits);
         assert_eq!(findings[0].observed, Value::Count(MAX_MASTER_TRAITS + 1));
         assert_eq!(findings[0].allowed, Value::Count(MAX_MASTER_TRAITS));
     }
 
+    /// Node ids are deliberately NOT judged — only the count is. A build with
+    /// ids no board names but a legal count must be silent (the membership
+    /// rule was removed for its staleness-driven false accusations).
     #[test]
-    fn stays_silent_without_a_character() {
-        assert_eq!(audit_master_traits(None, &[999999]), vec![]);
-    }
-
-    #[test]
-    fn stays_silent_on_an_empty_skillboard() {
-        assert_eq!(
-            audit_master_traits(Some(CharacterType::Pl0000), &[]),
-            vec![]
-        );
-    }
-
-    /// An unrecognised character has no board to check against, so the
-    /// unknown-node rule must stay silent rather than flag every node.
-    #[test]
-    fn stays_silent_for_an_unknown_character() {
-        assert_eq!(
-            audit_master_traits(Some(CharacterType::Unknown(7)), &[10]),
-            vec![]
-        );
+    fn node_ids_are_never_judged() {
+        let equipped: Vec<u32> = (0..MAX_MASTER_TRAITS as u32)
+            .map(|i| 0xDEAD_0000 + i)
+            .collect();
+        assert_eq!(audit_master_traits(&equipped), vec![]);
     }
 }

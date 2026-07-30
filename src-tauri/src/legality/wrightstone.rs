@@ -1,28 +1,22 @@
-//! Wrightstone legality (rules 1 and 2).
+//! Wrightstone legality: the slot-ceiling rule (user rule: no trait level
+//! above 20/15/10).
 //!
-//! Both rules avoid the wrightstone item id on purpose: remote players sync
+//! The rule avoids the wrightstone item id on purpose: remote players sync
 //! the stone's trait pairs but never its id, so an id-based rule would accuse
-//! honest players. Instead the primary trait must be one of the four family
-//! traits, and each of the three trait levels — in their true, physical slot
-//! order (primary, secondary1, secondary2) — must fit under that slot's own
-//! ceiling (20/15/10).
-
-use std::collections::HashSet;
+//! honest players. Each of the three trait levels — in their true, physical
+//! slot order (primary, secondary1, secondary2) — must fit under that slot's
+//! own ceiling (20/15/10).
+//!
+//! There is deliberately NO primary-trait rule: the four family traits are
+//! derived from the transmarvel gacha configs, which say nothing about
+//! stones from other sources — accusing a stone for its primary trait would
+//! rest on a table that does not claim to cover it.
 
 use protocol::WeaponState;
 
 use crate::transmarvel;
 
 use super::{Finding, Rule, Severity, Subject, Value};
-
-/// The legal wrightstone shape, derived from the stock gacha tables.
-#[derive(Debug, Clone, PartialEq)]
-pub struct WrightstoneRules {
-    /// The fixed primary trait of each stone family.
-    pub family_traits: HashSet<u32>,
-    /// Highest legal level per slot, slot 0 first.
-    pub slot_ceilings: [u32; 3],
-}
 
 /// Highest level any weight row permits: index `n` carries level `n + 1`.
 /// `None` when the lot grants no level at all.
@@ -75,22 +69,13 @@ fn ceilings_for<'a>(
     ceilings
 }
 
-/// Derived once from the baked transmarvel tables.
-pub fn stock_rules() -> &'static WrightstoneRules {
-    static RULES: std::sync::OnceLock<WrightstoneRules> = std::sync::OnceLock::new();
-    RULES.get_or_init(|| {
+/// The highest legal level per slot, slot 0 first, derived once from the baked
+/// transmarvel tables.
+pub fn stock_slot_ceilings() -> [u32; 3] {
+    static CEILINGS: std::sync::OnceLock<[u32; 3]> = std::sync::OnceLock::new();
+    *CEILINGS.get_or_init(|| {
         let tables = transmarvel::stock_tables();
-        let family_traits: HashSet<u32> = tables
-            .stone_configs
-            .values()
-            .map(|config| config.trait1)
-            .collect();
-        let slot_ceilings = ceilings_for(tables, tables.stone_configs.values());
-
-        WrightstoneRules {
-            family_traits,
-            slot_ceilings,
-        }
+        ceilings_for(tables, tables.stone_configs.values())
     })
 }
 
@@ -98,7 +83,7 @@ pub fn stock_rules() -> &'static WrightstoneRules {
 /// a partial remote read, not a shorter stone.
 const STONE_TRAIT_COUNT: usize = 3;
 
-/// Rules 1 and 2. Silent unless all three trait pairs arrived.
+/// The slot-ceiling rule. Silent unless all three trait pairs arrived.
 pub fn audit_wrightstone(state: Option<&WeaponState>) -> Vec<Finding> {
     let Some(state) = state else {
         return Vec::new();
@@ -107,8 +92,7 @@ pub fn audit_wrightstone(state: Option<&WeaponState>) -> Vec<Finding> {
         return Vec::new();
     }
 
-    let rules = stock_rules();
-    let mut findings = Vec::new();
+    let ceilings = stock_slot_ceilings();
 
     // Traits arrive in true physical slot order — index 0 is the primary
     // (cap 20), 1 is secondary1 (cap 15), 2 is secondary2 (cap 10). This is
@@ -119,66 +103,24 @@ pub fn audit_wrightstone(state: Option<&WeaponState>) -> Vec<Finding> {
     // therefore positional, NOT sorted: a low primary must not be allowed
     // to "absorb" a secondary slot's excess by comparing against the wrong
     // ceiling once shuffled.
-    let levels: Vec<u32> = state
+    let over_ceiling = state
         .wrightstone_traits
         .iter()
-        .map(|pair| pair.level)
-        .collect();
+        .zip(ceilings)
+        .any(|(pair, ceiling)| pair.level > ceiling);
 
-    if levels
-        .iter()
-        .zip(rules.slot_ceilings.iter())
-        .any(|(level, ceiling)| level > ceiling)
-    {
-        findings.push(Finding {
-            rule: Rule::WrightstoneTraitLevel,
-            severity: Severity::Impossible,
-            subject: Subject::Wrightstone,
-            observed: Value::Levels(levels),
-            allowed: Value::Levels(rules.slot_ceilings.to_vec()),
-            odds: None,
-        });
+    if !over_ceiling {
+        return Vec::new();
     }
 
-    // A stone's primary trait always matches one of the four families. We
-    // only flag when NONE of the three engraved traits is a family trait: a
-    // secondary slot can legitimately roll a trait id that happens to be
-    // another family's primary, so requiring exactly one would falsely
-    // accuse an honest build.
-    let primaries: Vec<u32> = state
-        .wrightstone_traits
-        .iter()
-        .map(|pair| pair.id)
-        .filter(|id| rules.family_traits.contains(id))
-        .collect();
-
-    if primaries.is_empty() {
-        // Ties on level break arbitrarily (`max_by_key` keeps the LAST
-        // maximal element), so which id gets reported here can depend on
-        // arrival order. That's fine: it's the ABSENCE of any family trait
-        // among the three — not which one happens to have the highest
-        // level — that makes the stone impossible, so the reported id is
-        // just a witness, not the reasoning.
-        let highest = state
-            .wrightstone_traits
-            .iter()
-            .max_by_key(|pair| pair.level)
-            .map(|pair| pair.id)
-            .expect("length guard above already ensures exactly STONE_TRAIT_COUNT elements");
-        let mut allowed: Vec<u32> = rules.family_traits.iter().copied().collect();
-        allowed.sort_unstable();
-
-        findings.push(Finding {
-            rule: Rule::WrightstonePrimaryTrait,
-            severity: Severity::Impossible,
-            subject: Subject::Wrightstone,
-            observed: Value::TraitId(highest),
-            allowed: Value::TraitIds(allowed),
-            odds: None,
-        });
-    }
-
-    findings
+    vec![Finding {
+        rule: Rule::WrightstoneTraitLevel,
+        severity: Severity::Impossible,
+        subject: Subject::Wrightstone,
+        observed: Value::Levels(state.wrightstone_traits.iter().map(|p| p.level).collect()),
+        allowed: Value::Levels(ceilings.to_vec()),
+        odds: None,
+    }]
 }
 
 #[cfg(test)]
@@ -186,22 +128,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn derives_four_families_from_stock_tables() {
-        let rules = stock_rules();
-        assert_eq!(rules.family_traits.len(), 4);
-        // Dread -> Stun Power, Vitality -> Critical Hit Rate,
-        // Fortification -> HP, Sequestration -> Weak Point DMG.
-        for expected in [0xceb700ee_u32, 0x8d78a19b, 0xf372f096, 0x6b694d6d] {
-            assert!(
-                rules.family_traits.contains(&expected),
-                "missing family trait {expected:08x}"
-            );
-        }
-    }
-
-    #[test]
     fn derives_twenty_fifteen_ten_ceiling() {
-        assert_eq!(stock_rules().slot_ceilings, [20, 15, 10]);
+        assert_eq!(stock_slot_ceilings(), [20, 15, 10]);
     }
 
     /// The global ceiling takes a max across all 12 configs per slot, which
@@ -212,7 +140,7 @@ mod tests {
     #[test]
     fn family_ceilings_agree_with_the_global_ceiling() {
         let tables = transmarvel::stock_tables();
-        let global = stock_rules().slot_ceilings;
+        let global = stock_slot_ceilings();
 
         let mut by_family: std::collections::HashMap<u32, Vec<&transmarvel::StoneConfig>> =
             std::collections::HashMap::new();
@@ -307,28 +235,20 @@ mod tests {
         assert_eq!(audit_wrightstone(Some(&state)), vec![]);
     }
 
-    /// Both rules are independent and can fire on the same stone: an
-    /// over-cap secondary1 level alongside a stone with no family trait at
-    /// all. Order follows the rule order in `audit_wrightstone`.
+    /// There is no primary-trait rule any more: a stone whose traits sit
+    /// outside the four gacha families is legal as far as this module can
+    /// know (the gacha configs say nothing about stones from other sources).
+    /// Levels are still judged on such a stone.
     #[test]
-    fn flags_both_rules_on_one_stone() {
-        let state = stone(&[(0xdc584f60, 25), (0x57ab5b10, 15), (0x95f3fa86, 10)]);
-        let findings = audit_wrightstone(Some(&state));
-        assert_eq!(findings.len(), 2);
+    fn primary_trait_is_never_judged() {
+        let legal_levels = stone(&[(0xdc584f60, 20), (0x57ab5b10, 15), (0x95f3fa86, 10)]);
+        assert_eq!(audit_wrightstone(Some(&legal_levels)), vec![]);
+
+        let over_cap = stone(&[(0xdc584f60, 25), (0x57ab5b10, 15), (0x95f3fa86, 10)]);
+        let findings = audit_wrightstone(Some(&over_cap));
+        assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::WrightstoneTraitLevel);
         assert_eq!(findings[0].observed, Value::Levels(vec![25, 15, 10]));
-        assert_eq!(findings[1].rule, Rule::WrightstonePrimaryTrait);
-        assert_eq!(findings[1].observed, Value::TraitId(0xdc584f60));
-    }
-
-    /// DMG Cap is a real trait but never a stone family's primary.
-    #[test]
-    fn flags_primary_trait_outside_the_four_families() {
-        let state = stone(&[(0xdc584f60, 20), (0x57ab5b10, 15), (0x95f3fa86, 10)]);
-        let findings = audit_wrightstone(Some(&state));
-        assert_eq!(findings.len(), 1);
-        assert_eq!(findings[0].rule, Rule::WrightstonePrimaryTrait);
-        assert_eq!(findings[0].observed, Value::TraitId(0xdc584f60));
     }
 
     #[test]
