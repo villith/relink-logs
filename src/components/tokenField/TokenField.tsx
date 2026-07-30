@@ -21,6 +21,11 @@ export type TokenFieldProps = {
   /** Token names this field accepts — anything else renders as a broken chip. */
   tokens: readonly string[];
   placeholder?: string;
+  /** Drop the visible label, keeping it only as the field's accessible name.
+   * For rows in a list where every field means the same thing and printing the
+   * label on each one is noise — the accessible name still has to be there,
+   * which is why this hides the label rather than removing it. */
+  hideLabel?: boolean;
 };
 
 /**
@@ -31,7 +36,7 @@ export type TokenFieldProps = {
  * the document back into the `{token}` string that gets persisted, so the
  * stored format is unchanged.
  */
-export const TokenField = ({ label, value, onChange, tokens, placeholder }: TokenFieldProps) => {
+export const TokenField = ({ label, value, onChange, tokens, placeholder, hideLabel }: TokenFieldProps) => {
   const { setActiveEditor } = useTokenPalette();
 
   const editor = useEditor(
@@ -111,11 +116,11 @@ export const TokenField = ({ label, value, onChange, tokens, placeholder }: Toke
     }
   }, [editor, value, tokens]);
 
-  return (
-    <Input.Wrapper label={label}>
-      <div className="token-field">
-        <EditorContent editor={editor} />
-      </div>
-    </Input.Wrapper>
+  const field = (
+    <div className="token-field">
+      <EditorContent editor={editor} />
+    </div>
   );
+
+  return hideLabel ? field : <Input.Wrapper label={label}>{field}</Input.Wrapper>;
 };

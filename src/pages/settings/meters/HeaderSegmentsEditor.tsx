@@ -1,19 +1,22 @@
 import { HEADER_TOKENS } from "@/components/Titlebar";
+import { TokenField } from "@/components/tokenField/TokenField";
 import { TokenPalette, TokenPaletteProvider } from "@/components/tokenField/TokenPalette";
 import useSettings from "@/pages/useSettings";
 import type { HeaderSegment } from "@/stores/useMeterSettingsStore";
 import { moveItem } from "@/utils";
-import { ActionIcon, Box, Button, Group, Paper, Select, Stack, Switch, Text } from "@mantine/core";
-import { ArrowDown, ArrowUp, Trash } from "@phosphor-icons/react";
+import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
+import { ActionIcon, Box, Button, Group, SegmentedControl, Stack, Text, Tooltip } from "@mantine/core";
+import { ArrowsInLineHorizontal, DotsSixVertical, Trash } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
-import { TemplateField } from "./TemplateField";
 
 /**
  * The overlay header, as an editable list of segments.
  *
- * Reorder is plain up/down buttons rather than drag-and-drop: a header holds a
- * handful of segments, and the drag library is only worth its weight on lists
- * that grow.
+ * One compact row per segment: the format field, which side it sits on, whether
+ * it survives a narrow overlay, and remove. Reorder is drag-and-drop from the
+ * handle only — the same `@hello-pangea/dnd` pattern ColumnEditor uses, and
+ * restricting the handle is what keeps dragging a token INTO a field from
+ * picking up the whole row instead.
  */
 export const HeaderSegmentsEditor = () => {
   const { t } = useTranslation();
@@ -46,67 +49,77 @@ export const HeaderSegmentsEditor = () => {
           {t("ui.header-segments-description")}
         </Text>
         <TokenPalette tokens={HEADER_TOKENS} />
-        {header_segments.map((segment, index) => (
-          <Paper key={segment.id} p="xs" withBorder>
-            {/* Wraps rather than forcing one line: this editor now lives in a
-              column beside the preview, and a nowrap row would squeeze the
-              template input — the field that actually needs the width. */}
-            <Group align="flex-start" gap="xs" wrap="wrap">
-              <Box style={{ flex: "1 1 260px", minWidth: 220 }}>
-                <TemplateField
-                  label={t("ui.header-segment-template")}
-                  value={segment.template}
-                  onChange={(template) => patch(index, { template })}
-                  tokens={HEADER_TOKENS}
-                />
-              </Box>
-              <Select
-                label={t("ui.header-segment-side")}
-                w={110}
-                data={[
-                  { value: "left", label: t("ui.header-side-left") },
-                  { value: "right", label: t("ui.header-side-right") },
-                ]}
-                value={segment.side}
-                allowDeselect={false}
-                onChange={(side) => side && patch(index, { side: side as HeaderSegment["side"] })}
-              />
-              <Switch
-                mt={28}
-                label={t("ui.header-segment-hide-narrow")}
-                checked={segment.hideWhenNarrow}
-                onChange={(event) => patch(index, { hideWhenNarrow: event.currentTarget.checked })}
-              />
-              <ActionIcon
-                mt={28}
-                variant="subtle"
-                aria-label={t("ui.move-up")}
-                disabled={index === 0}
-                onClick={() => update(moveItem(header_segments, index, index - 1))}
-              >
-                <ArrowUp size={16} />
-              </ActionIcon>
-              <ActionIcon
-                mt={28}
-                variant="subtle"
-                aria-label={t("ui.move-down")}
-                disabled={index === header_segments.length - 1}
-                onClick={() => update(moveItem(header_segments, index, index + 1))}
-              >
-                <ArrowDown size={16} />
-              </ActionIcon>
-              <ActionIcon
-                mt={28}
-                variant="subtle"
-                color="red"
-                aria-label={t("ui.remove")}
-                onClick={() => update(header_segments.filter((_, i) => i !== index))}
-              >
-                <Trash size={16} />
-              </ActionIcon>
-            </Group>
-          </Paper>
-        ))}
+        <DragDropContext
+          onDragEnd={(result) => {
+            if (!result.destination) return;
+            update(moveItem(header_segments, result.source.index, result.destination.index));
+          }}
+        >
+          <Droppable droppableId="header-segments">
+            {(droppable) => (
+              <Stack gap={4} ref={droppable.innerRef} {...droppable.droppableProps}>
+                {header_segments.map((segment, index) => (
+                  <Draggable key={segment.id} draggableId={segment.id} index={index}>
+                    {(draggable) => (
+                      <Group
+                        ref={draggable.innerRef}
+                        {...draggable.draggableProps}
+                        gap="xs"
+                        wrap="nowrap"
+                        align="center"
+                      >
+                        <Box
+                          {...draggable.dragHandleProps}
+                          aria-label={t("ui.header-segment-reorder")}
+                          style={{ cursor: "grab", display: "flex", color: "var(--mantine-color-dark-2)" }}
+                        >
+                          <DotsSixVertical size={16} />
+                        </Box>
+                        <Box style={{ flex: 1, minWidth: 0 }}>
+                          <TokenField
+                            label={t("ui.header-segment-template")}
+                            hideLabel
+                            value={segment.template}
+                            onChange={(template) => patch(index, { template })}
+                            tokens={HEADER_TOKENS}
+                          />
+                        </Box>
+                        <SegmentedControl
+                          size="xs"
+                          value={segment.side}
+                          onChange={(side) => patch(index, { side: side as HeaderSegment["side"] })}
+                          data={[
+                            { value: "left", label: t("ui.header-side-left") },
+                            { value: "right", label: t("ui.header-side-right") },
+                          ]}
+                        />
+                        <Tooltip label={t("ui.header-segment-hide-narrow")}>
+                          <ActionIcon
+                            variant={segment.hideWhenNarrow ? "filled" : "subtle"}
+                            aria-label={t("ui.header-segment-hide-narrow")}
+                            aria-pressed={segment.hideWhenNarrow}
+                            onClick={() => patch(index, { hideWhenNarrow: !segment.hideWhenNarrow })}
+                          >
+                            <ArrowsInLineHorizontal size={16} />
+                          </ActionIcon>
+                        </Tooltip>
+                        <ActionIcon
+                          variant="subtle"
+                          color="red"
+                          aria-label={t("ui.remove")}
+                          onClick={() => update(header_segments.filter((_, i) => i !== index))}
+                        >
+                          <Trash size={16} />
+                        </ActionIcon>
+                      </Group>
+                    )}
+                  </Draggable>
+                ))}
+                {droppable.placeholder}
+              </Stack>
+            )}
+          </Droppable>
+        </DragDropContext>
         <Group>
           <Button variant="light" size="xs" onClick={add}>
             {t("ui.header-segment-add")}
