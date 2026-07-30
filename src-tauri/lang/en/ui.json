@@ -80,6 +80,8 @@
     "copied-to-clipboard": "Copied to clipboard",
     "export-damage-log": "Export Damage Log to File",
     "meter-preview": "Preview",
+    "preview-scope-overlay": "Overlay",
+    "preview-scope-logs": "Logs window",
     "meter-colors-section": "Bar Colors",
     "meter-names-section": "Names & Privacy",
     "meter-values-section": "Values",

@@ -1,6 +1,7 @@
 import { ColumnEditor } from "@/components/ColumnEditor";
 import { useColumnControls } from "@/components/useColumnControls";
-import { Box, Divider, Flex, SimpleGrid, Stack, Text, Title } from "@mantine/core";
+import { Box, Divider, Flex, SegmentedControl, SimpleGrid, Stack, Text, Title } from "@mantine/core";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { BarAppearanceSection } from "./BarAppearanceSection";
@@ -10,6 +11,28 @@ import { LabelsSection } from "./LabelsSection";
 import { MeterPreview } from "./MeterPreview";
 import { NamesSection } from "./NamesSection";
 import { ValuesSection } from "./ValuesSection";
+
+/** Shared settings apply to both meters, so the preview asks which one you want
+ * to judge them against rather than silently picking one. */
+const ScopedPreview = () => {
+  const { t } = useTranslation();
+  const [scope, setScope] = useState<"overlay" | "logs">("overlay");
+
+  return (
+    <Stack gap="xs">
+      <SegmentedControl
+        size="xs"
+        value={scope}
+        onChange={(value) => setScope(value as "overlay" | "logs")}
+        data={[
+          { value: "overlay", label: t("ui.preview-scope-overlay") },
+          { value: "logs", label: t("ui.preview-scope-logs") },
+        ]}
+      />
+      <MeterPreview live={scope === "overlay"} showHeader={scope === "overlay"} />
+    </Stack>
+  );
+};
 
 /** Settings → Meters: how the meter renders, in the overlay and in the Logs
  * quest details.
@@ -84,7 +107,7 @@ const MeterSettings = () => {
             top: "calc(var(--app-shell-header-height, 50px) + var(--mantine-spacing-sm))",
           }}
         >
-          <MeterPreview />
+          <ScopedPreview />
         </Box>
       </Flex>
     </Stack>
