@@ -2,19 +2,60 @@ import { Editor } from "@tiptap/core";
 import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
+import { Dropcursor, Placeholder, UndoRedo } from "@tiptap/extensions";
 import { describe, expect, it } from "vitest";
 import { TokenNode } from "./TokenNode";
 import { templateToDoc } from "./tokenDoc";
 
 const ALLOWED = ["app", "version", "slot", "name", "character", "hpPercent", "hpCurrent", "hpMax"];
 
-/** The real single-line schema the field will use. */
+/**
+ * The field's REAL extension set, not a reduced one.
+ *
+ * The round-trip guarantee is worth nothing if it is proved against a schema no
+ * user ever runs, so this list has to stay identical to TokenField's. Kept in
+ * one place precisely so that when the field's extensions change, this suite
+ * changes with it rather than silently drifting into testing a fiction.
+ */
+const EXTENSIONS = [
+  Document.extend({ content: "paragraph" }),
+  Paragraph,
+  Text,
+  TokenNode,
+  UndoRedo,
+  Dropcursor,
+  Placeholder.configure({ placeholder: "" }),
+];
+
+const editorWith = (content: unknown) =>
+  new Editor({
+    element: document.createElement("div"),
+    extensions: EXTENSIONS,
+    content: content as never,
+    enableContentCheck: true,
+  });
+
 const roundTrip = (template: string): string => {
+  const editor = editorWith(templateToDoc(template, ALLOWED));
+  const text = editor.getText();
+  editor.destroy();
+  return text;
+};
+
+/**
+ * Runs HTML through the schema's parse rules and reports the resulting text.
+ *
+ * Deliberately without `enableContentCheck`: that flag guards the `setContent`
+ * path and throws on anything its rules reject, which is the opposite of what
+ * we want to observe here — the whole question is what a REJECTED element falls
+ * through to. The clipboard uses these same parse rules, so this covers the
+ * rule; the end-to-end paste gesture is on A8's manual checklist.
+ */
+const parseHtml = (html: string): string => {
   const editor = new Editor({
     element: document.createElement("div"),
-    extensions: [Document.extend({ content: "paragraph" }), Paragraph, Text, TokenNode],
-    content: templateToDoc(template, ALLOWED),
-    enableContentCheck: true,
+    extensions: EXTENSIONS,
+    content: `<p>${html}</p>`,
   });
   const text = editor.getText();
   editor.destroy();
@@ -42,36 +83,70 @@ describe("TokenNode round trip", () => {
     expect(roundTrip(template)).toBe(template);
   });
 
-  it("renders a token as an atomic chip carrying its name", () => {
-    const editor = new Editor({
-      element: document.createElement("div"),
-      extensions: [Document.extend({ content: "paragraph" }), Paragraph, Text, TokenNode],
-      content: templateToDoc("{app}", ALLOWED),
-    });
+  it("survives an undo/redo cycle", () => {
+    const editor = editorWith(templateToDoc("HP {hpPercent}", ALLOWED));
+    editor.commands.focus("end");
+    editor.commands.insertToken("hpMax");
+    expect(editor.getText()).toBe("HP {hpPercent}{hpMax}");
+    editor.commands.undo();
+    expect(editor.getText()).toBe("HP {hpPercent}");
+    editor.commands.redo();
+    expect(editor.getText()).toBe("HP {hpPercent}{hpMax}");
+    editor.destroy();
+  });
+
+  it("renders a token as a chip carrying its name", () => {
+    const editor = editorWith(templateToDoc("{app}", ALLOWED));
     expect(editor.getHTML()).toContain('data-token="app"');
     expect(editor.getHTML()).not.toContain("data-unknown");
     editor.destroy();
   });
 
   it("marks a token outside the whitelist in the rendered chip", () => {
-    const editor = new Editor({
-      element: document.createElement("div"),
-      extensions: [Document.extend({ content: "paragraph" }), Paragraph, Text, TokenNode],
-      content: templateToDoc("{bogus}", ALLOWED),
-    });
+    const editor = editorWith(templateToDoc("{bogus}", ALLOWED));
     expect(editor.getHTML()).toContain('data-unknown="true"');
     editor.destroy();
   });
 
   it("inserts a token via the insertToken command", () => {
-    const editor = new Editor({
-      element: document.createElement("div"),
-      extensions: [Document.extend({ content: "paragraph" }), Paragraph, Text, TokenNode],
-      content: templateToDoc("HP ", ALLOWED),
-    });
+    const editor = editorWith(templateToDoc("HP ", ALLOWED));
     editor.commands.focus("end");
     editor.commands.insertToken("hpPercent");
     expect(editor.getText()).toBe("HP {hpPercent}");
     editor.destroy();
+  });
+});
+
+describe("TokenNode paste guard", () => {
+  it("keeps our own chips when they are pasted back", () => {
+    expect(parseHtml('<span data-token="app" class="token-chip">{app}</span>')).toBe("{app}");
+  });
+
+  it("preserves the unknown marker through a paste", () => {
+    expect(parseHtml('<span data-token="bogus" data-unknown="true" class="token-chip">{bogus}</span>')).toBe("{bogus}");
+  });
+
+  // `data-token` is used in the wild by analytics and design systems, so this
+  // is an ordinary copy-paste from a web page, not a crafted attack. Note the
+  // name here is a perfectly VALID token name — validating the name alone does
+  // not save us, which is why the rule requires our own class. Without that,
+  // the span's visible text is DISCARDED and "Buy now" comes back "{tracking}".
+  it("parses a foreign span as its text, not as a chip", () => {
+    expect(parseHtml('<span data-token="tracking">Buy now</span>')).toBe("Buy now");
+  });
+
+  it("ignores a foreign span whose name is not even well formed", () => {
+    expect(parseHtml('<span data-token="track-id-99">Buy now</span>')).toBe("Buy now");
+  });
+
+  it("does not mint an empty chip from an empty attribute", () => {
+    expect(parseHtml('<span data-token="">zzz</span>')).toBe("zzz");
+  });
+
+  // A name carrying braces would serialize to text that reparses as MORE nodes
+  // than it started with, so the document would not be stable under its own
+  // round trip. Rejected even when it carries our class.
+  it("rejects a name that would break the token grammar", () => {
+    expect(parseHtml('<span data-token="a} evil {b" class="token-chip">q</span>')).toBe("q");
   });
 });
