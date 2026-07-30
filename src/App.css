@@ -118,7 +118,11 @@
   table-layout: fixed;
   text-align: left;
   border: none;
-  border-spacing: 0;
+  /* Vertical gap only, from --meter-row-gap on the table root. The table
+     already used the separate box model, so this is a one-property change. It
+     also opens a gap between thead and the first row, which only shows once
+     the user asks for spacing at all. */
+  border-spacing: 0 var(--meter-row-gap, 0);
   user-select: none;
 }
 
@@ -164,30 +168,70 @@
     0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
+/* Bar textures. Each recipe is a vertical light/dark profile in neutral rgba
+   layered OVER the player colour — which is what lets one recipe tint to any
+   colour, the same property that makes the statusbar textures in WoW-lineage
+   meters work. The class sits on the meter table root and the variable
+   inherits, so the nested skill-breakdown table needs no wiring of its own. */
+.bar-texture-solid {
+  --bar-texture: none;
+}
+.bar-texture-smooth {
+  --bar-texture: linear-gradient(rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0.22) 50%, rgb(255 255 255 / 0) 100%);
+}
+.bar-texture-gloss {
+  --bar-texture: linear-gradient(rgb(255 255 255 / 0.28) 0%, rgb(255 255 255 / 0) 50%, rgb(0 0 0 / 0.22) 100%);
+}
+.bar-texture-glaze {
+  --bar-texture: linear-gradient(
+    rgb(255 255 255 / 0.35) 0%,
+    rgb(255 255 255 / 0.05) 45%,
+    rgb(0 0 0 / 0) 46%,
+    rgb(0 0 0 / 0.12) 100%
+  );
+}
+.bar-texture-charcoal {
+  --bar-texture: linear-gradient(rgb(0 0 0 / 0) 60%, rgb(0 0 0 / 0.35) 100%);
+}
+.bar-texture-fade {
+  --bar-texture: linear-gradient(to right, rgb(0 0 0 / 0) 40%, rgb(0 0 0 / 0.45) 100%);
+}
+.bar-texture-striped {
+  --bar-texture: repeating-linear-gradient(45deg, rgb(255 255 255 / 0.12) 0 6px, rgb(255 255 255 / 0) 6px 12px);
+}
+
 /* The damage bar is painted as the row's own background, sized by the
    --damage-bar-* custom properties set inline on the row (damageBarStyle in
    utils.ts). It must NOT be a positioned child element layered with z-index:
    position/z-index on table internals (tr/td) is undefined in CSS 2.1 —
    Chromium (Windows WebView2) honors it, but WebKitGTK (Linux) paints such a
    bar over the cell text (https://bugs.webkit.org/show_bug.cgi?id=240961).
-   A row background can never paint over cell content, in any engine. */
+   A row background can never paint over cell content, in any engine.
+
+   Row height and the texture layer come from --meter-row-height / --bar-texture
+   on the table root (Table.tsx), so a taller row costs no extra markup. */
 .table .player-row,
 .table .skill-row {
   color: white;
   font-size: 14px;
-  height: 27px;
-  background-image: linear-gradient(var(--damage-bar-color, transparent), var(--damage-bar-color, transparent));
-  background-size: var(--damage-bar-width, 0%) 100%;
+  height: var(--meter-row-height, 27px);
+  background-image: var(--bar-texture, none),
+    linear-gradient(var(--damage-bar-color, transparent), var(--damage-bar-color, transparent));
+  background-size:
+    var(--damage-bar-width, 0%) 100%,
+    var(--damage-bar-width, 0%) 100%;
   background-repeat: no-repeat;
   transition: background-size 0.1s ease-in-out;
 }
 
 /* Same 50%-darkening the old bar got from filter: brightness(0.5) — a black
-   overlay gradient stacked on the bar gradient, both sized to the bar. */
+   overlay gradient stacked on the bar gradient, all sized to the bar. Layer
+   order is [darkening] [texture] [colour]. */
 .table .skill-row.nested {
-  background-image: linear-gradient(rgb(0 0 0 / 0.5), rgb(0 0 0 / 0.5)),
+  background-image: linear-gradient(rgb(0 0 0 / 0.5), rgb(0 0 0 / 0.5)), var(--bar-texture, none),
     linear-gradient(var(--damage-bar-color, transparent), var(--damage-bar-color, transparent));
   background-size:
+    var(--damage-bar-width, 0%) 100%,
     var(--damage-bar-width, 0%) 100%,
     var(--damage-bar-width, 0%) 100%;
 }
