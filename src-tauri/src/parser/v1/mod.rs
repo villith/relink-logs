@@ -5703,3 +5703,148 @@ mod stored_log_compat {
         assert_eq!(parser.encounter.raw_event_log.len(), 1);
     }
 }
+
+/// The `PlayerData` -> `BuildSnapshot` bridge, tested with data in it.
+///
+/// `legality_inputs` lives here because `PlayerData`'s fields are private to
+/// this module, and it is exercised nowhere else — `audit_player` has no
+/// production caller yet. A bridge test built on `PlayerData::default()`
+/// asserts nothing about the bridge: every rule is silent on empty input BY
+/// DESIGN, so replacing any field's conversion with an empty value leaves such
+/// a test green while the rule it feeds stops working in production forever.
+///
+/// So this fixture populates every field the bridge carries and pins the exact
+/// set of rules that comes back. Dropping ANY single field — `skillboard` to
+/// `Vec::new()`, `weapon_state`/`overmastery_info` to `None`, `sigils` or
+/// `summons` to empty, `character_type` to something unrecognised — removes
+/// its rule from that set and fails the assertion.
+#[cfg(test)]
+mod legality_bridge_tests {
+    use super::*;
+    use crate::legality::{audit_player, Rule};
+
+    /// War Elemental's sigil id, whose intrinsic first trait is `4c588c27`.
+    const WAR_ELEMENTAL_SIGIL: u32 = 0x0061_2b10;
+    const STEADY_FOCUS: u32 = 0x0053_599e;
+    /// A real trait, but not War Elemental's — so rule 5 fires.
+    const DMG_CAP: u32 = 0xdc58_4f60;
+    /// The Fortification family's primary trait (a legal wrightstone primary).
+    const HP_TRAIT: u32 = 0xf372_f096;
+    const SUPPLEMENTARY_DMG: u32 = 0x57ab_5b10;
+    /// Wheel of Fate III, with its main/bonus candidates at the top of their
+    /// own windows — a "perfect" roll.
+    const WHEEL_OF_FATE_III: u32 = 0x47e2_ae71;
+    const CRIT_RATE_UP: u32 = 0x00d1_71e0;
+    /// Overmastery ids: Attack, Health, Critical Hit Rate, Stun Power.
+    const OM_ATTACK: u32 = 0xc492_5bd7;
+    const OM_HEALTH: u32 = 0x52a2_07b5;
+    const OM_CRIT: u32 = 0x45c6_5767;
+    const OM_STUN: u32 = 0x6cb3_8ef3;
+
+    fn populated_player() -> PlayerData {
+        PlayerData {
+            // Gran, so the skillboard rule has a board to check against.
+            character_type: CharacterType::Pl0000,
+            // Rule 5: this sigil id does not encode DMG Cap as its first trait.
+            sigils: vec![Sigil {
+                first_trait_id: DMG_CAP,
+                first_trait_level: 15,
+                second_trait_id: STEADY_FOCUS,
+                second_trait_level: 10,
+                sigil_id: WAR_ELEMENTAL_SIGIL,
+                equipped_character: 0,
+                sigil_level: 15,
+                acquisition_count: 1,
+                notification_enum: 0,
+            }],
+            // Rule 10: top of window on both sides.
+            summons: vec![EquippedSummon {
+                summon_id: WHEEL_OF_FATE_III,
+                main_trait_id: SUPPLEMENTARY_DMG,
+                main_trait_level: 15,
+                bonus_id: CRIT_RATE_UP,
+                bonus_level: 9,
+            }],
+            // Rule 6: 999999 is on no board.
+            skillboard: vec![999999],
+            // Rule 1: the primary slot's ceiling is 20.
+            weapon_state: Some(WeaponState {
+                weapon_id: 0,
+                exp: 0,
+                star_level: 0,
+                plus_marks: 0,
+                awakening_level: 0,
+                wrightstone_id: 0,
+                wrightstone_traits: vec![
+                    WeaponTraitPair {
+                        id: HP_TRAIT,
+                        level: 25,
+                    },
+                    WeaponTraitPair {
+                        id: DMG_CAP,
+                        level: 15,
+                    },
+                    WeaponTraitPair {
+                        id: SUPPLEMENTARY_DMG,
+                        level: 10,
+                    },
+                ],
+                innate_traits: Vec::new(),
+            }),
+            // Rule 8: 5000 is on no ladder. The other three are legal, and a
+            // full set of four is required for the rule to speak at all.
+            overmastery_info: Some(OvermasteryInfo {
+                overmasteries: vec![
+                    Overmastery {
+                        id: OM_ATTACK,
+                        flags: 0,
+                        value: 5000.0,
+                    },
+                    Overmastery {
+                        id: OM_HEALTH,
+                        flags: 0,
+                        value: 800.0,
+                    },
+                    Overmastery {
+                        id: OM_CRIT,
+                        flags: 0,
+                        value: 6.0,
+                    },
+                    Overmastery {
+                        id: OM_STUN,
+                        flags: 0,
+                        value: 0.6,
+                    },
+                ],
+            }),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn the_bridge_carries_every_field_the_rules_read() {
+        let findings = audit_player(&populated_player());
+        let rules: Vec<Rule> = findings.iter().map(|finding| finding.rule).collect();
+
+        // One rule per bridged field, in `audit`'s own order. If this vector
+        // shrinks, a field stopped crossing the bridge.
+        assert_eq!(
+            rules,
+            vec![
+                Rule::WrightstoneTraitLevel,  // weapon_state
+                Rule::SigilFirstTrait,        // sigils
+                Rule::MasterTraitUnknownNode, // skillboard (+ character_type)
+                Rule::OvermasteryValue,       // overmastery_info
+                Rule::SummonPerfect,          // summons
+            ],
+            "a field stopped crossing the PlayerData -> BuildSnapshot bridge"
+        );
+    }
+
+    /// The companion to the above: the same rules really are silent on empty
+    /// input, which is exactly why the populated fixture is necessary.
+    #[test]
+    fn an_empty_player_is_silent_so_only_populated_input_tests_the_bridge() {
+        assert_eq!(audit_player(&PlayerData::default()), vec![]);
+    }
+}

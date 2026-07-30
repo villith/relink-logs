@@ -147,8 +147,15 @@ mod tests {
         assert_eq!(audit(&build), vec![]);
     }
 
+    /// HONEST LIMITATION: this pins the empty-input contract through
+    /// `audit_player`, NOT that the bridge carries anything. Every rule is
+    /// silent on empty input by design, so emptying any field of
+    /// `legality_inputs` leaves this green. The test with teeth is
+    /// `parser::v1::legality_bridge_tests::the_bridge_carries_every_field_the_rules_read`,
+    /// which feeds a populated `PlayerData` and pins one rule per field; it
+    /// lives there because `PlayerData`'s fields are private to that module.
     #[test]
-    fn audits_a_player_through_the_snapshot_bridge() {
+    fn an_empty_player_audits_to_silence() {
         let player = PlayerData::default();
         assert_eq!(audit_player(&player), vec![]);
     }
