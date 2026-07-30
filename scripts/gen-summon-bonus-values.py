@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate src/assets/summon-bonus-values.json from the game's summon_base_param.tbl.
+"""Generate src-tauri/assets/summon-bonus-values.json from the game's summon_base_param.tbl.
 
 The Builds tab uses this to show a summon equip-bonus's real magnitude instead of
 its raw level: `bonus_id` (protocol EquippedSummon) keys this map, `bonus_level`
@@ -20,7 +20,7 @@ import sqlite3
 import sys
 from pathlib import Path
 
-OUT_PATH = Path(__file__).resolve().parent.parent / "src" / "assets" / "summon-bonus-values.json"
+OUT_PATH = Path(__file__).resolve().parent.parent / "src-tauri" / "assets" / "summon-bonus-values.json"
 
 
 def clean(value: float) -> float | int:

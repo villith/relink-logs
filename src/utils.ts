@@ -23,16 +23,21 @@ import {
 import checklistDefault from "@/assets/checklist-default.json";
 import sigilTraitCategories from "@/assets/sigil-trait-categories.json";
 import skillboardLayout from "@/assets/skillboard-layout.json";
-import summonBonusValues from "@/assets/summon-bonus-values.json";
 import traitMaxLevels from "@/assets/trait-max-levels.json";
 import weaponTraitsData from "@/assets/weapon-traits.json";
 import weaponTranscendenceData from "@/assets/weapon-transcendence.json";
 import i18next, { t } from "i18next";
 import { useEffect, useRef, type CSSProperties } from "react";
+import summonBonusValues from "../src-tauri/assets/summon-bonus-values.json";
 
 import { abilitySourceKeys, stripTierSuffix, summonClassSource } from "./skillNameSources";
 
 export const EMPTY_ID = 2289754288;
+
+/** An empty slot arrives as either a plain zero or the engine's sentinel, so
+ * both must count as empty — the same contract as `legality::is_empty` on the
+ * Rust side. Prefer this over a bare `=== EMPTY_ID`, which misses the zero. */
+export const isEmptyId = (id: number): boolean => id === 0 || id === EMPTY_ID;
 
 export const formatInPartyOrder = (party: Record<string, PlayerState>): ComputedPlayerState[] => {
   const players = Object.keys(party).map((key) => {

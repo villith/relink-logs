@@ -125,7 +125,7 @@ Output shape: { "<summonIdHex8>": {
 } }
 Main-trait levels are 1-based as displayed. Bonus levels are 0-based, indexing
 summon_base_param's ten LevelNValue columns, matching EquippedSummon.bonus_level
-and src/assets/summon-bonus-values.json. `levels` is sorted ascending, so the
+and src-tauri/assets/summon-bonus-values.json. `levels` is sorted ascending, so the
 top of a window is its last entry. Weight totals are not emitted: sum them,
 because the table's own totals are 10000, 9999 or 9998 depending on the lot.
 
