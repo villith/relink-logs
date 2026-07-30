@@ -16,6 +16,7 @@ use crate::parser::constants::CharacterType;
 
 pub mod master_traits;
 pub mod overmastery_rules;
+pub mod sigils;
 pub mod wrightstone;
 
 /// Everything the rules need from a player, borrowed rather than cloned.
@@ -104,6 +105,7 @@ pub struct Finding {
 pub fn audit(build: &BuildSnapshot) -> Vec<Finding> {
     let mut findings = Vec::new();
     findings.extend(wrightstone::audit_wrightstone(build.weapon_state));
+    findings.extend(sigils::audit_sigils(build.sigils));
     findings.extend(master_traits::audit_master_traits(
         build.character_type,
         build.skillboard,
