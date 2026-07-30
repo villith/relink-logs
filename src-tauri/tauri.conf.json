@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "GBFR Logs",
-    "version": "1.12.5-4"
+    "version": "1.12.5-5"
   },
   "tauri": {
     "allowlist": {
