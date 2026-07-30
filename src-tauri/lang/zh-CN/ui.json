@@ -1253,8 +1253,8 @@
       "320": "空中连击 3",
       "400": "上挑攻击",
       "410": "下落攻击",
-      "1700": "二王之净 (主要伤害)",
-      "1701": "二王之净 (多重箭)",
+      "1700": "二王之诤 (主要伤害)",
+      "1701": "二王之诤 (多重箭)",
       "skill-groups": {
         "normal-attack": "普通攻击",
         "charged-normal-attack": "普通攻击 (蓄力)",
@@ -1262,7 +1262,7 @@
         "charged-combo-finisher": "连击收招 (蓄力)",
         "power-finisher": "派生收招",
         "aerial-attack": "空中攻击",
-        "two-crown-strife": "二王之净"
+        "two-crown-strife": "二王之诤"
       }
     },
     "Pl2400": {
