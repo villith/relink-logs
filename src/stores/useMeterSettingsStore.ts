@@ -39,6 +39,32 @@ export const BAR_TEXTURES = ["solid", "smooth", "gloss", "glaze", "charcoal", "f
 
 export const DEFAULT_PLAYER_LABEL = "[{slot}] {name} ({character})";
 
+/**
+ * The overlay header's action buttons, in the order they are drawn.
+ *
+ * Minimize is deliberately absent: it is always shown, so an overlay can never
+ * be configured into a state where there is no way to get it out of the way.
+ */
+export const HEADER_BUTTONS = ["clipboard", "pin", "screenshot", "reset"] as const;
+export type HeaderButtonId = (typeof HEADER_BUTTONS)[number];
+export type HeaderButtonVisibility = Record<HeaderButtonId, boolean>;
+
+export const DEFAULT_HEADER_BUTTONS: HeaderButtonVisibility = {
+  clipboard: true,
+  pin: true,
+  screenshot: true,
+  reset: true,
+};
+
+/** The overlay's starting size, matching the `main` window in tauri.conf.json —
+ * the two must agree or the overlay would jump on first launch. */
+export const DEFAULT_OVERLAY_SIZE = { overlay_width: 500, overlay_height: 350 };
+
+/** Floors from the `main` window's minWidth/minHeight. Going under them lets the
+ * user shrink the overlay past what the window itself accepts, so the stored
+ * number and the real window would silently disagree. */
+export const OVERLAY_MIN_SIZE = { width: 250, height: 120 };
+
 /** Seeded to reproduce the header exactly as it read before it was customizable. */
 export const DEFAULT_HEADER_SEGMENTS: HeaderSegment[] = [
   { id: "brand", side: "left", template: "{app} {version}", hideWhenNarrow: false },
@@ -85,6 +111,13 @@ interface MeterSettings {
   player_label_template: string;
   /** The overlay header, as an ordered list of independently-templated pieces. */
   header_segments: HeaderSegment[];
+  /** Which of the header's action buttons are drawn. */
+  header_buttons: HeaderButtonVisibility;
+  /** The overlay window's size in logical pixels. The overlay applies these to
+   * itself and writes back whatever the user drags it to, so the numbers on the
+   * settings page and the window on screen stay the same thing. */
+  overlay_width: number;
+  overlay_height: number;
   bar_fill_mode: BarFillMode;
   bar_texture: string;
   /** Meter row height in px. */
@@ -131,6 +164,8 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   logs_skill_columns: [...DEFAULT_LOGS_SKILL_COLUMNS],
   player_label_template: DEFAULT_PLAYER_LABEL,
   header_segments: [...DEFAULT_HEADER_SEGMENTS],
+  header_buttons: { ...DEFAULT_HEADER_BUTTONS },
+  ...DEFAULT_OVERLAY_SIZE,
   ...DEFAULT_BAR_APPEARANCE,
 };
 

@@ -56,24 +56,28 @@ export const BarAppearanceSection = () => {
           />
         )}
       </SimpleGrid>
-      <LabelledSlider
-        label={t("ui.bar-height")}
-        min={16}
-        max={48}
-        step={1}
-        unit="px"
-        value={bar_height}
-        onChange={(value) => setMeterSettings({ bar_height: value })}
-      />
-      <LabelledSlider
-        label={t("ui.bar-spacing")}
-        min={0}
-        max={8}
-        step={1}
-        unit="px"
-        value={bar_spacing}
-        onChange={(value) => setMeterSettings({ bar_spacing: value })}
-      />
+      {/* Paired: neither slider needs the full width, and side by side they read
+          as the two halves of one row-geometry decision. */}
+      <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
+        <LabelledSlider
+          label={t("ui.bar-height")}
+          min={16}
+          max={48}
+          step={1}
+          unit="px"
+          value={bar_height}
+          onChange={(value) => setMeterSettings({ bar_height: value })}
+        />
+        <LabelledSlider
+          label={t("ui.bar-spacing")}
+          min={0}
+          max={8}
+          step={1}
+          unit="px"
+          value={bar_spacing}
+          onChange={(value) => setMeterSettings({ bar_spacing: value })}
+        />
+      </SimpleGrid>
     </Stack>
   );
 };

@@ -4,6 +4,8 @@ import { HeaderSegmentsEditor } from "@/pages/settings/meters/HeaderSegmentsEdit
 import { MeterPreview } from "@/pages/settings/meters/MeterPreview";
 import { Box, Divider, Flex, Stack, Text, Title } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import { HeaderButtonsSection } from "./HeaderButtonsSection";
+import { OverlaySizeSection } from "./OverlaySizeSection";
 import { TransparencySection } from "./TransparencySection";
 
 /** Settings → Overlay: the settings that apply ONLY to the always-on-top game
@@ -18,9 +20,13 @@ const OverlaySettings = () => {
       <Title order={4}>{t("ui.overlay-settings")}</Title>
       <Flex gap="lg" align="flex-start" direction={{ base: "column-reverse", lg: "row" }}>
         <Stack gap="lg" style={{ flex: 1, minWidth: 0, width: "100%" }}>
+          <OverlaySizeSection />
+          <Divider />
           <TransparencySection />
           <Divider />
           <HeaderSegmentsEditor />
+          <Divider />
+          <HeaderButtonsSection />
           <Divider />
           <Text size="md" fw={700}>
             {t("ui.overlay-columns-section")}

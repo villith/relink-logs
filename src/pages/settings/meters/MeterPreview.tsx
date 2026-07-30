@@ -1,5 +1,6 @@
 import { HeaderSegments } from "@/components/HeaderSegments";
 import { Table } from "@/components/Table";
+import { TitlebarButtons } from "@/components/TitlebarButtons";
 import useSettings from "@/pages/useSettings";
 import { MeterColumns } from "@/types";
 import { Paper, Stack, Text } from "@mantine/core";
@@ -30,7 +31,7 @@ export type MeterPreviewProps = {
  */
 export const MeterPreview = ({ live, showHeader = true }: MeterPreviewProps) => {
   const { t } = useTranslation();
-  const { transparency, header_segments } = useSettings();
+  const { transparency, header_segments, header_buttons } = useSettings();
 
   return (
     <Stack gap={4}>
@@ -57,6 +58,9 @@ export const MeterPreview = ({ live, showHeader = true }: MeterPreviewProps) => 
                 tokens={PREVIEW_HEADER_TOKENS}
                 toneClass="hook-ok"
               />
+              {/* No `actions`: the buttons are drawn so the header's real
+                  proportions show, but nothing is wired up. */}
+              <TitlebarButtons visible={header_buttons} />
             </div>
           </div>
         )}

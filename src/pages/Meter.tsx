@@ -5,8 +5,12 @@ import { Titlebar } from "@/components/Titlebar";
 import "@/i18n";
 
 import useMeter from "./useMeter";
+import { useOverlaySize } from "./useOverlaySize";
 
 export const Meter = () => {
+  // Overlay-only: this window is the one the stored overlay size describes.
+  useOverlaySize();
+
   const {
     encounterState,
     partyData,

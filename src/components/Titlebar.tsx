@@ -1,5 +1,3 @@
-import { ActionIcon, Menu, Tooltip } from "@mantine/core";
-import { ArrowCounterClockwise, Camera, ClipboardText, Minus, PushPinSimple } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
 import { appWindow } from "@tauri-apps/api/window";
 import { useCallback } from "react";
@@ -21,6 +19,7 @@ import {
   millisecondsToElapsedFormat,
 } from "@/utils";
 import { HeaderSegments } from "./HeaderSegments";
+import { TitlebarButtons } from "./TitlebarButtons";
 
 /** Every token an overlay header segment may use. Exported for the settings
  * editor, which lists them and flags anything else as a typo. */
@@ -115,6 +114,7 @@ export const Titlebar = ({
   const { t } = useTranslation();
   const { version } = getVersion();
   const header_segments = useMeterSettingsStore((state) => state.header_segments);
+  const header_buttons = useMeterSettingsStore((state) => state.header_buttons);
   const { tokens, toneClass } = useHeaderTokens(encounterState, elapsedTime, version);
 
   const onMinimize = () => {
@@ -143,35 +143,17 @@ export const Titlebar = ({
       </div>
       <div data-tauri-drag-region className="titlebar-right">
         <HeaderSegments segments={header_segments} side="right" tokens={tokens} toneClass={toneClass} />
-        <Menu shadow="md" trigger="hover" openDelay={100} closeDelay={400}>
-          <Menu.Target>
-            <ActionIcon aria-label="Clipboard" variant="transparent" color="light">
-              <ClipboardText size={16} />
-            </ActionIcon>
-          </Menu.Target>
-          <Menu.Dropdown>
-            <Menu.Item onClick={handleSimpleEncounterCopy}>{t("ui.copy-to-clipboard-simple")}</Menu.Item>
-            <Menu.Item onClick={handleFullEncounterCopy}>{t("ui.copy-to-clipboard-full")}</Menu.Item>
-          </Menu.Dropdown>
-        </Menu>
-        <Tooltip label={t("ui.pin-window")} color="dark">
-          <div className="titlebar-button" id="titlebar-snapshot" onClick={onPin}>
-            <PushPinSimple size={16} />
-          </div>
-        </Tooltip>
-        <Tooltip label={t("ui.copy-screenshot-to-clipboard")} color="dark">
-          <div className="titlebar-button" id="titlebar-snapshot" onClick={() => exportScreenshotToClipboard(".app")}>
-            <Camera size={16} />
-          </div>
-        </Tooltip>
-        <Tooltip label={t("ui.reset-session")} color="dark">
-          <div className="titlebar-button" id="titlebar-reset" onClick={onResetSession}>
-            <ArrowCounterClockwise size={16} />
-          </div>
-        </Tooltip>
-        <div className="titlebar-button" id="titlebar-minimize" onClick={onMinimize}>
-          <Minus size={16} />
-        </div>
+        <TitlebarButtons
+          visible={header_buttons}
+          actions={{
+            onCopySimple: handleSimpleEncounterCopy,
+            onCopyFull: handleFullEncounterCopy,
+            onPin,
+            onScreenshot: () => exportScreenshotToClipboard(".app"),
+            onReset: onResetSession,
+            onMinimize,
+          }}
+        />
       </div>
     </div>
   );
