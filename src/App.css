@@ -278,6 +278,10 @@
   content: "● ";
   color: #ffd43b;
 }
+.encounter-status.hook-error::before {
+  content: "● ";
+  color: #ff6b6b;
+}
 .encounter-status.hook-idle::before {
   content: "● ";
   color: #868e96;
