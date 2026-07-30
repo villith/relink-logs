@@ -1,5 +1,6 @@
-import { renderTemplate, unknownTokens, type TemplateTokens } from "@/labelTemplate";
-import { Code, Group, Stack, Text, TextInput } from "@mantine/core";
+import { TokenField } from "@/components/tokenField/TokenField";
+import { renderTemplate, type TemplateTokens } from "@/labelTemplate";
+import { Code, Group, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
 export type TemplateFieldProps = {
@@ -8,36 +9,32 @@ export type TemplateFieldProps = {
   onChange: (value: string) => void;
   /** Token names this field accepts — anything else is flagged as a typo. */
   tokens: readonly string[];
-  /** Sample values used to render the inline preview. */
-  sample: TemplateTokens;
+  /** Sample values for the inline preview. Omit where a live preview of the
+   * whole thing is already on screen; a second copy of it is noise. */
+  sample?: TemplateTokens;
 };
 
 /**
- * A template text input with a live rendered preview beneath it and a warning
- * for tokens that do not exist.
+ * A token-chip template field, optionally with a rendered preview beneath it.
  *
- * The preview is the whole point: a template is unreadable until you see what
- * it produces, and the collapse rules mean the output is not a simple
- * substitution of the string you typed.
+ * The unknown-token warning that used to live here is gone: an unrecognized
+ * token now renders as a struck-through red chip in place, which says the same
+ * thing where the problem actually is.
  */
 export const TemplateField = ({ label, value, onChange, tokens, sample }: TemplateFieldProps) => {
   const { t } = useTranslation();
-  const unknown = unknownTokens(value, tokens);
-  const preview = renderTemplate(value, sample);
+  const preview = sample ? renderTemplate(value, sample) : null;
 
   return (
     <Stack gap={4} style={{ flex: 1 }}>
-      <TextInput label={label} value={value} onChange={(event) => onChange(event.currentTarget.value)} />
-      <Group gap="xs">
-        <Text size="xs" c="dimmed">
-          {t("ui.template-preview")}
-        </Text>
-        <Code>{preview === "" ? t("ui.template-preview-empty") : preview}</Code>
-      </Group>
-      {unknown.length > 0 && (
-        <Text size="xs" c="orange">
-          {t("ui.template-unknown-tokens", { tokens: unknown.map((token) => `{${token}}`).join(", ") })}
-        </Text>
+      <TokenField label={label} value={value} onChange={onChange} tokens={tokens} />
+      {preview !== null && (
+        <Group gap="xs">
+          <Text size="xs" c="dimmed">
+            {t("ui.template-preview")}
+          </Text>
+          <Code>{preview === "" ? t("ui.template-preview-empty") : preview}</Code>
+        </Group>
       )}
     </Stack>
   );

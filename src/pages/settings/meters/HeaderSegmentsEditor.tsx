@@ -1,24 +1,12 @@
 import { HEADER_TOKENS } from "@/components/Titlebar";
+import { TokenPalette, TokenPaletteProvider } from "@/components/tokenField/TokenPalette";
 import useSettings from "@/pages/useSettings";
 import type { HeaderSegment } from "@/stores/useMeterSettingsStore";
 import { moveItem } from "@/utils";
-import { ActionIcon, Box, Button, Code, Group, Paper, Select, Stack, Switch, Text } from "@mantine/core";
+import { ActionIcon, Box, Button, Group, Paper, Select, Stack, Switch, Text } from "@mantine/core";
 import { ArrowDown, ArrowUp, Trash } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 import { TemplateField } from "./TemplateField";
-
-/** A fight in progress against a boss — the state where every token has a value. */
-const SAMPLE = {
-  app: "Relink Logs",
-  version: "1.0.0",
-  damage: "1.2b",
-  dps: "45.2k",
-  hpPercent: "45.2%",
-  hpCurrent: "1.2b",
-  hpMax: "2.6b",
-  time: "02:41",
-  status: "02:41",
-};
 
 /**
  * The overlay header, as an editable list of segments.
@@ -49,88 +37,82 @@ export const HeaderSegmentsEditor = () => {
     ]);
 
   return (
-    <Stack gap="xs">
-      <Text size="md" fw={700}>
-        {t("ui.header-segments-section")}
-      </Text>
-      <Text size="xs" c="dimmed">
-        {t("ui.header-segments-description")}
-      </Text>
-      <Group gap={6}>
-        <Text size="xs" c="dimmed">
-          {t("ui.template-tokens")}
+    <TokenPaletteProvider>
+      <Stack gap="xs">
+        <Text size="md" fw={700}>
+          {t("ui.header-segments-section")}
         </Text>
-        {HEADER_TOKENS.map((token) => (
-          <Code key={token}>{`{${token}}`}</Code>
-        ))}
-      </Group>
-      {header_segments.map((segment, index) => (
-        <Paper key={segment.id} p="xs" withBorder>
-          {/* Wraps rather than forcing one line: this editor now lives in a
+        <Text size="xs" c="dimmed">
+          {t("ui.header-segments-description")}
+        </Text>
+        <TokenPalette tokens={HEADER_TOKENS} />
+        {header_segments.map((segment, index) => (
+          <Paper key={segment.id} p="xs" withBorder>
+            {/* Wraps rather than forcing one line: this editor now lives in a
               column beside the preview, and a nowrap row would squeeze the
               template input — the field that actually needs the width. */}
-          <Group align="flex-start" gap="xs" wrap="wrap">
-            <Box style={{ flex: "1 1 260px", minWidth: 220 }}>
-              <TemplateField
-                label={t("ui.header-segment-template")}
-                value={segment.template}
-                onChange={(template) => patch(index, { template })}
-                tokens={HEADER_TOKENS}
-                sample={SAMPLE}
+            <Group align="flex-start" gap="xs" wrap="wrap">
+              <Box style={{ flex: "1 1 260px", minWidth: 220 }}>
+                <TemplateField
+                  label={t("ui.header-segment-template")}
+                  value={segment.template}
+                  onChange={(template) => patch(index, { template })}
+                  tokens={HEADER_TOKENS}
+                />
+              </Box>
+              <Select
+                label={t("ui.header-segment-side")}
+                w={110}
+                data={[
+                  { value: "left", label: t("ui.header-side-left") },
+                  { value: "right", label: t("ui.header-side-right") },
+                ]}
+                value={segment.side}
+                allowDeselect={false}
+                onChange={(side) => side && patch(index, { side: side as HeaderSegment["side"] })}
               />
-            </Box>
-            <Select
-              label={t("ui.header-segment-side")}
-              w={110}
-              data={[
-                { value: "left", label: t("ui.header-side-left") },
-                { value: "right", label: t("ui.header-side-right") },
-              ]}
-              value={segment.side}
-              allowDeselect={false}
-              onChange={(side) => side && patch(index, { side: side as HeaderSegment["side"] })}
-            />
-            <Switch
-              mt={28}
-              label={t("ui.header-segment-hide-narrow")}
-              checked={segment.hideWhenNarrow}
-              onChange={(event) => patch(index, { hideWhenNarrow: event.currentTarget.checked })}
-            />
-            <ActionIcon
-              mt={28}
-              variant="subtle"
-              aria-label={t("ui.move-up")}
-              disabled={index === 0}
-              onClick={() => update(moveItem(header_segments, index, index - 1))}
-            >
-              <ArrowUp size={16} />
-            </ActionIcon>
-            <ActionIcon
-              mt={28}
-              variant="subtle"
-              aria-label={t("ui.move-down")}
-              disabled={index === header_segments.length - 1}
-              onClick={() => update(moveItem(header_segments, index, index + 1))}
-            >
-              <ArrowDown size={16} />
-            </ActionIcon>
-            <ActionIcon
-              mt={28}
-              variant="subtle"
-              color="red"
-              aria-label={t("ui.remove")}
-              onClick={() => update(header_segments.filter((_, i) => i !== index))}
-            >
-              <Trash size={16} />
-            </ActionIcon>
-          </Group>
-        </Paper>
-      ))}
-      <Group>
-        <Button variant="light" size="xs" onClick={add}>
-          {t("ui.header-segment-add")}
-        </Button>
-      </Group>
-    </Stack>
+              <Switch
+                mt={28}
+                label={t("ui.header-segment-hide-narrow")}
+                checked={segment.hideWhenNarrow}
+                onChange={(event) => patch(index, { hideWhenNarrow: event.currentTarget.checked })}
+              />
+              <ActionIcon
+                mt={28}
+                variant="subtle"
+                aria-label={t("ui.move-up")}
+                disabled={index === 0}
+                onClick={() => update(moveItem(header_segments, index, index - 1))}
+              >
+                <ArrowUp size={16} />
+              </ActionIcon>
+              <ActionIcon
+                mt={28}
+                variant="subtle"
+                aria-label={t("ui.move-down")}
+                disabled={index === header_segments.length - 1}
+                onClick={() => update(moveItem(header_segments, index, index + 1))}
+              >
+                <ArrowDown size={16} />
+              </ActionIcon>
+              <ActionIcon
+                mt={28}
+                variant="subtle"
+                color="red"
+                aria-label={t("ui.remove")}
+                onClick={() => update(header_segments.filter((_, i) => i !== index))}
+              >
+                <Trash size={16} />
+              </ActionIcon>
+            </Group>
+          </Paper>
+        ))}
+        <Group>
+          <Button variant="light" size="xs" onClick={add}>
+            {t("ui.header-segment-add")}
+          </Button>
+        </Group>
+      </Stack>
+    </TokenPaletteProvider>
   );
 };

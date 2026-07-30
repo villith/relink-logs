@@ -1,6 +1,7 @@
+import { TokenPalette, TokenPaletteProvider } from "@/components/tokenField/TokenPalette";
 import useSettings from "@/pages/useSettings";
 import { PLAYER_LABEL_TOKENS } from "@/utils";
-import { Code, Group, Stack, Text } from "@mantine/core";
+import { Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { TemplateField } from "./TemplateField";
 
@@ -13,28 +14,23 @@ export const LabelsSection = () => {
   const { player_label_template, setMeterSettings } = useSettings();
 
   return (
-    <Stack gap="xs">
-      <Text size="md" fw={700}>
-        {t("ui.meter-labels-section")}
-      </Text>
-      <TemplateField
-        label={t("ui.player-label-template")}
-        value={player_label_template}
-        onChange={(value) => setMeterSettings({ player_label_template: value })}
-        tokens={PLAYER_LABEL_TOKENS}
-        sample={SAMPLE}
-      />
-      <Group gap={6}>
-        <Text size="xs" c="dimmed">
-          {t("ui.template-tokens")}
+    <TokenPaletteProvider>
+      <Stack gap="xs">
+        <Text size="md" fw={700}>
+          {t("ui.meter-labels-section")}
         </Text>
-        {PLAYER_LABEL_TOKENS.map((token) => (
-          <Code key={token}>{`{${token}}`}</Code>
-        ))}
-      </Group>
-      <Text size="xs" c="dimmed">
-        {t("ui.player-label-hint")}
-      </Text>
-    </Stack>
+        <TemplateField
+          label={t("ui.player-label-template")}
+          value={player_label_template}
+          onChange={(value) => setMeterSettings({ player_label_template: value })}
+          tokens={PLAYER_LABEL_TOKENS}
+          sample={SAMPLE}
+        />
+        <TokenPalette tokens={PLAYER_LABEL_TOKENS} />
+        <Text size="xs" c="dimmed">
+          {t("ui.player-label-hint")}
+        </Text>
+      </Stack>
+    </TokenPaletteProvider>
   );
 };
