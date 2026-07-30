@@ -34,7 +34,28 @@ fn best_max_level_chance() -> f64 {
         .fold(0.0_f64, f64::max)
 }
 
-/// Rules 8 and 9. Silent without a full set of four overmasteries.
+/// Whether a slot's magnitude was never read, rather than read as small.
+///
+/// The hook reports an overmastery it could not measure as exactly `0.0`, on
+/// three paths: `read_loadout_overmasteries_and_level` sets `value: 0.0`
+/// unconditionally because the loadout stores only id + level bits and no
+/// computed magnitude (it is the fallback whenever the record block is
+/// sentinel-empty, i.e. in town or out of quest), and the record path itself
+/// falls back to `0.0` when the guarded `f32` read fails or returns
+/// non-finite. The parser and the log view already render this state as
+/// "(Lvl. N)" with no magnitude.
+///
+/// A zero can never be a real magnitude: the smallest step on any ladder in
+/// `overmastery-tables.json` is 0.1, pinned by
+/// `zero_is_not_a_legitimate_magnitude_on_any_ladder`. So the comparison is
+/// exact and unambiguous — nothing legitimate rounds to it.
+fn magnitude_unread(value: f32) -> bool {
+    value == 0.0
+}
+
+/// Rules 8 and 9. Silent without a full set of four overmasteries, and
+/// silent about any slot whose magnitude was never read — including rule 9,
+/// which cannot conclude "all four maxed" from a value it never saw.
 pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
     let Some(info) = info else {
         return Vec::new();
@@ -60,6 +81,15 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
             });
             continue;
         };
+
+        // The id is real data even when the magnitude is not — it was read
+        // and passed the hook's own sentinel filter — so the catalogue check
+        // above still applies. Everything below judges the magnitude, and
+        // there is no magnitude to judge.
+        if magnitude_unread(mastery.value) {
+            all_maxed = false;
+            continue;
+        }
 
         let on_ladder = param
             .values
@@ -180,6 +210,81 @@ mod tests {
             (STUN, 0.6),
         ]);
         assert_eq!(audit_overmastery(Some(&info)), vec![]);
+    }
+
+    /// The exact shape three real encounters in this repo's `logs.db` carry
+    /// (logs 404, 445 and 448): four real, catalogued ids whose magnitudes
+    /// were never read. Before the zero guard this accused that player four
+    /// times over.
+    #[test]
+    fn a_production_shaped_unread_set_is_silent() {
+        let info = info(&[
+            (0x9a97_c049, 0.0),
+            (0x9c55_5433, 0.0),
+            (0xc492_5bd7, 0.0),
+            (0x43b7_581d, 0.0),
+        ]);
+        assert_eq!(audit_overmastery(Some(&info)), vec![]);
+    }
+
+    /// A zero silences its own slot only. A genuinely off-ladder magnitude
+    /// elsewhere in the same set is still proof and must still be reported.
+    #[test]
+    fn an_unread_slot_does_not_silence_a_real_off_ladder_value() {
+        let info = info(&[(ATTACK, 0.0), (HEALTH, 777.0), (CRIT, 0.0), (STUN, 0.0)]);
+        let findings = audit_overmastery(Some(&info));
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::OvermasteryValue);
+        assert_eq!(findings[0].subject, Subject::Overmastery(1));
+        assert_eq!(findings[0].observed, Value::Amount(777.0));
+    }
+
+    /// "All four maxed" cannot be concluded from magnitudes that were never
+    /// read. Three maxed slots beside one unread slot must stay silent.
+    #[test]
+    fn all_maxed_does_not_fire_on_a_set_containing_an_unread_slot() {
+        let info = info(&[
+            (ATTACK, 1000.0),
+            (HEALTH, 2000.0),
+            (CRIT, 20.0),
+            (STUN, 0.0),
+        ]);
+        assert_eq!(audit_overmastery(Some(&info)), vec![]);
+    }
+
+    /// The catalogue check is independent of the magnitude: an id that exists
+    /// nowhere in the game's tables is still proof even when the value was
+    /// never read.
+    #[test]
+    fn an_unknown_id_is_still_flagged_when_the_magnitude_was_not_read() {
+        let info = info(&[
+            (0xdead_beef, 0.0),
+            (HEALTH, 800.0),
+            (CRIT, 6.0),
+            (STUN, 0.6),
+        ]);
+        let findings = audit_overmastery(Some(&info));
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::OvermasteryValue);
+        assert_eq!(findings[0].subject, Subject::Overmastery(0));
+    }
+
+    /// No ladder in `overmastery-tables.json` contains 0.0 — the smallest
+    /// magnitude any overmastery can legitimately hold is 0.1 — so a zero can
+    /// only ever mean "not read". This is what makes the guard above safe.
+    #[test]
+    fn zero_is_not_a_legitimate_magnitude_on_any_ladder() {
+        let tables = stock_tables();
+        assert!(!tables.params.is_empty());
+        for (id, param) in &tables.params {
+            for &step in &param.values {
+                assert!(
+                    step >= 0.1 - EPSILON,
+                    "param {id:08x} admits {step}, so a zero magnitude may be real \
+                     and the unread-slot guard needs a different discriminator"
+                );
+            }
+        }
     }
 
     #[test]
