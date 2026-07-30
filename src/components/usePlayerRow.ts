@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import { severityColor, worstSeverity } from "@/legality";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
-import { ComputedPlayerState, MeterColumns, PlayerData, visibleColumns } from "@/types";
+import { ComputedPlayerState, LegalityFinding, MeterColumns, PlayerData, visibleColumns } from "@/types";
 import { PLAYER_COLORS, computeSupPercentage, humanizeNumbers, resolvePlayerColor } from "@/utils";
 
 export type ColumnValue = {
@@ -10,26 +11,53 @@ export type ColumnValue = {
   unit?: string | number;
 };
 
-export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyData: Array<PlayerData | null>) => {
-  const { color_1, color_2, color_3, color_4, show_display_names, show_full_values, overlay_columns, logs_columns } =
-    useMeterSettingsStore(
-      useShallow((state) => ({
-        color_1: state.color_1,
-        color_2: state.color_2,
-        color_3: state.color_3,
-        color_4: state.color_4,
-        show_display_names: state.show_display_names,
-        show_full_values: state.show_full_values,
-        overlay_columns: state.overlay_columns,
-        logs_columns: state.logs_columns,
-      }))
-    );
+export const usePlayerRow = (
+  live: boolean,
+  player: ComputedPlayerState,
+  partyData: Array<PlayerData | null>,
+  /** Build-legality findings per party slot, aligned with `partyData`. Omitted
+   * by callers that have none — an old log, or a fight before the first party
+   * update — which reads as "not judged", never as "clean". */
+  legality?: LegalityFinding[][]
+) => {
+  const {
+    color_1,
+    color_2,
+    color_3,
+    color_4,
+    show_display_names,
+    show_full_values,
+    overlay_columns,
+    logs_columns,
+    highlight_illegal_builds,
+    streamer_mode,
+  } = useMeterSettingsStore(
+    useShallow((state) => ({
+      color_1: state.color_1,
+      color_2: state.color_2,
+      color_3: state.color_3,
+      color_4: state.color_4,
+      show_display_names: state.show_display_names,
+      show_full_values: state.show_full_values,
+      overlay_columns: state.overlay_columns,
+      logs_columns: state.logs_columns,
+      highlight_illegal_builds: state.highlight_illegal_builds,
+      streamer_mode: state.streamer_mode,
+    }))
+  );
 
   const [isOpen, setIsOpen] = useState(false);
 
   const playerColors = [color_1, color_2, color_3, color_4, ...PLAYER_COLORS.slice(4)];
   const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
   const color = resolvePlayerColor(playerColors, partyData, partySlotIndex, player.partyIndex);
+
+  // Colouring a name in an always-on-top overlay is a public accusation, so it
+  // is gated twice: on the user's own choice, and on streamer mode — which
+  // hides names precisely so nothing about a player reaches the stream.
+  const legalityColor = severityColor(
+    highlight_illegal_builds && !streamer_mode ? worstSeverity(legality?.[partySlotIndex] ?? []) : null
+  );
 
   const [totalDamage, totalDamageUnit] = humanizeNumbers(player.totalDamage);
   const [dps, dpsUnit] = humanizeNumbers(player.dps);
@@ -84,6 +112,7 @@ export const usePlayerRow = (live: boolean, player: ComputedPlayerState, partyDa
     isOpen,
     setIsOpen,
     color,
+    legalityColor,
     matchColumnTypeToValue,
     partySlotIndex,
     showFullValues: show_full_values,

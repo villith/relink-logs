@@ -659,6 +659,7 @@ export const ViewPage = () => {
     questCompleted,
     roomIndex,
     playerData,
+    legality,
     setSelectedTargetSpans,
     loadFromResponse,
   } = useEncounterStore((state) => ({
@@ -672,6 +673,7 @@ export const ViewPage = () => {
     targetEntries: state.targetEntries,
     selectedTargetSpans: state.selectedTargetSpans,
     playerData: state.players,
+    legality: state.legality,
     questId: state.questId,
     questTimer: state.questTimer,
     questCompleted: state.questCompleted,
@@ -1356,6 +1358,7 @@ export const ViewPage = () => {
                   setSortType={setSortType}
                   setSortDirection={setSortDirection}
                   partyData={playerData}
+                  legality={legality}
                 />
                 <DetailCharts
                   data={detailData}

@@ -23,6 +23,11 @@ interface MeterSettings {
   transparency: number;
   show_display_names: boolean;
   streamer_mode: boolean;
+  /** Colour a player's name in the meter when the build audit flags their
+   * equipment. A coloured name in an always-on-top overlay is a public
+   * accusation, so it is a choice — and it is suppressed under streamer_mode,
+   * where names are hidden anyway. */
+  highlight_illegal_builds: boolean;
   show_full_values: boolean;
   use_condensed_skills: boolean;
   /** Count Primal Burst damage toward the meters. Off by default: whether a
@@ -57,6 +62,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   transparency: 0.2,
   show_display_names: true,
   streamer_mode: false,
+  highlight_illegal_builds: true,
   show_full_values: false,
   use_condensed_skills: true,
   include_primal_burst: false,

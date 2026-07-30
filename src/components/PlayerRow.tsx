@@ -1,7 +1,7 @@
 import { CaretDown, CaretUp } from "@phosphor-icons/react";
 import { Fragment, useMemo } from "react";
 
-import { ComputedPlayerState, PlayerData } from "@/types";
+import { ComputedPlayerState, LegalityFinding, PlayerData } from "@/types";
 import { NO_TARGETS, damageBarStyle, mergeTargetBreakdowns, translatedPlayerName } from "@/utils";
 
 import { SkillBreakdown } from "./SkillBreakdown";
@@ -13,14 +13,18 @@ export const PlayerRow = ({
   player,
   partyData,
   durationSeconds = 0,
+  legality,
 }: {
   live?: boolean;
   player: ComputedPlayerState;
   partyData: Array<PlayerData | null>;
   durationSeconds?: number;
+  /** Build-legality findings per party slot, aligned with `partyData`. */
+  legality?: LegalityFinding[][];
 }) => {
   const {
     color,
+    legalityColor,
     columns,
     isOpen,
     setIsOpen,
@@ -28,7 +32,7 @@ export const PlayerRow = ({
     showDisplayNames,
     showFullValues,
     matchColumnTypeToValue,
-  } = usePlayerRow(live, player, partyData);
+  } = usePlayerRow(live, player, partyData, legality);
 
   const targetBreakdown = useMemo(
     () => (live ? NO_TARGETS : mergeTargetBreakdowns(player.skillBreakdown.map((skill) => skill.targets))),
@@ -48,7 +52,13 @@ export const PlayerRow = ({
           style={damageBarStyle(color, player.percentage)}
           onClick={() => setIsOpen(!isOpen)}
         >
-          <td className="text-left row-data">
+          {/* `color` is an inline style rather than a class: the meter's rows
+              are plain <td>s outside Mantine, so the severity name maps to a
+              CSS variable the same way Mantine would resolve it. */}
+          <td
+            className="text-left row-data"
+            style={legalityColor ? { color: `var(--mantine-color-${legalityColor}-5)` } : undefined}
+          >
             {translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player, showDisplayNames)}
           </td>
           {columns.map((column) => {

@@ -18,6 +18,7 @@ const MeterSettings = () => {
     transparency,
     show_display_names,
     streamer_mode,
+    highlight_illegal_builds,
     show_full_values,
     use_condensed_skills,
     include_primal_burst,
@@ -75,6 +76,13 @@ const MeterSettings = () => {
           label={t("ui.streamer-mode")}
           checked={streamer_mode}
           onChange={(event) => setMeterSettings({ streamer_mode: event.currentTarget.checked })}
+        />
+      </Tooltip>
+      <Tooltip label={t("ui.highlight-illegal-builds-description")}>
+        <Checkbox
+          label={t("ui.highlight-illegal-builds")}
+          checked={highlight_illegal_builds}
+          onChange={(event) => setMeterSettings({ highlight_illegal_builds: event.currentTarget.checked })}
         />
       </Tooltip>
       <Tooltip label={t("ui.show-full-values-description")}>

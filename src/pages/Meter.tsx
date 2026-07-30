@@ -11,6 +11,8 @@ export const Meter = () => {
     encounterState,
     partyData,
     lastPartyData,
+    legality,
+    lastLegality,
     elapsedTime,
     sortType,
     setSortType,
@@ -33,6 +35,7 @@ export const Meter = () => {
           live
           encounterState={encounterState}
           partyData={encounterState.status === "Stopped" ? lastPartyData : partyData}
+          legality={encounterState.status === "Stopped" ? lastLegality : legality}
           sortType={sortType}
           setSortType={setSortType}
           sortDirection={sortDirection}

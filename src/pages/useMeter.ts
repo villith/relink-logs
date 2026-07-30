@@ -2,6 +2,7 @@ import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import {
   EncounterState,
   EncounterUpdateEvent,
+  LegalityFinding,
   MeterColumns,
   PartyUpdateEvent,
   PlayerData,
@@ -31,6 +32,11 @@ export default function useMeter() {
   const [partyData, setPartyData] = useState<Array<PlayerData | null>>([null, null, null, null]);
   const [encounterState, setEncounterState] = useState<EncounterState>(DEFAULT_ENCOUNTER_STATE);
   const [lastPartyData, setLastPartyData] = useState<Array<PlayerData | null>>([null, null, null, null]);
+  // Build-legality findings per party slot. A live fight has no stored row to
+  // read verdicts from, so the backend derives them and pushes them alongside
+  // the party update.
+  const [legality, setLegality] = useState<LegalityFinding[][]>([[], [], [], []]);
+  const [lastLegality, setLastLegality] = useState<LegalityFinding[][]>([[], [], [], []]);
 
   const previousStatus = usePrevious(encounterState.status);
 
@@ -81,6 +87,10 @@ export default function useMeter() {
       setPartyData(event.payload);
     });
 
+    const onLegalityUpdate = listen("encounter-legality-update", (event: { payload: LegalityFinding[][] }) => {
+      setLegality(event.payload);
+    });
+
     const onSuccessAlert = listen("success-alert", (evt) => {
       toast.success(evt.payload as string);
     });
@@ -107,6 +117,7 @@ export default function useMeter() {
       encounterSavedErrorListener.then((f) => f());
       onAreaEnterListener.then((f) => f());
       onPartyUpdate.then((f) => f());
+      onLegalityUpdate.then((f) => f());
       onSuccessAlert.then((f) => f());
       onErrorAlert.then((f) => f());
       onPinned.then((f) => f());
@@ -125,8 +136,11 @@ export default function useMeter() {
   useEffect(() => {
     if (previousStatus === "InProgress" && encounterState.status === "Stopped") {
       setLastPartyData(partyData);
+      // Frozen with the party it describes: the finished fight stays on screen
+      // and its colours must stay with it.
+      setLastLegality(legality);
     }
-  }, [previousStatus, encounterState.status, partyData]);
+  }, [previousStatus, encounterState.status, partyData, legality]);
 
   const elapsedTime = Math.max(currentTime - encounterState.startTime, 0);
 
@@ -134,6 +148,8 @@ export default function useMeter() {
     encounterState,
     partyData,
     lastPartyData,
+    legality,
+    lastLegality,
     elapsedTime,
     sortType,
     setSortType,

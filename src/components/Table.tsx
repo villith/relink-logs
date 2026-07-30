@@ -5,6 +5,7 @@ import { useMeterSettingsStore } from "../stores/useMeterSettingsStore";
 import {
   ComputedPlayerState,
   EncounterState,
+  LegalityFinding,
   MeterColumns,
   PlayerData,
   SortDirection,
@@ -22,10 +23,13 @@ export const Table = ({
   sortDirection,
   setSortType,
   setSortDirection,
+  legality,
 }: {
   live?: boolean;
   encounterState: EncounterState;
   partyData: Array<PlayerData | null>;
+  /** Build-legality findings per party slot, aligned with `partyData`. */
+  legality?: LegalityFinding[][];
   sortType: SortType;
   sortDirection: SortDirection;
   setSortType: (sortType: SortType) => void;
@@ -109,6 +113,7 @@ export const Table = ({
             player={player}
             partyData={partyData}
             durationSeconds={durationSeconds}
+            legality={legality}
           />
         ))}
       </tbody>
