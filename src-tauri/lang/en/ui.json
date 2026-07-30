@@ -10,6 +10,8 @@
       "out-of-date": "Hook out of date",
       "unresponsive": "Hook not responding",
       "no-game": "No game found",
+      "dll-missing": "Hook file missing",
+      "how-to-fix": "How to fix",
       "refresh": "Refresh hook",
       "restart-game": "Restart the game to update the hook",
       "refresh-encounter-warning": "This will interrupt the current encounter. Refresh the hook now?",
