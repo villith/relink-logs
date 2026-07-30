@@ -87,6 +87,7 @@
         "msi"
       ],
       "identifier": "com.false",
+      "publisher": "Scott Donnelly",
       "longDescription": "GBFR Logs - DPS Meter for Granblue Fantasy: Relink",
       "shortDescription": "GBFR Logs",
       "icon": [

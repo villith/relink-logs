@@ -268,9 +268,43 @@ async fn handshake_and_apply(app: &AppHandle) {
 /// Deliberately `hello` and not `handshake`: this loop IS the retry, so the
 /// backoff ladder would only spend four RPCs (and up to ~10s) per tick to
 /// reach the same verdict the next tick re-checks anyway.
+/// Re-stat the hook DLL and publish the result if the derived status changed.
+///
+/// Antivirus quarantines this file (see `hook_dll`), and until it had a state
+/// of its own the app reported the aftermath as "No game found" — the inject
+/// error went to reload-debug.log and the UI claimed success regardless. Three
+/// callers share this: startup (before the game is even running, when the user
+/// can still act), the injection loop, and the heartbeat (which is what
+/// notices a quarantine that happens mid-session). One `is_file` on a local
+/// directory, so the heartbeat can afford it every tick.
+#[cfg(windows)]
+fn refresh_hook_dll_presence(app: &AppHandle) {
+    let hook = app.state::<HookStatus>();
+    let before = hook.snapshot();
+    let found = gbfr_logs::hook_dll::injectable_hook();
+    match &found {
+        Some(path) => log::debug!("hook DLL present at {path:?}"),
+        None => log::warn!(
+            "no hook DLL in any of {:?} — almost always antivirus quarantine; \
+             nothing can be injected until it is restored",
+            gbfr_logs::hook_dll::search_dirs()
+        ),
+    }
+    hook.dll_missing.store(found.is_none(), Ordering::Relaxed);
+    if hook.snapshot() != before {
+        emit_hook_status(app);
+    }
+}
+
 async fn hook_heartbeat(app: AppHandle) {
     loop {
         tokio::time::sleep(toolbox_rpc::HEARTBEAT_INTERVAL).await;
+
+        // Before the connected/gated early-out below: a quarantine that lands
+        // while no game is running is exactly the case the user needs told,
+        // and it is the case the RPC-only heartbeat could never see.
+        #[cfg(windows)]
+        refresh_hook_dll_presence(&app);
 
         let hook = app.state::<HookStatus>();
         // Nothing to ask when the stream is down. A teardown in flight is
@@ -1271,42 +1305,81 @@ async fn check_and_perform_hook(app: AppHandle) {
 
         match OwnedProcess::find_first_by_name(gbfr_logs::game_mem::GAME_EXE) {
             Some(target) => {
-                let syringe = Syringe::for_process(target);
-                let debug_dll_path = Path::new("hook-dbg.dll");
-                let mut dll_path = Path::new("hook.dll");
+                // `Syringe` is !Send, so nothing may await while it is alive —
+                // hence this sync block, which decides and then drops it. The
+                // retry sleeps happen outside, after `ready` comes back false.
+                let ready = {
+                    let syringe = Syringe::for_process(target);
 
-                if cfg!(debug_assertions) && debug_dll_path.exists() {
-                    dll_path = debug_dll_path;
-                }
-
-                // If a hook is ALREADY mapped, do not inject again and NEVER
-                // FreeLibrary it here. A live hook has detours installed and game
-                // threads running through its trampolines; unmapping it out from
-                // under them crashes the game (AccessViolation). A second inject
-                // would only bump the refcount without re-running the ctor
-                // (LoadLibrary runs it once). The only safe teardown of a live
-                // hook is the graceful control-channel path in reload_hook_inner,
-                // which disables the detours and fully unmaps BEFORE we get here —
-                // so a real reload arrives with nothing mapped and injects below.
-                // A hook already present is therefore either that live hook (from
-                // a prior app session) or an abnormally dead one: in both cases we
-                // just (re)connect and let the pipe tell us which.
-                if hook_module_present(&syringe) {
-                    reload_dbg(
-                        "check_and_perform_hook: a hook is already mapped; connecting without re-inject (never FreeLibrary a live hook)",
-                    );
-                } else {
-                    reload_dbg(&format!(
-                        "check_and_perform_hook: game found, injecting {dll_path:?}"
-                    ));
-                    match syringe.inject(dll_path) {
-                        Ok(module) => reload_dbg(&format!(
-                            "check_and_perform_hook: inject OK ({dll_path:?} -> {module:?})"
-                        )),
-                        Err(e) => reload_dbg(&format!(
-                            "check_and_perform_hook: inject FAILED for {dll_path:?}: {e:?}"
-                        )),
+                    // If a hook is ALREADY mapped, do not inject again and NEVER
+                    // FreeLibrary it here. A live hook has detours installed and game
+                    // threads running through its trampolines; unmapping it out from
+                    // under them crashes the game (AccessViolation). A second inject
+                    // would only bump the refcount without re-running the ctor
+                    // (LoadLibrary runs it once). The only safe teardown of a live
+                    // hook is the graceful control-channel path in reload_hook_inner,
+                    // which disables the detours and fully unmaps BEFORE we get here —
+                    // so a real reload arrives with nothing mapped and injects below.
+                    // A hook already present is therefore either that live hook (from
+                    // a prior app session) or an abnormally dead one: in both cases we
+                    // just (re)connect and let the pipe tell us which.
+                    if hook_module_present(&syringe) {
+                        reload_dbg(
+                            "check_and_perform_hook: a hook is already mapped; connecting without re-inject (never FreeLibrary a live hook)",
+                        );
+                        true
+                    } else {
+                        // Stat before injecting: a quarantined DLL is the
+                        // common failure here, and it deserves a named state
+                        // rather than an inject error nobody reads. Keep
+                        // polling — restoring the file then self-heals
+                        // without an app restart.
+                        refresh_hook_dll_presence(&app);
+                        match gbfr_logs::hook_dll::injectable_hook() {
+                            None => {
+                                reload_dbg(
+                                    "check_and_perform_hook: game found but NO hook DLL on disk; \
+                                     not injecting (see the hook status badge)",
+                                );
+                                false
+                            }
+                            Some(dll_path) => {
+                                reload_dbg(&format!(
+                                    "check_and_perform_hook: game found, injecting {dll_path:?}"
+                                ));
+                                match syringe.inject(&dll_path) {
+                                    Ok(module) => {
+                                        reload_dbg(&format!(
+                                            "check_and_perform_hook: inject OK ({dll_path:?} -> {module:?})"
+                                        ));
+                                        true
+                                    }
+                                    // Used to fall through to the "Found
+                                    // game.." toast below and then wait on a
+                                    // pipe nothing would ever serve. Say so
+                                    // and retry instead.
+                                    Err(e) => {
+                                        reload_dbg(&format!(
+                                            "check_and_perform_hook: inject FAILED for {dll_path:?}: {e:?}"
+                                        ));
+                                        log::error!(
+                                            "hook injection failed for {dll_path:?}: {e:?}"
+                                        );
+                                        let _ = app.emit_all(
+                                            "error-alert",
+                                            format!("Hook injection failed: {e}"),
+                                        );
+                                        false
+                                    }
+                                }
+                            }
+                        }
                     }
+                };
+
+                if !ready {
+                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                    continue;
                 }
                 let _ = app.emit_all("success-alert", "Found game..");
 
@@ -2217,6 +2290,12 @@ fn main() {
             update_tray_labels,
         ])
         .setup(|app| {
+            // Before anything waits on a game: if antivirus took the hook DLL,
+            // the badge says so from the first frame rather than after the
+            // user has launched the game and watched an empty meter.
+            #[cfg(windows)]
+            refresh_hook_dll_presence(&app.handle());
+
             // Perform the game hook check in a separate thread.
             tauri::async_runtime::spawn(check_and_perform_hook(app.handle()));
             // Outlives individual connections on purpose: it must also run for

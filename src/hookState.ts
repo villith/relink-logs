@@ -12,6 +12,7 @@ export const HOOK_DOT_COLOR: Record<HookState, string> = {
   reconnecting: "#ffd43b",
   outOfDate: "#ffd43b",
   unresponsive: "#ffd43b",
+  dllMissing: "#ff6b6b",
   disconnected: "#868e96",
 };
 
@@ -21,6 +22,7 @@ export const HOOK_TONE_CLASS: Record<HookState, string> = {
   reconnecting: "hook-warn",
   outOfDate: "hook-warn",
   unresponsive: "hook-warn",
+  dllMissing: "hook-error",
   disconnected: "hook-idle",
 };
 
@@ -29,6 +31,7 @@ export const HOOK_LABEL_KEY: Record<HookState, string> = {
   reconnecting: "ui.hook-status.reconnecting",
   outOfDate: "ui.hook-status.out-of-date",
   unresponsive: "ui.hook-status.unresponsive",
+  dllMissing: "ui.hook-status.dll-missing",
   disconnected: "ui.hook-status.no-game",
 };
 

@@ -42,6 +42,15 @@ pub struct HookStatus {
     pub hook_version: Mutex<Option<String>>,
     /// True when the connected hook advertised the `eject` control channel.
     pub supports_eject: AtomicBool,
+    /// True when the hook DLL is not on disk where the injector looks for it
+    /// (`crate::hook_dll::search_dirs`). Almost always antivirus: the DLL
+    /// injects into a game process and installs inline detours, which a
+    /// behavioural scanner cannot tell apart from a cheat, so it gets
+    /// quarantined despite being Authenticode-signed. Kept as its own flag,
+    /// not folded into `connected`, because it is a fact about the *disk* and
+    /// stays true while no game is running — which is exactly when the user
+    /// can still act on it.
+    pub dll_missing: AtomicBool,
     /// Dev-only: hold the hook OUT of the game process after an eject, so a
     /// debug `Disconnected` stays put instead of self-healing when the
     /// injection loop reinjects a second later. Deliberately NOT read by
@@ -70,6 +79,9 @@ pub enum HookState {
     /// Its version is UNKNOWN here — deliberately not folded into
     /// `OutOfDate`, which asserts something we have not been told.
     Unresponsive,
+    /// The hook DLL is not on disk, so there is nothing to inject. Ranked
+    /// above `Disconnected` because it is a known cause, not an absence.
+    DllMissing,
     /// No hook / game not running.
     Disconnected,
 }
@@ -146,10 +158,18 @@ impl HookStatus {
         // `outdated` outranks `unresponsive`: a version verdict came from the
         // hook itself and stays true even once it stops answering, whereas
         // `unresponsive` only ever means "unknown".
+        // `dll_missing` is checked only once the stream is known to be down: a
+        // hook that is mapped and answering works regardless of what is on
+        // disk, and telling that user their install is broken would be both
+        // useless and wrong. See the snapshot tests.
         let state = if self.reloading.load(Ordering::Relaxed) {
             HookState::Reconnecting
         } else if !self.connected.load(Ordering::Relaxed) {
-            HookState::Disconnected
+            if self.dll_missing.load(Ordering::Relaxed) {
+                HookState::DllMissing
+            } else {
+                HookState::Disconnected
+            }
         } else if self.outdated.load(Ordering::Relaxed) || version_mismatch {
             HookState::OutOfDate
         } else if self.unresponsive.load(Ordering::Relaxed) {
@@ -402,6 +422,37 @@ mod tests {
             HookStatus::default().snapshot().state,
             HookState::Disconnected
         );
+    }
+
+    /// Antivirus quarantining hook.dll used to be indistinguishable from "the
+    /// game isn't running": the inject failed into a debug log and the badge
+    /// said "No game found". It is a distinct, actionable fact and says so.
+    #[test]
+    fn snapshot_dll_missing_when_the_file_is_gone() {
+        let hook = HookStatus::default();
+        hook.dll_missing.store(true, Ordering::Relaxed);
+        assert_eq!(hook.snapshot().state, HookState::DllMissing);
+    }
+
+    /// A live hook is a live hook. The DLL can vanish from disk *after* it was
+    /// injected (a mid-session quarantine, or an update replacing it), and the
+    /// meter keeps working off the mapped module — so the badge must not cry
+    /// broken at someone whose session is fine. It surfaces on the next launch,
+    /// when it is actually true.
+    #[test]
+    fn snapshot_prefers_a_live_hook_over_a_missing_file() {
+        let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
+        hook.dll_missing.store(true, Ordering::Relaxed);
+        assert_eq!(hook.snapshot().state, HookState::Connected);
+    }
+
+    /// A teardown in flight has deleted nothing; `Reconnecting` still outranks.
+    #[test]
+    fn snapshot_reconnecting_outranks_dll_missing() {
+        let hook = HookStatus::default();
+        hook.dll_missing.store(true, Ordering::Relaxed);
+        hook.reloading.store(true, Ordering::Relaxed);
+        assert_eq!(hook.snapshot().state, HookState::Reconnecting);
     }
 
     #[test]
