@@ -29,15 +29,20 @@ Two failure classes, two approaches:
 | pattern 0 matches / offset warning | broken **AOB signature** | sigscan (re-anchor) |
 | wrong value read, no crash | shifted **struct field offset** | sigscan `dumprva` + live diag |
 | game crashes on hook | wrong **function target/arity** | Ghidra (find true entry) |
+| every sig still matches, but a feature silently reads nothing | shifted **hardcoded RVA** | see "Relocating hardcoded RVAs" |
+
+**A patch can move every hardcoded RVA while leaving every AOB signature matching.** That was the whole of 2.0.3: `.data` moved uniformly, the hook log looked healthy (`[hook ok]` across the board), and the only symptom was features quietly reading nothing. Whenever a patch breaks behaviour but not signatures, audit the `const *_RVA` blocks first — `grep -rn "RVA: usize" src-hook/ src-tauri/`.
 
 ## The sigscan harness
 
 ```sh
 # from repo root; GBFR_EXE overrides the default Steam path
-cargo run -p hook --bin sigscan --release -- "<pelite pattern>" [mode]
+cargo run -p hook --bin sigscan --release -- "<pelite pattern>" [mode] [--all]
 ```
 
 Modes: `slice_u32` (default, read a u32 operand at cursor), `slice_u8`, `addr` (follow a call, report target RVA), `dumprva <hexrva> [len]` (raw bytes at an RVA).
+
+`--all` widens the scan from the code section to the **whole image**. Hook signatures are all code, so the default is right for them — but data lives outside it, and without `--all` a pattern in `.rdata`/`.data` silently reports **0 matches**. Needed for the RTTI vtable walk below.
 
 Every match prints `pre:` (24 bytes before) + `at:` (48 bytes from the match) — essential for re-anchoring. **Want exactly 1 match.** See the file header in `src-hook/src/bin/sigscan.rs` for details.
 
@@ -53,6 +58,36 @@ Old patterns embed **magic type-hash constants** (e.g. `0x887ae0b0` = LE `b0 e0 
 4. `sigscan "<new pattern>"` until it gives **1 match** with the right value.
 
 Compiler drift to expect: `mov eax,K`→`mov r8d,K` (`b8`→`41 b8`); base register `rsi`→`r14` (`48 8d 8e`→`49 8d 8e`); AVX sequences re-ordered.
+
+### Relocating hardcoded RVAs (data globals)
+
+A global is reached by some instruction's RIP-relative displacement, so recover it from the code that uses it:
+
+1. `XrefsTo.java` on the **old analyzed DB** → the code sites referencing the stale RVA.
+2. `DumpBytes.java` on the old DB → the bytes at that site.
+3. Wildcard the disp32, scan the **new** exe, and compute `target = cursor_rva + 4 + disp` (plus any bytes trailing the disp32, e.g. 4 more for a trailing imm32 as in `cmp dword [rip+x], imm32`).
+
+**Take the disp32's address from sigscan's reported `cursor_rva` — never by counting bytes in a hex dump by eye.** Miscounting is silent: the value still lands in the same BSS region, still looks like a plausible global, and simply reads nothing at runtime. A 2.0.3 pass mis-sited three displacements by 8 this way, shipped, and cost a full live-test round.
+
+**The strongest check: byte-diff the whole enclosing function, old vs new.** These functions are typically identical apart from their displacement bytes, so the diff pins every displacement position exactly — and running the same arithmetic on the *old* function must reproduce the *old, known-good* value. That reproduction is the proof.
+
+Cross-check two ways: derive the same global from two independent call sites, and compare against the section's common delta (2.0.3: every `.data` global moved `-0x3040`). **Uniformity is a check, not a derivation** — but any value that breaks it is far more likely to be your arithmetic than a real anomaly.
+
+### Relocating vtable RVAs (RTTI walk)
+
+Vtables have no RIP-relative xrefs to chase, so walk **MSVC RTTI** forward from the class name, which survives recompiles. Get the old names with `SymbolAt.java` on the analyzed DB, then in the new exe (all scans need `--all`, since none of this is in the code section):
+
+```
+".?AV<Class>@@" string  ->  TypeDescriptor       (the string sits at TD+0x10)
+TypeDescriptor          ->  Complete Object Locator  (COL+0x0C holds the TD's RVA)
+COL                     ->  vtable               (the qword at vtable-8 points at the COL)
+```
+
+COL layout: `sig(0)=1, offset(4), cdOffset(8), pTypeDescriptor(0xC), pClassDescriptor(0x10), pSelf(0x14)`.
+
+**These classes carry ~20 COLs each** (one per base subobject of a deep multiple-inheritance hierarchy), so `sig==1` alone is not discriminating. The vtable that lands at `*(object)` — the one the hook compares — is the **subobject at offset 0**: filter `sig==1 && offset==0 && cdOffset==0 && pSelf==colRva`.
+
+Always **round-trip**: feed each recovered vtable RVA back through the walk and confirm it yields the class you started from. That turns 18 guesses into 18 verified facts.
 
 ### Shifted struct field (wrong value, no crash)
 
@@ -160,6 +195,8 @@ The injected DLL is **locked while the game runs** — close the game to swap it
 
 ## Common mistakes
 
+- **Hand-counting a disp32's position in a hex dump.** Use sigscan's `cursor_rva`, or byte-diff the enclosing function. An off-by-N lands in the same BSS region and reads as a plausible global, so nothing errors — the feature just silently returns nothing.
+- **Assuming the OLD exe is still around to compare against.** Steam patches it **in place**, so the moment you launch after an update the old binary is gone. Its Ghidra DB is the only surviving record — keep the previous version's `.rep` until the new one is fully derived and live-verified.
 - **Trusting a unique `call`-follow match as a hook target.** Unique ≠ clean entry. The followed target can be a callee mid-function. Always confirm the entry with Ghidra before detouring. (This crashed the quest hook on v2.0.2: the old sig followed a call to a 2-arg helper hooked as 1-arg.)
 - **Running the DEFAULT full Ghidra auto-analysis.** Multi-hour (Decompiler Parameter ID ~10x's it). For quick lookups use lean `-noanalysis` + targeted scripts; when you genuinely need the decompiler, use the *fast* analysis (analyzers disabled via `FastAnalysisOptions.java`) — and note the analyzed `gbfr202fast` DB already exists for v2.0.2, so query it, don't rebuild.
 - **Misidentifying the Ghidra java PID as hung.** Sampling the wrong `java.exe` (e.g. the editor's `redhat.java` LSP) shows 0 CPU and looks dead. Match on `ghidra.GhidraClassLoader` in the command line first.
@@ -171,6 +208,8 @@ The injected DLL is **locked while the game runs** — close the game to swap it
 ## Files
 
 - `src-hook/src/bin/sigscan.rs` — the harness (in-repo, committed).
+- `ghidra/DumpBytes.java` — RVA(s) → raw hex bytes from the program (lean DB). THE query for "what did the OLD exe look like here" once Steam has patched the exe in place and only its Ghidra DB survives. Pair with `XrefsTo`: xref site → `DumpBytes` → wildcard the disp32 → scan the NEW exe → read the new displacement.
+- `ghidra/SymbolAt.java` — RVA(s) → the symbols defined there (needs the **analyzed** DB). The inverse of `ListSymbols`. THE query for "what class is this vtable RVA", i.e. the first step in relocating a hardcoded vtable list after a patch.
 - `ghidra/FindEntry.java` — anchor RVA(s) → containing-function entry RVA + prologue bytes (lean DB).
 - `ghidra/InspectFunc.java` — entry RVA(s) → callers, callees, string refs, prologue disasm (lean DB).
 - `ghidra/FindByBytes.java` — byte pattern → containing-function entry for each hit (lean DB).
@@ -183,6 +222,8 @@ The injected DLL is **locked while the game runs** — close the game to swap it
 - `ghidra/Decompile.java` — RVA(s) → decompiled C of the containing function (needs the **analyzed** `gbfr202fast` DB).
 - `ghidra/FastAnalysisOptions.java` — pre-script that disables slow analyzers for the fast full-analysis build.
 
-**Two Ghidra DBs** (both under `C:\Users\Scott\ghidra-projects\gbfr`, both persist): `gbfr202lean` (import-only, for fast FindEntry/InspectFunc/FindByBytes lookups) and `gbfr202fast` (fully analyzed, for `Decompile.java` + xrefs + C++ RTTI names). Re-create both only after a new game patch.
+**Ghidra DBs** (all under `C:\Users\Scott\ghidra-projects\gbfr`, all persist). Two kinds per game version: `gbfr<ver>lean` (import-only, for fast FindEntry/InspectFunc/FindByBytes lookups) and `gbfr<ver>fast` (fully analyzed, for `Decompile.java` + xrefs + `SymbolAt`/C++ RTTI names). Re-create both only after a new game patch.
+
+Present: **`gbfr202lean` / `gbfr202fast`** (v2.0.2) and **`gbfr203lean` / `gbfr203fast`** (v2.0.3). **Keep the previous version's DBs** — the 2.0.3 fix was derived almost entirely by querying `gbfr202fast` for xrefs and old bytes, which is impossible once Steam has overwritten the old exe.
 
 Detailed, evolving findings for the current patch live in the memory file `gbfr-endless-ragnarok-break` (verified entries, offsets, and per-hook status).

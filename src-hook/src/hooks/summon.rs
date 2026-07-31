@@ -18,25 +18,34 @@ use crate::hooks::GetEntityHashID0x58;
 /// `*(summon) - MODULE_BASE` — a plain read and compare, never a vfunc call on
 /// a swept pointer. Goes stale on every game patch by design; a miss fails
 /// closed and warns once.
+/// v2.0.3 values, re-derived 2026-07-31. Each was recovered by walking MSVC RTTI
+/// forward from the class name, which survives recompiles: the `.?AV<Class>@@`
+/// string locates the TypeDescriptor, the Complete Object Locator carrying that
+/// TD's RVA *at subobject offset 0* is the primary one (these classes each have
+/// ~20 COLs, one per base of a deep multiple-inheritance hierarchy — only the
+/// offset-0 subobject's vtable is what `*(summon)` yields), and the qword
+/// pointing at that COL sits at vtable-8. Every entry was then round-tripped back
+/// through the same walk to confirm the RVA yields the class it came from, so
+/// these are read facts, not the -0x4040 section shift applied arithmetically.
 const SUMMON_BASE_VTABLE_RVAS: &[usize] = &[
-    0x59C61D0, // BehaviorSummonObjectBase (generic/data-driven body)
-    0x5C58DD0, // So0000  Lucilius
-    0x5C59FF0, // So4e00  Albacore
-    0x5C5CA60, // So6400  Wheel of Fate
-    0x5C5DC10, // So0200  Rolan
-    0x5C5EDA0, // So2001  Silverslime var.
-    0x5C61020, // So4502  Lilith var.
-    0x5E75600, // So4500  Lilith
-    0x5E78240, // So4c00  Managarmr Nihilla
-    0x5E793D0, // So1d00  Quakadile
-    0x5E7A4C0, // So9200  Beelzebub
-    0x5E7B650, // So0d00  Goblin Soldier
-    0x5E7C7E0, // So4f00  Hope-Filled Skydwellers
-    0x5E7D990, // So5600  Mellose Clan
-    0x5E7EB40, // So5700  Crew Alliance Rafale
-    0x5E7FCF0, // So5f01  Cat var.
-    0x617F998, // So1100  Goblin Warrior
-    0x617FD38, // So1100Base (generic body)
+    0x59C2190, // BehaviorSummonObjectBase (generic/data-driven body)
+    0x5C54D90, // So0000  Lucilius
+    0x5C55FB0, // So4e00  Albacore
+    0x5C58A20, // So6400  Wheel of Fate
+    0x5C59BD0, // So0200  Rolan
+    0x5C5AD60, // So2001  Silverslime var.
+    0x5C5CFE0, // So4502  Lilith var.
+    0x5E715C0, // So4500  Lilith
+    0x5E74200, // So4c00  Managarmr Nihilla
+    0x5E75390, // So1d00  Quakadile
+    0x5E76480, // So9200  Beelzebub
+    0x5E77610, // So0d00  Goblin Soldier
+    0x5E787A0, // So4f00  Hope-Filled Skydwellers
+    0x5E79950, // So5600  Mellose Clan
+    0x5E7AB00, // So5700  Crew Alliance Rafale
+    0x5E7BCB0, // So5f01  Cat var.
+    0x617B980, // So1100  Goblin Warrior
+    0x617BD20, // So1100Base (generic body)
 ];
 
 /// One-shot latch so a patch that moves these vtables logs once per session

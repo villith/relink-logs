@@ -68,10 +68,19 @@ const ON_HANDLE_SBA_UPDATE_SIG: &str = "48 89 f1 c5 f8 28 ce 41 89 d8 e8 $ { ' }
 // All of it is plain data walking — replicated below with guarded reads, no
 // game code called. SBAPOLL probe first; production events once live-verified.
 // ---------------------------------------------------------------------------
-const SBA_SLOT_HANDLES_RVA: usize = 0x70367f0;
+/// v2.0.3 RVAs (re-derived 2026-07-31; the 2.0.2 values are in the trailing
+/// comments). The patch shifted every data global by -0x3040, but each of these
+/// was read back out of the new binary rather than shifted arithmetically:
+/// the slot-handle table from the `vmovaps xmm0,[rip+..]` in all three party-wide
+/// appliers (they agree), and the entity table + component-type id from the
+/// handle→component resolver those appliers call (2.0.2 `FUN_1406d2490`, now at
+/// rva 0x6cbb30). The resolver's shape is unchanged — it still validates against
+/// the entity table's +0x48 id / +0x20 entity arrays, takes the specified actor
+/// at +0x70, and looks the component up in the +0xC0 map.
+const SBA_SLOT_HANDLES_RVA: usize = 0x70337b0; // 2.0.2: 0x70367f0
 const SBA_SLOT_HANDLE_STRIDE: usize = 0x18;
-const ENTITY_TABLE_RVA: usize = 0x70214e8;
-const SBA_COMPONENT_TYPE_RVA: usize = 0x7ab3f50;
+const ENTITY_TABLE_RVA: usize = 0x701e4a8; // 2.0.2: 0x70214e8
+const SBA_COMPONENT_TYPE_RVA: usize = 0x7ab0f10; // 2.0.2: 0x7ab3f50
 /// Session-mode global: `DAT_147c54810` is a pointer; the game's own online checks
 /// read `*(int*)(ptr + 4) == 3` (seen in FUN_143029580 and the result-screen router
 /// decompiles). Logged per poll to mark the online→offline transition an AFK
@@ -79,7 +88,7 @@ const SBA_COMPONENT_TYPE_RVA: usize = 0x7ab3f50;
 /// still read `online=1` during the offline tail), so this global is the candidate
 /// production signal for "currently an online lobby".
 #[cfg(feature = "hookdiag")]
-const SESSION_MODE_PTR_RVA: usize = 0x7c54810;
+const SESSION_MODE_PTR_RVA: usize = 0x7c517d0; // 2.0.2: 0x7c54810
 const ON_ATTEMPT_SBA_SIG: &str = "e8 $ { ' } 48 8d 8e ? ? ff ff c7 44 24 38 00 00 80 3f";
 const ON_CHECK_SBA_COLLISION_SIG: &str = "e8 $ { ' } 84 c0 0f 85 f0 00 00 ? 8b 8e ? ? ff ff";
 const ON_CONTINUE_SBA_CHAIN_SIG: &str = "e8 $ { ' } 48 8b 53 ? 48 8d 82 ? ? ? ?";
