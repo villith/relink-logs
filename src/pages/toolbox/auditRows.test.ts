@@ -121,6 +121,27 @@ describe("caseFor", () => {
     expect(caseFor(siunaus).fights[0].questId).toBe(401);
   });
 
+  /** The fight list is the case's table of contents, so every fight has to name
+   * the entry it jumps to. A fight whose findings all deduplicated into a newer
+   * fight's entry has no entry of its own — it must point at the one that
+   * absorbed it rather than at nothing, or most of the contents are dead. */
+  it("points a deduplicated fight at the entry that absorbed it", () => {
+    const fights = caseFor(siunaus).fights;
+
+    expect(fights.map((f) => f.logId)).toEqual([10, 11]);
+    // Fight 11 carries only the repeated sigil-level finding, whose evidence is
+    // kept against the newer fight 10.
+    expect(fights.map((f) => f.entryLogId)).toEqual([10, 10]);
+  });
+
+  /** A fight that contributed its own distinct finding is its own entry. */
+  it("points a fight with its own evidence at itself", () => {
+    const relevelled = { ...sigilLevel, observed: { kind: "level" as const, value: 30 } };
+    const changed = player("changed", [row(1, 100, sigilLevel), row(2, 200, relevelled)]);
+
+    expect(caseFor(changed).fights.map((f) => f.entryLogId)).toEqual([2, 1]);
+  });
+
   /** Two sigil rules across two fights are still one "Impossible Sigil" — the
    * chips say what is wrong with the build, not how often it was measured. */
   it("summarises what the person is flagged for, each violation once", () => {

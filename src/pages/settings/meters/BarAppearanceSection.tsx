@@ -1,7 +1,7 @@
 import useSettings from "@/pages/useSettings";
 import { useIsLinux } from "@/platform";
 import { BAR_TEXTURES, DEFAULT_BAR_APPEARANCE, type BarFillMode } from "@/stores/useMeterSettingsStore";
-import { Select, SimpleGrid, Text } from "@mantine/core";
+import { Select, SimpleGrid } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 import { SettingsSection } from "../SettingsSection";
 import { LabelledSlider } from "./LabelledSlider";
@@ -22,12 +22,6 @@ export const BarAppearanceSection = () => {
 
   return (
     <SettingsSection title={t("ui.bar-appearance-section")} onReset={reset}>
-      {/* The fill-mode description sits here rather than on its Select: as a
-          two-line `description` it made that Select 60px taller than the one
-          beside it, so the pair no longer lined up. */}
-      <Text size="xs" c="dimmed">
-        {t("ui.bar-fill-mode-description")}
-      </Text>
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
         <Select
           label={t("ui.bar-fill-mode")}

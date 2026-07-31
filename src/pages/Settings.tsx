@@ -15,12 +15,14 @@ export const SETTINGS_SECTIONS: NavRailSection[] = [
     labelKey: "ui.settings-nav.meters",
     labelFallback: "Meters",
     icon: Gauge,
+    newId: "meter-settings",
   },
   {
     to: "/logs/settings/overlay",
     labelKey: "ui.settings-nav.overlay",
     labelFallback: "Overlay",
     icon: Monitor,
+    newId: "overlay-settings",
   },
   {
     to: "/logs/settings/checklist",

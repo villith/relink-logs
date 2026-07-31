@@ -2829,7 +2829,12 @@ impl Parser {
             // Audit while the equipment is in hand. Re-running the rules later
             // means decompressing and reparsing this blob again, which is the
             // whole cost the stored findings exist to avoid.
-            self.encounter.write_legality_findings(conn, id)?;
+            //
+            // Asked with the very timestamp stored as `time` above, so this
+            // agrees with the sweep by construction rather than by coincidence.
+            if crate::legality::should_audit(start_datetime.timestamp_millis()) {
+                self.encounter.write_legality_findings(conn, id)?;
+            }
 
             return Ok(Some(id));
         }
@@ -2848,12 +2853,9 @@ mod legality_save_tests {
     /// Also pins the STAMP. Without it every freshly saved log would look
     /// stale to the startup sweep and be re-audited on the next launch — the
     /// sweep would never converge and the write here would be pointless work.
-    #[test]
-    fn saving_an_encounter_stores_its_findings_and_stamps_the_rules_version() {
-        let mut parser = super::tests::parser_with_memory_db();
-
-        // Behemoth III with the boss-set Healing Cap Up at its top: +75%
-        // against a +50% ceiling, so both summon-bonus rules fire.
+    /// Behemoth III with the boss-set Healing Cap Up at its top: +75% against
+    /// a +50% ceiling, so both summon-bonus rules fire.
+    fn illegal_player() -> PlayerData {
         let mut player = PlayerData {
             display_name: "炎顺帝".to_string(),
             ..Default::default()
@@ -2865,7 +2867,17 @@ mod legality_save_tests {
             bonus_id: 0x2ea9_ca80,
             bonus_level: 9,
         }];
-        parser.encounter.player_data[2] = Some(player);
+        player
+    }
+
+    #[test]
+    fn saving_an_encounter_stores_its_findings_and_stamps_the_rules_version() {
+        let mut parser = super::tests::parser_with_memory_db();
+
+        // Inside the audited window. The default is epoch 0, which the cutoff
+        // would skip — leaving this test green for the wrong reason.
+        parser.derived_state.start_time = crate::legality::AUDIT_CUTOFF_MS;
+        parser.encounter.player_data[2] = Some(illegal_player());
 
         let log_id = parser
             .save_encounter_to_db()
@@ -2877,6 +2889,41 @@ mod legality_save_tests {
         assert_eq!(stored.len(), 2, "both summon-bonus rules should be stored");
         assert!(stored.iter().all(|row| row.player_index == 2));
         assert!(stored.iter().all(|row| row.display_name == "炎顺帝"));
+
+        let stamp: Option<u32> = conn
+            .query_row(
+                "SELECT legality_rules_version FROM logs WHERE id = ?",
+                [log_id],
+                |row| row.get(0),
+            )
+            .expect("read the stamp");
+        assert_eq!(stamp, Some(crate::legality::RULES_VERSION));
+    }
+
+    /// The cutoff holds on the SAVE path too, not only in the startup sweep.
+    /// The sweep alone would leave this hole open: a log saved with a
+    /// pre-cutoff start time is stamped current on the way in, so no sweep
+    /// would ever revisit it and withdraw what the rules said about it.
+    ///
+    /// It is still saved and still stamped — only the audit is skipped.
+    #[test]
+    fn an_encounter_older_than_the_cutoff_is_saved_without_being_audited() {
+        let mut parser = super::tests::parser_with_memory_db();
+        parser.derived_state.start_time = crate::legality::AUDIT_CUTOFF_MS - 1;
+        parser.encounter.player_data[2] = Some(illegal_player());
+
+        let log_id = parser
+            .save_encounter_to_db()
+            .expect("save succeeds")
+            .expect("a log row was written");
+
+        let conn = parser.db.as_ref().expect("the fixture holds a connection");
+        assert!(
+            crate::db::legality::findings_for_log(conn, log_id)
+                .expect("read findings")
+                .is_empty(),
+            "a pre-cutoff encounter must not be judged by tables baked from a later patch"
+        );
 
         let stamp: Option<u32> = conn
             .query_row(

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { compareVersions, isNewVersion, NEW_FEATURES } from "./newFeatures";
+import { compareVersions, isNewVersion, NEW_FEATURES, sectionNewIds } from "./newFeatures";
+import { SETTINGS_SECTIONS } from "./pages/Settings";
 
 describe("NEW_FEATURES", () => {
   it("shows the toolbox + overmastery predictor chips in the 1.10.0 release that ships them", () => {
@@ -17,6 +18,20 @@ describe("NEW_FEATURES", () => {
     expect(isNewVersion(NEW_FEATURES["flagged-builds-setting"], "1.12.5")).toBe(true);
     // And in an RC of it, which is what a tester actually runs.
     expect(isNewVersion(NEW_FEATURES["flagged-builds-setting"], "1.12.5-2")).toBe(true);
+  });
+
+  it("chips both rebuilt settings sections in the release that ships them", () => {
+    expect(isNewVersion(NEW_FEATURES["meter-settings"], "1.12.5")).toBe(true);
+    expect(isNewVersion(NEW_FEATURES["overlay-settings"], "1.12.5")).toBe(true);
+    expect(isNewVersion(NEW_FEATURES["meter-settings"], "1.12.7")).toBe(false);
+  });
+
+  // The settings tab is the only marker visible before the rail is opened, so
+  // every chipped section has to reach it.
+  it("carries the real settings sections up to the settings tab", () => {
+    expect(sectionNewIds("settings", SETTINGS_SECTIONS)).toEqual(
+      expect.arrayContaining(["settings", "meter-settings", "overlay-settings"])
+    );
   });
 });
 

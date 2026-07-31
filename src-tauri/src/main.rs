@@ -941,10 +941,10 @@ fn sweep_stale_legality(app: &tauri::AppHandle) {
     });
 
     match result {
-        Ok(outcome) if outcome.rescanned > 0 || outcome.unreadable > 0 => {
+        Ok(outcome) if outcome.rescanned > 0 || outcome.unreadable > 0 || outcome.skipped > 0 => {
             info!(
-                "legality sweep: re-audited {} logs ({} unreadable)",
-                outcome.rescanned, outcome.unreadable
+                "legality sweep: re-audited {} logs ({} unreadable, {} older than the audit cutoff)",
+                outcome.rescanned, outcome.unreadable, outcome.skipped
             );
         }
         Ok(_) => {}

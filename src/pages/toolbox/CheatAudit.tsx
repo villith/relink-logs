@@ -1,5 +1,6 @@
 import {
   Alert,
+  Anchor,
   Badge,
   Box,
   Button,
@@ -10,12 +11,13 @@ import {
   Loader,
   Progress,
   Stack,
+  Table,
   Text,
   TextInput,
   UnstyledButton,
 } from "@mantine/core";
 import { useDebouncedValue } from "@mantine/hooks";
-import { CaretRight, MagnifyingGlass } from "@phosphor-icons/react";
+import { CaretRight, MagnifyingGlass, Warning } from "@phosphor-icons/react";
 import { invoke } from "@tauri-apps/api";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -29,9 +31,22 @@ import { Violation, violationLabel } from "@/violations";
 import { FindingDetail } from "@/components/FindingDetail";
 import { AuditFilters, DEFAULT_FILTERS, applyFilters, auditRows, caseFor, playerKey } from "./auditRows";
 
-/** How many flagged fights the case lists before folding the rest away. Enough
- * to show a pattern, few enough that the evidence above stays on screen. */
-const FIGHTS_SHOWN = 3;
+/**
+ * The page's height, so its three lists scroll inside it rather than growing
+ * the window.
+ *
+ * A person flagged in a hundred fights made every one of them a page the reader
+ * had to scroll past to reach the next person, and a database with hundreds of
+ * flagged players did the same to the rail. Bounding the page to the viewport is
+ * what lets the rail, the evidence and the fight list each own a scrollbar and
+ * stay put relative to one another.
+ *
+ * Same expression the Toolbox's own nav rail uses, read from Mantine's variables
+ * so the two cannot drift: the AppShell header, plus its padding above and
+ * below. `box-sizing: border-box` (Mantine's reset) means this box's own padding
+ * is inside the figure.
+ */
+const PAGE_HEIGHT = "calc(100vh - var(--app-shell-header-height, 50px) - var(--mantine-spacing-sm) * 2)";
 
 /** A violation, named.
  *
@@ -74,7 +89,6 @@ const CheatAuditPage = () => {
   const [sweep, setSweep] = useState<LegalitySweepProgress | null>(null);
   const [filters, setFilters] = useState<AuditFilters>(DEFAULT_FILTERS);
   const [selected, setSelected] = useState<string | null>(null);
-  const [allFights, setAllFights] = useState(false);
 
   const [search] = useDebouncedValue(filters.search, 150);
 
@@ -108,6 +122,23 @@ const CheatAuditPage = () => {
     };
   }, []);
 
+  /**
+   * The fight list is the case's table of contents, and this is where a click
+   * on it lands: the fight the reader picked, and the entry it took them to.
+   *
+   * Both, not just one. The entry is what gets scrolled to and marked; the
+   * fight is what gets marked in the contents — and the two are not the same
+   * row, because several fights routinely share one entry.
+   */
+  const [jumped, setJumped] = useState<{ fight: number; entry: number } | null>(null);
+  const entryRefs = useRef(new Map<number, HTMLDivElement | null>());
+
+  const jumpToEntry = (fight: number, entry: number) => {
+    setJumped({ fight, entry });
+    // Optional-called: jsdom has no layout, so it implements no scrollIntoView.
+    entryRefs.current.get(entry)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  };
+
   const kept = useMemo(() => (players ? applyFilters(players, { search }) : []), [players, search]);
   const rows = useMemo(() => auditRows(kept).sort((a, b) => b.lastSeen - a.lastSeen), [kept]);
   const byKey = useMemo(() => new Map(kept.map((p) => [playerKey(p), p])), [kept]);
@@ -122,7 +153,9 @@ const CheatAuditPage = () => {
     else if (selected === null || !byKey.has(selected)) setSelected(rows[0].key);
   }, [rows, byKey, selected]);
 
-  useEffect(() => setAllFights(false), [selected]);
+  // A mark left on the previous person's contents would point at an entry the
+  // new person's case does not have.
+  useEffect(() => setJumped(null), [selected]);
 
   if (error) {
     return (
@@ -169,8 +202,7 @@ const CheatAuditPage = () => {
     );
   }
 
-  const fights = found ? (allFights ? found.fights : found.fights.slice(0, FIGHTS_SHOWN)) : [];
-  const hidden = found ? found.fights.length - fights.length : 0;
+  const fights = found?.fights ?? [];
 
   /** The evidence, in groups of one build each. More than one group means the
    * person changed their gear between flagged fights, and each group is then
@@ -183,11 +215,20 @@ const CheatAuditPage = () => {
   }));
 
   return (
-    <Box p="sm">
+    <Box p="sm" style={{ height: PAGE_HEIGHT, display: "flex", flexDirection: "column", minHeight: 0 }}>
+      {/* Above everything, and outside the scrollers, because a reader who
+          scrolls past a caveat about accusations has not read it. Only on the
+          page that names people: the empty state has no finding to doubt. */}
+      <Alert color="yellow" variant="light" icon={<Warning size={16} />} mb="xs" p="xs">
+        <Text size="xs">{t("ui.legality.disclaimer", { report: t("ui.report-bug") })}</Text>
+      </Alert>
+
       {sweepBar}
 
-      <Flex gap="sm" align="flex-start">
-        <Box w={200} style={{ flexShrink: 0 }}>
+      {/* `align="stretch"` so all three columns are as tall as the page and can
+          each scroll to their own bottom. */}
+      <Flex gap="sm" align="stretch" style={{ flexGrow: 1, minHeight: 0 }}>
+        <Box w={200} style={{ flexShrink: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
           <Text size="xs" c="dimmed" mb={6}>
             {t("ui.legality.summary-players", { count: rows.length })}
           </Text>
@@ -212,35 +253,39 @@ const CheatAuditPage = () => {
               </Button>
             </Stack>
           ) : (
-            <Stack gap={0}>
-              {rows.map((row) => (
-                <UnstyledButton
-                  key={row.key}
-                  onClick={() => setSelected(row.key)}
-                  p={6}
-                  style={{
-                    borderLeft: `2px solid ${row.key === selected ? "var(--mantine-color-red-6)" : "transparent"}`,
-                    backgroundColor: row.key === selected ? "var(--mantine-color-dark-6)" : undefined,
-                    borderRadius: 2,
-                  }}
-                >
-                  {/* eslint-disable-next-line i18next/no-literal-string -- player-entered name */}
-                  <Text size="sm" fw={600} truncate>
-                    {row.displayName || t("ui:characters.ai")}
-                  </Text>
-                  {/* eslint-disable-next-line i18next/no-literal-string -- already-translated character name */}
-                  <Text size="xs" c="dimmed" truncate>
-                    {translateCharacterType(row.characterType)}
-                  </Text>
-                </UnstyledButton>
-              ))}
-            </Stack>
+            // The count and the search box stay put; only the names scroll. A
+            // search you cannot reach without scrolling back up is no search.
+            <Box style={{ flexGrow: 1, minHeight: 0, overflowY: "auto" }}>
+              <Stack gap={0}>
+                {rows.map((row) => (
+                  <UnstyledButton
+                    key={row.key}
+                    onClick={() => setSelected(row.key)}
+                    p={6}
+                    style={{
+                      borderLeft: `2px solid ${row.key === selected ? "var(--mantine-color-red-6)" : "transparent"}`,
+                      backgroundColor: row.key === selected ? "var(--mantine-color-dark-6)" : undefined,
+                      borderRadius: 2,
+                    }}
+                  >
+                    {/* eslint-disable-next-line i18next/no-literal-string -- player-entered name */}
+                    <Text size="sm" fw={600} truncate>
+                      {row.displayName || t("ui:characters.ai")}
+                    </Text>
+                    {/* eslint-disable-next-line i18next/no-literal-string -- already-translated character name */}
+                    <Text size="xs" c="dimmed" truncate>
+                      {translateCharacterType(row.characterType)}
+                    </Text>
+                  </UnstyledButton>
+                ))}
+              </Stack>
+            </Box>
           )}
         </Box>
 
         {/* `minWidth: 0` so a long gear line wraps inside the pane instead of
             widening the flex row and pushing the rail off screen. */}
-        <Box style={{ flexGrow: 1, minWidth: 0 }}>
+        <Box style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
           {!player || !found ? (
             <Center py="xl">
               <Text size="sm" c="dimmed">
@@ -248,8 +293,10 @@ const CheatAuditPage = () => {
               </Text>
             </Center>
           ) : (
-            <Stack gap="xs">
-              <Box>
+            <>
+              {/* Who, and what of. Outside the scrollers, so the name the reader
+                  is reading evidence about never scrolls away from it. */}
+              <Box mb={4}>
                 {/* eslint-disable-next-line i18next/no-literal-string -- player-entered name */}
                 <Text size="lg" fw={700}>
                   {player.displayName || t("ui:characters.ai")}
@@ -260,76 +307,180 @@ const CheatAuditPage = () => {
                 </Text>
               </Box>
 
-              <Group gap={4}>
+              <Group gap={4} mb="xs">
                 {found.violations.map((violation) => (
                   <ViolationChip key={violation} violation={violation} />
                 ))}
               </Group>
 
-              <Stack gap="xs">
-                {builds.map((build, buildIndex) => (
-                  <Box key={build.logId}>
-                    {buildIndex > 0 && <Divider mb="xs" />}
-                    {/* Only when there is more than one build to tell apart. A
-                        single build needs no heading saying which fight it came
-                        from — every finding came from that one. */}
-                    {builds.length > 1 && build.fight && (
-                      <Text size="xs" c="dimmed" mb={4}>
-                        {/* eslint-disable-next-line i18next/no-literal-string -- already-translated quest name and a formatted date */}
-                        {`${translateQuestId(build.fight.questId ?? null)} · ${epochToLocalTime(build.fight.time)}`}
-                      </Text>
-                    )}
-                    <Stack gap="xs">
-                      {build.rows.map((row, index) => (
-                        <Box key={index}>
-                          {index > 0 && <Divider mb="xs" />}
-                          <FindingDetail finding={row.finding} />
-                        </Box>
-                      ))}
-                    </Stack>
-                  </Box>
-                ))}
-              </Stack>
-
-              <Divider />
-
-              <Box>
-                <Text size="xs" c="dimmed" mb={2}>
-                  {t("ui.legality.seen-in")}
-                </Text>
-                <Stack gap={2}>
-                  {fights.map((fight) => (
-                    <Group key={fight.logId} gap="xs" justify="space-between" wrap="nowrap">
-                      <Text size="xs" truncate>
-                        {/* eslint-disable-next-line i18next/no-literal-string -- already-translated quest name and a formatted date */}
-                        {`${translateQuestId(fight.questId ?? null)} · ${epochToLocalTime(fight.time)}`}
-                      </Text>
-                      <Button
-                        size="compact-xs"
-                        variant="subtle"
-                        component={Link}
-                        to={`/logs/${fight.logId}?tab=equipment`}
-                        rightSection={<CaretRight size={10} weight="bold" />}
-                        style={{ flexShrink: 0 }}
+              {/* Evidence and sightings side by side rather than stacked. They
+                  answer two different questions — WHAT is wrong with the build,
+                  and WHERE you met it — and the fight list is the one that grows
+                  without bound: a hundred sightings below the evidence pushed
+                  the evidence off the screen entirely. */}
+              <Flex gap="sm" align="stretch" style={{ flexGrow: 1, minHeight: 0 }}>
+                {/* Keyed by person so both scrollers remount when the selection
+                    changes: a shared node keeps its scrollTop, which landed the
+                    reader halfway down the next person's evidence. */}
+                <Box key={selected} style={{ flexGrow: 1, minWidth: 0, overflowY: "auto" }}>
+                  <Stack gap="xs">
+                    {builds.map((build, buildIndex) => (
+                      <Box
+                        key={build.logId}
+                        id={`audit-entry-${build.logId}`}
+                        ref={(node: HTMLDivElement | null) => entryRefs.current.set(build.logId, node)}
+                        // The border is always there, transparent when unmarked,
+                        // so arriving at an entry does not shift the text under
+                        // the reader's eye by two pixels.
+                        pl={8}
+                        style={{
+                          borderLeft: `2px solid ${
+                            jumped?.entry === build.logId ? "var(--mantine-color-red-6)" : "transparent"
+                          }`,
+                        }}
                       >
-                        {t("ui.legality.open-log")}
-                      </Button>
-                    </Group>
-                  ))}
-                  {hidden > 0 && (
-                    <Button
-                      size="compact-xs"
-                      variant="subtle"
-                      color="gray"
-                      onClick={() => setAllFights(true)}
-                      style={{ alignSelf: "flex-start" }}
+                        {buildIndex > 0 && <Divider mb="xs" />}
+                        {/* Always, even for a lone build. This used to be gated
+                            on there being more than one build to tell apart, on
+                            the reasoning that a single group's fight is implied —
+                            but it is only implied to someone who already knows
+                            the page reduces findings to builds. To everyone else
+                            an accusation with no fight attached is an accusation
+                            with no date on it. */}
+                        {build.fight && (
+                          // Left in the link colour rather than dimmed: this is
+                          // the way out to the fight itself, and a grey line
+                          // that happens to be clickable reads as a caption.
+                          <Anchor component={Link} to={`/logs/${build.logId}?tab=equipment`} display="block" mb={4}>
+                            {/* The arrow says this LEAVES the page. Without it
+                                the heading is indistinguishable from the quest
+                                name in the contents beside it, which is a link
+                                that only scrolls. */}
+                            <Group gap={4} wrap="nowrap">
+                              {/* eslint-disable-next-line i18next/no-literal-string -- already-translated quest name and a formatted date */}
+                              <Text size="xs" truncate>
+                                {`${translateQuestId(build.fight.questId ?? null)} · ${epochToLocalTime(build.fight.time)}`}
+                              </Text>
+                              <CaretRight size={10} weight="bold" style={{ flexShrink: 0 }} />
+                            </Group>
+                          </Anchor>
+                        )}
+                        <Stack gap="xs">
+                          {build.rows.map((row, index) => (
+                            <Box key={index}>
+                              {index > 0 && <Divider mb="xs" />}
+                              <FindingDetail finding={row.finding} />
+                            </Box>
+                          ))}
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Stack>
+                </Box>
+
+                <Box
+                  w={460}
+                  style={{
+                    flexShrink: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    minHeight: 0,
+                    borderLeft: "1px solid var(--mantine-color-dark-4)",
+                    paddingLeft: "var(--mantine-spacing-sm)",
+                  }}
+                >
+                  {/* Its own scroller, which is what retired the "+N more" fold:
+                      that existed only to stop a long list burying the evidence,
+                      and a column that scrolls on its own cannot bury anything.
+                      The header stays put over it, which is also what replaced
+                      the "Seen in" caption — a column headed "Quest / Date" says
+                      what it is without a sentence above it. */}
+                  <Box key={selected} style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden" }}>
+                    {/* `tableLayout: fixed` is what keeps this column from
+                        scrolling sideways: with auto layout a long quest name
+                        widens the table past the column and the scroller — which
+                        has overflow-y, so overflow-x resolves to auto too —
+                        grows a horizontal bar. Fixed makes the widths below
+                        binding, so a long name ellipsizes instead. */}
+                    <Table
+                      striped
+                      highlightOnHover
+                      stickyHeader
+                      verticalSpacing={2}
+                      horizontalSpacing="xs"
+                      fz="xs"
+                      style={{ tableLayout: "fixed", width: "100%" }}
                     >
-                      {t("ui.legality.seen-more", { count: hidden })}
-                    </Button>
-                  )}
-                </Stack>
-              </Box>
-            </Stack>
+                      <Table.Thead>
+                        <Table.Tr>
+                          <Table.Th>{t("ui.logs.quest-name")}</Table.Th>
+                          {/* Wide enough for a full `epochToLocalTime` stamp
+                              ("7/31/2026, 12:28 PM") plus the cell padding. Too
+                              narrow and the nowrap date overflows its cell,
+                              which is what put a horizontal scrollbar under a
+                              table whose own width was already 100%. */}
+                          <Table.Th w={165}>{t("ui.logs.date")}</Table.Th>
+                        </Table.Tr>
+                      </Table.Thead>
+                      <Table.Tbody>
+                        {fights.map((fight) => (
+                          // The whole row is the target. A row that highlights
+                          // under the cursor but only responds on one word of
+                          // itself invites the miss — and the date half is
+                          // dead space that has to do something.
+                          <Table.Tr
+                            key={fight.logId}
+                            onClick={() => jumpToEntry(fight.logId, fight.entryLogId)}
+                            bg={jumped?.fight === fight.logId ? "var(--mantine-color-dark-6)" : undefined}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <Table.Td style={{ overflow: "hidden" }}>
+                              {/* Still a real button inside the row, and not
+                                  only for the look of it: a clickable `<tr>` is
+                                  unreachable by keyboard, so this stays as the
+                                  row's tab stop. Clicking it bubbles to the row
+                                  and jumps twice to the same place, which costs
+                                  nothing.
+
+                                  Either way the move is WITHIN the case — the
+                                  entry is already on screen beside the list, and
+                                  leaving the page to show something a scroll
+                                  away was the wrong answer to "show me this
+                                  fight". */}
+                              <Anchor
+                                component="button"
+                                type="button"
+                                onClick={() => jumpToEntry(fight.logId, fight.entryLogId)}
+                                size="xs"
+                                display="block"
+                                ta="left"
+                                title={translateQuestId(fight.questId ?? null)}
+                                style={{ overflow: "hidden", width: "100%" }}
+                              >
+                                {/* eslint-disable-next-line i18next/no-literal-string -- already-translated quest name */}
+                                <Text size="xs" truncate>
+                                  {translateQuestId(fight.questId ?? null)}
+                                </Text>
+                              </Anchor>
+                            </Table.Td>
+                            {/* Text, not a link. NOTHING in the contents leaves
+                                the page: a list where one column scrolls and
+                                the next navigates makes the reader guess which
+                                click costs them their place. The way out to a
+                                log is the entry heading, which is where the
+                                arrow is. */}
+                            {/* eslint-disable-next-line i18next/no-literal-string -- a formatted date */}
+                            <Table.Td c="dimmed" style={{ whiteSpace: "nowrap" }}>
+                              {epochToLocalTime(fight.time)}
+                            </Table.Td>
+                          </Table.Tr>
+                        ))}
+                      </Table.Tbody>
+                    </Table>
+                  </Box>
+                </Box>
+              </Flex>
+            </>
           )}
         </Box>
       </Flex>

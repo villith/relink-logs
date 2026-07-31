@@ -32,11 +32,21 @@ export type AuditRow = {
   lastSeen: number;
 };
 
-/** One flagged fight, as a link out of the case. */
+/** One flagged fight, as a row of the case's table of contents. */
 export type AuditFight = {
   logId: number;
   time: number;
   questId?: number | null;
+  /**
+   * The entry this fight jumps to — the log whose evidence group holds what
+   * this fight was flagged for.
+   *
+   * Usually itself. It differs whenever a fight's findings all deduplicated
+   * into a newer fight's entry, which is the normal case: the same build worn
+   * six times has one entry and six fights, and five of those fights would
+   * otherwise point at an entry the page never drew.
+   */
+  entryLogId: number;
 };
 
 /**
@@ -126,7 +136,17 @@ export const caseFor = (player: LegalityFlaggedPlayer): AuditCase => {
   for (const row of rows) {
     const key = findingKey(row.finding);
     if (!byKey.has(key)) byKey.set(key, { finding: row.finding, logId: row.logId });
-    if (!byLog.has(row.logId)) byLog.set(row.logId, { logId: row.logId, time: row.time, questId: row.questId });
+    // Read back through `byKey` rather than using `row.logId`: that is what
+    // resolves a fight to the entry that absorbed it. Newest-first ordering is
+    // what makes it well defined — by the time a fight is first seen, the entry
+    // for its newest finding has already been claimed.
+    if (!byLog.has(row.logId))
+      byLog.set(row.logId, {
+        logId: row.logId,
+        time: row.time,
+        questId: row.questId,
+        entryLogId: byKey.get(key)?.logId ?? row.logId,
+      });
   }
 
   const evidence = [...byKey.values()];
