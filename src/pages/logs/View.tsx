@@ -36,6 +36,7 @@ import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 
 import { ColumnsPopover } from "@/components/ColumnsPopover";
+import { FlaggedGear } from "@/components/FlaggedGear";
 import { LegalityMark, LegalityPlayerName } from "@/components/LegalityMark";
 import { Table as MeterTable } from "@/components/Table";
 import { useTabParam } from "@/hooks/useTabParam";
@@ -50,7 +51,6 @@ import {
   type ComputedPlayerState,
   type EncounterState,
   type LegalityFinding,
-  type Overmastery,
   type PlayerData,
   type SortDirection,
   type SortType,
@@ -78,6 +78,7 @@ import {
   formatBonusAmount,
   formatCharacterLabel,
   formatInPartyOrder,
+  formatOvermastery,
   formatSummonBonusValue,
   groupBonuses,
   hasQuestElapsedTime,
@@ -85,7 +86,7 @@ import {
   millisecondsToElapsedFormat,
   openDamageCalculator,
   orderedChecklistEntries,
-  overmasteryAmountFromId,
+  overmasteryAmount,
   resolvePlayerColor,
   skillboardActivationCost,
   skillboardLayoutFor,
@@ -127,27 +128,8 @@ import { useShallow } from "zustand/react/shallow";
 
 type Label = { name: string; partySlotIndex: number; label?: string; color: string; strokeDasharray?: string }[];
 
-// The single-bit level flag (bit N → level N+1) → a 1-based level, or 0 if unset.
-// `>>> 0` forces the isolated bit to an unsigned value so a set bit 31 can't make
-// `flags & -flags` negative and yield `Math.log2(negative) === NaN`.
-const overmasteryLevel = (flags: number): number => (flags === 0 ? 0 : Math.log2((flags & -flags) >>> 0) + 1);
-
-// v2.0.2: overmasteries recovered from the town loadout carry only id + level
-// (in `flags`), not the computed in-game magnitude (`value` is 0) — fall back
-// to the level, matching the "(Lvl. N)" style used for sigils and summons.
-const overmasteryAmount = (overmastery: Overmastery): BonusAmount =>
-  overmastery.value === 0
-    ? { kind: "level", amount: overmasteryLevel(overmastery.flags) }
-    : overmasteryAmountFromId(overmastery.id, overmastery.value);
-
-const formatOvermastery = (overmastery: Overmastery | undefined): string => {
-  if (!overmastery) return "";
-  const translation = translateOvermasteryId(overmastery.id);
-  const amount = overmasteryAmount(overmastery);
-  return amount.kind === "level"
-    ? `${translation} ${formatBonusAmount(amount)}`
-    : `${translation}: ${formatBonusAmount(amount)}`;
-};
+// `formatOvermastery` and friends now live in `@/utils`, shared with the
+// Build Audit page — see the import above.
 
 // "+1800 (Lvl. 3)" — numeric totals first, with any magnitude-unknown
 // (level-only) contributions trailing. Totals arrive in that order already.
@@ -628,6 +610,10 @@ const AbilitiesRow = ({ playerData }: { playerData: PlayerData[] }) => {
 const VIEW_TABS = ["overview", "sba", "equipment", "builds"] as const;
 const DATALESS_VIEW_TABS = ["overview", "sba"] as const;
 
+/** No verdicts at all, for when the user has asked not to see them. One frozen
+ * instance so substituting it never invalidates a memo. */
+const NO_LEGALITY: LegalityFinding[][] = [];
+
 export const ViewPage = () => {
   const { color_1, color_2, color_3, color_4, show_display_names, streamer_mode } = useMeterSettingsStore(
     useShallow((state) => ({
@@ -662,7 +648,7 @@ export const ViewPage = () => {
     questCompleted,
     roomIndex,
     playerData,
-    legality,
+    legality: storedLegality,
     setSelectedTargetSpans,
     loadFromResponse,
   } = useEncounterStore((state) => ({
@@ -684,6 +670,13 @@ export const ViewPage = () => {
     setSelectedTargetSpans: state.setSelectedTargetSpans,
     loadFromResponse: state.loadFromResponse,
   }));
+  // The app-wide switch is honoured once, here, rather than at each of the
+  // dozen marks below: with no findings in hand every LegalityMark, FlaggedGear
+  // and LegalityPlayerName renders its children untouched, which is already
+  // what they do for a clean build. A frozen constant so the substitution does
+  // not hand a fresh array to the memos downstream on every render.
+  const show_flagged_builds = useMeterSettingsStore((state) => state.show_flagged_builds);
+  const legality = show_flagged_builds ? storedLegality : NO_LEGALITY;
   // The open tab lives in the URL, so leaving this page and coming back through
   // the Logs tab returns to it. Equipment and Builds are disabled without
   // player data, so they only become selectable once it has loaded.
@@ -1467,7 +1460,7 @@ export const ViewPage = () => {
                         <Table.Td key={player.actorIndex} flex={1}>
                           <Flex direction="row" wrap="nowrap" align="center">
                             <Text fw={700} size="xl" mr="5">
-                              <LegalityPlayerName findings={legality[playerIndex] ?? []} player={player}>
+                              <LegalityPlayerName findings={legality[playerIndex] ?? []}>
                                 {formatPlayerDisplayName(player, show_display_names && !streamer_mode, false)}
                               </LegalityPlayerName>
                             </Text>
@@ -1583,10 +1576,7 @@ export const ViewPage = () => {
                       return (
                         <Table.Td key={player.actorIndex}>
                           <Text size="xs" fw={700}>
-                            <LegalityMark
-                              findings={findingsForSubject(findings, "overmasteries")}
-                              subjectName={t("ui.player-overmasteries")}
-                            >
+                            <LegalityMark findings={findingsForSubject(findings, "overmasteries")}>
                               {t("ui.player-overmasteries")}
                             </LegalityMark>
                           </Text>
@@ -1601,7 +1591,6 @@ export const ViewPage = () => {
                                 <Text size="xs" fs="italic" fw={300}>
                                   <LegalityMark
                                     findings={findingsForSubject(findings, "overmastery", overmasteryIndex)}
-                                    subjectName={formatOvermastery(overmastery)}
                                   >
                                     {formatOvermastery(overmastery)}
                                   </LegalityMark>
@@ -1677,22 +1666,18 @@ export const ViewPage = () => {
                                   show the traits under the generic label. */}
                               {(player.weaponState.wrightstoneId > 0 ||
                                 player.weaponState.wrightstoneTraits.length > 0) && (
-                                <>
-                                  <Text size="xs" fw={700}>
-                                    <LegalityMark
-                                      findings={findingsForSubject(legality[playerIndex] ?? [], "wrightstone")}
-                                      subjectName={translateWrightstoneId(player.weaponState.wrightstoneId)}
-                                    >
-                                      {translateWrightstoneId(player.weaponState.wrightstoneId)}
-                                    </LegalityMark>
-                                  </Text>
-                                  {player.weaponState.wrightstoneTraits.map((trait) => (
-                                    <Text size="xs" fs="italic" fw={300} key={trait.id}>
-                                      - {translateTraitId(trait.id)}
-                                      {trait.level > 0 ? ` (Lvl. ${trait.level})` : ""}
-                                    </Text>
-                                  ))}
-                                </>
+                                <FlaggedGear
+                                  name={translateWrightstoneId(player.weaponState.wrightstoneId)}
+                                  findings={findingsForSubject(legality[playerIndex] ?? [], "wrightstone")}
+                                  explain="tooltip"
+                                  lines={player.weaponState.wrightstoneTraits.map((trait) => ({
+                                    id: trait.id,
+                                    level: trait.level,
+                                    text: `${translateTraitId(trait.id)}${
+                                      trait.level > 0 ? ` ${t("ui.trait-level", { level: trait.level })}` : ""
+                                    }`,
+                                  }))}
+                                />
                               )}
                             </>
                           ) : !player.weaponInfo ? (
@@ -1773,33 +1758,36 @@ export const ViewPage = () => {
                       return (
                         <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
                           <Text size="xs" fw={700}>
-                            <LegalityMark
-                              findings={findingsForSubject(findings, "summons")}
-                              subjectName={t("ui.player-summons")}
-                            >
+                            <LegalityMark findings={findingsForSubject(findings, "summons")}>
                               {t("ui.player-summons")}
                             </LegalityMark>
                           </Text>
                           <Placeholder empty={summons.length === 0}>
                             {summons.map((summon, summonIndex) => (
                               <Box key={summonIndex} mt={summonIndex > 0 ? 4 : 0}>
-                                <Text size="xs" fw={600}>
-                                  <LegalityMark
-                                    findings={findingsForSubject(findings, "summon", summonIndex)}
-                                    subjectName={translateSummonId(summon.summonId)}
-                                  >
-                                    {translateSummonId(summon.summonId)}
-                                  </LegalityMark>
-                                </Text>
-                                <Text size="xs" fs="italic" fw={300} pl={8}>
-                                  - {translateTraitId(summon.mainTraitId)}{" "}
-                                  {t("ui.trait-level", { level: summon.mainTraitLevel })}
-                                </Text>
-                                <Text size="xs" fs="italic" fw={300} pl={8}>
-                                  - {translateSummonBonusId(summon.bonusId)}{" "}
-                                  {formatSummonBonusValue(summon.bonusId, summon.bonusLevel) ??
-                                    `(Lvl. ${summon.bonusLevel + 1})`}
-                                </Text>
+                                <FlaggedGear
+                                  name={translateSummonId(summon.summonId)}
+                                  nameWeight={600}
+                                  findings={findingsForSubject(findings, "summon", summonIndex)}
+                                  explain="tooltip"
+                                  lines={[
+                                    {
+                                      id: summon.mainTraitId,
+                                      level: summon.mainTraitLevel,
+                                      text: `${translateTraitId(summon.mainTraitId)} ${t("ui.trait-level", {
+                                        level: summon.mainTraitLevel,
+                                      })}`,
+                                    },
+                                    {
+                                      id: summon.bonusId,
+                                      level: summon.bonusLevel,
+                                      text: `${translateSummonBonusId(summon.bonusId)} ${
+                                        formatSummonBonusValue(summon.bonusId, summon.bonusLevel) ??
+                                        t("ui.trait-level", { level: summon.bonusLevel + 1 })
+                                      }`,
+                                    },
+                                  ]}
+                                />
                               </Box>
                             ))}
                           </Placeholder>
@@ -1834,28 +1822,34 @@ export const ViewPage = () => {
                             {sigils.length > 0 && ` (${sigils.length})`}
                           </Text>
                           <Placeholder empty={sigils.length === 0}>
-                            {sigils.map(({ sigil, slot }, sigilIndex) => (
-                              <Box key={sigilIndex} mt={sigilIndex > 0 ? 4 : 0}>
-                                <Text size="xs" fw={600}>
-                                  <LegalityMark
+                            {sigils.map(({ sigil, slot }, sigilIndex) => {
+                              const trait = (id: number, level: number) => ({
+                                id,
+                                level,
+                                text: `${translateTraitId(id)} ${t("ui.trait-level", { level })}`,
+                              });
+                              // The empty second slot is dropped, matching the
+                              // snapshot the rules mark against — a rendered
+                              // empty line would shift every index past it.
+                              return (
+                                <Box key={sigilIndex} mt={sigilIndex > 0 ? 4 : 0}>
+                                  <FlaggedGear
+                                    name={`${translateSigilId(sigil.sigilId)} ${t("ui.trait-level", {
+                                      level: sigil.sigilLevel,
+                                    })}`}
+                                    nameWeight={600}
                                     findings={findingsForSubject(findings, "sigil", slot)}
-                                    subjectName={translateSigilId(sigil.sigilId)}
-                                  >
-                                    {translateSigilId(sigil.sigilId)} {t("ui.trait-level", { level: sigil.sigilLevel })}
-                                  </LegalityMark>
-                                </Text>
-                                <Text size="xs" fs="italic" fw={300} pl={8}>
-                                  - {translateTraitId(sigil.firstTraitId)}{" "}
-                                  {t("ui.trait-level", { level: sigil.firstTraitLevel })}
-                                </Text>
-                                {sigil.secondTraitId !== EMPTY_ID && (
-                                  <Text size="xs" fs="italic" fw={300} pl={8}>
-                                    - {translateTraitId(sigil.secondTraitId)}{" "}
-                                    {t("ui.trait-level", { level: sigil.secondTraitLevel })}
-                                  </Text>
-                                )}
-                              </Box>
-                            ))}
+                                    explain="tooltip"
+                                    lines={[
+                                      trait(sigil.firstTraitId, sigil.firstTraitLevel),
+                                      ...(sigil.secondTraitId !== EMPTY_ID
+                                        ? [trait(sigil.secondTraitId, sigil.secondTraitLevel)]
+                                        : []),
+                                    ]}
+                                  />
+                                </Box>
+                              );
+                            })}
                           </Placeholder>
                         </Table.Td>
                       );
@@ -1873,7 +1867,7 @@ export const ViewPage = () => {
                     {playerData.map((player, playerIndex) => (
                       <Table.Td key={player.actorIndex} flex={1}>
                         <Text fw={700} size="xl">
-                          <LegalityPlayerName findings={legality[playerIndex] ?? []} player={player}>
+                          <LegalityPlayerName findings={legality[playerIndex] ?? []}>
                             {formatPlayerDisplayName(player, show_display_names && !streamer_mode, false)}
                           </LegalityPlayerName>
                         </Text>
@@ -1961,21 +1955,23 @@ export const ViewPage = () => {
 
                       return (
                         <Table.Td key={player.actorIndex} style={{ verticalAlign: "top" }}>
-                          <Text size="xs" fw={700}>
-                            {/* Both whole-set reports land here: this row merges
-                                overmasteries and summon equip bonuses into one
-                                list, so it is the only place either claim has a
-                                heading to attach to. */}
-                            <LegalityMark
-                              findings={[
-                                ...findingsForSubject(findings, "overmasteries"),
-                                ...findingsForSubject(findings, "summons"),
-                              ]}
-                              subjectName={t("ui.player-overmasteries")}
-                            >
-                              {t("ui.player-overmasteries")}
-                            </LegalityMark>
-                          </Text>
+                          {/* Both whole-set reports land here: this row merges
+                              overmasteries and summon equip bonuses into one
+                              list BY EFFECT, so no row corresponds to a member
+                              of either set and the heading is the only honest
+                              place for the claim. `lines={[]}` says exactly
+                              that — the shared marker then reddens the heading
+                              of its own accord, by the same rule it uses
+                              everywhere else. */}
+                          <FlaggedGear
+                            name={t("ui.player-overmasteries")}
+                            lines={[]}
+                            findings={[
+                              ...findingsForSubject(findings, "overmasteries"),
+                              ...findingsForSubject(findings, "summons"),
+                            ]}
+                            explain="tooltip"
+                          />
                           <Placeholder empty={combined.length === 0}>
                             {allEffects.map((bonus) => (
                               <BonusRow key={bonus.name} bonus={bonus} />
@@ -2274,10 +2270,7 @@ function MasterTraitsRows({
           // header is the only honest place to put it — no single node is at
           // fault.
           const label = (
-            <LegalityMark
-              findings={findingsForSubject(legality[playerIndex] ?? [], "masterTraits")}
-              subjectName={t("ui.player-master-traits")}
-            >
+            <LegalityMark findings={findingsForSubject(legality[playerIndex] ?? [], "masterTraits")}>
               {rawLabel}
             </LegalityMark>
           );

@@ -1,11 +1,18 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
-import { describeFinding, findingsForSubject, severityColor, worstSeverity } from "./legality";
+import { describeLimit, describeOdds, findingsForSubject } from "./legality";
 import { LegalityFinding } from "./types";
+
+// i18next is not initialised under vitest, so the id-to-name lookup is stubbed:
+// what these tests are about is which names are composed and in what order, not
+// the translation itself. `legalityStrings.test.ts` renders the real strings.
+vi.mock("./utils", async (original) => ({
+  ...(await original<typeof import("./utils")>()),
+  translateSummonId: (id: number) => ({ 1: "Rolan", 2: "Lucilius", 3: "Beelzebub", 4: "Lilith" })[id] ?? `#${id}`,
+}));
 
 const finding = (over: Partial<LegalityFinding> = {}): LegalityFinding => ({
   rule: "summonBonusMagnitude",
-  severity: "impossible",
   subject: { kind: "summon", index: 0 },
   observed: { kind: "amount", value: 75 },
   allowed: { kind: "amount", value: 50 },
@@ -13,43 +20,16 @@ const finding = (over: Partial<LegalityFinding> = {}): LegalityFinding => ({
   ...over,
 });
 
-const impossible = finding();
-const improbable = finding({
+/** A hard table breach: no odds, because that is the point of one. */
+const breach = finding();
+/** A long-odds report. With severity gone, `odds` is the ONLY thing telling a
+ * reader this is luck rather than proof. */
+const longOdds = finding({
   rule: "summonPerfectCount",
-  severity: "improbable",
   subject: { kind: "summons" },
   observed: { kind: "count", value: 3 },
   allowed: { kind: "none" },
   odds: 4.7e-7,
-});
-
-/** The tooltips are translated, and the test i18n stub returns the key. Assert
- * on the interpolation values instead, which is where the claim actually
- * lives — a wrong number in a public accusation is the failure that matters. */
-describe("worstSeverity", () => {
-  it("ranks impossible above improbable whatever the order", () => {
-    expect(worstSeverity([improbable, impossible])).toBe("impossible");
-    expect(worstSeverity([impossible, improbable])).toBe("impossible");
-  });
-
-  it("reports improbable when that is all there is", () => {
-    expect(worstSeverity([improbable])).toBe("improbable");
-  });
-
-  it("reports nothing for a clean player", () => {
-    expect(worstSeverity([])).toBeNull();
-  });
-});
-
-describe("severityColor", () => {
-  it("keeps proof and suspicion visually distinct", () => {
-    expect(severityColor("impossible")).toBe("red");
-    expect(severityColor("improbable")).toBe("yellow");
-  });
-
-  it("has no colour for a clean player", () => {
-    expect(severityColor(null)).toBeUndefined();
-  });
 });
 
 describe("findingsForSubject", () => {
@@ -62,7 +42,7 @@ describe("findingsForSubject", () => {
   });
 
   it("matches whole-set subjects, which carry no index", () => {
-    expect(findingsForSubject([improbable, summonZero], "summons")).toEqual([improbable]);
+    expect(findingsForSubject([longOdds, summonZero], "summons")).toEqual([longOdds]);
   });
 
   it("returns nothing when a subject is clean", () => {
@@ -74,8 +54,10 @@ describe("findingsForSubject", () => {
   });
 });
 
-describe("describeFinding", () => {
-  /** The i18n stub returns `key`, so capture the interpolation instead. */
+describe("describeLimit", () => {
+  /** The i18n stub returns `key`, so capture the interpolation instead.
+   * `legalityStrings.test.ts` renders the real strings; this pins what reaches
+   * them. */
   const capture = () => {
     const calls: Record<string, unknown>[] = [];
     const t = ((key: string, options?: Record<string, unknown>) => {
@@ -85,39 +67,144 @@ describe("describeFinding", () => {
     return { calls, t };
   };
 
-  it("states the magnitude claim with both numbers", () => {
+  /**
+   * A bonus-source claim is about an ID, and ids are invisible on a gear line:
+   * two of them share every effect's display name, so a Behemoth III caught
+   * with the boss set's Healing Cap Up renders a line reading "Healing Cap Up"
+   * — a bonus Behemoth III genuinely grants. The old "not from this summon"
+   * therefore contradicted its own evidence. Naming the owners is what makes
+   * the claim checkable, so those names have to reach the string.
+   */
+  it("names the summons that do grant a foreign bonus, alphabetically", () => {
     const { calls, t } = capture();
-    describeFinding(t, impossible, "Behemoth III");
+    describeLimit(
+      t,
+      finding({
+        rule: "summonBonusSource",
+        observed: { kind: "summonBonusId", value: 99 },
+        allowed: { kind: "summonIds", value: [1, 2, 3, 4] },
+      })
+    );
 
     expect(calls[0]).toMatchObject({
-      key: "ui.legality.explain.summonBonusMagnitude",
-      subject: "Behemoth III",
+      key: "ui.legality.limit.summonBonusSource",
+      allowed: "Beelzebub, Lilith, Lucilius, Rolan",
+    });
+  });
+
+  /** A bonus no summon is known to grant has nobody to name — a modded id, or
+   * one granted too widely to list. The claim then has to stand on its own
+   * rather than trail an empty "only". */
+  it("falls back to the bare claim when there is nobody to name", () => {
+    const { calls, t } = capture();
+    describeLimit(
+      t,
+      finding({
+        rule: "summonBonusSource",
+        observed: { kind: "summonBonusId", value: 99 },
+        allowed: { kind: "summonIds", value: [] },
+      })
+    );
+
+    expect(calls[0]).toMatchObject({ key: "ui.legality.limit.summonBonusSource-unnamed" });
+  });
+
+  it("hands the magnitude claim both numbers", () => {
+    const { calls, t } = capture();
+    describeLimit(t, breach);
+
+    expect(calls[0]).toMatchObject({
+      key: "ui.legality.limit.summonBonusMagnitude",
       observed: 75,
       allowed: 50,
     });
   });
 
-  it("states the perfect-summon report as odds, not as an accusation", () => {
+  /** Without a slot the list stays whole, for a claim about the levels
+   * together. */
+  it("renders a list of levels as one comparable figure", () => {
     const { calls, t } = capture();
-    describeFinding(t, improbable, "");
-
-    expect(calls[0]).toMatchObject({
-      key: "ui.legality.explain.summonPerfectCount",
-      observed: 3,
-    });
-    // 1 in N, the form a reader can judge — not a bare probability.
-    expect(calls[0].denominator).toBe(Math.round(1 / 4.7e-7).toLocaleString());
+    describeLimit(t, finding({ rule: "wrightstoneTraitLevel", observed: { kind: "levels", value: [12, 9, 5] } }));
+    expect(calls[0].observed).toBe("12 / 9 / 5");
   });
 
-  it("omits the denominator when a finding carries no odds", () => {
+  /** The reason `slot` exists: a wrightstone line reading "Stun Power (Lvl. 30)"
+   * must be followed by ITS cap, not by all three. */
+  it("picks one slot's cap out of a per-slot list", () => {
     const { calls, t } = capture();
-    describeFinding(t, impossible, "Behemoth III");
-    expect(calls[0].denominator).toBeUndefined();
+    describeLimit(
+      t,
+      finding({
+        rule: "wrightstoneTraitLevel",
+        observed: { kind: "levels", value: [30, 20, 20] },
+        allowed: { kind: "levels", value: [20, 15, 10] },
+      }),
+      1
+    );
+
+    expect(calls[0]).toMatchObject({ observed: 20, allowed: 15 });
+  });
+
+  /** Ids name a thing rather than measure one; those rules phrase their limit
+   * without a number, so passing an id as one would render nonsense. */
+  it("hands no figure for an id-valued finding", () => {
+    const { calls, t } = capture();
+    describeLimit(t, finding({ rule: "summonTrait", observed: { kind: "traitId", value: 91 } }));
+    expect(calls[0].observed).toBeUndefined();
+  });
+
+  /** The odds-carrying rules quote them inside their own limit line, so the
+   * chance has to reach the template. Found by key rather than by position:
+   * building the chance is itself a translation, so it lands first. */
+  it("hands the chance to a rule that quotes it", () => {
+    const { calls, t } = capture();
+    describeLimit(t, longOdds);
+
+    const limit = calls.find((call) => call.key === "ui.legality.limit.summonPerfectCount");
+    expect(limit?.chance).toBe("ui.legality.chance-percent");
+    expect(calls.find((call) => call.key === "ui.legality.chance-percent")?.percent).toBe("0.000047");
+  });
+
+  /** Below a point a percentage is a row of zeroes rather than a quantity, and
+   * words carry it better. */
+  it("stops quoting a percentage once it has stopped meaning anything", () => {
+    const { calls, t } = capture();
+    describeLimit(t, { ...longOdds, odds: 1 / 96_281_828_704 });
+
+    expect(calls.some((call) => call.key === "ui.legality.chance-impossible")).toBe(true);
+    expect(calls.some((call) => call.key === "ui.legality.chance-percent")).toBe(false);
   });
 
   it("falls back to the rule's own key rather than rendering nothing", () => {
     const { calls, t } = capture();
-    describeFinding(t, finding({ rule: "masterTraitCount", subject: { kind: "masterTraits" } }), "");
-    expect(calls[0].key).toBe("ui.legality.explain.masterTraitCount");
+    describeLimit(t, finding({ rule: "masterTraitCount", subject: { kind: "masterTraits" } }));
+    expect(calls[0].key).toBe("ui.legality.limit.masterTraitCount");
+  });
+});
+
+describe("describeOdds", () => {
+  const capture = () => {
+    const calls: Record<string, unknown>[] = [];
+    const t = ((key: string, options?: Record<string, unknown>) => {
+      calls.push({ key, ...options });
+      return key;
+    }) as never;
+    return { calls, t };
+  };
+
+  /** 1 in N, the form a reader can judge — not a bare probability, and not the
+   * bare denominator that used to read as a count. */
+  it("hands the denominator to the 1-in-N wrapper", () => {
+    const { calls, t } = capture();
+    describeOdds(t, longOdds.odds);
+
+    expect(calls[0]).toMatchObject({ key: "ui.legality.odds-value" });
+    expect(calls[0].denominator).toBe(Math.round(1 / 4.7e-7).toLocaleString());
+  });
+
+  it("renders nothing at all when a finding carries no odds", () => {
+    const { calls, t } = capture();
+    expect(describeOdds(t, breach.odds)).toBe("");
+    expect(calls).toHaveLength(0);
   });
 });

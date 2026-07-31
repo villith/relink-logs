@@ -703,10 +703,6 @@ export type LegalityRule =
   | "summonPerfectCount"
   | "masterTraitCount";
 
-/** `legality::Severity`. `impossible` is proof, `improbable` is suspicion —
- * never collapse them. */
-export type LegalitySeverity = "impossible" | "improbable";
-
 /** `legality::Subject`, an internally tagged enum: `index` is absent for the
  * variants that carry none (`wrightstone`). */
 export type LegalitySubject = {
@@ -720,17 +716,72 @@ export type LegalitySubject = {
  * rule. */
 export type LegalityValue =
   | { kind: "level" | "count" | "amount" | "traitId" | "summonBonusId" | "overmasteryId"; value: number }
-  | { kind: "levels" | "traitIds" | "sigilIds" | "summonBonusIds"; value: number[] }
+  /** `summonBonusIds` is legacy — it survives only so findings stored before
+   * the bonus-source rule started naming its owners still deserialize.
+   * `summonIds` replaced it: one id per display NAME, the summons that DO grant
+   * a bonus some other summon was caught holding. */
+  | { kind: "levels" | "traitIds" | "sigilIds" | "summonBonusIds" | "summonIds"; value: number[] }
   | { kind: "none" };
+
+/** One trait or bonus line beneath its item — `legality::EvidenceTrait`. */
+export type LegalityEvidenceTrait = { id: number; level: number };
+
+/** One equipped summon — `legality::EvidenceSummon`. */
+export type LegalityEvidenceSummon = {
+  summonId: number;
+  main: LegalityEvidenceTrait;
+  bonus: LegalityEvidenceTrait;
+};
+
+/** One overmastery. `flags` decides whether the magnitude is a level or an
+ * amount, so it must survive to the formatter — `legality::EvidenceOvermastery`. */
+export type LegalityEvidenceOvermastery = { id: number; value: number; flags: number };
+
+/**
+ * The equipment a finding is about, captured when the finding was computed —
+ * `legality::Evidence`.
+ *
+ * This is what makes a stored verdict self-describing. `LegalitySubject` alone
+ * carries a slot index, which is meaningless without the encounter it indexes
+ * into; rendering it against any other build names whichever item now sits in
+ * that slot. With the snapshot the page needs no encounter at all.
+ */
+export type LegalityEvidence =
+  | { kind: "sigil"; sigilId: number; level: number; traits: LegalityEvidenceTrait[] }
+  | { kind: "wrightstone"; wrightstoneId: number; traits: LegalityEvidenceTrait[] }
+  | ({ kind: "summon" } & LegalityEvidenceSummon)
+  | { kind: "summons"; summons: LegalityEvidenceSummon[] }
+  | ({ kind: "overmastery" } & LegalityEvidenceOvermastery)
+  | { kind: "overmasteries"; entries: LegalityEvidenceOvermastery[] }
+  | { kind: "masterTraits"; observed: number; allowed: number };
 
 export type LegalityFinding = {
   rule: LegalityRule;
-  severity: LegalitySeverity;
   subject: LegalitySubject;
   observed: LegalityValue;
   allowed: LegalityValue;
-  /** Probability of occurring legitimately, present only for `improbable`. */
+  /** Absent on rows written before the snapshot existed; the sweep refills
+   * them, and a finding without one simply names nothing. */
+  evidence?: LegalityEvidence | null;
+  /** Probability of occurring legitimately. Null for a hard table breach,
+   * which has no odds to quote.
+   *
+   * Severity is gone, so this is the only thing separating a report of long
+   * odds from proof the game could not have produced a build — a surface that
+   * shows findings must show these odds wherever they exist. */
   odds: number | null;
+};
+
+/** One stored finding with the party slot it belongs to — `db::legality::StoredFinding`.
+ *
+ * The quest list reads these: it draws a party as text rather than as the
+ * players themselves, so it needs the slot to know which name to colour. */
+export type StoredLegalityFinding = {
+  /** Party slot 0-3, the same index the encounter's player data uses. */
+  playerIndex: number;
+  displayName: string;
+  characterType: CharacterType;
+  finding: LegalityFinding;
 };
 
 /** One stored finding with the encounter it came from — `db::legality::PlayerFinding`. */
@@ -738,6 +789,9 @@ export type LegalityPlayerFinding = {
   logId: number;
   /** Milliseconds since the UNIX epoch. */
   time: number;
+  /** The quest the encounter was, so the audit page can name each flagged fight
+   * without loading it. Absent on a log recorded before the column existed. */
+  questId?: number | null;
   finding: LegalityFinding;
 };
 
@@ -748,10 +802,8 @@ export type LegalityPlayerFinding = {
 export type LegalityFlaggedPlayer = {
   displayName: string;
   characterType: CharacterType;
-  /** True when any finding is `impossible` — the page's red/yellow split. */
-  impossible: boolean;
-  /** Distinct encounters flagged, not findings: repetition across fights is
-   * what separates a real mod from a one-off misread. */
+  /** Distinct encounters flagged, not findings. A tiebreaker on the page's
+   * ordering; the page does not draw it as a badge. */
   encounters: number;
   /** Most recent flagged encounter, milliseconds since the UNIX epoch. */
   lastSeen: number;

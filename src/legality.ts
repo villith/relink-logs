@@ -11,27 +11,8 @@
 
 import { TFunction } from "i18next";
 
-import { LegalityFinding, LegalitySeverity, LegalitySubject, LegalityValue, PlayerData } from "./types";
+import { LegalityFinding, LegalityRule, LegalitySubject, LegalityValue, PlayerData } from "./types";
 import { translateSigilId, translateSummonId } from "./utils";
-
-/** The worst severity in a set, or null when nothing fired.
- *
- * `impossible` outranks `improbable` and the two must never be collapsed: one
- * is proof the game could not have produced a build, the other is a report of
- * long odds that a dedicated farmer can genuinely hit. */
-export const worstSeverity = (findings: LegalityFinding[]): LegalitySeverity | null => {
-  if (findings.some((finding) => finding.severity === "impossible")) return "impossible";
-  if (findings.length > 0) return "improbable";
-  return null;
-};
-
-/** The Mantine colour for a severity; undefined leaves text at its usual
- * colour, which is what a clean player must look like. */
-export const severityColor = (severity: LegalitySeverity | null): "red" | "yellow" | undefined => {
-  if (severity === "impossible") return "red";
-  if (severity === "improbable") return "yellow";
-  return undefined;
-};
 
 /** The findings pointing at one piece of equipment.
  *
@@ -45,18 +26,53 @@ export const findingsForSubject = (
   index?: number
 ): LegalityFinding[] => findings.filter((finding) => finding.subject.kind === kind && finding.subject.index === index);
 
-/** A `LegalityValue` as a number a sentence can interpolate, or undefined when
- * the value is a list or absent — those rules phrase themselves without one. */
-const scalar = (value: LegalityValue | undefined): number | undefined => {
+/** A `LegalityValue` as the figure a reader compares, or undefined when the
+ * value is an id — ids name a thing rather than measure one, and the rules that
+ * carry them phrase their value without a number.
+ *
+ * `summonIds` is the exception, and earns it: the bonus-source claim's limit
+ * genuinely IS a set of names ("only Rolan, Lucilius, Beelzebub, Lilith"), and
+ * it has to be spelled out because the gear line cannot show it. Two bonus ids
+ * share every effect's display name, so the line reads "Healing Cap Up" whether
+ * or not this summon may hold that one.
+ *
+ * `slot` picks one entry out of a per-slot list, so a wrightstone's three caps
+ * can each be quoted against the trait line they belong to. Without it a list
+ * renders whole (`12 / 9 / 5`), which is what a claim about the levels together
+ * needs. */
+const displayValue = (value: LegalityValue | undefined, slot?: number): string | number | undefined => {
   if (!value) return undefined;
   switch (value.kind) {
     case "level":
     case "count":
     case "amount":
       return value.value;
+    case "levels":
+      return slot === undefined ? value.value.join(" / ") : value.value[slot];
+    // Sorted after translating, not before: the backend orders them by id, and
+    // alphabetical only means anything in the language being read.
+    case "summonIds":
+      return value.value
+        .map(translateSummonId)
+        .sort((a, b) => a.localeCompare(b))
+        .join(", ");
     default:
       return undefined;
   }
+};
+
+/**
+ * The string a finding's limit is written in.
+ *
+ * Only one rule needs a choice: a foreign summon bonus normally names the
+ * summons that DO grant it, but an id nobody is known to grant — a modded one,
+ * or one granted too widely for the backend to list — leaves nothing to name,
+ * and "only " trailing into nothing is worse than the bare claim.
+ */
+const limitKey = (finding: LegalityFinding): string => {
+  const key = `ui.legality.limit.${finding.rule}`;
+  const unnamed = finding.allowed?.kind === "summonIds" && finding.allowed.value.length === 0;
+  return unnamed ? `${key}-unnamed` : key;
 };
 
 /** `odds` is a probability; a reader judges "1 in N". Locale-formatted here so
@@ -65,25 +81,95 @@ const scalar = (value: LegalityValue | undefined): number | undefined => {
 const denominator = (odds: number | null): string | undefined =>
   odds !== null && odds !== undefined && odds > 0 ? Math.round(1 / odds).toLocaleString() : undefined;
 
+/** Below this, a percentage stops conveying anything — `0.0000000010%` is a
+ * row of zeroes, not a quantity — so the odds are stated in words instead. */
+const BEYOND_CHANCE = 1e-9;
+
 /**
- * The sentence a reader judges a finding by.
+ * Odds as the percentage a reader can picture, or words when the number has
+ * stopped meaning anything.
  *
- * `subjectName` is the already-translated name of the thing the finding points
- * at ("Behemoth III", "War Elemental") — the caller has the equipment in hand
- * and this module deliberately does not.
- *
- * Every rule gets its own key so the claim can be phrased in the reader's terms
- * rather than the rule's. `improbable` wording must never accuse: the game can
- * produce those builds and roughly one player in eight in a real database
- * carries one.
+ * "1 in 953" was the old form and it failed twice over: the denominator had no
+ * unit, and a reader has to invert it to judge it. A percentage needs neither
+ * step. Significant digits rather than fixed decimals, because these span nine
+ * orders of magnitude and `0.00%` is not an answer.
  */
-export const describeFinding = (t: TFunction, finding: LegalityFinding, subjectName: string): string =>
-  t(`ui.legality.explain.${finding.rule}`, {
-    subject: subjectName,
-    observed: scalar(finding.observed),
-    allowed: scalar(finding.allowed),
-    denominator: denominator(finding.odds),
+export const describeChance = (t: TFunction, odds: number | null): string => {
+  if (odds === null || odds === undefined || odds <= 0) return "";
+  if (odds < BEYOND_CHANCE) return t("ui.legality.chance-impossible");
+
+  const percent = odds * 100;
+  // `toPrecision` gives exponent form below 1e-6; expanded with `toFixed`,
+  // since "1.2e-5%" is worse than the row of zeroes it was avoiding.
+  const written = Number(percent.toPrecision(2))
+    .toFixed(Math.max(0, 1 - Math.floor(Math.log10(percent))))
+    .replace(/\.?0+$/, "");
+
+  return t("ui.legality.chance-percent", { percent: written });
+};
+
+/**
+ * A finding, as the pieces a reader actually compares: what rule fired, what it
+ * points at, and the limit it broke.
+ *
+ * These were one interpolated sentence per rule. That shape inlined
+ * `{{subject}}`, so a surface listing people across many logs — holding none of
+ * their equipment — rendered every claim headless ("cannot roll this trait.").
+ * Keeping the pieces apart lets the audit page put the limit against the gear
+ * line it belongs to, and lets a tooltip that has no gear in hand still say
+ * something complete.
+ */
+
+/** What fired, in the reader's terms rather than the rule's. */
+export const ruleLabel = (t: TFunction, rule: LegalityRule): string => t(`ui.legality.rule.${rule}`);
+
+/**
+ * What the game allows, phrased to sit immediately after a gear line —
+ * `max 20`, `doesn't roll on this summon`, `max +50`.
+ *
+ * A suffix, never a sentence, and never naming its subject: the line it follows
+ * already names the item and shows the offending value, so this says only what
+ * the limit is. That is the whole reason it replaced the old standalone
+ * `15 / max 10` fragments — those restated a number the reader was already
+ * looking at, in a vocabulary the rest of the app does not use.
+ *
+ * `slot` picks the cap belonging to one trait line, for rules that carry one
+ * per slot.
+ */
+export const describeLimit = (
+  t: TFunction,
+  finding: LegalityFinding,
+  slot?: number,
+  /** A pre-formatted allowed value, for a caller that knows the unit the rule
+   * does not. A summon bonus stores a bare `50`, and "max +50" beside a line
+   * reading "+75%" leaves the reader to finish the comparison. */
+  allowed?: string
+): string =>
+  t(limitKey(finding), {
+    observed: displayValue(finding.observed, slot),
+    allowed: allowed ?? displayValue(finding.allowed, slot),
+    chance: describeChance(t, finding.odds),
+    denominator: denominator(finding.odds) ?? "",
   });
+
+/** A finding's odds as the `1 in N` a reader can judge, or empty when the rule
+ * carries none. A hard table breach has no odds — that is the point of one. */
+export const describeOdds = (t: TFunction, odds: number | null): string => {
+  const value = denominator(odds);
+  return value === undefined ? "" : t("ui.legality.odds-value", { denominator: value });
+};
+
+/**
+ * The slot a finding points at, counted from one the way the equipment tabs
+ * show it.
+ *
+ * A fallback, not the goal: the stored `Subject` carries a slot index and no
+ * item id, so a surface without the build in hand can say "Sigil 8" but not
+ * "Tyranny". Whole-set subjects get nothing rather than a wrong slot — their
+ * claim is about the set, so pointing at a member misrepresents it.
+ */
+export const subjectLabel = (t: TFunction, subject: LegalitySubject): string =>
+  subject.index === undefined ? "" : t(`ui.legality.subject.${subject.kind}`, { slot: subject.index + 1 });
 
 /**
  * The translated name of the equipment a finding points at, resolved from the

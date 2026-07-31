@@ -389,6 +389,36 @@ export const overmasteryAmountFromId = (id: number, value: number): BonusAmount 
     ? stunPowerAmount(value)
     : { kind: OVERMASTERY_FLAT_VALUE_IDS.has(id) ? "flat" : "percent", amount: value };
 
+/** The single-bit level flag (bit N → level N+1) → a 1-based level, or 0 if
+ * unset. `>>> 0` forces the isolated bit to an unsigned value so a set bit 31
+ * can't make `flags & -flags` negative and yield `Math.log2(negative) === NaN`. */
+export const overmasteryLevel = (flags: number): number => (flags === 0 ? 0 : Math.log2((flags & -flags) >>> 0) + 1);
+
+/** v2.0.2: overmasteries recovered from the town loadout carry only id + level
+ * (in `flags`), not the computed in-game magnitude (`value` is 0) — fall back
+ * to the level, matching the "(Lvl. N)" style used for sigils and summons. */
+export const overmasteryAmount = (overmastery: { id: number; value: number; flags: number }): BonusAmount =>
+  overmastery.value === 0
+    ? { kind: "level", amount: overmasteryLevel(overmastery.flags) }
+    : overmasteryAmountFromId(overmastery.id, overmastery.value);
+
+/**
+ * An overmastery as the equipment and builds tabs write it — `Critical Hit
+ * Rate Up: +20%`, or `… (Lvl. 3)` when only the level survived.
+ *
+ * Shared rather than per-page: the audit page printed a bare `20` where `+20%`
+ * belonged because it formatted the raw value itself, and a number without its
+ * unit is not a claim anyone can check.
+ */
+export const formatOvermastery = (overmastery: { id: number; value: number; flags: number } | undefined): string => {
+  if (!overmastery) return "";
+  const translation = translateOvermasteryId(overmastery.id);
+  const amount = overmasteryAmount(overmastery);
+  return amount.kind === "level"
+    ? `${translation} ${formatBonusAmount(amount)}`
+    : `${translation}: ${formatBonusAmount(amount)}`;
+};
+
 /**
  * Expands combined bonuses to the full canonical effect list: every name in
  * `allNames` gets a row (an empty group when the player has none — render it
