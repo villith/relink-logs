@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderTemplate, splitTemplate, unknownTokens, usedTokens } from "./labelTemplate";
+import { renderTemplate, renderTemplateNodes, splitTemplate, unknownTokens, usedTokens } from "./labelTemplate";
 
 describe("renderTemplate", () => {
   it("substitutes known tokens", () => {
@@ -41,6 +41,29 @@ describe("renderTemplate", () => {
 
   it("renders empty when every token is empty", () => {
     expect(renderTemplate("{a} ({b})", { a: "", b: "" })).toBe("");
+  });
+
+  // Rule 4: literal text is there to decorate a value. With every value gone
+  // there is nothing left to decorate, so the whole template goes — otherwise
+  // the default header segments read "/s" and "HP /" before a fight starts.
+  it("renders empty when every token is empty, whatever literal text surrounds them", () => {
+    expect(renderTemplate("{dps}/s", { dps: "" })).toBe("");
+    expect(renderTemplate("HP {hpPercent} ({hpCurrent} / {hpMax})", { hpPercent: "", hpCurrent: "", hpMax: "" })).toBe(
+      ""
+    );
+  });
+
+  it("keeps the literal text once any one token has a value", () => {
+    expect(renderTemplate("{dps}/s", { dps: "61.2k" })).toBe("61.2k/s");
+    expect(
+      renderTemplate("HP {hpPercent} ({hpCurrent} / {hpMax})", { hpPercent: "45.2%", hpCurrent: "", hpMax: "" })
+    ).toBe("HP 45.2%");
+  });
+
+  it("does not count an unknown token as an empty one", () => {
+    // `{nope}` stays literal, so the segment still has something to show and
+    // the typo remains visible rather than silently blanking the whole thing.
+    expect(renderTemplate("{nope}/s", {})).toBe("{nope}/s");
   });
 
   it("returns empty for an empty template", () => {
@@ -166,5 +189,55 @@ describe("splitTemplate", () => {
 
     expect(found).toEqual(["slot", "name", "character", "bogus"]);
     expect(unknownTokens(template, ["slot", "name", "character"])).toEqual(["bogus"]);
+  });
+});
+
+describe("renderTemplateNodes", () => {
+  it("returns a node part for a node token, carrying its raw value", () => {
+    expect(renderTemplateNodes("{icon} {name}", { icon: "Pl1400", name: "Scott" }, ["icon"])).toEqual([
+      { type: "node", name: "icon", value: "Pl1400" },
+      { type: "text", value: " Scott" },
+    ]);
+  });
+
+  it("returns plain text when no node token is used", () => {
+    expect(renderTemplateNodes("{name}", { name: "Scott" }, ["icon"])).toEqual([{ type: "text", value: "Scott" }]);
+  });
+
+  // An emptied node token has to behave exactly like an emptied text token,
+  // or the collapse rules would apply to some tokens and not others.
+  it("drops an emptied node token and leaves the rest", () => {
+    expect(renderTemplateNodes("{icon} {name}", { icon: "", name: "Scott" }, ["icon"])).toEqual([
+      { type: "text", value: "Scott" },
+    ]);
+  });
+
+  it("unwraps a bracket group following an emptied node token (rule 2)", () => {
+    expect(renderTemplateNodes("{icon} ({name})", { icon: "", name: "Scott" }, ["icon"])).toEqual([
+      { type: "text", value: "Scott" },
+    ]);
+  });
+
+  it("renders nothing when every token emptied (rule 3)", () => {
+    expect(renderTemplateNodes("{icon} ({name})", { icon: "", name: "" }, ["icon"])).toEqual([]);
+  });
+
+  it("keeps a node token that repeats", () => {
+    expect(renderTemplateNodes("{icon}{icon}", { icon: "Pl0000" }, ["icon"])).toEqual([
+      { type: "node", name: "icon", value: "Pl0000" },
+      { type: "node", name: "icon", value: "Pl0000" },
+    ]);
+  });
+
+  it("leaves an unknown token literal, as the string renderer does", () => {
+    expect(renderTemplateNodes("{nope} {name}", { name: "Scott" }, ["icon"])).toEqual([
+      { type: "text", value: "{nope} Scott" },
+    ]);
+  });
+
+  it("agrees with renderTemplate when no token is a node token", () => {
+    const tokens = { slot: "1", name: "", character: "Io" };
+    const parts = renderTemplateNodes("[{slot}] {name} ({character})", tokens, []);
+    expect(parts).toEqual([{ type: "text", value: renderTemplate("[{slot}] {name} ({character})", tokens) }]);
   });
 });

@@ -30,13 +30,21 @@
   align-items: center;
 }
 
+/* The segments give up space; the buttons never do. A flex item defaults to
+   min-width: auto, so without `min-width: 0` the left side refuses to shrink
+   below its own nowrap text and pushes the window buttons off the end of a
+   narrow overlay instead. Clipping the text is the right trade — a segment you
+   can only half read still tells you more than a minimise button you cannot
+   reach. */
 .titlebar-left {
-  flex: 2;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   justify-content: flex-start;
 }
 
 .titlebar-right {
-  flex: 1;
+  flex: 0 0 auto;
   justify-content: flex-end;
 }
 
@@ -116,33 +124,93 @@
   font-weight: 600;
 }
 
+/* The meter is a grid of divs, NOT a <table> — deliberately, and it must stay
+   that way.
+
+   The damage bar is the ROW's own background. In a table, backgrounds are
+   painted per CELL, so every engine got to disagree about where a row
+   background lives: WebKitGTK repainted the bar inside each cell (worked around
+   by force-clearing every cell's background), Chromium tore it along cell edges
+   whenever the meter landed on fractional pixels, and WebKit bug 240961 ruled
+   out layering the bar as a positioned child instead. A row that is one grid
+   div has exactly one background box, and all three problems disappear with the
+   table.
+
+   `--meter-grid` is set per table in JS because the column count is dynamic;
+   the track WIDTHS inside it stay variables so the narrow rules below can
+   still retune them without rebuilding the template. */
 .table {
-  table-layout: fixed;
+  --meter-value-col: 4.5rem;
+  /* Player-icon geometry, derived from the bar height rather than the font: the
+     icon is the one thing in a row that is allowed to be bigger than the row,
+     so a font-locked size left it small in a tall bar and forced a short bar
+     taller.
+
+     The busts stand on their own bar and grow UPWARDS out of it, which is why
+     `--player-icon-overhang` is the whole difference rather than half of it:
+     none of it goes below. Rows paint front-to-back down the list (see
+     `.player-row`), so each bust is overlapped by the one below exactly the way
+     a row of people standing behind each other is. The 2px is rounding slack;
+     unlike a centred icon this alignment has no font-metric term.
+
+     The scale is a compromise the geometry forces. A bottom-aligned icon shows
+     its own row the BOTTOM `--meter-row-height` of itself and puts everything
+     above that in the row above — so at 2x the bar height the face lands over
+     the previous row's name and each row appears to be labelled with the next
+     player's head. Cropping the torso off the source (see `.player-label-icon`)
+     is what buys a big face instead: it moves the head down into the part of
+     the icon that its own row actually shows, and 1.5 is as tall as the icon
+     can then get before the face climbs out of its row again.
+
+     `--player-icon-step` walks each row's bust further right so the ones behind
+     are not hidden dead centre; it is a fraction of the icon rather than a flat
+     px so the stagger stays proportional at every bar height.
+     `--player-icon-reserve` is the width that steps out of, held constant per
+     row so the NAMES stay aligned no matter how far the icon has stepped. Three
+     steps covers a full party. */
+  --player-icon-scale: 1.5;
+  --player-icon-step: calc(var(--player-icon-height) / 6);
+  --player-icon-reserve: calc(3 * var(--player-icon-step));
+  --player-icon-height: calc(var(--meter-row-height, 27px) * var(--player-icon-scale));
+  --player-icon-overhang: calc(var(--player-icon-height) - var(--meter-row-height, 27px) + 2px);
+  display: flex;
+  flex-direction: column;
+  /* Also opens a gap between the header and the first row, which only shows
+     once the user asks for row spacing at all. */
+  gap: var(--meter-row-gap, 0);
   text-align: left;
-  border: none;
-  /* Vertical gap only, from --meter-row-gap on the table root. The table
-     already used the separate box model, so this is a one-property change. It
-     also opens a gap between thead and the first row, which only shows once
-     the user asks for spacing at all. */
-  border-spacing: 0 var(--meter-row-gap, 0);
   user-select: none;
 }
 
+/* Wider value columns for un-humanized numbers. The nested skill table carries
+   `.table` but never `.full-values`, so this re-declaration resets it back to
+   4.5rem there — matching what the fixed table layout did before. */
+.table.full-values {
+  --meter-value-col: 6rem;
+}
+
+.table-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--meter-row-gap, 0);
+}
+
+/* Every row — header, player, skill — shares one template, which is what keeps
+   the columns lined up between them. The name track has a 120px floor so it
+   stays readable when many value columns compete for space; below that the grid
+   overflows rather than collapsing the name, exactly as the fixed table did. */
+.meter-row {
+  display: grid;
+  grid-template-columns: var(--meter-grid, minmax(120px, 1fr));
+  align-items: center;
+}
+
 .table .header-name {
-  width: 100%;
   padding: 2px 8px;
-  /* Keep the name column readable when many value columns compete for space
-     (table-layout is fixed, so the name column is the one that gets squeezed).
-     The table overflows/scrolls before the name collapses to an ellipsis. */
-  min-width: 120px;
 }
 
 .table .header-column {
   font-size: 14px;
-  width: 4.5rem;
-}
-.table.full-values .header-column {
-  width: 6rem;
 }
 
 .table .header-name,
@@ -154,6 +222,32 @@
 .table .player-row,
 .table .skill-row {
   cursor: pointer;
+}
+
+/* Paints each row in front of the one above it, so the busts overlap like
+   people standing in a line rather than the top row looming over everybody.
+   Positioning alone does it: a positioned row paints in the positioned phase,
+   which runs in TREE ORDER and takes the row's background with it, so no
+   per-row z-index is needed. Unpositioned rows could not — every background in
+   the table paints before any content, so the row above's bust would sit on
+   top of the row below's bar.
+
+   This is NOT the layering that `damageBarStyle` and the note above warn off.
+   The bar is still the row's OWN background, and an element's background can
+   never paint over that element's content. What is forbidden is making the bar
+   a positioned CHILD stacked against its siblings, which is where WebKitGTK
+   paints it over the text (bug 240961). */
+.table .player-row {
+  position: relative;
+}
+
+/* An open breakdown outranks the bust of the row below it. Without this the
+   next row down, being later in the tree, would paint its icon across the
+   skill names — the one place the crowd effect costs information rather than
+   adding to it. */
+.skill-table {
+  position: relative;
+  z-index: 1;
 }
 
 .skill-row:hover {
@@ -204,11 +298,10 @@
 
 /* The damage bar is painted as the row's own background, sized by the
    --damage-bar-* custom properties set inline on the row (damageBarStyle in
-   utils.ts). It must NOT be a positioned child element layered with z-index:
-   position/z-index on table internals (tr/td) is undefined in CSS 2.1 —
-   Chromium (Windows WebView2) honors it, but WebKitGTK (Linux) paints such a
-   bar over the cell text (https://bugs.webkit.org/show_bug.cgi?id=240961).
-   A row background can never paint over cell content, in any engine.
+   utils.ts). It must NOT be a positioned child element layered with z-index —
+   WebKitGTK (Linux) paints such a bar over the row's text
+   (https://bugs.webkit.org/show_bug.cgi?id=240961). A background can never
+   paint over its own element's content, in any engine.
 
    Row height and the texture layer come from --meter-row-height / --bar-texture
    on the table root (Table.tsx), so a taller row costs no extra markup. */
@@ -216,7 +309,7 @@
 .table .skill-row {
   color: white;
   font-size: 14px;
-  height: var(--meter-row-height, 27px);
+  min-height: var(--meter-row-height, 27px);
   background-image: var(--bar-texture, none),
     linear-gradient(var(--damage-bar-color, transparent), var(--damage-bar-color, transparent));
   background-size:
@@ -238,26 +331,101 @@
     var(--damage-bar-width, 0%) 100%;
 }
 
+/* No background reset here any more. Cells used to need `background: none
+   !important` because WebKitGTK repainted the row's bar inside every table
+   cell; a grid cell is an ordinary div and never inherits a background, so the
+   override is gone along with the table. `min-width: 0` lets a cell shrink
+   inside its track so the ellipsis can engage. */
 .skill-row .row-data,
 .player-row .row-data,
-.row-button {
+.header-name,
+.header-column {
   padding: 0 6px;
+  min-width: 0;
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;
-  /**
-   * For some reason on Linux, all of the row-data bars inherit the player-row/skill-row parent background-image
-   */
-  background: none !important;
-  background-image: none !important;
 }
 
 .skill-row .row-data.nested {
   padding: 0 6px 0 12px;
 }
 
-.row-button {
-  width: 1em;
+/* The cell the player icon overhangs out of.
+   Two jobs, both about keeping the bar exactly as tall as the user asked:
+
+   - A definite height means nothing inside the cell — a big icon, a big font —
+     can push the row past `--meter-row-height` the way a content-sized cell
+     could.
+   - Padding traded for the same amount of negative margin moves the
+     `overflow: hidden` clip edge outwards while leaving the cell's OUTER size,
+     the only thing the grid row measures, unchanged. That is the room the
+     oversized bust is drawn into; without it the cell would crop it.
+
+   `content-box` because the Mantine reset makes everything border-box, which
+   would take that padding out of the height instead of adding to it. */
+.player-row .row-data.player-name {
+  box-sizing: content-box;
+  height: var(--meter-row-height, 27px);
+  line-height: var(--meter-row-height, 27px);
+  /* All the room is opened upwards, where the bust goes. The 2px at the bottom
+     is for the case where the text's own line box is taller than a very short
+     bar and pushes the icon's baseline down a fraction. */
+  padding-block: var(--player-icon-overhang) 2px;
+  margin-block: calc(-1 * var(--player-icon-overhang)) -2px;
+  /* That padding is a clip window, not a target. It reaches a whole bust above
+     the bar, and rows paint front-to-back, so leaving it hit-testable would put
+     an invisible slab of THIS row over the bar of the row above — hovering or
+     clicking that row would open this one's tooltip and breakdown instead.
+     Nothing in here is interactive on its own (the row carries the click and
+     the tooltip), so the cell drops out of hit-testing entirely and every press
+     lands on the bar it looks like it landed on. */
+  pointer-events: none;
+}
+
+/* The `{icon}` token in a player label.
+   The source is a painted bust whose bottom fifth is torso, so an uncropped one
+   spends the row's height on a chest rather than a face. `object-fit: cover`
+   against a box wider per unit height than the source crops the overflow off
+   the BOTTOM (with `object-position: top`), which both lands the art on the bar
+   and spends the icon's height on the head.
+
+   The width ratio is the whole control, and both halves of it mean something:
+   the denominator is how many source rows survive the crop, and the numerator
+   is just the source's width. So `192 / 180` shows the top 180 rows of a 192px
+   wide source — lower the 180 to zoom the face further. The art's scale works
+   out to height/180 either way, independent of the numerator, which is why
+   trimming the sources narrower did not shrink any face.
+
+   Every file in `mini/` is exactly 192x255 because `scripts/crop-character-
+   icons.mjs` cropped them to one shared rect; re-run it if the icons are ever
+   re-extracted, and take the ratio it prints.
+
+   Vertically, the bust stands on the bottom of its own bar and rises out of the
+   top. `vertical-align: bottom` puts the bottom of its MARGIN box on the bottom
+   of the line box, and the -height top margin makes that margin box zero-tall
+   with the art hanging above it. Zero-tall is the whole trick: an inline
+   replaced element hands its margin box, not its art, to the line box, so an
+   icon of any size adds nothing to the line's — and therefore the row's —
+   height. The room it rises into is the padding on `.player-name`.
+
+   Horizontally, `--player-icon-indent` (set per row, in PlayerRow) steps the
+   bust right while the right margin gives back exactly what the left one took,
+   so every row spends the same width on its icon and the names stay in a
+   column. */
+.player-label-icon {
+  height: var(--player-icon-height, 1.6em);
+  margin-top: calc(-1 * var(--player-icon-height, 1.6em));
+  margin-bottom: 0;
+  margin-left: var(--player-icon-indent, 0px);
+  margin-right: calc(var(--player-icon-reserve, 0px) - var(--player-icon-indent, 0px));
+  width: calc(var(--player-icon-height, 1.6em) * 192 / 180);
+  object-fit: cover;
+  object-position: center top;
+  vertical-align: bottom;
+  /* The row is a nowrap ellipsis track; without this the icon can be handed a
+     shrunken box before the text ever elides. */
+  flex: none;
 }
 
 .player-table {
@@ -297,14 +465,38 @@
     display: none;
   }
 
-  .table .header-column {
-    width: 55px;
+  /* Retunes the track the row template already refers to, so the header and
+     every row narrow together without the template being rebuilt. */
+  .table {
+    --meter-value-col: 55px;
   }
 
-  .table .dropdown,
-  .table .row-button {
+  .table .dropdown {
     display: none;
   }
+}
+
+/* The same rules, driven by a class instead of the viewport.
+   The media query above measures the WINDOW, which in the overlay is the
+   overlay — but in the settings preview it is the settings window, which has
+   nothing to do with how wide the overlay being previewed is. The preview knows
+   that width as a number, so it sets this class itself (MeterPreview). */
+.is-narrow .titlebar .item.hide-narrow,
+.is-narrow .table .dropdown {
+  display: none;
+}
+
+.is-narrow .table {
+  --meter-value-col: 55px;
+}
+
+/* The settings preview drawn at the overlay's real pixel size, scaled down to
+   whatever room the settings column has. Scaling rather than shrinking is what
+   keeps it honest: every proportion inside is the one the overlay will have. */
+.overlay-preview-frame {
+  transform-origin: top left;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Hook status tones in the overlay status slot. A leading dot glyph is always

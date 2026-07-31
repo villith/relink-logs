@@ -61,17 +61,18 @@ export const SkillGroupRow = ({
         showFullValues={showFullValues}
         color={color}
       >
-        <tr
-          className="skill-row group"
+        <div
+          role="row"
+          className="meter-row skill-row group"
           style={damageBarStyle(color, barWidth(group.percentage, maxPercentage, fillMode))}
           onClick={() => setExpanded(!expanded)}
         >
-          <td className="text-left row-data">
+          <div role="cell" className="text-left row-data">
             <span>{getSkillName(group.childCharacterType, group)}</span>
             <span className="p4">{expanded ? <CaretUp size={12} /> : <CaretDown size={12} />}</span>
-          </td>
+          </div>
           {columns.map(renderCell)}
-        </tr>
+        </div>
       </SkillTargetTooltip>
       {expanded &&
         sortedSkills.map((skill) => (

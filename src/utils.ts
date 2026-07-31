@@ -1038,7 +1038,11 @@ export const formatCharacterLabel = (
 
 /** The tokens a player-name template may use. Exported so the settings editor
  * can list them and flag anything else as a typo. */
-export const PLAYER_LABEL_TOKENS = ["slot", "name", "character"] as const;
+export const PLAYER_LABEL_TOKENS = ["slot", "name", "character", "icon"] as const;
+
+/** The subset of PLAYER_LABEL_TOKENS that draws as a node rather than text.
+ * Text-only consumers (the tooltip, log exports) blank these instead. */
+export const PLAYER_NODE_TOKENS = ["icon"] as const;
 
 /**
  * Token values for one meter row.
@@ -1069,6 +1073,11 @@ export const playerLabelTokens = (
     slot: partySlotData ? String(partySlotIndex + 1) : "Guest",
     name,
     character: translateCharacterType(player.characterType),
+    // The character id doubles as the icon's filename. An unidentified
+    // character has no id and so no icon: empty rather than absent, because an
+    // absent token renders LITERALLY as `{icon}` — a token that cannot resolve
+    // must collapse like any other empty value, not print itself into the meter.
+    icon: typeof player.characterType === "string" ? player.characterType : "",
   };
 };
 
@@ -1085,7 +1094,13 @@ export const translatedPlayerName = (
 ) => {
   if (!player) return "Guest";
 
-  return renderTemplate(template, playerLabelTokens(partySlotIndex, partySlotData, player, show_display_names));
+  // The icon has no text form, so it empties here and collapses like any other
+  // absent value. Substituting it would print the raw id ("Pl1400 Scott") into
+  // the tooltip and everywhere else a label is needed as a plain string.
+  return renderTemplate(template, {
+    ...playerLabelTokens(partySlotIndex, partySlotData, player, show_display_names),
+    icon: "",
+  });
 };
 
 export const sortPlayers = (players: ComputedPlayerState[], sortType: SortType, sortDirection: SortDirection) => {

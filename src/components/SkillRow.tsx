@@ -58,14 +58,16 @@ export const SkillRow = ({
   // a dash (which keeps the row aligned with whatever columns are visible).
   if (skill.actionType === "PerfectGuardQuickening") {
     return (
-      <tr className={`skill-row ${nested ? "nested" : ""}`}>
-        <td className={`text-left row-data ${nested ? "nested" : ""}`}>{getSkillName(characterType, skill)}</td>
+      <div role="row" className={`meter-row skill-row ${nested ? "nested" : ""}`}>
+        <div role="cell" className={`text-left row-data ${nested ? "nested" : ""}`}>
+          {getSkillName(characterType, skill)}
+        </div>
         {columns.map((column) => (
-          <td key={column} className="text-center row-data">
+          <div key={column} role="cell" className="text-center row-data">
             {column === SkillColumns.Hits ? skill.hits : "-"}
-          </td>
+          </div>
         ))}
-      </tr>
+      </div>
     );
   }
 
@@ -76,13 +78,16 @@ export const SkillRow = ({
       showFullValues={showFullValues}
       color={color}
     >
-      <tr
-        className={`skill-row ${nested ? "nested" : ""}`}
+      <div
+        role="row"
+        className={`meter-row skill-row ${nested ? "nested" : ""}`}
         style={damageBarStyle(color, barWidth(skill.percentage, maxPercentage, fillMode))}
       >
-        <td className={`text-left row-data ${nested ? "nested" : ""}`}>{getSkillName(characterType, skill)}</td>
+        <div role="cell" className={`text-left row-data ${nested ? "nested" : ""}`}>
+          {getSkillName(characterType, skill)}
+        </div>
         {columns.map(renderCell)}
-      </tr>
+      </div>
     </SkillTargetTooltip>
   );
 };

@@ -21,6 +21,27 @@ const TOKEN_PATTERN = /\{([a-zA-Z][a-zA-Z0-9]*)\}/g;
  */
 const EMPTY_MARK = String.fromCharCode(0);
 
+/**
+ * Prefixes a token that resolved to a real value, the mirror of EMPTY_MARK.
+ *
+ * Without it the collapse rules cannot tell a surviving VALUE from the literal
+ * text around it once substitution has happened — `HP 45.2% (x / y)` and
+ * `HP 45.2% ( / )` are the same string to a regex unless the values are marked.
+ * That distinction is the whole of rule 1 below. Stripped with EMPTY_MARK.
+ */
+const VALUE_MARK = String.fromCharCode(1);
+
+/**
+ * Wraps the index of a token that renders as a React node rather than text, so
+ * `renderTemplateNodes` can find it again after the string engine has run.
+ *
+ * Distinct from EMPTY_MARK and VALUE_MARK because it has to survive alongside
+ * them: a node token is a *present* value as far as the collapse rules are
+ * concerned, and marking it as one is the whole trick — the rules then treat an
+ * icon exactly as they treat a name, with no second implementation.
+ */
+const NODE_MARK = String.fromCharCode(2);
+
 export type TemplateTokens = Record<string, string>;
 
 /**
@@ -94,29 +115,64 @@ export const usedTokens = (templates: readonly string[]): string[] => [
 ];
 
 /**
+ * Drops every bracket group of one kind that has lost all its values.
+ *
+ * "Lost all its values" means the group holds at least one emptied token and no
+ * surviving one — its remaining text is punctuation that was only ever there to
+ * separate values, so `({hpCurrent} / {hpMax})` goes rather than leaving `( / )`.
+ * A group of pure literal text has no emptied token in it and is left alone; a
+ * group that is genuinely blank (`()`) goes, as it always has.
+ */
+const dropEmptiedGroups = (text: string, open: string, close: string, inner: string): string =>
+  text.replace(new RegExp(`\\${open}(${inner}*)\\${close}`, "g"), (group, content: string) => {
+    if (content.includes(VALUE_MARK)) return group;
+    return content.includes(EMPTY_MARK) || content.trim() === "" ? "" : group;
+  });
+
+/**
  * Renders a template against its token values.
  *
  * A token missing from `tokens` is left LITERAL (`{typo}` renders as `{typo}`):
  * a token that silently vanished is how a broken label ships unnoticed. A token
  * that is present but empty triggers the collapse rules:
  *
- *   1. A bracket pair — `()` or `[]` — with no non-whitespace content is removed.
+ *   1. A bracket group — `()` or `[]` — left with no surviving value is removed,
+ *      punctuation and all.
  *   2. A bracket group immediately after an emptied token loses its brackets,
  *      keeping its contents.
- *   3. Whitespace runs collapse to one space; the result is trimmed.
+ *   3. A template whose tokens ALL emptied renders as nothing, whatever literal
+ *      text surrounds them.
+ *   4. Whitespace runs collapse to one space; the result is trimmed.
  *
  * Rule 2 is what reproduces the meter's long-standing streamer-mode behaviour:
  * `[{slot}] {name} ({character})` renders `[1] Scott (Cagliostro)` normally and
  * `[1] Cagliostro` — parentheses and all — once the name is hidden.
  *
+ * Rule 3 is the same idea one level up: literal text exists to decorate values,
+ * so with every value gone there is nothing left to decorate. It is what keeps
+ * the overlay's `{dps}/s` segment from reading `/s` before a fight starts.
+ *
  * Bracket groups are not nesting-aware; `({a} (b))` is not a supported shape.
  */
 export const renderTemplate = (template: string, tokens: TemplateTokens): string => {
+  let known = 0;
+  let emptied = 0;
+
   const substituted = template.replace(TOKEN_PATTERN, (literal, name: string) => {
     const value = tokens[name];
+    // An unknown token stays literal, so it is neither known nor emptied: a
+    // typo must keep its segment on screen where it can be seen and fixed.
     if (value === undefined) return literal;
-    return value === "" ? EMPTY_MARK : value;
+    known += 1;
+    if (value === "") {
+      emptied += 1;
+      return EMPTY_MARK;
+    }
+    return VALUE_MARK + value;
   });
+
+  // Rule 3, before any collapsing: nothing survives, so nothing needs pruning.
+  if (known > 0 && emptied === known) return "";
 
   // Rule 2 runs before rule 1: unwrapping can leave a group whose contents are
   // themselves empty, which rule 1 then removes.
@@ -124,9 +180,62 @@ export const renderTemplate = (template: string, tokens: TemplateTokens): string
     .replace(new RegExp(`${EMPTY_MARK}\\s*\\(([^()]*)\\)`, "g"), `${EMPTY_MARK} $1`)
     .replace(new RegExp(`${EMPTY_MARK}\\s*\\[([^[\\]]*)\\]`, "g"), `${EMPTY_MARK} $1`);
 
-  const pruned = unwrapped
-    .replace(new RegExp(`\\(\\s*(?:${EMPTY_MARK}\\s*)*\\)`, "g"), "")
-    .replace(new RegExp(`\\[\\s*(?:${EMPTY_MARK}\\s*)*\\]`, "g"), "");
+  const pruned = dropEmptiedGroups(dropEmptiedGroups(unwrapped, "(", ")", "[^()]"), "[", "]", "[^[\\]]");
 
-  return pruned.split(EMPTY_MARK).join("").replace(/\s+/g, " ").trim();
+  return pruned.split(EMPTY_MARK).join("").split(VALUE_MARK).join("").replace(/\s+/g, " ").trim();
+};
+
+/** One piece of a rendered template: literal text, or a token to draw as a node. */
+export type TemplateNodePart = { type: "text"; value: string } | { type: "node"; name: string; value: string };
+
+/**
+ * Renders a template where some tokens draw as React nodes rather than text —
+ * the meter's `{icon}`, which is an `<img>`, not a string.
+ *
+ * Deliberately built ON TOP of renderTemplate rather than beside it. Each node
+ * token is swapped for a sentinel that reads to the string engine as an
+ * ordinary present value, the engine runs untouched, and the sentinels are cut
+ * back out afterwards. So every collapse rule — emptied groups, bracket
+ * unwrapping, all-empty, whitespace — applies to an icon exactly as it applies
+ * to a name, and cannot drift, because there is only one copy of them.
+ *
+ * A node token that is empty or absent is left for the engine to handle, so it
+ * empties and collapses like any other token.
+ *
+ * `value` on a node part is the RAW token value (e.g. `Pl1400`), not the
+ * sentinel — callers map it to whatever they draw.
+ */
+export const renderTemplateNodes = (
+  template: string,
+  tokens: TemplateTokens,
+  nodeTokens: readonly string[]
+): TemplateNodePart[] => {
+  const slots: { name: string; value: string }[] = [];
+  const substituted: TemplateTokens = { ...tokens };
+
+  for (const name of nodeTokens) {
+    const value = tokens[name];
+    // undefined stays literal, "" stays emptied — both are the engine's job.
+    if (value === undefined || value === "") continue;
+    substituted[name] = `${NODE_MARK}${slots.length}${NODE_MARK}`;
+    slots.push({ name, value });
+  }
+
+  const rendered = renderTemplate(template, substituted);
+
+  const parts: TemplateNodePart[] = [];
+  let cursor = 0;
+
+  // `\\d` matters: in a template literal `\d` collapses to a bare `d`, which
+  // silently makes this hunt for the letter rather than the index.
+  for (const match of rendered.matchAll(new RegExp(`${NODE_MARK}(\\d+)${NODE_MARK}`, "g"))) {
+    const start = match.index!;
+    if (start > cursor) parts.push({ type: "text", value: rendered.slice(cursor, start) });
+    const slot = slots[Number(match[1])];
+    parts.push({ type: "node", name: slot.name, value: slot.value });
+    cursor = start + match[0].length;
+  }
+
+  if (cursor < rendered.length) parts.push({ type: "text", value: rendered.slice(cursor) });
+  return parts;
 };

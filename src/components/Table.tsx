@@ -100,36 +100,49 @@ export const Table = ({
     // The bar custom properties are set on the OUTER table and inherit down the
     // DOM, so the nested skill-breakdown table picks them up with no wiring of
     // its own.
-    <table
+    //
+    // Divs with explicit ARIA roles rather than a <table>: the damage bar is a
+    // row background, and table cells paint backgrounds in ways engines
+    // disagree about — see the note above `.table` in App.css. The roles keep
+    // the semantics a table gave for free.
+    <div
+      role="table"
       className={`player-table table w-full bar-texture-${barTexture} ${show_full_values ? "full-values" : ""}`}
       style={
         {
           "--meter-row-height": `${barHeight}px`,
           "--meter-row-gap": `${barGap}px`,
+          // One template shared by the header and every row, so the columns
+          // cannot drift apart. Built here because only this component knows how
+          // many value columns the user has chosen; the widths stay variables so
+          // the narrow rules can retune them.
+          "--meter-grid": `minmax(120px, 1fr) repeat(${columns.length}, var(--meter-value-col))`,
         } as CSSProperties
       }
     >
-      <thead className="header transparent-bg">
-        <tr>
-          <th className="header-name" onClick={() => toggleSort(MeterColumns.Name)}>
+      <div className="header transparent-bg" role="rowgroup">
+        <div className="meter-row" role="row">
+          <div className="header-name" role="columnheader" onClick={() => toggleSort(MeterColumns.Name)}>
             {t("ui.meter-columns.name")}
-          </th>
+          </div>
           {columns.map((column) => (
-            <th
+            <div
               key={column}
+              role="columnheader"
               className={`header-column header-column-${column} text-center`}
               onClick={() => toggleSort(column)}
             >
               {t(`ui.meter-columns.${column}`)}
-            </th>
+            </div>
           ))}
-        </tr>
-      </thead>
-      <tbody>
-        {players.map((player) => (
+        </div>
+      </div>
+      <div className="table-body" role="rowgroup">
+        {players.map((player, rank) => (
           <PlayerRow
             live={live}
             key={player.index}
+            rank={rank}
             player={player}
             partyData={partyData}
             durationSeconds={durationSeconds}
@@ -138,7 +151,7 @@ export const Table = ({
             fillMode={barFillMode}
           />
         ))}
-      </tbody>
-    </table>
+      </div>
+    </div>
   );
 };
