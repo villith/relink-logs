@@ -8,12 +8,12 @@ describe("NEW_FEATURES", () => {
     expect(isNewVersion(NEW_FEATURES["overmastery-predictor"], "1.10.0")).toBe(true);
   });
 
-  /** Both halves of the build-audit story are chipped together: the page that
+  /** Both halves of the cheat-audit story are chipped together: the page that
    * produces the verdicts, and the setting that lets them be seen anywhere
    * else. A chip on one without the other points at a feature the reader
    * cannot switch on. */
-  it("chips the build audit and its visibility setting through the same release window", () => {
-    expect(isNewVersion(NEW_FEATURES["build-audit"], "1.12.5")).toBe(true);
+  it("chips the cheat audit and its visibility setting through the same release window", () => {
+    expect(isNewVersion(NEW_FEATURES["cheat-audit"], "1.12.5")).toBe(true);
     expect(isNewVersion(NEW_FEATURES["flagged-builds-setting"], "1.12.5")).toBe(true);
     // And in an RC of it, which is what a tester actually runs.
     expect(isNewVersion(NEW_FEATURES["flagged-builds-setting"], "1.12.5-2")).toBe(true);

@@ -17,9 +17,9 @@ export const NEW_FEATURES = {
   "overmastery-predictor": { from: "1.10.0", until: "1.12.0" },
   "transmarvel-wishlist": { from: "1.12.4", until: "1.12.5" },
   "checklist-settings": { from: "1.12.5", until: "1.12.6" },
-  "build-audit": { from: "1.12.5", until: "1.12.7" },
+  "cheat-audit": { from: "1.12.5", until: "1.12.7" },
   // The switch that lets the audit's verdicts appear anywhere but the audit
-  // page. Chipped alongside `build-audit` and for the same span: it ships off,
+  // page. Chipped alongside `cheat-audit` and for the same span: it ships off,
   // so without a chip the feature is only discoverable by someone who already
   // went looking for it.
   "flagged-builds-setting": { from: "1.12.5", until: "1.12.7" },

@@ -50,7 +50,7 @@ const ViolationChip = ({ violation }: { violation: Violation }) => {
 };
 
 /**
- * Build Audit: everyone you have played with whose equipment the game's own
+ * Cheat Audit: everyone you have played with whose equipment the game's own
  * tables say it could not have produced.
  *
  * Master–detail, because the question is "who cheats, and what did they do?"
@@ -67,7 +67,7 @@ const ViolationChip = ({ violation }: { violation: Violation }) => {
  * progress this page reports rather than showing a stale list as if it were
  * final.
  */
-const BuildAuditPage = () => {
+const CheatAuditPage = () => {
   const { t } = useTranslation();
   const [players, setPlayers] = useState<LegalityFlaggedPlayer[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -337,4 +337,4 @@ const BuildAuditPage = () => {
   );
 };
 
-export default BuildAuditPage;
+export default CheatAuditPage;

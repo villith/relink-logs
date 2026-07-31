@@ -129,7 +129,7 @@ import { useShallow } from "zustand/react/shallow";
 type Label = { name: string; partySlotIndex: number; label?: string; color: string; strokeDasharray?: string }[];
 
 // `formatOvermastery` and friends now live in `@/utils`, shared with the
-// Build Audit page — see the import above.
+// Cheat Audit page — see the import above.
 
 // "+1800 (Lvl. 3)" — numeric totals first, with any magnitude-unknown
 // (level-only) contributions trailing. Totals arrive in that order already.

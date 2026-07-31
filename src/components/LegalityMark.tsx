@@ -7,7 +7,7 @@ import { LegalityFinding } from "@/types";
 import { FindingDetail } from "./FindingDetail";
 
 /**
- * What a set of findings SAYS — the Build Audit page's own block, one per
+ * What a set of findings SAYS — the Cheat Audit page's own block, one per
  * finding.
  *
  * This used to be a tooltip-only list: rule label, subject, limit, odds. It

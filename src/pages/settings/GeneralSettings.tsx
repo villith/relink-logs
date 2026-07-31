@@ -74,7 +74,7 @@ const GeneralSettings = () => {
           {t("ui.check-updates")}
         </Button>
       </Group>
-      {/* The master switch for every build-audit verdict outside the Build
+      {/* The master switch for every cheat-audit verdict outside the Cheat
           Audit page itself. Off by default — the app does not accuse anyone on
           the user's behalf until asked. */}
       <Group gap="sm">

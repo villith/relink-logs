@@ -1,5 +1,5 @@
 /**
- * The Build Audit page's two levels, as pure data.
+ * The Cheat Audit page's two levels, as pure data.
  *
  * The page asks one question — **who have I played with that cheats, and what
  * exactly did they do?** — so it needs two shapes and no more:

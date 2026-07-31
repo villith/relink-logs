@@ -27,7 +27,7 @@ vi.mock("@/utils", async (importOriginal) => ({
   translateSigilId: (id: number) => `sigil:${id}`,
 }));
 
-import BuildAudit from "./BuildAudit";
+import CheatAudit from "./CheatAudit";
 
 const wrightstoneFinding = {
   rule: "wrightstoneTraitLevel",
@@ -81,12 +81,12 @@ const renderPage = () =>
   render(
     <MantineProvider>
       <MemoryRouter>
-        <BuildAudit />
+        <CheatAudit />
       </MemoryRouter>
     </MantineProvider>
   );
 
-describe("BuildAudit", () => {
+describe("CheatAudit", () => {
   beforeEach(() => {
     invoke.mockReset();
     invoke.mockImplementation((command: string) =>
@@ -266,7 +266,7 @@ const swappedEncounters: Record<number, unknown> = {
   21: { players: [{ displayName: "Swapper", characterType: "Pl1000", sigils: [sigil(111, 30), sigil(333, 15)] }] },
 };
 
-describe("BuildAudit when the build changed between fights", () => {
+describe("CheatAudit when the build changed between fights", () => {
   beforeEach(() => {
     invoke.mockReset();
     invoke.mockImplementation((command: string, args?: { id: number }) =>
