@@ -417,7 +417,7 @@
   height: var(--player-icon-height, 1.6em);
   margin-top: calc(-1 * var(--player-icon-height, 1.6em));
   margin-bottom: 0;
-  margin-left: var(--player-icon-indent, 0px);
+  margin-left: calc(var(--player-icon-indent, 0px) - 6px);
   margin-right: calc(var(--player-icon-reserve, 0px) - var(--player-icon-indent, 0px));
   width: calc(var(--player-icon-height, 1.6em) * 192 / 180);
   object-fit: cover;
