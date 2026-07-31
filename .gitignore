@@ -48,3 +48,10 @@ docs/superpowers/
 *.key
 *.key.pub
 /.worktrees
+
+# Brainstorming companion working files
+.superpowers/
+
+# Local scratch: full-res UI atlas dumps extracted from the game archive.
+# Large (~400MB) and not ours to redistribute - never commit.
+/icon-export/
