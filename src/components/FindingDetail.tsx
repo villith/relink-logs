@@ -13,6 +13,7 @@ import {
   translateSummonId,
   translateWrightstoneId,
 } from "@/utils";
+import { violationLabel, violationOf } from "@/violations";
 
 /**
  * The equipment a finding is about, named from the finding itself.
@@ -49,7 +50,11 @@ export const FindingDetail = ({ finding }: { finding: LegalityFinding }) => {
    */
   const bonus = (entry: { id: number; level: number }): GearLine => {
     const magnitude = formatSummonBonusValue(entry.id, entry.level);
-    const named = `${translateSummonBonusId(entry.id)} ${level(entry.level)}`;
+    // `+ 1` to display: `bonusLevel` is 0-indexed (max 9) and the table is
+    // indexed by the raw value, but the game — and the log view's Equipment tab
+    // — count from one. Printing the raw index here had the two surfaces
+    // disagreeing by one about the same summon.
+    const named = `${translateSummonBonusId(entry.id)} ${level(entry.level + 1)}`;
     return { ...entry, text: magnitude === null ? named : `${named} ${magnitude}` };
   };
 
@@ -101,7 +106,12 @@ export const FindingDetail = ({ finding }: { finding: LegalityFinding }) => {
       );
 
     case "masterTraits":
-      return item(t("ui.legality.rule.masterTraitCount"), [
+      // Named through the VIOLATION vocabulary, not a per-rule label: this is
+      // the one branch with no gear item to name, and the page already calls
+      // this set "Master Traits" on the person's chips. A `ui.legality.rule.*`
+      // namespace kept alive for this single call site was one key with no test
+      // behind it — the suite that would have caught it renders `limit.*` only.
+      return item(violationLabel(t, violationOf(finding.rule)), [
         {
           id: 0,
           level: 0,

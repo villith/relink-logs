@@ -134,7 +134,6 @@ describe("BuildAudit", () => {
             observed: allowed === 20 ? 30 : 20,
             allowed,
             chance: "",
-            denominator: "",
           })}`
         )
       ).toBeTruthy();

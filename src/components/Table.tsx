@@ -113,9 +113,10 @@ export const Table = ({
           "--meter-row-height": `${barHeight}px`,
           "--meter-row-gap": `${barGap}px`,
           // One template shared by the header and every row, so the columns
-          // cannot drift apart. Built here because only this component knows how
-          // many value columns the user has chosen; the widths stay variables so
-          // the narrow rules can retune them.
+          // cannot drift apart. Set here because only this component knows how
+          // many value columns the user has chosen; the shape itself lives in
+          // `meterGridTemplate`, which the skill table reads too. The widths
+          // stay CSS variables so the narrow rules can retune them.
           "--meter-grid": meterGridTemplate(columns.length),
         } as CSSProperties
       }

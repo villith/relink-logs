@@ -2,11 +2,12 @@
  * Renders every rule's strings against the REAL English table.
  *
  * `legality.test.ts` asserts on the values handed to i18next, which is what a
- * key-returning stub allows — and that is exactly how two defects shipped: the
- * `{{subject}}` templates rendered headless on the audit page (which has no item
- * name to give them), and `{{denominator}}` reached the sentence as a bare
- * number because the "1 in N" wrapper was never applied. Both are invisible
- * unless the string itself is rendered, so this suite renders it.
+ * key-returning stub allows — and that is exactly how a defect shipped: the
+ * `{{subject}}` templates rendered headless on the audit page (which has no
+ * item name to give them). An unfilled or missing placeholder is invisible
+ * unless the string itself is rendered, so this suite renders it. `ui.legality
+ * .limit.<rule>` is now the only namespace a finding resolves, and every member
+ * of the `LegalityRule` union is exercised against the real table below.
  */
 
 import { describe, expect, it } from "vitest";

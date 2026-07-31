@@ -29,11 +29,13 @@ export const HEADER_BUTTON_ICONS: Record<HeaderButtonId, Icon> = {
 const TOOLTIP_BUTTONS: ReadonlyArray<{
   id: HeaderButtonId;
   labelKey: string;
-  handler: (actions: TitlebarActions) => () => void;
+  /** The field of `TitlebarActions` this button fires, named rather than closed
+   * over: a key still fails `tsc` when it is wrong, and the row stays data. */
+  action: keyof TitlebarActions;
 }> = [
-  { id: "pin", labelKey: "ui.pin-window", handler: (a) => a.onPin },
-  { id: "screenshot", labelKey: "ui.copy-screenshot-to-clipboard", handler: (a) => a.onScreenshot },
-  { id: "reset", labelKey: "ui.reset-session", handler: (a) => a.onReset },
+  { id: "pin", labelKey: "ui.pin-window", action: "onPin" },
+  { id: "screenshot", labelKey: "ui.copy-screenshot-to-clipboard", action: "onScreenshot" },
+  { id: "reset", labelKey: "ui.reset-session", action: "onReset" },
 ];
 
 export type TitlebarActions = {
@@ -91,12 +93,12 @@ export const TitlebarButtons = ({ visible, actions }: TitlebarButtonsProps) => {
           </ActionIcon>
         ))}
 
-      {TOOLTIP_BUTTONS.map(({ id, labelKey, handler }) => {
+      {TOOLTIP_BUTTONS.map(({ id, labelKey, action }) => {
         const Glyph = HEADER_BUTTON_ICONS[id];
         return (
           shown[id] && (
             <Tooltip key={id} label={t(labelKey)} color="dark" disabled={!actions}>
-              <div className="titlebar-button" onClick={actions && handler(actions)}>
+              <div className="titlebar-button" onClick={actions?.[action]}>
                 <Glyph size={16} />
               </div>
             </Tooltip>

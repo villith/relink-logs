@@ -77,12 +77,40 @@ pub fn clear_findings(conn: &Connection, log_id: i64) -> Result<()> {
 
 /// Every stored finding for one log, in insertion order.
 ///
-/// The one-log case of [`findings_for_logs`]; both order by rowid, and a log
-/// with nothing stored reads back as an empty list either way.
+/// The one-log case of [`findings_for_logs`] — same `ORDER BY rowid`, and a log
+/// with nothing stored reads back as an empty list either way — but it keeps its
+/// own statement rather than delegating: that function builds its `IN (...)`
+/// text per call and so deliberately cannot use the statement cache, while this
+/// one's SQL never varies and it runs on every log the user opens.
 pub fn findings_for_log(conn: &Connection, log_id: i64) -> Result<Vec<StoredFinding>> {
-    Ok(findings_for_logs(conn, &[log_id])?
-        .remove(&log_id)
-        .unwrap_or_default())
+    let mut stmt = conn.prepare_cached(
+        r#"SELECT player_index, display_name, character_type, payload
+             FROM legality_findings
+            WHERE log_id = ?
+            ORDER BY rowid"#,
+    )?;
+
+    let rows = stmt.query_map(params![log_id], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+        ))
+    })?;
+
+    let mut stored = Vec::new();
+    for row in rows {
+        let (player_index, display_name, character_type, payload) = row?;
+        stored.push(StoredFinding {
+            player_index: player_index as usize,
+            display_name,
+            character_type,
+            finding: serde_json::from_str(&payload)?,
+        });
+    }
+
+    Ok(stored)
 }
 
 /// Every stored finding for one page of logs, keyed by the log it belongs to.

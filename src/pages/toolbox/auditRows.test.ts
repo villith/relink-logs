@@ -68,12 +68,6 @@ describe("auditRows", () => {
 });
 
 describe("caseFor", () => {
-  /** Two sigil rules across two fights are still one "Impossible Sigil" — the
-   * chips say what is wrong with the build, not how often it was measured. */
-  it("lists each violation once however many findings carry it", () => {
-    expect(caseFor(siunaus).violations).toEqual(["impossibleSigil", "perfectSummons"]);
-  });
-
   /** THE reason master–detail beats the old tree. The same build is usually
    * equipped in every flagged fight, so a person flagged six times is one bad
    * wrightstone seen six times. Stating it once is the whole point; the tree
@@ -127,7 +121,9 @@ describe("caseFor", () => {
     expect(caseFor(siunaus).fights[0].questId).toBe(401);
   });
 
-  it("summarises what the person is flagged for", () => {
+  /** Two sigil rules across two fights are still one "Impossible Sigil" — the
+   * chips say what is wrong with the build, not how often it was measured. */
+  it("summarises what the person is flagged for, each violation once", () => {
     expect(caseFor(siunaus).violations).toEqual(["impossibleSigil", "perfectSummons"]);
   });
 

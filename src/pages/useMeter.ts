@@ -124,7 +124,8 @@ export default function useMeter() {
       onClickthrough.then((f) => f());
     };
     // Deliberately NOT keyed on partyData: none of these handlers read it, the
-    // backend emits `encounter-party-update` once per damage hit, and Tauri v1's
+    // backend re-emits `encounter-party-update` on every damage hit (it is this
+    // hook's only source for the party — there is no fetch), and Tauri v1's
     // `listen` leaks a `window._<uid>` closure per call that `unlisten` never
     // removes (transformCallback only deletes it for `once` callbacks). Keying
     // on party data re-registered all nine at combat rate, and each leaked

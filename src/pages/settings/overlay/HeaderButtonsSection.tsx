@@ -6,8 +6,9 @@ import {
   headerButtonsWithDefaults,
   type HeaderButtonId,
 } from "@/stores/useMeterSettingsStore";
-import { Anchor, Checkbox, Group, Stack, Text } from "@mantine/core";
+import { Checkbox, Group } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import { SettingsSection } from "../SettingsSection";
 
 /**
  * Which action buttons the overlay header carries.
@@ -27,20 +28,10 @@ export const HeaderButtonsSection = () => {
     setMeterSettings({ header_buttons: { ...shown, [id]: checked } });
 
   return (
-    <Stack gap="xs">
-      <Group justify="space-between">
-        <Text size="md" fw={700}>
-          {t("ui.header-buttons-section")}
-        </Text>
-        <Anchor
-          component="button"
-          type="button"
-          size="xs"
-          onClick={() => setMeterSettings({ header_buttons: { ...DEFAULT_HEADER_BUTTONS } })}
-        >
-          {t("ui.reset-to-defaults")}
-        </Anchor>
-      </Group>
+    <SettingsSection
+      title={t("ui.header-buttons-section")}
+      onReset={() => setMeterSettings({ header_buttons: { ...DEFAULT_HEADER_BUTTONS } })}
+    >
       <Group gap="lg">
         {HEADER_BUTTONS.map((id) => {
           const Icon = HEADER_BUTTON_ICONS[id];
@@ -59,6 +50,6 @@ export const HeaderButtonsSection = () => {
           );
         })}
       </Group>
-    </Stack>
+    </SettingsSection>
   );
 };

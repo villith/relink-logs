@@ -688,7 +688,10 @@ export interface HookStatusSnapshot {
 
 /** `legality::Rule`, spelled as a closed union so adding or renaming a rule in
  * Rust fails `tsc` here rather than silently rendering an untranslated id.
- * Each name must have a `ui.legality.rules.<name>` key. */
+ * Each name must have a `ui.legality.limit.<name>` key — that is what
+ * `describeLimit` reads and what `legalityStrings.test.ts` enforces. (There is
+ * no per-rule LABEL namespace any more: findings name themselves through the
+ * gear line the limit sits under.) */
 export type LegalityRule =
   | "wrightstoneTraitLevel"
   | "sigilTraitLevel"

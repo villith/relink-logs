@@ -205,9 +205,6 @@
       "open-log": "open",
       "detail-unavailable": "This fight's gear could not be loaded, so the items can't be named.",
       "player-flagged": "This build was flagged",
-      "rule": {
-        "masterTraitCount": "Master traits"
-      },
       "limit": {
         "wrightstoneTraitLevel": "max {{allowed}}",
         "sigilTraitLevel": "max {{allowed}}",

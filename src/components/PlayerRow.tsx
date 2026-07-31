@@ -1,9 +1,15 @@
 import { Fragment, useMemo, type CSSProperties } from "react";
 
-import { renderTemplate } from "@/labelTemplate";
 import type { BarFillMode } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, LegalityFinding, PlayerData } from "@/types";
-import { NO_TARGETS, barWidth, damageBarStyle, mergeTargetBreakdowns, playerLabelTokens } from "@/utils";
+import {
+  NO_TARGETS,
+  barWidth,
+  damageBarStyle,
+  mergeTargetBreakdowns,
+  playerLabelTokens,
+  translatedPlayerName,
+} from "@/utils";
 
 import { PlayerLabel } from "./PlayerLabel";
 import { SkillBreakdown } from "./SkillBreakdown";
@@ -62,10 +68,14 @@ export const PlayerRow = ({
     [live, player.skillBreakdown]
   );
 
+  // The text-only form, through the shared helper so the rule for tokens that
+  // have no text (the icon) lives in one place. Skipped on the live overlay:
   // SkillTargetTooltip renders its children untouched when it has no targets,
-  // and the live overlay never has any — so building the string form there
-  // would run a whole template render per row per frame and discard it.
-  const label = targetBreakdown.length === 0 ? "" : renderTemplate(playerLabelTemplate, { ...labelTokens, icon: "" });
+  // and `live` is exactly what makes `targetBreakdown` empty above — so this
+  // would otherwise run a whole template render per row per frame and discard it.
+  const label = live
+    ? ""
+    : translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player, showDisplayNames, playerLabelTemplate);
 
   return (
     <Fragment>

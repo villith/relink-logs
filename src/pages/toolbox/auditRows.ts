@@ -4,8 +4,9 @@
  * The page asks one question — **who have I played with that cheats, and what
  * exactly did they do?** — so it needs two shapes and no more:
  *
- *   1. `auditRows` — one entry per person for the rail: name, character, and
- *                    everything they have ever been flagged for.
+ *   1. `auditRows` — one entry per person for the rail: name and character.
+ *                    What they were flagged for belongs to the detail pane,
+ *                    which is the only place it is drawn.
  *   2. `caseFor`   — one person's whole case: the distinct findings against
  *                    them, which fight to name the gear from, and every fight
  *                    they were flagged in.

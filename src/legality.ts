@@ -75,12 +75,6 @@ const limitKey = (finding: LegalityFinding): string => {
   return unnamed ? `${key}-unnamed` : key;
 };
 
-/** `odds` is a probability; a reader judges "1 in N". Locale-formatted here so
- * the sentence never has to, and named `denominator` rather than `count` —
- * i18next treats `count` as a pluralisation key. */
-const denominator = (odds: number | null): string | undefined =>
-  odds !== null && odds !== undefined && odds > 0 ? Math.round(1 / odds).toLocaleString() : undefined;
-
 /** Below this, a percentage stops conveying anything — `0.0000000010%` is a
  * row of zeroes, not a quantity — so the odds are stated in words instead. */
 const BEYOND_CHANCE = 1e-9;
@@ -134,5 +128,4 @@ export const describeLimit = (
     observed: displayValue(finding.observed, slot),
     allowed: allowed ?? displayValue(finding.allowed, slot),
     chance: describeChance(t, finding.odds),
-    denominator: denominator(finding.odds) ?? "",
   });

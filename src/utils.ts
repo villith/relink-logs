@@ -1336,8 +1336,14 @@ export const barWidth = (percentage: number, maxPercentage: number, mode: BarFil
 ///
 /// It cannot move into App.css: `repeat()` needs a literal integer count, so a
 /// `var()` there does not parse.
+///
+/// Zero columns drops the `repeat()` entirely rather than emitting `repeat(0,
+/// …)`, which `repeat()`'s `<integer [1,∞]>` grammar rejects — and an invalid
+/// `var()` substitution takes the WHOLE declaration with it, so the name track
+/// would be lost too and the header would stop lining up with its rows. The
+/// user can reach zero: nothing stops them unchecking every value column.
 export const meterGridTemplate = (columnCount: number): string =>
-  `minmax(120px, 1fr) repeat(${columnCount}, var(--meter-value-col))`;
+  columnCount > 0 ? `minmax(120px, 1fr) repeat(${columnCount}, var(--meter-value-col))` : "minmax(120px, 1fr)";
 
 export const damageBarStyle = (color: string, percentage: number): CSSProperties => {
   const width = Number.isFinite(percentage) ? Math.min(100, Math.max(0, percentage)) : 0;

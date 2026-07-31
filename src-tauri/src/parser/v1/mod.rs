@@ -652,10 +652,15 @@ impl Encounter {
     /// The save path and the startup sweep are the two callers, and they must
     /// agree on what a stored row carries; keeping the walk here means a change
     /// to that reaches both.
+    ///
+    /// APPENDS. `log_id` must carry no findings yet — a freshly inserted log, or
+    /// one the caller has just passed to [`crate::db::legality::clear_findings`]
+    /// (which is what the sweep does). Re-running this over a log that already
+    /// has rows stores every verdict twice, and nothing downstream deduplicates.
     pub fn write_legality_findings(&self, conn: &Connection, log_id: i64) -> Result<()> {
         for (player_index, player) in self.player_data.iter().enumerate() {
             let Some(player) = player else { continue };
-            let findings = crate::legality::audit(&player.legality_inputs());
+            let findings = crate::legality::audit_player(player);
             if findings.is_empty() {
                 continue;
             }
@@ -1585,6 +1590,12 @@ pub struct Parser {
     /// The manager dtor rarely fires, so this is the primary "cleared" signal.
     #[serde(skip)]
     active_run_completed: bool,
+
+    /// The party's verdicts as last computed, so the per-hit identity path can
+    /// re-broadcast them without re-auditing four builds. Recomputed only when
+    /// the party actually changes — see [`Parser::insert_player_data`].
+    #[serde(skip)]
+    last_party_legality: [Vec<crate::legality::Finding>; 4],
 }
 
 impl Parser {
@@ -2265,20 +2276,29 @@ impl Parser {
         };
         // The identity path publishes on EVERY damage hit (`hooks/damage.rs`
         // sends a `PlayerIdentityEvent` for each hit's source actor), so this
-        // runs at combat rate, not once per equipment snapshot. Re-emitting an
-        // unchanged party would re-audit four builds and push two IPC messages
-        // per hit; equality short-circuits on the first differing field and
-        // allocates nothing, so the steady state costs a comparison.
-        if slot.as_ref() == Some(&player_data) {
-            return;
+        // runs at combat rate, not once per equipment snapshot.
+        //
+        // What that made expensive was the AUDIT, not the emit: `party_legality`
+        // rebuilds four `LegalityInputs` (each cloning a whole equipment set)
+        // and runs every rule over them. That is gated on a real change here.
+        //
+        // The two emits are NOT gated. They are the frontend's only source for
+        // the party — `useMeter` holds no fetch for it — so a meter that mounts
+        // or reloads mid-fight would otherwise draw four unnamed, uncoloured
+        // rows for the rest of the quest, a settled party never changing again.
+        // Note the guard is a derived `PartialEq` over structs holding `f32`
+        // read from game memory: one NaN makes it compare unequal forever, so
+        // it must only ever cost work, never correctness.
+        if slot.as_ref() != Some(&player_data) {
+            *slot = Some(player_data);
+            // A live fight has no stored row to read verdicts from, so the
+            // meter's colouring is derived here.
+            self.last_party_legality = self.party_legality();
         }
-        *slot = Some(player_data);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-party-update", &self.encounter.player_data);
-            // A live fight has no stored row to read verdicts from, so the
-            // meter's colouring is derived here.
-            let _ = window.emit("encounter-legality-update", &self.party_legality());
+            let _ = window.emit("encounter-legality-update", &self.last_party_legality);
         }
     }
 
@@ -2289,7 +2309,7 @@ impl Parser {
         std::array::from_fn(|slot| {
             self.encounter.player_data[slot]
                 .as_ref()
-                .map(|player| crate::legality::audit(&player.legality_inputs()))
+                .map(crate::legality::audit_player)
                 .unwrap_or_default()
         })
     }

@@ -1657,8 +1657,10 @@ export const ViewPage = () => {
                               })()}
                               {player.weaponState.innateTraits.map((trait) => (
                                 <Text size="xs" fs="italic" fw={300} key={trait.id}>
-                                  - {translateTraitId(trait.id)}
-                                  {trait.level > 0 ? ` (Lvl. ${trait.level})` : ""}
+                                  {/* Through `traitLine` like the wrightstone lines below: this
+                                      used to bake in an English "(Lvl. N)", so every non-English
+                                      user read two spellings of the level in one column. */}
+                                  - {traitLine(t, trait.id, trait.level).text}
                                 </Text>
                               ))}
                               {/* Remote players sync the wrightstone's trait pairs but never its
@@ -1813,7 +1815,6 @@ export const ViewPage = () => {
                           </Text>
                           <Placeholder empty={sigils.length === 0}>
                             {sigils.map(({ sigil, slot }, sigilIndex) => {
-                              const trait = (id: number, level: number) => traitLine(t, id, level);
                               // The empty second slot is dropped, matching the
                               // snapshot the rules mark against — a rendered
                               // empty line would shift every index past it.
@@ -1827,9 +1828,9 @@ export const ViewPage = () => {
                                     findings={findingsForSubject(findings, "sigil", slot)}
                                     explain="tooltip"
                                     lines={[
-                                      trait(sigil.firstTraitId, sigil.firstTraitLevel),
+                                      traitLine(t, sigil.firstTraitId, sigil.firstTraitLevel),
                                       ...(sigil.secondTraitId !== EMPTY_ID
-                                        ? [trait(sigil.secondTraitId, sigil.secondTraitLevel)]
+                                        ? [traitLine(t, sigil.secondTraitId, sigil.secondTraitLevel)]
                                         : []),
                                     ]}
                                   />

@@ -15,6 +15,11 @@
  * two more forms — anchored for validation, and brace-wrapped for its input
  * rule — and a name any of them disagreed about would not survive the
  * chip → stored string → reparse round trip.
+ *
+ * MUST contain no capturing group. Every consumer wraps it in exactly one and
+ * reads `match[1]` for the name, so a `(…)` added here — widening the grammar
+ * as `"([a-zA-Z]|_)[a-zA-Z0-9]*"` rather than `"(?:…)"` — would silently make
+ * group 1 the inner alternation and every token render as its first letter.
  */
 export const TOKEN_NAME_SOURCE = "[a-zA-Z][a-zA-Z0-9]*";
 
@@ -142,17 +147,23 @@ const dropEmptiedGroups = (text: string, pattern: RegExp): string =>
 
 /**
  * Hoisted rather than built per call: these close over module constants only,
- * and `renderTemplate` runs ~13 times per meter frame (five header segments plus
- * two per player row), which made this five `RegExp` compilations a frame.
+ * and `renderTemplate` compiled FOUR of them on every call — five header
+ * segments plus one per player row is ~9 calls a meter frame, so ~36 `RegExp`
+ * constructions a frame that all produce the same five patterns.
  *
- * Safe to share despite `/g`: `String.replace` resets `lastIndex` to 0 when it
- * finishes, and `String.matchAll` reads the source regex's `lastIndex` without
- * writing it.
+ * Safe to share despite `/g`: `String.replace` sets `lastIndex` to 0 before it
+ * starts and `RegExpBuiltinExec` resets it to 0 on the terminating failed
+ * match, so a shared pattern cannot carry state between calls even if a
+ * replacer throws part-way. `String.matchAll` never writes `lastIndex` back —
+ * but it does READ it, so NODE_SLOT is still walked through a copy below.
  */
-const PAREN_GROUP = /\(([^()]*)\)/g;
-const BRACKET_GROUP = /\[([^[\]]*)\]/g;
-const EMPTY_THEN_PARENS = new RegExp(`${EMPTY_MARK}\\s*\\(([^()]*)\\)`, "g");
-const EMPTY_THEN_BRACKETS = new RegExp(`${EMPTY_MARK}\\s*\\[([^[\\]]*)\\]`, "g");
+const PAREN_INNER = "[^()]*";
+const BRACKET_INNER = "[^[\\]]*";
+const PAREN_GROUP = new RegExp(`\\((${PAREN_INNER})\\)`, "g");
+const BRACKET_GROUP = new RegExp(`\\[(${BRACKET_INNER})\\]`, "g");
+const EMPTY_THEN_PARENS = new RegExp(`${EMPTY_MARK}\\s*\\((${PAREN_INNER})\\)`, "g");
+const EMPTY_THEN_BRACKETS = new RegExp(`${EMPTY_MARK}\\s*\\[(${BRACKET_INNER})\\]`, "g");
+const WHITESPACE_RUN = /\s+/g;
 // `\\d` matters: in a template literal `\d` collapses to a bare `d`, which
 // silently makes this hunt for the letter rather than the index.
 const NODE_SLOT = new RegExp(`${NODE_MARK}(\\d+)${NODE_MARK}`, "g");
@@ -208,9 +219,9 @@ export const renderTemplate = (template: string, tokens: TemplateTokens): string
     .replace(EMPTY_THEN_PARENS, `${EMPTY_MARK} $1`)
     .replace(EMPTY_THEN_BRACKETS, `${EMPTY_MARK} $1`);
 
-  const pruned = dropEmptiedGroups(dropEmptiedGroups(unwrapped, PAREN_GROUP), BRACKET_GROUP);
+  const pruned = [PAREN_GROUP, BRACKET_GROUP].reduce(dropEmptiedGroups, unwrapped);
 
-  return pruned.split(EMPTY_MARK).join("").split(VALUE_MARK).join("").replace(/\s+/g, " ").trim();
+  return pruned.split(EMPTY_MARK).join("").split(VALUE_MARK).join("").replace(WHITESPACE_RUN, " ").trim();
 };
 
 /** One piece of a rendered template: literal text, or a token to draw as a node. */
@@ -254,7 +265,11 @@ export const renderTemplateNodes = (
   const parts: TemplateNodePart[] = [];
   let cursor = 0;
 
-  for (const match of rendered.matchAll(NODE_SLOT)) {
+  // A COPY, for the same reason `matchTokens` walks one: `matchAll` reads the
+  // source regex's `lastIndex` (it just never writes it back), so a shared `/g`
+  // constant that anything ever `.exec()`s or `.test()`s would make this start
+  // mid-string and silently drop the leading node slots.
+  for (const match of rendered.matchAll(new RegExp(NODE_SLOT))) {
     const start = match.index!;
     if (start > cursor) parts.push({ type: "text", value: rendered.slice(cursor, start) });
     const slot = slots[Number(match[1])];
