@@ -1,3 +1,4 @@
+import NewChip from "@/components/NewChip";
 import useSettings from "@/pages/useSettings";
 import { useIsLinux } from "@/platform";
 import { useLogIndexStore } from "@/stores/useLogIndexStore";
@@ -17,7 +18,14 @@ const GeneralSettings = () => {
   const [debugMode, setDebugMode] = useState(false);
   const isLinux = useIsLinux();
 
-  const { languages, handleLanguageChange, open_log_on_save, auto_check_updates, setMeterSettings } = useSettings();
+  const {
+    languages,
+    handleLanguageChange,
+    open_log_on_save,
+    auto_check_updates,
+    show_flagged_builds,
+    setMeterSettings,
+  } = useSettings();
   const { checking, checkNow } = useManualUpdateCheck();
   const { deleteAllLogs } = useLogIndexStore((state) => ({ deleteAllLogs: state.deleteAllLogs }));
 
@@ -65,6 +73,19 @@ const GeneralSettings = () => {
         <Button size="compact-sm" variant="light" onClick={checkNow} loading={checking}>
           {t("ui.check-updates")}
         </Button>
+      </Group>
+      {/* The master switch for every build-audit verdict outside the Build
+          Audit page itself. Off by default — the app does not accuse anyone on
+          the user's behalf until asked. */}
+      <Group gap="sm">
+        <Tooltip label={t("ui.show-flagged-builds-description")} multiline w={320}>
+          <Checkbox
+            label={t("ui.show-flagged-builds")}
+            checked={show_flagged_builds}
+            onChange={(event) => setMeterSettings({ show_flagged_builds: event.currentTarget.checked })}
+          />
+        </Tooltip>
+        <NewChip id="flagged-builds-setting" />
       </Group>
       <Tooltip label={t("ui.debug-mode-description")}>
         <Checkbox label={t("ui.debug-mode")} checked={debugMode} onChange={toggleDebugMode} />

@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
-import { severityColor, worstSeverity } from "@/legality";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, LegalityFinding, MeterColumns, PlayerData, visibleColumns } from "@/types";
 import { PLAYER_COLORS, computeSupPercentage, humanizeNumbers, resolvePlayerColor } from "@/utils";
@@ -29,6 +28,7 @@ export const usePlayerRow = (
     show_full_values,
     overlay_columns,
     logs_columns,
+    show_flagged_builds,
     highlight_illegal_builds,
     streamer_mode,
     player_label_template,
@@ -42,6 +42,7 @@ export const usePlayerRow = (
       show_full_values: state.show_full_values,
       overlay_columns: state.overlay_columns,
       logs_columns: state.logs_columns,
+      show_flagged_builds: state.show_flagged_builds,
       highlight_illegal_builds: state.highlight_illegal_builds,
       streamer_mode: state.streamer_mode,
       player_label_template: state.player_label_template,
@@ -55,11 +56,17 @@ export const usePlayerRow = (
   const color = resolvePlayerColor(playerColors, partyData, partySlotIndex, player.partyIndex);
 
   // Colouring a name in an always-on-top overlay is a public accusation, so it
-  // is gated twice: on the user's own choice, and on streamer mode — which
-  // hides names precisely so nothing about a player reaches the stream.
-  const legalityColor = severityColor(
-    highlight_illegal_builds && !streamer_mode ? worstSeverity(legality?.[partySlotIndex] ?? []) : null
-  );
+  // is gated three times: on the app-wide master switch, on the meter's own
+  // narrower choice under it, and on streamer mode — which hides names
+  // precisely so nothing about a player reaches the stream.
+  //
+  // One colour, not two: the meter has no room to explain the difference
+  // between proof and long odds, and a yellow that a reader cannot interpret
+  // is just a second kind of accusation.
+  const legalityColor =
+    show_flagged_builds && highlight_illegal_builds && !streamer_mode && (legality?.[partySlotIndex]?.length ?? 0) > 0
+      ? "red"
+      : undefined;
 
   const [totalDamage, totalDamageUnit] = humanizeNumbers(player.totalDamage);
   const [dps, dpsUnit] = humanizeNumbers(player.dps);

@@ -18,6 +18,11 @@ export const NEW_FEATURES = {
   "transmarvel-wishlist": { from: "1.12.4", until: "1.12.5" },
   "checklist-settings": { from: "1.12.5", until: "1.12.6" },
   "build-audit": { from: "1.12.5", until: "1.12.7" },
+  // The switch that lets the audit's verdicts appear anywhere but the audit
+  // page. Chipped alongside `build-audit` and for the same span: it ships off,
+  // so without a chip the feature is only discoverable by someone who already
+  // went looking for it.
+  "flagged-builds-setting": { from: "1.12.5", until: "1.12.7" },
 } as const satisfies Record<string, NewWindow>;
 
 export type NewFeatureId = keyof typeof NEW_FEATURES;

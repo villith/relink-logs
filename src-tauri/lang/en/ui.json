@@ -486,7 +486,10 @@
       "refresh-btn": "Refresh"
     },
     "highlight-illegal-builds": "Highlight Flagged Builds",
-    "highlight-illegal-builds-description": "Colours a player's name in the meter when the build audit flags their equipment. Never shown in streamer mode."
+    "highlight-illegal-builds-description": "Colours a player's name in the meter when the build audit flags their equipment. Never shown in streamer mode.",
+    "highlight-illegal-builds-requires-flagged": "Turn on \"Show Flagged Builds\" in Settings → General to use this.",
+    "show-flagged-builds": "Show Flagged Builds",
+    "show-flagged-builds-description": "Marks players whose equipment the build audit flagged, in the quest list, a log's Equipment and Builds tabs, and the meter — and lets the quest list be filtered by it. The Build Audit tool always shows its findings regardless."
   },
   "characters": {
     "Pl2000": "Id (Transformation)",

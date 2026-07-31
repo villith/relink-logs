@@ -8,6 +8,7 @@ export const SETTINGS_SECTIONS: NavRailSection[] = [
     labelKey: "ui.settings-nav.general",
     labelFallback: "General",
     icon: SlidersHorizontal,
+    newId: "flagged-builds-setting",
   },
   {
     to: "/logs/settings/meters",

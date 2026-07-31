@@ -82,10 +82,19 @@ interface MeterSettings {
   transparency: number;
   show_display_names: boolean;
   streamer_mode: boolean;
+  /** Show build-audit verdicts anywhere outside the Build Audit page itself —
+   * the quest list, a log's Equipment and Builds tabs, and the meter.
+   *
+   * Off by default, and the master switch the narrower ones sit under. Naming
+   * someone a cheater is an accusation the app should not make on a user's
+   * behalf until they ask for it; the Build Audit page is where someone goes
+   * deliberately to look, so it is the one surface this does not gate. */
+  show_flagged_builds: boolean;
   /** Colour a player's name in the meter when the build audit flags their
    * equipment. A coloured name in an always-on-top overlay is a public
    * accusation, so it is a choice — and it is suppressed under streamer_mode,
-   * where names are hidden anyway. */
+   * where names are hidden anyway. Only has effect while
+   * `show_flagged_builds` is on. */
   highlight_illegal_builds: boolean;
   show_full_values: boolean;
   use_condensed_skills: boolean;
@@ -151,6 +160,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   transparency: 0.2,
   show_display_names: true,
   streamer_mode: false,
+  show_flagged_builds: false,
   highlight_illegal_builds: true,
   show_full_values: false,
   use_condensed_skills: true,
