@@ -12,7 +12,7 @@
 import { describe, expect, it } from "vitest";
 
 import ui from "../src-tauri/lang/en/ui.json";
-import { describeLimit, describeOdds, ruleLabel, subjectLabel } from "./legality";
+import { describeLimit } from "./legality";
 import { LegalityFinding, LegalityRule } from "./types";
 
 /** Minimal i18next: resolves a dotted `ui.` key and fills `{{name}}` from the
@@ -125,12 +125,6 @@ const RULES = Object.keys(FIXTURES) as LegalityRule[];
 
 describe.each(RULES)("%s", (rule) => {
   const finding = FIXTURES[rule];
-
-  it("has a rule label", () => {
-    const label = ruleLabel(t, rule);
-    expect(label).not.toMatch(/^MISSING:/);
-    expect(label.trim()).not.toBe("");
-  });
 
   it("renders a limit with every placeholder filled", () => {
     const limit = describeLimit(t, finding);
@@ -245,32 +239,5 @@ describe("limit strings", () => {
         odds: 1 / 96_281_828_704,
       })
     ).toBe("3 perfect summon rolls — completely impossible");
-  });
-});
-
-describe("describeOdds", () => {
-  /** "1 in 41,000" alone measures nothing — 41,000 of WHAT. Naming the unit is
-   * most of what made this number readable. */
-  it("renders a probability as the 1-in-N a reader can judge, with its unit", () => {
-    expect(describeOdds(t, 1 / 41000)).toBe("1 in 41,000 rolls");
-  });
-
-  it("is empty when a finding carries no odds", () => {
-    expect(describeOdds(t, null)).toBe("");
-  });
-});
-
-describe("subjectLabel", () => {
-  it("names the slot an indexed subject sits in, counting from one", () => {
-    expect(subjectLabel(t, { kind: "sigil", index: 7 })).toBe("Sigil 8");
-    expect(subjectLabel(t, { kind: "summon", index: 0 })).toBe("Summon 1");
-  });
-
-  /** Whole-set rules are about the set, so pointing at a slot misrepresents
-   * them — they get no subject rather than a wrong one. */
-  it("is empty for whole-set subjects", () => {
-    expect(subjectLabel(t, { kind: "summons" })).toBe("");
-    expect(subjectLabel(t, { kind: "masterTraits" })).toBe("");
-    expect(subjectLabel(t, { kind: "wrightstone" })).toBe("");
   });
 });

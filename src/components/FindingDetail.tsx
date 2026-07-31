@@ -1,7 +1,7 @@
 import { Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
-import { FlaggedGear, GearLine } from "@/components/FlaggedGear";
+import { FlaggedGear, GearLine, traitLine } from "@/components/FlaggedGear";
 import { LegalityFinding } from "@/types";
 import {
   formatBonusAmount,
@@ -11,7 +11,6 @@ import {
   translateSigilId,
   translateSummonBonusId,
   translateSummonId,
-  translateTraitId,
   translateWrightstoneId,
 } from "@/utils";
 
@@ -38,10 +37,7 @@ export const FindingDetail = ({ finding }: { finding: LegalityFinding }) => {
     );
 
   const level = (value: number) => t("ui.trait-level", { level: value });
-  const trait = (entry: { id: number; level: number }): GearLine => ({
-    ...entry,
-    text: `${translateTraitId(entry.id)} ${level(entry.level)}`,
-  });
+  const trait = (entry: { id: number; level: number }): GearLine => traitLine(t, entry.id, entry.level);
 
   /**
    * A summon's equip bonus, with the MAGNITUDE it displays in game.

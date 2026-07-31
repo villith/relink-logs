@@ -1,15 +1,22 @@
 import { mergeAttributes, Node, nodeInputRule } from "@tiptap/core";
 
+import { TOKEN_NAME_SOURCE } from "@/labelTemplate";
+
 /** How a dragged token travels between the palette and a field. A custom MIME
  * type rather than `text/plain` so the field's drop handler can tell one of our
  * tokens from arbitrary dragged text and ignore the latter. The constant only
  * names the channel — the ignoring is the drop handler's job. */
 export const TOKEN_MIME = "application/x-relink-token";
 
-/** A token name the `{token}` grammar in labelTemplate.ts would actually parse.
- * Kept in step with TOKEN_PATTERN there: a name outside this shape could not
- * survive `getText()` → stored string → reparse. */
-const VALID_TOKEN_NAME = /^[a-zA-Z][a-zA-Z0-9]*$/;
+/** A token name the `{token}` grammar would actually parse. Built from
+ * TOKEN_NAME_SOURCE rather than restated, so it cannot drift from the renderer:
+ * a name outside this shape could not survive `getText()` → stored string →
+ * reparse. */
+const VALID_TOKEN_NAME = new RegExp(`^${TOKEN_NAME_SOURCE}$`);
+
+/** The same grammar brace-wrapped and anchored to the caret, for the input rule
+ * that turns a just-typed `{token}` into a chip. */
+const TYPED_TOKEN = new RegExp(`(\\{${TOKEN_NAME_SOURCE}\\})$`);
 
 declare module "@tiptap/core" {
   interface Commands<ReturnType> {
@@ -184,9 +191,8 @@ export const TokenNode = Node.create<TokenNodeOptions>({
         // so capturing only the name leaves the braces behind and `{app}` types
         // out as `{` + chip + `}` — which serializes to `{{app}}`.
         //
-        // Anchored to the caret, and the same grammar as TOKEN_PATTERN: a name
-        // this rejects could not survive the stored-string round trip anyway.
-        find: /(\{[a-zA-Z][a-zA-Z0-9]*\})$/,
+        // A name this rejects could not survive the stored-string round trip.
+        find: TYPED_TOKEN,
         type: this.type,
         getAttributes: (match) => {
           const name = match[1].slice(1, -1);

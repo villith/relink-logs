@@ -60,7 +60,7 @@ const OverlaySettings = () => {
             top: "calc(var(--app-shell-header-height, 50px) + var(--mantine-spacing-sm))",
           }}
         >
-          <MeterPreview live showHeader />
+          <MeterPreview live />
         </Box>
       </Flex>
     </Stack>

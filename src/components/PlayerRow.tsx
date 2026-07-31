@@ -1,15 +1,9 @@
 import { Fragment, useMemo, type CSSProperties } from "react";
 
+import { renderTemplate } from "@/labelTemplate";
 import type { BarFillMode } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, LegalityFinding, PlayerData } from "@/types";
-import {
-  NO_TARGETS,
-  barWidth,
-  damageBarStyle,
-  mergeTargetBreakdowns,
-  playerLabelTokens,
-  translatedPlayerName,
-} from "@/utils";
+import { NO_TARGETS, barWidth, damageBarStyle, mergeTargetBreakdowns, playerLabelTokens } from "@/utils";
 
 import { PlayerLabel } from "./PlayerLabel";
 import { SkillBreakdown } from "./SkillBreakdown";
@@ -58,23 +52,20 @@ export const PlayerRow = ({
     matchColumnTypeToValue,
   } = usePlayerRow(live, player, partyData, legality);
 
-  // Two renderings of one label, deliberately. `label` is the text-only form
-  // the tooltip takes as a string prop; the row itself renders the same
-  // template through PlayerLabel so `{icon}` can draw as an image.
-  const label = translatedPlayerName(
-    partySlotIndex,
-    partyData[partySlotIndex],
-    player,
-    showDisplayNames,
-    playerLabelTemplate
-  );
-
+  // One token set, two renderings of it. The row draws the template through
+  // PlayerLabel so `{icon}` can be an image; the tooltip takes the same
+  // template as a plain string, where the icon has no text form and so empties.
   const labelTokens = playerLabelTokens(partySlotIndex, partyData[partySlotIndex], player, showDisplayNames);
 
   const targetBreakdown = useMemo(
     () => (live ? NO_TARGETS : mergeTargetBreakdowns(player.skillBreakdown.map((skill) => skill.targets))),
     [live, player.skillBreakdown]
   );
+
+  // SkillTargetTooltip renders its children untouched when it has no targets,
+  // and the live overlay never has any — so building the string form there
+  // would run a whole template render per row per frame and discard it.
+  const label = targetBreakdown.length === 0 ? "" : renderTemplate(playerLabelTemplate, { ...labelTokens, icon: "" });
 
   return (
     <Fragment>

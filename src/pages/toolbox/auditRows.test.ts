@@ -52,17 +52,10 @@ const siunaus = player("siunaus", [
 ]);
 
 describe("auditRows", () => {
-  /** The rail is one row per person: name, character, and every violation they
-   * have ever been flagged for. */
+  /** The rail is one row per person: name and character. The violations belong
+   * to the detail pane, which is the only place they are drawn. */
   it("gives each person one row", () => {
     expect(auditRows([siunaus])).toHaveLength(1);
-  });
-
-  /** Two sigil rules across two fights are still one "Impossible Sigil" — the
-   * chips say what is wrong with the build, not how often it was measured. */
-  it("lists each violation once however many findings carry it", () => {
-    const [entry] = auditRows([siunaus]);
-    expect(entry.violations).toEqual(["impossibleSigil", "perfectSummons"]);
   });
 
   /** Name and character are drawn separately, so they arrive separately — the
@@ -75,6 +68,12 @@ describe("auditRows", () => {
 });
 
 describe("caseFor", () => {
+  /** Two sigil rules across two fights are still one "Impossible Sigil" — the
+   * chips say what is wrong with the build, not how often it was measured. */
+  it("lists each violation once however many findings carry it", () => {
+    expect(caseFor(siunaus).violations).toEqual(["impossibleSigil", "perfectSummons"]);
+  });
+
   /** THE reason master–detail beats the old tree. The same build is usually
    * equipped in every flagged fight, so a person flagged six times is one bad
    * wrightstone seen six times. Stating it once is the whole point; the tree

@@ -26,7 +26,7 @@ const ScopedPreview = () => {
           { value: "logs", label: t("ui.preview-scope-logs") },
         ]}
       />
-      <MeterPreview live={scope === "overlay"} showHeader={scope === "overlay"} />
+      <MeterPreview live={scope === "overlay"} />
     </Stack>
   );
 };

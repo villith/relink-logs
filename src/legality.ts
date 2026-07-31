@@ -11,8 +11,8 @@
 
 import { TFunction } from "i18next";
 
-import { LegalityFinding, LegalityRule, LegalitySubject, LegalityValue, PlayerData } from "./types";
-import { translateSigilId, translateSummonId } from "./utils";
+import { LegalityFinding, LegalitySubject, LegalityValue } from "./types";
+import { translateSummonId } from "./utils";
 
 /** The findings pointing at one piece of equipment.
  *
@@ -94,7 +94,7 @@ const BEYOND_CHANCE = 1e-9;
  * step. Significant digits rather than fixed decimals, because these span nine
  * orders of magnitude and `0.00%` is not an answer.
  */
-export const describeChance = (t: TFunction, odds: number | null): string => {
+const describeChance = (t: TFunction, odds: number | null): string => {
   if (odds === null || odds === undefined || odds <= 0) return "";
   if (odds < BEYOND_CHANCE) return t("ui.legality.chance-impossible");
 
@@ -107,21 +107,6 @@ export const describeChance = (t: TFunction, odds: number | null): string => {
 
   return t("ui.legality.chance-percent", { percent: written });
 };
-
-/**
- * A finding, as the pieces a reader actually compares: what rule fired, what it
- * points at, and the limit it broke.
- *
- * These were one interpolated sentence per rule. That shape inlined
- * `{{subject}}`, so a surface listing people across many logs — holding none of
- * their equipment — rendered every claim headless ("cannot roll this trait.").
- * Keeping the pieces apart lets the audit page put the limit against the gear
- * line it belongs to, and lets a tooltip that has no gear in hand still say
- * something complete.
- */
-
-/** What fired, in the reader's terms rather than the rule's. */
-export const ruleLabel = (t: TFunction, rule: LegalityRule): string => t(`ui.legality.rule.${rule}`);
 
 /**
  * What the game allows, phrased to sit immediately after a gear line —
@@ -151,48 +136,3 @@ export const describeLimit = (
     chance: describeChance(t, finding.odds),
     denominator: denominator(finding.odds) ?? "",
   });
-
-/** A finding's odds as the `1 in N` a reader can judge, or empty when the rule
- * carries none. A hard table breach has no odds — that is the point of one. */
-export const describeOdds = (t: TFunction, odds: number | null): string => {
-  const value = denominator(odds);
-  return value === undefined ? "" : t("ui.legality.odds-value", { denominator: value });
-};
-
-/**
- * The slot a finding points at, counted from one the way the equipment tabs
- * show it.
- *
- * A fallback, not the goal: the stored `Subject` carries a slot index and no
- * item id, so a surface without the build in hand can say "Sigil 8" but not
- * "Tyranny". Whole-set subjects get nothing rather than a wrong slot — their
- * claim is about the set, so pointing at a member misrepresents it.
- */
-export const subjectLabel = (t: TFunction, subject: LegalitySubject): string =>
-  subject.index === undefined ? "" : t(`ui.legality.subject.${subject.kind}`, { slot: subject.index + 1 });
-
-/**
- * The translated name of the equipment a finding points at, resolved from the
- * player who owns it.
- *
- * A tooltip on one item already knows what it is, but a tooltip on a player's
- * NAME covers their whole build and has to name each item itself — otherwise
- * every line reads "… can grant at most +50%" with nothing in front of it.
- *
- * Whole-set and unindexed subjects have no single item to name and resolve to
- * an empty string; their sentences are written not to need one.
- */
-export const subjectNameFor = (player: PlayerData, finding: LegalityFinding): string => {
-  const { kind, index } = finding.subject;
-  if (index === undefined) return "";
-
-  if (kind === "sigil") {
-    const sigil = player.sigils?.[index];
-    return sigil ? translateSigilId(sigil.sigilId) : "";
-  }
-  if (kind === "summon") {
-    const summon = player.summons?.[index];
-    return summon ? translateSummonId(summon.summonId) : "";
-  }
-  return "";
-};

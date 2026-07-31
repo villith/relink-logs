@@ -204,25 +204,8 @@
       "seen-more": "+{{count}} more",
       "open-log": "open",
       "detail-unavailable": "This fight's gear could not be loaded, so the items can't be named.",
-      "odds-value": "1 in {{denominator}} rolls",
       "player-flagged": "This build was flagged",
-      "subject": {
-        "sigil": "Sigil {{slot}}",
-        "summon": "Summon {{slot}}",
-        "overmastery": "Overmastery {{slot}}"
-      },
       "rule": {
-        "wrightstoneTraitLevel": "Wrightstone trait level",
-        "sigilTraitLevel": "Sigil trait level",
-        "sigilLockedPair": "Locked trait pair",
-        "sigilQuestLockedTrait": "Quest-locked trait",
-        "sigilSingleTraitOnly": "Single-trait sigil",
-        "overmasteryValue": "Overmastery value",
-        "overmasteryAllMaxed": "All overmasteries maxed",
-        "summonTrait": "Summon trait",
-        "summonBonusSource": "Summon bonus source",
-        "summonBonusMagnitude": "Summon bonus",
-        "summonPerfectCount": "Perfect summons",
         "masterTraitCount": "Master traits"
       },
       "limit": {

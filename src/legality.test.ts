@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { describeLimit, describeOdds, findingsForSubject } from "./legality";
+import { describeLimit, findingsForSubject } from "./legality";
 import { LegalityFinding } from "./types";
 
 // i18next is not initialised under vitest, so the id-to-name lookup is stubbed:
@@ -179,32 +179,5 @@ describe("describeLimit", () => {
     const { calls, t } = capture();
     describeLimit(t, finding({ rule: "masterTraitCount", subject: { kind: "masterTraits" } }));
     expect(calls[0].key).toBe("ui.legality.limit.masterTraitCount");
-  });
-});
-
-describe("describeOdds", () => {
-  const capture = () => {
-    const calls: Record<string, unknown>[] = [];
-    const t = ((key: string, options?: Record<string, unknown>) => {
-      calls.push({ key, ...options });
-      return key;
-    }) as never;
-    return { calls, t };
-  };
-
-  /** 1 in N, the form a reader can judge — not a bare probability, and not the
-   * bare denominator that used to read as a count. */
-  it("hands the denominator to the 1-in-N wrapper", () => {
-    const { calls, t } = capture();
-    describeOdds(t, longOdds.odds);
-
-    expect(calls[0]).toMatchObject({ key: "ui.legality.odds-value" });
-    expect(calls[0].denominator).toBe(Math.round(1 / 4.7e-7).toLocaleString());
-  });
-
-  it("renders nothing at all when a finding carries no odds", () => {
-    const { calls, t } = capture();
-    expect(describeOdds(t, breach.odds)).toBe("");
-    expect(calls).toHaveLength(0);
   });
 });

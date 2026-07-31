@@ -20,7 +20,7 @@ use gbfr_logs::legality;
 /// against production data.
 fn run_sweep(db_path: &std::path::Path) -> Result<()> {
     let mut conn = Connection::open(db_path)?;
-    gbfr_logs::db::migrations_for_diagnostics().to_latest(&mut conn)?;
+    gbfr_logs::db::migrations().to_latest(&mut conn)?;
 
     let outcome = legality::sweep::sweep_stale_logs(&mut conn, |_| ())?;
     println!(

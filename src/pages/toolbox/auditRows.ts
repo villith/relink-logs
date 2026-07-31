@@ -29,8 +29,6 @@ export type AuditRow = {
   displayName: string;
   characterType: CharacterType;
   lastSeen: number;
-  /** Every violation they have ever carried, in display order. */
-  violations: Violation[];
 };
 
 /** One flagged fight, as a link out of the case. */
@@ -94,13 +92,18 @@ const violationsIn = (findings: LegalityFinding[]): Violation[] => {
   return VIOLATIONS.filter((violation) => present.has(violation));
 };
 
+/** What identifies one person in the rail. Exported so the lookup map the page
+ * builds is keyed by exactly what the rows carry — the two drifting apart would
+ * leave a selected row permanently unresolvable. */
+export const playerKey = (player: { displayName: string; characterType: CharacterType }): string =>
+  `${player.displayName}-${player.characterType}`;
+
 export const auditRows = (players: LegalityFlaggedPlayer[]): AuditRow[] =>
   players.map((player) => ({
-    key: `${player.displayName}-${player.characterType}`,
+    key: playerKey(player),
     displayName: player.displayName,
     characterType: player.characterType,
     lastSeen: player.lastSeen,
-    violations: violationsIn(player.findings.map((row) => row.finding)),
   }));
 
 /** What makes a finding distinct: the same rule against the same slot is the

@@ -78,7 +78,7 @@ impl<'a> AdjustedDamageInstance<'a> {
 }
 
 /// Equippable sigil for a character
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct WeaponInfo {
     /// Weapon ID Hash
@@ -133,7 +133,7 @@ impl From<protocol::WeaponInfo> for WeaponInfo {
 }
 
 /// Overmastery, also known as `limit_bonus`.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Overmastery {
     /// Overmastery ID
@@ -154,7 +154,7 @@ impl From<protocol::Overmastery> for Overmastery {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct OvermasteryInfo {
     pub overmasteries: Vec<Overmastery>,
@@ -172,7 +172,7 @@ impl From<protocol::OvermasteryInfo> for OvermasteryInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerStats {
     pub level: u32,
@@ -197,7 +197,7 @@ impl From<protocol::PlayerStats> for PlayerStats {
 }
 
 /// Equippable sigil for a character
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct Sigil {
     /// ID of the first trait in this sigil
@@ -224,7 +224,7 @@ struct Sigil {
 /// apply party-wide). `summon_id` keys the summon table, `main_trait_id` is a
 /// regular trait id (named by the `traits:` lang namespace), `bonus_id` keys the
 /// summon base-param table; `bonus_level` is 0-indexed (max 9).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EquippedSummon {
     pub summon_id: u32,
@@ -254,7 +254,7 @@ impl From<protocol::EquippedSummon> for EquippedSummon {
 /// than that carry `unk58` and no `criticalRate` and the field has to stay
 /// optional or none of them load (see `stored_log_compat` below). Their old
 /// value is not carried over, and the builds panel hides a zero crit rate.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordStats {
     pub level: u32,
@@ -294,7 +294,7 @@ pub struct WeaponTraitPair {
 /// 2026-07-17). Every field is `#[serde(default)]` so logs stored by the
 /// short-lived raw-block shape of this struct still deserialize (they carry
 /// `weaponId` plus since-removed raw arrays, which serde ignores).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct WeaponState {
     #[serde(default)]
@@ -379,7 +379,7 @@ fn merge_weapon_state(known: WeaponState, fresh: WeaponState) -> WeaponState {
 }
 
 /// Data for a player in the encounter
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerData {
     /// Actor index for this player
@@ -643,6 +643,32 @@ impl Encounter {
     /// Compresses this encounter data into a binary blob.
     pub fn to_blob(&self) -> Result<Vec<u8>> {
         to_stored_blob(self)
+    }
+
+    /// Audits every occupied party slot and stores the verdicts against
+    /// `log_id`. Clean players write nothing — a slot with no row reads as
+    /// clean, so storing empty verdicts would only cost space.
+    ///
+    /// The save path and the startup sweep are the two callers, and they must
+    /// agree on what a stored row carries; keeping the walk here means a change
+    /// to that reaches both.
+    pub fn write_legality_findings(&self, conn: &Connection, log_id: i64) -> Result<()> {
+        for (player_index, player) in self.player_data.iter().enumerate() {
+            let Some(player) = player else { continue };
+            let findings = crate::legality::audit(&player.legality_inputs());
+            if findings.is_empty() {
+                continue;
+            }
+            crate::db::legality::write_findings(
+                conn,
+                log_id,
+                player_index,
+                player.display_name(),
+                &player.character_type().to_string(),
+                &findings,
+            )?;
+        }
+        Ok(())
     }
 
     /// Deserializes a binary blob into encounter instance.
@@ -2237,14 +2263,21 @@ impl Parser {
             // 0xFF placeholder or corrupt slot — never clobber a real slot with it.
             return;
         };
+        // The identity path publishes on EVERY damage hit (`hooks/damage.rs`
+        // sends a `PlayerIdentityEvent` for each hit's source actor), so this
+        // runs at combat rate, not once per equipment snapshot. Re-emitting an
+        // unchanged party would re-audit four builds and push two IPC messages
+        // per hit; equality short-circuits on the first differing field and
+        // allocates nothing, so the steady state costs a comparison.
+        if slot.as_ref() == Some(&player_data) {
+            return;
+        }
         *slot = Some(player_data);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-party-update", &self.encounter.player_data);
             // A live fight has no stored row to read verdicts from, so the
-            // meter's colouring is derived here. This runs on an equipment
-            // snapshot, not per damage hit — both callers of this function are
-            // player-load events — so auditing four builds is free.
+            // meter's colouring is derived here.
             let _ = window.emit("encounter-legality-update", &self.party_legality());
         }
     }
@@ -2776,21 +2809,7 @@ impl Parser {
             // Audit while the equipment is in hand. Re-running the rules later
             // means decompressing and reparsing this blob again, which is the
             // whole cost the stored findings exist to avoid.
-            for (player_index, player) in self.encounter.player_data.iter().enumerate() {
-                let Some(player) = player else { continue };
-                let findings = crate::legality::audit(&player.legality_inputs());
-                if findings.is_empty() {
-                    continue;
-                }
-                crate::db::legality::write_findings(
-                    conn,
-                    id,
-                    player_index,
-                    player.display_name(),
-                    &player.character_type().to_string(),
-                    &findings,
-                )?;
-            }
+            self.encounter.write_legality_findings(conn, id)?;
 
             return Ok(Some(id));
         }

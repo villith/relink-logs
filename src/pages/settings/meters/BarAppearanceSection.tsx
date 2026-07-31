@@ -1,8 +1,9 @@
 import useSettings from "@/pages/useSettings";
 import { useIsLinux } from "@/platform";
 import { BAR_TEXTURES, DEFAULT_BAR_APPEARANCE, type BarFillMode } from "@/stores/useMeterSettingsStore";
-import { Anchor, Group, Select, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Select, SimpleGrid, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import { SettingsSection } from "../SettingsSection";
 import { LabelledSlider } from "./LabelledSlider";
 
 /** How the meter's damage bars are drawn: fill rule, texture, row size. */
@@ -20,15 +21,7 @@ export const BarAppearanceSection = () => {
   const reset = () => setMeterSettings({ ...DEFAULT_BAR_APPEARANCE });
 
   return (
-    <Stack gap="xs">
-      <Group justify="space-between">
-        <Text size="md" fw={700}>
-          {t("ui.bar-appearance-section")}
-        </Text>
-        <Anchor component="button" type="button" size="xs" onClick={reset}>
-          {t("ui.reset-to-defaults")}
-        </Anchor>
-      </Group>
+    <SettingsSection title={t("ui.bar-appearance-section")} onReset={reset}>
       {/* The fill-mode description sits here rather than on its Select: as a
           two-line `description` it made that Select 60px taller than the one
           beside it, so the pair no longer lined up. */}
@@ -78,6 +71,6 @@ export const BarAppearanceSection = () => {
           onChange={(value) => setMeterSettings({ bar_spacing: value })}
         />
       </SimpleGrid>
-    </Stack>
+    </SettingsSection>
   );
 };

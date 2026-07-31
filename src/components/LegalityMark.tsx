@@ -7,20 +7,6 @@ import { LegalityFinding } from "@/types";
 import { FindingDetail } from "./FindingDetail";
 
 /**
- * Colours whatever it wraps when anything was flagged against it, and explains
- * why on hover.
- *
- * One component for every flagged thing — a player's name, a summon, a sigil,
- * a wrightstone — so the colour and the sentence can never disagree about what
- * is being claimed. With no findings it renders its children untouched and adds
- * no tooltip, so a clean build looks exactly as it did before.
- *
- * There is one colour. Severity used to split this red/yellow, but "Impossible"
- * and "Improbable" are adjectives a reader has to decode; what actually
- * separates proof from luck is the claim itself, so the odds line below carries
- * it instead.
- */
-/**
  * What a set of findings SAYS — the Build Audit page's own block, one per
  * finding.
  *
@@ -48,6 +34,20 @@ export const FindingsExplanation = ({ findings, title }: { findings: LegalityFin
   </Stack>
 );
 
+/**
+ * Colours whatever it wraps when anything was flagged against it, and explains
+ * why on hover.
+ *
+ * One component for every flagged thing — a player's name, a summon, a sigil,
+ * a wrightstone — so the colour and the sentence can never disagree about what
+ * is being claimed. With no findings it renders its children untouched and adds
+ * no tooltip, so a clean build looks exactly as it did before.
+ *
+ * There is one colour. Severity used to split this red/yellow, but "Impossible"
+ * and "Improbable" are adjectives a reader has to decode; what actually
+ * separates proof from luck is the claim itself, so the odds line below carries
+ * it instead.
+ */
 export const LegalityMark = ({
   findings,
   title,

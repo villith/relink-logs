@@ -16,7 +16,7 @@ use anyhow::Result;
 use log::warn;
 use rusqlite::{params, Connection};
 
-use crate::db::legality::{clear_findings, write_findings};
+use crate::db::legality::clear_findings;
 
 /// How far the sweep has got, for a UI that wants to say so.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,31 +68,19 @@ pub fn sweep_stale_logs(
     let transaction = conn.transaction()?;
 
     for (done, log_id) in stale.into_iter().enumerate() {
-        let (blob, version): (Vec<u8>, u8) = transaction.query_row(
-            "SELECT data, version FROM logs WHERE id = ?",
-            params![log_id],
-            |row| Ok((row.get(0)?, row.get(1)?)),
-        )?;
+        // `prepare_cached` rather than a fresh prepare: this loop runs once per
+        // stale log (692 on a first sweep), and the statement text never varies.
+        let (blob, version): (Vec<u8>, u8) = transaction
+            .prepare_cached("SELECT data, version FROM logs WHERE id = ?")?
+            .query_row(params![log_id], |row| Ok((row.get(0)?, row.get(1)?)))?;
 
         clear_findings(&transaction, log_id)?;
 
         match crate::parser::deserialize_version(&blob, version) {
             Ok(parser) => {
-                for (player_index, player) in parser.encounter.player_data.iter().enumerate() {
-                    let Some(player) = player else { continue };
-                    let findings = super::audit(&player.legality_inputs());
-                    if findings.is_empty() {
-                        continue;
-                    }
-                    write_findings(
-                        &transaction,
-                        log_id,
-                        player_index,
-                        player.display_name(),
-                        &player.character_type().to_string(),
-                        &findings,
-                    )?;
-                }
+                parser
+                    .encounter
+                    .write_legality_findings(&transaction, log_id)?;
                 outcome.rescanned += 1;
             }
             Err(error) => {
@@ -101,10 +89,9 @@ pub fn sweep_stale_logs(
             }
         }
 
-        transaction.execute(
-            "UPDATE logs SET legality_rules_version = ? WHERE id = ?",
-            params![super::RULES_VERSION, log_id],
-        )?;
+        transaction
+            .prepare_cached("UPDATE logs SET legality_rules_version = ? WHERE id = ?")?
+            .execute(params![super::RULES_VERSION, log_id])?;
 
         progress(SweepProgress {
             done: done + 1,

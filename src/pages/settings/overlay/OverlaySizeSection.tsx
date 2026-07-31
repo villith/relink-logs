@@ -1,8 +1,9 @@
 import useSettings from "@/pages/useSettings";
 import { DEFAULT_OVERLAY_SIZE, OVERLAY_MIN_SIZE } from "@/stores/useMeterSettingsStore";
-import { Anchor, Group, SimpleGrid, Stack, Text, TextInput } from "@mantine/core";
+import { SimpleGrid, TextInput } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { SettingsSection } from "../SettingsSection";
 
 /** Ceiling on either dimension. Larger than any monitor the overlay would sit
  * on, so it only ever catches a typo. */
@@ -70,20 +71,7 @@ export const OverlaySizeSection = () => {
   const { overlay_width, overlay_height, setMeterSettings } = useSettings();
 
   return (
-    <Stack gap="xs">
-      <Group justify="space-between">
-        <Text size="md" fw={700}>
-          {t("ui.overlay-size-section")}
-        </Text>
-        <Anchor
-          component="button"
-          type="button"
-          size="xs"
-          onClick={() => setMeterSettings({ ...DEFAULT_OVERLAY_SIZE })}
-        >
-          {t("ui.reset-to-defaults")}
-        </Anchor>
-      </Group>
+    <SettingsSection title={t("ui.overlay-size-section")} onReset={() => setMeterSettings({ ...DEFAULT_OVERLAY_SIZE })}>
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
         <PixelInput
           label={t("ui.overlay-width")}
@@ -98,6 +86,6 @@ export const OverlaySizeSection = () => {
           onCommit={(overlay_height) => setMeterSettings({ overlay_height })}
         />
       </SimpleGrid>
-    </Stack>
+    </SettingsSection>
   );
 };

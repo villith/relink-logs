@@ -1,7 +1,8 @@
 import useSettings from "@/pages/useSettings";
 import { DEFAULT_METER_COLORS } from "@/stores/useMeterSettingsStore";
-import { Anchor, ColorPicker, ColorSwatch, Group, Popover, Stack, Text, TextInput } from "@mantine/core";
+import { ColorPicker, ColorSwatch, Group, Popover, Stack, Text, TextInput } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import { SettingsSection } from "../SettingsSection";
 
 /**
  * The four party-slot bar colours, as swatches.
@@ -31,15 +32,7 @@ export const ColorsSection = () => {
     });
 
   return (
-    <Stack gap="xs">
-      <Group justify="space-between">
-        <Text size="md" fw={700}>
-          {t("ui.meter-colors-section")}
-        </Text>
-        <Anchor component="button" type="button" size="xs" onClick={reset}>
-          {t("ui.reset-to-defaults")}
-        </Anchor>
-      </Group>
+    <SettingsSection title={t("ui.meter-colors-section")} onReset={reset}>
       <Group gap="sm">
         {colors.map((color) => (
           <Popover key={color.key} position="bottom-start" withArrow shadow="md">
@@ -76,6 +69,6 @@ export const ColorsSection = () => {
           </Popover>
         ))}
       </Group>
-    </Stack>
+    </SettingsSection>
   );
 };

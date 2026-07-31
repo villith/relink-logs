@@ -6,9 +6,10 @@ import useSettings from "@/pages/useSettings";
 import { DEFAULT_HEADER_SEGMENTS, type HeaderSegment } from "@/stores/useMeterSettingsStore";
 import { moveItem } from "@/utils";
 import { DragDropContext, Draggable, Droppable } from "@hello-pangea/dnd";
-import { ActionIcon, Anchor, Box, Button, Group, SegmentedControl, Stack, Text, Tooltip } from "@mantine/core";
+import { ActionIcon, Box, Button, Group, SegmentedControl, Stack, Tooltip } from "@mantine/core";
 import { ArrowsInLineHorizontal, DotsSixVertical, Trash } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
+import { SettingsSection } from "../SettingsSection";
 
 /**
  * The overlay header, as an editable list of segments.
@@ -48,15 +49,7 @@ export const HeaderSegmentsEditor = () => {
 
   return (
     <TokenPaletteProvider>
-      <Stack gap="xs">
-        <Group justify="space-between">
-          <Text size="md" fw={700}>
-            {t("ui.header-segments-section")}
-          </Text>
-          <Anchor component="button" type="button" size="xs" onClick={reset}>
-            {t("ui.reset-to-defaults")}
-          </Anchor>
-        </Group>
+      <SettingsSection title={t("ui.header-segments-section")} onReset={reset}>
         <TokenPalette tokens={HEADER_TOKENS} used={used} />
         <DragDropContext
           onDragEnd={(result) => {
@@ -135,7 +128,7 @@ export const HeaderSegmentsEditor = () => {
             {t("ui.header-segment-add")}
           </Button>
         </Group>
-      </Stack>
+      </SettingsSection>
     </TokenPaletteProvider>
   );
 };

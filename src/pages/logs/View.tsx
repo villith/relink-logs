@@ -36,7 +36,7 @@ import toast from "react-hot-toast";
 import { Link, useParams } from "react-router-dom";
 
 import { ColumnsPopover } from "@/components/ColumnsPopover";
-import { FlaggedGear } from "@/components/FlaggedGear";
+import { FlaggedGear, traitLine } from "@/components/FlaggedGear";
 import { LegalityMark, LegalityPlayerName } from "@/components/LegalityMark";
 import { Table as MeterTable } from "@/components/Table";
 import { useTabParam } from "@/hooks/useTabParam";
@@ -1670,13 +1670,9 @@ export const ViewPage = () => {
                                   name={translateWrightstoneId(player.weaponState.wrightstoneId)}
                                   findings={findingsForSubject(legality[playerIndex] ?? [], "wrightstone")}
                                   explain="tooltip"
-                                  lines={player.weaponState.wrightstoneTraits.map((trait) => ({
-                                    id: trait.id,
-                                    level: trait.level,
-                                    text: `${translateTraitId(trait.id)}${
-                                      trait.level > 0 ? ` ${t("ui.trait-level", { level: trait.level })}` : ""
-                                    }`,
-                                  }))}
+                                  lines={player.weaponState.wrightstoneTraits.map((trait) =>
+                                    traitLine(t, trait.id, trait.level)
+                                  )}
                                 />
                               )}
                             </>
@@ -1771,13 +1767,7 @@ export const ViewPage = () => {
                                   findings={findingsForSubject(findings, "summon", summonIndex)}
                                   explain="tooltip"
                                   lines={[
-                                    {
-                                      id: summon.mainTraitId,
-                                      level: summon.mainTraitLevel,
-                                      text: `${translateTraitId(summon.mainTraitId)} ${t("ui.trait-level", {
-                                        level: summon.mainTraitLevel,
-                                      })}`,
-                                    },
+                                    traitLine(t, summon.mainTraitId, summon.mainTraitLevel),
                                     {
                                       id: summon.bonusId,
                                       level: summon.bonusLevel,
@@ -1823,11 +1813,7 @@ export const ViewPage = () => {
                           </Text>
                           <Placeholder empty={sigils.length === 0}>
                             {sigils.map(({ sigil, slot }, sigilIndex) => {
-                              const trait = (id: number, level: number) => ({
-                                id,
-                                level,
-                                text: `${translateTraitId(id)} ${t("ui.trait-level", { level })}`,
-                              });
+                              const trait = (id: number, level: number) => traitLine(t, id, level);
                               // The empty second slot is dropped, matching the
                               // snapshot the rules mark against — a rendered
                               // empty line would shift every index past it.

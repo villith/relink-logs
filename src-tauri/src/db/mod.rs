@@ -11,8 +11,10 @@ pub mod runs;
 /// or a database that already ran it diverges from one that has not.
 ///
 /// Split out of [`setup_db`] so a test can apply the real list to an in-memory
-/// database instead of the user's `logs.db`.
-pub(crate) fn migrations() -> Migrations<'static> {
+/// database instead of the user's `logs.db`, and so the diagnostic examples can
+/// migrate a COPY of a real `logs.db` — they cannot go through [`setup_db`],
+/// which hard-codes the app's own data directory.
+pub fn migrations() -> Migrations<'static> {
     Migrations::new(vec![
         M::up(
             r#"CREATE TABLE IF NOT EXISTS logs (
@@ -50,9 +52,9 @@ pub(crate) fn migrations() -> Migrations<'static> {
             buffs TEXT
         )"#,
         ),
-        // Stored build-legality verdicts. The DDL is `legality::SCHEMA` split
-        // into one migration per statement, so the tests in that module
-        // exercise the shape this creates.
+        // Stored build-legality verdicts. This is the only DDL for the table —
+        // `legality`'s own tests migrate an in-memory db through here rather
+        // than applying a copy that could drift away from it.
         M::up(
             r#"CREATE TABLE IF NOT EXISTS legality_findings (
             log_id INTEGER NOT NULL,
@@ -92,32 +94,6 @@ pub fn setup_db() -> Result<()> {
 mod tests {
     use super::*;
 
-    /// The migration that creates `legality_findings` and the `SCHEMA` the
-    /// module's own tests run against are two copies of one DDL, and only this
-    /// notices when they drift. A migration is append-only, so a divergence
-    /// here can never be fixed by editing the migration — it would have to be
-    /// a whole new one, which is exactly the mess worth catching early.
-    #[test]
-    fn the_migrations_build_the_findings_table_the_legality_module_expects() {
-        let mut conn = Connection::open_in_memory().expect("in-memory db");
-        migrations().to_latest(&mut conn).expect("migrations apply");
-
-        let finding = crate::legality::Finding {
-            rule: crate::legality::Rule::SummonBonusMagnitude,
-            subject: crate::legality::Subject::Summon(3),
-            observed: crate::legality::Value::Amount(75.0),
-            allowed: crate::legality::Value::Amount(50.0),
-            odds: None,
-            evidence: None,
-        };
-
-        legality::write_findings(&conn, 537, 2, "炎顺帝", "Pl1600", &[finding.clone()])
-            .expect("the migrated table accepts what the module writes");
-        let stored = legality::findings_for_log(&conn, 537).expect("read back");
-        assert_eq!(stored.len(), 1);
-        assert_eq!(stored[0].finding, finding);
-    }
-
     /// Logs predating the legality work carry a NULL stamp, which is what
     /// marks them for the startup sweep. A `NOT NULL DEFAULT` here would have
     /// stamped every existing log as current and silently skipped the entire
@@ -140,13 +116,6 @@ mod tests {
             .expect("read the stamp");
         assert_eq!(stamp, None);
     }
-}
-
-/// [`migrations`], for the diagnostic examples — they migrate a COPY of a real
-/// `logs.db` rather than the one the app writes, so they cannot go through
-/// [`setup_db`], which hard-codes the app's own data directory.
-pub fn migrations_for_diagnostics() -> Migrations<'static> {
-    migrations()
 }
 
 /// Connect to database.

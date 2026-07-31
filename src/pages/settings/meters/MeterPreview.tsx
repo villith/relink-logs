@@ -62,10 +62,9 @@ export type MeterPreviewProps = {
   /** Which column set to render: the overlay's, or the Logs window's. The two
    * are configured separately, so a preview that ignores this shows a meter the
    * user is not editing. Also selects the preview's shape — the overlay is a
-   * sized window, the Logs meter is a panel that fills what it is given. */
+   * sized window with a title bar, the Logs meter is a panel that fills what it
+   * is given and has no title bar. */
   live: boolean;
-  /** Show the overlay's title bar. Off for the Logs meter, which has none. */
-  showHeader?: boolean;
 };
 
 /**
@@ -78,7 +77,7 @@ export type MeterPreviewProps = {
  * whichever set `live` picks, since the overlay and the Logs window keep their
  * own.
  */
-export const MeterPreview = ({ live, showHeader = true }: MeterPreviewProps) => {
+export const MeterPreview = ({ live }: MeterPreviewProps) => {
   const { t } = useTranslation();
   const { transparency, header_segments, header_buttons, overlay_width, overlay_height } = useSettings();
 
@@ -95,7 +94,7 @@ export const MeterPreview = ({ live, showHeader = true }: MeterPreviewProps) => 
         flexDirection: "column",
       }}
     >
-      {showHeader && (
+      {live && (
         /* `.titlebar` is position: fixed for the real overlay — pinned static
            here so it stays inside the card instead of the settings window. */
         <div className="titlebar transparent-bg font-sm" style={{ position: "static", flexShrink: 0 }}>

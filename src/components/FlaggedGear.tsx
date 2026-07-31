@@ -1,9 +1,11 @@
 import { Box, Group, Text, Tooltip } from "@mantine/core";
+import { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import { describeLimit } from "@/legality";
 import { markedLines } from "@/legalityLines";
 import { LegalityFinding } from "@/types";
+import { translateTraitId } from "@/utils";
 
 import { FindingsExplanation } from "./LegalityMark";
 
@@ -21,6 +23,22 @@ export type GearLine = {
   /** The line as the reader sees it, already translated. */
   text: string;
 };
+
+/**
+ * A trait line — the shape every surface draws a sigil, summon or wrightstone
+ * trait in.
+ *
+ * Here rather than at each call site because the log view's Equipment and
+ * Builds tabs and the audit page's detail pane all draw the same line, and a
+ * reader comparing them has to see one wording. An unlevelled trait (level 0,
+ * which is how a remote player's wrightstone syncs) drops the suffix rather
+ * than printing "Lvl. 0".
+ */
+export const traitLine = (t: TFunction, id: number, level: number): GearLine => ({
+  id,
+  level,
+  text: level > 0 ? `${translateTraitId(id)} ${t("ui.trait-level", { level })}` : translateTraitId(id),
+});
 
 /**
  * An item, its lines, and the mark saying which line is wrong.

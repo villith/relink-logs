@@ -16,22 +16,6 @@ use serde::Serialize;
 
 use crate::legality::Finding;
 
-/// The table this module owns, in the shape the migration creates it. Kept
-/// here so the tests exercise the real schema rather than a copy that could
-/// drift away from the migration.
-pub const SCHEMA: &str = r#"
-CREATE TABLE IF NOT EXISTS legality_findings (
-    log_id INTEGER NOT NULL,
-    player_index INTEGER NOT NULL,
-    display_name TEXT NOT NULL,
-    character_type TEXT NOT NULL,
-    severity TEXT NOT NULL,
-    rule TEXT NOT NULL,
-    payload TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS legality_findings_log ON legality_findings (log_id);
-"#;
-
 /// One stored finding, with the player it belongs to.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -85,43 +69,20 @@ pub fn write_findings(
 /// Drops every finding stored for a log. Re-auditing calls this first, so a
 /// rescan replaces a log's verdicts instead of doubling them.
 pub fn clear_findings(conn: &Connection, log_id: i64) -> Result<()> {
-    conn.execute(
-        "DELETE FROM legality_findings WHERE log_id = ?",
-        params![log_id],
-    )?;
+    // `prepare_cached`: the startup sweep calls this once per stale log.
+    conn.prepare_cached("DELETE FROM legality_findings WHERE log_id = ?")?
+        .execute(params![log_id])?;
     Ok(())
 }
 
 /// Every stored finding for one log, in insertion order.
+///
+/// The one-log case of [`findings_for_logs`]; both order by rowid, and a log
+/// with nothing stored reads back as an empty list either way.
 pub fn findings_for_log(conn: &Connection, log_id: i64) -> Result<Vec<StoredFinding>> {
-    let mut stmt = conn.prepare_cached(
-        r#"SELECT player_index, display_name, character_type, payload
-             FROM legality_findings
-            WHERE log_id = ?
-            ORDER BY rowid"#,
-    )?;
-
-    let rows = stmt.query_map(params![log_id], |row| {
-        Ok((
-            row.get::<_, i64>(0)?,
-            row.get::<_, String>(1)?,
-            row.get::<_, String>(2)?,
-            row.get::<_, String>(3)?,
-        ))
-    })?;
-
-    let mut stored = Vec::new();
-    for row in rows {
-        let (player_index, display_name, character_type, payload) = row?;
-        stored.push(StoredFinding {
-            player_index: player_index as usize,
-            display_name,
-            character_type,
-            finding: serde_json::from_str(&payload)?,
-        });
-    }
-
-    Ok(stored)
+    Ok(findings_for_logs(conn, &[log_id])?
+        .remove(&log_id)
+        .unwrap_or_default())
 }
 
 /// Every stored finding for one page of logs, keyed by the log it belongs to.
@@ -284,19 +245,21 @@ mod tests {
     use super::*;
     use crate::legality::{Rule, Subject, Value};
 
+    /// The real migrations rather than a copy of the DDL: a copy can drift away
+    /// from the migration that actually ships, and a migration is append-only,
+    /// so a divergence could never be fixed by editing it.
     fn memory_db() -> Connection {
-        let conn = Connection::open_in_memory().expect("in-memory db");
-        conn.execute_batch(SCHEMA).expect("schema applies");
-        conn
-    }
-
-    /// `flagged_players` joins `logs` for the timestamp, so its fixtures need
-    /// the whole schema rather than this module's table alone.
-    fn migrated_db_with_logs(logs: &[(i64, i64)]) -> Connection {
         let mut conn = Connection::open_in_memory().expect("in-memory db");
         crate::db::migrations()
             .to_latest(&mut conn)
             .expect("migrations apply");
+        conn
+    }
+
+    /// `flagged_players` joins `logs` for the timestamp, so its fixtures need
+    /// log rows on top of the migrated schema.
+    fn migrated_db_with_logs(logs: &[(i64, i64)]) -> Connection {
+        let conn = memory_db();
         for (id, time) in logs {
             conn.execute(
                 "INSERT INTO logs (id, name, time, duration, data, version)

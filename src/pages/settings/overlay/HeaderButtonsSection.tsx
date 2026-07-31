@@ -1,6 +1,11 @@
 import { HEADER_BUTTON_ICONS } from "@/components/TitlebarButtons";
 import useSettings from "@/pages/useSettings";
-import { DEFAULT_HEADER_BUTTONS, HEADER_BUTTONS, type HeaderButtonId } from "@/stores/useMeterSettingsStore";
+import {
+  DEFAULT_HEADER_BUTTONS,
+  HEADER_BUTTONS,
+  headerButtonsWithDefaults,
+  type HeaderButtonId,
+} from "@/stores/useMeterSettingsStore";
 import { Anchor, Checkbox, Group, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
@@ -16,9 +21,7 @@ export const HeaderButtonsSection = () => {
   const { t } = useTranslation();
   const { header_buttons, setMeterSettings } = useSettings();
 
-  // Defaults underneath, so a settings blob saved before a button existed does
-  // not read as "user hid it".
-  const shown = { ...DEFAULT_HEADER_BUTTONS, ...header_buttons };
+  const shown = headerButtonsWithDefaults(header_buttons);
 
   const toggle = (id: HeaderButtonId, checked: boolean) =>
     setMeterSettings({ header_buttons: { ...shown, [id]: checked } });

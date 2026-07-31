@@ -12,7 +12,7 @@ import {
   SortType,
   visibleColumns,
 } from "../types";
-import { formatInPartyOrder, sortPlayers } from "../utils";
+import { formatInPartyOrder, meterGridTemplate, sortPlayers } from "../utils";
 import { PlayerRow } from "./PlayerRow";
 
 export const Table = ({
@@ -116,7 +116,7 @@ export const Table = ({
           // cannot drift apart. Built here because only this component knows how
           // many value columns the user has chosen; the widths stay variables so
           // the narrow rules can retune them.
-          "--meter-grid": `minmax(120px, 1fr) repeat(${columns.length}, var(--meter-value-col))`,
+          "--meter-grid": meterGridTemplate(columns.length),
         } as CSSProperties
       }
     >

@@ -1,6 +1,6 @@
 import useSettings from "@/pages/useSettings";
-import { Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import { SettingsSection } from "../SettingsSection";
 import { LabelledSlider } from "../meters/LabelledSlider";
 
 /** How opaque the overlay's background sits over the game. Overlay-only: the
@@ -10,10 +10,7 @@ export const TransparencySection = () => {
   const { transparency, setMeterSettings } = useSettings();
 
   return (
-    <Stack gap="xs">
-      <Text size="md" fw={700}>
-        {t("ui.overlay-background-section")}
-      </Text>
+    <SettingsSection title={t("ui.overlay-background-section")}>
       <LabelledSlider
         label={t("ui.meter-transparency")}
         min={0}
@@ -23,6 +20,6 @@ export const TransparencySection = () => {
         value={Math.round(transparency * 100)}
         onChange={(value) => setMeterSettings({ transparency: value / 100 })}
       />
-    </Stack>
+    </SettingsSection>
   );
 };

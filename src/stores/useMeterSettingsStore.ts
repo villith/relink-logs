@@ -49,12 +49,23 @@ export const HEADER_BUTTONS = ["clipboard", "pin", "screenshot", "reset"] as con
 export type HeaderButtonId = (typeof HEADER_BUTTONS)[number];
 export type HeaderButtonVisibility = Record<HeaderButtonId, boolean>;
 
-export const DEFAULT_HEADER_BUTTONS: HeaderButtonVisibility = {
-  clipboard: true,
-  pin: true,
-  screenshot: true,
-  reset: true,
-};
+export const DEFAULT_HEADER_BUTTONS: HeaderButtonVisibility = Object.fromEntries(
+  HEADER_BUTTONS.map((id) => [id, true])
+) as HeaderButtonVisibility;
+
+/**
+ * A stored visibility record with the defaults underneath it.
+ *
+ * A settings object persisted before a button existed has no key for it, and
+ * `undefined` would silently hide a button the user never chose to hide. Both
+ * the header and the settings checkboxes that edit it need this, and they must
+ * agree — a checkbox describing a different set than the header draws is worse
+ * than either being wrong alone.
+ */
+export const headerButtonsWithDefaults = (stored: Partial<HeaderButtonVisibility>): HeaderButtonVisibility => ({
+  ...DEFAULT_HEADER_BUTTONS,
+  ...stored,
+});
 
 /** The overlay's starting size, matching the `main` window in tauri.conf.json —
  * the two must agree or the overlay would jump on first launch. */

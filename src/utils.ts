@@ -1326,6 +1326,19 @@ export const resolvePlayerColor = (
 export const barWidth = (percentage: number, maxPercentage: number, mode: BarFillMode): number =>
   mode === "relative" && maxPercentage > 0 ? (percentage / maxPercentage) * 100 : percentage;
 
+/// The meter's grid track template, for a table with `columnCount` value
+/// columns.
+///
+/// Built here rather than at each table because the header row, the player rows
+/// and the skill rows all read `--meter-grid`, and their lining up is the whole
+/// point of the shared template — two components composing it separately is two
+/// chances for the header to stop matching the rows under it.
+///
+/// It cannot move into App.css: `repeat()` needs a literal integer count, so a
+/// `var()` there does not parse.
+export const meterGridTemplate = (columnCount: number): string =>
+  `minmax(120px, 1fr) repeat(${columnCount}, var(--meter-value-col))`;
+
 export const damageBarStyle = (color: string, percentage: number): CSSProperties => {
   const width = Number.isFinite(percentage) ? Math.min(100, Math.max(0, percentage)) : 0;
   return {
@@ -1641,10 +1654,7 @@ export const toHashString = (num: number | undefined): string => (num ? num.toSt
 export const deriveNavState = (pathname: string) => {
   const toolboxActive = pathname.startsWith("/logs/toolbox");
   const settingsActive = pathname.startsWith("/logs/settings");
-  // `/logs/legality` is a dev-only diagnostic reached from the Debug page, so it
-  // belongs to the Debug tab: without this the Logs tab would light up for it and
-  // then remember it as the place to return to.
-  const debugActive = pathname.startsWith("/logs/debug") || pathname.startsWith("/logs/legality");
+  const debugActive = pathname.startsWith("/logs/debug");
   const logsActive = !toolboxActive && !settingsActive && !debugActive;
   const confluxActive = pathname.startsWith("/logs/conflux");
   const questsActive = logsActive && !confluxActive;

@@ -3,7 +3,7 @@ import { ArrowCounterClockwise, Camera, ClipboardText, Icon, Minus, PushPinSimpl
 import { useTranslation } from "react-i18next";
 
 import {
-  DEFAULT_HEADER_BUTTONS,
+  headerButtonsWithDefaults,
   type HeaderButtonId,
   type HeaderButtonVisibility,
 } from "@/stores/useMeterSettingsStore";
@@ -17,6 +17,24 @@ export const HEADER_BUTTON_ICONS: Record<HeaderButtonId, Icon> = {
   screenshot: Camera,
   reset: ArrowCounterClockwise,
 };
+
+/**
+ * The three buttons that are a tooltip over a glyph, differing only in which
+ * action they fire. Written out once so adding a fourth is one row here rather
+ * than a fourth copy of the same seven lines.
+ *
+ * Clipboard is not in the table: it is a hover menu with two items, not a
+ * single-action button, so it keeps its own branch below.
+ */
+const TOOLTIP_BUTTONS: ReadonlyArray<{
+  id: HeaderButtonId;
+  labelKey: string;
+  handler: (actions: TitlebarActions) => () => void;
+}> = [
+  { id: "pin", labelKey: "ui.pin-window", handler: (a) => a.onPin },
+  { id: "screenshot", labelKey: "ui.copy-screenshot-to-clipboard", handler: (a) => a.onScreenshot },
+  { id: "reset", labelKey: "ui.reset-session", handler: (a) => a.onReset },
+];
 
 export type TitlebarActions = {
   onCopySimple: () => void;
@@ -48,10 +66,7 @@ export type TitlebarButtonsProps = {
 export const TitlebarButtons = ({ visible, actions }: TitlebarButtonsProps) => {
   const { t } = useTranslation();
 
-  // Defaults underneath the stored value: a settings object persisted before a
-  // button existed has no key for it, and `undefined` would silently hide a
-  // button the user never chose to hide.
-  const shown = { ...DEFAULT_HEADER_BUTTONS, ...visible };
+  const shown = headerButtonsWithDefaults(visible);
 
   return (
     <>
@@ -76,29 +91,18 @@ export const TitlebarButtons = ({ visible, actions }: TitlebarButtonsProps) => {
           </ActionIcon>
         ))}
 
-      {shown.pin && (
-        <Tooltip label={t("ui.pin-window")} color="dark" disabled={!actions}>
-          <div className="titlebar-button" onClick={actions?.onPin}>
-            <PushPinSimple size={16} />
-          </div>
-        </Tooltip>
-      )}
-
-      {shown.screenshot && (
-        <Tooltip label={t("ui.copy-screenshot-to-clipboard")} color="dark" disabled={!actions}>
-          <div className="titlebar-button" onClick={actions?.onScreenshot}>
-            <Camera size={16} />
-          </div>
-        </Tooltip>
-      )}
-
-      {shown.reset && (
-        <Tooltip label={t("ui.reset-session")} color="dark" disabled={!actions}>
-          <div className="titlebar-button" onClick={actions?.onReset}>
-            <ArrowCounterClockwise size={16} />
-          </div>
-        </Tooltip>
-      )}
+      {TOOLTIP_BUTTONS.map(({ id, labelKey, handler }) => {
+        const Glyph = HEADER_BUTTON_ICONS[id];
+        return (
+          shown[id] && (
+            <Tooltip key={id} label={t(labelKey)} color="dark" disabled={!actions}>
+              <div className="titlebar-button" onClick={actions && handler(actions)}>
+                <Glyph size={16} />
+              </div>
+            </Tooltip>
+          )
+        );
+      })}
 
       <div className="titlebar-button" id="titlebar-minimize" onClick={actions?.onMinimize}>
         <Minus size={16} />

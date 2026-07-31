@@ -7,8 +7,19 @@
  * shown" and "names hidden" without the user maintaining two strings.
  */
 
-/** `{name}` — a leading letter then letters/digits, so `100%` and `{}` stay literal text. */
-const TOKEN_PATTERN = /\{([a-zA-Z][a-zA-Z0-9]*)\}/g;
+/**
+ * A token name: a leading letter then letters/digits, so `100%` and `{}` stay
+ * literal text.
+ *
+ * The ONE definition of the grammar. The chip editor needs the same shape in
+ * two more forms — anchored for validation, and brace-wrapped for its input
+ * rule — and a name any of them disagreed about would not survive the
+ * chip → stored string → reparse round trip.
+ */
+export const TOKEN_NAME_SOURCE = "[a-zA-Z][a-zA-Z0-9]*";
+
+/** `{name}`, as the renderer scans for it. */
+const TOKEN_PATTERN = new RegExp(`\\{(${TOKEN_NAME_SOURCE})\\}`, "g");
 
 /**
  * Stands in for a token that resolved to empty, so the collapse rules can tell
@@ -123,11 +134,28 @@ export const usedTokens = (templates: readonly string[]): string[] => [
  * A group of pure literal text has no emptied token in it and is left alone; a
  * group that is genuinely blank (`()`) goes, as it always has.
  */
-const dropEmptiedGroups = (text: string, open: string, close: string, inner: string): string =>
-  text.replace(new RegExp(`\\${open}(${inner}*)\\${close}`, "g"), (group, content: string) => {
+const dropEmptiedGroups = (text: string, pattern: RegExp): string =>
+  text.replace(pattern, (group, content: string) => {
     if (content.includes(VALUE_MARK)) return group;
     return content.includes(EMPTY_MARK) || content.trim() === "" ? "" : group;
   });
+
+/**
+ * Hoisted rather than built per call: these close over module constants only,
+ * and `renderTemplate` runs ~13 times per meter frame (five header segments plus
+ * two per player row), which made this five `RegExp` compilations a frame.
+ *
+ * Safe to share despite `/g`: `String.replace` resets `lastIndex` to 0 when it
+ * finishes, and `String.matchAll` reads the source regex's `lastIndex` without
+ * writing it.
+ */
+const PAREN_GROUP = /\(([^()]*)\)/g;
+const BRACKET_GROUP = /\[([^[\]]*)\]/g;
+const EMPTY_THEN_PARENS = new RegExp(`${EMPTY_MARK}\\s*\\(([^()]*)\\)`, "g");
+const EMPTY_THEN_BRACKETS = new RegExp(`${EMPTY_MARK}\\s*\\[([^[\\]]*)\\]`, "g");
+// `\\d` matters: in a template literal `\d` collapses to a bare `d`, which
+// silently makes this hunt for the letter rather than the index.
+const NODE_SLOT = new RegExp(`${NODE_MARK}(\\d+)${NODE_MARK}`, "g");
 
 /**
  * Renders a template against its token values.
@@ -177,10 +205,10 @@ export const renderTemplate = (template: string, tokens: TemplateTokens): string
   // Rule 2 runs before rule 1: unwrapping can leave a group whose contents are
   // themselves empty, which rule 1 then removes.
   const unwrapped = substituted
-    .replace(new RegExp(`${EMPTY_MARK}\\s*\\(([^()]*)\\)`, "g"), `${EMPTY_MARK} $1`)
-    .replace(new RegExp(`${EMPTY_MARK}\\s*\\[([^[\\]]*)\\]`, "g"), `${EMPTY_MARK} $1`);
+    .replace(EMPTY_THEN_PARENS, `${EMPTY_MARK} $1`)
+    .replace(EMPTY_THEN_BRACKETS, `${EMPTY_MARK} $1`);
 
-  const pruned = dropEmptiedGroups(dropEmptiedGroups(unwrapped, "(", ")", "[^()]"), "[", "]", "[^[\\]]");
+  const pruned = dropEmptiedGroups(dropEmptiedGroups(unwrapped, PAREN_GROUP), BRACKET_GROUP);
 
   return pruned.split(EMPTY_MARK).join("").split(VALUE_MARK).join("").replace(/\s+/g, " ").trim();
 };
@@ -226,9 +254,7 @@ export const renderTemplateNodes = (
   const parts: TemplateNodePart[] = [];
   let cursor = 0;
 
-  // `\\d` matters: in a template literal `\d` collapses to a bare `d`, which
-  // silently makes this hunt for the letter rather than the index.
-  for (const match of rendered.matchAll(new RegExp(`${NODE_MARK}(\\d+)${NODE_MARK}`, "g"))) {
+  for (const match of rendered.matchAll(NODE_SLOT)) {
     const start = match.index!;
     if (start > cursor) parts.push({ type: "text", value: rendered.slice(cursor, start) });
     const slot = slots[Number(match[1])];

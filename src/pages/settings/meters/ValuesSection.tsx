@@ -1,6 +1,7 @@
 import useSettings from "@/pages/useSettings";
-import { Checkbox, Stack, Text, Tooltip } from "@mantine/core";
+import { Checkbox, Tooltip } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import { SettingsSection } from "../SettingsSection";
 
 /** What the meter counts and how it writes the numbers down. Unlike the colour
  * and bar settings above, these feed the shared meter table, so they apply in
@@ -10,10 +11,7 @@ export const ValuesSection = () => {
   const { show_full_values, use_condensed_skills, include_primal_burst, setMeterSettings } = useSettings();
 
   return (
-    <Stack gap="xs">
-      <Text size="md" fw={700}>
-        {t("ui.meter-values-section")}
-      </Text>
+    <SettingsSection title={t("ui.meter-values-section")}>
       <Tooltip label={t("ui.show-full-values-description")}>
         <Checkbox
           label={t("ui.show-full-values")}
@@ -35,6 +33,6 @@ export const ValuesSection = () => {
           onChange={(event) => setMeterSettings({ include_primal_burst: event.currentTarget.checked })}
         />
       </Tooltip>
-    </Stack>
+    </SettingsSection>
   );
 };

@@ -27,7 +27,7 @@ import { epochToLocalTime, translateCharacterType, translateQuestId } from "@/ut
 import { Violation, violationLabel } from "@/violations";
 
 import { FindingDetail } from "@/components/FindingDetail";
-import { AuditFilters, DEFAULT_FILTERS, applyFilters, auditRows, caseFor } from "./auditRows";
+import { AuditFilters, DEFAULT_FILTERS, applyFilters, auditRows, caseFor, playerKey } from "./auditRows";
 
 /** How many flagged fights the case lists before folding the rest away. Enough
  * to show a pattern, few enough that the evidence above stays on screen. */
@@ -110,7 +110,7 @@ const BuildAuditPage = () => {
 
   const kept = useMemo(() => (players ? applyFilters(players, { search }) : []), [players, search]);
   const rows = useMemo(() => auditRows(kept).sort((a, b) => b.lastSeen - a.lastSeen), [kept]);
-  const byKey = useMemo(() => new Map(kept.map((p) => [`${p.displayName}-${p.characterType}`, p])), [kept]);
+  const byKey = useMemo(() => new Map(kept.map((p) => [playerKey(p), p])), [kept]);
 
   const player = selected === null ? undefined : byKey.get(selected);
   const found = useMemo(() => (player ? caseFor(player) : null), [player]);

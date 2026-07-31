@@ -12,7 +12,7 @@ import {
   visibleColumns,
 } from "@/types";
 
-import { getSkillName, isSkillGroup } from "@/utils";
+import { getSkillName, isSkillGroup, meterGridTemplate } from "@/utils";
 import { SkillGroupRow } from "./SkillGroupRow";
 import { SkillRow } from "./SkillRow";
 import { useSkillBreakdown } from "./useSkillBreakdown";
@@ -103,7 +103,7 @@ export const SkillBreakdown = ({ player, color, durationSeconds = 0, live }: Ski
       className="table w-full skill-table"
       style={
         {
-          "--meter-grid": `minmax(120px, 1fr) repeat(${columns.length}, var(--meter-value-col))`,
+          "--meter-grid": meterGridTemplate(columns.length),
         } as CSSProperties
       }
     >

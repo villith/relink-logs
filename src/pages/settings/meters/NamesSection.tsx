@@ -1,6 +1,7 @@
 import useSettings from "@/pages/useSettings";
-import { Checkbox, Stack, Text, Tooltip } from "@mantine/core";
+import { Checkbox, Tooltip } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+import { SettingsSection } from "../SettingsSection";
 
 /** What the meter reveals about the people in the party. */
 export const NamesSection = () => {
@@ -9,10 +10,7 @@ export const NamesSection = () => {
     useSettings();
 
   return (
-    <Stack gap="xs">
-      <Text size="md" fw={700}>
-        {t("ui.meter-names-section")}
-      </Text>
+    <SettingsSection title={t("ui.meter-names-section")}>
       <Checkbox
         label={t("ui.show-player-names")}
         checked={show_display_names}
@@ -50,6 +48,6 @@ export const NamesSection = () => {
           />
         </div>
       </Tooltip>
-    </Stack>
+    </SettingsSection>
   );
 };
