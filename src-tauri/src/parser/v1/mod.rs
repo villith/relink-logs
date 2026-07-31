@@ -23,10 +23,12 @@ use super::{
 pub mod audit;
 mod cap_detection;
 mod filters;
+pub mod phantom_targets;
 mod player_state;
 mod skill_state;
 
 pub use filters::{is_excluded, MeterFilters};
+use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::PlayerState;
 
 pub struct AdjustedDamageInstance<'a> {
@@ -1306,10 +1308,18 @@ fn segment_targets_inner(
         Vec::new()
     };
 
+    // Markers are not enemies, so they get no dropdown entry and no HP series —
+    // and because the assignment vector is pre-filled with `None`, skipping one
+    // leaves its slot unassigned, exactly like a non-damage event.
+    let phantoms = PhantomTargets::learned_from(events.iter());
+
     for (event_index, (timestamp, message)) in events.iter().enumerate() {
         let Message::DamageEvent(event) = message else {
             continue;
         };
+        if phantoms.is_phantom(event) {
+            continue;
+        }
         let rel_ts = timestamp - start_time;
         let hp = event.target_current_hp.zip(event.target_max_hp);
         let key = event.target.index;
@@ -1437,12 +1447,16 @@ pub fn build_player_dps_chart(
         .map(|index| (*index, vec![0; chart_len]))
         .collect();
 
+    // Same rule as the meter, so a chart's area can't disagree with the row
+    // total it sits under.
+    let phantoms = PhantomTargets::learned_from(events.iter());
+
     for (timestamp, event) in events {
         let Message::DamageEvent(damage_event) = event else {
             continue;
         };
 
-        if is_excluded(damage_event, &filters) {
+        if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
             continue;
         }
 
@@ -1558,6 +1572,12 @@ pub struct Parser {
     #[serde(skip)]
     pub filters: MeterFilters,
 
+    /// Target actor types this encounter has shown to be markers rather than
+    /// enemies (see [`phantom_targets`]). Derived from the raw log, so it is
+    /// rebuilt on every reparse and never stored.
+    #[serde(skip)]
+    phantom_targets: PhantomTargets,
+
     /// The window handle for the parser, used to send messages to the front-end
     #[serde(skip)]
     app: Option<AppHandle>,
@@ -1662,6 +1682,10 @@ impl Parser {
     ) {
         let filters = self.filters;
         let log_start = self.start_time();
+        // Learned up front from the WHOLE log: most of a marker's hits carry no
+        // HP read, so judging it as events stream past would drop only the few
+        // that happen to reveal the pool.
+        self.phantom_targets = PhantomTargets::learned_from(self.encounter.event_log());
         self.derived_state = Default::default();
         // `Default` means Stopped, but a reparse says nothing about whether the
         // fight is over — the live path reparses on a filter toggle mid-fight.
@@ -1693,6 +1717,12 @@ impl Parser {
             // never reaches `process_damage_event` for an excluded hit and so
             // never moves the window from one.
             if let Message::DamageEvent(event) = event {
+                // Ahead of the excluded-damage note as well: a marker's damage
+                // was never real, so it belongs in no total, not even the
+                // "excluded" one the user can toggle back on.
+                if self.phantom_targets.is_phantom(event) {
+                    continue;
+                }
                 if is_excluded(event, &filters) {
                     self.derived_state.note_excluded_damage(event);
                     continue;
@@ -2048,6 +2078,15 @@ impl Parser {
 
         self.encounter
             .push_event(now, Message::DamageEvent(event.clone()));
+
+        // Recorded above, counted nowhere — same contract as the filters below.
+        // Live can only recognise a marker from its first HP-bearing hit
+        // onward, so a few earlier hits may sit in the overlay's running total;
+        // the saved log is reparsed from the raw events and comes out exact.
+        self.phantom_targets.observe(&event);
+        if self.phantom_targets.is_phantom(&event) {
+            return;
+        }
 
         // Recorded above, counted nowhere: the raw log is the source of truth,
         // so turning the setting on and reparsing brings this hit back. The
@@ -2523,8 +2562,11 @@ impl Parser {
             return true;
         }
 
-        // Eugen's Grenade should be ignored.
-        if event.target.actor_type == 0x022a350f {
+        // Hand-listed non-enemy actors (Eugen's Grenade, skill-spawned markers).
+        // The learned tiny-HP rule can't run here — it needs an HP read this
+        // event may not carry — so it is applied on the derive path instead,
+        // which is also what makes it retroactive for already-recorded logs.
+        if is_excluded_target_type(event) {
             return true;
         }
 
@@ -3108,6 +3150,115 @@ mod tests {
 
         assert_eq!(parser.encounter.raw_event_log.len(), 2);
         assert_eq!(parser.derived_state.total_damage, 4_000);
+    }
+
+    /// The same hit as `damage_from`, aimed at `target_type` and reporting
+    /// `max_hp` as the target's pool. `index` separates the two markers one cast
+    /// spawns, which the game gives distinct spawn ids.
+    fn damage_on_target(
+        target_type: u32,
+        index: u32,
+        damage: i32,
+        max_hp: Option<u64>,
+    ) -> DamageEvent {
+        let mut event = damage_from(PLAYER_HASH, 1602, damage);
+        event.target = Actor {
+            index,
+            actor_type: target_type,
+            parent_index: index,
+            parent_actor_type: target_type,
+        };
+        event.target_current_hp = max_hp.map(|_| 0);
+        event.target_max_hp = max_hp;
+        event
+    }
+
+    /// One charged Flamek Thunder as the game reports it: the hit that lands on
+    /// the enemy plus the two identical hits on the 1-HP markers the cast spawns
+    /// (log 562, t+8784ms — all three at the same millisecond, same damage).
+    fn parser_with_a_phantom_cast() -> Parser {
+        const MARKER: u32 = crate::parser::v1::phantom_targets::EXCLUDED_TARGET_TYPES[1];
+        let mut parser = Parser::default();
+        parser.encounter.raw_event_log.push((
+            1_000,
+            Message::DamageEvent(damage_on_target(0xa379ac65, 9, 4_174_929, Some(39_000_000))),
+        ));
+        for (offset, index) in [(0, 20), (0, 21)] {
+            parser.encounter.raw_event_log.push((
+                1_000 + offset,
+                Message::DamageEvent(damage_on_target(MARKER, index, 4_174_929, Some(1))),
+            ));
+        }
+        parser
+    }
+
+    #[test]
+    fn marker_actors_spawned_by_a_cast_do_not_inflate_damage() {
+        // One cast must be counted once, not three times.
+        let mut parser = parser_with_a_phantom_cast();
+
+        parser.reparse();
+
+        let player = parser.derived_state.party.get(&0).unwrap();
+        assert_eq!(
+            player.total_damage, 4_174_929,
+            "the cast's two markers must not be counted"
+        );
+        assert_eq!(parser.derived_state.total_damage, 4_174_929);
+        assert_eq!(
+            parser.derived_state.targets.len(),
+            1,
+            "markers must not open enemy rows"
+        );
+        let skill = &player.skill_breakdown[0];
+        assert_eq!(skill.hits, 1, "one cast is one hit");
+        assert_eq!(
+            skill.targets.len(),
+            1,
+            "the per-enemy tooltip must not list a marker"
+        );
+    }
+
+    #[test]
+    fn a_marker_is_dropped_from_logs_recorded_before_the_rule_existed() {
+        // The raw log is untouched, so the fix is retroactive: an old log still
+        // holds the marker hits and loses them on the next reparse.
+        let mut parser = parser_with_a_phantom_cast();
+
+        parser.reparse();
+
+        assert_eq!(
+            parser.encounter.raw_event_log.len(),
+            3,
+            "the raw log stays the source of truth"
+        );
+        assert_eq!(parser.derived_state.total_damage, 4_174_929);
+    }
+
+    #[test]
+    fn an_unlisted_marker_is_caught_by_its_hp_pool_alone() {
+        // 0x60b55c0f is not on the hand-written list; its 1-HP pool is the only
+        // thing identifying it, and most of its hits carry no HP read at all.
+        let mut parser = Parser::default();
+        parser.encounter.raw_event_log.push((
+            1_000,
+            Message::DamageEvent(damage_on_target(0xa379ac65, 9, 1_000, Some(39_000_000))),
+        ));
+        parser.encounter.raw_event_log.push((
+            1_100,
+            Message::DamageEvent(damage_on_target(0x60b55c0f, 20, 546_000, None)),
+        ));
+        parser.encounter.raw_event_log.push((
+            1_200,
+            Message::DamageEvent(damage_on_target(0x60b55c0f, 20, 546_000, Some(1))),
+        ));
+
+        parser.reparse();
+
+        assert_eq!(
+            parser.derived_state.total_damage, 1_000,
+            "both marker hits go, including the one with no HP read"
+        );
     }
 
     #[test]

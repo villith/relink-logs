@@ -31,7 +31,13 @@ function RoomRow({ room, buffIds }: { room: ConfluxRoom; buffIds: number[] }) {
         </Group>
       </Table.Td>
       <Table.Td>
-        <Button size="xs" variant="default" component={Link} to={`/logs/${room.logId}`}>
+        <Button
+          size="xs"
+          variant="default"
+          component={Link}
+          to={`/logs/${room.logId}`}
+          state={{ backTo: "/logs/conflux" }}
+        >
           {t("ui.logs.overview")}
         </Button>
       </Table.Td>

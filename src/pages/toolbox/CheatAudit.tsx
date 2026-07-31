@@ -351,7 +351,13 @@ const CheatAuditPage = () => {
                           // Left in the link colour rather than dimmed: this is
                           // the way out to the fight itself, and a grey line
                           // that happens to be clickable reads as a caption.
-                          <Anchor component={Link} to={`/logs/${build.logId}?tab=equipment`} display="block" mb={4}>
+                          <Anchor
+                            component={Link}
+                            to={`/logs/${build.logId}?tab=equipment`}
+                            state={{ backTo: "/logs/toolbox/audit" }}
+                            display="block"
+                            mb={4}
+                          >
                             {/* The arrow says this LEAVES the page. Without it
                                 the heading is indistinguishable from the quest
                                 name in the contents beside it, which is a link

@@ -34,12 +34,13 @@ import { invoke } from "@tauri-apps/api";
 import { t } from "i18next";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { FlaggedGear, traitLine } from "@/components/FlaggedGear";
 import { LegalityMark, LegalityPlayerName } from "@/components/LegalityMark";
 import { Table as MeterTable } from "@/components/Table";
+import { useBackTo } from "@/hooks/useBackTo";
 import { useTabParam } from "@/hooks/useTabParam";
 import { findingsForSubject } from "@/legality";
 import { useChecklistStore } from "@/stores/useChecklistStore";
@@ -635,25 +636,10 @@ export const ViewPage = () => {
   const { id } = useParams();
 
   /**
-   * Back to wherever the reader came from.
-   *
-   * This used to be a hard link to `/logs`, which was right only for the one
-   * route that reaches a log through the list. A log opened from the Cheat
-   * Audit, from the quest list, or from the toast the app raises when an
-   * encounter saves would answer "Back" by dumping the reader on a page they
-   * were never on — and, from the audit, losing the person whose case they were
-   * halfway through reading.
-   *
-   * `location.key === "default"` is react-router's marker for the first entry in
-   * the history stack: there is nothing behind it, so that is the only case that
-   * still needs a destination of its own.
+   * Back to the quest list, unless the link that opened this log named
+   * somewhere else. See `useBackTo` for why this is not a history walk.
    */
-  const navigate = useNavigate();
-  const location = useLocation();
-  const goBack = useCallback(() => {
-    if (location.key === "default") navigate("/logs");
-    else navigate(-1);
-  }, [navigate, location.key]);
+  const goBack = useBackTo();
 
   const {
     encounter,
