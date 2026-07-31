@@ -167,8 +167,8 @@ fn main() -> Result<()> {
         println!("{}: {} finding(s)", player.display_name(), findings.len());
         for finding in &findings {
             println!(
-                "    {:?}/{:?} at {:?}: observed {:?}, allowed {:?}",
-                finding.rule, finding.severity, finding.subject, finding.observed, finding.allowed
+                "    {:?} at {:?}: observed {:?}, allowed {:?}",
+                finding.rule, finding.subject, finding.observed, finding.allowed
             );
         }
     }

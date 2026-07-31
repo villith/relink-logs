@@ -26,7 +26,7 @@ use serde::Deserialize;
 
 use crate::transmarvel;
 
-use super::{is_empty, parse_hex, Finding, Rule, Severity, Subject, Value};
+use super::{is_empty, parse_hex, Finding, Rule, Subject, Value};
 
 /// The level ceiling for a sigil trait that the table does not override. A
 /// user-confirmed game rule, not a table fact: `maxLevel` is emitted only by
@@ -234,11 +234,11 @@ pub fn audit_sigils(sigils: &[Sigil]) -> Vec<Finding> {
                 if level > entry.max_level {
                     findings.push(Finding {
                         rule: Rule::SigilTraitLevel,
-                        severity: Severity::Impossible,
                         subject: Subject::Sigil(index),
                         observed: Value::Level(level),
                         allowed: Value::Level(entry.max_level),
                         odds: None,
+                        evidence: None,
                     });
                 }
             }
@@ -254,11 +254,11 @@ pub fn audit_sigils(sigils: &[Sigil]) -> Vec<Finding> {
                 };
                 findings.push(Finding {
                     rule: Rule::SigilLockedPair,
-                    severity: Severity::Impossible,
                     subject: Subject::Sigil(index),
                     observed: Value::TraitId(observed),
                     allowed: Value::TraitIds(vec![locked]),
                     odds: None,
+                    evidence: None,
                 });
             }
         }
@@ -276,12 +276,12 @@ pub fn audit_sigils(sigils: &[Sigil]) -> Vec<Finding> {
             allowed.sort_unstable();
             findings.push(Finding {
                 rule: Rule::SigilQuestLockedTrait,
-                severity: Severity::Impossible,
                 subject: Subject::Sigil(index),
                 observed: Value::TraitId(trait_id),
                 // SIGIL ids, not traits: the list names where this trait may live.
                 allowed: Value::SigilIds(allowed),
                 odds: None,
+                evidence: None,
             });
         }
 
@@ -289,11 +289,11 @@ pub fn audit_sigils(sigils: &[Sigil]) -> Vec<Finding> {
         if let Some(second) = second.filter(|_| SINGLE_TRAIT_SIGILS.contains(&sigil.sigil_id)) {
             findings.push(Finding {
                 rule: Rule::SigilSingleTraitOnly,
-                severity: Severity::Impossible,
                 subject: Subject::Sigil(index),
                 observed: Value::TraitId(second),
                 allowed: Value::None,
                 odds: None,
+                evidence: None,
             });
         }
     }
@@ -473,7 +473,6 @@ mod tests {
         let findings = audit_sigils(&wrong_second);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::SigilLockedPair);
-        assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].observed, Value::TraitId(STEADY_FOCUS));
         assert_eq!(
             findings[0].allowed,
@@ -557,7 +556,6 @@ mod tests {
         let findings = audit_sigils(&as_second);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::SigilQuestLockedTrait);
-        assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].observed, Value::TraitId(CRABBY_RESONANCE));
 
         let as_first = [sigil(WAR_ELEMENTAL, (CRABVESTMENT_RETURNS, 15), (0, 0))];
@@ -594,7 +592,6 @@ mod tests {
             let findings = audit_sigils(&equipped);
             assert_eq!(findings.len(), 1, "sigil {sigil_id:08x}");
             assert_eq!(findings[0].rule, Rule::SigilSingleTraitOnly);
-            assert_eq!(findings[0].severity, Severity::Impossible);
             assert_eq!(findings[0].observed, Value::TraitId(STEADY_FOCUS));
         }
     }
@@ -668,7 +665,6 @@ mod tests {
         let findings = audit_sigils(&equipped);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::SigilTraitLevel);
-        assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].subject, Subject::Sigil(0));
         assert_eq!(findings[0].observed, Value::Level(30));
         assert_eq!(findings[0].allowed, Value::Level(15));
@@ -844,7 +840,6 @@ mod tests {
         let findings = audit_sigils(&above);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::SigilTraitLevel);
-        assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].observed, Value::Level(46));
         assert_eq!(findings[0].allowed, Value::Level(45));
     }

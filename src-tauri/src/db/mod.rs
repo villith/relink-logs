@@ -104,11 +104,11 @@ mod tests {
 
         let finding = crate::legality::Finding {
             rule: crate::legality::Rule::SummonBonusMagnitude,
-            severity: crate::legality::Severity::Impossible,
             subject: crate::legality::Subject::Summon(3),
             observed: crate::legality::Value::Amount(75.0),
             allowed: crate::legality::Value::Amount(50.0),
             odds: None,
+            evidence: None,
         };
 
         legality::write_findings(&conn, 537, 2, "炎顺帝", "Pl1600", &[finding.clone()])

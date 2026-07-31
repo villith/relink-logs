@@ -19,7 +19,7 @@
 //! legitimate build exceed 50 unlocked nodes, this rule misfires and must be
 //! recalibrated.
 
-use super::{Finding, Rule, Severity, Subject, Value};
+use super::{Finding, Rule, Subject, Value};
 
 /// The most master traits a player can unlock, confirmed by the user and by
 /// the game's own 50-slot skillboard storage.
@@ -34,11 +34,11 @@ pub fn audit_master_traits(skillboard: &[u32]) -> Vec<Finding> {
 
     vec![Finding {
         rule: Rule::MasterTraitCount,
-        severity: Severity::Impossible,
         subject: Subject::MasterTraits,
         observed: Value::Count(skillboard.len()),
         allowed: Value::Count(MAX_MASTER_TRAITS),
         odds: None,
+        evidence: None,
     }]
 }
 
@@ -63,7 +63,6 @@ mod tests {
         let findings = audit_master_traits(&equipped);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::MasterTraitCount);
-        assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].subject, Subject::MasterTraits);
         assert_eq!(findings[0].observed, Value::Count(MAX_MASTER_TRAITS + 1));
         assert_eq!(findings[0].allowed, Value::Count(MAX_MASTER_TRAITS));

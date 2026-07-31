@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OpenFlags};
 
-use gbfr_logs::legality::{self, Severity};
+use gbfr_logs::legality;
 
 /// Migrates a copy of a real database, runs the startup sweep over it, and
 /// prints what the Toolbox audit page would show — the whole stored path,
@@ -36,22 +36,14 @@ fn run_sweep(db_path: &std::path::Path) -> Result<()> {
 
     for player in gbfr_logs::db::legality::flagged_players(&conn)? {
         println!(
-            "{}  [{}]  {}  {} encounter(s), {} finding(s)",
-            if player.impossible {
-                "IMPOSSIBLE"
-            } else {
-                "improbable"
-            },
+            "[{}]  {}  {} encounter(s), {} finding(s)",
             player.character_type,
             player.display_name,
             player.encounters,
             player.findings.len()
         );
         for row in &player.findings {
-            println!(
-                "      {:?}/{:?}  log {}",
-                row.finding.rule, row.finding.severity, row.log_id
-            );
+            println!("      {:?}  log {}", row.finding.rule, row.log_id);
         }
     }
 
@@ -109,7 +101,7 @@ fn main() -> Result<()> {
             let name = player.display_name().to_string();
             seen_players.insert(name.clone());
             for finding in legality::audit(&player.legality_inputs()) {
-                let key = format!("{:?}/{:?}", finding.rule, finding.severity);
+                let key = format!("{:?}", finding.rule);
                 *by_rule.entry(key.clone()).or_default() += 1;
                 let slot = by_player
                     .entry(name.clone())
@@ -129,41 +121,20 @@ fn main() -> Result<()> {
         println!("  {count:6}  {rule}");
     }
 
-    // How many DISTINCT people any colour would reach — the number that
-    // decides whether a meter tint reads as a signal or as wallpaper.
-    let impossible_players = by_player
-        .values()
-        .filter(|rules| {
-            rules
-                .keys()
-                .any(|rule| rule.contains(&format!("{:?}", Severity::Impossible)))
-        })
-        .count();
-    let improbable_only = by_player
-        .values()
-        .filter(|rules| {
-            !rules
-                .keys()
-                .any(|rule| rule.contains(&format!("{:?}", Severity::Impossible)))
-        })
-        .count();
+    // How many DISTINCT people the meter tint would reach — the number that
+    // decides whether it reads as a signal or as wallpaper. Severity is gone,
+    // so every flagged person is one tint; the per-rule breakdown below is
+    // what tells a calibrator WHICH rule is doing the reaching.
     println!(
-        "\nplayers: {} flagged of {} seen ({impossible_players} impossible, {improbable_only} improbable only)",
+        "\nplayers: {} flagged of {} seen",
         by_player.len(),
         total_players
     );
 
-    println!("\nplayers carrying an Impossible finding:");
+    println!("\nwhat each flagged player carries:");
     for (name, rules) in &by_player {
-        let impossible: Vec<_> = rules
-            .iter()
-            .filter(|(rule, _)| rule.contains(&format!("{:?}", Severity::Impossible)))
-            .collect();
-        if impossible.is_empty() {
-            continue;
-        }
         println!("  {name}");
-        for (rule, (count, logs)) in impossible {
+        for (rule, (count, logs)) in rules {
             let sample: Vec<_> = logs.iter().take(4).collect();
             println!("      {count:4}x  {rule}  (logs {sample:?})");
         }

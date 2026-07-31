@@ -2,7 +2,7 @@
 //!
 //! A summon may only carry a main trait, and an equip bonus, that summons of
 //! its NAME can grant. Anything else is an outcome the game's tables price at
-//! exactly zero, so it is [`Severity::Impossible`].
+//! exactly zero — the game could not have produced it.
 //!
 //! # Why the checks are per NAME, not per lot
 //!
@@ -35,8 +35,8 @@
 //! windows in the summon's own lots. Only the six endgame boss summons in
 //! [`PERFECT_WATCHED_NAMES`] are counted (user-scoped 2026-07-30: nobody
 //! farms perfection on anything else, so a maxed common summon is noise, not
-//! signal). It is [`Severity::Improbable`] and can never be `Impossible`,
-//! because measured production data forbids it:
+//! signal). It is a REPORT of long odds and can never be proof, because
+//! measured production data forbids it:
 //!
 //! * A single perfect summon is ordinary — 42 of 72 real players in the
 //!   production census own at least one (the rarest single config is only
@@ -52,7 +52,9 @@
 //! * The reported odds are the product of each counted summon's single-draw
 //!   config probability. That is the honest table price of the draws, but it
 //!   OVERSTATES rarity for a farmer who rolls hundreds of times and equips
-//!   the best — which is exactly why the severity is a suspicion, not proof.
+//!   the best — which is exactly why this rule reports rather than accuses.
+//!   The odds the UI prints beside it are what carries that distinction to a
+//!   reader now that findings no longer carry a severity.
 //!
 //! # Why levels are deliberately NOT judged, but magnitudes are
 //!
@@ -76,7 +78,9 @@ use std::collections::HashMap;
 use protocol::EquippedSummon;
 use serde::Deserialize;
 
-use super::{is_empty, parse_hex, summon_bonus_values, Finding, Rule, Severity, Subject, Value};
+use super::{
+    chased_effects, is_empty, parse_hex, summon_bonus_values, Finding, Rule, Subject, Value,
+};
 
 /// One candidate of a summon's main-trait or equip-bonus lot, as generated.
 #[derive(Debug, Clone, Deserialize)]
@@ -138,6 +142,33 @@ impl Lot {
             .rev()
             .find(|&&(_, weight)| weight > 0)
             .map(|&(level, _)| level)
+    }
+
+    /// The top of a candidate's level window, but only where landing on it was
+    /// a ROLL. `None` when the candidate's window holds a single level: the top
+    /// is then also the floor, and it lands there with certainty.
+    ///
+    /// Every rolled watched boss offers five ordinary main traits on an 11-15
+    /// curve plus one "special" on a singleton curve at level 15 — War
+    /// Elemental (Rolan, Lilith), Berserker Echo (Lucilius), Spartan Echo
+    /// (Beelzebub), Stout Heart (Behemoth III, Vrazarek). A special is at the
+    /// top of its window the instant it drops, so counting it as a perfect roll
+    /// prices certainty as luck.
+    ///
+    /// Distinct from [`Lot::top_level`], which the magnitude ceiling still
+    /// wants: a ceiling is about what a summon CAN display, and a fixed-level
+    /// candidate displays its magnitude just as surely as a rolled one.
+    pub fn rolled_top_level(&self, id: u32) -> Option<u32> {
+        let candidate = self.candidates.get(&id)?;
+        let mut live = candidate
+            .levels
+            .iter()
+            .filter(|&&(_, weight)| weight > 0)
+            .map(|&(level, _)| level);
+        // Levels are ascending, so the last live one is the top — and reaching
+        // `last` at all proves a second level existed to have rolled instead.
+        live.next()?;
+        live.last()
     }
 
     /// Probability of ONE roll of this lot landing exactly `(id, level)`.
@@ -251,7 +282,22 @@ struct SummonRules {
     name_group: HashMap<u32, Vec<u32>>,
     /// Summon ids whose display name is on [`PERFECT_WATCHED_NAMES`].
     perfect_watched: std::collections::HashSet<u32>,
+    /// Which summons grant each equip-bonus id: one representative id per
+    /// display NAME, ascending. Empty for a bonus too widely granted to name
+    /// (see [`MAX_NAMED_OWNERS`]) and absent for an id no summon grants at all.
+    ///
+    /// This is what a bonus-source finding quotes. The claim is about an id, and
+    /// ids are invisible on a gear line — two of them share every effect's
+    /// display name — so the only way to make the claim checkable is to supply
+    /// the fact the line cannot show.
+    bonus_owners: HashMap<u32, Vec<u32>>,
 }
+
+/// Above this many names the phrase stops being a phrase. The tables leave a
+/// wide margin: the only ids the rule can realistically fire on are the boss
+/// set's eleven, granted by four summons, while a standard-set id is granted by
+/// most of the roster — so nothing lands near this number.
+const MAX_NAMED_OWNERS: usize = 6;
 
 fn summon_rules() -> &'static SummonRules {
     static RULES: std::sync::OnceLock<SummonRules> = std::sync::OnceLock::new();
@@ -303,11 +349,33 @@ fn summon_rules() -> &'static SummonRules {
             .flat_map(|(_, ids)| ids.iter().copied())
             .collect();
 
+        // Inverted from the same name-unioned lists the rule accuses with, so
+        // the two can never disagree: a bonus is "from" exactly the names whose
+        // union would have accepted it. The lowest id represents its group —
+        // any member translates to the same display name, and picking one
+        // deterministically keeps the phrase stable between runs.
+        let mut bonus_owners: HashMap<u32, Vec<u32>> = HashMap::new();
+        for ids in groups.values() {
+            let Some(&representative) = ids.iter().min() else {
+                continue;
+            };
+            for &bonus in &allowed_bonuses[&representative] {
+                bonus_owners.entry(bonus).or_default().push(representative);
+            }
+        }
+        for owners in bonus_owners.values_mut() {
+            owners.sort_unstable();
+            if owners.len() > MAX_NAMED_OWNERS {
+                owners.clear();
+            }
+        }
+
         SummonRules {
             allowed_mains,
             allowed_bonuses,
             name_group,
             perfect_watched,
+            bonus_owners,
         }
     })
 }
@@ -319,16 +387,26 @@ pub const PERFECT_SUMMON_FLAG_COUNT: usize = 2;
 
 /// The single-draw price of this summon's exact config, or `None` when the
 /// summon does not count as "perfect": a guaranteed variant (its fixed config
-/// is a probability-1 drop, not a roll), a slot below the top of its window,
-/// or a trait/bonus outside the summon's own lots (its window is unknown).
+/// is a probability-1 drop, not a roll), a bonus granting an effect nobody
+/// farms for, a slot below the top of its window, a slot whose window holds
+/// only one level, or a trait/bonus outside the summon's own lots (its window
+/// is unknown).
 fn perfect_config_odds(entry: &SummonEntry, summon: &EquippedSummon) -> Option<f64> {
     if !entry.rolled {
         return None;
     }
-    if entry.main_traits.top_level(summon.main_trait_id)? != summon.main_trait_level {
+    // Perfection is only interesting about a stat a player would reroll for
+    // (see `chased_effects`) — a maxed Healing Cap Up is a coincidence, not a
+    // farm. The main trait is scoped by its window instead: its namespace has
+    // no notion of these effects, and `rolled_top_level` below is what keeps
+    // the certainty-shaped mains out.
+    if !summon_bonus_values::effect_of(summon.bonus_id).is_some_and(chased_effects::is_chased) {
         return None;
     }
-    if entry.bonuses.top_level(summon.bonus_id)? != summon.bonus_level {
+    if entry.main_traits.rolled_top_level(summon.main_trait_id)? != summon.main_trait_level {
+        return None;
+    }
+    if entry.bonuses.rolled_top_level(summon.bonus_id)? != summon.bonus_level {
         return None;
     }
     let main = entry
@@ -390,11 +468,11 @@ pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
         {
             findings.push(Finding {
                 rule: Rule::SummonTrait,
-                severity: Severity::Impossible,
                 subject: Subject::Summon(index),
                 observed: Value::TraitId(summon.main_trait_id),
                 allowed: Value::TraitIds(allowed_mains.clone()),
                 odds: None,
+                evidence: None,
             });
         }
 
@@ -405,11 +483,22 @@ pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
         if !is_empty(summon.bonus_id) && allowed_bonuses.binary_search(&summon.bonus_id).is_err() {
             findings.push(Finding {
                 rule: Rule::SummonBonusSource,
-                severity: Severity::Impossible,
                 subject: Subject::Summon(index),
                 observed: Value::SummonBonusId(summon.bonus_id),
-                allowed: Value::SummonBonusIds(allowed_bonuses.clone()),
+                // WHOSE bonus it is, not what this summon may hold. The line a
+                // reader sees shows only the effect's display name, which two
+                // ids share — so "not from this summon" contradicted a line
+                // reading "Healing Cap Up" on a summon that grants one. Naming
+                // the owners is the only form of this claim the reader can check.
+                allowed: Value::SummonIds(
+                    rules
+                        .bonus_owners
+                        .get(&summon.bonus_id)
+                        .cloned()
+                        .unwrap_or_default(),
+                ),
                 odds: None,
+                evidence: None,
             });
         }
 
@@ -426,11 +515,11 @@ pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
                 if observed > ceiling {
                     findings.push(Finding {
                         rule: Rule::SummonBonusMagnitude,
-                        severity: Severity::Impossible,
                         subject: Subject::Summon(index),
                         observed: Value::Amount(observed as f32),
                         allowed: Value::Amount(ceiling as f32),
                         odds: None,
+                        evidence: None,
                     });
                 }
             }
@@ -454,13 +543,13 @@ pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
     if perfect.len() >= PERFECT_SUMMON_FLAG_COUNT {
         findings.push(Finding {
             rule: Rule::SummonPerfectCount,
-            severity: Severity::Improbable,
             subject: Subject::Summons,
             observed: Value::Count(perfect.len()),
             // Nothing is exceeded: the set is legal, merely improbable, so
             // `odds` is the payload (the `OvermasteryAllMaxed` idiom).
             allowed: Value::None,
             odds: Some(perfect.iter().product()),
+            evidence: None,
         });
     }
 
@@ -471,7 +560,7 @@ pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
 mod tests {
     use super::*;
     use crate::legality::EMPTY_ID;
-    use crate::legality::{Rule, Severity, Subject, Value};
+    use crate::legality::{Rule, Subject, Value};
 
     /// Wheel of Fate III: tier 3, rolled.
     const WHEEL_OF_FATE_III: u32 = 0x47e2_ae71;
@@ -511,6 +600,15 @@ mod tests {
     /// DMG Cap Up +100% but displays a perfectly ordinary +50% at level 6.
     const BOSS_SET_HEALING_CAP: u32 = 0x2ea9_ca80;
     const BOSS_SET_NA_DMG_CAP: u32 = 0x9245_dfa4;
+
+    /// Lucilius' single-level main candidate: level 15 at pick weight 800,
+    /// where its five siblings run 11-15. Its Behemoth III counterpart is
+    /// Stout Heart; the shape is the same on all six watched bosses.
+    const BERSERKER_ECHO: u32 = 0xee85_cd1f;
+    /// The standard-set Healing Cap Up, topping out at +50% where the boss set
+    /// reaches +75%. A real candidate of Behemoth III's bonus lot, and an
+    /// effect nobody farms for.
+    const STANDARD_HEALING_CAP: u32 = 0x2270_bc40;
 
     fn summon(summon_id: u32, main: (u32, u32), bonus: (u32, u32)) -> EquippedSummon {
         EquippedSummon {
@@ -556,7 +654,6 @@ mod tests {
         let findings = audit_summons(&bad_main);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::SummonTrait);
-        assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].subject, Subject::Summon(0));
         assert_eq!(findings[0].observed, Value::TraitId(NOT_A_WHEEL_TRAIT));
         let Value::TraitIds(allowed) = &findings[0].allowed else {
@@ -576,10 +673,13 @@ mod tests {
             findings[0].observed,
             Value::SummonBonusId(SUPPLEMENTARY_DMG)
         );
-        let Value::SummonBonusIds(allowed) = &findings[0].allowed else {
-            panic!("allowed should list this summon's own bonus candidates");
+        // A trait id in the bonus slot is granted as a bonus by nobody, so
+        // there is no owner to name. The phrase falls back to the bare claim —
+        // the rule still fires, it simply has no "then whose is it?" to answer.
+        let Value::SummonIds(owners) = &findings[0].allowed else {
+            panic!("allowed should name the summons granting the bonus");
         };
-        assert!(allowed.contains(&CRIT_RATE_UP) && allowed.contains(&VRAZAREK_BONUS));
+        assert_eq!(owners, &Vec::<u32>::new());
     }
 
     /// A guaranteed-variant summon still cannot carry a main trait no summon
@@ -614,7 +714,6 @@ mod tests {
     #[test]
     fn a_guaranteed_variant_inherits_its_rolled_siblings_pool() {
         const LUCILIUS_GUARANTEED: u32 = 0x90bd_4ac0;
-        const BERSERKER_ECHO: u32 = 0xee85_cd1f;
         const LUCILIUS_SET_SKILL_CAP: u32 = 0xce70_c58a;
         let equipped = [summon(
             LUCILIUS_GUARANTEED,
@@ -643,18 +742,19 @@ mod tests {
         let findings = audit_summons(&equipped);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::SummonBonusSource);
-        assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].subject, Subject::Summon(0));
         assert_eq!(
             findings[0].observed,
             Value::SummonBonusId(BOSS_SET_NA_DMG_CAP)
         );
-        let Value::SummonBonusIds(allowed) = &findings[0].allowed else {
-            panic!("allowed should list this summon's own bonus candidates");
+        let Value::SummonIds(owners) = &findings[0].allowed else {
+            panic!("allowed should name the summons granting the bonus");
         };
-        assert!(
-            allowed.contains(&BEHEMOTH_BONUS) && !allowed.contains(&BOSS_SET_NA_DMG_CAP),
-            "allowed should be this summon's name-union, not every bonus id in the game"
+        assert_eq!(
+            names_of(owners),
+            ["Beelzebub", "Lilith", "Lucilius", "Rolan"],
+            "the finding must name the four bosses that grant the boss set, so a \
+             reader can check a claim the gear line itself cannot show"
         );
     }
 
@@ -671,7 +771,6 @@ mod tests {
         const LUCILIUS_GUARANTEED: u32 = 0x90bd_4ac0;
         const BEELZEBUB_GUARANTEED: u32 = 0x2f15_455c;
         const LILITH_GUARANTEED: u32 = 0x855d_018c;
-        const BERSERKER_ECHO: u32 = 0xee85_cd1f;
         const SUPPLEMENTARY_DMG_MAIN: u32 = 0x3d81_53a1;
         const LUCILIUS_SKILL_DMG_CAP: u32 = 0xce70_c58a;
 
@@ -744,7 +843,6 @@ mod tests {
         let findings = audit_summons(&equipped);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::SummonPerfectCount);
-        assert_eq!(findings[0].severity, Severity::Improbable);
         assert_eq!(findings[0].subject, Subject::Summons);
         assert_eq!(findings[0].observed, Value::Count(2));
         assert_eq!(findings[0].allowed, Value::None);
@@ -752,6 +850,138 @@ mod tests {
         assert!(
             odds > 0.0 && odds < 1e-4,
             "odds {odds} should be tiny but non-zero"
+        );
+    }
+
+    /// The display names of some summon ids, read from the same lang file the
+    /// rule joins on — so a test can assert what a reader will actually see.
+    fn names_of(ids: &[u32]) -> Vec<String> {
+        let names: HashMap<String, RawName> =
+            serde_json::from_str(include_str!("../../lang/en/summons.json"))
+                .expect("summons.json matches the lang shape");
+        let mut out: Vec<String> = ids
+            .iter()
+            .map(|id| {
+                let key = format!("{id:08x}");
+                names
+                    .get(&key)
+                    .unwrap_or_else(|| panic!("summon {key} is unnamed in lang/en"))
+                    .text
+                    .clone()
+            })
+            .collect();
+        out.sort();
+        out
+    }
+
+    /// A FOREIGN BONUS MUST SAY WHOSE IT IS (user, 2026-07-30).
+    ///
+    /// Two ids share every effect's display name — Behemoth III's own Healing
+    /// Cap Up (`2270bc40`, tops at +50%) and the boss set's (`2ea9ca80`, +75%) —
+    /// so the rendered line reads "Healing Cap Up", a bonus Behemoth III really
+    /// does grant. Against that line the old claim "not from this summon" reads
+    /// as simply false, and a reader has nothing on the line to check it with.
+    ///
+    /// The finding therefore carries the summons that DO grant the id. That is
+    /// the fact the line cannot show and the one that settles the claim.
+    #[test]
+    fn a_foreign_bonus_names_the_summons_that_do_grant_it() {
+        let equipped = [summon(
+            BEHEMOTH_III_ROLLED,
+            (UPLIFT, 15),
+            (BOSS_SET_HEALING_CAP, 9),
+        )];
+        let findings = audit_summons(&equipped);
+        let source = findings
+            .iter()
+            .find(|finding| finding.rule == Rule::SummonBonusSource)
+            .expect("the source rule fired");
+
+        let Value::SummonIds(owners) = &source.allowed else {
+            panic!("allowed should name the summons granting the bonus, got {source:?}");
+        };
+        assert_eq!(
+            names_of(owners),
+            ["Beelzebub", "Lilith", "Lucilius", "Rolan"],
+            "the boss-set Healing Cap Up is granted by those four summons alone"
+        );
+    }
+
+    /// One representative id per NAME, not one per id. Each of those four bosses
+    /// owns a rolled and a guaranteed id, and a phrase reading "Lucilius,
+    /// Lucilius, Beelzebub, Beelzebub…" names nothing twice as usefully.
+    #[test]
+    fn the_named_owners_are_one_per_display_name() {
+        let equipped = [summon(
+            BEHEMOTH_III_ROLLED,
+            (UPLIFT, 15),
+            (BOSS_SET_HEALING_CAP, 9),
+        )];
+        let findings = audit_summons(&equipped);
+        let Value::SummonIds(owners) = &findings[0].allowed else {
+            panic!("allowed should name the granting summons");
+        };
+        assert_eq!(owners.len(), 4, "expected four names, got {owners:?}");
+    }
+
+    /// THE SPECIAL-CANDIDATE GUARD (user, 2026-07-30).
+    ///
+    /// Every rolled watched boss offers five ordinary main traits on an 11-15
+    /// curve plus ONE "special" pinned to a single-level curve at 15 (War
+    /// Elemental on Rolan and Lilith, Berserker Echo on Lucilius, Spartan Echo
+    /// on Beelzebub, Stout Heart on Behemoth III and Vrazarek). A special is at
+    /// "the top of its window" the instant it drops — there is no other level
+    /// it could have taken — so calling that a perfect roll prices certainty as
+    /// though it were luck.
+    #[test]
+    fn a_main_trait_that_can_only_ever_be_fifteen_is_not_a_perfect_roll() {
+        let equipped = [
+            summon(
+                LUCILIUS_ROLLED,
+                (BERSERKER_ECHO, 15),
+                (LUCILIUS_NA_DMG_CAP, 9),
+            ),
+            summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BEHEMOTH_BONUS, 9)),
+        ];
+        assert_eq!(
+            audit_summons(&equipped),
+            vec![],
+            "a single-level main trait was counted as a perfect roll"
+        );
+    }
+
+    /// The same trait on an ordinary multi-level curve still counts — the guard
+    /// must reject certainty, not every level-15 trait. Without this, the fix
+    /// above passes just as well by refusing to count level 15 at all.
+    #[test]
+    fn a_main_trait_that_could_have_been_lower_still_counts_at_fifteen() {
+        let equipped = [
+            summon(LUCILIUS_ROLLED, (ALPHA, 15), (LUCILIUS_NA_DMG_CAP, 9)),
+            summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BEHEMOTH_BONUS, 9)),
+        ];
+        assert!(
+            audit_summons(&equipped)
+                .iter()
+                .any(|finding| finding.rule == Rule::SummonPerfectCount),
+            "an 11-15 main trait at 15 stopped counting as a perfect roll"
+        );
+    }
+
+    /// THE EFFECT SCOPE (user, 2026-07-30): only the stats players actually
+    /// chase — Attack Power Up, Stun Power Up and the three Damage Cap Ups —
+    /// count toward perfection. Both of these summons sit at the top of both
+    /// windows, so both were counted before; a maxed Healing Cap Up is not what
+    /// anyone farms for and must not read as one.
+    #[test]
+    fn a_bonus_outside_the_chased_effects_is_not_a_perfect_roll() {
+        let equipped = [
+            summon(LUCILIUS_ROLLED, (ALPHA, 15), (BOSS_SET_HEALING_CAP, 9)),
+            summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (STANDARD_HEALING_CAP, 9)),
+        ];
+        assert_eq!(
+            audit_summons(&equipped),
+            vec![],
+            "a maxed Healing Cap Up was counted as a perfect roll"
         );
     }
 
@@ -919,7 +1149,6 @@ mod tests {
             .iter()
             .find(|finding| finding.rule == Rule::SummonBonusMagnitude)
             .expect("the magnitude rule should fire on +75% against a +50% ceiling");
-        assert_eq!(magnitude.severity, Severity::Impossible);
         assert_eq!(magnitude.subject, Subject::Summon(0));
         assert_eq!(magnitude.observed, Value::Amount(75.0));
         assert_eq!(magnitude.allowed, Value::Amount(50.0));
@@ -982,7 +1211,6 @@ mod tests {
     /// grants exactly one bonus, so every other effect is unpriceable for it.
     #[test]
     fn an_effect_the_summon_never_grants_has_no_ceiling_to_exceed() {
-        const STANDARD_HEALING_CAP: u32 = 0x2270_bc40;
         let equipped = [summon(
             VRAZAREK_III,
             (DMG_CAP, 15),

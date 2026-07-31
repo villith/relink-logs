@@ -16,7 +16,7 @@ use protocol::WeaponState;
 
 use crate::transmarvel;
 
-use super::{Finding, Rule, Severity, Subject, Value};
+use super::{Finding, Rule, Subject, Value};
 
 /// Highest level any weight row permits: index `n` carries level `n + 1`.
 /// `None` when the lot grants no level at all.
@@ -115,11 +115,11 @@ pub fn audit_wrightstone(state: Option<&WeaponState>) -> Vec<Finding> {
 
     vec![Finding {
         rule: Rule::WrightstoneTraitLevel,
-        severity: Severity::Impossible,
         subject: Subject::Wrightstone,
         observed: Value::Levels(state.wrightstone_traits.iter().map(|p| p.level).collect()),
         allowed: Value::Levels(ceilings.to_vec()),
         odds: None,
+        evidence: None,
     }]
 }
 
@@ -202,7 +202,6 @@ mod tests {
         let findings = audit_wrightstone(Some(&state));
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::WrightstoneTraitLevel);
-        assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].observed, Value::Levels(vec![25, 15, 10]));
         assert_eq!(findings[0].allowed, Value::Levels(vec![20, 15, 10]));
     }
@@ -217,7 +216,6 @@ mod tests {
         let findings = audit_wrightstone(Some(&state));
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::WrightstoneTraitLevel);
-        assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].observed, Value::Levels(vec![10, 20, 15]));
         assert_eq!(findings[0].allowed, Value::Levels(vec![20, 15, 10]));
     }

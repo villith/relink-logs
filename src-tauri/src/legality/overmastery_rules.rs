@@ -2,7 +2,7 @@
 
 use protocol::OvermasteryInfo;
 
-use super::{is_empty, Finding, Rule, Severity, Subject, Value};
+use super::{chased_effects, is_empty, Finding, Rule, Subject, Value};
 use crate::overmastery::stock_tables;
 
 /// The game always rolls four overmasteries; fewer means a partial read.
@@ -88,7 +88,6 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
         let Some(param) = tables.params.get(&mastery.id) else {
             findings.push(Finding {
                 rule: Rule::OvermasteryValue,
-                severity: Severity::Impossible,
                 subject: Subject::Overmastery(index),
                 // The id is what was rejected, not the magnitude — and the
                 // magnitude may not even have been read. Matches
@@ -96,6 +95,7 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
                 observed: Value::OvermasteryId(mastery.id),
                 allowed: Value::None,
                 odds: None,
+                evidence: None,
             });
             continue;
         };
@@ -116,17 +116,26 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
         if !on_ladder {
             findings.push(Finding {
                 rule: Rule::OvermasteryValue,
-                severity: Severity::Impossible,
                 subject: Subject::Overmastery(index),
                 observed: Value::Amount(mastery.value),
                 allowed: Value::Amount(param.values[param.values.len() - 1]),
                 odds: None,
+                evidence: None,
             });
             continue;
         }
 
+        // Only the five chased effects count toward the tally (see
+        // `chased_effects`). A maxed Health Up is a coincidence nobody rerolled
+        // for, and counting it made an ordinary endgame set a report.
+        //
+        // The threshold stays at all four slots, so this is strictly narrower:
+        // a single uncounted slot puts the tally permanently out of reach for
+        // that set, whatever the other three did.
         let top = param.values[param.values.len() - 1];
-        if (top - mastery.value).abs() < EPSILON {
+        if (top - mastery.value).abs() < EPSILON
+            && chased_effects::overmastery_is_chased(mastery.id)
+        {
             maxed_slots += 1;
         }
     }
@@ -134,7 +143,6 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
     if maxed_slots == OVERMASTERY_SLOT_COUNT {
         findings.push(Finding {
             rule: Rule::OvermasteryAllMaxed,
-            severity: Severity::Improbable,
             subject: Subject::Overmasteries,
             observed: Value::Count(OVERMASTERY_SLOT_COUNT),
             // Nothing is being exceeded here: four maxed slots are a legal
@@ -143,6 +151,7 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
             // sides conveyed nothing.
             allowed: Value::None,
             odds: Some(best_max_level_chance().powi(OVERMASTERY_SLOT_COUNT as i32)),
+            evidence: None,
         });
     }
 
@@ -159,6 +168,26 @@ mod tests {
     const HEALTH: u32 = 0x52a207b5;
     const CRIT: u32 = 0x45c65767;
     const STUN: u32 = 0x6cb38ef3;
+
+    /// The two other chased effects, both on the 1,1,2,4,6,8,10,12,16,20
+    /// ladder. Attack Power Up and Stun Power Up above complete the set of
+    /// five names the count rule recognises.
+    const NA_DMG_CAP: u32 = 0x43b7_581d;
+    const SKILL_DMG_CAP: u32 = 0x9c55_5433;
+    /// Skill Damage UP — the same ladder as the cap ups and a stat that looks
+    /// just as maxed, but not one the rule counts. The near-miss is the point.
+    const SKILL_DMG: u32 = 0x9a97_c049;
+
+    /// Four maxed slots that the rule must recognise: all four are chased
+    /// effects. `flags_all_four_at_maximum` pins the finding it produces.
+    fn four_chased_maxed() -> OvermasteryInfo {
+        info(&[
+            (ATTACK, 1000.0),
+            (STUN, 2.0),
+            (NA_DMG_CAP, 20.0),
+            (SKILL_DMG_CAP, 20.0),
+        ])
+    }
 
     fn info(entries: &[(u32, f32)]) -> OvermasteryInfo {
         OvermasteryInfo {
@@ -185,7 +214,6 @@ mod tests {
         let findings = audit_overmastery(Some(&info));
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::OvermasteryValue);
-        assert_eq!(findings[0].severity, Severity::Impossible);
         assert_eq!(findings[0].subject, Subject::Overmastery(0));
         assert_eq!(findings[0].observed, Value::Amount(5000.0));
     }
@@ -208,18 +236,36 @@ mod tests {
         assert_eq!(findings[0].observed, Value::OvermasteryId(0xdeadbeef));
     }
 
+    /// THE EFFECT SCOPE (user, 2026-07-30). Only Attack Power Up, Stun Power Up
+    /// and the three Damage Cap Ups count toward the tally, so a maxed Health
+    /// Up or Critical Hit Rate Up is no longer evidence of anything — and with
+    /// two of the four slots uncounted the tally can never reach four.
+    ///
+    /// THE PRODUCTION CASE the scope was requested for: a real set of four
+    /// maxed rolls, two of them chased and two not, which the rule reported.
+    #[test]
+    fn a_maxed_set_containing_an_uncounted_effect_is_not_reported() {
+        let info = info(&[
+            (NA_DMG_CAP, 20.0),
+            (SKILL_DMG_CAP, 20.0),
+            (CRIT, 20.0),
+            (SKILL_DMG, 20.0),
+        ]);
+        assert_eq!(
+            audit_overmastery(Some(&info)),
+            vec![],
+            "a set with two uncounted effects was reported as all-maxed"
+        );
+    }
+
+    /// The counterpart, so the scope cannot pass by silencing the rule
+    /// outright: four maxed CHASED effects are still the finding.
     #[test]
     fn flags_all_four_at_maximum() {
-        let info = info(&[
-            (ATTACK, 1000.0),
-            (HEALTH, 2000.0),
-            (CRIT, 20.0),
-            (STUN, 2.0),
-        ]);
+        let info = four_chased_maxed();
         let findings = audit_overmastery(Some(&info));
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::OvermasteryAllMaxed);
-        assert_eq!(findings[0].severity, Severity::Improbable);
         // The claim is about the whole set, so the subject is the whole set —
         // pointing at slot 0 made the audit page display a single overmastery.
         assert_eq!(findings[0].subject, Subject::Overmasteries);
@@ -233,13 +279,16 @@ mod tests {
         assert_eq!(findings[0].allowed, Value::None);
     }
 
+    /// All four slots are chased effects, so only the count can hold the rule
+    /// back — which is what makes this a test of the threshold rather than of
+    /// the scope.
     #[test]
     fn three_maxed_slots_are_not_flagged() {
         let info = info(&[
             (ATTACK, 1000.0),
-            (HEALTH, 2000.0),
-            (CRIT, 20.0),
-            (STUN, 0.6),
+            (STUN, 2.0),
+            (NA_DMG_CAP, 20.0),
+            (SKILL_DMG_CAP, 16.0),
         ]);
         assert_eq!(audit_overmastery(Some(&info)), vec![]);
     }
@@ -275,12 +324,8 @@ mod tests {
     /// read. Three maxed slots beside one unread slot must stay silent.
     #[test]
     fn all_maxed_does_not_fire_on_a_set_containing_an_unread_slot() {
-        let info = info(&[
-            (ATTACK, 1000.0),
-            (HEALTH, 2000.0),
-            (CRIT, 20.0),
-            (STUN, 0.0),
-        ]);
+        let mut info = four_chased_maxed();
+        info.overmasteries[1].value = 0.0;
         assert_eq!(audit_overmastery(Some(&info)), vec![]);
     }
 
@@ -309,7 +354,14 @@ mod tests {
     #[test]
     fn sentinel_ids_are_missing_data_not_unknown_ids() {
         for sentinel in [0x887a_e0b0_u32, 0] {
-            let info = info(&[(sentinel, 0.0), (HEALTH, 2000.0), (CRIT, 20.0), (STUN, 2.0)]);
+            // The other three are maxed CHASED effects, so nothing but the
+            // sentinel guard itself can be keeping the all-maxed rule quiet.
+            let mut info = four_chased_maxed();
+            info.overmasteries[0] = Overmastery {
+                id: sentinel,
+                flags: 0,
+                value: 0.0,
+            };
             assert_eq!(
                 audit_overmastery(Some(&info)),
                 vec![],

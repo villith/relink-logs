@@ -12,6 +12,7 @@
 use protocol::{EquippedSummon, OvermasteryInfo, Sigil, WeaponState};
 use serde::{Deserialize, Serialize};
 
+pub mod chased_effects;
 pub mod master_traits;
 pub mod overmastery_rules;
 pub mod sigils;
@@ -34,7 +35,11 @@ pub const EMPTY_ID: u32 = game_reader::EMPTY_KEY;
 /// `the_rules_version_matches_what_the_rules_currently_say` pins this against
 /// a snapshot of what the rules actually output, so a change that would
 /// silently strand old verdicts fails the build instead.
-pub const RULES_VERSION: u32 = 1;
+/// 4: the two perfection reports were scoped to the chased effects, and
+/// single-level ("special") summon candidates stopped counting as rolls.
+/// 5: a bonus-source finding now names the summons that DO grant the bonus,
+/// rather than listing the eleven its own summon may hold.
+pub const RULES_VERSION: u32 = 5;
 
 /// An empty slot reaches us as either a plain zero or the engine sentinel, so
 /// both must count as empty.
@@ -128,16 +133,6 @@ pub enum Rule {
     MasterTraitCount,
 }
 
-/// Proof versus suspicion. Never collapse these into one flag.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum Severity {
-    /// The game's tables cannot produce this value.
-    Impossible,
-    /// The game can produce it, but rarely enough to report the odds.
-    Improbable,
-}
-
 /// What the finding points at, so a UI can anchor it later.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", tag = "kind", content = "index")]
@@ -184,7 +179,19 @@ pub enum Value {
     /// A summon equip-bonus id (`summon_base_param.tbl`), a namespace disjoint
     /// from ordinary trait ids.
     SummonBonusId(u32),
+    /// LEGACY. `SummonBonusSource` used to answer "what may this summon hold?"
+    /// with this — eleven ids no surface ever rendered, and which could not
+    /// have settled the claim if it had: the offending bonus SHARES its display
+    /// name with one of them. It now answers "then whose is it?" with
+    /// [`Value::SummonIds`] instead.
+    ///
+    /// Kept because findings written before that change are still in `logs.db`
+    /// and must go on deserializing until the sweep rewrites them — a stored row
+    /// that fails to parse fails the whole query it is read in.
     SummonBonusIds(Vec<u32>),
+    /// Summon ids, one per display NAME. The summons that grant a bonus some
+    /// other summon was caught holding.
+    SummonIds(Vec<u32>),
     /// An overmastery id.
     OvermasteryId(u32),
     Amount(f32),
@@ -195,15 +202,214 @@ pub enum Value {
 #[serde(rename_all = "camelCase")]
 pub struct Finding {
     pub rule: Rule,
-    pub severity: Severity,
     pub subject: Subject,
     pub observed: Value,
     pub allowed: Value,
-    /// Probability of this occurring legitimately, for `Improbable` findings.
+    /// Probability of this occurring legitimately. `None` for a hard table
+    /// breach, which has no odds to quote.
+    ///
+    /// With severity gone this is the only thing separating a report of long
+    /// odds from proof that the game could not have produced a build, so a UI
+    /// that shows findings must show these odds where they exist.
     pub odds: Option<f64>,
+    /// The equipment this finding is about, captured AT AUDIT TIME.
+    ///
+    /// [`Subject`] carries only a slot index, which is meaningless without the
+    /// encounter it indexes into — a UI resolving `Sigil(7)` against any other
+    /// build names whatever sigil happens to sit there, and accuses gear the
+    /// rules never flagged. Recording what the rule actually saw makes a stored
+    /// finding self-describing: it can be rendered from the database alone,
+    /// with no encounter to load and no way to pair it with the wrong one.
+    ///
+    /// `None` on rows written before this field existed; the sweep refills them.
+    #[serde(default)]
+    pub evidence: Option<Evidence>,
 }
 
-/// Every legality finding for one build, in rule order.
+/// One trait or bonus line, as a UI draws it beneath its item.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceTrait {
+    pub id: u32,
+    pub level: u32,
+}
+
+/// One equipped summon: its main trait and its equip bonus.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceSummon {
+    pub summon_id: u32,
+    pub main: EvidenceTrait,
+    pub bonus: EvidenceTrait,
+}
+
+/// One overmastery, with the raw fields a UI needs to format it the way the
+/// equipment tab does — `flags` decides whether the magnitude is a level or an
+/// amount, so dropping it prints a bare `20` where `+20%` belongs.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceOvermastery {
+    pub id: u32,
+    pub value: f32,
+    pub flags: u32,
+}
+
+/// The equipment a finding is about, in the shape a UI renders it.
+///
+/// Tagged by `kind`, one variant per [`Subject`], so a renderer switches on the
+/// same word the subject uses and never has to infer which catalogue an id
+/// belongs to.
+///
+/// `rename_all_fields` is not redundant with `rename_all`: on an enum the latter
+/// renames the VARIANTS only, so without it a struct variant's fields ship in
+/// snake_case under a correctly camelCased tag — the shape the frontend switches
+/// on looks right while the field it then reads is `undefined`. The `alias`es
+/// read the findings already stored under those old names.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase",
+    tag = "kind"
+)]
+pub enum Evidence {
+    Sigil {
+        #[serde(alias = "sigil_id")]
+        sigil_id: u32,
+        level: u32,
+        traits: Vec<EvidenceTrait>,
+    },
+    Wrightstone {
+        #[serde(alias = "wrightstone_id")]
+        wrightstone_id: u32,
+        traits: Vec<EvidenceTrait>,
+    },
+    Summon(EvidenceSummon),
+    Summons {
+        summons: Vec<EvidenceSummon>,
+    },
+    Overmastery(EvidenceOvermastery),
+    Overmasteries {
+        entries: Vec<EvidenceOvermastery>,
+    },
+    MasterTraits {
+        observed: usize,
+        allowed: usize,
+    },
+}
+
+/// Trait pairs with the empty slots dropped — a wrightstone's third slot and a
+/// single-trait sigil's second would otherwise render as a garbage name.
+fn traits_of(pairs: impl IntoIterator<Item = (u32, u32)>) -> Vec<EvidenceTrait> {
+    pairs
+        .into_iter()
+        .filter(|(id, _)| !is_empty(*id))
+        .map(|(id, level)| EvidenceTrait { id, level })
+        .collect()
+}
+
+fn summon_evidence(summon: &protocol::EquippedSummon) -> EvidenceSummon {
+    EvidenceSummon {
+        summon_id: summon.summon_id,
+        main: EvidenceTrait {
+            id: summon.main_trait_id,
+            level: summon.main_trait_level,
+        },
+        bonus: EvidenceTrait {
+            id: summon.bonus_id,
+            level: summon.bonus_level,
+        },
+    }
+}
+
+/// The equipment a finding points at, resolved against the build it was
+/// computed from.
+///
+/// Called once, inside [`audit`], where the inputs ARE that build — which is
+/// the whole point. Doing it anywhere later means holding a slot index and
+/// hoping the right encounter is still to hand.
+fn evidence_for(build: &LegalityInputs, finding: &Finding) -> Option<Evidence> {
+    match finding.subject {
+        Subject::Sigil(index) => {
+            let sigil = build.sigils.get(index)?;
+            Some(Evidence::Sigil {
+                sigil_id: sigil.sigil_id,
+                level: sigil.sigil_level,
+                traits: traits_of([
+                    (sigil.first_trait_id, sigil.first_trait_level),
+                    (sigil.second_trait_id, sigil.second_trait_level),
+                ]),
+            })
+        }
+
+        Subject::Wrightstone => {
+            let weapon = build.weapon_state.as_ref()?;
+            Some(Evidence::Wrightstone {
+                wrightstone_id: weapon.wrightstone_id,
+                traits: traits_of(
+                    weapon
+                        .wrightstone_traits
+                        .iter()
+                        .map(|pair| (pair.id, pair.level)),
+                ),
+            })
+        }
+
+        Subject::Summon(index) => {
+            Some(Evidence::Summon(summon_evidence(build.summons.get(index)?)))
+        }
+
+        Subject::Summons => {
+            let summons: Vec<EvidenceSummon> = build
+                .summons
+                .iter()
+                .filter(|summon| !is_empty(summon.summon_id))
+                .map(summon_evidence)
+                .collect();
+            (!summons.is_empty()).then_some(Evidence::Summons { summons })
+        }
+
+        Subject::Overmastery(index) => {
+            let entry = build.overmastery_info.as_ref()?.overmasteries.get(index)?;
+            Some(Evidence::Overmastery(EvidenceOvermastery {
+                id: entry.id,
+                value: entry.value,
+                flags: entry.flags,
+            }))
+        }
+
+        Subject::Overmasteries => {
+            let entries: Vec<EvidenceOvermastery> = build
+                .overmastery_info
+                .as_ref()?
+                .overmasteries
+                .iter()
+                .map(|entry| EvidenceOvermastery {
+                    id: entry.id,
+                    value: entry.value,
+                    flags: entry.flags,
+                })
+                .collect();
+            (!entries.is_empty()).then_some(Evidence::Overmasteries { entries })
+        }
+
+        Subject::MasterTraits => Some(Evidence::MasterTraits {
+            observed: match finding.observed {
+                Value::Count(count) => count,
+                _ => build.skillboard.len(),
+            },
+            allowed: match finding.allowed {
+                Value::Count(count) => count,
+                _ => 0,
+            },
+        }),
+    }
+}
+
+/// Every legality finding for one build, in rule order, each carrying the
+/// equipment it is about.
+///
+/// The rules themselves emit only a slot; the snapshot is attached here, in the
+/// one place the build is guaranteed to be the build the rule just read.
 pub fn audit(build: &LegalityInputs) -> Vec<Finding> {
     let mut findings = Vec::new();
     findings.extend(wrightstone::audit_wrightstone(build.weapon_state.as_ref()));
@@ -213,6 +419,11 @@ pub fn audit(build: &LegalityInputs) -> Vec<Finding> {
     ));
     findings.extend(summons::audit_summons(&build.summons));
     findings.extend(master_traits::audit_master_traits(&build.skillboard));
+
+    for finding in &mut findings {
+        finding.evidence = evidence_for(build, finding);
+    }
+
     findings
 }
 
@@ -270,23 +481,35 @@ mod tests {
     ///   derived 20/15/10 ceilings. Re-ordering them makes the fixture illegal:
     ///   the check is positional, not sorted.
     /// * **Overmasteries** — all four ids and ladders read from
-    ///   `overmastery-tables.json`: Attack `c4925bd7` tops at 1000, Health
-    ///   `52a207b5` at 2000, Crit `45c65767` at 20, Stun `6cb38ef3` at 2.0.
-    ///   Three sit at their maximum and Stun deliberately does not, so the
-    ///   all-maxed rule must stay quiet. Stun's 0.6 is a real rung (index 4),
-    ///   NOT a zero — a zero reads as "magnitude never measured" and would
-    ///   skip the ladder comparison entirely, leaving the fixture green for
-    ///   the wrong reason.
+    ///   `overmastery-tables.json`: Attack Power Up `c4925bd7` tops at 1000,
+    ///   Normal Attack DMG Cap Up `43b7581d` and Skill DMG Cap Up `9c555433`
+    ///   at 20, Stun Power Up `6cb38ef3` at 2.0. Three sit at their maximum
+    ///   and Stun deliberately does not, so the all-maxed rule must stay quiet.
+    ///   Stun's 0.6 is a real rung (index 4), NOT a zero — a zero reads as
+    ///   "magnitude never measured" and would skip the ladder comparison
+    ///   entirely, leaving the fixture green for the wrong reason.
+    ///
+    ///   All four are `chased_effects`, which is what gives the fixture its
+    ///   teeth: the all-maxed rule counts only those five effect names, so a
+    ///   set containing a Health Up could never reach the threshold and the
+    ///   reachability case below would pass without the rule ever judging a
+    ///   magnitude.
     /// * **Summons** — Lucilius `6e5968fc` and Behemoth III `e4b7dcf9`, both
     ///   `rolled: true`, both on the perfect-count WATCH LIST, each carrying
-    ///   a genuine candidate of its own lots: Lucilius main `5c862e13` with
-    ///   bonus `2ea9ca80`, Behemoth III main `b5ff9fd3` (Uplift) with bonus
-    ///   `a3539fbb`. Lucilius sits at the TOP of both windows on purpose:
-    ///   ONE perfect summon is legal and unreported (42 of 72 census players
-    ///   own one). Behemoth deliberately sits one step below its bonus top
-    ///   (8 of 9) so the perfect COUNT stays at one and the >=2 report must
-    ///   stay quiet — the summon twin of Stun's deliberately-unmaxed
-    ///   overmastery above.
+    ///   a genuine candidate of its own lots: Lucilius main `5c862e13` (Gamma,
+    ///   window 11-15) with bonus `9245dfa4`, Behemoth III main `b5ff9fd3`
+    ///   (Uplift, 11-15) with bonus `a3539fbb`. Lucilius sits at the TOP of
+    ///   both windows on purpose: ONE perfect summon is legal and unreported
+    ///   (42 of 72 census players own one). Behemoth deliberately sits one step
+    ///   below its bonus top (8 of 9) so the perfect COUNT stays at one and the
+    ///   >=2 report must stay quiet — the summon twin of Stun's
+    ///   deliberately-unmaxed overmastery above.
+    ///
+    ///   Both bonuses are Damage Cap Ups and both mains are on 11-15 curves,
+    ///   for the same reason the overmasteries are all chased effects: a
+    ///   Healing Cap Up bonus or a singleton-curve main (Berserker Echo) can
+    ///   never count as perfect, so either would leave the reachability case
+    ///   below green without the report ever counting a summon.
     /// * **Skillboard** — exactly the 50-node maximum the game's own storage
     ///   holds. The ids are arbitrary on purpose: only the COUNT is judged.
     fn legal_build() -> LegalityInputs {
@@ -342,7 +565,7 @@ mod tests {
                     summon_id: 0x6e59_68fc,
                     main_trait_id: 0x5c86_2e13,
                     main_trait_level: 15,
-                    bonus_id: 0x2ea9_ca80,
+                    bonus_id: 0x9245_dfa4,
                     bonus_level: 9,
                 },
                 EquippedSummon {
@@ -384,12 +607,12 @@ mod tests {
                         value: 1000.0,
                     },
                     Overmastery {
-                        id: 0x52a2_07b5,
+                        id: 0x43b7_581d,
                         flags: 0,
-                        value: 2000.0,
+                        value: 20.0,
                     },
                     Overmastery {
-                        id: 0x45c6_5767,
+                        id: 0x9c55_5433,
                         flags: 0,
                         value: 20.0,
                     },
@@ -567,6 +790,207 @@ mod tests {
         );
     }
 
+    /// A stored finding must be renderable from the database ALONE.
+    ///
+    /// `Subject` carries a slot index, which means nothing without the build it
+    /// indexes into. Before this, a UI had to load the encounter to name the
+    /// gear — and one that loaded the wrong encounter named whichever sigil now
+    /// sat in that slot, accusing gear the rules never flagged.
+    #[test]
+    fn a_finding_carries_the_gear_it_is_about() {
+        let mut build = legal_build();
+        build.sigils[0].first_trait_level = 30;
+
+        let findings = audit(&build);
+        let sigil = findings
+            .iter()
+            .find(|f| f.rule == Rule::SigilTraitLevel)
+            .expect("the level rule fired");
+
+        assert_eq!(
+            sigil.evidence,
+            Some(Evidence::Sigil {
+                sigil_id: build.sigils[0].sigil_id,
+                level: build.sigils[0].sigil_level,
+                traits: vec![
+                    EvidenceTrait {
+                        id: build.sigils[0].first_trait_id,
+                        level: 30
+                    },
+                    EvidenceTrait {
+                        id: build.sigils[0].second_trait_id,
+                        level: build.sigils[0].second_trait_level
+                    },
+                ],
+            })
+        );
+    }
+
+    /// THE WIRE NAMES `src/types.ts` reads, pinned per variant.
+    ///
+    /// A mismatch here is invisible from Rust and nearly invisible from the UI:
+    /// `#[serde(rename_all)]` on an ENUM renames its VARIANTS, not the fields of
+    /// its struct variants, so `sigil_id` shipped unrenamed while `kind` looked
+    /// right. The renderer's switch matched, then read `undefined` — a crash for
+    /// the sigil id and a silently wrong name for the wrightstone's.
+    ///
+    /// Every variant is listed, not just the two that broke: the next struct
+    /// variant with a two-word field is the same bug again.
+    #[test]
+    fn evidence_serializes_with_the_field_names_the_frontend_reads() {
+        let keys = |evidence: Evidence| {
+            let json = serde_json::to_value(evidence).expect("evidence serializes");
+            let mut keys: Vec<String> = json
+                .as_object()
+                .expect("an internally tagged variant is a JSON object")
+                .keys()
+                .cloned()
+                .collect();
+            keys.sort();
+            keys
+        };
+        let summon = || EvidenceSummon {
+            summon_id: 1,
+            main: EvidenceTrait { id: 2, level: 3 },
+            bonus: EvidenceTrait { id: 4, level: 5 },
+        };
+        let overmastery = || EvidenceOvermastery {
+            id: 1,
+            value: 2.0,
+            flags: 3,
+        };
+
+        assert_eq!(
+            keys(Evidence::Sigil {
+                sigil_id: 1,
+                level: 2,
+                traits: vec![]
+            }),
+            ["kind", "level", "sigilId", "traits"]
+        );
+        assert_eq!(
+            keys(Evidence::Wrightstone {
+                wrightstone_id: 1,
+                traits: vec![]
+            }),
+            ["kind", "traits", "wrightstoneId"]
+        );
+        assert_eq!(
+            keys(Evidence::Summon(summon())),
+            ["bonus", "kind", "main", "summonId"]
+        );
+        assert_eq!(
+            keys(Evidence::Summons {
+                summons: vec![summon()]
+            }),
+            ["kind", "summons"]
+        );
+        assert_eq!(
+            keys(Evidence::Overmastery(overmastery())),
+            ["flags", "id", "kind", "value"]
+        );
+        assert_eq!(
+            keys(Evidence::Overmasteries {
+                entries: vec![overmastery()]
+            }),
+            ["entries", "kind"]
+        );
+        assert_eq!(
+            keys(Evidence::MasterTraits {
+                observed: 51,
+                allowed: 50
+            }),
+            ["allowed", "kind", "observed"]
+        );
+    }
+
+    /// Findings already in `logs.db` were written with the snake_case names, so
+    /// the renamed fields must still ACCEPT them.
+    ///
+    /// A stored row that fails to parse does not degrade to an unnamed finding —
+    /// it fails the whole query it was read in, taking every other player's
+    /// findings down with it.
+    #[test]
+    fn a_stored_finding_written_with_the_old_names_still_reads() {
+        let sigil = r#"{"kind":"sigil","sigil_id":6368016,"level":15,"traits":[]}"#;
+        assert_eq!(
+            serde_json::from_str::<Evidence>(sigil).expect("a stored sigil row reads"),
+            Evidence::Sigil {
+                sigil_id: 6368016,
+                level: 15,
+                traits: vec![]
+            }
+        );
+
+        let wrightstone = r#"{"kind":"wrightstone","wrightstone_id":42,"traits":[]}"#;
+        assert_eq!(
+            serde_json::from_str::<Evidence>(wrightstone).expect("a stored wrightstone row reads"),
+            Evidence::Wrightstone {
+                wrightstone_id: 42,
+                traits: vec![]
+            }
+        );
+    }
+
+    /// Whole-set rules are about the set, so their snapshot is the set — and it
+    /// drops empty slots, which would otherwise render as a garbage name.
+    #[test]
+    fn a_whole_set_finding_carries_the_whole_set_without_its_empty_slots() {
+        let mut build = legal_build();
+        build.summons.push(EquippedSummon {
+            summon_id: EMPTY_ID,
+            main_trait_id: EMPTY_ID,
+            main_trait_level: 0,
+            bonus_id: EMPTY_ID,
+            bonus_level: 0,
+        });
+        let equipped = build
+            .summons
+            .iter()
+            .filter(|s| !is_empty(s.summon_id))
+            .count();
+
+        let evidence = evidence_for(
+            &build,
+            &Finding {
+                rule: Rule::SummonPerfectCount,
+                subject: Subject::Summons,
+                observed: Value::Count(2),
+                allowed: Value::None,
+                odds: Some(1e-6),
+                evidence: None,
+            },
+        );
+
+        match evidence {
+            Some(Evidence::Summons { summons }) => assert_eq!(summons.len(), equipped),
+            other => panic!("expected a summon set, got {other:?}"),
+        }
+    }
+
+    /// An overmastery snapshot keeps `flags`: it decides whether the magnitude
+    /// is a level or an amount, and a UI without it prints a bare `20` where
+    /// `+20%` belongs.
+    #[test]
+    fn an_overmastery_snapshot_keeps_the_flags_that_format_it() {
+        let mut build = legal_build();
+        masteries(&mut build)[3].value = 0.7;
+
+        let findings = audit(&build);
+        let overmastery = findings
+            .iter()
+            .find(|f| f.rule == Rule::OvermasteryValue)
+            .expect("the value rule fired");
+
+        match &overmastery.evidence {
+            Some(Evidence::Overmastery(entry)) => {
+                assert_eq!(entry.value, 0.7);
+                assert_eq!(entry.flags, masteries(&mut legal_build())[3].flags);
+            }
+            other => panic!("expected one overmastery, got {other:?}"),
+        }
+    }
+
     /// THE STALENESS GUARD for [`RULES_VERSION`].
     ///
     /// Findings are STORED, so a rule change that does not bump the version
@@ -578,24 +1002,38 @@ mod tests {
     /// When it fails: read the diff, confirm the new output is what you meant,
     /// paste it in, and bump `RULES_VERSION`. Both, always — the snapshot
     /// alone would hide exactly the staleness this exists to catch.
+    /// TWO builds, because no single one can reach every rule: the accusation
+    /// rules need magnitudes off their ladders, and the two PERFECTION reports
+    /// need those same magnitudes at their tops. Snapshotting only the first
+    /// left both reports outside the guard entirely — which is how the
+    /// 2026-07-30 rescoping of them (chased effects only, single-level windows
+    /// excluded) changed what the rules say while this test stayed green.
+    ///
+    /// `odds` is part of the snapshot because it is the perfection reports'
+    /// whole payload: a rescoping that counts a different set of summons can
+    /// leave the COUNT untouched and still reprice the claim.
     #[test]
     fn the_rules_version_matches_what_the_rules_currently_say() {
-        let mut build = legal_build();
-        build.summons[1].bonus_id = BOSS_SET_HEALING_CAP;
-        build.summons[1].bonus_level = 9;
-        build.sigils[0].first_trait_level = 30;
-        masteries(&mut build)[3].value = 0.7;
+        let mut accused = legal_build();
+        accused.summons[1].bonus_id = BOSS_SET_HEALING_CAP;
+        accused.summons[1].bonus_level = 9;
+        accused.sigils[0].first_trait_level = 30;
+        masteries(&mut accused)[3].value = 0.7;
 
-        let snapshot: Vec<String> = audit(&build)
+        // Stun to the top of its ladder maxes all four chased overmasteries;
+        // Behemoth's bonus to the top of its window makes a second perfect
+        // summon beside the fixture's already-perfect Lucilius.
+        let mut perfect = legal_build();
+        masteries(&mut perfect)[3].value = 2.0;
+        perfect.summons[1].bonus_level = 9;
+
+        let snapshot: Vec<String> = [accused, perfect]
             .iter()
+            .flat_map(audit)
             .map(|finding| {
                 format!(
-                    "{:?}/{:?} {:?} {:?} -> {:?}",
-                    finding.rule,
-                    finding.severity,
-                    finding.subject,
-                    finding.observed,
-                    finding.allowed
+                    "{:?} {:?} {:?} -> {:?} odds={:?}",
+                    finding.rule, finding.subject, finding.observed, finding.allowed, finding.odds
                 )
             })
             .collect();
@@ -603,13 +1041,17 @@ mod tests {
         assert_eq!(
             (RULES_VERSION, snapshot.join("\n").as_str()),
             (
-                1,
-                "SigilTraitLevel/Impossible Sigil(0) Level(30) -> Level(15)\n\
-                 OvermasteryValue/Impossible Overmastery(3) Amount(0.7) -> Amount(2.0)\n\
-                 SummonBonusSource/Impossible Summon(1) SummonBonusId(782879360) -> \
-                 SummonBonusIds([13726176, 577813568, 804999327, 1513740315, 1716424242, \
-                 1964215585, 2740166587, 2791457225, 2828012672, 3159265995, 4155519343])\n\
-                 SummonBonusMagnitude/Impossible Summon(1) Amount(75.0) -> Amount(50.0)"
+                5,
+                "SigilTraitLevel Sigil(0) Level(30) -> Level(15) odds=None\n\
+                 OvermasteryValue Overmastery(3) Amount(0.7) -> Amount(2.0) odds=None\n\
+                 SummonBonusSource Summon(1) SummonBonusId(782879360) -> \
+                 SummonIds([261648089, 789923164, 1851353340, 2237464972]) \
+                 odds=None\n\
+                 SummonBonusMagnitude Summon(1) Amount(75.0) -> Amount(50.0) odds=None\n\
+                 OvermasteryAllMaxed Overmasteries Count(4) -> None \
+                 odds=Some(0.0010497599999999998)\n\
+                 SummonPerfectCount Summons Count(2) -> None \
+                 odds=Some(2.4793388429752063e-8)"
             ),
             "the rules changed what they say — update this snapshot AND bump \
              RULES_VERSION, or every stored log keeps the old verdicts forever"

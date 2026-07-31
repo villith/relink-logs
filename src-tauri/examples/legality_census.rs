@@ -96,7 +96,7 @@ fn main() -> Result<()> {
                 *current
                     .entry(name.clone())
                     .or_default()
-                    .entry(format!("{:?}/{:?}", finding.rule, finding.severity))
+                    .entry(format!("{:?}", finding.rule))
                     .or_default() += 1;
             }
 
@@ -239,7 +239,7 @@ fn main() -> Result<()> {
 
     println!("logs {logs}, skipped {skipped}, player-encounters {player_encounters}");
 
-    println!("\n== current rules, findings per player (rule/severity: count) ==");
+    println!("\n== current rules, findings per player (rule: count) ==");
     for (name, rules) in &current {
         let total: usize = rules.values().sum();
         println!("{name}: {total}");
