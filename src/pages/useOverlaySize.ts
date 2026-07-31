@@ -1,11 +1,24 @@
 import { LogicalSize, appWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef } from "react";
 
-import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
+import { OVERLAY_MIN_SIZE, useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 
 /** Differences this small are rounding between the window's logical size and
  * the webview's client size, not a resize worth recording. */
 const SIZE_EPSILON = 2;
+
+/**
+ * A size the window itself would never accept, so it cannot be one the user
+ * chose by dragging.
+ *
+ * Minimizing is the case that matters: wry's WM_SIZE handler resizes the
+ * webview to the window's client rect unconditionally, and Windows reports a
+ * minimized window's client rect as 0x0 — so minimizing the overlay fires a
+ * `resize` at 0x0. Recording that would put 0 into the width and height on the
+ * settings page (and persist it, if the app is closed while minimized).
+ */
+const isBelowMinimum = (width: number, height: number) =>
+  width < OVERLAY_MIN_SIZE.width || height < OVERLAY_MIN_SIZE.height;
 
 /** How long after we resize the window a `resize` event is still assumed to be
  * our own doing rather than the user's. */
@@ -35,16 +48,18 @@ export const useOverlaySize = () => {
   const set = useMeterSettingsStore((state) => state.set);
   const appliedAt = useRef(0);
 
-  // Setting → window.
+  // Setting → window. Clamped to the window's own floor, which also heals a
+  // zero size left behind by a build that recorded one on minimize.
   useEffect(() => {
     if (!insideTauri()) return;
+    const width = Math.max(OVERLAY_MIN_SIZE.width, overlay_width);
+    const height = Math.max(OVERLAY_MIN_SIZE.height, overlay_height);
     const matches =
-      Math.abs(window.innerWidth - overlay_width) <= SIZE_EPSILON &&
-      Math.abs(window.innerHeight - overlay_height) <= SIZE_EPSILON;
+      Math.abs(window.innerWidth - width) <= SIZE_EPSILON && Math.abs(window.innerHeight - height) <= SIZE_EPSILON;
     if (matches) return;
 
     appliedAt.current = Date.now();
-    void appWindow.setSize(new LogicalSize(overlay_width, overlay_height));
+    void appWindow.setSize(new LogicalSize(width, height));
   }, [overlay_width, overlay_height]);
 
   // Window → setting, so dragging the overlay's edge updates the numbers on the
@@ -59,6 +74,7 @@ export const useOverlaySize = () => {
         if (Date.now() - appliedAt.current < SELF_RESIZE_QUIET_MS) return;
         const width = Math.round(window.innerWidth);
         const height = Math.round(window.innerHeight);
+        if (isBelowMinimum(width, height)) return;
         if (Math.abs(width - overlay_width) <= SIZE_EPSILON && Math.abs(height - overlay_height) <= SIZE_EPSILON) {
           return;
         }

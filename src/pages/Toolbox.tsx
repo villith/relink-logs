@@ -26,10 +26,10 @@ export const TOOLS: (NavRailSection & { windowsOnly?: boolean })[] = [
   },
   {
     to: "/logs/toolbox/audit",
-    labelKey: "ui.toolbox.build-audit",
-    labelFallback: "Build Audit",
+    labelKey: "ui.toolbox.cheat-audit",
+    labelFallback: "Cheat Audit",
     icon: ShieldWarning,
-    newId: "build-audit",
+    newId: "cheat-audit",
   },
 ];
 

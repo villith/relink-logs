@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { compareVersions, isNewVersion, NEW_FEATURES } from "./newFeatures";
+import { compareVersions, isNewVersion, NEW_FEATURES, sectionNewIds } from "./newFeatures";
+import { SETTINGS_SECTIONS } from "./pages/Settings";
 
 describe("NEW_FEATURES", () => {
   it("shows the toolbox + overmastery predictor chips in the 1.10.0 release that ships them", () => {
@@ -8,15 +9,29 @@ describe("NEW_FEATURES", () => {
     expect(isNewVersion(NEW_FEATURES["overmastery-predictor"], "1.10.0")).toBe(true);
   });
 
-  /** Both halves of the build-audit story are chipped together: the page that
+  /** Both halves of the cheat-audit story are chipped together: the page that
    * produces the verdicts, and the setting that lets them be seen anywhere
    * else. A chip on one without the other points at a feature the reader
    * cannot switch on. */
-  it("chips the build audit and its visibility setting through the same release window", () => {
-    expect(isNewVersion(NEW_FEATURES["build-audit"], "1.12.5")).toBe(true);
+  it("chips the cheat audit and its visibility setting through the same release window", () => {
+    expect(isNewVersion(NEW_FEATURES["cheat-audit"], "1.12.5")).toBe(true);
     expect(isNewVersion(NEW_FEATURES["flagged-builds-setting"], "1.12.5")).toBe(true);
     // And in an RC of it, which is what a tester actually runs.
     expect(isNewVersion(NEW_FEATURES["flagged-builds-setting"], "1.12.5-2")).toBe(true);
+  });
+
+  it("chips both rebuilt settings sections in the release that ships them", () => {
+    expect(isNewVersion(NEW_FEATURES["meter-settings"], "1.12.5")).toBe(true);
+    expect(isNewVersion(NEW_FEATURES["overlay-settings"], "1.12.5")).toBe(true);
+    expect(isNewVersion(NEW_FEATURES["meter-settings"], "1.12.7")).toBe(false);
+  });
+
+  // The settings tab is the only marker visible before the rail is opened, so
+  // every chipped section has to reach it.
+  it("carries the real settings sections up to the settings tab", () => {
+    expect(sectionNewIds("settings", SETTINGS_SECTIONS)).toEqual(
+      expect.arrayContaining(["settings", "meter-settings", "overlay-settings"])
+    );
   });
 });
 

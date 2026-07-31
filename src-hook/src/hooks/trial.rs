@@ -37,8 +37,13 @@ pub(super) fn disable() {
 // What the "Quit Training" click runs.
 const TRIAL_QUIT_PROLOGUE_SIG: &str =
     "56 57 55 53 48 83 ec 28 48 8b 81 a0 00 00 00 80 78 48 00 0f 84 99 01 00 00";
+// The two `mov`s and the trailing `cmp` reach globals through RIP displacements,
+// which every patch rewrites — 2.0.3 moved all three and killed this signature
+// (silently, since setup below fails closed rather than erroring). Wildcard the
+// displacements and anchor on the opcodes plus the two literal struct offsets,
+// which are what actually identify the call site.
 const TRIAL_QUIT_CALLSITE_SIG: &str =
-    "48 8b 35 7a b5 01 06 0f b6 59 60 48 8b 0d f7 db 04 06 e8 $ { ' } 88 9e 0e 01 00 00 80 3d 05 de";
+    "48 8b 35 ? ? ? ? 0f b6 59 60 48 8b 0d ? ? ? ? e8 $ { ' } 88 9e 0e 01 00 00 80 3d";
 
 // Fires at trial START. The in-training Restart button never leaves Trial mode
 // and never runs the quit choke point, so this is the only signal that closes a

@@ -34,7 +34,16 @@ export type NavRailSection = {
 export const NavRailLayout = ({ sections, storageKey }: { sections: NavRailSection[]; storageKey: string }) => {
   const { t } = useTranslation();
   const { pathname } = useLocation();
-  const [collapsed, setCollapsed] = useLocalStorage({ key: storageKey, defaultValue: false });
+  // `getInitialValueInEffect: false` reads localStorage during the first
+  // render instead of in an effect after it. The default (true) exists for SSR,
+  // where the server has no storage to read; here it only means a collapsed
+  // rail renders expanded for one frame and then visibly snaps shut every time
+  // the page is mounted — which is every switch between Toolbox and Settings.
+  const [collapsed, setCollapsed] = useLocalStorage({
+    key: storageKey,
+    defaultValue: false,
+    getInitialValueInEffect: false,
+  });
 
   // Hard-fixed row height: the label's line box (~40.8px row) vs icon-only
   // (40px row) would otherwise shift everything a fraction on collapse.

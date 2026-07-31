@@ -1,6 +1,7 @@
 import { AreaChart, LineChart } from "@mantine/charts";
 import {
   ActionIcon,
+  Anchor,
   Badge,
   Box,
   Button,
@@ -33,7 +34,7 @@ import { invoke } from "@tauri-apps/api";
 import { t } from "i18next";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
-import { Link, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { FlaggedGear, traitLine } from "@/components/FlaggedGear";
@@ -129,7 +130,7 @@ import { useShallow } from "zustand/react/shallow";
 type Label = { name: string; partySlotIndex: number; label?: string; color: string; strokeDasharray?: string }[];
 
 // `formatOvermastery` and friends now live in `@/utils`, shared with the
-// Build Audit page — see the import above.
+// Cheat Audit page — see the import above.
 
 // "+1800 (Lvl. 3)" — numeric totals first, with any magnitude-unknown
 // (level-only) contributions trailing. Totals arrive in that order already.
@@ -632,6 +633,27 @@ export const ViewPage = () => {
   const checklistGroups = useChecklistStore(useShallow((state) => state.groups));
   const { t, i18n } = useTranslation();
   const { id } = useParams();
+
+  /**
+   * Back to wherever the reader came from.
+   *
+   * This used to be a hard link to `/logs`, which was right only for the one
+   * route that reaches a log through the list. A log opened from the Cheat
+   * Audit, from the quest list, or from the toast the app raises when an
+   * encounter saves would answer "Back" by dumping the reader on a page they
+   * were never on — and, from the audit, losing the person whose case they were
+   * halfway through reading.
+   *
+   * `location.key === "default"` is react-router's marker for the first entry in
+   * the history stack: there is nothing behind it, so that is the only case that
+   * still needs a destination of its own.
+   */
+  const navigate = useNavigate();
+  const location = useLocation();
+  const goBack = useCallback(() => {
+    if (location.key === "default") navigate("/logs");
+    else navigate(-1);
+  }, [navigate, location.key]);
 
   const {
     encounter,
@@ -1164,7 +1186,9 @@ export const ViewPage = () => {
     return (
       <Box>
         <Text>
-          <Link to="/logs">{t("ui.back-btn")}</Link>
+          <Anchor component="button" type="button" onClick={goBack}>
+            {t("ui.back-btn")}
+          </Anchor>
         </Text>
         <Divider my="sm" />
         <Text>{t("ui.loading")}</Text>
@@ -1183,7 +1207,7 @@ export const ViewPage = () => {
       <Text>
         <Box display="flex">
           <Box display="flex" flex={1}>
-            <Button size="xs" variant="default" component={Link} to="/logs">
+            <Button size="xs" variant="default" onClick={goBack}>
               {t("ui.back-btn")}
             </Button>
           </Box>

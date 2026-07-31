@@ -27,7 +27,7 @@ vi.mock("@/utils", async (importOriginal) => ({
   translateSigilId: (id: number) => `sigil:${id}`,
 }));
 
-import BuildAudit from "./BuildAudit";
+import CheatAudit from "./CheatAudit";
 
 const wrightstoneFinding = {
   rule: "wrightstoneTraitLevel",
@@ -81,12 +81,12 @@ const renderPage = () =>
   render(
     <MantineProvider>
       <MemoryRouter>
-        <BuildAudit />
+        <CheatAudit />
       </MemoryRouter>
     </MantineProvider>
   );
 
-describe("BuildAudit", () => {
+describe("CheatAudit", () => {
   beforeEach(() => {
     invoke.mockReset();
     invoke.mockImplementation((command: string) =>
@@ -140,11 +140,69 @@ describe("BuildAudit", () => {
     }
   });
 
-  /** Every flagged fight is still reachable — they are the links out. */
-  it("lists both flagged fights", async () => {
+  /** Every flagged fight is still listed — the contents name them all, whether
+   * or not each has an entry of its own. */
+  it("lists every flagged fight", async () => {
     renderPage();
-    expect(await screen.findByText("quest:401 · time:300")).toBeTruthy();
-    expect(screen.getByText("quest:402 · time:200")).toBeTruthy();
+    await screen.findByText("Dread Wrightstone III");
+
+    expect(screen.getByText("quest:401")).toBeTruthy();
+    expect(screen.getByText("quest:402")).toBeTruthy();
+    expect(screen.getByText("time:300")).toBeTruthy();
+    expect(screen.getByText("time:200")).toBeTruthy();
+  });
+
+  /** Nothing in the contents navigates. A list where one column scrolls and the
+   * next leaves the page makes every click a gamble on losing your place; the
+   * entry heading is the single way out, and it carries the arrow that says so. */
+  it("never leaves the page from the table of contents", async () => {
+    renderPage();
+    await screen.findByText("Dread Wrightstone III");
+
+    expect(screen.getByText("quest:401").closest("a")).toBeNull();
+    expect(screen.getByText("quest:402").closest("a")).toBeNull();
+    expect(screen.getByText("time:300").closest("a")).toBeNull();
+    expect(screen.getByText("time:200").closest("a")).toBeNull();
+
+    // The one link on the page is the entry heading.
+    const hrefs = screen.getAllByRole("link").map((link) => link.getAttribute("href"));
+    expect(hrefs).toEqual(["/logs/10?tab=equipment"]);
+  });
+
+  /** The contents jump, they do not navigate. Clicking a quest used to leave the
+   * page entirely, which is the wrong answer to "show me this fight" when the
+   * fight's evidence is already on screen beside it. */
+  it("scrolls to the entry a fight was flagged for rather than leaving the page", async () => {
+    renderPage();
+    await screen.findByText("Dread Wrightstone III");
+
+    // The quest name is no longer an exit — the date is.
+    expect(screen.getByText("quest:401").closest("a")).toBeNull();
+
+    const entry = document.getElementById("audit-entry-10");
+    expect(entry).toBeTruthy();
+    const scrollIntoView = vi.fn();
+    entry!.scrollIntoView = scrollIntoView;
+
+    // Fight 11's finding deduplicated into fight 10's entry, so even the fight
+    // without an entry of its own has somewhere to land.
+    fireEvent.click(screen.getByText("quest:402"));
+    expect(scrollIntoView).toHaveBeenCalled();
+  });
+
+  /** The whole row, not just the word. Half of every row is a date, and a row
+   * that highlights under the cursor but answers on one word of itself invites
+   * the miss. */
+  it("jumps from anywhere in the row, not only the quest name", async () => {
+    renderPage();
+    await screen.findByText("Dread Wrightstone III");
+
+    const entry = document.getElementById("audit-entry-10");
+    const scrollIntoView = vi.fn();
+    entry!.scrollIntoView = scrollIntoView;
+
+    fireEvent.click(screen.getByText("time:200"));
+    expect(scrollIntoView).toHaveBeenCalled();
   });
 
   /** Empty is the CORRECT result for almost everyone, so it must not look like
@@ -266,7 +324,7 @@ const swappedEncounters: Record<number, unknown> = {
   21: { players: [{ displayName: "Swapper", characterType: "Pl1000", sigils: [sigil(111, 30), sigil(333, 15)] }] },
 };
 
-describe("BuildAudit when the build changed between fights", () => {
+describe("CheatAudit when the build changed between fights", () => {
   beforeEach(() => {
     invoke.mockReset();
     invoke.mockImplementation((command: string, args?: { id: number }) =>
@@ -294,7 +352,9 @@ describe("BuildAudit when the build changed between fights", () => {
     renderPage();
     await screen.findByText(/sigil:111/);
 
-    expect(screen.getAllByText("quest:501 · time:900").length).toBeGreaterThan(1);
-    expect(screen.getAllByText("quest:502 · time:800").length).toBeGreaterThan(1);
+    // The heading names the fight AND links to it: the reader's next question
+    // after "which fight was this worn in?" is to go and look at that fight.
+    expect(screen.getByText("quest:501 · time:900").closest("a")?.getAttribute("href")).toBe("/logs/20?tab=equipment");
+    expect(screen.getByText("quest:502 · time:800").closest("a")?.getAttribute("href")).toBe("/logs/21?tab=equipment");
   });
 });

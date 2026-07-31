@@ -7,6 +7,24 @@ markdown in the app.
 
 ## 1.12.5
 
+### Notes
+
+- **Supports game patch 2.0.3.**. The patch broke a number of things so it is highly suggested you update.
+
+### Features
+
+- Added a new toolbox tool: Cheat Audit
+  - This reads your existing logs and builds a list of cheaters, with explanations of why
+  - You can also turn on highlighting in the meter / log list / equipment / builds in the Settings section
+- The UI is now more customizable
+  - There are separate setting panels for cutomizing the meters and the overlay window
+- The Checklist feature now supports custom groups. [suggestion from lingsamuel](https://github.com/villith/relink-logs/issues/36)
+
+### Bug Fixes
+
+- The connection status now also includes "Hook not found" as a status, in case your antivirus has quarantined the file. [suggestion from sgqy](https://github.com/villith/relink-logs/issues/65)
+- AI teammates should now properly show up as "AI". does not apply to existing logs. [bug submitted by GGGbooy](https://github.com/villith/relink-logs/issues/64)
+
 ### Language
 
 - Additional zh-CN translations. [credit to Souma-Sumire](https://github.com/Souma-Sumire)

@@ -212,7 +212,7 @@ function SortableColumn({
 
 /** The party, drawn one member at a time so a flagged build can colour exactly
  * the person it belongs to — and explain itself in the same words the log page
- * and the Build Audit use.
+ * and the Cheat Audit use.
  *
  * Attribution is by party slot: `playerIndex` on a stored finding is the slot
  * the backend audited, and `partyMembers` carries the same number. Legacy

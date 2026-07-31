@@ -13,7 +13,7 @@ import { FindingsExplanation } from "./LegalityMark";
 /**
  * THE REGRESSION THIS FILE EXISTS FOR.
  *
- * The tooltips and the Build Audit page are supposed to explain a finding the
+ * The tooltips and the Cheat Audit page are supposed to explain a finding the
  * same way, and for a long time they did not: the audit page drew the gear with
  * its offending line marked, while the tooltip printed a rule label, a subject
  * and a sentence — no gear at all. They shared one function (`describeLimit`)
@@ -54,7 +54,7 @@ describe("FindingsExplanation", () => {
     await i18next.use(initReactI18next).init({ lng: "en", resources: { en: { translation: ui } } });
   });
 
-  it("says exactly what the Build Audit page says about the same finding", () => {
+  it("says exactly what the Cheat Audit page says about the same finding", () => {
     expect(text(<FindingsExplanation findings={[summonFinding]} />)).toBe(
       text(<FindingDetail finding={summonFinding} />)
     );

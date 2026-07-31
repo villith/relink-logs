@@ -8,8 +8,15 @@
 //!     offset sigs) or the followed call target RVA (for function sigs).
 //!
 //! Usage:
-//!   cargo run -p hook --bin sigscan -- "<pelite pattern>" [slice_u32|slice_u8|addr]
+//!   cargo run -p hook --bin sigscan -- "<pelite pattern>" [slice_u32|slice_u8|addr] [--all]
 //!   cargo run -p hook --bin sigscan -- dumprva <hexrva> [len]
+//!
+//! `--all` widens the scan from the code section (`matches_code`, what the hook
+//! itself uses, and the right default for hook signatures) to the WHOLE image, so
+//! patterns in `.rdata`/`.data` are visible. Needed to relocate data structures
+//! after a patch — e.g. walking MSVC RTTI (`.?AV<Class>@@` name string ->
+//! TypeDescriptor -> Complete Object Locator -> vtable) to recover the summon
+//! vtable RVAs, none of which live in the code section.
 //!
 //! The exe path is read from the GBFR_EXE env var, falling back to the known
 //! Steam library path on this machine.
@@ -29,7 +36,12 @@ fn main() {
         std::process::exit(2);
     }
     let pat_str = &args[1];
-    let mode = args.get(2).map(|s| s.as_str()).unwrap_or("slice_u32");
+    let scan_all = args.iter().any(|a| a == "--all");
+    let mode = args
+        .get(2)
+        .map(|s| s.as_str())
+        .filter(|s| *s != "--all")
+        .unwrap_or("slice_u32");
 
     let exe_path = env::var("GBFR_EXE").unwrap_or_else(|_| DEFAULT_EXE.to_string());
     let file_bytes = std::fs::read(exe_path).expect("could not read game exe");
@@ -51,12 +63,20 @@ fn main() {
     let pattern = pattern::parse(pat_str).expect("could not parse pattern");
     let scanner = pe.scanner();
 
-    let mut matches = scanner.matches_code(&pattern);
+    let mut matches = if scan_all {
+        scanner.matches(&pattern, 0..pe.optional_header().SizeOfImage)
+    } else {
+        scanner.matches_code(&pattern)
+    };
     let mut addrs = [0u32; 8];
     let mut count = 0usize;
 
     println!("pattern: {}", pat_str);
-    println!("mode:    {}", mode);
+    println!(
+        "mode:    {}{}",
+        mode,
+        if scan_all { " (whole image)" } else { "" }
+    );
     // Cap only the verbose per-match dump; keep counting every match so `total matches` and
     // the uniqueness WARNING below are accurate even for a very non-unique pattern.
     const MAX_DUMP: usize = 32;

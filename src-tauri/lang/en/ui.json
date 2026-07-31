@@ -88,7 +88,6 @@
     "meter-labels-section": "Labels",
     "bar-appearance-section": "Bar Appearance",
     "bar-fill-mode": "Fill Style",
-    "bar-fill-mode-description": "How wide each bar is drawn. The percentage column is unaffected.",
     "bar-fill-total": "Share of total",
     "bar-fill-relative": "Relative to the top bar",
     "bar-texture": "Bar Texture",
@@ -187,7 +186,8 @@
       "sent-nothing": "The hook accepted the batch but nothing was listening — this should not happen."
     },
     "legality": {
-      "title": "Build Audit",
+      "title": "Cheat Audit",
+      "disclaimer": "The rules that detect cheating are not perfect. Use your own judgement to determine if a finding is valid. Report any finding you believe is wrong through the {{report}} button at the top right.",
       "summary-players": "{{count}} flagged",
       "no-findings": "Nothing flagged",
       "no-findings-detail": "Every logged build has been checked against the game's sigil, wrightstone, summon and overmastery tables.",
@@ -474,7 +474,7 @@
       "tm-no-stones": "Add wrightstones you want to roll for.",
       "tm-results-caveat": "Predictions assume your next RNG-consuming action is a transmarvel roll.",
       "tm-truncated": "Showing the first {{shown}} of {{total}} rolls.",
-      "build-audit": "Build Audit"
+      "cheat-audit": "Cheat Audit"
     },
     "weapon-awakening": "Awakening",
     "wrightstone": "Wrightstone",
@@ -495,11 +495,11 @@
       "remove-btn": "Remove hook",
       "refresh-btn": "Refresh"
     },
-    "highlight-illegal-builds": "Highlight Flagged Builds",
-    "highlight-illegal-builds-description": "Colours a player's name in the meter when the build audit flags their equipment. Never shown in streamer mode.",
-    "highlight-illegal-builds-requires-flagged": "Turn on \"Show Flagged Builds\" in Settings → General to use this.",
-    "show-flagged-builds": "Show Flagged Builds",
-    "show-flagged-builds-description": "Marks players whose equipment the build audit flagged, in the quest list, a log's Equipment and Builds tabs, and the meter — and lets the quest list be filtered by it. The Build Audit tool always shows its findings regardless."
+    "highlight-illegal-builds": "Highlight Cheaters",
+    "highlight-illegal-builds-description": "Colours a player's name in the meter when the cheat audit flags them.",
+    "highlight-illegal-builds-requires-flagged": "Turn on \"Enable Cheat Audit\" in Settings → General to use this.",
+    "show-flagged-builds": "Enable Cheat Audit",
+    "show-flagged-builds-description": "Marks players the cheat audit flagged in the quest list, equipment/build tabs, and in the meter."
   },
   "characters": {
     "Pl2000": "Id (Transformation)",

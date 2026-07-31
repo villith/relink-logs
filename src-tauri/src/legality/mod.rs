@@ -39,7 +39,37 @@ pub const EMPTY_ID: u32 = game_reader::EMPTY_KEY;
 /// single-level ("special") summon candidates stopped counting as rolls.
 /// 5: a bonus-source finding now names the summons that DO grant the bonus,
 /// rather than listing the eleven its own summon may hold.
-pub const RULES_VERSION: u32 = 5;
+/// 6: encounters older than [`AUDIT_CUTOFF_MS`] stopped being audited. The
+/// rules themselves say exactly what they said at 5 — the bump is what makes
+/// the sweep revisit logs already stamped 5 and WITHDRAW the verdicts it now
+/// declines to make. Without it the cutoff would only ever govern logs nobody
+/// had judged yet, i.e. nothing already in the database.
+pub const RULES_VERSION: u32 = 6;
+
+/// Encounters recorded before this are never audited: epoch millis for
+/// 2026-07-09T00:00:00Z, inclusive (a log stamped exactly this is judged).
+///
+/// Every table the rules judge against — the overmastery ladders, the
+/// transmarvel stone configs behind the 20/15/10 ceilings, the sigil and summon
+/// lots — is baked from the CURRENT game data, and nothing stored with a log
+/// says which game version recorded it (`logs.version` is the parser's blob
+/// format, not the game's). So a value that was legal under an earlier patch is
+/// indistinguishable from one that was never legal at all, and
+/// `overmastery_rules::audit_overmastery` is not silent about an id it does not
+/// recognise — it accuses. A date is the only discriminator available.
+pub const AUDIT_CUTOFF_MS: i64 = 1_783_555_200_000;
+
+/// Whether an encounter that started at `time_ms` (epoch millis — the value
+/// stored in `logs.time`) may be judged at all.
+///
+/// The save path and the startup sweep both ask here rather than comparing for
+/// themselves: a cutoff enforced in only one of them is no cutoff. The sweep
+/// alone would let a freshly saved pre-cutoff log through (it is stamped
+/// current on the way in, so no sweep ever revisits it); the save path alone
+/// would leave every log already in the database judged.
+pub fn should_audit(time_ms: i64) -> bool {
+    time_ms >= AUDIT_CUTOFF_MS
+}
 
 /// An empty slot reaches us as either a plain zero or the engine sentinel, so
 /// both must count as empty.
@@ -1041,7 +1071,7 @@ mod tests {
         assert_eq!(
             (RULES_VERSION, snapshot.join("\n").as_str()),
             (
-                5,
+                6,
                 "SigilTraitLevel Sigil(0) Level(30) -> Level(15) odds=None\n\
                  OvermasteryValue Overmastery(3) Amount(0.7) -> Amount(2.0) odds=None\n\
                  SummonBonusSource Summon(1) SummonBonusId(782879360) -> \
