@@ -1,13 +1,16 @@
+import { HEADER_BUTTON_ICONS } from "@/components/TitlebarButtons";
 import useSettings from "@/pages/useSettings";
 import { DEFAULT_HEADER_BUTTONS, HEADER_BUTTONS, type HeaderButtonId } from "@/stores/useMeterSettingsStore";
-import { Anchor, Group, Stack, Switch, Text } from "@mantine/core";
+import { Anchor, Checkbox, Group, Stack, Text } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
 /**
  * Which action buttons the overlay header carries.
  *
- * Minimize is not listed because it has no toggle: leaving one guaranteed way
- * to push the overlay aside is worth more than the pixel it costs.
+ * Each one is labelled with the glyph it draws in the header as well as its
+ * name, so the row reads as the header it edits. Minimize is not listed because
+ * it has no toggle: leaving one guaranteed way to push the overlay aside is
+ * worth more than the pixel it costs.
  */
 export const HeaderButtonsSection = () => {
   const { t } = useTranslation();
@@ -35,19 +38,23 @@ export const HeaderButtonsSection = () => {
           {t("ui.reset-to-defaults")}
         </Anchor>
       </Group>
-      <Text size="xs" c="dimmed">
-        {t("ui.header-buttons-description")}
-      </Text>
       <Group gap="lg">
-        {HEADER_BUTTONS.map((id) => (
-          <Switch
-            key={id}
-            size="sm"
-            label={t(`ui.header-button.${id}`)}
-            checked={shown[id]}
-            onChange={(event) => toggle(id, event.currentTarget.checked)}
-          />
-        ))}
+        {HEADER_BUTTONS.map((id) => {
+          const Icon = HEADER_BUTTON_ICONS[id];
+          return (
+            <Checkbox
+              key={id}
+              label={
+                <Group gap={6} wrap="nowrap">
+                  <Icon size={16} />
+                  {t(`ui.header-button.${id}`)}
+                </Group>
+              }
+              checked={shown[id]}
+              onChange={(event) => toggle(id, event.currentTarget.checked)}
+            />
+          );
+        })}
       </Group>
     </Stack>
   );

@@ -1,8 +1,22 @@
 import { ActionIcon, Menu, Tooltip } from "@mantine/core";
-import { ArrowCounterClockwise, Camera, ClipboardText, Minus, PushPinSimple } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, Camera, ClipboardText, Icon, Minus, PushPinSimple } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
-import { DEFAULT_HEADER_BUTTONS, type HeaderButtonVisibility } from "@/stores/useMeterSettingsStore";
+import {
+  DEFAULT_HEADER_BUTTONS,
+  type HeaderButtonId,
+  type HeaderButtonVisibility,
+} from "@/stores/useMeterSettingsStore";
+
+/** The glyph each toggleable header button wears. Exported so the settings
+ * checkbox for a button can show the button — a name alone ("Pin on top") does
+ * not tell you which of the icons in the header it is going to remove. */
+export const HEADER_BUTTON_ICONS: Record<HeaderButtonId, Icon> = {
+  clipboard: ClipboardText,
+  pin: PushPinSimple,
+  screenshot: Camera,
+  reset: ArrowCounterClockwise,
+};
 
 export type TitlebarActions = {
   onCopySimple: () => void;

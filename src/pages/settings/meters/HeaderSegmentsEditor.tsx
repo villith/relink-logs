@@ -57,9 +57,6 @@ export const HeaderSegmentsEditor = () => {
             {t("ui.reset-to-defaults")}
           </Anchor>
         </Group>
-        <Text size="xs" c="dimmed">
-          {t("ui.header-segments-description")}
-        </Text>
         <TokenPalette tokens={HEADER_TOKENS} used={used} />
         <DragDropContext
           onDragEnd={(result) => {

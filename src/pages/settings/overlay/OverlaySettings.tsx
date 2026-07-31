@@ -50,11 +50,12 @@ const OverlaySettings = () => {
         </Stack>
         {/* Sticky against the page scroll, clearing the fixed AppShell header —
             see the matching note in MeterSettings for why `top` is measured
-            from the viewport. */}
+            from the viewport, and why the two columns split the row evenly. */}
         <Box
-          w={{ base: "100%", lg: 520, xl: 620 }}
+          w={{ base: "100%", lg: "auto" }}
+          flex={{ base: "0 0 auto", lg: "1 1 0" }}
+          miw={0}
           style={{
-            flexShrink: 0,
             position: "sticky",
             top: "calc(var(--app-shell-header-height, 50px) + var(--mantine-spacing-sm))",
           }}

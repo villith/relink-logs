@@ -1,4 +1,4 @@
-import { Group, Text, UnstyledButton } from "@mantine/core";
+import { Group, UnstyledButton } from "@mantine/core";
 import { DotsSixVertical } from "@phosphor-icons/react";
 import type { Editor } from "@tiptap/core";
 import { createContext, useContext, useMemo, useRef, type ReactNode } from "react";
@@ -64,7 +64,9 @@ export type TokenPaletteProps = {
  *
  * Each chip carries a grip glyph. A plain code-styled box reads as a label —
  * something to look at, not something to pick up — and the drag affordance was
- * being missed entirely.
+ * being missed entirely. That glyph is also why the row needs no "Available:"
+ * caption: a row of grippable chips above a field does not read as anything
+ * else.
  */
 export const TokenPalette = ({ tokens, used = [] }: TokenPaletteProps) => {
   const { t } = useTranslation();
@@ -72,9 +74,6 @@ export const TokenPalette = ({ tokens, used = [] }: TokenPaletteProps) => {
 
   return (
     <Group gap={6}>
-      <Text size="xs" c="dimmed">
-        {t("ui.template-tokens")}
-      </Text>
       {tokens.map((token) => {
         const spent = used.includes(token);
         return (

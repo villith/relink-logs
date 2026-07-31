@@ -1,7 +1,61 @@
 import useSettings from "@/pages/useSettings";
 import { DEFAULT_OVERLAY_SIZE, OVERLAY_MIN_SIZE } from "@/stores/useMeterSettingsStore";
-import { Anchor, Group, NumberInput, SimpleGrid, Stack, Text } from "@mantine/core";
+import { Anchor, Group, SimpleGrid, Stack, Text, TextInput } from "@mantine/core";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+
+/** Ceiling on either dimension. Larger than any monitor the overlay would sit
+ * on, so it only ever catches a typo. */
+const OVERLAY_MAX_SIZE = 4000;
+
+type PixelInputProps = {
+  label: string;
+  value: number;
+  min: number;
+  onCommit: (value: number) => void;
+};
+
+/**
+ * A pixel measurement, typed freely and applied when the user is done.
+ *
+ * Deliberately not a NumberInput: that one reformats and re-clamps on every
+ * keystroke, so with a floor of 250 the "3" of "300" is instantly rewritten to
+ * "250" and the caret jumps — you could only ever type at the very start of the
+ * field. Holding a draft string and clamping once, on blur or Enter, lets the
+ * value pass through states that are not yet valid, which is what typing is.
+ */
+const PixelInput = ({ label, value, min, onCommit }: PixelInputProps) => {
+  const [draft, setDraft] = useState(String(value));
+
+  // Follows the stored value when something else changes it — a reset here, or
+  // the user dragging the overlay's own edge. Typing does not trip this: the
+  // draft is local until it is committed.
+  useEffect(() => setDraft(String(value)), [value]);
+
+  const commit = () => {
+    const parsed = Number.parseInt(draft, 10);
+    if (Number.isNaN(parsed)) {
+      setDraft(String(value)); // an emptied field means "never mind", not "0"
+      return;
+    }
+    const clamped = Math.min(OVERLAY_MAX_SIZE, Math.max(min, parsed));
+    setDraft(String(clamped));
+    onCommit(clamped);
+  };
+
+  return (
+    <TextInput
+      label={label}
+      value={draft}
+      inputMode="numeric"
+      onChange={(event) => setDraft(event.currentTarget.value.replace(/[^0-9]/g, ""))}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") commit();
+      }}
+    />
+  );
+};
 
 /**
  * The overlay window's size, in logical pixels.
@@ -30,29 +84,18 @@ export const OverlaySizeSection = () => {
           {t("ui.reset-to-defaults")}
         </Anchor>
       </Group>
-      <Text size="xs" c="dimmed">
-        {t("ui.overlay-size-description")}
-      </Text>
       <SimpleGrid cols={{ base: 1, sm: 2 }} spacing="sm">
-        <NumberInput
+        <PixelInput
           label={t("ui.overlay-width")}
-          min={OVERLAY_MIN_SIZE.width}
-          max={4000}
-          step={10}
-          clampBehavior="strict"
-          suffix="px"
           value={overlay_width}
-          onChange={(value) => typeof value === "number" && setMeterSettings({ overlay_width: value })}
+          min={OVERLAY_MIN_SIZE.width}
+          onCommit={(overlay_width) => setMeterSettings({ overlay_width })}
         />
-        <NumberInput
+        <PixelInput
           label={t("ui.overlay-height")}
-          min={OVERLAY_MIN_SIZE.height}
-          max={4000}
-          step={10}
-          clampBehavior="strict"
-          suffix="px"
           value={overlay_height}
-          onChange={(value) => typeof value === "number" && setMeterSettings({ overlay_height: value })}
+          min={OVERLAY_MIN_SIZE.height}
+          onCommit={(overlay_height) => setMeterSettings({ overlay_height })}
         />
       </SimpleGrid>
     </Stack>

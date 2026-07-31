@@ -69,15 +69,16 @@ const MeterSettings = () => {
             variable so the two cannot drift apart. A flex item's containing block
             is the flex row, which is as tall as the options column — that is the
             room the preview has to travel in. */}
-        {/* Width is not arbitrary: the meter table needs a 120px name column
-            plus one fixed 4.5rem column per visible value, so with the default
-            six it wants ~600px before the name starts truncating. Narrower
-            viewports get less and the name ellipsises — which is exactly what a
-            real overlay that narrow would do, so the preview stays honest. */}
+        {/* An even split rather than a fixed width: the preview draws the
+            overlay at its real pixel size and scales it down to fit, so every
+            pixel this column gains is scale the preview does not have to give
+            up. `1 1 0` on both sides makes the share independent of content —
+            with `auto` bases the taller-text column would quietly claim more. */}
         <Box
-          w={{ base: "100%", lg: 520, xl: 620 }}
+          w={{ base: "100%", lg: "auto" }}
+          flex={{ base: "0 0 auto", lg: "1 1 0" }}
+          miw={0}
           style={{
-            flexShrink: 0,
             position: "sticky",
             top: "calc(var(--app-shell-header-height, 50px) + var(--mantine-spacing-sm))",
           }}
