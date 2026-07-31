@@ -10,7 +10,7 @@ use std::{
 
 use anyhow::Context;
 use gbfr_logs::toolbox_rpc::{self, HookStatus};
-use gbfr_logs::{db, overmastery, parser, synthesis, transmarvel};
+use gbfr_logs::{db, legality, overmastery, parser, synthesis, transmarvel};
 
 use db::logs::LogEntry;
 #[cfg(windows)]
@@ -268,9 +268,43 @@ async fn handshake_and_apply(app: &AppHandle) {
 /// Deliberately `hello` and not `handshake`: this loop IS the retry, so the
 /// backoff ladder would only spend four RPCs (and up to ~10s) per tick to
 /// reach the same verdict the next tick re-checks anyway.
+/// Re-stat the hook DLL and publish the result if the derived status changed.
+///
+/// Antivirus quarantines this file (see `hook_dll`), and until it had a state
+/// of its own the app reported the aftermath as "No game found" — the inject
+/// error went to reload-debug.log and the UI claimed success regardless. Three
+/// callers share this: startup (before the game is even running, when the user
+/// can still act), the injection loop, and the heartbeat (which is what
+/// notices a quarantine that happens mid-session). One `is_file` on a local
+/// directory, so the heartbeat can afford it every tick.
+#[cfg(windows)]
+fn refresh_hook_dll_presence(app: &AppHandle) {
+    let hook = app.state::<HookStatus>();
+    let before = hook.snapshot();
+    let found = gbfr_logs::hook_dll::injectable_hook();
+    match &found {
+        Some(path) => log::debug!("hook DLL present at {path:?}"),
+        None => log::warn!(
+            "no hook DLL in any of {:?} — almost always antivirus quarantine; \
+             nothing can be injected until it is restored",
+            gbfr_logs::hook_dll::search_dirs()
+        ),
+    }
+    hook.dll_missing.store(found.is_none(), Ordering::Relaxed);
+    if hook.snapshot() != before {
+        emit_hook_status(app);
+    }
+}
+
 async fn hook_heartbeat(app: AppHandle) {
     loop {
         tokio::time::sleep(toolbox_rpc::HEARTBEAT_INTERVAL).await;
+
+        // Before the connected/gated early-out below: a quarantine that lands
+        // while no game is running is exactly the case the user needs told,
+        // and it is the case the RPC-only heartbeat could never see.
+        #[cfg(windows)]
+        refresh_hook_dll_presence(&app);
 
         let hook = app.state::<HookStatus>();
         // Nothing to ask when the stream is down. A teardown in flight is
@@ -679,6 +713,12 @@ struct SearchResult {
     player_ids: Vec<String>,
     /// Names of the Characters that can be filtered by.
     player_types: Vec<String>,
+    /// Stored legality verdicts for the logs on this page, keyed by log id.
+    /// Sent with the page rather than fetched separately so a row and its
+    /// verdicts can never be a render apart — and only for the ten rows drawn,
+    /// not the whole table the audit page reads. Logs nobody was flagged in are
+    /// absent; the quest list reads a miss as clean.
+    legality: HashMap<i64, Vec<db::legality::StoredFinding>>,
 }
 
 #[tauri::command]
@@ -691,7 +731,11 @@ fn fetch_logs(
     quest_completed: Option<bool>,
     filter_by_player_id: Option<String>,
     filter_by_player_character: Option<String>,
+    flagged_only: Option<bool>,
 ) -> Result<SearchResult, String> {
+    // Absent means "no legality filter" — the quest list only ever asks for the
+    // flagged runs or for all of them.
+    let flagged_only = flagged_only.unwrap_or(false);
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
     let page = page.unwrap_or(1);
     let per_page = 10;
@@ -724,6 +768,7 @@ fn fetch_logs(
         quest_completed,
         &filter_by_player_id,
         &filter_by_player_character,
+        flagged_only,
     )
     .map_err(|e| e.to_string())?;
 
@@ -734,8 +779,12 @@ fn fetch_logs(
         quest_completed,
         &filter_by_player_id,
         &filter_by_player_character,
+        flagged_only,
     )
     .map_err(|e| e.to_string())?;
+
+    let page_ids: Vec<i64> = logs.iter().map(|log| log.id()).collect();
+    let legality = db::legality::findings_for_logs(&conn, &page_ids).map_err(|e| e.to_string())?;
 
     let page_count = (log_count as f64 / per_page as f64).ceil() as u32;
 
@@ -817,6 +866,7 @@ fn fetch_logs(
         quest_ids,
         player_ids,
         player_types,
+        legality,
     })
 }
 
@@ -848,6 +898,60 @@ fn fetch_conflux_runs(page: Option<u32>) -> Result<ConfluxSearchResult, String> 
     })
 }
 
+/// How far the startup legality sweep has got, for the audit page's banner.
+/// `done == total` means it has finished.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LegalitySweepProgress {
+    done: usize,
+    total: usize,
+}
+
+/// Re-audits every log the current rules have not judged, reporting progress to
+/// the logs window.
+///
+/// Errors are logged, never surfaced: a sweep that fails leaves the stored
+/// findings exactly as they were, and the next launch tries again. It must not
+/// be able to take the app down with it.
+fn sweep_stale_legality(app: &tauri::AppHandle) {
+    let mut conn = match db::connect_to_db() {
+        Ok(conn) => conn,
+        Err(error) => {
+            log::warn!("legality sweep: could not open the database: {error:#}");
+            return;
+        }
+    };
+
+    // Emitted at most once a second: a 692-log sweep would otherwise push
+    // hundreds of events at a window that only renders a percentage.
+    let mut last_emit = std::time::Instant::now();
+    let result = legality::sweep::sweep_stale_logs(&mut conn, |progress| {
+        let finished = progress.done == progress.total;
+        if finished || last_emit.elapsed() >= std::time::Duration::from_secs(1) {
+            last_emit = std::time::Instant::now();
+            let _ = app.emit_to(
+                "logs",
+                "legality-sweep-progress",
+                LegalitySweepProgress {
+                    done: progress.done,
+                    total: progress.total,
+                },
+            );
+        }
+    });
+
+    match result {
+        Ok(outcome) if outcome.rescanned > 0 || outcome.unreadable > 0 => {
+            info!(
+                "legality sweep: re-audited {} logs ({} unreadable)",
+                outcome.rescanned, outcome.unreadable
+            );
+        }
+        Ok(_) => {}
+        Err(error) => log::warn!("legality sweep failed: {error:#}"),
+    }
+}
+
 #[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct EncounterStateResponse {
@@ -859,6 +963,11 @@ struct EncounterStateResponse {
     /// 0-based room index when this log is a Conflux room, else None. Lets the
     /// detail view suppress quest-status/elapsed-time (meaningless for a room).
     room_index: Option<u32>,
+    /// Stored build-legality findings, one vector per party slot so it lines up
+    /// with `players` by index. Read from the table rather than recomputed:
+    /// the startup sweep keeps them current, and opening a log must not pay
+    /// for an audit.
+    legality: [Vec<legality::Finding>; 4],
     /// Per-spawn selectable targets for the filter dropdown, in first-hit
     /// order — 1:1 with the HP chart's series (same instance numbers).
     target_entries: Vec<v1::TargetSegment>,
@@ -917,6 +1026,23 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         .query_row([id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
         .map_err(|e| e.to_string())?;
 
+    // Regrouped from the flat stored rows into one vector per party slot, so
+    // the response lines up with `players` by index. A log the sweep has not
+    // reached yet simply has no rows and reads as clean, which is the honest
+    // answer until it has been judged.
+    let mut findings: [Vec<legality::Finding>; 4] = Default::default();
+    match db::legality::findings_for_log(&conn, id as i64) {
+        Ok(stored) => {
+            for row in stored {
+                if let Some(slot) = findings.get_mut(row.player_index) {
+                    slot.push(row.finding);
+                }
+            }
+        }
+        // Never fatal: a log still opens without its verdicts.
+        Err(error) => log::warn!("could not read legality findings for log {id}: {error:#}"),
+    }
+
     // @TODO(false): If we deserialize from an older version, we should save it back into the DB as the newer format.
     let mut parser = parser::deserialize_version(&blob, version).map_err(|e| e.to_string())?;
 
@@ -934,6 +1060,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             quest_timer: parser.encounter.quest_timer,
             quest_completed: parser.encounter.quest_completed,
             room_index,
+            legality: findings,
             ..Default::default()
         });
     }
@@ -1009,6 +1136,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         quest_timer: parser.encounter.quest_timer,
         quest_completed: parser.encounter.quest_completed,
         room_index,
+        legality: findings,
         dps_chart: player_dps,
         hp_chart,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
@@ -1018,6 +1146,16 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         death_events,
         target_entries,
     })
+}
+
+/// Every flagged player across the whole database, for the Toolbox audit page.
+///
+/// Reads stored verdicts, so this is a join and a group rather than a re-audit
+/// of every log. `(async)` regardless: it still walks every finding.
+#[tauri::command(async)]
+fn fetch_legality_players() -> Result<Vec<db::legality::FlaggedPlayer>, String> {
+    let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+    db::legality::flagged_players(&conn).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1183,42 +1321,81 @@ async fn check_and_perform_hook(app: AppHandle) {
 
         match OwnedProcess::find_first_by_name(gbfr_logs::game_mem::GAME_EXE) {
             Some(target) => {
-                let syringe = Syringe::for_process(target);
-                let debug_dll_path = Path::new("hook-dbg.dll");
-                let mut dll_path = Path::new("hook.dll");
+                // `Syringe` is !Send, so nothing may await while it is alive —
+                // hence this sync block, which decides and then drops it. The
+                // retry sleeps happen outside, after `ready` comes back false.
+                let ready = {
+                    let syringe = Syringe::for_process(target);
 
-                if cfg!(debug_assertions) && debug_dll_path.exists() {
-                    dll_path = debug_dll_path;
-                }
-
-                // If a hook is ALREADY mapped, do not inject again and NEVER
-                // FreeLibrary it here. A live hook has detours installed and game
-                // threads running through its trampolines; unmapping it out from
-                // under them crashes the game (AccessViolation). A second inject
-                // would only bump the refcount without re-running the ctor
-                // (LoadLibrary runs it once). The only safe teardown of a live
-                // hook is the graceful control-channel path in reload_hook_inner,
-                // which disables the detours and fully unmaps BEFORE we get here —
-                // so a real reload arrives with nothing mapped and injects below.
-                // A hook already present is therefore either that live hook (from
-                // a prior app session) or an abnormally dead one: in both cases we
-                // just (re)connect and let the pipe tell us which.
-                if hook_module_present(&syringe) {
-                    reload_dbg(
-                        "check_and_perform_hook: a hook is already mapped; connecting without re-inject (never FreeLibrary a live hook)",
-                    );
-                } else {
-                    reload_dbg(&format!(
-                        "check_and_perform_hook: game found, injecting {dll_path:?}"
-                    ));
-                    match syringe.inject(dll_path) {
-                        Ok(module) => reload_dbg(&format!(
-                            "check_and_perform_hook: inject OK ({dll_path:?} -> {module:?})"
-                        )),
-                        Err(e) => reload_dbg(&format!(
-                            "check_and_perform_hook: inject FAILED for {dll_path:?}: {e:?}"
-                        )),
+                    // If a hook is ALREADY mapped, do not inject again and NEVER
+                    // FreeLibrary it here. A live hook has detours installed and game
+                    // threads running through its trampolines; unmapping it out from
+                    // under them crashes the game (AccessViolation). A second inject
+                    // would only bump the refcount without re-running the ctor
+                    // (LoadLibrary runs it once). The only safe teardown of a live
+                    // hook is the graceful control-channel path in reload_hook_inner,
+                    // which disables the detours and fully unmaps BEFORE we get here —
+                    // so a real reload arrives with nothing mapped and injects below.
+                    // A hook already present is therefore either that live hook (from
+                    // a prior app session) or an abnormally dead one: in both cases we
+                    // just (re)connect and let the pipe tell us which.
+                    if hook_module_present(&syringe) {
+                        reload_dbg(
+                            "check_and_perform_hook: a hook is already mapped; connecting without re-inject (never FreeLibrary a live hook)",
+                        );
+                        true
+                    } else {
+                        // Stat before injecting: a quarantined DLL is the
+                        // common failure here, and it deserves a named state
+                        // rather than an inject error nobody reads. Keep
+                        // polling — restoring the file then self-heals
+                        // without an app restart.
+                        refresh_hook_dll_presence(&app);
+                        match gbfr_logs::hook_dll::injectable_hook() {
+                            None => {
+                                reload_dbg(
+                                    "check_and_perform_hook: game found but NO hook DLL on disk; \
+                                     not injecting (see the hook status badge)",
+                                );
+                                false
+                            }
+                            Some(dll_path) => {
+                                reload_dbg(&format!(
+                                    "check_and_perform_hook: game found, injecting {dll_path:?}"
+                                ));
+                                match syringe.inject(&dll_path) {
+                                    Ok(module) => {
+                                        reload_dbg(&format!(
+                                            "check_and_perform_hook: inject OK ({dll_path:?} -> {module:?})"
+                                        ));
+                                        true
+                                    }
+                                    // Used to fall through to the "Found
+                                    // game.." toast below and then wait on a
+                                    // pipe nothing would ever serve. Say so
+                                    // and retry instead.
+                                    Err(e) => {
+                                        reload_dbg(&format!(
+                                            "check_and_perform_hook: inject FAILED for {dll_path:?}: {e:?}"
+                                        ));
+                                        log::error!(
+                                            "hook injection failed for {dll_path:?}: {e:?}"
+                                        );
+                                        let _ = app.emit_all(
+                                            "error-alert",
+                                            format!("Hook injection failed: {e}"),
+                                        );
+                                        false
+                                    }
+                                }
+                            }
+                        }
                     }
+                };
+
+                if !ready {
+                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                    continue;
                 }
                 let _ = app.emit_all("success-alert", "Found game..");
 
@@ -2095,6 +2272,7 @@ fn main() {
             fetch_encounter_state,
             fetch_logs,
             fetch_conflux_runs,
+            fetch_legality_players,
             delete_logs,
             delete_all_logs,
             toggle_always_on_top,
@@ -2128,11 +2306,24 @@ fn main() {
             update_tray_labels,
         ])
         .setup(|app| {
+            // Before anything waits on a game: if antivirus took the hook DLL,
+            // the badge says so from the first frame rather than after the
+            // user has launched the game and watched an empty meter.
+            #[cfg(windows)]
+            refresh_hook_dll_presence(&app.handle());
+
             // Perform the game hook check in a separate thread.
             tauri::async_runtime::spawn(check_and_perform_hook(app.handle()));
             // Outlives individual connections on purpose: it must also run for
             // a hook that was already mapped when the app started.
             tauri::async_runtime::spawn(hook_heartbeat(app.handle()));
+
+            // Re-audit any log the current rules have not judged — every log
+            // recorded before the legality work, and every log at all after a
+            // rule changes. On its own thread so a rules bump never delays the
+            // window appearing.
+            let handle = app.handle();
+            std::thread::spawn(move || sweep_stale_legality(&handle));
 
             Ok(())
         })

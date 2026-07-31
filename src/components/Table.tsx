@@ -1,17 +1,18 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 import { useMeterSettingsStore } from "../stores/useMeterSettingsStore";
 import {
   ComputedPlayerState,
   EncounterState,
+  LegalityFinding,
   MeterColumns,
   PlayerData,
   SortDirection,
   SortType,
   visibleColumns,
 } from "../types";
-import { formatInPartyOrder, sortPlayers } from "../utils";
+import { formatInPartyOrder, meterGridTemplate, sortPlayers } from "../utils";
 import { PlayerRow } from "./PlayerRow";
 
 export const Table = ({
@@ -22,25 +23,33 @@ export const Table = ({
   sortDirection,
   setSortType,
   setSortDirection,
+  legality,
 }: {
   live?: boolean;
   encounterState: EncounterState;
   partyData: Array<PlayerData | null>;
+  /** Build-legality findings per party slot, aligned with `partyData`. */
+  legality?: LegalityFinding[][];
   sortType: SortType;
   sortDirection: SortDirection;
   setSortType: (sortType: SortType) => void;
   setSortDirection: (sortDirection: SortDirection) => void;
 }) => {
   const { t } = useTranslation();
-  const { streamerMode, show_full_values, overlay_columns, logs_columns } = useMeterSettingsStore(
-    useShallow((state) => ({
-      useCondensedSkills: state.use_condensed_skills,
-      streamerMode: state.streamer_mode,
-      show_full_values: state.show_full_values,
-      overlay_columns: state.overlay_columns,
-      logs_columns: state.logs_columns,
-    }))
-  );
+  const { streamerMode, show_full_values, overlay_columns, logs_columns, barFillMode, barTexture, barHeight, barGap } =
+    useMeterSettingsStore(
+      useShallow((state) => ({
+        useCondensedSkills: state.use_condensed_skills,
+        streamerMode: state.streamer_mode,
+        show_full_values: state.show_full_values,
+        overlay_columns: state.overlay_columns,
+        logs_columns: state.logs_columns,
+        barFillMode: state.bar_fill_mode,
+        barTexture: state.bar_texture,
+        barHeight: state.bar_height,
+        barGap: state.bar_spacing,
+      }))
+    );
 
   const partyOrderPlayers = formatInPartyOrder(encounterState.party);
   let players: Array<ComputedPlayerState> = partyOrderPlayers.map((playerData) => {
@@ -60,6 +69,10 @@ export const Table = ({
     // Otherwise, show all players.
     return streamerMode ? partySlotIndex === 0 : true;
   });
+
+  // Taken AFTER the streamer-mode filter: with only the streamer's own row on
+  // screen, a relative bar that always reads 100% is the intended result.
+  const maxPercentage = players.reduce((max, player) => Math.max(max, player.percentage || 0), 0);
 
   // Encounter duration in seconds — the same span (last damage − first damage)
   // the parser divides by for player.stunPerSecond, so per-skill SPS stays
@@ -84,34 +97,62 @@ export const Table = ({
   );
 
   return (
-    <table className={`player-table table w-full ${show_full_values ? "full-values" : ""}`}>
-      <thead className="header transparent-bg">
-        <tr>
-          <th className="header-name" onClick={() => toggleSort(MeterColumns.Name)}>
+    // The bar custom properties are set on the OUTER table and inherit down the
+    // DOM, so the nested skill-breakdown table picks them up with no wiring of
+    // its own.
+    //
+    // Divs with explicit ARIA roles rather than a <table>: the damage bar is a
+    // row background, and table cells paint backgrounds in ways engines
+    // disagree about — see the note above `.table` in App.css. The roles keep
+    // the semantics a table gave for free.
+    <div
+      role="table"
+      className={`player-table table w-full bar-texture-${barTexture} ${show_full_values ? "full-values" : ""}`}
+      style={
+        {
+          "--meter-row-height": `${barHeight}px`,
+          "--meter-row-gap": `${barGap}px`,
+          // One template shared by the header and every row, so the columns
+          // cannot drift apart. Set here because only this component knows how
+          // many value columns the user has chosen; the shape itself lives in
+          // `meterGridTemplate`, which the skill table reads too. The widths
+          // stay CSS variables so the narrow rules can retune them.
+          "--meter-grid": meterGridTemplate(columns.length),
+        } as CSSProperties
+      }
+    >
+      <div className="header transparent-bg" role="rowgroup">
+        <div className="meter-row" role="row">
+          <div className="header-name" role="columnheader" onClick={() => toggleSort(MeterColumns.Name)}>
             {t("ui.meter-columns.name")}
-          </th>
+          </div>
           {columns.map((column) => (
-            <th
+            <div
               key={column}
+              role="columnheader"
               className={`header-column header-column-${column} text-center`}
               onClick={() => toggleSort(column)}
             >
               {t(`ui.meter-columns.${column}`)}
-            </th>
+            </div>
           ))}
-        </tr>
-      </thead>
-      <tbody>
-        {players.map((player) => (
+        </div>
+      </div>
+      <div className="table-body" role="rowgroup">
+        {players.map((player, rank) => (
           <PlayerRow
             live={live}
             key={player.index}
+            rank={rank}
             player={player}
             partyData={partyData}
             durationSeconds={durationSeconds}
+            legality={legality}
+            maxPercentage={maxPercentage}
+            fillMode={barFillMode}
           />
         ))}
-      </tbody>
-    </table>
+      </div>
+    </div>
   );
 };

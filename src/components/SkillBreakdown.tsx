@@ -1,8 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { useShallow } from "zustand/react/shallow";
 
-import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
+import { useMeterSettingsStore, type BarFillMode } from "@/stores/useMeterSettingsStore";
 import {
   CharacterType,
   ComputedPlayerState,
@@ -12,7 +12,7 @@ import {
   visibleColumns,
 } from "@/types";
 
-import { getSkillName, isSkillGroup } from "@/utils";
+import { getSkillName, isSkillGroup, meterGridTemplate } from "@/utils";
 import { SkillGroupRow } from "./SkillGroupRow";
 import { SkillRow } from "./SkillRow";
 import { useSkillBreakdown } from "./useSkillBreakdown";
@@ -32,6 +32,8 @@ const renderSkillRow = (
   color: string,
   columns: SkillColumns[],
   durationSeconds: number,
+  maxPercentage: number,
+  fillMode: BarFillMode,
   live?: boolean
 ) => {
   if (isSkillGroup(skillData)) {
@@ -45,6 +47,8 @@ const renderSkillRow = (
         color={color}
         columns={columns}
         durationSeconds={durationSeconds}
+        maxPercentage={maxPercentage}
+        fillMode={fillMode}
         live={live}
       />
     );
@@ -59,6 +63,8 @@ const renderSkillRow = (
         color={color}
         columns={columns}
         durationSeconds={durationSeconds}
+        maxPercentage={maxPercentage}
+        fillMode={fillMode}
         live={live}
       />
     );
@@ -68,12 +74,18 @@ const renderSkillRow = (
 export const SkillBreakdown = ({ player, color, durationSeconds = 0, live }: SkillBreakdownProps) => {
   const { t } = useTranslation();
   const { skills } = useSkillBreakdown(player);
-  const { overlaySkillColumns, logsSkillColumns } = useMeterSettingsStore(
+  const { overlaySkillColumns, logsSkillColumns, barFillMode } = useMeterSettingsStore(
     useShallow((state) => ({
       overlaySkillColumns: state.overlay_skill_columns,
       logsSkillColumns: state.logs_skill_columns,
+      barFillMode: state.bar_fill_mode,
     }))
   );
+
+  // One max for the whole breakdown, taken over the top-level rows. Nested rows
+  // reuse it: a child's damage is always <= its group's, so a child bar can
+  // never overrun the parent bar it sits under.
+  const maxPercentage = skills.reduce((max, skill) => Math.max(max, skill.percentage || 0), 0);
 
   // The overlay honours the user's overlay columns; the logs view honours the
   // (separately-defaulted) logs columns. Memoized: the source lists are stable
@@ -84,24 +96,34 @@ export const SkillBreakdown = ({ player, color, durationSeconds = 0, live }: Ski
   );
 
   return (
-    <tr className="skill-table">
-      <td colSpan={100}>
-        <table className="table w-full">
-          <thead className="header transparent-bg">
-            <tr>
-              <th className="header-name">{t("ui.skill-columns.skill")}</th>
-              {columns.map((column) => (
-                <th key={column} className="header-column text-center">
-                  {t(`ui.skill-columns.${column}`)}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="transparent-bg">
-            {skills.map((skill) => renderSkillRow(player.characterType, skill, color, columns, durationSeconds, live))}
-          </tbody>
-        </table>
-      </td>
-    </tr>
+    // No caret track here — a group row draws its own caret inside the name
+    // cell rather than in a column of its own.
+    <div
+      role="table"
+      className="table w-full skill-table"
+      style={
+        {
+          "--meter-grid": meterGridTemplate(columns.length),
+        } as CSSProperties
+      }
+    >
+      <div className="header transparent-bg" role="rowgroup">
+        <div className="meter-row" role="row">
+          <div className="header-name" role="columnheader">
+            {t("ui.skill-columns.skill")}
+          </div>
+          {columns.map((column) => (
+            <div key={column} role="columnheader" className="header-column text-center">
+              {t(`ui.skill-columns.${column}`)}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="table-body transparent-bg" role="rowgroup">
+        {skills.map((skill) =>
+          renderSkillRow(player.characterType, skill, color, columns, durationSeconds, maxPercentage, barFillMode, live)
+        )}
+      </div>
+    </div>
   );
 };

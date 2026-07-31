@@ -5,10 +5,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const invoke = vi.fn();
 const emit = vi.fn();
+const open = vi.fn();
 let status: unknown = null;
 let encounterState: unknown = null;
 vi.mock("@tauri-apps/api", () => ({ invoke: (...a: unknown[]) => invoke(...a) }));
 vi.mock("@tauri-apps/api/event", () => ({ emit: (...a: unknown[]) => emit(...a) }));
+vi.mock("@tauri-apps/api/shell", () => ({ open: (...a: unknown[]) => open(...a) }));
 vi.mock("@/useHookStatus", () => ({ useHookStatus: () => status }));
 vi.mock("@mantine/modals", () => ({ modals: { openConfirmModal: vi.fn() } }));
 vi.mock("@/stores/useEncounterStore", () => ({
@@ -27,6 +29,8 @@ describe("HookStatusBadge", () => {
     invoke.mockReset();
     emit.mockReset();
     emit.mockResolvedValue(undefined);
+    open.mockReset();
+    open.mockResolvedValue(undefined);
     vi.mocked(modals.openConfirmModal).mockReset();
     status = null;
     encounterState = null;

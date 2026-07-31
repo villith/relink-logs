@@ -1,4 +1,13 @@
-import { DeathEvent, EncounterState, HpChartSeries, PlayerData, SBAEvent, TargetEntry, TargetSpan } from "@/types";
+import {
+  DeathEvent,
+  EncounterState,
+  HpChartSeries,
+  LegalityFinding,
+  PlayerData,
+  SBAEvent,
+  TargetEntry,
+  TargetSpan,
+} from "@/types";
 import { create } from "zustand";
 
 interface EncounterStore {
@@ -17,6 +26,11 @@ interface EncounterStore {
   selectedTargetSpans: TargetSpan[];
   selectedPlayers: string[];
   players: PlayerData[];
+  /** Stored build-legality findings, filtered in lockstep with `players` so the
+   * two line up by index. The response arrives keyed by PARTY SLOT, but
+   * `players` drops empty slots, so it is realigned on load rather than left
+   * for every consumer to remember. */
+  legality: LegalityFinding[][];
   questId: number | null;
   questTimer: number | null;
   questCompleted: boolean;
@@ -38,6 +52,8 @@ export interface EncounterStateResponse {
   sbaChartLen: number;
   targetEntries: TargetEntry[];
   players: PlayerData[];
+  /** One vector per PARTY SLOT (0-3), parallel to the unfiltered `players`. */
+  legality: LegalityFinding[][];
   questId: number | null;
   questTimer: number | null;
   questCompleted: boolean | null;
@@ -57,6 +73,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   selectedTargetSpans: [],
   selectedPlayers: [],
   players: [],
+  legality: [],
   questId: null,
   questTimer: null,
   questCompleted: false,
@@ -64,7 +81,12 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   setSelectedTargetSpans: (targetSpans: TargetSpan[]) => set({ selectedTargetSpans: targetSpans }),
   setSelectedPlayers: (playerNames: string[]) => set({ selectedPlayers: playerNames }),
   loadFromResponse: (response: EncounterStateResponse) => {
-    const filteredPlayers = response.players.filter((player) => player !== null);
+    // Keep the two filters identical, or a finding lands on the wrong player.
+    const keptSlots = response.players
+      .map((player, slot) => [player, slot] as const)
+      .filter(([player]) => player !== null);
+    const filteredPlayers = keptSlots.map(([player]) => player);
+    const filteredLegality = keptSlots.map(([, slot]) => response.legality?.[slot] ?? []);
 
     set({
       encounterState: response.encounterState,
@@ -77,6 +99,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       sbaChartLen: response.sbaChartLen,
       targetEntries: response.targetEntries ?? [],
       players: filteredPlayers,
+      legality: filteredLegality,
       questId: response.questId,
       questTimer: response.questTimer,
       questCompleted: response.questCompleted || false,

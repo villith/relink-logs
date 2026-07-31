@@ -7,6 +7,10 @@ authors = ["you"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[package.metadata.tauri-winres]
+CompanyName = "Scott Donnelly"
+OriginalFilename = "GBFR Logs.exe"
+Comments = "Source: https://github.com/villith/relink-logs"
 
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }

@@ -1,0 +1,7251 @@
+{
+ "00277247": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "004557b8": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "004cdeec": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "00612b10": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "4c588c27",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "006e474e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": "7ccff74f",
+  "trait2Lot": null
+ },
+ "0114dd91": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "01643ef4": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "23d0f67f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "01bb436b": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "7d75d904",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "01d1a6ce": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "23d0f67f",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "02472c43": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "e60a735c",
+  "trait2": "6ff05223",
+  "trait2Lot": null
+ },
+ "02b1f8c0": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "ec3cf174",
+  "trait2": "af513a9d",
+  "trait2Lot": null
+ },
+ "02ba37a3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "02c1d304": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8b3bf60c",
+  "trait2": "d2c8e10a",
+  "trait2Lot": null
+ },
+ "02c67f5e": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "035a4ddd": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "040549b7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d2c8e10a",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "041d7b20": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1470f860",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "04ac2281": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "b5ff9fd3",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "04bd9f6b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": "3fec5f80",
+  "trait2Lot": null
+ },
+ "04d028e3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0523a202": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "06719232",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "0537ef0b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "05aca892": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "921b6b0c",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "05fe0351": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "3d8153a1",
+  "trait2": "f372f096",
+  "trait2Lot": null
+ },
+ "06260d96": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "062844fd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "062ecb15": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "069046d9": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "86cbcdc4",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0713d928": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "dade14dc",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "0723f7ec": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "ed8d8ad8",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "07703a8a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b5ff9fd3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "07a3abd9": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "0890cd68": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "6018372b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0898bb55": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "08da7279": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "0952f945": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0a410bd8": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cd030268",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0a4651bb": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "ec1c6779",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0aa7735e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0b3a6cc9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7ccff74f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0b456def": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "0053599e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0bb4ccda": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "0bb9c188": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "0bbd27f6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9702860f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0c967a31": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "0da193fe": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0db316f8": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0db62b78": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0dd30ec5": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "451d814c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0e3be66c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0e83606d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0ea21045": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "0ee1e9d7": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "333e5862",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0f06d22c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0f1e9ff1": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0f2bb8b2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c84a6b3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0f386f8e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "fb572681",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "0f4a0a62": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "100e4b1d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f687c5ef",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "102ff7aa": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "104cd6ea": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "10b32273": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1122d016": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "113035d8": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "51c115d2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1147543e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "1150513c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "119b24a8": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "0cd6c625",
+  "trait2": "a3b49220",
+  "trait2Lot": null
+ },
+ "11df14e3": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "5463232f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "120c5d98": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "5e422ae5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "12789216": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1291f7ca": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "129e224a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "12d6f539": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "12dfd310": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "77c809f5",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "12fbb007": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "130508ac": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "132952c1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "13896108": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "14082b75": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "147da58b": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "af513a9d",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "14c58bf1": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "ec3cf174",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "15f618b1": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "16216fdd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b5ff9fd3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "164e776a": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "1706db6c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "1727e6b7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9702860f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "176fe02c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "973b49af",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1791546f": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d76f4d24",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "17974bba": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "17be4841": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "17ce9a47": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1834c3aa": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": "57ab5b10",
+  "trait2Lot": null
+ },
+ "186407ed": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "190c656d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "197818b7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2242921f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "19c4348e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "19cb4eb9": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "50b453dd",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "19f0455d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1a225843": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "09aa7db5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1a359b67": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "be3404b9",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "1a57aef1": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "29b07beb",
+  "trait2": "a63b89cd",
+  "trait2Lot": null
+ },
+ "1a5f39d2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "1a743e14": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1a94123d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "1abadc4d": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "9a9dc170",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1af3d4dc": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0053599e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1bbe919c": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "aa83f548",
+  "trait2": "921b6b0c",
+  "trait2Lot": null
+ },
+ "1bf76d02": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d2c8e10a",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1c1123ca": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1c166abc": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f687c5ef",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1c4d37e4": {
+  "maxLevel": 45,
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "082033cb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1c500ab2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "1ca872e7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "1cd1d367": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "1ceb58aa": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1d3b007a": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "29b292a8",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1d409445": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1df4d351": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1e2ebc39": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": "5e422ae5",
+  "trait2Lot": null
+ },
+ "1e56fe99": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "1e69c3d0": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "6085da25",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "1e7796e1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": "8d78a19b",
+  "trait2Lot": null
+ },
+ "1f012233": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "09aa7db5",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "1fc0c1a5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e0abfdfe",
+  "trait2": "e6cdba9c",
+  "trait2Lot": null
+ },
+ "2014714c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2037a9ed": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "20492635": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "207559b9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "208af595": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8b3bf60c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "20bcdb1b": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "3759a5b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "212b81f5": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "7351d602",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "21e10eb7": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "c2a4c7a9",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "22115f71": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a2fa9685",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "22319f27": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b6e31f76",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "22dc8701": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "231ebaa2": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "232147ad": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "237caa21": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1dc9d7e7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "23953fd4": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "7d75d904",
+  "trait2": "be3404b9",
+  "trait2Lot": null
+ },
+ "23c84e82": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "24883af3",
+  "trait2": null,
+  "trait2Lot": "27"
+ },
+ "23e7990d": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "247a41f3": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "9ace140b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "248c0116": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3759a5b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "24ed29e6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "24f8f42f": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "c31771f8",
+  "trait2": "1b0d9897",
+  "trait2Lot": null
+ },
+ "25cd5873": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "48a95b8d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2679a4f0": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "d2c8e10a",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "268cedc5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "05f2ecdc",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "26ddcd39": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2767b7e2": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": null,
+  "trait2Lot": "27"
+ },
+ "27c62352": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d54f8ca7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "27f0408a": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "7c84a6b3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "28089a97": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "93a2093c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "282dbff0": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "1de14c65",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "28a30205": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "28b71e53": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d54f8ca7",
+  "trait2": "48a95b8d",
+  "trait2Lot": null
+ },
+ "295219f9": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "d2c8e10a",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "297d03f7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": "05f2ecdc",
+  "trait2Lot": null
+ },
+ "29be4772": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d54f8ca7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2a2304e2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": "dc584f60",
+  "trait2Lot": null
+ },
+ "2a85a4c2": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2ac47940": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "ee85cd1f",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "2b2401ef": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "2b247ee4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7ccff74f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2b94d8d6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "5e422ae5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2bdfba94": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3759a5b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2c958609": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50b453dd",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2c95cee8": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2cb6d0d9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2cdc1fe0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "318d12e9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2d188557": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2d2c99e9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1470f860",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2d5f3437": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "95f3fa86",
+  "trait2": null,
+  "trait2Lot": "27"
+ },
+ "2d637d25": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2d70c37d": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "807b6684",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "2d7f2e70": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "2d85102a": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "4c588c27",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "2db5d969": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2e3351e3": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "5e422ae5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2f06ac30": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "af794a87",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2f5adac6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "2fd5965c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "3069c2fe": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "0f026cf0",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "30a3f2ea": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "f8496336",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "311d9cb9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "31afd43a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "31d241e4": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "31f91fcf": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "05fa4599",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "329c4e1c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7ccff74f",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "33006fc3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "332e9b30": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "ee85cd1f",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "3332e18d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50b453dd",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "335b55d0": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "335da2a5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e69a4694",
+  "trait2": "8d78a19b",
+  "trait2Lot": null
+ },
+ "33ac7f74": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "dc607d75",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "33c89f1c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "33f01810": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "cd030268",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "342143d7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "346edd73": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "3d8153a1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "34c77091": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "b85202bc",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3559988c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "35637b96": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e0abfdfe",
+  "trait2": "74aa75d6",
+  "trait2Lot": null
+ },
+ "3564aa4d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "3572645c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "35a14fc3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "35a6badd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "35accc3c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "35ae024e": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "35bd0f81": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "361d44c4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "36360691": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "3644ef2c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d2c8e10a",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "364c8e19": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "36e1c7fc": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": "b5ff9fd3",
+  "trait2Lot": null
+ },
+ "36f4b48a": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "37b0783c": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "9230e3f5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "37e83548": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e0abfdfe",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "380a3ca8": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "a38510e2",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "381bbe64": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "e6cdba9c",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "38a9cadf": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e69a4694",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "38de81d2": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "11aae5f5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "390175e7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c84a6b3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3973c1c4": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3976136f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "397a3150": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4bf2e191",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "39a38b2c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a2fa9685",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "39b62087": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "16eff868",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "39bea99b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "3b03dc0f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3b48e4e7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3ba37635": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "7ccff74f",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "3bca3fd5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dd4a701e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3bdbe4b0": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "b48eef48",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3c0f5461": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "f71f8997",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3c4e2fcf": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "3d0bf8cb": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "4c588c27",
+  "trait2": "09aa7db5",
+  "trait2Lot": null
+ },
+ "3d5e4678": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "e85ff8e0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3d8d9109": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d8f66c1c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3d9b8e6f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3dc4d818": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c84a6b3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3dd38511": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3ea4134b": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "d40d1e9b",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "3ed16fb2": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "24883af3",
+  "trait2": null,
+  "trait2Lot": "27"
+ },
+ "3edd4c1f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6085da25",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3f45dbdc": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3759a5b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "3f5e8fd8": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "3f8fc674": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "66de60b1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "40214c38": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": "e69a4694",
+  "trait2Lot": null
+ },
+ "40738cdd": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "a339d642",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "408cc3b5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "4119f09b": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "5559232f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "41ac1082": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "dba19768",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "425056c4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c84a6b3",
+  "trait2": "dc584f60",
+  "trait2Lot": null
+ },
+ "426ad20e": {
+  "maxLevel": 45,
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "082033cb",
+  "trait2": "d3b8c21f",
+  "trait2Lot": null
+ },
+ "42bb0c1c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "43088191": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "430df884": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "430fb951": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4365b3ff": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7edd69d0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "439a2d9c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "43cdd1fc": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": "f372f096",
+  "trait2Lot": null
+ },
+ "43dde5dd": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "281214ab",
+  "trait2": "6085da25",
+  "trait2Lot": null
+ },
+ "43f26a91": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "c00163b3",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "4438676e": {
+  "maxLevel": 30,
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "5c862e13",
+  "trait2": "dc584f60",
+  "trait2Lot": null
+ },
+ "44d48479": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "f1d5dbd0",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "450b862c": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "c7d379f1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "45140ae4": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4597a8a8": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "dba19768",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "459dd2c2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "45b43024": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "462782d5": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "e60a735c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "462b27d3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "464099cd": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "cfb48782",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "46aba3c0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7edd69d0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "47b00599": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "fb572681",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "47da8c35": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d2c8e10a",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4823bbb3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6085da25",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4840c322": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "490f7304": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "24883af3",
+  "trait2": "ceb700ee",
+  "trait2Lot": null
+ },
+ "49434696": {
+  "maxLevel": 20,
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "bf78fbfc",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "49651c89": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "a3b49220",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "4971e8fb": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "49745934": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "af794a87",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "49ebebeb": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "af794a87",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4a25d812": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "4a336d1e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "09aa7db5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4a36b37f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "29b292a8",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4a39dc7d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "973b49af",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4aa48417": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4abce5c8": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "c31771f8",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4ae72c9e": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "3d8153a1",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "4b754d3a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4b86cc01": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4b98f53a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e0abfdfe",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4ba4e4ac": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "4c28585a": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "b85202bc",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "4c6ad990": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "6ebfa176",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4c942ed5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4cc406ca": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6018372b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4cc5031d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dd4a701e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4cdce25b": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "ba504607",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "4d52c35c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "4d7c8632": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "ba504607",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4d962f18": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "66de60b1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4db1fdc1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "4e4911fa": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6018372b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4e988d4f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4ebaa02a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "fb572681",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4f01d6ca": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "6ebfa176",
+  "trait2": "f1d5dbd0",
+  "trait2Lot": null
+ },
+ "4f37be70": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b5ff9fd3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4f500fbf": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "318d12e9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "4ffe62e5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "501973ce": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5048c546": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "66de60b1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "50996321": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "50b05700": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc607d75",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5119e3f4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "5144fe4d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "515e693c": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "8519ad4a",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "51e98a7c": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "b953cc1e",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "522004ab": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "3bfed918",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "522c13b8": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "524de21c": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "77c809f5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "52a6e299": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cd030268",
+  "trait2": "a38510e2",
+  "trait2Lot": null
+ },
+ "52abe046": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": "0aa20846",
+  "trait2Lot": null
+ },
+ "52bd3102": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "533d337b": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "534b93c2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "53b1458d": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "53bd323f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "54cefd1c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "54d62fdf": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "54d8ea04": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "5536ee62": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5608ef7e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5670aeca": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "56881c69": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "8cdf9382",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "56a668b1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a4d6b880",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "56d196c5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "57b6d9a5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "cfb48782",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "57d2caf2": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "583cf40f": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "0cd6c625",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "58a21fb7": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "48a95b8d",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "58f63427": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e69a4694",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "58ffaeaa": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "590715d9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "590c19c8": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d7f9bb88",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "59de6187": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d2c8e10a",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "59e5335b": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5a360ea8": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "47384248",
+  "trait2": "30773197",
+  "trait2Lot": null
+ },
+ "5b939637": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "66de60b1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5bf84fd1": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": null,
+  "trait2Lot": "27"
+ },
+ "5c19bbb0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "973b49af",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5c569745": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "5cb2445f": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "30773197",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5d592fdd": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "4e5f6706",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "5dcc1f70": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "5e7eeec4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5eb282c6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "95f3fa86",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5f097193": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5f117445": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "5f988136": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "29b292a8",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5faa08e3": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "29b07beb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "5fb842e4": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "e6b92e34",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6056e1c7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "60571189": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "60bd40a1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "60cabddb": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50b453dd",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "612b6458": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e69a4694",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "6130d327": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e0abfdfe",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "614fb550": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "d54f8ca7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6151f5f6": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "61a1a299": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "3eb345d7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "61c49c10": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": "9389cc06",
+  "trait2Lot": null
+ },
+ "621a2a97": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "9afdfa9e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "628dd0df": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "62fed4f1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a2fa9685",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "630de5dd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "64301e91": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "47384248",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "645acee5": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "a3b49220",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "64d63823": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "aa83f548",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "65150a03": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "95f3fa86",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "65909e04": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "318d12e9",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "65b73b3f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "24883af3",
+  "trait2": "95f3fa86",
+  "trait2Lot": null
+ },
+ "65b7e5c8": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": "1470f860",
+  "trait2Lot": null
+ },
+ "65f0420a": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "46ee3116",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6674c639": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "4f135217",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "66cb28ba": {
+  "maxLevel": 20,
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "bf78fbfc",
+  "trait2": "1b0d9897",
+  "trait2Lot": null
+ },
+ "66f1b128": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "e6b92e34",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "673c5d8f": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "2e65a774",
+  "trait2": "16eff868",
+  "trait2Lot": null
+ },
+ "6786cf44": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "67c1e5e3": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "7b4fc47a",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "687b928e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "24883af3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "688ab21c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "68b1e888": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "68d0507a": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "692276e2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f687c5ef",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "695ebc2e": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "696226bb": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "7440e869",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "69bf4aac": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6a3b2653": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6aae4b8f": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "77c809f5",
+  "trait2": "9230e3f5",
+  "trait2Lot": null
+ },
+ "6ab4974c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c86f3082",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6ac327a2": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "2242921f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6b59242a": {
+  "maxLevel": 30,
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cd18a77d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6b920da2": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "79266456",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6ba991cd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f687c5ef",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6bb655f1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9702860f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6c85983c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": "f372f096",
+  "trait2Lot": null
+ },
+ "6cba6b0d": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "05f2ecdc",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "6cca1ff7": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "451d814c",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "6d18e7dc": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "a374fdf0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6db307d5": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "333e5862",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6ec9d6bb": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6efcd286": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "4c588c27",
+  "trait2": "3fec5f80",
+  "trait2Lot": null
+ },
+ "6f1d0870": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "48a95b8d",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "6f2cf65f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6f4749ad": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "6fd12e61": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "05f2ecdc",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "6ff3308a": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "4c588c27",
+  "trait2": "f26baea5",
+  "trait2Lot": null
+ },
+ "70051799": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "5e422ae5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7009517b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": "7c2e4d64",
+  "trait2Lot": null
+ },
+ "70336d00": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "318d12e9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "70361ef1": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "f1d5dbd0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "70a871d5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "48a95b8d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "70f6ae03": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7173b93f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "718f62f7": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "71ff966a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "72304799": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "c2a4c7a9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "72466f3c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "e0abfdfe",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "72735a07": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "728bda66": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6085da25",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7291a3f9": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "4bf2e191",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "72946a51": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50b453dd",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "72c5a23d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "72cba710": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d54f8ca7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "72d83138": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7300a967": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "735769a7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "318d12e9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "73b77d4f": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "73db3bd3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "73e4c05e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "48a95b8d",
+  "trait2": "7ccff74f",
+  "trait2Lot": null
+ },
+ "73e5554f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e6cdba9c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "74061b0c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "7428df74": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "7461bd6d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "5e422ae5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "748dd213": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8b3bf60c",
+  "trait2": "318d12e9",
+  "trait2Lot": null
+ },
+ "74eedc99": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "751228a2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "75183bfd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "753ecf9d": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "6ff05223",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7562f00a": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "758d5322": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "75b8dad7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0053599e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "75fe50e5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "7653b159": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "a63b89cd",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "76710852": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6018372b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "76786869": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "46ee3116",
+  "trait2": "1b0d9897",
+  "trait2Lot": null
+ },
+ "76c7eb69": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0aa20846",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "76d4716b": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "daefbb27",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "772601d4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7739febd": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "921b6b0c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "77802303": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "1470f860",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "77803875": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7885354a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc607d75",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "78b9f5ab": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "78c6f203": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9702860f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "791da8ed": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "793cfac5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "79495b88": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "24883af3",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "79d7536f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9389cc06",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "79f4fd3e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7a06c7fb": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "47384248",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7a74e84c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": "f372f096",
+  "trait2Lot": null
+ },
+ "7aa335b6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7ac9dc94": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7aebef91": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7b4aab30": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "7b8c3e06": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7bf56b6f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "7c7ec053": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "0e42be1b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7c8580ca": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "522e2388",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "7ce4d81c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": "74aa75d6",
+  "trait2Lot": null
+ },
+ "7d318ff7": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "5463232f",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "7d5c5a42": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4bf2e191",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7d720227": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "7d8ff2ee": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0053599e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7dea157b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "24883af3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7e0d082a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "66de60b1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7e13a72d": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "9389cc06",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7e3a52a3": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "15806dfc",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "7e76f58d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6018372b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7efa8c0d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "7f4f38ef": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7f5dda19": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "7f7e82ab": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d1012d8c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "7fb3e3d5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9702860f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "803f64bd": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cd124165",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8091acbe": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "48a95b8d",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "80a6dd30": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "80c94a24": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "7edd69d0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "80cccd83": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "af513a9d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "80cfc2f1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "80dc0fb8": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b6e31f76",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "811d8a6a": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "81742849": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "81b3962d": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "81cb6c6b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d2c8e10a",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8224e6e0": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8230b722": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "82677aaa": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "66de60b1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "82903e7e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "829ee87b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "82b300f5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "5e422ae5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "82cea35a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "82f1e7e4": {
+  "maxLevel": 45,
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d3b8c21f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "83111a4b": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "837b3d64": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "6085da25",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "83b5463b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "83e5006e": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "840c419a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "842abbeb": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "843070e7": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "0f026cf0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8456b1a3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "855e7713": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "7ad0c010",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "85d7b335": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "8cdf9382",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "85e85d91": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "867effed": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "872d3af9": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "8572b8af",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "87658a6f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "883380d4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b5ff9fd3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8856f755": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "89538be0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "895abbf6": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "1de14c65",
+  "trait2": "26956f25",
+  "trait2Lot": null
+ },
+ "89ca4db0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "8a108211": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8a3819c0": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "6316cbeb",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "8a3dcab1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "8a967a6e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "8a9f7374": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8b647510": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "8b66775a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8b8085c0": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "8b9c3d0f": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "8bf28309": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8ca7d9c1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "8ce18579": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8d639e0c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c86f3082",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8dbf201a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "8e20b20c": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "ec1c6779",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8e3f1ec7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8e5b056b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8ecbb0a3": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "e85ff8e0",
+  "trait2": "8572b8af",
+  "trait2Lot": null
+ },
+ "8f0329fc": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "8f1b4dc4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "8ff568f7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "90176d85": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "905c6d7f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "90822db1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": "ceb700ee",
+  "trait2Lot": null
+ },
+ "908d5612": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "909a3aeb": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "90e42e35": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "90fbb4bf": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "95f3fa86",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "91196499": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b6e31f76",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9172d000": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "9184f37b": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "7b5b081d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "91956b39": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9196a989": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "91ac1ddd": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "e69a4694",
+  "trait2": null,
+  "trait2Lot": "27"
+ },
+ "91cc46c0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "921bb96e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "921d90d8": {
+  "maxLevel": 30,
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "dbe1d775",
+  "trait2": "dc584f60",
+  "trait2Lot": null
+ },
+ "922804ef": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "92b2d85f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6018372b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9300fadb": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "936dfe00": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "a38510e2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "938db625": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "3d8153a1",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "9393d637": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "51c115d2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "93d9774f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "946481a5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e6cdba9c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "94b33570": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "cfb48782",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "94c2d5b3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "94dc820e": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "ed8d8ad8",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "94f7053c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "958588f6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b6e31f76",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "95858b63": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "959c926e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "95a41365": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "95c88e4f": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "7ccff74f",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "95cc3cb8": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d176d262",
+  "trait2": "461a8e07",
+  "trait2Lot": null
+ },
+ "961b274c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "96390ecf": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "96434c8d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "973b49af",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9673abb9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "24883af3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "96d6fe5e": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "9ace140b",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "978255ef": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0aa20846",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "97cf485d": {
+  "maxLevel": 30,
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cd18a77d",
+  "trait2": "57ab5b10",
+  "trait2Lot": null
+ },
+ "9814e19b": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9851fd38": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "987968df": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "989216cb": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "98a07ee2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e69a4694",
+  "trait2": "05f2ecdc",
+  "trait2Lot": null
+ },
+ "98a6d249": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "151e4674",
+  "trait2": "a374fdf0",
+  "trait2Lot": null
+ },
+ "98aeb873": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "98c33860": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dd4a701e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "98dffca0": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "98e33f8e": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "c86f3082",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "98e88fdf": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50b453dd",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "98e9e6ef": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "b064a634",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "99194505": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "be3404b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9978c657": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "06719232",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "99926ea8": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": "95f3fa86",
+  "trait2Lot": null
+ },
+ "99a4b2a7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c86f3082",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "99c83b77": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dd4a701e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "99e8b892": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "ee85cd1f",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "9a250027": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "9a341899": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "5e422ae5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9a59f1ec": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9a60fbf0": {
+  "maxLevel": 30,
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "cd18a77d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9a753e01": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9abd2da5": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "5559232f",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "9ada3e00": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "3bfed918",
+  "trait2": "f8496336",
+  "trait2Lot": null
+ },
+ "9b2b4b8f": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "dade14dc",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9baf1d6d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "48a95b8d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9bd1cc24": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "23d0f67f",
+  "trait2": "c2a4c7a9",
+  "trait2Lot": null
+ },
+ "9bd2b40e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "9c2399da": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "e0abfdfe",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "9c309b7a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": "d2c8e10a",
+  "trait2Lot": null
+ },
+ "9cb98cc1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e6cdba9c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9d3093ae": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9d4f66d7": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9d5bc5bf": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "2e65a774",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "9d65e6b6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d54f8ca7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9d88dea1": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "b48eef48",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "9dc8305d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "9de27b41": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9e62759d": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "c86f3082",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9e79aa31": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0aa20846",
+  "trait2": "8b3bf60c",
+  "trait2Lot": null
+ },
+ "9eb767bb": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "95f3fa86",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "9ec6c56d": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "d176d262",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "9f08f697": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "151e4674",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "9f72bae0": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "7b4fc47a",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "9f741115": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0aa20846",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "9fe3a10d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a0f94f69": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "9a9dc170",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "a110dc1e": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "0aa20846",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "a12cce9b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a1448db8": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": "f372f096",
+  "trait2Lot": null
+ },
+ "a14ba9ce": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a1c947c2": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "a1e5c919": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "cfb48782",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a21005e9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "a224a830": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e6cdba9c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a248e5d1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1470f860",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a266e055": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "a278238e": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a3021b5e": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "a3210b84": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4bf2e191",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a33af136": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "09aa7db5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a3578968": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "e6cdba9c",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "a4204593": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a441fb51": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "c00163b3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a4456853": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a44aefc0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1dc9d7e7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a468a3e8": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "a490badf": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "d8f66c1c",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "a492ffac": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "a4b849a0": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "09aa7db5",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "a576b01b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a59c9613": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "cd124165",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "a5b20c3c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a6aac25f": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": null,
+  "trait2Lot": "27"
+ },
+ "a6ee588a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a70c5270": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "a70daf5a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a74c2893": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dd4a701e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a7856a22": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a7f292bf": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9389cc06",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a7f84c3b": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "ec1c6779",
+  "trait2": "f372f096",
+  "trait2Lot": null
+ },
+ "a8533ce3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a879208f": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "a63b89cd",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "a89c98c9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "a8a0cbff": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "06719232",
+  "trait2": "ed8d8ad8",
+  "trait2Lot": null
+ },
+ "a8c67937": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "a8dc84bd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a91be816": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c84a6b3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a931e9fa": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "a99085f7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "a9d804d4": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "b064a634",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "aa45cd2d": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "9702860f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "aa793de2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3759a5b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "aa941053": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "aac7a219": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ab4f7d56": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "15806dfc",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ab70208c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "318d12e9",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "ab835493": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "86cbcdc4",
+  "trait2": "05fa4599",
+  "trait2Lot": null
+ },
+ "abaefe36": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "abc07972": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "abc0b11b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": "05f2ecdc",
+  "trait2Lot": null
+ },
+ "abf24655": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "abfa79f2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0fba47e8",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ac175924": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "9afdfa9e",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "ac2ed9a4": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "ec1c6779",
+  "trait2": "09aa7db5",
+  "trait2Lot": null
+ },
+ "ac7822a4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c84a6b3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "aca7fb5a": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ad0a2ae1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "05f2ecdc",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ad8caefb": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "81b293d9",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "ae5d5a4f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "ae6c2f04": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ae9899c6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ae9d89df": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "9230e3f5",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "aebfadf5": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "aeef8343": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "9a9dc170",
+  "trait2": "522e2388",
+  "trait2Lot": null
+ },
+ "af7fb20d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "af8e7e7e": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "93a2093c",
+  "trait2": "7ad0c010",
+  "trait2Lot": null
+ },
+ "b0634504": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "81b293d9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b06c66a6": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "09aa7db5",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "b09e9d63": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "05f2ecdc",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "b0ad15dd": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "b0cb5c64": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "b0ce994b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "b109c429": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "973b49af",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b12e3029": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": "71f11a9b",
+  "trait2Lot": null
+ },
+ "b143dae6": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "29b07beb",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "b1683add": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "26956f25",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b17c7207": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "b1b79be4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": "e6cdba9c",
+  "trait2Lot": null
+ },
+ "b1c1200b": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "8519ad4a",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b1ccc211": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "b6e31f76",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b1d40170": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "333e5862",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b20182a7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b2191f16": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "522e2388",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b2420cbe": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b242510c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "b289a9ad": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "89c66acb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b2b08f0d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc607d75",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b2c6f95a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b2d492a3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "318d12e9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b3ab43f3": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "d7f9bb88",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "b3c0c93d": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b441275d": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d908223d",
+  "trait2": "7351d602",
+  "trait2Lot": null
+ },
+ "b4adddc5": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b4ece7bc": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "b953cc1e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b506b258": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "0053599e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b5170056": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b570d9ca": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b5725272": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "e60a735c",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "b5b23f02": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "b5da3e80": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "d1012d8c",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "b60d6796": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b63e221a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1dc9d7e7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b6552ba8": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b694cdd6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b71df666": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a2fa9685",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b74c207b": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "6ebfa176",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "b7c4535a": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b7f89ac3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "05f2ecdc",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b832e7a7": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "0aa20846",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "b83fb38e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b85c5c3b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b5ff9fd3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b8a811ed": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c86f3082",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "b8c44d5e": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d40d1e9b",
+  "trait2": "15806dfc",
+  "trait2Lot": null
+ },
+ "b98a0f22": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "93a2093c",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "ba16f729": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "9389cc06",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ba28c81c": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "30773197",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "ba77b7f2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e69a4694",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ba8a0229": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "bb49c8f6": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "e69a4694",
+  "trait2": null,
+  "trait2Lot": "27"
+ },
+ "bb6dee38": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "bb86ef75": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "bbe831b2": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "51c115d2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "bbf1566e": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "3bfed918",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "bc445153": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "bc53ce24": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "d76f4d24",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "bc795189": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "bcedf060": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "05fa4599",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "bcf91f80": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "ee85cd1f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "bd2cf495": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "bd8ba705": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "bdcc9a89": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "f8496336",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "be0f226f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "09aa7db5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "be3c851c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "be4c13a6": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "1de14c65",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "be6b6288": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "be799271": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6085da25",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "be8caf15": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a8a3163b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "bf4d978a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "bf714a8a": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "7351d602",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "bf7ca5db": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3759a5b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "bfaa447e": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "bfdf838c": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "4f135217",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "c02e6bea": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "48a95b8d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c06f4708": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "6ff05223",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "c0b5128e": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "86cbcdc4",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "c0c92d64": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c1377955": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc607d75",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c19839bd": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "c1a3f47e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "fb572681",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c275b86f": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c2c979fc": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7726190",
+  "trait2": "7ccff74f",
+  "trait2Lot": null
+ },
+ "c349ad51": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c37a0842": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c37d080a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c3a4c1ec": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "c42e609c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": "e0abfdfe",
+  "trait2Lot": null
+ },
+ "c452ab03": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c4c213bd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "c4dd863a": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "ef05ec4d",
+  "trait2": "6085da25",
+  "trait2Lot": null
+ },
+ "c55f6cdf": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "29b292a8",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c5b72ce6": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c63c8ddf": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "6018372b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c64737e7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "29b292a8",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c6539cb5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "c66e8203": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "ec3cf174",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c6a019ae": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c6b1bbe6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c6b50fea": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "cac6aff2",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c6e71d09": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "c7d124dd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "24883af3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c7d94dc9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c856d9a9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": "7ccff74f",
+  "trait2Lot": null
+ },
+ "c8935975": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c98dc248": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6085da25",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "c9d8bd97": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d40d1e9b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "caae3f9c": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "0e42be1b",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "cb5f29c1": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "a1a8e39d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "cbabdb59": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "cc29955a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc607d75",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "cc5db833": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "cc5ff698": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "cc7dde55": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ccd29b2b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a2fa9685",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "cce507e7": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "4e5f6706",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "cd4b83c7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1dc9d7e7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "cd6bb486": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "cdfeb37e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "ce16d68b": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "5463232f",
+  "trait2": "451d814c",
+  "trait2Lot": null
+ },
+ "ce6c62cf": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "7edd69d0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ce8aa073": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "ce8c3c96": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "4c588c27",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "cee9dd46": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "cef31894": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "fdd1ad24",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "d038f852": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "d0b43ca0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "d0d61caa": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "05f2ecdc",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d14aa754": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "d1b747c5": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d259d5d7": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d2740e3b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2242921f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d28011a6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d29cd8e0": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "9232dc17",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "d3071d85": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "dd4a701e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d32c0caf": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d32dc086": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c35b111b",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "d340651c": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "95f3fa86",
+  "trait2": null,
+  "trait2Lot": "27"
+ },
+ "d3538cfd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "09aa7db5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d36cc890": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "2e65a774",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d3774b13": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7ccff74f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d393da22": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d39f1c79": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7ccff74f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d3a40c27": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "d4117ff3": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "461a8e07",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "d42a2d77": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7edd69d0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d42dc37c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "d4488a1d": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "daefbb27",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d48abdda": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "a374fdf0",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "d4b2adba": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b6e31f76",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d4ebb836": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "d5808f9e": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "d594d945": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d176d262",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d5a23569": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a2fa9685",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d5ca277f": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "3fec5f80",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d5cf6765": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "73220725",
+  "trait2": "6085da25",
+  "trait2Lot": null
+ },
+ "d626ac9f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d54f8ca7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d657db39": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d6738e0f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d6c28e35": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0aa20846",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d77efbc6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "973b49af",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d7abbdca": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f687c5ef",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d7c37871": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "fb572681",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d7d2f16e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "d8a464f1": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "7b5b081d",
+  "trait2": "9ace140b",
+  "trait2Lot": null
+ },
+ "d8c61507": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "3eb345d7",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "d8d6b380": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e69a4694",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d959a6d2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "d982ae55": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "24883af3",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "da9136a1": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "4c588c27",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "db05a865": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "807b6684",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "dbe503c7": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "8572b8af",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "dbebfdad": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e6cdba9c",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "dc09b8d1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "dce00ddb": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "dd12001e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1470f860",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "dd492226": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "dd5eff28": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0053599e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "de19a583": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": "ceb700ee",
+  "trait2Lot": null
+ },
+ "ded4e384": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "df4a666e": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "cfb48782",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "df8a52fb": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1dc9d7e7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "dfc20239": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "71f11a9b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "dfd60614": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "dfe82763": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9389cc06",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e0294510": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "57ab5b10",
+  "trait2": "e0abfdfe",
+  "trait2Lot": null
+ },
+ "e073ea65": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "d908223d",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "e0b702c6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e135a05a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "cdeb73f6",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e1443933": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e14e1598": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "e16e4dd4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e18cc78f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e19b1965": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "8cdf9382",
+  "trait2": "d1012d8c",
+  "trait2Lot": null
+ },
+ "e19de7ae": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f687c5ef",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e21a4170": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "c7d379f1",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "e255fad2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e27b1c51": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9389cc06",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e2b380e5": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "b48eef48",
+  "trait2": "11aae5f5",
+  "trait2Lot": null
+ },
+ "e3103186": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "95f3fa86",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e347b563": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e365b951": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6085da25",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "e3cd2935": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "461a8e07",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e405aca0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "29b292a8",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e4815918": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "d029fe08",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e496d882": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "a339d642",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "e4f986d9": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "7440e869",
+  "trait2": "cd124165",
+  "trait2Lot": null
+ },
+ "e4fc5af6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "29b292a8",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e501b772": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "e507a543": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e53d0e38": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e69a4694",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e546f899": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "333e5862",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "e570a041": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "6316cbeb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e59bbe0a": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": "8d78a19b",
+  "trait2Lot": null
+ },
+ "e5b58127": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c86f3082",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e5c9f685": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "b5ff9fd3",
+  "trait2": null,
+  "trait2Lot": "26"
+ },
+ "e5d96666": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b360801d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "e5e2ad4b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8b3bf60c",
+  "trait2": "e6cdba9c",
+  "trait2Lot": null
+ },
+ "e7062c19": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "151e4674",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e71b1fe4": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e0abfdfe",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e71b5cd5": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e0abfdfe",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "e7624711": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "0cd6c625",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "e7643634": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ceb700ee",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "e8454459": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "e87b1975": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "05f2ecdc",
+  "trait2": "09aa7db5",
+  "trait2Lot": null
+ },
+ "e89224a1": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "8b3bf60c",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "e8b8a474": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4bf2e191",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e92ee838": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": null,
+  "trait2Lot": "5"
+ },
+ "e93b7346": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2242921f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e9917ac1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "c0979a17",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "e9d3b6ca": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "cfb48782",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "eaa911b2": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "7ad0c010",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "eae396e1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "36e3848d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "eb105b98": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "eb10aca3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7edd69d0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "eb4ad96d": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "e85ff8e0",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "eb5f28e0": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "eb73e730": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "05f2ecdc",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "eb766d87": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "79266456",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "ebc1fe90": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "74aa75d6",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ebcc193c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1470f860",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ec9ffe77": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "7b5b081d",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "ecd324c7": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0053599e",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ed715e85": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f372f096",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "eda2116a": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "1470f860",
+  "trait2": null,
+  "trait2Lot": "7"
+ },
+ "edd3770b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "b5ff9fd3",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "eded0b97": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "edef9eb0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8b3bf60c",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "ee25bd8f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "eae321eb",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ee337fe3": {
+  "maxLevel": 30,
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "8d2adb6e",
+  "trait2": "dc584f60",
+  "trait2Lot": null
+ },
+ "ee732781": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "eeb6c4cc": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ef5d0d16": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "1dc9d7e7",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ef70ca76": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "fb572681",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f04c2cdc": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "f17850b9",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f1267035": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "1a2ef59e",
+  "trait2": "6085da25",
+  "trait2Lot": null
+ },
+ "f127d45f": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "8d078597",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f12b5464": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "48a95b8d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f142a66c": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7ccff74f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f1691adc": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0aa20846",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f1839306": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "50079a1c",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "f1caffa6": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "dc225c96",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f1d8f754": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f26baea5",
+  "trait2": "57ab5b10",
+  "trait2Lot": null
+ },
+ "f1d9e8dd": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "8d78a19b",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f212db64": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f21404b1": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "26956f25",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "f22290a6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "f2c84d4f": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "0ead65e0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f2cbffd2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "95f3fa86",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f30a86f6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7edd69d0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f3220fd0": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "af794a87",
+  "trait2": "f372f096",
+  "trait2Lot": null
+ },
+ "f3336835": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "ec1c6779",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f39b8fe1": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "95f3fa86",
+  "trait2": "2fc8fbff",
+  "trait2Lot": null
+ },
+ "f3c8c676": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2242921f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f40082d6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a9d17f55",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "f44367cf": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "9ad8b5e6",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f47fda29": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1470f860",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f4a5e0ad": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "f4accc72": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "7c2e4d64",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f50a5fe2": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "e0abfdfe",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f610e3b9": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "8f502f0d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f687b1bb": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3f488339",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f6c0fca5": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "11aae5f5",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "f6f3c863": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "9389cc06",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f719d195": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "fdd1ad24",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f7707cac": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6b694d6d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f7a65030": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "ac9674c1",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f7b836f6": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f85b6ab0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "f687c5ef",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f8cf8814": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "82ce278d",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "f8fef304": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "1b0d9897",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "f94b6319": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "f94e0066": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": null,
+  "trait2Lot": "6"
+ },
+ "f964a4ca": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "7d75d904",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "f9870ad0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "dc584f60",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "fa3db1e3": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a7a45f28",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "fa9ff841": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "6085da25",
+  "trait2": "7ccff74f",
+  "trait2Lot": null
+ },
+ "fb0f9037": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "7440e869",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "fb5092f2": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "f71f8997",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "fb8c743f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "1c360c63",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "fb9b6dd5": {
+  "rollsSecond": true,
+  "special": true,
+  "trait1": "16eff868",
+  "trait2": null,
+  "trait2Lot": "15"
+ },
+ "fb9bc6c9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2242921f",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "fbb1778f": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "fbb938e9": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "fbf16984": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "2fc8fbff",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "fbf24912": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "3c2b57b0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "fc19bf26": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "a898e283",
+  "trait2": "b5ff9fd3",
+  "trait2Lot": null
+ },
+ "fc1a2561": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "70395731",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "fcf90349": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4bf2e191",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "fd99311b": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "d908223d",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "feee9198": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "1568e0e4",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ff2cbcd0": {
+  "rollsSecond": true,
+  "special": false,
+  "trait1": "dc607d75",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ff580af6": {
+  "rollsSecond": false,
+  "special": true,
+  "trait1": "aa83f548",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ff5f3079": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "0de887a0",
+  "trait2": "50079a1c",
+  "trait2Lot": null
+ },
+ "ff8a608b": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "84078cb0",
+  "trait2": null,
+  "trait2Lot": null
+ },
+ "ffba8af0": {
+  "rollsSecond": false,
+  "special": false,
+  "trait1": "4f1a3683",
+  "trait2": null,
+  "trait2Lot": null
+ }
+}

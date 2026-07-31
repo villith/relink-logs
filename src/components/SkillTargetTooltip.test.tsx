@@ -9,15 +9,15 @@ import { SkillTargetTooltip } from "./SkillTargetTooltip";
 const renderTooltip = (targets: SkillTargetState[]) =>
   render(
     <MantineProvider>
-      <table>
-        <tbody>
+      <div role="table">
+        <div role="rowgroup">
           <SkillTargetTooltip label="Zeta" targets={targets} showFullValues={false} color="#ff0000">
-            <tr>
-              <td>row content</td>
-            </tr>
+            <div role="row">
+              <div role="cell">row content</div>
+            </div>
           </SkillTargetTooltip>
-        </tbody>
-      </table>
+        </div>
+      </div>
     </MantineProvider>
   );
 
@@ -54,10 +54,10 @@ describe("SkillTargetTooltip", () => {
     // rows does not carry a hidden tooltip subtree each.
     expect(screen.queryByText("Test Boss")).toBeNull();
 
-    fireEvent.mouseEnter(screen.getByText("row content").closest("tr")!);
+    fireEvent.mouseEnter(screen.getByText("row content").closest('[role="row"]')!);
     expect(screen.getByText("Test Boss")).toBeTruthy();
 
-    fireEvent.mouseLeave(screen.getByText("row content").closest("tr")!);
+    fireEvent.mouseLeave(screen.getByText("row content").closest('[role="row"]')!);
     expect(screen.queryByText("Test Boss")).toBeNull();
   });
 
@@ -70,7 +70,7 @@ describe("SkillTargetTooltip", () => {
     } as DOMRect);
 
     renderTooltip([{ enemyType: "Em1000", hits: 5, totalDamage: 1000 }]);
-    fireEvent.mouseEnter(screen.getByText("row content").closest("tr")!, { clientX: 400, clientY: 300 });
+    fireEvent.mouseEnter(screen.getByText("row content").closest('[role="row"]')!, { clientX: 400, clientY: 300 });
 
     const tooltip = screen.getByTestId("skill-target-tooltip");
     expect(tooltip.style.visibility).toBe("visible");

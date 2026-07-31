@@ -798,25 +798,11 @@ impl OnLoadPlayerIdentityHook {
             log_weapon_state_probe(record, player_key);
         }
 
-        // Offline non-slot-0 records are the AI companions (and, transiently, the
-        // pre-population placeholders of an online lobby). Their snapshot carries the
-        // LOCAL profile's name (confirmed live: all four records announce the local
-        // name with distinct keys), which is not the AI's own name — so cache them
-        // with the names BLANKED. This lets AI damage resolve to its party slot (the
-        // meter then shows "[N] <character>" instead of "[Guest] <character>"), while
-        // a real remote player joining the slot re-claims it with their real name on
-        // the next identity refresh (latest claim wins).
-        if is_ai_placeholder(&identity) {
-            identity.display_name = CString::new("").expect("empty CString is valid");
-            identity.character_name = CString::new("").expect("empty CString is valid");
-            // Sigils are NOT blanked: unlike the name (which the snapshot fills from
-            // the LOCAL profile), each party slot's record resolves its sigils from
-            // its own per-character loadout, so an AI companion's snapshot sigils are
-            // genuinely that companion's build. Confirmed from the town roster: the
-            // four party records carry four DISTINCT loadout charids with distinct
-            // sigil/overmastery/skillboard data (LODIAG). The empty display name is
-            // what the frontend keys the "(AI)" marker off, so it stands alone.
-        }
+        // Cache AI companions with their names blanked (see
+        // [`StoredPlayerIdentity::blank_names_if_ai`]). A real remote player joining
+        // the slot re-claims it with their real name on the next identity refresh
+        // (latest claim wins).
+        identity.blank_names_if_ai();
 
         #[cfg(feature = "console")]
         println!(
@@ -849,11 +835,40 @@ impl OnLoadPlayerIdentityHook {
     }
 }
 
-/// Slot 0 is always the local player. Any other slot that is not flagged online is
-/// an AI companion (or a not-yet-populated lobby placeholder) whose snapshot name is
-/// the local profile's, not its own.
-fn is_ai_placeholder(identity: &StoredPlayerIdentity) -> bool {
-    identity.party_index != 0 && !identity.is_online
+impl StoredPlayerIdentity {
+    /// Slot 0 is always the local player. Any other slot that is not flagged
+    /// online is an AI companion (or a not-yet-populated lobby placeholder)
+    /// whose snapshot name is the local profile's, not its own.
+    fn is_ai_placeholder(&self) -> bool {
+        self.party_index != 0 && !self.is_online
+    }
+
+    /// Blanks the names an AI companion's snapshot cannot own.
+    ///
+    /// Their snapshot carries the LOCAL profile's name (confirmed live: all four
+    /// records announce the local name with distinct keys), so leaving it in
+    /// place labels every companion with the local player's name. Blanking lets
+    /// AI damage still resolve to its party slot (the meter shows
+    /// "[N] <character>", not "[Guest] <character>") while the empty name is what
+    /// the frontend keys its "(AI)" marker off.
+    ///
+    /// **Every path that emits an identity must apply this** — both the
+    /// `RefreshPlayerIdentity` claim and the embedded-record path in
+    /// [`embedded_identity_event`] read the name from a snapshot that carries
+    /// the local profile's name. Missing it on the second is what made the meter
+    /// label all three companions with the local player's name.
+    ///
+    /// Sigils are deliberately NOT blanked: unlike the name, each party slot's
+    /// record resolves its sigils from its own per-character loadout, so an AI
+    /// companion's snapshot sigils are genuinely that companion's build.
+    /// Confirmed from the town roster: the four party records carry four DISTINCT
+    /// loadout charids with distinct sigil/overmastery/skillboard data (LODIAG).
+    fn blank_names_if_ai(&mut self) {
+        if self.is_ai_placeholder() {
+            self.display_name = CString::new("").expect("empty CString is valid");
+            self.character_name = CString::new("").expect("empty CString is valid");
+        }
+    }
 }
 
 /// Resolves the concrete combat actor (as seen by the damage hook) to a cached
@@ -908,28 +923,7 @@ pub fn identity_event_for_actor(
                 .cloned()
         });
         let equip = cached.unwrap_or_else(|| identity.clone());
-        return Some(PlayerIdentityEvent {
-            character_name: identity.character_name,
-            display_name: identity.display_name,
-            character_type,
-            party_index,
-            actor_index: slot_key(party_index),
-            is_online: identity.is_online,
-            sigils: if identity.sigils.is_empty() {
-                equip.sigils
-            } else {
-                identity.sigils
-            },
-            summons: equip.summons,
-            overmasteries: equip.overmasteries,
-            player_level: equip.player_level,
-            abilities: equip.abilities,
-            weapon_key: equip.weapon_key,
-            master_level: equip.master_level,
-            skillboard: equip.skillboard,
-            stats: equip.stats,
-            weapon_state: equip.weapon_state,
-        });
+        return Some(embedded_identity_event(identity, equip, character_type));
     }
 
     let Some(player_key) = read_actor_player_key(actor) else {
@@ -995,6 +989,48 @@ pub fn identity_event_for_actor(
         stats: identity.stats,
         weapon_state: identity.weapon_state,
     })
+}
+
+/// Builds the outgoing event for an actor resolved through its own embedded
+/// record: identity (name, slot, online) comes from the actor itself, the
+/// equipment payload from whichever claim [`IdentityStore::equipment_donor`]
+/// matched (falling back to the actor's own snapshot).
+fn embedded_identity_event(
+    mut identity: StoredPlayerIdentity,
+    equip: StoredPlayerIdentity,
+    character_type: u32,
+) -> PlayerIdentityEvent {
+    let party_index = identity.party_index.min(3);
+
+    // The claim path blanks AI names for the reason spelled out at
+    // [`is_ai_placeholder`]; this path reads the name from the actor's OWN
+    // embedded record, which carries the same local-profile name, so it has to
+    // apply the same rule. Without it every companion ships the local player's
+    // name and the meter renders "<local name> (Zeta)" instead of "AI (Zeta)".
+    identity.blank_names_if_ai();
+
+    PlayerIdentityEvent {
+        character_name: identity.character_name,
+        display_name: identity.display_name,
+        character_type,
+        party_index,
+        actor_index: slot_key(party_index),
+        is_online: identity.is_online,
+        sigils: if identity.sigils.is_empty() {
+            equip.sigils
+        } else {
+            identity.sigils
+        },
+        summons: equip.summons,
+        overmasteries: equip.overmasteries,
+        player_level: equip.player_level,
+        abilities: equip.abilities,
+        weapon_key: equip.weapon_key,
+        master_level: equip.master_level,
+        skillboard: equip.skillboard,
+        stats: equip.stats,
+        weapon_state: equip.weapon_state,
+    }
 }
 
 /// Clamp helper for record scalars that may hold the empty sentinel or garbage
@@ -2762,5 +2798,39 @@ mod tests {
         assert_eq!(identity.party_index, 0);
         assert!(!identity.is_online);
         assert!(identity.sigils.is_empty());
+    }
+
+    // An AI companion's own embedded record carries the LOCAL profile's name (the
+    // snapshot fills it from the local save), so the meter labelled all three
+    // companions with the local player's name — "Manmoth (Zeta)" instead of
+    // "AI (Zeta)". The claim path has always blanked those names; the embedded
+    // record became the PRIMARY resolution path on 2026-07-18 and read the name
+    // raw, so the blanking stopped reaching the event the meter renders.
+    #[test]
+    fn ai_companion_from_its_embedded_record_emits_a_blank_name() {
+        let ai = identity("Manmoth", 2, false, 0);
+        let event = embedded_identity_event(ai.clone(), ai, 0);
+
+        assert_eq!(
+            event.display_name.as_bytes(),
+            b"",
+            "an offline non-slot-0 record is an AI companion; the frontend keys \
+             its \"(AI)\" marker off the empty name"
+        );
+        assert_eq!(event.character_name.as_bytes(), b"");
+    }
+
+    // Streamer-mode safety and the online case: a real player must never be
+    // mislabelled as AI. Remote players are flagged online, the local player owns
+    // slot 0 — both keep the name their record carries.
+    #[test]
+    fn real_players_from_their_embedded_record_keep_their_names() {
+        let remote = identity("Sylmorn", 3, true, 0);
+        let event = embedded_identity_event(remote.clone(), remote, 0);
+        assert_eq!(event.display_name.as_bytes(), b"Sylmorn");
+
+        let local = identity("Manmoth", 0, false, 0);
+        let event = embedded_identity_event(local.clone(), local, 0);
+        assert_eq!(event.display_name.as_bytes(), b"Manmoth");
     }
 }

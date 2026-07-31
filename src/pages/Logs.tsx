@@ -23,6 +23,7 @@ import { TOOLS, visibleTools } from "./Toolbox";
 import { useUpdateStatusStore } from "@/stores/useUpdateStatusStore";
 
 import useUpdateCheck from "@/useUpdateCheck";
+import { SETTINGS_SECTIONS } from "./Settings";
 
 const GITHUB_URL = "https://github.com/villith/relink-logs";
 
@@ -152,7 +153,10 @@ const Layout = () => {
                 </Group>
               </NavTab>
               <NavTab to={tabTarget("settings")} icon={<Gear size="1rem" />} active={settingsActive}>
-                {t("ui.settings")}
+                <Group gap={6} wrap="nowrap">
+                  {t("ui.settings")}
+                  <NewChip id={sectionNewIds("settings", SETTINGS_SECTIONS)} />
+                </Group>
               </NavTab>
               {import.meta.env.DEV && (
                 <NavTab to={tabTarget("debug")} icon={<Bug size="1rem" />} active={debugActive}>

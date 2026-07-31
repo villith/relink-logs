@@ -674,7 +674,7 @@ export type LinuxSetupStatus = {
 /** Mirrors `HookState` in src-tauri/src/toolbox_rpc.rs. `unresponsive` is
  * "connected, but the hook is not answering the toolbox channel" — its version
  * is unknown, which is NOT the same claim as `outOfDate`. */
-export type HookState = "connected" | "reconnecting" | "outOfDate" | "unresponsive" | "disconnected";
+export type HookState = "connected" | "reconnecting" | "outOfDate" | "unresponsive" | "dllMissing" | "disconnected";
 
 export interface HookStatusSnapshot {
   state: HookState;
@@ -682,3 +682,140 @@ export interface HookStatusSnapshot {
   appVersion: string;
   supportsEject: boolean;
 }
+
+/* Build legality. Mirrors `src-tauri/src/legality`'s `Finding` and the stored
+ * rows `src-tauri/src/db/legality.rs` serves. */
+
+/** `legality::Rule`, spelled as a closed union so adding or renaming a rule in
+ * Rust fails `tsc` here rather than silently rendering an untranslated id.
+ * Each name must have a `ui.legality.limit.<name>` key — that is what
+ * `describeLimit` reads and what `legalityStrings.test.ts` enforces. (There is
+ * no per-rule LABEL namespace any more: findings name themselves through the
+ * gear line the limit sits under.) */
+export type LegalityRule =
+  | "wrightstoneTraitLevel"
+  | "sigilTraitLevel"
+  | "sigilLockedPair"
+  | "sigilQuestLockedTrait"
+  | "sigilSingleTraitOnly"
+  | "overmasteryValue"
+  | "overmasteryAllMaxed"
+  | "summonTrait"
+  | "summonBonusSource"
+  | "summonBonusMagnitude"
+  | "summonPerfectCount"
+  | "masterTraitCount";
+
+/** `legality::Subject`, an internally tagged enum: `index` is absent for the
+ * variants that carry none (`wrightstone`). */
+export type LegalitySubject = {
+  kind: "wrightstone" | "sigil" | "summon" | "overmastery" | "overmasteries" | "summons" | "masterTraits";
+  index?: number;
+};
+
+/** `legality::Value`, adjacently tagged so ids and levels are told apart. Ids
+ * carry their CATALOGUE in the tag — one kind per namespace — so the renderer
+ * never has to infer which translate helper resolves them from the paired
+ * rule. */
+export type LegalityValue =
+  | { kind: "level" | "count" | "amount" | "traitId" | "summonBonusId" | "overmasteryId"; value: number }
+  /** `summonBonusIds` is legacy — it survives only so findings stored before
+   * the bonus-source rule started naming its owners still deserialize.
+   * `summonIds` replaced it: one id per display NAME, the summons that DO grant
+   * a bonus some other summon was caught holding. */
+  | { kind: "levels" | "traitIds" | "sigilIds" | "summonBonusIds" | "summonIds"; value: number[] }
+  | { kind: "none" };
+
+/** One trait or bonus line beneath its item — `legality::EvidenceTrait`. */
+export type LegalityEvidenceTrait = { id: number; level: number };
+
+/** One equipped summon — `legality::EvidenceSummon`. */
+export type LegalityEvidenceSummon = {
+  summonId: number;
+  main: LegalityEvidenceTrait;
+  bonus: LegalityEvidenceTrait;
+};
+
+/** One overmastery. `flags` decides whether the magnitude is a level or an
+ * amount, so it must survive to the formatter — `legality::EvidenceOvermastery`. */
+export type LegalityEvidenceOvermastery = { id: number; value: number; flags: number };
+
+/**
+ * The equipment a finding is about, captured when the finding was computed —
+ * `legality::Evidence`.
+ *
+ * This is what makes a stored verdict self-describing. `LegalitySubject` alone
+ * carries a slot index, which is meaningless without the encounter it indexes
+ * into; rendering it against any other build names whichever item now sits in
+ * that slot. With the snapshot the page needs no encounter at all.
+ */
+export type LegalityEvidence =
+  | { kind: "sigil"; sigilId: number; level: number; traits: LegalityEvidenceTrait[] }
+  | { kind: "wrightstone"; wrightstoneId: number; traits: LegalityEvidenceTrait[] }
+  | ({ kind: "summon" } & LegalityEvidenceSummon)
+  | { kind: "summons"; summons: LegalityEvidenceSummon[] }
+  | ({ kind: "overmastery" } & LegalityEvidenceOvermastery)
+  | { kind: "overmasteries"; entries: LegalityEvidenceOvermastery[] }
+  | { kind: "masterTraits"; observed: number; allowed: number };
+
+export type LegalityFinding = {
+  rule: LegalityRule;
+  subject: LegalitySubject;
+  observed: LegalityValue;
+  allowed: LegalityValue;
+  /** Absent on rows written before the snapshot existed; the sweep refills
+   * them, and a finding without one simply names nothing. */
+  evidence?: LegalityEvidence | null;
+  /** Probability of occurring legitimately. Null for a hard table breach,
+   * which has no odds to quote.
+   *
+   * Severity is gone, so this is the only thing separating a report of long
+   * odds from proof the game could not have produced a build — a surface that
+   * shows findings must show these odds wherever they exist. */
+  odds: number | null;
+};
+
+/** One stored finding with the party slot it belongs to — `db::legality::StoredFinding`.
+ *
+ * The quest list reads these: it draws a party as text rather than as the
+ * players themselves, so it needs the slot to know which name to colour. */
+export type StoredLegalityFinding = {
+  /** Party slot 0-3, the same index the encounter's player data uses. */
+  playerIndex: number;
+  displayName: string;
+  characterType: CharacterType;
+  finding: LegalityFinding;
+};
+
+/** One stored finding with the encounter it came from — `db::legality::PlayerFinding`. */
+export type LegalityPlayerFinding = {
+  logId: number;
+  /** Milliseconds since the UNIX epoch. */
+  time: number;
+  /** The quest the encounter was, so the audit page can name each flagged fight
+   * without loading it. Absent on a log recorded before the column existed. */
+  questId?: number | null;
+  finding: LegalityFinding;
+};
+
+/** Everything the audit page shows for one person — `db::legality::FlaggedPlayer`.
+ *
+ * Grouped by name AND character, so one human on one character is a single row
+ * however many party slots they have occupied. */
+export type LegalityFlaggedPlayer = {
+  displayName: string;
+  characterType: CharacterType;
+  /** Distinct encounters flagged, not findings. A tiebreaker on the page's
+   * ordering; the page does not draw it as a badge. */
+  encounters: number;
+  /** Most recent flagged encounter, milliseconds since the UNIX epoch. */
+  lastSeen: number;
+  findings: LegalityPlayerFinding[];
+};
+
+/** Progress of the startup rescan — `LegalitySweepProgress` in main.rs, pushed
+ * on the `legality-sweep-progress` event. `done === total` means finished. */
+export type LegalitySweepProgress = {
+  done: number;
+  total: number;
+};

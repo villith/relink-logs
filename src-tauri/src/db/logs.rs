@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rusqlite::Connection;
-use sea_query::{Condition, Expr, Iden, Order, Query, SqliteQueryBuilder};
+use sea_query::{Condition, Expr, Iden, Order, Query, SimpleExpr, SqliteQueryBuilder};
 use sea_query_rusqlite::RusqliteBinder;
 use serde::Serialize;
 
@@ -38,6 +38,27 @@ enum Logs {
     QuestElapsedTime,
     QuestCompleted,
     RunId,
+}
+
+/// The stored-verdicts table, as much of it as the quest list's filter needs.
+/// Owned by [`crate::db::legality`]; named here only to build the subquery.
+#[derive(Iden)]
+enum LegalityFindings {
+    Table,
+    LogId,
+}
+
+/// "Somebody in this log was flagged", as a condition over `logs`.
+///
+/// A subquery rather than a join: a log flagging two players has two rows in
+/// `legality_findings`, and a join would list that log — and count it — twice.
+fn flagged_condition() -> SimpleExpr {
+    Expr::col(Logs::Id).in_subquery(
+        Query::select()
+            .column(LegalityFindings::LogId)
+            .from(LegalityFindings::Table)
+            .take(),
+    )
 }
 
 #[derive(Debug, Serialize)]
@@ -79,6 +100,16 @@ pub struct LogEntry {
     quest_completed: Option<bool>,
 }
 
+impl LogEntry {
+    /// The log's id, for a caller that has to ask a second table about the page
+    /// it just fetched — the quest list's stored legality verdicts.
+    pub fn id(&self) -> i64 {
+        self.id as i64
+    }
+}
+
+/// One page of the quest list. `flagged_only` keeps just the logs somebody was
+/// flagged in; false (the default) does not filter on legality at all.
 pub fn get_logs(
     conn: &Connection,
     filter_by_enemy_id: Option<u32>,
@@ -90,6 +121,7 @@ pub fn get_logs(
     cleared: Option<bool>,
     filter_by_player_id: &Option<String>,
     filter_by_player_character: &Option<String>,
+    flagged_only: bool,
 ) -> anyhow::Result<Vec<LogEntry>> {
     let sort_column = match sort_by {
         SortType::Time => Logs::Time,
@@ -209,6 +241,13 @@ pub fn get_logs(
             },
             |_| {},
         )
+        .conditions(
+            flagged_only,
+            |q| {
+                q.and_where(flagged_condition());
+            },
+            |_| {},
+        )
         .order_by_with_nulls(sort_column, order, sea_query::NullOrdering::Last)
         .limit(per_page.into())
         .offset(offset.into())
@@ -245,6 +284,9 @@ pub fn get_logs(
     Ok(rows.unwrap_or(vec![]))
 }
 
+/// How many logs the same filters match. Takes `flagged_only` for the same
+/// reason it takes every other filter: a count that ignored one would promise
+/// pages the list cannot fill.
 pub fn get_logs_count(
     conn: &Connection,
     filter_by_enemy_id: Option<u32>,
@@ -252,6 +294,7 @@ pub fn get_logs_count(
     cleared: Option<bool>,
     filter_by_player_id: &Option<String>,
     filter_by_player_character: &Option<String>,
+    flagged_only: bool,
 ) -> Result<i32> {
     let (sql, values) = Query::select()
         .expr(Expr::col(Logs::Id).count())
@@ -341,6 +384,13 @@ pub fn get_logs_count(
             },
             |_| {},
         )
+        .conditions(
+            flagged_only,
+            |q| {
+                q.and_where(flagged_condition());
+            },
+            |_| {},
+        )
         .build_rusqlite(SqliteQueryBuilder);
 
     let mut stmt = conn.prepare(&sql).unwrap();
@@ -349,4 +399,110 @@ pub fn get_logs_count(
     let row: i32 = stmt.query_row(&*params, |r| r.get(0))?;
 
     Ok(row)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rusqlite::params;
+
+    /// A database with the real schema and a handful of logs, some of which
+    /// somebody was flagged in.
+    fn db_with(logs: &[(i64, bool)]) -> Connection {
+        let mut conn = Connection::open_in_memory().expect("in-memory db");
+        crate::db::migrations()
+            .to_latest(&mut conn)
+            .expect("migrations apply");
+
+        for (id, flagged) in logs {
+            conn.execute(
+                "INSERT INTO logs (id, name, time, duration, data, version)
+                 VALUES (?, '', ?, 1, x'00', 1)",
+                params![id, id],
+            )
+            .expect("insert log");
+
+            if *flagged {
+                conn.execute(
+                    "INSERT INTO legality_findings (
+                        log_id, player_index, display_name, character_type, severity, rule, payload
+                     ) VALUES (?, 0, 'Kahs', 'Pl1400', 'finding', 'sigilTraitLevel', '{}')",
+                    params![id],
+                )
+                .expect("insert finding");
+            }
+        }
+
+        conn
+    }
+
+    fn ids(logs: &[LogEntry]) -> Vec<u64> {
+        logs.iter().map(|log| log.id).collect()
+    }
+
+    fn fetch(conn: &Connection, flagged_only: bool) -> Vec<LogEntry> {
+        get_logs(
+            conn,
+            None,
+            None,
+            10,
+            0,
+            &SortType::Time,
+            &SortDirection::Ascending,
+            None,
+            &None,
+            &None,
+            flagged_only,
+        )
+        .expect("query")
+    }
+
+    fn count(conn: &Connection, flagged_only: bool) -> i32 {
+        get_logs_count(conn, None, None, None, &None, &None, flagged_only).expect("count")
+    }
+
+    /// Every listed log has somebody flagged in it — and one flagged player is
+    /// enough, however many findings they carry.
+    #[test]
+    fn flagged_filter_keeps_only_logs_with_findings() {
+        let conn = db_with(&[(1, false), (2, true), (3, false), (4, true)]);
+
+        assert_eq!(ids(&fetch(&conn, true)), vec![2, 4]);
+    }
+
+    /// Off, the filter is not a filter: every log comes back, flagged or not.
+    #[test]
+    fn the_unfiltered_list_holds_every_log() {
+        let conn = db_with(&[(1, false), (2, true), (3, false), (4, true)]);
+
+        assert_eq!(ids(&fetch(&conn, false)), vec![1, 2, 3, 4]);
+    }
+
+    /// A log flagging two players is still one log. Without a subquery — a
+    /// join would do it — it would appear twice in the list and twice in the
+    /// count.
+    #[test]
+    fn a_log_with_two_flagged_players_is_listed_once() {
+        let conn = db_with(&[(1, true)]);
+        conn.execute(
+            "INSERT INTO legality_findings (
+                log_id, player_index, display_name, character_type, severity, rule, payload
+             ) VALUES (1, 2, 'Manmoth', 'Pl1300', 'finding', 'summonPerfectCount', '{}')",
+            [],
+        )
+        .expect("second finding");
+
+        assert_eq!(ids(&fetch(&conn, true)), vec![1]);
+        assert_eq!(count(&conn, true), 1);
+    }
+
+    /// The count follows the same filter as the list; otherwise the pager
+    /// promises pages the list cannot fill.
+    #[test]
+    fn the_count_matches_the_filtered_list() {
+        let conn = db_with(&[(1, false), (2, true), (3, false), (4, true)]);
+
+        assert_eq!(count(&conn, true), 2);
+        assert_eq!(count(&conn, false), 4);
+    }
 }

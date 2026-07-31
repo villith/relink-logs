@@ -42,11 +42,12 @@ const renderAt = (entry: string) => {
 
 const tabHref = (name: RegExp) => screen.getByRole("link", { name }).getAttribute("href");
 
-// Matched loosely: the Toolbox tab carries a "New" chip inside its label, which
-// lands in the accessible name.
+// Matched loosely: a tab carrying a "New" chip has the chip's text in its
+// accessible name. Settings has had one since it gained a chip in d743454, so
+// an anchored match there breaks whenever the chip's release window is open.
 const LOGS_TAB = /^ui\.logs-tab/;
 const TOOLBOX_TAB = /^ui\.toolbox\.title/;
-const SETTINGS_TAB = /^ui\.settings$/;
+const SETTINGS_TAB = /^ui\.settings\b/;
 
 describe("logs window header tabs", () => {
   beforeEach(() => {

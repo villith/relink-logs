@@ -23,16 +23,23 @@ import {
 import checklistDefault from "@/assets/checklist-default.json";
 import sigilTraitCategories from "@/assets/sigil-trait-categories.json";
 import skillboardLayout from "@/assets/skillboard-layout.json";
-import summonBonusValues from "@/assets/summon-bonus-values.json";
 import traitMaxLevels from "@/assets/trait-max-levels.json";
 import weaponTraitsData from "@/assets/weapon-traits.json";
 import weaponTranscendenceData from "@/assets/weapon-transcendence.json";
 import i18next, { t } from "i18next";
 import { useEffect, useRef, type CSSProperties } from "react";
+import summonBonusValues from "../src-tauri/assets/summon-bonus-values.json";
 
+import { renderTemplate } from "./labelTemplate";
 import { abilitySourceKeys, stripTierSuffix, summonClassSource } from "./skillNameSources";
+import { DEFAULT_PLAYER_LABEL, type BarFillMode } from "./stores/useMeterSettingsStore";
 
 export const EMPTY_ID = 2289754288;
+
+/** An empty slot arrives as either a plain zero or the engine's sentinel, so
+ * both must count as empty — the same contract as `legality::is_empty` on the
+ * Rust side. Prefer this over a bare `=== EMPTY_ID`, which misses the zero. */
+export const isEmptyId = (id: number): boolean => id === 0 || id === EMPTY_ID;
 
 export const formatInPartyOrder = (party: Record<string, PlayerState>): ComputedPlayerState[] => {
   const players = Object.keys(party).map((key) => {
@@ -381,6 +388,36 @@ export const overmasteryAmountFromId = (id: number, value: number): BonusAmount 
   STUN_POWER_OVERMASTERY_IDS.has(id)
     ? stunPowerAmount(value)
     : { kind: OVERMASTERY_FLAT_VALUE_IDS.has(id) ? "flat" : "percent", amount: value };
+
+/** The single-bit level flag (bit N → level N+1) → a 1-based level, or 0 if
+ * unset. `>>> 0` forces the isolated bit to an unsigned value so a set bit 31
+ * can't make `flags & -flags` negative and yield `Math.log2(negative) === NaN`. */
+export const overmasteryLevel = (flags: number): number => (flags === 0 ? 0 : Math.log2((flags & -flags) >>> 0) + 1);
+
+/** v2.0.2: overmasteries recovered from the town loadout carry only id + level
+ * (in `flags`), not the computed in-game magnitude (`value` is 0) — fall back
+ * to the level, matching the "(Lvl. N)" style used for sigils and summons. */
+export const overmasteryAmount = (overmastery: { id: number; value: number; flags: number }): BonusAmount =>
+  overmastery.value === 0
+    ? { kind: "level", amount: overmasteryLevel(overmastery.flags) }
+    : overmasteryAmountFromId(overmastery.id, overmastery.value);
+
+/**
+ * An overmastery as the equipment and builds tabs write it — `Critical Hit
+ * Rate Up: +20%`, or `… (Lvl. 3)` when only the level survived.
+ *
+ * Shared rather than per-page: the audit page printed a bare `20` where `+20%`
+ * belonged because it formatted the raw value itself, and a number without its
+ * unit is not a claim anyone can check.
+ */
+export const formatOvermastery = (overmastery: { id: number; value: number; flags: number } | undefined): string => {
+  if (!overmastery) return "";
+  const translation = translateOvermasteryId(overmastery.id);
+  const amount = overmasteryAmount(overmastery);
+  return amount.kind === "level"
+    ? `${translation} ${formatBonusAmount(amount)}`
+    : `${translation}: ${formatBonusAmount(amount)}`;
+};
 
 /**
  * Expands combined bonuses to the full canonical effect list: every name in
@@ -980,7 +1017,8 @@ export const translateCharacterType = (characterType: CharacterType): string =>
 ///
 /// AI companions have their `displayName` blanked by the hook (their identity
 /// snapshot carries the LOCAL player's name, which isn't theirs), so an empty name
-/// on a resolved slot means "AI" — rendered as `CharacterType (AI)`. Real players
+/// on a resolved slot means "AI" — rendered as `AI (CharacterType)`, i.e. the marker
+/// stands in for the missing name so the label keeps its usual shape. Real players
 /// (local or remote) always carry a name. When `showName` is off (streamer mode) we
 /// hide real names but must NOT mislabel them as AI, so the marker keys on the empty
 /// name, not on the toggle.
@@ -992,26 +1030,77 @@ export const formatCharacterLabel = (
   const type = translateCharacterType(characterType);
 
   if (displayName === "") {
-    return `${type} (${t("ui:characters.ai")})`;
+    return `${t("ui:characters.ai")} (${type})`;
   }
 
   return showName ? `${displayName} (${type})` : type;
 };
 
-/// Formats the player name and translates the player's character type.
+/** The tokens a player-name template may use. Exported so the settings editor
+ * can list them and flag anything else as a typo. */
+export const PLAYER_LABEL_TOKENS = ["slot", "name", "character", "icon"] as const;
+
+/** The subset of PLAYER_LABEL_TOKENS that draws as a node rather than text.
+ * Text-only consumers (the tooltip, log exports) blank these instead. */
+export const PLAYER_NODE_TOKENS = ["icon"] as const;
+
+/**
+ * Token values for one meter row.
+ *
+ * `name` is empty when there is nothing nameable to show — an unresolved slot,
+ * or a real player whose name the user has hidden. Empty is meaningful here: it
+ * is what triggers the template engine's collapse rules, so `{name}
+ * ({character})` loses its parentheses rather than rendering them around
+ * nothing. An AI companion is NOT empty — it resolves to the "AI" marker,
+ * because the label still has something to say about that slot.
+ */
+export const playerLabelTokens = (
+  partySlotIndex: number,
+  partySlotData: PlayerData | null,
+  player: ComputedPlayerState,
+  showDisplayNames: boolean
+): Record<string, string> => {
+  let name = "";
+  if (partySlotData) {
+    if (partySlotData.displayName === "") {
+      name = t("ui:characters.ai");
+    } else if (showDisplayNames) {
+      name = partySlotData.displayName;
+    }
+  }
+
+  return {
+    slot: partySlotData ? String(partySlotIndex + 1) : "Guest",
+    name,
+    character: translateCharacterType(player.characterType),
+    // The character id doubles as the icon's filename. An unidentified
+    // character has no id and so no icon: empty rather than absent, because an
+    // absent token renders LITERALLY as `{icon}` — a token that cannot resolve
+    // must collapse like any other empty value, not print itself into the meter.
+    icon: typeof player.characterType === "string" ? player.characterType : "",
+  };
+};
+
+/// Formats the player name and translates the player's character type, arranged
+/// by the user's own label template (see src/labelTemplate.ts). Callers that
+/// have no access to the store omit `template` and get the shipped default,
+/// which renders exactly what this function rendered before it was templated.
 export const translatedPlayerName = (
   partySlotIndex: number,
   partySlotData: PlayerData | null,
   player?: ComputedPlayerState,
-  show_display_names: boolean = true
+  show_display_names: boolean = true,
+  template: string = DEFAULT_PLAYER_LABEL
 ) => {
   if (!player) return "Guest";
 
-  const name = partySlotData
-    ? formatCharacterLabel(player.characterType, partySlotData.displayName, show_display_names)
-    : translateCharacterType(player.characterType);
-
-  return `[${partySlotData ? partySlotIndex + 1 : "Guest"}]` + " " + name;
+  // The icon has no text form, so it empties here and collapses like any other
+  // absent value. Substituting it would print the raw id ("Pl1400 Scott") into
+  // the tooltip and everywhere else a label is needed as a plain string.
+  return renderTemplate(template, {
+    ...playerLabelTokens(partySlotIndex, partySlotData, player, show_display_names),
+    icon: "",
+  });
 };
 
 export const sortPlayers = (players: ComputedPlayerState[], sortType: SortType, sortDirection: SortDirection) => {
@@ -1225,6 +1314,37 @@ export const resolvePlayerColor = (
 /// (see .player-row/.skill-row in App.css). The bar must NOT be a positioned
 /// child element: relative/z-index layering on table internals is undefined
 /// CSS that WebKitGTK (Linux) resolves by painting the bar over the cell text.
+/// The width a row's bar should be painted at, as a percentage.
+///
+/// In `relative` mode the largest row in a table fills its bar and every other
+/// row is scaled against it, which makes the differences between the middle
+/// rows readable. It changes the painted width ONLY — the percentage in the
+/// column stays a true share of the total, because that one is data.
+///
+/// A zero `maxPercentage` (nothing has dealt damage yet) falls through to the
+/// raw percentage rather than dividing by zero.
+export const barWidth = (percentage: number, maxPercentage: number, mode: BarFillMode): number =>
+  mode === "relative" && maxPercentage > 0 ? (percentage / maxPercentage) * 100 : percentage;
+
+/// The meter's grid track template, for a table with `columnCount` value
+/// columns.
+///
+/// Built here rather than at each table because the header row, the player rows
+/// and the skill rows all read `--meter-grid`, and their lining up is the whole
+/// point of the shared template — two components composing it separately is two
+/// chances for the header to stop matching the rows under it.
+///
+/// It cannot move into App.css: `repeat()` needs a literal integer count, so a
+/// `var()` there does not parse.
+///
+/// Zero columns drops the `repeat()` entirely rather than emitting `repeat(0,
+/// …)`, which `repeat()`'s `<integer [1,∞]>` grammar rejects — and an invalid
+/// `var()` substitution takes the WHOLE declaration with it, so the name track
+/// would be lost too and the header would stop lining up with its rows. The
+/// user can reach zero: nothing stops them unchecking every value column.
+export const meterGridTemplate = (columnCount: number): string =>
+  columnCount > 0 ? `minmax(120px, 1fr) repeat(${columnCount}, var(--meter-value-col))` : "minmax(120px, 1fr)";
+
 export const damageBarStyle = (color: string, percentage: number): CSSProperties => {
   const width = Number.isFinite(percentage) ? Math.min(100, Math.max(0, percentage)) : 0;
   return {

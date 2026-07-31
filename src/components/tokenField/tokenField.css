@@ -1,0 +1,135 @@
+/* The field is a Mantine-styled box wrapping a ProseMirror contenteditable, so
+   it has to reproduce Input's border/focus treatment rather than inherit it. */
+.token-field {
+  min-height: 34px;
+  padding: 5px 10px;
+  border: 1px solid var(--mantine-color-dark-4);
+  border-radius: var(--mantine-radius-sm);
+  background-color: var(--mantine-color-dark-6);
+  /* A literal length, NOT var(--mantine-font-size-sm): this app's theme sets
+     sm/md/lg/xl to unitless strings ("12"), which is not a valid CSS length, so
+     the declaration would be dropped and the field would inherit 16px. */
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.token-field:focus-within {
+  border-color: var(--mantine-color-blue-filled);
+}
+
+/* While a token is held over the field. Without it a drag gives no sign the
+   field will take the drop, which reads as "drag does not work". */
+.token-field.is-drop-target {
+  border-color: var(--mantine-color-blue-filled);
+  border-style: dashed;
+  background-color: var(--mantine-color-dark-5);
+}
+
+.token-field .ProseMirror {
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* The editor's only paragraph would otherwise carry the UA default
+   `margin: 1em 0` — 32px of empty space inside every field, which is most of a
+   row in the header segment list. */
+.token-field .ProseMirror p {
+  margin: 0;
+}
+
+/* The placeholder, driven by the Placeholder extension's data attribute. */
+.token-field .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--mantine-color-dimmed);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.token-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  margin: 0 1px;
+  border-radius: var(--mantine-radius-sm);
+  background-color: var(--mantine-color-blue-light);
+  color: var(--mantine-color-blue-2);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: 0.85em;
+  white-space: nowrap;
+  cursor: grab;
+  user-select: none;
+}
+
+/* A token the field does not recognize. Colour alone would not carry this, so
+   the chip is also struck through — the same information without relying on
+   hue. */
+.token-chip[data-unknown="true"] {
+  background-color: var(--mantine-color-red-light);
+  color: var(--mantine-color-red-2);
+  text-decoration: line-through;
+}
+
+.token-chip.ProseMirror-selectednode {
+  outline: 2px solid var(--mantine-color-blue-filled);
+}
+
+/* The chip's remove button. Always visible rather than hover-only: a control
+   that appears only on hover cannot be found by someone looking for a way to
+   delete the token, which is the whole reason it exists. */
+.token-chip-remove {
+  all: unset;
+  margin-left: 4px;
+  padding: 0 2px;
+  border-radius: 2px;
+  color: inherit;
+  opacity: 0.65;
+  font-size: 1.1em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.token-chip-remove:hover,
+.token-chip-remove:focus-visible {
+  opacity: 1;
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+/* A draggable token in the palette. */
+.token-source {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 6px 2px 3px;
+  border: 1px dashed var(--mantine-color-dark-3);
+  border-radius: var(--mantine-radius-sm);
+  background-color: var(--mantine-color-dark-6);
+  color: var(--mantine-color-blue-2);
+  font-family: var(--mantine-font-family-monospace);
+  /* A literal length: this app's theme sets --mantine-font-size-* to unitless
+     strings, so `font-size: var(--mantine-font-size-xs)` would be dropped. */
+  font-size: 12px;
+  cursor: grab;
+  user-select: none;
+}
+
+.token-source:hover:not(.is-spent) {
+  border-color: var(--mantine-color-blue-filled);
+  background-color: var(--mantine-color-blue-light);
+}
+
+.token-source-grip {
+  flex: none;
+  opacity: 0.5;
+}
+
+/* Already placed in one of this section's fields. Dimmed AND struck through:
+   colour alone would not carry it. */
+.token-source.is-spent {
+  border-style: solid;
+  border-color: var(--mantine-color-dark-4);
+  color: var(--mantine-color-dimmed);
+  text-decoration: line-through;
+  cursor: not-allowed;
+  opacity: 0.55;
+}

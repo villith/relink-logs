@@ -15,6 +15,76 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { create, Mutate, StoreApi } from "zustand";
 import { persist } from "zustand/middleware";
 
+/** How a row's bar is sized. `total`: the width is the row's share of the whole.
+ * `relative`: the largest row fills its bar and the rest scale against it, which
+ * makes differences between the middle rows readable. Affects the painted bar
+ * ONLY — the percentage column is always a true share, because that one is data. */
+export type BarFillMode = "total" | "relative";
+
+/** One piece of the overlay header. Rendered as its own `.item` div, so it keeps
+ * the CSS dot separator and the Tauri drag region; a segment whose template
+ * renders empty is not rendered at all, which is what makes team damage and boss
+ * HP appear only once they have something to report. */
+export type HeaderSegment = {
+  id: string;
+  side: "left" | "right";
+  template: string;
+  /** Dropped on very narrow overlays, where the window buttons need the room. */
+  hideWhenNarrow: boolean;
+};
+
+/** Built-in bar textures. Stored as a plain string rather than a union so a
+ * future user-supplied source (`file:…`) needs no settings migration. */
+export const BAR_TEXTURES = ["solid", "smooth", "gloss", "glaze", "charcoal", "fade", "striped"] as const;
+
+export const DEFAULT_PLAYER_LABEL = "[{slot}] {name} ({character})";
+
+/**
+ * The overlay header's action buttons, in the order they are drawn.
+ *
+ * Minimize is deliberately absent: it is always shown, so an overlay can never
+ * be configured into a state where there is no way to get it out of the way.
+ */
+export const HEADER_BUTTONS = ["clipboard", "pin", "screenshot", "reset"] as const;
+export type HeaderButtonId = (typeof HEADER_BUTTONS)[number];
+export type HeaderButtonVisibility = Record<HeaderButtonId, boolean>;
+
+export const DEFAULT_HEADER_BUTTONS: HeaderButtonVisibility = Object.fromEntries(
+  HEADER_BUTTONS.map((id) => [id, true])
+) as HeaderButtonVisibility;
+
+/**
+ * A stored visibility record with the defaults underneath it.
+ *
+ * A settings object persisted before a button existed has no key for it, and
+ * `undefined` would silently hide a button the user never chose to hide. Both
+ * the header and the settings checkboxes that edit it need this, and they must
+ * agree — a checkbox describing a different set than the header draws is worse
+ * than either being wrong alone.
+ */
+export const headerButtonsWithDefaults = (stored: Partial<HeaderButtonVisibility>): HeaderButtonVisibility => ({
+  ...DEFAULT_HEADER_BUTTONS,
+  ...stored,
+});
+
+/** The overlay's starting size, matching the `main` window in tauri.conf.json —
+ * the two must agree or the overlay would jump on first launch. */
+export const DEFAULT_OVERLAY_SIZE = { overlay_width: 500, overlay_height: 350 };
+
+/** Floors from the `main` window's minWidth/minHeight. Going under them lets the
+ * user shrink the overlay past what the window itself accepts, so the stored
+ * number and the real window would silently disagree. */
+export const OVERLAY_MIN_SIZE = { width: 250, height: 120 };
+
+/** Seeded to reproduce the header exactly as it read before it was customizable. */
+export const DEFAULT_HEADER_SEGMENTS: HeaderSegment[] = [
+  { id: "brand", side: "left", template: "{app} {version}", hideWhenNarrow: false },
+  { id: "damage", side: "left", template: "{damage}", hideWhenNarrow: true },
+  { id: "dps", side: "left", template: "{dps}/s", hideWhenNarrow: true },
+  { id: "hp", side: "left", template: "HP {hpPercent} ({hpCurrent} / {hpMax})", hideWhenNarrow: true },
+  { id: "status", side: "right", template: "{status}", hideWhenNarrow: false },
+];
+
 interface MeterSettings {
   color_1: string;
   color_2: string;
@@ -23,6 +93,20 @@ interface MeterSettings {
   transparency: number;
   show_display_names: boolean;
   streamer_mode: boolean;
+  /** Show build-audit verdicts anywhere outside the Build Audit page itself —
+   * the quest list, a log's Equipment and Builds tabs, and the meter.
+   *
+   * Off by default, and the master switch the narrower ones sit under. Naming
+   * someone a cheater is an accusation the app should not make on a user's
+   * behalf until they ask for it; the Build Audit page is where someone goes
+   * deliberately to look, so it is the one surface this does not gate. */
+  show_flagged_builds: boolean;
+  /** Colour a player's name in the meter when the build audit flags their
+   * equipment. A coloured name in an always-on-top overlay is a public
+   * accusation, so it is a choice — and it is suppressed under streamer_mode,
+   * where names are hidden anyway. Only has effect while
+   * `show_flagged_builds` is on. */
+  highlight_illegal_builds: boolean;
   show_full_values: boolean;
   use_condensed_skills: boolean;
   /** Count Primal Burst damage toward the meters. Off by default: whether a
@@ -43,20 +127,52 @@ interface MeterSettings {
   logs_columns: ColumnSetting<MeterColumns>[];
   /** Customizable skill-breakdown value columns for the main (logs) window. */
   logs_skill_columns: ColumnSetting<SkillColumns>[];
+  /** Template for the meter's player-name cell. See src/labelTemplate.ts. */
+  player_label_template: string;
+  /** The overlay header, as an ordered list of independently-templated pieces. */
+  header_segments: HeaderSegment[];
+  /** Which of the header's action buttons are drawn. */
+  header_buttons: HeaderButtonVisibility;
+  /** The overlay window's size in logical pixels. The overlay applies these to
+   * itself and writes back whatever the user drags it to, so the numbers on the
+   * settings page and the window on screen stay the same thing. */
+  overlay_width: number;
+  overlay_height: number;
+  bar_fill_mode: BarFillMode;
+  bar_texture: string;
+  /** Meter row height in px. */
+  bar_height: number;
+  /** Vertical gap between meter rows in px. */
+  bar_spacing: number;
 }
 
 interface MeterStateFunctions {
   set: (settings: Partial<MeterSettings>) => void;
 }
 
+/** The four default party-slot colours, in slot order. Exported so the settings
+ * page can offer a reset without restating them. */
+export const DEFAULT_METER_COLORS = ["#FF5630", "#F2D90A", "#36B37E", "#00B8D9"] as const;
+
+/** Default bar geometry, exported so the settings page can offer a reset
+ * without restating the numbers. */
+export const DEFAULT_BAR_APPEARANCE = {
+  bar_fill_mode: "total" as BarFillMode,
+  bar_texture: "solid",
+  bar_height: 27,
+  bar_spacing: 0,
+};
+
 const DEFAULT_METER_SETTINGS: MeterSettings = {
-  color_1: "#FF5630",
-  color_2: "#F2D90A",
-  color_3: "#36B37E",
-  color_4: "#00B8D9",
+  color_1: DEFAULT_METER_COLORS[0],
+  color_2: DEFAULT_METER_COLORS[1],
+  color_3: DEFAULT_METER_COLORS[2],
+  color_4: DEFAULT_METER_COLORS[3],
   transparency: 0.2,
   show_display_names: true,
   streamer_mode: false,
+  show_flagged_builds: false,
+  highlight_illegal_builds: true,
   show_full_values: false,
   use_condensed_skills: true,
   include_primal_burst: false,
@@ -67,6 +183,11 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   overlay_skill_columns: [...DEFAULT_OVERLAY_SKILL_COLUMNS],
   logs_columns: [...DEFAULT_LOGS_COLUMNS],
   logs_skill_columns: [...DEFAULT_LOGS_SKILL_COLUMNS],
+  player_label_template: DEFAULT_PLAYER_LABEL,
+  header_segments: [...DEFAULT_HEADER_SEGMENTS],
+  header_buttons: { ...DEFAULT_HEADER_BUTTONS },
+  ...DEFAULT_OVERLAY_SIZE,
+  ...DEFAULT_BAR_APPEARANCE,
 };
 
 /* Cross-window sync. The overlay and the logs/settings window are separate

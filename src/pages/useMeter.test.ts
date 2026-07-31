@@ -36,7 +36,7 @@ describe("useMeter", () => {
     for (const k of Object.keys(listeners)) delete listeners[k];
   });
 
-  // The backend emits `encounter-party-update` once per damage hit
+  // The backend re-emits `encounter-party-update` on every damage hit
   // (parser/v1/mod.rs insert_player_data), so any listener churn keyed on party
   // data runs at combat rate. Tauri v1's `listen` leaks a `window._<uid>`
   // closure per call that `unlisten` never removes, so re-registering is an

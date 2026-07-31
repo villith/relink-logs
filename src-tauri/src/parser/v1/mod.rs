@@ -78,7 +78,7 @@ impl<'a> AdjustedDamageInstance<'a> {
 }
 
 /// Equippable sigil for a character
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct WeaponInfo {
     /// Weapon ID Hash
@@ -133,7 +133,7 @@ impl From<protocol::WeaponInfo> for WeaponInfo {
 }
 
 /// Overmastery, also known as `limit_bonus`.
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct Overmastery {
     /// Overmastery ID
@@ -154,7 +154,7 @@ impl From<protocol::Overmastery> for Overmastery {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct OvermasteryInfo {
     pub overmasteries: Vec<Overmastery>,
@@ -172,7 +172,7 @@ impl From<protocol::OvermasteryInfo> for OvermasteryInfo {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerStats {
     pub level: u32,
@@ -197,7 +197,7 @@ impl From<protocol::PlayerStats> for PlayerStats {
 }
 
 /// Equippable sigil for a character
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct Sigil {
     /// ID of the first trait in this sigil
@@ -224,7 +224,7 @@ struct Sigil {
 /// apply party-wide). `summon_id` keys the summon table, `main_trait_id` is a
 /// regular trait id (named by the `traits:` lang namespace), `bonus_id` keys the
 /// summon base-param table; `bonus_level` is 0-indexed (max 9).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct EquippedSummon {
     pub summon_id: u32,
@@ -254,7 +254,7 @@ impl From<protocol::EquippedSummon> for EquippedSummon {
 /// than that carry `unk58` and no `criticalRate` and the field has to stay
 /// optional or none of them load (see `stored_log_compat` below). Their old
 /// value is not carried over, and the builds panel hides a zero crit rate.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct RecordStats {
     pub level: u32,
@@ -294,7 +294,7 @@ pub struct WeaponTraitPair {
 /// 2026-07-17). Every field is `#[serde(default)]` so logs stored by the
 /// short-lived raw-block shape of this struct still deserialize (they carry
 /// `weaponId` plus since-removed raw arrays, which serde ignores).
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct WeaponState {
     #[serde(default)]
@@ -379,7 +379,7 @@ fn merge_weapon_state(known: WeaponState, fresh: WeaponState) -> WeaponState {
 }
 
 /// Data for a player in the encounter
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerData {
     /// Actor index for this player
@@ -432,6 +432,139 @@ pub struct PlayerData {
     overmastery_info: Option<OvermasteryInfo>,
     /// Player stats for this player
     player_stats: Option<PlayerStats>,
+}
+
+/// Hand-written rather than derived because `CharacterType` has no `Default`
+/// and giving it one would assert a default character for the whole crate.
+/// An unknown hash is the honest stand-in for "no character read yet".
+impl Default for PlayerData {
+    fn default() -> Self {
+        Self {
+            actor_index: 0,
+            display_name: String::new(),
+            character_name: String::new(),
+            character_type: CharacterType::Unknown(0),
+            sigils: Vec::new(),
+            summons: Vec::new(),
+            abilities: Vec::new(),
+            weapon_key: String::new(),
+            master_level: 0,
+            skillboard: Vec::new(),
+            stats: None,
+            weapon_state: None,
+            is_online: false,
+            weapon_info: None,
+            overmastery_info: None,
+            player_stats: None,
+        }
+    }
+}
+
+/// Owned `protocol`-typed copies of the fields the legality rules read.
+///
+/// The rules are written against `protocol` types so they stay independent of
+/// this module's persisted on-disk format, but `PlayerData` stores the parser's
+/// own mirrors of those types. The struct itself lives with the rules that read
+/// it; the `From` impls below and [`PlayerData::legality_inputs`] are the bridge.
+pub use crate::legality::LegalityInputs;
+
+impl From<&WeaponTraitPair> for protocol::WeaponTraitPair {
+    fn from(pair: &WeaponTraitPair) -> Self {
+        Self {
+            id: pair.id,
+            level: pair.level,
+        }
+    }
+}
+
+impl From<&Overmastery> for protocol::Overmastery {
+    fn from(mastery: &Overmastery) -> Self {
+        Self {
+            id: mastery.id,
+            flags: mastery.flags,
+            value: mastery.value,
+        }
+    }
+}
+
+impl From<&Sigil> for protocol::Sigil {
+    fn from(sigil: &Sigil) -> Self {
+        Self {
+            first_trait_id: sigil.first_trait_id,
+            first_trait_level: sigil.first_trait_level,
+            second_trait_id: sigil.second_trait_id,
+            second_trait_level: sigil.second_trait_level,
+            sigil_id: sigil.sigil_id,
+            equipped_character: sigil.equipped_character,
+            sigil_level: sigil.sigil_level,
+            acquisition_count: sigil.acquisition_count,
+            notification_enum: sigil.notification_enum,
+        }
+    }
+}
+
+impl From<&EquippedSummon> for protocol::EquippedSummon {
+    fn from(summon: &EquippedSummon) -> Self {
+        Self {
+            summon_id: summon.summon_id,
+            main_trait_id: summon.main_trait_id,
+            main_trait_level: summon.main_trait_level,
+            bonus_id: summon.bonus_id,
+            bonus_level: summon.bonus_level,
+        }
+    }
+}
+
+impl From<&WeaponState> for protocol::WeaponState {
+    fn from(state: &WeaponState) -> Self {
+        Self {
+            weapon_id: state.weapon_id,
+            exp: state.exp,
+            star_level: state.star_level,
+            plus_marks: state.plus_marks,
+            awakening_level: state.awakening_level,
+            wrightstone_id: state.wrightstone_id,
+            wrightstone_traits: state.wrightstone_traits.iter().map(Into::into).collect(),
+            innate_traits: state.innate_traits.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<&OvermasteryInfo> for protocol::OvermasteryInfo {
+    fn from(info: &OvermasteryInfo) -> Self {
+        Self {
+            overmasteries: info.overmasteries.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl PlayerData {
+    /// Convert the fields the legality rules need into `protocol` types. Lives
+    /// here because `PlayerData`'s fields are private to this module.
+    pub fn legality_inputs(&self) -> LegalityInputs {
+        LegalityInputs {
+            sigils: self.sigils.iter().map(Into::into).collect(),
+            summons: self.summons.iter().map(Into::into).collect(),
+            weapon_state: self.weapon_state.as_ref().map(Into::into),
+            overmastery_info: self.overmastery_info.as_ref().map(Into::into),
+            skillboard: self.skillboard.clone(),
+        }
+    }
+
+    /// Who this row is, for a caller that has to label an audited player.
+    /// Here for the same reason `legality_inputs` is: the fields are private to
+    /// this module, and the serde shape is a storage format, not an API.
+    pub fn display_name(&self) -> &str {
+        &self.display_name
+    }
+
+    pub fn character_name(&self) -> &str {
+        &self.character_name
+    }
+
+    pub fn character_type(&self) -> CharacterType {
+        self.character_type
+    }
 }
 
 /// Derived breakdown for an enemy target
@@ -510,6 +643,37 @@ impl Encounter {
     /// Compresses this encounter data into a binary blob.
     pub fn to_blob(&self) -> Result<Vec<u8>> {
         to_stored_blob(self)
+    }
+
+    /// Audits every occupied party slot and stores the verdicts against
+    /// `log_id`. Clean players write nothing — a slot with no row reads as
+    /// clean, so storing empty verdicts would only cost space.
+    ///
+    /// The save path and the startup sweep are the two callers, and they must
+    /// agree on what a stored row carries; keeping the walk here means a change
+    /// to that reaches both.
+    ///
+    /// APPENDS. `log_id` must carry no findings yet — a freshly inserted log, or
+    /// one the caller has just passed to [`crate::db::legality::clear_findings`]
+    /// (which is what the sweep does). Re-running this over a log that already
+    /// has rows stores every verdict twice, and nothing downstream deduplicates.
+    pub fn write_legality_findings(&self, conn: &Connection, log_id: i64) -> Result<()> {
+        for (player_index, player) in self.player_data.iter().enumerate() {
+            let Some(player) = player else { continue };
+            let findings = crate::legality::audit_player(player);
+            if findings.is_empty() {
+                continue;
+            }
+            crate::db::legality::write_findings(
+                conn,
+                log_id,
+                player_index,
+                player.display_name(),
+                &player.character_type().to_string(),
+                &findings,
+            )?;
+        }
+        Ok(())
     }
 
     /// Deserializes a binary blob into encounter instance.
@@ -1426,6 +1590,12 @@ pub struct Parser {
     /// The manager dtor rarely fires, so this is the primary "cleared" signal.
     #[serde(skip)]
     active_run_completed: bool,
+
+    /// The party's verdicts as last computed, so the per-hit identity path can
+    /// re-broadcast them without re-auditing four builds. Recomputed only when
+    /// the party actually changes — see [`Parser::insert_player_data`].
+    #[serde(skip)]
+    last_party_legality: [Vec<crate::legality::Finding>; 4],
 }
 
 impl Parser {
@@ -2104,11 +2274,44 @@ impl Parser {
             // 0xFF placeholder or corrupt slot — never clobber a real slot with it.
             return;
         };
-        *slot = Some(player_data);
+        // The identity path publishes on EVERY damage hit (`hooks/damage.rs`
+        // sends a `PlayerIdentityEvent` for each hit's source actor), so this
+        // runs at combat rate, not once per equipment snapshot.
+        //
+        // What that made expensive was the AUDIT, not the emit: `party_legality`
+        // rebuilds four `LegalityInputs` (each cloning a whole equipment set)
+        // and runs every rule over them. That is gated on a real change here.
+        //
+        // The two emits are NOT gated. They are the frontend's only source for
+        // the party — `useMeter` holds no fetch for it — so a meter that mounts
+        // or reloads mid-fight would otherwise draw four unnamed, uncoloured
+        // rows for the rest of the quest, a settled party never changing again.
+        // Note the guard is a derived `PartialEq` over structs holding `f32`
+        // read from game memory: one NaN makes it compare unequal forever, so
+        // it must only ever cost work, never correctness.
+        if slot.as_ref() != Some(&player_data) {
+            *slot = Some(player_data);
+            // A live fight has no stored row to read verdicts from, so the
+            // meter's colouring is derived here.
+            self.last_party_legality = self.party_legality();
+        }
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-party-update", &self.encounter.player_data);
+            let _ = window.emit("encounter-legality-update", &self.last_party_legality);
         }
+    }
+
+    /// Findings per party slot, in `player_data` order. Empty vectors for
+    /// absent or clean players, so a caller can index by slot without
+    /// tracking which slots exist.
+    pub fn party_legality(&self) -> [Vec<crate::legality::Finding>; 4] {
+        std::array::from_fn(|slot| {
+            self.encounter.player_data[slot]
+                .as_ref()
+                .map(crate::legality::audit_player)
+                .unwrap_or_default()
+        })
     }
 
     /// Handles one per-hit stun message from the network stun-apply hook — the
@@ -2589,8 +2792,9 @@ impl Parser {
                         quest_completed,
                         run_id,
                         room_index,
-                        total_damage
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+                        total_damage,
+                        legality_rules_version
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
                 params![
                     "",
                     start_datetime.timestamp_millis(),
@@ -2611,16 +2815,104 @@ impl Parser {
                     self.encounter.quest_completed,
                     run_id,
                     room_index,
-                    total_damage
+                    total_damage,
+                    // Stamped here rather than left for the startup sweep: an
+                    // unstamped log reads as stale, so every fresh save would
+                    // be re-audited on the next launch and the write below
+                    // would be wasted work.
+                    crate::legality::RULES_VERSION
                 ],
             )?;
 
             let id = conn.last_insert_rowid();
 
+            // Audit while the equipment is in hand. Re-running the rules later
+            // means decompressing and reparsing this blob again, which is the
+            // whole cost the stored findings exist to avoid.
+            self.encounter.write_legality_findings(conn, id)?;
+
             return Ok(Some(id));
         }
 
         Ok(None)
+    }
+}
+
+#[cfg(test)]
+mod legality_save_tests {
+    use super::*;
+
+    /// Saving an encounter audits its players and stores the verdicts, so the
+    /// log view and the audit page never have to re-run the rules.
+    ///
+    /// Also pins the STAMP. Without it every freshly saved log would look
+    /// stale to the startup sweep and be re-audited on the next launch — the
+    /// sweep would never converge and the write here would be pointless work.
+    #[test]
+    fn saving_an_encounter_stores_its_findings_and_stamps_the_rules_version() {
+        let mut parser = super::tests::parser_with_memory_db();
+
+        // Behemoth III with the boss-set Healing Cap Up at its top: +75%
+        // against a +50% ceiling, so both summon-bonus rules fire.
+        let mut player = PlayerData {
+            display_name: "炎顺帝".to_string(),
+            ..Default::default()
+        };
+        player.summons = vec![EquippedSummon {
+            summon_id: 0xe4b7_dcf9,
+            main_trait_id: 0xb5ff_9fd3,
+            main_trait_level: 15,
+            bonus_id: 0x2ea9_ca80,
+            bonus_level: 9,
+        }];
+        parser.encounter.player_data[2] = Some(player);
+
+        let log_id = parser
+            .save_encounter_to_db()
+            .expect("save succeeds")
+            .expect("a log row was written");
+
+        let conn = parser.db.as_ref().expect("the fixture holds a connection");
+        let stored = crate::db::legality::findings_for_log(conn, log_id).expect("read findings");
+        assert_eq!(stored.len(), 2, "both summon-bonus rules should be stored");
+        assert!(stored.iter().all(|row| row.player_index == 2));
+        assert!(stored.iter().all(|row| row.display_name == "炎顺帝"));
+
+        let stamp: Option<u32> = conn
+            .query_row(
+                "SELECT legality_rules_version FROM logs WHERE id = ?",
+                [log_id],
+                |row| row.get(0),
+            )
+            .expect("read the stamp");
+        assert_eq!(stamp, Some(crate::legality::RULES_VERSION));
+    }
+
+    /// A legal party stores nothing but is still stamped, so the sweep leaves
+    /// it alone. An unstamped clean log would be re-audited forever.
+    #[test]
+    fn a_clean_encounter_stores_no_findings_but_is_still_stamped() {
+        let mut parser = super::tests::parser_with_memory_db();
+        parser.encounter.player_data[0] = Some(PlayerData::default());
+
+        let log_id = parser
+            .save_encounter_to_db()
+            .expect("save succeeds")
+            .expect("a log row was written");
+
+        let conn = parser.db.as_ref().expect("the fixture holds a connection");
+        assert!(crate::db::legality::findings_for_log(conn, log_id)
+            .expect("read findings")
+            .is_empty());
+
+        let stamp: Option<u32> = conn
+            .query_row(
+                "SELECT legality_rules_version FROM logs WHERE id = ?",
+                [log_id],
+                |row| row.get(0),
+            )
+            .expect("read the stamp");
+        assert_eq!(stamp, Some(crate::legality::RULES_VERSION));
     }
 }
 
@@ -2646,13 +2938,13 @@ mod tests {
 
     use super::*;
 
-    fn parser_with_memory_db() -> Parser {
+    /// The REAL migration list, not a hand-copied one. It used to be a copy,
+    /// which meant a schema the save path depends on could be added without
+    /// these tests noticing — and the save path now also writes findings, so
+    /// a copy would have been missing a whole table.
+    pub(super) fn parser_with_memory_db() -> Parser {
         let mut conn = rusqlite::Connection::open_in_memory().unwrap();
-        let migrations = rusqlite_migration::Migrations::new(vec![
-            rusqlite_migration::M::up("CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY, name TEXT NOT NULL, time INTEGER NOT NULL, duration INTEGER NOT NULL, data BLOB NOT NULL, version INTEGER NOT NULL DEFAULT 0, primary_target INTEGER, p1_name TEXT, p1_type TEXT, p2_name TEXT, p2_type TEXT, p3_name TEXT, p3_type TEXT, p4_name TEXT, p4_type TEXT, quest_id INTEGER, quest_elapsed_time INTEGER, quest_completed BOOLEAN, run_id INTEGER, room_index INTEGER, total_damage INTEGER)"),
-            rusqlite_migration::M::up("CREATE TABLE IF NOT EXISTS runs (id INTEGER PRIMARY KEY, start_time INTEGER NOT NULL, end_time INTEGER, duration INTEGER, room_count INTEGER NOT NULL DEFAULT 0, completed BOOLEAN, buffs TEXT)"),
-        ]);
-        migrations.to_latest(&mut conn).unwrap();
+        crate::db::migrations().to_latest(&mut conn).unwrap();
         Parser {
             db: Some(conn),
             ..Default::default()
@@ -5575,5 +5867,150 @@ mod stored_log_compat {
 
         assert_eq!(parser.encounter.event_log.len(), 1);
         assert_eq!(parser.encounter.raw_event_log.len(), 1);
+    }
+}
+
+/// The `PlayerData` -> `LegalityInputs` bridge, tested with data in it.
+///
+/// `legality_inputs` lives here because `PlayerData`'s fields are private to
+/// this module, and it is exercised nowhere else — `audit_player` has no
+/// production caller yet. A bridge test built on `PlayerData::default()`
+/// asserts nothing about the bridge: every rule is silent on empty input BY
+/// DESIGN, so replacing any field's conversion with an empty value leaves such
+/// a test green while the rule it feeds stops working in production forever.
+///
+/// So this fixture populates every field the bridge carries and pins the exact
+/// set of rules that comes back. Dropping ANY single field — `skillboard` to
+/// `Vec::new()`, `weapon_state`/`overmastery_info` to `None`, `sigils` or
+/// `summons` to empty, `character_type` to something unrecognised — removes
+/// its rule from that set and fails the assertion.
+#[cfg(test)]
+mod legality_bridge_tests {
+    use super::*;
+    use crate::legality::{audit_player, Rule};
+
+    /// War Elemental's sigil id, whose intrinsic first trait is `4c588c27`.
+    const WAR_ELEMENTAL_SIGIL: u32 = 0x0061_2b10;
+    const WAR_ELEMENTAL_TRAIT: u32 = 0x4c58_8c27;
+    const STEADY_FOCUS: u32 = 0x0053_599e;
+    /// A real trait, used where an out-of-place one is needed.
+    const DMG_CAP: u32 = 0xdc58_4f60;
+    /// The Fortification family's primary trait (a legal wrightstone primary).
+    const HP_TRAIT: u32 = 0xf372_f096;
+    const SUPPLEMENTARY_DMG: u32 = 0x57ab_5b10;
+    /// Wheel of Fate III — DMG Cap is not a candidate of any of its lots.
+    const WHEEL_OF_FATE_III: u32 = 0x47e2_ae71;
+    const CRIT_RATE_UP: u32 = 0x00d1_71e0;
+    /// Overmastery ids: Attack, Health, Critical Hit Rate, Stun Power.
+    const OM_ATTACK: u32 = 0xc492_5bd7;
+    const OM_HEALTH: u32 = 0x52a2_07b5;
+    const OM_CRIT: u32 = 0x45c6_5767;
+    const OM_STUN: u32 = 0x6cb3_8ef3;
+
+    fn populated_player() -> PlayerData {
+        PlayerData {
+            character_type: CharacterType::Pl0000,
+            // SigilTraitLevel: two traits present, first at 30 over the
+            // ceiling of 15.
+            sigils: vec![Sigil {
+                first_trait_id: WAR_ELEMENTAL_TRAIT,
+                first_trait_level: 30,
+                second_trait_id: STEADY_FOCUS,
+                second_trait_level: 10,
+                sigil_id: WAR_ELEMENTAL_SIGIL,
+                equipped_character: 0,
+                sigil_level: 15,
+                acquisition_count: 1,
+                notification_enum: 0,
+            }],
+            // SummonTrait: DMG Cap is not a candidate of the Wheel's main lot.
+            summons: vec![EquippedSummon {
+                summon_id: WHEEL_OF_FATE_III,
+                main_trait_id: DMG_CAP,
+                main_trait_level: 15,
+                bonus_id: CRIT_RATE_UP,
+                bonus_level: 9,
+            }],
+            // Rule 1: the primary slot's ceiling is 20.
+            weapon_state: Some(WeaponState {
+                weapon_id: 0,
+                exp: 0,
+                star_level: 0,
+                plus_marks: 0,
+                awakening_level: 0,
+                wrightstone_id: 0,
+                wrightstone_traits: vec![
+                    WeaponTraitPair {
+                        id: HP_TRAIT,
+                        level: 25,
+                    },
+                    WeaponTraitPair {
+                        id: DMG_CAP,
+                        level: 15,
+                    },
+                    WeaponTraitPair {
+                        id: SUPPLEMENTARY_DMG,
+                        level: 10,
+                    },
+                ],
+                innate_traits: Vec::new(),
+            }),
+            // Rule 8: 5000 is on no ladder. The other three are legal, and a
+            // full set of four is required for the rule to speak at all.
+            overmastery_info: Some(OvermasteryInfo {
+                overmasteries: vec![
+                    Overmastery {
+                        id: OM_ATTACK,
+                        flags: 0,
+                        value: 5000.0,
+                    },
+                    Overmastery {
+                        id: OM_HEALTH,
+                        flags: 0,
+                        value: 800.0,
+                    },
+                    Overmastery {
+                        id: OM_CRIT,
+                        flags: 0,
+                        value: 6.0,
+                    },
+                    Overmastery {
+                        id: OM_STUN,
+                        flags: 0,
+                        value: 0.6,
+                    },
+                ],
+            }),
+            // MasterTraitCount: one node past the 50-slot storage.
+            skillboard: (0..=50).collect(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn the_bridge_carries_every_field_the_rules_read() {
+        let findings = audit_player(&populated_player());
+        let rules: Vec<Rule> = findings.iter().map(|finding| finding.rule).collect();
+
+        // One rule per bridged field, in `audit`'s own order. If this vector
+        // shrinks, a field stopped crossing the bridge.
+        assert_eq!(
+            rules,
+            vec![
+                Rule::WrightstoneTraitLevel, // weapon_state
+                Rule::SigilTraitLevel,       // sigils
+                Rule::OvermasteryValue,      // overmastery_info
+                Rule::SummonTrait,           // summons
+                Rule::MasterTraitCount,      // skillboard
+            ],
+            "a field stopped crossing the PlayerData -> LegalityInputs bridge"
+        );
+    }
+
+    /// The companion to the above: the same rules really are silent on empty
+    /// input, which is exactly why the populated fixture is necessary.
+    #[test]
+    fn an_empty_player_is_silent_so_only_populated_input_tests_the_bridge() {
+        assert_eq!(audit_player(&PlayerData::default()), vec![]);
     }
 }

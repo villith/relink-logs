@@ -233,7 +233,11 @@ impl OnEndlessBuffInstallHook {
 
         #[cfg(feature = "hookdiag")]
         {
-            crate::hooks::diag::ev!("endless_buff", "buff_this={:#x} buff_id={buff_id:#x}", a1 as usize);
+            crate::hooks::diag::ev!(
+                "endless_buff",
+                "buff_this={:#x} buff_id={buff_id:#x}",
+                a1 as usize
+            );
             crate::hooks::diag::probe_u32_window_delta("endless_buff", a1 as usize, 0x1000);
         }
 
@@ -270,12 +274,15 @@ impl OnEndlessMgrDtorHook {
     }
 
     fn run(&self, a1: *const usize) -> usize {
-        log::warn!("CONFLUX hook: mgr_dtor (run-end) manager={:#x}", a1 as usize);
-        let _ = self
-            .tx
-            .send(protocol::Message::ConfluxRunEnd(protocol::ConfluxRunEndEvent {
+        log::warn!(
+            "CONFLUX hook: mgr_dtor (run-end) manager={:#x}",
+            a1 as usize
+        );
+        let _ = self.tx.send(protocol::Message::ConfluxRunEnd(
+            protocol::ConfluxRunEndEvent {
                 manager_ptr: a1 as u64,
-            }));
+            },
+        ));
 
         #[cfg(feature = "hookdiag")]
         {

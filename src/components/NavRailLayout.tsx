@@ -48,7 +48,21 @@ export const NavRailLayout = ({ sections, storageKey }: { sections: NavRailSecti
 
   return (
     <Flex gap="md" align="flex-start">
-      <Box w={collapsed ? 56 : 300} style={{ flexShrink: 0 }}>
+      {/* The rail stays put while the section scrolls: it is the navigation for
+          the page you are already on, and scrolling it away costs a trip back to
+          the top to switch sections. `top` clears the fixed AppShell header —
+          read from Mantine's own variable so the two cannot drift apart — and
+          the rail scrolls internally if it ever outgrows the viewport. */}
+      <Box
+        w={collapsed ? 56 : 300}
+        style={{
+          flexShrink: 0,
+          position: "sticky",
+          top: "calc(var(--app-shell-header-height, 50px) + var(--mantine-spacing-sm))",
+          maxHeight: "calc(100vh - var(--app-shell-header-height, 50px) - var(--mantine-spacing-sm) * 2)",
+          overflowY: "auto",
+        }}
+      >
         {sections.map(({ to, labelKey, labelFallback, icon: ItemIcon, newId }) => {
           const label = t(labelKey, labelFallback);
           return (

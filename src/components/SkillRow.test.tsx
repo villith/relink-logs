@@ -32,18 +32,20 @@ const renderRow = (
 ) =>
   render(
     <MantineProvider>
-      <table>
-        <tbody>
+      <div role="table">
+        <div role="rowgroup">
           <SkillRow
             characterType="Pl0000"
             skill={skill}
             color="#ff0000"
             columns={columns}
             durationSeconds={durationSeconds}
+            maxPercentage={100}
+            fillMode="total"
             live
           />
-        </tbody>
-      </table>
+        </div>
+      </div>
     </MantineProvider>
   );
 
@@ -71,7 +73,7 @@ describe("SkillRow", () => {
   it("renders a Perfect Guard (Quickening) row as hits plus dashes", () => {
     const { container } = renderRow(makeSkill({ actionType: "PerfectGuardQuickening", hits: 1 }));
 
-    const cells = container.querySelectorAll("td");
+    const cells = container.querySelectorAll(String.raw`[role="cell"]`);
     expect(cells[0].textContent).toBe("Perfect Guard (Quickening)");
     expect(cells[1].textContent).toBe("1");
     // total, min, max, avg, stun, stun-hits, stun/hit, SPS, cap%, %
@@ -85,7 +87,7 @@ describe("SkillRow", () => {
   it("keeps normal value rendering for other rows", () => {
     const { container } = renderRow(makeSkill({ actionType: "PerfectGuard", hits: 2, totalStunValue: 927 }));
 
-    const cells = container.querySelectorAll("td");
+    const cells = container.querySelectorAll(String.raw`[role="cell"]`);
     expect(cells[0].textContent).toBe("Perfect Guard");
     expect(cells[1].textContent).toBe("2");
     expect(cells[2].textContent).toBe("0");
@@ -104,7 +106,7 @@ describe("SkillRow", () => {
       [SkillColumns.StunEligibleHits, SkillColumns.StunPerEligibleHit]
     );
 
-    const cells = container.querySelectorAll("td");
+    const cells = container.querySelectorAll(String.raw`[role="cell"]`);
     expect(cells[0].textContent).toBe("Perfect Guard");
     expect(cells[1].textContent).toBe("8"); // stun hits
     expect(cells[2].textContent).toBe("25"); // 200 / 8 = 25 stun per hit
@@ -119,7 +121,7 @@ describe("SkillRow", () => {
       60
     );
 
-    const cells = container.querySelectorAll("td");
+    const cells = container.querySelectorAll(String.raw`[role="cell"]`);
     expect(cells[1].textContent).toBe("5.00"); // 300 / 60
   });
 
@@ -132,7 +134,7 @@ describe("SkillRow", () => {
       0
     );
 
-    const cells = container.querySelectorAll("td");
+    const cells = container.querySelectorAll(String.raw`[role="cell"]`);
     expect(cells[1].textContent).toBe("");
   });
 
@@ -144,7 +146,7 @@ describe("SkillRow", () => {
       [SkillColumns.StunEligibleHits, SkillColumns.StunPerEligibleHit]
     );
 
-    const cells = container.querySelectorAll("td");
+    const cells = container.querySelectorAll(String.raw`[role="cell"]`);
     expect(cells[1].textContent).toBe("");
     expect(cells[2].textContent).toBe("");
   });

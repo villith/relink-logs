@@ -38,13 +38,13 @@ export const renderSkillCell = (
   switch (column) {
     case SkillColumns.Hits:
       return (
-        <td key={column} className="text-center row-data">
+        <div key={column} role="cell" className="text-center row-data">
           {data.hits}
-        </td>
+        </div>
       );
     case SkillColumns.TotalDamage:
       return (
-        <td key={column} className="text-center row-data">
+        <div key={column} role="cell" className="text-center row-data">
           {showFullValues ? (
             data.totalDamage.toLocaleString()
           ) : (
@@ -53,11 +53,11 @@ export const renderSkillCell = (
               <span className="unit font-sm">{totalDamageUnit}</span>
             </>
           )}
-        </td>
+        </div>
       );
     case SkillColumns.MinDamage:
       return (
-        <td key={column} className="text-center row-data">
+        <div key={column} role="cell" className="text-center row-data">
           {showFullValues ? (
             data.minDamage ? (
               data.minDamage.toLocaleString()
@@ -70,11 +70,11 @@ export const renderSkillCell = (
               <span className="unit font-sm">{minDmgUnit}</span>
             </>
           )}
-        </td>
+        </div>
       );
     case SkillColumns.MaxDamage:
       return (
-        <td key={column} className="text-center row-data">
+        <div key={column} role="cell" className="text-center row-data">
           {showFullValues ? (
             data.maxDamage ? (
               data.maxDamage.toLocaleString()
@@ -87,11 +87,11 @@ export const renderSkillCell = (
               <span className="unit font-sm">{maxDmgUnit}</span>
             </>
           )}
-        </td>
+        </div>
       );
     case SkillColumns.AverageDamage:
       return (
-        <td key={column} className="text-center row-data">
+        <div key={column} role="cell" className="text-center row-data">
           {showFullValues ? (
             rawAverageDmg.toLocaleString()
           ) : (
@@ -100,15 +100,15 @@ export const renderSkillCell = (
               <span className="unit font-sm">{averageDmgUnit}</span>
             </>
           )}
-        </td>
+        </div>
       );
     case SkillColumns.TotalStunValue:
       return <StunCell key={column} value={data.totalStunValue ?? 0} showFullValues={showFullValues} />;
     case SkillColumns.StunEligibleHits:
       return (
-        <td key={column} className="text-center row-data">
+        <div key={column} role="cell" className="text-center row-data">
           {(data.stunEligibleHits ?? 0) > 0 ? data.stunEligibleHits : ""}
-        </td>
+        </div>
       );
     case SkillColumns.StunPerEligibleHit: {
       const eligible = data.stunEligibleHits ?? 0;
@@ -118,24 +118,24 @@ export const renderSkillCell = (
     case SkillColumns.StunPerSecond: {
       const sps = durationSeconds > 0 ? (data.totalStunValue ?? 0) / durationSeconds : 0;
       return (
-        <td key={column} className="text-center row-data">
+        <div key={column} role="cell" className="text-center row-data">
           {sps > 0 ? sps.toFixed(2) : ""}
-        </td>
+        </div>
       );
     }
     case SkillColumns.Overcap:
       return <OvercapCell key={column} percentage={overcapPercentage} />;
     case SkillColumns.DamagePercentage:
       return (
-        <td key={column} className="text-center row-data">
+        <div key={column} role="cell" className="text-center row-data">
           {data.percentage.toFixed(0)}
           <span className="unit font-sm">%</span>
-        </td>
+        </div>
       );
     default:
       // An id outside the current SkillColumns (e.g. a stale/corrupted persisted
       // list): still emit a cell so the body stays aligned with the header, which
       // renders one <th> per column unconditionally.
-      return <td key={column} className="text-center row-data" />;
+      return <div key={column} role="cell" className="text-center row-data" />;
   }
 };

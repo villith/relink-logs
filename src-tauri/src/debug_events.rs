@@ -15,17 +15,17 @@ use protocol::{
 use serde::Deserialize;
 
 /// Gran — a real hash from `parser::constants::CharacterType`.
-const PL0000: u32 = 0x26A4848A;
+pub const PL0000: u32 = 0x26A4848A;
 /// Katalina — likewise real, so the parser's character lookup resolves.
-const PL0200: u32 = 0x34D4FD8F;
+pub const PL0200: u32 = 0x34D4FD8F;
 
 /// The non-player target. Deliberately a hash outside the game's tables: a real
 /// enemy hash would render as that enemy's name in the UI, Eugen's grenade
 /// (0x022a350f) is dropped by the damage filter, and Sir Barrold (0xA379AC65)
 /// makes the save path discard the encounter's quest id.
-const TARGET_TYPE: u32 = 0xDEAD_BEEF;
+pub const TARGET_TYPE: u32 = 0xDEAD_BEEF;
 /// The target's actor index; any value works, it is never joined against.
-const TARGET_INDEX: u32 = 0x1000;
+pub const TARGET_INDEX: u32 = 0x1000;
 
 #[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -42,9 +42,13 @@ pub enum Scenario {
     Reset,
 }
 
-fn identity(slot: u8, character_type: u32, name: &str) -> Message {
+/// An identity event carrying nothing but who the player is. `pub` because the
+/// `legality_seed` example builds synthetic players from the same shape and
+/// then fills in the one field its scenario is about — a second copy would
+/// have to be updated in lockstep every time `PlayerIdentityEvent` grows.
+pub fn identity_event(slot: u8, character_type: u32, name: &str) -> PlayerIdentityEvent {
     let name = CString::new(name).expect("debug names carry no interior nul");
-    Message::PlayerIdentityEvent(PlayerIdentityEvent {
+    PlayerIdentityEvent {
         character_name: name.clone(),
         display_name: name,
         character_type,
@@ -61,12 +65,14 @@ fn identity(slot: u8, character_type: u32, name: &str) -> Message {
         skillboard: Vec::new(),
         stats: None,
         weapon_state: None,
-    })
+    }
 }
 
-fn damage(slot: u8, character_type: u32, amount: i32, skill_id: u32) -> Message {
+/// A plain attributed hit against [`TARGET_TYPE`]. `pub` for the same reason
+/// [`identity_event`] is.
+pub fn damage_event(slot: u8, character_type: u32, amount: i32, skill_id: u32) -> DamageEvent {
     let key = protocol::player_slot_key(slot);
-    Message::DamageEvent(DamageEvent {
+    DamageEvent {
         source: Actor {
             index: key,
             actor_type: character_type,
@@ -92,7 +98,15 @@ fn damage(slot: u8, character_type: u32, amount: i32, skill_id: u32) -> Message 
         base_damage: None,
         target_current_hp: None,
         target_max_hp: None,
-    })
+    }
+}
+
+fn identity(slot: u8, character_type: u32, name: &str) -> Message {
+    Message::PlayerIdentityEvent(identity_event(slot, character_type, name))
+}
+
+fn damage(slot: u8, character_type: u32, amount: i32, skill_id: u32) -> Message {
+    Message::DamageEvent(damage_event(slot, character_type, amount, skill_id))
 }
 
 /// The message script for one Debug button. One press sends one batch — pacing
