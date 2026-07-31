@@ -1,5 +1,6 @@
 import { useEncounterStore } from "@/stores/useEncounterStore";
 import { useLogIndexStore } from "@/stores/useLogIndexStore";
+import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { LogSortType } from "@/types";
 
 import { Text } from "@mantine/core";
@@ -37,9 +38,16 @@ export default function useIndex() {
     setSelectedTargetSpans: state.setSelectedTargetSpans,
   }));
 
+  // Read as a scalar so this subscribes to the one field, not to every meter
+  // setting: the quest list re-queries when it changes.
+  const show_flagged_builds = useMeterSettingsStore((state) => state.show_flagged_builds);
+
+  // Also on the master switch: it decides whether the flagged filter reaches
+  // the query at all, so flipping it has to re-ask rather than leave the list
+  // filtered by a control that is no longer on screen.
   useEffect(() => {
     fetchLogs();
-  }, [currentPage, filters]);
+  }, [currentPage, filters, show_flagged_builds]);
 
   useEffect(() => {
     const encounterSavedListener = listen("encounter-saved", () => {

@@ -713,6 +713,12 @@ struct SearchResult {
     player_ids: Vec<String>,
     /// Names of the Characters that can be filtered by.
     player_types: Vec<String>,
+    /// Stored legality verdicts for the logs on this page, keyed by log id.
+    /// Sent with the page rather than fetched separately so a row and its
+    /// verdicts can never be a render apart — and only for the ten rows drawn,
+    /// not the whole table the audit page reads. Logs nobody was flagged in are
+    /// absent; the quest list reads a miss as clean.
+    legality: HashMap<i64, Vec<db::legality::StoredFinding>>,
 }
 
 #[tauri::command]
@@ -725,7 +731,11 @@ fn fetch_logs(
     quest_completed: Option<bool>,
     filter_by_player_id: Option<String>,
     filter_by_player_character: Option<String>,
+    flagged_only: Option<bool>,
 ) -> Result<SearchResult, String> {
+    // Absent means "no legality filter" — the quest list only ever asks for the
+    // flagged runs or for all of them.
+    let flagged_only = flagged_only.unwrap_or(false);
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
     let page = page.unwrap_or(1);
     let per_page = 10;
@@ -758,6 +768,7 @@ fn fetch_logs(
         quest_completed,
         &filter_by_player_id,
         &filter_by_player_character,
+        flagged_only,
     )
     .map_err(|e| e.to_string())?;
 
@@ -768,8 +779,12 @@ fn fetch_logs(
         quest_completed,
         &filter_by_player_id,
         &filter_by_player_character,
+        flagged_only,
     )
     .map_err(|e| e.to_string())?;
+
+    let page_ids: Vec<i64> = logs.iter().map(|log| log.id()).collect();
+    let legality = db::legality::findings_for_logs(&conn, &page_ids).map_err(|e| e.to_string())?;
 
     let page_count = (log_count as f64 / per_page as f64).ceil() as u32;
 
@@ -851,6 +866,7 @@ fn fetch_logs(
         quest_ids,
         player_ids,
         player_types,
+        legality,
     })
 }
 

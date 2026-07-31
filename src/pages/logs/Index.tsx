@@ -1,11 +1,11 @@
+import { LegalityPlayerName } from "@/components/LegalityMark";
 import { FilterState } from "@/stores/useLogIndexStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
-import { CharacterType, Log, LogSortType, SortDirection } from "@/types";
+import { Log, LogSortType, SortDirection, StoredLegalityFinding } from "@/types";
 import {
   epochToLocalTime,
   hasQuestElapsedTime,
   millisecondsToElapsedFormat,
-  translateCharacterType,
   translateEnemyType,
   translateEnemyTypeId,
   translateQuestId,
@@ -25,10 +25,11 @@ import {
   Text,
   UnstyledButton,
 } from "@mantine/core";
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
+import { PartyMember, partyMembers } from "./partyMembers";
 import useIndex from "./useIndex";
 
 export const IndexPage = () => {
@@ -47,42 +48,17 @@ export const IndexPage = () => {
     toggleAdvancedFilters,
   } = useIndex();
 
-  const { streamer_mode, show_display_names } = useMeterSettingsStore(
+  const { streamer_mode, show_display_names, show_flagged_builds } = useMeterSettingsStore(
     useShallow((state) => ({
       show_display_names: state.show_display_names,
       streamer_mode: state.streamer_mode,
+      show_flagged_builds: state.show_flagged_builds,
     }))
   );
 
   const rows = searchResult.logs.map((log) => {
     const primaryTarget = translateEnemyType(log.primaryTarget);
-
-    let names = "";
-
-    if (log.version == 0) {
-      names = log.name
-        .split(", ")
-        .map((name) => t(`characters:${name}`, `ui:characters.${name}`))
-        .join(", ");
-    } else {
-      names = [
-        { name: log.p1Name, type: log.p1Type },
-        { name: log.p2Name, type: log.p2Type },
-        { name: log.p3Name, type: log.p3Type },
-        { name: log.p4Name, type: log.p4Type },
-      ]
-        .filter((player) => player.name || player.type)
-        .map((player) => {
-          const characterName = translateCharacterType(player.type as CharacterType);
-
-          // A slot with a character but no player name is an AI companion.
-          if (!player.name) return `${characterName} (${t("ui.logs.ai-companion")})`;
-          if (!show_display_names || streamer_mode) return characterName;
-
-          return `${characterName} (${player.name})`;
-        })
-        .join(", ");
-    }
+    const members = partyMembers(log, { showDisplayNames: show_display_names, streamerMode: streamer_mode, t });
 
     const resetSelectedTargets = () => {
       setSelectedTargetSpans([]);
@@ -95,7 +71,11 @@ export const IndexPage = () => {
         selectedLogIds={selectedLogIds}
         setSelectedLogIds={setSelectedLogIds}
         primaryTarget={primaryTarget}
-        names={names}
+        members={members}
+        // Only when the user has asked to see verdicts at all. Withheld here
+        // rather than at the mark, so the row cannot colour what it was never
+        // given.
+        findings={show_flagged_builds ? searchResult.legality?.[log.id] : undefined}
         resetSelectedTargets={resetSelectedTargets}
       />
     );
@@ -125,6 +105,12 @@ export const IndexPage = () => {
           )}
           {filters.showAdvancedFilters && (
             <SelectablePlayerType playerTypes={searchResult.playerTypes} setFilters={setFilters} filters={filters} />
+          )}
+          {/* Hidden with the verdicts themselves: filtering by something the
+              user has asked not to see would narrow the list for a reason
+              nothing on screen explains. */}
+          {filters.showAdvancedFilters && show_flagged_builds && (
+            <SelectableFlagged setFilters={setFilters} filters={filters} />
           )}
         </Group>
       </Box>
@@ -224,19 +210,49 @@ function SortableColumn({
   );
 }
 
+/** The party, drawn one member at a time so a flagged build can colour exactly
+ * the person it belongs to — and explain itself in the same words the log page
+ * and the Build Audit use.
+ *
+ * Attribution is by party slot: `playerIndex` on a stored finding is the slot
+ * the backend audited, and `partyMembers` carries the same number. Legacy
+ * version-0 logs have no slots, so their members carry `null` and never match. */
+function PartyNames({ members, findings }: { members: PartyMember[]; findings?: StoredLegalityFinding[] }) {
+  return (
+    <Text size="xs">
+      {members.map((member, index) => (
+        <Fragment key={index}>
+          {index > 0 && ", "}
+          <LegalityPlayerName
+            findings={(findings ?? [])
+              .filter((stored) => member.slot !== null && stored.playerIndex === member.slot)
+              .map((stored) => stored.finding)}
+          >
+            {member.label}
+          </LegalityPlayerName>
+        </Fragment>
+      ))}
+    </Text>
+  );
+}
+
 function LogEntry({
   log,
   selectedLogIds,
   setSelectedLogIds,
   primaryTarget,
-  names,
+  members,
+  findings,
   resetSelectedTargets,
 }: {
   log: Log;
   selectedLogIds: number[];
   setSelectedLogIds: (ids: number[]) => void;
   primaryTarget: string;
-  names: string;
+  members: PartyMember[];
+  /** This log's stored verdicts, or nothing when the user has asked not to see
+   * them — which reads the same as a log nobody was flagged in. */
+  findings?: StoredLegalityFinding[];
   resetSelectedTargets: () => void;
 }): JSX.Element {
   const { t } = useTranslation();
@@ -276,7 +292,7 @@ function LogEntry({
         </Text>
       </Table.Td>
       <Table.Td>
-        <Text size="xs">{names}</Text>
+        <PartyNames members={members} findings={findings} />
       </Table.Td>
       <Table.Td>
         <Button size="xs" variant="default" component={Link} to={`/logs/${log.id}`} onClick={resetSelectedTargets}>
@@ -384,6 +400,33 @@ function SelectableQuestCompletion({
       value={filters.questCompletedFilter === null ? "null" : filters.questCompletedFilter ? "true" : "false"}
       onClear={() => setFilters({ questCompletedFilter: null })}
       searchable
+      clearable
+    />
+  );
+}
+
+/** Quests narrowed to the ones somebody was flagged in. Two states, not three:
+ * "who cheated" is a question people have; "show me only the clean runs" is
+ * not, and an option nobody picks still costs everybody a read. */
+function SelectableFlagged({
+  filters,
+  setFilters,
+}: {
+  filters: FilterState;
+  setFilters: (filters: Partial<FilterState>) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Select
+      data={[
+        { value: "all", label: t("ui.logs.filter-all") },
+        { value: "flagged", label: t("ui.logs.filter-flagged-only") },
+      ]}
+      onChange={(value) => setFilters({ flaggedOnly: value === "flagged" })}
+      placeholder={t("ui.logs.filter-flagged")}
+      value={filters.flaggedOnly ? "flagged" : "all"}
+      onClear={() => setFilters({ flaggedOnly: false })}
       clearable
     />
   );

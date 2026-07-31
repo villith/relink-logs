@@ -402,6 +402,8 @@
       "filter-completed": "Completed",
       "filter-failed": "Failed",
       "filter-quest-completion": "Quest Completion",
+      "filter-flagged": "Flagged Builds",
+      "filter-flagged-only": "Flagged runs",
       "conflux-room": "Conflux Room",
       "conflux-room-number": "Room #{{number}}",
       "conflux-run": "Conflux Run",
