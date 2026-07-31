@@ -1,6 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
@@ -77,14 +77,25 @@ const encounter = {
   ],
 };
 
-const renderPage = () =>
-  render(
+/** Reports the live route so a test can read where a link actually took the
+ * reader, and with what state — neither of which is visible on the anchor. */
+let landedOn: { pathname: string; search: string; state: unknown } | null = null;
+const LocationProbe = () => {
+  landedOn = useLocation();
+  return null;
+};
+
+const renderPage = () => {
+  landedOn = null;
+  return render(
     <MantineProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={["/logs/toolbox/audit"]}>
         <CheatAudit />
+        <LocationProbe />
       </MemoryRouter>
     </MantineProvider>
   );
+};
 
 describe("CheatAudit", () => {
   beforeEach(() => {
@@ -356,5 +367,21 @@ describe("CheatAudit when the build changed between fights", () => {
     // after "which fight was this worn in?" is to go and look at that fight.
     expect(screen.getByText("quest:501 · time:900").closest("a")?.getAttribute("href")).toBe("/logs/20?tab=equipment");
     expect(screen.getByText("quest:502 · time:800").closest("a")?.getAttribute("href")).toBe("/logs/21?tab=equipment");
+  });
+
+  /** The fight link is the one way into a log that should send the reader back
+   * to the audit rather than to the quest list — losing the case they were
+   * halfway through reading is the whole reason it carries a destination. The
+   * state rides on the link, invisible on the anchor, so it can only be checked
+   * by following it. */
+  it("tells the fight it opens to come back to the audit", async () => {
+    renderPage();
+    await screen.findByText(/sigil:111/);
+
+    fireEvent.click(screen.getByText("quest:501 · time:900"));
+
+    expect(landedOn?.pathname).toBe("/logs/20");
+    expect(landedOn?.search).toBe("?tab=equipment");
+    expect(landedOn?.state).toEqual({ backTo: "/logs/toolbox/audit" });
   });
 });
