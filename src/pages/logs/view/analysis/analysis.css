@@ -1,0 +1,177 @@
+/* Design tokens and shared rules for the Analysis view.
+ *
+ * Scoped under .analysis so nothing here can reach the Classic view, which
+ * deliberately keeps the old look.
+ *
+ * Font sizes are written as CSS lengths, never as var(--mantine-font-size-*):
+ * this app's theme sets those tokens to unitless strings ("12", "14"), so the
+ * var resolves to invalid CSS and the declaration is silently dropped. */
+.analysis {
+  --an-bg: #17181c;
+  --an-panel: #1d1f24;
+  --an-raised: #22252b;
+  --an-line: #2c2f36;
+  --an-line-strong: #3b4048;
+  --an-ink: #e8eaed;
+  --an-ink-2: #a2a8b4;
+  --an-ink-3: #6c7280;
+  --an-accent: #00b8d9;
+  --an-plot: #1a1c21;
+
+  background-color: var(--an-bg);
+  color: var(--an-ink);
+  border: 1px solid var(--an-line);
+  border-radius: 5px;
+}
+
+/* Small tracked capitals for column heads and section labels. */
+.analysis-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--an-ink-3);
+  font-weight: 600;
+}
+
+/* Every figure in the view is tabular so columns align down the page. */
+.analysis-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A metric row: the bar is the row's background and the text sits on it. */
+.analysis-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 8px;
+  margin-bottom: 2px;
+  width: 100%;
+  border-radius: 2px;
+  text-align: left;
+}
+
+.analysis-row-pinnable {
+  cursor: pointer;
+}
+
+.analysis-row:hover {
+  outline: 1px solid var(--an-line-strong);
+}
+
+/* background-color, never the `background` shorthand: the shorthand resets
+ * background-size and has broken full-width bars in this app before. */
+.analysis-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 2px;
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.analysis-row:hover .analysis-bar {
+  opacity: 0.62;
+}
+
+/* Every cell sits above the bar. */
+.analysis-rank,
+.analysis-name,
+.analysis-cell {
+  position: relative;
+}
+
+.analysis-rank {
+  width: 24px;
+  padding-right: 9px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--an-ink-3);
+}
+
+.analysis-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-cell {
+  width: 84px;
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-cell-muted {
+  color: var(--an-ink-2);
+  font-size: 12px;
+}
+
+.analysis-head {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--an-line);
+  margin-bottom: 6px;
+}
+
+/* The hover card: the same row anatomy at a smaller scale. */
+.analysis-card-section + .analysis-card-section {
+  border-top: 1px solid var(--an-line-strong);
+}
+
+.analysis-card-head {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  background-color: var(--an-raised);
+}
+
+.analysis-card-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 23px;
+  padding: 0 8px;
+  margin: 2px 4px;
+  border-radius: 2px;
+}
+
+.analysis-card-row .analysis-bar {
+  opacity: 0.38;
+}
+
+.analysis-card-name {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-card-share {
+  position: relative;
+  width: 52px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--an-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-card-amount {
+  position: relative;
+  width: 64px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
