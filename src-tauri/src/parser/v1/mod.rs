@@ -27,7 +27,7 @@ pub mod phantom_targets;
 mod player_state;
 mod skill_state;
 
-pub use filters::{is_excluded, MeterFilters};
+pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::PlayerState;
 
