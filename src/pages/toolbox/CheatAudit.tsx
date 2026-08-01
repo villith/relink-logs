@@ -384,8 +384,14 @@ const CheatAuditPage = () => {
                   </Stack>
                 </Box>
 
+                {/* Capped at a share of the pane, not just a px width: the
+                    evidence beside this is the column that gives way when the
+                    window narrows, and a fixed 460px here let this list shove
+                    it to zero width and sit over where it was. The 40% cap
+                    means the evidence always keeps the larger share; the fixed
+                    table layout below ellipsizes quest names to fit. */}
                 <Box
-                  w={460}
+                  w="min(460px, 40%)"
                   style={{
                     flexShrink: 0,
                     display: "flex",
