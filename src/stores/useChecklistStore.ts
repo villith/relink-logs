@@ -2,7 +2,6 @@ import { defaultChecklist, moveItem, type ChecklistEntry, type ChecklistGroupKin
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { durableStorage, registerDurableKey } from "./durableStorage";
-import { withStorageDOMEvents } from "./useMeterSettingsStore";
 
 /** A checklist entry plus whether the user has it switched on. */
 export type ChecklistSetting = ChecklistEntry & { enabled: boolean };
@@ -210,5 +209,4 @@ export const useChecklistStore = create<ChecklistState>()(
   )
 );
 
-withStorageDOMEvents(useChecklistStore);
 registerDurableKey("checklist-settings", () => void useChecklistStore.persist.rehydrate());

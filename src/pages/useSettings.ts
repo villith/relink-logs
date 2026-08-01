@@ -1,5 +1,5 @@
 import { SUPPORTED_LANGUAGES } from "@/i18n";
-import { broadcastLanguage, useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
+import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { useTranslation } from "react-i18next";
 
 /** The language picker's options. A module constant: `SUPPORTED_LANGUAGES` never
@@ -25,10 +25,11 @@ export default function useSettings() {
 
   const { i18n } = useTranslation();
 
+  // i18n's own `languageChanged` handler persists the choice and reaches the
+  // other window, so changing the language here is all this has to do.
   const handleLanguageChange = (language: string | null) => {
     if (!language) return;
     i18n.changeLanguage(language);
-    broadcastLanguage(language);
   };
 
   return {

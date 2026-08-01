@@ -4,7 +4,6 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { SynthesisForm } from "@/pages/toolbox/useSynthesisHelper";
 
 import { durableStorage, registerDurableKey } from "./durableStorage";
-import { withStorageDOMEvents } from "./useMeterSettingsStore";
 
 interface SynthesisFormState {
   /** The last Synthesis Helper form, restored on startup; sanitized on read
@@ -31,5 +30,4 @@ export const useSynthesisFormStore = create<SynthesisFormState>()(
   )
 );
 
-withStorageDOMEvents(useSynthesisFormStore);
 registerDurableKey("synthesis-form", () => void useSynthesisFormStore.persist.rehydrate());

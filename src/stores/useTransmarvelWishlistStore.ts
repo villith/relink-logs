@@ -4,7 +4,6 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { SigilEntry, WrightstoneEntry } from "@/pages/toolbox/useTransmarvelSearcher";
 
 import { durableStorage, registerDurableKey } from "./durableStorage";
-import { withStorageDOMEvents } from "./useMeterSettingsStore";
 
 interface TransmarvelWishlistState {
   /** Sigil wishlist: (sigil trait1, optional 2nd trait) pairs; deduped by
@@ -46,5 +45,4 @@ export const useTransmarvelWishlistStore = create<TransmarvelWishlistState>()(
   )
 );
 
-withStorageDOMEvents(useTransmarvelWishlistStore);
 registerDurableKey("transmarvel-wishlists", () => void useTransmarvelWishlistStore.persist.rehydrate());

@@ -11,8 +11,7 @@ import {
   reconcileColumns,
   SkillColumns,
 } from "@/types";
-import { emit, listen } from "@tauri-apps/api/event";
-import { create, Mutate, StoreApi } from "zustand";
+import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { durableStorage, registerDurableKey } from "./durableStorage";
@@ -192,62 +191,19 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   ...DEFAULT_BAR_APPEARANCE,
 };
 
-/* Cross-window sync. The overlay and the logs/settings window are separate
-   webviews, and the DOM storage-event path (withStorageDOMEvents below) only
-   works where the webviews share one browser process: on Linux, WebKitGTK
-   neither fires cross-window `storage` events nor even shares localStorage
-   between windows (https://github.com/tauri-apps/tauri/issues/10981), so
-   settings changed in the settings page never reached the live overlay.
-   Every mutation is therefore also broadcast as a Tauri event *carrying the
-   changed values*; each window applies them to its own store, and persist
-   then rewrites that window's own localStorage copy, keeping the per-window
-   copies equal (whichever window's copy survives exit is then correct). */
-export const SETTINGS_SYNC_EVENT = "meter-settings-sync";
-export const LANGUAGE_SYNC_EVENT = "language-sync";
-
-/** True while applying a broadcast from another window: those set() calls
- * must not broadcast again (the emitting window also receives its own event,
- * so re-emitting would ping-pong between windows). */
-let applyingRemoteSettings = false;
-
-/** Broadcasts a language change to the other window (the storage-event path
- * for `i18nextLng` below is Windows-only, same as for settings). */
-export const broadcastLanguage = (language: string) => {
-  if (insideTauri()) void emit(LANGUAGE_SYNC_EVENT, language);
-};
-
-/** The Tauri event IPC only exists inside a real Tauri window — not in
- * vitest/jsdom or a plain-browser `npm run dev`. */
-const insideTauri = () => "__TAURI_IPC__" in window;
-
-export type StoreWithPersist<T> = Mutate<StoreApi<T>, [["zustand/persist", T]]>;
-
-export const withStorageDOMEvents = <T>(store: StoreWithPersist<T>) => {
-  const storageEventCallback = (e: StorageEvent) => {
-    if (e.key === "i18nextLng" && window.i18n) {
-      window.i18n.changeLanguage(e.newValue);
-    }
-
-    if (e.key === store.persist?.getOptions().name && e.newValue) {
-      store.persist.rehydrate();
-    }
-  };
-
-  window.addEventListener("storage", storageEventCallback);
-
-  return () => {
-    window.removeEventListener("storage", storageEventCallback);
-  };
-};
+/* Cross-window sync lives in `durableStorage`: every write goes to settings.db,
+   which emits one `settings-changed` event that each window applies to its own
+   store. That replaced a value-carrying broadcast plus a DOM storage-event
+   listener, which between them only worked where the webviews share one browser
+   process — on Linux, WebKitGTK neither fires cross-window `storage` events nor
+   even shares localStorage between windows
+   (https://github.com/tauri-apps/tauri/issues/10981). */
 
 export const useMeterSettingsStore = create<MeterSettings & MeterStateFunctions>()(
   persist(
     (set) => ({
       ...DEFAULT_METER_SETTINGS,
-      set: (settings) => {
-        set(settings);
-        if (!applyingRemoteSettings && insideTauri()) void emit(SETTINGS_SYNC_EVENT, settings);
-      },
+      set: (settings) => set(settings),
     }),
     {
       name: "meter-settings",
@@ -335,22 +291,4 @@ export const useMeterSettingsStore = create<MeterSettings & MeterStateFunctions>
   )
 );
 
-withStorageDOMEvents(useMeterSettingsStore);
 registerDurableKey("meter-settings", () => void useMeterSettingsStore.persist.rehydrate());
-
-if (insideTauri()) {
-  void listen<Partial<MeterSettings>>(SETTINGS_SYNC_EVENT, (event) => {
-    applyingRemoteSettings = true;
-    try {
-      useMeterSettingsStore.getState().set(event.payload);
-    } finally {
-      applyingRemoteSettings = false;
-    }
-  });
-
-  void listen<string>(LANGUAGE_SYNC_EVENT, (event) => {
-    if (window.i18n && window.i18n.language !== event.payload) {
-      window.i18n.changeLanguage(event.payload);
-    }
-  });
-}

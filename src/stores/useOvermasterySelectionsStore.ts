@@ -4,7 +4,6 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import type { SavedSelection } from "@/pages/toolbox/useOvermasteryPredictor";
 
 import { durableStorage, registerDurableKey } from "./durableStorage";
-import { withStorageDOMEvents } from "./useMeterSettingsStore";
 
 interface OvermasterySelectionsState {
   /** Wanted-overmastery form selections per character id hash (8-hex). */
@@ -37,5 +36,4 @@ export const useOvermasterySelectionsStore = create<OvermasterySelectionsState>(
   )
 );
 
-withStorageDOMEvents(useOvermasterySelectionsStore);
 registerDurableKey("overmastery-selections", () => void useOvermasterySelectionsStore.persist.rehydrate());
