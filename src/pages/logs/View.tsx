@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 
 import { LogsViewMode, useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 
-import { AnalysisView } from "./view/AnalysisView";
+import { AnalysisView } from "./view/analysis/AnalysisView";
 import { ClassicView } from "./view/ClassicView";
 
 /** Chooses between the redesigned Analysis frame and the original four-tab

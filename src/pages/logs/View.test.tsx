@@ -8,7 +8,7 @@ vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => k
 // Both bodies are heavy (charts, fetches, Tauri IPC). The shell's job is only
 // to pick one, so stub them and assert the pick.
 vi.mock("./view/ClassicView", () => ({ ClassicView: () => <div>classic-body</div> }));
-vi.mock("./view/AnalysisView", () => ({ AnalysisView: () => <div>analysis-body</div> }));
+vi.mock("./view/analysis/AnalysisView", () => ({ AnalysisView: () => <div>analysis-body</div> }));
 
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 
