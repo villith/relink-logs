@@ -72,6 +72,52 @@ export const durableStorage: StateStorage = {
   },
 };
 
+/**
+ * Reconcile the durable copy with the cache, then hydrate every registered
+ * key. Runs once, before the first render (see `src/main.tsx`).
+ *
+ * Order matters and is the whole design:
+ *   1. the backend copy wins over the cache, repairing a wiped webview store;
+ *   2. a key the cache has and the backend does not is adopted, which is how
+ *      an existing user's settings survive the release that ships this;
+ *   3. every registered key's handler runs, hydrating stores that were built
+ *      with `skipHydration`.
+ *
+ * A backend failure is not fatal: step 3 still runs against the cache, so the
+ * app behaves exactly as it did before this existed.
+ */
+export const bootstrapDurableSettings = async (): Promise<void> => {
+  let rows: Record<string, string> = {};
+
+  if (insideTauri()) {
+    try {
+      rows = await invoke<Record<string, string>>("get_settings");
+    } catch (e) {
+      console.warn("[settings] backend unavailable, falling back to localStorage:", e);
+    }
+  }
+
+  for (const [key, value] of Object.entries(rows)) {
+    localStorage.setItem(key, value);
+  }
+
+  if (insideTauri()) {
+    for (const key of DURABLE_KEYS) {
+      if (key in rows) continue;
+      const cached = localStorage.getItem(key);
+      if (cached === null) continue;
+
+      void invoke("set_setting", { key, value: cached }).catch((e) =>
+        console.warn(`[settings] failed to adopt ${key}:`, e)
+      );
+    }
+  }
+
+  for (const key of handlers.keys()) {
+    applyDurableKey(key, localStorage.getItem(key));
+  }
+};
+
 /* One listener replaces the whole per-store broadcast arrangement this file
    supersedes: the backend is the only writer of record, so it is also the only
    thing that needs to announce a change. Works on Linux, where WebKitGTK
