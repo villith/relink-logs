@@ -1,5 +1,5 @@
 import { MantineProvider } from "@mantine/core";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { MetricRow } from "../metrics/types";
@@ -92,5 +92,23 @@ describe("MetricTable", () => {
   it("names what the rows are", () => {
     renderTable({ rowsLabelKey: "ui.logs.rows-by-player" });
     expect(screen.getByText("ui.logs.rows-by-player")).toBeTruthy();
+  });
+
+  it("wraps a row in a hover card when the caller supplies sections", () => {
+    const { container } = renderTable({
+      rowSections: () => [
+        { headingKey: "ui.logs.hover-by-target", color: "rgb(1,2,3)", entries: [{ key: "t", label: "Boss", value: 5 }] },
+      ],
+    });
+    const row = container.querySelector<HTMLElement>(".analysis-row");
+    expect(row).toBeTruthy();
+    fireEvent.mouseOver(row!);
+    expect(screen.getByTestId("metric-hover-card")).toBeTruthy();
+    expect(screen.getByText("Boss")).toBeTruthy();
+  });
+
+  it("renders rows unwrapped when no sections are supplied", () => {
+    renderTable();
+    expect(screen.queryByTestId("metric-hover-card")).toBeNull();
   });
 });

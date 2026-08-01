@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import type { MetricRow } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
 
+import { HoverCard, type CardSection } from "./HoverCard";
 import "./analysis.css";
 
 export type MetricTableProps = {
@@ -21,6 +22,9 @@ export type MetricTableProps = {
   rowColor?: (row: MetricRow) => string;
   /** i18next key naming what a row currently represents. */
   rowsLabelKey?: string;
+  /** The hover card's sections for one row, or null for no card. Injected
+   * because the breakdown needs translated names and the settings store. */
+  rowSections?: (row: MetricRow) => CardSection[] | null;
 };
 
 const FALLBACK_COLOR = "var(--an-ink-3)";
@@ -34,7 +38,15 @@ const FALLBACK_COLOR = "var(--an-ink-3)";
  * Bars scale against the LARGEST row rather than the total: at the abilities
  * level the rows are a subset of one player's damage, so a share-of-total bar
  * would render every row as a sliver. */
-export const MetricTable = ({ rows, columnKeys, onPin, renderLabel, rowColor, rowsLabelKey }: MetricTableProps) => {
+export const MetricTable = ({
+  rows,
+  columnKeys,
+  onPin,
+  renderLabel,
+  rowColor,
+  rowsLabelKey,
+  rowSections,
+}: MetricTableProps) => {
   const { t } = useTranslation();
 
   if (rows.length === 0) {
@@ -60,32 +72,44 @@ export const MetricTable = ({ rows, columnKeys, onPin, renderLabel, rowColor, ro
         ))}
       </Box>
 
-      {rows.map((row, index) => (
-        <UnstyledButton
-          key={row.key}
-          className={`analysis-row${row.pinOnClick ? " analysis-row-pinnable" : ""}`}
-          onClick={() => row.pinOnClick && onPin(row.pinOnClick)}
-        >
-          <Box
-            data-metric-bar
-            className="analysis-bar"
-            style={{
-              // largest === 0 when every row is zero (a fight with no stun,
-              // say). Guarding here keeps those rows visible at zero width
-              // instead of rendering NaN.
-              width: largest === 0 ? "0%" : `${(row.value / largest) * 100}%`,
-              backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
-            }}
-          />
-          <Text className="analysis-rank">{index + 1}</Text>
-          <Text className="analysis-name">{renderLabel ? renderLabel(row) : row.label}</Text>
-          {row.columns.map((value, columnIndex) => (
-            <Text key={columnIndex} className={`analysis-cell${columnIndex === 0 ? "" : " analysis-cell-muted"}`}>
-              {value}
-            </Text>
-          ))}
-        </UnstyledButton>
-      ))}
+      {rows.map((row, index) => {
+        const button = (
+          <UnstyledButton
+            className={`analysis-row${row.pinOnClick ? " analysis-row-pinnable" : ""}`}
+            onClick={() => row.pinOnClick && onPin(row.pinOnClick)}
+          >
+            <Box
+              data-metric-bar
+              className="analysis-bar"
+              style={{
+                // largest === 0 when every row is zero (a fight with no stun,
+                // say). Guarding here keeps those rows visible at zero width
+                // instead of rendering NaN.
+                width: largest === 0 ? "0%" : `${(row.value / largest) * 100}%`,
+                backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
+              }}
+            />
+            <Text className="analysis-rank">{index + 1}</Text>
+            <Text className="analysis-name">{renderLabel ? renderLabel(row) : row.label}</Text>
+            {row.columns.map((value, columnIndex) => (
+              <Text key={columnIndex} className={`analysis-cell${columnIndex === 0 ? "" : " analysis-cell-muted"}`}>
+                {value}
+              </Text>
+            ))}
+          </UnstyledButton>
+        );
+
+        // The key moves off the button and onto whichever element is the list
+        // child: HoverCard clones its child and would otherwise lose it.
+        const sections = rowSections?.(row);
+        if (!sections || sections.length === 0) return <Box key={row.key}>{button}</Box>;
+
+        return (
+          <HoverCard key={row.key} sections={sections}>
+            {button}
+          </HoverCard>
+        );
+      })}
     </Box>
   );
 };

@@ -1,11 +1,9 @@
 import { AreaChart, LineChart } from "@mantine/charts";
 import { Box, Group, Paper, Text, UnstyledButton } from "@mantine/core";
 import { t } from "i18next";
-import { memo, useRef, useState } from "react";
+import { memo } from "react";
 
 import { humanizeNumbers } from "@/utils";
-
-import { dragToRange } from "./dragRange";
 
 /** One series per charted player, as the DPS chart's `series` prop wants it. */
 export type Label = {
@@ -106,7 +104,6 @@ export const DetailCharts = memo(function DetailCharts({
   hiddenHpSeries,
   onToggleHpSeries,
   labels,
-  onDragRange,
 }: {
   data: ChartDatapoint[];
   hpData: HpDatapoint[];
@@ -114,73 +111,11 @@ export const DetailCharts = memo(function DetailCharts({
   hiddenHpSeries: Set<string>;
   onToggleHpSeries: (name: string) => void;
   labels: Label;
-  /** Analysis passes this to make the plot itself the scrub gesture. Classic
-   * does not, and with it absent no pointer handler is attached at all — its
-   * window still comes from the RangeSlider beneath the chart. */
-  onDragRange?: (range: [number, number] | null, committed: boolean) => void;
 }) {
   // Our own legend chips instead of the recharts legend: they toggle lines
   // on/off, and they wrap ABOVE the chart instead of into the plot area on
   // summon-heavy fights. Hidden series leave the plot and the tooltip alike.
   const visibleHpSeries = hpSeries.filter((series) => !hiddenHpSeries.has(series.name));
-
-  // Drag-to-scope, live only while a drag is in flight. The handlers sit on the
-  // WRAPPER rather than an overlay: an overlay that captures pointer events
-  // would also swallow the chart's own tooltip.
-  const plotRef = useRef<HTMLDivElement>(null);
-  const dragFrom = useRef<number | null>(null);
-  const [dragTo, setDragTo] = useState<number | null>(null);
-
-  // The plot area, not the whole box: recharts insets it by the y-axis width
-  // plus its margin on each side, and a drag must map to the buckets actually
-  // under the pointer.
-  const plotGeometry = () => {
-    const rect = plotRef.current?.getBoundingClientRect();
-    if (!rect) return null;
-    const left = rect.left + CHART_Y_AXIS_WIDTH + CHART_MARGIN;
-    return { left, width: rect.width - CHART_Y_AXIS_WIDTH - 2 * CHART_MARGIN, maxIndex: Math.max(0, data.length - 1) };
-  };
-
-  const reportDrag = (toX: number, committed: boolean) => {
-    const geometry = plotGeometry();
-    if (!onDragRange || dragFrom.current === null || !geometry) return;
-    onDragRange(dragToRange(dragFrom.current, toX, geometry), committed);
-  };
-
-  const dragHandlers = onDragRange
-    ? {
-        onPointerDown: (event: React.PointerEvent) => {
-          dragFrom.current = event.clientX;
-          setDragTo(event.clientX);
-        },
-        onPointerMove: (event: React.PointerEvent) => {
-          if (dragFrom.current === null) return;
-          setDragTo(event.clientX);
-          reportDrag(event.clientX, false);
-        },
-        onPointerUp: (event: React.PointerEvent) => {
-          reportDrag(event.clientX, true);
-          dragFrom.current = null;
-          setDragTo(null);
-        },
-        // A drag that ends off the chart still has to end, or the next pointer
-        // move over the plot would extend a stale selection.
-        onPointerLeave: () => {
-          if (dragFrom.current === null) return;
-          dragFrom.current = null;
-          setDragTo(null);
-          onDragRange(null, true);
-        },
-      }
-    : {};
-
-  const dragShade =
-    dragFrom.current !== null && dragTo !== null && Math.abs(dragTo - dragFrom.current) >= 1 && plotRef.current
-      ? {
-          left: Math.min(dragFrom.current, dragTo) - plotRef.current.getBoundingClientRect().left,
-          width: Math.abs(dragTo - dragFrom.current),
-        }
-      : null;
 
   return (
     <>
@@ -285,7 +220,6 @@ export const DetailCharts = memo(function DetailCharts({
             content: ({ label, payload }) => <ChartTooltip label={label} payload={payload} />,
           }}
         />
-      </Box>
     </>
   );
 });
