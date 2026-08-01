@@ -13,7 +13,9 @@ import {
 } from "@/types";
 import { emit, listen } from "@tauri-apps/api/event";
 import { create, Mutate, StoreApi } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
+
+import { durableStorage, registerDurableKey } from "./durableStorage";
 
 /** How a row's bar is sized. `total`: the width is the row's share of the whole.
  * `relative`: the largest row fills its bar and the rest scale against it, which
@@ -250,6 +252,11 @@ export const useMeterSettingsStore = create<MeterSettings & MeterStateFunctions>
     {
       name: "meter-settings",
       version: 2,
+      storage: createJSONStorage(() => durableStorage),
+      // Hydration is driven by bootstrapDurableSettings(), which runs after
+      // settings.db has had its say. Hydrating at import time would load the
+      // cache copy and then get overwritten.
+      skipHydration: true,
       // v2 changed column lists from an ordered array of *shown* columns
       // (string[]) to the full set of columns each tagged visible/hidden
       // (ColumnSetting[]), so hiding a column keeps its position. Convert any
@@ -329,6 +336,7 @@ export const useMeterSettingsStore = create<MeterSettings & MeterStateFunctions>
 );
 
 withStorageDOMEvents(useMeterSettingsStore);
+registerDurableKey("meter-settings", () => void useMeterSettingsStore.persist.rehydrate());
 
 if (insideTauri()) {
   void listen<Partial<MeterSettings>>(SETTINGS_SYNC_EVENT, (event) => {

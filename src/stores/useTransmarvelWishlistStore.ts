@@ -1,8 +1,9 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 import type { SigilEntry, WrightstoneEntry } from "@/pages/toolbox/useTransmarvelSearcher";
 
+import { durableStorage, registerDurableKey } from "./durableStorage";
 import { withStorageDOMEvents } from "./useMeterSettingsStore";
 
 interface TransmarvelWishlistState {
@@ -33,8 +34,17 @@ export const useTransmarvelWishlistStore = create<TransmarvelWishlistState>()(
       setStones: (stones) => set({ stones }),
       setRolls: (rolls) => set({ rolls }),
     }),
-    { name: "transmarvel-wishlists", version: 1 }
+    {
+      name: "transmarvel-wishlists",
+      version: 1,
+      storage: createJSONStorage(() => durableStorage),
+      // Hydration is driven by bootstrapDurableSettings(), which runs after
+      // settings.db has had its say. Hydrating at import time would load the
+      // cache copy and then get overwritten.
+      skipHydration: true,
+    }
   )
 );
 
 withStorageDOMEvents(useTransmarvelWishlistStore);
+registerDurableKey("transmarvel-wishlists", () => void useTransmarvelWishlistStore.persist.rehydrate());

@@ -12,10 +12,15 @@ const entry = {
   ],
 };
 
-/** Fresh module instance each time, as if the app had been restarted. */
+/** Fresh module instance each time, as if the app had been restarted. The
+ * store is built with `skipHydration`, so the reload has to rehydrate the way
+ * a real launch does — via `bootstrapDurableSettings()`, which runs every
+ * registered key's handler once settings.db has had its say. */
 const freshStore = async () => {
   vi.resetModules();
-  return (await import("./useOvermasterySelectionsStore")).useOvermasterySelectionsStore;
+  const store = (await import("./useOvermasterySelectionsStore")).useOvermasterySelectionsStore;
+  await store.persist.rehydrate();
+  return store;
 };
 
 describe("useOvermasterySelectionsStore persistence", () => {

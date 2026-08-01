@@ -1,8 +1,9 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { createJSONStorage, persist } from "zustand/middleware";
 
 import type { SavedSelection } from "@/pages/toolbox/useOvermasteryPredictor";
 
+import { durableStorage, registerDurableKey } from "./durableStorage";
 import { withStorageDOMEvents } from "./useMeterSettingsStore";
 
 interface OvermasterySelectionsState {
@@ -24,8 +25,17 @@ export const useOvermasterySelectionsStore = create<OvermasterySelectionsState>(
       save: (character, selection) =>
         set((state) => ({ selections: { ...state.selections, [character]: selection }, lastCharacter: character })),
     }),
-    { name: "overmastery-selections", version: 1 }
+    {
+      name: "overmastery-selections",
+      version: 1,
+      storage: createJSONStorage(() => durableStorage),
+      // Hydration is driven by bootstrapDurableSettings(), which runs after
+      // settings.db has had its say. Hydrating at import time would load the
+      // cache copy and then get overwritten.
+      skipHydration: true,
+    }
   )
 );
 
 withStorageDOMEvents(useOvermasterySelectionsStore);
+registerDurableKey("overmastery-selections", () => void useOvermasterySelectionsStore.persist.rehydrate());

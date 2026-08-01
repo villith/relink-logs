@@ -23,6 +23,9 @@ describe("meter settings defaults", () => {
     );
 
     const { useMeterSettingsStore, DEFAULT_PLAYER_LABEL } = await import("./useMeterSettingsStore");
+    // The store is built with `skipHydration`; a real launch hydrates it from
+    // `bootstrapDurableSettings()` once settings.db has had its say.
+    await useMeterSettingsStore.persist.rehydrate();
     const state = useMeterSettingsStore.getState();
 
     // What the user had saved survives untouched.
