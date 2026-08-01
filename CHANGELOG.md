@@ -12,6 +12,8 @@ markdown in the app.
 - The "Back" button on the quest details screen now behaves as before in most cases ( return to the log list )
 - Dummy actors will no longer appear in the damage meters
   - The mark applied by Essence Eustace's Tier 3 perk can be damaged and was appearing in the damage meters
+- (Linux) Hook will now properly be installed
+- (Linux) After this update, saved settings will persist through updates
 
 ## 1.12.5
 
