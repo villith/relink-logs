@@ -60,13 +60,13 @@ export const MetricTable = ({
   const largest = Math.max(...rows.map((row) => row.value));
 
   return (
-    <Box>
-      <Box className="analysis-head">
-        <Text className="analysis-label" style={{ flex: 1 }}>
+    <Box role="table">
+      <Box className="analysis-head" role="row">
+        <Text className="analysis-label" role="columnheader" style={{ flex: 1 }}>
           {rowsLabelKey ? t(rowsLabelKey) : ""}
         </Text>
         {columnKeys.map((key) => (
-          <Text key={key} className="analysis-label analysis-cell">
+          <Text key={key} role="columnheader" className="analysis-label analysis-cell">
             {t(key)}
           </Text>
         ))}
@@ -75,6 +75,7 @@ export const MetricTable = ({
       {rows.map((row, index) => {
         const button = (
           <UnstyledButton
+            role="row"
             className={`analysis-row${row.pinOnClick ? " analysis-row-pinnable" : ""}`}
             onClick={() => row.pinOnClick && onPin(row.pinOnClick)}
           >
@@ -89,10 +90,18 @@ export const MetricTable = ({
                 backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
               }}
             />
-            <Text className="analysis-rank">{index + 1}</Text>
-            <Text className="analysis-name">{renderLabel ? renderLabel(row) : row.label}</Text>
+            <Text role="cell" className="analysis-rank">
+              {index + 1}
+            </Text>
+            <Text role="cell" className="analysis-name">
+              {renderLabel ? renderLabel(row) : row.label}
+            </Text>
             {row.columns.map((value, columnIndex) => (
-              <Text key={columnIndex} className={`analysis-cell${columnIndex === 0 ? "" : " analysis-cell-muted"}`}>
+              <Text
+                key={columnIndex}
+                role="cell"
+                className={`analysis-cell${columnIndex === 0 ? "" : " analysis-cell-muted"}`}
+              >
                 {value}
               </Text>
             ))}

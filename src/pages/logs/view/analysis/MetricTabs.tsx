@@ -19,8 +19,27 @@ export type MetricTabsProps = {
 export const MetricTabs = ({ tabs, value, onChange }: MetricTabsProps) => {
   const { t } = useTranslation();
 
+  // Arrow keys move between tabs and only the active tab is tabbable — the
+  // ARIA tabs pattern. Without it every tab is a separate tab stop and the
+  // arrows do nothing.
+  const move = (delta: number) => {
+    const at = tabs.findIndex((tab) => tab.value === value);
+    const next = tabs[(at + delta + tabs.length) % tabs.length];
+    if (next) onChange(next.value);
+  };
+
   return (
-    <Box role="tablist" style={{ display: "flex", padding: "0 16px", borderBottom: "1px solid var(--an-line)" }}>
+    <Box
+      role="tablist"
+      aria-label={t("ui.logs.metric-tablist-label")}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowRight") move(1);
+        else if (event.key === "ArrowLeft") move(-1);
+        else return;
+        event.preventDefault();
+      }}
+      style={{ display: "flex", padding: "0 16px", borderBottom: "1px solid var(--an-line)" }}
+    >
       {tabs.map((tab) => {
         const active = tab.value === value;
         return (
@@ -28,6 +47,7 @@ export const MetricTabs = ({ tabs, value, onChange }: MetricTabsProps) => {
             key={tab.value}
             role="tab"
             aria-selected={active}
+            tabIndex={active ? 0 : -1}
             onClick={() => onChange(tab.value)}
             style={{
               padding: "7px 0",
