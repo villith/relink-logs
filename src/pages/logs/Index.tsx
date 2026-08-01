@@ -23,8 +23,10 @@ import {
   Space,
   Table,
   Text,
+  Tooltip,
   UnstyledButton,
 } from "@mantine/core";
+import { WarningCircle } from "@phosphor-icons/react";
 import { Fragment, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
@@ -295,9 +297,16 @@ function LogEntry({
         <PartyNames members={members} findings={findings} />
       </Table.Td>
       <Table.Td>
-        <Button size="xs" variant="default" component={Link} to={`/logs/${log.id}`} onClick={resetSelectedTargets}>
-          {t("ui.view-btn")}
-        </Button>
+        <Group gap={6} wrap="nowrap" justify="flex-end">
+          {log.imported && (
+            <Tooltip label={t("ui.logs.imported-tooltip")} multiline w={280}>
+              <WarningCircle size={20} color="var(--mantine-color-yellow-6)" aria-label={t("ui.imported-badge")} />
+            </Tooltip>
+          )}
+          <Button size="xs" variant="default" component={Link} to={`/logs/${log.id}`} onClick={resetSelectedTargets}>
+            {t("ui.view-btn")}
+          </Button>
+        </Group>
       </Table.Td>
     </Table.Tr>
   );

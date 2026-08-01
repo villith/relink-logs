@@ -33,6 +33,10 @@ mod loadprobe;
 mod player;
 mod quest;
 mod sba;
+// Buff/debuff lifecycle observation (diag stage — see hooks/status.rs). The
+// module only exists with `hookdiag`; a release hook.dll contains none of it.
+#[cfg(any(feature = "hookdiag", test))]
+mod status;
 mod stunnet;
 mod summon;
 mod trial;
@@ -179,6 +183,21 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         OnEndlessMgrDtorHook::new(tx.clone()).setup(&process),
     );
 
+    /* Status (buff/debuff) lifecycle — hookdiag-only observation stage. Detours the
+    shared StatusBase::init (apply; 165/168 classes inherit it) and the shared
+    scalar-deleting dtor (removal) to establish apply/refresh/remove semantics and
+    hunt the acting-action id in the apply ctx before any protocol events exist. */
+    #[cfg(feature = "hookdiag")]
+    try_step(
+        "status_init",
+        status::OnStatusInitHook::new().setup(&process),
+    );
+    #[cfg(feature = "hookdiag")]
+    try_step(
+        "status_dtor",
+        status::OnStatusDtorHook::new().setup(&process),
+    );
+
     /* SBA */
     try_step(
         "sba_update",
@@ -229,6 +248,8 @@ pub fn teardown_hooks() {
     sba::disable();
     #[cfg(feature = "hookdiag")]
     loadprobe::disable();
+    #[cfg(any(feature = "hookdiag", test))]
+    status::disable();
     #[cfg(any(feature = "fullassist", test))]
     assist::disable();
     log::info!("all detours disabled");

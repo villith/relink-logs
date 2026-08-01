@@ -83,6 +83,15 @@ describe("partyMembers", () => {
     expect(member.label).toBe("characters:Pl1400 (ui.logs.ai-companion)");
   });
 
+  /** In an imported log a nameless slot may be a backfilled character whose
+   * player name was simply never recorded — calling it an AI companion would
+   * be a guess, so the bare character is all that is claimed. */
+  it("does not call a nameless slot an AI companion in an imported log", () => {
+    const [member] = partyMembers(log({ p1Type: "Pl1400", imported: true }), shown);
+
+    expect(member.label).toBe("characters:Pl1400");
+  });
+
   it("drops the name when names are hidden, and under streamer mode", () => {
     const entry = log({ p1Name: "Kahs", p1Type: "Pl1400" });
 

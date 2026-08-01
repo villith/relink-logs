@@ -169,7 +169,7 @@
      row so the NAMES stay aligned no matter how far the icon has stepped. Three
      steps covers a full party. */
   --player-icon-scale: 1.5;
-  --player-icon-step: calc(var(--player-icon-height) / 6);
+  --player-icon-step: calc(var(--player-icon-height) / 9);
   --player-icon-reserve: calc(3 * var(--player-icon-step));
   --player-icon-height: calc(var(--meter-row-height, 27px) * var(--player-icon-scale));
   --player-icon-overhang: calc(var(--player-icon-height) - var(--meter-row-height, 27px) + 2px);
@@ -269,8 +269,13 @@
    colour, the same property that makes the statusbar textures in WoW-lineage
    meters work. The class sits on the meter table root and the variable
    inherits, so the nested skill-breakdown table needs no wiring of its own. */
+/* "No texture" is a fully transparent gradient rather than `none`, which paints
+   identically but keeps the first background-image layer a real image function.
+   html2canvas (Copy Screenshot) throws the WHOLE layer list away when layer 0 is
+   the `none` keyword, so `none` here costs the screenshot its damage bars —
+   rows come out with their text and nothing behind it. See barTexture.test.ts. */
 .bar-texture-solid {
-  --bar-texture: none;
+  --bar-texture: linear-gradient(rgb(255 255 255 / 0), rgb(255 255 255 / 0));
 }
 .bar-texture-smooth {
   --bar-texture: linear-gradient(rgb(255 255 255 / 0) 0%, rgb(255 255 255 / 0.22) 50%, rgb(255 255 255 / 0) 100%);
@@ -517,4 +522,9 @@
 .encounter-status.hook-idle::before {
   content: "● ";
   color: #868e96;
+}
+
+ul {
+  margin-block-start: 8px;
+  margin-block-end: 8px;
 }

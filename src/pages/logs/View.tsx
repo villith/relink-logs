@@ -27,6 +27,7 @@ import {
   Minus,
   Plus,
   Warning,
+  WarningCircle,
   X,
   type Icon as PhosphorIcon,
 } from "@phosphor-icons/react";
@@ -655,6 +656,7 @@ export const ViewPage = () => {
     questTimer,
     questCompleted,
     roomIndex,
+    imported,
     playerData,
     legality: storedLegality,
     setSelectedTargetSpans,
@@ -675,6 +677,7 @@ export const ViewPage = () => {
     questTimer: state.questTimer,
     questCompleted: state.questCompleted,
     roomIndex: state.roomIndex,
+    imported: state.imported,
     setSelectedTargetSpans: state.setSelectedTargetSpans,
     loadFromResponse: state.loadFromResponse,
   }));
@@ -1256,6 +1259,16 @@ export const ViewPage = () => {
             <Text size="sm" fs="italic" ml={4}>
               {epochToLocalTime(encounter.startTime)}
             </Text>
+            {imported && (
+              <Tooltip label={t("ui.logs.imported-tooltip")} multiline w={280}>
+                <WarningCircle
+                  size={20}
+                  color="var(--mantine-color-yellow-6)"
+                  style={{ marginLeft: "auto" }}
+                  aria-label={t("ui.imported-badge")}
+                />
+              </Tooltip>
+            )}
           </Box>
           <Box display="flex">
             <Text size="sm" fw={800}>

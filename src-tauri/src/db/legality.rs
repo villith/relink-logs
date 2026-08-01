@@ -75,6 +75,18 @@ pub fn clear_findings(conn: &Connection, log_id: i64) -> Result<()> {
     Ok(())
 }
 
+/// Drops every finding whose log no longer exists. Run at startup (and the
+/// delete paths clean up as they go): `logs.id` is a plain rowid, which
+/// SQLite recycles after the highest rows are deleted — an orphaned finding
+/// left behind would silently attach itself to whatever future encounter
+/// lands on the recycled id.
+pub fn sweep_orphaned_findings(conn: &Connection) -> Result<usize> {
+    Ok(conn.execute(
+        "DELETE FROM legality_findings WHERE log_id NOT IN (SELECT id FROM logs)",
+        [],
+    )?)
+}
+
 /// Every stored finding for one log, in insertion order.
 ///
 /// The one-log case of [`findings_for_logs`] — same `ORDER BY rowid`, and a log
@@ -498,6 +510,24 @@ mod tests {
     fn flagged_players_is_empty_when_nothing_is_flagged() {
         let conn = migrated_db_with_logs(&[(1, 1_000)]);
         assert_eq!(flagged_players(&conn).expect("group"), vec![]);
+    }
+
+    /// Findings whose log is gone are swept; findings whose log remains are
+    /// not. Without this, a finding orphaned by a delete would attach itself
+    /// to whatever future log lands on the recycled rowid.
+    #[test]
+    fn orphaned_findings_are_swept_and_live_ones_kept() {
+        let conn = migrated_db_with_logs(&[(1, 1_000), (2, 2_000)]);
+        write_findings(&conn, 1, 0, "Kahs", "Pl1400", &[magnitude_finding()]).expect("write");
+        write_findings(&conn, 2, 0, "Manmoth", "Pl1300", &[magnitude_finding()]).expect("write");
+
+        conn.execute("DELETE FROM logs WHERE id = 1", [])
+            .expect("delete log 1");
+        let swept = sweep_orphaned_findings(&conn).expect("sweep");
+
+        assert_eq!(swept, 1);
+        assert!(findings_for_log(&conn, 1).expect("read").is_empty());
+        assert_eq!(findings_for_log(&conn, 2).expect("read").len(), 1);
     }
 
     /// The rule column carries the same spelling the frontend sees, so a query

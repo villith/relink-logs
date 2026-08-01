@@ -3,8 +3,10 @@
 // for function symbols, the entry RVA. Run against the ANALYZED DB (gbfr202fast) —
 // the lean import has no RTTI names.
 //
-// Args: one or more substrings (each searched independently):
+// Args: one or more substrings (each searched independently). If the FIRST arg is
+// numeric it sets the per-needle match cap (default 40):
 //   -postScript ListSymbols.java ResultEnableInput Death Sigil
+//   -postScript ListSymbols.java 2000 StatusBase
 //
 // @category GBFR
 import ghidra.app.script.GhidraScript;
@@ -22,7 +24,14 @@ public class ListSymbols extends GhidraScript {
         baseOff = currentProgram.getImageBase().getOffset();
         String[] needles = getScriptArgs();
         if (needles == null || needles.length == 0) { println("need substring arg(s)"); return; }
-        for (String needle : needles) {
+        int cap = 40;
+        int firstNeedle = 0;
+        if (needles.length > 1 && needles[0].matches("\\d+")) {
+            cap = Integer.parseInt(needles[0]);
+            firstNeedle = 1;
+        }
+        for (int n = firstNeedle; n < needles.length; n++) {
+            String needle = needles[n];
             String lo = needle.toLowerCase();
             println("=== ListSymbols: \"" + needle + "\" ===");
             SymbolIterator it = currentProgram.getSymbolTable().getAllSymbols(true);
@@ -34,7 +43,7 @@ public class ListSymbols extends GhidraScript {
                 Function fn = currentProgram.getFunctionManager().getFunctionAt(s.getAddress());
                 println("  0x" + Long.toHexString(rva(s.getAddress())) + "  " + name +
                         (fn != null ? "  [function]" : "  [" + s.getSymbolType() + "]"));
-                if (++shown >= 40) { println("  ... more elided"); break; }
+                if (++shown >= cap) { println("  ... more elided"); break; }
             }
             if (shown == 0) println("  (no matches)");
         }

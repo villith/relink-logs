@@ -3,6 +3,7 @@ use log::info;
 use rusqlite::Connection;
 use rusqlite_migration::{Migrations, M};
 
+pub mod import;
 pub mod legality;
 pub mod logs;
 pub mod runs;
@@ -70,6 +71,10 @@ pub fn migrations() -> Migrations<'static> {
         // NULL means "never audited", which is every log that existed before
         // this shipped — the startup sweep treats it as stale and backfills.
         M::up("ALTER TABLE logs ADD COLUMN legality_rules_version INTEGER"),
+        // 1 on rows copied in from another installation's logs.db, so the UI
+        // can mark them: an imported log may lack data the source app never
+        // recorded. Defaulted 0 — everything already here was recorded live.
+        M::up("ALTER TABLE logs ADD COLUMN imported BOOLEAN NOT NULL DEFAULT 0"),
     ])
 }
 
@@ -86,6 +91,7 @@ pub fn setup_db() -> Result<()> {
     migrations().to_latest(&mut conn)?;
 
     runs::sweep_orphaned_runs(&conn)?;
+    legality::sweep_orphaned_findings(&conn)?;
 
     Ok(())
 }
@@ -116,6 +122,15 @@ mod tests {
             .expect("read the stamp");
         assert_eq!(stamp, None);
     }
+}
+
+/// Copy the whole log store to `path`. `VACUUM INTO` rather than a file copy
+/// for the same reason `settings_db::export_to` uses it: the database runs in
+/// WAL mode, so copying logs.db alone would silently miss every encounter
+/// still sitting in the -wal sidecar.
+pub fn export_to(conn: &Connection, path: &std::path::Path) -> Result<()> {
+    conn.execute("VACUUM INTO ?", [path.to_string_lossy().as_ref()])?;
+    Ok(())
 }
 
 /// Connect to database.

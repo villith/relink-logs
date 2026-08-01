@@ -44,6 +44,9 @@ type LogIndexState = {
   setSelectedLogIds: (ids: number[]) => void;
   deleteSelectedLogs: () => void;
   deleteAllLogs: () => void;
+  /** Deletes every imported log and refetches; resolves to how many went.
+   * Throws on failure so the caller can phrase the error toast. */
+  deleteImportedLogs: () => Promise<number>;
   fetchLogs: () => void;
 };
 
@@ -113,6 +116,16 @@ export const useLogIndexStore = create<LogIndexState>((set, get) => ({
     } catch (e) {
       toast.error(`Failed to delete logs: ${e}`);
     }
+  },
+  deleteImportedLogs: async () => {
+    const { fetchLogs } = get();
+
+    const count = await invoke<number>("delete_imported_logs");
+    // The same index reset the sibling deletes do: the current page may no
+    // longer exist and the selection may name deleted rows.
+    set({ currentPage: 1, selectedLogIds: [] });
+    await fetchLogs();
+    return count;
   },
   fetchLogs: async () => {
     const { currentPage, filters, setSearchResult } = get();

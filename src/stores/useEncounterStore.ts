@@ -36,6 +36,9 @@ interface EncounterStore {
   questCompleted: boolean;
   /** 0-based room index when this log is a Conflux room, else null. */
   roomIndex: number | null;
+  /** Copied in from another installation's logs.db — may lack data the source
+   * app never recorded, so the detail view marks it. */
+  imported: boolean;
   setSelectedTargetSpans: (targetSpans: TargetSpan[]) => void;
   setSelectedPlayers: (playerNames: string[]) => void;
   loadFromResponse: (response: EncounterStateResponse) => void;
@@ -58,6 +61,8 @@ export interface EncounterStateResponse {
   questTimer: number | null;
   questCompleted: boolean | null;
   roomIndex: number | null;
+  /** Optional so a backend older than the field reads as "not imported". */
+  imported?: boolean;
 }
 
 export const useEncounterStore = create<EncounterStore>((set) => ({
@@ -78,6 +83,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   questTimer: null,
   questCompleted: false,
   roomIndex: null,
+  imported: false,
   setSelectedTargetSpans: (targetSpans: TargetSpan[]) => set({ selectedTargetSpans: targetSpans }),
   setSelectedPlayers: (playerNames: string[]) => set({ selectedPlayers: playerNames }),
   loadFromResponse: (response: EncounterStateResponse) => {
@@ -104,6 +110,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       questTimer: response.questTimer,
       questCompleted: response.questCompleted || false,
       roomIndex: response.roomIndex,
+      imported: response.imported ?? false,
     });
   },
 }));

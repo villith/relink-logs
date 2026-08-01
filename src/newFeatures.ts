@@ -12,23 +12,17 @@ export type NewWindow = { from?: string; until?: string };
  * chip usages too (ids are typed, so the compiler points at them).
  */
 export const NEW_FEATURES = {
-  settings: { from: "1.12.5", until: "1.12.6" },
+  settings: { from: "1.12.7", until: "1.12.8" },
   toolbox: { from: "1.10.0", until: "1.12.0" },
   "overmastery-predictor": { from: "1.10.0", until: "1.12.0" },
   "transmarvel-wishlist": { from: "1.12.4", until: "1.12.5" },
   "checklist-settings": { from: "1.12.5", until: "1.12.6" },
-  // Both settings sections were rebuilt this release — the meter gained its bar
-  // appearance and column controls, the overlay its size, header segments and
-  // header buttons. Same window as the other settings entries, so the whole
-  // settings tab stops advertising itself at once.
   "meter-settings": { from: "1.12.5", until: "1.12.6" },
   "overlay-settings": { from: "1.12.5", until: "1.12.6" },
   "cheat-audit": { from: "1.12.5", until: "1.12.7" },
-  // The switch that lets the audit's verdicts appear anywhere but the audit
-  // page. Chipped alongside `cheat-audit` and for the same span: it ships off,
-  // so without a chip the feature is only discoverable by someone who already
-  // went looking for it.
   "flagged-builds-setting": { from: "1.12.5", until: "1.12.7" },
+  "import-export-logs": { from: "1.12.7", until: "1.12.8" },
+  "import-export-settings": { from: "1.12.7", until: "1.12.8" },
 } as const satisfies Record<string, NewWindow>;
 
 export type NewFeatureId = keyof typeof NEW_FEATURES;
