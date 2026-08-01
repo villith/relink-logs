@@ -242,20 +242,26 @@ mod tests {
         assert!(is_ours(&utf16("CompanyName: Relink Logs")));
     }
 
+    /// A PE image starts with `MZ`. CI stubs the Tauri resource with an empty
+    /// `touch src-tauri/hook.dll` (see ci.yaml) because nothing there loads it,
+    /// so "a file exists at that path" is not enough to mean "a hook was built".
+    fn is_pe_image(bytes: &[u8]) -> bool {
+        bytes.starts_with(b"MZ")
+    }
+
     #[test]
     fn a_really_built_hook_dll_is_recognised_as_ours() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let Some(dll) = [
+        let Some((dll, bytes)) = [
             root.join("hook.dll"),
             root.join("../target/release/hook.dll"),
         ]
         .into_iter()
-        .find(|p| p.is_file()) else {
+        .filter_map(|p| fs::read(&p).ok().map(|b| (p, b)))
+        .find(|(_, bytes)| is_pe_image(bytes)) else {
             eprintln!("no built hook.dll found; skipping");
             return;
         };
-
-        let bytes = fs::read(&dll).expect("read built hook.dll");
 
         assert!(
             is_ours(&bytes),
