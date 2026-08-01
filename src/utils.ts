@@ -927,6 +927,12 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "Group"): {
       const actionType = skill.actionType as { Group: string };
 
+      // Custom groups are keyed as "custom::<display-name>"; the name is
+      // user-supplied text, so there is no i18n key to look up.
+      if (actionType.Group.startsWith("custom::")) {
+        return actionType.Group.slice("custom::".length);
+      }
+
       return t(
         [
           `skills.${characterType}.skill-groups.${actionType.Group}`,

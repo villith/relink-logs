@@ -58,7 +58,7 @@
     "streamer-mode-description": "仅在悬浮窗上显示自己造成的伤害",
     "show-full-values": "显示完整数值",
     "show-full-values-description": "在悬浮窗中显示完整数值",
-    "use-condensed-skills": "使用简化技能名称",
+    "use-condensed-skills": "技能合并显示",
     "use-condensed-skills-description": "将相似技能合并显示（例如 攻击1、攻击2 合并为\"攻击\"）",
     "open-log-on-save": "保存后打开日志",
     "open-log-on-save-description": "保存战斗记录后自动打开日志页面",
@@ -395,7 +395,23 @@
       "general": "通用",
       "meters": "悬浮窗"
     },
-    "color-placeholder": "颜色"
+    "color-placeholder": "颜色",
+    "custom-skill-groups": "自定义分组",
+    "custom-skill-groups-description": "在启用“技能合并显示”时，额外定义将哪些技能合并为一组显示。",
+    "custom-skill-group-character": "角色",
+    "custom-skill-group-new-group": "新建自定义分组",
+    "custom-skill-group-no-custom": "暂无自定义分组，点击上方“新建自定义分组”创建。",
+    "custom-skill-group-custom-badge": "自定义",
+    "custom-skill-group-reset": "恢复默认",
+    "custom-skill-group-skills": "技能",
+    "custom-skill-group-skills-placeholder": "搜索技能...",
+    "custom-skill-group-edit": "编辑技能",
+    "custom-skill-group-delete": "删除",
+    "custom-skill-group-reset-title": "重置分组",
+    "custom-skill-group-reset-confirm": "确定要重置“{{character}}”的所有分组吗？这将删除所有自定义分组并恢复预置设置。",
+    "custom-skill-group-reset-confirm-2": "此操作不可撤销。确定继续？",
+    "custom-skill-group-name": "分组名称",
+    "custom-skill-group-done": "完成"
   },
   "characters": {
     "Pl2000": "伊德 (龙形态)",
