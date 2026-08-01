@@ -94,6 +94,22 @@ describe("stun descriptor", () => {
     expect(rows.every((r) => r.pinOnClick === null)).toBe(true);
   });
 
+  it("sums every player's breakdown when an ability is pinned with no friendly", () => {
+    const party = [
+      player(0, 50, 2.0, [{ action: 100, stun: 50, max: 30 }]),
+      player(1, 20, 1.0, [{ action: 100, stun: 20, max: 40 }]),
+    ];
+    const rows = stun.rows(
+      input("skills", { source: null, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].value).toBe(70);
+    // The max is the biggest single hit anyone landed, so it crosses players.
+    expect(rows[0].columns[1]).toBe("40.0");
+    expect(rows[0].colorSlot).toBe(-1);
+  });
+
   it("sums abilities that share an action id into one row, keeping the largest single hit", () => {
     // Two breakdown rows under one ability — the player's own hits and their
     // summon's. Stun totals add; the max is the biggest single hit either

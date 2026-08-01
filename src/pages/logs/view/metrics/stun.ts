@@ -42,7 +42,7 @@ export const stun: MetricDescriptor = {
           oneDecimal(Math.max(...skills.map((skill) => skill.maxStunValue))),
         ],
         pinOnClick: level === "abilities" ? { ability: key } : null,
-        colorSlot: owner.partyIndex,
+        colorSlot,
       }))
       .sort((a, b) => b.value - a.value);
   },

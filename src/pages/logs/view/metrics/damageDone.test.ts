@@ -246,6 +246,50 @@ describe("damageDone descriptor", () => {
     expect(rows[0].columns[1]).toBe("3");
   });
 
+  it("sums every player's breakdown when an ability is pinned with no friendly", () => {
+    // The scoped fetch sends sourceIndices: [] with the ability filter intact,
+    // so the state is correct and complete — only the row builder refused to
+    // read it, and the table claimed nothing matched.
+    const party = [
+      player(0, 30, [{ action: 100, damage: 30, hits: 2 }]),
+      player(1, 20, [{ action: 100, damage: 20, hits: 1 }]),
+    ];
+    const rows = damageDone.rows(
+      input("skills", { source: null, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].value).toBe(50);
+    expect(rows[0].columns[1]).toBe("3");
+  });
+
+  it("shares against the whole party's total when no friendly is pinned", () => {
+    const party = [player(0, 30, [{ action: 100, damage: 30 }]), player(1, 10, [{ action: 110, damage: 10 }])];
+    const rows = damageDone.rows(
+      input("skills", { source: null, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
+    );
+
+    expect(rows[0].columns.at(-1)).toBe("75.0%");
+    expect(rows[1].columns.at(-1)).toBe("25.0%");
+  });
+
+  it("gives a party-wide row no party colour", () => {
+    // A row summed across players belongs to no one slot; the table renders a
+    // negative slot in its neutral ink.
+    const party = [player(0, 30, [{ action: 100, damage: 30 }]), player(1, 20, [{ action: 100, damage: 20 }])];
+    const rows = damageDone.rows(
+      input("skills", { source: null, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
+    );
+
+    expect(rows[0].colorSlot).toBe(-1);
+  });
+
+  it("still returns nothing when a pinned source has no data", () => {
+    // A source that IS pinned but absent from the scoped party is a different
+    // case from no source at all, and must stay empty.
+    expect(damageDone.rows(input("skills", { source: 99, targetIds: [], ability: "Normal:100" }))).toEqual([]);
+  });
+
   it("carries the share of the level's total as its last column", () => {
     const rows = damageDone.rows(input("players"));
     expect(rows[0].columns.at(-1)).toBe("75.0%");

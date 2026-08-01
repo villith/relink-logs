@@ -73,12 +73,12 @@ export const damageDone: MetricDescriptor = {
               (values) => Math.max(...values)
             ),
             format(hits === 0 ? 0 : Math.round(damage / hits)),
-            share(damage, owner.totalDamage),
+            share(damage, total),
           ],
           // Display only at the skills level: a member skill has nothing below
           // it to descend into.
           pinOnClick: level === "abilities" ? { ability: key } : null,
-          colorSlot: owner.partyIndex,
+          colorSlot,
         };
       })
       .sort((a, b) => b.value - a.value);
