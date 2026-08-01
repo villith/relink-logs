@@ -1,4 +1,4 @@
-import { LineChart } from "@mantine/charts";
+import { AreaChart, LineChart } from "@mantine/charts";
 import { Box, Paper, Text } from "@mantine/core";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,23 +15,47 @@ export type DpsChartProps = {
   /** Already sliced to the committed window, so the chart IS the window. */
   data: ChartDatapoint[];
   labels: Label;
+  /** i18next key naming what is plotted; follows the metric tabs. */
+  labelKey: string;
+  /** How a value reads: a humanized amount, or a gauge percentage. */
+  format: "amount" | "percent";
   /** Commits a window as bucket indexes RELATIVE TO `data`, or null to clear. */
   onScope: (window: [number, number] | null) => void;
   /** Drawn under the plot as the axis bounds. */
   fromLabel: string;
   toLabel: string;
+  /** Stack the series as filled bands instead of drawing them independently.
+   *
+   * The drill-down levels are a decomposition — a player's damage split by skill
+   * group, an ability's split by target — so the bands compose a total that is
+   * itself meaningful, and the stack's height keeps showing it. Independent
+   * lines are right at the players level, where four players' curves are
+   * compared rather than added. */
+  stacked?: boolean;
 };
 
 // recharts types a tooltip entry as Payload<any, any>, which has no index
 // signature; the same `any` escape hatch as DetailCharts' tooltip.
-const ChartTooltip = ({
+export const ChartTooltip = ({
   label,
   payload,
+  format,
+  labels,
 }: {
   label: string;
   payload: Record<string, any>[] | undefined; // eslint-disable-line
+  format: "amount" | "percent";
+  /** The series descriptors, so a payload entry can be named. */
+  labels: Label;
 }) => {
   if (!payload) return null;
+
+  // Mantine hands recharts `name: item.name` — the series KEY, not its label
+  // (AreaChart.mjs) — so the payload cannot name itself. Mantine's own legend
+  // hides this by looking the key up through `getSeriesLabels`; ours has to do
+  // the same, or it prints actor indexes and group keys at the user.
+  const labelByKey = new Map(labels.map((series) => [series.name, series.label ?? series.name]));
+
   return (
     <Paper px="md" py="sm" withBorder shadow="md" radius="md">
       <Text fw={500} mb={5}>
@@ -40,13 +64,14 @@ const ChartTooltip = ({
       {payload
         .filter((item) => item.value !== null && item.value !== undefined)
         .map((item) => {
-          const [n, suffix] = humanizeNumbers(item.value as number);
+          const [n, suffix] =
+            format === "percent" ? [item.value as number, "%"] : humanizeNumbers(item.value as number);
           return (
             // Keyed by dataKey (the actor index), not name: two players can
             // share a display label, and React drops the duplicate row.
             <Text key={String(item.dataKey)} fz="sm">
               <Text component="span" c={item.color as string}>
-                {String(item.name)}
+                {labelByKey.get(String(item.name)) ?? String(item.name)}
               </Text>
               : {n}
               {suffix}
@@ -67,7 +92,16 @@ const ChartTooltip = ({
  * Committing does not shade — it re-slices. The parent hands back `data` cropped
  * to the window, so the chart becomes the window and the band has nothing left
  * to mark. */
-export const DpsChart = ({ data, labels, onScope, fromLabel, toLabel }: DpsChartProps) => {
+export const DpsChart = ({
+  data,
+  labels,
+  labelKey,
+  format,
+  onScope,
+  fromLabel,
+  toLabel,
+  stacked = false,
+}: DpsChartProps) => {
   const { t } = useTranslation();
   const anchor = useRef<number | null>(null);
   const [band, setBand] = useState<[number, number] | null>(null);
@@ -83,10 +117,73 @@ export const DpsChart = ({ data, labels, onScope, fromLabel, toLabel }: DpsChart
     onScope(windowFromDrag(start, last, maxIndex));
   };
 
+  // recharts' own drag, identical for both chart types — Mantine just forwards
+  // it under a different prop name.
+  const interaction = {
+    margin: { top: 5, right: 5, bottom: 5, left: 5 },
+    // Selecting text mid-drag would otherwise fight the gesture.
+    style: { userSelect: "none" as const },
+    onMouseDown: (state: { activeTooltipIndex?: number }) => {
+      const index = at(state?.activeTooltipIndex);
+      if (index === null) return;
+      anchor.current = index;
+      setBand([index, index]);
+    },
+    onMouseMove: (state: { activeTooltipIndex?: number }) => {
+      if (anchor.current === null) return;
+      const index = at(state?.activeTooltipIndex);
+      if (index === null) return;
+      setBand([anchor.current, index]);
+    },
+    onMouseUp: (state: { activeTooltipIndex?: number }) => end(at(state?.activeTooltipIndex)),
+    // A drag that leaves the plot still has to end, or the next move over it
+    // would extend a stale selection.
+    onMouseLeave: () => {
+      anchor.current = null;
+      setBand(null);
+    },
+  };
+
+  const shared = {
+    h: "clamp(190px, 26vh, 380px)",
+    data,
+    dataKey: "timestamp",
+    withDots: false,
+    withLegend: true,
+    series: labels,
+    valueFormatter: (value: number) => {
+      if (format === "percent") return `${value}%`;
+      const [n, suffix] = humanizeNumbers(value);
+      return `${n}${suffix}`;
+    },
+    yAxisProps: { width: 60 },
+    xAxisProps: { interval: "preserveStartEnd" as const },
+  };
+
+  // Kept out of `shared`: recharts types `content` against its own tooltip
+  // props, and passing it through a plain object loses the contextual typing
+  // that makes the destructured label and payload check.
+  const tooltip = {
+    content: ({ label, payload }: { label?: unknown; payload?: Record<string, any>[] }) => ( // eslint-disable-line
+      <ChartTooltip label={String(label ?? "")} payload={payload} format={format} />
+    ),
+  };
+
+  const scopeBand = band && band[0] !== band[1] && (
+    <ReferenceArea
+      x1={data[Math.min(band[0], band[1])]?.timestamp}
+      x2={data[Math.max(band[0], band[1])]?.timestamp}
+      strokeOpacity={0.9}
+      stroke="var(--an-accent)"
+      fill="var(--an-accent)"
+      fillOpacity={0.13}
+    />
+  );
+
   return (
     <Box style={{ padding: "10px 16px 8px" }}>
       <Text className="analysis-label" style={{ marginBottom: 5 }}>
-        {t("ui.logs.chart-dps-label")}
+        {t(labelKey)}
       </Text>
       {/* Double-click sits on the wrapper, not in `lineChartProps`: recharts'
           CategoricalChartProps has no onDoubleClick, and the wrapper sees the
