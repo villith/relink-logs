@@ -1377,6 +1377,14 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     // Dropdown entries are ALWAYS the unfiltered segmentation — the user picks
     // from everything the fight contained, whatever is currently selected.
     let target_entries = v1::segment_targets(&parser.encounter.raw_event_log, start_time);
+    // Windowed, but never narrowed by the pins themselves: each selector must
+    // keep offering everything the OTHER pins still allow.
+    let selection_facts = v1::selection_facts(
+        &parser.encounter.raw_event_log,
+        start_time,
+        options.from_ms,
+        options.up_to_ms,
+    );
 
     let player_indices: Vec<u32> = parser
         .derived_state
