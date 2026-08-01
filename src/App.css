@@ -169,7 +169,7 @@
      row so the NAMES stay aligned no matter how far the icon has stepped. Three
      steps covers a full party. */
   --player-icon-scale: 1.5;
-  --player-icon-step: calc(var(--player-icon-height) / 6);
+  --player-icon-step: calc(var(--player-icon-height) / 9);
   --player-icon-reserve: calc(3 * var(--player-icon-step));
   --player-icon-height: calc(var(--meter-row-height, 27px) * var(--player-icon-scale));
   --player-icon-overhang: calc(var(--player-icon-height) - var(--meter-row-height, 27px) + 2px);
