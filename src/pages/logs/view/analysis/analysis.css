@@ -17,8 +17,8 @@
   --an-line: #2c2f36;
   --an-line-strong: #3b4048;
   --an-ink: #e8eaed;
-  --an-ink-2: #a2a8b4;
-  --an-ink-3: #6c7280;
+  --an-ink-2: #b9bfc9;
+  --an-ink-3: #8b929e;
   --an-accent: #00b8d9;
   --an-plot: #1a1c21;
 }
@@ -77,9 +77,9 @@
   pointer-events: none;
 }
 
-.analysis-row:hover .analysis-bar {
-  opacity: 0.62;
-}
+/* Hover deliberately does NOT raise the fill's opacity. Taking it to 0.62 put
+ * three of four row names below 4.5:1 — the row got harder to read at the exact
+ * moment the user was reading it. The outline above carries the hover state. */
 
 /* Every cell sits above the bar. */
 .analysis-rank,
@@ -93,7 +93,9 @@
   padding-right: 9px;
   text-align: right;
   font-size: 11px;
-  color: var(--an-ink-3);
+  /* The rank is always inside the bar (the narrowest measured 523px against a
+   * 32px cell), so it must survive the fill rather than the background. */
+  color: var(--an-ink-2);
 }
 
 .analysis-name {

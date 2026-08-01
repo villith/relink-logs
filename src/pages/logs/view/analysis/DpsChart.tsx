@@ -42,7 +42,9 @@ const ChartTooltip = ({
         .map((item) => {
           const [n, suffix] = humanizeNumbers(item.value as number);
           return (
-            <Text key={String(item.name)} fz="sm">
+            // Keyed by dataKey (the actor index), not name: two players can
+            // share a display label, and React drops the duplicate row.
+            <Text key={String(item.dataKey)} fz="sm">
               <Text component="span" c={item.color as string}>
                 {String(item.name)}
               </Text>
@@ -145,9 +147,7 @@ export const DpsChart = ({ data, labels, onScope, fromLabel, toLabel }: DpsChart
       </Box>
       <Box style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
         <Text className="analysis-label">{fromLabel}</Text>
-        <Text className="analysis-label" style={{ color: "#4a4f58" }}>
-          {t("ui.logs.chart-drag-hint")}
-        </Text>
+        <Text className="analysis-label">{t("ui.logs.chart-drag-hint")}</Text>
         <Text className="analysis-label">{toLabel}</Text>
       </Box>
     </Box>
