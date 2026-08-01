@@ -66,13 +66,28 @@ export const QuestSummary = ({
         borderBottom: "1px solid var(--an-line)",
       }}
     >
-      <Text style={{ fontWeight: 700, fontSize: 15, letterSpacing: "-0.015em" }}>{name}</Text>
+      {/* The quest name truncates so the metadata beside it never has to wrap:
+          at a 620px viewport the block grew 48px -> 71px and "Total Damage"
+          broke onto two lines. */}
+      <Text
+        style={{
+          fontWeight: 700,
+          fontSize: 15,
+          letterSpacing: "-0.015em",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          minWidth: 0,
+        }}
+      >
+        {name}
+      </Text>
       {roomIndex === null && !!questId && (
         <Text style={{ fontSize: 11.5 }} c={questCompleted ? "teal.4" : "red.5"}>
           {questCompleted ? t("ui.logs.quest-cleared") : t("ui.logs.quest-failed")}
         </Text>
       )}
-      <Text className="analysis-num" style={{ fontSize: 12, color: "var(--an-ink-3)" }}>
+      <Text className="analysis-num" style={{ fontSize: 12, color: "var(--an-ink-3)", whiteSpace: "nowrap" }}>
         {duration}
         {timer} · {epochToLocalTime(encounter.startTime)}
       </Text>
@@ -81,7 +96,7 @@ export const QuestSummary = ({
           <WarningCircle size={18} color="var(--mantine-color-yellow-6)" aria-label={t("ui.imported-badge")} />
         </Tooltip>
       )}
-      <Text className="analysis-label" style={{ marginLeft: "auto" }}>
+      <Text className="analysis-label" style={{ marginLeft: "auto", whiteSpace: "nowrap" }}>
         {t("ui.logs.total-damage")}
       </Text>
       <Text className="analysis-num" style={{ fontWeight: 700, fontSize: 17 }}>

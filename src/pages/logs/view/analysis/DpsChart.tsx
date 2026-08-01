@@ -93,7 +93,7 @@ export const DpsChart = ({ data, labels, onScope, fromLabel, toLabel }: DpsChart
           same gesture anywhere over the plot. */}
       <Box onDoubleClick={() => onScope(null)}>
         <LineChart
-          h={190}
+          h="clamp(190px, 26vh, 380px)"
         data={data}
         dataKey="timestamp"
         withDots={false}

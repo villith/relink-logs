@@ -61,8 +61,16 @@
   cursor: pointer;
 }
 
+/* Rows are 28px with a 2px gap, so an outline drawn outside the box overlaps
+ * its neighbour's. Both states draw their ring inside the row instead, which
+ * keeps the table's density rather than opening the gap to fit the ring. */
 .analysis-row:hover {
   outline: 1px solid var(--an-line-strong);
+  outline-offset: -1px;
+}
+
+.analysis-row:focus-visible {
+  outline-offset: -2px;
 }
 
 /* background-color, never the `background` shorthand: the shorthand resets

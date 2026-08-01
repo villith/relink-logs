@@ -55,6 +55,9 @@ export const PinBar = ({ options, pins, onChange, windowLabel, fullLabel, onClea
       <MultiSelect
         w={210}
         size="xs"
+        // Mantine's xs MultiSelect wraps its value in a pill container, which
+        // makes it 33px against the Selects' 30px and misaligns the row.
+        styles={{ input: { minHeight: 30, height: 30 } }}
         data={options.targets}
         value={pins.targetIds.map(String)}
         placeholder={t("ui.logs.selector-all-enemies")}
@@ -97,8 +100,10 @@ export const PinBar = ({ options, pins, onChange, windowLabel, fullLabel, onClea
           <Text style={{ fontSize: 11, color: "var(--an-ink-3)" }}>
             {t("ui.logs.window-within", { total: fullLabel })}
           </Text>
+          {/* sm, not xs: this is the only control that clears a window, and xs
+              measured 18x18 against WCAG 2.2 SC 2.5.8's 24x24. */}
           <ActionIcon
-            size="xs"
+            size="sm"
             variant="transparent"
             color="gray"
             aria-label={t("ui.logs.window-reset")}
