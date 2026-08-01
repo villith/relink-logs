@@ -19,5 +19,6 @@ export const sba: MetricDescriptor = {
         value: p.sba,
         columns: [p.sba.toFixed(2)],
         pinOnClick: null,
+        colorSlot: p.partyIndex,
       })),
 };

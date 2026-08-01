@@ -85,4 +85,22 @@ describe("damageDone descriptor", () => {
     // header cannot be fixed.
     expect(damageDone.columnKeys("players")).not.toEqual(damageDone.columnKeys("abilities"));
   });
+
+  it("tags each player row with its party slot", () => {
+    const rows = damageDone.rows(input("players"));
+    expect(rows.map((r) => r.colorSlot)).toEqual([0, 1]);
+  });
+
+  it("tags every ability row with the pinned player's slot", () => {
+    // All of one player's abilities are that player's colour — the rows are a
+    // breakdown of one bar, not four.
+    const rows = damageDone.rows(input("abilities", { source: 0, targetIds: [], ability: null }));
+    expect(rows.every((r) => r.colorSlot === 0)).toBe(true);
+  });
+
+  it("carries the share of the level's total as its last column", () => {
+    const rows = damageDone.rows(input("players"));
+    expect(rows[0].columns.at(-1)).toBe("75.0%");
+    expect(rows[1].columns.at(-1)).toBe("25.0%");
+  });
 });

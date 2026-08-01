@@ -17,6 +17,10 @@ export type MetricRow = {
   columns: string[];
   /** What clicking this row pins, or null if the row is a leaf. */
   pinOnClick: Partial<SelectorPins> | null;
+  /** Party slot this row's colour comes from, or -1 when it has none (a hit, an
+   * enemy). The table resolves the slot to a colour, so descriptors stay pure
+   * functions with no reach into the settings store. */
+  colorSlot: number;
 };
 
 /** What `label` should be resolved against before it is drawn. */

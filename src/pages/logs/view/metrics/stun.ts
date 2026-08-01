@@ -23,6 +23,7 @@ export const stun: MetricDescriptor = {
           value: p.totalStunValue,
           columns: [oneDecimal(p.totalStunValue), oneDecimal(p.stunPerSecond)],
           pinOnClick: { source: p.index },
+          colorSlot: p.partyIndex,
         }));
     }
 
@@ -37,6 +38,7 @@ export const stun: MetricDescriptor = {
         value: skill.totalStunValue,
         columns: [oneDecimal(skill.totalStunValue), oneDecimal(skill.maxStunValue)],
         pinOnClick: level === "abilities" ? { ability: abilityKey(skill.actionType) } : null,
+        colorSlot: owner.partyIndex,
       }));
   },
 };
