@@ -50,15 +50,15 @@ const OverlaySettings = () => {
         </Stack>
         {/* Sticky against the page scroll, clearing the fixed AppShell header —
             see the matching note in MeterSettings for why `top` is measured
-            from the viewport, and why the two columns split the row evenly. */}
+            from the viewport, why the two columns split the row evenly, and why
+            stickiness only applies at `lg`+ where the preview has its own
+            column. */}
         <Box
           w={{ base: "100%", lg: "auto" }}
           flex={{ base: "0 0 auto", lg: "1 1 0" }}
           miw={0}
-          style={{
-            position: "sticky",
-            top: "calc(var(--app-shell-header-height, 50px) + var(--mantine-spacing-sm))",
-          }}
+          pos={{ base: "static", lg: "sticky" }}
+          top="calc(var(--app-shell-header-height, 50px) + var(--mantine-spacing-sm))"
         >
           <MeterPreview live />
         </Box>
