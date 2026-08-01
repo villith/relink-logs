@@ -1,4 +1,4 @@
-import { abilityKey } from "../abilityKey";
+import { groupSkillsByAbility } from "../abilitySkills";
 import type { MetricDescriptor, MetricRow } from "./types";
 
 const oneDecimal = (value: number): string => value.toFixed(1);
@@ -30,15 +30,20 @@ export const stun: MetricDescriptor = {
     const owner = players.find((p) => p.index === pins.source);
     if (!owner) return [];
 
-    return [...owner.skillBreakdown]
-      .sort((a, b) => b.totalStunValue - a.totalStunValue)
-      .map((skill) => ({
-        key: `skill:${abilityKey(skill.actionType)}`,
-        label: abilityKey(skill.actionType),
-        value: skill.totalStunValue,
-        columns: [oneDecimal(skill.totalStunValue), oneDecimal(skill.maxStunValue)],
-        pinOnClick: level === "abilities" ? { ability: abilityKey(skill.actionType) } : null,
+    // Grouped, not mapped 1:1 — see `groupSkillsByAbility`. Totals add; the max
+    // is the biggest single hit, so it takes the largest rather than summing.
+    return groupSkillsByAbility(owner.skillBreakdown)
+      .map(({ key, skills }) => ({
+        key: `skill:${key}`,
+        label: key,
+        value: skills.reduce((sum, skill) => sum + skill.totalStunValue, 0),
+        columns: [
+          oneDecimal(skills.reduce((sum, skill) => sum + skill.totalStunValue, 0)),
+          oneDecimal(Math.max(...skills.map((skill) => skill.maxStunValue))),
+        ],
+        pinOnClick: level === "abilities" ? { ability: key } : null,
         colorSlot: owner.partyIndex,
-      }));
+      }))
+      .sort((a, b) => b.value - a.value);
   },
 };

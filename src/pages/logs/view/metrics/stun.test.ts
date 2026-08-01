@@ -5,7 +5,12 @@ import type { ComputedPlayerState } from "@/types";
 import type { SelectorPins } from "../selectorOptions";
 import { stun } from "./stun";
 
-const player = (index: number, total: number, perSecond: number, skills: { action: number; stun: number }[]) =>
+const player = (
+  index: number,
+  total: number,
+  perSecond: number,
+  skills: { action: number; stun: number; child?: string; max?: number }[]
+) =>
   ({
     index,
     partyIndex: index,
@@ -23,13 +28,13 @@ const player = (index: number, total: number, perSecond: number, skills: { actio
     overcapCapSum: 0,
     skillBreakdown: skills.map((s) => ({
       actionType: { Normal: s.action },
-      childCharacterType: "Pl0000",
+      childCharacterType: s.child ?? "Pl0000",
       hits: 1,
       minDamage: null,
       maxDamage: null,
       totalDamage: 0,
       totalStunValue: s.stun,
-      maxStunValue: s.stun,
+      maxStunValue: s.max ?? s.stun,
       cappedHits: 0,
       cappableHits: 0,
       overcapBaseSum: 0,
@@ -47,8 +52,11 @@ const PLAYERS = [
 
 const NO_PINS: SelectorPins = { source: null, targetIds: [], ability: null };
 
-const input = (level: "players" | "abilities" | "hits", pins: SelectorPins = NO_PINS) =>
-  ({ encounter: { totalDamage: 0 } as never, partyData: [null, null], players: PLAYERS, level, pins }) as never;
+const input = (
+  level: "players" | "abilities" | "hits",
+  pins: SelectorPins = NO_PINS,
+  players: ComputedPlayerState[] = PLAYERS
+) => ({ encounter: { totalDamage: 0 } as never, partyData: [null, null], players, level, pins }) as never;
 
 describe("stun descriptor", () => {
   it("ranks players by stun, not by damage", () => {
@@ -68,5 +76,39 @@ describe("stun descriptor", () => {
 
   it("returns no rows for a source with no data", () => {
     expect(stun.rows(input("abilities", { source: 99, targetIds: [], ability: null }))).toEqual([]);
+  });
+
+  it("lists a pinned group's member skills at the skills level, unpinnable", () => {
+    const owner = [
+      player(0, 90, 3.0, [
+        { action: 100, stun: 50, max: 30 },
+        { action: 110, stun: 40, max: 25 },
+      ]),
+    ];
+    const rows = stun.rows(
+      input("skills", { source: 0, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, owner)
+    );
+
+    expect(rows.map((r) => r.key)).toEqual(["skill:Normal:100", "skill:Normal:110"]);
+    expect(rows.map((r) => r.value)).toEqual([50, 40]);
+    expect(rows.every((r) => r.pinOnClick === null)).toBe(true);
+  });
+
+  it("sums abilities that share an action id into one row, keeping the largest single hit", () => {
+    // Two breakdown rows under one ability — the player's own hits and their
+    // summon's. Stun totals add; the max is the biggest single hit either
+    // landed, so it takes the larger rather than the sum.
+    const withSummon = [
+      player(0, 120, 4.5, [
+        { action: 100, stun: 50, max: 30 },
+        { action: 100, stun: 30, max: 25, child: "Wp0000" },
+        { action: 200, stun: 40 },
+      ]),
+    ];
+    const rows = stun.rows(input("abilities", { source: 0, targetIds: [], ability: null }, withSummon));
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0].value).toBe(80);
+    expect(rows[0].columns).toEqual(["80.0", "30.0"]);
   });
 });
