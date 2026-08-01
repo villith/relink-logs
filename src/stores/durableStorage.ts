@@ -111,15 +111,26 @@ export const bootstrapDurableSettings = async (): Promise<void> => {
   }
 
   if (insideTauri()) {
+    const adoptions: Promise<unknown>[] = [];
+
     for (const key of DURABLE_KEYS) {
       if (key in rows) continue;
       const cached = localStorage.getItem(key);
       if (cached === null) continue;
 
-      void invoke("set_setting", { key, value: cached }).catch((e) =>
-        console.warn(`[settings] failed to adopt ${key}:`, e)
+      adoptions.push(
+        invoke("set_setting", { key, value: cached }).catch((e) =>
+          console.warn(`[settings] failed to adopt ${key}:`, e)
+        )
       );
     }
+
+    // Awaited, not fired and forgotten: adoption is the one-shot migration of
+    // an existing user's settings, and it runs on exactly the launch where
+    // localStorage is most likely to be wiped out from under it. `allSettled`
+    // so one unwritable key cannot stop the app from starting. Costs nothing
+    // after the first launch, when there is nothing left to adopt.
+    await Promise.allSettled(adoptions);
   }
 
   for (const key of handlers.keys()) {

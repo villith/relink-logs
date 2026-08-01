@@ -44,6 +44,39 @@ describe("bootstrapDurableSettings", () => {
     });
   });
 
+  // Adoption is the one-shot migration of an existing user's settings, and it
+  // runs on exactly the launch where localStorage is most likely to be wiped
+  // out from under it. Letting it race the first render leaves a window where
+  // an update, a quick quit and a wipe lose the data for good.
+  it("waits for the adoption writes before resolving", async () => {
+    localStorage.setItem("synthesis-form", "user-data");
+    let adopted = false;
+    invokeMock.mockImplementation((cmd) => {
+      if (cmd === "get_settings") return Promise.resolve({});
+      return new Promise((resolve) =>
+        setTimeout(() => {
+          adopted = true;
+          resolve(undefined);
+        }, 0)
+      );
+    });
+
+    await bootstrapDurableSettings();
+
+    expect(adopted).toBe(true);
+  });
+
+  // Guards the choice of allSettled over all: one unwritable key must not stop
+  // the app from starting, exactly as a failed fetch does not.
+  it("still starts when an adoption write fails", async () => {
+    localStorage.setItem("synthesis-form", "user-data");
+    invokeMock.mockImplementation((cmd) =>
+      cmd === "get_settings" ? Promise.resolve({}) : Promise.reject(new Error("disk full"))
+    );
+
+    await expect(bootstrapDurableSettings()).resolves.toBeUndefined();
+  });
+
   it("does not adopt a key the backend already has", async () => {
     localStorage.setItem("synthesis-form", "cached");
     invokeMock.mockImplementation((cmd) =>
