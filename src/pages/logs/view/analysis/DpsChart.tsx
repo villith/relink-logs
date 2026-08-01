@@ -1,6 +1,6 @@
 import { AreaChart, LineChart } from "@mantine/charts";
 import { Box, Paper, Text } from "@mantine/core";
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReferenceArea } from "recharts";
 
@@ -56,14 +56,21 @@ export const ChartTooltip = ({
   // the same, or it prints actor indexes and group keys at the user.
   const labelByKey = new Map(labels.map((series) => [series.name, series.label ?? series.name]));
 
+  // Only what actually landed in this bucket. A stack of 17 skill-group bands
+  // is mostly zeroes at any one moment, and listing every one of them buries
+  // the few that fired. A zero reads the same on the gauge tab — "0%" says
+  // nothing the absent row does not.
+  const landed = payload.filter((item) => typeof item.value === "number" && item.value !== 0);
+
+  // Nothing at all: a card holding only a timestamp is worse than no card.
+  if (landed.length === 0) return null;
+
   return (
     <Paper px="md" py="sm" withBorder shadow="md" radius="md">
       <Text fw={500} mb={5}>
         {label}
       </Text>
-      {payload
-        .filter((item) => item.value !== null && item.value !== undefined)
-        .map((item) => {
+      {landed.map((item) => {
           const [n, suffix] =
             format === "percent" ? [item.value as number, "%"] : humanizeNumbers(item.value as number);
           return (
@@ -105,6 +112,34 @@ export const DpsChart = ({
   const { t } = useTranslation();
   const anchor = useRef<number | null>(null);
   const [band, setBand] = useState<[number, number] | null>(null);
+
+  // Series the user has clicked off in the legend. Mantine 7.6.1 cannot do this
+  // itself — its legend has no click handler and no hidden state.
+  //
+  // Hiding a band lowers the stack, so the plot stops showing the player's whole
+  // output. That is accepted deliberately: comparing two groups directly is the
+  // reason to hide the others.
+  const [hidden, setHidden] = useState<Set<string>>(new Set());
+
+  // The keys the current pins produce. A hidden band must not survive a pin
+  // change: under the next player the keys differ, and a set carried across
+  // would hide an arbitrary band of a chart the user never touched.
+  const seriesKeys = useMemo(() => labels.map((series) => series.name).join(" "), [labels]);
+  useEffect(() => setHidden(new Set()), [seriesKeys]);
+
+  const shownSeries = useMemo(() => labels.filter((series) => !hidden.has(series.name)), [labels, hidden]);
+
+  const legendEntries = useMemo(
+    () => labels.map((series) => ({ key: series.name, label: series.label ?? series.name, color: series.color })),
+    [labels]
+  );
+
+  const toggleSeries = (key: string) =>
+    setHidden((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
 
   const maxIndex = Math.max(0, data.length - 1);
   const at = (index: number | undefined) => (typeof index === "number" ? index : null);
@@ -149,8 +184,11 @@ export const DpsChart = ({
     data,
     dataKey: "timestamp",
     withDots: false,
-    withLegend: true,
-    series: labels,
+    // Ours instead, rendered outside the plot: Mantine's is laid out INSIDE it
+    // at a fixed 44px and overlaps it as soon as the entries wrap — see
+    // ChartLegend.
+    withLegend: false,
+    series: shownSeries,
     valueFormatter: (value: number) => {
       if (format === "percent") return `${value}%`;
       const [n, suffix] = humanizeNumbers(value);
@@ -242,6 +280,7 @@ export const DpsChart = ({
           )}
         </LineChart>
       </Box>
+      <ChartLegend entries={legendEntries} hidden={hidden} onToggle={toggleSeries} />
       <Box style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
         <Text className="analysis-label">{fromLabel}</Text>
         <Text className="analysis-label">{t("ui.logs.chart-drag-hint")}</Text>

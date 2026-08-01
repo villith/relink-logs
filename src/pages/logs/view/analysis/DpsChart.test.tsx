@@ -49,6 +49,34 @@ describe("ChartTooltip", () => {
     expect(screen.getAllByText("AI")).toHaveLength(2);
   });
 
+  it("leaves out a series that contributed nothing to the bucket", () => {
+    // A stack of 17 bands is mostly zeroes at any one moment, and a tooltip
+    // listing every one of them buries the few that actually landed.
+    renderTooltip([
+      { dataKey: "0", name: "0", value: 1000, color: "#f00" },
+      { dataKey: "1", name: "1", value: 0, color: "#0f0" },
+    ]);
+
+    expect(screen.getByText("Rain")).toBeTruthy();
+    expect(screen.queryByText("Manmoth")).toBeNull();
+  });
+
+  it("drops the card entirely when nothing landed in the bucket", () => {
+    // Every series at zero — a box holding only a timestamp says nothing.
+    renderTooltip([
+      { dataKey: "0", name: "0", value: 0, color: "#f00" },
+      { dataKey: "1", name: "1", value: 0, color: "#0f0" },
+    ]);
+
+    expect(screen.queryByText("03:03")).toBeNull();
+  });
+
+  it("keeps a gauge reading of zero out too", () => {
+    // The SBA tab is a percentage: 0% is as uninformative as 0 damage.
+    renderTooltip([{ dataKey: "0", name: "0", value: 0, color: "#f00" }], LABELS);
+    expect(screen.queryByText("Rain")).toBeNull();
+  });
+
   it("labels a drill band by its group name", () => {
     const bands: Label = [
       { name: 'Group:reginleiv@"Pl2000"', label: "Reginleiv Recidiv", partySlotIndex: 0, color: "#f00" },
