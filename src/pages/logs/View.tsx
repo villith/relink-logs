@@ -1265,7 +1265,7 @@ export const ViewPage = () => {
                   size={20}
                   color="var(--mantine-color-yellow-6)"
                   style={{ marginLeft: "auto" }}
-                  aria-label={t("ui.logs.imported-badge")}
+                  aria-label={t("ui.imported-badge")}
                 />
               </Tooltip>
             )}

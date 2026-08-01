@@ -300,7 +300,7 @@ function LogEntry({
         <Group gap={6} wrap="nowrap" justify="flex-end">
           {log.imported && (
             <Tooltip label={t("ui.logs.imported-tooltip")} multiline w={280}>
-              <WarningCircle size={20} color="var(--mantine-color-yellow-6)" aria-label={t("ui.logs.imported-badge")} />
+              <WarningCircle size={20} color="var(--mantine-color-yellow-6)" aria-label={t("ui.imported-badge")} />
             </Tooltip>
           )}
           <Button size="xs" variant="default" component={Link} to={`/logs/${log.id}`} onClick={resetSelectedTargets}>
