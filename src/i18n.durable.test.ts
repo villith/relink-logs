@@ -5,11 +5,14 @@ const registered: Record<string, (value: string | null) => void> = {};
 
 vi.mock("@tauri-apps/api", () => ({ invoke: (cmd: string, args?: unknown) => invokeMock(cmd, args) }));
 vi.mock("@/stores/durableStorage", () => ({
-  durableStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+  durableStorage: {
+    getItem: () => null,
+    setItem: (key: string, value: string) => invokeMock("set_setting", { key, value }),
+    removeItem: () => {},
+  },
   registerDurableKey: (key: string, handler: (value: string | null) => void) => {
     registered[key] = handler;
   },
-  writeDurable: (key: string, value: string) => invokeMock("set_setting", { key, value }),
 }));
 
 const { mirrorLanguage, applyRemoteLanguage } = await import("./i18nDurable");

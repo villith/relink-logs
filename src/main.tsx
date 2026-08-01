@@ -27,10 +27,11 @@ const theme = createTheme({
 });
 
 // Reconcile settings.db with the localStorage cache before anything renders.
-// Every store module has already been evaluated by this point (ESM imports run
-// first), so each has registered its key and can be hydrated here — which is
-// why the stores use `skipHydration`. Awaiting before the first paint is what
-// keeps the transparent overlay from showing default columns for a frame.
+// Every store module evaluated by this point has registered its key and is
+// hydrated here — which is why the stores use `skipHydration`; one that
+// registers later (a code-split route) hydrates itself on registration.
+// Awaiting before the first paint is what keeps the transparent overlay from
+// showing default columns for a frame.
 await bootstrapDurableSettings();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

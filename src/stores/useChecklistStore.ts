@@ -1,7 +1,7 @@
 import { defaultChecklist, moveItem, type ChecklistEntry, type ChecklistGroupKind } from "@/utils";
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
-import { durableStorage, registerDurableKey } from "./durableStorage";
+import { persist } from "zustand/middleware";
+import { durablePersistOptions, registerDurableStore } from "./durableStorage";
 
 /** A checklist entry plus whether the user has it switched on. */
 export type ChecklistSetting = ChecklistEntry & { enabled: boolean };
@@ -196,11 +196,7 @@ export const useChecklistStore = create<ChecklistState>()(
     {
       name: "checklist-settings",
       version: 2,
-      storage: createJSONStorage(() => durableStorage),
-      // Hydration is driven by bootstrapDurableSettings(), which runs after
-      // settings.db has had its say. Hydrating at import time would load the
-      // cache copy and then get overwritten.
-      skipHydration: true,
+      ...durablePersistOptions<ChecklistState>(),
       migrate: (persisted, version) =>
         version >= 2
           ? (persisted as ChecklistState)
@@ -209,4 +205,4 @@ export const useChecklistStore = create<ChecklistState>()(
   )
 );
 
-registerDurableKey("checklist-settings", () => void useChecklistStore.persist.rehydrate());
+registerDurableStore(useChecklistStore);

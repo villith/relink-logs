@@ -33,7 +33,10 @@ describe("bootstrapDurableSettings", () => {
   });
 
   // How every existing user's data survives the release that ships this.
+  // Registration is what makes a key durable, so the key has to be registered
+  // for adoption to consider it at all.
   it("adopts a cache-only key into the backend", async () => {
+    registerDurableKey("transmarvel-wishlists", vi.fn());
     localStorage.setItem("transmarvel-wishlists", "user-data");
 
     await bootstrapDurableSettings();
@@ -49,6 +52,7 @@ describe("bootstrapDurableSettings", () => {
   // out from under it. Letting it race the first render leaves a window where
   // an update, a quick quit and a wipe lose the data for good.
   it("waits for the adoption writes before resolving", async () => {
+    registerDurableKey("synthesis-form", vi.fn());
     localStorage.setItem("synthesis-form", "user-data");
     let adopted = false;
     invokeMock.mockImplementation((cmd) => {
@@ -69,6 +73,7 @@ describe("bootstrapDurableSettings", () => {
   // Guards the choice of allSettled over all: one unwritable key must not stop
   // the app from starting, exactly as a failed fetch does not.
   it("still starts when an adoption write fails", async () => {
+    registerDurableKey("synthesis-form", vi.fn());
     localStorage.setItem("synthesis-form", "user-data");
     invokeMock.mockImplementation((cmd) =>
       cmd === "get_settings" ? Promise.resolve({}) : Promise.reject(new Error("disk full"))
@@ -78,6 +83,7 @@ describe("bootstrapDurableSettings", () => {
   });
 
   it("does not adopt a key the backend already has", async () => {
+    registerDurableKey("synthesis-form", vi.fn());
     localStorage.setItem("synthesis-form", "cached");
     invokeMock.mockImplementation((cmd) =>
       cmd === "get_settings" ? Promise.resolve({ "synthesis-form": "durable" }) : Promise.resolve()

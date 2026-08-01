@@ -1,12 +1,19 @@
-import { writeDurable } from "@/stores/durableStorage";
+import { durableStorage } from "@/stores/durableStorage";
 
 /** The key i18next's browser detector caches the chosen language under. */
 export const LANGUAGE_KEY = "i18nextLng";
 
-/** Push a language change to settings.db. i18next has already written the
- * localStorage half by the time this runs. */
+/** Push a language change to settings.db. Goes through the same adapter as
+ * every other durable key so the write rules are stated in one place —
+ * i18next's detector has already written this exact value to localStorage, so
+ * the cache half is a harmless no-op.
+ *
+ * Call this from the language picker only, never from i18next's
+ * `languageChanged` event: that event also fires for the language the detector
+ * guessed during `init()`, which races the bootstrap's restore and can persist
+ * a fallback over the user's stored choice. */
 export const mirrorLanguage = (language: string) => {
-  writeDurable(LANGUAGE_KEY, language);
+  durableStorage.setItem(LANGUAGE_KEY, language);
 };
 
 /** Apply a language that came from settings.db — either restored at startup

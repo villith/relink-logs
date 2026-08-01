@@ -7,9 +7,9 @@ import { invoke } from "@tauri-apps/api";
 import { readTextFile } from "@tauri-apps/api/fs";
 import { resolveResource } from "@tauri-apps/api/path";
 
-import { registerDurableKey } from "@/stores/durableStorage";
+import { insideTauri, registerDurableKey } from "@/stores/durableStorage";
 
-import { applyRemoteLanguage, LANGUAGE_KEY, mirrorLanguage } from "./i18nDurable";
+import { applyRemoteLanguage, LANGUAGE_KEY } from "./i18nDurable";
 
 const loadLanguageFromPath = async (language: string, namespace: string) => {
   const resourcePath = await resolveResource(`lang/${language}/${namespace}.json`);
@@ -31,7 +31,7 @@ export const SUPPORTED_LANGUAGES: { [key: string]: string } = {
 
 /** Pushes the localized system-tray menu strings to the backend. */
 export const syncTrayLabels = async () => {
-  if (!("__TAURI_IPC__" in window)) return;
+  if (!insideTauri()) return;
   try {
     await invoke("update_tray_labels", {
       openMeter: i18n.t("ui.tray-open-meter"),
@@ -94,10 +94,15 @@ i18n
   });
 
 i18n.on("initialized", () => void syncTrayLabels());
-i18n.on("languageChanged", (language: string) => {
-  void syncTrayLabels();
-  mirrorLanguage(language);
-});
+// Deliberately NOT the place the language is persisted from. i18next emits
+// `languageChanged` from `init()` too, carrying whatever its detector found —
+// and on the launch this whole feature exists to repair, the detector finds an
+// empty localStorage and falls back to the navigator language. Mirroring that
+// would race `bootstrapDurableSettings()` restoring the stored language and
+// could overwrite it with `en`. Persisting is the user action's job; see
+// `handleLanguageChange` in `pages/useSettings.ts`. A language that only ever
+// lived in the cache is picked up by the bootstrap's adoption pass instead.
+i18n.on("languageChanged", () => void syncTrayLabels());
 
 // The language is the one durable key the adapter does not own: i18next's
 // detector writes the localStorage half itself.

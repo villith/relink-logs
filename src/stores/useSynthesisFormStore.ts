@@ -1,9 +1,9 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
+import { persist } from "zustand/middleware";
 
 import type { SynthesisForm } from "@/pages/toolbox/useSynthesisHelper";
 
-import { durableStorage, registerDurableKey } from "./durableStorage";
+import { durablePersistOptions, registerDurableStore } from "./durableStorage";
 
 interface SynthesisFormState {
   /** The last Synthesis Helper form, restored on startup; sanitized on read
@@ -21,13 +21,9 @@ export const useSynthesisFormStore = create<SynthesisFormState>()(
     {
       name: "synthesis-form",
       version: 1,
-      storage: createJSONStorage(() => durableStorage),
-      // Hydration is driven by bootstrapDurableSettings(), which runs after
-      // settings.db has had its say. Hydrating at import time would load the
-      // cache copy and then get overwritten.
-      skipHydration: true,
+      ...durablePersistOptions<SynthesisFormState>(),
     }
   )
 );
 
-registerDurableKey("synthesis-form", () => void useSynthesisFormStore.persist.rehydrate());
+registerDurableStore(useSynthesisFormStore);

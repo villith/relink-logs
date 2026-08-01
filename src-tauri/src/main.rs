@@ -513,41 +513,47 @@ struct SettingsChanged {
     origin: String,
 }
 
+const SETTINGS_CHANGED_EVENT: &str = "settings-changed";
+
+/// Tell the *other* windows a setting changed.
+///
+/// Only ever called for a write that changed something. A window that hears a
+/// change rehydrates, and zustand's rehydrate writes back through the same
+/// adapter, so announcing a write that changed nothing is what would let two
+/// windows echo each other without end. The originating window is filtered out
+/// because it already has the value; the frontend drops its own `origin` too,
+/// as defence in depth.
+fn announce(window: &tauri::Window, key: String, value: Option<String>) {
+    let origin = window.label().to_string();
+    let payload = SettingsChanged {
+        key,
+        value,
+        origin: origin.clone(),
+    };
+
+    let _ = window
+        .app_handle()
+        .emit_filter(SETTINGS_CHANGED_EVENT, payload, |w| w.label() != origin);
+}
+
 #[tauri::command]
 fn get_settings() -> Result<std::collections::HashMap<String, String>, String> {
-    let conn = settings_db::open().map_err(|e| e.to_string())?;
-    settings_db::get_all(&conn).map_err(|e| e.to_string())
+    settings_db::read_all().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 fn set_setting(window: tauri::Window, key: String, value: String) -> Result<(), String> {
-    let conn = settings_db::open().map_err(|e| e.to_string())?;
-    settings_db::set(&conn, &key, &value).map_err(|e| e.to_string())?;
-
-    let _ = window.app_handle().emit_all(
-        "settings-changed",
-        SettingsChanged {
-            key,
-            value: Some(value),
-            origin: window.label().to_string(),
-        },
-    );
+    if settings_db::write(&key, &value).map_err(|e| e.to_string())? {
+        announce(&window, key, Some(value));
+    }
     Ok(())
 }
 
 #[tauri::command]
 fn delete_setting(window: tauri::Window, key: String) -> Result<(), String> {
-    let conn = settings_db::open().map_err(|e| e.to_string())?;
-    settings_db::delete(&conn, &key).map_err(|e| e.to_string())?;
-
-    let _ = window.app_handle().emit_all(
-        "settings-changed",
-        SettingsChanged {
-            key,
-            value: None,
-            origin: window.label().to_string(),
-        },
-    );
+    if settings_db::remove(&key).map_err(|e| e.to_string())? {
+        announce(&window, key, None);
+    }
     Ok(())
 }
 
