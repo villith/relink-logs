@@ -35,6 +35,42 @@ pub fn is_excluded(event: &DamageEvent, filters: &MeterFilters) -> bool {
     !filters.include_primal_burst && is_primal_burst(event)
 }
 
+/// Which events the *selector bar* keeps, as opposed to [`MeterFilters`] which
+/// decides what counts at all.
+///
+/// Empty means "All" for that dimension. The fields are ANDed: an event must
+/// satisfy every non-empty dimension. Kept separate from `MeterFilters` because
+/// these are a view concern the user changes constantly, while those are a
+/// settings concern that changes what a total *means*.
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct SelectionFilter {
+    /// Player actor-type hashes to keep (empty = all).
+    pub source_actor_types: Vec<u32>,
+    /// Actions to keep (empty = all).
+    pub abilities: Vec<ActionType>,
+}
+
+/// True when `event` survives the current selector pins.
+///
+/// Source matches on `parent_actor_type`, not `actor_type`: a summon's hit
+/// belongs to the player who called it, and pinning that player must keep it.
+pub fn matches_selection(event: &DamageEvent, selection: &SelectionFilter) -> bool {
+    if !selection.source_actor_types.is_empty()
+        && !selection
+            .source_actor_types
+            .contains(&event.source.parent_actor_type)
+    {
+        return false;
+    }
+
+    if !selection.abilities.is_empty() && !selection.abilities.contains(&event.action_id) {
+        return false;
+    }
+
+    true
+}
+
 /// True for a hit dealt by one of the three Primal Burst body classes.
 ///
 /// Matches on the SOURCE body (`source.actor_type`), not the summoner
