@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 
 import type { SigilEntry, WrightstoneEntry } from "@/pages/toolbox/useTransmarvelSearcher";
 
-import { withStorageDOMEvents } from "./useMeterSettingsStore";
+import { durablePersistOptions, registerDurableStore } from "./durableStorage";
 
 interface TransmarvelWishlistState {
   /** Sigil wishlist: (sigil trait1, optional 2nd trait) pairs; deduped by
@@ -33,8 +33,12 @@ export const useTransmarvelWishlistStore = create<TransmarvelWishlistState>()(
       setStones: (stones) => set({ stones }),
       setRolls: (rolls) => set({ rolls }),
     }),
-    { name: "transmarvel-wishlists", version: 1 }
+    {
+      name: "transmarvel-wishlists",
+      version: 1,
+      ...durablePersistOptions<TransmarvelWishlistState>(),
+    }
   )
 );
 
-withStorageDOMEvents(useTransmarvelWishlistStore);
+registerDurableStore(useTransmarvelWishlistStore);

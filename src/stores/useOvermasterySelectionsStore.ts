@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 
 import type { SavedSelection } from "@/pages/toolbox/useOvermasteryPredictor";
 
-import { withStorageDOMEvents } from "./useMeterSettingsStore";
+import { durablePersistOptions, registerDurableStore } from "./durableStorage";
 
 interface OvermasterySelectionsState {
   /** Wanted-overmastery form selections per character id hash (8-hex). */
@@ -24,8 +24,12 @@ export const useOvermasterySelectionsStore = create<OvermasterySelectionsState>(
       save: (character, selection) =>
         set((state) => ({ selections: { ...state.selections, [character]: selection }, lastCharacter: character })),
     }),
-    { name: "overmastery-selections", version: 1 }
+    {
+      name: "overmastery-selections",
+      version: 1,
+      ...durablePersistOptions<OvermasterySelectionsState>(),
+    }
   )
 );
 
-withStorageDOMEvents(useOvermasterySelectionsStore);
+registerDurableStore(useOvermasterySelectionsStore);

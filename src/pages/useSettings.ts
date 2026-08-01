@@ -1,5 +1,6 @@
 import { SUPPORTED_LANGUAGES } from "@/i18n";
-import { broadcastLanguage, useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
+import { mirrorLanguage } from "@/i18nDurable";
+import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { useTranslation } from "react-i18next";
 
 /** The language picker's options. A module constant: `SUPPORTED_LANGUAGES` never
@@ -25,10 +26,15 @@ export default function useSettings() {
 
   const { i18n } = useTranslation();
 
+  // The user picking a language is the only thing that may persist one. Doing
+  // it from i18next's `languageChanged` event instead would also fire for the
+  // language its detector guessed during `init()`, which on a launch with a
+  // wiped localStorage is a fallback that must not overwrite what settings.db
+  // holds. Persisting reaches the overlay too, via the backend's change event.
   const handleLanguageChange = (language: string | null) => {
     if (!language) return;
     i18n.changeLanguage(language);
-    broadcastLanguage(language);
+    mirrorLanguage(language);
   };
 
   return {

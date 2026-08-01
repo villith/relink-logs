@@ -3,7 +3,7 @@ import { persist } from "zustand/middleware";
 
 import type { SynthesisForm } from "@/pages/toolbox/useSynthesisHelper";
 
-import { withStorageDOMEvents } from "./useMeterSettingsStore";
+import { durablePersistOptions, registerDurableStore } from "./durableStorage";
 
 interface SynthesisFormState {
   /** The last Synthesis Helper form, restored on startup; sanitized on read
@@ -18,8 +18,12 @@ export const useSynthesisFormStore = create<SynthesisFormState>()(
       saved: null,
       save: (form) => set({ saved: form }),
     }),
-    { name: "synthesis-form", version: 1 }
+    {
+      name: "synthesis-form",
+      version: 1,
+      ...durablePersistOptions<SynthesisFormState>(),
+    }
   )
 );
 
-withStorageDOMEvents(useSynthesisFormStore);
+registerDurableStore(useSynthesisFormStore);

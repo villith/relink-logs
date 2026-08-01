@@ -10,14 +10,14 @@ use std::{
 
 use anyhow::Context;
 use gbfr_logs::toolbox_rpc::{self, HookStatus};
-use gbfr_logs::{db, legality, overmastery, parser, synthesis, transmarvel};
+use gbfr_logs::{db, legality, overmastery, parser, settings_db, synthesis, transmarvel};
 
 use db::logs::LogEntry;
 #[cfg(windows)]
 use dll_syringe::{process::OwnedProcess, Syringe};
 #[cfg(windows)]
 use interprocess::os::windows::named_pipe::tokio::RecvPipeStream;
-use log::{info, LevelFilter};
+use log::{error, info, LevelFilter};
 use parser::{
     constants::{CharacterType, EnemyType},
     v1::{self, PlayerData},
@@ -500,6 +500,61 @@ fn set_full_assist_unlock(enabled: bool) -> Result<(), String> {
     let contents = serde_json::json!({ "unlock_full_assist_infinity": enabled });
 
     std::fs::write(&path, contents.to_string()).map_err(|e| e.to_string())
+}
+
+/// Broadcast on every settings write so the other window can catch up.
+/// `value` is `None` for a deletion. `origin` is filled in from the calling
+/// window, never from the frontend, so a window cannot misreport it and
+/// swallow its own real changes.
+#[derive(Clone, serde::Serialize)]
+struct SettingsChanged {
+    key: String,
+    value: Option<String>,
+    origin: String,
+}
+
+const SETTINGS_CHANGED_EVENT: &str = "settings-changed";
+
+/// Tell the *other* windows a setting changed.
+///
+/// Only ever called for a write that changed something. A window that hears a
+/// change rehydrates, and zustand's rehydrate writes back through the same
+/// adapter, so announcing a write that changed nothing is what would let two
+/// windows echo each other without end. The originating window is filtered out
+/// because it already has the value; the frontend drops its own `origin` too,
+/// as defence in depth.
+fn announce(window: &tauri::Window, key: String, value: Option<String>) {
+    let origin = window.label().to_string();
+    let payload = SettingsChanged {
+        key,
+        value,
+        origin: origin.clone(),
+    };
+
+    let _ = window
+        .app_handle()
+        .emit_filter(SETTINGS_CHANGED_EVENT, payload, |w| w.label() != origin);
+}
+
+#[tauri::command]
+fn get_settings() -> Result<std::collections::HashMap<String, String>, String> {
+    settings_db::read_all().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_setting(window: tauri::Window, key: String, value: String) -> Result<(), String> {
+    if settings_db::write(&key, &value).map_err(|e| e.to_string())? {
+        announce(&window, key, Some(value));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_setting(window: tauri::Window, key: String) -> Result<(), String> {
+    if settings_db::remove(&key).map_err(|e| e.to_string())? {
+        announce(&window, key, None);
+    }
+    Ok(())
 }
 
 #[cfg(target_os = "linux")]
@@ -2236,6 +2291,13 @@ fn main() {
     // Setup the database.
     db::setup_db().expect("Failed to setup database");
 
+    // Deliberately not fatal, unlike logs.db: settings are not load-bearing for
+    // parsing damage, so a corrupt or unwritable settings.db degrades to
+    // localStorage-only behaviour instead of stopping the app from starting.
+    if let Err(e) = settings_db::setup() {
+        error!("Failed to set up settings.db, settings will not persist: {e}");
+    }
+
     info!("Database setup complete, launching application..");
 
     tauri::Builder::default()
@@ -2304,6 +2366,9 @@ fn main() {
             debug_clear_hello_override,
             debug_broadcast_scenario,
             update_tray_labels,
+            get_settings,
+            set_setting,
+            delete_setting,
         ])
         .setup(|app| {
             // Before anything waits on a game: if antivirus took the hook DLL,

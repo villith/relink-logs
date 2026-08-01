@@ -1,6 +1,7 @@
 import { LogicalSize, appWindow } from "@tauri-apps/api/window";
 import { useEffect, useRef } from "react";
 
+import { insideTauri, withOverlayWrite } from "@/stores/durableStorage";
 import { OVERLAY_MIN_SIZE, useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 
 /** Differences this small are rounding between the window's logical size and
@@ -23,8 +24,6 @@ const isBelowMinimum = (width: number, height: number) =>
 /** How long after we resize the window a `resize` event is still assumed to be
  * our own doing rather than the user's. */
 const SELF_RESIZE_QUIET_MS = 500;
-
-const insideTauri = () => "__TAURI_IPC__" in window;
 
 /**
  * Keeps the overlay window and the stored overlay size the same thing, both ways.
@@ -78,7 +77,10 @@ export const useOverlaySize = () => {
         if (Math.abs(width - overlay_width) <= SIZE_EPSILON && Math.abs(height - overlay_height) <= SIZE_EPSILON) {
           return;
         }
-        set({ overlay_width: width, overlay_height: height });
+        // The overlay is otherwise a read-only consumer of settings.db — the
+        // logs window owns every setting the user can edit. Its dragged size is
+        // the exception, because this is the only window that can observe it.
+        withOverlayWrite(() => set({ overlay_width: width, overlay_height: height }));
       }, 250);
     };
 

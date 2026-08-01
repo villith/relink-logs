@@ -10,6 +10,9 @@ import "./styles.css";
 import "@/assets/skill-name-sources";
 
 import { ModalsProvider } from "@mantine/modals";
+
+import { bootstrapDurableSettings } from "@/stores/durableStorage";
+
 import { App } from "./App";
 
 const theme = createTheme({
@@ -22,6 +25,14 @@ const theme = createTheme({
     xl: "18",
   },
 });
+
+// Reconcile settings.db with the localStorage cache before anything renders.
+// Every store module evaluated by this point has registered its key and is
+// hydrated here — which is why the stores use `skipHydration`; one that
+// registers later (a code-split route) hydrates itself on registration.
+// Awaiting before the first paint is what keeps the transparent overlay from
+// showing default columns for a frame.
+await bootstrapDurableSettings();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <MantineProvider theme={theme} defaultColorScheme="dark">
