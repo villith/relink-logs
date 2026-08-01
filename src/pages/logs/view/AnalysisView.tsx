@@ -102,7 +102,10 @@ export const AnalysisView = () => {
   const [metricKey, setMetricKey] = useState<string>("damage");
   const [hiddenHpSeries, setHiddenHpSeries] = useState<Set<string>>(new Set());
   // Committed window as [start, end] second indexes; null = the full fight.
+  // `pendingRange` tracks the drag in progress — only the shade follows it, so
+  // no fetch happens until the pointer is released.
   const [range, setRange] = useState<[number, number] | null>(null);
+  const [pendingRange, setPendingRange] = useState<[number, number] | null>(null);
   // Meter state + facts re-derived under the current pins and window. Null
   // means "nothing pinned and no window", i.e. the base load already says it.
   const [scoped, setScoped] = useState<{ state: EncounterState; facts: SelectionFact[] } | null>(null);
@@ -342,6 +345,24 @@ export const AnalysisView = () => {
     setHiddenHpSeries(new Set(hpSeries.filter((series) => series.defaultHidden).map((series) => series.name)));
   }, [hpSeries]);
 
+  // Dragging the plot IS the scrub gesture here — there is no RangeSlider. An
+  // uncommitted call only moves the shade (cheap, client-side); the commit is
+  // what refetches. A drag spanning the whole plot clears back to the full
+  // fight rather than refetching an identical window.
+  const handleDragRange = useCallback(
+    (next: [number, number] | null, committed: boolean) => {
+      setPendingRange(next);
+      if (!committed) return;
+      setPendingRange(null);
+      if (next === null || (next[0] <= 0 && next[1] >= chartLen - 1)) {
+        setRange(null);
+        return;
+      }
+      setRange(next);
+    },
+    [chartLen]
+  );
+
   const toggleHpSeries = useCallback((name: string) => {
     setHiddenHpSeries((previous) => {
       const next = new Set(previous);
@@ -353,7 +374,10 @@ export const AnalysisView = () => {
 
   if (!shownEncounter) return null;
 
-  const windowLabel = range === null ? null : `${bucketLabel(range[0])} – ${bucketLabel(range[1])}`;
+  // The readout follows the drag live, so the window is named while it is being
+  // chosen rather than only once it commits.
+  const shownRange = pendingRange ?? range;
+  const windowLabel = shownRange === null ? null : `${bucketLabel(shownRange[0])} – ${bucketLabel(shownRange[1])}`;
   const [total, totalSuffix] = humanizeNumbers(shownEncounter.totalDamage);
 
   return (
@@ -401,6 +425,7 @@ export const AnalysisView = () => {
         hiddenHpSeries={hiddenHpSeries}
         onToggleHpSeries={toggleHpSeries}
         labels={labels}
+        onDragRange={handleDragRange}
       />
     </Stack>
   );
