@@ -73,6 +73,35 @@ describe("cardSectionsFor", () => {
     expect(sections?.[0].entries.map((e) => e.value)).toEqual([200, 100]);
   });
 
+  it("sums skills that share an ability key into one row", () => {
+    // The parser can emit more than one SkillState per action id, so mapping
+    // 1:1 draws the same ability twice with its damage split between the rows
+    // — and hands React two children with the same key. Measured live on log
+    // 544: "Link Attack" and "Light Blast" both appeared twice.
+    const players = [
+      {
+        index: 0,
+        partyIndex: 0,
+        characterType: "Pl1400",
+        totalDamage: 300,
+        skillBreakdown: [skill(100, 200, 20), skill(100, 50, 5), skill(200, 50, 5)],
+      },
+    ] as unknown as ComputedPlayerState[];
+
+    const sections = cardSectionsFor({
+      row: row("player:0"),
+      level: "players",
+      players,
+      pins: { source: 0, targetIds: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: LABELS,
+    });
+
+    const abilities = sections?.[0].entries ?? [];
+    expect(abilities.map((e) => e.key)).toEqual(["Normal:100", "Normal:200"]);
+    expect(abilities.map((e) => e.value)).toEqual([250, 50]);
+  });
+
   it("merges a player's targets across every ability, biggest first", () => {
     // Em0003 takes 0.8 of both skills: 160 + 80. The unknown takes 0.2: 40 + 20.
     const sections = call("players", "player:0");

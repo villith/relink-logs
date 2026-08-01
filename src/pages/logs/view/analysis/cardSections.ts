@@ -36,6 +36,24 @@ export const aggregateTargets = (skills: SkillState[], enemyLabel: (type: EnemyT
   return [...byType.values()].sort((a, b) => b.value - a.value);
 };
 
+/** Per-ability totals, summed across every skill sharing an action id.
+ *
+ * The parser can emit more than one `SkillState` for one action — a generic id
+ * reused across contexts, for instance — so mapping `skillBreakdown` 1:1 draws
+ * the same ability twice with its damage split between the rows, and hands
+ * React two children with the same key. Measured on log 544: "Link Attack" and
+ * "Light Blast" each appeared twice. Same shape as `aggregateTargets`. */
+export const aggregateAbilities = (skills: SkillState[], abilityLabel: (key: string) => string) => {
+  const byKey = new Map<string, { key: string; label: string; value: number }>();
+  for (const skill of skills) {
+    const key = abilityKey(skill.actionType);
+    const found = byKey.get(key);
+    if (found) found.value += skill.totalDamage;
+    else byKey.set(key, { key, label: abilityLabel(key), value: skill.totalDamage });
+  }
+  return [...byKey.values()].sort((a, b) => b.value - a.value);
+};
+
 const TARGET_COLOR = "var(--mantine-color-red-6)";
 
 /** The hover card's sections for one row, or null when the row has nothing to
@@ -70,13 +88,7 @@ export const cardSectionsFor = ({
       {
         headingKey: "ui.logs.hover-by-ability",
         color,
-        entries: [...player.skillBreakdown]
-          .sort((a, b) => b.totalDamage - a.totalDamage)
-          .map((skill) => ({
-            key: abilityKey(skill.actionType),
-            label: labels.ability(abilityKey(skill.actionType)),
-            value: skill.totalDamage,
-          })),
+        entries: aggregateAbilities(player.skillBreakdown, labels.ability),
       },
       {
         headingKey: "ui.logs.hover-by-target",
