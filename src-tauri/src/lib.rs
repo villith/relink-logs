@@ -20,6 +20,7 @@ pub mod linux_support;
 pub mod overmastery;
 pub mod parser;
 pub mod rpc;
+pub mod settings_db;
 pub mod synthesis;
 pub mod toolbox_rpc;
 pub mod transmarvel;
