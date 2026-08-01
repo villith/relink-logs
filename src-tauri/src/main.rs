@@ -557,6 +557,97 @@ fn delete_setting(window: tauri::Window, key: String) -> Result<(), String> {
     Ok(())
 }
 
+/// The dialog every settings/logs database import and export starts from.
+fn db_file_dialog(title: &str) -> tauri::api::dialog::blocking::FileDialogBuilder {
+    tauri::api::dialog::blocking::FileDialogBuilder::new()
+        .set_title(title)
+        .add_filter("SQLite database", &["db"])
+}
+
+/// One save dialog for a whole-database export: pick a path, clear any
+/// existing file (`VACUUM INTO` refuses to overwrite, and the dialog already
+/// asked), then run `export`. `None` when the dialog is cancelled.
+fn export_db_via_dialog(
+    file_name: &str,
+    export: impl FnOnce(&std::path::Path) -> Result<(), String>,
+) -> Result<Option<String>, String> {
+    let Some(path) = db_file_dialog(&format!("Export {file_name}"))
+        .set_file_name(file_name)
+        .save_file()
+    else {
+        return Ok(None);
+    };
+
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+
+    export(&path)?;
+    Ok(Some(path.to_string_lossy().into_owned()))
+}
+
+/// Save a copy of the settings store wherever the user picks. `None` when the
+/// save dialog is cancelled.
+#[tauri::command]
+async fn export_settings_db() -> Result<Option<String>, String> {
+    export_db_via_dialog("settings.db", |path| {
+        settings_db::export_to(path).map_err(|e| e.to_string())
+    })
+}
+
+/// Native file picker for a settings database to import. `None` means the
+/// user cancelled. Async so the blocking dialog runs off the main thread.
+#[tauri::command]
+async fn pick_settings_db_file() -> Option<String> {
+    db_file_dialog("Select the settings.db to import")
+        .pick_file()
+        .map(|path| path.to_string_lossy().into_owned())
+}
+
+/// Overwrite our settings with the rows of the settings database at `path`
+/// (from [`pick_settings_db_file`]). Returns how many settings actually
+/// changed.
+///
+/// Each changed key is announced on the normal settings-changed channel with a
+/// non-window `origin`, so EVERY window — including the one that invoked this —
+/// applies the imported values live.
+#[tauri::command]
+async fn import_settings_from_file(app: tauri::AppHandle, path: String) -> Result<u32, String> {
+    let changed =
+        settings_db::import_from(std::path::Path::new(&path)).map_err(|e| e.to_string())?;
+    let count = changed.len() as u32;
+    for (key, value) in changed {
+        let _ = app.emit_all(
+            SETTINGS_CHANGED_EVENT,
+            SettingsChanged {
+                key,
+                value: Some(value),
+                origin: "settings-import".into(),
+            },
+        );
+    }
+    Ok(count)
+}
+
+/// Emitted after every stored setting has been deleted. Windows respond by
+/// dropping the listed keys from their caches and reloading — a reload rather
+/// than a rehydrate, because rehydrating a store from a missing key leaves its
+/// in-memory state as it was; only a fresh boot lands on the defaults.
+#[derive(Clone, Serialize)]
+struct SettingsReset {
+    keys: Vec<String>,
+}
+
+const SETTINGS_RESET_EVENT: &str = "settings-reset";
+
+/// Delete every stored setting and tell all windows to reload on defaults.
+#[tauri::command]
+async fn reset_settings_to_default(app: tauri::AppHandle) -> Result<(), String> {
+    let keys = settings_db::reset_all().map_err(|e| e.to_string())?;
+    let _ = app.emit_all(SETTINGS_RESET_EVENT, SettingsReset { keys });
+    Ok(())
+}
+
 #[cfg(target_os = "linux")]
 mod linux_setup {
     use serde::Serialize;
@@ -663,11 +754,157 @@ fn remove_linux_hook() -> Result<(), String> {
     Err("linux-only".into())
 }
 
+/// Native file picker for another installation's logs.db. `None` means the
+/// user cancelled. Async so the blocking dialog runs off the main thread.
+#[tauri::command]
+async fn pick_logs_db_file() -> Option<String> {
+    let dialog = db_file_dialog("Select the logs.db to import");
+
+    // Start in the install this importer exists for when it's present,
+    // otherwise fall back to Program Files, where installs live.
+    #[cfg(windows)]
+    let dialog = {
+        let program_files = std::env::var_os("ProgramFiles").map(std::path::PathBuf::from);
+        let start = program_files
+            .as_ref()
+            .map(|dir| dir.join("GBFR Logs Awa Edition"))
+            .filter(|dir| dir.exists())
+            .or_else(|| program_files.filter(|dir| dir.exists()));
+        match start {
+            Some(dir) => dialog.set_directory(dir),
+            None => dialog,
+        }
+    };
+
+    dialog
+        .pick_file()
+        .map(|path| path.to_string_lossy().into_owned())
+}
+
+/// Payload of the `import-progress` event both [`analyze_logs_db`] and
+/// [`import_logs_from_file`] emit while working through a source logs.db.
+#[derive(Clone, Serialize)]
+struct ImportProgressPayload {
+    processed: u32,
+    total: u32,
+}
+
+/// A progress callback that emits `import-progress` to `window`, throttled to
+/// 0.1% steps so a large source doesn't flood the webview with events. Both
+/// passes report `(rows examined, total rows)`, so one emitter serves both.
+fn import_progress_emitter(window: tauri::Window) -> impl FnMut(u32, u32) {
+    let mut last_emitted: Option<u32> = None;
+    move |processed, total| {
+        let step = (total / 1000).max(1);
+        let due = match last_emitted {
+            None => true,
+            Some(last) => processed >= last + step || processed == total,
+        };
+        if due {
+            last_emitted = Some(processed);
+            let _ = window.emit(
+                "import-progress",
+                ImportProgressPayload { processed, total },
+            );
+        }
+    }
+}
+
+/// Dry-run a logs.db import: what would come across, and what data those logs
+/// actually carry. Decoding every blob is real CPU time, so it runs on a
+/// blocking thread rather than tying up an async-runtime worker the other
+/// commands and event emission share; progress goes to the invoking window as
+/// `import-progress` events.
+#[tauri::command]
+async fn analyze_logs_db(
+    window: tauri::Window,
+    path: String,
+) -> Result<db::import::ImportAnalysis, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+        db::import::analyze_logs_db_file(
+            &conn,
+            std::path::Path::new(&path),
+            import_progress_emitter(window),
+        )
+        .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Merge the logs.db at `path` (from [`pick_logs_db_file`]) into ours, on a
+/// blocking thread for the same reason as [`analyze_logs_db`]. Progress goes
+/// to the invoking window as `import-progress` events.
+#[tauri::command]
+async fn import_logs_from_file(
+    app: tauri::AppHandle,
+    window: tauri::Window,
+    path: String,
+) -> Result<db::import::ImportSummary, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+        let summary = db::import::import_logs_from_file(
+            &conn,
+            std::path::Path::new(&path),
+            import_progress_emitter(window),
+        )
+        .map_err(|e| e.to_string())?;
+
+        // Imported rows arrive unstamped; judge them now rather than making the
+        // cheat audit wait for the next launch. Same background sweep as startup,
+        // so the audit page's progress banner covers this pass too.
+        if summary.imported > 0 {
+            std::thread::spawn(move || sweep_stale_legality(&app));
+        }
+
+        Ok(summary)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// How many logs arrived via the importer — what [`delete_imported_logs`]
+/// would delete, so the confirmation dialog can say so.
+#[tauri::command]
+async fn count_imported_logs() -> Result<u32, String> {
+    let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+    conn.query_row("SELECT COUNT(*) FROM logs WHERE imported = 1", [], |r| {
+        r.get(0)
+    })
+    .map_err(|e| e.to_string())
+}
+
+/// Delete every log that arrived via the importer, returning how many went.
+/// Logs recorded by this installation are untouched.
+#[tauri::command]
+async fn delete_imported_logs() -> Result<u32, String> {
+    let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+    let deleted = conn
+        .execute("DELETE FROM logs WHERE imported = 1", [])
+        .map_err(|e| e.to_string())?;
+    // Verdicts go with their logs — see delete_logs.
+    db::legality::sweep_orphaned_findings(&conn).map_err(|e| e.to_string())?;
+    Ok(deleted as u32)
+}
+
+/// Save a copy of the whole log store wherever the user picks. `None` when
+/// the save dialog is cancelled.
+#[tauri::command]
+async fn export_logs_db() -> Result<Option<String>, String> {
+    export_db_via_dialog("logs.db", |path| {
+        let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+        db::export_to(&conn, path).map_err(|e| e.to_string())
+    })
+}
+
 #[tauri::command]
 async fn delete_all_logs() -> Result<(), String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM logs", [])
         .map_err(|e| e.to_string())?;
+    // Verdicts go with their logs — see delete_logs.
+    db::legality::sweep_orphaned_findings(&conn).map_err(|e| e.to_string())?;
     // Deleting every log leaves every Conflux run roomless — drop them too so the
     // Conflux tab doesn't keep showing ghost "×0 rooms" runs.
     conn.execute("DELETE FROM runs", [])
@@ -1018,6 +1255,9 @@ struct EncounterStateResponse {
     /// 0-based room index when this log is a Conflux room, else None. Lets the
     /// detail view suppress quest-status/elapsed-time (meaningless for a room).
     room_index: Option<u32>,
+    /// Copied in from another installation's logs.db, so it may lack data the
+    /// source app never recorded — the detail view marks it.
+    imported: bool,
     /// Stored build-legality findings, one vector per party slot so it lines up
     /// with `players` by index. Read from the table rather than recomputed:
     /// the startup sweep keeps them current, and opening a log must not pay
@@ -1074,11 +1314,13 @@ struct ParseOptions {
 fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStateResponse, String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
     let mut stmt = conn
-        .prepare("SELECT data, version, room_index FROM logs WHERE id = ?")
+        .prepare("SELECT data, version, room_index, imported FROM logs WHERE id = ?")
         .map_err(|e| e.to_string())?;
 
-    let (blob, version, room_index): (Vec<u8>, u8, Option<u32>) = stmt
-        .query_row([id], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+    let (blob, version, room_index, imported): (Vec<u8>, u8, Option<u32>, bool) = stmt
+        .query_row([id], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
         .map_err(|e| e.to_string())?;
 
     // Regrouped from the flat stored rows into one vector per party slot, so
@@ -1115,6 +1357,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             quest_timer: parser.encounter.quest_timer,
             quest_completed: parser.encounter.quest_completed,
             room_index,
+            imported,
             legality: findings,
             ..Default::default()
         });
@@ -1191,6 +1434,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         quest_timer: parser.encounter.quest_timer,
         quest_completed: parser.encounter.quest_completed,
         room_index,
+        imported,
         legality: findings,
         dps_chart: player_dps,
         hp_chart,
@@ -1227,6 +1471,10 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
             .execute(params_from_iter(ids))
             .map_err(|e| e.to_string())?;
     }
+
+    // Verdicts go with their logs: an orphaned finding would attach itself to
+    // whatever future encounter lands on the recycled rowid.
+    db::legality::sweep_orphaned_findings(&conn).map_err(|e| e.to_string())?;
 
     // A deleted log may have been a Conflux room; reap any run left with no rooms so it
     // doesn't linger as a ghost "×0 rooms" row (the startup sweep only reaps in-progress
@@ -2337,6 +2585,12 @@ fn main() {
             fetch_legality_players,
             delete_logs,
             delete_all_logs,
+            pick_logs_db_file,
+            analyze_logs_db,
+            import_logs_from_file,
+            count_imported_logs,
+            delete_imported_logs,
+            export_logs_db,
             toggle_always_on_top,
             toggle_clickthrough,
             reset_meter_window,
@@ -2369,6 +2623,10 @@ fn main() {
             get_settings,
             set_setting,
             delete_setting,
+            export_settings_db,
+            pick_settings_db_file,
+            import_settings_from_file,
+            reset_settings_to_default,
         ])
         .setup(|app| {
             // Before anything waits on a game: if antivirus took the hook DLL,

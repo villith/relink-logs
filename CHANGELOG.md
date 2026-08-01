@@ -5,6 +5,18 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.7
+
+### Features
+
+- Added Import/Export functionality
+  - You can now import/export log data from/to other compatible GBFR forks
+  - You can now import/export user settings from Relink Logs
+
+### Bug Fixes
+
+- Fixed an issue where using the "Copy Screenshot to Clipboard" feature on the overlay resulted in a screenshot that had bars with no background colors
+
 ## 1.12.6
 
 ### Bug Fixes

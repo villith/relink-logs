@@ -14,9 +14,10 @@
 //! (tauri-apps/tauri#10981), and users lost their toolbox data across updates.
 
 use std::collections::HashMap;
+use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use rusqlite::Connection;
 use rusqlite_migration::{Migrations, M};
 
@@ -107,6 +108,67 @@ pub fn write(key: &str, value: &str) -> Result<bool> {
 /// Remove one key, reporting whether it existed. See [`delete`].
 pub fn remove(key: &str) -> Result<bool> {
     with_conn(|conn| delete(conn, key))
+}
+
+/// Copy the whole store to `path`. `VACUUM INTO` rather than a file copy for
+/// the same reason `export_logs_db` uses it: the database runs in WAL mode, so
+/// copying the file alone would miss writes still sitting in the -wal sidecar.
+pub fn export_to(path: &Path) -> Result<()> {
+    with_conn(|conn| {
+        conn.execute("VACUUM INTO ?", [path.to_string_lossy().as_ref()])?;
+        Ok(())
+    })
+}
+
+/// Every row of a *source* settings database, after checking it is one.
+fn read_source_settings(source: &Connection) -> Result<Vec<(String, String)>> {
+    let columns: Vec<String> = source
+        .prepare("SELECT name FROM pragma_table_info('settings')")?
+        .query_map([], |row| row.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    for required in ["key", "value"] {
+        if !columns.iter().any(|c| c == required) {
+            bail!("not a settings database: no `settings.{required}` column");
+        }
+    }
+
+    let mut stmt = source.prepare("SELECT key, value FROM settings")?;
+    let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    Ok(rows.collect::<rusqlite::Result<_>>()?)
+}
+
+/// Overwrite our settings with every row of the settings database at `path`
+/// (an export, or another installation's settings.db). Keys the source lacks
+/// are kept. Returns the pairs whose stored value actually changed, so the
+/// caller can announce exactly those to the windows.
+///
+/// The source open (read-only first, retried writable so SQLite can recover a
+/// WAL sidecar) is the logs importer's `with_source`.
+pub fn import_from(path: &Path) -> Result<Vec<(String, String)>> {
+    let rows = crate::db::import::with_source(path, read_source_settings)?;
+
+    with_conn(|conn| {
+        let mut changed = Vec::new();
+        for (key, value) in rows {
+            if set(conn, &key, &value)? {
+                changed.push((key, value));
+            }
+        }
+        Ok(changed)
+    })
+}
+
+/// Delete every stored setting, returning the keys that were removed so the
+/// caller can tell the windows which caches to drop.
+pub fn reset_all() -> Result<Vec<String>> {
+    with_conn(|conn| {
+        let keys: Vec<String> = conn
+            .prepare("SELECT key FROM settings")?
+            .query_map([], |row| row.get(0))?
+            .collect::<rusqlite::Result<_>>()?;
+        conn.execute("DELETE FROM settings", [])?;
+        Ok(keys)
+    })
 }
 
 /// Every stored setting. One round trip, because the frontend wants the whole
@@ -227,6 +289,35 @@ mod tests {
         assert!(delete(&conn, "a").expect("delete a"));
         assert!(!delete(&conn, "a").expect("delete a again"));
         assert!(!delete(&conn, "never-existed").expect("delete absent"));
+    }
+
+    /// A picked file that is not a settings database reports an error instead
+    /// of silently importing nothing.
+    #[test]
+    fn a_database_without_a_settings_table_is_rejected() {
+        let conn = Connection::open_in_memory().expect("in-memory db");
+
+        let err = read_source_settings(&conn).expect_err("reject");
+
+        assert!(err.to_string().contains("not a settings database"));
+    }
+
+    #[test]
+    fn a_source_settings_database_reads_every_row() {
+        let conn = migrated();
+        set(&conn, "meter-settings", "a").expect("set");
+        set(&conn, "i18nextLng", "en").expect("set");
+
+        let mut rows = read_source_settings(&conn).expect("read");
+        rows.sort();
+
+        assert_eq!(
+            rows,
+            vec![
+                ("i18nextLng".into(), "en".into()),
+                ("meter-settings".into(), "a".into())
+            ]
+        );
     }
 
     /// A no-op upsert must not quietly drop the row it declined to update.

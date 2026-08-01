@@ -523,6 +523,60 @@ export type Log = {
   questId: number | null;
   questElapsedTime: number | null;
   questCompleted: boolean;
+  /** Copied in from another installation's logs.db, so it may lack data the
+   * source app never recorded. Optional so a backend older than the field
+   * (dev HMR skew) reads as "not imported" rather than breaking the list. */
+  imported?: boolean;
+};
+
+/** Result of merging another installation's logs.db into ours
+ * (`import_logs_from_file`). */
+export type ImportSummary = {
+  imported: number;
+  duplicates: number;
+  unreadable: number;
+  filtered: number;
+};
+
+/** Payload of the `import-progress` event emitted while `analyze_logs_db` or
+ * `import_logs_from_file` works through a source file. */
+export type ImportProgress = {
+  processed: number;
+  total: number;
+};
+
+/** One source row, as the import dialog's example tooltips draw it. */
+export type ImportLogExample = {
+  time: number;
+  duration: number;
+  questId: number | null;
+};
+
+/** Dry-run report for a logs.db import (`analyze_logs_db`): what would come
+ * across, and — of those logs — how many carry each kind of data. */
+export type ImportAnalysis = {
+  total: number;
+  importable: number;
+  duplicates: number;
+  unreadable: number;
+  filtered: number;
+  /** Up to 5 example rows per classification, for the summary tooltips. */
+  examples: {
+    total: ImportLogExample[];
+    duplicates: ImportLogExample[];
+    unreadable: ImportLogExample[];
+    filtered: ImportLogExample[];
+    importable: ImportLogExample[];
+  };
+  withPartyNames: number;
+  withEquipment: number;
+  withEnemyHp: number;
+  withOvercap: number;
+  withDeaths: number;
+  withStunEvents: number;
+  withSbaEvents: number;
+  withQuest: number;
+  withQuestTime: number;
 };
 
 export type ConfluxBuffDelta = {

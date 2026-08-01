@@ -560,6 +560,26 @@ impl PlayerData {
         &self.display_name
     }
 
+    /// True when this slot names somebody — what the quest list's party column
+    /// and the player filters display.
+    pub fn has_identity(&self) -> bool {
+        !self.display_name.is_empty() || !self.character_name.is_empty()
+    }
+
+    /// True when this slot carries any recovered build data — anything the log
+    /// page's equipment panes and the cheat audit read.
+    pub fn has_equipment(&self) -> bool {
+        !self.sigils.is_empty()
+            || !self.summons.is_empty()
+            || !self.abilities.is_empty()
+            || !self.skillboard.is_empty()
+            || self.stats.is_some()
+            || self.weapon_state.is_some()
+            || self.weapon_info.is_some()
+            || self.overmastery_info.is_some()
+            || self.player_stats.is_some()
+    }
+
     pub fn character_name(&self) -> &str {
         &self.character_name
     }
@@ -711,6 +731,261 @@ impl Encounter {
 
     pub fn event_log(&self) -> impl Iterator<Item = &(i64, Message)> {
         self.raw_event_log.iter()
+    }
+
+    /// Which kinds of data this encounter actually carries. Drives the import
+    /// dialog's per-category availability report: a logs.db recorded by an
+    /// older or third-party build can lack whole classes of events, and the
+    /// only way to know is to look. Call after [`Self::repopulate_event_log`]
+    /// (as [`Parser::from_encounter_blob`] does) so legacy logs report their
+    /// damage-carried fields too.
+    pub fn data_coverage(&self) -> DataCoverage {
+        let mut coverage = DataCoverage {
+            party_names: self
+                .player_data
+                .iter()
+                .flatten()
+                .any(PlayerData::has_identity),
+            equipment: self
+                .player_data
+                .iter()
+                .flatten()
+                .any(PlayerData::has_equipment),
+            quest: self.quest_id.is_some(),
+            quest_time: self.quest_timer.is_some(),
+            ..Default::default()
+        };
+
+        for (_, message) in self.event_log() {
+            match message {
+                Message::DamageEvent(event) => {
+                    coverage.enemy_hp |= event.target_current_hp.is_some();
+                    coverage.overcap |= event.base_damage.is_some();
+                }
+                Message::OnDeathEvent(_) => coverage.deaths = true,
+                Message::OnPlayerStun(_)
+                | Message::OnPerfectGuardStun(_)
+                | Message::OnPerfectGuardQuickening(_)
+                | Message::OnStunEffect(_) => coverage.stun_events = true,
+                Message::OnUpdateSBA(_)
+                | Message::OnAttemptSBA(_)
+                | Message::OnPerformSBA(_)
+                | Message::OnContinueSBAChain(_) => coverage.sba_events = true,
+                _ => {}
+            }
+            // Every event-derived flag is already true — the rest of a long
+            // fight's log has nothing left to prove.
+            if coverage.enemy_hp
+                && coverage.overcap
+                && coverage.deaths
+                && coverage.stun_events
+                && coverage.sba_events
+            {
+                break;
+            }
+        }
+
+        coverage
+    }
+
+    /// The party's character types as the damage events tell them: one entry
+    /// per distinct source parent that maps to a known character, in
+    /// first-hit order, capped at the four party slots. This is the same
+    /// derivation the meter's rows are built from (see `ensure_player_row`),
+    /// so the import backfill can fill the quest list's character columns for
+    /// logs whose source never recorded player identity. Display names are
+    /// not recoverable — nothing in a damage event carries them.
+    pub fn derive_party_characters(&self) -> Vec<CharacterType> {
+        let mut seen_parents = Vec::new();
+        let mut characters = Vec::new();
+        for (_, message) in self.event_log() {
+            let Message::DamageEvent(event) = message else {
+                continue;
+            };
+            let character = CharacterType::from_hash(event.source.parent_actor_type);
+            if matches!(character, CharacterType::Unknown(_))
+                || seen_parents.contains(&event.source.parent_index)
+            {
+                continue;
+            }
+            seen_parents.push(event.source.parent_index);
+            characters.push(character);
+            if characters.len() == 4 {
+                break;
+            }
+        }
+        characters
+    }
+}
+
+/// See [`Encounter::data_coverage`]. One flag per category the import dialog
+/// reports on; `false` means "this encounter carries none of it".
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct DataCoverage {
+    pub party_names: bool,
+    pub equipment: bool,
+    pub enemy_hp: bool,
+    pub overcap: bool,
+    pub deaths: bool,
+    pub stun_events: bool,
+    pub sba_events: bool,
+    /// A quest id (and with it a meaningful clear status) was recorded.
+    pub quest: bool,
+    pub quest_time: bool,
+}
+
+#[cfg(test)]
+mod data_coverage_tests {
+    use super::*;
+
+    fn actor() -> protocol::Actor {
+        protocol::Actor {
+            index: 0,
+            actor_type: 0,
+            parent_index: 0,
+            parent_actor_type: 0,
+        }
+    }
+
+    fn damage(base_damage: Option<f32>, target_hp: Option<u64>) -> Message {
+        Message::DamageEvent(protocol::DamageEvent {
+            source: actor(),
+            target: actor(),
+            damage: 100,
+            flags: 0,
+            action_id: protocol::ActionType::Normal(1),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+            base_damage,
+            target_current_hp: target_hp,
+            target_max_hp: target_hp,
+        })
+    }
+
+    #[test]
+    fn an_empty_encounter_covers_nothing() {
+        assert_eq!(
+            Encounter::default().data_coverage(),
+            DataCoverage::default()
+        );
+    }
+
+    /// The shape of a log recorded by a build without HP capture, overcap,
+    /// deaths, stun, or SBA hooks: damage alone lights no optional category.
+    #[test]
+    fn bare_damage_events_light_no_optional_category() {
+        let encounter = Encounter {
+            raw_event_log: vec![(0, damage(None, None))],
+            ..Default::default()
+        };
+
+        assert_eq!(encounter.data_coverage(), DataCoverage::default());
+    }
+
+    #[test]
+    fn each_kind_of_data_lights_its_own_category() {
+        let encounter = Encounter {
+            player_data: [
+                Some(PlayerData {
+                    display_name: "Kahs".into(),
+                    overmastery_info: Some(OvermasteryInfo {
+                        overmasteries: Vec::new(),
+                    }),
+                    ..Default::default()
+                }),
+                None,
+                None,
+                None,
+            ],
+            quest_id: Some(77),
+            quest_timer: Some(120),
+            raw_event_log: vec![
+                (0, damage(Some(123.0), Some(1_000_000))),
+                (
+                    1,
+                    Message::OnDeathEvent(protocol::OnDeathEvent {
+                        actor_index: 0,
+                        death_counter: 1,
+                    }),
+                ),
+                (
+                    2,
+                    Message::OnUpdateSBA(protocol::OnUpdateSBAEvent {
+                        actor_index: 0,
+                        sba_value: 10.0,
+                        sba_added: 1.0,
+                    }),
+                ),
+                (
+                    3,
+                    Message::OnPlayerStun(protocol::OnPlayerStunEvent {
+                        actor_index: 0,
+                        stun_amount: 5.0,
+                    }),
+                ),
+            ],
+            ..Default::default()
+        };
+
+        assert_eq!(
+            encounter.data_coverage(),
+            DataCoverage {
+                party_names: true,
+                equipment: true,
+                enemy_hp: true,
+                overcap: true,
+                deaths: true,
+                stun_events: true,
+                sba_events: true,
+                quest: true,
+                quest_time: true,
+            }
+        );
+    }
+
+    /// Party characters come from damage-event source parents: known player
+    /// hashes in first-hit order, one per parent index, enemies (unknown
+    /// hashes) skipped, duplicates collapsed.
+    #[test]
+    fn party_characters_derive_from_damage_sources_in_first_hit_order() {
+        let player = |parent_index: u32, hash: u32| {
+            let mut event = match damage(None, None) {
+                Message::DamageEvent(event) => event,
+                _ => unreachable!(),
+            };
+            event.source.parent_index = parent_index;
+            event.source.parent_actor_type = hash;
+            Message::DamageEvent(event)
+        };
+        let encounter = Encounter {
+            raw_event_log: vec![
+                (0, player(2, 0x601AA977)), // Pl1400
+                (1, player(9, 0xDEADBEEF)), // an enemy: unknown hash, skipped
+                (2, player(2, 0x601AA977)), // same parent again: collapsed
+                (3, player(5, 0x28AC1108)), // Pl1000
+            ],
+            ..Default::default()
+        };
+
+        assert_eq!(
+            encounter.derive_party_characters(),
+            vec![CharacterType::Pl1400, CharacterType::Pl1000]
+        );
+    }
+
+    /// An occupied slot with no name and no gear (the pre-identity-capture
+    /// shape) counts for neither party names nor equipment.
+    #[test]
+    fn a_nameless_bare_slot_counts_for_nothing() {
+        let encounter = Encounter {
+            player_data: [Some(PlayerData::default()), None, None, None],
+            ..Default::default()
+        };
+
+        let coverage = encounter.data_coverage();
+        assert!(!coverage.party_names);
+        assert!(!coverage.equipment);
     }
 }
 

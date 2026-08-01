@@ -5,6 +5,9 @@ import { createJSONStorage, type StateStorage } from "zustand/middleware";
 /** Emitted by the Rust side on every settings write. */
 export const SETTINGS_CHANGED_EVENT = "settings-changed";
 
+/** Emitted by the Rust side after "Reset Settings" deleted every stored key. */
+export const SETTINGS_RESET_EVENT = "settings-reset";
+
 type SettingsChanged = { key: string; value: string | null; origin: string };
 
 /** The Tauri event IPC only exists inside a real Tauri window — not in
@@ -278,5 +281,19 @@ if (insideTauri()) {
     else localStorage.setItem(payload.key, payload.value);
 
     applyDurableKey(payload.key, payload.value);
+  });
+
+  /* "Reset Settings" cannot go through the per-key channel: rehydrating a
+     store from a key that no longer exists leaves its in-memory state exactly
+     as it was — zustand only merges what it finds. So every window drops the
+     deleted keys from its cache (plus every registered key, belt and braces —
+     an unregistered cached copy would otherwise be adopted back into the
+     backend at the next bootstrap) and reloads; a fresh boot over an empty
+     store is precisely the defaults. */
+  void listen<{ keys: string[] }>(SETTINGS_RESET_EVENT, ({ payload }) => {
+    for (const key of new Set([...payload.keys, ...handlers.keys()])) {
+      localStorage.removeItem(key);
+    }
+    window.location.reload();
   });
 }

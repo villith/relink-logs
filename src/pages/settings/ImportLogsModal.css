@@ -1,0 +1,13 @@
+/* Ledger rows that carry an examples tooltip highlight under the cursor, so
+   it is clear which line the tooltip belongs to. Rows without a tooltip never
+   get the class, so they never light up. */
+.import-summary-line {
+  border-radius: var(--mantine-radius-sm);
+  padding: 0 6px;
+  margin: 0 -6px;
+  cursor: default;
+}
+
+.import-summary-line:hover {
+  background-color: var(--mantine-color-default-hover);
+}

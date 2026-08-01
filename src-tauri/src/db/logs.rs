@@ -38,6 +38,7 @@ enum Logs {
     QuestElapsedTime,
     QuestCompleted,
     RunId,
+    Imported,
 }
 
 /// The stored-verdicts table, as much of it as the quest list's filter needs.
@@ -98,6 +99,9 @@ pub struct LogEntry {
     quest_elapsed_time: Option<u32>,
     /// Was quest completed?
     quest_completed: Option<bool>,
+    /// Copied in from another installation's logs.db, so it may lack data the
+    /// source app never recorded.
+    imported: bool,
 }
 
 impl LogEntry {
@@ -154,6 +158,7 @@ pub fn get_logs(
             Logs::QuestId,
             Logs::QuestElapsedTime,
             Logs::QuestCompleted,
+            Logs::Imported,
         ])
         // Exclude Conflux rooms: they are `logs` rows tagged with a run_id and belong to the
         // Conflux tab, not the normal quest list.
@@ -277,6 +282,7 @@ pub fn get_logs(
                 quest_id: row.get(14)?,
                 quest_elapsed_time: row.get(15)?,
                 quest_completed: row.get(16)?,
+                imported: row.get(17)?,
             })
         })
         .collect::<rusqlite::Result<Vec<LogEntry>>>();
