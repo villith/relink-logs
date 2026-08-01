@@ -6,7 +6,11 @@
  * Font sizes are written as CSS lengths, never as var(--mantine-font-size-*):
  * this app's theme sets those tokens to unitless strings ("12", "14"), so the
  * var resolves to invalid CSS and the declaration is silently dropped. */
-.analysis {
+/* Tokens live on their own class so they can be applied anywhere in the DOM.
+ * The hover card portals to document.body, outside .analysis — custom
+ * properties inherit down the tree, so tokens declared only on .analysis
+ * resolve to nothing there and the card renders with no panel at all. */
+.analysis-tokens {
   --an-bg: #17181c;
   --an-panel: #1d1f24;
   --an-raised: #22252b;
@@ -17,7 +21,9 @@
   --an-ink-3: #6c7280;
   --an-accent: #00b8d9;
   --an-plot: #1a1c21;
+}
 
+.analysis {
   background-color: var(--an-bg);
   color: var(--an-ink);
   border: 1px solid var(--an-line);
@@ -174,4 +180,12 @@
   text-align: right;
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+/* .analysis-label and .analysis-cell have equal specificity, so the later one
+ * (.analysis-cell, 13px) wins and column heads render at row size. Scoping to
+ * the header row restores the intended 10px without touching either class. */
+.analysis-head .analysis-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
 }
