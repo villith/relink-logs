@@ -72,6 +72,15 @@ export const durableStorage: StateStorage = {
   },
 };
 
+/** Push a value the adapter does not own to the backend. i18next's detector
+ * writes `i18nextLng` to localStorage itself, so only the durable half is
+ * missing. */
+export const writeDurable = (key: string, value: string) => {
+  if (!insideTauri()) return;
+
+  void invoke("set_setting", { key, value }).catch((e) => console.warn(`[settings] failed to persist ${key}:`, e));
+};
+
 /**
  * Reconcile the durable copy with the cache, then hydrate every registered
  * key. Runs once, before the first render (see `src/main.tsx`).

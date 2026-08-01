@@ -7,6 +7,10 @@ import { invoke } from "@tauri-apps/api";
 import { readTextFile } from "@tauri-apps/api/fs";
 import { resolveResource } from "@tauri-apps/api/path";
 
+import { registerDurableKey } from "@/stores/durableStorage";
+
+import { applyRemoteLanguage, LANGUAGE_KEY, mirrorLanguage } from "./i18nDurable";
+
 const loadLanguageFromPath = async (language: string, namespace: string) => {
   const resourcePath = await resolveResource(`lang/${language}/${namespace}.json`);
   return JSON.parse(await readTextFile(resourcePath));
@@ -90,7 +94,14 @@ i18n
   });
 
 i18n.on("initialized", () => void syncTrayLabels());
-i18n.on("languageChanged", () => void syncTrayLabels());
+i18n.on("languageChanged", (language: string) => {
+  void syncTrayLabels();
+  mirrorLanguage(language);
+});
+
+// The language is the one durable key the adapter does not own: i18next's
+// detector writes the localStorage half itself.
+registerDurableKey(LANGUAGE_KEY, applyRemoteLanguage);
 
 declare global {
   interface Window {
