@@ -45,21 +45,24 @@ pub fn is_excluded(event: &DamageEvent, filters: &MeterFilters) -> bool {
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct SelectionFilter {
-    /// Player actor-type hashes to keep (empty = all).
-    pub source_actor_types: Vec<u32>,
+    /// Source actor indices to keep (empty = all).
+    ///
+    /// The INDEX, not the actor-type hash: a hash names a character class, and
+    /// an online party can hold two of the same character, which a hash would
+    /// silently merge into one row. The index is unique per player in a fight
+    /// and is what the derived party is already keyed by.
+    pub source_indices: Vec<u32>,
     /// Actions to keep (empty = all).
     pub abilities: Vec<ActionType>,
 }
 
 /// True when `event` survives the current selector pins.
 ///
-/// Source matches on `parent_actor_type`, not `actor_type`: a summon's hit
-/// belongs to the player who called it, and pinning that player must keep it.
+/// Source matches on `parent_index`, not `index`: a summon's hit belongs to the
+/// player who called it, and pinning that player must keep it.
 pub fn matches_selection(event: &DamageEvent, selection: &SelectionFilter) -> bool {
-    if !selection.source_actor_types.is_empty()
-        && !selection
-            .source_actor_types
-            .contains(&event.source.parent_actor_type)
+    if !selection.source_indices.is_empty()
+        && !selection.source_indices.contains(&event.source.parent_index)
     {
         return false;
     }
