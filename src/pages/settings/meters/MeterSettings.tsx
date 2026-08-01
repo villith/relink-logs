@@ -68,7 +68,9 @@ const MeterSettings = () => {
             preview slides underneath it. Read from Mantine's own header-height
             variable so the two cannot drift apart. A flex item's containing block
             is the flex row, which is as tall as the options column — that is the
-            room the preview has to travel in. */}
+            room the preview has to travel in. Only at `lg`+, where the preview
+            has its own column: once the row stacks, sticking would pin the
+            preview over the options it shares the column with. */}
         {/* An even split rather than a fixed width: the preview draws the
             overlay at its real pixel size and scales it down to fit, so every
             pixel this column gains is scale the preview does not have to give
@@ -78,10 +80,8 @@ const MeterSettings = () => {
           w={{ base: "100%", lg: "auto" }}
           flex={{ base: "0 0 auto", lg: "1 1 0" }}
           miw={0}
-          style={{
-            position: "sticky",
-            top: "calc(var(--app-shell-header-height, 50px) + var(--mantine-spacing-sm))",
-          }}
+          pos={{ base: "static", lg: "sticky" }}
+          top="calc(var(--app-shell-header-height, 50px) + var(--mantine-spacing-sm))"
         >
           <ScopedPreview />
         </Box>
