@@ -24,6 +24,16 @@ pub struct StatusInterval {
     pub start_ms: i64,
     pub end_ms: i64,
     pub max_stacks: u32,
+    /// Which enemy SPAWN held this, as an index into the same response's
+    /// `target_entries`. `None` for a player, and for an enemy the segmenter
+    /// skipped (a phantom marker actor).
+    ///
+    /// The spawn, never the raw actor index, for the reason
+    /// [`super::SelectionFact::target_segment`] gives: the game frees a dead
+    /// boss's index and reissues it to the next one, so a debuff open when the
+    /// first dragon died was extended by the second dragon's apply into a single
+    /// row spanning both fights.
+    pub target_segment: Option<usize>,
     /// How many times the effect landed within this window — the initial apply
     /// plus every refresh that extended it.
     ///
@@ -34,18 +44,56 @@ pub struct StatusInterval {
     pub applications: u32,
 }
 
+/// The spawn an enemy actor index belonged to at `at_ms`.
+///
+/// `None` for a player — party slot keys are not spawns — and for an id the
+/// segmenter never opened a segment for. An apply that precedes every segment
+/// for its id belongs to the first of them: segments open on the first DAMAGE
+/// event, so a debuff landing a moment before the enemy is first hit is
+/// genuinely earlier than its own spawn's start.
+fn segment_at(segments: &[super::TargetSegment], actor_index: u32, at_ms: i64) -> Option<usize> {
+    if protocol::is_player_slot_key(actor_index) {
+        return None;
+    }
+
+    let mut first = None;
+    let mut current = None;
+    for (index, segment) in segments.iter().enumerate() {
+        if segment.id != actor_index {
+            continue;
+        }
+        if first.is_none() {
+            first = Some(index);
+        }
+        // Segments for one id are chronological and disjoint, so the last one
+        // to have started by `at_ms` is the spawn that was alive then.
+        if segment.start_ms <= at_ms {
+            current = Some(index);
+        }
+    }
+    current.or(first)
+}
+
 /// Closed intervals from apply/remove pairs in `events`.
 ///
 /// `start_time` rebases timestamps; `fight_end_ms` closes anything still open
 /// when the fight ended — a buff active at the kill emits no remove, and
-/// dropping it would under-report uptime on the pull that mattered.
+/// dropping it would under-report uptime on the pull that mattered. An enemy's
+/// interval closes at the end of its own SPAWN instead, so a debuff on a dying
+/// boss is not reported as held for the minutes of fight that followed it.
+///
+/// `segments` is the same `target_entries` vector the response ships, so the
+/// `target_segment` indices below point into it.
 pub fn assemble_intervals(
     events: &[(i64, Message)],
     start_time: i64,
     fight_end_ms: i64,
+    segments: &[super::TargetSegment],
 ) -> Vec<StatusInterval> {
-    // Keyed on the full identity: actor, effect, AND causing ability.
-    let mut open: HashMap<(u32, u32, Option<u32>), StatusInterval> = HashMap::new();
+    // Keyed on the full identity: actor, SPAWN, effect, and causing ability.
+    // The spawn is part of it because the actor index alone is a recycled
+    // handle — see `StatusInterval::target_segment`.
+    let mut open: HashMap<(u32, Option<usize>, u32, Option<u32>), StatusInterval> = HashMap::new();
     let mut closed = Vec::new();
 
     for (ts, message) in events {
@@ -53,7 +101,13 @@ pub fn assemble_intervals(
 
         match message {
             Message::StatusApply(event) => {
-                let key = (event.actor_index, event.status_id, event.ability_id);
+                let segment = segment_at(segments, event.actor_index, at);
+                let key = (
+                    event.actor_index,
+                    segment,
+                    event.status_id,
+                    event.ability_id,
+                );
                 open.entry(key)
                     .and_modify(|existing| {
                         // A refresh: extend, never open a second overlapping
@@ -68,13 +122,24 @@ pub fn assemble_intervals(
                         status_id: event.status_id,
                         ability_id: event.ability_id,
                         start_ms: at,
-                        end_ms: fight_end_ms,
+                        // Provisional: a matched remove overwrites it. An enemy
+                        // that never sends one is closed at its spawn's end
+                        // rather than the fight's.
+                        end_ms: segment
+                            .and_then(|index| segments.get(index))
+                            .map_or(fight_end_ms, |spawn| spawn.end_ms),
                         max_stacks: event.stacks,
+                        target_segment: segment,
                         applications: 1,
                     });
             }
             Message::StatusRemove(event) => {
-                let key = (event.actor_index, event.status_id, event.ability_id);
+                let key = (
+                    event.actor_index,
+                    segment_at(segments, event.actor_index, at),
+                    event.status_id,
+                    event.ability_id,
+                );
                 // A remove with nothing open has no known start — the capture
                 // can begin mid-effect, and inventing a start fabricates uptime.
                 if let Some(mut interval) = open.remove(&key) {
@@ -183,6 +248,90 @@ mod tests {
         // known start, and inventing one would fabricate uptime.
         let intervals = assemble_intervals(&[remove(1_000, 1, 10, Some(500))], 0, 10_000);
         assert!(intervals.is_empty());
+    }
+
+    fn segment(id: u32, start_ms: i64, end_ms: i64) -> super::super::TargetSegment {
+        super::super::TargetSegment {
+            id,
+            enemy_type: super::super::EnemyType::from_hash(0),
+            instance: 1,
+            max_hp: None,
+            start_ms,
+            end_ms,
+        }
+    }
+
+    /// An enemy actor index. Distinct from a player slot key, which is what
+    /// decides whether a holder is segmented at all.
+    const ENEMY: u32 = 3_926_405_961;
+
+    #[test]
+    fn two_spawns_sharing_a_recycled_id_stay_separate() {
+        // The Four Dragons case: the game frees a dead boss's actor index and
+        // reissues it to the next one. Keyed on the index alone, the second
+        // dragon's apply extended the first's still-open window into one row
+        // spanning both fights.
+        let segments = [segment(ENEMY, 0, 1_000), segment(ENEMY, 5_000, 9_000)];
+        let events = vec![
+            apply(0, ENEMY, 10, Some(500), 1),
+            apply(5_000, ENEMY, 10, Some(500), 1),
+        ];
+        let intervals = assemble_intervals(&events, 0, 10_000, &segments);
+
+        assert_eq!(intervals.len(), 2, "one spawn is not the other");
+        assert_eq!(intervals[0].target_segment, Some(0));
+        assert_eq!(intervals[1].target_segment, Some(1));
+    }
+
+    #[test]
+    fn an_enemy_interval_closes_when_its_spawn_dies() {
+        // A debuff on a dying boss emits no remove. Running it to the end of the
+        // FIGHT would report the effect as held for minutes after the enemy
+        // holding it stopped existing.
+        let segments = [segment(ENEMY, 0, 1_000)];
+        let intervals =
+            assemble_intervals(&[apply(0, ENEMY, 10, Some(500), 1)], 0, 10_000, &segments);
+
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals[0].end_ms, 1_000);
+    }
+
+    #[test]
+    fn a_player_holder_is_never_segmented() {
+        // Segments are enemy spawns; a player has none, and an unclosed buff on
+        // one still runs to the end of the fight.
+        let player = protocol::player_slot_key(2);
+        let segments = [segment(ENEMY, 0, 1_000)];
+        let intervals =
+            assemble_intervals(&[apply(0, player, 10, Some(500), 1)], 0, 10_000, &segments);
+
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals[0].target_segment, None);
+        assert_eq!(intervals[0].end_ms, 10_000);
+    }
+
+    #[test]
+    fn a_debuff_landing_before_the_first_hit_belongs_to_that_spawn() {
+        // Segments open on the first DAMAGE event, so a debuff applied a moment
+        // earlier precedes every segment for its id. It belongs to the spawn
+        // about to be hit, not to nothing.
+        let segments = [segment(ENEMY, 500, 4_000)];
+        let intervals =
+            assemble_intervals(&[apply(0, ENEMY, 10, Some(500), 1)], 0, 10_000, &segments);
+
+        assert_eq!(intervals[0].target_segment, Some(0));
+    }
+
+    #[test]
+    fn an_enemy_with_no_segment_at_all_keeps_its_interval() {
+        // A phantom marker actor is deliberately skipped by the segmenter. Its
+        // debuff has nowhere to belong, but dropping the interval would lose
+        // uptime the capture really recorded.
+        let intervals = assemble_intervals(&[apply(0, ENEMY, 10, Some(500), 1)], 0, 10_000, &[]);
+
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals[0].target_segment, None);
+        assert_eq!(intervals[0].end_ms, 10_000);
     }
 
     #[test]

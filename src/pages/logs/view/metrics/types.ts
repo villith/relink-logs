@@ -28,8 +28,11 @@ export type MetricRow = {
  * `"status"` is the buff/debuff row: a `status:<effect>:<cause>` key that reads
  * as "Attack Up (Signo Drive)" — the effect first so shared effects sort
  * together, the cause in parentheses because two abilities granting one effect
- * are two rows. */
-export type LabelKind = "player" | "ability" | "status" | "raw";
+ * are two rows.
+ *
+ * `"target"` is the debuff holder row: a `target:<segment>` or `actor:<id>` key
+ * naming the enemy SPAWN that held the effect. */
+export type LabelKind = "player" | "ability" | "status" | "raw" | "target";
 
 /** Everything a metric needs to turn encounter state into rows. */
 export type MetricDescriptor = {

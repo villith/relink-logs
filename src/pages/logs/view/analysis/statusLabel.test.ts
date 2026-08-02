@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { targetRowLabel } from "./statusLabel";
+
 import { statusLabelFor } from "./statusLabel";
 
 // Stands in for i18next: the real thing interpolates the same way.

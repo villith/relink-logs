@@ -826,7 +826,7 @@ export const PRIMAL_BURST_GROUP = "primal-burst";
 /** True for a summon hit dealt by one of the Primal Burst bodies. Owns the
  * hash-format detail (lowercase, zero-padded to eight) so callers never
  * re-derive it. */
-export const isPrimalBurstHit = (skill: SkillState): boolean => {
+export const isPrimalBurstHit = (skill: SkillRow): boolean => {
   if (typeof skill.actionType !== "object" || !Object.hasOwn(skill.actionType, "Normal")) return false;
   if ((skill.actionType as { Normal: number }).Normal !== SUMMON_ATTACK_ACTION_ID) return false;
 
@@ -874,7 +874,7 @@ export const summonDisplayName = (bodyClassHash: string): string | null => {
   return stripTierSuffix(text);
 };
 
-export const getSkillName = (characterType: CharacterType, skill: SkillState) => {
+export const getSkillName = (characterType: CharacterType, skill: SkillRow) => {
   switch (true) {
     case skill.actionType === "LinkAttack":
       return t([`skills.${characterType}.link-attack`, "skills.default.link-attack"]);

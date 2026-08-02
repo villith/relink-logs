@@ -1433,8 +1433,15 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     // Closed against the end of the full log, not the scrub window: an interval
     // still open at the last event runs to the end of the fight, and closing it
     // at a window edge instead would report a buff as having dropped there.
-    let status_intervals =
-        v1::assemble_intervals(&parser.encounter.raw_event_log, start_time, duration);
+    // Segmented against the same `target_entries` the response ships, so a
+    // debuff row names the SPAWN that held it. Without it a recycled boss id
+    // merged two enemies' windows into one row labelled with a bare number.
+    let status_intervals = v1::assemble_intervals(
+        &parser.encounter.raw_event_log,
+        start_time,
+        duration,
+        &target_entries,
+    );
 
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 

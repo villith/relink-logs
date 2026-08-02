@@ -1,5 +1,5 @@
 import SkillGroupMapping from "@/assets/skill-groups";
-import type { CharacterType, SkillState } from "@/types";
+import type { CharacterType, SkillRow } from "@/types";
 import { PRIMAL_BURST_GROUP, isPrimalBurstHit } from "@/utils";
 
 /** The condensed row a skill folds into: a group name, scoped to the child
@@ -27,7 +27,7 @@ export type SkillGroupKey = { group: string; childCharacterType: CharacterType |
  * Whether to condense is the CALLER's decision — Classic asks
  * `use_condensed_skills`, the analysis chart always condenses because an
  * ungrouped stack is unreadable. This function only answers where a skill goes. */
-export const skillGroupFor = (skill: SkillState): SkillGroupKey | null => {
+export const skillGroupFor = (skill: SkillRow): SkillGroupKey | null => {
   if (isPrimalBurstHit(skill)) return { group: PRIMAL_BURST_GROUP, childCharacterType: null };
 
   if (typeof skill.actionType !== "object" || !Object.hasOwn(skill.actionType, "Normal")) return null;

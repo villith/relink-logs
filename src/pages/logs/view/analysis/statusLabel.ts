@@ -2,6 +2,29 @@
  * it, or the literal `unknown` where the hook could not attribute one. */
 const STATUS_KEY = /^status:(\d+):(\d+|unknown)$/;
 
+/** How a debuff holder row names the enemy that held the effect: the SPAWN it
+ * belonged to, or the bare actor id when the segmenter never placed it. */
+const TARGET_ROW = /^(target|actor):(\d+)$/;
+
+/** Display name for a debuff holder row.
+ *
+ * Two spellings because there are two things to say. `target:<n>` indexes the
+ * response's `targetEntries`, which is what carries an enemy's name and its
+ * "#n" — the actor index cannot, because the game reissues a dead boss's index
+ * to the next one. `actor:<id>` is the fallback for an enemy with no segment at
+ * all (a phantom marker actor the segmenter skips): its window is real capture,
+ * so the row stays, showing the only identity there is.
+ *
+ * `labelForTarget` is injected for the same reason `statusLabelFor` injects its
+ * names — it needs i18n and the entries vector, and this stays pure. */
+export const targetRowLabel = (label: string, labelForTarget: (segment: number) => string): string => {
+  const parsed = TARGET_ROW.exec(label);
+  if (!parsed) return label;
+
+  const [, kind, id] = parsed;
+  return kind === "target" ? labelForTarget(Number(id)) : id;
+};
+
 /** Display name for a `status:<effect>:<cause>` row key.
  *
  * Reads as `Attack Up (Signo Drive)` — effect first so that two abilities

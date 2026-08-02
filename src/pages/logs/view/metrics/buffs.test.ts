@@ -14,7 +14,8 @@ const interval = (
   status = 10,
   ability: number | null = 500,
   stacks = 1,
-  applications = 1
+  applications = 1,
+  targetSegment: number | null = null
 ): StatusInterval => ({
   actorIndex: actor,
   casterIndex: 0,
@@ -23,6 +24,7 @@ const interval = (
   startMs: start,
   endMs: end,
   maxStacks: stacks,
+  targetSegment,
   applications,
 });
 
@@ -135,5 +137,23 @@ describe("debuffs descriptor", () => {
 
   it("leaves enemy rows without a party colour", () => {
     expect(debuffs.rows(input("players"))[0].colorSlot).toBe(-1);
+  });
+
+  it("gives one holder row per enemy SPAWN, not per recycled actor id", () => {
+    // The Four Dragons case end to end: one actor id, two spawns. Keyed on the
+    // id the two dragons shared a row labelled with a bare number.
+    const recycled = [
+      interval(9, 0, 1_000, 30, 700, 1, 1, 0),
+      interval(9, 5_000, 9_000, 30, 700, 1, 1, 1),
+    ];
+    const rows = debuffs.rows(input("skills", "status:30:700", recycled));
+    expect(rows.map((r) => r.key)).toEqual(["target:1", "target:0"]);
+  });
+
+  it("keeps an enemy the segmenter never placed on its own row", () => {
+    // A phantom marker actor gets no segment. Its window is real capture, so it
+    // keeps a row — labelled by the raw id, which is all that is known.
+    const rows = debuffs.rows(input("skills", "status:30:700", [interval(9, 0, 6_000, 30, 700)]));
+    expect(rows.map((r) => r.key)).toEqual(["actor:9"]);
   });
 });
