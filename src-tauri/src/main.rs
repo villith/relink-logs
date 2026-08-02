@@ -1266,6 +1266,14 @@ struct EncounterStateResponse {
     /// Per-spawn selectable targets for the filter dropdown, in first-hit
     /// order — 1:1 with the HP chart's series (same instance numbers).
     target_entries: Vec<v1::TargetSegment>,
+    /// The analysis view's drill-down chart, present only on a scoped fetch that
+    /// pinned a source: what that player's damage was made of, one band per
+    /// breakdown row. Empty at every other level — with nothing pinned the
+    /// per-player `dps_chart` already answers.
+    ability_chart: Vec<v1::AbilityChartSeries>,
+    /// The drill-down chart one level further in: with a source AND an ability
+    /// pinned, what that ability hit, one band per enemy spawn.
+    target_chart: Vec<v1::TargetChartSeries>,
     dps_chart: HashMap<u32, Vec<i32>>,
     /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
     /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
@@ -1376,7 +1384,11 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     let start_time = parser.start_time();
     // Dropdown entries are ALWAYS the unfiltered segmentation — the user picks
     // from everything the fight contained, whatever is currently selected.
-    let target_entries = v1::segment_targets(&parser.encounter.raw_event_log, start_time);
+    // Indexed, because a `SelectionFact` names the SEGMENT it hit rather than
+    // the game's actor index (which is recycled between bosses) — and those
+    // indices are into this very vector, which ships as `target_entries`.
+    let (target_entries, assignment) =
+        v1::segment_targets_indexed(&parser.encounter.raw_event_log, start_time);
     // Windowed, but never narrowed by the pins themselves: each selector must
     // keep offering everything the OTHER pins still allow.
     let selection_facts = v1::selection_facts(
@@ -1384,6 +1396,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         start_time,
         options.from_ms,
         options.up_to_ms,
+        &assignment,
     );
 
     let player_indices: Vec<u32> = parser

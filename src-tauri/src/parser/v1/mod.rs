@@ -1753,6 +1753,139 @@ pub fn build_player_dps_chart(
     player_dps
 }
 
+/// Build the per-player stun chart: stun applied per bucket, keyed by actor
+/// index.
+///
+/// Not a clone of [`build_player_dps_chart`], because stun does not simply
+/// accumulate. It arrives by two independent paths that observe the SAME game
+/// accumulator — per-hit deltas on damage events (the solo path) and network
+/// stun messages (the online path, where the delta method structurally reads
+/// 0) — and the meter reconciles them with `max(delta_sum, message_sum)`, not a
+/// sum. Solo loopback fires both for one accrual, so adding them double-counts.
+///
+/// `max` does not decompose per bucket (`max` of sums is not the sum of
+/// `max`es), so this walks the log once to learn which path won FOR EACH PLAYER
+/// and then buckets only that path. The series therefore sums to exactly the
+/// `total_stun_value` the table reports — a chart's area cannot disagree with
+/// the row total it sits under.
+///
+/// Every gate the reparse loop applies is mirrored here: phantom and filter
+/// exclusion, the excluded-hit stun suppression that stops a message being
+/// credited to the skill before it, the dragon-form remap, and Perfect Guard's
+/// local-versus-remote zero rule. Stun messages carry no target, so target
+/// spans do not gate them (enemy stun is effectively boss-wide).
+#[allow(clippy::too_many_arguments)]
+pub fn build_player_stun_chart(
+    events: &[(i64, Message)],
+    player_data: &[Option<PlayerData>; 4],
+    player_indices: &[u32],
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+    target_spans: &[TargetSpan],
+    filters: MeterFilters,
+) -> HashMap<u32, Vec<f64>> {
+    let empty = || -> HashMap<u32, Vec<f64>> {
+        player_indices
+            .iter()
+            .map(|index| (*index, vec![0.0; chart_len]))
+            .collect()
+    };
+    let mut delta = empty();
+    let mut message = empty();
+
+    let phantoms = PhantomTargets::learned_from(events.iter());
+    // Mirrors `DerivedEncounterState::stun_suppressed_players`: an excluded hit
+    // claims the message trailing it so it is dropped, and the next counted
+    // stun-capable hit takes that claim back.
+    let mut suppressed: HashSet<u32> = HashSet::new();
+
+    for (timestamp, event) in events {
+        let bucket = ((timestamp - start_time) / interval) as usize;
+        if bucket >= chart_len {
+            continue;
+        }
+
+        match event {
+            Message::DamageEvent(damage_event) => {
+                if phantoms.is_phantom(damage_event) {
+                    continue;
+                }
+                if is_excluded(damage_event, &filters) {
+                    // `note_excluded_damage`: supplementary and DoT hits never
+                    // own a stun message, so they cannot suppress one.
+                    if !matches!(
+                        damage_event.action_id,
+                        ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)
+                    ) {
+                        suppressed.insert(damage_event.source.parent_index);
+                    }
+                    continue;
+                }
+
+                let damage_event = remap_dragon_form(player_data, damage_event);
+
+                if !matches!(
+                    damage_event.action_id,
+                    ActionType::SupplementaryDamage(_) | ActionType::DamageOverTime(_)
+                ) {
+                    suppressed.remove(&damage_event.source.parent_index);
+                }
+
+                let Some(chart) = delta.get_mut(&damage_event.source.parent_index) else {
+                    continue;
+                };
+                if target_selected(timestamp - start_time, &damage_event, target_spans) {
+                    chart[bucket] += damage_event.stun_value.unwrap_or(0.0) as f64;
+                }
+            }
+            Message::OnPlayerStun(stun) => {
+                if suppressed.contains(&stun.actor_index) {
+                    continue;
+                }
+                if let Some(chart) = message.get_mut(&stun.actor_index) {
+                    chart[bucket] += stun.stun_amount as f64;
+                }
+            }
+            Message::OnPerfectGuardStun(guard) => {
+                // A local guard always registers its stun in-call, so 0 means it
+                // applied none. Remote guards are host-authoritative and read 0
+                // regardless, so 0 carries no information there.
+                if guard.stun_amount <= 0.0
+                    && is_remote_slot(player_data, guard.actor_index) == Some(false)
+                {
+                    continue;
+                }
+                if let Some(chart) = delta.get_mut(&guard.actor_index) {
+                    chart[bucket] += guard.stun_amount as f64;
+                }
+            }
+            Message::OnStunEffect(effect) => {
+                if let Some(chart) = delta.get_mut(&effect.actor_index) {
+                    chart[bucket] += effect.stun_amount as f64;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Per player, keep whichever path saw the accrual — the bucketed mirror of
+    // `PlayerState::refresh_total_stun`.
+    player_indices
+        .iter()
+        .map(|index| {
+            let deltas = delta.remove(index).unwrap_or_default();
+            let messages = message.remove(index).unwrap_or_default();
+            let series = if deltas.iter().sum::<f64>() >= messages.iter().sum::<f64>() {
+                deltas
+            } else {
+                messages
+            };
+            (*index, series)
+        })
+        .collect()
+}
+
 /// Build the quest-details enemy HP charts: one series per [`TargetSegment`]
 /// with HP data passing the filter, largest max-HP first (stable, so same-size
 /// series keep spawn order), capped at [`HP_CHART_MAX_SERIES`]. Series carry
