@@ -92,3 +92,4 @@ describe("HoverCard", () => {
     expect(card?.classList.contains("analysis-tokens")).toBe(true);
   });
 });
+

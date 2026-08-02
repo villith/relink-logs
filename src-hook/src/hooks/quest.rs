@@ -79,6 +79,9 @@ impl OnLoadQuestHook {
                 OnLoadQuestState.initialize(func, move |a1| cloned_self.run(a1))?;
                 OnLoadQuestState.enable()?;
             }
+            // Only now does a null QUEST_STATE_PTR mean "no quest has loaded"
+            // rather than "nothing is watching" — see `in_quest_from_flow`.
+            QUEST_TRACKING_LIVE.store(true, Ordering::Relaxed);
         } else {
             return Err(anyhow!("Could not find on_load_quest_state"));
         }
@@ -497,3 +500,83 @@ impl OnQuestFlowEndHook {
         }
     }
 }
+
+/// The quest-flow singleton slot on the quest manager — the same link the load
+/// hook reads off its own argument and [`OnQuestFlowEndHook::poll_flow_state`]
+/// polls per frame. The flow object exists for exactly as long as a quest does.
+const QUEST_FLOW_OFFSET: usize = 0x210;
+
+/// Set once the quest-load detour is installed, which is what makes a null
+/// [`QUEST_STATE_PTR`] meaningful: with the detour live, "no manager" really is
+/// "no quest has loaded", whereas without it we simply cannot tell.
+static QUEST_TRACKING_LIVE: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Whether the game is inside a quest, decided from the observable state.
+///
+/// Fails OPEN on every "cannot tell" input. A gate that fails closed would
+/// silently delete a whole feature's worth of rows after a patch moved an
+/// offset — no error, no log line, just permanently empty tables — which is a
+/// far worse failure than paying for some events in town.
+fn in_quest_from_flow(tracking_live: bool, manager: usize, flow: Option<usize>) -> bool {
+    if !tracking_live {
+        // The load detour never installed, so neither the manager pointer nor
+        // the flow slot below means anything.
+        return true;
+    }
+    if manager == 0 {
+        // Tracking is live and no quest has ever loaded. The one case this
+        // gets wrong is a mid-quest injection, which loses statuses until the
+        // next quest load — the same partial-capture the encounter itself has.
+        return false;
+    }
+    // `None` is an unreadable slot, not an absent flow: fail open.
+    flow.map_or(true, |flow| flow != 0)
+}
+
+/// Whether the game is currently inside a quest. Two guarded reads, cheap
+/// enough to sit in front of a high-rate hook's emit path.
+pub(crate) fn in_quest_now() -> bool {
+    let manager = QUEST_STATE_PTR.load(Ordering::Relaxed) as usize;
+    let flow = (manager != 0)
+        .then(|| read_ptr_guarded(manager, QUEST_FLOW_OFFSET))
+        .flatten();
+    in_quest_from_flow(QUEST_TRACKING_LIVE.load(Ordering::Relaxed), manager, flow)
+}
+
+#[cfg(test)]
+mod gate_tests {
+    use super::in_quest_from_flow;
+
+    #[test]
+    fn a_destroyed_flow_object_is_not_a_quest() {
+        // In town the quest manager survives but its flow object is destroyed,
+        // so the slot reads a clean null. That is the state the status hooks
+        // must stay quiet in — it is the whole point of the gate.
+        assert!(!in_quest_from_flow(true, 0x1000, Some(0)));
+    }
+
+    #[test]
+    fn a_live_flow_object_is_a_quest() {
+        assert!(in_quest_from_flow(true, 0x1000, Some(0x1234_5678)));
+    }
+
+    #[test]
+    fn no_quest_manager_yet_is_not_a_quest() {
+        assert!(!in_quest_from_flow(true, 0, None));
+    }
+
+    #[test]
+    fn an_unreadable_slot_fails_open() {
+        assert!(in_quest_from_flow(true, 0x1000, None));
+    }
+
+    #[test]
+    fn an_uninstalled_load_detour_fails_open() {
+        // Without the detour there is no manager pointer to read, so the null
+        // above must NOT be read as "in town" — that would gate the feature off
+        // permanently the day the load signature breaks.
+        assert!(in_quest_from_flow(false, 0, None));
+    }
+}
+

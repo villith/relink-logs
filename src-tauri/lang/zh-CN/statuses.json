@@ -1,0 +1,302 @@
+{
+  "0": {
+    "key": "atkup",
+    "text": "攻击UP"
+  },
+  "1": {
+    "key": "defup",
+    "text": "防御UP"
+  },
+  "10": {
+    "key": "protect",
+    "text": "挺身而出"
+  },
+  "1000": {
+    "key": "poison",
+    "text": "中毒"
+  },
+  "1001": {
+    "key": "burn",
+    "text": "灼热"
+  },
+  "1002": {
+    "key": "slow",
+    "text": "缓速"
+  },
+  "1003": {
+    "key": "stun",
+    "text": "昏迷"
+  },
+  "1004": {
+    "key": "freeze",
+    "text": "冰冻"
+  },
+  "1005": {
+    "key": "frostbite",
+    "text": "冻伤"
+  },
+  "1006": {
+    "key": "sandman",
+    "text": "泥沙"
+  },
+  "1007": {
+    "key": "paralysis",
+    "text": "麻痹"
+  },
+  "1008": {
+    "key": "waterprison",
+    "text": "水牢"
+  },
+  "1011": {
+    "key": "darkburn",
+    "text": "紫银之炎"
+  },
+  "1012": {
+    "key": "TXT_STATUS_BINDAILMENT",
+    "text": "束缚"
+  },
+  "1015": {
+    "key": "TXT_STATUS_CAPTUREAILMENT",
+    "text": "束缚"
+  },
+  "1016": {
+    "key": "disableability",
+    "text": "能力封印"
+  },
+  "1017": {
+    "key": "disableougi",
+    "text": "奥义封印"
+  },
+  "1018": {
+    "key": "darkpoison",
+    "text": "灾祸"
+  },
+  "1019": {
+    "key": "fear",
+    "text": "恐惧"
+  },
+  "1020": {
+    "key": "arvessfermare",
+    "text": "阿尔贝斯之印"
+  },
+  "1021": {
+    "key": "elementweak",
+    "text": "元素不和"
+  },
+  "11": {
+    "key": "protected",
+    "text": "安全"
+  },
+  "125": {
+    "key": "blacksnipper",
+    "text": "钳蟹的馈赠"
+  },
+  "134": {
+    "key": "stundown",
+    "text": "昏厥抗性DOWN"
+  },
+  "140": {
+    "key": "antiburn",
+    "text": "灼热免疫"
+  },
+  "141": {
+    "key": "antifreeze",
+    "text": "冻伤·冰冻免疫"
+  },
+  "142": {
+    "key": "antidraw",
+    "text": "不动"
+  },
+  "145": {
+    "key": "em2510",
+    "text": "趔趄"
+  },
+  "17": {
+    "key": "antidebuff",
+    "text": "弱化免疫"
+  },
+  "18": {
+    "key": "drain",
+    "text": "汲取"
+  },
+  "2": {
+    "key": "atkdown",
+    "text": "攻击DOWN"
+  },
+  "20": {
+    "key": "guts",
+    "text": "豪胆"
+  },
+  "21": {
+    "key": "strength",
+    "text": "强壮"
+  },
+  "22": {
+    "key": "gyakkyou",
+    "text": "逆境"
+  },
+  "23": {
+    "key": "criticalup",
+    "text": "暴击率UP"
+  },
+  "24": {
+    "key": "hateup",
+    "text": "挑衅力UP"
+  },
+  "25": {
+    "key": "autorevive",
+    "text": "自动复活"
+  },
+  "26": {
+    "key": "magicvortex",
+    "text": "魔力漩涡"
+  },
+  "27": {
+    "key": "concentration",
+    "text": "专注"
+  },
+  "28": {
+    "key": "ironmeiden",
+    "text": "铁娘子"
+  },
+  "29": {
+    "key": "idodragon",
+    "text": "龙人化"
+  },
+  "3": {
+    "key": "defdown",
+    "text": "防御DOWN"
+  },
+  "30": {
+    "key": "idosuper",
+    "text": "神威一体"
+  },
+  "31": {
+    "key": "undead",
+    "text": "不死之身"
+  },
+  "32": {
+    "key": "TXT_STATE_BOSSARTSAURA",
+    "text": "狂暴"
+  },
+  "33": {
+    "key": "phantasmagoria",
+    "text": "幻术光影"
+  },
+  "36": {
+    "key": "em1806",
+    "text": "深渊荣耀"
+  },
+  "37": {
+    "key": "maxhpdown",
+    "text": "最大HP减少"
+  },
+  "38": {
+    "key": "doubletap",
+    "text": "双发子弹"
+  },
+  "4": {
+    "key": "damagecut",
+    "text": "减伤"
+  },
+  "41": {
+    "key": "barrier",
+    "text": "屏障"
+  },
+  "42": {
+    "key": "dmgup",
+    "text": "造成伤害UP"
+  },
+  "43": {
+    "key": "sharpshoot",
+    "text": "狙击"
+  },
+  "44": {
+    "key": "senrai",
+    "text": "歼雷鸣镝"
+  },
+  "45": {
+    "key": "colorwing",
+    "text": "极彩羽翼"
+  },
+  "46": {
+    "key": "armorparge",
+    "text": "铁衣玉碎"
+  },
+  "5": {
+    "key": "regeneration",
+    "text": "再生"
+  },
+  "50": {
+    "key": "risingnova",
+    "text": "新星跃升"
+  },
+  "51": {
+    "key": "dmgdown",
+    "text": "造成伤害DOWN"
+  },
+  "52": {
+    "key": "bravecarol",
+    "text": "英勇颂歌"
+  },
+  "53": {
+    "key": "playwithfire",
+    "text": "戏火"
+  },
+  "54": {
+    "key": "rebuildstun",
+    "text": "疾天"
+  },
+  "55": {
+    "key": "rebuildweak",
+    "text": "红天"
+  },
+  "56": {
+    "key": "dmglimitup",
+    "text": "伤害上限UP"
+  },
+  "57": {
+    "key": "atkupadd",
+    "text": "叠加攻击UP"
+  },
+  "58": {
+    "key": "defupadd",
+    "text": "叠加防御UP"
+  },
+  "59": {
+    "key": "defdownadd",
+    "text": "叠加防御DOWN"
+  },
+  "6": {
+    "key": "muteki",
+    "text": "无敌"
+  },
+  "67": {
+    "key": "atkdownadd",
+    "text": "叠加攻击DOWN"
+  },
+  "69": {
+    "key": "mspl0200_02",
+    "text": "苍刃"
+  },
+  "7": {
+    "key": "tsuigeki",
+    "text": "追击"
+  },
+  "79": {
+    "key": "mspl0700_01",
+    "text": "幽缘"
+  },
+  "8": {
+    "key": "hyperarmor",
+    "text": "霸体"
+  },
+  "84": {
+    "key": "abdmgup",
+    "text": "能力伤害UP"
+  },
+  "9": {
+    "key": "illusion",
+    "text": "幻影"
+  }
+}

@@ -1,7 +1,7 @@
 import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
 
 import { abilityKey } from "../abilityKey";
-import { skillsForAbility } from "../abilitySkills";
+import { abilityRowKey, skillsForAbilityKey } from "../abilitySkills";
 import type { RowLevel } from "../deriveRows";
 import type { MetricRow } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
@@ -40,17 +40,18 @@ export const aggregateTargets = (skills: SkillState[], enemyLabel: (type: EnemyT
   return [...byType.values()].sort((a, b) => b.value - a.value);
 };
 
-/** Per-ability totals, summed across every skill sharing an action id.
+/** Per-ability totals, summed across every skill the table would draw as ONE
+ * row — condensed into skill groups, exactly like the table beneath the card.
  *
- * The parser can emit more than one `SkillState` for one action — a generic id
- * reused across contexts, for instance — so mapping `skillBreakdown` 1:1 draws
- * the same ability twice with its damage split between the rows, and hands
- * React two children with the same key. Measured on log 544: "Link Attack" and
- * "Light Blast" each appeared twice. Same shape as `aggregateTargets`. */
+ * The parser emits one `SkillState` per (action, child character), so mapping
+ * `skillBreakdown` 1:1 draws an ability twice with its damage split between the
+ * rows, and hands React two children with the same key. Measured on log 544:
+ * "Link Attack" and "Light Blast" each appeared twice. Same shape as
+ * `aggregateTargets`. */
 export const aggregateAbilities = (skills: SkillState[], abilityLabel: (key: string) => string) => {
   const byKey = new Map<string, { key: string; label: string; value: number }>();
   for (const skill of skills) {
-    const key = abilityKey(skill.actionType);
+    const key = abilityRowKey(skill);
     const found = byKey.get(key);
     if (found) found.value += skill.totalDamage;
     else byKey.set(key, { key, label: abilityLabel(key), value: skill.totalDamage });
@@ -132,35 +133,14 @@ export const cardSectionsFor = ({
     const owner = players.find((candidate) => candidate.index === pins.source);
     // EVERY skill under the ability, not the first: the row above sums them, so
     // explaining it with one contributor describes a fraction of what it says.
-    const skills = skillsForAbility(owner?.skillBreakdown ?? [], row.key.replace(/^skill:/, ""));
+    const skills = skillsForAbilityKey(owner?.skillBreakdown ?? [], row.key.replace(/^skill:/, ""));
     if (skills.length === 0) return null;
-
-    const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
-    const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
-    // Extremes across the contributors — the smallest and largest single hit
-    // any of them landed. A null means the log predates the field, not a zero.
-    const mins = skills.map((skill) => skill.minDamage).filter((value): value is number => value !== null);
-    const maxes = skills.map((skill) => skill.maxDamage).filter((value): value is number => value !== null);
 
     return [
       {
         headingKey: "ui.logs.hover-by-target",
         color: TARGET_COLOR,
         entries: aggregateTargets(skills, labels.enemy),
-      },
-      {
-        headingKey: "ui.logs.hover-by-hits",
-        color,
-        entries: [
-          { key: "count", label: labels.text("ui.logs.hover-count"), value: hits },
-          { key: "min", label: labels.text("ui.skill-columns.min"), value: mins.length === 0 ? 0 : Math.min(...mins) },
-          { key: "max", label: labels.text("ui.skill-columns.max"), value: maxes.length === 0 ? 0 : Math.max(...maxes) },
-          {
-            key: "avg",
-            label: labels.text("ui.skill-columns.average"),
-            value: hits === 0 ? 0 : Math.round(damage / hits),
-          },
-        ],
       },
     ];
   }
@@ -192,3 +172,4 @@ export const cardSectionsFor = ({
 
   return null;
 };
+

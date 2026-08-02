@@ -1,0 +1,302 @@
+{
+  "0": {
+    "key": "atkup",
+    "text": "ATQ↑"
+  },
+  "1": {
+    "key": "defup",
+    "text": "DEF↑"
+  },
+  "10": {
+    "key": "protect",
+    "text": "Substituir"
+  },
+  "1000": {
+    "key": "poison",
+    "text": "Veneno"
+  },
+  "1001": {
+    "key": "burn",
+    "text": "Queimadura"
+  },
+  "1002": {
+    "key": "slow",
+    "text": "Lentidão"
+  },
+  "1003": {
+    "key": "stun",
+    "text": "Tontura"
+  },
+  "1004": {
+    "key": "freeze",
+    "text": "Gelo"
+  },
+  "1005": {
+    "key": "frostbite",
+    "text": "Geladura"
+  },
+  "1006": {
+    "key": "sandman",
+    "text": "Cova de Areia"
+  },
+  "1007": {
+    "key": "paralysis",
+    "text": "Paralisia"
+  },
+  "1008": {
+    "key": "waterprison",
+    "text": "Afogamento"
+  },
+  "1011": {
+    "key": "darkburn",
+    "text": "Chama Sombria"
+  },
+  "1012": {
+    "key": "TXT_STATUS_BINDAILMENT",
+    "text": "Contenção"
+  },
+  "1015": {
+    "key": "TXT_STATUS_CAPTUREAILMENT",
+    "text": "Contenção"
+  },
+  "1016": {
+    "key": "disableability",
+    "text": "Hab. Selada"
+  },
+  "1017": {
+    "key": "disableougi",
+    "text": "AC Seladas"
+  },
+  "1018": {
+    "key": "darkpoison",
+    "text": "Peste"
+  },
+  "1019": {
+    "key": "fear",
+    "text": "Petrificação"
+  },
+  "1020": {
+    "key": "arvessfermare",
+    "text": "Fermare de Arvess"
+  },
+  "1021": {
+    "key": "elementweak",
+    "text": "Fricção Elemental"
+  },
+  "11": {
+    "key": "protected",
+    "text": "Coberto"
+  },
+  "125": {
+    "key": "blacksnipper",
+    "text": "Sinergia de Pinça-Miúda"
+  },
+  "134": {
+    "key": "stundown",
+    "text": "Resistência a Atordoamento↓"
+  },
+  "140": {
+    "key": "antiburn",
+    "text": "Imunidade a Queimadura"
+  },
+  "141": {
+    "key": "antifreeze",
+    "text": "Imunidade a Geladura/Gelo"
+  },
+  "142": {
+    "key": "antidraw",
+    "text": "Enraizamento"
+  },
+  "145": {
+    "key": "em2510",
+    "text": "Instável"
+  },
+  "17": {
+    "key": "antidebuff",
+    "text": "Imunidade à Penalidade"
+  },
+  "18": {
+    "key": "drain",
+    "text": "Drenar"
+  },
+  "2": {
+    "key": "atkdown",
+    "text": "ATQ↓"
+  },
+  "20": {
+    "key": "guts",
+    "text": "Coragem"
+  },
+  "21": {
+    "key": "strength",
+    "text": "Força"
+  },
+  "22": {
+    "key": "gyakkyou",
+    "text": "Preso"
+  },
+  "23": {
+    "key": "criticalup",
+    "text": "Chance de Acerto Crítico↑"
+  },
+  "24": {
+    "key": "hateup",
+    "text": "Hostilidade↑"
+  },
+  "25": {
+    "key": "autorevive",
+    "text": "Autorreanimação"
+  },
+  "26": {
+    "key": "magicvortex",
+    "text": "Vórtice Místico"
+  },
+  "27": {
+    "key": "concentration",
+    "text": "Focado"
+  },
+  "28": {
+    "key": "ironmeiden",
+    "text": "Dama de Ferro"
+  },
+  "29": {
+    "key": "idodragon",
+    "text": "Forma de Dragão"
+  },
+  "3": {
+    "key": "defdown",
+    "text": "DEF↓"
+  },
+  "30": {
+    "key": "idosuper",
+    "text": "Força Divina"
+  },
+  "31": {
+    "key": "undead",
+    "text": "Imortal"
+  },
+  "32": {
+    "key": "TXT_STATE_BOSSARTSAURA",
+    "text": "Sanguinolência"
+  },
+  "33": {
+    "key": "phantasmagoria",
+    "text": "Fantasmagoria"
+  },
+  "36": {
+    "key": "em1806",
+    "text": "Glória Abissal"
+  },
+  "37": {
+    "key": "maxhpdown",
+    "text": "HP máximo↓"
+  },
+  "38": {
+    "key": "doubletap",
+    "text": "Toque Duplo"
+  },
+  "4": {
+    "key": "damagecut",
+    "text": "Corte de Dano"
+  },
+  "41": {
+    "key": "barrier",
+    "text": "Barreira"
+  },
+  "42": {
+    "key": "dmgup",
+    "text": "DANO↑"
+  },
+  "43": {
+    "key": "sharpshoot",
+    "text": "Mira Certeira"
+  },
+  "44": {
+    "key": "senrai",
+    "text": "Venha a Trovoada"
+  },
+  "45": {
+    "key": "colorwing",
+    "text": "Asas Cromáticas"
+  },
+  "46": {
+    "key": "armorparge",
+    "text": "Final do Mata-Mata"
+  },
+  "5": {
+    "key": "regeneration",
+    "text": "Regeneração"
+  },
+  "50": {
+    "key": "risingnova",
+    "text": "Nova Ascendente"
+  },
+  "51": {
+    "key": "dmgdown",
+    "text": "DANO↓"
+  },
+  "52": {
+    "key": "bravecarol",
+    "text": "Hino de Batalha"
+  },
+  "53": {
+    "key": "playwithfire",
+    "text": "Brincando com Fogo"
+  },
+  "54": {
+    "key": "rebuildstun",
+    "text": "Sabedoria"
+  },
+  "55": {
+    "key": "rebuildweak",
+    "text": "Cardeal"
+  },
+  "56": {
+    "key": "dmglimitup",
+    "text": "Limite de Dano↑"
+  },
+  "57": {
+    "key": "atkupadd",
+    "text": "ATQ Cumulativo↑"
+  },
+  "58": {
+    "key": "defupadd",
+    "text": "DEF Cumulativa↑"
+  },
+  "59": {
+    "key": "defdownadd",
+    "text": "DEF Cumulativa↓"
+  },
+  "6": {
+    "key": "muteki",
+    "text": "Invulnerabilidade"
+  },
+  "67": {
+    "key": "atkdownadd",
+    "text": "ATQ Cumulativo↓"
+  },
+  "69": {
+    "key": "mspl0200_02",
+    "text": "Lâmina Azul"
+  },
+  "7": {
+    "key": "tsuigeki",
+    "text": "Dano Suplementar"
+  },
+  "79": {
+    "key": "mspl0700_01",
+    "text": "Vínculo Espiritual"
+  },
+  "8": {
+    "key": "hyperarmor",
+    "text": "Coração Valente"
+  },
+  "84": {
+    "key": "abdmgup",
+    "text": "Dano de Habilidade↑"
+  },
+  "9": {
+    "key": "illusion",
+    "text": "Imagem Espelhada"
+  }
+}

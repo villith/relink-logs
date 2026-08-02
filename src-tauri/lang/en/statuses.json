@@ -1,0 +1,302 @@
+{
+  "0": {
+    "key": "atkup",
+    "text": "ATK↑"
+  },
+  "1": {
+    "key": "defup",
+    "text": "DEF↑"
+  },
+  "10": {
+    "key": "protect",
+    "text": "Substitute"
+  },
+  "1000": {
+    "key": "poison",
+    "text": "Poison"
+  },
+  "1001": {
+    "key": "burn",
+    "text": "Burn"
+  },
+  "1002": {
+    "key": "slow",
+    "text": "Slow"
+  },
+  "1003": {
+    "key": "stun",
+    "text": "Dizzy"
+  },
+  "1004": {
+    "key": "freeze",
+    "text": "Glaciate"
+  },
+  "1005": {
+    "key": "frostbite",
+    "text": "Frostbite"
+  },
+  "1006": {
+    "key": "sandman",
+    "text": "Sandtomb"
+  },
+  "1007": {
+    "key": "paralysis",
+    "text": "Paralysis"
+  },
+  "1008": {
+    "key": "waterprison",
+    "text": "Held Under"
+  },
+  "1011": {
+    "key": "darkburn",
+    "text": "Darkflame"
+  },
+  "1012": {
+    "key": "TXT_STATUS_BINDAILMENT",
+    "text": "Bound"
+  },
+  "1015": {
+    "key": "TXT_STATUS_CAPTUREAILMENT",
+    "text": "Bound"
+  },
+  "1016": {
+    "key": "disableability",
+    "text": "Skill Sealed"
+  },
+  "1017": {
+    "key": "disableougi",
+    "text": "SBA Sealed"
+  },
+  "1018": {
+    "key": "darkpoison",
+    "text": "Blight"
+  },
+  "1019": {
+    "key": "fear",
+    "text": "Petrified"
+  },
+  "1020": {
+    "key": "arvessfermare",
+    "text": "Arvess Fermare"
+  },
+  "1021": {
+    "key": "elementweak",
+    "text": "Elemental Friction"
+  },
+  "11": {
+    "key": "protected",
+    "text": "Covered"
+  },
+  "125": {
+    "key": "blacksnipper",
+    "text": "Pincer Synergy"
+  },
+  "134": {
+    "key": "stundown",
+    "text": "Stun Resistance↓"
+  },
+  "140": {
+    "key": "antiburn",
+    "text": "Burn Immunity"
+  },
+  "141": {
+    "key": "antifreeze",
+    "text": "Frostbite/Glaciate Immunity"
+  },
+  "142": {
+    "key": "antidraw",
+    "text": "Rooted"
+  },
+  "145": {
+    "key": "em2510",
+    "text": "Unstable"
+  },
+  "17": {
+    "key": "antidebuff",
+    "text": "Debuff Immunity"
+  },
+  "18": {
+    "key": "drain",
+    "text": "Drain"
+  },
+  "2": {
+    "key": "atkdown",
+    "text": "ATK↓"
+  },
+  "20": {
+    "key": "guts",
+    "text": "Guts"
+  },
+  "21": {
+    "key": "strength",
+    "text": "Strength"
+  },
+  "22": {
+    "key": "gyakkyou",
+    "text": "Jammed"
+  },
+  "23": {
+    "key": "criticalup",
+    "text": "Critical Hit Rate↑"
+  },
+  "24": {
+    "key": "hateup",
+    "text": "Hostility↑"
+  },
+  "25": {
+    "key": "autorevive",
+    "text": "Autorevive"
+  },
+  "26": {
+    "key": "magicvortex",
+    "text": "Mystic Vortex"
+  },
+  "27": {
+    "key": "concentration",
+    "text": "Focused"
+  },
+  "28": {
+    "key": "ironmeiden",
+    "text": "Iron Maiden"
+  },
+  "29": {
+    "key": "idodragon",
+    "text": "Dragonform"
+  },
+  "3": {
+    "key": "defdown",
+    "text": "DEF↓"
+  },
+  "30": {
+    "key": "idosuper",
+    "text": "Godmight"
+  },
+  "31": {
+    "key": "undead",
+    "text": "Undying"
+  },
+  "32": {
+    "key": "TXT_STATE_BOSSARTSAURA",
+    "text": "Bloodthirst"
+  },
+  "33": {
+    "key": "phantasmagoria",
+    "text": "Phantasmagoria"
+  },
+  "36": {
+    "key": "em1806",
+    "text": "Abyssal Glory"
+  },
+  "37": {
+    "key": "maxhpdown",
+    "text": "Max HP↓"
+  },
+  "38": {
+    "key": "doubletap",
+    "text": "Double Tap"
+  },
+  "4": {
+    "key": "damagecut",
+    "text": "DMG Cut"
+  },
+  "41": {
+    "key": "barrier",
+    "text": "Shield"
+  },
+  "42": {
+    "key": "dmgup",
+    "text": "DMG↑"
+  },
+  "43": {
+    "key": "sharpshoot",
+    "text": "Deadshot"
+  },
+  "44": {
+    "key": "senrai",
+    "text": "Bring the Thunder"
+  },
+  "45": {
+    "key": "colorwing",
+    "text": "Chromatic Wings"
+  },
+  "46": {
+    "key": "armorparge",
+    "text": "Deathmatch Finale"
+  },
+  "5": {
+    "key": "regeneration",
+    "text": "Regen"
+  },
+  "50": {
+    "key": "risingnova",
+    "text": "Rising Nova"
+  },
+  "51": {
+    "key": "dmgdown",
+    "text": "DMG↓"
+  },
+  "52": {
+    "key": "bravecarol",
+    "text": "Battle Hymn"
+  },
+  "53": {
+    "key": "playwithfire",
+    "text": "Play with Fire"
+  },
+  "54": {
+    "key": "rebuildstun",
+    "text": "Sage"
+  },
+  "55": {
+    "key": "rebuildweak",
+    "text": "Cardinal"
+  },
+  "56": {
+    "key": "dmglimitup",
+    "text": "DMG Cap↑"
+  },
+  "57": {
+    "key": "atkupadd",
+    "text": "Stackable ATK↑"
+  },
+  "58": {
+    "key": "defupadd",
+    "text": "Stackable DEF↑"
+  },
+  "59": {
+    "key": "defdownadd",
+    "text": "Stackable DEF↓"
+  },
+  "6": {
+    "key": "muteki",
+    "text": "Invincibility"
+  },
+  "67": {
+    "key": "atkdownadd",
+    "text": "Stackable ATK↓"
+  },
+  "69": {
+    "key": "mspl0200_02",
+    "text": "Blade Blue"
+  },
+  "7": {
+    "key": "tsuigeki",
+    "text": "Supplementary DMG"
+  },
+  "79": {
+    "key": "mspl0700_01",
+    "text": "Spiritbond"
+  },
+  "8": {
+    "key": "hyperarmor",
+    "text": "Stout Heart"
+  },
+  "84": {
+    "key": "abdmgup",
+    "text": "Skill DMG↑"
+  },
+  "9": {
+    "key": "illusion",
+    "text": "Mirror Image"
+  }
+}

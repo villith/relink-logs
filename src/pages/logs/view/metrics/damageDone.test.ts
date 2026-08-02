@@ -43,16 +43,16 @@ const player = (
 
 const PLAYERS = [
   player(0, 300, [
-    { action: 100, damage: 200 },
-    { action: 200, damage: 100 },
+    { action: 9001, damage: 200 },
+    { action: 9002, damage: 100 },
   ]),
   player(1, 100, []),
 ];
 
-const NO_PINS: SelectorPins = { source: null, targetIds: [], ability: null };
+const NO_PINS: SelectorPins = { source: null, targets: [], ability: null };
 
 const input = (
-  level: "players" | "abilities" | "hits",
+  level: "players" | "abilities" | "skills",
   pins: SelectorPins = NO_PINS,
   players: ComputedPlayerState[] = PLAYERS
 ) =>
@@ -78,13 +78,13 @@ describe("damageDone descriptor", () => {
   });
 
   it("gives the pinned player's abilities at the abilities level", () => {
-    const rows = damageDone.rows(input("abilities", { source: 0, targetIds: [], ability: null }));
+    const rows = damageDone.rows(input("abilities", { source: 0, targets: [], ability: null }));
     expect(rows.map((r) => r.value)).toEqual([200, 100]);
-    expect(rows[0].pinOnClick).toEqual({ ability: "Normal:100" });
+    expect(rows[0].pinOnClick).toEqual({ ability: "Normal:9001" });
   });
 
   it("returns no rows when the pinned source has no data", () => {
-    const rows = damageDone.rows(input("abilities", { source: 99, targetIds: [], ability: null }));
+    const rows = damageDone.rows(input("abilities", { source: 99, targets: [], ability: null }));
     expect(rows).toEqual([]);
   });
 
@@ -102,7 +102,7 @@ describe("damageDone descriptor", () => {
   it("tags every ability row with the pinned player's slot", () => {
     // All of one player's abilities are that player's colour — the rows are a
     // breakdown of one bar, not four.
-    const rows = damageDone.rows(input("abilities", { source: 0, targetIds: [], ability: null }));
+    const rows = damageDone.rows(input("abilities", { source: 0, targets: [], ability: null }));
     expect(rows.every((r) => r.colorSlot === 0)).toBe(true);
   });
 
@@ -114,12 +114,12 @@ describe("damageDone descriptor", () => {
     // hover card.
     const withSummon = [
       player(0, 300, [
-        { action: 100, damage: 120, hits: 3 },
-        { action: 100, damage: 80, child: "Wp0000", hits: 2 },
-        { action: 200, damage: 100 },
+        { action: 9001, damage: 120, hits: 3 },
+        { action: 9001, damage: 80, child: "Wp0000", hits: 2 },
+        { action: 9002, damage: 100 },
       ]),
     ];
-    const rows = damageDone.rows(input("abilities", { source: 0, targetIds: [], ability: null }, withSummon));
+    const rows = damageDone.rows(input("abilities", { source: 0, targets: [], ability: null }, withSummon));
 
     expect(rows).toHaveLength(2);
     expect(new Set(rows.map((r) => r.key)).size).toBe(2);
@@ -142,7 +142,7 @@ describe("damageDone descriptor", () => {
         { action: 201, damage: 5 },
       ]),
     ];
-    const rows = damageDone.rows(input("abilities", { source: 0, targetIds: [], ability: null }, owner));
+    const rows = damageDone.rows(input("abilities", { source: 0, targets: [], ability: null }, owner));
 
     expect(rows).toHaveLength(2);
     // Biggest first: normal-attack's 60 over power-raise's 45.
@@ -155,8 +155,8 @@ describe("damageDone descriptor", () => {
   it("carries min, max and average per ability", () => {
     // These used to sit in the hover card as a fourth "share of a maximum" list,
     // which meant nothing. A column header gives them their meaning back.
-    const owner = [player(0, 300, [{ action: 100, damage: 1000, hits: 4, min: 100, max: 500 }])];
-    const rows = damageDone.rows(input("abilities", { source: 0, targetIds: [], ability: null }, owner));
+    const owner = [player(0, 300, [{ action: 9001, damage: 1000, hits: 4, min: 100, max: 500 }])];
+    const rows = damageDone.rows(input("abilities", { source: 0, targets: [], ability: null }, owner));
 
     expect(damageDone.columnKeys("abilities")).toEqual([
       "ui.skill-columns.total",
@@ -172,11 +172,11 @@ describe("damageDone descriptor", () => {
   it("takes the extremes across every skill behind one ability", () => {
     const owner = [
       player(0, 300, [
-        { action: 100, damage: 200, hits: 2, min: 80, max: 120 },
-        { action: 100, damage: 300, hits: 2, min: 40, max: 260, child: "Wp0000" },
+        { action: 9001, damage: 200, hits: 2, min: 80, max: 120 },
+        { action: 9001, damage: 300, hits: 2, min: 40, max: 260, child: "Wp0000" },
       ]),
     ];
-    const rows = damageDone.rows(input("abilities", { source: 0, targetIds: [], ability: null }, owner));
+    const rows = damageDone.rows(input("abilities", { source: 0, targets: [], ability: null }, owner));
 
     // Smallest and largest single hit either landed — not the smallest minimum
     // of one contributor alone.
@@ -184,8 +184,8 @@ describe("damageDone descriptor", () => {
   });
 
   it("shows a dash rather than a zero when a log predates the min/max fields", () => {
-    const owner = [player(0, 300, [{ action: 100, damage: 200, hits: 2, min: null, max: null }])];
-    const rows = damageDone.rows(input("abilities", { source: 0, targetIds: [], ability: null }, owner));
+    const owner = [player(0, 300, [{ action: 9001, damage: 200, hits: 2, min: null, max: null }])];
+    const rows = damageDone.rows(input("abilities", { source: 0, targets: [], ability: null }, owner));
 
     // A null is "not recorded", and rendering it as 0 claims a hit landed for
     // nothing. The average is still derivable from total and hits.
@@ -204,7 +204,7 @@ describe("damageDone descriptor", () => {
       ]),
     ];
     const rows = damageDone.rows(
-      input("skills", { source: 0, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, owner)
+      input("skills", { source: 0, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, owner)
     );
 
     expect(rows.map((r) => r.key)).toEqual(["skill:Normal:100", "skill:Normal:110", "skill:Normal:120"]);
@@ -215,7 +215,7 @@ describe("damageDone descriptor", () => {
     // Display only: there is nothing below a member skill to descend into.
     const owner = [player(0, 30, [{ action: 100, damage: 30 }])];
     const rows = damageDone.rows(
-      input("skills", { source: 0, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, owner)
+      input("skills", { source: 0, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, owner)
     );
 
     expect(rows.every((r) => r.pinOnClick === null)).toBe(true);
@@ -224,7 +224,7 @@ describe("damageDone descriptor", () => {
   it("shows one row for a pinned ungrouped ability", () => {
     // Link Attack and SBA never group. One row, itself, is the honest answer.
     const owner = [player(0, 40, [{ action: 9001, damage: 40 }])];
-    const rows = damageDone.rows(input("skills", { source: 0, targetIds: [], ability: "Normal:9001" }, owner));
+    const rows = damageDone.rows(input("skills", { source: 0, targets: [], ability: "Normal:9001" }, owner));
 
     expect(rows).toHaveLength(1);
     expect(rows[0].key).toBe("skill:Normal:9001");
@@ -238,7 +238,7 @@ describe("damageDone descriptor", () => {
       ]),
     ];
     const rows = damageDone.rows(
-      input("skills", { source: 0, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, owner)
+      input("skills", { source: 0, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, owner)
     );
 
     expect(rows).toHaveLength(1);
@@ -255,7 +255,7 @@ describe("damageDone descriptor", () => {
       player(1, 20, [{ action: 100, damage: 20, hits: 1 }]),
     ];
     const rows = damageDone.rows(
-      input("skills", { source: null, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
+      input("skills", { source: null, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
     );
 
     expect(rows).toHaveLength(1);
@@ -266,7 +266,7 @@ describe("damageDone descriptor", () => {
   it("shares against the whole party's total when no friendly is pinned", () => {
     const party = [player(0, 30, [{ action: 100, damage: 30 }]), player(1, 10, [{ action: 110, damage: 10 }])];
     const rows = damageDone.rows(
-      input("skills", { source: null, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
+      input("skills", { source: null, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
     );
 
     expect(rows[0].columns.at(-1)).toBe("75.0%");
@@ -278,7 +278,7 @@ describe("damageDone descriptor", () => {
     // negative slot in its neutral ink.
     const party = [player(0, 30, [{ action: 100, damage: 30 }]), player(1, 20, [{ action: 100, damage: 20 }])];
     const rows = damageDone.rows(
-      input("skills", { source: null, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
+      input("skills", { source: null, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
     );
 
     expect(rows[0].colorSlot).toBe(-1);
@@ -287,7 +287,7 @@ describe("damageDone descriptor", () => {
   it("still returns nothing when a pinned source has no data", () => {
     // A source that IS pinned but absent from the scoped party is a different
     // case from no source at all, and must stay empty.
-    expect(damageDone.rows(input("skills", { source: 99, targetIds: [], ability: "Normal:100" }))).toEqual([]);
+    expect(damageDone.rows(input("skills", { source: 99, targets: [], ability: "Normal:100" }))).toEqual([]);
   });
 
   it("carries the share of the level's total as its last column", () => {
@@ -296,3 +296,4 @@ describe("damageDone descriptor", () => {
     expect(rows[1].columns.at(-1)).toBe("25.0%");
   });
 });
+

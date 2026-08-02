@@ -1,0 +1,322 @@
+{
+  "0": {
+    "key": "atkup",
+    "text": "攻撃UP"
+  },
+  "1": {
+    "key": "defup",
+    "text": "防御UP"
+  },
+  "10": {
+    "key": "protect",
+    "text": "かばう"
+  },
+  "1000": {
+    "key": "poison",
+    "text": "毒"
+  },
+  "1001": {
+    "key": "burn",
+    "text": "灼熱"
+  },
+  "1002": {
+    "key": "slow",
+    "text": "スロウ"
+  },
+  "1003": {
+    "key": "stun",
+    "text": "気絶"
+  },
+  "1004": {
+    "key": "freeze",
+    "text": "氷結"
+  },
+  "1005": {
+    "key": "frostbite",
+    "text": "凍傷"
+  },
+  "1006": {
+    "key": "sandman",
+    "text": "砂だるま"
+  },
+  "1007": {
+    "key": "paralysis",
+    "text": "麻痺"
+  },
+  "1008": {
+    "key": "waterprison",
+    "text": "水牢"
+  },
+  "1011": {
+    "key": "darkburn",
+    "text": "紫銀の炎"
+  },
+  "1012": {
+    "key": "TXT_STATUS_BINDAILMENT",
+    "text": "拘束"
+  },
+  "1015": {
+    "key": "TXT_STATUS_CAPTUREAILMENT",
+    "text": "拘束"
+  },
+  "1016": {
+    "key": "disableability",
+    "text": "アビリティ封印"
+  },
+  "1017": {
+    "key": "disableougi",
+    "text": "奥義封印"
+  },
+  "1018": {
+    "key": "darkpoison",
+    "text": "災禍"
+  },
+  "1019": {
+    "key": "fear",
+    "text": "恐怖"
+  },
+  "1020": {
+    "key": "arvessfermare",
+    "text": "アルベス・フェルマーレ"
+  },
+  "1021": {
+    "key": "elementweak",
+    "text": "元素不和"
+  },
+  "11": {
+    "key": "protected",
+    "text": "セーフティ"
+  },
+  "12": {
+    "key": "TXT_STATE_MANIGANS",
+    "text": "マニガンス"
+  },
+  "125": {
+    "key": "blacksnipper",
+    "text": "カニシナジー"
+  },
+  "13": {
+    "key": "TXT_STATE_PL1200ATTACKBUFF",
+    "text": "ヴァリアントスタンス"
+  },
+  "134": {
+    "key": "stundown",
+    "text": "スタン耐性DOWN"
+  },
+  "14": {
+    "key": "TXT_STATE_PL1300ATTACKBUFF",
+    "text": "刀逡巡"
+  },
+  "140": {
+    "key": "antiburn",
+    "text": "灼熱無効"
+  },
+  "141": {
+    "key": "antifreeze",
+    "text": "凍傷・氷結無効"
+  },
+  "142": {
+    "key": "antidraw",
+    "text": "不動"
+  },
+  "145": {
+    "key": "em2510",
+    "text": "浮き足"
+  },
+  "16": {
+    "key": "TXT_STATE_CLEARAILMENT",
+    "text": "状態異常解除"
+  },
+  "17": {
+    "key": "antidebuff",
+    "text": "弱体無効"
+  },
+  "18": {
+    "key": "drain",
+    "text": "吸収"
+  },
+  "19": {
+    "key": "TXT_STATE_JUSTCOMBINATION",
+    "text": "竜気解放"
+  },
+  "2": {
+    "key": "atkdown",
+    "text": "攻撃DOWN"
+  },
+  "20": {
+    "key": "guts",
+    "text": "ガッツ"
+  },
+  "21": {
+    "key": "strength",
+    "text": "ストレングス"
+  },
+  "22": {
+    "key": "gyakkyou",
+    "text": "逆境"
+  },
+  "23": {
+    "key": "criticalup",
+    "text": "クリティカル確率UP"
+  },
+  "24": {
+    "key": "hateup",
+    "text": "敵対心UP"
+  },
+  "25": {
+    "key": "autorevive",
+    "text": "自動復活"
+  },
+  "26": {
+    "key": "magicvortex",
+    "text": "魔力の渦"
+  },
+  "27": {
+    "key": "concentration",
+    "text": "コンセントレーション"
+  },
+  "28": {
+    "key": "ironmeiden",
+    "text": "アイアン・メイデン"
+  },
+  "29": {
+    "key": "idodragon",
+    "text": "竜人化"
+  },
+  "3": {
+    "key": "defdown",
+    "text": "防御DOWN"
+  },
+  "30": {
+    "key": "idosuper",
+    "text": "神威一体"
+  },
+  "31": {
+    "key": "undead",
+    "text": "不死身"
+  },
+  "32": {
+    "key": "TXT_STATE_BOSSARTSAURA",
+    "text": "バーストオーラ"
+  },
+  "33": {
+    "key": "phantasmagoria",
+    "text": "ファンタズマゴリア"
+  },
+  "36": {
+    "key": "em1806",
+    "text": "アビサルグローリー"
+  },
+  "37": {
+    "key": "maxhpdown",
+    "text": "最大HP減少"
+  },
+  "38": {
+    "key": "doubletap",
+    "text": "ダブルタップ"
+  },
+  "4": {
+    "key": "damagecut",
+    "text": "被ダメージカット"
+  },
+  "41": {
+    "key": "barrier",
+    "text": "バリア"
+  },
+  "42": {
+    "key": "dmgup",
+    "text": "与ダメージUP"
+  },
+  "43": {
+    "key": "sharpshoot",
+    "text": "狙撃"
+  },
+  "44": {
+    "key": "senrai",
+    "text": "殲雷の鏑矢"
+  },
+  "45": {
+    "key": "colorwing",
+    "text": "極彩色の羽"
+  },
+  "46": {
+    "key": "armorparge",
+    "text": "鎧散牙"
+  },
+  "5": {
+    "key": "regeneration",
+    "text": "再生"
+  },
+  "50": {
+    "key": "risingnova",
+    "text": "ライジング・ノヴァ"
+  },
+  "51": {
+    "key": "dmgdown",
+    "text": "与ダメージDOWN"
+  },
+  "52": {
+    "key": "bravecarol",
+    "text": "ブレイブキャロル"
+  },
+  "53": {
+    "key": "playwithfire",
+    "text": "プレイウィズファイア"
+  },
+  "54": {
+    "key": "rebuildstun",
+    "text": "疾天"
+  },
+  "55": {
+    "key": "rebuildweak",
+    "text": "紅天"
+  },
+  "56": {
+    "key": "dmglimitup",
+    "text": "ダメージ上限UP"
+  },
+  "57": {
+    "key": "atkupadd",
+    "text": "累積攻撃UP"
+  },
+  "58": {
+    "key": "defupadd",
+    "text": "累積防御UP"
+  },
+  "59": {
+    "key": "defdownadd",
+    "text": "累積防御DOWN"
+  },
+  "6": {
+    "key": "muteki",
+    "text": "無敵"
+  },
+  "67": {
+    "key": "atkdownadd",
+    "text": "累積攻撃DOWN"
+  },
+  "69": {
+    "key": "mspl0200_02",
+    "text": "蒼刃"
+  },
+  "7": {
+    "key": "tsuigeki",
+    "text": "追撃"
+  },
+  "79": {
+    "key": "mspl0700_01",
+    "text": "幽縁"
+  },
+  "8": {
+    "key": "hyperarmor",
+    "text": "怯み無効"
+  },
+  "84": {
+    "key": "abdmgup",
+    "text": "アビリティダメージUP"
+  },
+  "9": {
+    "key": "illusion",
+    "text": "幻影"
+  }
+}

@@ -47,3 +47,4 @@ export const skillGroupFor = (skill: SkillRow): SkillGroupKey | null => {
 
   return null;
 };
+

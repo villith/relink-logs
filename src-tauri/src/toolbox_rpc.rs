@@ -329,7 +329,17 @@ async fn request(
     if hook.outdated.load(Ordering::Relaxed) {
         return Err("hook-outdated".into());
     }
-    match call(req).await {
+    map_transport(call(req).await)
+}
+
+/// Map one transport result onto the slug the UI switches on.
+///
+/// Split out of [`request`] so it can be tested without a pipe: a developer
+/// with the game open has a hook that ANSWERS the toolbox channel, so driving
+/// this through the real transport asserted the absence of the very thing the
+/// machine was running.
+fn map_transport(result: Result<ToolboxResponse>) -> Result<Option<ToolboxResponse>, String> {
+    match result {
         Ok(resp) => Ok(Some(resp)),
         Err(e) => {
             log::warn!("toolbox rpc failed: {e:?}");
@@ -396,16 +406,31 @@ mod tests {
         );
     }
 
-    /// connected + current but nothing listening (no game in tests) → the
-    /// unreachable slug, not a hang (RPC_TIMEOUT bounds it).
-    #[tokio::test]
-    async fn unreachable_hook_maps_to_its_slug() {
-        let hook = HookStatus::default();
-        hook.connected.store(true, Ordering::Relaxed);
+    /// connected + current but the request does not come back → the unreachable
+    /// slug, never a hang and never a version verdict.
+    ///
+    /// Asserted on the mapping rather than through the real pipe: the old form
+    /// called `synthesis_snapshot` and depended on nothing listening, so it
+    /// failed on every local run made with the game open — the one machine
+    /// state where a hook is guaranteed to answer.
+    #[test]
+    fn unreachable_transport_maps_to_its_slug() {
         assert_eq!(
-            synthesis_snapshot(&hook).await,
-            Err("hook-unreachable".to_string())
+            map_transport(Err(anyhow::anyhow!("toolbox pipe busy"))).err(),
+            Some("hook-unreachable".to_string())
         );
+    }
+
+    /// The other half of the same mapping: an answer is passed straight
+    /// through, so a reachable hook is never reported as unreachable.
+    #[test]
+    fn answered_transport_passes_through() {
+        let answered = map_transport(Ok(ToolboxResponse::Hello {
+            protocol_version: TOOLBOX_PROTOCOL_VERSION,
+            hook_version: "test".into(),
+            supports_eject: false,
+        }));
+        assert!(matches!(answered, Ok(Some(ToolboxResponse::Hello { .. }))));
     }
 
     fn connected_hook(hook_version: Option<&str>, supports_eject: bool) -> HookStatus {
@@ -664,3 +689,4 @@ mod tests {
         assert_eq!(hook.snapshot().state, HookState::Disconnected);
     }
 }
+

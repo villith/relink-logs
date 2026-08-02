@@ -1,8 +1,7 @@
-import { skillGroupFor } from "@/components/skillGrouping";
-import type { AbilityChartSeries, CharacterType, EnemyType, SkillState, TargetChartSeries } from "@/types";
+import type { AbilityChartSeries, CharacterType, EnemyType, SkillRow, TargetChartSeries } from "@/types";
+import { targetLabelKey } from "@/utils";
 
-import { abilityKey } from "../abilityKey";
-import { targetLabelKey } from "../../../../utils";
+import { abilityRowKey, abilityRowName } from "../abilitySkills";
 
 /** One band of the drill-down chart, ready to plot: a stable series key, the
  * name the legend shows, and one value per bucket. */
@@ -15,10 +14,14 @@ const addInto = (into: number[], values: number[]) => {
   }
 };
 
-const byTotalDescending = (a: DrillSeries, b: DrillSeries) => {
-  const total = (series: DrillSeries) => series.values.reduce((sum, value) => sum + value, 0);
-  return total(b) - total(a);
-};
+/** Biggest band first. Each total is summed ONCE and carried through the sort —
+ * a comparator that re-summed would walk every bucket of both operands on each
+ * of the O(n log n) comparisons. */
+const byTotalDescending = (series: DrillSeries[]): DrillSeries[] =>
+  series
+    .map((band) => ({ band, total: band.values.reduce((sum, value) => sum + value, 0) }))
+    .sort((a, b) => b.total - a.total)
+    .map(({ band }) => band);
 
 /** The pinned player's per-ability bands, folded into skill groups.
  *
@@ -35,21 +38,15 @@ const byTotalDescending = (a: DrillSeries, b: DrillSeries) => {
 export const foldAbilityChart = (
   series: AbilityChartSeries[],
   characterType: CharacterType,
-  skillName: (characterType: CharacterType, skill: SkillState) => string
+  skillName: (characterType: CharacterType, skill: SkillRow) => string
 ): DrillSeries[] => {
   const byKey = new Map<string, DrillSeries>();
 
   for (const band of series) {
-    const skill = band as unknown as SkillState;
-    const group = skillGroupFor(skill);
-
-    // The child is part of the key even for a group: a pet's group is not its
-    // owner's. A group spanning classes (Primal Burst) carries a null child and
-    // so collapses to one band, which is the point of it.
-    const key =
-      group === null
-        ? `skill:${abilityKey(band.actionType)}:${JSON.stringify(band.childCharacterType)}`
-        : `group:${group.group}:${JSON.stringify(group.childCharacterType)}`;
+    // The SAME key the table gives the row this band belongs to, so a band and
+    // a row are the same thing — that correspondence is what lets the stack's
+    // height be read against the table's totals.
+    const key = abilityRowKey(band);
 
     const found = byKey.get(key);
     if (found) {
@@ -59,18 +56,12 @@ export const foldAbilityChart = (
 
     byKey.set(key, {
       key,
-      label:
-        group === null
-          ? skillName(characterType, skill)
-          : skillName(characterType, {
-              ...skill,
-              actionType: { Group: group.group },
-            } as SkillState),
+      label: abilityRowName(characterType, band, skillName),
       values: [...band.values],
     });
   }
 
-  return [...byKey.values()].sort(byTotalDescending);
+  return byTotalDescending([...byKey.values()]);
 };
 
 /** The pinned ability's per-spawn bands.
@@ -92,3 +83,4 @@ export const foldTargetChart = (
       values: [...band.values],
     }))
   );
+

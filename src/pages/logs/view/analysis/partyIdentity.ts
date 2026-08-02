@@ -16,3 +16,4 @@ export const identityPartyOf = (
   const party = baseParty ?? scopedParty;
   return party ? formatInPartyOrder(party) : [];
 };
+

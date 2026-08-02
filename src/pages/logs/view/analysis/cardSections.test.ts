@@ -33,7 +33,7 @@ const PLAYERS = [
     partyIndex: 0,
     characterType: "Pl1400",
     totalDamage: 300,
-    skillBreakdown: [skill(100, 200, 20), skill(200, 100, 10)],
+    skillBreakdown: [skill(9001, 200, 20), skill(9002, 100, 10)],
   },
 ] as unknown as ComputedPlayerState[];
 
@@ -72,12 +72,12 @@ const row = (key: string): MetricRow => ({
   colorSlot: 0,
 });
 
-const call = (level: "players" | "abilities" | "hits", key: string) =>
+const call = (level: "players" | "abilities" | "skills", key: string) =>
   cardSectionsFor({
     row: row(key),
     level,
     players: PLAYERS,
-    pins: { source: 0, targetIds: [], ability: null },
+    pins: { source: 0, targets: [], ability: null },
     color: "rgb(1,2,3)",
     labels: LABELS,
   });
@@ -85,7 +85,7 @@ const call = (level: "players" | "abilities" | "hits", key: string) =>
 const callWith = (
   level: "players" | "abilities" | "skills",
   key: string,
-  pins: { source: number | null; targetIds: number[]; ability: string | null },
+  pins: { source: number | null; targets: number[]; ability: string | null },
   players = PARTY
 ) =>
   cardSectionsFor({
@@ -119,7 +119,7 @@ describe("cardSectionsFor", () => {
         partyIndex: 0,
         characterType: "Pl1400",
         totalDamage: 300,
-        skillBreakdown: [skill(100, 200, 20), skill(100, 50, 5), skill(200, 50, 5)],
+        skillBreakdown: [skill(9001, 200, 20), skill(9001, 50, 5), skill(9002, 50, 5)],
       },
     ] as unknown as ComputedPlayerState[];
 
@@ -127,13 +127,13 @@ describe("cardSectionsFor", () => {
       row: row("player:0"),
       level: "players",
       players,
-      pins: { source: 0, targetIds: [], ability: null },
+      pins: { source: 0, targets: [], ability: null },
       color: "rgb(1,2,3)",
       labels: LABELS,
     });
 
     const abilities = sections?.[0].entries ?? [];
-    expect(abilities.map((e) => e.key)).toEqual(["Normal:100", "Normal:200"]);
+    expect(abilities.map((e) => e.key)).toEqual(["Normal:9001", "Normal:9002"]);
     expect(abilities.map((e) => e.value)).toEqual([250, 50]);
   });
 
@@ -157,7 +157,7 @@ describe("cardSectionsFor", () => {
         totalDamage: 30,
         skillBreakdown: [
           {
-            ...skill(100, 30, 3),
+            ...skill(9001, 30, 3),
             targets: [
               { enemyType: { Unknown: 1 }, hits: 1, totalDamage: 20 },
               { enemyType: { Unknown: 2 }, hits: 1, totalDamage: 10 },
@@ -171,7 +171,7 @@ describe("cardSectionsFor", () => {
       row: row("player:0"),
       level: "players",
       players,
-      pins: { source: 0, targetIds: [], ability: null },
+      pins: { source: 0, targets: [], ability: null },
       color: "rgb(1,2,3)",
       labels: LABELS,
     });
@@ -184,7 +184,7 @@ describe("cardSectionsFor", () => {
     // already pinned, so it would always be one row at 100%. No hit-statistics
     // section either — every section here renders as a share and a bar, which
     // is meaningless over min/max/avg, so those live in the table's columns.
-    const sections = call("abilities", "skill:Normal:100");
+    const sections = call("abilities", "skill:Normal:9001");
     expect(sections?.map((s) => s.headingKey)).toEqual(["ui.logs.hover-by-target"]);
   });
 
@@ -197,15 +197,15 @@ describe("cardSectionsFor", () => {
         partyIndex: 0,
         characterType: "Pl1400",
         totalDamage: 250,
-        skillBreakdown: [skill(100, 200, 20), skill(100, 50, 5)],
+        skillBreakdown: [skill(9001, 200, 20), skill(9001, 50, 5)],
       },
     ] as unknown as ComputedPlayerState[];
 
     const sections = cardSectionsFor({
-      row: row("skill:Normal:100"),
+      row: row("skill:Normal:9001"),
       level: "abilities",
       players,
-      pins: { source: 0, targetIds: [], ability: null },
+      pins: { source: 0, targets: [], ability: null },
       color: "rgb(1,2,3)",
       labels: LABELS,
     });
@@ -224,7 +224,7 @@ describe("cardSectionsFor", () => {
 });
 
 describe("cardSectionsFor at the skills level", () => {
-  const ABILITY_ONLY = { source: null, targetIds: [] as number[], ability: "Normal:9001" };
+  const ABILITY_ONLY = { source: null, targets: [] as number[], ability: "Normal:9001" };
 
   it("explains a member skill by source and then by target", () => {
     const sections = callWith("skills", "skill:Normal:9001", ABILITY_ONLY);
@@ -261,7 +261,7 @@ describe("cardSectionsFor at the skills level", () => {
     // makes the card change shape as the friendly pin comes and goes.
     // With a friendly pinned the scoped party holds only that player, so the
     // section is a single row — which is exactly the case being kept.
-    const sections = callWith("skills", "skill:Normal:9001", { source: 0, targetIds: [], ability: "Normal:9001" }, [
+    const sections = callWith("skills", "skill:Normal:9001", { source: 0, targets: [], ability: "Normal:9001" }, [
       PARTY[0],
     ]);
 

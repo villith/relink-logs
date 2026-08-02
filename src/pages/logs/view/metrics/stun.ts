@@ -1,4 +1,4 @@
-import { groupSkillsByAbility } from "../abilitySkills";
+import { groupSkillsForRows, mergeSkillsByAction } from "../abilitySkills";
 import type { MetricDescriptor, MetricRow } from "./types";
 
 const oneDecimal = (value: number): string => value.toFixed(1);
@@ -27,12 +27,22 @@ export const stun: MetricDescriptor = {
         }));
     }
 
-    const owner = players.find((p) => p.index === pins.source);
-    if (!owner) return [];
+    // Same rule as `damageDone`: a pinned-but-absent source is empty, while NO
+    // pinned source widens the scope to the whole party without changing what a
+    // row is.
+    const owner = pins.source === null ? null : players.find((p) => p.index === pins.source);
+    if (pins.source !== null && !owner) return [];
 
-    // Grouped, not mapped 1:1 — see `groupSkillsByAbility`. Totals add; the max
-    // is the biggest single hit, so it takes the largest rather than summing.
-    return groupSkillsByAbility(owner.skillBreakdown)
+    const breakdown = owner ? owner.skillBreakdown : players.flatMap((p) => p.skillBreakdown);
+    const colorSlot = owner ? owner.partyIndex : -1;
+
+    // Condensed into skill-group rows at the abilities level — see
+    // `abilityRowKey` — and NOT condensed one level down, where the rows are the
+    // pinned group's members. Totals add; the max is the biggest single hit, so
+    // it takes the largest rather than summing.
+    const fold = level === "abilities" ? groupSkillsForRows : mergeSkillsByAction;
+
+    return fold(breakdown)
       .map(({ key, skills }) => ({
         key: `skill:${key}`,
         label: key,
@@ -47,3 +57,4 @@ export const stun: MetricDescriptor = {
       .sort((a, b) => b.value - a.value);
   },
 };
+

@@ -173,4 +173,63 @@ mod tests {
             &MeterFilters::default()
         ));
     }
+
+    #[test]
+    fn empty_selection_matches_every_event() {
+        let selection = SelectionFilter::default();
+        assert!(matches_selection(
+            &hit(ORDINARY_SUMMON_BODY, 200),
+            &selection
+        ));
+    }
+
+    #[test]
+    fn source_filter_keys_on_the_parent_not_the_body() {
+        // A summon's hit belongs to the player who summoned it, so pinning that
+        // player must keep it. `hit` sets parent_index to 0 and index to 1.
+        let selection = SelectionFilter {
+            source_indices: vec![0],
+            abilities: vec![],
+        };
+        assert!(matches_selection(
+            &hit(ORDINARY_SUMMON_BODY, 200),
+            &selection
+        ));
+
+        let other = SelectionFilter {
+            source_indices: vec![3],
+            abilities: vec![],
+        };
+        assert!(!matches_selection(&hit(ORDINARY_SUMMON_BODY, 200), &other));
+    }
+
+    #[test]
+    fn ability_filter_matches_the_action_id() {
+        let selection = SelectionFilter {
+            source_indices: vec![],
+            abilities: vec![ActionType::Normal(200)],
+        };
+        assert!(matches_selection(
+            &hit(ORDINARY_SUMMON_BODY, 200),
+            &selection
+        ));
+        assert!(!matches_selection(
+            &hit(ORDINARY_SUMMON_BODY, 201),
+            &selection
+        ));
+    }
+
+    #[test]
+    fn source_and_ability_are_anded() {
+        let selection = SelectionFilter {
+            source_indices: vec![0],
+            abilities: vec![ActionType::Normal(999)],
+        };
+        // Source matches, ability does not — the event is out.
+        assert!(!matches_selection(
+            &hit(ORDINARY_SUMMON_BODY, 200),
+            &selection
+        ));
+    }
 }
+

@@ -215,3 +215,42 @@
   font-size: 10px;
   letter-spacing: 0.08em;
 }
+
+/* The chart legend, in ordinary flow below the plot: a recharts <Legend> is
+   laid out INSIDE the chart against a hardcoded 44px reservation, so a legend
+   that wraps to a second row overlaps the plot. This one wraps as far as it
+   needs to. */
+.analysis-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  padding: 4px 0 2px;
+}
+
+.analysis-legend-entry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 2px;
+  border-radius: 3px;
+}
+
+/* An outline, not a fill — the same hover language `.analysis-row` uses. */
+.analysis-legend-entry:hover {
+  outline: 1px solid var(--an-line-strong);
+  outline-offset: -1px;
+}
+
+.analysis-legend-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.analysis-legend-name {
+  font-size: 11px;
+  color: var(--an-ink-2);
+  line-height: 1.4;
+}
+

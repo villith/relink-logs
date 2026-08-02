@@ -12,6 +12,7 @@
     "format": "prettier --write --ignore-unknown --ext js,jsx,ts,tsx src ./src",
     "format-check": "prettier --check --ignore-unknown --ext js,jsx,ts,tsx src ./src",
     "tauri": "tauri",
+    "tauri:debug": "node scripts/tauri-dev-debug.mjs",
     "test": "vitest",
     "bump": "node scripts/bump-version.mjs",
     "clean:target": "node scripts/clean-target.mjs",

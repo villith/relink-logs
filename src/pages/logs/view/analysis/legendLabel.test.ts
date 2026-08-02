@@ -61,3 +61,4 @@ describe("labelSourceOptions", () => {
     expect(labelled[0]).toEqual({ value: "nonsense", label: "?" });
   });
 });
+

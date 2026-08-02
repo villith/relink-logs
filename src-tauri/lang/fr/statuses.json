@@ -1,0 +1,302 @@
+{
+  "0": {
+    "key": "atkup",
+    "text": "ATT ↑"
+  },
+  "1": {
+    "key": "defup",
+    "text": "DÉF ↑"
+  },
+  "10": {
+    "key": "protect",
+    "text": "Substitution"
+  },
+  "1000": {
+    "key": "poison",
+    "text": "Empoisonnement"
+  },
+  "1001": {
+    "key": "burn",
+    "text": "Brûlure"
+  },
+  "1002": {
+    "key": "slow",
+    "text": "Ralentissement"
+  },
+  "1003": {
+    "key": "stun",
+    "text": "Vertige"
+  },
+  "1004": {
+    "key": "freeze",
+    "text": "Gel"
+  },
+  "1005": {
+    "key": "frostbite",
+    "text": "Engelure"
+  },
+  "1006": {
+    "key": "sandman",
+    "text": "Ensablement"
+  },
+  "1007": {
+    "key": "paralysis",
+    "text": "Paralysie"
+  },
+  "1008": {
+    "key": "waterprison",
+    "text": "Séquestration"
+  },
+  "1011": {
+    "key": "darkburn",
+    "text": "Sombreflamme"
+  },
+  "1012": {
+    "key": "TXT_STATUS_BINDAILMENT",
+    "text": "Attache"
+  },
+  "1015": {
+    "key": "TXT_STATUS_CAPTUREAILMENT",
+    "text": "Attache"
+  },
+  "1016": {
+    "key": "disableability",
+    "text": "Compétences scellées"
+  },
+  "1017": {
+    "key": "disableougi",
+    "text": "Arts célestes scellés"
+  },
+  "1018": {
+    "key": "darkpoison",
+    "text": "Fléau"
+  },
+  "1019": {
+    "key": "fear",
+    "text": "Peur"
+  },
+  "1020": {
+    "key": "arvessfermare",
+    "text": "Arvess Fermare"
+  },
+  "1021": {
+    "key": "elementweak",
+    "text": "Friction élémentaire"
+  },
+  "11": {
+    "key": "protected",
+    "text": "Égide"
+  },
+  "125": {
+    "key": "blacksnipper",
+    "text": "Synergie du crabe"
+  },
+  "134": {
+    "key": "stundown",
+    "text": "Résistance Étourdissement ↓"
+  },
+  "140": {
+    "key": "antiburn",
+    "text": "Immunité Brûlure"
+  },
+  "141": {
+    "key": "antifreeze",
+    "text": "Immunité Engelure/Gel"
+  },
+  "142": {
+    "key": "antidraw",
+    "text": "Inflexible"
+  },
+  "145": {
+    "key": "em2510",
+    "text": "Pieds flottants"
+  },
+  "17": {
+    "key": "antidebuff",
+    "text": "Immunité d'altération"
+  },
+  "18": {
+    "key": "drain",
+    "text": "Absorption"
+  },
+  "2": {
+    "key": "atkdown",
+    "text": "ATT ↓"
+  },
+  "20": {
+    "key": "guts",
+    "text": "Pugnacité"
+  },
+  "21": {
+    "key": "strength",
+    "text": "Puissance"
+  },
+  "22": {
+    "key": "gyakkyou",
+    "text": "Adversité"
+  },
+  "23": {
+    "key": "criticalup",
+    "text": "Taux critique ↑"
+  },
+  "24": {
+    "key": "hateup",
+    "text": "Hostilité ↑"
+  },
+  "25": {
+    "key": "autorevive",
+    "text": "Auto-réanimation"
+  },
+  "26": {
+    "key": "magicvortex",
+    "text": "Vortex mystique"
+  },
+  "27": {
+    "key": "concentration",
+    "text": "Focalisation"
+  },
+  "28": {
+    "key": "ironmeiden",
+    "text": "Vierge de fer"
+  },
+  "29": {
+    "key": "idodragon",
+    "text": "Forme draconique"
+  },
+  "3": {
+    "key": "defdown",
+    "text": "DÉF ↓"
+  },
+  "30": {
+    "key": "idosuper",
+    "text": "Puissance divine"
+  },
+  "31": {
+    "key": "undead",
+    "text": "Mort-vivant"
+  },
+  "32": {
+    "key": "TXT_STATE_BOSSARTSAURA",
+    "text": "Soif de sang"
+  },
+  "33": {
+    "key": "phantasmagoria",
+    "text": "Fantasmagorie"
+  },
+  "36": {
+    "key": "em1806",
+    "text": "Gloire abyssale"
+  },
+  "37": {
+    "key": "maxhpdown",
+    "text": "PV max ↓"
+  },
+  "38": {
+    "key": "doubletap",
+    "text": "Doublette"
+  },
+  "4": {
+    "key": "damagecut",
+    "text": "Dégâts ↓"
+  },
+  "41": {
+    "key": "barrier",
+    "text": "Bouclier"
+  },
+  "42": {
+    "key": "dmgup",
+    "text": "Dégâts infligés ↑"
+  },
+  "43": {
+    "key": "sharpshoot",
+    "text": "Tir fatal"
+  },
+  "44": {
+    "key": "senrai",
+    "text": "Courroux céleste"
+  },
+  "45": {
+    "key": "colorwing",
+    "text": "Ailes chromatiques"
+  },
+  "46": {
+    "key": "armorparge",
+    "text": "Croc brise-armure"
+  },
+  "5": {
+    "key": "regeneration",
+    "text": "Régénération"
+  },
+  "50": {
+    "key": "risingnova",
+    "text": "Nova ascendante"
+  },
+  "51": {
+    "key": "dmgdown",
+    "text": "Dégâts infligés ↓"
+  },
+  "52": {
+    "key": "bravecarol",
+    "text": "Chant des braves"
+  },
+  "53": {
+    "key": "playwithfire",
+    "text": "Jouer avec le feu"
+  },
+  "54": {
+    "key": "rebuildstun",
+    "text": "Firmament dynamique"
+  },
+  "55": {
+    "key": "rebuildweak",
+    "text": "Firmament cramoisi"
+  },
+  "56": {
+    "key": "dmglimitup",
+    "text": "Limite de dégâts ↑"
+  },
+  "57": {
+    "key": "atkupadd",
+    "text": "ATT ↑ cumulatif"
+  },
+  "58": {
+    "key": "defupadd",
+    "text": "DÉF ↑ cumulatif"
+  },
+  "59": {
+    "key": "defdownadd",
+    "text": "DÉF ↓ cumulatif"
+  },
+  "6": {
+    "key": "muteki",
+    "text": "Invincibilité"
+  },
+  "67": {
+    "key": "atkdownadd",
+    "text": "ATT ↓ cumulatif"
+  },
+  "69": {
+    "key": "mspl0200_02",
+    "text": "Lame d'azur"
+  },
+  "7": {
+    "key": "tsuigeki",
+    "text": "Dégâts supplémentaires"
+  },
+  "79": {
+    "key": "mspl0700_01",
+    "text": "Liens fantômes"
+  },
+  "8": {
+    "key": "hyperarmor",
+    "text": "Stoïcisme"
+  },
+  "84": {
+    "key": "abdmgup",
+    "text": "Dégâts de compétence ↑"
+  },
+  "9": {
+    "key": "illusion",
+    "text": "Illusion"
+  }
+}

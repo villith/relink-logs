@@ -577,6 +577,35 @@ pub struct OnQuestFailEvent {
     pub quest_id: u32,
 }
 
+/// A status effect being applied to an actor.
+///
+/// `ability_id` is the action that CAUSED the effect, not the effect itself:
+/// two abilities granting the same buff must stay distinguishable, so the UI
+/// keys on the pair. `None` when the apply site cannot resolve the originating
+/// action — the UI then falls back to the bare effect name.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct StatusApplyEvent {
+    /// Who now holds the effect.
+    pub actor_index: u32,
+    /// Who applied it. `None` for effects with no attributable caster.
+    pub caster_index: Option<u32>,
+    /// The effect granted, from status.tbl.
+    pub status_id: u32,
+    /// The action that caused it. `None` when unresolvable.
+    pub ability_id: Option<u32>,
+    /// Stack count after this application. 1 for unstacking effects.
+    pub stacks: u32,
+}
+
+/// A status effect ending on an actor. Pairs with [`StatusApplyEvent`] by
+/// `(actor_index, status_id, ability_id)`.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct StatusRemoveEvent {
+    pub actor_index: u32,
+    pub status_id: u32,
+    pub ability_id: Option<u32>,
+}
+
 /// A tick of the in-game quest timer, in whole seconds since the quest loaded.
 /// The same clock the result screen reports as the clear time, so it excludes
 /// loading and pauses — which is what makes it a better DPS denominator than
@@ -649,6 +678,11 @@ pub enum Message {
     /// clear time still arrives separately on `OnQuestComplete`. Appended last
     /// per the append-only rule.
     OnQuestElapsedTime(QuestElapsedTimeEvent),
+    /// A status effect applied to an actor. Appended last per the append-only
+    /// rule.
+    StatusApply(StatusApplyEvent),
+    /// A status effect ending. Appended last per the append-only rule.
+    StatusRemove(StatusRemoveEvent),
 }
 
 #[cfg(test)]

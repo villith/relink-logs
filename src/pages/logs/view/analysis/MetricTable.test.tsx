@@ -16,11 +16,73 @@ const ROWS: MetricRow[] = [
 const renderTable = (props: Partial<React.ComponentProps<typeof MetricTable>> = {}) =>
   render(
     <MantineProvider>
-      <MetricTable rows={ROWS} columnKeys={["ui.logs.total-damage", "ui.meter-columns.dps"]} onPin={() => {}} {...props} />
+      <MetricTable
+        rows={ROWS}
+        columnKeys={["ui.logs.total-damage", "ui.meter-columns.dps"]}
+        onPin={() => {}}
+        {...props}
+      />
     </MantineProvider>
   );
 
 describe("MetricTable", () => {
+  it("says why a table is empty in the caller's words", () => {
+    // A log that never recorded the metric has nothing to do with the pins, and
+    // the default message would send the user clearing them for nothing.
+    renderTable({ rows: [], emptyKey: "ui.logs.buffs-empty" });
+    expect(screen.getByText("ui.logs.buffs-empty")).toBeTruthy();
+  });
+
+  it("grows no row control when no toggle is given", () => {
+    const { container } = renderTable();
+    expect(container.querySelectorAll(".analysis-row-toggle")).toHaveLength(0);
+  });
+
+  it("toggles a row without pinning it", () => {
+    // The toggle sits inside the row button, so a click that reached the row
+    // would band the row AND descend a level.
+    const onToggle = vi.fn();
+    const onPin = vi.fn();
+    const { container } = renderTable({ onPin, rowToggle: (row) => (row.key === "a" ? { shown: false, onToggle } : null) });
+
+    const toggles = container.querySelectorAll(".analysis-row-toggle");
+    expect(toggles).toHaveLength(1);
+
+    fireEvent.click(toggles[0]);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onPin).not.toHaveBeenCalled();
+  });
+
+  it("says why a table is empty in the caller's words", () => {
+    // A log that never recorded the metric has nothing to do with the pins, and
+    // the default message would send the user clearing them for nothing.
+    renderTable({ rows: [], emptyKey: "ui.logs.buffs-empty" });
+    expect(screen.getByText("ui.logs.buffs-empty")).toBeTruthy();
+  });
+
+  it("grows no row control when no toggle is given", () => {
+    const { container } = renderTable();
+    expect(container.querySelectorAll(".analysis-row-toggle")).toHaveLength(0);
+  });
+
+  it("toggles a row without pinning it", () => {
+    // The toggle sits inside the row button, so a click that reached the row
+    // would band the row AND descend a level.
+    const onToggle = vi.fn();
+    const onPin = vi.fn();
+    const { container } = renderTable({
+      onPin,
+      rowToggle: (row) => (row.key === "a" ? { shown: false, onToggle } : null),
+    });
+
+    const toggles = container.querySelectorAll(".analysis-row-toggle");
+    expect(toggles).toHaveLength(1);
+
+    fireEvent.click(toggles[0]);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+    expect(onPin).not.toHaveBeenCalled();
+  });
+
   it("renders one row per metric row", () => {
     renderTable();
     expect(screen.getByText("Narmaya")).toBeTruthy();
@@ -100,7 +162,11 @@ describe("MetricTable", () => {
   it("wraps a row in a hover card when the caller supplies sections", () => {
     const { container } = renderTable({
       rowSections: () => [
-        { headingKey: "ui.logs.hover-by-target", color: "rgb(1,2,3)", entries: [{ key: "t", label: "Boss", value: 5 }] },
+        {
+          headingKey: "ui.logs.hover-by-target",
+          color: "rgb(1,2,3)",
+          entries: [{ key: "t", label: "Boss", value: 5 }],
+        },
       ],
     });
     const row = container.querySelector<HTMLElement>(".analysis-row");
@@ -113,5 +179,59 @@ describe("MetricTable", () => {
   it("renders rows unwrapped when no sections are supplied", () => {
     renderTable();
     expect(screen.queryByTestId("metric-hover-card")).toBeNull();
+  });
+
+  it("does not nest one interactive control inside another", () => {
+    // The row was a <button role="row"> with a focusable role="button" span
+    // inside it for the band toggle. A button may not contain interactive
+    // content: browsers and screen readers disagree about what a click on the
+    // inner control even means, and the row swallowed its own toggle's focus.
+    const { container } = renderTable({
+      rowToggle: () => ({ shown: false, onToggle: () => {} }),
+    });
+
+    expect(container.querySelector("button button")).toBeNull();
+    expect(container.querySelector(String.raw`button [role="button"]`)).toBeNull();
+    expect(container.querySelector(String.raw`[role="button"] button`)).toBeNull();
+  });
+
+  it("makes the band toggle a real button", () => {
+    // Not a span wearing role="button": it needs its own focus, its own Enter
+    // and Space handling, and its own place in the tab order, all of which the
+    // element gives for free and the span had to reimplement.
+    const { container } = renderTable({
+      rowToggle: () => ({ shown: true, onToggle: () => {} }),
+    });
+
+    const toggle = container.querySelector(".analysis-row-toggle");
+    expect(toggle?.tagName).toBe("BUTTON");
+    expect(toggle?.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("does not nest one interactive control inside another", () => {
+    // The row was a <button role="row"> with a focusable role="button" span
+    // inside it for the band toggle. A button may not contain interactive
+    // content: browsers and screen readers disagree about what a click on the
+    // inner control even means, and the row swallowed its own toggle's focus.
+    const { container } = renderTable({
+      rowToggle: () => ({ shown: false, onToggle: () => {} }),
+    });
+
+    expect(container.querySelector("button button")).toBeNull();
+    expect(container.querySelector(String.raw`button [role="button"]`)).toBeNull();
+    expect(container.querySelector(String.raw`[role="button"] button`)).toBeNull();
+  });
+
+  it("makes the band toggle a real button", () => {
+    // Not a span wearing role="button": it needs its own focus, its own Enter
+    // and Space handling, and its own place in the tab order, all of which the
+    // element gives for free and the span had to reimplement.
+    const { container } = renderTable({
+      rowToggle: () => ({ shown: true, onToggle: () => {} }),
+    });
+
+    const toggle = container.querySelector(".analysis-row-toggle");
+    expect(toggle?.tagName).toBe("BUTTON");
+    expect(toggle?.getAttribute("aria-pressed")).toBe("true");
   });
 });

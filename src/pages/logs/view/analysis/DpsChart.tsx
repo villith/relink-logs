@@ -7,10 +7,11 @@ import { ReferenceArea } from "recharts";
 import { humanizeNumbers } from "@/utils";
 
 import { DPS_BUCKET_MS, type ChartDatapoint, type Label } from "../DetailCharts";
-import type { Band } from "../statusBands";
+import { bandOpacity, type Band } from "../statusBands";
 
-import { windowFromDrag } from "./scopeWindow";
+import { ChartLegend } from "./ChartLegend";
 import "./analysis.css";
+import { windowFromDrag } from "./scopeWindow";
 
 export type DpsChartProps = {
   /** Already sliced to the committed window, so the chart IS the window. */
@@ -18,8 +19,10 @@ export type DpsChartProps = {
   labels: Label;
   /** i18next key naming what is plotted; follows the metric tabs. */
   labelKey: string;
-  /** How a value reads: a humanized amount, or a gauge percentage. */
-  format: "amount" | "percent";
+  /** How a value reads: a humanized amount, a gauge percentage, or a plain
+   * integer count (a stack depth, which `humanizeNumbers` would render as
+   * "3.0" and a percent sign would misdescribe). */
+  format: "amount" | "percent" | "count";
   /** Commits a window as bucket indexes RELATIVE TO `data`, or null to clear. */
   onScope: (window: [number, number] | null) => void;
   /** Drawn under the plot as the axis bounds. */
@@ -49,7 +52,7 @@ export const ChartTooltip = ({
 }: {
   label: string;
   payload: Record<string, any>[] | undefined; // eslint-disable-line
-  format: "amount" | "percent";
+  format: "amount" | "percent" | "count";
   /** The series descriptors, so a payload entry can be named. */
   labels: Label;
 }) => {
@@ -95,20 +98,24 @@ export const ChartTooltip = ({
         {label}
       </Text>
       {landed.map((item) => {
-          const [n, suffix] =
-            format === "percent" ? [item.value as number, "%"] : humanizeNumbers(item.value as number);
-          return (
-            // Keyed by dataKey (the actor index), not name: two players can
-            // share a display label, and React drops the duplicate row.
-            <Text key={String(item.dataKey)} fz="sm">
-              <Text component="span" c={item.color as string}>
-                {labelByKey.get(String(item.name)) ?? String(item.name)}
-              </Text>
-              : {n}
-              {suffix}
+        const [n, suffix] =
+          format === "percent"
+            ? [item.value as number, "%"]
+            : format === "count"
+              ? [item.value as number, ""]
+              : humanizeNumbers(item.value as number);
+        return (
+          // Keyed by dataKey (the actor index), not name: two players can
+          // share a display label, and React drops the duplicate row.
+          <Text key={String(item.dataKey)} fz="sm">
+            <Text component="span" c={item.color as string}>
+              {labelByKey.get(String(item.name)) ?? String(item.name)}
             </Text>
-          );
-        })}
+            : {n}
+            {suffix}
+          </Text>
+        );
+      })}
     </Paper>
   );
 };
@@ -216,6 +223,7 @@ export const DpsChart = ({
     series: shownSeries,
     valueFormatter: (value: number) => {
       if (format === "percent") return `${value}%`;
+      if (format === "count") return String(value);
       const [n, suffix] = humanizeNumbers(value);
       return `${n}${suffix}`;
     },
@@ -227,24 +235,38 @@ export const DpsChart = ({
   // props, and passing it through a plain object loses the contextual typing
   // that makes the destructured label and payload check.
   const tooltip = {
-    content: ({ label, payload }: { label?: unknown; payload?: Record<string, any>[] }) => ( // eslint-disable-line
-      <ChartTooltip label={String(label ?? "")} payload={payload} format={format} />
-    ),
+    content: (
+      { label, payload }: { label?: unknown; payload?: Record<string, any>[] } // eslint-disable-line
+    ) => <ChartTooltip label={String(label ?? "")} payload={payload} format={format} labels={labels} />,
   };
 
   // Status bands, drawn under the scope selection in the same chart space. A
   // band is milliseconds from the window's start and a bucket is one second
   // wide, so the index is the conversion — never a hand-written `/ 1000`.
-  const statusBands = (bands ?? []).map(({ color, band: span }, index) => (
-    <ReferenceArea
-      key={index}
-      x1={data[Math.round(span.startMs / DPS_BUCKET_MS)]?.timestamp}
-      x2={data[Math.min(maxIndex, Math.round(span.endMs / DPS_BUCKET_MS))]?.timestamp}
-      stroke="none"
-      fill={color}
-      fillOpacity={0.16}
-    />
-  ));
+  //
+  // BOTH ends are clamped. An unclamped `x1` could index past the end of `data`
+  // (a band starting in the window's last bucket), and recharts reads a missing
+  // x1 as "the start of the axis" — a half-second buff then shaded the entire
+  // chart. Floor the start and ceil the end so a band always covers the buckets
+  // it touches rather than rounding off a short one to nothing.
+  // Memoised: this mounts one element per span and the component re-renders on
+  // every tooltip hover, which rebuilt and re-reconciled the whole set each time
+  // the pointer moved across the plot.
+  const statusBands = useMemo(() => {
+    const bucket = (index: number) => Math.max(0, Math.min(maxIndex, index));
+    return (bands ?? []).map(({ color, band: span }, index) => (
+      <ReferenceArea
+        key={index}
+        x1={data[bucket(Math.floor(span.startMs / DPS_BUCKET_MS))]?.timestamp}
+        x2={data[bucket(Math.ceil(span.endMs / DPS_BUCKET_MS))]?.timestamp}
+        stroke="none"
+        fill={color}
+        // Deeper stacks shade harder — this is the only place a stack count
+        // reaches the chart, since the table has no Stacks column.
+        fillOpacity={bandOpacity(span.stacks)}
+      />
+    ));
+  }, [bands, data, maxIndex]);
 
   const scopeBand = band && band[0] !== band[1] && (
     <ReferenceArea
@@ -266,58 +288,26 @@ export const DpsChart = ({
           CategoricalChartProps has no onDoubleClick, and the wrapper sees the
           same gesture anywhere over the plot. */}
       <Box onDoubleClick={() => onScope(null)}>
-        <LineChart
-          h="clamp(190px, 26vh, 380px)"
-        data={data}
-        dataKey="timestamp"
-        withDots={false}
-        withLegend
-        series={labels}
-        valueFormatter={(value) => {
-          const [n, suffix] = humanizeNumbers(value);
-          return `${n}${suffix}`;
-        }}
-        yAxisProps={{ width: 60 }}
-        xAxisProps={{ interval: "preserveStartEnd" }}
-        lineChartProps={{
-          margin: { top: 5, right: 5, bottom: 5, left: 5 },
-          // Selecting text mid-drag would otherwise fight the gesture.
-          style: { userSelect: "none" },
-          onMouseDown: (state: { activeTooltipIndex?: number }) => {
-            const index = at(state?.activeTooltipIndex);
-            if (index === null) return;
-            anchor.current = index;
-            setBand([index, index]);
-          },
-          onMouseMove: (state: { activeTooltipIndex?: number }) => {
-            if (anchor.current === null) return;
-            const index = at(state?.activeTooltipIndex);
-            if (index === null) return;
-            setBand([anchor.current, index]);
-          },
-          onMouseUp: (state: { activeTooltipIndex?: number }) => end(at(state?.activeTooltipIndex)),
-          // A drag that leaves the plot still has to end, or the next move over
-          // it would extend a stale selection.
-          onMouseLeave: () => {
-            anchor.current = null;
-            setBand(null);
-          },
-        }}
-        tooltipProps={{
-          content: ({ label, payload }) => <ChartTooltip label={label} payload={payload} />,
-        }}
-      >
-        {band && band[0] !== band[1] && (
-          <ReferenceArea
-            x1={data[Math.min(band[0], band[1])]?.timestamp}
-            x2={data[Math.max(band[0], band[1])]?.timestamp}
-            strokeOpacity={0.9}
-            stroke="var(--an-accent)"
-            fill="var(--an-accent)"
-            fillOpacity={0.13}
-          />
-          )}
-        </LineChart>
+        {stacked ? (
+          // A thin stroke over a translucent fill: the band edges stay legible
+          // where two bands are close, without the fills darkening into one mass.
+          <AreaChart
+            {...shared}
+            type="stacked"
+            strokeWidth={1}
+            fillOpacity={0.3}
+            areaChartProps={interaction}
+            tooltipProps={tooltip}
+          >
+            {statusBands}
+            {scopeBand}
+          </AreaChart>
+        ) : (
+          <LineChart {...shared} lineChartProps={interaction} tooltipProps={tooltip}>
+            {statusBands}
+            {scopeBand}
+          </LineChart>
+        )}
       </Box>
       <ChartLegend entries={legendEntries} hidden={hidden} onToggle={toggleSeries} />
       <Box style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
@@ -328,3 +318,4 @@ export const DpsChart = ({
     </Box>
   );
 };
+

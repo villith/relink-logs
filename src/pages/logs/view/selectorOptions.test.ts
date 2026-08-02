@@ -23,7 +23,7 @@ const fact = (sourceIndex: number, targetSegment: number, action: number): Selec
 
 const FACTS: SelectionFact[] = [fact(NARMAYA, BOSS, 100), fact(NARMAYA, ADD, 200), fact(EUGEN, BOSS, 300)];
 
-const NO_PINS = { source: null, targetIds: [], ability: null };
+const NO_PINS = { source: null, targets: [], ability: null };
 
 describe("deriveSelectorOptions", () => {
   it("offers every dimension when nothing is pinned", () => {
@@ -107,7 +107,7 @@ describe("deriveSelectorOptions", () => {
   });
 
   it("intersects multiple pins", () => {
-    const options = deriveSelectorOptions(FACTS, { ...NO_PINS, source: NARMAYA, targetIds: [ADD] });
+    const options = deriveSelectorOptions(FACTS, { ...NO_PINS, source: NARMAYA, targets: [ADD] });
     expect(options.abilities.map((o) => o.value)).toEqual(["Normal:200"]);
   });
 

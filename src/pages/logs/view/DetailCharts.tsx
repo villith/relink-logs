@@ -1,5 +1,5 @@
 import { AreaChart, LineChart } from "@mantine/charts";
-import { Box, Group, Paper, Text, UnstyledButton } from "@mantine/core";
+import { Group, Paper, Text, UnstyledButton } from "@mantine/core";
 import { t } from "i18next";
 import { memo } from "react";
 
@@ -181,26 +181,9 @@ export const DetailCharts = memo(function DetailCharts({
         </>
       )}
       <Text size="sm">{t("ui.logs.damage-per-second")}</Text>
-      <Box ref={plotRef} style={{ position: "relative", touchAction: onDragRange ? "none" : undefined }} {...dragHandlers}>
-        {dragShade && (
-          <Box
-            style={{
-              position: "absolute",
-              top: 0,
-              bottom: 0,
-              left: dragShade.left,
-              width: dragShade.width,
-              background: "rgba(250, 204, 21, 0.18)",
-              borderLeft: "1px solid var(--mantine-color-yellow-5)",
-              borderRight: "1px solid var(--mantine-color-yellow-5)",
-              pointerEvents: "none",
-              zIndex: 5,
-            }}
-          />
-        )}
-        <LineChart
-          h={400}
-          data={data}
+      <LineChart
+        h={400}
+        data={data}
         dataKey="timestamp"
         withDots={false}
         withLegend
@@ -215,11 +198,11 @@ export const DetailCharts = memo(function DetailCharts({
           syncId: "quest-details",
           margin: { top: CHART_MARGIN, right: CHART_MARGIN, bottom: CHART_MARGIN, left: CHART_MARGIN },
         }}
-          tooltipProps={{
-            wrapperStyle: { zIndex: 10 }, // below the HP tooltip when they meet
-            content: ({ label, payload }) => <ChartTooltip label={label} payload={payload} />,
-          }}
-        />
+        tooltipProps={{
+          wrapperStyle: { zIndex: 10 }, // below the HP tooltip when they meet
+          content: ({ label, payload }) => <ChartTooltip label={label} payload={payload} />,
+        }}
+      />
     </>
   );
 });
@@ -229,11 +212,7 @@ export const DetailCharts = memo(function DetailCharts({
  *
  * Classic-only: the analysis view scopes its window by dragging the plot
  * itself, so it has no brush and needs no strip to ride on. */
-export const OverviewChart = memo(function OverviewChart({
-  data,
-}: {
-  data: { timestamp?: string; party?: number }[];
-}) {
+export const OverviewChart = memo(function OverviewChart({ data }: { data: { timestamp?: string; party?: number }[] }) {
   return (
     <AreaChart
       h={56}
@@ -262,3 +241,4 @@ export const brushShade = (side: "left" | "right", widthPercent: number): React.
   background: "rgba(10, 10, 10, 0.55)",
   pointerEvents: "none",
 });
+

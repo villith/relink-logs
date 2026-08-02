@@ -33,10 +33,12 @@ mod loadprobe;
 mod player;
 mod quest;
 mod sba;
-// Buff/debuff lifecycle observation (diag stage — see hooks/status.rs). The
-// module only exists with `hookdiag`; a release hook.dll contains none of it.
-#[cfg(any(feature = "hookdiag", test))]
+// Buff/debuff lifecycle (see hooks/status.rs): emits StatusApply/StatusRemove,
+// and logs a field dump on top of that under `hookdiag`.
 mod status;
+// Generated from status.tbl's HasLevels column — which ids the +0xb0 stack
+// count is real for. Regenerate with scripts/gen-stackable-statuses.py.
+mod status_levels;
 mod stunnet;
 mod summon;
 mod trial;
@@ -183,19 +185,16 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         OnEndlessMgrDtorHook::new(tx.clone()).setup(&process),
     );
 
-    /* Status (buff/debuff) lifecycle — hookdiag-only observation stage. Detours the
-    shared StatusBase::init (apply; 165/168 classes inherit it) and the shared
-    scalar-deleting dtor (removal) to establish apply/refresh/remove semantics and
-    hunt the acting-action id in the apply ctx before any protocol events exist. */
-    #[cfg(feature = "hookdiag")]
+    /* Status (buff/debuff) lifecycle. Detours the shared StatusBase::init (apply
+    AND refresh — the game re-inits the same instance; 165/168 classes inherit
+    it) and the shared scalar-deleting dtor (removal). */
     try_step(
         "status_init",
-        status::OnStatusInitHook::new().setup(&process),
+        status::OnStatusInitHook::new(tx.clone()).setup(&process),
     );
-    #[cfg(feature = "hookdiag")]
     try_step(
         "status_dtor",
-        status::OnStatusDtorHook::new().setup(&process),
+        status::OnStatusDtorHook::new(tx.clone()).setup(&process),
     );
 
     /* SBA */
@@ -248,7 +247,6 @@ pub fn teardown_hooks() {
     sba::disable();
     #[cfg(feature = "hookdiag")]
     loadprobe::disable();
-    #[cfg(any(feature = "hookdiag", test))]
     status::disable();
     #[cfg(any(feature = "fullassist", test))]
     assist::disable();
@@ -320,3 +318,4 @@ mod teardown_tests {
         super::teardown_hooks();
     }
 }
+

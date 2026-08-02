@@ -44,16 +44,16 @@ const player = (
 
 const PLAYERS = [
   player(0, 120, 4.5, [
-    { action: 100, stun: 80 },
-    { action: 200, stun: 40 },
+    { action: 9001, stun: 80 },
+    { action: 9002, stun: 40 },
   ]),
   player(1, 60, 2.0, []),
 ];
 
-const NO_PINS: SelectorPins = { source: null, targetIds: [], ability: null };
+const NO_PINS: SelectorPins = { source: null, targets: [], ability: null };
 
 const input = (
-  level: "players" | "abilities" | "hits",
+  level: "players" | "abilities" | "skills",
   pins: SelectorPins = NO_PINS,
   players: ComputedPlayerState[] = PLAYERS
 ) => ({ encounter: { totalDamage: 0 } as never, partyData: [null, null], players, level, pins }) as never;
@@ -70,12 +70,12 @@ describe("stun descriptor", () => {
   });
 
   it("breaks a pinned player down by stun-dealing ability", () => {
-    const rows = stun.rows(input("abilities", { source: 0, targetIds: [], ability: null }));
+    const rows = stun.rows(input("abilities", { source: 0, targets: [], ability: null }));
     expect(rows.map((r) => r.value)).toEqual([80, 40]);
   });
 
   it("returns no rows for a source with no data", () => {
-    expect(stun.rows(input("abilities", { source: 99, targetIds: [], ability: null }))).toEqual([]);
+    expect(stun.rows(input("abilities", { source: 99, targets: [], ability: null }))).toEqual([]);
   });
 
   it("lists a pinned group's member skills at the skills level, unpinnable", () => {
@@ -86,7 +86,7 @@ describe("stun descriptor", () => {
       ]),
     ];
     const rows = stun.rows(
-      input("skills", { source: 0, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, owner)
+      input("skills", { source: 0, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, owner)
     );
 
     expect(rows.map((r) => r.key)).toEqual(["skill:Normal:100", "skill:Normal:110"]);
@@ -100,7 +100,7 @@ describe("stun descriptor", () => {
       player(1, 20, 1.0, [{ action: 100, stun: 20, max: 40 }]),
     ];
     const rows = stun.rows(
-      input("skills", { source: null, targetIds: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
+      input("skills", { source: null, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, party)
     );
 
     expect(rows).toHaveLength(1);
@@ -116,15 +116,16 @@ describe("stun descriptor", () => {
     // landed, so it takes the larger rather than the sum.
     const withSummon = [
       player(0, 120, 4.5, [
-        { action: 100, stun: 50, max: 30 },
-        { action: 100, stun: 30, max: 25, child: "Wp0000" },
-        { action: 200, stun: 40 },
+        { action: 9001, stun: 50, max: 30 },
+        { action: 9001, stun: 30, max: 25, child: "Wp0000" },
+        { action: 9002, stun: 40 },
       ]),
     ];
-    const rows = stun.rows(input("abilities", { source: 0, targetIds: [], ability: null }, withSummon));
+    const rows = stun.rows(input("abilities", { source: 0, targets: [], ability: null }, withSummon));
 
     expect(rows).toHaveLength(2);
     expect(rows[0].value).toBe(80);
     expect(rows[0].columns).toEqual(["80.0", "30.0"]);
   });
 });
+

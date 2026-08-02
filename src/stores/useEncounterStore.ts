@@ -1,10 +1,14 @@
 import {
+  AbilityChartSeries,
   DeathEvent,
   EncounterState,
   HpChartSeries,
   LegalityFinding,
   PlayerData,
   SBAEvent,
+  SelectionFact,
+  StatusInterval,
+  TargetChartSeries,
   TargetEntry,
   TargetSpan,
 } from "@/types";
@@ -13,8 +17,14 @@ import { create } from "zustand";
 interface EncounterStore {
   encounterState: EncounterState | null;
   dpsChart: Record<number, number[]>;
+  /** Stun applied per second, keyed by actor index. Empty on a backend that
+   * predates the field. */
+  stunChart: Record<number, number[]>;
   /** Enemy HP% per second, one series per charted HP pool (largest first). Empty on old logs. */
   hpChart: HpChartSeries[];
+  /** Every window an actor held a status effect for, spanning the whole fight.
+   * Empty on logs recorded before status capture. */
+  statusIntervals: StatusInterval[];
   sbaChart: Record<number, number[]>;
   sbaEvents: SBAEvent[];
   deathEvents: DeathEvent[];
@@ -22,6 +32,9 @@ interface EncounterStore {
   sbaChartLen: number;
   /** Per-spawn selectable targets, first-hit order. */
   targetEntries: TargetEntry[];
+  /** Every (source, target, ability) combination in the current window, with
+   * the selector pins NOT applied — the analysis view cascades from this. */
+  selectionFacts: SelectionFact[];
   /** Selected target spawn spans; empty = all. */
   selectedTargetSpans: TargetSpan[];
   selectedPlayers: string[];
@@ -46,14 +59,32 @@ interface EncounterStore {
 
 export interface EncounterStateResponse {
   encounterState: EncounterState;
+  /** Per-player damage buckets. On the base load these span the whole fight
+   * unpinned; on a scoped fetch with NO source pinned they are rebuilt under the
+   * enemy and ability pins, so the analysis chart narrows with its table. Empty
+   * on a scoped fetch that pinned a source — the drill charts answer there. */
   dpsChart: Record<number, number[]>;
+  /** Optional so a backend older than the field reads as "no stun series". */
+  stunChart?: Record<number, number[]>;
   hpChart: HpChartSeries[];
+  /** Optional so a backend older than the field reads as "no status capture" —
+   * which is also what every log recorded before the hook emitted these has. */
+  statusIntervals?: StatusInterval[];
   sbaChart: Record<number, number[]>;
   sbaEvents: SBAEvent[];
   deathEvents: DeathEvent[];
   chartLen: number;
   sbaChartLen: number;
   targetEntries: TargetEntry[];
+  /** Optional so a backend older than the field reads as "nothing to cascade". */
+  selectionFacts?: SelectionFact[];
+  /** The analysis view's drill-down chart, sent only on a scoped fetch that
+   * pinned a source. Not stored: it belongs to one set of pins, and the store
+   * holds the base load. Optional so a frontend ahead of its backend — the Rust
+   * binary does not hot-reload — degrades to the per-player chart. */
+  abilityChart?: AbilityChartSeries[];
+  /** The level below: what the pinned ability hit, one band per enemy spawn. */
+  targetChart?: TargetChartSeries[];
   players: PlayerData[];
   /** One vector per PARTY SLOT (0-3), parallel to the unfiltered `players`. */
   legality: LegalityFinding[][];
@@ -68,13 +99,16 @@ export interface EncounterStateResponse {
 export const useEncounterStore = create<EncounterStore>((set) => ({
   encounterState: null,
   dpsChart: {},
+  stunChart: {},
   hpChart: [],
+  statusIntervals: [],
   sbaChart: {},
   sbaEvents: [],
   deathEvents: [],
   chartLen: 0,
   sbaChartLen: 0,
   targetEntries: [],
+  selectionFacts: [],
   selectedTargetSpans: [],
   selectedPlayers: [],
   players: [],
@@ -97,13 +131,16 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
     set({
       encounterState: response.encounterState,
       dpsChart: response.dpsChart,
+      stunChart: response.stunChart ?? {},
       hpChart: response.hpChart ?? [],
+      statusIntervals: response.statusIntervals ?? [],
       sbaChart: response.sbaChart,
       sbaEvents: response.sbaEvents,
       deathEvents: response.deathEvents,
       chartLen: response.chartLen,
       sbaChartLen: response.sbaChartLen,
       targetEntries: response.targetEntries ?? [],
+      selectionFacts: response.selectionFacts ?? [],
       players: filteredPlayers,
       legality: filteredLegality,
       questId: response.questId,
@@ -114,3 +151,4 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
     });
   },
 }));
+

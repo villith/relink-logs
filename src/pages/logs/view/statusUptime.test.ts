@@ -45,3 +45,4 @@ describe("statusKey", () => {
     expect(statusKey(interval(1, 0, 1, null))).toBe("10:unknown");
   });
 });
+

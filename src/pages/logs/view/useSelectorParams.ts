@@ -3,6 +3,7 @@ import { useCallback, useMemo } from "react";
 
 import { parseAbilityKey } from "./abilityKey";
 import type { SelectorPins } from "./selectorOptions";
+import { isStatusPin } from "./statusUptime";
 
 export type RawPins = { src: string | null; tgt: string | null; abil: string | null };
 
@@ -30,7 +31,11 @@ export const decodePins = (raw: RawPins): SelectorPins => {
   return {
     source: raw.src !== null && Number.isInteger(source) ? source : null,
     targets,
-    ability: raw.abil !== null && parseAbilityKey(raw.abil) !== null ? raw.abil : null,
+    // Two grammars share this pin: an `abilityKey` and a status effect's
+    // `status:<effect>:<cause>`. Validating only the first silently dropped
+    // every buff pin on the way back out of the URL — the pin is written, read
+    // back as null, and the Buffs table never descends to its holders.
+    ability: raw.abil !== null && (isStatusPin(raw.abil) || parseAbilityKey(raw.abil) !== null) ? raw.abil : null,
   };
 };
 
@@ -55,3 +60,4 @@ export const useSelectorParams = () => {
 
   return [pins, setPins] as const;
 };
+

@@ -46,3 +46,4 @@ export const buildSeriesPoints = ({
 
   return points;
 };
+

@@ -1,0 +1,302 @@
+{
+  "0": {
+    "key": "atkup",
+    "text": "공격 UP"
+  },
+  "1": {
+    "key": "defup",
+    "text": "방어 UP"
+  },
+  "10": {
+    "key": "protect",
+    "text": "지켜주기"
+  },
+  "1000": {
+    "key": "poison",
+    "text": "독"
+  },
+  "1001": {
+    "key": "burn",
+    "text": "작열"
+  },
+  "1002": {
+    "key": "slow",
+    "text": "슬로우"
+  },
+  "1003": {
+    "key": "stun",
+    "text": "기절"
+  },
+  "1004": {
+    "key": "freeze",
+    "text": "빙결"
+  },
+  "1005": {
+    "key": "frostbite",
+    "text": "동상"
+  },
+  "1006": {
+    "key": "sandman",
+    "text": "모래 인간"
+  },
+  "1007": {
+    "key": "paralysis",
+    "text": "마비"
+  },
+  "1008": {
+    "key": "waterprison",
+    "text": "물감옥"
+  },
+  "1011": {
+    "key": "darkburn",
+    "text": "자은의 불꽃"
+  },
+  "1012": {
+    "key": "TXT_STATUS_BINDAILMENT",
+    "text": "속박"
+  },
+  "1015": {
+    "key": "TXT_STATUS_CAPTUREAILMENT",
+    "text": "속박"
+  },
+  "1016": {
+    "key": "disableability",
+    "text": "어빌리티 봉인"
+  },
+  "1017": {
+    "key": "disableougi",
+    "text": "오의 봉인"
+  },
+  "1018": {
+    "key": "darkpoison",
+    "text": "재앙"
+  },
+  "1019": {
+    "key": "fear",
+    "text": "공포"
+  },
+  "1020": {
+    "key": "arvessfermare",
+    "text": "알베스 페르마레"
+  },
+  "1021": {
+    "key": "elementweak",
+    "text": "원소불화"
+  },
+  "11": {
+    "key": "protected",
+    "text": "안전"
+  },
+  "125": {
+    "key": "blacksnipper",
+    "text": "게 시너지"
+  },
+  "134": {
+    "key": "stundown",
+    "text": "스턴 내성 DOWN"
+  },
+  "140": {
+    "key": "antiburn",
+    "text": "작열 무효"
+  },
+  "141": {
+    "key": "antifreeze",
+    "text": "동상 및 빙결 무효"
+  },
+  "142": {
+    "key": "antidraw",
+    "text": "부동"
+  },
+  "145": {
+    "key": "em2510",
+    "text": "발 띄우기"
+  },
+  "17": {
+    "key": "antidebuff",
+    "text": "약화 무효"
+  },
+  "18": {
+    "key": "drain",
+    "text": "흡수"
+  },
+  "2": {
+    "key": "atkdown",
+    "text": "공격 DOWN"
+  },
+  "20": {
+    "key": "guts",
+    "text": "근성"
+  },
+  "21": {
+    "key": "strength",
+    "text": "기운"
+  },
+  "22": {
+    "key": "gyakkyou",
+    "text": "역경"
+  },
+  "23": {
+    "key": "criticalup",
+    "text": "크리티컬 확률 UP"
+  },
+  "24": {
+    "key": "hateup",
+    "text": "적대심 UP"
+  },
+  "25": {
+    "key": "autorevive",
+    "text": "자동 부활"
+  },
+  "26": {
+    "key": "magicvortex",
+    "text": "마력의 소용돌이"
+  },
+  "27": {
+    "key": "concentration",
+    "text": "콘센트레이션"
+  },
+  "28": {
+    "key": "ironmeiden",
+    "text": "아이언 메이든"
+  },
+  "29": {
+    "key": "idodragon",
+    "text": "용인화"
+  },
+  "3": {
+    "key": "defdown",
+    "text": "방어 DOWN"
+  },
+  "30": {
+    "key": "idosuper",
+    "text": "신위일체"
+  },
+  "31": {
+    "key": "undead",
+    "text": "불사신"
+  },
+  "32": {
+    "key": "TXT_STATE_BOSSARTSAURA",
+    "text": "버스트 오라"
+  },
+  "33": {
+    "key": "phantasmagoria",
+    "text": "판타즈마고리아"
+  },
+  "36": {
+    "key": "em1806",
+    "text": "어비설 글로리"
+  },
+  "37": {
+    "key": "maxhpdown",
+    "text": "최대 HP 감소"
+  },
+  "38": {
+    "key": "doubletap",
+    "text": "더블 탭"
+  },
+  "4": {
+    "key": "damagecut",
+    "text": "입는 대미지 감소"
+  },
+  "41": {
+    "key": "barrier",
+    "text": "배리어"
+  },
+  "42": {
+    "key": "dmgup",
+    "text": "대미지 UP"
+  },
+  "43": {
+    "key": "sharpshoot",
+    "text": "저격"
+  },
+  "44": {
+    "key": "senrai",
+    "text": "섬뢰의 명적"
+  },
+  "45": {
+    "key": "colorwing",
+    "text": "극채색 날개"
+  },
+  "46": {
+    "key": "armorparge",
+    "text": "개산아"
+  },
+  "5": {
+    "key": "regeneration",
+    "text": "재생"
+  },
+  "50": {
+    "key": "risingnova",
+    "text": "라이징 노바"
+  },
+  "51": {
+    "key": "dmgdown",
+    "text": "대미지 DOWN"
+  },
+  "52": {
+    "key": "bravecarol",
+    "text": "브레이브 캐럴"
+  },
+  "53": {
+    "key": "playwithfire",
+    "text": "플레이 위드 파이어"
+  },
+  "54": {
+    "key": "rebuildstun",
+    "text": "질천"
+  },
+  "55": {
+    "key": "rebuildweak",
+    "text": "홍천"
+  },
+  "56": {
+    "key": "dmglimitup",
+    "text": "대미지 상한 UP"
+  },
+  "57": {
+    "key": "atkupadd",
+    "text": "누적 공격 UP"
+  },
+  "58": {
+    "key": "defupadd",
+    "text": "누적 방어 UP"
+  },
+  "59": {
+    "key": "defdownadd",
+    "text": "누적 방어 DOWN"
+  },
+  "6": {
+    "key": "muteki",
+    "text": "무적"
+  },
+  "67": {
+    "key": "atkdownadd",
+    "text": "누적 공격 DOWN"
+  },
+  "69": {
+    "key": "mspl0200_02",
+    "text": "푸른 검날"
+  },
+  "7": {
+    "key": "tsuigeki",
+    "text": "추가 대미지"
+  },
+  "79": {
+    "key": "mspl0700_01",
+    "text": "유령의 인연"
+  },
+  "8": {
+    "key": "hyperarmor",
+    "text": "움츠러들기 무효"
+  },
+  "84": {
+    "key": "abdmgup",
+    "text": "어빌리티 대미지 UP"
+  },
+  "9": {
+    "key": "illusion",
+    "text": "환영"
+  }
+}

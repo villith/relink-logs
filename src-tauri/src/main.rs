@@ -898,6 +898,7 @@ async fn export_logs_db() -> Result<Option<String>, String> {
     })
 }
 
+
 #[tauri::command]
 async fn delete_all_logs() -> Result<(), String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
@@ -1266,6 +1267,10 @@ struct EncounterStateResponse {
     /// Per-spawn selectable targets for the filter dropdown, in first-hit
     /// order — 1:1 with the HP chart's series (same instance numbers).
     target_entries: Vec<v1::TargetSegment>,
+    /// Every distinct (source, target, ability) combination inside the current
+    /// window, with the selector pins NOT applied — the analysis view cascades
+    /// its three selectors from this without a round trip per keystroke.
+    selection_facts: Vec<v1::SelectionFact>,
     /// The analysis view's drill-down chart, present only on a scoped fetch that
     /// pinned a source: what that player's damage was made of, one band per
     /// breakdown row. Empty at every other level — with nothing pinned the
@@ -1319,6 +1324,123 @@ struct ParseOptions {
     /// must never silently get contested damage folded into its totals.
     #[serde(default)]
     filters: v1::MeterFilters,
+    /// Which source actors and abilities the selector bar has pinned. Absent or
+    /// empty means "All" on every dimension — the shipped default.
+    #[serde(default)]
+    selection: v1::SelectionFilter,
+}
+
+// Per-second buckets: the quest-details charts and the window scrubber both
+// work in whole seconds, so a bucket index IS the elapsed second.
+const DPS_INTERVAL: i64 = 1_000;
+const SBA_INTERVAL: i64 = 1_000;
+
+/// The analysis view's drill-down chart series for the current pins.
+///
+/// The chart follows the row level, so what it decomposes is decided entirely by
+/// what is pinned: a source alone means "what was this player's damage made
+/// of", a source and an ability means "what did this ability hit". Nothing
+/// pinned needs no series at all — that level is the per-player `dps_chart` the
+/// base load already carries — so both come back empty and the caller pays
+/// nothing for a fetch that only moved the window.
+///
+/// Only the FIRST pinned source and ability are read: the selector bar pins one
+/// of each, and a chart that stacked two players' abilities together would have
+/// no meaningful total.
+fn build_drill_charts(
+    parser: &v1::Parser,
+    options: &ParseOptions,
+) -> (Vec<v1::AbilityChartSeries>, Vec<v1::TargetChartSeries>) {
+    let Some(&source_index) = options.selection.source_indices.first() else {
+        return (Vec::new(), Vec::new());
+    };
+
+    let start_time = parser.start_time();
+    // Whole-fight geometry, so a bucket index is still the elapsed second no
+    // matter what window the same fetch applied to the derived state.
+    let chart_len = (parser.full_log_duration() / DPS_INTERVAL) as usize + 1;
+
+    match options.selection.abilities.first() {
+        Some(&ability) => {
+            // Shared segmentation, not a fresh one: it is what makes a band and
+            // a target-dropdown entry mean the same spawn.
+            let (segments, assignment) =
+                v1::segment_targets_indexed(&parser.encounter.raw_event_log, start_time);
+            let target_chart = v1::build_target_damage_chart(
+                &parser.encounter.raw_event_log,
+                &parser.encounter.player_data,
+                &segments,
+                &assignment,
+                source_index,
+                ability,
+                start_time,
+                DPS_INTERVAL,
+                chart_len,
+                &options.target_spans,
+                options.filters,
+            );
+            (Vec::new(), target_chart)
+        }
+        None => {
+            let ability_chart = v1::build_ability_damage_chart(
+                &parser.encounter.raw_event_log,
+                &parser.encounter.player_data,
+                source_index,
+                start_time,
+                DPS_INTERVAL,
+                chart_len,
+                &options.target_spans,
+                options.filters,
+            );
+            (ability_chart, Vec::new())
+        }
+    }
+}
+
+/// The per-player damage chart for a scope with NO source pinned.
+///
+/// The base-load `dps_chart` is built with no pins at all, so an enemy or
+/// ability pin left the plot showing the whole fight while the table beside it
+/// had narrowed — measured on log 1566, where pinning one enemy halved the
+/// table's totals and did not move a single line.
+///
+/// Empty with a source pinned: [`build_drill_charts`] already answers there, and
+/// its bands are target-filtered. Empty with nothing narrowing, so a fetch that
+/// only moved the window pays nothing.
+///
+/// Damage only, by construction — this is the damage tab's series. Stun's two
+/// capture paths reconcile with `max()` and its network messages carry no target
+/// at all, so a target-filtered stun chart would be a fiction; the SBA gauge has
+/// no decomposition.
+fn build_scoped_player_chart(parser: &v1::Parser, options: &ParseOptions) -> HashMap<u32, Vec<i32>> {
+    if !options.selection.source_indices.is_empty()
+        || (options.target_spans.is_empty() && options.selection.abilities.is_empty())
+    {
+        return HashMap::new();
+    }
+
+    let player_indices: Vec<u32> = parser
+        .derived_state
+        .party
+        .values()
+        .map(|player| player.index)
+        .collect();
+
+    // Whole-fight geometry, exactly as `build_drill_charts` uses: the view slices
+    // its chart client-side, so a bucket index must stay the elapsed second.
+    let chart_len = (parser.full_log_duration() / DPS_INTERVAL) as usize + 1;
+
+    v1::build_player_dps_chart(
+        &parser.encounter.raw_event_log,
+        &parser.encounter.player_data,
+        &player_indices,
+        parser.start_time(),
+        DPS_INTERVAL,
+        chart_len,
+        &options.target_spans,
+        &options.selection.abilities,
+        options.filters,
+    )
 }
 
 // `(async)` so the decompress + full reparse runs off the main thread — this is
@@ -1357,9 +1479,42 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     let mut parser = parser::deserialize_version(&blob, version).map_err(|e| e.to_string())?;
 
     parser.filters = options.filters;
+    parser.selection = options.selection.clone();
     parser.reparse_with_options_window(&options.target_spans, options.from_ms, options.up_to_ms);
 
     if options.state_only {
+        // Included even here, unlike the charts: it is one pass over the events
+        // with no buffers to build, and the analysis view's selectors have to
+        // re-cascade against the new window on the very fetch that applies it.
+        // The segmentation is over the UNWINDOWED log, exactly as the base load
+        // computes `target_entries` — a fact's `target_segment` indexes into
+        // those, so the two must be the same segmentation or a pin would point
+        // at a different enemy on a scoped fetch than on the load.
+        let (_, assignment) =
+            v1::segment_targets_indexed(&parser.encounter.raw_event_log, parser.start_time());
+        let selection_facts = v1::selection_facts(
+            &parser.encounter.raw_event_log,
+            parser.start_time(),
+            options.from_ms,
+            options.up_to_ms,
+            &assignment,
+        );
+
+        // The drill-down chart. Built here rather than on the base load because
+        // it is the pins that decide what it decomposes, and only a pinned
+        // source narrows it enough to be worth sending: the unpinned case is
+        // the per-player `dps_chart` the base load already carries.
+        //
+        // Deliberately spans the FULL fight, ignoring `from_ms`/`up_to_ms`: the
+        // view slices its chart client-side from whole-fight buckets, so a
+        // pre-sliced series would be windowed twice and a bucket index would
+        // stop being the elapsed second.
+        let (ability_chart, target_chart) = build_drill_charts(&parser, &options);
+        // The level above those: no source pinned, but an enemy or an ability
+        // still narrowing the fight. Without it the plot kept drawing the whole
+        // party's whole fight beside a table that had already narrowed.
+        let dps_chart = build_scoped_player_chart(&parser, &options);
+
         // Only the fields the scrub commit actually consumes; everything else stays at its
         // Default so a new response field doesn't have to be mirrored as a hand-written
         // zero here (where forgetting it would silently return stale-looking data).
@@ -1372,6 +1527,10 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             room_index,
             imported,
             legality: findings,
+            selection_facts,
+            ability_chart,
+            target_chart,
+            dps_chart,
             ..Default::default()
         });
     }
@@ -1380,11 +1539,6 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     // derived state — the chart-building loops below walk the full event log, so
     // sizing from the truncated duration would index out of bounds.
     let duration = parser.full_log_duration();
-
-    // Per-second buckets: the quest-details charts and the window scrubber both
-    // work in whole seconds, so a bucket index IS the elapsed second.
-    const DPS_INTERVAL: i64 = 1_000;
-    const SBA_INTERVAL: i64 = 1_000;
 
     let start_time = parser.start_time();
     // Dropdown entries are ALWAYS the unfiltered segmentation — the user picks
@@ -1418,6 +1572,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         DPS_INTERVAL,
         (duration / DPS_INTERVAL) as usize + 1,
         &options.target_spans,
+        &options.selection.abilities,
         options.filters,
     );
 
@@ -1475,6 +1630,11 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         room_index,
         imported,
         legality: findings,
+        // Nothing to decompose on the base load: it is the unpinned fight, which
+        // is exactly the level `dps_chart` already draws.
+        ability_chart: Vec::new(),
+        target_chart: Vec::new(),
+        status_intervals,
         dps_chart: player_dps,
         hp_chart,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
@@ -1483,6 +1643,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         sba_events,
         death_events,
         target_entries,
+        selection_facts,
     })
 }
 
@@ -1510,6 +1671,10 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
             .execute(params_from_iter(ids))
             .map_err(|e| e.to_string())?;
     }
+
+    // Verdicts go with their logs: an orphaned finding would attach itself to
+    // whatever future encounter lands on the recycled rowid.
+    db::legality::sweep_orphaned_findings(&conn).map_err(|e| e.to_string())?;
 
     // Verdicts go with their logs: an orphaned finding would attach itself to
     // whatever future encounter lands on the recycled rowid.
@@ -2307,6 +2472,12 @@ fn connect_and_run_parser(app: AppHandle) {
                                 protocol::Message::OnStunEffect(event) => {
                                     state.on_stun_effect(event);
                                 }
+                                protocol::Message::StatusApply(event) => {
+                                    state.on_status_apply(event);
+                                }
+                                protocol::Message::StatusRemove(event) => {
+                                    state.on_status_remove(event);
+                                }
                             }
                         }
                     }
@@ -2624,6 +2795,9 @@ fn main() {
             fetch_legality_players,
             delete_logs,
             delete_all_logs,
+            pick_logs_db_file,
+            analyze_logs_db,
+            import_logs_from_file,
             pick_logs_db_file,
             analyze_logs_db,
             import_logs_from_file,

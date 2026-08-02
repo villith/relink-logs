@@ -9,6 +9,7 @@ import { abilityLabelFor } from "./abilityLabel";
  * fallback does. */
 const SKILL_NAME = (characterType: CharacterType, skill: SkillRow) => {
   const action = skill.actionType;
+  if (typeof action === "object" && "Group" in action) return `group:${action.Group}`;
   // The real chain resolves `skills.<character>.<id>` before anything else, so
   // with no character to key on it drops through to the unknown-skill string.
   const named = characterType !== "";

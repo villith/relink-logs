@@ -30,3 +30,4 @@ describe("identityPartyOf", () => {
     expect(identityPartyOf(null, null)).toEqual([]);
   });
 });
+

@@ -493,3 +493,4 @@ mod tests {
         assert_eq!(s, xorshift32(xorshift32(123_456_789)));
     }
 }
+

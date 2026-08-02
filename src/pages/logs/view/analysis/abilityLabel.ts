@@ -1,6 +1,7 @@
-import type { CharacterType, ComputedPlayerState, SkillState } from "@/types";
+import type { CharacterType, ComputedPlayerState, SkillRow } from "@/types";
 
 import { abilityKey, parseAbilityKey } from "../abilityKey";
+import { abilityRowKey, abilityRowName, groupOfPin } from "../abilitySkills";
 
 /** The party fields naming needs — the whole `ComputedPlayerState` is accepted,
  * this only names the parts that are read. */
@@ -28,17 +29,35 @@ export type AbilityLabelPlayer = Pick<ComputedPlayerState, "characterType" | "sk
 export const abilityLabelFor = (
   key: string,
   players: AbilityLabelPlayer[],
-  skillName: (characterType: CharacterType, skill: SkillState) => string
+  skillName: (characterType: CharacterType, skill: SkillRow) => string
 ): string => {
-  const action = parseAbilityKey(key);
-  if (!action) return key;
+  // A condensed group row is named through `{ Group }`; anything else is named
+  // through the action the key parses to. The raw key survives only when it is
+  // neither — a stale or hand-edited URL, where showing it back is the answer.
+  const group = groupOfPin(key);
+  const action = group === null ? parseAbilityKey(key) : { Group: group };
+  if (action === null) return key;
+
+  // A group pin matches on the ROW key; a raw pin matches on the action alone,
+  // deliberately — a key from a backend that sent no child character is raw even
+  // where that player's own skill groups, and it must still find its owner.
+  const owns = (entry: SkillRow) =>
+    group === null ? abilityKey(entry.actionType) === key : abilityRowKey(entry) === key;
+
+  // Named as the row the key names: through `{ Group }` for a group pin (shared
+  // with the drill-down legend, so a band and this label cannot disagree), and
+  // as the skill itself for a raw one.
+  const name = (characterType: CharacterType, skill: SkillRow) =>
+    group === null ? skillName(characterType, skill) : abilityRowName(characterType, skill, skillName);
 
   for (const player of players) {
-    const skill = player.skillBreakdown.find((entry) => abilityKey(entry.actionType) === key);
-    if (skill) return skillName(player.characterType, skill);
+    const skill = player.skillBreakdown.find(owns);
+    if (skill) return name(player.characterType, skill);
   }
 
-  // No owner, so no character to name it against and no child class to resolve a
-  // summon body from — both lookups miss and the default chain answers.
-  return skillName("", { actionType: action, childCharacterType: "" } as SkillState);
+  // Nobody used it. No character to name it against and no child class to
+  // resolve a summon body from, so the default chain answers — for a group,
+  // through its own `skills.default.skill-groups.<group>` name.
+  return skillName("", { actionType: action, childCharacterType: "" });
 };
+

@@ -20,7 +20,7 @@ const OPTIONS = {
   abilities: [{ value: "Normal:100", label: "Dawnfly Stance" }],
 };
 
-const NO_PINS = { source: null, targetIds: [], ability: null };
+const NO_PINS = { source: null, targets: [], ability: null };
 
 const renderIt = (props: Partial<React.ComponentProps<typeof PinBar>> = {}) =>
   render(

@@ -12,3 +12,4 @@ if (process.platform === "win32") {
 } else {
   console.log("[build-hook-dev] non-Windows host: skipping hook.dll build (windows-only crate).");
 }
+

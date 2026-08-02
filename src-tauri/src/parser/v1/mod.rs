@@ -26,8 +26,10 @@ mod filters;
 pub mod phantom_targets;
 mod player_state;
 mod skill_state;
+mod status;
 
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
+pub use status::{assemble_intervals, StatusInterval};
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::PlayerState;
 
@@ -1517,6 +1519,20 @@ pub struct TargetSpan {
 #[serde(rename_all = "camelCase")]
 pub struct TargetSegment {
     pub id: u32,
+    /// The game's own actor index for this spawn (`target.parent_index`).
+    ///
+    /// `id` above is the spawn's INSTANCE POINTER folded to 32 bits, which is
+    /// what tells two simultaneous same-kind actors apart. The status hook
+    /// cannot report that — it sees the actor, not the damage instance — and
+    /// sends this index instead, so it is the only field the two capture paths
+    /// share and the only one a status window can be matched on.
+    ///
+    /// Coarser than `id` by design: sibling summons collapse onto one actor
+    /// index (Lucilius' three swords), which is why the damage path stopped
+    /// keying on it. For a boss, the one case debuff attribution matters for,
+    /// it is unambiguous, and [`status::segment_at`] disambiguates sequential
+    /// reuse by time.
+    pub actor_index: u32,
     pub enemy_type: EnemyType,
     /// 1-based, chronological within `enemy_type` — the "#n" in both UIs.
     pub instance: u32,
@@ -1537,6 +1553,94 @@ pub struct TargetSegment {
 const RESPAWN_FRACTION: f64 = 0.95;
 const NEARLY_DEAD_FRACTION: f64 = 0.25;
 const RESPAWN_QUIET_GAP_MS: i64 = 30_000;
+
+/// One distinct combination present in the log: who dealt it, what they used,
+/// and what they hit.
+///
+/// Source is the PARENT actor, matching [`matches_selection`]: a summon's hit
+/// is offered under the player who called it, not under the summon body.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectionFact {
+    pub source_actor_type: u32,
+    pub source_index: u32,
+    /// Index into the [`TargetSegment`] vector this fight segments into — i.e.
+    /// into the `targetEntries` the same response carries.
+    ///
+    /// The SEGMENT, never `target.index`: the game frees a dead boss's actor
+    /// index and reissues it (live, "Four Dragons of the Apocalypse": Wilinus
+    /// Icewyrm and Vrazarek Firewyrm both arrived as `3926405961`). Keyed by the
+    /// index the two collapsed into one dropdown entry, the second dragon never
+    /// appeared, and pinning the first showed both dragons' damage. A segment is
+    /// one spawn, which is what the user means by "this enemy".
+    pub target_segment: usize,
+    pub ability: ActionType,
+    /// The body the hit came from, filed the way `skill_breakdown` files it.
+    ///
+    /// Present so the ability selector can condense its list into skill groups
+    /// with the same rule the table uses — grouping is per child character, and
+    /// the action alone cannot say which group it belongs to.
+    pub child_character_type: CharacterType,
+}
+
+/// The distinct [`SelectionFact`]s in `events`, in first-seen order.
+///
+/// Computed with the time window applied but the selector pins NOT applied:
+/// cascading needs the full population of each dimension given the *others*,
+/// and filtering by the pins first would collapse every list to what is already
+/// selected. The window IS applied, so the selectors only ever offer a pin that
+/// has something behind it.
+pub fn selection_facts(
+    events: &[(i64, Message)],
+    start_time: i64,
+    from_ms: Option<i64>,
+    up_to_ms: Option<i64>,
+    assignment: &[Option<usize>],
+) -> Vec<SelectionFact> {
+    let mut seen = HashSet::new();
+    let mut facts = Vec::new();
+
+    for (event_index, (timestamp, message)) in events.iter().enumerate() {
+        let Message::DamageEvent(event) = message else {
+            continue;
+        };
+
+        let rel_ms = timestamp - start_time;
+        if from_ms.is_some_and(|from| rel_ms < from) || up_to_ms.is_some_and(|up_to| rel_ms > up_to)
+        {
+            continue;
+        }
+
+        // No segment = not a selectable enemy (a phantom marker actor, which the
+        // segmenter deliberately skips). The dropdown lists enemies, so a hit
+        // with nowhere to belong is not offered rather than given a bogus home.
+        let Some(Some(target_segment)) = assignment.get(event_index).copied() else {
+            continue;
+        };
+
+        let fact = SelectionFact {
+            source_actor_type: event.source.parent_actor_type,
+            source_index: event.source.parent_index,
+            target_segment,
+            ability: event.action_id,
+            child_character_type: player_state::child_character_type_for(event),
+        };
+        // The child is part of the identity, not just payload: one player can
+        // hold two group rows of the same name (Id and his dragon form share
+        // three), and collapsing them here would hide one from the selector.
+        if seen.insert((
+            fact.source_actor_type,
+            fact.source_index,
+            fact.target_segment,
+            fact.ability,
+            fact.child_character_type,
+        )) {
+            facts.push(fact);
+        }
+    }
+
+    facts
+}
 
 /// Split every damage-event target into [`TargetSegment`]s, in first-hit
 /// order. Events without HP data still open/extend segments (DoT-only spans,
@@ -1617,6 +1721,9 @@ fn segment_targets_inner(
         if boundary {
             segments.push(TargetSegment {
                 id: key,
+                // The bridge to the status events, which know an enemy only by
+                // this index — see `TargetSegment::actor_index`.
+                actor_index: event.target.parent_index,
                 enemy_type: EnemyType::from_hash(event.target.parent_actor_type),
                 instance: 0, // numbered below
                 max_hp: hp.map(|(_, max)| max),
@@ -1715,6 +1822,10 @@ pub fn build_player_dps_chart(
     interval: i64,
     chart_len: usize,
     target_spans: &[TargetSpan],
+    // Actions to keep (empty = all), the same rule `matches_selection` applies
+    // to the derived state — so a chart drawn under an ability pin cannot
+    // disagree with the table beneath it.
+    abilities: &[ActionType],
     filters: MeterFilters,
 ) -> HashMap<u32, Vec<i32>> {
     let mut player_dps: HashMap<u32, Vec<i32>> = player_indices
@@ -1732,6 +1843,12 @@ pub fn build_player_dps_chart(
         };
 
         if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
+            continue;
+        }
+
+        // The RAW action, read before the dragon-form remap below — that remap
+        // rewrites the source, never the action, so the two are independent.
+        if !abilities.is_empty() && !abilities.contains(&damage_event.action_id) {
             continue;
         }
 
@@ -1963,6 +2080,199 @@ pub fn build_target_hp_charts(
     charts
 }
 
+/// One band of the analysis view's ability drill-down chart: what one breakdown
+/// row of one player dealt per bucket.
+///
+/// Keyed exactly as `skill_breakdown` keys its rows — same action, same child
+/// character — so a band always corresponds to a row of the table beneath it,
+/// and the frontend can fold bands into skill groups with the same rule it
+/// folds rows by. The raw key, not the group: grouping is a display concern the
+/// parser has never known about, and folding a sum is lossless while splitting
+/// one is not.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AbilityChartSeries {
+    pub action_type: ActionType,
+    pub child_character_type: CharacterType,
+    pub values: Vec<i32>,
+}
+
+/// One band of the target drill-down chart: what one pinned ability dealt to one
+/// spawn segment per bucket.
+///
+/// Carries the segment's `instance` rather than merging same-type spawns, so a
+/// band lines up with the target dropdown, the enemy-HP chart above it and the
+/// target pin. Merging down to the type is something the frontend can still do;
+/// splitting a merged series is not.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TargetChartSeries {
+    pub enemy_type: EnemyType,
+    pub instance: u32,
+    pub values: Vec<i32>,
+}
+
+/// Damage buckets for one player, split by breakdown row.
+///
+/// Every gate the meter applies is applied here too — phantom targets, the
+/// contested-source filter, the dragon-form remap and the target spans — so the
+/// chart's area equals the total the table reports. Bands come back largest
+/// first, which is also the table's order.
+///
+/// `chart_len` must be sized from the FULL log duration, exactly as
+/// [`build_player_dps_chart`] requires: a bucket index IS the elapsed second.
+#[allow(clippy::too_many_arguments)]
+pub fn build_ability_damage_chart(
+    events: &[(i64, Message)],
+    player_data: &[Option<PlayerData>; 4],
+    source_index: u32,
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+    target_spans: &[TargetSpan],
+    filters: MeterFilters,
+) -> Vec<AbilityChartSeries> {
+    let phantoms = PhantomTargets::learned_from(events.iter());
+    // One keying per call: it is stateful and must see this player's hits in log
+    // order, which is exactly what walking the log once gives it.
+    let mut keying = player_state::BreakdownKeying::default();
+    let mut series: Vec<AbilityChartSeries> = Vec::new();
+
+    for (timestamp, event) in events {
+        let Message::DamageEvent(damage_event) = event else {
+            continue;
+        };
+
+        if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
+            continue;
+        }
+
+        let damage_event = remap_dragon_form(player_data, damage_event);
+        if damage_event.source.parent_index != source_index {
+            continue;
+        }
+
+        let rel_ts = timestamp - start_time;
+        if !target_selected(rel_ts, &damage_event, target_spans) {
+            continue;
+        }
+
+        let bucket = (rel_ts / interval) as usize;
+        if bucket >= chart_len {
+            continue;
+        }
+
+        let (action_type, child_character_type) = keying.key_for(&damage_event);
+        let found = series
+            .iter_mut()
+            .find(|s| s.action_type == action_type && s.child_character_type == child_character_type);
+        let band = match found {
+            Some(band) => band,
+            None => {
+                series.push(AbilityChartSeries {
+                    action_type,
+                    child_character_type,
+                    values: vec![0; chart_len],
+                });
+                series.last_mut().expect("band pushed just above")
+            }
+        };
+        band.values[bucket] += damage_event.damage;
+    }
+
+    // Stable, so bands with equal totals keep the order they first landed in.
+    series.sort_by_key(|band| std::cmp::Reverse(band.values.iter().map(|v| *v as i64).sum::<i64>()));
+    series
+}
+
+/// Damage buckets for one player's one ability, split by the enemy spawn it hit.
+///
+/// `segments`/`assignment` MUST come from [`segment_targets_indexed`] over the
+/// same events: sharing the segmentation is what guarantees a band and a
+/// dropdown entry mean the same enemy. Time cannot substitute for it — a phase
+/// change opens a segment at the same millisecond the outgoing one ends.
+///
+/// The ability is matched on the RAW `action_id`, the same rule
+/// [`matches_selection`] applies to the derived state, so this chart and the
+/// table beneath it always agree about what is pinned.
+///
+/// Capped at [`HP_CHART_MAX_SERIES`] like the HP chart, for the same reason:
+/// one summon wave can spawn a dozen pools. What the cap drops is logged rather
+/// than silently truncated.
+#[allow(clippy::too_many_arguments)]
+pub fn build_target_damage_chart(
+    events: &[(i64, Message)],
+    player_data: &[Option<PlayerData>; 4],
+    segments: &[TargetSegment],
+    assignment: &[Option<usize>],
+    source_index: u32,
+    ability: ActionType,
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+    target_spans: &[TargetSpan],
+    filters: MeterFilters,
+) -> Vec<TargetChartSeries> {
+    let phantoms = PhantomTargets::learned_from(events.iter());
+    let mut values_by_segment: Vec<Option<Vec<i32>>> = vec![None; segments.len()];
+
+    for (position, (timestamp, event)) in events.iter().enumerate() {
+        let Message::DamageEvent(damage_event) = event else {
+            continue;
+        };
+
+        if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
+            continue;
+        }
+        if damage_event.action_id != ability {
+            continue;
+        }
+
+        let damage_event = remap_dragon_form(player_data, damage_event);
+        if damage_event.source.parent_index != source_index {
+            continue;
+        }
+
+        let rel_ts = timestamp - start_time;
+        if !target_selected(rel_ts, &damage_event, target_spans) {
+            continue;
+        }
+
+        let bucket = (rel_ts / interval) as usize;
+        if bucket >= chart_len {
+            continue;
+        }
+
+        let Some(Some(segment)) = assignment.get(position) else {
+            continue;
+        };
+        let band = values_by_segment[*segment].get_or_insert_with(|| vec![0; chart_len]);
+        band[bucket] += damage_event.damage;
+    }
+
+    let mut charts: Vec<TargetChartSeries> = values_by_segment
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, values)| {
+            values.map(|values| TargetChartSeries {
+                enemy_type: segments[index].enemy_type,
+                instance: segments[index].instance,
+                values,
+            })
+        })
+        .collect();
+
+    charts.sort_by_key(|band| std::cmp::Reverse(band.values.iter().map(|v| *v as i64).sum::<i64>()));
+    if charts.len() > HP_CHART_MAX_SERIES {
+        log::info!(
+            "target drill chart: showing the {HP_CHART_MAX_SERIES} biggest of {} spawns hit",
+            charts.len()
+        );
+        charts.truncate(HP_CHART_MAX_SERIES);
+    }
+    charts
+}
+
 /// The parser for the encounter.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Parser {
@@ -1979,6 +2289,14 @@ pub struct Parser {
     /// the whole point is that the raw log stays neutral.
     #[serde(skip)]
     pub filters: MeterFilters,
+
+    /// Which source actors and abilities the quest view's selector bar has
+    /// pinned. Skipped for the same reason as [`Self::filters`] — it is what
+    /// someone is currently looking at, not something about the fight.
+    /// [`Default`] is every dimension unpinned, so the live path and every
+    /// caller that never sets it derive the whole encounter.
+    #[serde(skip)]
+    pub selection: SelectionFilter,
 
     /// Target actor types this encounter has shown to be markers rather than
     /// enemies (see [`phantom_targets`]). Derived from the raw log, so it is
@@ -2082,6 +2400,11 @@ impl Parser {
     /// [`Self::filters`] drops contested damage sources (see [`is_excluded`])
     /// from every derived total. The raw log is untouched, so setting a
     /// different value and reparsing restores them.
+    ///
+    /// [`Self::selection`] narrows to the selector bar's pinned source and
+    /// ability (see [`matches_selection`]), alongside `target_spans` and under
+    /// the same rule: it changes whose damage counts, never the window that
+    /// damage is measured over.
     pub fn reparse_with_options_window(
         &mut self,
         target_spans: &[TargetSpan],
@@ -2089,6 +2412,8 @@ impl Parser {
         up_to_ms: Option<i64>,
     ) {
         let filters = self.filters;
+        // Cloned rather than borrowed: the loop below takes `&mut self`.
+        let selection = self.selection.clone();
         let log_start = self.start_time();
         // Learned up front from the WHOLE log: most of a marker's hits carry no
         // HP read, so judging it as events stream past would drop only the few
@@ -2140,10 +2465,15 @@ impl Parser {
                 Message::DamageEvent(event) => {
                     // Ahead of the target-selection check, so filtering to one
                     // target narrows WHOSE damage counts without also redefining
-                    // the window that damage is measured over.
+                    // the window that damage is measured over. The selector
+                    // bar's source/ability pins sit on the same side of this
+                    // line for the same reason: pinning one player must not
+                    // shorten the fight everyone's DPS is divided by.
                     self.derived_state.extend_window(*timestamp);
 
-                    if target_selected(*timestamp - log_start, event, target_spans) {
+                    if target_selected(*timestamp - log_start, event, target_spans)
+                        && matches_selection(event, &selection)
+                    {
                         let event = remap_dragon_form(&self.encounter.player_data, event);
 
                         let player_data = self
@@ -2818,6 +3148,38 @@ impl Parser {
         }
     }
 
+    /// Records one status effect landing on an actor.
+    ///
+    /// Kept in the raw log only: uptime is assembled from apply/remove pairs on
+    /// read (see [`assemble_intervals`]), so nothing here has to hold open
+    /// intervals across a reparse.
+    ///
+    /// Recorded ONLY inside a running encounter, and deliberately never opens
+    /// one. Statuses fire constantly outside combat — party buffs on load,
+    /// food, regen in town — so starting a fight on one would fill the log with
+    /// empty quests. The cost is a buff pre-cast before the first hit of a
+    /// pull: it is dropped rather than back-dated, because `ensure_encounter_started`
+    /// is what makes an event survive the first damage event's `reset()` and
+    /// nothing may call it that cannot legitimately begin a fight.
+    pub fn on_status_apply(&mut self, event: protocol::StatusApplyEvent) {
+        if self.status != ParserStatus::InProgress {
+            return;
+        }
+        let now = Utc::now().timestamp_millis();
+        self.encounter.push_event(now, Message::StatusApply(event));
+    }
+
+    /// Records one status effect ending. Same in-fight rule as
+    /// [`Self::on_status_apply`]: a buff expiring in town belongs to no
+    /// encounter, and recording it would attach it to the NEXT one.
+    pub fn on_status_remove(&mut self, event: protocol::StatusRemoveEvent) {
+        if self.status != ParserStatus::InProgress {
+            return;
+        }
+        let now = Utc::now().timestamp_millis();
+        self.encounter.push_event(now, Message::StatusRemove(event));
+    }
+
     /// Handles one guarded-Quickening marker (The World): counts the guard for
     /// the player, nothing else.
     pub fn on_perfect_guard_quickening(&mut self, event: OnPlayerStunEvent) {
@@ -3455,6 +3817,57 @@ mod tests {
     /// than restated, so a hash correction after a game patch reaches the tests.
     const PRIMAL_BURST_BODY: u32 = protocol::PRIMAL_BURST_BODY_HASHES[0];
 
+    fn status_apply(status_id: u32) -> protocol::StatusApplyEvent {
+        protocol::StatusApplyEvent {
+            actor_index: 0,
+            caster_index: Some(0),
+            status_id,
+            ability_id: None,
+            stacks: 1,
+        }
+    }
+
+    #[test]
+    fn a_status_applied_outside_a_fight_does_not_open_an_encounter() {
+        // Statuses fire constantly in town — party buffs on load, food, regen.
+        // Opening an encounter on one would fill the log with empty quests.
+        let mut parser = Parser::default();
+
+        parser.on_status_apply(status_apply(10));
+
+        assert_eq!(parser.status, ParserStatus::Stopped);
+        assert!(parser.encounter.raw_event_log.is_empty());
+    }
+
+    #[test]
+    fn a_status_applied_during_a_fight_is_recorded() {
+        let mut parser = Parser::default();
+        parser.on_damage_event(damage_from(PLAYER_HASH, 100, 500));
+
+        parser.on_status_apply(status_apply(10));
+
+        assert!(parser
+            .encounter
+            .raw_event_log
+            .iter()
+            .any(|(_, message)| matches!(message, Message::StatusApply(_))));
+    }
+
+    #[test]
+    fn a_status_removed_outside_a_fight_is_dropped() {
+        // The mirror of the apply rule: a buff expiring in town belongs to no
+        // encounter, and recording it would attach it to the NEXT one.
+        let mut parser = Parser::default();
+
+        parser.on_status_remove(protocol::StatusRemoveEvent {
+            actor_index: 0,
+            status_id: 10,
+            ability_id: None,
+        });
+
+        assert!(parser.encounter.raw_event_log.is_empty());
+    }
+
     /// A hit on enemy 9 credited to player slot 0. `body` is the acting actor's
     /// class (the player's own hash for a normal hit, a Primal Burst body for a
     /// burst); `action` is the skill id.
@@ -3849,6 +4262,7 @@ mod tests {
             1_000,
             3,
             &[],
+            &[],
             MeterFilters::default(),
         );
 
@@ -3882,12 +4296,277 @@ mod tests {
             1_000,
             2,
             &[],
+            &[],
             MeterFilters {
                 include_primal_burst: true,
             },
         );
 
         assert_eq!(chart.get(&0).unwrap(), &vec![1_000, 3_000]);
+    }
+
+    #[test]
+    fn dps_chart_keeps_only_the_selected_abilities() {
+        // The analysis view pins an ability with no friendly: the chart must
+        // narrow the same way the table does, or the two disagree on screen.
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 500)),
+            ),
+            (
+                2_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 200, 700)),
+            ),
+        ];
+
+        let chart = build_player_dps_chart(
+            &events,
+            &Default::default(),
+            &[0],
+            1_000,
+            1_000,
+            3,
+            &[],
+            &[ActionType::Normal(100)],
+            MeterFilters::default(),
+        );
+
+        assert_eq!(
+            chart.get(&0).unwrap(),
+            &vec![500, 0, 0],
+            "only the pinned ability counts"
+        );
+    }
+
+    #[test]
+    fn dps_chart_with_no_selected_abilities_counts_everything() {
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 500)),
+            ),
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 200, 700)),
+            ),
+        ];
+
+        let chart = build_player_dps_chart(
+            &events,
+            &Default::default(),
+            &[0],
+            1_000,
+            1_000,
+            2,
+            &[],
+            &[],
+            MeterFilters::default(),
+        );
+
+        assert_eq!(
+            chart.get(&0).unwrap(),
+            &vec![1_200, 0],
+            "an empty list means All"
+        );
+    }
+
+    /// `damage_from`, but landing on a chosen enemy — the drill-down target
+    /// chart is the only thing that cares which one was hit.
+    fn damage_onto(target_index: u32, action: u32, damage: i32) -> DamageEvent {
+        let mut event = damage_from(PLAYER_HASH, action, damage);
+        event.target.index = target_index;
+        event.target.parent_index = target_index;
+        event
+    }
+
+    #[test]
+    fn ability_chart_splits_one_player_by_breakdown_row() {
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (
+                2_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 200, 300)),
+            ),
+            (
+                3_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 500)),
+            ),
+        ];
+
+        let series = build_ability_damage_chart(
+            &events,
+            &Default::default(),
+            0,
+            1_000,
+            1_000,
+            3,
+            &[],
+            MeterFilters::default(),
+        );
+
+        assert_eq!(series.len(), 2, "one band per ability");
+        // Largest first: action 100 totals 1500 against action 200's 300.
+        assert_eq!(series[0].action_type, ActionType::Normal(100));
+        assert_eq!(series[0].values, vec![1_000, 0, 500]);
+        assert_eq!(series[1].action_type, ActionType::Normal(200));
+        assert_eq!(series[1].values, vec![0, 300, 0]);
+    }
+
+    #[test]
+    fn ability_chart_area_equals_the_players_total() {
+        // The invariant that makes the chart trustworthy: a band's area is part
+        // of the row total beneath it, so the whole stack is the player total.
+        let mut parser = Parser::default();
+        for (timestamp, action, damage) in [(1_000, 100, 1_000), (2_000, 200, 300), (2_500, 100, 500)]
+        {
+            parser
+                .encounter
+                .raw_event_log
+                .push((timestamp, Message::DamageEvent(damage_from(PLAYER_HASH, action, damage))));
+        }
+        parser.reparse();
+
+        let series = build_ability_damage_chart(
+            &parser.encounter.raw_event_log,
+            &parser.encounter.player_data,
+            0,
+            parser.start_time(),
+            1_000,
+            3,
+            &[],
+            MeterFilters::default(),
+        );
+
+        let charted: i64 = series
+            .iter()
+            .flat_map(|band| band.values.iter())
+            .map(|value| *value as i64)
+            .sum();
+        let table_total = parser.derived_state.party.values().next().unwrap().total_damage;
+        assert_eq!(charted, table_total as i64);
+    }
+
+    #[test]
+    fn ability_chart_drops_other_players_and_filtered_hits() {
+        let mut other = damage_from(PLAYER_HASH, 100, 9_999);
+        other.source.parent_index = 3;
+
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (1_500, Message::DamageEvent(other)),
+            (
+                2_000,
+                Message::DamageEvent(damage_from(
+                    PRIMAL_BURST_BODY,
+                    SUMMON_ATTACK_ACTION_ID,
+                    3_000,
+                )),
+            ),
+        ];
+
+        let series = build_ability_damage_chart(
+            &events,
+            &Default::default(),
+            0,
+            1_000,
+            1_000,
+            2,
+            &[],
+            MeterFilters::default(),
+        );
+
+        assert_eq!(series.len(), 1);
+        assert_eq!(series[0].values, vec![1_000, 0]);
+    }
+
+    #[test]
+    fn a_spawn_records_the_actor_index_the_status_events_use() {
+        // A damage event names its target twice: `index` is the target's
+        // instance pointer folded to 32 bits, which is what tells two
+        // simultaneous same-kind actors apart, and `parent_index` is the game's
+        // own actor index. A status apply can only report the second — the
+        // status hook sees the actor, not the damage instance — so the segment
+        // has to keep it or an enemy's debuffs can never be matched to it.
+        //
+        // The real values from log 1614, where all 11 enemy-held intervals
+        // resolved to no spawn because only `index` was recorded.
+        let mut event = damage_onto(9, 100, 1_000);
+        event.target.index = 2_785_501_876;
+        event.target.parent_index = 977_212_104;
+
+        let segments = segment_targets(&[(1_000, Message::DamageEvent(event))], 1_000);
+
+        assert_eq!(segments.len(), 1);
+        assert_eq!(segments[0].id, 2_785_501_876, "the per-spawn discriminator");
+        assert_eq!(
+            segments[0].actor_index, 977_212_104,
+            "the bridge to the status events"
+        );
+    }
+
+    #[test]
+    fn target_chart_splits_one_ability_by_spawn() {
+        let events = vec![
+            (1_000, Message::DamageEvent(damage_onto(9, 100, 1_000))),
+            (2_000, Message::DamageEvent(damage_onto(11, 100, 400))),
+            // A different ability: pinning action 100 must exclude it.
+            (2_000, Message::DamageEvent(damage_onto(9, 200, 7_777))),
+            (3_000, Message::DamageEvent(damage_onto(9, 100, 250))),
+        ];
+        let (segments, assignment) = segment_targets_indexed(&events, 1_000);
+
+        let series = build_target_damage_chart(
+            &events,
+            &Default::default(),
+            &segments,
+            &assignment,
+            0,
+            ActionType::Normal(100),
+            1_000,
+            1_000,
+            3,
+            &[],
+            MeterFilters::default(),
+        );
+
+        assert_eq!(series.len(), 2, "one band per spawn hit");
+        assert_eq!(series[0].values, vec![1_000, 0, 250]);
+        assert_eq!(series[1].values, vec![0, 400, 0]);
+        // Instances come from the shared segmentation, so a band names the same
+        // enemy the target dropdown does.
+        assert_eq!(
+            series.iter().map(|s| s.instance).collect::<Vec<_>>(),
+            vec![segments[0].instance, segments[1].instance]
+        );
+    }
+
+    #[test]
+    fn target_chart_is_empty_when_the_ability_never_landed() {
+        let events = vec![(1_000, Message::DamageEvent(damage_onto(9, 100, 1_000)))];
+        let (segments, assignment) = segment_targets_indexed(&events, 1_000);
+
+        let series = build_target_damage_chart(
+            &events,
+            &Default::default(),
+            &segments,
+            &assignment,
+            0,
+            ActionType::Normal(999),
+            1_000,
+            1_000,
+            1,
+            &[],
+            MeterFilters::default(),
+        );
+
+        assert!(series.is_empty(), "no band for an ability with no hits");
     }
 
     #[test]
@@ -3905,6 +4584,7 @@ mod tests {
             1_000,
             1,
             &[],
+            &[],
             MeterFilters::default(),
         );
 
@@ -3912,6 +4592,207 @@ mod tests {
         // rather than invented — same as the pre-extraction loop.
         assert_eq!(chart.len(), 1);
         assert_eq!(chart.get(&7).unwrap(), &vec![0]);
+    }
+
+    /// One `OnPlayerStun` message at `at` ms crediting slot 0.
+    fn stun_message(at: i64, amount: f32) -> (i64, Message) {
+        (
+            at,
+            Message::OnPlayerStun(protocol::OnPlayerStunEvent {
+                actor_index: 0,
+                stun_amount: amount,
+            }),
+        )
+    }
+
+    #[test]
+    fn stun_chart_buckets_the_delta_path_when_it_is_the_one_that_saw_the_accrual() {
+        // `damage_from` carries stun_value 50.0, so two hits give a delta sum of
+        // 100 against a message sum of 0 — the solo case.
+        let events = vec![
+            (1_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
+            (3_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
+        ];
+
+        let chart = build_player_stun_chart(
+            &events,
+            &Default::default(),
+            &[0],
+            1_000,
+            1_000,
+            3,
+            &[],
+            MeterFilters::default(),
+        );
+
+        assert_eq!(chart.get(&0).unwrap(), &vec![50.0, 0.0, 50.0]);
+    }
+
+    #[test]
+    fn stun_chart_buckets_the_message_path_when_it_is_the_larger_one() {
+        // Online: the delta path reads 0 and the messages carry the stun. One
+        // damage event still has to exist, or nothing establishes the player.
+        let mut hit = damage_from(PLAYER_HASH, 100, 1);
+        hit.stun_value = Some(0.0);
+        let events = vec![
+            (1_000, Message::DamageEvent(hit)),
+            stun_message(1_000, 30.0),
+            stun_message(3_000, 20.0),
+        ];
+
+        let chart = build_player_stun_chart(
+            &events,
+            &Default::default(),
+            &[0],
+            1_000,
+            1_000,
+            3,
+            &[],
+            MeterFilters::default(),
+        );
+
+        assert_eq!(chart.get(&0).unwrap(), &vec![30.0, 0.0, 20.0]);
+    }
+
+    #[test]
+    fn stun_chart_never_sums_the_two_paths_together() {
+        // Solo loopback fires BOTH paths for the same accrual. total_stun_value
+        // is max(delta, messages), so the chart must pick a path — summing would
+        // draw double the stun the table beneath it reports.
+        let events = vec![
+            (1_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
+            stun_message(1_000, 50.0),
+        ];
+
+        let chart = build_player_stun_chart(
+            &events,
+            &Default::default(),
+            &[0],
+            1_000,
+            1_000,
+            2,
+            &[],
+            MeterFilters::default(),
+        );
+
+        let series = chart.get(&0).unwrap();
+        assert_eq!(series.iter().sum::<f64>(), 50.0);
+    }
+
+    #[test]
+    fn stun_chart_totals_match_the_derived_player_total() {
+        // The invariant that matters: a chart's area cannot disagree with the
+        // row total it sits under.
+        let events = vec![
+            (1_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
+            (2_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
+            stun_message(2_500, 30.0),
+        ];
+
+        let mut state = DerivedEncounterState::default();
+        for (timestamp, event) in &events {
+            match event {
+                Message::DamageEvent(event) => {
+                    let instance = AdjustedDamageInstance::from_damage_event(event, None);
+                    state.process_damage_event(*timestamp, &instance);
+                }
+                Message::OnPlayerStun(event) => {
+                    state.process_stun_message(*timestamp, event.actor_index, event.stun_amount as f64)
+                }
+                _ => {}
+            }
+        }
+
+        let chart = build_player_stun_chart(
+            &events,
+            &Default::default(),
+            &[0],
+            1_000,
+            1_000,
+            3,
+            &[],
+            MeterFilters::default(),
+        );
+
+        let charted: f64 = chart.get(&0).unwrap().iter().sum();
+        assert_eq!(charted, state.party.get(&0).unwrap().total_stun_value);
+    }
+
+    #[test]
+    fn stun_chart_drops_a_message_trailing_an_excluded_hit() {
+        // Same suppression rule as the meter: an excluded hit's trailing stun
+        // message must not be credited to the skill before it.
+        let mut burst = damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000);
+        burst.source.parent_index = 0;
+        burst.stun_value = Some(0.0);
+        let mut hit = damage_from(PLAYER_HASH, 100, 1);
+        hit.stun_value = Some(0.0);
+
+        let events = vec![
+            (1_000, Message::DamageEvent(hit)),
+            (2_000, Message::DamageEvent(burst)),
+            stun_message(2_100, 40.0),
+        ];
+
+        let chart = build_player_stun_chart(
+            &events,
+            &Default::default(),
+            &[0],
+            1_000,
+            1_000,
+            3,
+            &[],
+            MeterFilters::default(),
+        );
+
+        assert_eq!(chart.get(&0).unwrap().iter().sum::<f64>(), 0.0);
+    }
+
+    #[test]
+    fn stun_chart_counts_a_stun_effect_proc_on_the_delta_path() {
+        // Eugen's sticky grenade: real stun with no damage event of its own.
+        let events = vec![
+            (1_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
+            (
+                2_000,
+                Message::OnStunEffect(protocol::OnPlayerStunEvent {
+                    actor_index: 0,
+                    stun_amount: 25.0,
+                }),
+            ),
+        ];
+
+        let chart = build_player_stun_chart(
+            &events,
+            &Default::default(),
+            &[0],
+            1_000,
+            1_000,
+            2,
+            &[],
+            MeterFilters::default(),
+        );
+
+        assert_eq!(chart.get(&0).unwrap(), &vec![50.0, 25.0]);
+    }
+
+    #[test]
+    fn stun_chart_rows_exist_only_for_the_given_players() {
+        let events = vec![(1_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1)))];
+
+        let chart = build_player_stun_chart(
+            &events,
+            &Default::default(),
+            &[7],
+            1_000,
+            1_000,
+            1,
+            &[],
+            MeterFilters::default(),
+        );
+
+        assert_eq!(chart.len(), 1);
+        assert_eq!(chart.get(&7).unwrap(), &vec![0.0]);
     }
 
     #[test]
@@ -4899,6 +5780,195 @@ mod tests {
         // No cutoff = the full fight (same as a plain reparse).
         parser.reparse_with_options_window(&[], None, None);
         assert_eq!(parser.derived_state.total_damage, 700);
+    }
+
+    #[test]
+    fn selection_facts_list_distinct_combinations_only() {
+        let mut parser = Parser::default();
+        let base = 1_000;
+        // Two identical hits plus one different ability, same source and target.
+        parser
+            .encounter
+            .push_event(base, Message::DamageEvent(a_damage_event()));
+        parser
+            .encounter
+            .push_event(base + 10, Message::DamageEvent(a_damage_event()));
+        let mut other = a_damage_event();
+        other.action_id = ActionType::Normal(777);
+        parser
+            .encounter
+            .push_event(base + 20, Message::DamageEvent(other));
+
+        let (_, assignment) = segment_targets_indexed(&parser.encounter.raw_event_log, base);
+        let facts = selection_facts(&parser.encounter.raw_event_log, base, None, None, &assignment);
+
+        assert_eq!(facts.len(), 2, "identical combinations collapse to one fact");
+        assert!(facts.iter().any(|f| f.ability == ActionType::Normal(777)));
+    }
+
+    /// THE RECYCLED-ID CASE (live: log 1575, "Four Dragons of the Apocalypse").
+    ///
+    /// The game frees a dead boss's actor index and hands the SAME one to a
+    /// later boss: Wilinus Icewyrm and Vrazarek Firewyrm both arrived as index
+    /// `3926405961`. `segment_targets` already tells them apart — different max
+    /// HP opens a new segment — so a fact must name the SEGMENT it hit, not the
+    /// index. Keyed by the index, the two dragons collapsed into one dropdown
+    /// entry, one of them vanished from the list entirely, and pinning the
+    /// survivor showed the other's damage too.
+    #[test]
+    fn selection_facts_tell_apart_two_enemies_sharing_a_recycled_index() {
+        const WILINUS: u32 = 0xe170_f036;
+        const VRAZAREK: u32 = 0x4a29_9e62;
+        const RECYCLED: u32 = 3_926_405_961;
+
+        let hit = |ts: i64, enemy: u32, max: u64| {
+            let mut event = a_damage_event();
+            event.target.index = RECYCLED;
+            event.target.parent_index = RECYCLED;
+            event.target.parent_actor_type = enemy;
+            event.target_current_hp = Some(max / 2);
+            event.target_max_hp = Some(max);
+            (ts, Message::DamageEvent(event))
+        };
+
+        let events = vec![
+            hit(0, WILINUS, 900_900_032),
+            hit(140_000, WILINUS, 900_900_032),
+            hit(280_000, VRAZAREK, 817_537_472),
+        ];
+
+        let (segments, assignment) = segment_targets_indexed(&events, 0);
+        assert_eq!(segments.len(), 2, "the segmenter already splits them");
+
+        let facts = selection_facts(&events, 0, None, None, &assignment);
+
+        let targets: std::collections::BTreeSet<usize> =
+            facts.iter().map(|fact| fact.target_segment).collect();
+        assert_eq!(
+            targets.len(),
+            2,
+            "both dragons must be offered; keyed by the recycled index they \
+             collapse to one entry and the second dragon disappears"
+        );
+        assert_eq!(
+            targets.into_iter().collect::<Vec<_>>(),
+            vec![0, 1],
+            "each fact names its own segment, so a pin selects one dragon"
+        );
+    }
+
+    /// A hit on a phantom marker actor has no segment, so it can never be
+    /// offered as a target — the dropdown lists enemies, not markers.
+    #[test]
+    fn selection_facts_skip_events_with_no_segment() {
+        let events = vec![(1_000, Message::DamageEvent(a_damage_event()))];
+        let (_, assignment) = segment_targets_indexed(&events, 1_000);
+        let facts = selection_facts(&events, 1_000, None, None, &assignment);
+        assert_eq!(facts.len(), 1);
+
+        // An assignment that claims nothing belongs to a segment drops the fact
+        // rather than inventing one.
+        let facts = selection_facts(&events, 1_000, None, None, &[None]);
+        assert!(facts.is_empty());
+    }
+
+    /// The facts describe the window on screen: an ability used only outside it
+    /// must not be offered, or the selector would list a pin that produces an
+    /// empty table.
+    #[test]
+    fn selection_facts_respect_the_window() {
+        let mut parser = Parser::default();
+        let base = 1_000;
+
+        for (offset, action) in [(0, 1), (5_000, 777)] {
+            let mut event = a_damage_event();
+            event.action_id = ActionType::Normal(action);
+            parser
+                .encounter
+                .push_event(base + offset, Message::DamageEvent(event));
+        }
+
+        let (_, assignment) = segment_targets_indexed(&parser.encounter.raw_event_log, base);
+        let facts = selection_facts(
+            &parser.encounter.raw_event_log,
+            base,
+            None,
+            Some(2_000),
+            &assignment,
+        );
+
+        assert_eq!(facts.len(), 1);
+        assert_eq!(facts[0].ability, ActionType::Normal(1));
+    }
+
+    /// The selector bar's pins narrow WHOSE damage counts, on the same side of
+    /// `extend_window` as the enemy filter: pinning an ability must not shorten
+    /// the fight that DPS is divided by, or every metric would silently be
+    /// measured over a different span than the one on screen.
+    #[test]
+    fn selection_narrows_totals_without_moving_the_window() {
+        let mut parser = Parser::default();
+        let base = 10_000;
+
+        for (offset, damage, action) in [(0, 100, 1), (4_000, 200, 2), (8_000, 400, 1)] {
+            let mut event = a_damage_event();
+            event.damage = damage;
+            event.action_id = ActionType::Normal(action);
+            parser
+                .encounter
+                .push_event(base + offset, Message::DamageEvent(event));
+        }
+
+        parser.reparse();
+        assert_eq!(parser.derived_state.total_damage, 700);
+        let full_end = parser.derived_state.end_time;
+
+        parser.selection = SelectionFilter {
+            source_indices: vec![],
+            abilities: vec![ActionType::Normal(2)],
+        };
+        parser.reparse();
+
+        assert_eq!(parser.derived_state.total_damage, 200, "only the pinned ability counts");
+        assert_eq!(
+            parser.derived_state.end_time, full_end,
+            "the window still spans the whole fight"
+        );
+
+        // An unpinned selection restores everything — the raw log is untouched.
+        parser.selection = SelectionFilter::default();
+        parser.reparse();
+        assert_eq!(parser.derived_state.total_damage, 700);
+    }
+
+    /// Pinning a source keys on the summoner, so a summon's hit stays with the
+    /// player who called it.
+    #[test]
+    fn selection_by_source_keeps_summon_damage_with_its_owner() {
+        let mut parser = Parser::default();
+        let base = 10_000;
+
+        let mut own_hit = a_damage_event();
+        own_hit.damage = 100;
+        parser
+            .encounter
+            .push_event(base, Message::DamageEvent(own_hit));
+
+        // Same parent, different body: an ordinary summon call.
+        let mut summon_hit = a_damage_event();
+        summon_hit.damage = 50;
+        summon_hit.source.actor_type = 0xB079_2857;
+        parser
+            .encounter
+            .push_event(base + 1_000, Message::DamageEvent(summon_hit));
+
+        parser.selection = SelectionFilter {
+            source_indices: vec![0],
+            abilities: vec![],
+        };
+        parser.reparse();
+
+        assert_eq!(parser.derived_state.total_damage, 150);
     }
 
     /// The two-ended window scrubber: events on both sides of the window are

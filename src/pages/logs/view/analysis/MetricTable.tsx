@@ -1,5 +1,5 @@
-import { Eye, EyeSlash } from "@phosphor-icons/react";
 import { Box, Text, UnstyledButton } from "@mantine/core";
+import { Eye, EyeSlash } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
 import type { MetricRow } from "../metrics/types";
@@ -30,6 +30,15 @@ export type MetricTableProps = {
    * status metrics pass it; absent, no row grows a control and the table keeps
    * the DOM it has. */
   rowToggle?: (row: MetricRow) => { shown: boolean; onToggle: () => void } | null;
+  /** Length of the window `MetricRow.timeline` spans, in milliseconds — the
+   * denominator that turns a window into a position. Zero (or absent) makes
+   * every row fall back to its magnitude bar, which is what a fight with no
+   * measured length can honestly draw. */
+  timelineMs?: number;
+  /** What an empty table says. Defaults to the pins explanation, which is the
+   * usual reason for one — but a log that never recorded the metric at all has
+   * nothing to do with the pins, and saying so sends the user clearing them. */
+  emptyKey?: string;
 };
 
 const FALLBACK_COLOR = "var(--an-ink-3)";
@@ -52,13 +61,15 @@ export const MetricTable = ({
   rowsLabelKey,
   rowSections,
   rowToggle,
+  timelineMs = 0,
+  emptyKey = "ui.logs.no-rows",
 }: MetricTableProps) => {
   const { t } = useTranslation();
 
   if (rows.length === 0) {
     return (
       <Text size="sm" c="dimmed" ta="center" py="lg">
-        {t("ui.logs.no-rows")}
+        {t(emptyKey)}
       </Text>
     );
   }
@@ -66,7 +77,7 @@ export const MetricTable = ({
   const largest = Math.max(...rows.map((row) => row.value));
 
   return (
-    <Box role="table">
+    <Box role="grid">
       <Box className="analysis-head" role="row">
         <Text className="analysis-label" role="columnheader" style={{ flex: 1 }}>
           {rowsLabelKey ? t(rowsLabelKey) : ""}
@@ -101,17 +112,40 @@ export const MetricTable = ({
               onPin(row.pinOnClick);
             }}
           >
-            <Box
-              data-metric-bar
-              className="analysis-bar"
-              style={{
-                // largest === 0 when every row is zero (a fight with no stun,
-                // say). Guarding here keeps those rows visible at zero width
-                // instead of rendering NaN.
-                width: largest === 0 ? "0%" : `${(row.value / largest) * 100}%`,
-                backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
-              }}
-            />
+            {row.timeline && timelineMs > 0 ? (
+              // Positional, not proportional: Warcraft Logs' uptime bar marks
+              // WHEN the effect was up, and the % column beside it already says
+              // how much. One piece per contiguous window — `toBands` merged the
+              // overlaps, so a party-wide buff is a few spans and not hundreds.
+              <Box className="analysis-timeline" aria-hidden>
+                {row.timeline.map((span, spanIndex) => (
+                  <Box
+                    key={spanIndex}
+                    className="analysis-timeline-piece"
+                    style={{
+                      left: `${(span.startMs / timelineMs) * 100}%`,
+                      width: `${((span.endMs - span.startMs) / timelineMs) * 100}%`,
+                      // A window shorter than a pixel is still a real window; at
+                      // zero width it would vanish from a row that reports it.
+                      minWidth: "2px",
+                      backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
+                    }}
+                  />
+                ))}
+              </Box>
+            ) : (
+              <Box
+                data-metric-bar
+                className="analysis-bar"
+                style={{
+                  // largest === 0 when every row is zero (a fight with no stun,
+                  // say). Guarding here keeps those rows visible at zero width
+                  // instead of rendering NaN.
+                  width: largest === 0 ? "0%" : `${(row.value / largest) * 100}%`,
+                  backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
+                }}
+              />
+            )}
             {/* A real button now that the row is not one. Still stops
                 propagation, so banding a row does not also pin it — including
                 on the keyboard, where the row above listens for the same keys. */}
@@ -133,13 +167,13 @@ export const MetricTable = ({
                 {toggle.shown ? <Eye size={14} weight="fill" /> : <EyeSlash size={14} />}
               </UnstyledButton>
             )}
-            <Text role="cell" className="analysis-name">
+            <Text role="gridcell" className="analysis-name">
               {renderLabel ? renderLabel(row) : row.label}
             </Text>
             {row.columns.map((value, columnIndex) => (
               <Text
                 key={columnIndex}
-                role="cell"
+                role="gridcell"
                 className={`analysis-cell${columnIndex === 0 ? "" : " analysis-cell-muted"}`}
               >
                 {value}
@@ -162,3 +196,4 @@ export const MetricTable = ({
     </Box>
   );
 };
+

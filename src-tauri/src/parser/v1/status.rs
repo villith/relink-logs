@@ -158,7 +158,19 @@ pub fn assemble_intervals(
     }
 
     closed.extend(open.into_values());
-    closed.sort_by_key(|i| (i.start_ms, i.actor_index, i.status_id));
+    // `ability_id` is part of the sort key, not just the identity: the still-open
+    // intervals arrive in HashMap order, so without it two windows of one effect
+    // from two causes tie and land in whichever order the hasher happened to
+    // produce — a different order on each run of the same log.
+    closed.sort_by_key(|i| {
+        (
+            i.start_ms,
+            i.actor_index,
+            i.target_segment,
+            i.status_id,
+            i.ability_id,
+        )
+    });
     closed
 }
 
@@ -167,7 +179,13 @@ mod tests {
     use super::*;
     use protocol::{Message, StatusApplyEvent, StatusRemoveEvent};
 
-    fn apply(ts: i64, actor: u32, status: u32, ability: Option<u32>, stacks: u32) -> (i64, Message) {
+    fn apply(
+        ts: i64,
+        actor: u32,
+        status: u32,
+        ability: Option<u32>,
+        stacks: u32,
+    ) -> (i64, Message) {
         (
             ts,
             Message::StatusApply(StatusApplyEvent {
@@ -193,8 +211,11 @@ mod tests {
 
     #[test]
     fn a_matched_pair_becomes_one_closed_interval() {
-        let events = vec![apply(0, 1, 10, Some(500), 1), remove(3_000, 1, 10, Some(500))];
-        let intervals = assemble_intervals(&events, 0, 10_000);
+        let events = vec![
+            apply(0, 1, 10, Some(500), 1),
+            remove(3_000, 1, 10, Some(500)),
+        ];
+        let intervals = assemble_intervals(&events, 0, 10_000, &[]);
 
         assert_eq!(intervals.len(), 1);
         assert_eq!(intervals[0].start_ms, 0);
@@ -207,7 +228,7 @@ mod tests {
         // A buff still active when the boss dies emits no remove. Dropping it
         // would under-report uptime on exactly the pull that mattered.
         let events = vec![apply(1_000, 1, 10, Some(500), 1)];
-        let intervals = assemble_intervals(&events, 0, 10_000);
+        let intervals = assemble_intervals(&events, 0, 10_000, &[]);
 
         assert_eq!(intervals.len(), 1);
         assert_eq!(intervals[0].end_ms, 10_000);
@@ -222,7 +243,7 @@ mod tests {
             remove(1_000, 1, 10, Some(500)),
             remove(2_000, 1, 10, Some(600)),
         ];
-        let intervals = assemble_intervals(&events, 0, 10_000);
+        let intervals = assemble_intervals(&events, 0, 10_000, &[]);
 
         assert_eq!(intervals.len(), 2);
         assert_eq!(
@@ -241,7 +262,7 @@ mod tests {
             apply(500, 2, 10, Some(500), 1),
             remove(1_000, 1, 10, Some(500)),
         ];
-        let intervals = assemble_intervals(&events, 0, 10_000);
+        let intervals = assemble_intervals(&events, 0, 10_000, &[]);
 
         assert_eq!(intervals.len(), 2, "per-actor, never merged");
         let actor_two = intervals.iter().find(|i| i.actor_index == 2).unwrap();
@@ -252,8 +273,25 @@ mod tests {
     fn a_remove_with_no_apply_is_dropped() {
         // The capture can start mid-effect. A remove with nothing open has no
         // known start, and inventing one would fabricate uptime.
-        let intervals = assemble_intervals(&[remove(1_000, 1, 10, Some(500))], 0, 10_000);
+        let intervals = assemble_intervals(&[remove(1_000, 1, 10, Some(500))], 0, 10_000, &[]);
         assert!(intervals.is_empty());
+    }
+
+    #[test]
+    fn a_remove_naming_a_different_cause_does_not_close_the_interval() {
+        // The pairing contract, asserted rather than assumed: both emit sites in
+        // the hook must read the cause the same way. Sending `None` from the
+        // removal while the apply sent a real cause left every attributable
+        // status open, so it ran to the end of the fight and reported ~100%
+        // uptime. This is the test that fails if that regresses.
+        let events = vec![apply(0, 1, 10, Some(500), 1), remove(3_000, 1, 10, None)];
+        let intervals = assemble_intervals(&events, 0, 10_000, &[]);
+
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(
+            intervals[0].end_ms, 10_000,
+            "a mismatched cause closes nothing, so the window runs to the fight's end"
+        );
     }
 
     /// A spawn whose id and actor index are the same number.
@@ -395,7 +433,7 @@ mod tests {
 
     #[test]
     fn a_fresh_interval_counts_one_application() {
-        let intervals = assemble_intervals(&[apply(0, 1, 10, Some(500), 1)], 0, 10_000);
+        let intervals = assemble_intervals(&[apply(0, 1, 10, Some(500), 1)], 0, 10_000, &[]);
         assert_eq!(intervals[0].applications, 1);
     }
 
@@ -411,7 +449,7 @@ mod tests {
             apply(2_000, 1, 10, Some(500), 1),
             remove(3_000, 1, 10, Some(500)),
         ];
-        let intervals = assemble_intervals(&events, 0, 10_000);
+        let intervals = assemble_intervals(&events, 0, 10_000, &[]);
 
         assert_eq!(intervals.len(), 1);
         assert_eq!(intervals[0].applications, 3);
@@ -428,7 +466,7 @@ mod tests {
             apply(2_000, 1, 10, Some(500), 1),
             remove(3_000, 1, 10, Some(500)),
         ];
-        let intervals = assemble_intervals(&events, 0, 10_000);
+        let intervals = assemble_intervals(&events, 0, 10_000, &[]);
 
         assert_eq!(intervals.len(), 2);
         assert_eq!(intervals[0].applications, 1);
@@ -444,11 +482,15 @@ mod tests {
             apply(1_000, 1, 10, Some(500), 2),
             remove(3_000, 1, 10, Some(500)),
         ];
-        let intervals = assemble_intervals(&events, 0, 10_000);
+        let intervals = assemble_intervals(&events, 0, 10_000, &[]);
 
         assert_eq!(intervals.len(), 1);
         assert_eq!(intervals[0].start_ms, 0);
         assert_eq!(intervals[0].end_ms, 3_000);
-        assert_eq!(intervals[0].max_stacks, 2, "the refresh's stack count is kept");
+        assert_eq!(
+            intervals[0].max_stacks, 2,
+            "the refresh's stack count is kept"
+        );
     }
 }
+

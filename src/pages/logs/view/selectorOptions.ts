@@ -1,6 +1,7 @@
 import type { SelectionFact } from "@/types";
 
 import { abilityRowKey } from "./abilitySkills";
+import { isStatusPin } from "./statusUptime";
 
 /** The ability-row key a fact belongs to — the same key the table gives the row
  * this option pins, so picking from the list and clicking a row agree.
@@ -36,13 +37,23 @@ export type SelectorOptions = {
   abilities: SelectorOption[];
 };
 
+/** A fact beside its row key, computed once. The three passes below each need
+ * the key — deriving it per pass ran `abilityRowKey` (a group-map walk and a
+ * `JSON.stringify`) three times over every fact on every pin click. */
+type KeyedFact = { fact: SelectionFact; key: string };
+
 /** Facts surviving every pin EXCEPT `ignore` — a dimension must never narrow
  * its own list, or a pinned value would be the only thing you could pick. */
-const survivors = (facts: SelectionFact[], pins: SelectorPins, ignore: keyof SelectorPins) =>
-  facts.filter((f) => {
-    if (ignore !== "source" && pins.source !== null && f.sourceIndex !== pins.source) return false;
-    if (ignore !== "targetIds" && pins.targetIds.length > 0 && !pins.targetIds.includes(f.targetId)) return false;
-    if (ignore !== "ability" && pins.ability !== null && abilityKey(f.ability) !== pins.ability) return false;
+const survivors = (facts: KeyedFact[], pins: SelectorPins, ignore: keyof SelectorPins) =>
+  facts.filter(({ fact, key }) => {
+    if (ignore !== "source" && pins.source !== null && fact.sourceIndex !== pins.source) return false;
+    if (ignore !== "targets" && pins.targets.length > 0 && !pins.targets.includes(fact.targetSegment)) return false;
+    // A status pin names an effect, and no damage fact's key can ever equal one
+    // — narrowing by it would drop every fact and leave the Player and Enemy
+    // selectors with no options at all. A buff narrows its own table, not the
+    // fight's other dimensions.
+    if (ignore !== "ability" && pins.ability !== null && !isStatusPin(pins.ability) && key !== pins.ability)
+      return false;
     return true;
   });
 
@@ -51,8 +62,13 @@ const survivors = (facts: SelectionFact[], pins: SelectorPins, ignore: keyof Sel
 const distinct = (values: string[]): SelectorOption[] => [...new Set(values)].map((value) => ({ value }));
 
 /** Each selector's currently reachable options, given the other pins. */
-export const deriveSelectorOptions = (facts: SelectionFact[], pins: SelectorPins): SelectorOptions => ({
-  sources: distinct(survivors(facts, pins, "source").map((f) => String(f.sourceIndex))),
-  targets: distinct(survivors(facts, pins, "targetIds").map((f) => String(f.targetId))),
-  abilities: distinct(survivors(facts, pins, "ability").map((f) => abilityKey(f.ability))),
-});
+export const deriveSelectorOptions = (facts: SelectionFact[], pins: SelectorPins): SelectorOptions => {
+  const keyed: KeyedFact[] = facts.map((fact) => ({ fact, key: factRowKey(fact) }));
+
+  return {
+    sources: distinct(survivors(keyed, pins, "source").map(({ fact }) => String(fact.sourceIndex))),
+    targets: distinct(survivors(keyed, pins, "targets").map(({ fact }) => String(fact.targetSegment))),
+    abilities: distinct(survivors(keyed, pins, "ability").map(({ key }) => key)),
+  };
+};
+

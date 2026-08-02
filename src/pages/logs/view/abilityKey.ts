@@ -26,3 +26,4 @@ export const parseAbilityKey = (key: string): ActionType | null => {
   if (!Number.isInteger(id)) return null;
   return { [name]: id } as ActionType;
 };
+

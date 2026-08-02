@@ -12,6 +12,103 @@ use super::{skill_state::SkillState, AdjustedDamageInstance};
 /// swallowed.
 const GUARD_STUN_WINDOW_MS: i64 = 150;
 
+/// The breakdown row a damage event belongs to: `(action, child character)`,
+/// exactly the key [`PlayerState::breakdown_row_mut`] uses.
+///
+/// Stateful, and therefore order-dependent, for two reasons: Ferry's pet actions
+/// are corrected from the last pet skill seen, and every supplementary-damage
+/// hit folds into the FIRST supplementary row this player opened, whatever its
+/// payload or body. Feed it one player's damage events in log order.
+///
+/// THE one place the row key is decided. [`PlayerState`] owns one of these and
+/// routes every damage event through it, so the drill-down chart keying its
+/// series the same way is not a second implementation that could drift — a chart
+/// whose series did not correspond to breakdown rows would draw bands that no
+/// row explains.
+#[derive(Debug, Default)]
+pub struct BreakdownKeying {
+    last_known_pet_skill: Option<ActionType>,
+    first_supplementary: Option<(ActionType, CharacterType)>,
+}
+
+impl BreakdownKeying {
+    pub fn key_for(&mut self, event: &DamageEvent) -> (ActionType, CharacterType) {
+        let parent_character_type = CharacterType::from_hash(event.source.parent_actor_type);
+        let child_character_type = child_character_type_for(event);
+
+        // Ferry's pet hits report the wrong action id, so hers are corrected.
+        let action = if parent_character_type == CharacterType::Pl0700 {
+            ferry_action(&mut self.last_known_pet_skill, event)
+        } else {
+            event.action_id
+        };
+
+        // Every echo shares one row regardless of payload or body, so the first
+        // one seen names it — which is what collapses the whole family onto a
+        // single breakdown row.
+        if matches!(action, ActionType::SupplementaryDamage(_)) {
+            return *self
+                .first_supplementary
+                .get_or_insert((action, child_character_type));
+        }
+
+        (action, child_character_type)
+    }
+}
+
+/// The character a hit's breakdown row is filed under.
+///
+/// Seofon (Pl2200) collapses onto himself: his avatar's skill ids are his own.
+pub(super) fn child_character_type_for(event: &DamageEvent) -> CharacterType {
+    let parent_character_type = CharacterType::from_hash(event.source.parent_actor_type);
+    // @TODO(false): Collapse all skill IDs from Seofon's avatar into his own.
+    if parent_character_type == CharacterType::Pl2200 {
+        parent_character_type
+    } else {
+        CharacterType::from_hash(event.source.actor_type)
+    }
+}
+
+// @todo(false): maybe Ferry specific stuff can be removed/abstracted if some extra flags are found or the attribution is fixed
+/// Ferry's pet hits report the wrong action id — strafe then dodge, and further
+/// pet hits come back as "dodge" — so a pet skill is remembered and reused. The
+/// remembered skill lives in [`BreakdownKeying`], which is the only caller.
+fn ferry_action(last_known_pet_skill: &mut Option<ActionType>, event: &DamageEvent) -> ActionType {
+    let is_ferry_pet =
+        CharacterType::Pl0700Ghost == CharacterType::from_hash(event.source.actor_type);
+    let is_ferry_pet_skill = is_ferry_pet && (event.flags & (1 << 2) != 0); // pet skills for ferry always have this flag set
+    let is_ferry_pet_normal =
+        is_ferry_pet && !is_ferry_pet_skill && event.action_id != ActionType::LinkAttack;
+
+    // Umlauf excluded since that uses a separate actor which works correctly
+    if is_ferry_pet_skill
+        && [
+            FerrySkillId::BlausGespenst,
+            FerrySkillId::Pendel,
+            FerrySkillId::Strafe,
+        ]
+        .into_iter()
+        .any(|skill_id| ActionType::Normal(skill_id as u32) == event.action_id)
+    {
+        *last_known_pet_skill = Some(event.action_id);
+    }
+
+    const PET_NORMAL: ActionType = ActionType::Normal(FerrySkillId::PetNormal as u32);
+
+    if is_ferry_pet_normal {
+        // Note technically the pet portion of Onslaught will count as a Pet normal, but I think that's fine since
+        // it does exactly as much as a pet normal. Could consider adding Onslaught (pet) as a separate category
+        PET_NORMAL
+    } else if is_ferry_pet_skill {
+        match *last_known_pet_skill {
+            None => PET_NORMAL, // May be good to instead have a separate "pet skill" backup for this case
+            Some(skill_id) => skill_id,
+        }
+    } else {
+        event.action_id
+    }
+}
+
 /// Derived stat breakdown for a player
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,7 +116,6 @@ pub struct PlayerState {
     pub index: u32,
     pub character_type: CharacterType,
     pub total_damage: u64,
-    pub last_known_pet_skill: Option<ActionType>, // used for Ferry's skills that don't keep track of where they came from
     pub dps: f64,
     pub skill_breakdown: Vec<SkillState>,
     pub sba: f64,
@@ -55,6 +151,13 @@ pub struct PlayerState {
     /// the player last hit with, leaving the guard row at 0.
     #[serde(skip)]
     last_guard_at: Option<i64>,
+    /// Decides the breakdown row every damage event lands in. Stateful (Ferry's
+    /// pet remap, the echo fold), so it must see this player's hits in log
+    /// order — which is what feeding it from `update_from_damage_event` gives
+    /// it. Not sent to the frontend and not stored: derived state is rebuilt by
+    /// replaying the raw event log, which rebuilds this with it.
+    #[serde(skip)]
+    keying: BreakdownKeying,
     /// Number of hits by this player that reached the game's damage cap (base > cap)
     pub capped_hits: u32,
     /// Number of hits that were subject to a damage cap at all — the denominator
@@ -87,8 +190,8 @@ impl PlayerState {
             stun_message_sum: 0.0,
             last_stun_attribution: None,
             last_guard_at: None,
+            keying: BreakdownKeying::default(),
             skill_breakdown: Vec::new(),
-            last_known_pet_skill: None,
             capped_hits: 0,
             cappable_hits: 0,
             overcap_base_sum: 0.0,
@@ -204,45 +307,6 @@ impl PlayerState {
         self.stun_per_second = self.total_stun_value / duration_secs;
     }
 
-    // @todo(false): maybe Ferry specific stuff can be removed/abstracted if some extra flags are found or the attribution is fixed
-    pub fn get_action_from_ferry_damage_event(&mut self, event: &DamageEvent) -> ActionType {
-        // Ferry needs special handling because the action_id that comes back for pet skills is usually wrong
-        // e.g. if you strafe then dodge the action_id for further hits comes back as "dodge"
-        let is_ferry_pet =
-            CharacterType::Pl0700Ghost == CharacterType::from_hash(event.source.actor_type);
-        let is_ferry_pet_skill = is_ferry_pet && (event.flags & (1 << 2) != 0); // pet skills for ferry always have this flag set
-        let is_ferry_pet_normal =
-            is_ferry_pet && !is_ferry_pet_skill && event.action_id != ActionType::LinkAttack;
-
-        // Umlauf excluded since that uses a separate actor which works correctly
-        if is_ferry_pet_skill
-            && vec![
-                FerrySkillId::BlausGespenst,
-                FerrySkillId::Pendel,
-                FerrySkillId::Strafe,
-            ]
-            .into_iter()
-            .any(|skill_id| ActionType::Normal(skill_id as u32) == event.action_id)
-        {
-            self.last_known_pet_skill = Some(event.action_id);
-        }
-
-        const PET_NORMAL: ActionType = ActionType::Normal(FerrySkillId::PetNormal as u32);
-
-        if is_ferry_pet_normal {
-            // Note technically the pet portion of Onslaught will count as a Pet normal, but I think that's fine since
-            // it does exactly as much as a pet normal. Could consider adding Onslaught (pet) as a separate category
-            PET_NORMAL
-        } else if is_ferry_pet_skill {
-            match self.last_known_pet_skill {
-                None => PET_NORMAL, // May be good to instead have a separate "pet skill" backup for this case
-                Some(skill_id) => skill_id,
-            }
-        } else {
-            event.action_id
-        }
-    }
-
     pub fn update_from_damage_event(&mut self, damage_instance: &AdjustedDamageInstance) {
         if damage_instance.is_cappable {
             self.cappable_hits += 1;
@@ -258,22 +322,16 @@ impl PlayerState {
         self.stun_delta_sum += damage_instance.stun_damage;
         self.refresh_total_stun();
 
-        let parent_character_type =
-            CharacterType::from_hash(damage_instance.event.source.parent_actor_type);
-
-        // @TODO(false): Collapse all skill IDs from Seofon's avatar into his own.
-        let child_character_type = if parent_character_type == CharacterType::Pl2200 {
-            parent_character_type
-        } else {
-            CharacterType::from_hash(damage_instance.event.source.actor_type)
-        };
-
-        // for ferry defer to special function to handle the weird way her pets work
-        let action = if parent_character_type == CharacterType::Pl0700 {
-            self.get_action_from_ferry_damage_event(damage_instance.event)
-        } else {
-            damage_instance.event.action_id
-        };
+        // Ferry's pet remap and the echo fold both live in `BreakdownKeying`,
+        // so the row a hit lands in is decided in exactly one place — the same
+        // place the drill-down chart asks, which is what makes a chart band and
+        // a table row the same thing.
+        //
+        // NOTE: damage-over-time deliberately does NOT fold. Since the 2.0.2
+        // hook fix its payload is the DoT TYPE (0 poison / 1 burn / 2 darkburn)
+        // and each type is named separately in the breakdown, so one row per
+        // type is what we want — ticks of the same type still merge on the key.
+        let (action, child_character_type) = self.keying.key_for(damage_instance.event);
 
         // Remember where a trailing network stun message should attribute (see
         // the field doc): echoes and DoT ticks can't proc stun, so they must
@@ -285,40 +343,15 @@ impl PlayerState {
             self.last_stun_attribution = Some((action, child_character_type));
         }
 
-        // If the skill is already being tracked, update it.
-        for skill in self.skill_breakdown.iter_mut() {
-            // Aggregate all supplementary damage events into the same skill instance.
-            if matches!(
-                skill.action_type,
-                protocol::ActionType::SupplementaryDamage(_)
-            ) && matches!(action, protocol::ActionType::SupplementaryDamage(_))
-            {
-                skill.update_from_damage_event(damage_instance);
-                return;
-            }
-
-            // NOTE: damage-over-time deliberately falls through to the equality check
-            // below. Since the 2.0.2 hook fix its payload is the DoT TYPE (0 poison /
-            // 1 burn / 2 darkburn), and each type is named separately in the breakdown,
-            // so one row per type is what we want — ticks of the same type still merge.
-
-            // If the skill is already being tracked, update it.
-            if skill.action_type == action && skill.child_character_type == child_character_type {
-                skill.update_from_damage_event(damage_instance);
-                return;
-            }
-        }
-
-        // Otherwise, create a new skill and track it.
-        let mut skill = SkillState::new(action, child_character_type);
-
-        skill.update_from_damage_event(damage_instance);
-        self.skill_breakdown.push(skill);
+        self.breakdown_row_mut(action, child_character_type)
+            .update_from_damage_event(damage_instance);
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use crate::parser::v1::{PlayerData, PlayerStats};
 
     use super::*;
@@ -784,6 +817,91 @@ mod tests {
             target_current_hp: None,
             target_max_hp: None,
         }
+    }
+
+    /// The keys a standalone `BreakdownKeying` assigns to `events` — the way
+    /// `build_ability_damage_chart` drives it — beside the rows `PlayerState`
+    /// opens for the same events.
+    ///
+    /// `PlayerState` routes through a `BreakdownKeying` of its own, so this no
+    /// longer guards two implementations against drift; it pins the property
+    /// the drill-down chart is built on, that one key names exactly one row.
+    /// The cases below are really about the folds themselves.
+    fn keys_and_rows(
+        events: &[DamageEvent],
+    ) -> (
+        Vec<(ActionType, CharacterType)>,
+        Vec<(ActionType, CharacterType)>,
+    ) {
+        let mut keying = BreakdownKeying::default();
+        let keys: Vec<_> = events.iter().map(|event| keying.key_for(event)).collect();
+
+        let mut player = empty_player();
+        for event in events {
+            apply(&mut player, event);
+        }
+        let rows = player
+            .skill_breakdown
+            .iter()
+            .map(|skill| (skill.action_type, skill.child_character_type))
+            .collect();
+
+        (keys, rows)
+    }
+
+    #[test]
+    fn keying_agrees_with_the_rows_player_state_opens() {
+        let events = [
+            plain_event(ActionType::Normal(100), 10),
+            plain_event(ActionType::Normal(200), 20),
+            plain_event(ActionType::Normal(100), 30),
+            plain_event(ActionType::LinkAttack, 40),
+            plain_event(ActionType::DamageOverTime(0), 5),
+            plain_event(ActionType::DamageOverTime(1), 5),
+        ];
+
+        let (keys, rows) = keys_and_rows(&events);
+
+        let distinct: HashSet<_> = keys.iter().copied().collect();
+        assert_eq!(
+            distinct,
+            rows.iter().copied().collect::<HashSet<_>>(),
+            "every key must name a row, and every row must have a key"
+        );
+    }
+
+    #[test]
+    fn keying_folds_every_echo_onto_the_first_supplementary_row() {
+        // The payload differs per trigger and every echo shares one row, so
+        // three distinct payloads must still collapse to a single key — or the
+        // chart draws one band per trigger against a single table row.
+        let events = [
+            plain_event(ActionType::SupplementaryDamage(1), 10),
+            plain_event(ActionType::SupplementaryDamage(2), 20),
+            plain_event(ActionType::SupplementaryDamage(3), 30),
+        ];
+
+        let (keys, rows) = keys_and_rows(&events);
+
+        assert_eq!(rows.len(), 1, "one row for every echo");
+        assert_eq!(
+            keys.iter().copied().collect::<HashSet<_>>().len(),
+            1,
+            "one key for every echo"
+        );
+        assert_eq!(keys[0], rows[0]);
+    }
+
+    #[test]
+    fn keying_files_seofons_avatar_under_seofon() {
+        let mut event = plain_event(ActionType::Normal(100), 10);
+        event.source.parent_actor_type = 0x59DB0CD9; // Pl2200
+        event.source.actor_type = 0xDEADBEEF; // the avatar's own body
+
+        let (keys, rows) = keys_and_rows(&[event]);
+
+        assert_eq!(keys[0].1, CharacterType::Pl2200);
+        assert_eq!(keys[0], rows[0]);
     }
 
     fn apply(player: &mut PlayerState, event: &DamageEvent) {

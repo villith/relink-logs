@@ -44,17 +44,38 @@ export const bandOpacity = (stacks: number): number =>
  *
  * A band touching the window only at an edge is dropped: at zero width it would
  * draw as a hairline over a moment it never covered.
+ *
+ * Overlaps are MERGED. One effect row covers every holder and every refresh, so
+ * a party-wide buff on a long fight produced hundreds of identical, stacked
+ * spans — each a mounted `<ReferenceArea>` redrawn on every tooltip hover, all
+ * painting the same region several deep at the same opacity. The merged form
+ * draws the same picture out of the few spans it actually has.
  */
 export const toBands = (
-  intervals: { startMs: number; endMs: number }[],
+  intervals: { startMs: number; endMs: number; maxStacks?: number }[],
   { startMs, endMs }: { startMs: number; endMs: number }
 ): Band[] => {
   if (endMs <= startMs) return [];
 
-  return intervals
+  const clipped = intervals
     .filter((interval) => interval.startMs < endMs && interval.endMs > startMs)
     .map((interval) => ({
       startMs: Math.max(startMs, interval.startMs) - startMs,
       endMs: Math.min(endMs, interval.endMs) - startMs,
-    }));
+      // The hook reports 1 for every status status.tbl does not mark
+      // HasLevels, so a missing count is one stack rather than none.
+      stacks: interval.maxStacks ?? 1,
+    }))
+    .sort((a, b) => a.startMs - b.startMs);
+
+  const merged: Band[] = [];
+  for (const span of clipped) {
+    const last = merged[merged.length - 1];
+    if (last && span.startMs <= last.endMs) {
+      last.endMs = Math.max(last.endMs, span.endMs);
+      last.stacks = Math.max(last.stacks, span.stacks);
+    } else merged.push({ ...span });
+  }
+  return merged;
 };
+

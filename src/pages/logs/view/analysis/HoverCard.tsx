@@ -1,4 +1,4 @@
-import { Box, Group, Stack, Text } from "@mantine/core";
+import { Box, Text } from "@mantine/core";
 import { cloneElement, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
@@ -6,75 +6,96 @@ import { useTranslation } from "react-i18next";
 import { rafThrottle } from "@/components/rafThrottle";
 import { humanizeNumbers } from "@/utils";
 
+import "./analysis.css";
+
 // The card grows up and to the right of the cursor, sitting this many pixels
 // clear of it and kept this far in from the viewport edges. Both copied from
 // SkillTargetTooltip, which this replaces.
 const CURSOR_OFFSET = 6;
 const VIEWPORT_PADDING = 5;
 
-export type BreakdownEntry = { key: string; label: string; value: number };
+/** One row of a card section. `color` overrides the section's colour for this
+ * row alone — a "by source" section is per player, and one colour across every
+ * row of it would say nothing about who dealt what. */
+export type BreakdownEntry = { key: string; label: string; value: number; color?: string };
 
-export type HoverCardBodyProps = {
-  title: string;
-  subtitle: string;
-  byAbility: BreakdownEntry[];
-  byTarget: BreakdownEntry[];
+/** One stacked section of the card: a heading naming the dimension, then its
+ * rows. `color` is the entity's colour — ability rows take their owner's, target
+ * rows take the target's — so colour keeps following the entity. */
+export type CardSection = {
+  headingKey: string;
+  color: string;
+  entries: BreakdownEntry[];
 };
 
-const Half = ({ headingKey, entries, color }: { headingKey: string; entries: BreakdownEntry[]; color: string }) => {
+export type HoverCardBodyProps = {
+  sections: CardSection[];
+};
+
+const Section = ({ headingKey, color, entries }: CardSection) => {
   const { t } = useTranslation();
   if (entries.length === 0) return null;
 
+  // Scaled to the section's largest entry, not its total: a three-row target
+  // list scaled to the total would be three slivers.
   const largest = Math.max(...entries.map((entry) => entry.value));
+  const total = entries.reduce((sum, entry) => sum + entry.value, 0);
 
   return (
-    <Stack gap={2}>
-      <Text size="xs" c="dimmed" tt="uppercase">
-        {t(headingKey)}
-      </Text>
+    <Box className="analysis-card-section">
+      <Box className="analysis-card-head">
+        <Text className="analysis-label" style={{ flex: 1 }}>
+          {t(headingKey)}
+        </Text>
+        {/* Amount then share, matching the table above it: the amount is what
+            the row is about and the share qualifies it. */}
+        <Text className="analysis-label" style={{ width: 64, textAlign: "right" }}>
+          {t("ui.meter-columns.damage")}
+        </Text>
+        <Text className="analysis-label" style={{ width: 52, textAlign: "right" }}>
+          {t("ui.logs.column-share")}
+        </Text>
+      </Box>
       {entries.map((entry) => {
         const [n, suffix] = humanizeNumbers(entry.value);
         return (
-          <Group key={entry.key} gap={6} wrap="nowrap">
-            <Text size="xs" w={78} truncate>
-              {entry.label}
-            </Text>
-            <Box style={{ flex: 1, height: 8, borderRadius: 2, background: "var(--mantine-color-dark-5)" }}>
-              <Box
-                style={{
-                  width: largest === 0 ? "0%" : `${(entry.value / largest) * 100}%`,
-                  height: "100%",
-                  borderRadius: 2,
-                  background: color,
-                }}
-              />
-            </Box>
-            <Text size="xs" w={46} ta="right" style={{ fontVariantNumeric: "tabular-nums" }}>
+          <Box key={entry.key} className="analysis-card-row">
+            <Box
+              data-card-bar
+              className="analysis-bar"
+              style={{
+                width: largest === 0 ? "0%" : `${(entry.value / largest) * 100}%`,
+                backgroundColor: entry.color ?? color,
+              }}
+            />
+            <Text className="analysis-card-name">{entry.label}</Text>
+            <Text className="analysis-card-amount">
               {n}
               {suffix}
             </Text>
-          </Group>
+            <Text className="analysis-card-share">
+              {total === 0 ? "0.0%" : `${((entry.value / total) * 100).toFixed(1)}%`}
+            </Text>
+          </Box>
         );
       })}
-    </Stack>
+    </Box>
   );
 };
 
 /** The card's contents, separated from its positioning so it can be tested
- * without a cursor. */
-export const HoverCardBody = ({ title, subtitle, byAbility, byTarget }: HoverCardBodyProps) => (
-  <Stack gap={8} p="xs">
-    <Stack gap={0}>
-      <Text size="sm" fw={600}>
-        {title}
-      </Text>
-      <Text size="xs" c="dimmed">
-        {subtitle}
-      </Text>
-    </Stack>
-    <Half headingKey="ui.logs.hover-by-ability" entries={byAbility} color="var(--mantine-color-blue-5)" />
-    <Half headingKey="ui.logs.hover-by-target" entries={byTarget} color="var(--mantine-color-violet-5)" />
-  </Stack>
+ * without a cursor.
+ *
+ * Long lists are capped by the portal's max-height rather than truncated per
+ * section, so the card never grows past 70vh. A party's top damage dealer can
+ * carry 30+ abilities, which measured 873px in a 1124px viewport before the
+ * cap. */
+export const HoverCardBody = ({ sections }: HoverCardBodyProps) => (
+  <Box>
+    {sections.map((section) => (
+      <Section key={section.headingKey} {...section} />
+    ))}
+  </Box>
 );
 
 /** [`HoverCardBody`] in a cursor-following portal.
@@ -105,11 +126,20 @@ export const HoverCard = ({
   // Re-measured when the card opens AND when its content changes, so a row
   // whose data shifts mid-hover (scrubbing the window) does not keep a stale
   // size and mis-place the grow-up and edge clamps.
+  //
+  // The bail-out is load-bearing, not a micro-optimisation: `content` is
+  // memoized on a props object rebuilt every render, so this effect fires on
+  // every render, and storing a fresh {width, height} unconditionally would
+  // schedule another render each time — an unbounded loop. Returning the
+  // previous object when nothing moved lets React skip the update.
   useLayoutEffect(() => {
-    if (opened && floatingRef.current) {
-      const rect = floatingRef.current.getBoundingClientRect();
-      setSize({ width: rect.width, height: rect.height });
-    }
+    if (!opened || !floatingRef.current) return;
+    const rect = floatingRef.current.getBoundingClientRect();
+    setSize((previous) =>
+      previous.width === rect.width && previous.height === rect.height
+        ? previous
+        : { width: rect.width, height: rect.height }
+    );
   }, [opened, content]);
 
   // A position: fixed card would otherwise stay frozen over a now-different row
@@ -125,7 +155,8 @@ export const HoverCard = ({
     };
   }, [opened]);
 
-  if (body.byAbility.length === 0 && body.byTarget.length === 0) {
+  // Nothing to explain — render the row alone rather than an empty card.
+  if (body.sections.every((section) => section.entries.length === 0)) {
     return children;
   }
 
@@ -166,6 +197,7 @@ export const HoverCard = ({
           <Box
             ref={floatingRef}
             data-testid="metric-hover-card"
+            className="analysis-tokens"
             style={{
               position: "fixed",
               top: Math.round(top),
@@ -173,12 +205,15 @@ export const HoverCard = ({
               zIndex: 300,
               pointerEvents: "none",
               visibility: size.height > 0 ? "visible" : "hidden",
-              background: "var(--mantine-color-dark-6)",
               color: "var(--mantine-color-white)",
               borderRadius: "var(--mantine-radius-sm)",
               boxShadow: "var(--mantine-shadow-md)",
-              minWidth: 260,
-              maxWidth: 360,
+              minWidth: 300,
+              maxWidth: 420,
+              maxHeight: "70vh",
+              overflow: "hidden",
+              border: "1px solid var(--an-line-strong)",
+              backgroundColor: "var(--an-panel)",
             }}
           >
             {content}
@@ -193,3 +228,4 @@ export const HoverCard = ({
     </>
   );
 };
+

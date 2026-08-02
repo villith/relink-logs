@@ -21,6 +21,14 @@ export type MetricRow = {
    * enemy). The table resolves the slot to a colour, so descriptors stay pure
    * functions with no reach into the settings store. */
   colorSlot: number;
+  /** Contiguous windows this row's effect was up, in MILLISECONDS FROM THE
+   * START OF THE MEASURED WINDOW, overlaps merged.
+   *
+   * Present only on the status tables. Where it is set the table draws a
+   * timeline instead of a magnitude bar: Warcraft Logs' uptime bar is
+   * positional, and against a `%` column that already states the magnitude a
+   * second reading of the same number says nothing. */
+  timeline?: { startMs: number; endMs: number }[];
 };
 
 /** What `label` should be resolved against before it is drawn.
@@ -59,5 +67,17 @@ export type MetricDescriptor = {
     statusIntervals?: StatusInterval[];
     /** Denominator for an uptime percentage. Optional for the same reason. */
     fightDurationMs?: number;
+    /** The FULL party, unnarrowed by any pin — identity, not figures.
+     * `players` is the scoped party, which a source pin shrinks to one; a
+     * descriptor that uses it as a ROSTER (the status tables, deciding buff
+     * from debuff) would file the rest of the party's effects as enemy-held. */
+    roster?: ComputedPlayerState[];
+    /** The window the status tables measure, in milliseconds from the fight's
+     * start. Needed to rebase `MetricRow.timeline` onto the chart's own first
+     * bucket — `fightDurationMs` gives its length but not where it begins, and
+     * a scrubbed table would otherwise draw every band at absolute fight time
+     * over a chart that starts somewhere else. */
+    statusWindow?: { startMs: number; endMs: number };
   }) => MetricRow[];
 };
+

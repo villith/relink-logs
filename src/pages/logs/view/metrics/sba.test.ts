@@ -25,13 +25,13 @@ const player = (index: number, sbaValue: number) =>
 
 const PLAYERS = [player(0, 2.5), player(1, 4.0)];
 
-const input = (level: "players" | "abilities" | "hits") =>
+const input = (level: "players" | "abilities" | "skills") =>
   ({
     encounter: { totalDamage: 0 } as never,
     partyData: [null, null],
     players: PLAYERS,
     level,
-    pins: { source: null, targetIds: [], ability: null },
+    pins: { source: null, targets: [], ability: null },
   }) as never;
 
 describe("sba descriptor", () => {

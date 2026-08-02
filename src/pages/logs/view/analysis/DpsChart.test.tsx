@@ -111,3 +111,4 @@ describe("ChartTooltip", () => {
     expect(screen.getByText("Reginleiv Recidiv")).toBeTruthy();
   });
 });
+

@@ -3,9 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { ComputedPlayerState, StatusInterval } from "@/types";
 
 import type { RowLevel } from "../deriveRows";
-import type { SelectorPins } from "../selectorOptions";
 
-import { buffs, narrowedByPins } from "./buffs";
+import { buffs } from "./buffs";
 import { debuffs } from "./debuffs";
 
 const interval = (
@@ -44,11 +43,12 @@ const PLAYERS = [
   { index: 1, partyIndex: 1 },
 ] as ComputedPlayerState[];
 
-const input = (level: RowLevel, ability: string | null = null, intervals = INTERVALS) =>
+const input = (level: RowLevel, ability: string | null = null, intervals = INTERVALS, players = PLAYERS) =>
   ({
     statusIntervals: intervals,
     fightDurationMs: 10_000,
-    players: PLAYERS,
+    players,
+    roster: PLAYERS,
     level,
     // `targets`, spelled as SelectorPins spells it — the helper said `targetIds`,
     // which no reader of the pins has ever looked at.
@@ -82,11 +82,30 @@ describe("buffs descriptor", () => {
   });
 
   it("gives one row per holder when a buff is pinned", () => {
-    // A pinned ability is the deepest level — see rowLevelFor.
+    // The PIN says which effect, not the level — the level comes from a pin
+    // shared with the damage tabs and cannot mean both things.
     const rows = buffs.rows(input("skills", "status:10:500"));
     expect(rows).toHaveLength(2);
     expect(rows[0].value).toBe(8_000); // Narmaya, merged
     expect(rows[1].value).toBe(2_000); // Eugen
+  });
+
+  it("gives holder rows for a pinned buff at any level", () => {
+    // rowLevelFor no longer descends on a status pin, so the level here is
+    // whatever the OTHER pins made it. The rows must not depend on that.
+    expect(buffs.rows(input("players", "status:10:500")).map((r) => r.key)).toEqual(["player:0", "player:1"]);
+    expect(buffs.rows(input("abilities", "status:10:500")).map((r) => r.key)).toEqual(["player:0", "player:1"]);
+  });
+
+  it("keeps a buff on the Buffs table when the scoped party has been narrowed", () => {
+    // A source pin narrows `players` to one; the roster is what decides buff
+    // from debuff, so reading it from the scoped party filed the rest of the
+    // party's buffs as enemy-held.
+    const scoped = [{ index: 0, partyIndex: 0 }] as ComputedPlayerState[];
+    const rows = buffs.rows(input("abilities", null, INTERVALS, scoped));
+    expect(rows.map((r) => r.key)).toEqual(["status:10:500", "status:20:600"]);
+    // Eugen's window still counts toward the effect's uptime.
+    expect(rows[0].value).toBe(8_000);
   });
 
   it("colours a holder row by its party slot", () => {
@@ -145,10 +164,7 @@ describe("debuffs descriptor", () => {
   it("gives one holder row per enemy SPAWN, not per recycled actor id", () => {
     // The Four Dragons case end to end: one actor id, two spawns. Keyed on the
     // id the two dragons shared a row labelled with a bare number.
-    const recycled = [
-      interval(9, 0, 1_000, 30, 700, 1, 1, 0),
-      interval(9, 5_000, 9_000, 30, 700, 1, 1, 1),
-    ];
+    const recycled = [interval(9, 0, 1_000, 30, 700, 1, 1, 0), interval(9, 5_000, 9_000, 30, 700, 1, 1, 1)];
     const rows = debuffs.rows(input("skills", "status:30:700", recycled));
     expect(rows.map((r) => r.key)).toEqual(["target:1", "target:0"]);
   });
@@ -160,3 +176,4 @@ describe("debuffs descriptor", () => {
     expect(rows.map((r) => r.key)).toEqual(["actor:9"]);
   });
 });
+

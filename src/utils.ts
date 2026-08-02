@@ -14,6 +14,7 @@ import {
   PlayerData,
   PlayerState,
   Sigil,
+  SkillRow,
   SkillState,
   SkillTargetState,
   SortDirection,
@@ -1370,6 +1371,19 @@ export const translateEnemyTypeId = (id: number): string => {
   const hash = toHashString(id);
   return t([`enemies:${hash}.text`, `enemies.unknown.${hash}`, "enemies.unknown-type"], { id: hash });
 };
+
+/** The game's own name for a status effect, or `""` where it has none.
+ *
+ * Keyed by `status.tbl`'s decimal `StatusId` — the value the hook puts in
+ * `StatusApplyEvent.status_id` — rather than by a hash like every other bundle,
+ * because statuses are the one table the runtime identifies by row id.
+ *
+ * Empty rather than a placeholder on a miss: roughly ninety of the 168 statuses
+ * are internal (`nayde1`, `mspl1900_01`) and the game names none of them, so
+ * the generated bundle omits them. `statusLabelFor` reads empty as "unnamed"
+ * and falls back to "Effect <id>", which is the documented shipping path. */
+export const translateStatusName = (statusId: number): string =>
+  t(`statuses:${statusId}.text`, { defaultValue: "" });
 
 // A string form usable as a map key ("Em1000" and { Unknown: 0x1234 } stay distinct).
 const enemyTypeKey = (type: EnemyType): string => (typeof type === "string" ? `s:${type}` : `h:${type.Unknown}`);
