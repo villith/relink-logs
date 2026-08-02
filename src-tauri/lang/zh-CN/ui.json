@@ -558,7 +558,7 @@
         "summonBonusSource-unnamed": "加成 ID 错误",
         "summonBonusMagnitude": "最大值 {{allowed}}",
         "summonPerfectCount": "{{observed}} 项召唤石加成达到满值（但合法） —— {{chance}}",
-        "masterTraitCount": "最高 {{allowed}} 个"
+        "masterTraitCount": "最多 {{allowed}} 个"
       },
       "chance-percent": "{{percent}}% 概率",
       "chance-impossible": "完全不可能",
