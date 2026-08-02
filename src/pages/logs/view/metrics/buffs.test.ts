@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { ComputedPlayerState, StatusInterval } from "@/types";
 
 import type { RowLevel } from "../deriveRows";
+import type { SelectorPins } from "../selectorOptions";
 
-import { buffs } from "./buffs";
+import { buffs, narrowedByPins } from "./buffs";
 import { debuffs } from "./debuffs";
 
 const interval = (
@@ -49,7 +50,9 @@ const input = (level: RowLevel, ability: string | null = null, intervals = INTER
     fightDurationMs: 10_000,
     players: PLAYERS,
     level,
-    pins: { source: null, targetIds: [], ability },
+    // `targets`, spelled as SelectorPins spells it — the helper said `targetIds`,
+    // which no reader of the pins has ever looked at.
+    pins: { source: null, targets: [], ability },
   }) as never;
 
 describe("buffs descriptor", () => {
