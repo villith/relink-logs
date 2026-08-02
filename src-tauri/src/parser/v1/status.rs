@@ -51,6 +51,12 @@ pub struct StatusInterval {
 /// for its id belongs to the first of them: segments open on the first DAMAGE
 /// event, so a debuff landing a moment before the enemy is first hit is
 /// genuinely earlier than its own spawn's start.
+///
+/// Matched on [`super::TargetSegment::actor_index`] and NEVER on the segment's
+/// `id`: the id is a folded instance pointer from the damage path, while a
+/// status apply carries the game's actor index. Comparing the two compared
+/// different namespaces, so it never matched and every enemy-held status lost
+/// its spawn.
 fn segment_at(segments: &[super::TargetSegment], actor_index: u32, at_ms: i64) -> Option<usize> {
     if protocol::is_player_slot_key(actor_index) {
         return None;
@@ -59,7 +65,7 @@ fn segment_at(segments: &[super::TargetSegment], actor_index: u32, at_ms: i64) -
     let mut first = None;
     let mut current = None;
     for (index, segment) in segments.iter().enumerate() {
-        if segment.id != actor_index {
+        if segment.actor_index != actor_index {
             continue;
         }
         if first.is_none() {
@@ -250,9 +256,25 @@ mod tests {
         assert!(intervals.is_empty());
     }
 
+    /// A spawn whose id and actor index are the same number.
+    ///
+    /// Only the time-resolution tests use this. The two are genuinely different
+    /// namespaces in production — see
+    /// [`a_debuff_resolves_by_actor_index_not_spawn_id`] — so a test that needs
+    /// to tell them apart uses [`spawn_of`] instead.
     fn segment(id: u32, start_ms: i64, end_ms: i64) -> super::super::TargetSegment {
+        spawn_of(id, id, start_ms, end_ms)
+    }
+
+    fn spawn_of(
+        id: u32,
+        actor_index: u32,
+        start_ms: i64,
+        end_ms: i64,
+    ) -> super::super::TargetSegment {
         super::super::TargetSegment {
             id,
+            actor_index,
             enemy_type: super::super::EnemyType::from_hash(0),
             instance: 1,
             max_hp: None,
@@ -264,6 +286,43 @@ mod tests {
     /// An enemy actor index. Distinct from a player slot key, which is what
     /// decides whether a holder is segmented at all.
     const ENEMY: u32 = 3_926_405_961;
+
+    #[test]
+    fn a_debuff_resolves_by_actor_index_not_spawn_id() {
+        // The two capture paths name one enemy two different ways: a damage
+        // event's `target.index` is its INSTANCE POINTER folded to 32 bits,
+        // while a status apply carries the game's ACTOR INDEX (`+0x170`).
+        // Matching a status's actor index against the spawn id compared values
+        // from different namespaces, so it was never equal — measured on log
+        // 1614, all 11 enemy-held intervals resolved to no spawn at all. The
+        // debuff holder rows could not be named and the Enemy pin emptied the
+        // table instead of narrowing it.
+        //
+        // These are the real values that log carries.
+        const SPAWN_ID: u32 = 2_785_501_876;
+        const ACTOR: u32 = 977_212_104;
+
+        let segments = [spawn_of(SPAWN_ID, ACTOR, 0, 10_000)];
+        let intervals =
+            assemble_intervals(&[apply(0, ACTOR, 10, Some(500), 1)], 0, 20_000, &segments);
+
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals[0].target_segment, Some(0));
+    }
+
+    #[test]
+    fn a_debuff_is_not_placed_on_a_spawn_that_merely_shares_its_number() {
+        // The mirror of the above: the spawn id namespace must not be consulted
+        // at all. A spawn whose folded pointer happens to equal some other
+        // enemy's actor index would otherwise claim that enemy's debuffs.
+        const ACTOR: u32 = 977_212_104;
+
+        let segments = [spawn_of(ACTOR, 555, 0, 10_000)];
+        let intervals =
+            assemble_intervals(&[apply(0, ACTOR, 10, Some(500), 1)], 0, 20_000, &segments);
+
+        assert_eq!(intervals[0].target_segment, None);
+    }
 
     #[test]
     fn two_spawns_sharing_a_recycled_id_stay_separate() {
