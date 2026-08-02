@@ -541,7 +541,7 @@
       "encounters_other": "{{count}} 场战斗",
       "last-seen": "最近出现于 {{date}}",
       "seen-in": "出现在",
-      "seen-more": "+{{count}} 更多",
+      "seen-more": "+另外 {{count}} 场战斗",
       "open-log": "打开",
       "detail-unavailable": "无法加载这场战斗的装备数据，因此无法列出具体物品。",
       "player-flagged": "此配置已被标记",
