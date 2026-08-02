@@ -81,10 +81,25 @@ export const MetricTable = ({
       {rows.map((row) => {
         const toggle = rowToggle?.(row);
         const button = (
-          <UnstyledButton
+          // A div, not a button. The band toggle inside it is a real <button>,
+          // and a button may not contain interactive content — the row used to
+          // be an UnstyledButton with a focusable role="button" span in it,
+          // which is invalid and made the two fight over focus and clicks.
+          //
+          // Focusable and Enter/Space-activated by hand, which is what the
+          // <button> was giving for free: a row in a grid is allowed to take
+          // focus, and losing keyboard pinning to fix the nesting would be a
+          // poor trade.
+          <Box
             role="row"
             className={`analysis-row${row.pinOnClick ? " analysis-row-pinnable" : ""}`}
+            tabIndex={row.pinOnClick ? 0 : undefined}
             onClick={() => row.pinOnClick && onPin(row.pinOnClick)}
+            onKeyDown={(event: React.KeyboardEvent) => {
+              if (!row.pinOnClick || (event.key !== "Enter" && event.key !== " ")) return;
+              event.preventDefault();
+              onPin(row.pinOnClick);
+            }}
           >
             <Box
               data-metric-bar
@@ -97,14 +112,11 @@ export const MetricTable = ({
                 backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
               }}
             />
-            {/* A span with role="button" rather than a nested <button>, which
-                would be invalid inside the row button. Stops propagation so
-                banding a row does not also pin it. */}
+            {/* A real button now that the row is not one. Still stops
+                propagation, so banding a row does not also pin it — including
+                on the keyboard, where the row above listens for the same keys. */}
             {toggle && (
-              <Box
-                component="span"
-                role="button"
-                tabIndex={0}
+              <UnstyledButton
                 aria-pressed={toggle.shown}
                 aria-label={t("ui.logs.buff-band-toggle")}
                 className="analysis-row-toggle"
@@ -115,13 +127,11 @@ export const MetricTable = ({
                 }}
                 onKeyDown={(event: React.KeyboardEvent) => {
                   if (event.key !== "Enter" && event.key !== " ") return;
-                  event.preventDefault();
                   event.stopPropagation();
-                  toggle.onToggle();
                 }}
               >
                 {toggle.shown ? <Eye size={14} weight="fill" /> : <EyeSlash size={14} />}
-              </Box>
+              </UnstyledButton>
             )}
             <Text role="cell" className="analysis-name">
               {renderLabel ? renderLabel(row) : row.label}
@@ -135,10 +145,10 @@ export const MetricTable = ({
                 {value}
               </Text>
             ))}
-          </UnstyledButton>
+          </Box>
         );
 
-        // The key moves off the button and onto whichever element is the list
+        // The key moves off the row and onto whichever element is the list
         // child: HoverCard clones its child and would otherwise lose it.
         const sections = rowSections?.(row);
         if (!sections || sections.length === 0) return <Box key={row.key}>{button}</Box>;
