@@ -175,6 +175,79 @@ fn dump_qwords(base: *const usize, len: usize) -> String {
     out
 }
 
+/// Largest believable stack count. Above this the field is not a level counter
+/// — the layout shifted, or the class reuses it — and the count is dropped
+/// rather than published. Same plausibility rule the sigil reader applies to
+/// its own levels.
+const MAX_PLAUSIBLE_STACKS: i32 = 100;
+
+/// The stack count to publish for a status, from its raw `+0xb0`.
+///
+/// Answers 1 for everything it cannot vouch for: a status `status.tbl` does not
+/// mark `HasLevels` (the field is uninitialised, or the class stores something
+/// else there — barrier keeps its absorb value in it), an unreadable field, the
+/// factory's pre-init -1, and anything too large to be a level count. 1 is what
+/// the hook published for every status before the table existed, so a status
+/// that falls through here is no worse off than it was.
+fn stacks_for(status_id: u32, raw: Option<i32>) -> u32 {
+    if !super::status_levels::has_levels(status_id) {
+        return 1;
+    }
+    match raw {
+        Some(count) if (1..=MAX_PLAUSIBLE_STACKS).contains(&count) => count as u32,
+        _ => 1,
+    }
+}
+
+/// The status's raw `+0xb0`, or `None` when it cannot be read.
+fn raw_stacks_of(status: *const usize) -> Option<i32> {
+    let base = status as usize;
+    if base == 0 || !readable(base.wrapping_add(STATUS_STACKS_OFFSET), 4) {
+        return None;
+    }
+    Some(unsafe { (base.wrapping_add(STATUS_STACKS_OFFSET) as *const i32).read_unaligned() })
+}
+
+#[cfg(test)]
+mod stack_tests {
+    use super::stacks_for;
+
+    #[test]
+    fn a_stackable_status_reports_its_count() {
+        // damagecut (4) is HasLevels, so +0xb0 means what it says.
+        assert_eq!(stacks_for(4, Some(3)), 3);
+    }
+
+    #[test]
+    fn a_non_stackable_status_always_reports_one() {
+        // atkup (0) is not HasLevels; whatever sits at +0xb0 is not a count.
+        assert_eq!(stacks_for(0, Some(7)), 1);
+        // barrier (41) keeps its ABSORB value there — 2000 stacks of anything
+        // is exactly the garbage this guard exists to keep off the wire.
+        assert_eq!(stacks_for(41, Some(2000)), 1);
+    }
+
+    #[test]
+    fn the_factory_pre_init_value_is_not_a_count() {
+        // The factory writes -1 before the class initialises the field.
+        assert_eq!(stacks_for(4, Some(-1)), 1);
+        assert_eq!(stacks_for(4, Some(0)), 1);
+    }
+
+    #[test]
+    fn an_unreadable_field_reports_one() {
+        assert_eq!(stacks_for(4, None), 1);
+    }
+
+    #[test]
+    fn an_implausible_count_reports_one() {
+        // Not a level count — the layout shifted, or the class reuses the
+        // field. Falling back to 1 loses a stack count; publishing 70000 would
+        // put a fabricated one in the log forever.
+        assert_eq!(stacks_for(4, Some(70_000)), 1);
+    }
+}
+
 /// Observes every `StatusBase::init` — i.e. (nearly) every buff/debuff
 /// application. Logs the status identity/duration fields after the original
 /// has armed them, plus a raw dump of the apply ctx. Stateless (like

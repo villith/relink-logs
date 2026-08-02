@@ -13,7 +13,7 @@ describe("toBands", () => {
     // The chart IS the window — its first bucket is the window's start — so a
     // band drawn at absolute time would sit wherever the scrub began.
     expect(toBands([{ startMs: 5_000, endMs: 7_000 }], { startMs: 4_000, endMs: 10_000 })).toEqual([
-      { startMs: 1_000, endMs: 3_000 },
+      { startMs: 1_000, endMs: 3_000, stacks: 1 },
     ]);
   });
 
