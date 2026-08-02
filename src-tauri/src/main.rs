@@ -1274,6 +1274,11 @@ struct EncounterStateResponse {
     /// The drill-down chart one level further in: with a source AND an ability
     /// pinned, what that ability hit, one band per enemy spawn.
     target_chart: Vec<v1::TargetChartSeries>,
+    /// Every window an actor held a status effect for, per actor and never
+    /// merged, spanning the FULL fight. The Buffs and Debuffs tables compute
+    /// their own uptime from these, so a scrub window narrows the view without
+    /// another round trip. Empty on logs recorded before status capture.
+    status_intervals: Vec<v1::StatusInterval>,
     dps_chart: HashMap<u32, Vec<i32>>,
     /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
     /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
@@ -1424,6 +1429,12 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         (duration / DPS_INTERVAL) as usize + 1,
         &options.target_spans,
     );
+
+    // Closed against the end of the full log, not the scrub window: an interval
+    // still open at the last event runs to the end of the fight, and closing it
+    // at a window edge instead would report a buff as having dropped there.
+    let status_intervals =
+        v1::assemble_intervals(&parser.encounter.raw_event_log, start_time, duration);
 
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 
