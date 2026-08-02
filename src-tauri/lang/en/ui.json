@@ -283,7 +283,7 @@
         "sigilQuestLockedTrait": "quest-only trait",
         "sigilSingleTraitOnly": "second trait",
         "overmasteryValue": "off-ladder value",
-        "overmasteryAllMaxed": "4 perfect rolls — {{chance}}",
+        "overmasteryAllMaxed": "3 max Stun Power Up rolls — {{chance}}",
         "summonTrait": "can't roll here",
         "summonBonusSource": "wrong bonus id — only {{allowed}}",
         "summonBonusSource-unnamed": "wrong bonus id",

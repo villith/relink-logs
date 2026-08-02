@@ -2,7 +2,7 @@
 
 use protocol::OvermasteryInfo;
 
-use super::{chased_effects, is_empty, Finding, Rule, Subject, Value};
+use super::{is_empty, Finding, Rule, Subject, Value};
 use crate::overmastery::stock_tables;
 
 /// The game always rolls four overmasteries; fewer means a partial read.
@@ -366,6 +366,54 @@ mod tests {
                 audit_overmastery(Some(&info)),
                 vec![],
                 "sentinel id {sentinel:08x} was accused (or all-maxed fired past it)"
+            );
+        }
+    }
+
+    /// THE DRIFT GUARD for [`STUN_IDS`].
+    ///
+    /// The ids are written out rather than derived, so a game update that
+    /// renumbers them — or adds a fourth stun id — would switch this report off
+    /// with nothing to notice it. Pin every property the rule leans on: each id
+    /// is a real param of category 3 topping at 2.0, all three live in the Lv1
+    /// pool, the Lv1 pool holds exactly these three and no more, and the larger
+    /// pools carry one apiece (which is what makes three self-identifying).
+    #[test]
+    fn the_stun_ids_are_the_category_3_params_of_the_lv1_pool() {
+        let tables = stock_tables();
+
+        for id in STUN_IDS {
+            let param = tables
+                .params
+                .get(&id)
+                .unwrap_or_else(|| panic!("stun id {id:08x} left the ladder table"));
+            assert_eq!(param.kind, 3, "stun id {id:08x} changed category");
+            assert_eq!(param.values[param.values.len() - 1], 2.0);
+        }
+
+        let stuns_in = |tier: usize| -> Vec<u32> {
+            tables.pools[tier]
+                .iter()
+                .map(|entry| entry.key)
+                .filter(|key| tables.params.get(key).is_some_and(|p| p.kind == 3))
+                .collect()
+        };
+
+        let mut lv1 = stuns_in(0);
+        lv1.sort_unstable();
+        let mut expected = STUN_IDS;
+        expected.sort_unstable();
+        assert_eq!(
+            lv1, expected,
+            "the Lv1 pool no longer holds exactly the three stun ids the rule counts"
+        );
+
+        for tier in [1, 2] {
+            assert_eq!(
+                stuns_in(tier).len(),
+                1,
+                "pool {tier} gained a second stun id — three stuns no longer \
+                 proves a Lv1 meditation"
             );
         }
     }

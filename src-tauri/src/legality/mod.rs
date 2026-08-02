@@ -44,7 +44,7 @@ pub const EMPTY_ID: u32 = game_reader::EMPTY_KEY;
 /// the sweep revisit logs already stamped 5 and WITHDRAW the verdicts it now
 /// declines to make. Without it the cutoff would only ever govern logs nobody
 /// had judged yet, i.e. nothing already in the database.
-pub const RULES_VERSION: u32 = 6;
+pub const RULES_VERSION: u32 = 7;
 
 /// Encounters recorded before this are never audited: epoch millis for
 /// 2026-07-09T00:00:00Z, inclusive (a log stamped exactly this is judged).
