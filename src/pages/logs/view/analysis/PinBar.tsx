@@ -59,12 +59,12 @@ export const PinBar = ({ options, pins, onChange, windowLabel, fullLabel, onClea
         // makes it 33px against the Selects' 30px and misaligns the row.
         styles={{ input: { minHeight: 30, height: 30 } }}
         data={options.targets}
-        value={pins.targetIds.map(String)}
+        value={pins.targets.map(String)}
         placeholder={t("ui.logs.selector-all-enemies")}
         aria-label={t("ui.logs.selector-target")}
         clearable
         searchable
-        onChange={(values) => onChange({ ...pins, targetIds: values.map(Number) })}
+        onChange={(values) => onChange({ ...pins, targets: values.map(Number) })}
       />
       <Select
         w={220}

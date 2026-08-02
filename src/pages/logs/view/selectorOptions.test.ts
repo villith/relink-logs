@@ -9,13 +9,15 @@ const EUGEN_HASH = 0x91418145;
 // Sources are pinned by actor INDEX, not by character hash.
 const NARMAYA = 0;
 const EUGEN = 1;
+// Targets are pinned by SPAWN — an index into targetEntries — not by the game's
+// actor id, which it reissues to a later boss.
 const BOSS = 1;
 const ADD = 2;
 
-const fact = (sourceIndex: number, targetId: number, action: number): SelectionFact => ({
+const fact = (sourceIndex: number, targetSegment: number, action: number): SelectionFact => ({
   sourceActorType: sourceIndex === NARMAYA ? NARMAYA_HASH : EUGEN_HASH,
   sourceIndex,
-  targetId,
+  targetSegment,
   ability: { Normal: action },
 });
 
@@ -28,6 +30,62 @@ describe("deriveSelectorOptions", () => {
     const options = deriveSelectorOptions(FACTS, NO_PINS);
     expect(options.sources.map((o) => o.value)).toEqual([String(NARMAYA), String(EUGEN)]);
     expect(options.targets.map((o) => o.value)).toEqual([String(BOSS), String(ADD)]);
+    expect(options.abilities.map((o) => o.value)).toEqual(["Normal:100", "Normal:200", "Normal:300"]);
+  });
+
+  it("condenses the ability list into skill groups, like the table", () => {
+    // Against the REAL table: Gran's 100/110 are "normal-attack", 200 is
+    // "power-raise". An uncondensed list is what put 27 entries in the dropdown
+    // where the table beneath shows a handful.
+    const grouped: SelectionFact[] = [
+      { ...fact(NARMAYA, BOSS, 100), childCharacterType: "Pl0000" },
+      { ...fact(NARMAYA, BOSS, 110), childCharacterType: "Pl0000" },
+      { ...fact(NARMAYA, BOSS, 200), childCharacterType: "Pl0000" },
+    ];
+
+    const options = deriveSelectorOptions(grouped, NO_PINS);
+
+    expect(options.abilities.map((o) => o.value)).toEqual([
+      'Group:normal-attack@"Pl0000"',
+      'Group:power-raise@"Pl0000"',
+    ]);
+  });
+
+  /** THE ECHO FOLD. Live on log 1573 this listed 24 options all reading
+   * "Supplementary Damage" against a table showing ONE row of 430.3m/260 hits;
+   * picking any of them pinned a single payload and reported 105.7m/41 hits as
+   * "100.0%". The parser folds every echo onto one row, so the list must too. */
+  it("offers one supplementary-damage entry however many payloads occurred", () => {
+    const echoes: SelectionFact[] = [1000, 1, 2, 3].map((payload) => ({
+      ...fact(NARMAYA, BOSS, 0),
+      ability: { SupplementaryDamage: payload },
+    }));
+
+    const options = deriveSelectorOptions([...echoes, fact(NARMAYA, BOSS, 100)], NO_PINS);
+
+    expect(options.abilities.map((o) => o.value)).toEqual(["SupplementaryDamage:0", "Normal:100"]);
+  });
+
+  it("narrows to every echo payload when the folded echo row is pinned", () => {
+    // The pin is one key, but it must survive the fact list unchanged — a fold
+    // that dropped the other payloads would empty the table it just opened.
+    const echoes: SelectionFact[] = [1000, 1].map((payload) => ({
+      ...fact(NARMAYA, BOSS, 0),
+      ability: { SupplementaryDamage: payload },
+    }));
+
+    const options = deriveSelectorOptions([...echoes, fact(EUGEN, BOSS, 300)], {
+      ...NO_PINS,
+      ability: "SupplementaryDamage:0",
+    });
+
+    expect(options.sources.map((o) => o.value)).toEqual([String(NARMAYA)]);
+  });
+
+  it("leaves the list ungrouped when the backend sends no child character", () => {
+    // An older binary has no `childCharacterType`; grouping on a guess would
+    // file skills under the wrong character.
+    const options = deriveSelectorOptions(FACTS, NO_PINS);
     expect(options.abilities.map((o) => o.value)).toEqual(["Normal:100", "Normal:200", "Normal:300"]);
   });
 
@@ -57,14 +115,33 @@ describe("deriveSelectorOptions", () => {
     // An online party can hold two of the same character, so keying sources on
     // the character hash would merge them into one row and one pin.
     const twins: SelectionFact[] = [
-      { sourceActorType: NARMAYA_HASH, sourceIndex: 0, targetId: BOSS, ability: { Normal: 100 } },
-      { sourceActorType: NARMAYA_HASH, sourceIndex: 2, targetId: BOSS, ability: { Normal: 900 } },
+      { sourceActorType: NARMAYA_HASH, sourceIndex: 0, targetSegment: BOSS, ability: { Normal: 100 } },
+      { sourceActorType: NARMAYA_HASH, sourceIndex: 2, targetSegment: BOSS, ability: { Normal: 900 } },
     ];
 
     expect(deriveSelectorOptions(twins, NO_PINS).sources.map((o) => o.value)).toEqual(["0", "2"]);
     expect(deriveSelectorOptions(twins, { ...NO_PINS, source: 2 }).abilities.map((o) => o.value)).toEqual([
       "Normal:900",
     ]);
+  });
+
+  /** THE RECYCLED-ID CASE (live: "Four Dragons of the Apocalypse"). Wilinus
+   * Icewyrm and Vrazarek Firewyrm both arrived as actor id 3926405961, so a
+   * fact keyed by that id offered ONE entry for two bosses — the second dragon
+   * never appeared, and pinning the first also returned the second's damage.
+   * Keyed by spawn, they are two entries that narrow independently. */
+  it("offers one entry per spawn even when the game reissued the actor id", () => {
+    const wilinus = 0;
+    const vrazarek = 2;
+    const dragons: SelectionFact[] = [fact(NARMAYA, wilinus, 100), fact(EUGEN, vrazarek, 900)];
+
+    const options = deriveSelectorOptions(dragons, NO_PINS);
+    expect(options.targets.map((o) => o.value)).toEqual([String(wilinus), String(vrazarek)]);
+
+    // ...and pinning one names only that dragon's attacker.
+    const pinned = deriveSelectorOptions(dragons, { ...NO_PINS, targets: [vrazarek] });
+    expect(pinned.sources.map((o) => o.value)).toEqual([String(EUGEN)]);
+    expect(pinned.abilities.map((o) => o.value)).toEqual(["Normal:900"]);
   });
 
   it("returns empty lists for an empty fact set", () => {

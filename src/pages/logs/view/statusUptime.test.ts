@@ -12,6 +12,7 @@ const interval = (actor: number, start: number, end: number, ability: number | n
   startMs: start,
   endMs: end,
   maxStacks: 1,
+  applications: 1,
 });
 
 describe("uptimeMs", () => {

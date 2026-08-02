@@ -1,4 +1,4 @@
-import type { ComputedPlayerState, EncounterState, PlayerData } from "@/types";
+import type { ComputedPlayerState, EncounterState, PlayerData, StatusInterval } from "@/types";
 
 import type { RowLevel } from "../deriveRows";
 import type { SelectorPins } from "../selectorOptions";
@@ -23,8 +23,13 @@ export type MetricRow = {
   colorSlot: number;
 };
 
-/** What `label` should be resolved against before it is drawn. */
-export type LabelKind = "player" | "ability" | "raw";
+/** What `label` should be resolved against before it is drawn.
+ *
+ * `"status"` is the buff/debuff row: a `status:<effect>:<cause>` key that reads
+ * as "Attack Up (Signo Drive)" — the effect first so shared effects sort
+ * together, the cause in parentheses because two abilities granting one effect
+ * are two rows. */
+export type LabelKind = "player" | "ability" | "status" | "raw";
 
 /** Everything a metric needs to turn encounter state into rows. */
 export type MetricDescriptor = {
@@ -45,5 +50,11 @@ export type MetricDescriptor = {
     players: ComputedPlayerState[];
     level: RowLevel;
     pins: SelectorPins;
+    /** Every status window in the fight, players and enemies alike. The Buffs
+     * and Debuffs descriptors split them by holder; optional because a log
+     * recorded before status capture has none. */
+    statusIntervals?: StatusInterval[];
+    /** Denominator for an uptime percentage. Optional for the same reason. */
+    fightDurationMs?: number;
   }) => MetricRow[];
 };

@@ -6,7 +6,8 @@ import { ReferenceArea } from "recharts";
 
 import { humanizeNumbers } from "@/utils";
 
-import type { ChartDatapoint, Label } from "../DetailCharts";
+import { DPS_BUCKET_MS, type ChartDatapoint, type Label } from "../DetailCharts";
+import type { Band } from "../statusBands";
 
 import { windowFromDrag } from "./scopeWindow";
 import "./analysis.css";
@@ -32,6 +33,10 @@ export type DpsChartProps = {
    * lines are right at the players level, where four players' curves are
    * compared rather than added. */
   stacked?: boolean;
+  /** Status-effect windows to shade, already rebased onto this chart's window
+   * by `toBands`. Only the Buffs and Debuffs metrics pass any; absent, the
+   * chart draws exactly what it draws today. */
+  bands?: { color: string; band: Band }[];
 };
 
 // recharts types a tooltip entry as Payload<any, any>, which has no index
@@ -56,17 +61,36 @@ export const ChartTooltip = ({
   // the same, or it prints actor indexes and group keys at the user.
   const labelByKey = new Map(labels.map((series) => [series.name, series.label ?? series.name]));
 
-  // Only what actually landed in this bucket. A stack of 17 skill-group bands
-  // is mostly zeroes at any one moment, and listing every one of them buries
-  // the few that fired. A zero reads the same on the gauge tab — "0%" says
+  // Only what actually landed in this bucket, largest first. A stack of 17
+  // skill-group bands is mostly zeroes at any one moment, and listing every one
+  // of them buries the few that fired. The payload arrives in SERIES order,
+  // which ranks the whole fight — at any one second the biggest contributor is
+  // rarely the first band. A zero reads the same on the gauge tab: "0%" says
   // nothing the absent row does not.
-  const landed = payload.filter((item) => typeof item.value === "number" && item.value !== 0);
+  const landed = payload
+    .filter((item) => typeof item.value === "number" && item.value !== 0)
+    .sort((a, b) => (b.value as number) - (a.value as number));
 
-  // Nothing at all: a card holding only a timestamp is worse than no card.
-  if (landed.length === 0) return null;
-
+  // Hidden, never unmounted. Recharts positions its wrapper by transform only
+  // while the measured box is non-zero (`getTooltipTranslate`), and then
+  // force-sets `visibility: visible` over its own hidden style — so a zero-size
+  // box paints the card at the wrapper's origin, the plot's top-left corner.
+  // It stays parked there until the next mouse move, because `updateBBox`
+  // mutates a field rather than state. Measured before this guard: 4 of 31
+  // samples across the plot painted at the plot's own left edge.
+  //
+  // `visibility` and not a null return, because it keeps the box in layout —
+  // an empty box is the very thing that parks the wrapper.
   return (
-    <Paper px="md" py="sm" withBorder shadow="md" radius="md">
+    <Paper
+      data-testid="chart-tooltip"
+      px="md"
+      py="sm"
+      withBorder
+      shadow="md"
+      radius="md"
+      style={landed.length === 0 ? { visibility: "hidden" } : undefined}
+    >
       <Text fw={500} mb={5}>
         {label}
       </Text>
@@ -108,6 +132,7 @@ export const DpsChart = ({
   fromLabel,
   toLabel,
   stacked = false,
+  bands,
 }: DpsChartProps) => {
   const { t } = useTranslation();
   const anchor = useRef<number | null>(null);
@@ -206,6 +231,20 @@ export const DpsChart = ({
       <ChartTooltip label={String(label ?? "")} payload={payload} format={format} />
     ),
   };
+
+  // Status bands, drawn under the scope selection in the same chart space. A
+  // band is milliseconds from the window's start and a bucket is one second
+  // wide, so the index is the conversion — never a hand-written `/ 1000`.
+  const statusBands = (bands ?? []).map(({ color, band: span }, index) => (
+    <ReferenceArea
+      key={index}
+      x1={data[Math.round(span.startMs / DPS_BUCKET_MS)]?.timestamp}
+      x2={data[Math.min(maxIndex, Math.round(span.endMs / DPS_BUCKET_MS))]?.timestamp}
+      stroke="none"
+      fill={color}
+      fillOpacity={0.16}
+    />
+  ));
 
   const scopeBand = band && band[0] !== band[1] && (
     <ReferenceArea

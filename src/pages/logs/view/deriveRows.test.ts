@@ -11,8 +11,8 @@ describe("rowLevelFor", () => {
     expect(rowLevelFor({ source: 1, targetIds: [], ability: null })).toBe("abilities");
   });
 
-  it("gives hits when source and ability are both pinned", () => {
-    expect(rowLevelFor({ source: 1, targetIds: [], ability: "Normal:100" })).toBe("hits");
+  it("gives skills when source and ability are both pinned", () => {
+    expect(rowLevelFor({ source: 1, targetIds: [], ability: "Normal:100" })).toBe("skills");
   });
 
   it("treats a target pin as a scope, not a level", () => {
@@ -22,9 +22,9 @@ describe("rowLevelFor", () => {
     expect(rowLevelFor({ source: 1, targetIds: [2], ability: null })).toBe("abilities");
   });
 
-  it("gives hits when an ability is pinned without a source", () => {
-    // Every hit of that ability across the party — still the most specific
-    // dimension left.
-    expect(rowLevelFor({ source: null, targetIds: [], ability: "Normal:100" })).toBe("hits");
+  it("gives skills when an ability is pinned without a source", () => {
+    // Every member skill of that ability across the party — still the most
+    // specific dimension left.
+    expect(rowLevelFor({ source: null, targetIds: [], ability: "Normal:100" })).toBe("skills");
   });
 });

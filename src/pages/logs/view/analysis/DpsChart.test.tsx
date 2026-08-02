@@ -61,14 +61,37 @@ describe("ChartTooltip", () => {
     expect(screen.queryByText("Manmoth")).toBeNull();
   });
 
-  it("drops the card entirely when nothing landed in the bucket", () => {
-    // Every series at zero — a box holding only a timestamp says nothing.
-    renderTooltip([
+  it("hides the card when nothing landed, without collapsing it to nothing", () => {
+    // Every series at zero. The card must not be UNMOUNTED: recharts positions
+    // its wrapper by transform only while the measured box is non-zero
+    // (getTooltipTranslate), and then force-sets visibility:visible over its own
+    // hidden style — so a zero-size box parks the card at the plot's top-left
+    // corner, and it stays there until the next mouse move because updateBBox
+    // mutates a field rather than state. Measured: 4 of 31 samples across the
+    // plot painted at left:29px, the plot's own left edge.
+    const { container } = renderTooltip([
       { dataKey: "0", name: "0", value: 0, color: "#f00" },
       { dataKey: "1", name: "1", value: 0, color: "#0f0" },
     ]);
 
-    expect(screen.queryByText("03:03")).toBeNull();
+    const card = container.querySelector<HTMLElement>('[data-testid="chart-tooltip"]');
+    expect(card).toBeTruthy();
+    expect(card!.style.visibility).toBe("hidden");
+    // Hidden, not empty: `visibility` keeps the box in layout, which is the
+    // whole point — an empty box is what parks the wrapper.
+    expect(screen.getByText("03:03")).toBeTruthy();
+  });
+
+  it("orders entries by value, largest first", () => {
+    // The payload arrives in series order, which is the stack's order over the
+    // WHOLE fight — at any one second the biggest contributor is rarely first.
+    renderTooltip([
+      { dataKey: "0", name: "0", value: 100, color: "#f00" },
+      { dataKey: "1", name: "1", value: 900, color: "#0f0" },
+    ]);
+
+    const names = [...document.querySelectorAll("span")].map((s) => s.textContent);
+    expect(names.indexOf("Manmoth")).toBeLessThan(names.indexOf("Rain"));
   });
 
   it("keeps a gauge reading of zero out too", () => {

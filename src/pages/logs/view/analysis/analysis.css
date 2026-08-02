@@ -44,14 +44,22 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* A metric row: the bar is the row's background and the text sits on it. */
+/* A metric row: the bar is the row's background and the text sits on it.
+ *
+ * 30px tall with NO margin, and the bar inset 1px top and bottom, rather than
+ * 28px with a 2px margin. It draws identically — a 28px bar every 30px — but
+ * the separation now belongs to the row instead of sitting between rows.
+ *
+ * That gap was dead space owned by no hover target: measured at the exact
+ * midpoint between two rows, `elementFromPoint` returned a bare DIV inside
+ * neither row, so a cursor crossing it fired mouseleave and tore the hover card
+ * down before the next row built it again. */
 .analysis-row {
   position: relative;
   display: flex;
   align-items: center;
-  height: 28px;
+  height: 30px;
   padding: 0 8px;
-  margin-bottom: 2px;
   width: 100%;
   border-radius: 2px;
   text-align: left;
@@ -61,16 +69,16 @@
   cursor: pointer;
 }
 
-/* Rows are 28px with a 2px gap, so an outline drawn outside the box overlaps
- * its neighbour's. Both states draw their ring inside the row instead, which
- * keeps the table's density rather than opening the gap to fit the ring. */
+/* Rows now touch, so an outline drawn outside the box would overlap its
+ * neighbour's. Both states draw their ring inside instead, offset by the row's
+ * own 1px inset so the ring lands on the bar's edge rather than in the gap. */
 .analysis-row:hover {
   outline: 1px solid var(--an-line-strong);
-  outline-offset: -1px;
+  outline-offset: -2px;
 }
 
 .analysis-row:focus-visible {
-  outline-offset: -2px;
+  outline-offset: -3px;
 }
 
 /* background-color, never the `background` shorthand: the shorthand resets
@@ -90,20 +98,28 @@
  * moment the user was reading it. The outline above carries the hover state. */
 
 /* Every cell sits above the bar. */
-.analysis-rank,
 .analysis-name,
 .analysis-cell {
   position: relative;
 }
 
-.analysis-rank {
-  width: 24px;
-  padding-right: 9px;
-  text-align: right;
-  font-size: 11px;
-  /* The rank is always inside the bar (the narrowest measured 523px against a
-   * 32px cell), so it must survive the fill rather than the background. */
-  color: var(--an-ink-2);
+/* The row's own separation, so the pixels between two bars still belong to a
+ * row and the hover card survives the crossing. */
+.analysis-row .analysis-bar {
+  top: 1px;
+  bottom: 1px;
+}
+
+/* The status metrics' band toggle. Sits on the bar like the rest of the row's
+ * text, so it takes `position: relative` for the same reason .analysis-name
+ * does — without it the bar's fill paints over the icon. */
+.analysis-row-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 6px;
+  cursor: pointer;
 }
 
 .analysis-name {

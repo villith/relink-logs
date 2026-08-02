@@ -24,6 +24,14 @@ pub struct StatusInterval {
     pub start_ms: i64,
     pub end_ms: i64,
     pub max_stacks: u32,
+    /// How many times the effect landed within this window — the initial apply
+    /// plus every refresh that extended it.
+    ///
+    /// Merging refreshes is what keeps uptime honest, but it also destroys the
+    /// only record that they happened; a buff refreshed forty times and one
+    /// applied once are the same single window otherwise. Summed across
+    /// holders, this is the "Count" the tables show beside uptime.
+    pub applications: u32,
 }
 
 /// Closed intervals from apply/remove pairs in `events`.
@@ -49,8 +57,10 @@ pub fn assemble_intervals(
                 open.entry(key)
                     .and_modify(|existing| {
                         // A refresh: extend, never open a second overlapping
-                        // interval, which would double-count uptime.
+                        // interval, which would double-count uptime. The count
+                        // is the only place the refresh survives.
                         existing.max_stacks = existing.max_stacks.max(event.stacks);
+                        existing.applications = existing.applications.saturating_add(1);
                     })
                     .or_insert(StatusInterval {
                         actor_index: event.actor_index,
@@ -60,6 +70,7 @@ pub fn assemble_intervals(
                         start_ms: at,
                         end_ms: fight_end_ms,
                         max_stacks: event.stacks,
+                        applications: 1,
                     });
             }
             Message::StatusRemove(event) => {
@@ -172,6 +183,48 @@ mod tests {
         // known start, and inventing one would fabricate uptime.
         let intervals = assemble_intervals(&[remove(1_000, 1, 10, Some(500))], 0, 10_000);
         assert!(intervals.is_empty());
+    }
+
+    #[test]
+    fn a_fresh_interval_counts_one_application() {
+        let intervals = assemble_intervals(&[apply(0, 1, 10, Some(500), 1)], 0, 10_000);
+        assert_eq!(intervals[0].applications, 1);
+    }
+
+    #[test]
+    fn every_refresh_counts_as_another_application() {
+        // The count the Buffs table shows is "how many times did this land",
+        // which is the number a merged interval would otherwise destroy: three
+        // applies collapse into one window, and without this the row would
+        // claim the effect landed once.
+        let events = vec![
+            apply(0, 1, 10, Some(500), 1),
+            apply(1_000, 1, 10, Some(500), 1),
+            apply(2_000, 1, 10, Some(500), 1),
+            remove(3_000, 1, 10, Some(500)),
+        ];
+        let intervals = assemble_intervals(&events, 0, 10_000);
+
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals[0].applications, 3);
+    }
+
+    #[test]
+    fn a_reopened_effect_starts_counting_again() {
+        // Two separate windows are two rows' worth of interval, each with its
+        // own count — carrying the first window's total into the second would
+        // double-count it once the table sums them.
+        let events = vec![
+            apply(0, 1, 10, Some(500), 1),
+            remove(1_000, 1, 10, Some(500)),
+            apply(2_000, 1, 10, Some(500), 1),
+            remove(3_000, 1, 10, Some(500)),
+        ];
+        let intervals = assemble_intervals(&events, 0, 10_000);
+
+        assert_eq!(intervals.len(), 2);
+        assert_eq!(intervals[0].applications, 1);
+        assert_eq!(intervals[1].applications, 1);
     }
 
     #[test]

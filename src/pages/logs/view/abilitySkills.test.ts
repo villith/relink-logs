@@ -13,6 +13,7 @@ vi.mock("@/assets/skill-groups", () => ({
 
 import type { SkillState } from "@/types";
 
+import { parseAbilityKey } from "./abilityKey";
 import {
   abilityRowKey,
   actionsForPin,
@@ -135,5 +136,58 @@ describe("actionsForPin", () => {
     // A stale or hand-edited URL: an empty list would read as "all abilities"
     // at the backend and silently drop the filter.
     expect(actionsForPin("Normal:9999", [])).toEqual([{ Normal: 9999 }]);
+  });
+
+  /** THE ECHO EXPANSION. The parser folds every echo onto ONE breakdown row, so
+   * that row carries a single payload out of the dozens behind it. Expanding the
+   * pin from the row alone filtered to that one payload and reported a quarter
+   * of the row's damage as its whole (live: 105.7m/41 hits against a row of
+   * 430.3m/260). The facts carry every payload, which is what completes it. */
+  it("expands an echo pin to every payload behind the row, not just the folded one", () => {
+    const rowAndFacts = [
+      skill({ SupplementaryDamage: 1000 }),
+      skill({ SupplementaryDamage: 1 }),
+      skill({ SupplementaryDamage: 2 }),
+      skill({ Normal: 100 }),
+    ];
+
+    expect(actionsForPin(abilityRowKey(rowAndFacts[0]), rowAndFacts)).toEqual([
+      { SupplementaryDamage: 1000 },
+      { SupplementaryDamage: 1 },
+      { SupplementaryDamage: 2 },
+    ]);
+  });
+});
+
+describe("abilityRowKey — supplementary damage", () => {
+  /** The parser folds ALL echoes onto one row whatever their payload or body
+   * (`BreakdownKeying::first_supplementary`). The row key must fold the same
+   * way, or the ability selector lists one entry per payload — all of them
+   * reading "Supplementary Damage" and each pinning a slice of the single row
+   * they appear to name. */
+  it("folds every payload onto one row key", () => {
+    const keys = [
+      abilityRowKey(skill({ SupplementaryDamage: 0 })),
+      abilityRowKey(skill({ SupplementaryDamage: 1 })),
+      abilityRowKey(skill({ SupplementaryDamage: 1000 })),
+    ];
+
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it("folds across bodies too, since the parser's fold ignores the child", () => {
+    expect(abilityRowKey(skill({ SupplementaryDamage: 1 }, "Pl1900"))).toBe(
+      abilityRowKey(skill({ SupplementaryDamage: 7 }, "Pl2000"))
+    );
+  });
+
+  it("keeps the key parseable, so the pin still names itself", () => {
+    // `getSkillName` names an echo from the variant alone, so a canonical
+    // payload reads exactly as the table row does.
+    expect(parseAbilityKey(abilityRowKey(skill({ SupplementaryDamage: 42 })))).toEqual({ SupplementaryDamage: 0 });
+  });
+
+  it("does not fold anything else onto the echo row", () => {
+    expect(abilityRowKey(skill({ DamageOverTime: 0 }))).not.toBe(abilityRowKey(skill({ SupplementaryDamage: 0 })));
   });
 });

@@ -8,7 +8,7 @@ export type RawPins = { src: string | null; tgt: string | null; abil: string | n
 
 export const encodePins = (pins: SelectorPins): RawPins => ({
   src: pins.source === null ? null : String(pins.source),
-  tgt: pins.targetIds.length === 0 ? null : pins.targetIds.join(","),
+  tgt: pins.targets.length === 0 ? null : pins.targets.join(","),
   abil: pins.ability,
 });
 
@@ -18,15 +18,18 @@ export const decodePins = (raw: RawPins): SelectorPins => {
   const source = Number(raw.src);
   // The empty-segment filter is load-bearing: "".split(",") is [""], and
   // Number("") is 0, so without it an absent tgt decodes to a pin on target 0.
-  const targetIds = (raw.tgt ?? "")
+  const targets = (raw.tgt ?? "")
     .split(",")
     .filter((part) => part !== "")
     .map(Number)
-    .filter((id) => Number.isInteger(id));
+    // Segment indices, so a negative one names nothing. A URL written before
+    // the pin was a segment carries an actor id here, which is far past the end
+    // of `targetEntries` and drops out when the spans are resolved.
+    .filter((segment) => Number.isInteger(segment) && segment >= 0);
 
   return {
     source: raw.src !== null && Number.isInteger(source) ? source : null,
-    targetIds,
+    targets,
     ability: raw.abil !== null && parseAbilityKey(raw.abil) !== null ? raw.abil : null,
   };
 };

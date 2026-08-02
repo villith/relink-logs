@@ -37,10 +37,30 @@ const PLAYERS = [
   },
 ] as unknown as ComputedPlayerState[];
 
+/** Two players who both used 9001, for the source section — which only says
+ * anything when more than one player is in scope. */
+const PARTY = [
+  {
+    index: 0,
+    partyIndex: 0,
+    characterType: "Pl1400",
+    totalDamage: 300,
+    skillBreakdown: [skill(9001, 200, 20), skill(9002, 100, 10)],
+  },
+  {
+    index: 1,
+    partyIndex: 1,
+    characterType: "Pl1400",
+    totalDamage: 50,
+    skillBreakdown: [skill(9001, 50, 5)],
+  },
+] as unknown as ComputedPlayerState[];
+
 const LABELS = {
   ability: (key: string) => `ability:${key}`,
   enemy: (type: EnemyType) => `enemy:${typeof type === "string" ? type : `unknown-${type.Unknown}`}`,
-  text: (key: string) => key,
+  source: (index: number) => `player:${index}`,
+  sourceColor: (index: number) => `#00${index}`,
 };
 
 const row = (key: string): MetricRow => ({
@@ -58,6 +78,21 @@ const call = (level: "players" | "abilities" | "hits", key: string) =>
     level,
     players: PLAYERS,
     pins: { source: 0, targetIds: [], ability: null },
+    color: "rgb(1,2,3)",
+    labels: LABELS,
+  });
+
+const callWith = (
+  level: "players" | "abilities" | "skills",
+  key: string,
+  pins: { source: number | null; targetIds: number[]; ability: string | null },
+  players = PARTY
+) =>
+  cardSectionsFor({
+    row: row(key),
+    level,
+    players,
+    pins,
     color: "rgb(1,2,3)",
     labels: LABELS,
   });
@@ -144,28 +179,104 @@ describe("cardSectionsFor", () => {
     expect(sections?.[1].entries.map((e) => e.value)).toEqual([20, 10]);
   });
 
-  it("gives an ability row its targets and its hit distribution, and no source", () => {
-    // The abilities level is only reached with a source already pinned, so a
-    // Source section would always be one row at 100%.
+  it("gives an ability row its targets, and nothing else", () => {
+    // No Source section: the abilities level is only reached with a source
+    // already pinned, so it would always be one row at 100%. No hit-statistics
+    // section either — every section here renders as a share and a bar, which
+    // is meaningless over min/max/avg, so those live in the table's columns.
     const sections = call("abilities", "skill:Normal:100");
-    expect(sections?.map((s) => s.headingKey)).toEqual(["ui.logs.hover-by-target", "ui.logs.hover-by-hits"]);
+    expect(sections?.map((s) => s.headingKey)).toEqual(["ui.logs.hover-by-target"]);
   });
 
-  it("reports count, min, max and average for an ability", () => {
-    const sections = call("abilities", "skill:Normal:100");
-    expect(sections?.[1].entries).toEqual([
-      { key: "count", label: "ui.logs.hover-count", value: 20 },
-      { key: "min", label: "ui.skill-columns.min", value: 10 },
-      { key: "max", label: "ui.skill-columns.max", value: 90 },
-      { key: "avg", label: "ui.skill-columns.average", value: 10 },
-    ]);
+  it("explains an ability with every skill behind it, not just the first", () => {
+    // The row above the card sums the skills sharing an ability key, so a card
+    // built from one of them describes a fraction of what the row reports.
+    const players = [
+      {
+        index: 0,
+        partyIndex: 0,
+        characterType: "Pl1400",
+        totalDamage: 250,
+        skillBreakdown: [skill(100, 200, 20), skill(100, 50, 5)],
+      },
+    ] as unknown as ComputedPlayerState[];
+
+    const sections = cardSectionsFor({
+      row: row("skill:Normal:100"),
+      level: "abilities",
+      players,
+      pins: { source: 0, targetIds: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: LABELS,
+    });
+
+    // Targets merge across both, so the section totals the ability's damage.
+    expect(sections?.[0].entries.reduce((sum, e) => sum + e.value, 0)).toBe(250);
   });
 
-  it("gives a hit row no card", () => {
-    expect(call("hits", "hit:0")).toBeNull();
+  it("gives an unknown skills row no card", () => {
+    expect(call("skills", "skill:Normal:404")).toBeNull();
   });
 
   it("gives an unknown row no card", () => {
     expect(call("players", "player:99")).toBeNull();
+  });
+});
+
+describe("cardSectionsFor at the skills level", () => {
+  const ABILITY_ONLY = { source: null, targetIds: [] as number[], ability: "Normal:9001" };
+
+  it("explains a member skill by source and then by target", () => {
+    const sections = callWith("skills", "skill:Normal:9001", ABILITY_ONLY);
+
+    expect(sections?.map((section) => section.headingKey)).toEqual([
+      "ui.logs.hover-by-source",
+      "ui.logs.hover-by-target",
+    ]);
+  });
+
+  it("sums one action across every player who used it, biggest first", () => {
+    const sections = callWith("skills", "skill:Normal:9001", ABILITY_ONLY);
+
+    expect(sections?.[0].entries.map((entry) => entry.label)).toEqual(["player:0", "player:1"]);
+    expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([200, 50]);
+  });
+
+  it("colours each source entry with that player's own colour", () => {
+    // The section carries one colour for all its rows, so a per-player section
+    // needs the ENTRY to carry it — a party section in one colour says nothing.
+    const sections = callWith("skills", "skill:Normal:9001", ABILITY_ONLY);
+
+    expect(sections?.[0].entries.map((entry) => entry.color)).toEqual(["#000", "#001"]);
+  });
+
+  it("leaves out a player who never used the skill", () => {
+    const sections = callWith("skills", "skill:Normal:9002", ABILITY_ONLY);
+
+    expect(sections?.[0].entries.map((entry) => entry.label)).toEqual(["player:0"]);
+  });
+
+  it("still shows the source section when a friendly is pinned", () => {
+    // One row at 100%. Shown anyway: Warcraft Logs does, and suppressing it
+    // makes the card change shape as the friendly pin comes and goes.
+    // With a friendly pinned the scoped party holds only that player, so the
+    // section is a single row — which is exactly the case being kept.
+    const sections = callWith("skills", "skill:Normal:9001", { source: 0, targetIds: [], ability: "Normal:9001" }, [
+      PARTY[0],
+    ]);
+
+    expect(sections?.[0].headingKey).toBe("ui.logs.hover-by-source");
+    expect(sections?.[0].entries).toHaveLength(1);
+  });
+
+  it("totals the targets across every player's copy of the skill", () => {
+    const sections = callWith("skills", "skill:Normal:9001", ABILITY_ONLY);
+
+    // 250 damage total, split 80/20 across the two target rows by the fixture.
+    expect(sections?.[1].entries.reduce((sum, entry) => sum + entry.value, 0)).toBe(250);
+  });
+
+  it("returns null for a row no player's breakdown holds", () => {
+    expect(callWith("skills", "skill:Normal:404", ABILITY_ONLY)).toBeNull();
   });
 });

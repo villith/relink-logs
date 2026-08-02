@@ -1,3 +1,4 @@
+import { Eye, EyeSlash } from "@phosphor-icons/react";
 import { Box, Text, UnstyledButton } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +26,10 @@ export type MetricTableProps = {
   /** The hover card's sections for one row, or null for no card. Injected
    * because the breakdown needs translated names and the settings store. */
   rowSections?: (row: MetricRow) => CardSection[] | null;
+  /** Per-row eye toggle, or null where a row has nothing to show. Only the
+   * status metrics pass it; absent, no row grows a control and the table keeps
+   * the DOM it has. */
+  rowToggle?: (row: MetricRow) => { shown: boolean; onToggle: () => void } | null;
 };
 
 const FALLBACK_COLOR = "var(--an-ink-3)";
@@ -46,6 +51,7 @@ export const MetricTable = ({
   rowColor,
   rowsLabelKey,
   rowSections,
+  rowToggle,
 }: MetricTableProps) => {
   const { t } = useTranslation();
 
@@ -72,7 +78,8 @@ export const MetricTable = ({
         ))}
       </Box>
 
-      {rows.map((row, index) => {
+      {rows.map((row) => {
+        const toggle = rowToggle?.(row);
         const button = (
           <UnstyledButton
             role="row"
@@ -90,9 +97,32 @@ export const MetricTable = ({
                 backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
               }}
             />
-            <Text role="cell" className="analysis-rank">
-              {index + 1}
-            </Text>
+            {/* A span with role="button" rather than a nested <button>, which
+                would be invalid inside the row button. Stops propagation so
+                banding a row does not also pin it. */}
+            {toggle && (
+              <Box
+                component="span"
+                role="button"
+                tabIndex={0}
+                aria-pressed={toggle.shown}
+                aria-label={t("ui.logs.buff-band-toggle")}
+                className="analysis-row-toggle"
+                style={{ opacity: toggle.shown ? 1 : 0.35 }}
+                onClick={(event: React.MouseEvent) => {
+                  event.stopPropagation();
+                  toggle.onToggle();
+                }}
+                onKeyDown={(event: React.KeyboardEvent) => {
+                  if (event.key !== "Enter" && event.key !== " ") return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  toggle.onToggle();
+                }}
+              >
+                {toggle.shown ? <Eye size={14} weight="fill" /> : <EyeSlash size={14} />}
+              </Box>
+            )}
             <Text role="cell" className="analysis-name">
               {renderLabel ? renderLabel(row) : row.label}
             </Text>

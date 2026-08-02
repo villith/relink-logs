@@ -34,10 +34,13 @@ describe("MetricTable", () => {
     expect(parseFloat(bars[1].style.width)).toBeCloseTo(100 / 3, 6);
   });
 
-  it("ranks rows from one", () => {
-    renderTable();
-    expect(screen.getByText("1")).toBeTruthy();
-    expect(screen.getByText("2")).toBeTruthy();
+  it("draws no rank number", () => {
+    // Rows are already ordered and the bar shows the magnitude; a rank column
+    // repeats what the order says and steals width from the name.
+    const { container } = renderTable();
+    expect(container.querySelectorAll(".analysis-rank")).toHaveLength(0);
+    expect(screen.queryByText("1")).toBeNull();
+    expect(screen.queryByText("2")).toBeNull();
   });
 
   it("colours a bar from its row's slot, not its position", () => {
