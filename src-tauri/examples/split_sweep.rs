@@ -68,8 +68,7 @@ fn main() -> Result<()> {
         let offenders: Vec<(u32, Vec<(u32, u64)>)> = pairs
             .into_iter()
             .filter(|(_, parents)| {
-                parents.len() > 1
-                    && parents.keys().any(|p| protocol::is_player_slot_key(*p))
+                parents.len() > 1 && parents.keys().any(|p| protocol::is_player_slot_key(*p))
             })
             .map(|(src, parents)| (src, parents.into_iter().collect()))
             .collect();

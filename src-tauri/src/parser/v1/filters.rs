@@ -62,7 +62,9 @@ pub struct SelectionFilter {
 /// player who called it, and pinning that player must keep it.
 pub fn matches_selection(event: &DamageEvent, selection: &SelectionFilter) -> bool {
     if !selection.source_indices.is_empty()
-        && !selection.source_indices.contains(&event.source.parent_index)
+        && !selection
+            .source_indices
+            .contains(&event.source.parent_index)
     {
         return false;
     }
@@ -232,4 +234,3 @@ mod tests {
         ));
     }
 }
-

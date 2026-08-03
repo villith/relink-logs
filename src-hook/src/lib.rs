@@ -252,4 +252,3 @@ fn entry() {
     install_panic_hook();
     std::thread::spawn(setup);
 }
-

@@ -478,4 +478,3 @@ mod tests {
         assert_eq!(audit_overmastery(Some(&info)), vec![]);
     }
 }
-

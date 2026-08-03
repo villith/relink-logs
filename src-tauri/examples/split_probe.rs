@@ -26,7 +26,8 @@ fn main() -> Result<()> {
     }
 
     let conn = Connection::open(&db_path)?;
-    let blob: Vec<u8> = conn.query_row("SELECT data FROM logs WHERE id = ?", [log_id], |r| r.get(0))?;
+    let blob: Vec<u8> =
+        conn.query_row("SELECT data FROM logs WHERE id = ?", [log_id], |r| r.get(0))?;
     let mut encounter = Encounter::from_blob(&blob)?;
     encounter.repopulate_event_log();
 
@@ -39,7 +40,9 @@ fn main() -> Result<()> {
     let mut buckets: BTreeMap<u32, Vec<i64>> = BTreeMap::new();
 
     for (ts, msg) in &all {
-        let protocol::Message::DamageEvent(event) = msg else { continue };
+        let protocol::Message::DamageEvent(event) = msg else {
+            continue;
+        };
         let idx = event.source.parent_index;
         let secs = (ts - start) / 1000;
         let entry = seen
@@ -51,7 +54,11 @@ fn main() -> Result<()> {
         buckets.entry(idx).or_default().push(secs);
     }
 
-    println!("=== log {log_id}: {} events over {}s", all.len(), (all.last().map(|(t,_)| *t).unwrap_or(0) - start)/1000);
+    println!(
+        "=== log {log_id}: {} events over {}s",
+        all.len(),
+        (all.last().map(|(t, _)| *t).unwrap_or(0) - start) / 1000
+    );
     for (idx, (first, last, hits, ty)) in &seen {
         println!(
             "  parent_index={idx} ({idx:#010x}) type={ty:#010x} hits={hits} first=+{first}s last=+{last}s"
@@ -63,7 +70,9 @@ fn main() -> Result<()> {
     println!("--- source.index -> parent_index pairings ---");
     let mut pairs: BTreeMap<(u32, u32), BTreeMap<u32, u64>> = BTreeMap::new();
     for (_, msg) in &all {
-        let protocol::Message::DamageEvent(e) = msg else { continue };
+        let protocol::Message::DamageEvent(e) = msg else {
+            continue;
+        };
         *pairs
             .entry((e.source.index, e.source.actor_type))
             .or_default()

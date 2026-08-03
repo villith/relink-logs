@@ -101,12 +101,18 @@ fn main() -> Result<()> {
                 // summons — the reported case's family.
                 if matches!(summon.summon_id, 0xe4b7_dcf9 | 0xf2be_819e) {
                     *behemoth_levels
-                        .entry(format!("{:08x} bonus {:08x}", summon.summon_id, summon.bonus_id))
+                        .entry(format!(
+                            "{:08x} bonus {:08x}",
+                            summon.summon_id, summon.bonus_id
+                        ))
                         .or_default()
                         .entry(summon.bonus_level)
                         .or_default() += 1;
                 }
-                if entry.bonuses.level_weight(summon.bonus_id, summon.bonus_level) == Some(0)
+                if entry
+                    .bonuses
+                    .level_weight(summon.bonus_id, summon.bonus_level)
+                    == Some(0)
                     && entry
                         .bonuses
                         .top_level(summon.bonus_id)
@@ -128,12 +134,18 @@ fn main() -> Result<()> {
     }
 
     println!("summon readings with a bonus: {readings}\n");
-    println!("SHIPPED summon rules firing ({} distinct configs):", fired.len());
+    println!(
+        "SHIPPED summon rules firing ({} distinct configs):",
+        fired.len()
+    );
     for (key, (count, players, logs)) in &fired {
         println!("  {count:4}x  {key}\n         players {players:?} logs {logs:?}");
     }
 
-    println!("\nin-lot bonuses BELOW their window ({} distinct):", below.len());
+    println!(
+        "\nin-lot bonuses BELOW their window ({} distinct):",
+        below.len()
+    );
     for (key, (count, players, logs)) in &below {
         println!("  {count:4}x  {key}  players {players:?} logs {logs:?}");
     }

@@ -579,4 +579,3 @@ mod gate_tests {
         assert!(in_quest_from_flow(false, 0, None));
     }
 }
-

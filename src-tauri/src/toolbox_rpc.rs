@@ -689,4 +689,3 @@ mod tests {
         assert_eq!(hook.snapshot().state, HookState::Disconnected);
     }
 }
-

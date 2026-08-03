@@ -94,4 +94,3 @@ fn variant(event: &Message) -> &'static str {
         Message::StatusRemove(_) => "StatusRemove",
     }
 }
-
