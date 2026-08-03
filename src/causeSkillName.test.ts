@@ -1,12 +1,18 @@
 import i18n from "i18next";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
+import { setSkillNameResolutionMode, setSkillNameSources } from "./skillNameSources";
 import { causeSkillName } from "./utils";
 
 beforeAll(async () => {
   await i18n.init({
     lng: "en",
+    fallbackLng: "en",
     resources: {
+      fr: {
+        translation: {},
+        abilities: { ab127001: { text: "Mise à mort" } },
+      },
       en: {
         translation: {
           skills: {
@@ -23,6 +29,7 @@ beforeAll(async () => {
             default: { "9999": "Sigil/Trait Effect", "800": "Chain Burst" },
           },
         },
+        abilities: { ab127001: { text: "Slow Kill" } },
       },
     },
     interpolation: { escapeValue: false },
@@ -71,5 +78,37 @@ describe("causeSkillName", () => {
 
   it("answers empty when nothing names the cause", () => {
     expect(causeSkillName(["Pl2000"], 3300)).toBe("");
+  });
+});
+
+describe("causeSkillName across languages (language-first mode)", () => {
+  beforeAll(() => {
+    // Pl2700's 1000 carries BOTH an en hand label (above) and a bridge entry —
+    // the coexistence the language-major order resolves per language. The mode
+    // is an opt-in: label-first is the shipped default.
+    setSkillNameResolutionMode("language-first");
+    setSkillNameSources({
+      Pl2700: { "1000": { ns: "abilities", hash: "ab127001", key: "AB_PL2700_01" } },
+    });
+  });
+
+  afterAll(() => setSkillNameResolutionMode("label-first"));
+
+  afterEach(async () => {
+    await i18n.changeLanguage("en");
+  });
+
+  it("prefers the current language's bridge name over a foreign hand label", async () => {
+    await i18n.changeLanguage("fr");
+    expect(causeSkillName(["Pl2700"], 1000)).toBe("Mise à mort");
+  });
+
+  it("keeps the en hand label first while en is the language", () => {
+    expect(causeSkillName(["Pl2700"], 1000)).toBe("Slow Kill (Uncharged - Melee)");
+  });
+
+  it("carries the language-major order through the decade retry", async () => {
+    await i18n.changeLanguage("fr");
+    expect(causeSkillName(["Pl2700"], 1003)).toBe("Mise à mort");
   });
 });

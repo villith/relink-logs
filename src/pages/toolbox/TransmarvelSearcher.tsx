@@ -29,6 +29,7 @@ import ToolPage from "./ToolPage";
 import useTransmarvelSearcher, {
   EntryHits,
   familyCombos,
+  MAX_ROLLS,
   MAX_WISHED_TIER,
   parseSigilPickerValue,
   POOL,
@@ -43,10 +44,6 @@ import useTransmarvelSearcher, {
 /** Pool traits are stored as lowercase hex strings (the wishlist's key
  * shape); rolled outcomes carry the trait as a number. */
 const hex = (h: string) => parseInt(h, 16);
-
-/** Most rolls one prediction may simulate (mirrored by the backend clamp in
- * predict_transmarvel). */
-export const MAX_ROLLS = 50000;
 
 /** Most result rows actually rendered — a full 50k-row table would hang the
  * webview. Matching and the first-hit line still cover every roll; the

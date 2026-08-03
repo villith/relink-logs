@@ -61,4 +61,3 @@ describe("ChartLegend", () => {
     expect(container.querySelectorAll("[data-legend-swatch]")).toHaveLength(0);
   });
 });
-

@@ -20,7 +20,9 @@ describe("toBands", () => {
   it("clamps a band that overruns the window", () => {
     // An unclosed interval ends at the fight end, but a scrub window can be
     // shorter than the interval at either edge.
-    expect(toBands([{ startMs: 8_000, endMs: 99_000 }], WINDOW)).toEqual([{ startMs: 8_000, endMs: 10_000, stacks: 1 }]);
+    expect(toBands([{ startMs: 8_000, endMs: 99_000 }], WINDOW)).toEqual([
+      { startMs: 8_000, endMs: 10_000, stacks: 1 },
+    ]);
   });
 
   it("drops a band entirely outside the window", () => {

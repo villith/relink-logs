@@ -66,4 +66,3 @@ export const MetricTabs = ({ tabs, value, onChange }: MetricTabsProps) => {
     </Box>
   );
 };
-

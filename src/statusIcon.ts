@@ -1,4 +1,5 @@
 import statusMap from "./assets/game-icons/status-map.json";
+import { iconsByName } from "./iconMap";
 
 /**
  * Resolves a numeric status effect id to its buff/debuff icon.
@@ -20,9 +21,7 @@ const ICONS = import.meta.glob<string>("./assets/game-icons/status/*.png", {
   import: "default",
 });
 
-const BY_NAME = new Map(
-  Object.entries(ICONS).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1, -".png".length), url])
-);
+const BY_NAME = iconsByName(ICONS);
 
 /** The icon URL for a status effect id, or `undefined` when there is no art for it. */
 export const statusIconUrl = (statusId: number): string | undefined => {

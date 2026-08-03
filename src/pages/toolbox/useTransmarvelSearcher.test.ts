@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { TransmarvelRoll } from "@/types";
 
+import { DEFAULT_ROLLS } from "@/stores/useTransmarvelWishlistStore";
+
 import {
   MAX_ENTRY_HITS,
+  MAX_ROLLS,
   POOL,
   SigilEntry,
   TransmarvelPool,
@@ -11,6 +14,7 @@ import {
   familyCombos,
   matchRolls,
   parseSigilPickerValue,
+  sanitizeRolls,
   sanitizeWishlists,
   sigilPickerOptions,
   sigilPickerValue,
@@ -282,6 +286,21 @@ describe("per-entry hits", () => {
     ]);
     expect(matchRolls(rolls, [], [], POOL_DOUBLE).sigilHits).toEqual([]);
     expect(matchRolls(rolls, [], [], POOL_DOUBLE).stoneHits).toEqual([]);
+  });
+});
+
+describe("sanitizeRolls", () => {
+  it("keeps a count the field itself could have stored", () => {
+    expect(sanitizeRolls(1)).toBe(1);
+    expect(sanitizeRolls(120)).toBe(120);
+    expect(sanitizeRolls(MAX_ROLLS)).toBe(MAX_ROLLS);
+  });
+
+  it("falls back to the default for anything else", () => {
+    // 0 is the cleared input; the rest are hand-edited rows or an older shape.
+    for (const bad of [undefined, null, 0, -5, MAX_ROLLS + 1, 12.5, "50", NaN]) {
+      expect(sanitizeRolls(bad)).toBe(DEFAULT_ROLLS);
+    }
   });
 });
 

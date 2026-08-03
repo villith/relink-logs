@@ -18,7 +18,11 @@ vi.mock("@/utils", async () => {
   };
 });
 
-const ENCOUNTER = { startTime: 1_700_000_000_000, endTime: 1_700_000_252_000, totalDamage: 48_200_000 } as EncounterState;
+const ENCOUNTER = {
+  startTime: 1_700_000_000_000,
+  endTime: 1_700_000_252_000,
+  totalDamage: 48_200_000,
+} as EncounterState;
 
 const renderIt = (props: Partial<React.ComponentProps<typeof QuestSummary>> = {}) =>
   render(

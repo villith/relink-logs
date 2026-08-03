@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReferenceArea } from "recharts";
 
-import { humanizeNumbers } from "@/utils";
+import { humanizeNumber } from "@/utils";
 
 import { DPS_BUCKET_MS, type ChartDatapoint, type Label } from "../DetailCharts";
 import { bandOpacity, type Band } from "../statusBands";
@@ -12,6 +12,17 @@ import { bandOpacity, type Band } from "../statusBands";
 import { ChartLegend } from "./ChartLegend";
 import "./analysis.css";
 import { windowFromDrag } from "./scopeWindow";
+
+/** How a plotted value reads as text.
+ *
+ * One spelling for both readers of it — the axis/tooltip `valueFormatter` and
+ * the custom tooltip rows — which have to agree or the same point reads two
+ * ways depending on where the cursor is. */
+export const formatChartValue = (format: DpsChartProps["format"], value: number): string => {
+  if (format === "percent") return `${value}%`;
+  if (format === "count") return String(value);
+  return humanizeNumber(value);
+};
 
 export type DpsChartProps = {
   /** Already sliced to the committed window, so the chart IS the window. */
@@ -98,12 +109,6 @@ export const ChartTooltip = ({
         {label}
       </Text>
       {landed.map((item) => {
-        const [n, suffix] =
-          format === "percent"
-            ? [item.value as number, "%"]
-            : format === "count"
-              ? [item.value as number, ""]
-              : humanizeNumbers(item.value as number);
         return (
           // Keyed by dataKey (the actor index), not name: two players can
           // share a display label, and React drops the duplicate row.
@@ -111,8 +116,7 @@ export const ChartTooltip = ({
             <Text component="span" c={item.color as string}>
               {labelByKey.get(String(item.name)) ?? String(item.name)}
             </Text>
-            : {n}
-            {suffix}
+            : {formatChartValue(format, item.value as number)}
           </Text>
         );
       })}
@@ -221,12 +225,7 @@ export const DpsChart = ({
     // ChartLegend.
     withLegend: false,
     series: shownSeries,
-    valueFormatter: (value: number) => {
-      if (format === "percent") return `${value}%`;
-      if (format === "count") return String(value);
-      const [n, suffix] = humanizeNumbers(value);
-      return `${n}${suffix}`;
-    },
+    valueFormatter: (value: number) => formatChartValue(format, value),
     yAxisProps: { width: 60 },
     xAxisProps: { interval: "preserveStartEnd" as const },
   };
@@ -318,4 +317,3 @@ export const DpsChart = ({
     </Box>
   );
 };
-

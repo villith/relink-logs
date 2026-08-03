@@ -64,4 +64,3 @@ describe("buildSeriesPoints", () => {
     expect(buildSeriesPoints({ source: {}, len: 0, keys: [1], smoothing: 1, scale: 1 })).toEqual([]);
   });
 });
-

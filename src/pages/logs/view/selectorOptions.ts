@@ -71,4 +71,3 @@ export const deriveSelectorOptions = (facts: SelectionFact[], pins: SelectorPins
     abilities: distinct(survivors(keyed, pins, "ability").map(({ key }) => key)),
   };
 };
-

@@ -175,8 +175,9 @@ export type StatusInterval = {
   endMs: number;
   /** Peak stacks within the window. Carried for the chart, which is where a
    * stack count belongs — it varies over the window, so a table cell cannot
-   * say anything true about it. Every interval currently reports 1: the hook
-   * cannot yet tell which status classes hold a real count. */
+   * say anything true about it. A status the generated `status_levels` table
+   * does not mark HasLevels reports 1: whatever sits at the count offset for
+   * those is not a count (see `stacks_for` in the hook). */
   maxStacks: number;
   /** Which enemy SPAWN held this, as an index into `targetEntries`. Null for a
    * player, and for an enemy the segmenter skipped (a phantom marker actor).
@@ -640,6 +641,10 @@ export type Log = {
    * source app never recorded. Optional so a backend older than the field
    * (dev HMR skew) reads as "not imported" rather than breaking the list. */
   imported?: boolean;
+  /** Id of the first run of the Repeat Quest chain this log belongs to (null
+   * on the chain's first run and on unchained logs). Optional for the same
+   * backend-skew reason as `imported`: absent reads as "not chained". */
+  repeatGroup?: number | null;
 };
 
 /** Result of merging another installation's logs.db into ours
@@ -986,4 +991,3 @@ export type LegalitySweepProgress = {
   done: number;
   total: number;
 };
-

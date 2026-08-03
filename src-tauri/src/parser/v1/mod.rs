@@ -29,9 +29,9 @@ mod skill_state;
 mod status;
 
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
-pub use status::{assemble_intervals, StatusInterval};
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::PlayerState;
+pub use status::{assemble_intervals, StatusInterval};
 
 pub struct AdjustedDamageInstance<'a> {
     pub event: &'a DamageEvent,
@@ -2112,11 +2112,70 @@ pub struct TargetChartSeries {
     pub values: Vec<i32>,
 }
 
+/// The hits from one source that a drill-down chart counts, in log order, as
+/// `(position in the log, bucket, remapped event)`.
+///
+/// The gate chain the drill charts share, written once: phantom targets, the
+/// contested-source filter, the optional ability pin, the dragon-form remap,
+/// the target spans and the bucket bounds. Each chart's own docs promise that
+/// its area equals the total the table reports — a promise only as good as
+/// these gates agreeing, which hand-kept copies of them cannot guarantee.
+///
+/// `ability` is applied BEFORE the remap, which is safe because the remap
+/// rewrites only the event's source, never its `action_id` — and it keeps the
+/// clone off the hits the pin rejects.
+#[allow(clippy::too_many_arguments)]
+fn counted_hits<'a>(
+    events: &'a [(i64, Message)],
+    player_data: &'a [Option<PlayerData>; 4],
+    source_index: u32,
+    ability: Option<ActionType>,
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+    target_spans: &'a [TargetSpan],
+    filters: MeterFilters,
+) -> impl Iterator<Item = (usize, usize, DamageEvent)> + 'a {
+    let phantoms = PhantomTargets::learned_from(events.iter());
+
+    events
+        .iter()
+        .enumerate()
+        .filter_map(move |(position, (timestamp, event))| {
+            let Message::DamageEvent(damage_event) = event else {
+                return None;
+            };
+
+            if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
+                return None;
+            }
+            if ability.is_some_and(|pinned| damage_event.action_id != pinned) {
+                return None;
+            }
+
+            let damage_event = remap_dragon_form(player_data, damage_event);
+            if damage_event.source.parent_index != source_index {
+                return None;
+            }
+
+            let rel_ts = timestamp - start_time;
+            if !target_selected(rel_ts, &damage_event, target_spans) {
+                return None;
+            }
+
+            let bucket = (rel_ts / interval) as usize;
+            if bucket >= chart_len {
+                return None;
+            }
+
+            Some((position, bucket, damage_event))
+        })
+}
+
 /// Damage buckets for one player, split by breakdown row.
 ///
-/// Every gate the meter applies is applied here too — phantom targets, the
-/// contested-source filter, the dragon-form remap and the target spans — so the
-/// chart's area equals the total the table reports. Bands come back largest
+/// Every gate the meter applies is applied here too — see [`counted_hits`] — so
+/// the chart's area equals the total the table reports. Bands come back largest
 /// first, which is also the table's order.
 ///
 /// `chart_len` must be sized from the FULL log duration, exactly as
@@ -2132,40 +2191,26 @@ pub fn build_ability_damage_chart(
     target_spans: &[TargetSpan],
     filters: MeterFilters,
 ) -> Vec<AbilityChartSeries> {
-    let phantoms = PhantomTargets::learned_from(events.iter());
     // One keying per call: it is stateful and must see this player's hits in log
     // order, which is exactly what walking the log once gives it.
     let mut keying = player_state::BreakdownKeying::default();
     let mut series: Vec<AbilityChartSeries> = Vec::new();
 
-    for (timestamp, event) in events {
-        let Message::DamageEvent(damage_event) = event else {
-            continue;
-        };
-
-        if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
-            continue;
-        }
-
-        let damage_event = remap_dragon_form(player_data, damage_event);
-        if damage_event.source.parent_index != source_index {
-            continue;
-        }
-
-        let rel_ts = timestamp - start_time;
-        if !target_selected(rel_ts, &damage_event, target_spans) {
-            continue;
-        }
-
-        let bucket = (rel_ts / interval) as usize;
-        if bucket >= chart_len {
-            continue;
-        }
-
+    for (_, bucket, damage_event) in counted_hits(
+        events,
+        player_data,
+        source_index,
+        None,
+        start_time,
+        interval,
+        chart_len,
+        target_spans,
+        filters,
+    ) {
         let (action_type, child_character_type) = keying.key_for(&damage_event);
-        let found = series
-            .iter_mut()
-            .find(|s| s.action_type == action_type && s.child_character_type == child_character_type);
+        let found = series.iter_mut().find(|s| {
+            s.action_type == action_type && s.child_character_type == child_character_type
+        });
         let band = match found {
             Some(band) => band,
             None => {
@@ -2181,7 +2226,8 @@ pub fn build_ability_damage_chart(
     }
 
     // Stable, so bands with equal totals keep the order they first landed in.
-    series.sort_by_key(|band| std::cmp::Reverse(band.values.iter().map(|v| *v as i64).sum::<i64>()));
+    series
+        .sort_by_key(|band| std::cmp::Reverse(band.values.iter().map(|v| *v as i64).sum::<i64>()));
     series
 }
 
@@ -2213,36 +2259,19 @@ pub fn build_target_damage_chart(
     target_spans: &[TargetSpan],
     filters: MeterFilters,
 ) -> Vec<TargetChartSeries> {
-    let phantoms = PhantomTargets::learned_from(events.iter());
     let mut values_by_segment: Vec<Option<Vec<i32>>> = vec![None; segments.len()];
 
-    for (position, (timestamp, event)) in events.iter().enumerate() {
-        let Message::DamageEvent(damage_event) = event else {
-            continue;
-        };
-
-        if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
-            continue;
-        }
-        if damage_event.action_id != ability {
-            continue;
-        }
-
-        let damage_event = remap_dragon_form(player_data, damage_event);
-        if damage_event.source.parent_index != source_index {
-            continue;
-        }
-
-        let rel_ts = timestamp - start_time;
-        if !target_selected(rel_ts, &damage_event, target_spans) {
-            continue;
-        }
-
-        let bucket = (rel_ts / interval) as usize;
-        if bucket >= chart_len {
-            continue;
-        }
-
+    for (position, bucket, damage_event) in counted_hits(
+        events,
+        player_data,
+        source_index,
+        Some(ability),
+        start_time,
+        interval,
+        chart_len,
+        target_spans,
+        filters,
+    ) {
         let Some(Some(segment)) = assignment.get(position) else {
             continue;
         };
@@ -2262,7 +2291,8 @@ pub fn build_target_damage_chart(
         })
         .collect();
 
-    charts.sort_by_key(|band| std::cmp::Reverse(band.values.iter().map(|v| *v as i64).sum::<i64>()));
+    charts
+        .sort_by_key(|band| std::cmp::Reverse(band.values.iter().map(|v| *v as i64).sum::<i64>()));
     if charts.len() > HP_CHART_MAX_SERIES {
         log::info!(
             "target drill chart: showing the {HP_CHART_MAX_SERIES} biggest of {} spawns hit",
@@ -2336,6 +2366,15 @@ pub struct Parser {
     /// The manager dtor rarely fires, so this is the primary "cleared" signal.
     #[serde(skip)]
     active_run_completed: bool,
+
+    /// Id of the first saved run of the current Repeat Quest chain. Set by the
+    /// first completed save after a quest load and stamped onto every later
+    /// normal save, until a boundary that implies leaving the chain (quest
+    /// load, wipe/retire, training, Conflux) clears it. Repeat runs are
+    /// exactly the runs that start without a quest load in between — the game
+    /// skips `on_load_quest_state` on Repeat Quest.
+    #[serde(skip)]
+    repeat_chain_anchor: Option<i64>,
 
     /// The party's verdicts as last computed, so the per-hit identity path can
     /// re-broadcast them without re-auditing four builds. Recomputed only when
@@ -2629,6 +2668,10 @@ impl Parser {
         self.encounter.quest_timer = None;
         self.encounter.quest_completed = false;
         self.encounter.reset_player_data();
+        // A quest load is the Repeat Quest chain boundary (repeat runs are
+        // exactly the ones that load WITHOUT passing here). Cleared after the
+        // save above so a chained run cut by this load still joins its chain.
+        self.repeat_chain_anchor = None;
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("on-area-enter", &self.derived_state);
@@ -2696,6 +2739,13 @@ impl Parser {
             if self.has_damage() {
                 match self.save_encounter_to_db() {
                     Ok(id) => {
+                        // First completed save since the last quest load: the
+                        // parent every later run of a Repeat Quest chain
+                        // groups under (the save above already stamped the
+                        // PREVIOUS anchor, so the parent row itself is NULL).
+                        if self.repeat_chain_anchor.is_none() {
+                            self.repeat_chain_anchor = id;
+                        }
                         if let Some(window) = &self.window_handle {
                             let _ = window.emit("encounter-saved", id);
                         }
@@ -2720,6 +2770,13 @@ impl Parser {
         // above (the save reads player_data for the p1..p4 columns); every player's
         // identity is re-announced with their damage, so the next quest repopulates.
         self.encounter.reset_player_data();
+
+        // A Repeat Quest chain never revisits the quest-load boundary, so per-run
+        // state must also die here: the next chained run records its own clear
+        // time (keep-the-max made nine 109–137s clears all store a stale 142),
+        // and a wipe on a later run must not read as completed.
+        self.encounter.quest_timer = None;
+        self.encounter.quest_completed = false;
     }
 
     /// A training session started, which also tears down the previous one.
@@ -2730,6 +2787,9 @@ impl Parser {
     /// quest and would silently suppress every training save.
     pub fn on_trial_start_event(&mut self) {
         self.on_trial_end_event();
+        // Training loads without a quest load, but it is no repeat of the
+        // quest completed before it.
+        self.repeat_chain_anchor = None;
         self.reset();
     }
 
@@ -2786,6 +2846,13 @@ impl Parser {
         // Same rationale as the quest-complete boundary: actor indices are reused
         // across quests, so stale identities must die here (after the save above).
         self.encounter.reset_player_data();
+
+        // Quest boundary: the same per-run clears as the completion path. The
+        // wipe/retire also ends any Repeat Quest chain — continuing from here
+        // goes through a full quest load.
+        self.encounter.quest_timer = None;
+        self.encounter.quest_completed = false;
+        self.repeat_chain_anchor = None;
     }
 
     /// Starts the encounter (discard stale state, set the start time, mark
@@ -3409,6 +3476,10 @@ impl Parser {
                 self.update_status(ParserStatus::Stopped);
                 self.save_and_emit_encounter();
             }
+            // Conflux room loads suppress the quest-load boundary, so end any
+            // Repeat Quest chain here instead (after the leftover save above,
+            // which may itself belong to that chain).
+            self.repeat_chain_anchor = None;
 
             // Close out any prior run before opening the new one (defensive: normally the
             // manager dtor already finalized it). Superseded by a new run → not "completed".
@@ -3575,6 +3646,14 @@ impl Parser {
             self.encounter.quest_timer = None;
         }
 
+        // Conflux rooms group by run_id/room_index instead; only normal quest
+        // rows join a Repeat Quest chain.
+        let repeat_group = if run_id.is_none() {
+            self.repeat_chain_anchor
+        } else {
+            None
+        };
+
         let encounter_data = self.encounter.to_blob()?;
 
         let p1 = self.encounter.player_data[0].as_ref();
@@ -3605,8 +3684,9 @@ impl Parser {
                         run_id,
                         room_index,
                         total_damage,
-                        legality_rules_version
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+                        legality_rules_version,
+                        repeat_group
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
                 params![
                     "",
                     start_datetime.timestamp_millis(),
@@ -3632,7 +3712,8 @@ impl Parser {
                     // unstamped log reads as stale, so every fresh save would
                     // be re-audited on the next launch and the write below
                     // would be wasted work.
-                    crate::legality::RULES_VERSION
+                    crate::legality::RULES_VERSION,
+                    repeat_group
                 ],
             )?;
 
@@ -4421,12 +4502,13 @@ mod tests {
         // The invariant that makes the chart trustworthy: a band's area is part
         // of the row total beneath it, so the whole stack is the player total.
         let mut parser = Parser::default();
-        for (timestamp, action, damage) in [(1_000, 100, 1_000), (2_000, 200, 300), (2_500, 100, 500)]
+        for (timestamp, action, damage) in
+            [(1_000, 100, 1_000), (2_000, 200, 300), (2_500, 100, 500)]
         {
-            parser
-                .encounter
-                .raw_event_log
-                .push((timestamp, Message::DamageEvent(damage_from(PLAYER_HASH, action, damage))));
+            parser.encounter.raw_event_log.push((
+                timestamp,
+                Message::DamageEvent(damage_from(PLAYER_HASH, action, damage)),
+            ));
         }
         parser.reparse();
 
@@ -4446,7 +4528,13 @@ mod tests {
             .flat_map(|band| band.values.iter())
             .map(|value| *value as i64)
             .sum();
-        let table_total = parser.derived_state.party.values().next().unwrap().total_damage;
+        let table_total = parser
+            .derived_state
+            .party
+            .values()
+            .next()
+            .unwrap()
+            .total_damage;
         assert_eq!(charted, table_total as i64);
     }
 
@@ -4610,8 +4698,14 @@ mod tests {
         // `damage_from` carries stun_value 50.0, so two hits give a delta sum of
         // 100 against a message sum of 0 — the solo case.
         let events = vec![
-            (1_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
-            (3_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1)),
+            ),
+            (
+                3_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1)),
+            ),
         ];
 
         let chart = build_player_stun_chart(
@@ -4660,7 +4754,10 @@ mod tests {
         // is max(delta, messages), so the chart must pick a path — summing would
         // draw double the stun the table beneath it reports.
         let events = vec![
-            (1_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1)),
+            ),
             stun_message(1_000, 50.0),
         ];
 
@@ -4684,8 +4781,14 @@ mod tests {
         // The invariant that matters: a chart's area cannot disagree with the
         // row total it sits under.
         let events = vec![
-            (1_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
-            (2_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1)),
+            ),
+            (
+                2_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1)),
+            ),
             stun_message(2_500, 30.0),
         ];
 
@@ -4696,9 +4799,11 @@ mod tests {
                     let instance = AdjustedDamageInstance::from_damage_event(event, None);
                     state.process_damage_event(*timestamp, &instance);
                 }
-                Message::OnPlayerStun(event) => {
-                    state.process_stun_message(*timestamp, event.actor_index, event.stun_amount as f64)
-                }
+                Message::OnPlayerStun(event) => state.process_stun_message(
+                    *timestamp,
+                    event.actor_index,
+                    event.stun_amount as f64,
+                ),
                 _ => {}
             }
         }
@@ -4752,7 +4857,10 @@ mod tests {
     fn stun_chart_counts_a_stun_effect_proc_on_the_delta_path() {
         // Eugen's sticky grenade: real stun with no damage event of its own.
         let events = vec![
-            (1_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1))),
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1)),
+            ),
             (
                 2_000,
                 Message::OnStunEffect(protocol::OnPlayerStunEvent {
@@ -4778,7 +4886,10 @@ mod tests {
 
     #[test]
     fn stun_chart_rows_exist_only_for_the_given_players() {
-        let events = vec![(1_000, Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1)))];
+        let events = vec![(
+            1_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1)),
+        )];
 
         let chart = build_player_stun_chart(
             &events,
@@ -4893,10 +5004,14 @@ mod tests {
     }
 
     /// The result screen's frozen clear time is the authoritative number and
-    /// lands after the last tick the ticker managed to send.
+    /// lands after the last tick the ticker managed to send. Asserted on the
+    /// saved row: the in-memory timer is cleared at the quest boundary (Repeat
+    /// Quest chains never revisit the load boundary), so the save is where the
+    /// superseding is observable.
     #[test]
     fn the_clear_time_supersedes_the_last_tick() {
-        let mut parser = Parser::default();
+        let mut parser = parser_with_memory_db();
+        parser.on_damage_event(a_damage_event());
         parser.on_quest_elapsed_time(a_tick(230));
 
         parser.on_quest_complete_event(QuestCompleteEvent {
@@ -4904,21 +5019,32 @@ mod tests {
             elapsed_time_in_secs: 232,
         });
 
-        assert_eq!(parser.encounter.quest_timer, Some(232));
+        let conn = parser.db.as_ref().unwrap();
+        let timer: Option<u32> = conn
+            .query_row("SELECT quest_elapsed_time FROM logs", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(timer, Some(232));
     }
 
     /// An unknown quest id is no reason to throw away a known clear time.
     #[test]
     fn the_clear_time_survives_an_unknown_quest_id() {
-        let mut parser = Parser::default();
+        let mut parser = parser_with_memory_db();
+        parser.on_damage_event(a_damage_event());
 
         parser.on_quest_complete_event(QuestCompleteEvent {
             quest_id: 0,
             elapsed_time_in_secs: 180,
         });
 
-        assert_eq!(parser.encounter.quest_timer, Some(180));
-        assert_eq!(parser.encounter.quest_id, None, "id stays unknown");
+        let conn = parser.db.as_ref().unwrap();
+        let (quest_id, timer): (Option<u32>, Option<u32>) = conn
+            .query_row("SELECT quest_id, quest_elapsed_time FROM logs", [], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(timer, Some(180));
+        assert_eq!(quest_id, None, "id stays unknown");
     }
 
     /// The quest timer only advances within a quest, so a lower reading means
@@ -5800,9 +5926,19 @@ mod tests {
             .push_event(base + 20, Message::DamageEvent(other));
 
         let (_, assignment) = segment_targets_indexed(&parser.encounter.raw_event_log, base);
-        let facts = selection_facts(&parser.encounter.raw_event_log, base, None, None, &assignment);
+        let facts = selection_facts(
+            &parser.encounter.raw_event_log,
+            base,
+            None,
+            None,
+            &assignment,
+        );
 
-        assert_eq!(facts.len(), 2, "identical combinations collapse to one fact");
+        assert_eq!(
+            facts.len(),
+            2,
+            "identical combinations collapse to one fact"
+        );
         assert!(facts.iter().any(|f| f.ability == ActionType::Normal(777)));
     }
 
@@ -5929,7 +6065,10 @@ mod tests {
         };
         parser.reparse();
 
-        assert_eq!(parser.derived_state.total_damage, 200, "only the pinned ability counts");
+        assert_eq!(
+            parser.derived_state.total_damage, 200,
+            "only the pinned ability counts"
+        );
         assert_eq!(
             parser.derived_state.end_time, full_end,
             "the window still spans the whole fight"
@@ -6268,6 +6407,205 @@ mod tests {
             timer, None,
             "failed quest must not inherit quest A's 213s timer"
         );
+    }
+
+    /// A Repeat Quest chain never fires the quest-load boundary between runs
+    /// (live-confirmed 2026-08-03: one `on_load_quest_state` per chain), so
+    /// nothing per-run may rely on `on_area_enter_event` to clear it. The
+    /// keep-the-max rule in `record_in_game_time` made every chained run
+    /// faster than the slowest-so-far store the stale maximum (nine 142s rows
+    /// for 109–137s clears).
+    #[test]
+    fn chained_repeat_run_stores_its_own_faster_clear_time() {
+        let mut parser = parser_with_memory_db();
+
+        parser.on_area_enter_event(area_enter(0xAAAA));
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 0xAAAA,
+            elapsed_time_in_secs: 142,
+        });
+
+        // Repeat run: no quest load, damage opens the next encounter directly.
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 0xAAAA,
+            elapsed_time_in_secs: 109,
+        });
+
+        let conn = parser.db.as_ref().unwrap();
+        let timer: Option<u32> = conn
+            .query_row(
+                "SELECT quest_elapsed_time FROM logs ORDER BY id DESC LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(
+            timer,
+            Some(109),
+            "a chained run must store its own clear time, not the chain's max"
+        );
+    }
+
+    /// A wipe on a later run of a repeat chain: `quest_completed` and
+    /// `quest_timer` were last written by the previous run's completion, and
+    /// there is no load boundary in between to clear them.
+    #[test]
+    fn chained_repeat_wipe_is_not_marked_completed() {
+        let mut parser = parser_with_memory_db();
+
+        parser.on_area_enter_event(area_enter(0xAAAA));
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 0xAAAA,
+            elapsed_time_in_secs: 142,
+        });
+
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_fail_event(protocol::OnQuestFailEvent { quest_id: 0 });
+
+        let conn = parser.db.as_ref().unwrap();
+        let (completed, timer): (bool, Option<u32>) = conn
+            .query_row(
+                "SELECT quest_completed, quest_elapsed_time FROM logs ORDER BY id DESC LIMIT 1",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert!(!completed, "a wiped repeat run is not a clear");
+        assert_eq!(
+            timer, None,
+            "a wiped repeat run must not inherit the previous run's clear time"
+        );
+    }
+
+    /// Runs chained by Repeat Quest are recognisable as exactly the runs that
+    /// start without a quest load after a completion; they group under the
+    /// chain's first saved run.
+    #[test]
+    fn repeat_runs_group_under_the_chains_first_run() {
+        let mut parser = parser_with_memory_db();
+
+        parser.on_area_enter_event(area_enter(0xAAAA));
+        for elapsed in [142, 109, 120] {
+            parser.on_damage_event(a_damage_event());
+            parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+                quest_id: 0xAAAA,
+                elapsed_time_in_secs: elapsed,
+            });
+        }
+
+        let conn = parser.db.as_ref().unwrap();
+        let mut stmt = conn
+            .prepare("SELECT id, repeat_group FROM logs ORDER BY id")
+            .unwrap();
+        let rows: Vec<(i64, Option<i64>)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+            .unwrap()
+            .map(|r| r.unwrap())
+            .collect();
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0].1, None, "the chain's first run is a normal row");
+        assert_eq!(rows[1].1, Some(rows[0].0));
+        assert_eq!(rows[2].1, Some(rows[0].0));
+    }
+
+    /// A quest load is the chain boundary: the next completed quest starts a
+    /// fresh group instead of joining the previous one.
+    #[test]
+    fn a_quest_load_ends_the_repeat_chain() {
+        let mut parser = parser_with_memory_db();
+
+        parser.on_area_enter_event(area_enter(0xAAAA));
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 0xAAAA,
+            elapsed_time_in_secs: 142,
+        });
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 0xAAAA,
+            elapsed_time_in_secs: 109,
+        });
+
+        // Back to the counter: the next run is not a repeat of the chain.
+        parser.on_area_enter_event(area_enter(0xAAAA));
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 0xAAAA,
+            elapsed_time_in_secs: 130,
+        });
+
+        let conn = parser.db.as_ref().unwrap();
+        let group: Option<i64> = conn
+            .query_row(
+                "SELECT repeat_group FROM logs ORDER BY id DESC LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(group, None, "a load-started run belongs to no chain");
+    }
+
+    /// A wipe mid-chain still happened inside the chain — it joins the group
+    /// (and ends it; whatever follows goes through a quest load).
+    #[test]
+    fn a_wiped_repeat_run_joins_the_group() {
+        let mut parser = parser_with_memory_db();
+
+        parser.on_area_enter_event(area_enter(0xAAAA));
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 0xAAAA,
+            elapsed_time_in_secs: 142,
+        });
+
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_fail_event(protocol::OnQuestFailEvent { quest_id: 0 });
+
+        let conn = parser.db.as_ref().unwrap();
+        let rows: Vec<(i64, Option<i64>)> = {
+            let mut stmt = conn
+                .prepare("SELECT id, repeat_group FROM logs ORDER BY id")
+                .unwrap();
+            let rows = stmt
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))
+                .unwrap()
+                .map(|r| r.unwrap())
+                .collect();
+            rows
+        };
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[1].1, Some(rows[0].0), "the wipe belongs to the chain");
+    }
+
+    /// Training starts without a quest load, but it is not a repeat of the
+    /// quest completed before it.
+    #[test]
+    fn training_after_a_completion_is_not_part_of_a_chain() {
+        let mut parser = parser_with_memory_db();
+
+        parser.on_area_enter_event(area_enter(0xAAAA));
+        parser.on_damage_event(a_damage_event());
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 0xAAAA,
+            elapsed_time_in_secs: 142,
+        });
+
+        parser.on_trial_start_event();
+        parser.on_damage_event(a_damage_event());
+        parser.on_trial_end_event();
+
+        let conn = parser.db.as_ref().unwrap();
+        let group: Option<i64> = conn
+            .query_row(
+                "SELECT repeat_group FROM logs ORDER BY id DESC LIMIT 1",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(group, None, "a training session joins no quest chain");
     }
 
     #[test]

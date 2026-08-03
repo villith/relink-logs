@@ -36,4 +36,3 @@ export const DebugBar = ({ search, chart }: DebugBarProps) => {
     </Box>
   );
 };
-

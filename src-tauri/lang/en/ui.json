@@ -526,7 +526,9 @@
       "equipment": "Equipment",
       "builds": "Builds",
       "ai-companion": "AI",
-      "imported-tooltip": "This log was imported from another version of GBFR Logs and may be missing data that version never recorded."
+      "imported-tooltip": "This log was imported from another version of GBFR Logs and may be missing data that version never recorded.",
+      "repeat-chain-count": "×{{count}}",
+      "repeat-chain-tooltip": "Repeated quest — {{count}} runs chained with Repeat Quest. Click to expand or collapse."
     },
     "toolbox": {
       "title": "Toolbox",
@@ -766,6 +768,7 @@
     },
     "Pl0200": {
       "0": "Ares (Link attack bug)",
+      "9998": "Ares",
       "100": "Attack 1",
       "101": "Attack 2",
       "102": "Attack 3",
@@ -797,7 +800,6 @@
       "303": "Aerial Finisher",
       "400": "Launch",
       "410": "Aerial Barrage",
-      "9998": "Ares",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "finisher": "Finisher",
@@ -1599,8 +1601,8 @@
       "400": "Launch",
       "410": "Aerial Barrage",
       "1000": "Deathmatch Finale",
-      "1410": "Martial Spear Finisher",
       "11000": "Mode Change",
+      "1410": "Martial Spear Finisher",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "combo-finisher": "Combo Finisher",

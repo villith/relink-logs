@@ -85,9 +85,7 @@ describe("stun descriptor", () => {
         { action: 110, stun: 40, max: 25 },
       ]),
     ];
-    const rows = stun.rows(
-      input("skills", { source: 0, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, owner)
-    );
+    const rows = stun.rows(input("skills", { source: 0, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, owner));
 
     expect(rows.map((r) => r.key)).toEqual(["skill:Normal:100", "skill:Normal:110"]);
     expect(rows.map((r) => r.value)).toEqual([50, 40]);
@@ -128,4 +126,3 @@ describe("stun descriptor", () => {
     expect(rows[0].columns).toEqual(["80.0", "30.0"]);
   });
 });
-

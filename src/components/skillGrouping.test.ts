@@ -60,6 +60,8 @@ describe("skillGroupFor", () => {
   });
 
   it("leaves an unresolved child character ungrouped rather than guessing", () => {
-    expect(skillGroupFor({ actionType: { Normal: 120 }, childCharacterType: { Unknown: 7 } } as unknown as SkillState)).toBeNull();
+    expect(
+      skillGroupFor({ actionType: { Normal: 120 }, childCharacterType: { Unknown: 7 } } as unknown as SkillState)
+    ).toBeNull();
   });
 });

@@ -241,4 +241,3 @@ export const brushShade = (side: "left" | "right", widthPercent: number): React.
   background: "rgba(10, 10, 10, 0.55)",
   pointerEvents: "none",
 });
-
