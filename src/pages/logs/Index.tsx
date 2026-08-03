@@ -26,12 +26,13 @@ import {
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { WarningCircle } from "@phosphor-icons/react";
-import { Fragment, useMemo } from "react";
+import { CaretDown, CaretRight, WarningCircle } from "@phosphor-icons/react";
+import { Fragment, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import { PartyMember, partyMembers } from "./partyMembers";
+import { chainKey, groupRepeatChains } from "./repeatChains";
 import useIndex from "./useIndex";
 
 export const IndexPage = () => {
@@ -58,29 +59,49 @@ export const IndexPage = () => {
     }))
   );
 
-  const rows = searchResult.logs.map((log) => {
-    const primaryTarget = translateEnemyType(log.primaryTarget);
-    const members = partyMembers(log, { showDisplayNames: show_display_names, streamerMode: streamer_mode, t });
+  // Repeat Quest chains collapse under their first row in display order;
+  // expansion is per chain, keyed by the chain parent's id.
+  const [expandedChains, setExpandedChains] = useState<number[]>([]);
+  const toggleChain = (key: number) =>
+    setExpandedChains((old) => (old.includes(key) ? old.filter((k) => k !== key) : [...old, key]));
 
-    const resetSelectedTargets = () => {
-      setSelectedTargetSpans([]);
-    };
+  const chainGroups = useMemo(() => groupRepeatChains(searchResult.logs), [searchResult.logs]);
 
-    return (
-      <LogEntry
-        key={log.id}
-        log={log}
-        selectedLogIds={selectedLogIds}
-        setSelectedLogIds={setSelectedLogIds}
-        primaryTarget={primaryTarget}
-        members={members}
-        // Only when the user has asked to see verdicts at all. Withheld here
-        // rather than at the mark, so the row cannot colour what it was never
-        // given.
-        findings={show_flagged_builds ? searchResult.legality?.[log.id] : undefined}
-        resetSelectedTargets={resetSelectedTargets}
-      />
-    );
+  const rows = chainGroups.flatMap((group) => {
+    const key = chainKey(group.leader);
+    const expanded = expandedChains.includes(key);
+    const visible = expanded ? [group.leader, ...group.rest] : [group.leader];
+
+    return visible.map((log, position) => {
+      const primaryTarget = translateEnemyType(log.primaryTarget);
+      const members = partyMembers(log, { showDisplayNames: show_display_names, streamerMode: streamer_mode, t });
+
+      const resetSelectedTargets = () => {
+        setSelectedTargetSpans([]);
+      };
+
+      return (
+        <LogEntry
+          key={log.id}
+          log={log}
+          selectedLogIds={selectedLogIds}
+          setSelectedLogIds={setSelectedLogIds}
+          primaryTarget={primaryTarget}
+          members={members}
+          // Only when the user has asked to see verdicts at all. Withheld here
+          // rather than at the mark, so the row cannot colour what it was never
+          // given.
+          findings={show_flagged_builds ? searchResult.legality?.[log.id] : undefined}
+          resetSelectedTargets={resetSelectedTargets}
+          chain={
+            position === 0 && group.rest.length > 0
+              ? { count: group.rest.length + 1, expanded, onToggle: () => toggleChain(key) }
+              : undefined
+          }
+          chained={position > 0}
+        />
+      );
+    });
   });
 
   return (
@@ -246,6 +267,8 @@ function LogEntry({
   members,
   findings,
   resetSelectedTargets,
+  chain,
+  chained,
 }: {
   log: Log;
   selectedLogIds: number[];
@@ -256,6 +279,12 @@ function LogEntry({
    * them — which reads the same as a log nobody was flagged in. */
   findings?: StoredLegalityFinding[];
   resetSelectedTargets: () => void;
+  /** Present on the visible row of a collapsed/expanded Repeat Quest chain:
+   * how many runs it stands for, and the expand/collapse toggle. */
+  chain?: { count: number; expanded: boolean; onToggle: () => void };
+  /** True on the later rows of an expanded chain — indented under the row
+   * carrying the toggle. */
+  chained?: boolean;
 }): JSX.Element {
   const { t } = useTranslation();
 
@@ -273,7 +302,24 @@ function LogEntry({
         />
       </Table.Td>
       <Table.Td>
-        <Text size="xs">{epochToLocalTime(log.time)}</Text>
+        <Group gap={6} wrap="nowrap" pl={chained ? "lg" : undefined}>
+          {chain && (
+            <Tooltip label={t("ui.logs.repeat-chain-tooltip", { count: chain.count })} multiline w={280}>
+              <UnstyledButton
+                onClick={chain.onToggle}
+                aria-label={t("ui.logs.repeat-chain-tooltip", { count: chain.count })}
+              >
+                <Group gap={2} wrap="nowrap">
+                  {chain.expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
+                  <Text size="xs" fw={700}>
+                    {t("ui.logs.repeat-chain-count", { count: chain.count })}
+                  </Text>
+                </Group>
+              </UnstyledButton>
+            </Tooltip>
+          )}
+          <Text size="xs">{epochToLocalTime(log.time)}</Text>
+        </Group>
       </Table.Td>
       <Table.Td>
         <Text size="xs">{translateQuestId(log.questId)}</Text>

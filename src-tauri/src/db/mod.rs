@@ -75,6 +75,13 @@ pub fn migrations() -> Migrations<'static> {
         // can mark them: an imported log may lack data the source app never
         // recorded. Defaulted 0 — everything already here was recorded live.
         M::up("ALTER TABLE logs ADD COLUMN imported BOOLEAN NOT NULL DEFAULT 0"),
+        // Id of the FIRST run of a Repeat Quest chain, stamped on every later
+        // run of that chain (the first run itself stays NULL — it is a normal
+        // row other rows point at). Chained runs are the ones that start
+        // without a quest load after a completion; the quest list groups them
+        // under the parent. Not copied by import (ids are remapped on the way
+        // in, so a source's parent id would point at an unrelated row).
+        M::up("ALTER TABLE logs ADD COLUMN repeat_group INTEGER"),
     ])
 }
 

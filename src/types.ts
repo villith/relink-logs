@@ -640,6 +640,10 @@ export type Log = {
    * source app never recorded. Optional so a backend older than the field
    * (dev HMR skew) reads as "not imported" rather than breaking the list. */
   imported?: boolean;
+  /** Id of the first run of the Repeat Quest chain this log belongs to (null
+   * on the chain's first run and on unchained logs). Optional for the same
+   * backend-skew reason as `imported`: absent reads as "not chained". */
+  repeatGroup?: number | null;
 };
 
 /** Result of merging another installation's logs.db into ours
@@ -986,4 +990,3 @@ export type LegalitySweepProgress = {
   done: number;
   total: number;
 };
-
