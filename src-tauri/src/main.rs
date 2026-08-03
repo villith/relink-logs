@@ -898,7 +898,6 @@ async fn export_logs_db() -> Result<Option<String>, String> {
     })
 }
 
-
 #[tauri::command]
 async fn delete_all_logs() -> Result<(), String> {
     let conn = db::connect_to_db().map_err(|e| e.to_string())?;
@@ -1285,6 +1284,10 @@ struct EncounterStateResponse {
     /// another round trip. Empty on logs recorded before status capture.
     status_intervals: Vec<v1::StatusInterval>,
     dps_chart: HashMap<u32, Vec<i32>>,
+    /// Stun applied per DPS-chart bucket. Separate from `dps_chart` because
+    /// stun reconciles two capture paths with max(), not a sum — see
+    /// `build_player_stun_chart`.
+    stun_chart: HashMap<u32, Vec<f64>>,
     /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
     /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
     hp_chart: Vec<v1::HpChartSeries>,
@@ -1412,7 +1415,10 @@ fn build_drill_charts(
 /// capture paths reconcile with `max()` and its network messages carry no target
 /// at all, so a target-filtered stun chart would be a fiction; the SBA gauge has
 /// no decomposition.
-fn build_scoped_player_chart(parser: &v1::Parser, options: &ParseOptions) -> HashMap<u32, Vec<i32>> {
+fn build_scoped_player_chart(
+    parser: &v1::Parser,
+    options: &ParseOptions,
+) -> HashMap<u32, Vec<i32>> {
     if !options.selection.source_indices.is_empty()
         || (options.target_spans.is_empty() && options.selection.abilities.is_empty())
     {
@@ -1575,6 +1581,16 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         &options.selection.abilities,
         options.filters,
     );
+    let player_stun = v1::build_player_stun_chart(
+        &parser.encounter.raw_event_log,
+        &parser.encounter.player_data,
+        &player_indices,
+        start_time,
+        DPS_INTERVAL,
+        (duration / DPS_INTERVAL) as usize + 1,
+        &options.target_spans,
+        options.filters,
+    );
 
     let hp_chart = v1::build_target_hp_charts(
         &parser.encounter.raw_event_log,
@@ -1636,6 +1652,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         target_chart: Vec::new(),
         status_intervals,
         dps_chart: player_dps,
+        stun_chart: player_stun,
         hp_chart,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
         sba_chart_len: (duration / SBA_INTERVAL) as usize + 1,
