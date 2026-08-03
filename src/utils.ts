@@ -95,12 +95,35 @@ export const isSkillGroup = (
 ): row is ComputedSkillGroup & { actionType: { Group: string } } =>
   typeof row.actionType === "object" && Object.hasOwn(row.actionType, "Group");
 
+/** Bodies that swing on a player's behalf but never proc supplementary damage:
+ * Ferry's ghosts (Geegee/Beebee/Kikiriki/Nicola) and her Umlauf satellite.
+ *
+ * Named bodies only. A player wearing a different body is still the player —
+ * Id's transformation (`Pl2000`) and Cagliostro's clone both proc normally, and
+ * the game logs each proc under the body that earned it, which is how these two
+ * lists were told apart. */
+const SUP_INELIGIBLE_BODIES: readonly string[] = ["Pl0700Ghost", "Pl0700GhostSatellite"];
+
 /**
- * Only Normal skill hits can trigger supplementary damage — Link Attacks, Skybound
- * Arts and damage-over-time cannot. (Groups are frontend merges of Normal skills.)
+ * Whether a breakdown row's damage belongs in the Sup% eligible base.
+ *
+ * Only a player's own Normal skill hits can trigger supplementary damage. Link
+ * Attacks, Skybound Arts and damage-over-time cannot, and neither can the bodies
+ * that fight alongside them: Ferry's pets and summons deal Normal-typed damage
+ * but no proc is ever logged under either, so counting their damage only dilutes
+ * the number. (Groups are frontend merges of Normal skills, scoped to the body
+ * they came from, so the same two tests apply.)
  */
-export const isSupEligibleAction = (actionType: SkillState["actionType"]): boolean =>
-  typeof actionType === "object" && (Object.hasOwn(actionType, "Normal") || Object.hasOwn(actionType, "Group"));
+export const isSupEligibleRow = (skill: SkillRow): boolean => {
+  const { actionType } = skill;
+  if (typeof actionType !== "object") return false;
+  if (!Object.hasOwn(actionType, "Normal") && !Object.hasOwn(actionType, "Group")) return false;
+
+  if (isSummonHit(skill)) return false;
+  if ((actionType as { Group?: string }).Group === PRIMAL_BURST_GROUP) return false;
+
+  return !SUP_INELIGIBLE_BODIES.includes(String(skill.childCharacterType));
+};
 
 export type SupPercentages = {
   /** Supp damage relative to supp-eligible (Normal skill) damage — the proc-quality
@@ -108,7 +131,7 @@ export type SupPercentages = {
    * and a 100% proc rate this tops out at +60%. */
   eligible: number;
   /** Supp damage as a share of the player's total damage, ineligible sources
-   * (Link Attack, SBA, DoT) included. */
+   * (Link Attack, SBA, DoT, pets, summons) included. */
   overall: number;
 };
 
@@ -121,7 +144,7 @@ export const computeSupPercentage = (player: PlayerState): SupPercentages => {
   for (const skill of player.skillBreakdown) {
     if (isSupplementaryAction(skill.actionType)) {
       suppDamage += skill.totalDamage;
-    } else if (isSupEligibleAction(skill.actionType)) {
+    } else if (isSupEligibleRow(skill)) {
       eligibleDamage += skill.totalDamage;
     }
   }
@@ -824,16 +847,23 @@ export const PRIMAL_BURST_CLASSES: readonly string[] = ["5418b8f8", "32776c5b", 
 /** The skill-group key the three bodies condense into. */
 export const PRIMAL_BURST_GROUP = "primal-burst";
 
+/** True for a hit dealt by a called summon: every one of them reports the same
+ * shared summon-attack action from an unresolved `So####` body, which is what
+ * separates a summon from a player's own alternate body. */
+export const isSummonHit = (skill: SkillRow): boolean => {
+  if (typeof skill.actionType !== "object" || !Object.hasOwn(skill.actionType, "Normal")) return false;
+  if ((skill.actionType as { Normal: number }).Normal !== SUMMON_ATTACK_ACTION_ID) return false;
+
+  return summonBodyHash(skill.childCharacterType) !== null;
+};
+
 /** True for a summon hit dealt by one of the Primal Burst bodies. Owns the
  * hash-format detail (lowercase, zero-padded to eight) so callers never
  * re-derive it. */
 export const isPrimalBurstHit = (skill: SkillRow): boolean => {
-  if (typeof skill.actionType !== "object" || !Object.hasOwn(skill.actionType, "Normal")) return false;
-  if ((skill.actionType as { Normal: number }).Normal !== SUMMON_ATTACK_ACTION_ID) return false;
+  if (!isSummonHit(skill)) return false;
 
-  const bodyHash = summonBodyHash(skill.childCharacterType);
-
-  return bodyHash !== null && PRIMAL_BURST_CLASSES.includes(bodyHash);
+  return PRIMAL_BURST_CLASSES.includes(summonBodyHash(skill.childCharacterType)!);
 };
 
 /** The body-class hash of a summon hit, or null when the source is a real
