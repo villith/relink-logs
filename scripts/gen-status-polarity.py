@@ -16,6 +16,7 @@ Regeneration on a game update (GBFRDataTools = github.com/Nenkai/GBFRDataTools):
 
 import sqlite3
 import sys
+import textwrap
 from pathlib import Path
 
 OUT_PATH = (
@@ -59,24 +60,16 @@ def main() -> None:
         )
     ]
 
-    # Format with line wrapping to match Prettier's default behavior
-    id_strs = [str(status_id) for status_id in ids]
-    lines_list = []
-    current_line = "  "
-    for id_str in id_strs:
-        candidate = current_line + id_str + ", "
-        # Wrap if adding this ID would exceed the line limit
-        if len(candidate) > 120 and current_line != "  ":
-            lines_list.append(current_line[:-2] + ",")  # Remove trailing ", " and add ","
-            current_line = "  " + id_str + ", "
-        else:
-            current_line = candidate
-    # Add the last line
-    if current_line != "  ":
-        lines_list.append(current_line[:-2] + ",")  # Remove trailing ", " and add ","
-
-    formatted_ids = "\n".join(lines_list) + "\n"
-    OUT_PATH.write_text(HEADER.format(ids=formatted_ids), encoding="utf-8", newline="\n")
+    # Format with line wrapping to match .prettierrc's printWidth: 120
+    formatted_ids = textwrap.fill(
+        ", ".join(str(i) for i in ids) + ",",
+        width=120,
+        initial_indent="  ",
+        subsequent_indent="  ",
+    )
+    OUT_PATH.write_text(
+        HEADER.format(ids=formatted_ids + "\n"), encoding="utf-8", newline="\n"
+    )
     print(f"wrote {len(ids)} harmful status ids to {OUT_PATH}")
 
 
