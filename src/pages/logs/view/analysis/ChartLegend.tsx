@@ -56,4 +56,3 @@ export const ChartLegend = ({ entries, hidden, onToggle }: ChartLegendProps) => 
     </Box>
   );
 };
-

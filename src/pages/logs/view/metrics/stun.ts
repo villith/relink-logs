@@ -57,4 +57,3 @@ export const stun: MetricDescriptor = {
       .sort((a, b) => b.value - a.value);
   },
 };
-

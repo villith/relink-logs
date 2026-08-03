@@ -31,7 +31,9 @@ describe("formatChartDebug", () => {
     // Stun with a source pinned: the fetch is scoped, but no per-metric
     // decomposition exists, so the plot is still the base load's curves. A
     // chart=base line with scoped=1 is the fingerprint of that case.
-    expect(formatChartDebug({ ...FACTS, metric: "stun", scoped: true, chart: "base" })).toContain("chart=base series=4");
+    expect(formatChartDebug({ ...FACTS, metric: "stun", scoped: true, chart: "base" })).toContain(
+      "chart=base series=4"
+    );
     expect(formatChartDebug({ ...FACTS, metric: "stun", scoped: true, chart: "base" })).toContain("scoped=1");
   });
 

@@ -124,15 +124,15 @@ import { useShallow } from "zustand/react/shallow";
 // The charts, their geometry constants and the brush shading are shared with
 // the analysis view — one implementation, two callers.
 import {
-  brushShade,
-  ChartTooltip,
   CHART_MARGIN,
   CHART_Y_AXIS_WIDTH,
-  DetailCharts,
+  ChartTooltip,
   DPS_BUCKET_MS,
   DPS_SMOOTHING_WINDOW,
+  DetailCharts,
   HP_SERIES_COLORS,
   OverviewChart,
+  brushShade,
   type ChartDatapoint,
   type HpDatapoint,
   type Label,

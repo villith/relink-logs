@@ -24,4 +24,3 @@ export const rowLevelFor = (pins: SelectorPins): RowLevel => {
   if (pins.source !== null) return "abilities";
   return "players";
 };
-

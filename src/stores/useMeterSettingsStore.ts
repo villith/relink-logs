@@ -300,4 +300,3 @@ export const useMeterSettingsStore = create<MeterSettings & MeterStateFunctions>
 );
 
 registerDurableStore(useMeterSettingsStore);
-

@@ -161,4 +161,3 @@ export const actionsForPin = (key: string, skills: SkillRow[]): ActionType[] => 
   // sees an empty filter, which is the same thing the empty table shows.
   return parsed === null || groupOfPin(key) !== null ? [] : [parsed];
 };
-

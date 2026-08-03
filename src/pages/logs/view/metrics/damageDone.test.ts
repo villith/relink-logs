@@ -296,4 +296,3 @@ describe("damageDone descriptor", () => {
     expect(rows[1].columns.at(-1)).toBe("25.0%");
   });
 });
-

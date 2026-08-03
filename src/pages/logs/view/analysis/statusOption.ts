@@ -26,4 +26,3 @@ export const withStatusOption = (
   if (options.some((option) => option.value === pin)) return options;
   return [{ value: pin, label: label(pin) }, ...options];
 };
-

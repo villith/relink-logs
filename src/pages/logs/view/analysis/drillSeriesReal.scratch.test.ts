@@ -31,7 +31,13 @@ describe("foldAbilityChart against the real tables", () => {
       getSkillName
     );
 
-    console.log(JSON.stringify(folded.map((s) => ({ label: s.label, key: s.key, total: s.values[0] })), null, 2));
+    console.log(
+      JSON.stringify(
+        folded.map((s) => ({ label: s.label, key: s.key, total: s.values[0] })),
+        null,
+        2
+      )
+    );
     expect(folded).toHaveLength(2);
     expect(folded[0].label).toBe("Normal Attack");
     expect(folded[0].values).toEqual([60]);

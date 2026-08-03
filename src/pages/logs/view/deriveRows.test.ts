@@ -28,4 +28,3 @@ describe("rowLevelFor", () => {
     expect(rowLevelFor({ source: null, targets: [], ability: "Normal:100" })).toBe("skills");
   });
 });
-

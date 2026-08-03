@@ -71,4 +71,3 @@ export const buildStatusSeries = ({
 
   return [...byHolder.values()].sort((a, b) => b.values.filter(Boolean).length - a.values.filter(Boolean).length);
 };
-

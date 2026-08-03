@@ -318,4 +318,3 @@ export const DpsChart = ({
     </Box>
   );
 };
-

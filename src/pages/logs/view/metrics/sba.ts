@@ -22,4 +22,3 @@ export const sba: MetricDescriptor = {
         colorSlot: p.partyIndex,
       })),
 };
-

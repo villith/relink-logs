@@ -83,4 +83,3 @@ export const foldTargetChart = (
       values: [...band.values],
     }))
   );
-

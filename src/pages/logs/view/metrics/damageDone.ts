@@ -113,4 +113,3 @@ export const damageDone: MetricDescriptor = {
       .sort((a, b) => b.value - a.value);
   },
 };
-

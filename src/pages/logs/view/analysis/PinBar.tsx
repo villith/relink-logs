@@ -117,4 +117,3 @@ export const PinBar = ({ options, pins, onChange, windowLabel, fullLabel, onClea
     </Box>
   );
 };
-
