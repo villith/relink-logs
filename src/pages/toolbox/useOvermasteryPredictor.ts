@@ -1,6 +1,7 @@
 import characterIdHashes from "@/assets/character-id-hashes.json";
 import overmasteryCategories from "@/assets/overmastery-categories.json";
 import { assignable } from "@/pages/toolbox/matching";
+import { sanitizeRollCount } from "@/pages/toolbox/rollCount";
 import useGameStatus from "@/pages/toolbox/useGameStatus";
 import useRngSlotStaleness from "@/pages/toolbox/useRngSlotStaleness";
 import { DEFAULT_ROLLS, useOvermasterySelectionsStore } from "@/stores/useOvermasterySelectionsStore";
@@ -136,12 +137,8 @@ export const sanitizeSelection = (value: unknown, categories: CategoryPools = CA
   return { tier, wanted: slots };
 };
 
-/** Validate a stored roll count. The form itself only ever writes 1..MAX, so
- * anything else came from a hand-edited settings.db or an older shape; the
- * default is the safe answer. 0 is what the input holds while the user has
- * cleared it, and is never persisted — treat it as absent here too. */
-export const sanitizeRolls = (value: unknown): number =>
-  typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= MAX_ROLLS ? value : DEFAULT_ROLLS;
+/** This tool's roll-count guard — see `sanitizeRollCount`. */
+export const sanitizeRolls = (value: unknown): number => sanitizeRollCount(value, MAX_ROLLS, DEFAULT_ROLLS);
 
 /** Startup form: restore the last-worked-on character and their saved
  * selections, plus the account-wide roll count (falling back to defaults for

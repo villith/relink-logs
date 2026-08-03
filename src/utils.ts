@@ -996,6 +996,16 @@ export const humanizeNumbers = (n: number) => {
   else return [tryParseInt(n).toFixed(0), ""];
 };
 
+/// The single-string form of `humanizeNumbers`, for the callers that render the
+/// figure as text rather than styling the number and its suffix apart.
+export const humanizeNumber = (n: number): string => humanizeNumbers(n).join("");
+
+/// Share of `total` to one decimal, or "0.0%" when there is no total to divide
+/// by. Distinct from `percent` in `metrics/buffs.ts`, which clamps and rounds
+/// differently on purpose — this is the plain contribution-of-total form.
+export const share = (value: number, total: number): string =>
+  total === 0 ? "0.0%" : `${((value / total) * 100).toFixed(1)}%`;
+
 /// Takes a number of milliseconds and returns a string in the format of MM:SS.
 export const millisecondsToElapsedFormat = (ms: number): string => {
   const date = new Date(Date.UTC(0, 0, 0, 0, 0, 0, ms));

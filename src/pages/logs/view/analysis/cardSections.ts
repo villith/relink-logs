@@ -1,7 +1,7 @@
 import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
 
 import { abilityKey } from "../abilityKey";
-import { abilityRowKey, skillsForAbilityKey } from "../abilitySkills";
+import { groupSkillsForRows, skillsForAbilityKey } from "../abilitySkills";
 import type { RowLevel } from "../deriveRows";
 import type { MetricRow } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
@@ -74,14 +74,16 @@ export const aggregateAbilities = (
   abilityLabel: (key: string) => string,
   abilityIcon?: (key: string) => string | undefined
 ) => {
-  const byKey = new Map<string, { key: string; label: string; value: number; icon?: string }>();
-  for (const skill of skills) {
-    const key = abilityRowKey(skill);
-    const found = byKey.get(key);
-    if (found) found.value += skill.totalDamage;
-    else byKey.set(key, { key, label: abilityLabel(key), value: skill.totalDamage, icon: abilityIcon?.(key) });
-  }
-  return [...byKey.values()].sort((a, b) => b.value - a.value);
+  // `groupSkillsForRows` owns the condensing rule; re-deriving it here is what
+  // produced the double-draw above in the first place.
+  return groupSkillsForRows(skills)
+    .map(({ key, skills: grouped }) => ({
+      key,
+      label: abilityLabel(key),
+      value: grouped.reduce((sum, skill) => sum + skill.totalDamage, 0),
+      icon: abilityIcon?.(key),
+    }))
+    .sort((a, b) => b.value - a.value);
 };
 
 /** Per-player totals for ONE action, across the whole scoped party.

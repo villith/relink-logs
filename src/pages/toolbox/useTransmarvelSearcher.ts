@@ -1,4 +1,5 @@
 import pool from "@/assets/transmarvel-pool.json";
+import { sanitizeRollCount } from "@/pages/toolbox/rollCount";
 import useGameStatus from "@/pages/toolbox/useGameStatus";
 import useRngSlotStaleness from "@/pages/toolbox/useRngSlotStaleness";
 import { DEFAULT_ROLLS, useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
@@ -16,13 +17,8 @@ export type SigilEntry = { trait: string; trait2: string | null };
  * predict_transmarvel). */
 export const MAX_ROLLS = 50000;
 
-/** Validate a stored roll count. The field itself only ever stores 1..MAX, so
- * anything else came from a hand-edited settings.db or a lowered MAX; the
- * default is the safe answer. 0 is what the input holds while the user has
- * cleared it, and is never persisted — treat it as absent here too, or the
- * tool reopens with an empty field, a disabled Predict, and no auto-run. */
-export const sanitizeRolls = (value: unknown): number =>
-  typeof value === "number" && Number.isInteger(value) && value >= 1 && value <= MAX_ROLLS ? value : DEFAULT_ROLLS;
+/** This tool's roll-count guard — see `sanitizeRollCount`. */
+export const sanitizeRolls = (value: unknown): number => sanitizeRollCount(value, MAX_ROLLS, DEFAULT_ROLLS);
 
 /** A wished-for wrightstone: the type (family = its fixed trait-1 hash), a
  * minimum rarity tier (that tier or better hits), and optional per-position

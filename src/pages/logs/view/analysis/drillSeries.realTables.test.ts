@@ -1,14 +1,12 @@
 import { readFileSync } from "node:fs";
 
 import i18n from "i18next";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
-// The REAL shipped table, not a mock — this check exists to prove the fold
-// lands on the tables the app actually ships.
-vi.mock("@/assets/skill-groups", () => ({
-  default: JSON.parse(readFileSync("src-tauri/assets/skill-groups.json", "utf-8")),
-}));
-
+// The REAL shipped skill-groups table, not a stub — this check exists to prove
+// the fold lands on the tables the app actually ships. `src/test/setup.ts`
+// already mocks that module with exactly that table, so there is nothing to
+// override here.
 import type { AbilityChartSeries } from "@/types";
 import { getSkillName } from "@/utils";
 
@@ -31,13 +29,6 @@ describe("foldAbilityChart against the real tables", () => {
       getSkillName
     );
 
-    console.log(
-      JSON.stringify(
-        folded.map((s) => ({ label: s.label, key: s.key, total: s.values[0] })),
-        null,
-        2
-      )
-    );
     expect(folded).toHaveLength(2);
     expect(folded[0].label).toBe("Normal Attack");
     expect(folded[0].values).toEqual([60]);

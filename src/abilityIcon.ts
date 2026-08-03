@@ -1,4 +1,5 @@
 import abilityMap from "./assets/game-icons/ability-map.json";
+import { iconsByName } from "./iconMap";
 
 /**
  * Resolves ability art two ways: by equip slot, and by the meter's action id.
@@ -21,9 +22,7 @@ const ICONS = import.meta.glob<string>("./assets/game-icons/ability/*.png", {
   import: "default",
 });
 
-const BY_KEY = new Map(
-  Object.entries(ICONS).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1, -".png".length), url])
-);
+const BY_KEY = iconsByName(ICONS);
 
 /**
  * The icon URL for a character's ability slot (1-based, as the game numbers

@@ -2112,11 +2112,70 @@ pub struct TargetChartSeries {
     pub values: Vec<i32>,
 }
 
+/// The hits from one source that a drill-down chart counts, in log order, as
+/// `(position in the log, bucket, remapped event)`.
+///
+/// The gate chain the drill charts share, written once: phantom targets, the
+/// contested-source filter, the optional ability pin, the dragon-form remap,
+/// the target spans and the bucket bounds. Each chart's own docs promise that
+/// its area equals the total the table reports — a promise only as good as
+/// these gates agreeing, which hand-kept copies of them cannot guarantee.
+///
+/// `ability` is applied BEFORE the remap, which is safe because the remap
+/// rewrites only the event's source, never its `action_id` — and it keeps the
+/// clone off the hits the pin rejects.
+#[allow(clippy::too_many_arguments)]
+fn counted_hits<'a>(
+    events: &'a [(i64, Message)],
+    player_data: &'a [Option<PlayerData>; 4],
+    source_index: u32,
+    ability: Option<ActionType>,
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+    target_spans: &'a [TargetSpan],
+    filters: MeterFilters,
+) -> impl Iterator<Item = (usize, usize, DamageEvent)> + 'a {
+    let phantoms = PhantomTargets::learned_from(events.iter());
+
+    events
+        .iter()
+        .enumerate()
+        .filter_map(move |(position, (timestamp, event))| {
+            let Message::DamageEvent(damage_event) = event else {
+                return None;
+            };
+
+            if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
+                return None;
+            }
+            if ability.is_some_and(|pinned| damage_event.action_id != pinned) {
+                return None;
+            }
+
+            let damage_event = remap_dragon_form(player_data, damage_event);
+            if damage_event.source.parent_index != source_index {
+                return None;
+            }
+
+            let rel_ts = timestamp - start_time;
+            if !target_selected(rel_ts, &damage_event, target_spans) {
+                return None;
+            }
+
+            let bucket = (rel_ts / interval) as usize;
+            if bucket >= chart_len {
+                return None;
+            }
+
+            Some((position, bucket, damage_event))
+        })
+}
+
 /// Damage buckets for one player, split by breakdown row.
 ///
-/// Every gate the meter applies is applied here too — phantom targets, the
-/// contested-source filter, the dragon-form remap and the target spans — so the
-/// chart's area equals the total the table reports. Bands come back largest
+/// Every gate the meter applies is applied here too — see [`counted_hits`] — so
+/// the chart's area equals the total the table reports. Bands come back largest
 /// first, which is also the table's order.
 ///
 /// `chart_len` must be sized from the FULL log duration, exactly as
@@ -2132,36 +2191,22 @@ pub fn build_ability_damage_chart(
     target_spans: &[TargetSpan],
     filters: MeterFilters,
 ) -> Vec<AbilityChartSeries> {
-    let phantoms = PhantomTargets::learned_from(events.iter());
     // One keying per call: it is stateful and must see this player's hits in log
     // order, which is exactly what walking the log once gives it.
     let mut keying = player_state::BreakdownKeying::default();
     let mut series: Vec<AbilityChartSeries> = Vec::new();
 
-    for (timestamp, event) in events {
-        let Message::DamageEvent(damage_event) = event else {
-            continue;
-        };
-
-        if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
-            continue;
-        }
-
-        let damage_event = remap_dragon_form(player_data, damage_event);
-        if damage_event.source.parent_index != source_index {
-            continue;
-        }
-
-        let rel_ts = timestamp - start_time;
-        if !target_selected(rel_ts, &damage_event, target_spans) {
-            continue;
-        }
-
-        let bucket = (rel_ts / interval) as usize;
-        if bucket >= chart_len {
-            continue;
-        }
-
+    for (_, bucket, damage_event) in counted_hits(
+        events,
+        player_data,
+        source_index,
+        None,
+        start_time,
+        interval,
+        chart_len,
+        target_spans,
+        filters,
+    ) {
         let (action_type, child_character_type) = keying.key_for(&damage_event);
         let found = series.iter_mut().find(|s| {
             s.action_type == action_type && s.child_character_type == child_character_type
@@ -2214,36 +2259,19 @@ pub fn build_target_damage_chart(
     target_spans: &[TargetSpan],
     filters: MeterFilters,
 ) -> Vec<TargetChartSeries> {
-    let phantoms = PhantomTargets::learned_from(events.iter());
     let mut values_by_segment: Vec<Option<Vec<i32>>> = vec![None; segments.len()];
 
-    for (position, (timestamp, event)) in events.iter().enumerate() {
-        let Message::DamageEvent(damage_event) = event else {
-            continue;
-        };
-
-        if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
-            continue;
-        }
-        if damage_event.action_id != ability {
-            continue;
-        }
-
-        let damage_event = remap_dragon_form(player_data, damage_event);
-        if damage_event.source.parent_index != source_index {
-            continue;
-        }
-
-        let rel_ts = timestamp - start_time;
-        if !target_selected(rel_ts, &damage_event, target_spans) {
-            continue;
-        }
-
-        let bucket = (rel_ts / interval) as usize;
-        if bucket >= chart_len {
-            continue;
-        }
-
+    for (position, bucket, damage_event) in counted_hits(
+        events,
+        player_data,
+        source_index,
+        Some(ability),
+        start_time,
+        interval,
+        chart_len,
+        target_spans,
+        filters,
+    ) {
         let Some(Some(segment)) = assignment.get(position) else {
             continue;
         };

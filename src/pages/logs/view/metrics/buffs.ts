@@ -1,5 +1,6 @@
 import type { ComputedPlayerState, StatusInterval } from "@/types";
 
+import { groupBy } from "../groupBy";
 import type { SelectorPins } from "../selectorOptions";
 import { toBands } from "../statusBands";
 import { isStatusPin, statusPinKey, uptimeMs } from "../statusUptime";
@@ -23,19 +24,6 @@ const percent = (part: number, whole: number): string =>
  * `applications` rather than opening a second window. */
 const applications = (group: StatusInterval[]): number =>
   group.reduce((total, interval) => total + interval.applications, 0);
-
-const groupBy = <K, T>(items: T[], key: (item: T) => K): Map<K, T[]> => {
-  const groups = new Map<K, T[]>();
-  for (const item of items) {
-    // Computed once: `key` builds a template string per interval, and calling it
-    // twice per item doubled that on every render.
-    const itemKey = key(item);
-    const group = groups.get(itemKey);
-    if (group) group.push(item);
-    else groups.set(itemKey, [item]);
-  }
-  return groups;
-};
 
 /** Rows for a set of status intervals.
  *
@@ -87,48 +75,35 @@ export const statusRows = ({
   // nothing pinned produced an empty table, while answering it with effect rows
   // left `labelKind` claiming they were players and every row rendering "NaN".
   // The pin is the only thing that actually names an effect.
-  if (!isStatusPin(pinnedKey)) {
-    // The effect rows: one per (effect, cause), unioned across everyone holding
-    // it. A pin that is not a status key selects no effect — pins are shared
-    // with the damage tabs, and arriving from one must widen this table rather
-    // than empty it.
-    return [...groupBy(intervals, statusPinKey).entries()]
-      .map(([key, group]) => {
-        const uptime = uptimeMs(group);
-        return {
-          key,
-          label: key,
-          value: uptime,
-          columns: [percent(uptime, fightDurationMs), String(applications(group))],
-          pinOnClick: { ability: key },
-          // An effect row spans the party, so no one slot's colour is right.
-          colorSlot: -1,
-          timeline: timelineOf(group),
-        };
-      })
-      .sort((a, b) => b.value - a.value);
-  }
+  // Unpinned: the effect rows, one per (effect, cause), unioned across everyone
+  // holding it. A pin that is not a status key selects no effect — pins are
+  // shared with the damage tabs, and arriving from one must widen this table
+  // rather than empty it.
+  //
+  // Pinned: one level down to who held that effect, and for how long. Those are
+  // leaves; there is nothing below a holder to descend into.
+  const holderLevel = isStatusPin(pinnedKey);
+  const groups = holderLevel
+    ? groupBy(
+        intervals.filter((interval) => statusPinKey(interval) === pinnedKey),
+        (interval) => holderOf(interval).key
+      )
+    : groupBy(intervals, statusPinKey);
 
-  // One level down: who held the pinned effect, and for how long. Leaves —
-  // there is nothing below a holder to descend into.
-  return [
-    ...groupBy(
-      intervals.filter((interval) => statusPinKey(interval) === pinnedKey),
-      (interval) => holderOf(interval).key
-    ).entries(),
-  ]
+  return [...groups.entries()]
     .map(([key, group]) => {
       const uptime = uptimeMs(group);
       return {
         key,
-        // From the group's own first interval, so the label is whatever
-        // `holderOf` decided this holder is named by — a player index for
-        // Buffs, a spawn for Debuffs.
-        label: holderOf(group[0]).label,
+        // A holder's name comes from the group's own first interval, so it is
+        // whatever `holderOf` decided this holder is named by — a player index
+        // for Buffs, a spawn for Debuffs. An effect row is named by its key.
+        label: holderLevel ? holderOf(group[0]).label : key,
         value: uptime,
         columns: [percent(uptime, fightDurationMs), String(applications(group))],
-        pinOnClick: null,
-        colorSlot: slotOf(group[0].actorIndex),
+        pinOnClick: holderLevel ? null : { ability: key },
+        // An effect row spans the party, so no one slot's colour is right.
+        colorSlot: holderLevel ? slotOf(group[0].actorIndex) : -1,
         timeline: timelineOf(group),
       };
     })
@@ -160,8 +135,16 @@ export const heldByRoster = (
  * the game reissues a dead boss's index to the next one, so keying on it
  * merged two dragons into one row. An enemy the segmenter skipped (a phantom
  * marker) has no spawn to name it by and keeps the raw id. */
+export const enemyHolderKey = (interval: StatusInterval): string =>
+  interval.targetSegment === null ? `actor:${interval.actorIndex}` : `target:${interval.targetSegment}`;
+
+/** The holder row itself, keyed by `enemyHolderKey` and labelled with the raw
+ * key — the table resolves it to a name (see `targetRowLabel`), which is also
+ * what `TARGET_ROW` parses back out. Callers that CAN name the spawn (the
+ * chart, which holds `labelForTarget`) pass their own label and reuse the key
+ * function, so the grammar has exactly one author. */
 export const enemyHolderOf = (interval: StatusInterval): { key: string; label: string } => {
-  const key = interval.targetSegment === null ? `actor:${interval.actorIndex}` : `target:${interval.targetSegment}`;
+  const key = enemyHolderKey(interval);
   return { key, label: key };
 };
 

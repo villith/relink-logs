@@ -1,4 +1,5 @@
 import enemies from "../src-tauri/lang/en/enemies.json";
+import { iconsByName } from "./iconMap";
 import type { EnemyType } from "./types";
 
 /**
@@ -22,9 +23,7 @@ const ICONS = import.meta.glob<string>("./assets/game-icons/enemy/*.png", {
   import: "default",
 });
 
-const BY_ID = new Map(
-  Object.entries(ICONS).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1, -".png".length), url])
-);
+const BY_ID = iconsByName(ICONS);
 
 const EM_KEYS = enemies as Record<string, { key?: string }>;
 

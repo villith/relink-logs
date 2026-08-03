@@ -2,8 +2,14 @@ import type { StatusInterval } from "@/types";
 
 import { isStatusPin, statusPinKey } from "../statusUptime";
 
-/** One holder's stack count over the fight, one value per chart bucket. */
-export type StatusSeries = { key: string; label: string; values: number[] };
+import type { DrillSeries } from "./drillSeries";
+
+/** One holder's stack count over the fight, one value per chart bucket.
+ *
+ * The same shape as a drill-down band, and consumed by the same chart code —
+ * an alias rather than a twin so the two overlays stay one branch at the call
+ * site instead of two identical ones. */
+export type StatusSeries = DrillSeries;
 
 /** Per-holder stack counts for the pinned effect, bucketed for the chart.
  *
@@ -69,5 +75,11 @@ export const buildStatusSeries = ({
     }
   }
 
-  return [...byHolder.values()].sort((a, b) => b.values.filter(Boolean).length - a.values.filter(Boolean).length);
+  // Coverage is counted ONCE per series and carried through the sort, for the
+  // reason `byTotalDescending` spells out next door: a comparator that recounted
+  // would allocate and walk two whole bucket arrays on every comparison.
+  return [...byHolder.values()]
+    .map((series) => ({ series, covered: series.values.reduce((n, value) => (value ? n + 1 : n), 0) }))
+    .sort((a, b) => b.covered - a.covered)
+    .map(({ series }) => series);
 };
