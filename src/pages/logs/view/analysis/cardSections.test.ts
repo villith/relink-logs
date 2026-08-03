@@ -137,6 +137,32 @@ describe("cardSectionsFor", () => {
     expect(abilities.map((e) => e.value)).toEqual([250, 50]);
   });
 
+  it("names a player row's abilities for that player, not the first party member to share the id", () => {
+    // Action ids collide across characters (120 is Eustace's "Grade 1 Shot"
+    // AND Id's "Combo Finisher (Dragonform)"), and the party-order scan named
+    // Id's own 120 with Eustace's skill on the hover card. The card knows
+    // exactly whose breakdown it is decomposing, so it must say so.
+    const owners: unknown[] = [];
+    const sections = cardSectionsFor({
+      row: row("player:0"),
+      level: "players",
+      players: PLAYERS,
+      pins: { source: null, targets: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: {
+        ...LABELS,
+        ability: (key, owner) => {
+          owners.push(owner);
+          return `ability:${key}`;
+        },
+      },
+    });
+
+    expect(sections?.[0].entries.length).toBeGreaterThan(0);
+    expect(owners.length).toBeGreaterThan(0);
+    expect(owners.every((owner) => owner === PLAYERS[0])).toBe(true);
+  });
+
   it("merges a player's targets across every ability, biggest first", () => {
     // Em0003 takes 0.8 of both skills: 160 + 80. The unknown takes 0.2: 40 + 20.
     const sections = call("players", "player:0");

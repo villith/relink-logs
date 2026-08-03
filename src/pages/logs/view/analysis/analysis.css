@@ -140,6 +140,27 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The row's entity art — a status mark, a character bust, an ability diamond,
+ * a boss portrait — inline before the name. A fixed square with `contain` so
+ * the four families' different aspect ratios (the character busts are tall)
+ * line the names up identically; rows with no art render no box at all. */
+.analysis-row-icon {
+  height: 22px;
+  width: 22px;
+  object-fit: contain;
+  margin-right: 7px;
+  vertical-align: -6px;
+}
+
+/* The hover card's smaller copy of the same. */
+.analysis-card-icon {
+  height: 15px;
+  width: 15px;
+  object-fit: contain;
+  margin-right: 5px;
+  vertical-align: -3px;
+}
+
 .analysis-cell-muted {
   color: var(--an-ink-2);
   font-size: 12px;

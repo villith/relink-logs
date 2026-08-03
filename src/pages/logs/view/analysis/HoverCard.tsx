@@ -16,8 +16,10 @@ const VIEWPORT_PADDING = 5;
 
 /** One row of a card section. `color` overrides the section's colour for this
  * row alone — a "by source" section is per player, and one colour across every
- * row of it would say nothing about who dealt what. */
-export type BreakdownEntry = { key: string; label: string; value: number; color?: string };
+ * row of it would say nothing about who dealt what. `icon` is the entity's
+ * art, where it has any; rows without stay text-only rather than reserving a
+ * blank box. */
+export type BreakdownEntry = { key: string; label: string; value: number; color?: string; icon?: string };
 
 /** One stacked section of the card: a heading naming the dimension, then its
  * rows. `color` is the entity's colour — ability rows take their owner's, target
@@ -68,7 +70,10 @@ const Section = ({ headingKey, color, entries }: CardSection) => {
                 backgroundColor: entry.color ?? color,
               }}
             />
-            <Text className="analysis-card-name">{entry.label}</Text>
+            <Text className="analysis-card-name">
+              {entry.icon && <img className="analysis-card-icon" src={entry.icon} alt="" />}
+              {entry.label}
+            </Text>
             <Text className="analysis-card-amount">
               {n}
               {suffix}
@@ -228,4 +233,3 @@ export const HoverCard = ({
     </>
   );
 };
-

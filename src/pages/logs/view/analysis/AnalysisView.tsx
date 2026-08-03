@@ -6,6 +6,9 @@ import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
+import { characterIconUrl } from "@/characterIcon";
+import { enemyIconUrl } from "@/enemyIcon";
+import { statusIconUrl } from "@/statusIcon";
 import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
 import { useMeterFilters } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
@@ -19,6 +22,7 @@ import type {
 } from "@/types";
 import {
   PLAYER_COLORS,
+  causeSkillName,
   formatInPartyOrder,
   getSkillName,
   millisecondsToElapsedFormat,
@@ -67,8 +71,17 @@ import { formatChartDebug } from "./debugSummary";
 import { foldAbilityChart, foldTargetChart } from "./drillSeries";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { identityPartyOf } from "./partyIdentity";
+import { abilityRowIconUrl } from "./rowIcon";
 import { buildStatusSeries } from "./statusChart";
-import { causeLabel, statusLabelFor, statusRowKindFor, targetRowLabel } from "./statusLabel";
+import {
+  causeCandidatesFor,
+  causeNameFor,
+  statusIdOfKey,
+  statusLabelFor,
+  statusRowKindFor,
+  targetRowLabel,
+  targetRowSegment,
+} from "./statusLabel";
 import { withStatusOption } from "./statusOption";
 import { statusRowColors } from "./statusRowColors";
 import { useUrlQueryString } from "./useUrlQueryString";
@@ -407,12 +420,18 @@ export const AnalysisView = () => {
   // selector must display the pinned effect too, and a second spelling of this
   // would let the selector and the table name one effect two ways.
   const statusDisplayLabel = useCallback(
-    (key: string) =>
-      statusLabelFor(key, t, {
+    (key: string) => {
+      // A cause is the CASTER's action id, so it is named through the tables
+      // of this row's own casters (and their sub-actors) — never the whole
+      // party, whose colliding action ids fabricated cross-character names.
+      const candidates = causeCandidatesFor(key, statusIntervals, (index) => playerByIndex.get(index)?.player);
+      return statusLabelFor(key, t, {
         effect: translateStatusName,
-        cause: causeLabel,
-      }),
-    [t]
+        cause: (id) => causeNameFor(id, (cause) => causeSkillName(candidates, cause)),
+      });
+    },
+    // i18n.language: skill and band names are translated.
+    [t, statusIntervals, playerByIndex, i18n.language]
   );
 
   const labelledOptions = useMemo(
@@ -506,6 +525,32 @@ export const AnalysisView = () => {
   // row and its band can never disagree.
   const rowColors = useMemo(() => (isStatusMetric ? statusRowColors(rows) : null), [isStatusMetric, rows]);
 
+  // The art beside a row's name, by the same discriminator the name uses, so
+  // a row can never pair one kind's name with another kind's icon. Undefined
+  // is the honest answer for most of what has none: combo actions are not
+  // ability casts, `actor:` holder rows index no spawn, and only the boss
+  // roster has portraits at all (see enemyIcon.ts).
+  const rowIconUrl = useCallback(
+    (row: MetricRow): string | undefined => {
+      const kind = isStatusMetric ? statusRowKind : metric.labelKind(level);
+      if (kind === "status") {
+        const statusId = statusIdOfKey(row.label);
+        return statusId === null ? undefined : statusIconUrl(statusId);
+      }
+      if (kind === "player") {
+        const character = playerByIndex.get(Number(row.label))?.player.characterType;
+        return typeof character === "string" ? characterIconUrl(character) : undefined;
+      }
+      if (kind === "target") {
+        const segment = targetRowSegment(row.label);
+        return segment === null ? undefined : enemyIconUrl(targetEntries[segment]?.enemyType ?? null);
+      }
+      if (kind === "raw") return undefined;
+      return abilityRowIconUrl(row.label, identityPlayers, playerByIndex.get(pins.source ?? -1)?.player);
+    },
+    [metric, level, isStatusMetric, statusRowKind, playerByIndex, targetEntries, identityPlayers, pins.source]
+  );
+
   const renderLabel = useCallback(
     (row: MetricRow) => {
       // Effect names come from status.tbl via the generated `statuses` bundle;
@@ -514,13 +559,36 @@ export const AnalysisView = () => {
       // effect-entry id the game keys on, not an action id, so nothing maps it
       // to a skill name yet.
       const kind = isStatusMetric ? statusRowKind : metric.labelKind(level);
-      if (kind === "status") return statusDisplayLabel(row.label);
-      if (kind === "player") return labelForSource(Number(row.label));
-      if (kind === "target") return targetRowLabel(row.label, labelForTarget);
-      if (kind === "raw") return row.label;
-      return labelForAbility(row.label);
+      const name =
+        kind === "status"
+          ? statusDisplayLabel(row.label)
+          : kind === "player"
+            ? labelForSource(Number(row.label))
+            : kind === "target"
+              ? targetRowLabel(row.label, labelForTarget)
+              : kind === "raw"
+                ? row.label
+                : labelForAbility(row.label);
+      const icon = rowIconUrl(row);
+      if (!icon) return name;
+      return (
+        <>
+          <img className="analysis-row-icon" src={icon} alt="" />
+          {name}
+        </>
+      );
     },
-    [metric, level, isStatusMetric, statusRowKind, labelForSource, labelForTarget, labelForAbility, statusDisplayLabel]
+    [
+      metric,
+      level,
+      isStatusMetric,
+      statusRowKind,
+      labelForSource,
+      labelForTarget,
+      labelForAbility,
+      statusDisplayLabel,
+      rowIconUrl,
+    ]
   );
 
   const handlePin = useCallback((next: Partial<SelectorPins>) => setPins({ ...pins, ...next }), [pins, setPins]);
@@ -579,14 +647,27 @@ export const AnalysisView = () => {
   // and colour lookups that keep it a pure function.
   const sectionLabels = useMemo(
     () => ({
-      ability: labelForAbility,
+      // With an owner (a player card decomposing that player's own breakdown),
+      // the key is named against THEIR table first — action ids collide across
+      // characters, and the party-order scan named Id's own 120 with Eustace's
+      // "Grade 1 Shot" on the hover card.
+      ability: (key: string, owner?: ComputedPlayerState) =>
+        owner ? abilityLabelFor(key, identityPlayers, getSkillName, owner) : labelForAbility(key),
       enemy: (type: EnemyType) => translateEnemyType(type),
       source: labelForSource,
       // The player's OWN party colour, resolved through the identity party so a
       // scoped fetch's renumbered slots cannot recolour them mid-drill.
       sourceColor: (index: number) => resolvePlayerColor(palette, playerData, playerByIndex.get(index)?.slot ?? 0, 0),
+      // The same art the rows above the card show, resolved the same way, so
+      // hovering a row cannot show its members under different pictures.
+      abilityIcon: (key: string, owner?: ComputedPlayerState) => abilityRowIconUrl(key, identityPlayers, owner),
+      enemyIcon: enemyIconUrl,
+      sourceIcon: (index: number) => {
+        const character = playerByIndex.get(index)?.player.characterType;
+        return typeof character === "string" ? characterIconUrl(character) : undefined;
+      },
     }),
-    [labelForAbility, labelForSource, palette, playerData, playerByIndex]
+    [labelForAbility, identityPlayers, labelForSource, palette, playerData, playerByIndex]
   );
 
   const rowSections = useCallback(
