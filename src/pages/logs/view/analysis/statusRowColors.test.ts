@@ -22,4 +22,11 @@ describe("statusRowColors", () => {
     expect(colors.has("player:0")).toBe(false);
     expect(colors.get("target:2")).toBe("var(--mantine-color-red-6)");
   });
+
+  it("wraps back to the palette's start past its length", () => {
+    // HP_SERIES_COLORS has 12 entries; a 13th row must land back on the 1st.
+    const rows = Array.from({ length: 13 }, (_, i) => ({ key: `status:${i}:0`, colorSlot: -1 }));
+    const colors = statusRowColors(rows);
+    expect(colors.get("status:12:0")).toBe(colors.get("status:0:0"));
+  });
 });
