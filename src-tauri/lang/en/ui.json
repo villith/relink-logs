@@ -418,6 +418,9 @@
       "total-power": "Total PWR"
     },
     "logs": {
+      "hostility-label": "Hostility",
+      "hostility-friendlies": "Friendlies",
+      "hostility-enemies": "Enemies",
       "saved-count_zero": "No logs saved",
       "saved-count_one": "{{count}} log saved",
       "saved-count_other": "{{count}} logs saved",

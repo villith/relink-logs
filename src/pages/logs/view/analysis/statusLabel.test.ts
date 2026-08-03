@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { targetRowLabel } from "./statusLabel";
-
-import { buffs } from "../metrics/buffs";
-import { debuffs } from "../metrics/debuffs";
-
-import { statusLabelFor, statusRowKindFor } from "./statusLabel";
+import { causeLabel, statusLabelFor, statusRowKindFor, targetRowLabel } from "./statusLabel";
 
 // Stands in for i18next: the real thing interpolates the same way.
 const t = (key: string, vars?: Record<string, unknown>): string =>
@@ -43,30 +38,16 @@ describe("statusLabelFor", () => {
 });
 
 describe("statusRowKindFor", () => {
-  it("calls unpinned rows effects", () => {
-    expect(statusRowKindFor(buffs.labelKind, null)).toBe("status");
-    expect(statusRowKindFor(debuffs.labelKind, null)).toBe("status");
+  it("answers status when nothing is pinned, whatever the hostility", () => {
+    expect(statusRowKindFor(null, "friendly")).toBe("status");
+    expect(statusRowKindFor("120", "enemy")).toBe("status");
   });
 
-  it("calls a pinned buff's rows players and a pinned debuff's rows targets", () => {
-    // The rows really are holders here — `statusRows` builds them off the same
-    // pin — so anything else labels an actor as an effect, or an effect key as
-    // a player and prints NaN. A debuff holder is an enemy SPAWN, which is what
-    // carries a name and a "#n"; it used to be the bare recycled actor id.
-    expect(statusRowKindFor(buffs.labelKind, "status:10:500")).toBe("player");
-    expect(statusRowKindFor(debuffs.labelKind, "status:10:500")).toBe("target");
-  });
-
-  it("ignores a damage pin, which selects no effect", () => {
-    // Arriving from the Damage tab must leave the effect rows named as effects.
-    expect(statusRowKindFor(buffs.labelKind, "skill:Normal-1234")).toBe("status");
-  });
-
-  it("does not consult the row level, which is blind to a status pin", () => {
-    // The regression this exists to catch: `rowLevelFor` returns "players" for a
-    // pinned buff with no source, so `labelKind(level)` answered "status" over
-    // rows that were actors.
-    expect(statusRowKindFor(buffs.labelKind, "status:10:500")).not.toBe(buffs.labelKind("players"));
+  it("answers the holder kind for a status pin from the hostility", () => {
+    // The kind used to come from which TAB was open; with the hostility
+    // switch, a Debuffs table over friendly holders shows PLAYER rows.
+    expect(statusRowKindFor("status:10:500", "friendly")).toBe("player");
+    expect(statusRowKindFor("status:10:500", "enemy")).toBe("target");
   });
 });
 
@@ -74,6 +55,19 @@ describe("statusLabelFor fallbacks", () => {
   it("hands back anything that is not a status key", () => {
     // A stale or hand-edited pin: showing it back is what tells the user why.
     expect(statusLabelFor("skill:Normal-1234", t, { effect: () => "", cause: () => "" })).toBe("skill:Normal-1234");
+  });
+});
+
+describe("causeLabel", () => {
+  it("shows the discriminator, which is what keeps two same-effect rows apart", () => {
+    expect(causeLabel(11000)).toBe("11000");
+  });
+
+  it("reads the hook's no-cause sentinel as unattributed", () => {
+    // 0xFFFFFFFF is an all-ones u32, the game's own "no value" — a number the
+    // user can do nothing with, where "unknown source" at least says why.
+    expect(causeLabel(0xffffffff)).toBe("");
+    expect(causeLabel(null)).toBe("");
   });
 });
 

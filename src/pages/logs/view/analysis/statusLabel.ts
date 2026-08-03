@@ -1,5 +1,4 @@
-import type { RowLevel } from "../deriveRows";
-import type { LabelKind } from "../metrics/types";
+import type { Hostility, LabelKind } from "../metrics/types";
 import { isStatusPin } from "../statusUptime";
 
 /** How a status row's key is spelled: the effect, then the ability that caused
@@ -9,18 +8,12 @@ const STATUS_KEY = /^status:(\d+):(\d+|unknown)$/;
 /** What a status table's rows currently ARE, for labelling them and for naming
  * the column above them.
  *
- * The PIN decides, exactly as `statusRows` decides which rows to build. The row
- * LEVEL cannot: it is derived from an Ability pin shared with the damage tabs
- * and is deliberately blind to a status one, so it reads "players" for a pinned
- * buff whose rows are holders. Asking `labelKind(level)` there answered
- * "status" over actor rows — and, before the level became status-blind,
- * "player" over effect rows, where `Number("status:10:500")` is NaN. One
- * discriminator, used by both the labels and the header, is what keeps a status
- * table from describing itself two different ways at once. */
-export const statusRowKindFor = (labelKind: (level: RowLevel) => LabelKind, pin: string | null): LabelKind =>
-  // "skills" names any level below the top; a status descriptor answers it with
-  // what a HOLDER row is — a player for Buffs, a raw enemy index for Debuffs.
-  isStatusPin(pin) ? labelKind("skills") : "status";
+ * The PIN decides whether they are effects or holders, exactly as `statusRows`
+ * decides which rows to build; the HOSTILITY decides what a holder is — a
+ * player on the friendly side, an enemy spawn on the enemy side. The tab
+ * cannot: with the hostility switch either tab can show either side. */
+export const statusRowKindFor = (pin: string | null, hostility: Hostility): LabelKind =>
+  isStatusPin(pin) ? (hostility === "friendly" ? "player" : "target") : "status";
 
 /** How a debuff holder row names the enemy that held the effect: the SPAWN it
  * belonged to, or the bare actor id when the segmenter never placed it. */
@@ -44,6 +37,15 @@ export const targetRowLabel = (label: string, labelForTarget: (segment: number) 
   const [, kind, id] = parsed;
   return kind === "target" ? labelForTarget(Number(id)) : id;
 };
+
+/** The hook's `+0x4c` cause discriminator, as displayed.
+ *
+ * The number itself, because it is what keeps two abilities granting one
+ * effect on separate rows and no mapping from it to a skill name exists (see
+ * the hook's status module: it is an effect-entry constant, not an action id).
+ * All-ones is the game's own "no value", so it reads as unattributed instead
+ * of as a nine-digit number the user can do nothing with. */
+export const causeLabel = (id: number | null): string => (id === null || id === 0xffffffff ? "" : String(id));
 
 /** Display name for a `status:<effect>:<cause>` row key.
  *
@@ -76,4 +78,3 @@ export const statusLabelFor = (
     cause: names.cause(abilityId) || t("ui.logs.buff-cause-unknown"),
   });
 };
-

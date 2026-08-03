@@ -45,7 +45,7 @@ import { damageDone } from "../metrics/damageDone";
 import { debuffs } from "../metrics/debuffs";
 import { sba } from "../metrics/sba";
 import { stun } from "../metrics/stun";
-import type { MetricDescriptor, MetricRow } from "../metrics/types";
+import type { Hostility, MetricDescriptor, MetricRow } from "../metrics/types";
 import { deriveSelectorOptions, type SelectorPins } from "../selectorOptions";
 import { toBands } from "../statusBands";
 import { clipToWindow, isStatusPin, statusPinKey } from "../statusUptime";
@@ -54,6 +54,7 @@ import { useSelectorParams } from "../useSelectorParams";
 
 import { DebugBar } from "./DebugBar";
 import { DpsChart } from "./DpsChart";
+import { HostilityToggle } from "./HostilityToggle";
 import { MetricTable } from "./MetricTable";
 import { MetricTabs, type MetricTab } from "./MetricTabs";
 import { PinBar } from "./PinBar";
@@ -67,7 +68,7 @@ import { foldAbilityChart, foldTargetChart } from "./drillSeries";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { identityPartyOf } from "./partyIdentity";
 import { buildStatusSeries } from "./statusChart";
-import { statusLabelFor, statusRowKindFor, targetRowLabel } from "./statusLabel";
+import { causeLabel, statusLabelFor, statusRowKindFor, targetRowLabel } from "./statusLabel";
 import { withStatusOption } from "./statusOption";
 import { useUrlQueryString } from "./useUrlQueryString";
 
@@ -176,6 +177,11 @@ export const AnalysisView = () => {
 
   const [pins, setPins] = useSelectorParams();
   const [metricKey, setMetricKey] = useState<string>("damage");
+  // Which side's holders the status tables show. Follows the tab's natural
+  // side on every tab/log switch (Buffs → friendly, Debuffs → enemy), which is
+  // exactly what the tables showed before the switch existed.
+  const [hostility, setHostility] = useState<Hostility>("friendly");
+  useEffect(() => setHostility(metricKey === "debuffs" ? "enemy" : "friendly"), [metricKey, id]);
   // Committed window as [start, end] second indexes; null = the full fight. The
   // in-flight drag lives inside DpsChart — nothing outside it needs to know
   // about a selection that has not been released yet.
@@ -356,10 +362,12 @@ export const AnalysisView = () => {
   // fight while the scoped party holds only the pinned player, so searching the
   // scoped one left every other player's abilities showing their raw key.
   const labelForAbility = useCallback(
-    (key: string) => abilityLabelFor(key, identityPlayers, getSkillName),
+    // The pinned source is preferred: with one pinned the rows and options are
+    // that player's own, and a shared action id must take THEIR skill's name.
+    (key: string) => abilityLabelFor(key, identityPlayers, getSkillName, playerByIndex.get(pins.source ?? -1)?.player),
     // i18n.language: skill names are translated, so a language switch must
     // re-derive them even though it is not read here directly.
-    [identityPlayers, i18n.language]
+    [identityPlayers, playerByIndex, pins.source, i18n.language]
   );
 
   // The same rule the quest view's HP-chart legend and target filter label with,
@@ -401,7 +409,7 @@ export const AnalysisView = () => {
     (key: string) =>
       statusLabelFor(key, t, {
         effect: translateStatusName,
-        cause: (id) => (id === null ? "" : String(id)),
+        cause: causeLabel,
       }),
     [t]
   );
@@ -472,6 +480,7 @@ export const AnalysisView = () => {
             statusIntervals: windowedIntervals,
             fightDurationMs,
             statusWindow,
+            hostility,
           })
         : [],
     [
@@ -485,11 +494,12 @@ export const AnalysisView = () => {
       windowedIntervals,
       fightDurationMs,
       statusWindow,
+      hostility,
     ]
   );
 
   const isStatusMetric = metric.labelKind("players") === "status";
-  const statusRowKind = statusRowKindFor(metric.labelKind, pins.ability);
+  const statusRowKind = statusRowKindFor(pins.ability, hostility);
 
   const renderLabel = useCallback(
     (row: MetricRow) => {
@@ -658,21 +668,17 @@ export const AnalysisView = () => {
       bucketMs: DPS_BUCKET_MS,
       len: chartLen,
       holderOf: (interval) =>
-        metricKey === "debuffs"
+        hostility === "enemy"
           ? {
               key:
-                interval.targetSegment === null
-                  ? `actor:${interval.actorIndex}`
-                  : `target:${interval.targetSegment}`,
+                interval.targetSegment === null ? `actor:${interval.actorIndex}` : `target:${interval.targetSegment}`,
               label:
-                interval.targetSegment === null
-                  ? String(interval.actorIndex)
-                  : labelForTarget(interval.targetSegment),
+                interval.targetSegment === null ? String(interval.actorIndex) : labelForTarget(interval.targetSegment),
             }
           : { key: `player:${interval.actorIndex}`, label: labelForSource(interval.actorIndex) },
     });
     return series.length > 0 ? series : null;
-  }, [isStatusMetric, statusIntervals, pins.ability, chartLen, metricKey, labelForTarget, labelForSource]);
+  }, [isStatusMetric, statusIntervals, pins.ability, chartLen, hostility, labelForTarget, labelForSource]);
 
   // Which series the per-player chart draws. identityPlayers, not players: these
   // charts hold the whole party, so a pin must not drop curves from the plot.
@@ -748,27 +754,27 @@ export const AnalysisView = () => {
             color: HP_SERIES_COLORS[position % HP_SERIES_COLORS.length],
           }))
         : drill
-        ? drill.map((series, position) => ({
-            name: series.key,
-            label: series.label,
-            partySlotIndex: position,
-            color: HP_SERIES_COLORS[position % HP_SERIES_COLORS.length],
-          }))
-        : identityPlayers
-            .filter((player) => chartIndexes.includes(player.index))
-            .map((player) => ({
-              name: String(player.index),
-              // The legend carries no rank or position, so it names the
-              // character too — otherwise two AI players are told apart by
-              // colour alone.
-              label: legendLabelFor(
-                labelForSource(player.index),
-                translateCharacterType(player.characterType),
-                player_label_template
-              ),
-              partySlotIndex: player.partyIndex,
-              color: colors[player.partyIndex % colors.length] ?? PLAYER_COLORS[0],
-            })),
+          ? drill.map((series, position) => ({
+              name: series.key,
+              label: series.label,
+              partySlotIndex: position,
+              color: HP_SERIES_COLORS[position % HP_SERIES_COLORS.length],
+            }))
+          : identityPlayers
+              .filter((player) => chartIndexes.includes(player.index))
+              .map((player) => ({
+                name: String(player.index),
+                // The legend carries no rank or position, so it names the
+                // character too — otherwise two AI players are told apart by
+                // colour alone.
+                label: legendLabelFor(
+                  labelForSource(player.index),
+                  translateCharacterType(player.characterType),
+                  player_label_template
+                ),
+                partySlotIndex: player.partyIndex,
+                color: colors[player.partyIndex % colors.length] ?? PLAYER_COLORS[0],
+              })),
     [statusSeries, drill, identityPlayers, chartIndexes, labelForSource, colors, player_label_template]
   );
 
@@ -862,6 +868,12 @@ export const AnalysisView = () => {
 
       <MetricTabs tabs={METRIC_TABS} value={metricKey} onChange={setMetricKey} />
 
+      {isStatusMetric && (
+        <Box style={{ padding: "8px 16px 0" }}>
+          <HostilityToggle value={hostility} onChange={setHostility} />
+        </Box>
+      )}
+
       <PinBar
         options={labelledOptions}
         pins={pins}
@@ -909,4 +921,3 @@ export const AnalysisView = () => {
     </Box>
   );
 };
-

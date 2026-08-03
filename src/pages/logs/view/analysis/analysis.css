@@ -254,3 +254,80 @@
   line-height: 1.4;
 }
 
+/* Dev-only state readout under the plot. Monospace, wrapping and selectable:
+   its whole purpose is to be read exactly and pasted into a bug report. */
+.analysis-debug {
+  padding: 6px 16px 8px;
+  border-top: 1px solid var(--an-line);
+  background-color: var(--an-plot);
+}
+
+.analysis-debug-line {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--an-ink-3);
+  user-select: text;
+  /* Both lines are single unbroken tokens, so anywhere is the only break that
+     keeps a long pin set inside the panel. */
+  overflow-wrap: anywhere;
+}
+
+.analysis-debug-key {
+  color: var(--an-accent);
+  margin-right: 6px;
+}
+
+/* The status tables' uptime bar. Positioned like .analysis-bar — behind the
+ * row's text, which takes `position: relative` to sit over it — but drawn as
+ * one piece per window rather than a single fill, so the row says WHEN the
+ * effect was up rather than restating the percentage next to it. */
+.analysis-timeline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+/* The same 1px inset .analysis-bar takes inside a row, so replacing the bar
+ * with a timeline does not close the gap that separates two rows. */
+.analysis-row .analysis-timeline {
+  top: 1px;
+  bottom: 1px;
+}
+
+.analysis-timeline-piece {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  /* Longhand, never the `background` shorthand: the shorthand resets
+   * background-size and the bar loses its fill. */
+  opacity: 0.55;
+}
+
+/* The status tabs' Friendlies|Enemies switch. A small pill pair, not tabs:
+ * it re-pivots the current table rather than navigating. */
+.analysis-hostility {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--an-line);
+  border-radius: 4px;
+  background-color: var(--an-panel);
+}
+
+.analysis-hostility-option {
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 3px;
+  color: var(--an-ink-3);
+}
+
+.analysis-hostility-active {
+  color: var(--an-ink);
+  background-color: var(--an-raised);
+}
