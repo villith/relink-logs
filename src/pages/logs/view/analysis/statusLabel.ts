@@ -44,7 +44,7 @@ export const targetRowLabel = (label: string, labelForTarget: (segment: number) 
  * effect on separate rows and no mapping from it to a skill name exists (see
  * the hook's status module: it is an effect-entry constant, not an action id).
  * All-ones is the game's own "no value", so it reads as unattributed instead
- * of as a nine-digit number the user can do nothing with. */
+ * of as a ten-digit number the user can do nothing with. */
 export const causeLabel = (id: number | null): string => (id === null || id === 0xffffffff ? "" : String(id));
 
 /** Display name for a `status:<effect>:<cause>` row key.

@@ -27,4 +27,17 @@ describe("HostilityToggle", () => {
     fireEvent.click(screen.getByRole("radio", { name: "ui.logs.hostility-enemies" }));
     expect(onChange).toHaveBeenCalledWith("enemy");
   });
+
+  it("only tabs to the checked option — the roving tabindex", () => {
+    renderIt();
+    expect(screen.getByRole("radio", { name: "ui.logs.hostility-friendlies" }).getAttribute("tabindex")).toBe("0");
+    expect(screen.getByRole("radio", { name: "ui.logs.hostility-enemies" }).getAttribute("tabindex")).toBe("-1");
+  });
+
+  it("moves the selection with the arrow keys", () => {
+    const onChange = vi.fn();
+    renderIt({ onChange });
+    fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
+    expect(onChange).toHaveBeenCalledWith("enemy");
+  });
 });
