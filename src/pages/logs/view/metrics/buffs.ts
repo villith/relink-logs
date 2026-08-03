@@ -4,7 +4,8 @@ import type { SelectorPins } from "../selectorOptions";
 import { toBands } from "../statusBands";
 import { isStatusPin, statusPinKey, uptimeMs } from "../statusUptime";
 
-import type { MetricDescriptor, MetricRow } from "./types";
+import { isHarmful } from "./statusPolarity";
+import type { Hostility, MetricDescriptor, MetricRow } from "./types";
 
 /** Uptime as a share of the fight.
  *
@@ -152,6 +153,15 @@ export const heldByRoster = (
   held: boolean
 ): StatusInterval[] => intervals.filter((interval) => roster.has(interval.actorIndex) === held);
 
+/** How a non-player holder row is keyed: the SPAWN, never the actor index —
+ * the game reissues a dead boss's index to the next one, so keying on it
+ * merged two dragons into one row. An enemy the segmenter skipped (a phantom
+ * marker) has no spawn to name it by and keeps the raw id. */
+export const enemyHolderOf = (interval: StatusInterval): { key: string; label: string } => {
+  const key = interval.targetSegment === null ? `actor:${interval.actorIndex}` : `target:${interval.targetSegment}`;
+  return { key, label: key };
+};
+
 /** The intervals the Source and Enemy pins admit.
  *
  * These two selectors used to do NOTHING on the status tabs — the descriptors
@@ -160,15 +170,15 @@ export const heldByRoster = (
  * its buff tables by actor, and a live selector that changes nothing is worse
  * than one that is not offered.
  *
- * The two tabs read the pins DIFFERENTLY, because we have one Source selector
+ * The two sides read the pins DIFFERENTLY, because we have one Source selector
  * where Warcraft Logs has two actor dimensions (who gained it, who cast it):
  *
- * * A buff's rows are its holders, so Source is the HOLDER. An enemy pin cannot
- *   narrow a buff at all — no player-held interval carries an enemy spawn — so
- *   applying it would empty the table rather than narrow it.
- * * A debuff's rows are enemy spawns, so the Enemy pin is the HOLDER and Source
- *   is the CASTER: "which of Vira's debuffs are on this boss" is the question
- *   the two together ask.
+ * * On the friendly side the holders are players, so Source is the HOLDER. An
+ *   enemy pin cannot narrow it at all — no player-held interval carries an
+ *   enemy spawn — so applying it would empty the table rather than narrow it.
+ * * On the enemy side the holders are enemy spawns, so the Enemy pin is the
+ *   HOLDER and Source is the CASTER: "which of Vira's effects are on this
+ *   boss" is the question the two together ask.
  *
  * `pins.ability` is deliberately not read here: on these tabs it names an
  * EFFECT, and `statusRows` already uses it to choose between effect rows and
@@ -176,31 +186,53 @@ export const heldByRoster = (
 export const narrowedByPins = (
   intervals: StatusInterval[],
   pins: SelectorPins,
-  role: "buff" | "debuff"
+  hostility: Hostility
 ): StatusInterval[] =>
   intervals.filter((interval) => {
-    const actor = role === "buff" ? interval.actorIndex : interval.casterIndex;
+    const actor = hostility === "friendly" ? interval.actorIndex : interval.casterIndex;
     if (pins.source !== null && actor !== pins.source) return false;
-    // A buff has no enemy spawn to match, so an enemy pin leaves it alone.
-    if (role === "debuff" && pins.targets.length > 0) {
+    // A player-held effect has no enemy spawn to match, so an enemy pin
+    // leaves the friendly side alone.
+    if (hostility === "enemy" && pins.targets.length > 0) {
       if (interval.targetSegment === null || !pins.targets.includes(interval.targetSegment)) return false;
     }
     return true;
   });
 
+/** Rows for one status tab: the tab fixes the POLARITY (Buffs shows
+ * beneficial effects, Debuffs harmful ones — the game's own
+ * `PositiveStatusOrNegativeStatus` flag via `isHarmful`), the hostility
+ * switch picks the HOLDERS. Split by holder alone, the Debuffs tab filed an
+ * enemy's own Bloodthirst as a "debuff", which is not what a debuff is. */
+export const statusTabRows = (
+  input: Parameters<MetricDescriptor["rows"]>[0],
+  harmful: boolean,
+  fallbackHostility: Hostility
+): MetricRow[] => {
+  const { statusIntervals, fightDurationMs, players, roster, pins, statusWindow } = input;
+  const hostility = input.hostility ?? fallbackHostility;
+  const slots = slotsOf(roster ?? players);
+  const held = heldByRoster(statusIntervals ?? [], slots, hostility === "friendly");
+  return statusRows({
+    intervals: narrowedByPins(
+      held.filter((interval) => isHarmful(interval.statusId) === harmful),
+      pins,
+      hostility
+    ),
+    fightDurationMs: fightDurationMs ?? 0,
+    pinnedKey: pins.ability,
+    // Enemies have no party slot, so their holder rows take the neutral slot.
+    slotOf: hostility === "friendly" ? (actorIndex) => slots.get(actorIndex) ?? -1 : () => -1,
+    holderOf: hostility === "friendly" ? undefined : enemyHolderOf,
+    window: statusWindow,
+  });
+};
+
 export const buffs: MetricDescriptor = {
   labelKey: "ui.logs.metric-buffs",
   columnKeys: () => ["ui.logs.buff-uptime", "ui.logs.buff-count"],
+  // Holder-row kinds are decided by the HOSTILITY at render time
+  // (`statusRowKindFor`); this only marks the tab as a status table.
   labelKind: (level) => (level === "players" ? "status" : "player"),
-  rows: ({ statusIntervals, fightDurationMs, players, roster, pins, statusWindow }) => {
-    const slots = slotsOf(roster ?? players);
-    return statusRows({
-      intervals: narrowedByPins(heldByRoster(statusIntervals ?? [], slots, true), pins, "buff"),
-      fightDurationMs: fightDurationMs ?? 0,
-      pinnedKey: pins.ability,
-      slotOf: (actorIndex) => slots.get(actorIndex) ?? -1,
-      window: statusWindow,
-    });
-  },
+  rows: (input) => statusTabRows(input, false, "friendly"),
 };
-

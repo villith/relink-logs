@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { ComputedPlayerState, StatusInterval } from "@/types";
 
 import type { RowLevel } from "../deriveRows";
+import type { SelectorPins } from "../selectorOptions";
 
-import { buffs } from "./buffs";
+import { buffs, narrowedByPins } from "./buffs";
 import { debuffs } from "./debuffs";
 
 const interval = (
@@ -35,7 +36,7 @@ const INTERVALS: StatusInterval[] = [
   interval(0, 4_000, 8_000, 10, 500, 4),
   interval(1, 0, 2_000, 10, 500, 2),
   interval(0, 0, 1_000, 20, 600),
-  interval(9, 0, 6_000, 30, 700),
+  interval(9, 0, 6_000, 1001, 700),
 ];
 
 const PLAYERS = [
@@ -43,7 +44,13 @@ const PLAYERS = [
   { index: 1, partyIndex: 1 },
 ] as ComputedPlayerState[];
 
-const input = (level: RowLevel, ability: string | null = null, intervals = INTERVALS, players = PLAYERS) =>
+const input = (
+  level: RowLevel,
+  ability: string | null = null,
+  intervals = INTERVALS,
+  players = PLAYERS,
+  hostility?: "friendly" | "enemy"
+) =>
   ({
     statusIntervals: intervals,
     fightDurationMs: 10_000,
@@ -53,6 +60,7 @@ const input = (level: RowLevel, ability: string | null = null, intervals = INTER
     // `targets`, spelled as SelectorPins spells it — the helper said `targetIds`,
     // which no reader of the pins has ever looked at.
     pins: { source: null, targets: [], ability },
+    hostility,
   }) as never;
 
 describe("buffs descriptor", () => {
@@ -62,9 +70,10 @@ describe("buffs descriptor", () => {
     expect(rows.map((r) => r.key)).toEqual(["status:10:500", "status:20:600"]);
   });
 
-  it("leaves enemy-held effects to the debuffs table", () => {
-    // Actor 9 is nobody's player index, so status 30 is not a buff.
-    expect(buffs.rows(input("players")).some((r) => r.key === "status:30:700")).toBe(false);
+  it("leaves enemy-held effects off the friendly Buffs table", () => {
+    // Actor 9 is nobody's player index (and Burn is harmful besides) — under
+    // the default friendly hostility this table shows neither.
+    expect(buffs.rows(input("players")).some((r) => r.key === "status:1001:700")).toBe(false);
   });
 
   it("merges overlapping intervals when computing a buff's uptime", () => {
@@ -150,7 +159,7 @@ describe("buffs descriptor", () => {
 describe("debuffs descriptor", () => {
   it("gives one row per effect held by a non-player", () => {
     const rows = debuffs.rows(input("players"));
-    expect(rows.map((r) => r.key)).toEqual(["status:30:700"]);
+    expect(rows.map((r) => r.key)).toEqual(["status:1001:700"]);
   });
 
   it("counts an enemy's uptime the same way", () => {
@@ -164,16 +173,108 @@ describe("debuffs descriptor", () => {
   it("gives one holder row per enemy SPAWN, not per recycled actor id", () => {
     // The Four Dragons case end to end: one actor id, two spawns. Keyed on the
     // id the two dragons shared a row labelled with a bare number.
-    const recycled = [interval(9, 0, 1_000, 30, 700, 1, 1, 0), interval(9, 5_000, 9_000, 30, 700, 1, 1, 1)];
-    const rows = debuffs.rows(input("skills", "status:30:700", recycled));
+    const recycled = [interval(9, 0, 1_000, 1001, 700, 1, 1, 0), interval(9, 5_000, 9_000, 1001, 700, 1, 1, 1)];
+    const rows = debuffs.rows(input("skills", "status:1001:700", recycled));
     expect(rows.map((r) => r.key)).toEqual(["target:1", "target:0"]);
   });
 
   it("keeps an enemy the segmenter never placed on its own row", () => {
     // A phantom marker actor gets no segment. Its window is real capture, so it
     // keeps a row — labelled by the raw id, which is all that is known.
-    const rows = debuffs.rows(input("skills", "status:30:700", [interval(9, 0, 6_000, 30, 700)]));
+    const rows = debuffs.rows(input("skills", "status:1001:700", [interval(9, 0, 6_000, 1001, 700)]));
     expect(rows.map((r) => r.key)).toEqual(["actor:9"]);
   });
 });
 
+describe("narrowedByPins", () => {
+  const pins = (over: Partial<SelectorPins> = {}): SelectorPins => ({
+    source: null,
+    targets: [],
+    ability: null,
+    ...over,
+  });
+
+  // Two holders, and a debuff on two different enemy spawns cast by two players.
+  const HELD = [interval(0, 0, 1_000), interval(1, 0, 1_000)];
+  const ON_ENEMIES = [
+    { ...interval(9, 0, 1_000, 30, 700, 1, 1, 4), casterIndex: 0 },
+    { ...interval(8, 0, 1_000, 30, 700, 1, 1, 5), casterIndex: 1 },
+  ];
+
+  it("admits everything when nothing is pinned", () => {
+    expect(narrowedByPins(HELD, pins(), "friendly")).toEqual(HELD);
+    expect(narrowedByPins(ON_ENEMIES, pins(), "enemy")).toEqual(ON_ENEMIES);
+  });
+
+  it("narrows a buff to the pinned HOLDER", () => {
+    expect(narrowedByPins(HELD, pins({ source: 1 }), "friendly")).toEqual([HELD[1]]);
+  });
+
+  it("ignores an enemy pin on a buff, which has no enemy spawn", () => {
+    expect(narrowedByPins(HELD, pins({ targets: [4] }), "friendly")).toEqual(HELD);
+  });
+
+  it("narrows a debuff to the pinned CASTER, not its holder", () => {
+    expect(narrowedByPins(ON_ENEMIES, pins({ source: 1 }), "enemy")).toEqual([ON_ENEMIES[1]]);
+  });
+
+  it("narrows a debuff to the pinned enemy SPAWN", () => {
+    expect(narrowedByPins(ON_ENEMIES, pins({ targets: [4] }), "enemy")).toEqual([ON_ENEMIES[0]]);
+  });
+
+  it("drops a debuff with no spawn when an enemy is pinned", () => {
+    const noSpawn = { ...interval(9, 0, 1_000, 30, 700), casterIndex: 0 };
+    expect(narrowedByPins([noSpawn], pins({ targets: [4] }), "enemy")).toEqual([]);
+  });
+
+  it("applies caster and spawn together", () => {
+    expect(narrowedByPins(ON_ENEMIES, pins({ source: 0, targets: [5] }), "enemy")).toEqual([]);
+  });
+
+  it("ignores a STATUS ability pin, which selects the effect rather than an actor", () => {
+    expect(narrowedByPins(HELD, pins({ ability: "status:10:500" }), "friendly")).toEqual(HELD);
+  });
+});
+
+describe("polarity and hostility", () => {
+  // burn (1001) is harmful, bloodthirst (32) and protect (10) beneficial —
+  // per the generated statusPolarity table.
+  const MIXED: StatusInterval[] = [
+    interval(0, 0, 4_000, 1001, 500), // Burn ON Narmaya
+    interval(0, 0, 2_000, 10, 500), // protect on Narmaya
+    interval(9, 0, 6_000, 32, 700, 1, 1, 2), // Bloodthirst, enemy spawn 2's own
+    interval(9, 0, 5_000, 1001, 800, 1, 1, 2), // Burn on enemy spawn 2
+  ];
+
+  it("keeps harmful effects off the Buffs table even when a player holds them", () => {
+    expect(buffs.rows(input("players", null, MIXED)).map((r) => r.key)).toEqual(["status:10:500"]);
+  });
+
+  it("keeps enemy self-buffs off the Debuffs table", () => {
+    // Bloodthirst is a buff the enemy gave itself — the exact row the
+    // holder-based split used to misfile as a debuff.
+    expect(debuffs.rows(input("players", null, MIXED)).map((r) => r.key)).toEqual(["status:1001:800"]);
+  });
+
+  it("shows enemy self-buffs on the Buffs table under enemy hostility", () => {
+    expect(buffs.rows(input("players", null, MIXED, PLAYERS, "enemy")).map((r) => r.key)).toEqual(["status:32:700"]);
+  });
+
+  it("keys enemy-held holder rows by spawn under enemy hostility", () => {
+    const rows = buffs.rows(input("players", "status:32:700", MIXED, PLAYERS, "enemy"));
+    expect(rows.map((r) => r.key)).toEqual(["target:2"]);
+    expect(rows[0].colorSlot).toBe(-1);
+  });
+
+  it("shows ailments on players on the Debuffs table under friendly hostility", () => {
+    expect(debuffs.rows(input("players", null, MIXED, PLAYERS, "friendly")).map((r) => r.key)).toEqual([
+      "status:1001:500",
+    ]);
+  });
+
+  it("keys player-held holder rows by player under friendly hostility", () => {
+    const rows = debuffs.rows(input("players", "status:1001:500", MIXED, PLAYERS, "friendly"));
+    expect(rows.map((r) => r.key)).toEqual(["player:0"]);
+    expect(rows[0].colorSlot).toBe(0);
+  });
+});

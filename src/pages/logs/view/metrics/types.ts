@@ -42,6 +42,11 @@ export type MetricRow = {
  * naming the enemy SPAWN that held the effect. */
 export type LabelKind = "player" | "ability" | "status" | "raw" | "target";
 
+/** Which side's holders the status tables are about — WCL's
+ * Friendlies/Enemies switch. Polarity (buff vs debuff) is fixed per tab; this
+ * picks the holders, so all four quadrants are reachable. */
+export type Hostility = "friendly" | "enemy";
+
 /** Everything a metric needs to turn encounter state into rows. */
 export type MetricDescriptor = {
   /** i18next key for the switcher label. */
@@ -78,6 +83,8 @@ export type MetricDescriptor = {
      * a scrubbed table would otherwise draw every band at absolute fight time
      * over a chart that starts somewhere else. */
     statusWindow?: { startMs: number; endMs: number };
+    /** Which side's holders the status descriptors select. Absent, each tab
+     * uses its natural side: Buffs → friendly, Debuffs → enemy. */
+    hostility?: Hostility;
   }) => MetricRow[];
 };
-
