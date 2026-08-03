@@ -2534,6 +2534,13 @@ fn main() {
         std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1");
     }
 
+    // --- Portable mode: keep WebView2 cache in the EXE's own directory ---
+    gbfr_logs::portable::ensure_dirs().expect("Failed to create portable directories");
+    std::env::set_var(
+        "WEBVIEW2_USER_DATA_FOLDER",
+        gbfr_logs::portable::webview_data_dir(),
+    );
+
     info!("Starting application..");
 
     // Setup the database.
