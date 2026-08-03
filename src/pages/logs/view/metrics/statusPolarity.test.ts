@@ -28,7 +28,7 @@ describe("status polarity", () => {
     // Every current ailment id answers harmful; the count is a deliberate
     // tripwire so a game patch that adds ailments forces a regeneration.
     for (let id = 1000; id <= 1021; id++) {
-      if (HARMFUL_STATUS_IDS.has(id)) expect(isHarmful(id)).toBe(true);
+      expect(isHarmful(id)).toBe(true);
     }
     expect([...HARMFUL_STATUS_IDS].filter((id) => id >= 1000)).toHaveLength(22);
   });
