@@ -1,7 +1,8 @@
 import i18n from "i18next";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { setSkillNameSources } from "./skillNameSources";
+import { useMeterSettingsStore } from "./stores/useMeterSettingsStore";
 import { SkillState } from "./types";
 import { getSkillName } from "./utils";
 
@@ -57,5 +58,26 @@ describe("getSkillName language-major resolution", () => {
 
   it("still interpolates the unknown-skill fallback", () => {
     expect(getSkillName("Pl0400", hit(4321))).toBe("Skill 4321");
+  });
+});
+
+describe("the skill_name_resolution setting", () => {
+  afterEach(() => useMeterSettingsStore.getState().set({ skill_name_resolution: "language-first" }));
+
+  it("defaults to the language-major order", () => {
+    expect(useMeterSettingsStore.getState().skill_name_resolution).toBe("language-first");
+  });
+
+  it("switches getSkillName back to the label-first order", () => {
+    // The store subscription drives the resolver, so flipping the setting is
+    // all a user does — no reload, no re-injection.
+    useMeterSettingsStore.getState().set({ skill_name_resolution: "label-first" });
+    expect(getSkillName("Pl0400", hit(7000))).toBe("Gravity Well (Charged)");
+  });
+
+  it("switches back to language-major when restored", () => {
+    useMeterSettingsStore.getState().set({ skill_name_resolution: "label-first" });
+    useMeterSettingsStore.getState().set({ skill_name_resolution: "language-first" });
+    expect(getSkillName("Pl0400", hit(7000))).toBe("Puits de gravité");
   });
 });

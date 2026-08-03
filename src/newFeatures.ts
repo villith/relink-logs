@@ -23,6 +23,7 @@ export const NEW_FEATURES = {
   "flagged-builds-setting": { from: "1.12.5", until: "1.12.7" },
   "import-export-logs": { from: "1.12.7", until: "1.12.8" },
   "import-export-settings": { from: "1.12.7", until: "1.12.8" },
+  "skill-name-resolution": { from: "1.12.7", until: "1.12.8" },
 } as const satisfies Record<string, NewWindow>;
 
 export type NewFeatureId = keyof typeof NEW_FEATURES;

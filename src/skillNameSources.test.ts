@@ -1,7 +1,13 @@
 import i18n from "i18next";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { resolveSkillName, setSkillNameSources, stripTierSuffix, summonClassSource } from "./skillNameSources";
+import {
+  resolveSkillName,
+  setSkillNameResolutionMode,
+  setSkillNameSources,
+  stripTierSuffix,
+  summonClassSource,
+} from "./skillNameSources";
 
 const SOURCES = {
   Pl0000: { "1301": { ns: "abilities" as const, hash: "967964c1", key: "AB_PL0000_05" } },
@@ -118,6 +124,29 @@ describe("resolveSkillName", () => {
     } finally {
       await i18n.changeLanguage("fr");
     }
+  });
+
+  describe("in label-first mode (the pre-language-major behavior)", () => {
+    // The settings page offers the old order back: every hand label — any
+    // language's, via the normal per-key fallback — before any bridge name.
+    beforeEach(() => setSkillNameResolutionMode("label-first"));
+    afterEach(() => setSkillNameResolutionMode("language-first"));
+
+    it("lets a foreign hand label beat the current language's bridge name", () => {
+      expect(resolveSkillName(["Pl0400"], 4400)).toBe("Label EN 4400");
+    });
+
+    it("still puts the current language's own hand label first", () => {
+      expect(resolveSkillName(["Pl0400"], 1100)).toBe("Étiquette FR");
+    });
+
+    it("still reaches the bridge for an unlabelled id", () => {
+      expect(resolveSkillName(["Pl0400"], 3300)).toBe("Bridge EN 3300");
+    });
+
+    it("keeps the child block ahead of the character block", () => {
+      expect(resolveSkillName(["Pl0400Child", "Pl0400"], 1100)).toBe("Enfant FR");
+    });
   });
 });
 

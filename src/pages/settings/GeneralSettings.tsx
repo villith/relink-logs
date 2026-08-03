@@ -1,6 +1,7 @@
 import NewChip from "@/components/NewChip";
 import useSettings from "@/pages/useSettings";
 import { useIsLinux } from "@/platform";
+import { type SkillNameResolutionMode } from "@/skillNameSources";
 import { useLogIndexStore } from "@/stores/useLogIndexStore";
 import { useManualUpdateCheck } from "@/useUpdateCheck";
 import { Button, Checkbox, Divider, Group, Select, Stack, Text, Title, Tooltip } from "@mantine/core";
@@ -27,6 +28,7 @@ const GeneralSettings = () => {
     open_log_on_save,
     auto_check_updates,
     show_flagged_builds,
+    skill_name_resolution,
     setMeterSettings,
   } = useSettings();
   const { checking, checkNow } = useManualUpdateCheck();
@@ -124,6 +126,22 @@ const GeneralSettings = () => {
         allowDeselect={false}
         onChange={handleLanguageChange}
       />
+      <Group gap="sm" align="flex-end">
+        <Tooltip label={t("ui.skill-name-resolution-description")} multiline w={360}>
+          <Select
+            label={t("ui.skill-name-resolution")}
+            data={[
+              { value: "language-first", label: t("ui.skill-name-resolution-language-first") },
+              { value: "label-first", label: t("ui.skill-name-resolution-label-first") },
+            ]}
+            value={skill_name_resolution}
+            allowDeselect={false}
+            w={360}
+            onChange={(value) => value && setMeterSettings({ skill_name_resolution: value as SkillNameResolutionMode })}
+          />
+        </Tooltip>
+        <NewChip id="skill-name-resolution" />
+      </Group>
       <Tooltip label={t("ui.open-log-on-save-description")}>
         <Checkbox
           label={t("ui.open-log-on-save")}

@@ -58,6 +58,23 @@ export const setSkillNameSources = (next: SkillNameSources): void => {
 
 export const getSkillNameSources = (): SkillNameSources => sources;
 
+/** Which of the two resolution orders `resolveSkillName` walks.
+ *
+ * `language-first` (the default): the current language's hand label, then its
+ * bridge name, then the fallback language's — a translated game name beats a
+ * foreign hand label. `label-first` restores the pre-language-major order:
+ * every hand label (any language's, via the normal per-key fallback) before
+ * any bridge name — hand labels always win, at the cost of non-labelled
+ * languages reading English. Driven by the `skill_name_resolution` setting;
+ * the store subscription in useMeterSettingsStore keeps this in step. */
+export type SkillNameResolutionMode = "language-first" | "label-first";
+
+let resolutionMode: SkillNameResolutionMode = "language-first";
+
+export const setSkillNameResolutionMode = (mode: SkillNameResolutionMode): void => {
+  resolutionMode = mode;
+};
+
 /** Display name for an action id, resolved language-major.
  *
  * Priority is per LANGUAGE first, source second: the current language's ui.json
@@ -77,19 +94,39 @@ export const getSkillNameSources = (): SkillNameSources => sources;
  */
 export const resolveSkillName = (blocks: string[], skillId: number): string | null => {
   const id = String(skillId);
+  const languages = i18next.languages ?? [];
 
-  for (const lng of i18next.languages ?? []) {
-    for (const block of blocks) {
-      const label = i18next.t(`skills.${block}.${id}`, { lngs: [lng], defaultValue: "" });
-      if (label !== "") return label;
+  const label = (block: string, lng: string): string =>
+    i18next.t(`skills.${block}.${id}`, { lngs: [lng], defaultValue: "" });
+
+  const bridge = (block: string, lng: string): string => {
+    const source = sources[block]?.[id];
+    if (source === undefined) return "";
+    return i18next.t(`${source.ns}:${source.hash}.text`, { lngs: [lng], defaultValue: "" });
+  };
+
+  // label-first nests the loops the other way around: every label across the
+  // whole language chain before any bridge name — the order a plain t()
+  // fallback array used to produce.
+  if (resolutionMode === "label-first") {
+    for (const lookup of [label, bridge]) {
+      for (const block of blocks) {
+        for (const lng of languages) {
+          const text = lookup(block, lng);
+          if (text !== "") return text;
+        }
+      }
     }
 
-    for (const block of blocks) {
-      const source = sources[block]?.[id];
-      if (source === undefined) continue;
+    return null;
+  }
 
-      const text = i18next.t(`${source.ns}:${source.hash}.text`, { lngs: [lng], defaultValue: "" });
-      if (text !== "") return text;
+  for (const lng of languages) {
+    for (const lookup of [label, bridge]) {
+      for (const block of blocks) {
+        const text = lookup(block, lng);
+        if (text !== "") return text;
+      }
     }
   }
 

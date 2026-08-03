@@ -14,6 +14,7 @@ import {
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+import { setSkillNameResolutionMode, type SkillNameResolutionMode } from "@/skillNameSources";
 import { durablePersistOptions, registerDurableStore } from "./durableStorage";
 
 /** How a row's bar is sized. `total`: the width is the row's share of the whole.
@@ -156,6 +157,11 @@ interface MeterSettings {
   bar_spacing: number;
   /** See LogsViewMode. Switched from the control in the quest view itself. */
   logs_view_mode: LogsViewMode;
+  /** How skill and cause names resolve across languages — see
+   * `SkillNameResolutionMode`. `language-first` prefers the current language's
+   * translated game name over a hand label that only exists in English;
+   * `label-first` is the original order where any hand label wins. */
+  skill_name_resolution: SkillNameResolutionMode;
 }
 
 interface MeterStateFunctions {
@@ -201,6 +207,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   ...DEFAULT_OVERLAY_SIZE,
   ...DEFAULT_BAR_APPEARANCE,
   logs_view_mode: "analysis",
+  skill_name_resolution: "language-first",
 };
 
 /* Cross-window sync lives in `durableStorage`: every write goes to settings.db,
@@ -300,3 +307,10 @@ export const useMeterSettingsStore = create<MeterSettings & MeterStateFunctions>
 );
 
 registerDurableStore(useMeterSettingsStore);
+
+// `resolveSkillName` cannot subscribe itself: skillNameSources stays free of
+// store (and transitively Tauri) imports so utils' tests need no Tauri mocks.
+// Mirror the setting into it here — on hydration and every later change, from
+// this window or synced in from another.
+setSkillNameResolutionMode(useMeterSettingsStore.getState().skill_name_resolution);
+useMeterSettingsStore.subscribe((state) => setSkillNameResolutionMode(state.skill_name_resolution));
