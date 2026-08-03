@@ -40,7 +40,7 @@ import {
 } from "../DetailCharts";
 import { actionsForPin } from "../abilitySkills";
 import { rowLevelFor } from "../deriveRows";
-import { buffs } from "../metrics/buffs";
+import { buffs, heldByRoster, slotsOf } from "../metrics/buffs";
 import { damageDone } from "../metrics/damageDone";
 import { debuffs } from "../metrics/debuffs";
 import { sba } from "../metrics/sba";
@@ -70,6 +70,7 @@ import { identityPartyOf } from "./partyIdentity";
 import { buildStatusSeries } from "./statusChart";
 import { causeLabel, statusLabelFor, statusRowKindFor, targetRowLabel } from "./statusLabel";
 import { withStatusOption } from "./statusOption";
+import { statusRowColors } from "./statusRowColors";
 import { useUrlQueryString } from "./useUrlQueryString";
 
 /** The metric switcher's contents, in display order. Adding a metric is adding
@@ -501,6 +502,10 @@ export const AnalysisView = () => {
   const isStatusMetric = metric.labelKind("players") === "status";
   const statusRowKind = statusRowKindFor(pins.ability, hostility);
 
+  // One colour per slotless status row, shared with the chart bands below so a
+  // row and its band can never disagree.
+  const rowColors = useMemo(() => (isStatusMetric ? statusRowColors(rows) : null), [isStatusMetric, rows]);
+
   const renderLabel = useCallback(
     (row: MetricRow) => {
       // Effect names come from status.tbl via the generated `statuses` bundle;
@@ -560,14 +565,14 @@ export const AnalysisView = () => {
 
   const rowColor = useCallback(
     (row: MetricRow) => {
-      if (row.colorSlot < 0) return "var(--an-ink-3)";
+      if (row.colorSlot < 0) return rowColors?.get(row.key) ?? "var(--an-ink-3)";
       // Re-resolve through the identity party: a scoped fetch renumbers slots,
       // so the descriptor's colorSlot can point at the wrong player.
       const key = row.key.startsWith("player:") ? Number(row.key.slice("player:".length)) : pins.source;
       const slot = playerByIndex.get(key ?? -1)?.slot ?? row.colorSlot;
       return resolvePlayerColor(palette, playerData, slot, 0);
     },
-    [palette, playerData, playerByIndex, pins.source]
+    [palette, playerData, playerByIndex, pins.source, rowColors]
   );
 
   // The rule itself lives in cardSections.ts; the view only supplies the name
@@ -662,8 +667,11 @@ export const AnalysisView = () => {
   // against a chart that is already the window.
   const statusSeries = useMemo(() => {
     if (!isStatusMetric) return null;
+    // Same roster split as the table (`statusTabRows`): an effect held on both
+    // sides would otherwise grow one series mislabeled by the other side's key.
+    const roster = slotsOf(identityPlayers);
     const series = buildStatusSeries({
-      intervals: statusIntervals,
+      intervals: heldByRoster(statusIntervals, roster, hostility === "friendly"),
       pinnedKey: pins.ability,
       bucketMs: DPS_BUCKET_MS,
       len: chartLen,
@@ -678,7 +686,16 @@ export const AnalysisView = () => {
           : { key: `player:${interval.actorIndex}`, label: labelForSource(interval.actorIndex) },
     });
     return series.length > 0 ? series : null;
-  }, [isStatusMetric, statusIntervals, pins.ability, chartLen, hostility, labelForTarget, labelForSource]);
+  }, [
+    isStatusMetric,
+    statusIntervals,
+    pins.ability,
+    chartLen,
+    hostility,
+    labelForTarget,
+    labelForSource,
+    identityPlayers,
+  ]);
 
   // Which series the per-player chart draws. identityPlayers, not players: these
   // charts hold the whole party, so a pin must not drop curves from the plot.
@@ -794,11 +811,13 @@ export const AnalysisView = () => {
     if (banded.size === 0) return undefined;
 
     return [...banded].flatMap((key, index) => {
-      const color = mantineColorVar(HP_SERIES_COLORS[index % HP_SERIES_COLORS.length]);
+      // The row's own colour is the normal path; the index fallback only fires
+      // for a band whose row scrolled out of the current pin level.
+      const color = rowColors?.get(key) ?? mantineColorVar(HP_SERIES_COLORS[index % HP_SERIES_COLORS.length]);
       const held = statusIntervals.filter((interval) => statusPinKey(interval) === key);
       return toBands(held, statusWindow).map((band) => ({ color, band }));
     });
-  }, [banded, statusIntervals, statusWindow]);
+  }, [banded, statusIntervals, statusWindow, rowColors]);
 
   // What the plot was actually drawn from, for the dev-only readout. Read off
   // the very values the chart consumed rather than recomputed from the pins, so
