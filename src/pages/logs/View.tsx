@@ -83,6 +83,7 @@ import {
   formatInPartyOrder,
   formatOvermastery,
   formatSummonBonusValue,
+  getPlayerLevel,
   groupBonuses,
   hasQuestElapsedTime,
   humanizeNumbers,
@@ -141,7 +142,7 @@ const formatBonusTotals = (totals: BonusAmount[]): string => totals.map(formatBo
 const formatPlayerDisplayName = (player: PlayerData, showName: boolean, showLevel: boolean = true): string => {
   const label = formatCharacterLabel(player.characterType, player.displayName, showName);
 
-  return showLevel ? `${label} Lvl. ${player.playerStats?.level || 1}` : label;
+  return showLevel ? `${label} Lvl. ${getPlayerLevel(player)}` : label;
 };
 
 // Returns a string of stars based on the star level.
@@ -1521,7 +1522,7 @@ export const ViewPage = () => {
                             {t("ui.player-stats")}
                           </Text>
                           <Text size="xs" fs="italic" fw={300}>
-                            {t("ui.stats.level")}: {player.playerStats?.level || 1}
+                            {t("ui.stats.level")}: {getPlayerLevel(player)}
                           </Text>
                           {(player.masterLevel || 0) > 0 && (
                             <Text size="xs" fs="italic" fw={300}>

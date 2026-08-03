@@ -1036,6 +1036,10 @@ export const formatCharacterLabel = (
   return showName ? `${displayName} (${type})` : type;
 };
 
+/** Prefer the v2.0.2 record-stat recovery, while retaining the legacy field
+ * for logs recorded before that block was available. */
+export const getPlayerLevel = (player: PlayerData): number => player.stats?.level || player.playerStats?.level || 1;
+
 /** The tokens a player-name template may use. Exported so the settings editor
  * can list them and flag anything else as a typo. */
 export const PLAYER_LABEL_TOKENS = ["slot", "name", "character", "icon"] as const;
