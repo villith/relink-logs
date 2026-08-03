@@ -32,7 +32,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import summonBonusValues from "../src-tauri/assets/summon-bonus-values.json";
 
 import { renderTemplate } from "./labelTemplate";
-import { abilitySourceKeys, stripTierSuffix, summonClassSource } from "./skillNameSources";
+import { resolveSkillName, stripTierSuffix, summonClassSource } from "./skillNameSources";
 import { DEFAULT_PLAYER_LABEL, type BarFillMode } from "./stores/useMeterSettingsStore";
 
 export const EMPTY_ID = 2289754288;
@@ -911,19 +911,14 @@ export const getSkillName = (characterType: CharacterType, skill: SkillRow) => {
         return t(SUMMON_FALLBACK_KEYS, { id: skillID });
       }
 
-      return t(
-        [
-          `skills.${skill.childCharacterType}.${skillID}`,
-          `skills.${characterType}.${skillID}`,
-          // The generated abilities bundle, via the bridge map: ui.json keys rows
-          // by action id, abilities.json by ability hash. Sits behind the ui.json
-          // keys so a hand-authored label still wins.
-          ...abilitySourceKeys(String(characterType), String(skill.childCharacterType), skillID),
-          `skills.default.${skillID}`,
-          `skills.default.unknown-skill`,
-        ],
-        { id: skillID }
-      );
+      // Language-major: the current language's ui.json label, then its bridge
+      // (game) name, only then the fallback language's — so an English-only
+      // hand label cannot shadow a translated game name. Within one language a
+      // hand label still wins over the bridge.
+      const resolved = resolveSkillName([String(skill.childCharacterType), String(characterType)], skillID);
+      if (resolved !== null) return resolved;
+
+      return t([`skills.default.${skillID}`, `skills.default.unknown-skill`], { id: skillID });
     }
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "Group"): {
       const actionType = skill.actionType as { Group: string };
@@ -945,9 +940,9 @@ export const getSkillName = (characterType: CharacterType, skill: SkillRow) => {
 /** Name for a status row's cause id, or empty when no table names it.
  *
  * A cause in the character bands is the applying character's action id, so it
- * resolves through the same per-character tables the damage meter uses — tried
- * for every candidate character (the row's CASTERS — see `causeCandidatesFor`),
- * then the ability-hash bridge, then the `causes.default` band entries
+ * resolves through the same language-major lookup the damage meter uses —
+ * every candidate character's table then bridge entry per language (the row's
+ * CASTERS — see `causeCandidatesFor`), then the `causes.default` band entries
  * (sigil/trait, equipment, environment, perfect guard).
  *
  * `causes.default`, never `skills.default`: the shared skills table names the
@@ -957,8 +952,10 @@ export const getSkillName = (characterType: CharacterType, skill: SkillRow) => {
  * damage table would name wrongly. */
 export const causeSkillName = (candidates: CharacterType[], causeId: number): string => {
   const probe = (id: number): string => {
-    const keys = candidates.flatMap((c) => [`skills.${c}.${id}`, ...abilitySourceKeys(String(c), String(c), id)]);
-    return t([...keys, `causes.default.${id}`], { defaultValue: "" });
+    // Language-major, like the damage rows: within each language every
+    // candidate's hand label is tried before any candidate's bridge name.
+    const resolved = resolveSkillName(candidates.map(String), id);
+    return resolved ?? t(`causes.default.${id}`, { defaultValue: "" });
   };
   const exact = probe(causeId);
   if (exact) return exact;

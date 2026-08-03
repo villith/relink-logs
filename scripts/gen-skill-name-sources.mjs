@@ -228,22 +228,27 @@ export const buildSkillNameSources = (ui, generated, existing = {}) => {
  *
  *   1. An entry already in the artifact stays. It is human-reviewed; when the
  *      tag points elsewhere that is a report line, never a silent overwrite.
- *   2. An action any language still hand-labels is skipped: labels are often
- *      MORE specific than the game's name ("Overdrive Surge (Arts I)" vs
- *      "Overdrive Surge"), and validateSources treats coexistence as an error.
- *   3. A tag naming ANOTHER character's ability is skipped and reported. Dev
+ *   2. A tag naming ANOTHER character's ability is skipped and reported. Dev
  *      copy-paste junk has exactly that shape — Io's empowered Gravity Well
  *      rows carry Gran's Decimate, Djeeta's 1610-1613 carry it on rows her
  *      labels call Miserable Mist — and a name from outside the block's own
  *      key space cannot be told apart from it automatically. (utils.test.ts
  *      enforces the same scoping invariant over the committed artifact.)
- *   4. The tag resolves to the base key, else its _CG cutscene twin, else it
+ *   3. The tag resolves to the base key, else its _CG cutscene twin, else it
  *      is reported unresolved. What remains is added.
+ *
+ * A hand label does NOT block an entry: the runtime resolves language-major,
+ * so a label wins inside its own language while the bridge serves every other
+ * language's translated game name. The one safety net labels used to provide —
+ * catching a junk tag inside the block's OWN key space, which rule 2 cannot —
+ * survives as the labelMismatch report: an added entry whose en label does not
+ * begin with the game's en name (a label may legitimately refine it, e.g.
+ * "Overdrive Surge (Arts I)") is flagged for human review, never dropped.
  */
 export const buildGameDataSources = (rows, abilities, uiByLang, existing = {}) => {
   const hashOfKey = new Map(Object.entries(abilities).map(([hash, entry]) => [entry.key, hash]));
   const sources = Object.fromEntries(Object.entries(existing).map(([block, entries]) => [block, { ...entries }]));
-  const report = { added: [], cross: [], disagreements: [], labelled: [], unresolved: [] };
+  const report = { added: [], cross: [], disagreements: [], labelMismatch: [], unresolved: [] };
 
   for (const { block, id, tag } of rows) {
     const have = sources[block]?.[id];
@@ -251,11 +256,6 @@ export const buildGameDataSources = (rows, abilities, uiByLang, existing = {}) =
       if (have.key !== tag && have.key !== `${tag}_CG`) {
         report.disagreements.push({ block, id, have: have.key, tag });
       }
-      continue;
-    }
-
-    if (Object.values(uiByLang).some((ui) => typeof ui.skills?.[block]?.[id] === "string")) {
-      report.labelled.push({ block, id, tag });
       continue;
     }
 
@@ -270,8 +270,17 @@ export const buildGameDataSources = (rows, abilities, uiByLang, existing = {}) =
       continue;
     }
 
+    const hash = hashOfKey.get(key);
+    const enLabel = uiByLang.en?.skills?.[block]?.[id];
+    if (typeof enLabel === "string") {
+      const text = normalizeName(abilities[hash].text);
+      if (!normalizeName(enLabel).startsWith(text)) {
+        report.labelMismatch.push({ block, id, key, label: enLabel, text });
+      }
+    }
+
     sources[block] ??= {};
-    sources[block][id] = { ns: "abilities", hash: hashOfKey.get(key), key };
+    sources[block][id] = { ns: "abilities", hash, key };
     report.added.push({ block, id, key });
   }
 
@@ -301,11 +310,13 @@ const sortSources = (sources) =>
       ])
   );
 
-/** Validates a committed bridge map. The map is the source of truth once the
- * English names are deleted from ui.json, so re-runs check rather than rebuild.
- * Returns a list of human-readable errors; empty means healthy.
+/** Validates a committed bridge map: every entry must still resolve to text in
+ * its generated bundle. A ui.json label coexisting with a mapped id is NOT an
+ * error — the runtime resolves language-major, so the label wins inside its
+ * own language and the bridge serves the rest. Returns a list of
+ * human-readable errors; empty means healthy.
  */
-export const validateSources = (sources, generated, uiByLang) => {
+export const validateSources = (sources, generated) => {
   const errors = [];
   const bundles = { abilities: generated.abilities, summons: generated.summons, enemies: generated.enemies };
 
@@ -316,12 +327,6 @@ export const validateSources = (sources, generated, uiByLang) => {
         errors.push(
           `${block}.${id} -> ${source.ns}:${source.hash} (${source.key}) no longer resolves; a game patch may have renamed it`
         );
-      }
-
-      for (const [lang, ui] of Object.entries(uiByLang)) {
-        if (typeof ui.skills?.[block]?.[id] === "string") {
-          errors.push(`${lang}/ui.json duplicates mapped entry skills.${block}.${id}; delete it or drop the mapping`);
-        }
       }
     }
   }
@@ -444,13 +449,19 @@ const main = () => {
     for (const { block, id, tag } of report.unresolved) {
       console.warn(`[gen] ${block}.${id} tag ${tag} resolves to no abilities.json entry`);
     }
+    for (const { block, id, key, label, text } of report.labelMismatch) {
+      console.warn(
+        `[gen] ${block}.${id} -> ${key} (${JSON.stringify(text)}) but en labels it ` +
+          `${JSON.stringify(label)}; review — a same-character junk tag looks exactly like this`
+      );
+    }
     console.log(
       `[gen] ${rows.length} tagged actions: ${report.added.length} added, ` +
-        `${report.labelled.length} hand-labelled (labels win), ${report.cross.length} cross-character skip(s), ` +
-        `${report.disagreements.length} disagreement(s), ${report.unresolved.length} unresolved`
+        `${report.cross.length} cross-character skip(s), ${report.disagreements.length} disagreement(s), ` +
+        `${report.labelMismatch.length} label mismatch(es), ${report.unresolved.length} unresolved`
     );
 
-    const errors = validateSources(sources, generated, uiByLang);
+    const errors = validateSources(sources, generated);
     if (errors.length > 0) {
       console.error(`[gen] refusing to write: the merged map fails validation:`);
       for (const error of errors) console.error(`  - ${error}`);
@@ -465,7 +476,7 @@ const main = () => {
   // Validating is the default; `--check` is accepted so older invocations and
   // notes keep working.
   if (!process.argv.includes("--rebuild")) {
-    const errors = validateSources(existing, generated, uiByLang);
+    const errors = validateSources(existing, generated);
 
     if (errors.length > 0) {
       console.error(`[gen] ${errors.length} problem(s):`);

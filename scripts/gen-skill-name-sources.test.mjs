@@ -396,16 +396,56 @@ describe("buildGameDataSources", () => {
     expect(report.added).toEqual([]);
   });
 
-  it("skips an action any language still hand-labels, because labels are often more specific", () => {
-    // Real case: "Overdrive Surge (Arts I)" carries the arts level; the game's
-    // own name is just "Overdrive Surge". The hand label must keep winning.
-    const uiByLang = { "zh-TW": { skills: { Pl2400: { 1900: "(位階1) 悲慘之霧" } } } };
+  it("adds a bridge entry even for an action a language still hand-labels", () => {
+    // Coexistence is the designed state: the runtime resolves language-major,
+    // so the zh-TW label keeps winning for zh-TW players while every other
+    // language reads its own translated game name instead of that label.
+    const uiByLang = { "zh-TW": { skills: { Pl2400: { 1900: "(位階1) 迅雷之楔" } } } };
     const rows = [{ block: "Pl2400", id: "1900", tag: "AB_PL2400_09" }];
 
     const { sources, report } = buildGameDataSources(rows, GD_ABILITIES, uiByLang);
 
-    expect(sources.Pl2400).toBeUndefined();
-    expect(report.labelled).toEqual([{ block: "Pl2400", id: "1900", tag: "AB_PL2400_09" }]);
+    expect(sources.Pl2400["1900"]).toEqual({ ns: "abilities", hash: "bc2ef1d8", key: "AB_PL2400_09" });
+    expect(report.added).toEqual([{ block: "Pl2400", id: "1900", key: "AB_PL2400_09" }]);
+    // A non-en label cannot be compared against the en game name.
+    expect(report.labelMismatch).toEqual([]);
+  });
+
+  it("accepts an en hand label that refines the game's own name", () => {
+    // "Flashpoint (Arts I)" carries the arts level the game's "Flashpoint"
+    // does not — expected specificity, not a naming conflict.
+    const uiByLang = { en: { skills: { Pl2400: { 1900: "Flashpoint (Arts I)" } } } };
+    const rows = [{ block: "Pl2400", id: "1900", tag: "AB_PL2400_09" }];
+
+    const { report } = buildGameDataSources(rows, GD_ABILITIES, uiByLang);
+
+    expect(report.added).toEqual([{ block: "Pl2400", id: "1900", key: "AB_PL2400_09" }]);
+    expect(report.labelMismatch).toEqual([]);
+  });
+
+  it("reports an en hand label the game's own name contradicts", () => {
+    // The Gran-1610 shape: a same-character junk tag no scoping rule can catch.
+    // The row is still added — the tag is all the data there is — but a human
+    // must see that the en label calls it something else entirely.
+    const uiByLang = { en: { skills: { Pl2400: { 1100: "Skewering Stance" } } } };
+    const rows = [{ block: "Pl2400", id: "1100", tag: "AB_PL2400_01" }];
+
+    const { sources, report } = buildGameDataSources(rows, GD_ABILITIES, uiByLang);
+
+    expect(sources.Pl2400["1100"]).toEqual({ ns: "abilities", hash: "966f4a6f", key: "AB_PL2400_01" });
+    expect(report.labelMismatch).toEqual([
+      { block: "Pl2400", id: "1100", key: "AB_PL2400_01", label: "Skewering Stance", text: "Tip of the Spear" },
+    ]);
+  });
+
+  it("still skips cross-character junk on a hand-labelled row", () => {
+    const uiByLang = { en: { skills: { Pl0100: { 1610: "Miserable Mist" } } } };
+    const rows = [{ block: "Pl0100", id: "1610", tag: "AB_PL0000_01" }];
+
+    const { sources, report } = buildGameDataSources(rows, GD_ABILITIES, uiByLang);
+
+    expect(sources.Pl0100).toBeUndefined();
+    expect(report.cross).toEqual([{ block: "Pl0100", id: "1610", tag: "AB_PL0000_01" }]);
   });
 
   it("reports a tag no abilities bundle resolves rather than dropping it silently", () => {
@@ -464,8 +504,16 @@ const SOURCES = {
 };
 
 describe("validateSources", () => {
-  it("passes a map whose hashes all resolve and whose ui.json holds no duplicates", () => {
+  it("passes a map whose hashes all resolve", () => {
     expect(validateSources(SOURCES, GENERATED, { en: { skills: { Pl0000: { 100: "Attack 1" } } } })).toEqual([]);
+  });
+
+  it("accepts a hand label coexisting with a mapped entry", () => {
+    // Coexistence is the designed state under language-major resolution: the
+    // label wins inside its own language, the bridge serves every other.
+    const uiByLang = { ko: { skills: { Pl0000: { 1301: "애로우 레인" } } } };
+
+    expect(validateSources(SOURCES, GENERATED, uiByLang)).toEqual([]);
   });
 
   it("flags a hash a game patch removed", () => {
@@ -484,12 +532,5 @@ describe("validateSources", () => {
     expect(errors).toEqual([
       "Pl0000.1301 -> abilities:967964c1 (AB_PL0000_05) no longer resolves; a game patch may have renamed it",
     ]);
-  });
-
-  it("flags a ui.json that re-introduced a mapped label", () => {
-    const uiByLang = { ko: { skills: { Pl0000: { 1301: "애로우 레인" } } } };
-    const errors = validateSources(SOURCES, GENERATED, uiByLang);
-
-    expect(errors).toEqual(["ko/ui.json duplicates mapped entry skills.Pl0000.1301; delete it or drop the mapping"]);
   });
 });

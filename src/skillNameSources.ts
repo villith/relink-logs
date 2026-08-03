@@ -6,13 +6,18 @@
  * ui.json keys skill rows by ACTION ID; abilities.json keys them by ABILITY
  * HASH. Nothing else connects the two, so without this map a translated ability
  * name can only reach the meter by being copied into ui.json by hand — which is
- * why the six languages that ship no ui.json used to read English.
+ * why the six languages that ship no ui.json used to read English. The map may
+ * cover an action a ui.json also labels: `resolveSkillName` orders the two per
+ * LANGUAGE (own label, own bridge name, then the fallback language's), so the
+ * label wins inside its language without shadowing another language's name.
  *
  * Deliberately free of Tauri imports: the asset loader
  * (`src/assets/skill-name-sources.ts`) does the top-level `await` and calls
  * `setSkillNameSources`, so `utils.ts` — and every test that touches it — stays
  * clear of `@tauri-apps/api`.
  */
+
+import i18next from "i18next";
 
 export type SkillNameNamespace = "abilities" | "summons" | "enemies";
 
@@ -53,20 +58,42 @@ export const setSkillNameSources = (next: SkillNameSources): void => {
 
 export const getSkillNameSources = (): SkillNameSources => sources;
 
-/** i18next keys for a mapped action id, the child character's block first.
+/** Display name for an action id, resolved language-major.
  *
- * Returns an array so callers can splice it straight into an existing `t()`
- * fallback chain: empty means "nothing mapped, carry on".
+ * Priority is per LANGUAGE first, source second: the current language's ui.json
+ * hand label, then its bridge (game) name, and only then the fallback
+ * language's label and bridge. A plain `t()` fallback array cannot express
+ * this — i18next resolves each key across every language before trying the
+ * next key, which would let an English-only hand label shadow a perfectly
+ * translated game name. Within one language a hand label still wins (it is
+ * often more specific than the game's own name), and the caller's block order
+ * (child character first) is preserved.
+ *
+ * `i18next.languages` is the resolve hierarchy — e.g. ["fr-FR", "fr", "en"] —
+ * so a regional UI language reaches its base-language bundles, and zh-TW its
+ * zh-CN hop, without special cases. Each step pins ONE chain entry via `lngs`;
+ * `fallbackLng: false` cannot do this — i18next treats it as falsy and swaps
+ * the global fallback back in, which is exactly the leak being prevented.
  */
-export const abilitySourceKeys = (characterType: string, childCharacterType: string, skillId: number): string[] => {
+export const resolveSkillName = (blocks: string[], skillId: number): string | null => {
   const id = String(skillId);
 
-  for (const block of [childCharacterType, characterType]) {
-    const source = sources[block]?.[id];
-    if (source !== undefined) return [`${source.ns}:${source.hash}.text`];
+  for (const lng of i18next.languages ?? []) {
+    for (const block of blocks) {
+      const label = i18next.t(`skills.${block}.${id}`, { lngs: [lng], defaultValue: "" });
+      if (label !== "") return label;
+    }
+
+    for (const block of blocks) {
+      const source = sources[block]?.[id];
+      if (source === undefined) continue;
+
+      const text = i18next.t(`${source.ns}:${source.hash}.text`, { lngs: [lng], defaultValue: "" });
+      if (text !== "") return text;
+    }
   }
 
-  return [];
+  return null;
 };
 
 export const SUMMON_CLASSES_BLOCK = "summon-classes";
