@@ -14,15 +14,24 @@
  * OVER the committed artifact rather than replacing it, so it can only add or
  * correct entries — see buildSkillNameSources.
  *
+ * `--from-game-data` is the automatic path: it reads the ability tags the game
+ * itself ships in `system/player/data/pl####/pl####_action.msg` (the local
+ * `icon-export/` dump — see src/assets/game-icons/README.md for the extraction
+ * pipeline) and layers every edge nobody hand-labelled over the artifact. This
+ * is how a patch-added ability (Gallanza's Flashpoint, action 1900) gets its
+ * name without anyone playing the character and transcribing ids.
+ *
  * Usage:
- *   node scripts/gen-skill-name-sources.mjs              # validate, write nothing
- *   node scripts/gen-skill-name-sources.mjs --rebuild    # re-derive, merged into the artifact
+ *   node scripts/gen-skill-name-sources.mjs                  # validate, write nothing
+ *   node scripts/gen-skill-name-sources.mjs --rebuild        # re-derive from ui.json labels
+ *   node scripts/gen-skill-name-sources.mjs --from-game-data # derive from the action.msg dump
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { gameXxhash32 } from "./gbfr-hash.mjs";
+import { msgDecode } from "./msg-decode.mjs";
 
 /** Tier suffix on summon names. The ASCII form requires leading whitespace so a
  * name genuinely ending in "I" survives; the full-width form (zh-CN ships
@@ -210,6 +219,65 @@ export const buildSkillNameSources = (ui, generated, existing = {}) => {
   return { sources: sortSources(sources), report: { mapped, unmapped } };
 };
 
+/** The game's own action id -> ability edge, layered over `existing`.
+ *
+ * `rows` come from `system/player/data/pl####/pl####_action.msg`: each
+ * ActionInfo row carries its action `id_` and, for base ability actions, an
+ * `abilityTag_` (`AB_PL####_NN`) — the link ui.json hand labels used to
+ * supply by hand. Merge rules, in order:
+ *
+ *   1. An entry already in the artifact stays. It is human-reviewed; when the
+ *      tag points elsewhere that is a report line, never a silent overwrite.
+ *   2. An action any language still hand-labels is skipped: labels are often
+ *      MORE specific than the game's name ("Overdrive Surge (Arts I)" vs
+ *      "Overdrive Surge"), and validateSources treats coexistence as an error.
+ *   3. A tag naming ANOTHER character's ability is skipped and reported. Dev
+ *      copy-paste junk has exactly that shape — Io's empowered Gravity Well
+ *      rows carry Gran's Decimate, Djeeta's 1610-1613 carry it on rows her
+ *      labels call Miserable Mist — and a name from outside the block's own
+ *      key space cannot be told apart from it automatically. (utils.test.ts
+ *      enforces the same scoping invariant over the committed artifact.)
+ *   4. The tag resolves to the base key, else its _CG cutscene twin, else it
+ *      is reported unresolved. What remains is added.
+ */
+export const buildGameDataSources = (rows, abilities, uiByLang, existing = {}) => {
+  const hashOfKey = new Map(Object.entries(abilities).map(([hash, entry]) => [entry.key, hash]));
+  const sources = Object.fromEntries(Object.entries(existing).map(([block, entries]) => [block, { ...entries }]));
+  const report = { added: [], cross: [], disagreements: [], labelled: [], unresolved: [] };
+
+  for (const { block, id, tag } of rows) {
+    const have = sources[block]?.[id];
+    if (have !== undefined) {
+      if (have.key !== tag && have.key !== `${tag}_CG`) {
+        report.disagreements.push({ block, id, have: have.key, tag });
+      }
+      continue;
+    }
+
+    if (Object.values(uiByLang).some((ui) => typeof ui.skills?.[block]?.[id] === "string")) {
+      report.labelled.push({ block, id, tag });
+      continue;
+    }
+
+    if (!tag.startsWith(`AB_${block.replace(/^Pl/, "PL")}_`)) {
+      report.cross.push({ block, id, tag });
+      continue;
+    }
+
+    const key = hashOfKey.has(tag) ? tag : `${tag}_CG`;
+    if (!hashOfKey.has(key)) {
+      report.unresolved.push({ block, id, tag });
+      continue;
+    }
+
+    sources[block] ??= {};
+    sources[block][id] = { ns: "abilities", hash: hashOfKey.get(key), key };
+    report.added.push({ block, id, key });
+  }
+
+  return { sources: sortSources(sources), report };
+};
+
 /** Ids sorted by value when the whole block is numeric, lexically otherwise.
  *
  * The decision is per BLOCK, not per pair. Action ids are decimal, but summon
@@ -323,9 +391,76 @@ const reportDisagreements = (sources, uiByLang, generated) => {
   }
 };
 
+/** Every (block, action id, ability tag) edge in the local action.msg dump.
+ * Base ability actions only — that is all the game tags; variant actions
+ * (arts levels, follow-ups) stay the hand-label problem they always were. */
+const readActionTagRows = () => {
+  const playerDir = path.join(ROOT, "icon-export", "raw", "system", "player");
+  const rows = [];
+
+  for (let pl = 0; pl <= 99; pl++) {
+    const id = `pl${String(pl).padStart(2, "0")}00`;
+    // Archive paths are case-sensitive and split across data/ and Data/.
+    const file = ["data", "Data"]
+      .map((caseDir) => path.join(playerDir, caseDir, id, `${id}_action.msg`))
+      .find(existsSync);
+    if (file === undefined) continue;
+
+    for (const [key, value] of msgDecode(readFileSync(file))) {
+      if (key !== "ActionInfo") continue;
+      const action = Object.fromEntries(value);
+      if (/^AB_(?:PL|NP)\d{4}_\d{2}$/.test(action.abilityTag_ ?? "")) {
+        rows.push({ block: `Pl${id.slice(2)}`, id: String(action.id_), tag: action.abilityTag_ });
+      }
+    }
+  }
+
+  return rows;
+};
+
 const main = () => {
   const { uiByLang, generated } = loadInputs();
   const existing = existsSync(ARTIFACT) ? JSON.parse(readFileSync(ARTIFACT, "utf8")) : {};
+
+  if (process.argv.includes("--from-game-data")) {
+    const rows = readActionTagRows();
+    if (rows.length === 0) {
+      console.error("[gen] no pl####_action.msg files under icon-export/raw/system/player/");
+      console.error("[gen] run the extraction in src/assets/game-icons/README.md first");
+      process.exit(1);
+    }
+
+    const { sources, report } = buildGameDataSources(rows, generated.abilities, uiByLang, existing);
+
+    for (const { block, id, key } of report.added) {
+      console.log(`[gen] + ${block}.${id} -> ${key}`);
+    }
+    for (const { block, id, tag } of report.cross) {
+      console.warn(`[gen] ${block}.${id} tagged with another character's ${tag}; skipped — label it by hand`);
+    }
+    for (const { block, id, have, tag } of report.disagreements) {
+      console.warn(`[gen] artifact ${block}.${id} holds ${have} but the game tags ${tag}; kept the artifact`);
+    }
+    for (const { block, id, tag } of report.unresolved) {
+      console.warn(`[gen] ${block}.${id} tag ${tag} resolves to no abilities.json entry`);
+    }
+    console.log(
+      `[gen] ${rows.length} tagged actions: ${report.added.length} added, ` +
+        `${report.labelled.length} hand-labelled (labels win), ${report.cross.length} cross-character skip(s), ` +
+        `${report.disagreements.length} disagreement(s), ${report.unresolved.length} unresolved`
+    );
+
+    const errors = validateSources(sources, generated, uiByLang);
+    if (errors.length > 0) {
+      console.error(`[gen] refusing to write: the merged map fails validation:`);
+      for (const error of errors) console.error(`  - ${error}`);
+      process.exit(1);
+    }
+
+    writeFileSync(ARTIFACT, `${JSON.stringify(sources, null, 2)}\n`, "utf8");
+    console.log(`[gen] wrote ${path.relative(ROOT, ARTIFACT)}`);
+    return;
+  }
 
   // Validating is the default; `--check` is accepted so older invocations and
   // notes keep working.

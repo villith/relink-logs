@@ -1,4 +1,188 @@
 {
+  "Pl0000": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "b2f74994",
+      "key": "AB_PL0000_08"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "bad9baa3",
+      "key": "AB_PL0000_01"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "967964c1",
+      "key": "AB_PL0000_05"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "e5598482",
+      "key": "AB_PL0000_04"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "538572d0",
+      "key": "AB_PL0000_02"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "42d185d5",
+      "key": "AB_PL0000_06"
+    },
+    "1610": {
+      "ns": "abilities",
+      "hash": "bad9baa3",
+      "key": "AB_PL0000_01"
+    },
+    "1611": {
+      "ns": "abilities",
+      "hash": "bad9baa3",
+      "key": "AB_PL0000_01"
+    },
+    "1612": {
+      "ns": "abilities",
+      "hash": "bad9baa3",
+      "key": "AB_PL0000_01"
+    },
+    "1613": {
+      "ns": "abilities",
+      "hash": "bad9baa3",
+      "key": "AB_PL0000_01"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "fb1526c3",
+      "key": "AB_PL0000_07"
+    },
+    "1800": {
+      "ns": "abilities",
+      "hash": "dbe960dd",
+      "key": "AB_PL0000_03"
+    },
+    "2000": {
+      "ns": "abilities",
+      "hash": "6fd0843a",
+      "key": "AB_PL0000_10"
+    },
+    "2100": {
+      "ns": "abilities",
+      "hash": "fc0562ec",
+      "key": "AB_PL0000_11"
+    },
+    "2200": {
+      "ns": "abilities",
+      "hash": "1e4c06ec",
+      "key": "AB_PL0000_09"
+    },
+    "2300": {
+      "ns": "abilities",
+      "hash": "66b7cf9c",
+      "key": "AB_PL0000_12"
+    },
+    "2400": {
+      "ns": "abilities",
+      "hash": "f4bb441f",
+      "key": "AB_PL0000_14"
+    },
+    "2500": {
+      "ns": "abilities",
+      "hash": "abfe9091",
+      "key": "AB_PL0000_15"
+    },
+    "2600": {
+      "ns": "abilities",
+      "hash": "4f634ad4",
+      "key": "AB_PL0000_16"
+    },
+    "2700": {
+      "ns": "abilities",
+      "hash": "f9492778",
+      "key": "AB_PL0000_13"
+    }
+  },
+  "Pl0100": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "401ab759",
+      "key": "AB_PL0100_08"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "aa949a9e",
+      "key": "AB_PL0100_01"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "fad51809",
+      "key": "AB_PL0100_05"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "3111fe5e",
+      "key": "AB_PL0100_04"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "faff8838",
+      "key": "AB_PL0100_02"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "c908857c",
+      "key": "AB_PL0100_06"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "3c5a7509",
+      "key": "AB_PL0100_07"
+    },
+    "1800": {
+      "ns": "abilities",
+      "hash": "ef2108b4",
+      "key": "AB_PL0100_03"
+    },
+    "2000": {
+      "ns": "abilities",
+      "hash": "4257541b",
+      "key": "AB_PL0100_10"
+    },
+    "2100": {
+      "ns": "abilities",
+      "hash": "2a8ef6c4",
+      "key": "AB_PL0100_11"
+    },
+    "2200": {
+      "ns": "abilities",
+      "hash": "ccec1035",
+      "key": "AB_PL0100_09"
+    },
+    "2300": {
+      "ns": "abilities",
+      "hash": "eb16fd99",
+      "key": "AB_PL0100_12"
+    },
+    "2400": {
+      "ns": "abilities",
+      "hash": "8e2bfc26",
+      "key": "AB_PL0100_14"
+    },
+    "2500": {
+      "ns": "abilities",
+      "hash": "531dd853",
+      "key": "AB_PL0100_15"
+    },
+    "2600": {
+      "ns": "abilities",
+      "hash": "d064b37f",
+      "key": "AB_PL0100_16"
+    },
+    "2700": {
+      "ns": "abilities",
+      "hash": "7ef53ff4",
+      "key": "AB_PL0100_13"
+    }
+  },
   "Pl0200": {
     "1": {
       "ns": "abilities",
@@ -9,6 +193,11 @@
       "ns": "abilities",
       "hash": "e224a3d2",
       "key": "AB_PL0200_02"
+    },
+    "3": {
+      "ns": "abilities",
+      "hash": "66e797cc",
+      "key": "AB_PL0200_03"
     },
     "4": {
       "ns": "abilities",
@@ -29,6 +218,11 @@
       "ns": "abilities",
       "hash": "9f1539d2",
       "key": "AB_PL0200_07"
+    },
+    "8": {
+      "ns": "abilities",
+      "hash": "ed04d44b",
+      "key": "AB_PL0200_08"
     }
   },
   "Pl0300": {
@@ -42,10 +236,25 @@
       "hash": "7c63d77a",
       "key": "AB_PL0300_02"
     },
+    "3": {
+      "ns": "abilities",
+      "hash": "d712d990",
+      "key": "AB_PL0300_03"
+    },
+    "4": {
+      "ns": "abilities",
+      "hash": "a5f5e86c",
+      "key": "AB_PL0300_04"
+    },
     "5": {
       "ns": "abilities",
       "hash": "099abf09",
       "key": "AB_PL0300_05"
+    },
+    "6": {
+      "ns": "abilities",
+      "hash": "243ecbfc",
+      "key": "AB_PL0300_06"
     },
     "7": {
       "ns": "abilities",
@@ -59,6 +268,11 @@
     }
   },
   "Pl0400": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "3d4193db",
+      "key": "AB_PL0400_01"
+    },
     "2000": {
       "ns": "abilities",
       "hash": "1c7aa5cc",
@@ -73,6 +287,66 @@
       "ns": "abilities",
       "hash": "d4c45d64",
       "key": "AB_PL0400_07"
+    },
+    "5000": {
+      "ns": "abilities",
+      "hash": "b40ccd9c",
+      "key": "AB_PL0400_08"
+    },
+    "6000": {
+      "ns": "abilities",
+      "hash": "65083f2d",
+      "key": "AB_PL0400_06"
+    },
+    "7000": {
+      "ns": "abilities",
+      "hash": "200663cb",
+      "key": "AB_PL0400_04"
+    },
+    "7100": {
+      "ns": "abilities",
+      "hash": "200663cb",
+      "key": "AB_PL0400_04"
+    },
+    "7101": {
+      "ns": "abilities",
+      "hash": "200663cb",
+      "key": "AB_PL0400_04"
+    },
+    "7102": {
+      "ns": "abilities",
+      "hash": "200663cb",
+      "key": "AB_PL0400_04"
+    },
+    "7103": {
+      "ns": "abilities",
+      "hash": "200663cb",
+      "key": "AB_PL0400_04"
+    },
+    "8000": {
+      "ns": "abilities",
+      "hash": "32b4a16e",
+      "key": "AB_PL0400_03"
+    },
+    "8100": {
+      "ns": "abilities",
+      "hash": "32b4a16e",
+      "key": "AB_PL0400_03"
+    },
+    "8101": {
+      "ns": "abilities",
+      "hash": "32b4a16e",
+      "key": "AB_PL0400_03"
+    },
+    "8102": {
+      "ns": "abilities",
+      "hash": "32b4a16e",
+      "key": "AB_PL0400_03"
+    },
+    "8103": {
+      "ns": "abilities",
+      "hash": "32b4a16e",
+      "key": "AB_PL0400_03"
     }
   },
   "Pl0500": {
@@ -101,10 +375,20 @@
       "hash": "c3ccadf8",
       "key": "AB_PL0500_06"
     },
+    "7": {
+      "ns": "abilities",
+      "hash": "2246eec2",
+      "key": "AB_PL0500_07"
+    },
     "8": {
       "ns": "abilities",
       "hash": "d457585d",
       "key": "AB_PL0500_08"
+    },
+    "17": {
+      "ns": "abilities",
+      "hash": "2246eec2",
+      "key": "AB_PL0500_07"
     }
   },
   "Pl0600": {
@@ -113,15 +397,35 @@
       "hash": "3eb33877",
       "key": "AB_PL0600_02"
     },
+    "3": {
+      "ns": "abilities",
+      "hash": "c7db192c",
+      "key": "AB_PL0600_03"
+    },
     "4": {
       "ns": "abilities",
       "hash": "8c4d811c",
       "key": "AB_PL0600_04"
     },
+    "5": {
+      "ns": "abilities",
+      "hash": "cd6940de",
+      "key": "AB_PL0600_05"
+    },
     "6": {
       "ns": "abilities",
       "hash": "395e4823",
       "key": "AB_PL0600_06"
+    },
+    "7": {
+      "ns": "abilities",
+      "hash": "cf0b171b",
+      "key": "AB_PL0600_07"
+    },
+    "8": {
+      "ns": "abilities",
+      "hash": "8f187f08",
+      "key": "AB_PL0600_08"
     }
   },
   "Pl0700": {
@@ -134,6 +438,16 @@
       "ns": "abilities",
       "hash": "ceebae4a",
       "key": "AB_PL0700_02"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "03e4d1bc",
+      "key": "AB_PL0700_03"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "512cba53",
+      "key": "AB_PL0700_04"
     },
     "1340": {
       "ns": "abilities",
@@ -149,6 +463,11 @@
       "ns": "abilities",
       "hash": "94da6b12",
       "key": "AB_PL0700_06"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "82695b1e",
+      "key": "AB_PL0700_07"
     },
     "1640": {
       "ns": "abilities",
@@ -177,6 +496,11 @@
       "hash": "282fd588",
       "key": "AB_PL0800_03"
     },
+    "1300": {
+      "ns": "abilities",
+      "hash": "5d19bbe2",
+      "key": "AB_PL0800_04"
+    },
     "1400": {
       "ns": "abilities",
       "hash": "511571ee",
@@ -186,13 +510,33 @@
       "ns": "abilities",
       "hash": "2ecb1f0b",
       "key": "AB_PL0800_06"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "05359b18",
+      "key": "AB_PL0800_07"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "a4d546ab",
+      "key": "AB_PL0800_08"
     }
   },
   "Pl0900": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "12f12cac",
+      "key": "AB_PL0900_01"
+    },
     "1100": {
       "ns": "abilities",
       "hash": "fbef06f2",
       "key": "AB_PL0900_02"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "1dd6b65d",
+      "key": "AB_PL0900_03"
     },
     "1300": {
       "ns": "abilities",
@@ -204,10 +548,20 @@
       "hash": "b9e9ed9f",
       "key": "AB_PL0900_05"
     },
+    "1500": {
+      "ns": "abilities",
+      "hash": "bd38e05b",
+      "key": "AB_PL0900_06"
+    },
     "1600": {
       "ns": "abilities",
       "hash": "bc4ebf36",
       "key": "AB_PL0900_07"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "88bcd098",
+      "key": "AB_PL0900_08"
     }
   },
   "Pl1000": {
@@ -216,10 +570,20 @@
       "hash": "caeeda5d",
       "key": "AB_PL1000_01"
     },
+    "2": {
+      "ns": "abilities",
+      "hash": "98e1b356",
+      "key": "AB_PL1000_02"
+    },
     "4": {
       "ns": "abilities",
       "hash": "70fe4df6",
       "key": "AB_PL1000_04"
+    },
+    "5": {
+      "ns": "abilities",
+      "hash": "6891463e",
+      "key": "AB_PL1000_05"
     },
     "6": {
       "ns": "abilities",
@@ -248,18 +612,43 @@
       "hash": "00aace55",
       "key": "AB_PL1100_02"
     },
+    "1200": {
+      "ns": "abilities",
+      "hash": "94b29689",
+      "key": "AB_PL1100_03"
+    },
     "1300": {
       "ns": "abilities",
       "hash": "a662c045",
       "key": "AB_PL1100_04"
     },
+    "1400": {
+      "ns": "abilities",
+      "hash": "c6f4ccb1",
+      "key": "AB_PL1100_05"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "eff4746c",
+      "key": "AB_PL1100_06"
+    },
     "1600": {
       "ns": "abilities",
       "hash": "5a356634",
       "key": "AB_PL1100_07"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "75d65667",
+      "key": "AB_PL1100_08"
     }
   },
   "Pl1200": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "ed00c663",
+      "key": "AB_PL1200_01"
+    },
     "1100": {
       "ns": "abilities",
       "hash": "bd038b68",
@@ -269,6 +658,26 @@
       "ns": "abilities",
       "hash": "24b19804",
       "key": "AB_PL1200_03"
+    },
+    "1210": {
+      "ns": "abilities",
+      "hash": "24b19804",
+      "key": "AB_PL1200_03"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "05ce9ce6",
+      "key": "AB_PL1200_04"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "c07a8e90",
+      "key": "AB_PL1200_05"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "69fcecc3",
+      "key": "AB_PL1200_06"
     },
     "1610": {
       "ns": "abilities",
@@ -292,10 +701,25 @@
       "hash": "5d39ff76",
       "key": "AB_PL1300_02"
     },
+    "3": {
+      "ns": "abilities",
+      "hash": "19a55d74",
+      "key": "AB_PL1300_03"
+    },
+    "4": {
+      "ns": "abilities",
+      "hash": "fe554ce1",
+      "key": "AB_PL1300_04"
+    },
     "5": {
       "ns": "abilities",
       "hash": "167179d2",
       "key": "AB_PL1300_05"
+    },
+    "6": {
+      "ns": "abilities",
+      "hash": "5acc7a93",
+      "key": "AB_PL1300_06"
     },
     "7": {
       "ns": "abilities",
@@ -323,6 +747,36 @@
       "ns": "abilities",
       "hash": "0adac47b",
       "key": "AB_PL1400_04"
+    },
+    "6": {
+      "ns": "abilities",
+      "hash": "41e3c434",
+      "key": "AB_PL1400_06"
+    },
+    "7": {
+      "ns": "abilities",
+      "hash": "3614971b",
+      "key": "AB_PL1400_07"
+    },
+    "8": {
+      "ns": "abilities",
+      "hash": "3cad2dd9",
+      "key": "AB_PL1400_08"
+    },
+    "9": {
+      "ns": "abilities",
+      "hash": "390a6ec6",
+      "key": "AB_PL1400_05"
+    },
+    "12": {
+      "ns": "abilities",
+      "hash": "f74b3c5b",
+      "key": "AB_PL1400_02"
+    },
+    "22": {
+      "ns": "abilities",
+      "hash": "f74b3c5b",
+      "key": "AB_PL1400_02"
     }
   },
   "Pl1500": {
@@ -341,10 +795,30 @@
       "hash": "088a1d08",
       "key": "AB_PL1500_03"
     },
+    "1300": {
+      "ns": "abilities",
+      "hash": "ee1ed3e4",
+      "key": "AB_PL1500_04"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "6b54f359",
+      "key": "AB_PL1500_05"
+    },
     "1500": {
       "ns": "abilities",
       "hash": "0f41d9b0",
       "key": "AB_PL1500_06"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "967c9abc",
+      "key": "AB_PL1500_07"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "84174bdd",
+      "key": "AB_PL1500_08"
     }
   },
   "Pl1600": {
@@ -363,15 +837,45 @@
       "hash": "974342aa",
       "key": "AB_PL1600_03"
     },
+    "1210": {
+      "ns": "abilities",
+      "hash": "974342aa",
+      "key": "AB_PL1600_03"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "52e3eed1",
+      "key": "AB_PL1600_04"
+    },
     "1400": {
       "ns": "abilities",
       "hash": "2ae2fa9d",
       "key": "AB_PL1600_05"
     },
+    "1500": {
+      "ns": "abilities",
+      "hash": "8c3c7ddc",
+      "key": "AB_PL1600_06"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "33028d0b",
+      "key": "AB_PL1600_07"
+    },
     "1610": {
       "ns": "abilities",
       "hash": "33028d0b",
       "key": "AB_PL1600_07"
+    },
+    "1701": {
+      "ns": "abilities",
+      "hash": "a8dd5b10",
+      "key": "AB_PL1600_08"
+    },
+    "1800": {
+      "ns": "abilities",
+      "hash": "67270513",
+      "key": "AB_PL1600_02"
     }
   },
   "Pl1700": {
@@ -389,6 +893,16 @@
       "ns": "abilities",
       "hash": "8121f2bf",
       "key": "AB_PL1700_03"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "3a6c7767",
+      "key": "AB_PL1700_04"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "d71a616c",
+      "key": "AB_PL1700_05"
     },
     "1500": {
       "ns": "abilities",
@@ -422,10 +936,30 @@
       "hash": "12a18828",
       "key": "AB_PL1800_02"
     },
+    "1300": {
+      "ns": "abilities",
+      "hash": "85c06563",
+      "key": "AB_PL1800_04"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "ee45b7ef",
+      "key": "AB_PL1800_05"
+    },
     "1410": {
       "ns": "abilities",
       "hash": "ee45b7ef",
       "key": "AB_PL1800_05"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "b97bd8d4",
+      "key": "AB_PL1800_06"
+    },
+    "1520": {
+      "ns": "abilities",
+      "hash": "b97bd8d4",
+      "key": "AB_PL1800_06"
     },
     "1700": {
       "ns": "abilities",
@@ -436,6 +970,11 @@
       "ns": "abilities",
       "hash": "5b42826c",
       "key": "AB_PL1800_08"
+    },
+    "10000": {
+      "ns": "abilities",
+      "hash": "75043b52",
+      "key": "AB_PL1800_01"
     }
   },
   "Pl1900": {
@@ -473,9 +1012,54 @@
       "ns": "abilities",
       "hash": "c516d104",
       "key": "AB_PL1900_08"
+    },
+    "20": {
+      "ns": "abilities",
+      "hash": "0af90b6d",
+      "key": "AB_PL1900_03"
+    },
+    "21": {
+      "ns": "abilities",
+      "hash": "0af90b6d",
+      "key": "AB_PL1900_03"
+    },
+    "22": {
+      "ns": "abilities",
+      "hash": "0af90b6d",
+      "key": "AB_PL1900_03"
+    },
+    "23": {
+      "ns": "abilities",
+      "hash": "0af90b6d",
+      "key": "AB_PL1900_03"
+    },
+    "24": {
+      "ns": "abilities",
+      "hash": "0af90b6d",
+      "key": "AB_PL1900_03"
     }
   },
   "Pl2100": {
+    "1100": {
+      "ns": "abilities",
+      "hash": "081bd282",
+      "key": "AB_PL2100_10"
+    },
+    "1200": {
+      "ns": "abilities",
+      "hash": "a7e586b8",
+      "key": "AB_PL2100_11"
+    },
+    "1300": {
+      "ns": "abilities",
+      "hash": "b9429f15",
+      "key": "AB_PL2100_12"
+    },
+    "2000": {
+      "ns": "abilities",
+      "hash": "542f400f",
+      "key": "AB_PL2100_01"
+    },
     "2100": {
       "ns": "abilities",
       "hash": "da860bd8",
@@ -486,15 +1070,30 @@
       "hash": "34222ea5",
       "key": "AB_PL2100_03"
     },
+    "2300": {
+      "ns": "abilities",
+      "hash": "eb81f079",
+      "key": "AB_PL2100_04"
+    },
     "2400": {
       "ns": "abilities",
       "hash": "31e089b9",
       "key": "AB_PL2100_05"
     },
+    "2602": {
+      "ns": "abilities",
+      "hash": "1031dbd0",
+      "key": "AB_PL2100_07"
+    },
     "2700": {
       "ns": "abilities",
       "hash": "a7c5a324",
       "key": "AB_PL2100_08"
+    },
+    "3000": {
+      "ns": "abilities",
+      "hash": "83bfbf22",
+      "key": "AB_PL2100_15"
     }
   },
   "Pl2200": {
@@ -508,18 +1107,78 @@
       "hash": "a7eb9e69",
       "key": "AB_PL2200_02"
     },
+    "2100": {
+      "ns": "abilities",
+      "hash": "a7eb9e69",
+      "key": "AB_PL2200_02"
+    },
+    "2110": {
+      "ns": "abilities",
+      "hash": "a7eb9e69",
+      "key": "AB_PL2200_02"
+    },
     "3000": {
       "ns": "abilities",
       "hash": "6e8e210a",
       "key": "AB_PL2200_03"
     },
+    "4000": {
+      "ns": "abilities",
+      "hash": "705a6a63",
+      "key": "AB_PL2200_04"
+    },
+    "4001": {
+      "ns": "abilities",
+      "hash": "705a6a63",
+      "key": "AB_PL2200_04"
+    },
+    "4002": {
+      "ns": "abilities",
+      "hash": "705a6a63",
+      "key": "AB_PL2200_04"
+    },
+    "5000": {
+      "ns": "abilities",
+      "hash": "0bd7b2e1",
+      "key": "AB_PL2200_05"
+    },
+    "5001": {
+      "ns": "abilities",
+      "hash": "0bd7b2e1",
+      "key": "AB_PL2200_05"
+    },
     "6000": {
       "ns": "abilities",
       "hash": "abab2642",
       "key": "AB_PL2200_06"
+    },
+    "7000": {
+      "ns": "abilities",
+      "hash": "c6629ae0",
+      "key": "AB_PL2200_07"
+    },
+    "7001": {
+      "ns": "abilities",
+      "hash": "c6629ae0",
+      "key": "AB_PL2200_07"
+    },
+    "7002": {
+      "ns": "abilities",
+      "hash": "c6629ae0",
+      "key": "AB_PL2200_07"
+    },
+    "8000": {
+      "ns": "abilities",
+      "hash": "3bb98b51",
+      "key": "AB_PL2200_08"
     }
   },
   "Pl2300": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "7f683594",
+      "key": "AB_PL2300_01"
+    },
     "1100": {
       "ns": "abilities",
       "hash": "7c0f49fb",
@@ -540,13 +1199,28 @@
       "hash": "bb425ac9",
       "key": "AB_PL2300_05"
     },
+    "1500": {
+      "ns": "abilities",
+      "hash": "a6b54953",
+      "key": "AB_PL2300_06"
+    },
     "1510": {
       "ns": "abilities",
       "hash": "a6b54953",
       "key": "AB_PL2300_06"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "d95b6aba",
+      "key": "AB_PL2300_07"
     }
   },
   "Pl2400": {
+    "1100": {
+      "ns": "abilities",
+      "hash": "966f4a6f",
+      "key": "AB_PL2400_01"
+    },
     "1200": {
       "ns": "abilities",
       "hash": "430f5db4",
@@ -576,10 +1250,30 @@
       "ns": "abilities",
       "hash": "4bc55ee0",
       "key": "AB_PL2400_07"
+    },
+    "1800": {
+      "ns": "abilities",
+      "hash": "6aa831f7",
+      "key": "AB_PL2400_08"
+    },
+    "1900": {
+      "ns": "abilities",
+      "hash": "bc2ef1d8",
+      "key": "AB_PL2400_09"
     }
   },
   "Pl2500": {
+    "1000": {
+      "ns": "abilities",
+      "hash": "b9c33c89",
+      "key": "AB_PL2500_01"
+    },
     "1100": {
+      "ns": "abilities",
+      "hash": "91d8e40b",
+      "key": "AB_PL2500_02"
+    },
+    "1101": {
       "ns": "abilities",
       "hash": "91d8e40b",
       "key": "AB_PL2500_02"
@@ -599,10 +1293,25 @@
       "hash": "547c38ae",
       "key": "AB_PL2500_05"
     },
+    "1401": {
+      "ns": "abilities",
+      "hash": "547c38ae",
+      "key": "AB_PL2500_05"
+    },
     "1500": {
       "ns": "abilities",
       "hash": "d6403105",
       "key": "AB_PL2500_06"
+    },
+    "1600": {
+      "ns": "abilities",
+      "hash": "6b21afbb",
+      "key": "AB_PL2500_07"
+    },
+    "1700": {
+      "ns": "abilities",
+      "hash": "d5d1bd18",
+      "key": "AB_PL2500_08"
     }
   },
   "Pl2600": {
@@ -635,9 +1344,19 @@
       "ns": "abilities",
       "hash": "b85aa34f",
       "key": "AB_PL2600_06"
+    },
+    "7000": {
+      "ns": "abilities",
+      "hash": "d16eeeea",
+      "key": "AB_PL2600_07"
     }
   },
   "Pl2700": {
+    "1100": {
+      "ns": "abilities",
+      "hash": "aa6e61e5",
+      "key": "AB_PL2700_02"
+    },
     "1110": {
       "ns": "abilities",
       "hash": "aa6e61e5",
@@ -647,6 +1366,16 @@
       "ns": "abilities",
       "hash": "9abfc62c",
       "key": "AB_PL2700_04"
+    },
+    "1400": {
+      "ns": "abilities",
+      "hash": "9ac21d84",
+      "key": "AB_PL2700_05"
+    },
+    "1500": {
+      "ns": "abilities",
+      "hash": "0026ab65",
+      "key": "AB_PL2700_06"
     },
     "1700": {
       "ns": "abilities",
@@ -702,12 +1431,52 @@
       "hash": "8f4e9d6f",
       "key": "AB_PL2900_01"
     },
+    "2000": {
+      "ns": "abilities",
+      "hash": "981a10bc",
+      "key": "AB_PL2900_02"
+    },
+    "3000": {
+      "ns": "abilities",
+      "hash": "b2795ca0",
+      "key": "AB_PL2900_03"
+    },
+    "4000": {
+      "ns": "abilities",
+      "hash": "c3c3d59a",
+      "key": "AB_PL2900_04"
+    },
+    "5000": {
+      "ns": "abilities",
+      "hash": "724636a8",
+      "key": "AB_PL2900_05"
+    },
+    "6000": {
+      "ns": "abilities",
+      "hash": "b09eac4c",
+      "key": "AB_PL2900_06"
+    },
     "7000": {
       "ns": "abilities",
       "hash": "d113989a",
       "key": "AB_PL2900_07"
     },
+    "8000": {
+      "ns": "abilities",
+      "hash": "b1c60cab",
+      "key": "AB_PL2900_08"
+    },
     "8010": {
+      "ns": "abilities",
+      "hash": "b1c60cab",
+      "key": "AB_PL2900_08"
+    },
+    "8020": {
+      "ns": "abilities",
+      "hash": "b1c60cab",
+      "key": "AB_PL2900_08"
+    },
+    "8030": {
       "ns": "abilities",
       "hash": "b1c60cab",
       "key": "AB_PL2900_08"
@@ -810,42 +1579,6 @@
       "key": "TXT_SMN_So1800_3",
       "via": "id"
     },
-    "49c45df3": {
-      "ns": "summons",
-      "hash": "2e3ce3d9",
-      "key": "TXT_SMN_So2900_2",
-      "via": "id"
-    },
-    "4b381318": {
-      "ns": "summons",
-      "hash": "2eacd79c",
-      "key": "TXT_SMN_So1a00_1",
-      "via": "id"
-    },
-    "5395ce93": {
-      "ns": "summons",
-      "hash": "2f15455c",
-      "key": "TXT_SMN_So9200",
-      "via": "id"
-    },
-    "6093301c": {
-      "ns": "summons",
-      "hash": "16b702dc",
-      "key": "TXT_SMN_So5600_3",
-      "via": "id"
-    },
-    "65294c5c": {
-      "ns": "summons",
-      "hash": "099e1dd3",
-      "key": "TXT_SMN_So4c00",
-      "via": "id"
-    },
-    "531631e9": {
-      "ns": "summons",
-      "hash": "2ea15d18",
-      "key": "TXT_SMN_So2500_2",
-      "via": "id"
-    },
     "37014e25": {
       "ns": "summons",
       "hash": "3c381dcd",
@@ -858,10 +1591,28 @@
       "key": "TXT_SMN_So3200_2",
       "via": "id"
     },
+    "49c45df3": {
+      "ns": "summons",
+      "hash": "2e3ce3d9",
+      "key": "TXT_SMN_So2900_2",
+      "via": "id"
+    },
+    "4b381318": {
+      "ns": "summons",
+      "hash": "2eacd79c",
+      "key": "TXT_SMN_So1a00_1",
+      "via": "id"
+    },
     "52a9d192": {
       "ns": "summons",
       "hash": "52b14b66",
       "key": "TXT_SMN_So4900_3",
+      "via": "id"
+    },
+    "531631e9": {
+      "ns": "summons",
+      "hash": "2ea15d18",
+      "key": "TXT_SMN_So2500_2",
       "via": "id"
     },
     "535f95e7": {
@@ -876,6 +1627,12 @@
       "key": "TXT_SMN_So2b00_1",
       "via": "id"
     },
+    "5395ce93": {
+      "ns": "summons",
+      "hash": "2f15455c",
+      "key": "TXT_SMN_So9200",
+      "via": "id"
+    },
     "58b51943": {
       "ns": "summons",
       "hash": "c1ccbc3c",
@@ -886,6 +1643,18 @@
       "ns": "summons",
       "hash": "1ab77fdf",
       "key": "TXT_SMN_So5f00",
+      "via": "id"
+    },
+    "6093301c": {
+      "ns": "summons",
+      "hash": "16b702dc",
+      "key": "TXT_SMN_So5600_3",
+      "via": "id"
+    },
+    "65294c5c": {
+      "ns": "summons",
+      "hash": "099e1dd3",
+      "key": "TXT_SMN_So4c00",
       "via": "id"
     },
     "65b83854": {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildGameDataSources,
   buildSkillNameSources,
   normalizeName,
   pickAbilityHash,
@@ -312,7 +313,7 @@ describe("buildSkillNameSources", () => {
     // object however they were inserted — the pass has to survive that.
     const existing = {
       "summon-classes": {
-        "69893920": { ns: "summons", hash: "5f3337b6", key: "TXT_SMN_So0d00_1" },
+        69893920: { ns: "summons", hash: "5f3337b6", key: "TXT_SMN_So0d00_1" },
         "0254b5ee": { ns: "summons", hash: "3dd9ecee", key: "TXT_SMN_So2600_1" },
       },
       Pl0000: { 1301: { ns: "abilities", hash: "967964c1", key: "AB_PL0000_05" } },
@@ -340,6 +341,120 @@ describe("buildSkillNameSources", () => {
     const { sources } = buildSkillNameSources(UI, GENERATED, existing);
 
     expect(sources.Pl0000[1301]).toEqual({ ns: "abilities", hash: "967964c1", key: "AB_PL0000_05" });
+  });
+});
+
+/** Shaped like en/abilities.json, for the game-data stream: the real Pl2400
+ * gap. Flashpoint ships base + _CG; the fictional _77 ships only its _CG twin
+ * so the fallback path is exercised. */
+const GD_ABILITIES = {
+  bc2ef1d8: { key: "AB_PL2400_09", text: "Flashpoint" },
+  "7f7e4a32": { key: "AB_PL2400_09_CG", text: "Flashpoint" },
+  "966f4a6f": { key: "AB_PL2400_01", text: "Tip of the Spear" },
+  aaaa1111: { key: "AB_PL2400_77_CG", text: "Cutscene Only" },
+  bad9baa3: { key: "AB_PL0000_01", text: "Decimate" },
+};
+
+describe("buildGameDataSources", () => {
+  it("maps a tagged action nobody hand-labelled, preferring the base key", () => {
+    const rows = [{ block: "Pl2400", id: "1900", tag: "AB_PL2400_09" }];
+
+    const { sources, report } = buildGameDataSources(rows, GD_ABILITIES, {});
+
+    expect(sources.Pl2400["1900"]).toEqual({ ns: "abilities", hash: "bc2ef1d8", key: "AB_PL2400_09" });
+    expect(report.added).toEqual([{ block: "Pl2400", id: "1900", key: "AB_PL2400_09" }]);
+  });
+
+  it("resolves through the _CG twin when the base key does not exist", () => {
+    const rows = [{ block: "Pl2400", id: "7700", tag: "AB_PL2400_77" }];
+
+    const { sources } = buildGameDataSources(rows, GD_ABILITIES, {});
+
+    expect(sources.Pl2400["7700"]).toEqual({ ns: "abilities", hash: "aaaa1111", key: "AB_PL2400_77_CG" });
+  });
+
+  it("keeps an existing artifact entry and reports when the tag disagrees", () => {
+    // The committed artifact is human-reviewed; game data corrects it only via a
+    // human reading the report, never by silent overwrite.
+    const existing = { Pl2400: { 1100: { ns: "abilities", hash: "bc2ef1d8", key: "AB_PL2400_09" } } };
+    const rows = [{ block: "Pl2400", id: "1100", tag: "AB_PL2400_01" }];
+
+    const { sources, report } = buildGameDataSources(rows, GD_ABILITIES, {}, existing);
+
+    expect(sources.Pl2400["1100"]).toEqual(existing.Pl2400[1100]);
+    expect(report.added).toEqual([]);
+    expect(report.disagreements).toEqual([{ block: "Pl2400", id: "1100", have: "AB_PL2400_09", tag: "AB_PL2400_01" }]);
+  });
+
+  it("keeps an agreeing existing entry without reporting a disagreement", () => {
+    const existing = { Pl2400: { 1100: { ns: "abilities", hash: "966f4a6f", key: "AB_PL2400_01" } } };
+    const rows = [{ block: "Pl2400", id: "1100", tag: "AB_PL2400_01" }];
+
+    const { report } = buildGameDataSources(rows, GD_ABILITIES, {}, existing);
+
+    expect(report.disagreements).toEqual([]);
+    expect(report.added).toEqual([]);
+  });
+
+  it("skips an action any language still hand-labels, because labels are often more specific", () => {
+    // Real case: "Overdrive Surge (Arts I)" carries the arts level; the game's
+    // own name is just "Overdrive Surge". The hand label must keep winning.
+    const uiByLang = { "zh-TW": { skills: { Pl2400: { 1900: "(位階1) 悲慘之霧" } } } };
+    const rows = [{ block: "Pl2400", id: "1900", tag: "AB_PL2400_09" }];
+
+    const { sources, report } = buildGameDataSources(rows, GD_ABILITIES, uiByLang);
+
+    expect(sources.Pl2400).toBeUndefined();
+    expect(report.labelled).toEqual([{ block: "Pl2400", id: "1900", tag: "AB_PL2400_09" }]);
+  });
+
+  it("reports a tag no abilities bundle resolves rather than dropping it silently", () => {
+    const rows = [{ block: "Pl2400", id: "8800", tag: "AB_PL2400_88" }];
+
+    const { sources, report } = buildGameDataSources(rows, GD_ABILITIES, {});
+
+    expect(sources.Pl2400).toBeUndefined();
+    expect(report.unresolved).toEqual([{ block: "Pl2400", id: "8800", tag: "AB_PL2400_88" }]);
+  });
+
+  it("skips a tag naming another character's ability, reporting it for review", () => {
+    // Real case: Djeeta's unlabelled 1610-1613 rows are tagged with GRAN's
+    // AB_PL0000_01 (Decimate) while their labelled siblings say Miserable Mist —
+    // dev copy-paste junk, same shape as Io's Gravity Well rows. A tag outside
+    // the block's own key space cannot be trusted to NAME the action, so it
+    // never maps automatically; utils.test.ts enforces the same invariant over
+    // the committed artifact.
+    const rows = [{ block: "Pl0100", id: "1610", tag: "AB_PL0000_01" }];
+
+    const { sources, report } = buildGameDataSources(rows, GD_ABILITIES, {});
+
+    expect(sources.Pl0100).toBeUndefined();
+    expect(report.added).toEqual([]);
+    expect(report.cross).toEqual([{ block: "Pl0100", id: "1610", tag: "AB_PL0000_01" }]);
+  });
+
+  it("layers over the artifact, preserving untouched blocks and key order", () => {
+    const existing = { Pl9999: { 5: { ns: "abilities", hash: "cafef00d", key: "AB_PL9999_01" } } };
+    const rows = [
+      { block: "Pl2400", id: "1900", tag: "AB_PL2400_09" },
+      { block: "Pl2400", id: "1100", tag: "AB_PL2400_01" },
+    ];
+
+    const { sources } = buildGameDataSources(rows, GD_ABILITIES, {}, existing);
+
+    expect(sources.Pl9999).toEqual(existing.Pl9999);
+    expect(Object.keys(sources.Pl2400)).toEqual(["1100", "1900"]);
+    expect(Object.keys(sources)).toEqual(["Pl2400", "Pl9999"]);
+  });
+
+  it("is idempotent: feeding its output back as the artifact adds nothing", () => {
+    const rows = [{ block: "Pl2400", id: "1900", tag: "AB_PL2400_09" }];
+
+    const once = buildGameDataSources(rows, GD_ABILITIES, {});
+    const twice = buildGameDataSources(rows, GD_ABILITIES, {}, once.sources);
+
+    expect(JSON.stringify(twice.sources)).toBe(JSON.stringify(once.sources));
+    expect(twice.report.added).toEqual([]);
   });
 });
 
