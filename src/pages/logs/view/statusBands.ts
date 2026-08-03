@@ -78,4 +78,3 @@ export const toBands = (
   }
   return merged;
 };
-

@@ -6,13 +6,18 @@
  * ui.json keys skill rows by ACTION ID; abilities.json keys them by ABILITY
  * HASH. Nothing else connects the two, so without this map a translated ability
  * name can only reach the meter by being copied into ui.json by hand — which is
- * why the six languages that ship no ui.json used to read English.
+ * why the six languages that ship no ui.json used to read English. The map may
+ * cover an action a ui.json also labels: `resolveSkillName` orders the two per
+ * LANGUAGE (own label, own bridge name, then the fallback language's), so the
+ * label wins inside its language without shadowing another language's name.
  *
  * Deliberately free of Tauri imports: the asset loader
  * (`src/assets/skill-name-sources.ts`) does the top-level `await` and calls
  * `setSkillNameSources`, so `utils.ts` — and every test that touches it — stays
  * clear of `@tauri-apps/api`.
  */
+
+import i18next from "i18next";
 
 export type SkillNameNamespace = "abilities" | "summons" | "enemies";
 
@@ -53,20 +58,80 @@ export const setSkillNameSources = (next: SkillNameSources): void => {
 
 export const getSkillNameSources = (): SkillNameSources => sources;
 
-/** i18next keys for a mapped action id, the child character's block first.
+/** Which of the two resolution orders `resolveSkillName` walks.
  *
- * Returns an array so callers can splice it straight into an existing `t()`
- * fallback chain: empty means "nothing mapped, carry on".
- */
-export const abilitySourceKeys = (characterType: string, childCharacterType: string, skillId: number): string[] => {
-  const id = String(skillId);
+ * `label-first` (the default): every hand label — any language's, via the
+ * normal per-key fallback — before any bridge name. Hand labels always win,
+ * at the cost of non-labelled languages reading English. `language-first`
+ * prefers the current language's own entries (label, then bridge name) over
+ * the fallback language's, so a translated game name beats a foreign hand
+ * label; it stays wired through the `skill_name_resolution` store field but
+ * currently ships with no settings UI. The store subscription in
+ * useMeterSettingsStore keeps this in step. */
+export type SkillNameResolutionMode = "language-first" | "label-first";
 
-  for (const block of [childCharacterType, characterType]) {
+let resolutionMode: SkillNameResolutionMode = "label-first";
+
+export const setSkillNameResolutionMode = (mode: SkillNameResolutionMode): void => {
+  resolutionMode = mode;
+};
+
+/** Display name for an action id, resolved language-major.
+ *
+ * Priority is per LANGUAGE first, source second: the current language's ui.json
+ * hand label, then its bridge (game) name, and only then the fallback
+ * language's label and bridge. A plain `t()` fallback array cannot express
+ * this — i18next resolves each key across every language before trying the
+ * next key, which would let an English-only hand label shadow a perfectly
+ * translated game name. Within one language a hand label still wins (it is
+ * often more specific than the game's own name), and the caller's block order
+ * (child character first) is preserved.
+ *
+ * `i18next.languages` is the resolve hierarchy — e.g. ["fr-FR", "fr", "en"] —
+ * so a regional UI language reaches its base-language bundles, and zh-TW its
+ * zh-CN hop, without special cases. Each step pins ONE chain entry via `lngs`;
+ * `fallbackLng: false` cannot do this — i18next treats it as falsy and swaps
+ * the global fallback back in, which is exactly the leak being prevented.
+ */
+export const resolveSkillName = (blocks: string[], skillId: number): string | null => {
+  const id = String(skillId);
+  const languages = i18next.languages ?? [];
+
+  const label = (block: string, lng: string): string =>
+    i18next.t(`skills.${block}.${id}`, { lngs: [lng], defaultValue: "" });
+
+  const bridge = (block: string, lng: string): string => {
     const source = sources[block]?.[id];
-    if (source !== undefined) return [`${source.ns}:${source.hash}.text`];
+    if (source === undefined) return "";
+    return i18next.t(`${source.ns}:${source.hash}.text`, { lngs: [lng], defaultValue: "" });
+  };
+
+  // label-first nests the loops the other way around: every label across the
+  // whole language chain before any bridge name — the order a plain t()
+  // fallback array used to produce.
+  if (resolutionMode === "label-first") {
+    for (const lookup of [label, bridge]) {
+      for (const block of blocks) {
+        for (const lng of languages) {
+          const text = lookup(block, lng);
+          if (text !== "") return text;
+        }
+      }
+    }
+
+    return null;
   }
 
-  return [];
+  for (const lng of languages) {
+    for (const lookup of [label, bridge]) {
+      for (const block of blocks) {
+        const text = lookup(block, lng);
+        if (text !== "") return text;
+      }
+    }
+  }
+
+  return null;
 };
 
 export const SUMMON_CLASSES_BLOCK = "summon-classes";

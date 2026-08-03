@@ -2,6 +2,7 @@ import { skillGroupFor } from "@/components/skillGrouping";
 import type { ActionType, CharacterType, SkillRow, SkillState } from "@/types";
 
 import { abilityKey, parseAbilityKey } from "./abilityKey";
+import { groupBy } from "./groupBy";
 
 /** One ability row and every breakdown row behind it. */
 export type AbilitySkills = { key: string; skills: SkillState[] };
@@ -93,17 +94,11 @@ export const groupOfPin = (key: string): string | null => {
   return group;
 };
 
+const foldBy = (skills: SkillState[], keyOf: (skill: SkillState) => string): AbilitySkills[] =>
+  [...groupBy(skills, keyOf)].map(([key, grouped]) => ({ key, skills: grouped }));
+
 /** A player's `skillBreakdown` as ability rows, in first-seen order. */
-export const groupSkillsForRows = (skills: SkillState[]): AbilitySkills[] => {
-  const byKey = new Map<string, AbilitySkills>();
-  for (const skill of skills) {
-    const key = abilityRowKey(skill);
-    const found = byKey.get(key);
-    if (found) found.skills.push(skill);
-    else byKey.set(key, { key, skills: [skill] });
-  }
-  return [...byKey.values()];
-};
+export const groupSkillsForRows = (skills: SkillState[]): AbilitySkills[] => foldBy(skills, abilityRowKey);
 
 /** A breakdown as one row per ACTION, in first-seen order.
  *
@@ -115,16 +110,8 @@ export const groupSkillsForRows = (skills: SkillState[]): AbilitySkills[] => {
  * same reason `abilityRowKey` drops it for an ungrouped skill: a player and
  * their summon using one action id are two breakdown rows of a single skill, and
  * keeping them apart would draw it twice with its damage split. */
-export const mergeSkillsByAction = (skills: SkillState[]): AbilitySkills[] => {
-  const byKey = new Map<string, AbilitySkills>();
-  for (const skill of skills) {
-    const key = abilityKey(skill.actionType);
-    const found = byKey.get(key);
-    if (found) found.skills.push(skill);
-    else byKey.set(key, { key, skills: [skill] });
-  }
-  return [...byKey.values()];
-};
+export const mergeSkillsByAction = (skills: SkillState[]): AbilitySkills[] =>
+  foldBy(skills, (skill) => abilityKey(skill.actionType));
 
 /** Every breakdown row behind one ability row.
  *
@@ -161,4 +148,3 @@ export const actionsForPin = (key: string, skills: SkillRow[]): ActionType[] => 
   // sees an empty filter, which is the same thing the empty table shows.
   return parsed === null || groupOfPin(key) !== null ? [] : [parsed];
 };
-

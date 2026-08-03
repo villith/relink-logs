@@ -79,8 +79,10 @@ export const causeLabel = (id: number | null): string =>
  * `nameForCause` is injected for the same reason `statusLabelFor` injects its
  * names — the lookup needs i18n and the party, and this stays pure. */
 export const causeNameFor = (id: number | null, nameForCause: (id: number) => string): string => {
-  if (id === null || id === 0 || id === 0xffffffff) return "";
-  return nameForCause(id) || causeLabel(id);
+  // `causeLabel` owns the unattributed test; re-spelling it here let the two
+  // disagree about what counts as "no cause".
+  const bare = causeLabel(id);
+  return bare === "" ? "" : nameForCause(id as number) || bare;
 };
 
 /** Candidate character types for naming one status row's cause: the CASTERS
@@ -98,15 +100,20 @@ export const causeNameFor = (id: number | null, nameForCause: (id: number) => st
  *
  * `playerOf` is injected for the same reason the other lookups here are —
  * it needs the view's actor-indexed party, and this stays pure. */
-export const causeCandidatesFor = (
-  key: string,
-  intervals: Pick<StatusInterval, "statusId" | "abilityId" | "casterIndex">[],
+export const causeCandidatesOf = (
+  intervals: Pick<StatusInterval, "casterIndex">[],
   playerOf: (actorIndex: number) => AbilityLabelPlayer | undefined
 ): CharacterType[] => {
   const seen = new Set<CharacterType>();
+  // One caster contributes the same types however many intervals it holds, and
+  // reading them means walking its whole skill breakdown — so each is walked
+  // once per row rather than once per interval.
+  const walked = new Set<number>();
   for (const interval of intervals) {
-    if (statusPinKey(interval) !== key || interval.casterIndex === null) continue;
-    const caster = playerOf(interval.casterIndex);
+    const casterIndex = interval.casterIndex;
+    if (casterIndex === null || walked.has(casterIndex)) continue;
+    walked.add(casterIndex);
+    const caster = playerOf(casterIndex);
     if (!caster) continue;
     seen.add(caster.characterType);
     for (const skill of caster.skillBreakdown) {
@@ -115,6 +122,20 @@ export const causeCandidatesFor = (
   }
   return [...seen];
 };
+
+/** `causeCandidatesOf` for one row key, selecting that row's intervals out of
+ * the whole fight. Callers with many rows to label should group ONCE by
+ * `statusPinKey` and call `causeCandidatesOf` per group instead — this scans
+ * every interval, so a call per row is quadratic. */
+export const causeCandidatesFor = (
+  key: string,
+  intervals: Pick<StatusInterval, "statusId" | "abilityId" | "casterIndex">[],
+  playerOf: (actorIndex: number) => AbilityLabelPlayer | undefined
+): CharacterType[] =>
+  causeCandidatesOf(
+    intervals.filter((interval) => statusPinKey(interval) === key),
+    playerOf
+  );
 
 /** Display name for a `status:<effect>:<cause>` row key.
  *

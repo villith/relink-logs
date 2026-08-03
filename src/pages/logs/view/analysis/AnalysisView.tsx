@@ -6,19 +6,25 @@ import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
+import { characterIconUrl } from "@/characterIcon";
+import { enemyIconUrl } from "@/enemyIcon";
+import { statusIconUrl } from "@/statusIcon";
 import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
 import { useMeterFilters } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import type {
   AbilityChartSeries,
+  CharacterType,
   ComputedPlayerState,
   EncounterState,
   EnemyType,
   SelectionFact,
+  StatusInterval,
   TargetChartSeries,
 } from "@/types";
 import {
   PLAYER_COLORS,
+  causeSkillName,
   formatInPartyOrder,
   getSkillName,
   millisecondsToElapsedFormat,
@@ -40,7 +46,7 @@ import {
 } from "../DetailCharts";
 import { actionsForPin } from "../abilitySkills";
 import { rowLevelFor } from "../deriveRows";
-import { buffs, heldByRoster, slotsOf } from "../metrics/buffs";
+import { buffs, enemyHolderKey, heldByRoster, slotsOf } from "../metrics/buffs";
 import { damageDone } from "../metrics/damageDone";
 import { debuffs } from "../metrics/debuffs";
 import { sba } from "../metrics/sba";
@@ -67,8 +73,17 @@ import { formatChartDebug } from "./debugSummary";
 import { foldAbilityChart, foldTargetChart } from "./drillSeries";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { identityPartyOf } from "./partyIdentity";
+import { abilityRowIconUrl } from "./rowIcon";
 import { buildStatusSeries } from "./statusChart";
-import { causeLabel, statusLabelFor, statusRowKindFor, targetRowLabel } from "./statusLabel";
+import {
+  causeCandidatesOf,
+  causeNameFor,
+  statusIdOfKey,
+  statusLabelFor,
+  statusRowKindFor,
+  targetRowLabel,
+  targetRowSegment,
+} from "./statusLabel";
 import { withStatusOption } from "./statusOption";
 import { statusRowColors } from "./statusRowColors";
 import { useUrlQueryString } from "./useUrlQueryString";
@@ -77,25 +92,21 @@ import { useUrlQueryString } from "./useUrlQueryString";
  * a descriptor here — the frame itself does not change. */
 const METRICS: Record<string, MetricDescriptor> = { damage: damageDone, stun, sba, buffs, debuffs };
 
-/** The switcher's contents, in display order. Adding a metric is adding a
- * descriptor to METRICS and an entry here — the frame does not change. */
-const METRIC_TABS: MetricTab[] = [
-  { value: "damage", labelKey: "ui.logs.metric-damage-done" },
-  { value: "stun", labelKey: "ui.logs.metric-stun" },
-  { value: "sba", labelKey: "ui.logs.metric-sba" },
-  { value: "buffs", labelKey: "ui.logs.metric-buffs" },
-  { value: "debuffs", labelKey: "ui.logs.metric-debuffs" },
-];
+/** The switcher's contents, derived from METRICS — each descriptor already
+ * carries the label the tab shows, and two lists that must agree is one list
+ * too many. Insertion order above is the display order. */
+const METRIC_TABS: MetricTab[] = Object.entries(METRICS).map(([value, descriptor]) => ({
+  value,
+  labelKey: descriptor.labelKey,
+}));
 
 /** i18next key naming a status table's rows, which are effects and then the
  * actors holding one — neither of which the level-based keys describe. */
 const STATUS_ROWS_LABEL_KEY = {
   status: "ui.logs.rows-by-effect",
   player: "ui.logs.rows-by-player",
-  // A debuff holder is an enemy spawn; `raw` remains for any table that still
-  // shows an unresolved key, and both read "Enemy" to the user.
+  // A debuff holder is an enemy spawn, so it reads "Enemy" to the user.
   target: "ui.logs.rows-by-enemy",
-  raw: "ui.logs.rows-by-enemy",
   ability: "ui.logs.rows-by-ability",
 } as const;
 
@@ -403,16 +414,47 @@ export const AnalysisView = () => {
     [playerByIndex, i18n.language]
   );
 
+  // Every status window filed under the row key it belongs to, in one pass.
+  // Both the row labels and the chart bands need "the intervals for this key",
+  // and each scanning the whole fight per key made them quadratic together.
+  const intervalsByPinKey = useMemo(() => {
+    const byKey = new Map<string, StatusInterval[]>();
+    for (const interval of statusIntervals) {
+      const key = statusPinKey(interval);
+      const group = byKey.get(key);
+      if (group) group.push(interval);
+      else byKey.set(key, [interval]);
+    }
+    return byKey;
+  }, [statusIntervals]);
+
+  // A cause is the CASTER's action id, so it is named through the tables of
+  // that row's own casters (and their sub-actors) — never the whole party,
+  // whose colliding action ids fabricated cross-character names.
+  const causeCandidates = useMemo(() => {
+    const byKey = new Map<string, CharacterType[]>();
+    for (const [key, group] of intervalsByPinKey) {
+      byKey.set(
+        key,
+        causeCandidatesOf(group, (index) => playerByIndex.get(index)?.player)
+      );
+    }
+    return byKey;
+  }, [intervalsByPinKey, playerByIndex]);
+
   // The same name the effect's own row shows. Extracted because the Ability
   // selector must display the pinned effect too, and a second spelling of this
   // would let the selector and the table name one effect two ways.
   const statusDisplayLabel = useCallback(
-    (key: string) =>
-      statusLabelFor(key, t, {
+    (key: string) => {
+      const candidates = causeCandidates.get(key) ?? [];
+      return statusLabelFor(key, t, {
         effect: translateStatusName,
-        cause: causeLabel,
-      }),
-    [t]
+        cause: (id) => causeNameFor(id, (cause) => causeSkillName(candidates, cause)),
+      });
+    },
+    // i18n.language: skill and band names are translated.
+    [t, causeCandidates, i18n.language]
   );
 
   const labelledOptions = useMemo(
@@ -502,25 +544,63 @@ export const AnalysisView = () => {
   const isStatusMetric = metric.labelKind("players") === "status";
   const statusRowKind = statusRowKindFor(pins.ability, hostility);
 
+  // What a row's label and its icon are BOTH resolved against. One value rather
+  // than the same expression in each callback: the two must never disagree, or
+  // a row pairs one kind's name with another kind's art.
+  const rowKind = isStatusMetric ? statusRowKind : metric.labelKind(level);
+
   // One colour per slotless status row, shared with the chart bands below so a
   // row and its band can never disagree.
   const rowColors = useMemo(() => (isStatusMetric ? statusRowColors(rows) : null), [isStatusMetric, rows]);
+
+  // The art beside a row's name, by the same discriminator the name uses, so
+  // a row can never pair one kind's name with another kind's icon. Undefined
+  // is the honest answer for most of what has none: combo actions are not
+  // ability casts, `actor:` holder rows index no spawn, and only the boss
+  // roster has portraits at all (see enemyIcon.ts).
+  const rowIconUrl = useCallback(
+    (row: MetricRow): string | undefined => {
+      if (rowKind === "status") {
+        const statusId = statusIdOfKey(row.label);
+        return statusId === null ? undefined : statusIconUrl(statusId);
+      }
+      if (rowKind === "player") {
+        const character = playerByIndex.get(Number(row.label))?.player.characterType;
+        return typeof character === "string" ? characterIconUrl(character) : undefined;
+      }
+      if (rowKind === "target") {
+        const segment = targetRowSegment(row.label);
+        return segment === null ? undefined : enemyIconUrl(targetEntries[segment]?.enemyType ?? null);
+      }
+      return abilityRowIconUrl(row.label, identityPlayers, playerByIndex.get(pins.source ?? -1)?.player);
+    },
+    [rowKind, playerByIndex, targetEntries, identityPlayers, pins.source]
+  );
 
   const renderLabel = useCallback(
     (row: MetricRow) => {
       // Effect names come from status.tbl via the generated `statuses` bundle;
       // the ~90 internal statuses the game never names answer empty and fall
-      // back to "Effect <id>". The CAUSE is still a bare number: `+0x4c` is an
-      // effect-entry id the game keys on, not an action id, so nothing maps it
-      // to a skill name yet.
-      const kind = isStatusMetric ? statusRowKind : metric.labelKind(level);
-      if (kind === "status") return statusDisplayLabel(row.label);
-      if (kind === "player") return labelForSource(Number(row.label));
-      if (kind === "target") return targetRowLabel(row.label, labelForTarget);
-      if (kind === "raw") return row.label;
-      return labelForAbility(row.label);
+      // back to "Effect <id>". The cause resolves through `causeSkillName`,
+      // which bridges the effect-entry id at `+0x4c` to the acting skill.
+      const name =
+        rowKind === "status"
+          ? statusDisplayLabel(row.label)
+          : rowKind === "player"
+            ? labelForSource(Number(row.label))
+            : rowKind === "target"
+              ? targetRowLabel(row.label, labelForTarget)
+              : labelForAbility(row.label);
+      const icon = rowIconUrl(row);
+      if (!icon) return name;
+      return (
+        <>
+          <img className="analysis-row-icon" src={icon} alt="" />
+          {name}
+        </>
+      );
     },
-    [metric, level, isStatusMetric, statusRowKind, labelForSource, labelForTarget, labelForAbility, statusDisplayLabel]
+    [rowKind, labelForSource, labelForTarget, labelForAbility, statusDisplayLabel, rowIconUrl]
   );
 
   const handlePin = useCallback((next: Partial<SelectorPins>) => setPins({ ...pins, ...next }), [pins, setPins]);
@@ -579,14 +659,27 @@ export const AnalysisView = () => {
   // and colour lookups that keep it a pure function.
   const sectionLabels = useMemo(
     () => ({
-      ability: labelForAbility,
+      // With an owner (a player card decomposing that player's own breakdown),
+      // the key is named against THEIR table first — action ids collide across
+      // characters, and the party-order scan named Id's own 120 with Eustace's
+      // "Grade 1 Shot" on the hover card.
+      ability: (key: string, owner?: ComputedPlayerState) =>
+        owner ? abilityLabelFor(key, identityPlayers, getSkillName, owner) : labelForAbility(key),
       enemy: (type: EnemyType) => translateEnemyType(type),
       source: labelForSource,
       // The player's OWN party colour, resolved through the identity party so a
       // scoped fetch's renumbered slots cannot recolour them mid-drill.
       sourceColor: (index: number) => resolvePlayerColor(palette, playerData, playerByIndex.get(index)?.slot ?? 0, 0),
+      // The same art the rows above the card show, resolved the same way, so
+      // hovering a row cannot show its members under different pictures.
+      abilityIcon: (key: string, owner?: ComputedPlayerState) => abilityRowIconUrl(key, identityPlayers, owner),
+      enemyIcon: enemyIconUrl,
+      sourceIcon: (index: number) => {
+        const character = playerByIndex.get(index)?.player.characterType;
+        return typeof character === "string" ? characterIconUrl(character) : undefined;
+      },
     }),
-    [labelForAbility, labelForSource, palette, playerData, playerByIndex]
+    [labelForAbility, identityPlayers, labelForSource, palette, playerData, playerByIndex]
   );
 
   const rowSections = useCallback(
@@ -678,8 +771,7 @@ export const AnalysisView = () => {
       holderOf: (interval) =>
         hostility === "enemy"
           ? {
-              key:
-                interval.targetSegment === null ? `actor:${interval.actorIndex}` : `target:${interval.targetSegment}`,
+              key: enemyHolderKey(interval),
               label:
                 interval.targetSegment === null ? String(interval.actorIndex) : labelForTarget(interval.targetSegment),
             }
@@ -721,27 +813,25 @@ export const AnalysisView = () => {
     [metricKey, scoped]
   );
 
+  // Whichever series is drawn INSTEAD of the per-player ones. Stack counts and
+  // drill-down bands are the same shape and are consumed identically, so they
+  // are one branch here rather than the same ternary spelled out per field.
+  // Which of the two it is still matters for smoothing and scale below.
+  const overlay = statusSeries ?? drill;
+
   const chartData: ChartDatapoint[] = useMemo(() => {
-    const source = statusSeries
-      ? Object.fromEntries(statusSeries.map((series) => [series.key, series.values]))
-      : drill
-        ? Object.fromEntries(drill.map((series) => [series.key, series.values]))
-        : scopedPlayers ?? chartMetric.source;
-    const keys = statusSeries
-      ? statusSeries.map((series) => series.key)
-      : drill
-        ? drill.map((series) => series.key)
-        : chartIndexes;
+    const source = overlay
+      ? Object.fromEntries(overlay.map((series) => [series.key, series.values]))
+      : scopedPlayers ?? chartMetric.source;
+    const keys = overlay ? overlay.map((series) => series.key) : chartIndexes;
     // Drill and scoped series are built over the whole fight from the same
     // per-second buckets, so their own length is authoritative — the base load's
     // chartLen belongs to a different fetch.
-    const len = statusSeries
-      ? Math.max(0, ...statusSeries.map((series) => series.values.length))
-      : drill
-        ? Math.max(0, ...drill.map((series) => series.values.length))
-        : scopedPlayers
-          ? Math.max(0, ...Object.values(scopedPlayers).map((values) => values.length))
-          : chartMetric.len;
+    const len = overlay
+      ? Math.max(0, ...overlay.map((series) => series.values.length))
+      : scopedPlayers
+        ? Math.max(0, ...Object.values(scopedPlayers).map((values) => values.length))
+        : chartMetric.len;
 
     return buildSeriesPoints({
       source: source as Record<string, number[]>,
@@ -754,45 +844,38 @@ export const AnalysisView = () => {
       smoothing: statusSeries ? 1 : chartMetric.smoothing,
       // The scoped per-player chart is raw damage like `dpsChart`, so its scale
       // is 1 on the damage tab either way — kept explicit rather than accidental.
-      scale: statusSeries || drill || scopedPlayers ? 1 : chartMetric.scale,
+      scale: overlay || scopedPlayers ? 1 : chartMetric.scale,
     }).map((point, bucket) => ({ ...point, timestamp: bucketLabel(bucket) })) as ChartDatapoint[];
-  }, [chartMetric, chartIndexes, drill, scopedPlayers, statusSeries]);
+  }, [chartMetric, chartIndexes, overlay, scopedPlayers, statusSeries]);
 
   const labels: Label = useMemo(
     () =>
       // Drilled in, the bands are one player's own output split up, so the
       // party palette says nothing about them — they take the categorical one
       // the enemy-HP chart already uses, in the same largest-first order.
-      statusSeries
-        ? statusSeries.map((series, position) => ({
+      overlay
+        ? overlay.map((series, position) => ({
             name: series.key,
             label: series.label,
             partySlotIndex: position,
             color: HP_SERIES_COLORS[position % HP_SERIES_COLORS.length],
           }))
-        : drill
-          ? drill.map((series, position) => ({
-              name: series.key,
-              label: series.label,
-              partySlotIndex: position,
-              color: HP_SERIES_COLORS[position % HP_SERIES_COLORS.length],
-            }))
-          : identityPlayers
-              .filter((player) => chartIndexes.includes(player.index))
-              .map((player) => ({
-                name: String(player.index),
-                // The legend carries no rank or position, so it names the
-                // character too — otherwise two AI players are told apart by
-                // colour alone.
-                label: legendLabelFor(
-                  labelForSource(player.index),
-                  translateCharacterType(player.characterType),
-                  player_label_template
-                ),
-                partySlotIndex: player.partyIndex,
-                color: colors[player.partyIndex % colors.length] ?? PLAYER_COLORS[0],
-              })),
-    [statusSeries, drill, identityPlayers, chartIndexes, labelForSource, colors, player_label_template]
+        : identityPlayers
+            .filter((player) => chartIndexes.includes(player.index))
+            .map((player) => ({
+              name: String(player.index),
+              // The legend carries no rank or position, so it names the
+              // character too — otherwise two AI players are told apart by
+              // colour alone.
+              label: legendLabelFor(
+                labelForSource(player.index),
+                translateCharacterType(player.characterType),
+                player_label_template
+              ),
+              partySlotIndex: player.partyIndex,
+              color: colors[player.partyIndex % colors.length] ?? PLAYER_COLORS[0],
+            })),
+    [overlay, identityPlayers, chartIndexes, labelForSource, colors, player_label_template]
   );
 
   // The chart IS the window: committing does not shade the rest of the fight,
@@ -814,10 +897,10 @@ export const AnalysisView = () => {
       // The row's own colour is the normal path; the index fallback only fires
       // for a band whose row scrolled out of the current pin level.
       const color = rowColors?.get(key) ?? mantineColorVar(HP_SERIES_COLORS[index % HP_SERIES_COLORS.length]);
-      const held = statusIntervals.filter((interval) => statusPinKey(interval) === key);
+      const held = intervalsByPinKey.get(key) ?? [];
       return toBands(held, statusWindow).map((band) => ({ color, band }));
     });
-  }, [banded, statusIntervals, statusWindow, rowColors]);
+  }, [banded, intervalsByPinKey, statusWindow, rowColors]);
 
   // What the plot was actually drawn from, for the dev-only readout. Read off
   // the very values the chart consumed rather than recomputed from the pins, so
@@ -907,7 +990,7 @@ export const AnalysisView = () => {
         labels={labels}
         labelKey={statusSeries ? "ui.logs.chart-stacks-label" : drill ? DRILL_LABEL_KEY[level] : chartMetric.labelKey}
         format={statusSeries ? "count" : drill ? "amount" : chartMetric.format}
-        stacked={statusSeries !== null || drill !== null}
+        stacked={overlay !== null}
         onScope={handleScope}
         fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
         toLabel={range === null ? fullLabel : bucketLabel(range[1])}

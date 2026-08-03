@@ -60,4 +60,3 @@ export const useSelectorParams = () => {
 
   return [pins, setPins] as const;
 };
-

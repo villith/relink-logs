@@ -36,4 +36,3 @@ export const labelSourceOptions = (
     const label = labelFor(index);
     return { ...option, label: Number.isInteger(index) ? legendLabelFor(label, characterFor(index), template) : label };
   });
-

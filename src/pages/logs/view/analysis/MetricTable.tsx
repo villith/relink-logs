@@ -1,5 +1,6 @@
 import { Box, Text, UnstyledButton } from "@mantine/core";
 import { Eye, EyeSlash } from "@phosphor-icons/react";
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MetricRow } from "../metrics/types";
@@ -66,6 +67,16 @@ export const MetricTable = ({
 }: MetricTableProps) => {
   const { t } = useTranslation();
 
+  // Built once per row set rather than once per render. At the players level a
+  // single call folds that player's whole skill breakdown (and at the skills
+  // level it scans the entire party twice), while the card that consumes it
+  // only ever opens under the pointer — so recomputing every row's sections on
+  // each band toggle, tab switch and window drag was pure waste.
+  const sectionsByRow = useMemo(
+    () => (rowSections ? new Map(rows.map((row) => [row.key, rowSections(row)])) : null),
+    [rows, rowSections]
+  );
+
   if (rows.length === 0) {
     return (
       <Text size="sm" c="dimmed" ta="center" py="lg">
@@ -91,6 +102,9 @@ export const MetricTable = ({
 
       {rows.map((row) => {
         const toggle = rowToggle?.(row);
+        // A row with windows to place draws a positional timeline instead of a
+        // magnitude bar — asked three times below, so it is answered once.
+        const positional = Boolean(row.timeline) && timelineMs > 0;
         const button = (
           // A div, not a button. The band toggle inside it is a real <button>,
           // and a button may not contain interactive content — the row used to
@@ -112,7 +126,7 @@ export const MetricTable = ({
               onPin(row.pinOnClick);
             }}
           >
-            {!(row.timeline && timelineMs > 0) && (
+            {!positional && (
               <Box
                 data-metric-bar
                 className="analysis-bar"
@@ -146,13 +160,10 @@ export const MetricTable = ({
                 {toggle.shown ? <Eye size={14} weight="fill" /> : <EyeSlash size={14} />}
               </UnstyledButton>
             )}
-            <Text
-              role="gridcell"
-              className={`analysis-name${row.timeline && timelineMs > 0 ? " analysis-name-fixed" : ""}`}
-            >
+            <Text role="gridcell" className={`analysis-name${positional ? " analysis-name-fixed" : ""}`}>
               {renderLabel ? renderLabel(row) : row.label}
             </Text>
-            {row.timeline && timelineMs > 0 && (
+            {positional && row.timeline && (
               // Positional, not proportional: Warcraft Logs' uptime bar marks
               // WHEN the effect was up, and the % column beside it already says
               // how much. Its own cell between the name and the numbers, so the
@@ -189,7 +200,7 @@ export const MetricTable = ({
 
         // The key moves off the row and onto whichever element is the list
         // child: HoverCard clones its child and would otherwise lose it.
-        const sections = rowSections?.(row);
+        const sections = sectionsByRow?.get(row.key);
         if (!sections || sections.length === 0) return <Box key={row.key}>{button}</Box>;
 
         return (

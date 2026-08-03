@@ -1,9 +1,10 @@
 import characterIdHashes from "@/assets/character-id-hashes.json";
 import overmasteryCategories from "@/assets/overmastery-categories.json";
 import { assignable } from "@/pages/toolbox/matching";
+import { sanitizeRollCount } from "@/pages/toolbox/rollCount";
 import useGameStatus from "@/pages/toolbox/useGameStatus";
 import useRngSlotStaleness from "@/pages/toolbox/useRngSlotStaleness";
-import { useOvermasterySelectionsStore } from "@/stores/useOvermasterySelectionsStore";
+import { DEFAULT_ROLLS, useOvermasterySelectionsStore } from "@/stores/useOvermasterySelectionsStore";
 import { CharacterType, OvermasteryMastery, OvermasteryPrediction, OvermasteryStatus } from "@/types";
 import { toHashString, translateCharacterType, translateOvermasteryId } from "@/utils";
 import { invoke } from "@tauri-apps/api";
@@ -42,8 +43,12 @@ export const initialForm: OvermasteryForm = {
   character: null,
   tier: "2",
   wanted: emptySlots(),
-  rolls: 50,
+  rolls: DEFAULT_ROLLS,
 };
+
+/** Most rolls a prediction will simulate: the game's own RNG stream is only
+ * worth walking so far ahead, and each roll costs a chunk of MSP. */
+export const MAX_ROLLS = 500;
 
 /** Numeric filter for one slot; null means "Any" on that axis. */
 export type WantedFilter = { kind: number | null; minLevel: number | null };
@@ -132,14 +137,23 @@ export const sanitizeSelection = (value: unknown, categories: CategoryPools = CA
   return { tier, wanted: slots };
 };
 
+/** This tool's roll-count guard — see `sanitizeRollCount`. */
+export const sanitizeRolls = (value: unknown): number => sanitizeRollCount(value, MAX_ROLLS, DEFAULT_ROLLS);
+
 /** Startup form: restore the last-worked-on character and their saved
- * selections (falling back to defaults for whatever is missing/invalid). */
-export const restoreForm = (lastCharacter: string | null, selections: Record<string, unknown>): OvermasteryForm => {
-  if (!lastCharacter) return initialForm;
+ * selections, plus the account-wide roll count (falling back to defaults for
+ * whatever is missing/invalid). */
+export const restoreForm = (
+  lastCharacter: string | null,
+  selections: Record<string, unknown>,
+  rolls?: unknown
+): OvermasteryForm => {
+  const base = { ...initialForm, rolls: sanitizeRolls(rolls) };
+  if (!lastCharacter) return base;
   const saved = sanitizeSelection(selections[lastCharacter]);
   return saved
-    ? { ...initialForm, character: lastCharacter, tier: saved.tier, wanted: saved.wanted }
-    : { ...initialForm, character: lastCharacter };
+    ? { ...base, character: lastCharacter, tier: saved.tier, wanted: saved.wanted }
+    : { ...base, character: lastCharacter };
 };
 
 export type CharacterOption = { value: string; label: string };
@@ -174,8 +188,8 @@ export default function useOvermasteryPredictor() {
   // which read the module-level i18n instance.
   const { i18n } = useTranslation();
   const [form, setForm] = useState<OvermasteryForm>(() => {
-    const { lastCharacter, selections } = useOvermasterySelectionsStore.getState();
-    return restoreForm(lastCharacter, selections);
+    const { lastCharacter, selections, rolls } = useOvermasterySelectionsStore.getState();
+    return restoreForm(lastCharacter, selections, rolls);
   });
   // The character picker is built from `status.roster`, so a status read
   // taken before the game was up would leave the tool unusable — the shared
@@ -185,6 +199,7 @@ export default function useOvermasteryPredictor() {
   const [predicting, setPredicting] = useState(false);
   const selections = useOvermasterySelectionsStore((s) => s.selections);
   const saveSelection = useOvermasterySelectionsStore((s) => s.save);
+  const saveRolls = useOvermasterySelectionsStore((s) => s.setRolls);
 
   const [stale, setStale] = useRngSlotStaleness(prediction);
 
@@ -207,6 +222,12 @@ export default function useOvermasteryPredictor() {
   useEffect(() => {
     if (form.character) saveSelection(form.character, { tier: form.tier, wanted: form.wanted });
   }, [form.character, form.tier, form.wanted, saveSelection]);
+
+  // A cleared field reads as 0 and is not a count the user chose; keep the
+  // stored one until they type a real number again.
+  useEffect(() => {
+    if (form.rolls >= 1) saveRolls(form.rolls);
+  }, [form.rolls, saveRolls]);
 
   const characterOptions = useMemo(
     () => buildCharacterOptions(status?.roster ?? [], (plCode) => translateCharacterType(plCode as CharacterType)),

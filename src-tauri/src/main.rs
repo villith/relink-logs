@@ -1350,9 +1350,17 @@ const SBA_INTERVAL: i64 = 1_000;
 /// Only the FIRST pinned source and ability are read: the selector bar pins one
 /// of each, and a chart that stacked two players' abilities together would have
 /// no meaningful total.
+///
+/// `segments`/`assignment` are the caller's segmentation of the UNWINDOWED log,
+/// passed in rather than recomputed: the caller already needs it for
+/// `selection_facts`, and segmenting twice per fetch is two more full passes
+/// over a log that can hold hundreds of thousands of events. Sharing it is also
+/// what makes a band and a target-dropdown entry mean the same spawn.
 fn build_drill_charts(
     parser: &v1::Parser,
     options: &ParseOptions,
+    segments: &[v1::TargetSegment],
+    assignment: &[Option<usize>],
 ) -> (Vec<v1::AbilityChartSeries>, Vec<v1::TargetChartSeries>) {
     let Some(&source_index) = options.selection.source_indices.first() else {
         return (Vec::new(), Vec::new());
@@ -1365,15 +1373,11 @@ fn build_drill_charts(
 
     match options.selection.abilities.first() {
         Some(&ability) => {
-            // Shared segmentation, not a fresh one: it is what makes a band and
-            // a target-dropdown entry mean the same spawn.
-            let (segments, assignment) =
-                v1::segment_targets_indexed(&parser.encounter.raw_event_log, start_time);
             let target_chart = v1::build_target_damage_chart(
                 &parser.encounter.raw_event_log,
                 &parser.encounter.player_data,
-                &segments,
-                &assignment,
+                segments,
+                assignment,
                 source_index,
                 ability,
                 start_time,
@@ -1496,7 +1500,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         // computes `target_entries` — a fact's `target_segment` indexes into
         // those, so the two must be the same segmentation or a pin would point
         // at a different enemy on a scoped fetch than on the load.
-        let (_, assignment) =
+        let (segments, assignment) =
             v1::segment_targets_indexed(&parser.encounter.raw_event_log, parser.start_time());
         let selection_facts = v1::selection_facts(
             &parser.encounter.raw_event_log,
@@ -1515,7 +1519,8 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         // view slices its chart client-side from whole-fight buckets, so a
         // pre-sliced series would be windowed twice and a bucket index would
         // stop being the elapsed second.
-        let (ability_chart, target_chart) = build_drill_charts(&parser, &options);
+        let (ability_chart, target_chart) =
+            build_drill_charts(&parser, &options, &segments, &assignment);
         // The level above those: no source pinned, but an enemy or an ability
         // still narrowing the fight. Without it the plot kept drawing the whole
         // party's whole fight beside a table that had already narrowed.
@@ -1688,10 +1693,6 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
             .execute(params_from_iter(ids))
             .map_err(|e| e.to_string())?;
     }
-
-    // Verdicts go with their logs: an orphaned finding would attach itself to
-    // whatever future encounter lands on the recycled rowid.
-    db::legality::sweep_orphaned_findings(&conn).map_err(|e| e.to_string())?;
 
     // Verdicts go with their logs: an orphaned finding would attach itself to
     // whatever future encounter lands on the recycled rowid.
@@ -2812,9 +2813,6 @@ fn main() {
             fetch_legality_players,
             delete_logs,
             delete_all_logs,
-            pick_logs_db_file,
-            analyze_logs_db,
-            import_logs_from_file,
             pick_logs_db_file,
             analyze_logs_db,
             import_logs_from_file,

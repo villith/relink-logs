@@ -115,4 +115,3 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
     skills: skillsToShow,
   };
 };
-

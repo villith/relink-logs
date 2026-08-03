@@ -39,6 +39,7 @@ enum Logs {
     QuestCompleted,
     RunId,
     Imported,
+    RepeatGroup,
 }
 
 /// The stored-verdicts table, as much of it as the quest list's filter needs.
@@ -102,6 +103,10 @@ pub struct LogEntry {
     /// Copied in from another installation's logs.db, so it may lack data the
     /// source app never recorded.
     imported: bool,
+    /// Id of the first run of the Repeat Quest chain this log belongs to; the
+    /// chain's first run (and every unchained log) carries NULL. The quest
+    /// list uses it to collapse a chain under its parent row.
+    repeat_group: Option<i64>,
 }
 
 impl LogEntry {
@@ -159,6 +164,7 @@ pub fn get_logs(
             Logs::QuestElapsedTime,
             Logs::QuestCompleted,
             Logs::Imported,
+            Logs::RepeatGroup,
         ])
         // Exclude Conflux rooms: they are `logs` rows tagged with a run_id and belong to the
         // Conflux tab, not the normal quest list.
@@ -283,6 +289,7 @@ pub fn get_logs(
                 quest_elapsed_time: row.get(15)?,
                 quest_completed: row.get(16)?,
                 imported: row.get(17)?,
+                repeat_group: row.get(18)?,
             })
         })
         .collect::<rusqlite::Result<Vec<LogEntry>>>();

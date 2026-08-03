@@ -40,7 +40,7 @@ export type MetricRow = {
  *
  * `"target"` is the debuff holder row: a `target:<segment>` or `actor:<id>` key
  * naming the enemy SPAWN that held the effect. */
-export type LabelKind = "player" | "ability" | "status" | "raw" | "target";
+export type LabelKind = "player" | "ability" | "status" | "target";
 
 /** Which side's holders the status tables are about — WCL's
  * Friendlies/Enemies switch. Polarity (buff vs debuff) is fixed per tab; this

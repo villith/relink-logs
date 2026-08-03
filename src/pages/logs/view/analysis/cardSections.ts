@@ -1,7 +1,7 @@
 import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
 
 import { abilityKey } from "../abilityKey";
-import { abilityRowKey, skillsForAbilityKey } from "../abilitySkills";
+import { groupSkillsForRows, skillsForAbilityKey } from "../abilitySkills";
 import type { RowLevel } from "../deriveRows";
 import type { MetricRow } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
@@ -11,12 +11,23 @@ import type { CardSection } from "./HoverCard";
 /** Name lookups the view injects, so this stays a pure function: skill and
  * enemy names need i18n, and player names and colours need the settings store. */
 export type SectionLabels = {
-  ability: (key: string) => string;
+  /** `owner` is the player whose breakdown the key is being named for, where
+   * the card knows one — action ids collide across characters (120 is
+   * Eustace's "Grade 1 Shot" AND Id's "Combo Finisher (Dragonform)"), so a
+   * player card's abilities must be named against that player's own table,
+   * not the first party member to share the id. */
+  ability: (key: string, owner?: ComputedPlayerState) => string;
   enemy: (type: EnemyType) => string;
   /** A player's display name, honouring streamer mode and the label template. */
   source: (index: number) => string;
   /** That player's own party colour, so a source row matches their bar. */
   sourceColor: (index: number) => string;
+  /** The entities' art, all optional so tests and older callers stay
+   * text-only. The ability icon takes the owner for the same collision reason
+   * the ability NAME does. */
+  abilityIcon?: (key: string, owner?: ComputedPlayerState) => string | undefined;
+  enemyIcon?: (type: EnemyType) => string | undefined;
+  sourceIcon?: (index: number) => string | undefined;
 };
 
 /** Per-enemy totals summed across a set of skills.
@@ -24,8 +35,12 @@ export type SectionLabels = {
  * `targets` is optional on SkillState because cached payloads predate it. An
  * absent list means the breakdown is unavailable, not that nothing was hit —
  * which is why a missing list yields no entries rather than a zero row. */
-export const aggregateTargets = (skills: SkillState[], enemyLabel: (type: EnemyType) => string) => {
-  const byType = new Map<string, { key: string; label: string; value: number }>();
+export const aggregateTargets = (
+  skills: SkillState[],
+  enemyLabel: (type: EnemyType) => string,
+  enemyIcon?: (type: EnemyType) => string | undefined
+) => {
+  const byType = new Map<string, { key: string; label: string; value: number; icon?: string }>();
   for (const skill of skills) {
     for (const target of skill.targets ?? []) {
       // JSON, not String(): EnemyType is `string | { Unknown: number }`, and
@@ -34,7 +49,13 @@ export const aggregateTargets = (skills: SkillState[], enemyLabel: (type: EnemyT
       const key = JSON.stringify(target.enemyType);
       const found = byType.get(key);
       if (found) found.value += target.totalDamage;
-      else byType.set(key, { key, label: enemyLabel(target.enemyType), value: target.totalDamage });
+      else
+        byType.set(key, {
+          key,
+          label: enemyLabel(target.enemyType),
+          value: target.totalDamage,
+          icon: enemyIcon?.(target.enemyType),
+        });
     }
   }
   return [...byType.values()].sort((a, b) => b.value - a.value);
@@ -48,15 +69,21 @@ export const aggregateTargets = (skills: SkillState[], enemyLabel: (type: EnemyT
  * rows, and hands React two children with the same key. Measured on log 544:
  * "Link Attack" and "Light Blast" each appeared twice. Same shape as
  * `aggregateTargets`. */
-export const aggregateAbilities = (skills: SkillState[], abilityLabel: (key: string) => string) => {
-  const byKey = new Map<string, { key: string; label: string; value: number }>();
-  for (const skill of skills) {
-    const key = abilityRowKey(skill);
-    const found = byKey.get(key);
-    if (found) found.value += skill.totalDamage;
-    else byKey.set(key, { key, label: abilityLabel(key), value: skill.totalDamage });
-  }
-  return [...byKey.values()].sort((a, b) => b.value - a.value);
+export const aggregateAbilities = (
+  skills: SkillState[],
+  abilityLabel: (key: string) => string,
+  abilityIcon?: (key: string) => string | undefined
+) => {
+  // `groupSkillsForRows` owns the condensing rule; re-deriving it here is what
+  // produced the double-draw above in the first place.
+  return groupSkillsForRows(skills)
+    .map(({ key, skills: grouped }) => ({
+      key,
+      label: abilityLabel(key),
+      value: grouped.reduce((sum, skill) => sum + skill.totalDamage, 0),
+      icon: abilityIcon?.(key),
+    }))
+    .sort((a, b) => b.value - a.value);
 };
 
 /** Per-player totals for ONE action, across the whole scoped party.
@@ -71,13 +98,15 @@ export const aggregateSources = (
   players: ComputedPlayerState[],
   actionKey: string,
   sourceLabel: (index: number) => string,
-  sourceColor: (index: number) => string
+  sourceColor: (index: number) => string,
+  sourceIcon?: (index: number) => string | undefined
 ) =>
   players
     .map((player) => ({
       key: `source:${player.index}`,
       label: sourceLabel(player.index),
       color: sourceColor(player.index),
+      icon: sourceIcon?.(player.index),
       value: player.skillBreakdown
         .filter((skill) => abilityKey(skill.actionType) === actionKey)
         .reduce((sum, skill) => sum + skill.totalDamage, 0),
@@ -119,12 +148,16 @@ export const cardSectionsFor = ({
       {
         headingKey: "ui.logs.hover-by-ability",
         color,
-        entries: aggregateAbilities(player.skillBreakdown, labels.ability),
+        entries: aggregateAbilities(
+          player.skillBreakdown,
+          (key) => labels.ability(key, player),
+          labels.abilityIcon && ((key) => labels.abilityIcon?.(key, player))
+        ),
       },
       {
         headingKey: "ui.logs.hover-by-target",
         color: TARGET_COLOR,
-        entries: aggregateTargets(player.skillBreakdown, labels.enemy),
+        entries: aggregateTargets(player.skillBreakdown, labels.enemy, labels.enemyIcon),
       },
     ];
   }
@@ -140,7 +173,7 @@ export const cardSectionsFor = ({
       {
         headingKey: "ui.logs.hover-by-target",
         color: TARGET_COLOR,
-        entries: aggregateTargets(skills, labels.enemy),
+        entries: aggregateTargets(skills, labels.enemy, labels.enemyIcon),
       },
     ];
   }
@@ -160,16 +193,15 @@ export const cardSectionsFor = ({
       {
         headingKey: "ui.logs.hover-by-source",
         color,
-        entries: aggregateSources(players, actionKey, labels.source, labels.sourceColor),
+        entries: aggregateSources(players, actionKey, labels.source, labels.sourceColor, labels.sourceIcon),
       },
       {
         headingKey: "ui.logs.hover-by-target",
         color: TARGET_COLOR,
-        entries: aggregateTargets(skills, labels.enemy),
+        entries: aggregateTargets(skills, labels.enemy, labels.enemyIcon),
       },
     ];
   }
 
   return null;
 };
-

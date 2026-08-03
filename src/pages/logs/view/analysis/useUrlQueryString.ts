@@ -22,4 +22,3 @@ export const useUrlQueryString = (): string => {
   const query = useOptimisticSearchParams().toString();
   return query === "" ? "" : `?${query}`;
 };
-
