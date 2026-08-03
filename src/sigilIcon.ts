@@ -1,3 +1,5 @@
+import { iconsByName } from "./iconMap";
+
 /**
  * Resolves a sigil's gem medallion icon by its visual recipe.
  *
@@ -16,9 +18,7 @@ const ICONS = import.meta.glob<string>("./assets/game-icons/sigil/*.png", {
   import: "default",
 });
 
-const BY_NAME = new Map(
-  Object.entries(ICONS).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1, -".png".length), url])
-);
+const BY_NAME = iconsByName(ICONS);
 
 export type SigilIconVariant = {
   /** `+`-sigil sparkle overlay baked into the art. */

@@ -58,11 +58,11 @@ vi.mock("@/utils", async (importOriginal) => ({
   translateWrightstoneId: (id: number | null) => `stone:${(id ?? 0).toString(16).padStart(8, "0")}`,
 }));
 
-import { useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
+import { DEFAULT_ROLLS, useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
 
 import { POPULAR_TRAITS } from "./traitOptions";
-import TransmarvelSearcher, { MAX_ROLLS, MAX_SHOWN_ROWS } from "./TransmarvelSearcher";
-import { familyCombos, POOL, sigilTrait2Options, slotTraitOptions } from "./useTransmarvelSearcher";
+import TransmarvelSearcher, { MAX_SHOWN_ROWS } from "./TransmarvelSearcher";
+import { familyCombos, MAX_ROLLS, POOL, sigilTrait2Options, slotTraitOptions } from "./useTransmarvelSearcher";
 
 /** The page's tab selection lives in the URL, so it needs a nuqs adapter —
  * the testing one stands in for the router-backed adapter the app installs. */
@@ -162,7 +162,7 @@ describe("TransmarvelSearcher", () => {
     invoke.mockReset();
     // The store is a module-level singleton, so its persisted state (roll
     // count included) would otherwise leak between tests.
-    useTransmarvelWishlistStore.setState({ sigils: [], stones: [], rolls: 50 });
+    useTransmarvelWishlistStore.setState({ sigils: [], stones: [], rolls: DEFAULT_ROLLS });
     window.localStorage.clear();
   });
 
@@ -437,6 +437,43 @@ describe("TransmarvelSearcher", () => {
     fireEvent.change(rollsInput, { target: { value: "60000" } });
     expect(rollsInput.value).toBe(String(MAX_ROLLS));
     expect(MAX_ROLLS).toBe(50000);
+  });
+
+  it("persists the rolls the user typed but not the empty field mid-edit", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    renderPage();
+
+    const rollsInput = (await screen.findByLabelText("Rolls to simulate", { selector: "input" })) as HTMLInputElement;
+    fireEvent.change(rollsInput, { target: { value: "120" } });
+    await waitFor(() => expect(useTransmarvelWishlistStore.getState().rolls).toBe(120));
+
+    // Clearing the field to type a new number must not leave 0 behind: the
+    // tool would reopen empty, with Predict disabled and no auto-prediction.
+    fireEvent.change(rollsInput, { target: { value: "" } });
+    expect(rollsInput.value).toBe("");
+    expect(useTransmarvelWishlistStore.getState().rolls).toBe(120);
+  });
+
+  it("opens on the default when the stored roll count is unusable", async () => {
+    invoke.mockImplementation((command: string) => {
+      if (command === "fetch_transmarvel_status") return Promise.resolve(statusOff);
+      return Promise.reject(new Error(`unexpected command ${command}`));
+    });
+
+    // What a settings.db row written before the mid-edit 0 stopped being
+    // persisted holds — an empty field with Predict disabled, forever.
+    useTransmarvelWishlistStore.setState({ rolls: 0 });
+
+    renderPage();
+
+    expect(((await screen.findByLabelText("Rolls to simulate", { selector: "input" })) as HTMLInputElement).value).toBe(
+      String(DEFAULT_ROLLS)
+    );
+    expect(((await screen.findByRole("button", { name: "Predict" })) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("renders at most the row cap and reports the truncation", async () => {

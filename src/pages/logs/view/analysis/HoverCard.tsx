@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import { rafThrottle } from "@/components/rafThrottle";
-import { humanizeNumbers } from "@/utils";
+import { humanizeNumbers, share } from "@/utils";
 
 import "./analysis.css";
 
@@ -78,9 +78,7 @@ const Section = ({ headingKey, color, entries }: CardSection) => {
               {n}
               {suffix}
             </Text>
-            <Text className="analysis-card-share">
-              {total === 0 ? "0.0%" : `${((entry.value / total) * 100).toFixed(1)}%`}
-            </Text>
+            <Text className="analysis-card-share">{share(entry.value, total)}</Text>
           </Box>
         );
       })}

@@ -1,16 +1,9 @@
-import { humanizeNumbers } from "@/utils";
+import { humanizeNumber, share } from "@/utils";
 
 import { groupSkillsForRows, mergeSkillsByAction } from "../abilitySkills";
 import type { MetricDescriptor, MetricRow } from "./types";
 
-const format = (value: number): string => {
-  const [n, suffix] = humanizeNumbers(value);
-  return `${n}${suffix}`;
-};
-
-/** Share of `total`, or "0.0%" when there is no total to divide by. */
-const share = (value: number, total: number): string =>
-  total === 0 ? "0.0%" : `${((value / total) * 100).toFixed(1)}%`;
+const format = humanizeNumber;
 
 /** Shown where a figure was never recorded — logs saved before `minDamage` and
  * `maxDamage` existed carry null. A zero would claim a hit landed for nothing. */
@@ -113,4 +106,3 @@ export const damageDone: MetricDescriptor = {
       .sort((a, b) => b.value - a.value);
   },
 };
-

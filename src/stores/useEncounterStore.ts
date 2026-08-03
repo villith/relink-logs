@@ -151,4 +151,3 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
     });
   },
 }));
-

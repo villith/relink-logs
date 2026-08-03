@@ -38,4 +38,3 @@ window.ResizeObserver =
     unobserve() {}
     disconnect() {}
   };
-

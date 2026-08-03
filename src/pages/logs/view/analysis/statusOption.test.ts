@@ -35,4 +35,3 @@ describe("withStatusOption", () => {
     expect(withStatusOption(once, "status:10:20", label)).toEqual(once);
   });
 });
-

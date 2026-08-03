@@ -3,13 +3,7 @@ import { WarningCircle } from "@phosphor-icons/react";
 import { t } from "i18next";
 
 import type { EncounterState } from "@/types";
-import {
-  epochToLocalTime,
-  hasQuestElapsedTime,
-  millisecondsToElapsedFormat,
-  toHash,
-  translateQuestId,
-} from "@/utils";
+import { epochToLocalTime, hasQuestElapsedTime, millisecondsToElapsedFormat, toHash, translateQuestId } from "@/utils";
 
 export type QuestHeaderProps = {
   encounter: EncounterState;
@@ -27,7 +21,14 @@ export type QuestHeaderProps = {
  *
  * Drawn by both the classic and analysis views — the same facts about a log
  * must not be stated two different ways depending on which view is open. */
-export const QuestHeader = ({ encounter, questId, roomIndex, questCompleted, questTimer, imported }: QuestHeaderProps) => (
+export const QuestHeader = ({
+  encounter,
+  questId,
+  roomIndex,
+  questCompleted,
+  questTimer,
+  imported,
+}: QuestHeaderProps) => (
   <Box>
     {roomIndex !== null && (
       <Box display="flex">

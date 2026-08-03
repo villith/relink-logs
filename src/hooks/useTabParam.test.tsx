@@ -71,4 +71,3 @@ describe("useTabParam", () => {
     expect(onUrlUpdate.mock.calls[0][0].searchParams.get("tab")).toBeNull();
   });
 });
-

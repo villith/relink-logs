@@ -1,0 +1,16 @@
+# Every text file is LF in the index *and* in the working tree.
+#
+# `eol=lf` is the part that matters: without it a Windows checkout with
+# `core.autocrlf=true` writes CRLF into the working tree, and since Prettier's
+# `endOfLine` default is `lf` it then flags every file it can parse. That made
+# `npm run format-check` report ~241 failures locally against CI's 56 — the
+# real drift was unfindable in the noise, so nobody ran the check locally and
+# the drift reached CI instead. Git still shows no diff for those files (the
+# index was always LF), which is why the mismatch stayed invisible.
+* text=auto eol=lf
+
+# Binary assets: no EOL conversion, and no attempt to diff them as text.
+*.png  binary
+*.ico  binary
+*.icns binary
+*.pyc  binary

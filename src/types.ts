@@ -175,8 +175,9 @@ export type StatusInterval = {
   endMs: number;
   /** Peak stacks within the window. Carried for the chart, which is where a
    * stack count belongs — it varies over the window, so a table cell cannot
-   * say anything true about it. Every interval currently reports 1: the hook
-   * cannot yet tell which status classes hold a real count. */
+   * say anything true about it. A status the generated `status_levels` table
+   * does not mark HasLevels reports 1: whatever sits at the count offset for
+   * those is not a count (see `stacks_for` in the hook). */
   maxStacks: number;
   /** Which enemy SPAWN held this, as an index into `targetEntries`. Null for a
    * player, and for an enemy the segmenter skipped (a phantom marker actor).

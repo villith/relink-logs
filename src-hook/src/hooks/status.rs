@@ -199,23 +199,14 @@ fn info_name(info: usize) -> String {
 /// would be indistinguishable from the real thing and would publish phantom
 /// Attack Up intervals whenever a layout shifted.
 fn status_id_of(status: *const usize) -> Option<u32> {
-    let base = status as usize;
-    if base == 0 || !readable(base.wrapping_add(STATUS_ID_OFFSET), 4) {
-        return None;
-    }
-    Some(unsafe { (base.wrapping_add(STATUS_ID_OFFSET) as *const u32).read_unaligned() })
+    diag::read_u32_opt_guarded(status as usize, STATUS_ID_OFFSET)
 }
 
 /// The status's `+0x4c` cause discriminator, or `None` when it is absent or
 /// unreadable. Strict for the same reason as [`status_id_of`]: a guarded read
 /// answering 0 is indistinguishable from the game's own "no specific cause".
 fn cause_id_of(status: *const usize) -> Option<u32> {
-    let base = status as usize;
-    if base == 0 || !readable(base.wrapping_add(STATUS_SUBID_OFFSET), 4) {
-        return None;
-    }
-    let value = unsafe { (base.wrapping_add(STATUS_SUBID_OFFSET) as *const u32).read_unaligned() };
-    (value > 0).then_some(value)
+    diag::read_u32_opt_guarded(status as usize, STATUS_SUBID_OFFSET).filter(|value| *value > 0)
 }
 
 /// The actor a status is on, as the index the parser keys players by.
@@ -330,11 +321,7 @@ fn stacks_for(status_id: u32, raw: Option<i32>) -> u32 {
 
 /// The status's raw `+0xb0`, or `None` when it cannot be read.
 fn raw_stacks_of(status: *const usize) -> Option<i32> {
-    let base = status as usize;
-    if base == 0 || !readable(base.wrapping_add(STATUS_STACKS_OFFSET), 4) {
-        return None;
-    }
-    Some(unsafe { (base.wrapping_add(STATUS_STACKS_OFFSET) as *const i32).read_unaligned() })
+    diag::read_i32_opt_guarded(status as usize, STATUS_STACKS_OFFSET)
 }
 
 #[cfg(test)]

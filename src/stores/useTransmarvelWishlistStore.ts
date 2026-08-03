@@ -5,6 +5,12 @@ import type { SigilEntry, WrightstoneEntry } from "@/pages/toolbox/useTransmarve
 
 import { durablePersistOptions, registerDurableStore } from "./durableStorage";
 
+/** How many upcoming rolls a prediction simulates before the user says
+ * otherwise. Lives here rather than beside the tool for the same reason as
+ * overmastery's: the searcher imports the store's value, so the reverse can
+ * only ever be a type import. */
+export const DEFAULT_ROLLS = 50;
+
 interface TransmarvelWishlistState {
   /** Sigil wishlist: (sigil trait1, optional 2nd trait) pairs; deduped by
    * the pair on read. */
@@ -14,7 +20,8 @@ interface TransmarvelWishlistState {
   stones: WrightstoneEntry[];
   /** How many upcoming rolls a prediction simulates. Persisted here rather
    * than on its own so the whole tool's state hydrates synchronously from one
-   * place — the mount-time auto-predict reads it on the first render. */
+   * place — the mount-time auto-predict reads it on the first render.
+   * Sanitized on read (`sanitizeRolls`), like the wishlists beside it. */
   rolls: number;
   setSigils: (sigils: SigilEntry[]) => void;
   setStones: (stones: WrightstoneEntry[]) => void;
@@ -28,7 +35,7 @@ export const useTransmarvelWishlistStore = create<TransmarvelWishlistState>()(
     (set) => ({
       sigils: [],
       stones: [],
-      rolls: 50,
+      rolls: DEFAULT_ROLLS,
       setSigils: (sigils) => set({ sigils }),
       setStones: (stones) => set({ stones }),
       setRolls: (rolls) => set({ rolls }),
