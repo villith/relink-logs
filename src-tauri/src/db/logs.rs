@@ -1,6 +1,10 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use rusqlite::Connection;
-use sea_query::{Condition, Expr, Iden, Order, Query, SimpleExpr, SqliteQueryBuilder};
+use sea_query::{
+    Condition, Expr, Func, Iden, Order, Query, SelectStatement, SimpleExpr, SqliteQueryBuilder,
+};
 use sea_query_rusqlite::RusqliteBinder;
 use serde::Serialize;
 
@@ -115,59 +119,72 @@ impl LogEntry {
     pub fn id(&self) -> i64 {
         self.id as i64
     }
+
+    /// The chain this log belongs to — the Rust twin of `chain_key_expr`.
+    fn chain_key(&self) -> i64 {
+        self.repeat_group.unwrap_or(self.id as i64)
+    }
 }
 
-/// One page of the quest list. `flagged_only` keeps just the logs somebody was
-/// flagged in; false (the default) does not filter on legality at all.
-pub fn get_logs(
-    conn: &Connection,
+/// The chain a log belongs to: its `repeat_group` if it is a later run of a
+/// Repeat Quest chain, otherwise its own id.
+///
+/// This is the unit the quest list pages by. Written the same way the frontend
+/// derives it (`chainKey` in `repeatChains.ts`) so a page boundary and a
+/// rendered group can never disagree about what a chain is.
+fn chain_key_expr() -> SimpleExpr {
+    Func::coalesce([
+        Expr::col(Logs::RepeatGroup).into(),
+        Expr::col(Logs::Id).into(),
+    ])
+    .into()
+}
+
+/// The shortest in-game clear time the game can actually report, in seconds.
+/// The Rust twin of `MIN_QUEST_ELAPSED_SECS` in `utils.ts` — logs recorded
+/// before the quest timer was read from the right offset stored a constant 1s,
+/// and the list renders anything below this as "-".
+const MIN_QUEST_ELAPSED_SECS: u32 = 2;
+
+/// The column a sort reads, with the values that are not really values folded
+/// to NULL so they sort as the absences they are.
+///
+/// Only in-game time has any: taken at face value the stored 1s placeholder is
+/// the fastest clear in the database, so "fastest first" would open on a page
+/// of rows the list draws as "-".
+fn sort_value_expr(sort_by: &SortType) -> SimpleExpr {
+    match sort_by {
+        SortType::Time => Expr::col(Logs::Time).into(),
+        SortType::Duration => Expr::col(Logs::Duration).into(),
+        // No ELSE, so a placeholder — and a log that never recorded a time —
+        // both come out NULL, and one NULL ordering covers the pair.
+        SortType::QuestElapsedTime => Expr::case(
+            Expr::col(Logs::QuestElapsedTime).gte(MIN_QUEST_ELAPSED_SECS),
+            Expr::col(Logs::QuestElapsedTime),
+        )
+        .into(),
+    }
+}
+
+/// The filters every quest-list query shares.
+///
+/// One spelling of them: the page query, the chain-key query that decides which
+/// chains the page holds, and the count all have to select the same rows, and
+/// three hand-kept copies of a nine-branch condition chain would not stay equal.
+/// A count that disagreed with the list promises pages the list cannot fill.
+#[allow(clippy::too_many_arguments)]
+fn apply_log_filters(
+    query: &mut SelectStatement,
     filter_by_enemy_id: Option<u32>,
     filter_by_quest_id: Option<u32>,
-    per_page: u32,
-    offset: u32,
-    sort_by: &SortType,
-    sort_direction: &SortDirection,
     cleared: Option<bool>,
     filter_by_player_id: &Option<String>,
     filter_by_player_character: &Option<String>,
     flagged_only: bool,
-) -> anyhow::Result<Vec<LogEntry>> {
-    let sort_column = match sort_by {
-        SortType::Time => Logs::Time,
-        SortType::Duration => Logs::Duration,
-        SortType::QuestElapsedTime => Logs::QuestElapsedTime,
-    };
-
-    let order = match sort_direction {
-        SortDirection::Ascending => Order::Asc,
-        SortDirection::Descending => Order::Desc,
-    };
-
-    let (sql, values) = Query::select()
-        .from(Logs::Table)
-        .columns([
-            Logs::Id,
-            Logs::Name,
-            Logs::Time,
-            Logs::Duration,
-            Logs::Version,
-            Logs::PrimaryTarget,
-            Logs::P1Name,
-            Logs::P1Type,
-            Logs::P2Name,
-            Logs::P2Type,
-            Logs::P3Name,
-            Logs::P3Type,
-            Logs::P4Name,
-            Logs::P4Type,
-            Logs::QuestId,
-            Logs::QuestElapsedTime,
-            Logs::QuestCompleted,
-            Logs::Imported,
-            Logs::RepeatGroup,
-        ])
-        // Exclude Conflux rooms: they are `logs` rows tagged with a run_id and belong to the
-        // Conflux tab, not the normal quest list.
+) {
+    query
+        // Exclude Conflux rooms: they are `logs` rows tagged with a run_id and
+        // belong to the Conflux tab, not the normal quest list.
         .and_where(Expr::col(Logs::RunId).is_null())
         .conditions(
             filter_by_enemy_id.is_some(),
@@ -215,8 +232,8 @@ pub fn get_logs(
                         )
                         .add(
                             Expr::col(Logs::P4Name)
-                                .eq(player_id)
-                                .and(Expr::col(Logs::P4Type).eq(player_character)),
+                                .eq(player_id.clone())
+                                .and(Expr::col(Logs::P4Type).eq(player_character.clone())),
                         ),
                 );
             },
@@ -232,7 +249,7 @@ pub fn get_logs(
                         .add(Expr::col(Logs::P1Name).eq(player_id.clone()))
                         .add(Expr::col(Logs::P2Name).eq(player_id.clone()))
                         .add(Expr::col(Logs::P3Name).eq(player_id.clone()))
-                        .add(Expr::col(Logs::P4Name).eq(player_id)),
+                        .add(Expr::col(Logs::P4Name).eq(player_id.clone())),
                 );
             },
             |_| {},
@@ -247,7 +264,7 @@ pub fn get_logs(
                         .add(Expr::col(Logs::P1Type).eq(player_character.clone()))
                         .add(Expr::col(Logs::P2Type).eq(player_character.clone()))
                         .add(Expr::col(Logs::P3Type).eq(player_character.clone()))
-                        .add(Expr::col(Logs::P4Type).eq(player_character)),
+                        .add(Expr::col(Logs::P4Type).eq(player_character.clone())),
                 );
             },
             |_| {},
@@ -258,10 +275,179 @@ pub fn get_logs(
                 q.and_where(flagged_condition());
             },
             |_| {},
-        )
-        .order_by_with_nulls(sort_column, order, sea_query::NullOrdering::Last)
+        );
+}
+
+/// The chain keys one page of the list holds, in display order.
+///
+/// A page is a fixed number of CHAINS, not of rows, so a Repeat Quest chain is
+/// never cut in half by a page boundary. It used to be: a chain straddling the
+/// break rendered as two blocks, each summarising only the runs that landed on
+/// its own page — two different averages for one chain, a "fastest run" that
+/// was merely the fastest of that half, and a different colour on each side of
+/// the break, which is precisely the signal that says the rows are one group.
+///
+/// A chain is placed by the run that would come FIRST on its own under the
+/// chosen sort — its fastest run ascending, its slowest descending. Asked for
+/// the quickest clears, the user means to find the chain that holds one, and a
+/// chain ranked by its own average or by its date would hide it behind slower
+/// standalone runs. The figures the summary row shows are about the whole set;
+/// where the block SITS is about its best run, which is also the run the list
+/// marks inside it.
+#[allow(clippy::too_many_arguments)]
+fn page_chain_keys(
+    conn: &Connection,
+    filter_by_enemy_id: Option<u32>,
+    filter_by_quest_id: Option<u32>,
+    per_page: u32,
+    offset: u32,
+    sort_by: &SortType,
+    sort_direction: &SortDirection,
+    cleared: Option<bool>,
+    filter_by_player_id: &Option<String>,
+    filter_by_player_character: &Option<String>,
+    flagged_only: bool,
+) -> Result<Vec<i64>> {
+    let order = match sort_direction {
+        SortDirection::Ascending => Order::Asc,
+        SortDirection::Descending => Order::Desc,
+    };
+
+    // Which end of the chain speaks for it follows the direction: the run the
+    // sort would put first is the one at the MIN end ascending and at the MAX
+    // end descending. Taking the minimum either way would rank a chain by its
+    // best run in a list asking which took longest.
+    //
+    // Time is the exception, and always the latest run. It is the one column
+    // whose summary cell shows a single run's value rather than a figure about
+    // the set — the chain's most recent date — so placing the band anywhere
+    // else would put a visible date out of order against the rows around it.
+    let placement: SimpleExpr = match (sort_by, sort_direction) {
+        (SortType::Time, _) | (_, SortDirection::Descending) => {
+            Func::max(sort_value_expr(sort_by)).into()
+        }
+        (_, SortDirection::Ascending) => Func::min(sort_value_expr(sort_by)).into(),
+    };
+
+    let mut query = Query::select();
+    query.from(Logs::Table).expr(chain_key_expr());
+    apply_log_filters(
+        &mut query,
+        filter_by_enemy_id,
+        filter_by_quest_id,
+        cleared,
+        filter_by_player_id,
+        filter_by_player_character,
+        flagged_only,
+    );
+
+    let (sql, values) = query
+        .add_group_by([chain_key_expr()])
+        // Nothing to rank by sorts last, not first: a chain of rows the list
+        // draws as "-" answers neither "fastest" nor "slowest".
+        .order_by_expr_with_nulls(placement, order.clone(), sea_query::NullOrdering::Last)
+        // Chains the sort column cannot separate — every untimed chain, and any
+        // genuine tie — fall back to the list's resting order, so they hold
+        // still between pages instead of arriving in whatever order the
+        // grouping happened to produce.
+        .order_by_expr(Expr::col(Logs::Time).max(), order)
         .limit(per_page.into())
         .offset(offset.into())
+        .build_rusqlite(SqliteQueryBuilder);
+
+    let mut stmt = conn.prepare(&sql)?;
+    let keys = stmt
+        .query(&*values.as_params())?
+        .mapped(|row| row.get::<_, i64>(0))
+        .collect::<rusqlite::Result<Vec<i64>>>()?;
+
+    Ok(keys)
+}
+
+/// One page of the quest list. `flagged_only` keeps just the logs somebody was
+/// flagged in; false (the default) does not filter on legality at all.
+pub fn get_logs(
+    conn: &Connection,
+    filter_by_enemy_id: Option<u32>,
+    filter_by_quest_id: Option<u32>,
+    per_page: u32,
+    offset: u32,
+    sort_by: &SortType,
+    sort_direction: &SortDirection,
+    cleared: Option<bool>,
+    filter_by_player_id: &Option<String>,
+    filter_by_player_character: &Option<String>,
+    flagged_only: bool,
+) -> anyhow::Result<Vec<LogEntry>> {
+    let order = match sort_direction {
+        SortDirection::Ascending => Order::Asc,
+        SortDirection::Descending => Order::Desc,
+    };
+
+    // Which chains this page holds. Selected first, then every run belonging to
+    // them is fetched whole — paging the rows directly is what used to cut a
+    // chain across the boundary.
+    let chain_keys = page_chain_keys(
+        conn,
+        filter_by_enemy_id,
+        filter_by_quest_id,
+        per_page,
+        offset,
+        sort_by,
+        sort_direction,
+        cleared,
+        filter_by_player_id,
+        filter_by_player_character,
+        flagged_only,
+    )?;
+
+    if chain_keys.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let mut query = Query::select();
+    query.from(Logs::Table).columns([
+        Logs::Id,
+        Logs::Name,
+        Logs::Time,
+        Logs::Duration,
+        Logs::Version,
+        Logs::PrimaryTarget,
+        Logs::P1Name,
+        Logs::P1Type,
+        Logs::P2Name,
+        Logs::P2Type,
+        Logs::P3Name,
+        Logs::P3Type,
+        Logs::P4Name,
+        Logs::P4Type,
+        Logs::QuestId,
+        Logs::QuestElapsedTime,
+        Logs::QuestCompleted,
+        Logs::Imported,
+        Logs::RepeatGroup,
+    ]);
+    apply_log_filters(
+        &mut query,
+        filter_by_enemy_id,
+        filter_by_quest_id,
+        cleared,
+        filter_by_player_id,
+        filter_by_player_character,
+        flagged_only,
+    );
+
+    // The same reading of the column the chains were placed by, so a run cannot
+    // lead its own chain on a time the block was not ranked by — and so the
+    // rows the list draws as "-" sit at the bottom of the block rather than
+    // claiming its record.
+    let (sql, values) = query
+        .and_where(Expr::expr(chain_key_expr()).is_in(chain_keys.clone()))
+        .order_by_expr_with_nulls(
+            sort_value_expr(sort_by),
+            order,
+            sea_query::NullOrdering::Last,
+        )
         .build_rusqlite(SqliteQueryBuilder);
 
     let mut stmt = conn.prepare(&sql).unwrap();
@@ -294,12 +480,71 @@ pub fn get_logs(
         })
         .collect::<rusqlite::Result<Vec<LogEntry>>>();
 
-    Ok(rows.unwrap_or(vec![]))
+    let mut rows = rows.unwrap_or_default();
+
+    // Put the chains back in the order the page query chose — by their most
+    // recent run — and keep each chain's runs together. The row query can only
+    // sort by the sort column, which interleaves chains whose runs overlap in
+    // time, and the list groups CONSECUTIVE runs only: an unrelated row landing
+    // mid-chain would split it into two blocks again.
+    //
+    // A stable sort, so within one chain the runs keep the order the sort
+    // column gave them.
+    let chain_order: HashMap<i64, usize> = chain_keys
+        .iter()
+        .enumerate()
+        .map(|(position, key)| (*key, position))
+        .collect();
+    rows.sort_by_key(|log| {
+        chain_order
+            .get(&log.chain_key())
+            .copied()
+            .unwrap_or(usize::MAX)
+    });
+
+    Ok(rows)
 }
 
-/// How many logs the same filters match. Takes `flagged_only` for the same
-/// reason it takes every other filter: a count that ignored one would promise
-/// pages the list cannot fill.
+/// How many CHAINS the same filters match — the number of things the list
+/// pages through, since a Repeat Quest chain occupies one slot on a page
+/// however many runs it holds. Counting rows here would promise more pages than
+/// the list can fill.
+///
+/// Takes `flagged_only` for the same reason it takes every other filter: a
+/// count that ignored one would disagree with the list it sizes.
+pub fn get_chains_count(
+    conn: &Connection,
+    filter_by_enemy_id: Option<u32>,
+    filter_by_quest_id: Option<u32>,
+    cleared: Option<bool>,
+    filter_by_player_id: &Option<String>,
+    filter_by_player_character: &Option<String>,
+    flagged_only: bool,
+) -> Result<i32> {
+    let mut query = Query::select();
+    query
+        .expr(Expr::expr(chain_key_expr()).count_distinct())
+        .from(Logs::Table);
+    apply_log_filters(
+        &mut query,
+        filter_by_enemy_id,
+        filter_by_quest_id,
+        cleared,
+        filter_by_player_id,
+        filter_by_player_character,
+        flagged_only,
+    );
+
+    let (sql, values) = query.build_rusqlite(SqliteQueryBuilder);
+
+    let mut stmt = conn.prepare(&sql)?;
+    let row: i32 = stmt.query_row(&*values.as_params(), |r| r.get(0))?;
+
+    Ok(row)
+}
+
+/// How many logs the same filters match, for the callers that count RUNS rather
+/// than chains — the "N saved" figure beside the pager.
 pub fn get_logs_count(
     conn: &Connection,
     filter_by_enemy_id: Option<u32>,
@@ -517,5 +762,238 @@ mod tests {
 
         assert_eq!(count(&conn, true), 2);
         assert_eq!(count(&conn, false), 4);
+    }
+
+    /// Stamps `ids` as later runs of the chain led by `parent`.
+    fn chain(conn: &Connection, parent: i64, ids: &[i64]) {
+        for id in ids {
+            conn.execute(
+                "UPDATE logs SET repeat_group = ? WHERE id = ?",
+                params![parent, id],
+            )
+            .expect("stamp chain");
+        }
+    }
+
+    fn page(conn: &Connection, per_page: u32, offset: u32) -> Vec<LogEntry> {
+        get_logs(
+            conn,
+            None,
+            None,
+            per_page,
+            offset,
+            &SortType::Time,
+            &SortDirection::Ascending,
+            None,
+            &None,
+            &None,
+            false,
+        )
+        .expect("query")
+    }
+
+    fn chains(conn: &Connection) -> i32 {
+        get_chains_count(conn, None, None, None, &None, &None, false).expect("count")
+    }
+
+    /// A page holds whole chains. Two slots against a 3-run chain and a lone
+    /// log used to mean the chain was cut after its second run, and the summary
+    /// row then averaged half a chain and marked the wrong run as fastest.
+    #[test]
+    fn a_page_never_cuts_a_chain_in_half() {
+        let conn = db_with(&[(1, false), (2, false), (3, false), (4, false)]);
+        chain(&conn, 1, &[2, 3]);
+
+        // Two slots: the chain (runs 1-3) and log 4. The chain arrives whole,
+        // so the page carries four rows rather than the two a row-pager would.
+        assert_eq!(ids(&page(&conn, 2, 0)), vec![1, 2, 3, 4]);
+    }
+
+    /// One slot per chain, so the second page starts at the next chain rather
+    /// than partway through the first.
+    #[test]
+    fn paging_steps_by_chain_not_by_row() {
+        let conn = db_with(&[(1, false), (2, false), (3, false), (4, false)]);
+        chain(&conn, 1, &[2, 3]);
+
+        assert_eq!(ids(&page(&conn, 1, 0)), vec![1, 2, 3]);
+        assert_eq!(ids(&page(&conn, 1, 1)), vec![4]);
+    }
+
+    /// The pager is sized in chains. Counting rows here would offer a second
+    /// page that the chain-based offset leaves empty.
+    #[test]
+    fn the_chain_count_counts_chains_not_runs() {
+        let conn = db_with(&[(1, false), (2, false), (3, false), (4, false)]);
+        chain(&conn, 1, &[2, 3]);
+
+        assert_eq!(chains(&conn), 2);
+        assert_eq!(count(&conn, false), 4);
+    }
+
+    /// A chain's runs stay together even when another log falls between them in
+    /// the sort order — the list groups CONSECUTIVE runs only, so an interloper
+    /// would split one chain into two blocks.
+    ///
+    /// The chain sits where its MOST RECENT run puts it, which is the date its
+    /// summary row shows: ascending by time, the lone log 2 precedes a chain
+    /// whose latest run is 3, and both of the chain's runs follow together.
+    ///
+    /// Ascending, that is the LAST of the chain's runs rather than the first —
+    /// time does not follow the direction the way duration and in-game time do
+    /// (see `page_chain_keys`). The band displays this date, so ranking it by
+    /// the chain's earliest run would print 3 above a row printing 2.
+    #[test]
+    fn a_chain_stays_contiguous_when_another_log_sorts_between_its_runs() {
+        let conn = db_with(&[(1, false), (2, false), (3, false)]);
+        // Log 2 sits between runs 1 and 3 by time, but belongs to no chain.
+        chain(&conn, 1, &[3]);
+
+        assert_eq!(ids(&page(&conn, 10, 0)), vec![2, 1, 3]);
+    }
+
+    /// Gives logs an in-game clear time, in the seconds the column stores.
+    fn igt(conn: &Connection, times: &[(i64, i64)]) {
+        for (id, seconds) in times {
+            conn.execute(
+                "UPDATE logs SET quest_elapsed_time = ? WHERE id = ?",
+                params![seconds, id],
+            )
+            .expect("set quest elapsed time");
+        }
+    }
+
+    /// Gives logs a wall-clock duration, in the milliseconds the column stores.
+    fn durations(conn: &Connection, values: &[(i64, i64)]) {
+        for (id, ms) in values {
+            conn.execute("UPDATE logs SET duration = ? WHERE id = ?", params![ms, id])
+                .expect("set duration");
+        }
+    }
+
+    fn sorted(conn: &Connection, sort_by: &SortType, direction: &SortDirection) -> Vec<u64> {
+        ids(&get_logs(
+            conn, None, None, 10, 0, sort_by, direction, None, &None, &None, false,
+        )
+        .expect("query"))
+    }
+
+    /// Sorting by in-game time ranks a chain by its FASTEST run, so asking for
+    /// the quickest clears surfaces the chain that holds one. Ranking it by its
+    /// most recent run instead — which is all the chain pager knew — left the
+    /// list in time order under every sort column.
+    #[test]
+    fn an_in_game_time_sort_places_a_chain_by_its_fastest_run() {
+        let conn = db_with(&[(1, false), (2, false), (3, false), (4, false)]);
+        chain(&conn, 1, &[3]);
+        igt(&conn, &[(1, 300), (2, 200), (3, 100), (4, 400)]);
+
+        // The chain holds the fastest clear (100s), so it leads — its own runs
+        // fastest-first — then the lone logs by their own times.
+        assert_eq!(
+            sorted(
+                &conn,
+                &SortType::QuestElapsedTime,
+                &SortDirection::Ascending
+            ),
+            vec![3, 1, 2, 4]
+        );
+    }
+
+    /// An unchained log is a chain of one, so the sort column has to move it
+    /// too. It did not: every log was its own chain, and chains were ordered by
+    /// time whatever column the user clicked.
+    #[test]
+    fn an_in_game_time_sort_orders_unchained_logs_by_their_own_time() {
+        let conn = db_with(&[(1, false), (2, false), (3, false)]);
+        igt(&conn, &[(1, 300), (2, 100), (3, 200)]);
+
+        assert_eq!(
+            sorted(
+                &conn,
+                &SortType::QuestElapsedTime,
+                &SortDirection::Ascending
+            ),
+            vec![2, 3, 1]
+        );
+    }
+
+    /// Descending, the question is "which took longest", so a chain is ranked
+    /// by its SLOWEST run — the same rule as ascending, read from the other
+    /// end. Ranking by the fastest either way would bury a chain holding the
+    /// longest clear in the list.
+    #[test]
+    fn a_descending_sort_places_a_chain_by_its_slowest_run() {
+        let conn = db_with(&[(1, false), (2, false), (3, false), (4, false)]);
+        chain(&conn, 1, &[3]);
+        // The newest log (4) holds neither the longest nor the shortest clear,
+        // so time order and in-game order disagree everywhere.
+        igt(&conn, &[(1, 300), (2, 400), (3, 100), (4, 200)]);
+
+        assert_eq!(
+            sorted(
+                &conn,
+                &SortType::QuestElapsedTime,
+                &SortDirection::Descending
+            ),
+            vec![2, 1, 3, 4]
+        );
+    }
+
+    /// The placeholder in-game time is not a clear time, so it cannot win the
+    /// sort. Logs recorded before the quest timer was read correctly store a
+    /// constant 1s; taken at face value it is the fastest clear in the database
+    /// and would pin every chain holding one to the top of an ascending sort.
+    #[test]
+    fn a_placeholder_in_game_time_does_not_place_a_chain() {
+        let conn = db_with(&[(1, false), (2, false), (3, false)]);
+        chain(&conn, 1, &[3]);
+        // Run 3 stored the placeholder, so the chain's real best is run 1's
+        // 300s — behind the lone log's 200s.
+        igt(&conn, &[(1, 300), (2, 200), (3, 1)]);
+
+        assert_eq!(
+            sorted(
+                &conn,
+                &SortType::QuestElapsedTime,
+                &SortDirection::Ascending
+            ),
+            vec![2, 1, 3]
+        );
+    }
+
+    /// A run with no clear time to show sorts last rather than first. The list
+    /// renders both the placeholder and a missing time as "-", and a column of
+    /// dashes at the top of "fastest first" answers the opposite of what was
+    /// asked. Among themselves they fall back to time, the list's resting
+    /// order — untimed rows in an arbitrary order would shuffle between pages.
+    #[test]
+    fn logs_without_a_real_in_game_time_sort_last() {
+        let conn = db_with(&[(1, false), (2, false), (3, false)]);
+        // Log 1 stored the placeholder; log 2 never recorded a time at all.
+        igt(&conn, &[(1, 1), (3, 100)]);
+
+        assert_eq!(
+            sorted(
+                &conn,
+                &SortType::QuestElapsedTime,
+                &SortDirection::Ascending
+            ),
+            vec![3, 1, 2]
+        );
+    }
+
+    /// Duration ranks a chain the same way: by the run that would come first on
+    /// its own. Wall-clock has no placeholder to exclude — every log has one.
+    #[test]
+    fn a_duration_sort_places_a_chain_by_its_fastest_run() {
+        let conn = db_with(&[(1, false), (2, false), (3, false)]);
+        chain(&conn, 1, &[3]);
+        durations(&conn, &[(1, 300), (2, 200), (3, 100)]);
+
+        assert_eq!(
+            sorted(&conn, &SortType::Duration, &SortDirection::Ascending),
+            vec![3, 1, 2]
+        );
     }
 }

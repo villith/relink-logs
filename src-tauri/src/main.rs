@@ -1075,10 +1075,24 @@ fn fetch_logs(
     )
     .map_err(|e| e.to_string())?;
 
+    // Pages hold a fixed number of CHAINS, not of rows, so a Repeat Quest chain
+    // is never cut across a page boundary — see `page_chain_keys`. `log_count`
+    // still counts runs: it is the "N saved" figure, which is about the logs.
+    let chain_count = db::logs::get_chains_count(
+        &conn,
+        filter_by_enemy_id,
+        filter_by_quest_id,
+        quest_completed,
+        &filter_by_player_id,
+        &filter_by_player_character,
+        flagged_only,
+    )
+    .map_err(|e| e.to_string())?;
+
     let page_ids: Vec<i64> = logs.iter().map(|log| log.id()).collect();
     let legality = db::legality::findings_for_logs(&conn, &page_ids).map_err(|e| e.to_string())?;
 
-    let page_count = (log_count as f64 / per_page as f64).ceil() as u32;
+    let page_count = (chain_count as f64 / per_page as f64).ceil() as u32;
 
     let mut enemy_ids = Vec::new();
     let mut quest_ids = Vec::new();
