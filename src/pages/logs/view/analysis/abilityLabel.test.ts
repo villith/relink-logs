@@ -29,10 +29,7 @@ const player = (index: number, characterType: string, actions: SkillState["actio
     skillBreakdown: actions.map((actionType) => ({ actionType, childCharacterType: characterType })),
   }) as unknown as ComputedPlayerState;
 
-const PARTY = [
-  player(0, "Pl1000", [{ Normal: 1000 }, "LinkAttack"]),
-  player(1, "Pl1400", [{ Normal: 2000 }]),
-];
+const PARTY = [player(0, "Pl1000", [{ Normal: 1000 }, "LinkAttack"]), player(1, "Pl1400", [{ Normal: 2000 }])];
 
 describe("abilityLabelFor", () => {
   it("names an ability against the player who used it", () => {
@@ -75,5 +72,21 @@ describe("abilityLabelFor", () => {
     // A stale or hand-edited URL. Showing it back is how the user sees what is
     // wrong; the selector itself degrades to "All".
     expect(abilityLabelFor("nonsense", PARTY, SKILL_NAME)).toBe("nonsense");
+  });
+
+  it("names a colliding action against the preferred player, not the first owner", () => {
+    // Action ids are shared across characters — 120 is Eustace's "Grade 1
+    // Shot" and Id's "Combo Finisher (Dragonform)". With a source pinned, the
+    // rows are that player's own, so the first party member to also own the id
+    // must not name them.
+    const collision = [player(0, "Pl1000", [{ Normal: 1000 }]), player(1, "Pl1400", [{ Normal: 1000 }])];
+
+    expect(abilityLabelFor("Normal:1000", collision, SKILL_NAME, collision[1])).toBe("Pl1400 Light Blast");
+  });
+
+  it("falls back to the party scan when the preferred player never used the action", () => {
+    const preferred = player(1, "Pl1400", [{ Normal: 2000 }]);
+
+    expect(abilityLabelFor("Normal:1000", PARTY, SKILL_NAME, preferred)).toBe("Pl1000 Light Blast");
   });
 });

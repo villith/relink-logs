@@ -29,7 +29,13 @@ export type AbilityLabelPlayer = Pick<ComputedPlayerState, "characterType" | "sk
 export const abilityLabelFor = (
   key: string,
   players: AbilityLabelPlayer[],
-  skillName: (characterType: CharacterType, skill: SkillRow) => string
+  skillName: (characterType: CharacterType, skill: SkillRow) => string,
+  /** The player whose table the key is being named for — the pinned source.
+   * Searched ahead of the party scan because action ids are shared across
+   * characters (120 is Eustace's "Grade 1 Shot" and Id's "Combo Finisher
+   * (Dragonform)"), so the first party member to own the id must not name
+   * another player's rows. */
+  preferred?: AbilityLabelPlayer
 ): string => {
   // A condensed group row is named through `{ Group }`; anything else is named
   // through the action the key parses to. The raw key survives only when it is
@@ -50,7 +56,7 @@ export const abilityLabelFor = (
   const name = (characterType: CharacterType, skill: SkillRow) =>
     group === null ? skillName(characterType, skill) : abilityRowName(characterType, skill, skillName);
 
-  for (const player of players) {
+  for (const player of preferred ? [preferred, ...players] : players) {
     const skill = player.skillBreakdown.find(owns);
     if (skill) return name(player.characterType, skill);
   }
@@ -60,4 +66,3 @@ export const abilityLabelFor = (
   // through its own `skills.default.skill-groups.<group>` name.
   return skillName("", { actionType: action, childCharacterType: "" });
 };
-
