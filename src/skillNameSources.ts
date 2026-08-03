@@ -60,16 +60,17 @@ export const getSkillNameSources = (): SkillNameSources => sources;
 
 /** Which of the two resolution orders `resolveSkillName` walks.
  *
- * `language-first` (the default): the current language's hand label, then its
- * bridge name, then the fallback language's — a translated game name beats a
- * foreign hand label. `label-first` restores the pre-language-major order:
- * every hand label (any language's, via the normal per-key fallback) before
- * any bridge name — hand labels always win, at the cost of non-labelled
- * languages reading English. Driven by the `skill_name_resolution` setting;
- * the store subscription in useMeterSettingsStore keeps this in step. */
+ * `label-first` (the default): every hand label — any language's, via the
+ * normal per-key fallback — before any bridge name. Hand labels always win,
+ * at the cost of non-labelled languages reading English. `language-first`
+ * prefers the current language's own entries (label, then bridge name) over
+ * the fallback language's, so a translated game name beats a foreign hand
+ * label; it stays wired through the `skill_name_resolution` store field but
+ * currently ships with no settings UI. The store subscription in
+ * useMeterSettingsStore keeps this in step. */
 export type SkillNameResolutionMode = "language-first" | "label-first";
 
-let resolutionMode: SkillNameResolutionMode = "language-first";
+let resolutionMode: SkillNameResolutionMode = "label-first";
 
 export const setSkillNameResolutionMode = (mode: SkillNameResolutionMode): void => {
   resolutionMode = mode;

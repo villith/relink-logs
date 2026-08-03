@@ -207,7 +207,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   ...DEFAULT_OVERLAY_SIZE,
   ...DEFAULT_BAR_APPEARANCE,
   logs_view_mode: "analysis",
-  skill_name_resolution: "language-first",
+  skill_name_resolution: "label-first",
 };
 
 /* Cross-window sync lives in `durableStorage`: every write goes to settings.db,

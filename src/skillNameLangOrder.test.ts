@@ -1,5 +1,5 @@
 import i18n from "i18next";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
 import { setSkillNameSources } from "./skillNameSources";
 import { useMeterSettingsStore } from "./stores/useMeterSettingsStore";
@@ -43,7 +43,10 @@ beforeAll(async () => {
 
 const hit = (id: number) => ({ actionType: { Normal: id }, childCharacterType: "Pl0400" }) as SkillState;
 
-describe("getSkillName language-major resolution", () => {
+describe("getSkillName language-major resolution (opt-in via the setting)", () => {
+  beforeAll(() => useMeterSettingsStore.getState().set({ skill_name_resolution: "language-first" }));
+  afterAll(() => useMeterSettingsStore.getState().set({ skill_name_resolution: "label-first" }));
+
   it("keeps the current language's own hand label first", () => {
     expect(getSkillName("Pl0400", hit(6000))).toBe("Concentration FR");
   });
@@ -62,22 +65,22 @@ describe("getSkillName language-major resolution", () => {
 });
 
 describe("the skill_name_resolution setting", () => {
-  afterEach(() => useMeterSettingsStore.getState().set({ skill_name_resolution: "language-first" }));
+  // The setting has no UI any more, but the store field and both resolver
+  // orders stay wired — flipping it must still switch getSkillName live.
+  afterEach(() => useMeterSettingsStore.getState().set({ skill_name_resolution: "label-first" }));
 
-  it("defaults to the language-major order", () => {
-    expect(useMeterSettingsStore.getState().skill_name_resolution).toBe("language-first");
-  });
-
-  it("switches getSkillName back to the label-first order", () => {
-    // The store subscription drives the resolver, so flipping the setting is
-    // all a user does — no reload, no re-injection.
-    useMeterSettingsStore.getState().set({ skill_name_resolution: "label-first" });
+  it("keeps the label-first order without any opt-in", () => {
     expect(getSkillName("Pl0400", hit(7000))).toBe("Gravity Well (Charged)");
   });
 
-  it("switches back to language-major when restored", () => {
-    useMeterSettingsStore.getState().set({ skill_name_resolution: "label-first" });
+  it("switches getSkillName to language-major when set", () => {
     useMeterSettingsStore.getState().set({ skill_name_resolution: "language-first" });
     expect(getSkillName("Pl0400", hit(7000))).toBe("Puits de gravité");
+  });
+
+  it("switches back to label-first when restored", () => {
+    useMeterSettingsStore.getState().set({ skill_name_resolution: "language-first" });
+    useMeterSettingsStore.getState().set({ skill_name_resolution: "label-first" });
+    expect(getSkillName("Pl0400", hit(7000))).toBe("Gravity Well (Charged)");
   });
 });

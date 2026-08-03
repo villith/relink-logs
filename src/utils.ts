@@ -911,10 +911,9 @@ export const getSkillName = (characterType: CharacterType, skill: SkillRow) => {
         return t(SUMMON_FALLBACK_KEYS, { id: skillID });
       }
 
-      // Language-major: the current language's ui.json label, then its bridge
-      // (game) name, only then the fallback language's — so an English-only
-      // hand label cannot shadow a translated game name. Within one language a
-      // hand label still wins over the bridge.
+      // ui.json labels and the bridge's game names, in the order the
+      // skill_name_resolution mode dictates — labels ahead of every bridge
+      // name by default; see SkillNameResolutionMode.
       const resolved = resolveSkillName([String(skill.childCharacterType), String(characterType)], skillID);
       if (resolved !== null) return resolved;
 
@@ -952,8 +951,7 @@ export const getSkillName = (characterType: CharacterType, skill: SkillRow) => {
  * damage table would name wrongly. */
 export const causeSkillName = (candidates: CharacterType[], causeId: number): string => {
   const probe = (id: number): string => {
-    // Language-major, like the damage rows: within each language every
-    // candidate's hand label is tried before any candidate's bridge name.
+    // The same label/bridge resolution the damage rows use, mode included.
     const resolved = resolveSkillName(candidates.map(String), id);
     return resolved ?? t(`causes.default.${id}`, { defaultValue: "" });
   };

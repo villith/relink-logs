@@ -1,7 +1,7 @@
 import i18n from "i18next";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { setSkillNameSources } from "./skillNameSources";
+import { setSkillNameResolutionMode, setSkillNameSources } from "./skillNameSources";
 import { causeSkillName } from "./utils";
 
 beforeAll(async () => {
@@ -81,14 +81,18 @@ describe("causeSkillName", () => {
   });
 });
 
-describe("causeSkillName across languages", () => {
+describe("causeSkillName across languages (language-first mode)", () => {
   beforeAll(() => {
     // Pl2700's 1000 carries BOTH an en hand label (above) and a bridge entry —
-    // the coexistence the language-major order resolves per language.
+    // the coexistence the language-major order resolves per language. The mode
+    // is an opt-in: label-first is the shipped default.
+    setSkillNameResolutionMode("language-first");
     setSkillNameSources({
       Pl2700: { "1000": { ns: "abilities", hash: "ab127001", key: "AB_PL2700_01" } },
     });
   });
+
+  afterAll(() => setSkillNameResolutionMode("label-first"));
 
   afterEach(async () => {
     await i18n.changeLanguage("en");

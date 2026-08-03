@@ -85,52 +85,62 @@ describe("resolveSkillName", () => {
     })
   );
 
-  it("prefers the current language's hand label over its bridge name", () => {
-    expect(resolveSkillName(["Pl0400"], 1100)).toBe("Étiquette FR");
+  it("defaults to the label-first order", () => {
+    // Runs FIRST, before any test touches the mode: a foreign hand label
+    // beating the current language's bridge name is the shipped behavior.
+    expect(resolveSkillName(["Pl0400"], 4400)).toBe("Label EN 4400");
   });
 
-  it("prefers the current language's bridge name over a foreign hand label", () => {
-    // 4400 is hand-labelled in en only; the fr player reads the fr game name.
-    expect(resolveSkillName(["Pl0400"], 4400)).toBe("Pont FR 4400");
-  });
+  describe("in language-first mode (opt-in)", () => {
+    beforeEach(() => setSkillNameResolutionMode("language-first"));
+    afterEach(() => setSkillNameResolutionMode("label-first"));
 
-  it("prefers the fallback language's hand label over its bridge name", () => {
-    expect(resolveSkillName(["Pl0400"], 2200)).toBe("Label EN 2200");
-  });
+    it("prefers the current language's hand label over its bridge name", () => {
+      expect(resolveSkillName(["Pl0400"], 1100)).toBe("Étiquette FR");
+    });
 
-  it("reaches the fallback language's bridge name last", () => {
-    expect(resolveSkillName(["Pl0400"], 3300)).toBe("Bridge EN 3300");
-  });
-
-  it("checks the child block before the character block within a language", () => {
-    expect(resolveSkillName(["Pl0400Child", "Pl0400"], 1100)).toBe("Enfant FR");
-  });
-
-  it("returns null when nothing names the id", () => {
-    expect(resolveSkillName(["Pl0400"], 9999)).toBeNull();
-  });
-
-  it("misses a bridge-only id when the map has not loaded yet", () => {
-    setSkillNameSources({});
-    expect(resolveSkillName(["Pl0400"], 3300)).toBeNull();
-  });
-
-  it("resolves a regional UI language through its base-language bundles", async () => {
-    // The picker ships "fr-FR" while the lang directory is "fr"; the resolve
-    // hierarchy ["fr-FR", "fr", "en"] is what connects the two.
-    await i18n.changeLanguage("fr-FR");
-    try {
+    it("prefers the current language's bridge name over a foreign hand label", () => {
+      // 4400 is hand-labelled in en only; the fr player reads the fr game name.
       expect(resolveSkillName(["Pl0400"], 4400)).toBe("Pont FR 4400");
-    } finally {
-      await i18n.changeLanguage("fr");
-    }
+    });
+
+    it("prefers the fallback language's hand label over its bridge name", () => {
+      expect(resolveSkillName(["Pl0400"], 2200)).toBe("Label EN 2200");
+    });
+
+    it("reaches the fallback language's bridge name last", () => {
+      expect(resolveSkillName(["Pl0400"], 3300)).toBe("Bridge EN 3300");
+    });
+
+    it("checks the child block before the character block within a language", () => {
+      expect(resolveSkillName(["Pl0400Child", "Pl0400"], 1100)).toBe("Enfant FR");
+    });
+
+    it("returns null when nothing names the id", () => {
+      expect(resolveSkillName(["Pl0400"], 9999)).toBeNull();
+    });
+
+    it("misses a bridge-only id when the map has not loaded yet", () => {
+      setSkillNameSources({});
+      expect(resolveSkillName(["Pl0400"], 3300)).toBeNull();
+    });
+
+    it("resolves a regional UI language through its base-language bundles", async () => {
+      // The picker ships "fr-FR" while the lang directory is "fr"; the resolve
+      // hierarchy ["fr-FR", "fr", "en"] is what connects the two.
+      await i18n.changeLanguage("fr-FR");
+      try {
+        expect(resolveSkillName(["Pl0400"], 4400)).toBe("Pont FR 4400");
+      } finally {
+        await i18n.changeLanguage("fr");
+      }
+    });
   });
 
-  describe("in label-first mode (the pre-language-major behavior)", () => {
-    // The settings page offers the old order back: every hand label — any
-    // language's, via the normal per-key fallback — before any bridge name.
+  describe("in label-first mode (the default)", () => {
+    // The original order: every hand label — any language's, via the normal
+    // per-key fallback — before any bridge name.
     beforeEach(() => setSkillNameResolutionMode("label-first"));
-    afterEach(() => setSkillNameResolutionMode("language-first"));
 
     it("lets a foreign hand label beat the current language's bridge name", () => {
       expect(resolveSkillName(["Pl0400"], 4400)).toBe("Label EN 4400");
