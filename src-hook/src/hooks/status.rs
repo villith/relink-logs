@@ -134,6 +134,7 @@ static_detour! {
 pub(super) fn disable() {
     super::disable_quiet("OnStatusInit", &OnStatusInit);
     super::disable_quiet("OnStatusDtor", &OnStatusDtor);
+    disable_variants();
 }
 
 /* Entity-info block offsets, decoded from the first live capture (2026-07-31):
@@ -514,6 +515,17 @@ impl OnStatusDtorHook {
 }
 
 fn run_dtor(tx: &event::Tx, status: *const usize, dtor_flags: u32) -> usize {
+    emit_remove(tx, status, dtor_flags);
+    unsafe { OnStatusDtor.call(status, dtor_flags) }
+}
+
+/// The removal observation itself — everything [`run_dtor`] does short of
+/// calling the original. Split out so the per-class dtor variants (below) can
+/// share it verbatim: every field read happens BEFORE any original runs, so
+/// one body serves all fourteen entry points.
+// `dtor_flags` is diag-only, so a release build sees it unused.
+#[cfg_attr(not(feature = "hookdiag"), allow(unused_variables))]
+fn emit_remove(tx: &event::Tx, status: *const usize, dtor_flags: u32) {
     // Diag-only reads; the removal itself needs the id and the holder.
     #[cfg(feature = "hookdiag")]
     let id = diag::read_u32_guarded(status as usize, STATUS_ID_OFFSET);
@@ -557,7 +569,144 @@ fn run_dtor(tx: &event::Tx, status: *const usize, dtor_flags: u32) -> usize {
         status as usize,
         info_summary(target_info)
     );
-
-    unsafe { OnStatusDtor.call(status, dtor_flags) }
 }
 
+/* Per-class dtor overrides.
+
+The shared scalar-deleting dtor covers 147 of the family's vtables, but 20
+classes override slot 0 with their own — verified on the v2.0.3 gbfr203fast DB
+by dumping slot 0 of every `Status*` vftable and keeping the classes whose
+vftable set never reaches the shared entry. Their removals were invisible, so
+those statuses' intervals ran to the end of the fight: Zeta's Ares, Io's
+Concentration Ex, Katalina's Cover/Noble/Guardpoint among them.
+
+COMDAT folding leaves 13 DISTINCT primary entries (decompile-verified: the
+primary is the body that writes `StatusBase::vftable` at offset 0; the other
+addresses in each class's set are secondary-vftable full clones the removal
+paths never dispatch — `ExStatus` holds primary `StatusBase*` — or adjustor
+thunks that forward into a primary). All take the same `(this, flags)` the
+shared dtor takes, verified from their prologues.
+
+Each signature anchors on the prologue plus the class's own member
+displacements (what makes one fold-group's dtor differ from another's), with
+RIP-relative displacements wildcarded; each was verified to match EXACTLY once,
+resolving to its known entry. A miss degrades to that group's statuses running
+long again — never to a wrong detour, because 0 matches skips the install. */
+macro_rules! status_dtor_variants {
+    ($(($detour:ident, $label:literal, $sig:expr)),+ $(,)?) => {
+        static_detour! {
+            $(static $detour: unsafe extern "system" fn(*const usize, u32) -> usize;)+
+        }
+
+        #[cfg(any(feature = "eject", test))]
+        pub(super) fn disable_variants() {
+            $(super::disable_quiet($label, &$detour);)+
+        }
+
+        /// Installs every per-class dtor detour, tolerating individual misses:
+        /// the ones that matched stay enabled, and the error names the rest.
+        fn setup_variants(tx: &event::Tx, process: &Process) -> Result<()> {
+            let mut missing: Vec<&'static str> = Vec::new();
+            $(
+                match process.search_address($sig) {
+                    Ok(addr) => {
+                        let tx = tx.clone();
+                        // Defined outside the unsafe block so the closure's own
+                        // `.call` is the one unsafe op it contains.
+                        let detour = move |status: *const usize, dtor_flags: u32| -> usize {
+                            emit_remove(&tx, status, dtor_flags);
+                            unsafe { $detour.call(status, dtor_flags) }
+                        };
+                        unsafe {
+                            let func: StatusDtorFunc = std::mem::transmute(addr);
+                            $detour.initialize(func, detour)?;
+                            $detour.enable()?;
+                        }
+                    }
+                    Err(_) => missing.push($label),
+                }
+            )+
+            if missing.is_empty() {
+                Ok(())
+            } else {
+                Err(anyhow!("no match for: {}", missing.join(", ")))
+            }
+        }
+    };
+}
+
+status_dtor_variants! {
+    // Pl1000 charge parry + Pl1100 cover (one folded body).
+    (OnDtorChargeParry, "dtor_charge_parry",
+     "' 56 57 53 48 83 ec 20 89 d7 48 89 ce 48 8b 89 28 01 00 00 48 85 c9 74 1e 48 8d 86 f0 00 00 00 \
+      48 39 c1 0f 95 c2 48 8b 01 ff 50 20 48 c7 86 28 01 00 00 00 00 00 00"),
+    // Pl2400 spm damage up.
+    (OnDtorSpmDamageUp, "dtor_spm_damage_up",
+     "' 56 57 53 48 83 ec 20 89 d7 48 89 ce 48 8b 89 10 01 00 00 48 85 c9 74 1e 48 8d 86 d8 00 00 00 \
+      48 39 c1 0f 95 c2 48 8b 01 ff 50 20 48 c7 86 10 01 00 00 00 00 00 00"),
+    // Pl1200 guardpoint + Pl2400 ab dmg (one folded body).
+    (OnDtorGuardpoint, "dtor_guardpoint",
+     "' 56 57 53 48 83 ec 20 89 d7 48 89 ce 48 8b 89 58 01 00 00 48 85 c9 74 1e 48 8d 86 20 01 00 00 \
+      48 39 c1 0f 95 c2 48 8b 01 ff 50 20 48 c7 86 58 01 00 00 00 00 00 00"),
+    // Pl2400 g-swing just.
+    (OnDtorGSwingJust, "dtor_gswing_just",
+     "' 56 57 53 48 83 ec 20 89 d7 48 89 ce 48 8b 89 20 01 00 00 48 85 c9 74 1e 48 8d 86 e8 00 00 00 \
+      48 39 c1 0f 95 c2 48 8b 01 ff 50 20 48 c7 86 20 01 00 00 00 00 00 00"),
+    // The four Pl2600 clock buffs (one folded body); this one re-seats TWO
+    // vftables before touching members, hence the different shape.
+    (OnDtorClock, "dtor_clock",
+     "' 56 57 53 48 83 ec 20 89 d7 48 89 ce 48 8d 05 ? ? ? ? 48 89 01 48 8d 05 ? ? ? ? \
+      48 89 81 b0 00 00 00 48 8b 89 f8 00 00 00 48 85 c9 74 1e 48 8d 86 c0 00 00 00"),
+    // Pl1000 charge attack.
+    (OnDtorChargeAttack, "dtor_charge_attack",
+     "' 56 57 53 48 83 ec 20 89 d7 48 89 ce 48 8b 89 40 01 00 00 48 85 c9 74 1e 48 8d 86 08 01 00 00 \
+      48 39 c1 0f 95 c2 48 8b 01 ff 50 20 48 c7 86 40 01 00 00 00 00 00 00"),
+    // Pl1100 just + Pl1800 charge attack (one folded body).
+    (OnDtorJust, "dtor_just",
+     "' 56 57 53 48 83 ec 20 89 d7 48 89 ce 48 8b 89 50 01 00 00 48 85 c9 74 1e 48 8d 86 18 01 00 00 \
+      48 39 c1 0f 95 c2 48 8b 01 ff 50 20 48 c7 86 50 01 00 00 00 00 00 00"),
+    // Pl1000 flame empire.
+    (OnDtorFlameEmpire, "dtor_flame_empire",
+     "' 56 57 53 48 83 ec 20 89 d7 48 89 ce 48 8b 89 18 01 00 00 48 85 c9 74 1e 48 8d 86 e0 00 00 00 \
+      48 39 c1 0f 95 c2 48 8b 01 ff 50 20 48 c7 86 18 01 00 00 00 00 00 00"),
+    // Pl0400 concentration EX + Pl1200 noble (one folded body).
+    (OnDtorConcentrationEx, "dtor_concentration_ex",
+     "' 56 57 53 48 83 ec 20 89 d7 48 89 ce 48 8b 89 a0 01 00 00 48 85 c9 74 1e 48 8d 86 68 01 00 00 \
+      48 39 c1 0f 95 c2 48 8b 01 ff 50 20 48 c7 86 a0 01 00 00 00 00 00 00"),
+    // Pl0200 Ares.
+    (OnDtorAres, "dtor_ares",
+     "' 56 57 53 48 83 ec 20 89 d7 48 89 ce 48 8b 89 08 01 00 00 48 85 c9 74 1e 48 8d 86 d0 00 00 00 \
+      48 39 c1 0f 95 c2 48 8b 01 ff 50 20 48 c7 86 08 01 00 00 00 00 00 00"),
+    // Em1806 aura; the EH-frame prologue variant.
+    (OnDtorEm1806Aura, "dtor_em1806_aura",
+     "' 55 56 57 53 48 83 ec 28 48 8d 6c 24 20 48 c7 45 00 fe ff ff ff 89 d7 48 89 ce \
+      48 8b 89 c0 00 00 00 48 85 c9 74 10 48 c7 86 c0 00 00 00 00 00 00 00 e8 ? ? ? ? \
+      48 8d 05 ? ? ? ? 48 89 06"),
+    // Em0001 (goblin witch doctor) buff.
+    (OnDtorEm0001, "dtor_em0001",
+     "' 55 56 57 53 48 83 ec 28 48 8d 6c 24 20 48 c7 45 00 fe ff ff ff 89 d7 48 89 ce \
+      48 8b 89 00 01 00 00 48 85 c9 74 10 48 c7 86 00 01 00 00 00 00 00 00 e8 ? ? ? ? \
+      48 8d 05 ? ? ? ? 48 89 06"),
+    // Pl1200 attack buff.
+    (OnDtorPl1200Attack, "dtor_pl1200_attack",
+     "' 55 56 57 53 48 83 ec 28 48 8d 6c 24 20 48 c7 45 00 fe ff ff ff 89 d7 48 89 ce \
+      48 8b 89 d8 00 00 00 48 85 c9 74 10 48 c7 86 d8 00 00 00 00 00 00 00 e8 ? ? ? ? \
+      48 8d 05 ? ? ? ? 48 89 06"),
+}
+
+/// Installs the 13 per-class dtor detours — the removal coverage the shared
+/// dtor cannot give. Stateless, like [`OnStatusDtorHook`].
+#[derive(Clone)]
+pub struct OnStatusDtorVariantsHook {
+    tx: event::Tx,
+}
+
+impl OnStatusDtorVariantsHook {
+    pub fn new(tx: event::Tx) -> Self {
+        Self { tx }
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        setup_variants(&self.tx, process)
+    }
+}

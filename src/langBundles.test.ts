@@ -65,11 +65,21 @@ describe("lang bundles", () => {
     expect(translateStatusName(1000)).toBe("Poison");
   });
 
+  it("names the character-signature statuses the first extraction left blank", () => {
+    // The first bundle only carried the ~77 rows whose titles the extraction
+    // surfaced; the character-signature buffs have real names too. Observed on
+    // log 1636: Sandalphon's aura and Fraux's stance buffs all rendered as
+    // "Effect <id>" without these rows.
+    expect(translateStatusName(47)).toBe("Näed Nulli");
+    expect(translateStatusName(60)).toBe("Heliotrope Aura");
+    expect(translateStatusName(119)).toBe("Enhanced Upright");
+  });
+
   it("answers empty for a status the game never names", () => {
-    // Roughly ninety of the 168 statuses are internal and carry no text at all.
-    // Empty is the contract statusLabelFor expects: it is what makes the row
-    // fall back to "Effect <id>" rather than printing a blank name.
-    expect(translateStatusName(47)).toBe("");
+    // A handful of rows are internal and carry no text at all. Empty is the
+    // contract statusLabelFor expects: it is what makes the row fall back to
+    // "Effect <id>" rather than printing a blank name.
+    expect(translateStatusName(12)).toBe("");
     expect(translateStatusName(999999)).toBe("");
   });
 });

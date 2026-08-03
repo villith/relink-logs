@@ -941,6 +941,36 @@ export const getSkillName = (characterType: CharacterType, skill: SkillRow) => {
       return t("ui.unknown");
   }
 };
+
+/** Name for a status row's cause id, or empty when no table names it.
+ *
+ * A cause in the character bands is the applying character's action id, so it
+ * resolves through the same per-character tables the damage meter uses — tried
+ * for every candidate character (the row's CASTERS — see `causeCandidatesFor`),
+ * then the ability-hash bridge, then the `causes.default` band entries
+ * (sigil/trait, equipment, environment, perfect guard).
+ *
+ * `causes.default`, never `skills.default`: the shared skills table names the
+ * DAMAGE id space, and the two spaces only coincide within one character's own
+ * band. Its 99999 is the conflux effect action, while cause 99999 arrives
+ * under Shield in quests with no conflux at all — a cause band the shared
+ * damage table would name wrongly. */
+export const causeSkillName = (candidates: CharacterType[], causeId: number): string => {
+  const probe = (id: number): string => {
+    const keys = candidates.flatMap((c) => [`skills.${c}.${id}`, ...abilitySourceKeys(String(c), String(c), id)]);
+    return t([...keys, `causes.default.${id}`], { defaultValue: "" });
+  };
+  const exact = probe(causeId);
+  if (exact) return exact;
+  // The game numbers action variants within a decade (1600/1601/1602 are all
+  // Flamek Thunder charge levels) and stamps computed causes as base+count
+  // (Fraux stores stance stacks as 20000+n), so a miss retries the decade
+  // base. Only the decade: a hundreds-floor crosses into different actions
+  // (1110 is not a variant of 1100), which is where names become fabrications.
+  const decade = causeId - (causeId % 10);
+  return decade !== causeId && decade > 0 ? probe(decade) : "";
+};
+
 const tryParseInt = (intString: string | number, defaultValue = 0) => {
   if (typeof intString === "number") {
     if (isNaN(intString)) return defaultValue;
@@ -1378,12 +1408,11 @@ export const translateEnemyTypeId = (id: number): string => {
  * `StatusApplyEvent.status_id` — rather than by a hash like every other bundle,
  * because statuses are the one table the runtime identifies by row id.
  *
- * Empty rather than a placeholder on a miss: roughly ninety of the 168 statuses
- * are internal (`nayde1`, `mspl1900_01`) and the game names none of them, so
- * the generated bundle omits them. `statusLabelFor` reads empty as "unnamed"
- * and falls back to "Effect <id>", which is the documented shipping path. */
-export const translateStatusName = (statusId: number): string =>
-  t(`statuses:${statusId}.text`, { defaultValue: "" });
+ * Empty rather than a placeholder on a miss: the bundle names 156 of the 168
+ * rows; the rest are internal (`nayde1`, `mspl1900_01`) with no text at all.
+ * `statusLabelFor` reads empty as "unnamed" and falls back to "Effect <id>",
+ * which is the documented shipping path. */
+export const translateStatusName = (statusId: number): string => t(`statuses:${statusId}.text`, { defaultValue: "" });
 
 // A string form usable as a map key ("Em1000" and { Unknown: 0x1234 } stay distinct).
 const enemyTypeKey = (type: EnemyType): string => (typeof type === "string" ? `s:${type}` : `h:${type.Unknown}`);

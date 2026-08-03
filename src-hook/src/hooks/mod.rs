@@ -196,6 +196,13 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         "status_dtor",
         status::OnStatusDtorHook::new(tx.clone()).setup(&process),
     );
+    /* The 20 classes whose vtables override the shared dtor (Ares,
+    Concentration Ex, Cover, the clock buffs, …) — without these their
+    removals are invisible and their uptime runs to the end of the fight. */
+    try_step(
+        "status_dtor_variants",
+        status::OnStatusDtorVariantsHook::new(tx.clone()).setup(&process),
+    );
 
     /* SBA */
     try_step(
@@ -318,4 +325,3 @@ mod teardown_tests {
         super::teardown_hooks();
     }
 }
-

@@ -11,6 +11,9 @@
     "key": "protect",
     "text": "Substitute"
   },
+  "100": {
+    "text": "Näed Seitset Excel"
+  },
   "1000": {
     "key": "poison",
     "text": "Poison"
@@ -47,6 +50,9 @@
     "key": "waterprison",
     "text": "Held Under"
   },
+  "101": {
+    "text": "Näed Nelja Excel"
+  },
   "1011": {
     "key": "darkburn",
     "text": "Darkflame"
@@ -75,6 +81,9 @@
     "key": "fear",
     "text": "Petrified"
   },
+  "102": {
+    "text": "Embrasque Unleashed"
+  },
   "1020": {
     "key": "arvessfermare",
     "text": "Arvess Fermare"
@@ -83,17 +92,122 @@
     "key": "elementweak",
     "text": "Elemental Friction"
   },
+  "103": {
+    "text": "Enhanced Damage Skills"
+  },
+  "104": {
+    "text": "Enhanced Combo Finishers"
+  },
+  "105": {
+    "text": "Avalanche"
+  },
+  "106": {
+    "text": "Limitless Light"
+  },
+  "107": {
+    "text": "Lucent Refuge"
+  },
+  "108": {
+    "text": "Bell of War"
+  },
+  "109": {
+    "text": "Piercing Gleam"
+  },
   "11": {
     "key": "protected",
     "text": "Covered"
+  },
+  "110": {
+    "text": "Dawnray"
+  },
+  "111": {
+    "text": "Dull Point"
+  },
+  "112": {
+    "text": "Ultimatum"
+  },
+  "113": {
+    "text": "Fall Flat"
+  },
+  "114": {
+    "text": "Wild Showman"
+  },
+  "115": {
+    "text": "Daredevil"
+  },
+  "116": {
+    "text": "Sovereign"
+  },
+  "117": {
+    "text": "Star Sea"
+  },
+  "118": {
+    "text": "Flamek Unleashed"
+  },
+  "119": {
+    "text": "Enhanced Upright"
+  },
+  "120": {
+    "text": "Enhanced Reversed"
+  },
+  "121": {
+    "text": "Enhanced Upright+"
+  },
+  "122": {
+    "text": "Enhanced Reversed+"
+  },
+  "123": {
+    "text": "Enhanced Combo Finishers"
+  },
+  "124": {
+    "text": "Malice"
   },
   "125": {
     "key": "blacksnipper",
     "text": "Pincer Synergy"
   },
+  "126": {
+    "text": "Inversa"
+  },
+  "127": {
+    "text": "Enhanced Clincher"
+  },
+  "128": {
+    "text": "Rise of Justice"
+  },
+  "129": {
+    "text": "Pain of Death"
+  },
+  "130": {
+    "text": "Kiss of the Devil"
+  },
+  "131": {
+    "text": "Collapse of the Tower"
+  },
+  "132": {
+    "text": "Melody of Judgement"
+  },
+  "133": {
+    "text": "Samudaya"
+  },
   "134": {
     "key": "stundown",
     "text": "Stun Resistance↓"
+  },
+  "135": {
+    "text": "Charisma"
+  },
+  "136": {
+    "text": "Booming Beatdown"
+  },
+  "137": {
+    "text": "Flame Wolf"
+  },
+  "138": {
+    "text": "Blood-Drinking Blade"
+  },
+  "139": {
+    "text": "Dual Raid"
   },
   "140": {
     "key": "antiburn",
@@ -107,9 +221,24 @@
     "key": "antidraw",
     "text": "Rooted"
   },
+  "144": {
+    "text": "Daybreak"
+  },
   "145": {
     "key": "em2510",
     "text": "Unstable"
+  },
+  "146": {
+    "text": "Proto-White World"
+  },
+  "147": {
+    "text": "Fractured World"
+  },
+  "148": {
+    "text": "Chaos Shift"
+  },
+  "149": {
+    "text": "Fractured World"
   },
   "17": {
     "key": "antidebuff",
@@ -223,6 +352,15 @@
     "key": "armorparge",
     "text": "Deathmatch Finale"
   },
+  "47": {
+    "text": "Näed Nulli"
+  },
+  "48": {
+    "text": "Näed Seitset"
+  },
+  "49": {
+    "text": "Näed Nelja"
+  },
   "5": {
     "key": "regeneration",
     "text": "Regen"
@@ -271,9 +409,33 @@
     "key": "muteki",
     "text": "Invincibility"
   },
+  "60": {
+    "text": "Heliotrope Aura"
+  },
+  "61": {
+    "text": "Enhanced Freeflutter"
+  },
+  "62": {
+    "text": "Enhanced Dawnfly"
+  },
+  "63": {
+    "text": "Kaleidoscope"
+  },
+  "64": {
+    "text": "Dragonsbane Pulse"
+  },
+  "65": {
+    "text": "Dark Zeal"
+  },
+  "66": {
+    "text": "Combat Healer"
+  },
   "67": {
     "key": "atkdownadd",
     "text": "Stackable ATK↓"
+  },
+  "68": {
+    "text": "Ares Surge"
   },
   "69": {
     "key": "mspl0200_02",
@@ -283,6 +445,33 @@
     "key": "tsuigeki",
     "text": "Supplementary DMG"
   },
+  "70": {
+    "text": "Super Bull's Eye Blast"
+  },
+  "71": {
+    "text": "Superstar"
+  },
+  "72": {
+    "text": "Sniper Elite"
+  },
+  "73": {
+    "text": "Shell Shock"
+  },
+  "74": {
+    "text": "Noble Order"
+  },
+  "75": {
+    "text": "Diamond Cutter"
+  },
+  "76": {
+    "text": "Divine Justice"
+  },
+  "77": {
+    "text": "Ultrafist"
+  },
+  "78": {
+    "text": "Loving Trust"
+  },
   "79": {
     "key": "mspl0700_01",
     "text": "Spiritbond"
@@ -291,12 +480,66 @@
     "key": "hyperarmor",
     "text": "Stout Heart"
   },
+  "81": {
+    "text": "Magic Chain"
+  },
+  "82": {
+    "text": "Ebony Glint"
+  },
+  "83": {
+    "text": "Stoked Charge"
+  },
   "84": {
     "key": "abdmgup",
     "text": "Skill DMG↑"
   },
+  "85": {
+    "text": "Molten Edge"
+  },
+  "86": {
+    "text": "Super Collapse"
+  },
+  "87": {
+    "text": "Arts Superiór"
+  },
+  "88": {
+    "text": "Grynoth Unleashed"
+  },
+  "89": {
+    "text": "Flash Cut"
+  },
   "9": {
     "key": "illusion",
     "text": "Mirror Image"
+  },
+  "90": {
+    "text": "Payback"
+  },
+  "91": {
+    "text": "Heroic Vigor"
+  },
+  "92": {
+    "text": "Truth"
+  },
+  "93": {
+    "text": "Synergy Boost"
+  },
+  "94": {
+    "text": "Loop Master"
+  },
+  "95": {
+    "text": "Arvess Unleashed"
+  },
+  "96": {
+    "text": "Heavy Hammer"
+  },
+  "97": {
+    "text": "Spiral Rose Bloomed"
+  },
+  "98": {
+    "text": "Lost Love Bloomed"
+  },
+  "99": {
+    "text": "Näed Nulli Excel"
   }
 }

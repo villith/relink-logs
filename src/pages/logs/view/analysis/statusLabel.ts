@@ -1,9 +1,19 @@
+import type { CharacterType, StatusInterval } from "@/types";
+
 import type { Hostility, LabelKind } from "../metrics/types";
-import { isStatusPin } from "../statusUptime";
+import { isStatusPin, statusPinKey } from "../statusUptime";
+import type { AbilityLabelPlayer } from "./abilityLabel";
 
 /** How a status row's key is spelled: the effect, then the ability that caused
  * it, or the literal `unknown` where the hook could not attribute one. */
 const STATUS_KEY = /^status:(\d+):(\d+|unknown)$/;
+
+/** The effect id inside a `status:<effect>:<cause>` key, or null for anything
+ * that is not one — the same tolerance `statusLabelFor` shows a stale pin. */
+export const statusIdOfKey = (key: string): number | null => {
+  const parsed = STATUS_KEY.exec(key);
+  return parsed === null ? null : Number(parsed[1]);
+};
 
 /** What a status table's rows currently ARE, for labelling them and for naming
  * the column above them.
@@ -18,6 +28,13 @@ export const statusRowKindFor = (pin: string | null, hostility: Hostility): Labe
 /** How a debuff holder row names the enemy that held the effect: the SPAWN it
  * belonged to, or the bare actor id when the segmenter never placed it. */
 const TARGET_ROW = /^(target|actor):(\d+)$/;
+
+/** The spawn segment inside a `target:<n>` row label, or null — including for
+ * `actor:<id>` rows, whose bare id indexes nothing a portrait could hang on. */
+export const targetRowSegment = (label: string): number | null => {
+  const parsed = TARGET_ROW.exec(label);
+  return parsed !== null && parsed[1] === "target" ? Number(parsed[2]) : null;
+};
 
 /** Display name for a debuff holder row.
  *
@@ -38,14 +55,66 @@ export const targetRowLabel = (label: string, labelForTarget: (segment: number) 
   return kind === "target" ? labelForTarget(Number(id)) : id;
 };
 
-/** The hook's `+0x4c` cause discriminator, as displayed.
+/** The hook's `+0x4c` cause discriminator, as a bare number.
  *
- * The number itself, because it is what keeps two abilities granting one
- * effect on separate rows and no mapping from it to a skill name exists (see
- * the hook's status module: it is an effect-entry constant, not an action id).
- * All-ones is the game's own "no value", so it reads as unattributed instead
- * of as a ten-digit number the user can do nothing with. */
-export const causeLabel = (id: number | null): string => (id === null || id === 0xffffffff ? "" : String(id));
+ * The numeric fallback under `causeNameFor`: it is what keeps two abilities
+ * granting one effect on separate rows when no table names the cause.
+ * All-ones is the game's own "no value" and 0 is what appliers pass when
+ * there is no cause, so both read as unattributed instead of as a number the
+ * user can do nothing with. */
+export const causeLabel = (id: number | null): string =>
+  id === null || id === 0 || id === 0xffffffff ? "" : String(id);
+
+/** Display name for the `+0x4c` cause discriminator.
+ *
+ * A cause in the character bands IS the applying character's action id — the
+ * same id space the damage meter names (established by the status-cause RE
+ * investigation: 1100 is "Scourge (Dragonform)" both statically and live) —
+ * so it resolves through the same per-character skill tables, with
+ * `skills.default` carrying the global bands (sigil/trait, environment,
+ * perfect guard). A cause no table names stays a number: id spaces collide
+ * across characters, so fabricating a name from a numeric coincidence is the
+ * one forbidden move.
+ *
+ * `nameForCause` is injected for the same reason `statusLabelFor` injects its
+ * names — the lookup needs i18n and the party, and this stays pure. */
+export const causeNameFor = (id: number | null, nameForCause: (id: number) => string): string => {
+  if (id === null || id === 0 || id === 0xffffffff) return "";
+  return nameForCause(id) || causeLabel(id);
+};
+
+/** Candidate character types for naming one status row's cause: the CASTERS
+ * of that row's own intervals, plus their child (sub-actor) types. The child
+ * types matter: Id's Dragonform Burn arrives from the Pl2000 sub-actor, and
+ * only Pl2000's table names its actions — the parent Pl1900 cannot.
+ *
+ * The casters, never the whole party: a cause is the applying character's
+ * action id, and action ids collide across characters — the party scan named
+ * Eustace's supp-DMG cause 1500 with Id's "Ragnarok Form", and Id's own cause
+ * 1200 with Eustace's "Play with Fire", purely by party order (log 1636). A
+ * row whose casters resolve to no player gets no candidates at all: the
+ * shared bands can still name it, and past them the number is the honest
+ * answer.
+ *
+ * `playerOf` is injected for the same reason the other lookups here are —
+ * it needs the view's actor-indexed party, and this stays pure. */
+export const causeCandidatesFor = (
+  key: string,
+  intervals: Pick<StatusInterval, "statusId" | "abilityId" | "casterIndex">[],
+  playerOf: (actorIndex: number) => AbilityLabelPlayer | undefined
+): CharacterType[] => {
+  const seen = new Set<CharacterType>();
+  for (const interval of intervals) {
+    if (statusPinKey(interval) !== key || interval.casterIndex === null) continue;
+    const caster = playerOf(interval.casterIndex);
+    if (!caster) continue;
+    seen.add(caster.characterType);
+    for (const skill of caster.skillBreakdown) {
+      if (skill.childCharacterType) seen.add(skill.childCharacterType);
+    }
+  }
+  return [...seen];
+};
 
 /** Display name for a `status:<effect>:<cause>` row key.
  *

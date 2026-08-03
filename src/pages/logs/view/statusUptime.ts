@@ -3,7 +3,7 @@ import type { StatusInterval } from "@/types";
 /** Identity of a buff row: the effect AND the ability that caused it.
  * Unresolved causes collapse to one "unknown" bucket per effect rather than
  * scattering — the documented fallback when the hook cannot attribute. */
-export const statusKey = (interval: StatusInterval): string =>
+export const statusKey = (interval: Pick<StatusInterval, "statusId" | "abilityId">): string =>
   `${interval.statusId}:${interval.abilityId ?? "unknown"}`;
 
 /** The prefix that keeps a status pin tellable apart from a damage-ability pin
@@ -13,7 +13,8 @@ export const statusKey = (interval: StatusInterval): string =>
 export const STATUS_PIN_PREFIX = "status:";
 
 /** `statusKey` prefixed, i.e. the value a status row pins. */
-export const statusPinKey = (interval: StatusInterval): string => `${STATUS_PIN_PREFIX}${statusKey(interval)}`;
+export const statusPinKey = (interval: Pick<StatusInterval, "statusId" | "abilityId">): string =>
+  `${STATUS_PIN_PREFIX}${statusKey(interval)}`;
 
 /** Whether an Ability pin selects a status effect rather than a damage ability.
  *
@@ -66,4 +67,3 @@ export const uptimeMs = (intervals: StatusInterval[]): number => {
 
   return total + (end - start);
 };
-
