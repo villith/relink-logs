@@ -1,6 +1,6 @@
 ---
 name: reverse-engineering-signatures
-description: Use when a Granblue Fantasy Relink game patch breaks the GBFR Logs hook — signatures no longer match, "Could not find match for pattern" / "Could not find <offset>" warnings, hooks logging FAIL at startup, an offset reads a wrong/garbage value, or a hook crashes the game. Covers re-deriving AOB byte-signatures and struct offsets in src-hook/ using the sigscan harness and Ghidra lean analysis.
+description: Use when a Granblue Fantasy Relink game patch breaks the GBFR Logs hook — signatures no longer match, "Could not find match for pattern" / "Could not find <offset>" warnings, hooks logging FAIL at startup, an offset reads a wrong/garbage value, or a hook crashes the game. Also use when tracing where a value in the game binary comes from — an unexplained id or constant surfaced by the hook, "which ability/system set this field", or before concluding a value is data-driven, runtime-only, or absent from the code.
 ---
 
 # Reverse-Engineering GBFR Signatures
@@ -174,6 +174,74 @@ mov rbx, rcx       ; arg1
 
 Match your `retour` detour signature and `.call(...)` to the real arity. A 1-arg detour on a 2-arg function leaves a register garbage → access violation.
 
+## Tracing a VALUE through the binary (not a signature)
+
+Sometimes the question is not "where is this function" but "where does this
+number come from" — a status cause id, a damage-type constant, a quest flag.
+Different discipline, and the failure mode is the opposite of a broken sig: you
+get a **confident wrong negative** instead of a loud error.
+
+### Never conclude "it isn't in the binary"
+
+**A null result from a scan only means your scan was too narrow.** It is never
+evidence the value is absent, and reporting it as such sends everyone chasing
+runtime captures for something sitting in the code.
+
+A real 2026-08-02 failure: a sweep of one API's call sites found no `1100`, and
+that was written up as "this cause is data-driven, static evidence exhausted."
+`1100` was in fact `MOV R8D,0x44c` in the very function that applies it — it
+just reached the field through a *different* applier. One extra sweep of the
+missed family recovered **18 cause values** in a single run.
+
+Before writing "not in the binary", you must have done all three:
+
+1. **Derived** the function family (below), not guessed it.
+2. **Position-aware** argument parsing for every member of that family.
+3. **Dataflow** for the register-passed cases — not a text scan.
+
+If you have not, the honest phrasing is "not found by <method>; <method> cannot
+see X" — say what you searched, not what exists.
+
+### Derive the call-site family, never guess it
+
+Wrappers around one implementation take **different argument positions**, so a
+sweep written for one of them silently misreads the others.
+
+```sh
+# 1. Who calls the implementation? These are the wrappers.
+-postScript XrefsTo.java <impl_rva>
+# 2. Repeat on each wrapper until the set stops growing (transitive closure).
+# 3. Only now sweep every member.
+```
+
+Stop when a round adds nothing. Values can also reach a call through a **field
+store** (`MOV [R14+0x8b4],0x44c` … later read and passed), which no call-site
+scan can see — those need the decompiler.
+
+### The three queries, in order
+
+| Question | Tool |
+|---|---|
+| Which constants does each caller pass? | `CallSiteArgs.java <target>` — all 8 arg slots per site |
+| Where is this constant used at all? | `ImmSites.java <value> …` — whole-listing scan, with containing function |
+| Where did this register's value come from? | `Decompile.java` — read the dataflow; a scan cannot |
+
+`CallSiteArgs` reports `?` (nothing in window) and `reg:NAME` (came from a
+register). **Both mean UNKNOWN, not absent** — resolve them by decompiling, or
+your summary will encode the same wrong negative.
+
+Interpreting `ImmSites` output: histogram the *instruction kinds* before
+concluding anything. 118 `AND` + 86 `TEST` of a value means it is a **mask**;
+`CMP` means a comparison; only a `MOV` into an argument slot is a passed value.
+But a value absent from this scan may still arrive via a field or a table.
+
+### Cross-check with a second stream
+
+Static call-site attribution and a live `hookdiag` capture are independent. When
+they disagree, the static sweep is usually incomplete (see above). When they
+agree, the fact is solid. The hook log is at `%APPDATA%\gbfr-logs\gbfr-logs.txt`
+and reaches **gigabytes** — always `tail -n` it, never read it whole.
+
 ## End-to-end: fixing one function hook
 
 1. Find a byte fingerprint that survived, *inside* the target (use `sigscan` to confirm it's unique).
@@ -203,6 +271,8 @@ The injected DLL is **locked while the game runs** — close the game to swap it
 - **Writing Ghidra scripts in Python.** Ghidra 12 has no Python without PyGhidra. Use Java `GhidraScript`s.
 - **Assuming a surviving AOB sig means correct data.** Inner struct offsets shift independently and fail *silently* as wrong numbers — verify the value, not just the match.
 - **Hand-computing RVA→file-offset with a fixed delta.** Wrong for high sections. Use `sigscan dumprva` (correct pelite addressing).
+- **Reporting a scan's null result as "not in the binary".** The single most expensive mistake in value tracing: it looks like a finding and sends everyone to runtime capture for something that is in the code. Derive the call-site family, parse every wrapper's own argument positions, and use the decompiler for register-passed values before claiming absence. See "Tracing a VALUE through the binary".
+- **Guessing which functions form an applier/wrapper family.** Wrappers take different argument positions, so a sweep written for one misreads the rest. Walk `XrefsTo` on the implementation transitively until the set stops growing.
 - **Deleting diagnostic logging.** The `dmgdiag` feature block and `console`-gated prints are kept on purpose for the next patch.
 
 ## Files
@@ -217,7 +287,9 @@ The injected DLL is **locked while the game runs** — close the game to swap it
 - `ghidra/XrefsTo.java` — RVA(s) → every referencing site, deduped by containing function with per-function counts. THE query for "who touches this global/vtable/function" (needs the **analyzed** DB).
 - `ghidra/ListSymbols.java` — case-insensitive substring search over the symbol table (RTTI class/vtable names) (needs the **analyzed** DB).
 - `ghidra/FindVCallSlot.java` — slot displacement (e.g. `0x48`) → every indirect `CALL qword ptr [reg + disp]` site with its containing function, plus the surrounding instructions. THE query for "who calls virtual slot N", which `XrefsTo` cannot answer: a virtual call references only the vtable, never the callee. Scans the listing, so data bytes that happen to match are never reported. Expect many hits — filter by the caller's code region and by how the out-param is used.
-- `ghidra/DisasmCalls.java` — target function RVA → every call site with the ~8 instructions preceding it (optionally filtered to given containing functions). THE query for "which immediate does each caller load into EDX/R8 before this call" (e.g. RNG slot constants), which the decompiler elides when the callee's recovered signature drops the argument.
+- `ghidra/DisasmCalls.java` — target function RVA → every call site with the ~8 instructions preceding it (optionally filtered to given containing functions). Raw disassembly per site; use `CallSiteArgs.java` instead when you want the arguments already parsed.
+- `ghidra/CallSiteArgs.java` — target RVA → per call site, the last immediate written to EACH x64 argument slot (RCX/RDX/R8/R9 + `[RSP+0x20..0x38]`), as CSV. THE query for "which constants does each caller pass". Emits `?` (nothing in window) and `reg:NAME` (register-sourced) — **both mean UNKNOWN, resolve with the decompiler, never read as "absent"**.
+- `ghidra/ImmSites.java` — value(s) → every instruction in the listing whose scalar operand matches, with containing function. THE query for "where is this constant used at all". Histogram the instruction kinds before concluding: many `AND`/`TEST` = a mask, `CMP` = a comparison, only a `MOV` into an argument slot is a passed value.
 - `ghidra/DumpVtableSlot.java` — class-name substring + slot displacement → the function each matching `<Class>::vftable` holds at that slot, with a tally of distinct targets. Answers "which subclasses OVERRIDE this virtual and which inherit the base", i.e. exactly how many detours a virtual needs. Classes with multiple vftables (multiple inheritance) or short vtables produce misaligned reads — sanity-check a candidate by decompiling it before trusting it.
 - `ghidra/Decompile.java` — RVA(s) → decompiled C of the containing function (needs the **analyzed** `gbfr202fast` DB).
 - `ghidra/FastAnalysisOptions.java` — pre-script that disables slow analyzers for the fast full-analysis build.
