@@ -43,7 +43,10 @@ describe("MetricTable", () => {
     // would band the row AND descend a level.
     const onToggle = vi.fn();
     const onPin = vi.fn();
-    const { container } = renderTable({ onPin, rowToggle: (row) => (row.key === "a" ? { shown: false, onToggle } : null) });
+    const { container } = renderTable({
+      onPin,
+      rowToggle: (row) => (row.key === "a" ? { shown: false, onToggle } : null),
+    });
 
     const toggles = container.querySelectorAll(".analysis-row-toggle");
     expect(toggles).toHaveLength(1);
@@ -233,5 +236,97 @@ describe("MetricTable", () => {
     const toggle = container.querySelector(".analysis-row-toggle");
     expect(toggle?.tagName).toBe("BUTTON");
     expect(toggle?.getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+describe("timeline rows", () => {
+  const row = (over: Partial<MetricRow> = {}): MetricRow => ({
+    key: "status:10:500",
+    label: "status:10:500",
+    value: 3_000,
+    columns: ["50%", "2"],
+    pinOnClick: null,
+    colorSlot: -1,
+    ...over,
+  });
+
+  it("draws one piece per window, positioned across the measured window", () => {
+    const { container } = renderTable({
+      rows: [
+        row({
+          timeline: [
+            { startMs: 0, endMs: 2_000 },
+            { startMs: 8_000, endMs: 10_000 },
+          ],
+        }),
+      ],
+      columnKeys: ["ui.logs.buff-uptime", "ui.logs.buff-count"],
+      timelineMs: 10_000,
+    });
+
+    const pieces = container.querySelectorAll<HTMLElement>(".analysis-timeline-piece");
+    expect(pieces).toHaveLength(2);
+    expect(pieces[0].style.left).toBe("0%");
+    expect(pieces[0].style.width).toBe("20%");
+    expect(pieces[1].style.left).toBe("80%");
+    expect(pieces[1].style.width).toBe("20%");
+  });
+
+  it("draws the magnitude bar, not a timeline, when the row has none", () => {
+    const { container } = renderTable({
+      rows: [row()],
+      columnKeys: ["ui.logs.buff-uptime"],
+      timelineMs: 10_000,
+    });
+
+    expect(container.querySelectorAll(".analysis-timeline-piece")).toHaveLength(0);
+    expect(container.querySelectorAll("[data-metric-bar]")).toHaveLength(1);
+  });
+
+  it("gives a zero-width window a visible minimum rather than nothing", () => {
+    const { container } = renderTable({
+      rows: [row({ timeline: [{ startMs: 5_000, endMs: 5_000 }] })],
+      columnKeys: ["ui.logs.buff-uptime"],
+      timelineMs: 10_000,
+    });
+
+    const piece = container.querySelector<HTMLElement>(".analysis-timeline-piece");
+    expect(piece?.style.minWidth).toBe("2px");
+  });
+
+  it("falls back to the magnitude bar when the window has no length", () => {
+    const { container } = renderTable({
+      rows: [row({ timeline: [{ startMs: 0, endMs: 1_000 }] })],
+      columnKeys: ["ui.logs.buff-uptime"],
+      timelineMs: 0,
+    });
+
+    expect(container.querySelectorAll(".analysis-timeline-piece")).toHaveLength(0);
+    expect(container.querySelectorAll("[data-metric-bar]")).toHaveLength(1);
+  });
+
+  it("draws the pieces inside a dedicated track cell, not across the row", () => {
+    const { container } = renderTable({
+      rows: [row({ timeline: [{ startMs: 0, endMs: 2_000 }] })],
+      columnKeys: ["ui.logs.buff-uptime"],
+      timelineMs: 10_000,
+    });
+
+    const track = container.querySelector(".analysis-track") as HTMLElement;
+    expect(track).not.toBeNull();
+    expect(track.querySelectorAll(".analysis-timeline-piece")).toHaveLength(1);
+    // The name cell is bounded so the track never sits under the text.
+    expect(container.querySelector(".analysis-name")?.className).toContain("analysis-name-fixed");
+  });
+
+  it("keeps the magnitude rows' name cell fluid", () => {
+    const { container } = renderTable({
+      rows: [row()],
+      columnKeys: ["ui.logs.buff-uptime"],
+      timelineMs: 10_000,
+    });
+
+    expect(container.querySelector(".analysis-name")?.className).not.toContain("analysis-name-fixed");
+    expect(container.querySelector(".analysis-track")).toBeNull();
   });
 });

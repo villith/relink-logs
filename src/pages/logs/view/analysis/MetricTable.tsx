@@ -112,28 +112,7 @@ export const MetricTable = ({
               onPin(row.pinOnClick);
             }}
           >
-            {row.timeline && timelineMs > 0 ? (
-              // Positional, not proportional: Warcraft Logs' uptime bar marks
-              // WHEN the effect was up, and the % column beside it already says
-              // how much. One piece per contiguous window — `toBands` merged the
-              // overlaps, so a party-wide buff is a few spans and not hundreds.
-              <Box className="analysis-timeline" aria-hidden>
-                {row.timeline.map((span, spanIndex) => (
-                  <Box
-                    key={spanIndex}
-                    className="analysis-timeline-piece"
-                    style={{
-                      left: `${(span.startMs / timelineMs) * 100}%`,
-                      width: `${((span.endMs - span.startMs) / timelineMs) * 100}%`,
-                      // A window shorter than a pixel is still a real window; at
-                      // zero width it would vanish from a row that reports it.
-                      minWidth: "2px",
-                      backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
-                    }}
-                  />
-                ))}
-              </Box>
-            ) : (
+            {!(row.timeline && timelineMs > 0) && (
               <Box
                 data-metric-bar
                 className="analysis-bar"
@@ -167,9 +146,35 @@ export const MetricTable = ({
                 {toggle.shown ? <Eye size={14} weight="fill" /> : <EyeSlash size={14} />}
               </UnstyledButton>
             )}
-            <Text role="gridcell" className="analysis-name">
+            <Text
+              role="gridcell"
+              className={`analysis-name${row.timeline && timelineMs > 0 ? " analysis-name-fixed" : ""}`}
+            >
               {renderLabel ? renderLabel(row) : row.label}
             </Text>
+            {row.timeline && timelineMs > 0 && (
+              // Positional, not proportional: Warcraft Logs' uptime bar marks
+              // WHEN the effect was up, and the % column beside it already says
+              // how much. Its own cell between the name and the numbers, so the
+              // pieces never sit under text. One piece per contiguous window —
+              // `toBands` merged the overlaps.
+              <Box className="analysis-track" aria-hidden>
+                {row.timeline.map((span, spanIndex) => (
+                  <Box
+                    key={spanIndex}
+                    className="analysis-timeline-piece"
+                    style={{
+                      left: `${(span.startMs / timelineMs) * 100}%`,
+                      width: `${((span.endMs - span.startMs) / timelineMs) * 100}%`,
+                      // A window shorter than a pixel is still a real window; at
+                      // zero width it would vanish from a row that reports it.
+                      minWidth: "2px",
+                      backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
+                    }}
+                  />
+                ))}
+              </Box>
+            )}
             {row.columns.map((value, columnIndex) => (
               <Text
                 key={columnIndex}
@@ -196,4 +201,3 @@ export const MetricTable = ({
     </Box>
   );
 };
-

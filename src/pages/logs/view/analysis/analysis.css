@@ -278,24 +278,22 @@
   margin-right: 6px;
 }
 
-/* The status tables' uptime bar. Positioned like .analysis-bar — behind the
- * row's text, which takes `position: relative` to sit over it — but drawn as
- * one piece per window rather than a single fill, so the row says WHEN the
- * effect was up rather than restating the percentage next to it. */
-.analysis-timeline {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  pointer-events: none;
+/* The status tables' uptime track: the timeline's own cell between the name
+ * and the numeric columns, so the pieces never sit under text. Faintly filled
+ * so "no pieces here" reads as an empty track rather than as a missing cell. */
+.analysis-track {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  margin: 4px 10px;
+  border-radius: 2px;
+  background-color: rgb(255 255 255 / 0.03);
 }
 
-/* The same 1px inset .analysis-bar takes inside a row, so replacing the bar
- * with a timeline does not close the gap that separates two rows. */
-.analysis-row .analysis-timeline {
-  top: 1px;
-  bottom: 1px;
+/* Timeline rows bound the name so the track gets the rest of the row. */
+.analysis-name-fixed {
+  flex: 0 0 220px;
 }
 
 .analysis-timeline-piece {
@@ -304,8 +302,10 @@
   bottom: 0;
   border-radius: 2px;
   /* Longhand, never the `background` shorthand: the shorthand resets
-   * background-size and the bar loses its fill. */
-  opacity: 0.55;
+   * background-size and the bar loses its fill.
+   * In its own cell the pieces are the only ink, so they can afford to be
+   * more solid than they were sharing space with the row's text. */
+  opacity: 0.75;
 }
 
 /* The status tabs' Friendlies|Enemies switch. A small pill pair, not tabs:
