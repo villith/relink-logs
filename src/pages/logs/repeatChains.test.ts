@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { chainKey, groupRepeatChains } from "./repeatChains";
+import { chainKey, chainLatestTime, groupRepeatChains, summarizeChain } from "./repeatChains";
 
 type Row = { id: number; repeatGroup?: number | null };
 
@@ -55,6 +55,80 @@ describe("groupRepeatChains", () => {
     expect(groups.map((g) => g.leader.id)).toEqual([9, 4]);
     expect(groups[0].rest.map((r) => r.id)).toEqual([7]);
     expect(groups[1].rest.map((r) => r.id)).toEqual([2]);
+  });
+});
+
+describe("summarizeChain", () => {
+  const run = (id: number, duration: number, questElapsedTime: number | null = null) => ({
+    id,
+    duration,
+    questElapsedTime,
+  });
+
+  it("reports the fastest run's times", () => {
+    const summary = summarizeChain([run(1, 120_000, 100), run(2, 60_000, 50), run(3, 90_000, 75)]);
+
+    expect(summary.runs).toBe(3);
+    expect(summary.bestDurationMs).toBe(60_000);
+    // Seconds on the log, milliseconds out.
+    expect(summary.bestQuestElapsedMs).toBe(50_000);
+  });
+
+  it("takes each best from its own run", () => {
+    // Run 3 ended fastest on the clock, run 2 cleared fastest in game time, so
+    // the two figures come from different rows.
+    const summary = summarizeChain([run(1, 120_000, 100), run(2, 90_000, 50), run(3, 60_000, 75)]);
+
+    expect(summary.bestDurationMs).toBe(60_000);
+    expect(summary.bestQuestElapsedMs).toBe(50_000);
+  });
+
+  it("names the run that set each best", () => {
+    // Different runs: run 3 ended fastest on the clock, run 2 cleared fastest
+    // in game time.
+    const summary = summarizeChain([run(1, 120_000, 100), run(2, 90_000, 50), run(3, 60_000, 75)]);
+
+    expect(summary.bestDurationId).toBe(3);
+    expect(summary.bestQuestElapsedId).toBe(2);
+  });
+
+  it("gives a tie to the first run in display order", () => {
+    const summary = summarizeChain([run(1, 60_000, 50), run(2, 60_000, 50)]);
+
+    expect(summary.bestDurationId).toBe(1);
+    expect(summary.bestQuestElapsedId).toBe(1);
+  });
+
+  it("never reports a placeholder in-game time as the best", () => {
+    // 1s is what logs recorded before the timer was read correctly stored; it
+    // is not a run's time, so it cannot win "best" — reported, it would claim a
+    // record nobody ran.
+    const summary = summarizeChain([run(1, 60_000, 100), run(2, 60_000, 1), run(3, 60_000, 200)]);
+
+    expect(summary.bestQuestElapsedMs).toBe(100_000);
+    expect(summary.bestQuestElapsedId).toBe(1);
+  });
+
+  it("reports no in-game time when no run recorded one", () => {
+    const summary = summarizeChain([run(1, 60_000, null), run(2, 30_000, 1)]);
+
+    expect(summary.bestQuestElapsedMs).toBeNull();
+    expect(summary.bestQuestElapsedId).toBeNull();
+    // Wall-clock duration is always present, so it still summarizes.
+    expect(summary.bestDurationMs).toBe(30_000);
+    expect(summary.bestDurationId).toBe(2);
+  });
+});
+
+describe("chainLatestTime", () => {
+  it("takes the most recent run whatever order the rows arrive in", () => {
+    // Under a duration sort the newest run can sit anywhere in the block, so
+    // reading the head of the list would date the chain by the wrong run.
+    expect(chainLatestTime([{ time: 200 }, { time: 300 }, { time: 100 }])).toBe(300);
+  });
+
+  it("is null with no runs to date", () => {
+    expect(chainLatestTime([])).toBeNull();
   });
 });
 

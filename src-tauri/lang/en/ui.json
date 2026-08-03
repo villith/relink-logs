@@ -527,8 +527,10 @@
       "builds": "Builds",
       "ai-companion": "AI",
       "imported-tooltip": "This log was imported from another version of GBFR Logs and may be missing data that version never recorded.",
-      "repeat-chain-count": "×{{count}}",
-      "repeat-chain-tooltip": "Repeated quest — {{count}} runs chained with Repeat Quest. Click to expand or collapse."
+      "repeat-chain-toggle_one": "Show or hide the run in this Repeat Quest chain",
+      "repeat-chain-toggle_other": "Show or hide the {{count}} runs in this Repeat Quest chain",
+      "repeat-chain-select_one": "Select the run in this Repeat Quest chain",
+      "repeat-chain-select_other": "Select all {{count}} runs in this Repeat Quest chain"
     },
     "toolbox": {
       "title": "Toolbox",

@@ -3,6 +3,7 @@ import { FilterState } from "@/stores/useLogIndexStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { Log, LogSortType, SortDirection, StoredLegalityFinding } from "@/types";
 import {
+  PLAYER_COLORS,
   epochToLocalTime,
   hasQuestElapsedTime,
   millisecondsToElapsedFormat,
@@ -26,13 +27,14 @@ import {
   Tooltip,
   UnstyledButton,
 } from "@mantine/core";
-import { CaretDown, CaretRight, WarningCircle } from "@phosphor-icons/react";
+import { CaretDown, CaretLeft, WarningCircle } from "@phosphor-icons/react";
 import { Fragment, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
+import "./logsTable.css";
 import { PartyMember, partyMembers } from "./partyMembers";
-import { chainKey, groupRepeatChains } from "./repeatChains";
+import { chainKey, chainLatestTime, groupRepeatChains, summarizeChain } from "./repeatChains";
 import useIndex from "./useIndex";
 
 export const IndexPage = () => {
@@ -59,20 +61,70 @@ export const IndexPage = () => {
     }))
   );
 
-  // Repeat Quest chains collapse under their first row in display order;
-  // expansion is per chain, keyed by the chain parent's id.
+  // Repeat Quest chains start closed: a farming session is one entry in the
+  // list until the user asks for its runs, and a page of open chains buries the
+  // rest of the history under rows that all say the same thing. State tracks
+  // what has been EXPANDED, so the default (nothing here) is collapsed and a
+  // new page starts closed.
   const [expandedChains, setExpandedChains] = useState<number[]>([]);
   const toggleChain = (key: number) =>
     setExpandedChains((old) => (old.includes(key) ? old.filter((k) => k !== key) : [...old, key]));
 
   const chainGroups = useMemo(() => groupRepeatChains(searchResult.logs), [searchResult.logs]);
 
+  // A colour per chain, cycled through the party palette exactly as player rows
+  // are — two chains of the same quest, back to back, are otherwise told apart
+  // only by where one block of identical rows stops and the next begins.
+  //
+  // Counted over CHAINS, not over groups: advancing the colour on every
+  // unchained log between them would make the sequence look arbitrary and let
+  // neighbouring chains land on the same hue.
+  const chainColors = useMemo(() => {
+    const colors = new Map<number, string>();
+    let position = 0;
+    for (const group of chainGroups) {
+      if (group.rest.length === 0) continue;
+      colors.set(chainKey(group.leader), PLAYER_COLORS[position % PLAYER_COLORS.length]);
+      position += 1;
+    }
+    return colors;
+  }, [chainGroups]);
+
   const rows = chainGroups.flatMap((group) => {
     const key = chainKey(group.leader);
-    const expanded = expandedChains.includes(key);
-    const visible = expanded ? [group.leader, ...group.rest] : [group.leader];
+    const chained = group.rest.length > 0;
+    const collapsed = !expandedChains.includes(key);
+    const runs = [group.leader, ...group.rest];
+    const visible = !chained || !collapsed ? runs : [];
+    // Only within a chain: a lone log is trivially its own best, and colouring
+    // every unchained row would make the mark mean nothing.
+    const best = chained ? summarizeChain(runs) : null;
 
-    return visible.map((log, position) => {
+    // A summary standing for the whole chain, rather than promoting one run to
+    // speak for the others: the runs below it are its detail, and the figures
+    // here are about the set.
+    const chainColor = chainColors.get(key);
+
+    const summaryRow = chained ? (
+      <ChainSummaryRow
+        key={`chain-${key}`}
+        runs={runs}
+        chainColor={chainColor}
+        collapsed={collapsed}
+        onToggle={() => toggleChain(key)}
+        selectedLogIds={selectedLogIds}
+        setSelectedLogIds={setSelectedLogIds}
+        questLabel={translateQuestId(group.leader.questId)}
+        primaryTarget={translateEnemyType(group.leader.primaryTarget)}
+        members={partyMembers(group.leader, {
+          showDisplayNames: show_display_names,
+          streamerMode: streamer_mode,
+          t,
+        })}
+      />
+    ) : null;
+
+    const runRows = visible.map((log) => {
       const primaryTarget = translateEnemyType(log.primaryTarget);
       const members = partyMembers(log, { showDisplayNames: show_display_names, streamerMode: streamer_mode, t });
 
@@ -93,15 +145,15 @@ export const IndexPage = () => {
           // given.
           findings={show_flagged_builds ? searchResult.legality?.[log.id] : undefined}
           resetSelectedTargets={resetSelectedTargets}
-          chain={
-            position === 0 && group.rest.length > 0
-              ? { count: group.rest.length + 1, expanded, onToggle: () => toggleChain(key) }
-              : undefined
-          }
-          chained={position > 0}
+          chained={chained}
+          chainColor={chainColor}
+          bestDuration={best?.bestDurationId === log.id}
+          bestQuestElapsed={best?.bestQuestElapsedId === log.id}
         />
       );
     });
+
+    return summaryRow ? [summaryRow, ...runRows] : runRows;
   });
 
   return (
@@ -121,7 +173,10 @@ export const IndexPage = () => {
           )}
         </Group>
       </Box>
-      <Box>
+      {/* The gap belongs to the filters, not to the pager below them: this Box
+          still renders when the filters are hidden, so spacing the pager
+          unconditionally would leave a hole under a row that is not there. */}
+      <Box pb={filters.showAdvancedFilters ? "xs" : undefined}>
         <Group>
           {filters.showAdvancedFilters && (
             <SelectablePlayer playerIds={searchResult.playerIds} setFilters={setFilters} filters={filters} />
@@ -140,7 +195,13 @@ export const IndexPage = () => {
       {searchResult.logs.length === 0 && <BlankTable />}
       {searchResult.logs.length > 0 && (
         <Box>
-          <Table striped highlightOnHover>
+          <Group justify="space-between">
+            <Pagination total={searchResult.pageCount} value={currentPage} onChange={handleSetPage} />
+            <Text size="sm" c="dimmed">
+              {t("ui.logs.saved-count", { count: searchResult.logCount })}
+            </Text>
+          </Group>
+          <Table striped highlightOnHover className="logs-table">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>
@@ -192,12 +253,6 @@ export const IndexPage = () => {
             <Table.Tbody>{rows}</Table.Tbody>
           </Table>
           <Divider my="sm" />
-          <Group justify="space-between">
-            <Pagination total={searchResult.pageCount} value={currentPage} onChange={handleSetPage} />
-            <Text size="sm" c="dimmed">
-              {t("ui.logs.saved-count", { count: searchResult.logCount })}
-            </Text>
-          </Group>
         </Box>
       )}
     </Box>
@@ -259,6 +314,134 @@ function PartyNames({ members, findings }: { members: PartyMember[]; findings?: 
   );
 }
 
+/** Hands a chain's colour to the stylesheet, which draws the spine and tints
+ * the band from it. A custom property rather than an inline `boxShadow` so the
+ * shape of the spine stays in CSS with the rest of the block's styling and only
+ * the hue crosses over. */
+const chainSpineStyle = (chainColor?: string): React.CSSProperties | undefined =>
+  chainColor === undefined ? undefined : ({ "--logs-chain-color": chainColor } as React.CSSProperties);
+
+/** The row a Repeat Quest chain is drawn as: what the set of runs beneath it
+ * amounts to, not one of the runs standing in for the rest.
+ *
+ * It fills the same columns as a run so the table still reads down a column,
+ * but only where a figure about the SET means something. The times become the
+ * chain's best — the run it peaked at, which is also the run the list places
+ * the block by — while the cleared mark and the View button stay empty: a
+ * chain has no single outcome and no one run to open, and answering those
+ * would be inventing one.
+ */
+function ChainSummaryRow({
+  runs,
+  chainColor,
+  collapsed,
+  onToggle,
+  selectedLogIds,
+  setSelectedLogIds,
+  questLabel,
+  primaryTarget,
+  members,
+}: {
+  runs: Log[];
+  /** This chain's colour from the party palette, drawn down its spine. */
+  chainColor?: string;
+  collapsed: boolean;
+  onToggle: () => void;
+  selectedLogIds: number[];
+  setSelectedLogIds: (ids: number[]) => void;
+  questLabel: string;
+  primaryTarget: string;
+  members: PartyMember[];
+}): JSX.Element {
+  const { t } = useTranslation();
+  const summary = useMemo(() => summarizeChain(runs), [runs]);
+  const latest = useMemo(() => chainLatestTime(runs), [runs]);
+
+  const ids = runs.map((run) => run.id);
+  const selected = ids.filter((id) => selectedLogIds.includes(id)).length;
+  const allSelected = selected === ids.length;
+
+  // One tick selects the whole session — a chain is usually kept or deleted as
+  // a unit, and ticking five rows by hand to drop one farming run is busywork.
+  const toggleSelection = () =>
+    setSelectedLogIds(
+      allSelected ? selectedLogIds.filter((id) => !ids.includes(id)) : [...new Set([...selectedLogIds, ...ids])]
+    );
+
+  // The chain's best, bare and in the column it belongs to — the band's own
+  // styling says the figure is about the set, so a label repeating it on every
+  // chain earned nothing. Closed, this is the only time the block shows, and a
+  // real run's time is the one figure that can sit in a column beside the
+  // standalone runs without misleading. Carried in the same accent the run that
+  // set it wears, so opening the chain shows the two are the same number.
+  const bestCell = (bestMs: number | null) => (
+    <Text size="xs" className="logs-num logs-chain-best">
+      {bestMs === null ? "-" : millisecondsToElapsedFormat(bestMs)}
+    </Text>
+  );
+
+  return (
+    // The whole band toggles: it is a heading for the rows under it, and a
+    // 26px caret at the far end of a wide row is a small thing to ask for. The
+    // caret stays as the labelled, keyboard-reachable control.
+    <Table.Tr className="logs-chain-summary" style={chainSpineStyle(chainColor)} onClick={onToggle}>
+      {/* Selecting a chain is not opening it, so the checkbox keeps its click
+          to itself — without this, ticking it would also fold the runs away. */}
+      <Table.Td onClick={(event: React.MouseEvent) => event.stopPropagation()}>
+        <Checkbox
+          aria-label={t("ui.logs.repeat-chain-select", { count: runs.length })}
+          checked={allSelected}
+          indeterminate={selected > 0 && !allSelected}
+          onChange={toggleSelection}
+        />
+      </Table.Td>
+      {/* The chain's most recent run, which is what the list is sorted by and
+          what dates the chain wherever it sits. Not a range: showing one end of
+          one read as a claim about the whole block. */}
+      <Table.Td>
+        <Text size="xs" className="logs-num">
+          {latest === null ? "" : epochToLocalTime(latest)}
+        </Text>
+      </Table.Td>
+      <Table.Td>
+        <Text size="xs">{questLabel}</Text>
+      </Table.Td>
+      <Table.Td></Table.Td>
+      <Table.Td>
+        <Text size="xs">{primaryTarget}</Text>
+      </Table.Td>
+      <Table.Td>{bestCell(summary.bestDurationMs)}</Table.Td>
+      <Table.Td>{bestCell(summary.bestQuestElapsedMs)}</Table.Td>
+      <Table.Td>
+        <PartyNames members={members} />
+      </Table.Td>
+      {/* The toggle sits in the actions column, among the View buttons of the
+          runs it opens — it is the band's action, and the one control on this
+          row that does something to the rows below. Centred rather than pushed
+          to the edge: alone in its column it needs to read as a control, not as
+          a stray glyph. Collapsed points LEFT, back toward the rows it folded
+          away; on a right-hand disclosure a right-pointing caret aims at
+          nothing. */}
+      <Table.Td>
+        <Group gap={6} wrap="nowrap" justify="center">
+          <UnstyledButton
+            // Stopped, or the row's own handler would toggle it straight back.
+            onClick={(event: React.MouseEvent) => {
+              event.stopPropagation();
+              onToggle();
+            }}
+            aria-label={t("ui.logs.repeat-chain-toggle", { count: runs.length })}
+            aria-expanded={!collapsed}
+            className="logs-chain-toggle"
+          >
+            {collapsed ? <CaretLeft size={16} weight="bold" /> : <CaretDown size={16} weight="bold" />}
+          </UnstyledButton>
+        </Group>
+      </Table.Td>
+    </Table.Tr>
+  );
+}
+
 function LogEntry({
   log,
   selectedLogIds,
@@ -267,8 +450,10 @@ function LogEntry({
   members,
   findings,
   resetSelectedTargets,
-  chain,
   chained,
+  chainColor,
+  bestDuration,
+  bestQuestElapsed,
 }: {
   log: Log;
   selectedLogIds: number[];
@@ -279,17 +464,26 @@ function LogEntry({
    * them — which reads the same as a log nobody was flagged in. */
   findings?: StoredLegalityFinding[];
   resetSelectedTargets: () => void;
-  /** Present on the visible row of a collapsed/expanded Repeat Quest chain:
-   * how many runs it stands for, and the expand/collapse toggle. */
-  chain?: { count: number; expanded: boolean; onToggle: () => void };
-  /** True on the later rows of an expanded chain — indented under the row
-   * carrying the toggle. */
+  /** This chain's colour from the party palette, drawn down its spine. */
+  chainColor?: string;
+  /** True for a run inside a Repeat Quest chain. The band above it already
+   * states everything that is constant across the chain — quest, enemy, party
+   * — so this row leaves those cells to it and fills only what varies. */
   chained?: boolean;
+  /** Marks this run as the chain's fastest by wall-clock and by in-game time.
+   * The two can be different runs: a fight can end quickly and still sit in a
+   * long post-clear wrap-up. */
+  bestDuration?: boolean;
+  bestQuestElapsed?: boolean;
 }): JSX.Element {
   const { t } = useTranslation();
 
   return (
-    <Table.Tr key={log.id}>
+    <Table.Tr
+      key={log.id}
+      className={chained ? "logs-chain-run" : undefined}
+      style={chained ? chainSpineStyle(chainColor) : undefined}
+    >
       <Table.Td>
         <Checkbox
           aria-label="Select row"
@@ -301,47 +495,37 @@ function LogEntry({
           }
         />
       </Table.Td>
+      {/* The full stamp, chained or not: the band above states no date, so
+          these rows are the only thing that dates the chain. The rail on this
+          cell carries the nesting — indenting the text instead stepped one
+          column out of its own header's track. */}
       <Table.Td>
-        <Group gap={6} wrap="nowrap" pl={chained ? "lg" : undefined}>
-          {chain && (
-            <Tooltip label={t("ui.logs.repeat-chain-tooltip", { count: chain.count })} multiline w={280}>
-              <UnstyledButton
-                onClick={chain.onToggle}
-                aria-label={t("ui.logs.repeat-chain-tooltip", { count: chain.count })}
-              >
-                <Group gap={2} wrap="nowrap">
-                  {chain.expanded ? <CaretDown size={12} /> : <CaretRight size={12} />}
-                  <Text size="xs" fw={700}>
-                    {t("ui.logs.repeat-chain-count", { count: chain.count })}
-                  </Text>
-                </Group>
-              </UnstyledButton>
-            </Tooltip>
-          )}
-          <Text size="xs">{epochToLocalTime(log.time)}</Text>
-        </Group>
+        <Text size="xs" className="logs-num">
+          {epochToLocalTime(log.time)}
+        </Text>
       </Table.Td>
+      {/* Quest, enemy and party are the band's to state. Blanking only some of
+          what a chain holds constant left holes in different columns on
+          different rows, which read as broken markup rather than as ditto. */}
+      <Table.Td>{!chained && <Text size="xs">{translateQuestId(log.questId)}</Text>}</Table.Td>
+      <Table.Td>{log.questId && log.questCompleted !== null && (log.questCompleted ? "✓" : "✕")}</Table.Td>
+      <Table.Td>{!chained && <Text size="xs">{primaryTarget}</Text>}</Table.Td>
+      {/* Weight as well as colour, so the chain's fastest still stands out for
+          a reader who cannot separate the accent from the ✓ two cells over. */}
       <Table.Td>
-        <Text size="xs">{translateQuestId(log.questId)}</Text>
-      </Table.Td>
-      <Table.Td>{log.questId && log.questCompleted !== null && (log.questCompleted ? "✓" : "X")}</Table.Td>
-      <Table.Td>
-        <Text size="xs">{primaryTarget}</Text>
-      </Table.Td>
-      <Table.Td>
-        <Text size="xs">{millisecondsToElapsedFormat(log.duration)}</Text>
+        <Text size="xs" className={`logs-num${bestDuration ? " logs-chain-best" : ""}`}>
+          {millisecondsToElapsedFormat(log.duration)}
+        </Text>
       </Table.Td>
       {/* In-game time. A dash on logs recorded before the quest timer was read
           correctly, and on fights the game never reported one for — those
           stored a constant 1s, which would otherwise read as a real 00:01. */}
       <Table.Td>
-        <Text size="xs">
+        <Text size="xs" className={`logs-num${bestQuestElapsed ? " logs-chain-best" : ""}`}>
           {hasQuestElapsedTime(log.questElapsedTime) ? millisecondsToElapsedFormat(log.questElapsedTime * 1000) : "-"}
         </Text>
       </Table.Td>
-      <Table.Td>
-        <PartyNames members={members} findings={findings} />
-      </Table.Td>
+      <Table.Td>{!chained && <PartyNames members={members} findings={findings} />}</Table.Td>
       <Table.Td>
         <Group gap={6} wrap="nowrap" justify="flex-end">
           {log.imported && (
