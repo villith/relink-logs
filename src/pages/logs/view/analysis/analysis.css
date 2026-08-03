@@ -1,0 +1,354 @@
+/* Design tokens and shared rules for the Analysis view.
+ *
+ * Scoped under .analysis so nothing here can reach the Classic view, which
+ * deliberately keeps the old look.
+ *
+ * Font sizes are written as CSS lengths, never as var(--mantine-font-size-*):
+ * this app's theme sets those tokens to unitless strings ("12", "14"), so the
+ * var resolves to invalid CSS and the declaration is silently dropped. */
+/* Tokens live on their own class so they can be applied anywhere in the DOM.
+ * The hover card portals to document.body, outside .analysis — custom
+ * properties inherit down the tree, so tokens declared only on .analysis
+ * resolve to nothing there and the card renders with no panel at all. */
+.analysis-tokens {
+  --an-bg: #17181c;
+  --an-panel: #1d1f24;
+  --an-raised: #22252b;
+  --an-line: #2c2f36;
+  --an-line-strong: #3b4048;
+  --an-ink: #e8eaed;
+  --an-ink-2: #b9bfc9;
+  --an-ink-3: #8b929e;
+  --an-accent: #00b8d9;
+  --an-plot: #1a1c21;
+}
+
+.analysis {
+  background-color: var(--an-bg);
+  color: var(--an-ink);
+  border: 1px solid var(--an-line);
+  border-radius: 5px;
+}
+
+/* Small tracked capitals for column heads and section labels. */
+.analysis-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--an-ink-3);
+  font-weight: 600;
+}
+
+/* Every figure in the view is tabular so columns align down the page. */
+.analysis-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A metric row: the bar is the row's background and the text sits on it.
+ *
+ * 30px tall with NO margin, and the bar inset 1px top and bottom, rather than
+ * 28px with a 2px margin. It draws identically — a 28px bar every 30px — but
+ * the separation now belongs to the row instead of sitting between rows.
+ *
+ * That gap was dead space owned by no hover target: measured at the exact
+ * midpoint between two rows, `elementFromPoint` returned a bare DIV inside
+ * neither row, so a cursor crossing it fired mouseleave and tore the hover card
+ * down before the next row built it again. */
+.analysis-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 8px;
+  width: 100%;
+  border-radius: 2px;
+  text-align: left;
+}
+
+.analysis-row-pinnable {
+  cursor: pointer;
+}
+
+/* Rows now touch, so an outline drawn outside the box would overlap its
+ * neighbour's. Both states draw their ring inside instead, offset by the row's
+ * own 1px inset so the ring lands on the bar's edge rather than in the gap. */
+.analysis-row:hover {
+  outline: 1px solid var(--an-line-strong);
+  outline-offset: -2px;
+}
+
+.analysis-row:focus-visible {
+  outline-offset: -3px;
+}
+
+/* background-color, never the `background` shorthand: the shorthand resets
+ * background-size and has broken full-width bars in this app before. */
+.analysis-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 2px;
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+/* Hover deliberately does NOT raise the fill's opacity. Taking it to 0.62 put
+ * three of four row names below 4.5:1 — the row got harder to read at the exact
+ * moment the user was reading it. The outline above carries the hover state. */
+
+/* Every cell sits above the bar. */
+.analysis-name,
+.analysis-cell {
+  position: relative;
+}
+
+/* The row's own separation, so the pixels between two bars still belong to a
+ * row and the hover card survives the crossing. */
+.analysis-row .analysis-bar {
+  top: 1px;
+  bottom: 1px;
+}
+
+/* The status metrics' band toggle. Sits on the bar like the rest of the row's
+ * text, so it takes `position: relative` for the same reason .analysis-name
+ * does — without it the bar's fill paints over the icon. */
+.analysis-row-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 6px;
+  cursor: pointer;
+}
+
+.analysis-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-cell {
+  width: 84px;
+  text-align: right;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The row's entity art — a status mark, a character bust, an ability diamond,
+ * a boss portrait — inline before the name. A fixed square with `contain` so
+ * the four families' different aspect ratios (the character busts are tall)
+ * line the names up identically; rows with no art render no box at all. */
+.analysis-row-icon {
+  height: 22px;
+  width: 22px;
+  object-fit: contain;
+  margin-right: 7px;
+  vertical-align: -6px;
+}
+
+/* The hover card's smaller copy of the same. */
+.analysis-card-icon {
+  height: 15px;
+  width: 15px;
+  object-fit: contain;
+  margin-right: 5px;
+  vertical-align: -3px;
+}
+
+.analysis-cell-muted {
+  color: var(--an-ink-2);
+  font-size: 12px;
+}
+
+.analysis-head {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border-bottom: 1px solid var(--an-line);
+  margin-bottom: 6px;
+}
+
+/* The hover card: the same row anatomy at a smaller scale. */
+.analysis-card-section + .analysis-card-section {
+  border-top: 1px solid var(--an-line-strong);
+}
+
+.analysis-card-head {
+  display: flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  background-color: var(--an-raised);
+}
+
+.analysis-card-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 23px;
+  padding: 0 8px;
+  margin: 2px 4px;
+  border-radius: 2px;
+}
+
+.analysis-card-row .analysis-bar {
+  opacity: 0.38;
+}
+
+.analysis-card-name {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.analysis-card-share {
+  position: relative;
+  width: 52px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--an-ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.analysis-card-amount {
+  position: relative;
+  width: 64px;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* .analysis-label and .analysis-cell have equal specificity, so the later one
+ * (.analysis-cell, 13px) wins and column heads render at row size. Scoping to
+ * the header row restores the intended 10px without touching either class. */
+.analysis-head .analysis-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+/* The chart legend, in ordinary flow below the plot: a recharts <Legend> is
+   laid out INSIDE the chart against a hardcoded 44px reservation, so a legend
+   that wraps to a second row overlaps the plot. This one wraps as far as it
+   needs to. */
+.analysis-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  padding: 4px 0 2px;
+}
+
+.analysis-legend-entry {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 1px 2px;
+  border-radius: 3px;
+}
+
+/* An outline, not a fill — the same hover language `.analysis-row` uses. */
+.analysis-legend-entry:hover {
+  outline: 1px solid var(--an-line-strong);
+  outline-offset: -1px;
+}
+
+.analysis-legend-swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.analysis-legend-name {
+  font-size: 11px;
+  color: var(--an-ink-2);
+  line-height: 1.4;
+}
+
+/* Dev-only state readout under the plot. Monospace, wrapping and selectable:
+   its whole purpose is to be read exactly and pasted into a bug report. */
+.analysis-debug {
+  padding: 6px 16px 8px;
+  border-top: 1px solid var(--an-line);
+  background-color: var(--an-plot);
+}
+
+.analysis-debug-line {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--an-ink-3);
+  user-select: text;
+  /* Both lines are single unbroken tokens, so anywhere is the only break that
+     keeps a long pin set inside the panel. */
+  overflow-wrap: anywhere;
+}
+
+.analysis-debug-key {
+  color: var(--an-accent);
+  margin-right: 6px;
+}
+
+/* The status tables' uptime track: the timeline's own cell between the name
+ * and the numeric columns, so the pieces never sit under text. Faintly filled
+ * so "no pieces here" reads as an empty track rather than as a missing cell. */
+.analysis-track {
+  position: relative;
+  flex: 1;
+  align-self: stretch;
+  min-width: 0;
+  margin: 4px 10px;
+  border-radius: 2px;
+  background-color: rgb(255 255 255 / 0.03);
+}
+
+/* Timeline rows bound the name so the track gets the rest of the row. */
+.analysis-name-fixed {
+  flex: 0 0 220px;
+}
+
+.analysis-timeline-piece {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  /* Longhand, never the `background` shorthand: the shorthand resets
+   * background-size and the bar loses its fill.
+   * In its own cell the pieces are the only ink, so they can afford to be
+   * more solid than they were sharing space with the row's text. */
+  opacity: 0.75;
+}
+
+/* The status tabs' Friendlies|Enemies switch. A small pill pair, not tabs:
+ * it re-pivots the current table rather than navigating. */
+.analysis-hostility {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--an-line);
+  border-radius: 4px;
+  background-color: var(--an-panel);
+}
+
+.analysis-hostility-option {
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 3px;
+  color: var(--an-ink-3);
+}
+
+.analysis-hostility-active {
+  color: var(--an-ink);
+  background-color: var(--an-raised);
+}

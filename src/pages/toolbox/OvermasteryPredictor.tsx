@@ -12,6 +12,7 @@ import ToolPage from "./ToolPage";
 
 import useOvermasteryPredictor, {
   emptySlots,
+  MAX_ROLLS,
   rollMatches,
   rollMatchesKinds,
   slotOptions,
@@ -179,7 +180,7 @@ const OvermasteryPredictor = () => {
               value={form.rolls === 0 ? "" : String(form.rolls)}
               onChange={(e) => {
                 const digits = e.currentTarget.value.replace(/\D/g, "");
-                setForm({ ...form, rolls: digits === "" ? 0 : Math.min(parseInt(digits, 10), 500) });
+                setForm({ ...form, rolls: digits === "" ? 0 : Math.min(parseInt(digits, 10), MAX_ROLLS) });
               }}
               disabled={busy}
               w={130}

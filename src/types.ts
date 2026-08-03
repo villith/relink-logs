@@ -27,11 +27,55 @@ export type EnemyType = string | { Unknown: number };
  */
 export type TargetEntry = {
   id: number;
+  /** The game's own actor index for this spawn.
+   *
+   * `id` is the spawn's instance pointer folded to 32 bits, which is what tells
+   * two simultaneous same-kind actors apart; this is the coarser index the
+   * STATUS events report, and the only field the damage and status capture
+   * paths share. Present so a debuff can be matched to the enemy holding it —
+   * see `StatusInterval.targetSegment`. */
+  actorIndex: number;
   enemyType: EnemyType;
   instance: number;
   maxHp: number | null;
   startMs: number;
   endMs: number;
+};
+
+/** One distinct (source, target, ability) combination present in the log,
+ * computed with the time window applied but the selector pins not applied.
+ * Mirrors the Rust `SelectionFact`.
+ *
+ * `sourceActorType`/`sourceIndex` are the PARENT actor, so a summon's hit is
+ * offered under the player who called it. */
+export type SelectionFact = {
+  sourceActorType: number;
+  sourceIndex: number;
+  /** Index into `targetEntries` — the SPAWN this hit landed on, never the
+   * game's actor id.
+   *
+   * The game reissues a dead boss's actor id to a later one ("Four Dragons of
+   * the Apocalypse": Wilinus Icewyrm and Vrazarek Firewyrm both arrived as
+   * 3926405961). Keyed by that id the two collapsed into one dropdown entry,
+   * the second dragon never appeared at all, and pinning the first showed both
+   * dragons' damage. */
+  targetSegment: number;
+  ability: ActionType;
+  /** The body the hit came from, filed the way `skillBreakdown` files it — so
+   * the ability selector can condense into skill groups with the same rule the
+   * table uses. Optional: a backend older than the field sends nothing, and the
+   * list then stays ungrouped rather than mis-grouping. */
+  childCharacterType?: CharacterType;
+};
+
+/** Which source actors and abilities the analysis view's selector bar has
+ * pinned, sent back as a filter. Empty on a dimension means "All"; the
+ * dimensions are ANDed. Mirrors the Rust `SelectionFilter`. */
+export type SelectionFilter = {
+  /** Source actor INDICES, not actor-type hashes: a hash names a character
+   * class, and an online party can hold two of the same character. */
+  sourceIndices: number[];
+  abilities: ActionType[];
 };
 
 /** The selectable slice of a TargetEntry, sent back as a filter. */
@@ -85,6 +129,76 @@ export type ActionType =
   | { DamageOverTime: number }
   | { Normal: number }
   | { Group: string };
+
+/**
+ * One band of the analysis view's ability drill-down chart (mirrors the Rust
+ * `AbilityChartSeries`): what one breakdown row of the pinned player dealt per
+ * second. Keyed exactly as a `skillBreakdown` row is — same action, same child
+ * character — so a band always corresponds to a row of the table beneath it and
+ * both fold into skill groups by the same rule.
+ *
+ * Present only on a scoped fetch that pinned a source; empty otherwise.
+ */
+export type AbilityChartSeries = SkillRow & {
+  values: number[];
+};
+
+/**
+ * One band of the target drill-down chart (mirrors the Rust
+ * `TargetChartSeries`): what the pinned ability dealt to one enemy spawn per
+ * second. Carries the spawn's `instance`, so a band names the same enemy the
+ * target dropdown and the HP chart do.
+ */
+export type TargetChartSeries = {
+  enemyType: EnemyType;
+  instance: number;
+  values: number[];
+};
+
+/**
+ * One window during which one actor held one status effect (mirrors the Rust
+ * `StatusInterval`).
+ *
+ * Per actor and never merged: a union across the party cannot be un-merged, so
+ * pinning a buff could never show which players had it. Uptime is computed from
+ * these in the frontend — see `statusUptime` — which is also what makes two
+ * overlapping sources read as 100% rather than 200%.
+ */
+export type StatusInterval = {
+  actorIndex: number;
+  casterIndex: number | null;
+  statusId: number;
+  /** Null when the hook could not resolve the causing ability. The row then
+   * falls back to the bare effect name rather than disappearing. */
+  abilityId: number | null;
+  startMs: number;
+  endMs: number;
+  /** Peak stacks within the window. Carried for the chart, which is where a
+   * stack count belongs — it varies over the window, so a table cell cannot
+   * say anything true about it. A status the generated `status_levels` table
+   * does not mark HasLevels reports 1: whatever sits at the count offset for
+   * those is not a count (see `stacks_for` in the hook). */
+  maxStacks: number;
+  /** Which enemy SPAWN held this, as an index into `targetEntries`. Null for a
+   * player, and for an enemy the segmenter skipped (a phantom marker actor).
+   *
+   * The spawn rather than `actorIndex` for the reason the damage path already
+   * pins targets by segment: the game reissues a dead boss's actor id to the
+   * next one, so a debuff open when the first dragon died was extended by the
+   * second dragon's apply into one row spanning both fights. */
+  targetSegment: number | null;
+  /** How many times the effect landed in this window — the apply plus every
+   * refresh merged into it. Summed across holders, this is the Count column. */
+  applications: number;
+};
+
+/** Everything grouping and naming read of a hit: the action and the body it came
+ * from.
+ *
+ * Narrower than `SkillState` on purpose — a chart band carries these two fields
+ * and a bucket array, nothing else, so it satisfies this structurally instead of
+ * needing a cast that would hide a real drift between a band and a row. */
+export type SkillRow = Pick<SkillState, "actionType" | "childCharacterType">;
 
 /** Per-enemy-type share of one skill's damage (mirrors the Rust
  * `SkillTargetState`); same-type spawns merge into one entry. Computed under
@@ -527,6 +641,10 @@ export type Log = {
    * source app never recorded. Optional so a backend older than the field
    * (dev HMR skew) reads as "not imported" rather than breaking the list. */
   imported?: boolean;
+  /** Id of the first run of the Repeat Quest chain this log belongs to (null
+   * on the chain's first run and on unchained logs). Optional for the same
+   * backend-skew reason as `imported`: absent reads as "not chained". */
+  repeatGroup?: number | null;
 };
 
 /** Result of merging another installation's logs.db into ours

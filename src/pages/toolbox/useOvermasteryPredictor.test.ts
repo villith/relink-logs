@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_ROLLS, useOvermasterySelectionsStore } from "@/stores/useOvermasterySelectionsStore";
 import { OvermasteryMastery, OvermasteryStatus } from "@/types";
 
 vi.mock("@tauri-apps/api", () => ({ invoke: vi.fn() }));
@@ -63,6 +64,41 @@ describe("useOvermasteryPredictor loading", () => {
     const { result } = renderHook(() => useOvermasteryPredictor());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe("game-not-running");
+  });
+});
+
+describe("useOvermasteryPredictor roll count", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValue({ gameRunning: true, roster: [] });
+    useOvermasterySelectionsStore.setState({ rolls: DEFAULT_ROLLS });
+  });
+
+  /** A mounted hook with its game-status fetch already settled — an unsettled
+   * one resolves later and updates state outside `act`. */
+  const mounted = async () => {
+    const rendered = renderHook(() => useOvermasteryPredictor());
+    await waitFor(() => expect(rendered.result.current.loading).toBe(false));
+    return rendered;
+  };
+
+  it("persists the count the user typed, and starts the next session on it", async () => {
+    const { result, unmount } = await mounted();
+    act(() => result.current.setForm({ ...result.current.form, rolls: 120 }));
+    await waitFor(() => expect(useOvermasterySelectionsStore.getState().rolls).toBe(120));
+    unmount();
+
+    expect((await mounted()).result.current.form.rolls).toBe(120);
+  });
+
+  it("keeps the stored count while the field sits empty", async () => {
+    const { result } = await mounted();
+    act(() => result.current.setForm({ ...result.current.form, rolls: 120 }));
+    await waitFor(() => expect(useOvermasterySelectionsStore.getState().rolls).toBe(120));
+
+    // Clearing the input reads as 0 — an editing state, not a chosen count.
+    act(() => result.current.setForm({ ...result.current.form, rolls: 0 }));
+    expect(useOvermasterySelectionsStore.getState().rolls).toBe(120);
   });
 });
 
@@ -335,6 +371,18 @@ describe("restoreForm", () => {
 
   it("returns the plain initial form when no character was remembered", () => {
     expect(restoreForm(null, {})).toEqual(initialForm);
+  });
+
+  it("restores the stored roll count, with or without a remembered character", () => {
+    expect(restoreForm(null, {}, 120).rolls).toBe(120);
+    expect(restoreForm("18e2f9f9", {}, 120)).toEqual({ ...initialForm, character: "18e2f9f9", rolls: 120 });
+  });
+
+  it("falls back to the default roll count for anything the form could not have written", () => {
+    // 0 is the cleared input, never persisted; the rest are hand-edited rows.
+    for (const bad of [undefined, null, 0, -5, 501, 12.5, "50", NaN]) {
+      expect(restoreForm(null, {}, bad).rolls).toBe(initialForm.rolls);
+    }
   });
 });
 

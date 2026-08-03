@@ -52,6 +52,9 @@ describe("meter settings defaults", () => {
     expect(state.bar_texture).toBe("solid");
     expect(state.bar_height).toBe(27);
     expect(state.bar_spacing).toBe(0);
+    // Hand-written labels keep winning by default; language-first resolution
+    // stays in the code as an opt-in with no UI.
+    expect(state.skill_name_resolution).toBe("label-first");
   });
 
   it("seeds header segments that reproduce the original header", async () => {

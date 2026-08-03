@@ -254,7 +254,10 @@
       "encounter-reset": "Reset (area enter)",
       "sent-frames_one": "Queued {{count}} event on the hook's broadcast channel",
       "sent-frames_other": "Queued {{count}} events on the hook's broadcast channel",
-      "sent-nothing": "The hook accepted the batch but nothing was listening — this should not happen."
+      "sent-nothing": "The hook accepted the batch but nothing was listening — this should not happen.",
+      "analysis-query": "Query",
+      "analysis-query-empty": "(none)",
+      "analysis-chart": "Chart"
     },
     "legality": {
       "title": "Cheat Audit",
@@ -283,7 +286,7 @@
         "sigilQuestLockedTrait": "quest-only trait",
         "sigilSingleTraitOnly": "second trait",
         "overmasteryValue": "off-ladder value",
-        "overmasteryAllMaxed": "4 perfect rolls — {{chance}}",
+        "overmasteryAllMaxed": "3 max Stun Power Up rolls — {{chance}}",
         "summonTrait": "can't roll here",
         "summonBonusSource": "wrong bonus id — only {{allowed}}",
         "summonBonusSource-unnamed": "wrong bonus id",
@@ -418,6 +421,61 @@
       "total-power": "Total PWR"
     },
     "logs": {
+      "view-mode": {
+        "label": "View mode",
+        "analysis": "Analysis",
+        "classic": "Classic",
+        "analysis-under-construction": "The analysis view is still being built on this branch."
+      },
+      "analysis-tab": "Analysis",
+      "events-tab": "Events",
+      "selector-source": "Source",
+      "selector-target": "Target",
+      "selector-ability": "Ability",
+      "selector-all-friendlies": "All friendlies",
+      "selector-all-enemies": "All enemies",
+      "selector-all-abilities": "All abilities",
+      "metric-damage-done": "Damage Done",
+      "metric-stun": "Stun",
+      "metric-sba": "SBA",
+      "metric-tablist-label": "Metric",
+      "metric-damage-taken": "Damage Taken",
+      "metric-buffs": "Buffs",
+      "metric-debuffs": "Debuffs",
+      "buff-uptime": "Uptime",
+      "buff-count": "Count",
+      "buff-timeline": "Timeline",
+      "buff-label": "{{effect}} ({{cause}})",
+      "buff-cause-unknown": "unknown source",
+      "buff-effect-unnamed": "Effect {{id}}",
+      "buff-band-toggle": "Show on the chart",
+      "hostility-label": "Hostility",
+      "hostility-friendlies": "Friendlies",
+      "hostility-enemies": "Enemies",
+      "buffs-empty": "No status effects were recorded for this log",
+      "rows-by-effect": "Effect",
+      "rows-by-enemy": "Enemy",
+      "rows-by-player": "Player",
+      "rows-by-ability": "Ability",
+      "rows-by-skill": "Skill",
+      "column-share": "%",
+      "hover-by-source": "Source",
+      "hover-by-ability": "Ability",
+      "hover-by-target": "Target",
+      "hover-by-hits": "Hits",
+      "hover-count": "Count",
+      "hover-capped": "Capped",
+      "chart-dps-label": "Damage per second",
+      "chart-sba-label": "Skybound Arts gauge",
+      "chart-stun-label": "Stun per second",
+      "chart-drill-ability-label": "Damage per second, by skill",
+      "chart-drill-target-label": "Damage per second, by enemy",
+      "chart-stacks-label": "Stacks",
+      "chart-drag-hint": "Drag to scope · double-click to reset",
+      "chart-legend-label": "Chart series",
+      "quest-cleared": "Cleared",
+      "quest-failed": "Not cleared",
+      "no-rows": "Nothing matches the current pins. Clear one to see more.",
       "saved-count_zero": "No logs saved",
       "saved-count_one": "{{count}} log saved",
       "saved-count_other": "{{count}} logs saved",
@@ -434,6 +492,7 @@
       "enemy-hp": "Enemy HP",
       "window-full": "Full fight",
       "window-of": "{{selected}} of {{total}} selected",
+      "window-within": "in {{total}}",
       "window-reset": "Show full fight",
       "delete-logs-title": "Delete logs",
       "delete-all-logs-confirmation": "This will delete all logs from the database. This action cannot be undone.",
@@ -467,7 +526,9 @@
       "equipment": "Equipment",
       "builds": "Builds",
       "ai-companion": "AI",
-      "imported-tooltip": "This log was imported from another version of GBFR Logs and may be missing data that version never recorded."
+      "imported-tooltip": "This log was imported from another version of GBFR Logs and may be missing data that version never recorded.",
+      "repeat-chain-count": "×{{count}}",
+      "repeat-chain-tooltip": "Repeated quest — {{count}} runs chained with Repeat Quest. Click to expand or collapse."
     },
     "toolbox": {
       "title": "Toolbox",
@@ -707,6 +768,7 @@
     },
     "Pl0200": {
       "0": "Ares (Link attack bug)",
+      "9998": "Ares",
       "100": "Attack 1",
       "101": "Attack 2",
       "102": "Attack 3",
@@ -787,6 +849,7 @@
       "8201": "Lightning (Mystic Vortex 1)",
       "8202": "Lightning (Mystic Vortex 2)",
       "8203": "Lightning (Mystic Vortex 3)",
+      "11000": "Concentration",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "stargaze": "Stargaze",
@@ -896,6 +959,7 @@
       "302": "Aerial Finisher",
       "400": "Launch",
       "410": "Aerial Barrage",
+      "10001": "Attack Level Up",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "aerial-attack": "Aerial Attack",
@@ -1042,6 +1106,7 @@
       "303": "Aerial Attack 4",
       "400": "Launch",
       "410": "Aerial Barrage",
+      "9998": "Shippegaeshi (Just)",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "flashing-void": "Flashing Void",
@@ -1123,6 +1188,7 @@
       "311": "Aerial Finisher (Perfect)",
       "400": "Launch",
       "410": "Aerial Barrage",
+      "9998": "Raging Fist",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "combo-finisher": "Combo Finisher",
@@ -1209,6 +1275,8 @@
       "302": "Aerial Attack 3",
       "400": "Launch",
       "410": "Aerial Barrage",
+      "1200": "Phantasmagoria",
+      "9998": "High-Speed Charge",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "power-strike": "Power Strike",
@@ -1285,6 +1353,7 @@
       "1300": "Arcadia (Dragonform)",
       "1400": "Fourfold Vengeance (Dragonform)",
       "1500": "Ragnarok Form (Activation)",
+      "3100": "Dragonform (Activation)",
       "skill-groups": {
         "normal-attack": "Normal Attack (Dragonform)",
         "aerial-attack": "Aerial Attack (Dragonform)",
@@ -1337,6 +1406,8 @@
       "3700": "Ethereal Prison (Chromatic Wings)",
       "6000": "Combo Finisher (Swords)",
       "6001": "Combo Finisher (Swords) (Chromatic Wings)",
+      "9998": "Chromatic Wings (Transformation)",
+      "9999": "Chromatic Wings (Transformation)",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "aerial-attack": "Aerial Attack",
@@ -1384,6 +1455,7 @@
       "2001": "Infinito Creare (Avatar)",
       "3001": "Rotura (Avatar)",
       "6001": "Despedazar (Avatar)",
+      "9996": "Avatar Finisher",
       "10000": "Spirit Swords (Projectiles)",
       "skill-groups": {
         "normal-attack": "Normal Attack",
@@ -1449,6 +1521,7 @@
       "1000": "Slow Kill (Uncharged - Melee)",
       "1010": "Slow Kill (Uncharged)",
       "1011": "Slow Kill (Charged)",
+      "1200": "Play with Fire",
       "1300": "Acidrage Howl (Missed Counter)",
       "1600": "Flamek Thunder (Uncharged)",
       "1601": "Flamek Thunder (Partially Charged)",
@@ -1527,6 +1600,8 @@
       "310": "Aerial Combo Finisher",
       "400": "Launch",
       "410": "Aerial Barrage",
+      "1000": "Deathmatch Finale",
+      "11000": "Mode Change",
       "1410": "Martial Spear Finisher",
       "skill-groups": {
         "normal-attack": "Normal Attack",
@@ -1598,6 +1673,7 @@
       "960": "Power Finisher Hit 2",
       "970": "Power Finisher Hit 3",
       "980": "Power Finisher Hit 4",
+      "8000": "Rising Nova",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "normal-attack-empowered": "Normal Attack (Empowered)",
@@ -1651,6 +1727,7 @@
       "970": "Attack 1 (Reversed, from Upright)",
       "5010": "Dead Lands Finisher",
       "6000": "Kick Face (No Counter)",
+      "20000": "Stacks",
       "skill-groups": {
         "normal-attack-upright": "Normal Attack (Upright)",
         "normal-attack-reversed": "Normal Attack (Reversed)",
@@ -1704,6 +1781,20 @@
     },
     "Pl0700GhostSatellite": {
       "1700": "Umlauf"
+    }
+  },
+  "causes": {
+    "default": {
+      "800": "Chain Burst",
+      "9999": "Sigil/Trait Effect",
+      "10000": "Equipment Effect",
+      "10001": "Equipment Effect",
+      "10002": "Equipment Effect",
+      "80000": "Summon Attack/Primal Burst",
+      "99993": "Darkflame End",
+      "99996": "Perfect Guard",
+      "99997": "Perfect Guard",
+      "1048575": "Environment"
     }
   },
   "enemies": {

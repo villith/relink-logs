@@ -44,7 +44,7 @@ pub const EMPTY_ID: u32 = game_reader::EMPTY_KEY;
 /// the sweep revisit logs already stamped 5 and WITHDRAW the verdicts it now
 /// declines to make. Without it the cutoff would only ever govern logs nobody
 /// had judged yet, i.e. nothing already in the database.
-pub const RULES_VERSION: u32 = 6;
+pub const RULES_VERSION: u32 = 7;
 
 /// Encounters recorded before this are never audited: epoch millis for
 /// 2026-07-09T00:00:00Z, inclusive (a log stamped exactly this is judged).
@@ -511,19 +511,20 @@ mod tests {
     ///   derived 20/15/10 ceilings. Re-ordering them makes the fixture illegal:
     ///   the check is positional, not sorted.
     /// * **Overmasteries** — all four ids and ladders read from
-    ///   `overmastery-tables.json`: Attack Power Up `c4925bd7` tops at 1000,
-    ///   Normal Attack DMG Cap Up `43b7581d` and Skill DMG Cap Up `9c555433`
-    ///   at 20, Stun Power Up `6cb38ef3` at 2.0. Three sit at their maximum
-    ///   and Stun deliberately does not, so the all-maxed rule must stay quiet.
-    ///   Stun's 0.6 is a real rung (index 4), NOT a zero — a zero reads as
-    ///   "magnitude never measured" and would skip the ladder comparison
-    ///   entirely, leaving the fixture green for the wrong reason.
+    ///   `overmastery-tables.json`: Attack Power Up `c4925bd7` tops at 1000 and
+    ///   the three Stun Power Ups `a3545ca1`, `59fbb7d8` and `6cb38ef3` at 2.0.
+    ///   A Lv1 meditation is the only one that draws three stun ids, and this
+    ///   is one: two sit at their maximum and the third deliberately does not,
+    ///   so the perfection report must stay quiet. The last stun's 0.6 is a
+    ///   real rung (index 4), NOT a zero — a zero reads as "magnitude never
+    ///   measured" and would skip the ladder comparison entirely, leaving the
+    ///   fixture green for the wrong reason.
     ///
-    ///   All four are `chased_effects`, which is what gives the fixture its
-    ///   teeth: the all-maxed rule counts only those five effect names, so a
-    ///   set containing a Health Up could never reach the threshold and the
-    ///   reachability case below would pass without the rule ever judging a
-    ///   magnitude.
+    ///   Three stuns is what gives the fixture its teeth: the report counts
+    ///   only maxed stuns, so a set holding one — an ordinary Lv3 roll — could
+    ///   never reach the threshold, and the reachability case below would pass
+    ///   without the rule ever judging a magnitude. It is the overmastery twin
+    ///   of Behemoth's deliberately-unmaxed bonus below.
     /// * **Summons** — Lucilius `6e5968fc` and Behemoth III `e4b7dcf9`, both
     ///   `rolled: true`, both on the perfect-count WATCH LIST, each carrying
     ///   a genuine candidate of its own lots: Lucilius main `5c862e13` (Gamma,
@@ -637,14 +638,14 @@ mod tests {
                         value: 1000.0,
                     },
                     Overmastery {
-                        id: 0x43b7_581d,
+                        id: 0xa354_5ca1,
                         flags: 0,
-                        value: 20.0,
+                        value: 2.0,
                     },
                     Overmastery {
-                        id: 0x9c55_5433,
+                        id: 0x59fb_b7d8,
                         flags: 0,
-                        value: 20.0,
+                        value: 2.0,
                     },
                     Overmastery {
                         id: 0x6cb3_8ef3,
@@ -704,11 +705,11 @@ mod tests {
     /// skipping it as unreadable.
     ///
     /// All ten rules, so the guard covers the whole module and not merely
-    /// one rule per file. One case worth reading closely: nudging Stun alone
-    /// to the top of its ladder fires `OvermasteryAllMaxed`, which can only
-    /// happen if the other three magnitudes were read, matched against their
-    /// own ladders AND recognised as maxed — one assertion covers all four
-    /// slots.
+    /// one rule per file. One case worth reading closely: nudging the third
+    /// Stun alone to the top of its ladder fires `OvermasteryAllMaxed`, which
+    /// can only happen if the other two stun magnitudes were read, matched
+    /// against their own ladders AND recognised as maxed — one assertion
+    /// covers all three counted slots.
     #[test]
     fn the_legal_fixture_reaches_every_rule() {
         // Wrightstone: an over-cap primary level.
@@ -1050,7 +1051,7 @@ mod tests {
         accused.sigils[0].first_trait_level = 30;
         masteries(&mut accused)[3].value = 0.7;
 
-        // Stun to the top of its ladder maxes all four chased overmasteries;
+        // The third stun to the top of its ladder makes all three maxed;
         // Behemoth's bonus to the top of its window makes a second perfect
         // summon beside the fixture's already-perfect Lucilius.
         let mut perfect = legal_build();
@@ -1071,15 +1072,15 @@ mod tests {
         assert_eq!(
             (RULES_VERSION, snapshot.join("\n").as_str()),
             (
-                6,
+                7,
                 "SigilTraitLevel Sigil(0) Level(30) -> Level(15) odds=None\n\
                  OvermasteryValue Overmastery(3) Amount(0.7) -> Amount(2.0) odds=None\n\
                  SummonBonusSource Summon(1) SummonBonusId(782879360) -> \
                  SummonIds([261648089, 789923164, 1851353340, 2237464972]) \
                  odds=None\n\
                  SummonBonusMagnitude Summon(1) Amount(75.0) -> Amount(50.0) odds=None\n\
-                 OvermasteryAllMaxed Overmasteries Count(4) -> None \
-                 odds=Some(0.0010497599999999998)\n\
+                 OvermasteryAllMaxed Overmasteries Count(3) -> None \
+                 odds=Some(2.2586109542631282e-9)\n\
                  SummonPerfectCount Summons Count(2) -> None \
                  odds=Some(2.4793388429752063e-8)"
             ),

@@ -1,0 +1,302 @@
+{
+  "0": {
+    "key": "atkup",
+    "text": "ATT↑"
+  },
+  "1": {
+    "key": "defup",
+    "text": "DIF↑"
+  },
+  "10": {
+    "key": "protect",
+    "text": "Sostituzione"
+  },
+  "1000": {
+    "key": "poison",
+    "text": "Veleno"
+  },
+  "1001": {
+    "key": "burn",
+    "text": "Ustione"
+  },
+  "1002": {
+    "key": "slow",
+    "text": "Rallentamento"
+  },
+  "1003": {
+    "key": "stun",
+    "text": "Vertigine"
+  },
+  "1004": {
+    "key": "freeze",
+    "text": "Glaciazione"
+  },
+  "1005": {
+    "key": "frostbite",
+    "text": "Assideramento"
+  },
+  "1006": {
+    "key": "sandman",
+    "text": "Insabbiamento"
+  },
+  "1007": {
+    "key": "paralysis",
+    "text": "Paralisi"
+  },
+  "1008": {
+    "key": "waterprison",
+    "text": "Oppressione"
+  },
+  "1011": {
+    "key": "darkburn",
+    "text": "Fiamma oscura"
+  },
+  "1012": {
+    "key": "TXT_STATUS_BINDAILMENT",
+    "text": "Vincolo"
+  },
+  "1015": {
+    "key": "TXT_STATUS_CAPTUREAILMENT",
+    "text": "Vincolo"
+  },
+  "1016": {
+    "key": "disableability",
+    "text": "Abilità sigillata"
+  },
+  "1017": {
+    "key": "disableougi",
+    "text": "AC sigillata"
+  },
+  "1018": {
+    "key": "darkpoison",
+    "text": "Sventura"
+  },
+  "1019": {
+    "key": "fear",
+    "text": "Pietrificazione"
+  },
+  "1020": {
+    "key": "arvessfermare",
+    "text": "Arvess Fermare"
+  },
+  "1021": {
+    "key": "elementweak",
+    "text": "Attrito elementale"
+  },
+  "11": {
+    "key": "protected",
+    "text": "Copertura"
+  },
+  "125": {
+    "key": "blacksnipper",
+    "text": "Sinergia crostacea"
+  },
+  "134": {
+    "key": "stundown",
+    "text": "Resistenza allo stordimento↓"
+  },
+  "140": {
+    "key": "antiburn",
+    "text": "Immunità a Ustione"
+  },
+  "141": {
+    "key": "antifreeze",
+    "text": "Immunità ad Assideramento/Glaciazione"
+  },
+  "142": {
+    "key": "antidraw",
+    "text": "Postura salda"
+  },
+  "145": {
+    "key": "em2510",
+    "text": "Passi instabili"
+  },
+  "17": {
+    "key": "antidebuff",
+    "text": "Immunità ai malus"
+  },
+  "18": {
+    "key": "drain",
+    "text": "Assorbimento"
+  },
+  "2": {
+    "key": "atkdown",
+    "text": "ATT↓"
+  },
+  "20": {
+    "key": "guts",
+    "text": "Coraggio"
+  },
+  "21": {
+    "key": "strength",
+    "text": "Forza"
+  },
+  "22": {
+    "key": "gyakkyou",
+    "text": "Crisi"
+  },
+  "23": {
+    "key": "criticalup",
+    "text": "Probabilità di critico↑"
+  },
+  "24": {
+    "key": "hateup",
+    "text": "Ostilità↑"
+  },
+  "25": {
+    "key": "autorevive",
+    "text": "Autorianimazione"
+  },
+  "26": {
+    "key": "magicvortex",
+    "text": "Vortice mistico"
+  },
+  "27": {
+    "key": "concentration",
+    "text": "Alta concentrazione"
+  },
+  "28": {
+    "key": "ironmeiden",
+    "text": "Vergine di ferro"
+  },
+  "29": {
+    "key": "idodragon",
+    "text": "Forma draconica"
+  },
+  "3": {
+    "key": "defdown",
+    "text": "DIF↓"
+  },
+  "30": {
+    "key": "idosuper",
+    "text": "Forza divina"
+  },
+  "31": {
+    "key": "undead",
+    "text": "Non morto"
+  },
+  "32": {
+    "key": "TXT_STATE_BOSSARTSAURA",
+    "text": "Sete di sangue"
+  },
+  "33": {
+    "key": "phantasmagoria",
+    "text": "Fantasmagoria"
+  },
+  "36": {
+    "key": "em1806",
+    "text": "Gloria degli abissi"
+  },
+  "37": {
+    "key": "maxhpdown",
+    "text": "PS massimi↓"
+  },
+  "38": {
+    "key": "doubletap",
+    "text": "Doppio colpo"
+  },
+  "4": {
+    "key": "damagecut",
+    "text": "Danni ridotti"
+  },
+  "41": {
+    "key": "barrier",
+    "text": "Barriera"
+  },
+  "42": {
+    "key": "dmgup",
+    "text": "Danni inflitti↑"
+  },
+  "43": {
+    "key": "sharpshoot",
+    "text": "Colpo mortale"
+  },
+  "44": {
+    "key": "senrai",
+    "text": "Tuono furente"
+  },
+  "45": {
+    "key": "colorwing",
+    "text": "Ali cromatiche"
+  },
+  "46": {
+    "key": "armorparge",
+    "text": "Corazza dispiegata"
+  },
+  "5": {
+    "key": "regeneration",
+    "text": "Rigenerazione"
+  },
+  "50": {
+    "key": "risingnova",
+    "text": "Nova nascente"
+  },
+  "51": {
+    "key": "dmgdown",
+    "text": "Danni inflitti↓"
+  },
+  "52": {
+    "key": "bravecarol",
+    "text": "Canto valoroso"
+  },
+  "53": {
+    "key": "playwithfire",
+    "text": "Giocare col fuoco"
+  },
+  "54": {
+    "key": "rebuildstun",
+    "text": "Cielo pestilenziale"
+  },
+  "55": {
+    "key": "rebuildweak",
+    "text": "Cielo cremisi"
+  },
+  "56": {
+    "key": "dmglimitup",
+    "text": "Limite danni↑"
+  },
+  "57": {
+    "key": "atkupadd",
+    "text": "ATT accumulato↑"
+  },
+  "58": {
+    "key": "defupadd",
+    "text": "DIF accumulata↑"
+  },
+  "59": {
+    "key": "defdownadd",
+    "text": "DIF accumulata↓"
+  },
+  "6": {
+    "key": "muteki",
+    "text": "Invulnerabilità"
+  },
+  "67": {
+    "key": "atkdownadd",
+    "text": "ATT accumulato↓"
+  },
+  "69": {
+    "key": "mspl0200_02",
+    "text": "Lama celeste"
+  },
+  "7": {
+    "key": "tsuigeki",
+    "text": "Danni supplementari"
+  },
+  "79": {
+    "key": "mspl0700_01",
+    "text": "Legame spiritico"
+  },
+  "8": {
+    "key": "hyperarmor",
+    "text": "Cuore impavido"
+  },
+  "84": {
+    "key": "abdmgup",
+    "text": "Danni abilità↑"
+  },
+  "9": {
+    "key": "illusion",
+    "text": "Immagine speculare"
+  }
+}

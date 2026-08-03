@@ -78,6 +78,7 @@ i18n
       "summon-bonuses",
       "skillboard",
       "skillboard-branches",
+      "statuses",
     ],
     defaultNS: "ui",
     fallbackLng: {

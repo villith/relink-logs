@@ -14,6 +14,7 @@ import {
   PlayerData,
   PlayerState,
   Sigil,
+  SkillRow,
   SkillState,
   SkillTargetState,
   SortDirection,
@@ -31,7 +32,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import summonBonusValues from "../src-tauri/assets/summon-bonus-values.json";
 
 import { renderTemplate } from "./labelTemplate";
-import { abilitySourceKeys, stripTierSuffix, summonClassSource } from "./skillNameSources";
+import { resolveSkillName, stripTierSuffix, summonClassSource } from "./skillNameSources";
 import { DEFAULT_PLAYER_LABEL, type BarFillMode } from "./stores/useMeterSettingsStore";
 
 export const EMPTY_ID = 2289754288;
@@ -826,7 +827,7 @@ export const PRIMAL_BURST_GROUP = "primal-burst";
 /** True for a summon hit dealt by one of the Primal Burst bodies. Owns the
  * hash-format detail (lowercase, zero-padded to eight) so callers never
  * re-derive it. */
-export const isPrimalBurstHit = (skill: SkillState): boolean => {
+export const isPrimalBurstHit = (skill: SkillRow): boolean => {
   if (typeof skill.actionType !== "object" || !Object.hasOwn(skill.actionType, "Normal")) return false;
   if ((skill.actionType as { Normal: number }).Normal !== SUMMON_ATTACK_ACTION_ID) return false;
 
@@ -874,7 +875,7 @@ export const summonDisplayName = (bodyClassHash: string): string | null => {
   return stripTierSuffix(text);
 };
 
-export const getSkillName = (characterType: CharacterType, skill: SkillState) => {
+export const getSkillName = (characterType: CharacterType, skill: SkillRow) => {
   switch (true) {
     case skill.actionType === "LinkAttack":
       return t([`skills.${characterType}.link-attack`, "skills.default.link-attack"]);
@@ -910,19 +911,13 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
         return t(SUMMON_FALLBACK_KEYS, { id: skillID });
       }
 
-      return t(
-        [
-          `skills.${skill.childCharacterType}.${skillID}`,
-          `skills.${characterType}.${skillID}`,
-          // The generated abilities bundle, via the bridge map: ui.json keys rows
-          // by action id, abilities.json by ability hash. Sits behind the ui.json
-          // keys so a hand-authored label still wins.
-          ...abilitySourceKeys(String(characterType), String(skill.childCharacterType), skillID),
-          `skills.default.${skillID}`,
-          `skills.default.unknown-skill`,
-        ],
-        { id: skillID }
-      );
+      // ui.json labels and the bridge's game names, in the order the
+      // skill_name_resolution mode dictates — labels ahead of every bridge
+      // name by default; see SkillNameResolutionMode.
+      const resolved = resolveSkillName([String(skill.childCharacterType), String(characterType)], skillID);
+      if (resolved !== null) return resolved;
+
+      return t([`skills.default.${skillID}`, `skills.default.unknown-skill`], { id: skillID });
     }
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "Group"): {
       const actionType = skill.actionType as { Group: string };
@@ -940,6 +935,37 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
       return t("ui.unknown");
   }
 };
+
+/** Name for a status row's cause id, or empty when no table names it.
+ *
+ * A cause in the character bands is the applying character's action id, so it
+ * resolves through the same language-major lookup the damage meter uses —
+ * every candidate character's table then bridge entry per language (the row's
+ * CASTERS — see `causeCandidatesFor`), then the `causes.default` band entries
+ * (sigil/trait, equipment, environment, perfect guard).
+ *
+ * `causes.default`, never `skills.default`: the shared skills table names the
+ * DAMAGE id space, and the two spaces only coincide within one character's own
+ * band. Its 99999 is the conflux effect action, while cause 99999 arrives
+ * under Shield in quests with no conflux at all — a cause band the shared
+ * damage table would name wrongly. */
+export const causeSkillName = (candidates: CharacterType[], causeId: number): string => {
+  const probe = (id: number): string => {
+    // The same label/bridge resolution the damage rows use, mode included.
+    const resolved = resolveSkillName(candidates.map(String), id);
+    return resolved ?? t(`causes.default.${id}`, { defaultValue: "" });
+  };
+  const exact = probe(causeId);
+  if (exact) return exact;
+  // The game numbers action variants within a decade (1600/1601/1602 are all
+  // Flamek Thunder charge levels) and stamps computed causes as base+count
+  // (Fraux stores stance stacks as 20000+n), so a miss retries the decade
+  // base. Only the decade: a hundreds-floor crosses into different actions
+  // (1110 is not a variant of 1100), which is where names become fabrications.
+  const decade = causeId - (causeId % 10);
+  return decade !== causeId && decade > 0 ? probe(decade) : "";
+};
+
 const tryParseInt = (intString: string | number, defaultValue = 0) => {
   if (typeof intString === "number") {
     if (isNaN(intString)) return defaultValue;
@@ -969,6 +995,16 @@ export const humanizeNumbers = (n: number) => {
   if (n >= 1e12) return [(n / 1e12).toFixed(1), "t"];
   else return [tryParseInt(n).toFixed(0), ""];
 };
+
+/// The single-string form of `humanizeNumbers`, for the callers that render the
+/// figure as text rather than styling the number and its suffix apart.
+export const humanizeNumber = (n: number): string => humanizeNumbers(n).join("");
+
+/// Share of `total` to one decimal, or "0.0%" when there is no total to divide
+/// by. Distinct from `percent` in `metrics/buffs.ts`, which clamps and rounds
+/// differently on purpose — this is the plain contribution-of-total form.
+export const share = (value: number, total: number): string =>
+  total === 0 ? "0.0%" : `${((value / total) * 100).toFixed(1)}%`;
 
 /// Takes a number of milliseconds and returns a string in the format of MM:SS.
 export const millisecondsToElapsedFormat = (ms: number): string => {
@@ -1370,6 +1406,18 @@ export const translateEnemyTypeId = (id: number): string => {
   const hash = toHashString(id);
   return t([`enemies:${hash}.text`, `enemies.unknown.${hash}`, "enemies.unknown-type"], { id: hash });
 };
+
+/** The game's own name for a status effect, or `""` where it has none.
+ *
+ * Keyed by `status.tbl`'s decimal `StatusId` — the value the hook puts in
+ * `StatusApplyEvent.status_id` — rather than by a hash like every other bundle,
+ * because statuses are the one table the runtime identifies by row id.
+ *
+ * Empty rather than a placeholder on a miss: the bundle names 156 of the 168
+ * rows; the rest are internal (`nayde1`, `mspl1900_01`) with no text at all.
+ * `statusLabelFor` reads empty as "unnamed" and falls back to "Effect <id>",
+ * which is the documented shipping path. */
+export const translateStatusName = (statusId: number): string => t(`statuses:${statusId}.text`, { defaultValue: "" });
 
 // A string form usable as a map key ("Em1000" and { Unknown: 0x1234 } stay distinct).
 const enemyTypeKey = (type: EnemyType): string => (typeof type === "string" ? `s:${type}` : `h:${type.Unknown}`);

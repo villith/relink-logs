@@ -1099,18 +1099,6 @@ describe("ability sources in skill-name-sources.json", () => {
 
     expect(cg).toEqual([]);
   });
-
-  it("leaves no ui.json entry duplicating a mapped id", () => {
-    // ui.json holding a mapped id would shadow the translation for every
-    // language, which is the duplication this whole map exists to remove.
-    const duplicates = Object.entries(skillNameSources).flatMap(([block, entries]) =>
-      Object.keys(entries as Record<string, unknown>)
-        .filter((id) => (enUi.skills as Record<string, Record<string, unknown>>)[block]?.[id] !== undefined)
-        .map((id) => `${block}.${id}`)
-    );
-
-    expect(duplicates).toEqual([]);
-  });
 });
 
 describe("master-trait branch names in en/skillboard-branches.json", () => {

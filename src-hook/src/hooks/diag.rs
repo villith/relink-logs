@@ -269,6 +269,46 @@ pub fn read_f32_guarded(base: usize, offset: usize) -> Option<f32> {
     Some(unsafe { (addr as *const f32).read_unaligned() })
 }
 
+/// Read a `u32` at `base + offset`, returning `None` if `base` is null or the location
+/// isn't committed/readable. VirtualQuery-guarded — can NEVER fault the game.
+///
+/// The Option-returning sibling of [`read_u32_guarded`], for readers that must tell
+/// "unreadable" apart from a legitimately zero value. The status hooks need exactly
+/// that: status id 0 is `atkup`, one of the most common buffs in the game, so a reader
+/// answering 0 on a failed read is indistinguishable from the real thing and would
+/// publish phantom Attack Up intervals whenever a layout shifted.
+///
+/// Concrete rather than generic over `Copy`, like the rest of this family: the guard
+/// proves the address is MAPPED, not that it holds a valid value of the type. For an
+/// integer a stale offset is a wrong number, which the callers are built to survive;
+/// for a `bool` or a `#[repr(u32)]` enum it would be undefined behaviour — exactly the
+/// failure this family exists to keep survivable.
+pub fn read_u32_opt_guarded(base: usize, offset: usize) -> Option<u32> {
+    if base == 0 {
+        return None;
+    }
+    let addr = base.wrapping_add(offset);
+    if !readable(addr, 4) {
+        return None;
+    }
+    Some(unsafe { (addr as *const u32).read_unaligned() })
+}
+
+/// Read an `i32` at `base + offset`, returning `None` if `base` is null or the location
+/// isn't committed/readable. The signed sibling of [`read_u32_opt_guarded`], for the
+/// status stack count at `+0xb0`, which is signed and whose garbage values the caller
+/// range-checks rather than trusting.
+pub fn read_i32_opt_guarded(base: usize, offset: usize) -> Option<i32> {
+    if base == 0 {
+        return None;
+    }
+    let addr = base.wrapping_add(offset);
+    if !readable(addr, 4) {
+        return None;
+    }
+    Some(unsafe { (addr as *const i32).read_unaligned() })
+}
+
 /// Dump every nonzero `u32` in the window `[base, base+len)` as `+off=val` (hex offset,
 /// decimal value), for re-deriving struct field offsets from a live playthrough. Used for
 /// the Conflux/EndlessMode work (see hooks/endless.rs, quest.rs): walking room→room, the

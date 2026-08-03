@@ -1667,6 +1667,38 @@ unsafe fn read_player_identity(snapshot: *const u8) -> Option<StoredPlayerIdenti
     })
 }
 
+/// The party slot from an identity snapshot, applying exactly the acceptance
+/// checks [`read_player_identity`] applies and allocating nothing.
+///
+/// The slot-key path — which is what damage, stun and status attribution all
+/// resolve through — needs one `u8`, but reaching it through the full read
+/// built a `Vec<Sigil>` and two `CString`s per call, on a game thread, per
+/// event. The checks are duplicated rather than shared because the full read
+/// wants the values and this wants only the verdict; the tests assert the two
+/// agree, which is the property that actually matters.
+unsafe fn snapshot_party_index(snapshot: *const u8) -> Option<u8> {
+    if snapshot.is_null() {
+        return None;
+    }
+    if !crate::hooks::diag::readable(snapshot as usize, std::mem::size_of::<SigilList>()) {
+        return None;
+    }
+
+    let list = &*(snapshot as *const SigilList);
+    if list.is_online > 1 || list.party_index > 3 {
+        return None;
+    }
+
+    // A real player always has a display name; an empty or unreadable one means
+    // this snapshot is not a resolvable identity yet.
+    let name_len = VBuffer(std::ptr::addr_of!(list.display_name) as *const usize).checked_len()?;
+    if name_len == 0 {
+        return None;
+    }
+
+    Some(list.party_index as u8)
+}
+
 /// Reads the sigil entries at the head of the identity snapshot (v2.0.2 layout:
 /// 13 x 0x24-byte entries at offset 0, same allocation as the verified name/party
 /// fields). Unequipped slots hold the 0x887AE0B0 sentinel and are dropped, as is
@@ -2805,6 +2837,59 @@ mod tests {
         assert_eq!(identity.party_index, 0);
         assert!(!identity.is_online);
         assert!(identity.sigils.is_empty());
+    }
+
+    // `snapshot_party_index` is the allocation-free half of
+    // `read_player_identity` — the only part the slot-key path needs. It must
+    // accept and reject exactly what the full read does, or attribution would
+    // differ between the fast and slow paths.
+    #[test]
+    fn snapshot_party_index_rejects_the_unmapped_snapshot() {
+        assert_eq!(
+            unsafe { snapshot_party_index(CRASH_SNAPSHOT_PTR as *const u8) },
+            None
+        );
+    }
+
+    #[test]
+    fn snapshot_party_index_matches_the_full_identity_read() {
+        let mut snapshot = vec![0u8; std::mem::size_of::<SigilList>()];
+        snapshot[0x208..0x20C].copy_from_slice(b"Gran");
+        snapshot[0x218..0x220].copy_from_slice(&4usize.to_le_bytes()); // used_size
+        snapshot[0x220..0x228].copy_from_slice(&0xfusize.to_le_bytes()); // max_size
+        snapshot[0x22C..0x230].copy_from_slice(&2u32.to_le_bytes()); // party_index
+
+        let full = unsafe { read_player_identity(snapshot.as_ptr()) }
+            .expect("the full read resolves this snapshot");
+        assert_eq!(
+            unsafe { snapshot_party_index(snapshot.as_ptr()) },
+            Some(full.party_index)
+        );
+        assert_eq!(full.party_index, 2);
+    }
+
+    #[test]
+    fn snapshot_party_index_rejects_a_nameless_snapshot() {
+        // An empty display name means the snapshot is not a resolvable identity
+        // yet. The full read turns it away, so this must too — accepting it
+        // would hand out a party slot key for an actor that has no identity.
+        let mut snapshot = vec![0u8; std::mem::size_of::<SigilList>()];
+        snapshot[0x220..0x228].copy_from_slice(&0xfusize.to_le_bytes()); // max_size
+
+        assert!(unsafe { read_player_identity(snapshot.as_ptr()) }.is_none());
+        assert_eq!(unsafe { snapshot_party_index(snapshot.as_ptr()) }, None);
+    }
+
+    #[test]
+    fn snapshot_party_index_rejects_an_out_of_range_party_slot() {
+        let mut snapshot = vec![0u8; std::mem::size_of::<SigilList>()];
+        snapshot[0x208..0x20C].copy_from_slice(b"Gran");
+        snapshot[0x218..0x220].copy_from_slice(&4usize.to_le_bytes());
+        snapshot[0x220..0x228].copy_from_slice(&0xfusize.to_le_bytes());
+        snapshot[0x22C..0x230].copy_from_slice(&9u32.to_le_bytes()); // not a party slot
+
+        assert!(unsafe { read_player_identity(snapshot.as_ptr()) }.is_none());
+        assert_eq!(unsafe { snapshot_party_index(snapshot.as_ptr()) }, None);
     }
 
     // An AI companion's own embedded record carries the LOCAL profile's name (the

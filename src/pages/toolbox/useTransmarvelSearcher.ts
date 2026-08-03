@@ -1,7 +1,8 @@
 import pool from "@/assets/transmarvel-pool.json";
+import { sanitizeRollCount } from "@/pages/toolbox/rollCount";
 import useGameStatus from "@/pages/toolbox/useGameStatus";
 import useRngSlotStaleness from "@/pages/toolbox/useRngSlotStaleness";
-import { useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
+import { DEFAULT_ROLLS, useTransmarvelWishlistStore } from "@/stores/useTransmarvelWishlistStore";
 import type { TransmarvelOutcome, TransmarvelPrediction, TransmarvelRoll, TransmarvelStatus } from "@/types";
 import { invoke } from "@tauri-apps/api";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -11,6 +12,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
  * a hit needs the rolled trait1 to match and, when specified, the rolled
  * trait2 too. */
 export type SigilEntry = { trait: string; trait2: string | null };
+
+/** Most rolls one prediction may simulate (mirrored by the backend clamp in
+ * predict_transmarvel). */
+export const MAX_ROLLS = 50000;
+
+/** This tool's roll-count guard — see `sanitizeRollCount`. */
+export const sanitizeRolls = (value: unknown): number => sanitizeRollCount(value, MAX_ROLLS, DEFAULT_ROLLS);
 
 /** A wished-for wrightstone: the type (family = its fixed trait-1 hash), a
  * minimum rarity tier (that tier or better hits), and optional per-position
@@ -279,10 +287,19 @@ export default function useTransmarvelSearcher() {
 
   const rawSigils = useTransmarvelWishlistStore((s) => s.sigils);
   const rawStones = useTransmarvelWishlistStore((s) => s.stones);
-  const rolls = useTransmarvelWishlistStore((s) => s.rolls);
   const setSigils = useTransmarvelWishlistStore((s) => s.setSigils);
   const setStones = useTransmarvelWishlistStore((s) => s.setStones);
-  const setRolls = useTransmarvelWishlistStore((s) => s.setRolls);
+  const saveRolls = useTransmarvelWishlistStore((s) => s.setRolls);
+
+  // The roll count is edited, not picked: it passes through 0 whenever the
+  // user clears the field, which is an editing state and not a count anyone
+  // chose. So the field's value lives here and only valid counts reach the
+  // store, where the wishlists' own writes go straight through.
+  const [rolls, setRolls] = useState(() => sanitizeRolls(useTransmarvelWishlistStore.getState().rolls));
+
+  useEffect(() => {
+    if (rolls >= 1) saveRolls(rolls);
+  }, [rolls, saveRolls]);
 
   // Stored entries can predate a game patch; validate on read, like
   // overmastery's sanitizeSelection. Writes go through the setters unchanged

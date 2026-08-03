@@ -226,7 +226,7 @@ describe("limit strings", () => {
    * carries them must say them, as a percentage rather than a "1 in N" the
    * reader has to invert before it means anything. */
   it("quote the odds on the rules that are reports rather than proof", () => {
-    expect(describeLimit(t, FIXTURES.overmasteryAllMaxed)).toBe("4 perfect rolls — 0.038% chance");
+    expect(describeLimit(t, FIXTURES.overmasteryAllMaxed)).toBe("3 max Stun Power Up rolls — 0.038% chance");
     expect(describeLimit(t, FIXTURES.summonPerfectCount)).toBe("4 perfect summon rolls — 0.0024% chance");
   });
 

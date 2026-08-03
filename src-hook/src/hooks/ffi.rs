@@ -209,6 +209,19 @@ impl VBuffer {
     /// hand `raw()` a garbage length/pointer. Rejects implausible sizes and any
     /// non-UTF-8 / interior-NUL content, returning `None` instead of reading junk.
     pub fn checked_raw(&self) -> Option<CString> {
+        let used_size = self.checked_len()?;
+        let bytes = unsafe { std::slice::from_raw_parts(self.ptr() as *const u8, used_size) };
+        CString::new(bytes).ok()
+    }
+
+    /// The validated length of the buffer's contents — every check
+    /// [`checked_raw`] applies, without building the `CString`.
+    ///
+    /// Exists because the identity resolution behind player attribution only
+    /// needs to know whether a name is PRESENT, and it runs on a game thread
+    /// per damage event and per status application. Allocating a string to test
+    /// it for emptiness put that churn on the hot path.
+    pub fn checked_len(&self) -> Option<usize> {
         const MAX_PLAYER_NAME_BYTES: usize = 0x100;
 
         let used_size = self.used_size();
@@ -231,7 +244,12 @@ impl VBuffer {
 
         let bytes = unsafe { std::slice::from_raw_parts(bytes_ptr, used_size) };
         std::str::from_utf8(bytes).ok()?;
-        CString::new(bytes).ok()
+        // `CString::new` rejects an interior NUL, so this must too — otherwise
+        // the length path would accept names `checked_raw` turns away.
+        if bytes.contains(&0) {
+            return None;
+        }
+        Some(used_size)
     }
 }
 
@@ -267,6 +285,34 @@ mod tests {
         assert_eq!(offset_of!(QuestState, freeze_flag), 0xADC);
         assert_eq!(offset_of!(QuestState, quest_id), QUEST_ID_OFFSET);
         assert_eq!(offset_of!(QuestState, quest_id), 0xDC8);
+    }
+
+    // `checked_len` is the acceptance half of `checked_raw` with the allocation
+    // removed, so the two must agree on every input or the identity fast path
+    // would accept snapshots the slow path rejects.
+    #[test]
+    fn checked_len_agrees_with_checked_raw_on_an_inline_buffer() {
+        let mut header: Box<[usize; 4]> = Box::new([0, 0, 4, 0xf]);
+        header[0] = usize::from_le_bytes(*b"Gran\0\0\0\0");
+        let vbuffer = VBuffer(header.as_ptr() as *const usize);
+        assert_eq!(vbuffer.checked_len(), Some(4));
+    }
+
+    #[test]
+    fn checked_len_agrees_with_checked_raw_on_an_unmapped_buffer() {
+        let header: Box<[usize; 4]> = Box::new([UNMAPPED_PTR, 0, 8, 0x20]);
+        let vbuffer = VBuffer(header.as_ptr() as *const usize);
+        assert!(vbuffer.checked_raw().is_none());
+        assert_eq!(vbuffer.checked_len(), None);
+    }
+
+    #[test]
+    fn checked_len_reports_zero_for_an_empty_name() {
+        // The identity path treats an empty name as "not resolvable yet", so
+        // this must be a clean Some(0) and not confusable with a rejection.
+        let header: Box<[usize; 4]> = Box::new([0, 0, 0, 0xf]);
+        let vbuffer = VBuffer(header.as_ptr() as *const usize);
+        assert_eq!(vbuffer.checked_len(), Some(0));
     }
 
     #[test]

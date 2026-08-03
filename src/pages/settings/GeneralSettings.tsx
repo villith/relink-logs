@@ -51,7 +51,7 @@ const GeneralSettings = () => {
       return;
     }
     modals.openConfirmModal({
-      title: t("ui.delete-logs-title", "Delete logs"),
+      title: t("ui.logs.delete-logs-title"),
       children: <Text size="sm">{t("ui.delete-imported-logs-confirmation", { count })}</Text>,
       labels: { confirm: t("ui.delete-btn"), cancel: t("ui.cancel-btn") },
       confirmProps: { color: "red" },
@@ -82,8 +82,8 @@ const GeneralSettings = () => {
 
   const confirmDeleteAll = () =>
     modals.openConfirmModal({
-      title: t("ui.delete-logs-title", "Delete logs"),
-      children: <Text size="sm">{t("ui.delete-all-logs-confirmation")}</Text>,
+      title: t("ui.logs.delete-logs-title"),
+      children: <Text size="sm">{t("ui.logs.delete-all-logs-confirmation")}</Text>,
       labels: { confirm: t("ui.delete-btn"), cancel: t("ui.cancel-btn") },
       confirmProps: { color: "red" },
       onConfirm: () => deleteAllLogs(),

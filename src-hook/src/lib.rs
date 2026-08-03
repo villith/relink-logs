@@ -31,7 +31,22 @@ async fn handle_client<S>(
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    while let Ok(msg) = rx.recv().await {
+    loop {
+        let msg = match rx.recv().await {
+            Ok(msg) => msg,
+            // The receiver fell behind the ring, so the oldest messages are
+            // gone. Losing those is survivable; treating it as end-of-stream is
+            // not — it closed the pipe, and the app reads that as "the game is
+            // gone", force-saves the half-finished encounter and alerts the
+            // user mid-fight. Every event AFTER the burst is still worth having,
+            // so skip the gap and keep reading.
+            Err(broadcast::error::RecvError::Lagged(skipped)) => {
+                warn!("event stream lagged, dropped {skipped} events");
+                continue;
+            }
+            // Every sender is gone: the hook is shutting down.
+            Err(broadcast::error::RecvError::Closed) => break,
+        };
         let bytes = protocol::bincode::serialize(&msg)?;
         stream.send(bytes.into()).await?;
     }
