@@ -39,17 +39,18 @@ const groupBy = <K, T>(items: T[], key: (item: T) => K): Map<K, T[]> => {
 
 /** Rows for a set of status intervals.
  *
- * Shared by the Buffs and Debuffs descriptors, which differ only in which
- * actors they look at — the row shape, uptime maths and pin behaviour are
- * identical, and duplicating them would let the two drift.
+ * Shared by the Buffs and Debuffs descriptors, which differ only in polarity
+ * (which effects they filter to before calling this) — the row shape, uptime
+ * maths and pin behaviour are identical, and duplicating them would let the
+ * two drift.
  *
  * `slotOf` resolves a holder's party slot for its bar colour, and answers -1 for
  * an actor that has none (an enemy).
  *
- * `holderKeyOf` says what a holder row IS. Buffs group by player, so the actor
- * index is the whole identity. Debuffs group by enemy SPAWN, because the actor
- * index is a handle the game reissues to the next boss — see
- * `StatusInterval.targetSegment`.
+ * `holderOf` says what a holder row IS. The friendly side groups by player, so
+ * the actor index is the whole identity. The enemy side groups by SPAWN,
+ * because the actor index is a handle the game reissues to the next boss —
+ * see `StatusInterval.targetSegment`.
  *
  * `window` is the span the table measures. Given one, every row also carries the
  * windows it was up (`MetricRow.timeline`) and the table draws a positional bar
@@ -134,19 +135,21 @@ export const statusRows = ({
     .sort((a, b) => b.value - a.value);
 };
 
-/** Party slots by actor index: the roster that decides buff from debuff, and
- * the colour of a holder row.
+/** Party slots by actor index: the roster that decides a holder's SIDE
+ * (friendly vs enemy), and the colour of a holder row. `isHarmful` is what
+ * decides buff from debuff; this only says who is on whose team.
  *
  * Built from the IDENTITY party, never the scoped one — a pinned source narrows
  * `players` to that one player, and a roster missing three of the party files
- * their buffs as enemy-held debuffs. Same rule the chart and the labels already
+ * their effects as enemy-held. Same rule the chart and the labels already
  * follow (`identityPlayers`, not `players`). */
 export const slotsOf = (players: ComputedPlayerState[]): Map<number, number> =>
   new Map(players.map((player) => [player.index, player.partyIndex]));
 
 /** The intervals a roster's players hold, or the ones nobody in it does — the
- * whole difference between the two tables. Takes the prebuilt roster so a
- * descriptor does not construct it twice per render. */
+ * hostility split (`statusTabRows` picks the boolean per tab, defaulted by
+ * `hostility`). Takes the prebuilt roster so a descriptor does not construct
+ * it twice per render. */
 export const heldByRoster = (
   intervals: StatusInterval[],
   roster: Map<number, number>,

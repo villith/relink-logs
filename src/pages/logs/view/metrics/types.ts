@@ -67,8 +67,9 @@ export type MetricDescriptor = {
     level: RowLevel;
     pins: SelectorPins;
     /** Every status window in the fight, players and enemies alike. The Buffs
-     * and Debuffs descriptors split them by holder; optional because a log
-     * recorded before status capture has none. */
+     * and Debuffs descriptors split them by polarity (which tab) and holder
+     * side (the `hostility` input below); optional because a log recorded
+     * before status capture has none. */
     statusIntervals?: StatusInterval[];
     /** Denominator for an uptime percentage. Optional for the same reason. */
     fightDurationMs?: number;

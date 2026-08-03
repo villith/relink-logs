@@ -30,7 +30,10 @@ const interval = (
 });
 
 // Narmaya (0) has it twice (overlapping), Eugen (1) once, and there is a second
-// buff. Actor 9 is an enemy — no player carries that index.
+// buff. Actor 9 is an enemy — no player carries that index — and deliberately
+// holds a HARMFUL id (1001, Burn): the debuffs suite needs a real debuff, and
+// a beneficial id there would silently empty the debuffs table instead of
+// testing what it means to.
 const INTERVALS: StatusInterval[] = [
   interval(0, 0, 5_000, 10, 500, 3),
   interval(0, 4_000, 8_000, 10, 500, 4),
@@ -107,8 +110,8 @@ describe("buffs descriptor", () => {
   });
 
   it("keeps a buff on the Buffs table when the scoped party has been narrowed", () => {
-    // A source pin narrows `players` to one; the roster is what decides buff
-    // from debuff, so reading it from the scoped party filed the rest of the
+    // A source pin narrows `players` to one; the roster is what decides a
+    // holder's SIDE, so reading it from the scoped party filed the rest of the
     // party's buffs as enemy-held.
     const scoped = [{ index: 0, partyIndex: 0 }] as ComputedPlayerState[];
     const rows = buffs.rows(input("abilities", null, INTERVALS, scoped));
