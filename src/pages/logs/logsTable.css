@@ -15,6 +15,15 @@
  * stylesheet order.
  */
 
+.logs-table {
+  /* The analysis view's accent (`--an-accent` in analysis.css, and
+     PLAYER_COLORS[3]), declared once here rather than written as a literal at
+     each use. That token is scoped to `.analysis-tokens`, which does not wrap
+     this table, so it cannot simply be referenced — but a single declaration
+     keeps the two places this table needs it in step with each other. */
+  --logs-accent: #00b8d9;
+}
+
 /* The whole chain reads as one object lifted off the page: the band brightest,
    its runs a step above the page behind them, everything outside untouched.
    Three tones rather than a rule alone — a single hairline is easy to miss in a
@@ -86,7 +95,7 @@
 }
 
 .logs-chain-toggle:focus-visible {
-  outline: 2px solid #00b8d9;
+  outline: 2px solid var(--logs-accent);
   outline-offset: 1px;
 }
 
@@ -100,6 +109,6 @@
    this app means "cleared" (see the ✓ two cells away, and QuestSummary's
    teal.4), so a green record time reads as an outcome rather than a best. */
 .logs-chain-best {
-  color: #00b8d9;
+  color: var(--logs-accent);
   font-weight: 700;
 }

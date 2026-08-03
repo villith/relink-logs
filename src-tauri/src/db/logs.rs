@@ -166,22 +166,51 @@ fn sort_value_expr(sort_by: &SortType) -> SimpleExpr {
     }
 }
 
-/// The filters every quest-list query shares.
+/// Which direction the list reads in.
+fn sort_order(sort_direction: &SortDirection) -> Order {
+    match sort_direction {
+        SortDirection::Ascending => Order::Asc,
+        SortDirection::Descending => Order::Desc,
+    }
+}
+
+/// What the user has narrowed the quest list to.
 ///
-/// One spelling of them: the page query, the chain-key query that decides which
-/// chains the page holds, and the count all have to select the same rows, and
-/// three hand-kept copies of a nine-branch condition chain would not stay equal.
-/// A count that disagreed with the list promises pages the list cannot fill.
-#[allow(clippy::too_many_arguments)]
-fn apply_log_filters(
-    query: &mut SelectStatement,
-    filter_by_enemy_id: Option<u32>,
-    filter_by_quest_id: Option<u32>,
-    cleared: Option<bool>,
-    filter_by_player_id: &Option<String>,
-    filter_by_player_character: &Option<String>,
-    flagged_only: bool,
-) {
+/// One value rather than six positional arguments: every query below has to
+/// select the same rows, and threaded by hand they were six parameters deep on
+/// four signatures — with two `Option<u32>` and an `Option<bool>` adjacent, so a
+/// transposed pair compiled silently. A filter added here reaches every reader
+/// at once, which is what keeps a count from disagreeing with the list it sizes.
+pub struct LogFilters<'a> {
+    pub enemy_id: Option<u32>,
+    pub quest_id: Option<u32>,
+    pub cleared: Option<bool>,
+    pub player_id: &'a Option<String>,
+    pub player_character: &'a Option<String>,
+    pub flagged_only: bool,
+}
+
+/// What the filtered list holds, counted two ways — see `get_counts`.
+pub struct LogCounts {
+    /// Runs: the "N saved" figure beside the pager.
+    pub logs: i32,
+    /// Chains: what the list pages through.
+    pub chains: i32,
+}
+
+/// The one spelling of the filters, applied to whichever query is being built:
+/// the page query, the chain-key query that decides which chains the page holds,
+/// and both counts.
+fn apply_log_filters(query: &mut SelectStatement, filters: &LogFilters) {
+    let &LogFilters {
+        enemy_id: filter_by_enemy_id,
+        quest_id: filter_by_quest_id,
+        cleared,
+        player_id: filter_by_player_id,
+        player_character: filter_by_player_character,
+        flagged_only,
+    } = filters;
+
     query
         // Exclude Conflux rooms: they are `logs` rows tagged with a run_id and
         // belong to the Conflux tab, not the normal quest list.
@@ -294,24 +323,15 @@ fn apply_log_filters(
 /// standalone runs. The figures the summary row shows are about the whole set;
 /// where the block SITS is about its best run, which is also the run the list
 /// marks inside it.
-#[allow(clippy::too_many_arguments)]
 fn page_chain_keys(
     conn: &Connection,
-    filter_by_enemy_id: Option<u32>,
-    filter_by_quest_id: Option<u32>,
+    filters: &LogFilters,
     per_page: u32,
     offset: u32,
     sort_by: &SortType,
     sort_direction: &SortDirection,
-    cleared: Option<bool>,
-    filter_by_player_id: &Option<String>,
-    filter_by_player_character: &Option<String>,
-    flagged_only: bool,
 ) -> Result<Vec<i64>> {
-    let order = match sort_direction {
-        SortDirection::Ascending => Order::Asc,
-        SortDirection::Descending => Order::Desc,
-    };
+    let order = sort_order(sort_direction);
 
     // Which end of the chain speaks for it follows the direction: the run the
     // sort would put first is the one at the MIN end ascending and at the MAX
@@ -331,15 +351,7 @@ fn page_chain_keys(
 
     let mut query = Query::select();
     query.from(Logs::Table).expr(chain_key_expr());
-    apply_log_filters(
-        &mut query,
-        filter_by_enemy_id,
-        filter_by_quest_id,
-        cleared,
-        filter_by_player_id,
-        filter_by_player_character,
-        flagged_only,
-    );
+    apply_log_filters(&mut query, filters);
 
     let (sql, values) = query
         .add_group_by([chain_key_expr()])
@@ -368,38 +380,18 @@ fn page_chain_keys(
 /// flagged in; false (the default) does not filter on legality at all.
 pub fn get_logs(
     conn: &Connection,
-    filter_by_enemy_id: Option<u32>,
-    filter_by_quest_id: Option<u32>,
+    filters: &LogFilters,
     per_page: u32,
     offset: u32,
     sort_by: &SortType,
     sort_direction: &SortDirection,
-    cleared: Option<bool>,
-    filter_by_player_id: &Option<String>,
-    filter_by_player_character: &Option<String>,
-    flagged_only: bool,
 ) -> anyhow::Result<Vec<LogEntry>> {
-    let order = match sort_direction {
-        SortDirection::Ascending => Order::Asc,
-        SortDirection::Descending => Order::Desc,
-    };
+    let order = sort_order(sort_direction);
 
     // Which chains this page holds. Selected first, then every run belonging to
     // them is fetched whole — paging the rows directly is what used to cut a
     // chain across the boundary.
-    let chain_keys = page_chain_keys(
-        conn,
-        filter_by_enemy_id,
-        filter_by_quest_id,
-        per_page,
-        offset,
-        sort_by,
-        sort_direction,
-        cleared,
-        filter_by_player_id,
-        filter_by_player_character,
-        flagged_only,
-    )?;
+    let chain_keys = page_chain_keys(conn, filters, per_page, offset, sort_by, sort_direction)?;
 
     if chain_keys.is_empty() {
         return Ok(vec![]);
@@ -427,22 +419,14 @@ pub fn get_logs(
         Logs::Imported,
         Logs::RepeatGroup,
     ]);
-    apply_log_filters(
-        &mut query,
-        filter_by_enemy_id,
-        filter_by_quest_id,
-        cleared,
-        filter_by_player_id,
-        filter_by_player_character,
-        flagged_only,
-    );
+    apply_log_filters(&mut query, filters);
 
     // The same reading of the column the chains were placed by, so a run cannot
     // lead its own chain on a time the block was not ranked by — and so the
     // rows the list draws as "-" sit at the bottom of the block rather than
     // claiming its record.
     let (sql, values) = query
-        .and_where(Expr::expr(chain_key_expr()).is_in(chain_keys.clone()))
+        .and_where(Expr::expr(chain_key_expr()).is_in(chain_keys.iter().copied()))
         .order_by_expr_with_nulls(
             sort_value_expr(sort_by),
             order,
@@ -505,158 +489,35 @@ pub fn get_logs(
     Ok(rows)
 }
 
-/// How many CHAINS the same filters match — the number of things the list
-/// pages through, since a Repeat Quest chain occupies one slot on a page
-/// however many runs it holds. Counting rows here would promise more pages than
-/// the list can fill.
+/// How many runs and how many chains the same filters match.
 ///
-/// Takes `flagged_only` for the same reason it takes every other filter: a
-/// count that ignored one would disagree with the list it sizes.
-pub fn get_chains_count(
-    conn: &Connection,
-    filter_by_enemy_id: Option<u32>,
-    filter_by_quest_id: Option<u32>,
-    cleared: Option<bool>,
-    filter_by_player_id: &Option<String>,
-    filter_by_player_character: &Option<String>,
-    flagged_only: bool,
-) -> Result<i32> {
+/// Both in one pass: they differ only in the aggregate, and the list needs each
+/// for a different job — the pager is sized in CHAINS, since a Repeat Quest
+/// chain occupies one slot however many runs it holds, while the "N saved"
+/// figure beside it is about the logs. Counting rows for the pager would promise
+/// more pages than the list can fill.
+///
+/// Answers to `flagged_only` for the same reason it answers to every other
+/// filter: a count that ignored one would disagree with the list it sizes.
+pub fn get_counts(conn: &Connection, filters: &LogFilters) -> Result<LogCounts> {
     let mut query = Query::select();
     query
+        .expr(Expr::col(Logs::Id).count())
         .expr(Expr::expr(chain_key_expr()).count_distinct())
         .from(Logs::Table);
-    apply_log_filters(
-        &mut query,
-        filter_by_enemy_id,
-        filter_by_quest_id,
-        cleared,
-        filter_by_player_id,
-        filter_by_player_character,
-        flagged_only,
-    );
+    apply_log_filters(&mut query, filters);
 
     let (sql, values) = query.build_rusqlite(SqliteQueryBuilder);
 
     let mut stmt = conn.prepare(&sql)?;
-    let row: i32 = stmt.query_row(&*values.as_params(), |r| r.get(0))?;
+    let counts = stmt.query_row(&*values.as_params(), |row| {
+        Ok(LogCounts {
+            logs: row.get(0)?,
+            chains: row.get(1)?,
+        })
+    })?;
 
-    Ok(row)
-}
-
-/// How many logs the same filters match, for the callers that count RUNS rather
-/// than chains — the "N saved" figure beside the pager.
-pub fn get_logs_count(
-    conn: &Connection,
-    filter_by_enemy_id: Option<u32>,
-    filter_by_quest_id: Option<u32>,
-    cleared: Option<bool>,
-    filter_by_player_id: &Option<String>,
-    filter_by_player_character: &Option<String>,
-    flagged_only: bool,
-) -> Result<i32> {
-    let (sql, values) = Query::select()
-        .expr(Expr::col(Logs::Id).count())
-        .from(Logs::Table)
-        // Exclude Conflux rooms (see get_logs) so the count matches the filtered list.
-        .and_where(Expr::col(Logs::RunId).is_null())
-        .conditions(
-            filter_by_enemy_id.is_some(),
-            |q| {
-                q.and_where(Expr::col(Logs::PrimaryTarget).eq(filter_by_enemy_id.unwrap()));
-            },
-            |_| {},
-        )
-        .conditions(
-            filter_by_quest_id.is_some(),
-            |q| {
-                q.and_where(Expr::col(Logs::QuestId).eq(filter_by_quest_id.unwrap()));
-            },
-            |_| {},
-        )
-        .conditions(
-            cleared.is_some(),
-            |q| {
-                q.and_where(Expr::col(Logs::QuestCompleted).eq(cleared.unwrap()));
-            },
-            |_| {},
-        )
-        .conditions(
-            filter_by_player_id.is_some() && filter_by_player_character.is_some(),
-            |q| {
-                let player_id = filter_by_player_id.as_ref().unwrap();
-                let player_character = filter_by_player_character.as_ref().unwrap();
-
-                q.cond_where(
-                    Condition::any()
-                        .add(
-                            Expr::col(Logs::P1Name)
-                                .eq(player_id.clone())
-                                .and(Expr::col(Logs::P1Type).eq(player_character.clone())),
-                        )
-                        .add(
-                            Expr::col(Logs::P2Name)
-                                .eq(player_id.clone())
-                                .and(Expr::col(Logs::P2Type).eq(player_character.clone())),
-                        )
-                        .add(
-                            Expr::col(Logs::P3Name)
-                                .eq(player_id.clone())
-                                .and(Expr::col(Logs::P3Type).eq(player_character.clone())),
-                        )
-                        .add(
-                            Expr::col(Logs::P4Name)
-                                .eq(player_id)
-                                .and(Expr::col(Logs::P4Type).eq(player_character)),
-                        ),
-                );
-            },
-            |_| {},
-        )
-        .conditions(
-            filter_by_player_id.is_some() && filter_by_player_character.is_none(),
-            |q| {
-                let player_id = filter_by_player_id.as_ref().unwrap();
-
-                q.cond_where(
-                    Condition::any()
-                        .add(Expr::col(Logs::P1Name).eq(player_id.clone()))
-                        .add(Expr::col(Logs::P2Name).eq(player_id.clone()))
-                        .add(Expr::col(Logs::P3Name).eq(player_id.clone()))
-                        .add(Expr::col(Logs::P4Name).eq(player_id)),
-                );
-            },
-            |_| {},
-        )
-        .conditions(
-            filter_by_player_id.is_none() && filter_by_player_character.is_some(),
-            |q| {
-                let player_character = filter_by_player_character.as_ref().unwrap();
-
-                q.cond_where(
-                    Condition::any()
-                        .add(Expr::col(Logs::P1Type).eq(player_character.clone()))
-                        .add(Expr::col(Logs::P2Type).eq(player_character.clone()))
-                        .add(Expr::col(Logs::P3Type).eq(player_character.clone()))
-                        .add(Expr::col(Logs::P4Type).eq(player_character)),
-                );
-            },
-            |_| {},
-        )
-        .conditions(
-            flagged_only,
-            |q| {
-                q.and_where(flagged_condition());
-            },
-            |_| {},
-        )
-        .build_rusqlite(SqliteQueryBuilder);
-
-    let mut stmt = conn.prepare(&sql).unwrap();
-    let params = values.as_params();
-
-    let row: i32 = stmt.query_row(&*params, |r| r.get(0))?;
-
-    Ok(row)
+    Ok(counts)
 }
 
 #[cfg(test)]
@@ -698,25 +559,39 @@ mod tests {
         logs.iter().map(|log| log.id).collect()
     }
 
+    /// A `LogFilters` borrows its two string filters, so the tests need
+    /// somewhere for an absent one to live.
+    static NO_FILTER: Option<String> = None;
+
+    /// Everything unfiltered but `flagged_only` — what nearly every case below
+    /// wants.
+    fn filters(flagged_only: bool) -> LogFilters<'static> {
+        LogFilters {
+            enemy_id: None,
+            quest_id: None,
+            cleared: None,
+            player_id: &NO_FILTER,
+            player_character: &NO_FILTER,
+            flagged_only,
+        }
+    }
+
     fn fetch(conn: &Connection, flagged_only: bool) -> Vec<LogEntry> {
         get_logs(
             conn,
-            None,
-            None,
+            &filters(flagged_only),
             10,
             0,
             &SortType::Time,
             &SortDirection::Ascending,
-            None,
-            &None,
-            &None,
-            flagged_only,
         )
         .expect("query")
     }
 
     fn count(conn: &Connection, flagged_only: bool) -> i32 {
-        get_logs_count(conn, None, None, None, &None, &None, flagged_only).expect("count")
+        get_counts(conn, &filters(flagged_only))
+            .expect("count")
+            .logs
     }
 
     /// Every listed log has somebody flagged in it — and one flagged player is
@@ -778,22 +653,17 @@ mod tests {
     fn page(conn: &Connection, per_page: u32, offset: u32) -> Vec<LogEntry> {
         get_logs(
             conn,
-            None,
-            None,
+            &filters(false),
             per_page,
             offset,
             &SortType::Time,
             &SortDirection::Ascending,
-            None,
-            &None,
-            &None,
-            false,
         )
         .expect("query")
     }
 
     fn chains(conn: &Connection) -> i32 {
-        get_chains_count(conn, None, None, None, &None, &None, false).expect("count")
+        get_counts(conn, &filters(false)).expect("count").chains
     }
 
     /// A page holds whole chains. Two slots against a 3-run chain and a lone
@@ -872,10 +742,7 @@ mod tests {
     }
 
     fn sorted(conn: &Connection, sort_by: &SortType, direction: &SortDirection) -> Vec<u64> {
-        ids(&get_logs(
-            conn, None, None, 10, 0, sort_by, direction, None, &None, &None, false,
-        )
-        .expect("query"))
+        ids(&get_logs(conn, &filters(false), 10, 0, sort_by, direction).expect("query"))
     }
 
     /// Sorting by in-game time ranks a chain by its FASTEST run, so asking for

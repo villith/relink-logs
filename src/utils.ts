@@ -92,37 +92,57 @@ export const isSupplementaryAction = (actionType: SkillState["actionType"]): boo
  */
 export const isSkillGroup = (
   row: ComputedSkillGroup | ComputedSkillState
-): row is ComputedSkillGroup & { actionType: { Group: string } } =>
+): row is ComputedSkillGroup & { actionType: { Group: string } } => hasGroupAction(row);
+
+/** The group test on its own, over the two fields any hit carries.
+ *
+ * `isSkillGroup` narrows to a full `ComputedSkillGroup`, which is only truthful
+ * for the rows the breakdown builds; callers holding a bare `SkillRow` need the
+ * same shape test without that promise. Both spell it once, here. */
+const hasGroupAction = (row: SkillRow): row is SkillRow & { actionType: { Group: string } } =>
   typeof row.actionType === "object" && Object.hasOwn(row.actionType, "Group");
 
-/** Bodies that swing on a player's behalf but never proc supplementary damage:
- * Ferry's ghosts (Geegee/Beebee/Kikiriki/Nicola) and her Umlauf satellite.
+/** Bodies that swing on a player's behalf but are not the player: Ferry's
+ * ghosts (Geegee/Beebee/Kikiriki/Nicola) and her Umlauf satellite.
  *
  * Named bodies only. A player wearing a different body is still the player —
- * Id's transformation (`Pl2000`) and Cagliostro's clone both proc normally, and
- * the game logs each proc under the body that earned it, which is how these two
- * lists were told apart. */
-const SUP_INELIGIBLE_BODIES: readonly string[] = ["Pl0700Ghost", "Pl0700GhostSatellite"];
+ * Id's transformation (`Pl2000`) and Cagliostro's clone both proc supplementary
+ * damage normally, and the game logs each proc under the body that earned it,
+ * which is how these two lists were told apart. */
+const COMPANION_BODIES: readonly string[] = ["Pl0700Ghost", "Pl0700GhostSatellite"];
+
+/**
+ * Whether a hit came from something fighting alongside the player rather than
+ * from the player's own body: a called summon, a Primal Burst, or one of
+ * Ferry's named pets.
+ *
+ * One question with one answer. The three tests were asked separately at the
+ * one call site that needed them, which left the concept unnamed and gave the
+ * next metric that wants it nothing to call.
+ */
+export const isCompanionHit = (skill: SkillRow): boolean => {
+  if (isSummonHit(skill)) return true;
+  if (hasGroupAction(skill) && skill.actionType.Group === PRIMAL_BURST_GROUP) return true;
+
+  return COMPANION_BODIES.includes(String(skill.childCharacterType));
+};
 
 /**
  * Whether a breakdown row's damage belongs in the Sup% eligible base.
  *
  * Only a player's own Normal skill hits can trigger supplementary damage. Link
- * Attacks, Skybound Arts and damage-over-time cannot, and neither can the bodies
- * that fight alongside them: Ferry's pets and summons deal Normal-typed damage
- * but no proc is ever logged under either, so counting their damage only dilutes
- * the number. (Groups are frontend merges of Normal skills, scoped to the body
- * they came from, so the same two tests apply.)
+ * Attacks, Skybound Arts and damage-over-time cannot, and neither can the
+ * companions: pets and summons deal Normal-typed damage but no proc is ever
+ * logged under either, so counting their damage only dilutes the number.
+ * (Groups are frontend merges of Normal skills, scoped to the body they came
+ * from, so the same two tests apply.)
  */
 export const isSupEligibleRow = (skill: SkillRow): boolean => {
   const { actionType } = skill;
   if (typeof actionType !== "object") return false;
-  if (!Object.hasOwn(actionType, "Normal") && !Object.hasOwn(actionType, "Group")) return false;
+  if (!Object.hasOwn(actionType, "Normal") && !hasGroupAction(skill)) return false;
 
-  if (isSummonHit(skill)) return false;
-  if ((actionType as { Group?: string }).Group === PRIMAL_BURST_GROUP) return false;
-
-  return !SUP_INELIGIBLE_BODIES.includes(String(skill.childCharacterType));
+  return !isCompanionHit(skill);
 };
 
 export type SupPercentages = {
@@ -847,23 +867,30 @@ export const PRIMAL_BURST_CLASSES: readonly string[] = ["5418b8f8", "32776c5b", 
 /** The skill-group key the three bodies condense into. */
 export const PRIMAL_BURST_GROUP = "primal-burst";
 
-/** True for a hit dealt by a called summon: every one of them reports the same
- * shared summon-attack action from an unresolved `So####` body, which is what
- * separates a summon from a player's own alternate body. */
-export const isSummonHit = (skill: SkillRow): boolean => {
-  if (typeof skill.actionType !== "object" || !Object.hasOwn(skill.actionType, "Normal")) return false;
-  if ((skill.actionType as { Normal: number }).Normal !== SUMMON_ATTACK_ACTION_ID) return false;
+/** The body-class hash of a called summon's hit, or null when the hit is not
+ * one: every summon reports the same shared summon-attack action from an
+ * unresolved `So####` body, which is what separates a summon from a player's
+ * own alternate body.
+ *
+ * Answers with the hash rather than a boolean so a caller that needs to know
+ * WHICH summon does not re-run the test to find out. */
+const summonHitBodyHash = (skill: SkillRow): string | null => {
+  if (typeof skill.actionType !== "object" || !Object.hasOwn(skill.actionType, "Normal")) return null;
+  if ((skill.actionType as { Normal: number }).Normal !== SUMMON_ATTACK_ACTION_ID) return null;
 
-  return summonBodyHash(skill.childCharacterType) !== null;
+  return summonBodyHash(skill.childCharacterType);
 };
+
+/** True for a hit dealt by a called summon. */
+export const isSummonHit = (skill: SkillRow): boolean => summonHitBodyHash(skill) !== null;
 
 /** True for a summon hit dealt by one of the Primal Burst bodies. Owns the
  * hash-format detail (lowercase, zero-padded to eight) so callers never
  * re-derive it. */
 export const isPrimalBurstHit = (skill: SkillRow): boolean => {
-  if (!isSummonHit(skill)) return false;
+  const bodyHash = summonHitBodyHash(skill);
 
-  return PRIMAL_BURST_CLASSES.includes(summonBodyHash(skill.childCharacterType)!);
+  return bodyHash !== null && PRIMAL_BURST_CLASSES.includes(bodyHash);
 };
 
 /** The body-class hash of a summon hit, or null when the source is a real

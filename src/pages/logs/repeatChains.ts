@@ -5,7 +5,7 @@
  * chain as a summary row with its runs listed beneath it.
  */
 
-import { hasQuestElapsedTime } from "@/utils";
+import { PLAYER_COLORS, hasQuestElapsedTime } from "@/utils";
 
 type ChainRow = { id: number; repeatGroup?: number | null };
 
@@ -58,7 +58,6 @@ type TimedRow = { id: number; duration: number; questElapsedTime?: number | null
  * has no in-game time to report. Wall-clock duration is always present.
  */
 export type ChainSummary = {
-  runs: number;
   bestDurationMs: number;
   bestQuestElapsedMs: number | null;
   /** The run that set each best, so opening the chain shows WHERE the band's
@@ -80,7 +79,6 @@ export function summarizeChain(runs: TimedRow[]): ChainSummary {
   const bestElapsed = fastest(timed, (run) => run.questElapsedTime as number);
 
   return {
-    runs: runs.length,
     bestDurationMs: bestDuration?.duration ?? 0,
     // Null, not zero: a chain where nothing reported an in-game time has no
     // best, and 00:00 would read as a clear nobody could have run.
@@ -97,4 +95,27 @@ export function summarizeChain(runs: TimedRow[]): ChainSummary {
  * is the leading row the latest one. */
 export function chainLatestTime(runs: { time: number }[]): number | null {
   return runs.length === 0 ? null : Math.max(...runs.map((run) => run.time));
+}
+
+/** A colour per chain, cycled through the party palette — two chains of the
+ * same quest, back to back, are otherwise told apart only by where one block of
+ * identical rows stops and the next begins.
+ *
+ * Positions are counted over CHAINS, so the unchained logs between them do not
+ * advance the palette: letting them would make the sequence look arbitrary and
+ * could land neighbouring chains on the same hue. The same categorical rule
+ * `statusRowColors` follows next door, kept here so it is testable rather than
+ * buried in the page component.
+ *
+ * The palette is shared with player rows for its hues alone — no chain means a
+ * player, and the meter's per-player colour overrides do not reach here. */
+export function chainColors<T extends ChainRow>(groups: RepeatChainGroup<T>[]): Map<number, string> {
+  const colors = new Map<number, string>();
+  let position = 0;
+  for (const group of groups) {
+    if (group.rest.length === 0) continue;
+    colors.set(chainKey(group.leader), PLAYER_COLORS[position % PLAYER_COLORS.length]);
+    position += 1;
+  }
+  return colors;
 }

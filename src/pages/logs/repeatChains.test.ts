@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import { chainKey, chainLatestTime, groupRepeatChains, summarizeChain } from "./repeatChains";
+import { PLAYER_COLORS } from "@/utils";
+
+import { chainColors, chainKey, chainLatestTime, groupRepeatChains, summarizeChain } from "./repeatChains";
 
 type Row = { id: number; repeatGroup?: number | null };
 
@@ -68,7 +70,6 @@ describe("summarizeChain", () => {
   it("reports the fastest run's times", () => {
     const summary = summarizeChain([run(1, 120_000, 100), run(2, 60_000, 50), run(3, 90_000, 75)]);
 
-    expect(summary.runs).toBe(3);
     expect(summary.bestDurationMs).toBe(60_000);
     // Seconds on the log, milliseconds out.
     expect(summary.bestQuestElapsedMs).toBe(50_000);
@@ -137,5 +138,32 @@ describe("chainKey", () => {
     expect(chainKey(row(9, 7))).toBe(7);
     expect(chainKey(row(7))).toBe(7);
     expect(chainKey(row(5, null))).toBe(5);
+  });
+});
+
+describe("chainColors", () => {
+  it("colours only the chains, and gives neighbouring ones different hues", () => {
+    // A lone log between two chains: it takes no colour, and — the point of
+    // counting positions over chains rather than groups — it does not advance
+    // the palette either, so the two chains still differ.
+    const groups = groupRepeatChains([row(9, 7), row(7), row(5), row(4, 2), row(2)]);
+    const colors = chainColors(groups);
+
+    expect(colors.get(5)).toBeUndefined();
+    expect(colors.get(7)).toBe(PLAYER_COLORS[0]);
+    expect(colors.get(2)).toBe(PLAYER_COLORS[1]);
+  });
+
+  it("wraps back to the start once the palette runs out", () => {
+    // One chain per palette slot, plus one more.
+    const rows = Array.from({ length: PLAYER_COLORS.length + 1 }, (_, chain) => [
+      row(chain * 2 + 2, chain * 2 + 1),
+      row(chain * 2 + 1),
+    ]).flat();
+    const colors = chainColors(groupRepeatChains(rows));
+
+    expect(colors.size).toBe(PLAYER_COLORS.length + 1);
+    expect(colors.get(1)).toBe(PLAYER_COLORS[0]);
+    expect(colors.get(PLAYER_COLORS.length * 2 + 1)).toBe(PLAYER_COLORS[0]);
   });
 });

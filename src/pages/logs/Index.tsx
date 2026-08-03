@@ -3,7 +3,6 @@ import { FilterState } from "@/stores/useLogIndexStore";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { Log, LogSortType, SortDirection, StoredLegalityFinding } from "@/types";
 import {
-  PLAYER_COLORS,
   epochToLocalTime,
   hasQuestElapsedTime,
   millisecondsToElapsedFormat,
@@ -34,7 +33,14 @@ import { Link } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 import "./logsTable.css";
 import { PartyMember, partyMembers } from "./partyMembers";
-import { chainKey, chainLatestTime, groupRepeatChains, summarizeChain } from "./repeatChains";
+import {
+  ChainSummary,
+  chainColors,
+  chainKey,
+  chainLatestTime,
+  groupRepeatChains,
+  summarizeChain,
+} from "./repeatChains";
 import useIndex from "./useIndex";
 
 export const IndexPage = () => {
@@ -72,62 +78,66 @@ export const IndexPage = () => {
 
   const chainGroups = useMemo(() => groupRepeatChains(searchResult.logs), [searchResult.logs]);
 
-  // A colour per chain, cycled through the party palette exactly as player rows
-  // are — two chains of the same quest, back to back, are otherwise told apart
-  // only by where one block of identical rows stops and the next begins.
-  //
-  // Counted over CHAINS, not over groups: advancing the colour on every
-  // unchained log between them would make the sequence look arbitrary and let
-  // neighbouring chains land on the same hue.
-  const chainColors = useMemo(() => {
-    const colors = new Map<number, string>();
-    let position = 0;
-    for (const group of chainGroups) {
-      if (group.rest.length === 0) continue;
-      colors.set(chainKey(group.leader), PLAYER_COLORS[position % PLAYER_COLORS.length]);
-      position += 1;
-    }
-    return colors;
+  // Everything about a chain that does not depend on what is selected or open,
+  // derived once per page. `runs` in particular: rebuilt inline it was a fresh
+  // array on every render, which is what made the summary memos downstream miss
+  // every time and recompute anyway.
+  const chains = useMemo(() => {
+    const colors = chainColors(chainGroups);
+    return chainGroups.map((group) => {
+      const runs = [group.leader, ...group.rest];
+      const chained = group.rest.length > 0;
+
+      return {
+        key: chainKey(group.leader),
+        leader: group.leader,
+        runs,
+        chained,
+        color: colors.get(chainKey(group.leader)),
+        // Only within a chain: a lone log is trivially its own best, and
+        // marking every unchained row would make the accent mean nothing.
+        summary: chained ? summarizeChain(runs) : null,
+        latest: chained ? chainLatestTime(runs) : null,
+      };
+    });
   }, [chainGroups]);
 
-  const rows = chainGroups.flatMap((group) => {
-    const key = chainKey(group.leader);
-    const chained = group.rest.length > 0;
-    const collapsed = !expandedChains.includes(key);
-    const runs = [group.leader, ...group.rest];
-    const visible = !chained || !collapsed ? runs : [];
-    // Only within a chain: a lone log is trivially its own best, and colouring
-    // every unchained row would make the mark mean nothing.
-    const best = chained ? summarizeChain(runs) : null;
+  // Membership answered in one step per row rather than a scan of the selection
+  // per row — with "select all on page" ticked, every chain was rescanning the
+  // whole page for each of its runs.
+  const selectedIds = useMemo(() => new Set(selectedLogIds), [selectedLogIds]);
+
+  const rows = chains.flatMap(({ key, leader, runs, chained, color, summary, latest }) => {
+    const expanded = expandedChains.includes(key);
+    const visible = chained && !expanded ? [] : runs;
 
     // A summary standing for the whole chain, rather than promoting one run to
     // speak for the others: the runs below it are its detail, and the figures
     // here are about the set.
-    const chainColor = chainColors.get(key);
-
-    const summaryRow = chained ? (
-      <ChainSummaryRow
-        key={`chain-${key}`}
-        runs={runs}
-        chainColor={chainColor}
-        collapsed={collapsed}
-        onToggle={() => toggleChain(key)}
-        selectedLogIds={selectedLogIds}
-        setSelectedLogIds={setSelectedLogIds}
-        questLabel={translateQuestId(group.leader.questId)}
-        primaryTarget={translateEnemyType(group.leader.primaryTarget)}
-        members={partyMembers(group.leader, {
-          showDisplayNames: show_display_names,
-          streamerMode: streamer_mode,
-          t,
-        })}
-      />
-    ) : null;
+    const summaryRow =
+      summary === null ? null : (
+        <ChainSummaryRow
+          key={`chain-${key}`}
+          runs={runs}
+          summary={summary}
+          latest={latest}
+          chainColor={color}
+          expanded={expanded}
+          onToggle={() => toggleChain(key)}
+          selectedIds={selectedIds}
+          selectedLogIds={selectedLogIds}
+          setSelectedLogIds={setSelectedLogIds}
+          questLabel={translateQuestId(leader.questId)}
+          primaryTarget={translateEnemyType(leader.primaryTarget)}
+          members={partyMembers(leader, {
+            showDisplayNames: show_display_names,
+            streamerMode: streamer_mode,
+            t,
+          })}
+        />
+      );
 
     const runRows = visible.map((log) => {
-      const primaryTarget = translateEnemyType(log.primaryTarget);
-      const members = partyMembers(log, { showDisplayNames: show_display_names, streamerMode: streamer_mode, t });
-
       const resetSelectedTargets = () => {
         setSelectedTargetSpans([]);
       };
@@ -138,22 +148,27 @@ export const IndexPage = () => {
           log={log}
           selectedLogIds={selectedLogIds}
           setSelectedLogIds={setSelectedLogIds}
-          primaryTarget={primaryTarget}
-          members={members}
+          // A run inside a chain leaves these to the band above it, so they are
+          // resolved only for the rows that draw them — `partyMembers` alone is
+          // four i18next lookups a chained row would throw away.
+          primaryTarget={chained ? "" : translateEnemyType(log.primaryTarget)}
+          members={
+            chained ? [] : partyMembers(log, { showDisplayNames: show_display_names, streamerMode: streamer_mode, t })
+          }
           // Only when the user has asked to see verdicts at all. Withheld here
           // rather than at the mark, so the row cannot colour what it was never
           // given.
           findings={show_flagged_builds ? searchResult.legality?.[log.id] : undefined}
           resetSelectedTargets={resetSelectedTargets}
           chained={chained}
-          chainColor={chainColor}
-          bestDuration={best?.bestDurationId === log.id}
-          bestQuestElapsed={best?.bestQuestElapsedId === log.id}
+          chainColor={color}
+          bestDuration={summary?.bestDurationId === log.id}
+          bestQuestElapsed={summary?.bestQuestElapsedId === log.id}
         />
       );
     });
 
-    return summaryRow ? [summaryRow, ...runRows] : runRows;
+    return [summaryRow, ...runRows];
   });
 
   return (
@@ -252,7 +267,6 @@ export const IndexPage = () => {
             </Table.Thead>
             <Table.Tbody>{rows}</Table.Tbody>
           </Table>
-          <Divider my="sm" />
         </Box>
       )}
     </Box>
@@ -333,9 +347,12 @@ const chainSpineStyle = (chainColor?: string): React.CSSProperties | undefined =
  */
 function ChainSummaryRow({
   runs,
+  summary,
+  latest,
   chainColor,
-  collapsed,
+  expanded,
   onToggle,
+  selectedIds,
   selectedLogIds,
   setSelectedLogIds,
   questLabel,
@@ -343,10 +360,16 @@ function ChainSummaryRow({
   members,
 }: {
   runs: Log[];
+  /** Computed by the page, which needs the same figures to mark the run that
+   * set each best — one derivation, so the band and the accent cannot disagree
+   * about which run that is. */
+  summary: ChainSummary;
+  latest: number | null;
   /** This chain's colour from the party palette, drawn down its spine. */
   chainColor?: string;
-  collapsed: boolean;
+  expanded: boolean;
   onToggle: () => void;
+  selectedIds: Set<number>;
   selectedLogIds: number[];
   setSelectedLogIds: (ids: number[]) => void;
   questLabel: string;
@@ -354,11 +377,9 @@ function ChainSummaryRow({
   members: PartyMember[];
 }): JSX.Element {
   const { t } = useTranslation();
-  const summary = useMemo(() => summarizeChain(runs), [runs]);
-  const latest = useMemo(() => chainLatestTime(runs), [runs]);
 
   const ids = runs.map((run) => run.id);
-  const selected = ids.filter((id) => selectedLogIds.includes(id)).length;
+  const selected = ids.filter((id) => selectedIds.has(id)).length;
   const allSelected = selected === ids.length;
 
   // One tick selects the whole session — a chain is usually kept or deleted as
@@ -431,10 +452,10 @@ function ChainSummaryRow({
               onToggle();
             }}
             aria-label={t("ui.logs.repeat-chain-toggle", { count: runs.length })}
-            aria-expanded={!collapsed}
+            aria-expanded={expanded}
             className="logs-chain-toggle"
           >
-            {collapsed ? <CaretLeft size={16} weight="bold" /> : <CaretDown size={16} weight="bold" />}
+            {expanded ? <CaretDown size={16} weight="bold" /> : <CaretLeft size={16} weight="bold" />}
           </UnstyledButton>
         </Group>
       </Table.Td>
@@ -479,11 +500,7 @@ function LogEntry({
   const { t } = useTranslation();
 
   return (
-    <Table.Tr
-      key={log.id}
-      className={chained ? "logs-chain-run" : undefined}
-      style={chained ? chainSpineStyle(chainColor) : undefined}
-    >
+    <Table.Tr key={log.id} className={chained ? "logs-chain-run" : undefined} style={chainSpineStyle(chainColor)}>
       <Table.Td>
         <Checkbox
           aria-label="Select row"
