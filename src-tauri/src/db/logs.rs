@@ -434,7 +434,7 @@ pub fn get_logs(
         )
         .build_rusqlite(SqliteQueryBuilder);
 
-    let mut stmt = conn.prepare(&sql).unwrap();
+    let mut stmt = conn.prepare(&sql)?;
     let params = values.as_params();
 
     let rows = stmt
@@ -464,7 +464,11 @@ pub fn get_logs(
         })
         .collect::<rusqlite::Result<Vec<LogEntry>>>();
 
-    let mut rows = rows.unwrap_or_default();
+    // Raised, not swallowed. An empty page is indistinguishable from a page
+    // whose filters matched nothing, so a decode failure here used to read as
+    // "no such logs" while the pager — sized by `get_counts`, which does raise
+    // — went on offering the pages it drew from.
+    let mut rows = rows?;
 
     // Put the chains back in the order the page query chose — by their most
     // recent run — and keep each chain's runs together. The row query can only

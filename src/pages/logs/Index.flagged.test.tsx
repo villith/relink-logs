@@ -164,6 +164,42 @@ describe("the quest list's flagged players", () => {
     expect(screen.getByRole("row", { name: /Manmoth/ })).toBeTruthy();
   });
 
+  /** A Repeat Quest chain draws its party once, on the band; the runs beneath
+   * it leave that column to it and start collapsed. So the band has to carry
+   * the verdicts of every run under it — read off the leader alone, a build
+   * flagged on the third run of a farming session would be marked nowhere at
+   * all, including for somebody who filtered the list down to flagged runs. */
+  it("marks a build flagged on a later run of a collapsed chain", () => {
+    const leader = { ...log(), id: 42, repeatGroup: null } as Log;
+    const laterRun = { ...log(), id: 43, time: 2, repeatGroup: 42 } as Log;
+    const searchResult = {
+      logs: [leader, laterRun],
+      page: 1,
+      pageCount: 1,
+      logCount: 2,
+      enemyIds: [],
+      questIds: [],
+      playerIds: [],
+      playerTypes: [],
+      // Only the later run was flagged, and it is the one the collapsed chain
+      // does not draw.
+      legality: { 43: [findingAgainstSlotOne()] } as Record<string, StoredLegalityFinding[]>,
+    };
+
+    useLogIndexStore.setState({ searchResult });
+    invoke.mockResolvedValue(searchResult);
+
+    const { container } = render(
+      <MantineProvider>
+        <MemoryRouter>
+          <IndexPage />
+        </MemoryRouter>
+      </MantineProvider>
+    );
+
+    expect(markedNames(container)).toEqual(["char:Pl1300 (Manmoth)"]);
+  });
+
   it("offers the flagged filter only while flagged builds are shown", () => {
     useLogIndexStore.setState({ filters: { ...useLogIndexStore.getState().filters, showAdvancedFilters: true } });
 

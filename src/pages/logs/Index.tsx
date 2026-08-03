@@ -134,6 +134,11 @@ export const IndexPage = () => {
             streamerMode: streamer_mode,
             t,
           })}
+          // The band draws the chain's party, so it has to carry the chain's
+          // verdicts too — the runs beneath it no longer draw names, and a
+          // flagged build in a collapsed chain would otherwise be invisible
+          // even to somebody who filtered the list down to it.
+          findings={show_flagged_builds ? mergeChainFindings(runs, searchResult.legality) : undefined}
         />
       );
 
@@ -335,6 +340,26 @@ function PartyNames({ members, findings }: { members: PartyMember[]; findings?: 
 const chainSpineStyle = (chainColor?: string): React.CSSProperties | undefined =>
   chainColor === undefined ? undefined : ({ "--logs-chain-color": chainColor } as React.CSSProperties);
 
+/** Every verdict recorded against a chain, as one set.
+ *
+ * A Repeat Quest chain is one party playing the same quest over, so a build
+ * flagged in any of its runs is flagged for the chain — and the band is the
+ * only row that draws the names, so it is the only place the mark can land.
+ * Identical findings collapse: repeated across a dozen runs they would print
+ * the same accusation a dozen times in one tooltip. */
+function mergeChainFindings(
+  runs: Log[],
+  legality: Record<string, StoredLegalityFinding[]> | undefined
+): StoredLegalityFinding[] {
+  const unique = new Map<string, StoredLegalityFinding>();
+  for (const run of runs) {
+    for (const stored of legality?.[run.id] ?? []) {
+      unique.set(JSON.stringify(stored), stored);
+    }
+  }
+  return [...unique.values()];
+}
+
 /** The row a Repeat Quest chain is drawn as: what the set of runs beneath it
  * amounts to, not one of the runs standing in for the rest.
  *
@@ -358,6 +383,7 @@ function ChainSummaryRow({
   questLabel,
   primaryTarget,
   members,
+  findings,
 }: {
   runs: Log[];
   /** Computed by the page, which needs the same figures to mark the run that
@@ -375,6 +401,10 @@ function ChainSummaryRow({
   questLabel: string;
   primaryTarget: string;
   members: PartyMember[];
+  /** Every verdict recorded against the chain's runs, or nothing when the user
+   * has asked not to see them. The runs beneath this row draw no names, so
+   * this is the only place a flagged build in a chain can be marked. */
+  findings?: StoredLegalityFinding[];
 }): JSX.Element {
   const { t } = useTranslation();
 
@@ -395,8 +425,10 @@ function ChainSummaryRow({
   // real run's time is the one figure that can sit in a column beside the
   // standalone runs without misleading. Carried in the same accent the run that
   // set it wears, so opening the chain shows the two are the same number.
+  // Only a real figure wears the accent: a chain nothing reported a time for
+  // draws a "-", and in bold cyan that dash reads as the record it is not.
   const bestCell = (bestMs: number | null) => (
-    <Text size="xs" className="logs-num logs-chain-best">
+    <Text size="xs" className={`logs-num${bestMs === null ? "" : " logs-chain-best"}`}>
       {bestMs === null ? "-" : millisecondsToElapsedFormat(bestMs)}
     </Text>
   );
@@ -434,7 +466,7 @@ function ChainSummaryRow({
       <Table.Td>{bestCell(summary.bestDurationMs)}</Table.Td>
       <Table.Td>{bestCell(summary.bestQuestElapsedMs)}</Table.Td>
       <Table.Td>
-        <PartyNames members={members} />
+        <PartyNames members={members} findings={findings} />
       </Table.Td>
       {/* The toggle sits in the actions column, among the View buttons of the
           runs it opens — it is the band's action, and the one control on this
