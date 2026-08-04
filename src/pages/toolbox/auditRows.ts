@@ -22,7 +22,7 @@
  */
 
 import { CharacterType, LegalityFinding, LegalityFlaggedPlayer } from "@/types";
-import { VIOLATIONS, Violation, violationOf } from "@/violations";
+import { LegalityTone, VIOLATIONS, Violation, findingsTone, toneOfViolations, violationOf } from "@/violations";
 
 /** One person, as the rail lists them. */
 export type AuditRow = {
@@ -30,6 +30,9 @@ export type AuditRow = {
   displayName: string;
   characterType: CharacterType;
   lastSeen: number;
+  /** How everything against them reads together — "lucky" draws their name
+   * gold, so a farmer is never listed looking like the cheats around them. */
+  tone: LegalityTone | undefined;
 };
 
 /** One flagged fight, as a row of the case's table of contents. */
@@ -74,6 +77,8 @@ export type AuditEvidence = {
  */
 export type AuditCase = {
   violations: Violation[];
+  /** The case's tone as a whole, matching the rail's read of the same person. */
+  tone: LegalityTone | undefined;
   evidence: AuditEvidence[];
   fights: AuditFight[];
   /** Distinct logs the evidence needs, newest fight first. */
@@ -115,6 +120,7 @@ export const auditRows = (players: LegalityFlaggedPlayer[]): AuditRow[] =>
     displayName: player.displayName,
     characterType: player.characterType,
     lastSeen: player.lastSeen,
+    tone: findingsTone(player.findings.map((row) => row.finding)),
   }));
 
 /** What makes a finding distinct: the same rule against the same slot is the
@@ -159,8 +165,11 @@ export const caseFor = (player: LegalityFlaggedPlayer): AuditCase => {
     (a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0)
   );
 
+  const violations = violationsIn(evidence.map((row) => row.finding));
+
   return {
-    violations: violationsIn(evidence.map((row) => row.finding)),
+    violations,
+    tone: toneOfViolations(violations),
     evidence,
     fights,
     evidenceLogIds,

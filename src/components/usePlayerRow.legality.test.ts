@@ -14,15 +14,24 @@ const finding = (): LegalityFinding => ({
   odds: null,
 });
 
-/** A long-odds report rather than a hard breach. It must colour EXACTLY as the
- * breach does: the meter has no room to explain the difference, and a second
- * colour a reader cannot interpret is just a second kind of accusation. */
-const longOdds = (): LegalityFinding => ({
+/** A full set of perfect summons — the one finding that reads as luck rather
+ * than cheating, and so colours gold instead of red. */
+const perfectSummons = (): LegalityFinding => ({
   rule: "summonPerfectCount",
   subject: { kind: "summons" },
   observed: { kind: "count", value: 3 },
   allowed: { kind: "none" },
   odds: 4.7e-7,
+});
+
+/** The OTHER long-odds report. It stays red: only perfect summons earns the
+ * gold, and a second unexplained colour would be a second kind of accusation. */
+const perfectOvermasteries = (): LegalityFinding => ({
+  rule: "overmasteryAllMaxed",
+  subject: { kind: "overmasteries" },
+  observed: { kind: "count", value: 4 },
+  allowed: { kind: "none" },
+  odds: 1.2e-5,
 });
 
 /** Enough of a player for the hook; the row's damage columns are not under
@@ -48,8 +57,22 @@ describe("usePlayerRow legality colour", () => {
     expect(render([[finding()], [], [], []]).current.legalityColor).toBe("red");
   });
 
-  it("colours a long-odds report exactly as it colours a hard breach", () => {
-    expect(render([[longOdds()], [], [], []]).current.legalityColor).toBe("red");
+  /** "Blessed by RNG": a player whose ONLY finding is a full set of perfect
+   * summons is a farmer, and their name says so in gold rather than red. */
+  it("colours a purely lucky player gold", () => {
+    expect(render([[perfectSummons()], [], [], []]).current.legalityColor).toBe("yellow");
+  });
+
+  /** Luck does not launder a modded build: one real breach beside the perfect
+   * summons and the row is red like any other cheat. */
+  it("colours a lucky player red once a real breach joins", () => {
+    expect(render([[perfectSummons(), finding()], [], [], []]).current.legalityColor).toBe("red");
+  });
+
+  /** Only perfect summons earns the gold; all-maxed overmasteries is a ladder a
+   * few rerolls can walk, and stays a cheat read. */
+  it("colours the other long-odds report red", () => {
+    expect(render([[perfectOvermasteries()], [], [], []]).current.legalityColor).toBe("red");
   });
 
   it("leaves a clean player uncoloured", () => {

@@ -5,6 +5,12 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.9
+
+### Notes
+
+- The Perfect Summon rule is no longer classified as a "cheat". Instead, players with Perfect Summons will be displayed in **gold** color because they are extremely lucky ✨
+
 ## 1.12.8
 
 ### Notes

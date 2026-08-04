@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import ui from "../src-tauri/lang/en/ui.json";
 import { LegalityRule } from "./types";
-import { VIOLATIONS, Violation, violationLabel, violationOf } from "./violations";
+import {
+  VIOLATIONS,
+  Violation,
+  findingsTone,
+  toneOfViolations,
+  violationLabel,
+  violationOf,
+  violationTone,
+} from "./violations";
 
 const render = (key: string): string => {
   const path = key.replace(/^ui\./, "").split(".");
@@ -64,8 +72,53 @@ describe("violationLabel", () => {
 
   it("names them the way the reader would say them", () => {
     expect(violationLabel(t, "impossibleSigil")).toBe("Impossible Sigil");
-    expect(violationLabel(t, "perfectSummons")).toBe("Perfect Summons");
     expect(violationLabel(t, "masterTraits")).toBe("Master Traits");
+  });
+
+  /** Not "Perfect Summons": that name filed a farmer's luck under cheating,
+   * which is the complaint that renamed it. The label is a compliment. */
+  it("names perfect summons as luck, not as a cheat", () => {
+    expect(violationLabel(t, "perfectSummons")).toBe("Blessed by RNG");
+  });
+});
+
+describe("violationTone", () => {
+  it("reads perfect summons as luck", () => {
+    expect(violationTone("perfectSummons")).toBe("lucky");
+  });
+
+  /** Everything else stays a cheat read — including perfect overmasteries,
+   * whose ladder a few rerolls can walk. */
+  it("reads every other violation as cheating", () => {
+    for (const violation of VIOLATIONS.filter((v) => v !== "perfectSummons")) {
+      expect(violationTone(violation)).toBe("cheat");
+    }
+  });
+});
+
+describe("toneOfViolations", () => {
+  it("is lucky only when luck is ALL there is", () => {
+    expect(toneOfViolations(["perfectSummons"])).toBe("lucky");
+  });
+
+  /** One real breach turns the whole set red: luck does not launder a modded
+   * sigil. */
+  it("is a cheat as soon as anything else joins", () => {
+    expect(toneOfViolations(["impossibleSigil", "perfectSummons"])).toBe("cheat");
+  });
+
+  /** An empty set is "not judged", which has no colour — never "clean", and
+   * never lucky. */
+  it("has no tone for an empty set", () => {
+    expect(toneOfViolations([])).toBeUndefined();
+  });
+});
+
+describe("findingsTone", () => {
+  it("reads tone through the rules that computed the findings", () => {
+    expect(findingsTone([{ rule: "summonPerfectCount" }])).toBe("lucky");
+    expect(findingsTone([{ rule: "summonPerfectCount" }, { rule: "sigilTraitLevel" }])).toBe("cheat");
+    expect(findingsTone([])).toBeUndefined();
   });
 });
 

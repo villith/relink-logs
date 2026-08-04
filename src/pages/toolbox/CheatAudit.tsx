@@ -26,7 +26,7 @@ import { Link } from "react-router-dom";
 
 import { LegalityFlaggedPlayer, LegalitySweepProgress } from "@/types";
 import { epochToLocalTime, translateCharacterType, translateQuestId } from "@/utils";
-import { Violation, violationLabel } from "@/violations";
+import { TONE_COLOR, Violation, violationLabel, violationTone } from "@/violations";
 
 import { FindingDetail } from "@/components/FindingDetail";
 import { AuditFilters, DEFAULT_FILTERS, applyFilters, auditRows, caseFor, playerKey } from "./auditRows";
@@ -50,15 +50,17 @@ const PAGE_HEIGHT = "calc(100vh - var(--app-shell-header-height, 50px) - var(--m
 
 /** A violation, named.
  *
- * One colour for all of them. There used to be two — red for proof, yellow for
- * long odds — but "Impossible" and "Improbable" are adjectives a reader has to
- * decode, and the claim itself does that job better: `max 20` reads as
- * impossible, `1 in 950 rolls` reads as luck. */
+ * Red for every cheat — the old red/yellow split graded HOW damning the same
+ * accusation was, which a reader has to decode, and the claim itself does that
+ * job better: `max 20` reads as impossible. Gold is not that split come back:
+ * it marks the one violation that is not an accusation at all ("Blessed by
+ * RNG"), and it keeps the colour beside every player it applies to, cheat or
+ * not. */
 const ViolationChip = ({ violation }: { violation: Violation }) => {
   const { t } = useTranslation();
 
   return (
-    <Badge size="sm" variant="light" color="red" style={{ textTransform: "none" }}>
+    <Badge size="sm" variant="light" color={TONE_COLOR[violationTone(violation)]} style={{ textTransform: "none" }}>
       {violationLabel(t, violation)}
     </Badge>
   );
@@ -263,13 +265,23 @@ const CheatAuditPage = () => {
                     onClick={() => setSelected(row.key)}
                     p={6}
                     style={{
-                      borderLeft: `2px solid ${row.key === selected ? "var(--mantine-color-red-6)" : "transparent"}`,
+                      // The selection bar takes the row's tone: a gold name
+                      // picked out by a red bar would re-accuse the person the
+                      // colour just cleared.
+                      borderLeft: `2px solid ${
+                        row.key === selected
+                          ? `var(--mantine-color-${TONE_COLOR[row.tone ?? "cheat"]}-6)`
+                          : "transparent"
+                      }`,
                       backgroundColor: row.key === selected ? "var(--mantine-color-dark-6)" : undefined,
                       borderRadius: 2,
                     }}
                   >
+                    {/* Gold in the rail too: a page titled "Cheat Audit" listing
+                        a farmer beside the mods is the complaint that created
+                        the tone in the first place. */}
                     {/* eslint-disable-next-line i18next/no-literal-string -- player-entered name */}
-                    <Text size="sm" fw={600} truncate>
+                    <Text size="sm" fw={600} truncate c={row.tone === "lucky" ? TONE_COLOR.lucky : undefined}>
                       {row.displayName || t("ui:characters.ai")}
                     </Text>
                     {/* eslint-disable-next-line i18next/no-literal-string -- already-translated character name */}
@@ -298,7 +310,7 @@ const CheatAuditPage = () => {
                   is reading evidence about never scrolls away from it. */}
               <Box mb={4}>
                 {/* eslint-disable-next-line i18next/no-literal-string -- player-entered name */}
-                <Text size="lg" fw={700}>
+                <Text size="lg" fw={700} c={found.tone === "lucky" ? TONE_COLOR.lucky : undefined}>
                   {player.displayName || t("ui:characters.ai")}
                 </Text>
                 {/* eslint-disable-next-line i18next/no-literal-string -- already-translated character name */}
