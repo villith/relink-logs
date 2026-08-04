@@ -2,9 +2,27 @@ import { describe, expect, it } from "vitest";
 
 import type { ComputedPlayerState, EnemyType } from "@/types";
 
-import type { MetricRow } from "../metrics/types";
+import type { MetricCard, MetricRow } from "../metrics/types";
 
 import { cardSectionsFor } from "./cardSections";
+
+/** What the damage tab measures. Spelled here rather than imported from the
+ * descriptor so a change of heart there shows up as a failing expectation
+ * instead of silently redefining what these cases assert. */
+const DAMAGE_CARD: MetricCard = {
+  amountKey: "ui.meter-columns.damage",
+  valueOf: (s) => s.totalDamage,
+  format: String,
+  perTarget: true,
+};
+
+/** The stun tab: a different figure, and no per-enemy record to break down. */
+const STUN_CARD: MetricCard = {
+  amountKey: "ui.skill-columns.stun",
+  valueOf: (s) => s.totalStunValue,
+  format: String,
+  perTarget: false,
+};
 
 const skill = (action: number, damage: number, hits: number) => ({
   actionType: { Normal: action },
@@ -13,7 +31,9 @@ const skill = (action: number, damage: number, hits: number) => ({
   minDamage: 10,
   maxDamage: 90,
   totalDamage: damage,
-  totalStunValue: 0,
+  // Deliberately NOT proportional to damage: a card reading the wrong field
+  // would otherwise still produce plausible-looking ordering.
+  totalStunValue: damage / 10,
   maxStunValue: 0,
   cappedHits: 0,
   cappableHits: 0,
@@ -80,6 +100,7 @@ const call = (level: "players" | "abilities" | "skills", key: string) =>
     pins: { source: 0, targets: [], ability: null },
     color: "rgb(1,2,3)",
     labels: LABELS,
+    card: DAMAGE_CARD,
   });
 
 const callWith = (
@@ -95,6 +116,7 @@ const callWith = (
     pins,
     color: "rgb(1,2,3)",
     labels: LABELS,
+    card: DAMAGE_CARD,
   });
 
 describe("cardSectionsFor", () => {
@@ -130,6 +152,7 @@ describe("cardSectionsFor", () => {
       pins: { source: 0, targets: [], ability: null },
       color: "rgb(1,2,3)",
       labels: LABELS,
+      card: DAMAGE_CARD,
     });
 
     const abilities = sections?.[0].entries ?? [];
@@ -156,6 +179,7 @@ describe("cardSectionsFor", () => {
           return `ability:${key}`;
         },
       },
+      card: DAMAGE_CARD,
     });
 
     expect(sections?.[0].entries.length).toBeGreaterThan(0);
@@ -200,6 +224,7 @@ describe("cardSectionsFor", () => {
       pins: { source: 0, targets: [], ability: null },
       color: "rgb(1,2,3)",
       labels: LABELS,
+      card: DAMAGE_CARD,
     });
 
     expect(sections?.[1].entries.map((e) => e.value)).toEqual([20, 10]);
@@ -234,6 +259,7 @@ describe("cardSectionsFor", () => {
       pins: { source: 0, targets: [], ability: null },
       color: "rgb(1,2,3)",
       labels: LABELS,
+      card: DAMAGE_CARD,
     });
 
     // Targets merge across both, so the section totals the ability's damage.
@@ -304,5 +330,55 @@ describe("cardSectionsFor at the skills level", () => {
 
   it("returns null for a row no player's breakdown holds", () => {
     expect(callWith("skills", "skill:Normal:404", ABILITY_ONLY)).toBeNull();
+  });
+});
+
+describe("the card follows the metric", () => {
+  // The card read `SkillState.totalDamage` whatever the tab, so a stun bar's
+  // tooltip explained it with damage figures under a "DMG" heading.
+  const stun = (level: "players" | "abilities" | "skills", key: string, players = PLAYERS) =>
+    cardSectionsFor({
+      row: row(key),
+      level,
+      players,
+      pins: { source: 0, targets: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: LABELS,
+      card: STUN_CARD,
+    });
+
+  it("reads the metric's own figure off each breakdown row", () => {
+    // The fixture's stun is damage/10, so reading the wrong field is a factor
+    // of ten out rather than a plausible-looking reordering.
+    const sections = stun("players", "player:0");
+    expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([20, 10]);
+  });
+
+  it("omits the by-target section where the metric has no per-enemy record", () => {
+    // SkillTargetState carries damage and hits only. A "Target" section here
+    // could only be filled from the damage figures — the original defect, one
+    // level down — and an empty one would suggest the ability hit nothing.
+    expect(stun("players", "player:0")?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-ability"]);
+  });
+
+  it("gives an ability row no card at all when by-target is its only section", () => {
+    // The abilities level offers targets and nothing else, so a metric with no
+    // per-enemy record has nothing to say there.
+    expect(stun("abilities", "skill:Normal:9001")).toBeNull();
+  });
+
+  it("keeps the source section on a member skill, measured in the metric", () => {
+    const sections = cardSectionsFor({
+      row: row("skill:Normal:9001"),
+      level: "skills",
+      players: PARTY,
+      pins: { source: null, targets: [], ability: "Normal:9001" },
+      color: "rgb(1,2,3)",
+      labels: LABELS,
+      card: STUN_CARD,
+    });
+
+    expect(sections?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-source"]);
+    expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([20, 5]);
   });
 });

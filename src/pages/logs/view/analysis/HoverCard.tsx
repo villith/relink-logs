@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 
 import { rafThrottle } from "@/components/rafThrottle";
-import { humanizeNumbers, share } from "@/utils";
+import { share } from "@/utils";
 
 import "./analysis.css";
 
@@ -30,11 +30,22 @@ export type CardSection = {
   entries: BreakdownEntry[];
 };
 
-export type HoverCardBodyProps = {
-  sections: CardSection[];
+/** How a card writes its figures, and what it calls them.
+ *
+ * Per card rather than per section: every section of one card measures the
+ * same thing, and the heading said "DMG" over stun figures for as long as it
+ * was hard-coded here. Supplied by the active metric — see `MetricCard`. */
+export type CardAmount = {
+  /** i18next key for the amount column. */
+  amountKey: string;
+  format: (value: number) => string;
 };
 
-const Section = ({ headingKey, color, entries }: CardSection) => {
+export type HoverCardBodyProps = {
+  sections: CardSection[];
+} & CardAmount;
+
+const Section = ({ headingKey, color, entries, amountKey, format }: CardSection & CardAmount) => {
   const { t } = useTranslation();
   if (entries.length === 0) return null;
 
@@ -52,14 +63,13 @@ const Section = ({ headingKey, color, entries }: CardSection) => {
         {/* Amount then share, matching the table above it: the amount is what
             the row is about and the share qualifies it. */}
         <Text className="analysis-label" style={{ width: 64, textAlign: "right" }}>
-          {t("ui.meter-columns.damage")}
+          {t(amountKey)}
         </Text>
         <Text className="analysis-label" style={{ width: 52, textAlign: "right" }}>
           {t("ui.logs.column-share")}
         </Text>
       </Box>
       {entries.map((entry) => {
-        const [n, suffix] = humanizeNumbers(entry.value);
         return (
           <Box key={entry.key} className="analysis-card-row">
             <Box
@@ -74,10 +84,7 @@ const Section = ({ headingKey, color, entries }: CardSection) => {
               {entry.icon && <img className="analysis-card-icon" src={entry.icon} alt="" />}
               {entry.label}
             </Text>
-            <Text className="analysis-card-amount">
-              {n}
-              {suffix}
-            </Text>
+            <Text className="analysis-card-amount">{format(entry.value)}</Text>
             <Text className="analysis-card-share">{share(entry.value, total)}</Text>
           </Box>
         );
@@ -93,10 +100,10 @@ const Section = ({ headingKey, color, entries }: CardSection) => {
  * section, so the card never grows past 70vh. A party's top damage dealer can
  * carry 30+ abilities, which measured 873px in a 1124px viewport before the
  * cap. */
-export const HoverCardBody = ({ sections }: HoverCardBodyProps) => (
+export const HoverCardBody = ({ sections, amountKey, format }: HoverCardBodyProps) => (
   <Box>
     {sections.map((section) => (
-      <Section key={section.headingKey} {...section} />
+      <Section key={section.headingKey} {...section} amountKey={amountKey} format={format} />
     ))}
   </Box>
 );

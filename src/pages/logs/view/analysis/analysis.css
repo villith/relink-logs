@@ -329,8 +329,9 @@
   opacity: 0.75;
 }
 
-/* The status tabs' Friendlies|Enemies switch. A small pill pair, not tabs:
- * it re-pivots the current table rather than navigating. */
+/* The Friendlies|Enemies switch. A small pill pair, not tabs: it re-pivots the
+ * current table rather than navigating. Sits above the metric tabs, so it holds
+ * its place on every tab and only the status ones can operate it. */
 .analysis-hostility {
   display: inline-flex;
   gap: 2px;
@@ -351,4 +352,15 @@
 .analysis-hostility-active {
   color: var(--an-ink);
   background-color: var(--an-raised);
+}
+
+/* Dimmed where the tab has no enemy-side figures to pivot to. The pointer
+ * cursor goes too — the switch keeps its place, but it must not invite a click
+ * that does nothing. */
+.analysis-hostility-disabled {
+  opacity: 0.4;
+}
+
+.analysis-hostility-disabled .analysis-hostility-option {
+  cursor: default;
 }

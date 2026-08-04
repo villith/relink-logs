@@ -162,21 +162,31 @@ describe("MetricTable", () => {
     expect(screen.getByText("ui.logs.rows-by-player")).toBeTruthy();
   });
 
+  const SECTIONS = () => [
+    {
+      headingKey: "ui.logs.hover-by-target",
+      color: "rgb(1,2,3)",
+      entries: [{ key: "t", label: "Boss", value: 5 }],
+    },
+  ];
+  const CARD_AMOUNT = { amountKey: "ui.meter-columns.damage", format: (value: number) => String(value) };
+
   it("wraps a row in a hover card when the caller supplies sections", () => {
-    const { container } = renderTable({
-      rowSections: () => [
-        {
-          headingKey: "ui.logs.hover-by-target",
-          color: "rgb(1,2,3)",
-          entries: [{ key: "t", label: "Boss", value: 5 }],
-        },
-      ],
-    });
+    const { container } = renderTable({ rowSections: SECTIONS, cardAmount: CARD_AMOUNT });
     const row = container.querySelector<HTMLElement>(".analysis-row");
     expect(row).toBeTruthy();
     fireEvent.mouseOver(row!);
     expect(screen.getByTestId("metric-hover-card")).toBeTruthy();
     expect(screen.getByText("Boss")).toBeTruthy();
+  });
+
+  it("renders no card for sections with no stated meaning", () => {
+    // `cardAmount` says what the figures ARE. Defaulting it is how every tab's
+    // tooltip came to head its column "DMG" and report damage; without one
+    // there is nothing honest to draw.
+    const { container } = renderTable({ rowSections: SECTIONS });
+    fireEvent.mouseOver(container.querySelector<HTMLElement>(".analysis-row")!);
+    expect(screen.queryByTestId("metric-hover-card")).toBeNull();
   });
 
   it("renders rows unwrapped when no sections are supplied", () => {

@@ -40,4 +40,38 @@ describe("HostilityToggle", () => {
     fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
     expect(onChange).toHaveBeenCalledWith("enemy");
   });
+
+  describe("disabled", () => {
+    // The switch keeps its place on the tabs that cannot use it, so every one
+    // of its ways in has to be closed — a dimmed control that still reports a
+    // change is the same defect as an undimmed one.
+    it("still shows both sides and which is active", () => {
+      renderIt({ disabled: true });
+      expect(screen.getByRole("radio", { name: "ui.logs.hostility-friendlies" }).getAttribute("aria-checked")).toBe(
+        "true"
+      );
+      expect(screen.getByRole("radiogroup").getAttribute("aria-disabled")).toBe("true");
+    });
+
+    it("ignores a click", () => {
+      const onChange = vi.fn();
+      renderIt({ onChange, disabled: true });
+      fireEvent.click(screen.getByRole("radio", { name: "ui.logs.hostility-enemies" }));
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("ignores the arrow keys", () => {
+      const onChange = vi.fn();
+      renderIt({ onChange, disabled: true });
+      fireEvent.keyDown(screen.getByRole("radiogroup"), { key: "ArrowRight" });
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it("leaves the tab order", () => {
+      renderIt({ disabled: true });
+      for (const name of ["ui.logs.hostility-friendlies", "ui.logs.hostility-enemies"]) {
+        expect(screen.getByRole("radio", { name }).getAttribute("tabindex")).toBe("-1");
+      }
+    });
+  });
 });

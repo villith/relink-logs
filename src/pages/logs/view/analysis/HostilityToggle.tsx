@@ -13,8 +13,24 @@ const SIDES: { value: Hostility; labelKey: string }[] = [
 /** WCL's Friendlies | Enemies switch: which side's holders the status tables
  * show. Polarity stays with the tab (Buffs = beneficial, Debuffs = harmful);
  * this re-pivots the holders, so an enemy's own Bloodthirst is reachable under
- * Buffs → Enemies instead of being misfiled as a debuff. */
-export const HostilityToggle = ({ value, onChange }: { value: Hostility; onChange: (next: Hostility) => void }) => {
+ * Buffs → Enemies instead of being misfiled as a debuff.
+ *
+ * `disabled` keeps the control on screen where it has nothing to switch. It
+ * lives above the metric tabs, as it does on Warcraft Logs, so hiding it on
+ * three of the five tabs moved every control below it each time the tab
+ * changed. Disabled rather than merely inert: the damage, stun and SBA tables
+ * have no enemy-side figures at all — nothing in the parser records what
+ * enemies deal — and a live switch that silently does nothing is worse than one
+ * that says so. */
+export const HostilityToggle = ({
+  value,
+  onChange,
+  disabled = false,
+}: {
+  value: Hostility;
+  onChange: (next: Hostility) => void;
+  disabled?: boolean;
+}) => {
   const { t } = useTranslation();
 
   // Arrow keys move the selection and only the checked option is tabbable —
@@ -27,8 +43,11 @@ export const HostilityToggle = ({ value, onChange }: { value: Hostility; onChang
     <Box
       role="radiogroup"
       aria-label={t("ui.logs.hostility-label")}
-      className="analysis-hostility"
+      aria-disabled={disabled || undefined}
+      className={`analysis-hostility${disabled ? " analysis-hostility-disabled" : ""}`}
+      title={disabled ? t("ui.logs.hostility-disabled-hint") : undefined}
       onKeyDown={(event) => {
+        if (disabled) return;
         if (event.key === "ArrowRight" || event.key === "ArrowLeft") onChange(other);
         else return;
         event.preventDefault();
@@ -39,9 +58,12 @@ export const HostilityToggle = ({ value, onChange }: { value: Hostility; onChang
           key={side.value}
           role="radio"
           aria-checked={value === side.value}
-          tabIndex={value === side.value ? 0 : -1}
+          aria-disabled={disabled || undefined}
+          // Out of the tab order entirely while disabled: a roving tabindex
+          // would still hand focus to a control that cannot be operated.
+          tabIndex={disabled ? -1 : value === side.value ? 0 : -1}
           className={`analysis-hostility-option${value === side.value ? " analysis-hostility-active" : ""}`}
-          onClick={() => onChange(side.value)}
+          onClick={() => !disabled && onChange(side.value)}
         >
           {t(side.labelKey)}
         </UnstyledButton>

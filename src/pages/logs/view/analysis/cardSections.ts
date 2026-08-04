@@ -3,7 +3,7 @@ import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
 import { abilityKey } from "../abilityKey";
 import { groupSkillsForRows, skillsForAbilityKey } from "../abilitySkills";
 import type { RowLevel } from "../deriveRows";
-import type { MetricRow } from "../metrics/types";
+import type { MetricCard, MetricRow } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
 
 import type { CardSection } from "./HoverCard";
@@ -31,6 +31,11 @@ export type SectionLabels = {
 };
 
 /** Per-enemy totals summed across a set of skills.
+ *
+ * DAMAGE, always: `SkillTargetState` records damage and hits and nothing else,
+ * so there is no per-enemy figure for any other metric. Callers gate on
+ * `MetricCard.perTarget` rather than passing an accessor here — a metric with
+ * no per-enemy record must omit the section, not fill it with damage.
  *
  * `targets` is optional on SkillState because cached payloads predate it. An
  * absent list means the breakdown is unavailable, not that nothing was hit —
@@ -72,6 +77,7 @@ export const aggregateTargets = (
 export const aggregateAbilities = (
   skills: SkillState[],
   abilityLabel: (key: string) => string,
+  valueOf: (skill: SkillState) => number,
   abilityIcon?: (key: string) => string | undefined
 ) => {
   // `groupSkillsForRows` owns the condensing rule; re-deriving it here is what
@@ -80,7 +86,7 @@ export const aggregateAbilities = (
     .map(({ key, skills: grouped }) => ({
       key,
       label: abilityLabel(key),
-      value: grouped.reduce((sum, skill) => sum + skill.totalDamage, 0),
+      value: grouped.reduce((sum, skill) => sum + valueOf(skill), 0),
       icon: abilityIcon?.(key),
     }))
     .sort((a, b) => b.value - a.value);
@@ -99,6 +105,7 @@ export const aggregateSources = (
   actionKey: string,
   sourceLabel: (index: number) => string,
   sourceColor: (index: number) => string,
+  valueOf: (skill: SkillState) => number,
   sourceIcon?: (index: number) => string | undefined
 ) =>
   players
@@ -109,7 +116,7 @@ export const aggregateSources = (
       icon: sourceIcon?.(player.index),
       value: player.skillBreakdown
         .filter((skill) => abilityKey(skill.actionType) === actionKey)
-        .reduce((sum, skill) => sum + skill.totalDamage, 0),
+        .reduce((sum, skill) => sum + valueOf(skill), 0),
     }))
     .filter((entry) => entry.value > 0)
     .sort((a, b) => b.value - a.value);
@@ -131,6 +138,7 @@ export const cardSectionsFor = ({
   pins,
   color,
   labels,
+  card,
 }: {
   row: MetricRow;
   level: RowLevel;
@@ -139,7 +147,26 @@ export const cardSectionsFor = ({
   /** The row's own colour, so the card matches the bar it came from. */
   color: string;
   labels: SectionLabels;
+  /** What the card measures. Every figure below is read through
+   * `card.valueOf`, and the by-target section is omitted outright where the
+   * metric has no per-enemy record — see `aggregateTargets`. */
+  card: MetricCard;
 }): CardSection[] | null => {
+  // Only where the metric HAS a per-enemy record. Omitted rather than zeroed:
+  // a stun card with an empty "Target" heading suggests the ability hit
+  // nothing, and one filled from `SkillTargetState.totalDamage` would print
+  // damage under a stun heading.
+  const targetSection = (skills: SkillState[]): CardSection[] =>
+    card.perTarget
+      ? [
+          {
+            headingKey: "ui.logs.hover-by-target",
+            color: TARGET_COLOR,
+            entries: aggregateTargets(skills, labels.enemy, labels.enemyIcon),
+          },
+        ]
+      : [];
+
   if (level === "players") {
     const player = players.find((candidate) => `player:${candidate.index}` === row.key);
     if (!player) return null;
@@ -151,14 +178,11 @@ export const cardSectionsFor = ({
         entries: aggregateAbilities(
           player.skillBreakdown,
           (key) => labels.ability(key, player),
+          card.valueOf,
           labels.abilityIcon && ((key) => labels.abilityIcon?.(key, player))
         ),
       },
-      {
-        headingKey: "ui.logs.hover-by-target",
-        color: TARGET_COLOR,
-        entries: aggregateTargets(player.skillBreakdown, labels.enemy, labels.enemyIcon),
-      },
+      ...targetSection(player.skillBreakdown),
     ];
   }
 
@@ -169,13 +193,11 @@ export const cardSectionsFor = ({
     const skills = skillsForAbilityKey(owner?.skillBreakdown ?? [], row.key.replace(/^skill:/, ""));
     if (skills.length === 0) return null;
 
-    return [
-      {
-        headingKey: "ui.logs.hover-by-target",
-        color: TARGET_COLOR,
-        entries: aggregateTargets(skills, labels.enemy, labels.enemyIcon),
-      },
-    ];
+    // By target alone — the abilities level is reached only with a source
+    // pinned, so a source section would always hold one row at 100%. A metric
+    // with no per-enemy record therefore has nothing to say here at all.
+    const sections = targetSection(skills);
+    return sections.length === 0 ? null : sections;
   }
 
   if (level === "skills") {
@@ -183,6 +205,9 @@ export const cardSectionsFor = ({
     // what it hit — the two dimensions the pins have NOT fixed. The source
     // section is shown even when a friendly is pinned and it holds a single row
     // at 100%, so the card keeps its shape as pins change.
+    //
+    // A row the descriptor decomposed some other way (an enemy row, whose key
+    // names a type rather than an action) matches no skill and falls out here.
     const actionKey = row.key.replace(/^skill:/, "");
     const skills = players.flatMap((player) =>
       player.skillBreakdown.filter((skill) => abilityKey(skill.actionType) === actionKey)
@@ -193,13 +218,16 @@ export const cardSectionsFor = ({
       {
         headingKey: "ui.logs.hover-by-source",
         color,
-        entries: aggregateSources(players, actionKey, labels.source, labels.sourceColor, labels.sourceIcon),
+        entries: aggregateSources(
+          players,
+          actionKey,
+          labels.source,
+          labels.sourceColor,
+          card.valueOf,
+          labels.sourceIcon
+        ),
       },
-      {
-        headingKey: "ui.logs.hover-by-target",
-        color: TARGET_COLOR,
-        entries: aggregateTargets(skills, labels.enemy, labels.enemyIcon),
-      },
+      ...targetSection(skills),
     ];
   }
 

@@ -1,12 +1,14 @@
+import type { EnemyType, SkillState } from "@/types";
 import { humanizeNumber, share } from "@/utils";
 
-import { groupSkillsForRows, mergeSkillsByAction } from "../abilitySkills";
+import { groupSkillsForRows, mergeSkillsByAction, type AbilitySkills } from "../abilitySkills";
 import type { MetricDescriptor, MetricRow } from "./types";
 
 const format = humanizeNumber;
 
 /** Shown where a figure was never recorded — logs saved before `minDamage` and
- * `maxDamage` existed carry null. A zero would claim a hit landed for nothing. */
+ * `maxDamage` existed carry null, and the per-enemy breakdown never carried
+ * them at all. A zero would claim a hit landed for nothing. */
 const NOT_RECORDED = "—";
 
 /** The smallest or largest single hit across an ability's skills, formatted.
@@ -18,6 +20,99 @@ const extreme = (values: (number | null)[], pick: (values: number[]) => number):
   return known.length === 0 ? NOT_RECORDED : format(pick(known));
 };
 
+/** The numeric columns every damage row below the players level fills, in
+ * header order. Written once because the three shapes of drill-down row have to
+ * line up under ONE header — see `columnKeys`. */
+const damageColumns = (damage: number, hits: number, min: string, max: string, total: number): string[] => [
+  format(damage),
+  String(hits),
+  min,
+  max,
+  format(hits === 0 ? 0 : Math.round(damage / hits)),
+  share(damage, total),
+];
+
+/** Rows for a set of ability (or member-skill) groups. */
+const abilityRows = (groups: AbilitySkills[], total: number, colorSlot: number, pinnable: boolean): MetricRow[] =>
+  groups
+    .map(({ key, skills }) => {
+      const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
+      const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
+      return {
+        key: `skill:${key}`,
+        label: key,
+        value: damage,
+        columns: damageColumns(
+          damage,
+          hits,
+          extreme(
+            skills.map((skill) => skill.minDamage),
+            (values) => Math.min(...values)
+          ),
+          extreme(
+            skills.map((skill) => skill.maxDamage),
+            (values) => Math.max(...values)
+          ),
+          total
+        ),
+        pinOnClick: pinnable ? { ability: key } : null,
+        colorSlot,
+      };
+    })
+    .sort((a, b) => b.value - a.value);
+
+/** The `EnemyType` an `enemy` row's label spells, or null for anything that is
+ * not one.
+ *
+ * The label IS the type's JSON — `enemyRows` writes it and the view reads it,
+ * so the grammar has one author. Tolerant of a malformed label for the same
+ * reason `statusLabelFor` is of a stale pin: `translateEnemyType` and
+ * `enemyIconUrl` both answer null with "unknown", which beats throwing inside
+ * a row renderer. */
+export const parseEnemyRow = (label: string): EnemyType | null => {
+  try {
+    return JSON.parse(label) as EnemyType;
+  } catch {
+    return null;
+  }
+};
+
+/** What the pinned ability dealt to each enemy TYPE.
+ *
+ * `SkillState.targets` is optional because cached payloads predate it, and it
+ * carries no per-enemy extremes — those columns are honestly blank rather than
+ * guessed at from the ability's own. Same-type spawns are already merged by the
+ * parser, so these rows name a type and pin nothing: the target pin selects a
+ * SPAWN, and a type cannot choose between two of them. */
+const enemyRows = (skills: SkillState[], total: number): MetricRow[] => {
+  const byType = new Map<string, { damage: number; hits: number }>();
+  for (const skill of skills) {
+    for (const target of skill.targets ?? []) {
+      // JSON, not String(): EnemyType is `string | { Unknown: number }`, and
+      // String() renders every Unknown variant as "[object Object]", merging
+      // every unidentified spawn into one row.
+      const key = JSON.stringify(target.enemyType);
+      const found = byType.get(key);
+      if (found) {
+        found.damage += target.totalDamage;
+        found.hits += target.hits;
+      } else byType.set(key, { damage: target.totalDamage, hits: target.hits });
+    }
+  }
+
+  return [...byType.entries()]
+    .map(([key, { damage, hits }]) => ({
+      key: `enemy:${key}`,
+      label: key,
+      kind: "enemy" as const,
+      value: damage,
+      columns: damageColumns(damage, hits, NOT_RECORDED, NOT_RECORDED, total),
+      pinOnClick: null,
+      colorSlot: -1,
+    }))
+    .sort((a, b) => b.value - a.value);
+};
+
 export const damageDone: MetricDescriptor = {
   labelKey: "ui.logs.metric-damage-done",
 
@@ -25,6 +120,11 @@ export const damageDone: MetricDescriptor = {
   // means little, so the second column becomes how often it landed and the
   // spread of those hits follows. Share is last in both cases, of whatever the
   // level's total is.
+  //
+  // One header for all three shapes of drill-down row: the level cannot say in
+  // advance whether it will decompose into member skills, enemies or players,
+  // and the columns line up under it either way — a shape with no extremes to
+  // report leaves those two cells blank rather than moving the ones after them.
   columnKeys: (level) =>
     level === "players"
       ? ["ui.meter-columns.damage", "ui.meter-columns.dps", "ui.logs.column-share"]
@@ -38,6 +138,15 @@ export const damageDone: MetricDescriptor = {
         ],
 
   labelKind: (level) => (level === "players" ? "player" : "ability"),
+
+  // The only metric the parser records per enemy (`SkillTargetState`), so the
+  // only one whose card can break a row down by target.
+  card: {
+    amountKey: "ui.meter-columns.damage",
+    valueOf: (skill) => skill.totalDamage,
+    format,
+    perTarget: true,
+  },
 
   rows: ({ players, level, pins }): MetricRow[] => {
     if (level === "players") {
@@ -70,39 +179,32 @@ export const damageDone: MetricDescriptor = {
     // The abilities level condenses into skill-group rows — see `abilityRowKey`.
     // One row is what the user pins, so a row must be one thing: a group where
     // the app groups, and otherwise one ability however many breakdown rows fed
-    // it. The skills level below it is the same breakdown NOT condensed: the
-    // scoped fetch has already narrowed the party to the pinned group's member
-    // actions, so folding them again would redraw the row just clicked.
-    const fold = level === "abilities" ? groupSkillsForRows : mergeSkillsByAction;
+    // it.
+    if (level === "abilities") return abilityRows(groupSkillsForRows(breakdown), total, colorSlot, true);
 
-    return fold(breakdown)
-      .map(({ key, skills }) => {
-        const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
-        const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
-        return {
-          key: `skill:${key}`,
-          label: key,
-          value: damage,
-          columns: [
-            format(damage),
-            String(hits),
-            extreme(
-              skills.map((skill) => skill.minDamage),
-              (values) => Math.min(...values)
-            ),
-            extreme(
-              skills.map((skill) => skill.maxDamage),
-              (values) => Math.max(...values)
-            ),
-            format(hits === 0 ? 0 : Math.round(damage / hits)),
-            share(damage, total),
-          ],
-          // Display only at the skills level: a member skill has nothing below
-          // it to descend into.
-          pinOnClick: level === "abilities" ? { ability: key } : null,
-          colorSlot,
-        };
-      })
-      .sort((a, b) => b.value - a.value);
+    // The skills level is the same breakdown NOT condensed: the scoped fetch has
+    // already narrowed the party to the pinned row's member actions, so folding
+    // them again would redraw the row just clicked.
+    const members = mergeSkillsByAction(breakdown);
+    // More than one action behind the pinned row means it was a GROUP, and the
+    // members are what it was made of.
+    if (members.length > 1) return abilityRows(members, total, colorSlot, false);
+
+    // One action behind the pinned row: restating it as a single row says
+    // nothing the row above it did not. With a friendly pinned, Warcraft Logs
+    // turns to the dimension the pins have left free and lists what the ability
+    // HIT — so do that.
+    //
+    // Only with an owner. Summed across the party the row is already an answer
+    // to a different question ("what did this ability do for everyone"), and
+    // the per-enemy breakdown behind it cannot say who dealt which part of it.
+    //
+    // A log saved before `SkillState.targets` existed has no enemies to list;
+    // the single row is still the honest floor.
+    if (owner) {
+      const enemies = enemyRows(breakdown, total);
+      if (enemies.length > 0) return enemies;
+    }
+    return abilityRows(members, total, colorSlot, false);
   },
 };

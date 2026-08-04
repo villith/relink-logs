@@ -42,6 +42,16 @@ const INTERVALS: StatusInterval[] = [
   interval(9, 0, 6_000, 1001, 700),
 ];
 
+// Both polarities on both sides, so a test can name any one of the four
+// quadrants. burn (1001) is harmful, bloodthirst (32) and protect (10)
+// beneficial — per the generated statusPolarity table.
+const MIXED_SIDES: StatusInterval[] = [
+  interval(0, 0, 4_000, 1001, 500), // Burn ON Narmaya
+  interval(0, 0, 2_000, 10, 500), // protect on Narmaya
+  interval(9, 0, 6_000, 32, 700, 1, 1, 2), // Bloodthirst, enemy spawn 2's own
+  interval(9, 0, 5_000, 1001, 800, 1, 1, 2), // Burn on enemy spawn 2
+];
+
 const PLAYERS = [
   { index: 0, partyIndex: 0 },
   { index: 1, partyIndex: 1 },
@@ -160,31 +170,45 @@ describe("buffs descriptor", () => {
 });
 
 describe("debuffs descriptor", () => {
+  // Every case here is about the ENEMY holders, which is now a side the caller
+  // asks for rather than one the tab assumes — see "defaults to the friendly
+  // holders, exactly like Buffs" below for the other half.
+  const enemySide = (level: RowLevel, ability: string | null = null, intervals = INTERVALS) =>
+    input(level, ability, intervals, PLAYERS, "enemy");
+
+  it("defaults to the friendly holders, exactly like Buffs", () => {
+    // Polarity and holder side are independent axes. Defaulting this tab to the
+    // enemy side made the switch read as a consequence of the tab, and hid the
+    // ailments the party was carrying — which is what a Debuffs tab is for.
+    // Burn (1001) on Narmaya is the only harmful effect a player holds here.
+    expect(debuffs.rows(input("players", null, MIXED_SIDES)).map((r) => r.key)).toEqual(["status:1001:500"]);
+  });
+
   it("gives one row per effect held by a non-player", () => {
-    const rows = debuffs.rows(input("players"));
+    const rows = debuffs.rows(enemySide("players"));
     expect(rows.map((r) => r.key)).toEqual(["status:1001:700"]);
   });
 
   it("counts an enemy's uptime the same way", () => {
-    expect(debuffs.rows(input("players"))[0].value).toBe(6_000);
+    expect(debuffs.rows(enemySide("players"))[0].value).toBe(6_000);
   });
 
   it("leaves enemy rows without a party colour", () => {
-    expect(debuffs.rows(input("players"))[0].colorSlot).toBe(-1);
+    expect(debuffs.rows(enemySide("players"))[0].colorSlot).toBe(-1);
   });
 
   it("gives one holder row per enemy SPAWN, not per recycled actor id", () => {
     // The Four Dragons case end to end: one actor id, two spawns. Keyed on the
     // id the two dragons shared a row labelled with a bare number.
     const recycled = [interval(9, 0, 1_000, 1001, 700, 1, 1, 0), interval(9, 5_000, 9_000, 1001, 700, 1, 1, 1)];
-    const rows = debuffs.rows(input("skills", "status:1001:700", recycled));
+    const rows = debuffs.rows(enemySide("skills", "status:1001:700", recycled));
     expect(rows.map((r) => r.key)).toEqual(["target:1", "target:0"]);
   });
 
   it("keeps an enemy the segmenter never placed on its own row", () => {
     // A phantom marker actor gets no segment. Its window is real capture, so it
     // keeps a row — labelled by the raw id, which is all that is known.
-    const rows = debuffs.rows(input("skills", "status:1001:700", [interval(9, 0, 6_000, 1001, 700)]));
+    const rows = debuffs.rows(enemySide("skills", "status:1001:700", [interval(9, 0, 6_000, 1001, 700)]));
     expect(rows.map((r) => r.key)).toEqual(["actor:9"]);
   });
 });
@@ -240,44 +264,48 @@ describe("narrowedByPins", () => {
 });
 
 describe("polarity and hostility", () => {
-  // burn (1001) is harmful, bloodthirst (32) and protect (10) beneficial —
-  // per the generated statusPolarity table.
-  const MIXED: StatusInterval[] = [
-    interval(0, 0, 4_000, 1001, 500), // Burn ON Narmaya
-    interval(0, 0, 2_000, 10, 500), // protect on Narmaya
-    interval(9, 0, 6_000, 32, 700, 1, 1, 2), // Bloodthirst, enemy spawn 2's own
-    interval(9, 0, 5_000, 1001, 800, 1, 1, 2), // Burn on enemy spawn 2
-  ];
-
   it("keeps harmful effects off the Buffs table even when a player holds them", () => {
-    expect(buffs.rows(input("players", null, MIXED)).map((r) => r.key)).toEqual(["status:10:500"]);
+    expect(buffs.rows(input("players", null, MIXED_SIDES)).map((r) => r.key)).toEqual(["status:10:500"]);
   });
 
   it("keeps enemy self-buffs off the Debuffs table", () => {
     // Bloodthirst is a buff the enemy gave itself — the exact row the
     // holder-based split used to misfile as a debuff.
-    expect(debuffs.rows(input("players", null, MIXED)).map((r) => r.key)).toEqual(["status:1001:800"]);
+    expect(debuffs.rows(input("players", null, MIXED_SIDES, PLAYERS, "enemy")).map((r) => r.key)).toEqual([
+      "status:1001:800",
+    ]);
   });
 
   it("shows enemy self-buffs on the Buffs table under enemy hostility", () => {
-    expect(buffs.rows(input("players", null, MIXED, PLAYERS, "enemy")).map((r) => r.key)).toEqual(["status:32:700"]);
+    expect(buffs.rows(input("players", null, MIXED_SIDES, PLAYERS, "enemy")).map((r) => r.key)).toEqual([
+      "status:32:700",
+    ]);
   });
 
   it("keys enemy-held holder rows by spawn under enemy hostility", () => {
-    const rows = buffs.rows(input("players", "status:32:700", MIXED, PLAYERS, "enemy"));
+    const rows = buffs.rows(input("players", "status:32:700", MIXED_SIDES, PLAYERS, "enemy"));
     expect(rows.map((r) => r.key)).toEqual(["target:2"]);
     expect(rows[0].colorSlot).toBe(-1);
   });
 
   it("shows ailments on players on the Debuffs table under friendly hostility", () => {
-    expect(debuffs.rows(input("players", null, MIXED, PLAYERS, "friendly")).map((r) => r.key)).toEqual([
+    expect(debuffs.rows(input("players", null, MIXED_SIDES, PLAYERS, "friendly")).map((r) => r.key)).toEqual([
       "status:1001:500",
     ]);
   });
 
   it("keys player-held holder rows by player under friendly hostility", () => {
-    const rows = debuffs.rows(input("players", "status:1001:500", MIXED, PLAYERS, "friendly"));
+    const rows = debuffs.rows(input("players", "status:1001:500", MIXED_SIDES, PLAYERS, "friendly"));
     expect(rows.map((r) => r.key)).toEqual(["player:0"]);
     expect(rows[0].colorSlot).toBe(0);
+  });
+
+  it("reads one side for both tabs when no hostility is given", () => {
+    // The absent-hostility default must not be per-tab: that is exactly the
+    // coupling this pair of axes was untangled from.
+    const buffKeys = buffs.rows(input("players", null, MIXED_SIDES)).map((r) => r.key);
+    const debuffKeys = debuffs.rows(input("players", null, MIXED_SIDES)).map((r) => r.key);
+    expect(buffKeys).toEqual(["status:10:500"]);
+    expect(debuffKeys).toEqual(["status:1001:500"]);
   });
 });

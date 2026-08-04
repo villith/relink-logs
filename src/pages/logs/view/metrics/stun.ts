@@ -13,6 +13,19 @@ export const stun: MetricDescriptor = {
 
   labelKind: (level) => (level === "players" ? "player" : "ability"),
 
+  // Stun, not damage — the card read `totalDamage` for every metric, so a stun
+  // bar's tooltip explained it with damage figures under a "DMG" heading.
+  //
+  // `perTarget: false`: `SkillTargetState` carries damage and hits only, so
+  // there is no per-enemy stun to report and the card offers no target
+  // section rather than filling one from the wrong figure.
+  card: {
+    amountKey: "ui.skill-columns.stun",
+    valueOf: (skill) => skill.totalStunValue,
+    format: oneDecimal,
+    perTarget: false,
+  },
+
   rows: ({ players, level, pins }): MetricRow[] => {
     if (level === "players") {
       return [...players]

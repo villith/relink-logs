@@ -122,9 +122,9 @@ export const slotsOf = (players: ComputedPlayerState[]): Map<number, number> =>
   new Map(players.map((player) => [player.index, player.partyIndex]));
 
 /** The intervals a roster's players hold, or the ones nobody in it does — the
- * hostility split (`statusTabRows` picks the boolean per tab, defaulted by
- * `hostility`). Takes the prebuilt roster so a descriptor does not construct
- * it twice per render. */
+ * hostility split (`statusTabRows` turns the chosen side into this boolean).
+ * Takes the prebuilt roster so a descriptor does not construct it twice per
+ * render. */
 export const heldByRoster = (
   intervals: StatusInterval[],
   roster: Map<number, number>,
@@ -189,14 +189,15 @@ export const narrowedByPins = (
  * beneficial effects, Debuffs harmful ones — the game's own
  * `PositiveStatusOrNegativeStatus` flag via `isHarmful`), the hostility
  * switch picks the HOLDERS. Split by holder alone, the Debuffs tab filed an
- * enemy's own Bloodthirst as a "debuff", which is not what a debuff is. */
-export const statusTabRows = (
-  input: Parameters<MetricDescriptor["rows"]>[0],
-  harmful: boolean,
-  fallbackHostility: Hostility
-): MetricRow[] => {
+ * enemy's own Bloodthirst as a "debuff", which is not what a debuff is.
+ *
+ * The two axes are INDEPENDENT, so there is no per-tab fallback side: a tab
+ * that defaulted itself to one side made the switch read as a consequence of
+ * the polarity, which it is not. Absent an explicit side both tabs answer for
+ * the friendly holders, the same way Warcraft Logs opens both of its. */
+export const statusTabRows = (input: Parameters<MetricDescriptor["rows"]>[0], harmful: boolean): MetricRow[] => {
   const { statusIntervals, fightDurationMs, players, roster, pins, statusWindow } = input;
-  const hostility = input.hostility ?? fallbackHostility;
+  const hostility: Hostility = input.hostility ?? "friendly";
   const slots = slotsOf(roster ?? players);
   const held = heldByRoster(statusIntervals ?? [], slots, hostility === "friendly");
   return statusRows({
@@ -220,5 +221,5 @@ export const buffs: MetricDescriptor = {
   // Holder-row kinds are decided by the HOSTILITY at render time
   // (`statusRowKindFor`); this only marks the tab as a status table.
   labelKind: (level) => (level === "players" ? "status" : "player"),
-  rows: (input) => statusTabRows(input, false, "friendly"),
+  rows: (input) => statusTabRows(input, false),
 };

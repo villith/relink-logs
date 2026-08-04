@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import type { MetricRow } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
 
-import { HoverCard, type CardSection } from "./HoverCard";
+import { HoverCard, type CardAmount, type CardSection } from "./HoverCard";
 import "./analysis.css";
 
 export type MetricTableProps = {
@@ -27,6 +27,11 @@ export type MetricTableProps = {
   /** The hover card's sections for one row, or null for no card. Injected
    * because the breakdown needs translated names and the settings store. */
   rowSections?: (row: MetricRow) => CardSection[] | null;
+  /** What those sections MEASURE — the amount column's name and format, from
+   * the active metric. No default: a card whose figures had no stated meaning
+   * is how every tab's tooltip came to report damage. Absent, rows carry no
+   * card, whatever `rowSections` returns. */
+  cardAmount?: CardAmount;
   /** Per-row eye toggle, or null where a row has nothing to show. Only the
    * status metrics pass it; absent, no row grows a control and the table keeps
    * the DOM it has. */
@@ -61,6 +66,7 @@ export const MetricTable = ({
   rowColor,
   rowsLabelKey,
   rowSections,
+  cardAmount,
   rowToggle,
   timelineMs = 0,
   emptyKey = "ui.logs.no-rows",
@@ -201,10 +207,10 @@ export const MetricTable = ({
         // The key moves off the row and onto whichever element is the list
         // child: HoverCard clones its child and would otherwise lose it.
         const sections = sectionsByRow?.get(row.key);
-        if (!sections || sections.length === 0) return <Box key={row.key}>{button}</Box>;
+        if (!sections || sections.length === 0 || !cardAmount) return <Box key={row.key}>{button}</Box>;
 
         return (
-          <HoverCard key={row.key} sections={sections}>
+          <HoverCard key={row.key} sections={sections} {...cardAmount}>
             {button}
           </HoverCard>
         );
