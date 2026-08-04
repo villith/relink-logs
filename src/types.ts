@@ -293,6 +293,11 @@ export type PlayerState = {
   dps: number;
   /** Amount of SBA Gauge (0.0 - 1000.0) */
   sba: number;
+  /** Total gauge generated over the fight — the sum of every recorded gauge
+   * increase. Ranks contribution; `sba` above is the LEVEL, which reads 0 right
+   * after a burst. Optional because logs served by a backend older than the
+   * field carry nothing. */
+  sbaGenerated?: number;
   /** Total stun value */
   totalStunValue: number;
   /** Stun per second over the encounter time */
