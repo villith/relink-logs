@@ -428,8 +428,21 @@ impl OnHandleSBAUpdateHook {
             // measured component) actually belongs to — same a1+0x10
             // specified-instance resolution the SBAUPD diag block uses — and
             // only credit the gain when it matches the attributed player.
-            let entity_ptr = unsafe { a1.byte_add(0x10).read() } as *const usize;
-            let component_owner = super::player_slot_key_for_source(entity_ptr);
+            //
+            // A raw `[a1+0x10]` read cannot be trusted with a vfunc dispatch:
+            // `player_slot_key_for_source`'s fallback arm CALLS the resolved
+            // pointer's +0x58 vtable slot, and today's valid specified-instance
+            // pointer is only that by convention — a future layout shift could
+            // leave garbage-but-readable bytes there (arbitrary jump on the
+            // game thread in a release build). `status.rs`'s `holder_index`
+            // hits the exact same hazard resolving a non-player holder and
+            // fixes it by probing the vfunc slot before dispatch; mirror that
+            // here so a stale layout fails closed (skip the emit, the poll
+            // remains the record) instead of dispatching through garbage.
+            let component_owner = crate::hooks::diag::read_ptr_guarded(a1 as usize, 0x10)
+                .filter(|p| *p != 0)
+                .filter(|p| super::summon::vfunc_slot_readable(*p as *const usize, 0x58))
+                .and_then(|p| super::player_slot_key_for_source(p as *const usize));
             if component_owner == Some(actor_index) {
                 let after = read_f32_guarded(a1 as usize, 0x7C);
                 if let (Some(before), Some(after)) = (before, after) {
