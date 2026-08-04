@@ -570,10 +570,12 @@ pub struct SbaGainEvent {
     /// The generating player's slot key (`PLAYER_SLOT_INDEX_BASE | slot`).
     pub actor_index: u32,
     /// Raw action id off the causing `DamageInstance` (+0x16C). The parser files
-    /// a gain as `ActionType::Normal(action_id)`. The hook classifies the hit
-    /// before emitting and SKIPS gains whose hit classifies as supplementary
-    /// damage — supp procs should not generate gauge, and an unnamed gain
-    /// beats a confidently wrong one.
+    /// a gain as `ActionType::Normal(action_id)`, so the hook emits ONLY hits
+    /// that classify as `Normal`: a link-attack, SBA or supplementary-damage
+    /// classification is dropped rather than flattened into a `Normal` row it
+    /// does not belong to. An unnamed gain beats a confidently wrong one — and
+    /// a flattened one would open a breakdown row carrying gauge and no damage
+    /// beside the real row for that hit.
     pub action_id: u32,
     /// Gauge added, measured across the game's own gauge-update call.
     pub amount: f32,
