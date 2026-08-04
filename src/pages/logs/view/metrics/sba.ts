@@ -1,6 +1,6 @@
 import type { MetricDescriptor, MetricRow } from "./types";
 
-/** Shown where the backend served no generated total — a log fetched from a
+/** Shown where the backend served no generated total — a log served by a
  * binary older than the field. A zero would claim the player built no gauge. */
 const NOT_RECORDED = "—";
 
