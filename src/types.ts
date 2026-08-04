@@ -295,8 +295,9 @@ export type PlayerState = {
   sba: number;
   /** Total gauge generated over the fight — the sum of every recorded gauge
    * increase. Ranks contribution; `sba` above is the LEVEL, which reads 0 right
-   * after a burst. Optional because logs served by a backend older than the
-   * field carry nothing. */
+   * after a burst. Optional: a backend older than the field sends nothing (dev
+   * HMR skew) — never a stored-log concern, since logs are always reparsed by
+   * the running backend. */
   sbaGenerated?: number;
   /** Total stun value */
   totalStunValue: number;
