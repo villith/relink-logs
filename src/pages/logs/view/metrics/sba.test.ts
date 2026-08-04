@@ -4,7 +4,7 @@ import type { ComputedPlayerState } from "@/types";
 
 import { sba } from "./sba";
 
-const player = (index: number, sbaValue: number) =>
+const player = (index: number, values: { sba: number; sbaGenerated?: number }) =>
   ({
     index,
     partyIndex: index,
@@ -12,7 +12,8 @@ const player = (index: number, sbaValue: number) =>
     totalDamage: 0,
     dps: 0,
     percentage: 0,
-    sba: sbaValue,
+    sba: values.sba,
+    sbaGenerated: values.sbaGenerated,
     totalStunValue: 0,
     stunPerSecond: 0,
     lastDamageTime: 0,
@@ -23,28 +24,36 @@ const player = (index: number, sbaValue: number) =>
     skillBreakdown: [],
   }) as unknown as ComputedPlayerState;
 
-const PLAYERS = [player(0, 2.5), player(1, 4.0)];
-
-const input = (level: "players" | "abilities" | "skills") =>
+const input = (level: "players" | "abilities" | "skills", players: ComputedPlayerState[]) =>
   ({
     encounter: { totalDamage: 0 } as never,
     partyData: [null, null],
-    players: PLAYERS,
+    players,
     level,
     pins: { source: null, targets: [], ability: null },
   }) as never;
 
 describe("sba descriptor", () => {
-  it("ranks players by gauge value", () => {
-    expect(sba.rows(input("players")).map((r) => r.value)).toEqual([4, 2.5]);
+  it("ranks players by the gauge they generated, not the level they ended on", () => {
+    // The level is what made every row read 0.0: it is whatever the gauge
+    // happened to be at the end, and a player who burst finishes at zero.
+    const players = [player(0, { sba: 0, sbaGenerated: 2400 }), player(1, { sba: 950, sbaGenerated: 950 })];
+
+    const rows = sba.rows(input("players", players));
+    expect(rows.map((row) => row.key)).toEqual(["player:0", "player:1"]);
+    expect(rows[0].value).toBe(2400);
   });
 
-  it("stays player rows even when a level below is requested", () => {
-    // A gauge belongs to a player, not a skill — there is no level to descend to.
-    expect(sba.rows(input("abilities")).map((r) => r.value)).toEqual([4, 2.5]);
+  it("reports the generated total and the current level as separate columns", () => {
+    const rows = sba.rows(input("players", [player(0, { sba: 250, sbaGenerated: 1750 })]));
+    expect(rows[0].columns).toEqual(["1750", "250"]);
   });
 
-  it("makes rows unclickable", () => {
-    expect(sba.rows(input("players")).every((r) => r.pinOnClick === null)).toBe(true);
+  it("falls back to the level for a log served without the generated total", () => {
+    // An older backend sends no sbaGenerated. Ranking every row at 0 would be
+    // the defect this replaced; the level is the only figure there is.
+    const rows = sba.rows(input("players", [player(0, { sba: 640 })]));
+    expect(rows[0].value).toBe(640);
+    expect(rows[0].columns).toEqual(["—", "640"]);
   });
 });

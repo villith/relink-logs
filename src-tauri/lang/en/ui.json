@@ -380,6 +380,8 @@
       "sup-percentage-description": "Extra Damage from Supplementary/Echo Procs",
       "sba": "SBA",
       "sba-description": "Skybound Arts Gauge",
+      "sba-generated": "Generated",
+      "sba-generated-description": "Total Skybound Arts Gauge Generated",
       "total-stun-value": "Stun",
       "total-stun-value-description": "Total Stun Value",
       "stun-per-second": "SPS",
@@ -451,6 +453,7 @@
       "hostility-label": "Hostility",
       "hostility-friendlies": "Friendlies",
       "hostility-enemies": "Enemies",
+      "hostility-disabled-hint": "Only the Buffs and Debuffs tabs have enemy-side figures",
       "buffs-empty": "No status effects were recorded for this log",
       "rows-by-effect": "Effect",
       "rows-by-enemy": "Enemy",
@@ -1415,7 +1418,8 @@
         "normal-attack-wings": "Normal Attack (Chromatic Wings)",
         "finisher": "Finisher",
         "finisher-wings": "Finisher (Chromatic Wings)",
-        "talviyo": "Talviyö"
+        "talviyo": "Talviyö",
+        "alone-in-heaven": "Alone in Heaven"
       }
     },
     "Pl2200": {
@@ -1777,7 +1781,8 @@
         "stomp": "Stomp",
         "miasma-hands": "Miasma Hands",
         "aerial-attack": "Aerial Attack",
-        "combo-finisher": "Combo Finisher"
+        "combo-finisher": "Combo Finisher",
+        "claws-of-reversal": "Claws of Reversal"
       }
     },
     "Pl0700GhostSatellite": {
