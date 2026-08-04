@@ -411,3 +411,99 @@ describe("drilling a pinned ability with a friendly pinned", () => {
     expect(rows[0].key).toBe("skill:Normal:100");
   });
 });
+
+const victimPlayer = (index: number, breakdown: { enemy: number; total: number }[]) =>
+  ({
+    index,
+    partyIndex: index,
+    characterType: "Pl0000",
+    totalDamage: 0,
+    dps: 0,
+    percentage: 0,
+    sba: 0,
+    totalStunValue: 0,
+    stunPerSecond: 0,
+    lastDamageTime: 0,
+    cappedHits: 0,
+    cappableHits: 0,
+    overcapBaseSum: 0,
+    overcapCapSum: 0,
+    skillBreakdown: [],
+    damageTakenBreakdown: breakdown.map((row) => ({
+      enemyType: { Unknown: row.enemy },
+      actionId: { Normal: 1 },
+      hits: 1,
+      totalDamage: row.total,
+      maxDamage: row.total,
+    })),
+  }) as unknown as ComputedPlayerState;
+
+describe("damageDone enemy side", () => {
+  it("ranks enemy types by damage dealt to the party", () => {
+    const players = [
+      victimPlayer(0, [{ enemy: 0xaa, total: 500 }]),
+      victimPlayer(1, [
+        { enemy: 0xaa, total: 300 },
+        { enemy: 0xbb, total: 100 },
+      ]),
+    ];
+
+    const rows = damageDone.rows({
+      encounter: { totalDamage: 0 } as never,
+      partyData: [null, null],
+      players,
+      level: "players",
+      pins: { source: null, targets: [], ability: null },
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    } as never);
+
+    expect(rows.map((row) => row.key)).toEqual([
+      `enemy:${JSON.stringify({ Unknown: 0xaa })}`,
+      `enemy:${JSON.stringify({ Unknown: 0xbb })}`,
+    ]);
+    expect(rows[0].kind).toBe("enemy");
+    expect(rows[0].value).toBe(800);
+    // Amount, DPS-to-party over the 100s window, share.
+    expect(rows[0].columns).toEqual(["800", "8", "88.9%"]);
+    expect(rows[0].pinOnClick).toBeNull();
+  });
+
+  it("shows nothing on the enemy side of a log with no incoming events recorded", () => {
+    const rows = damageDone.rows({
+      encounter: { totalDamage: 0 } as never,
+      partyData: [null, null],
+      players: [victimPlayer(0, [])],
+      level: "players",
+      pins: { source: null, targets: [], ability: null },
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    } as never);
+
+    expect(rows).toEqual([]);
+  });
+
+  it("fills the full six-column drill-down shape below the players level", () => {
+    const players = [
+      victimPlayer(0, [{ enemy: 0xaa, total: 500 }]),
+      victimPlayer(1, [
+        { enemy: 0xaa, total: 300 },
+        { enemy: 0xbb, total: 100 },
+      ]),
+    ];
+
+    const rows = damageDone.rows({
+      encounter: { totalDamage: 0 } as never,
+      partyData: [null, null],
+      players,
+      level: "abilities",
+      pins: { source: null, targets: [], ability: null },
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    } as never);
+
+    expect(rows[0].columns).toHaveLength(6);
+    // min is blank: DamageTakenState carries no minimum.
+    expect(rows[0].columns[2]).toBe("—");
+  });
+});

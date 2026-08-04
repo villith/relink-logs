@@ -1,7 +1,8 @@
-import type { EnemyType, SkillState } from "@/types";
+import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
 import { humanizeNumber, share } from "@/utils";
 
 import { groupSkillsForRows, mergeSkillsByAction, type AbilitySkills } from "../abilitySkills";
+import type { RowLevel } from "../deriveRows";
 import type { MetricDescriptor, MetricRow } from "./types";
 
 const format = humanizeNumber;
@@ -113,6 +114,55 @@ const enemyRows = (skills: SkillState[], total: number): MetricRow[] => {
     .sort((a, b) => b.value - a.value);
 };
 
+/** Damage per second over the measured window, or "—" without one (same rule
+ * as damageTaken's DTPS — these figures come from scrubbed reparses too). */
+const rateOver = (amount: number, fightDurationMs?: number): string =>
+  !fightDurationMs || fightDurationMs <= 0 ? NOT_RECORDED : format(amount / (fightDurationMs / 1000));
+
+/** Enemy types ranked by what they dealt TO the party, folded from the
+ * per-victim incoming breakdown. Empty on logs recorded before damage-taken
+ * capture (2026-08-04) — those recorded no incoming events at all, and the
+ * table's empty state says so.
+ *
+ * At the players level this answers one question with three columns (amount,
+ * rate, share), same as the friendly side. Below it, every OTHER damageDone
+ * row shape fills the full six-column set (see `damageColumns`), and this one
+ * must too or it renders three cells under a six-column header. Min stays
+ * blank there because `DamageTakenState` — unlike `SkillState` — never
+ * recorded a minimum; max is the largest single hit any breakdown row for
+ * that type carried. */
+const enemyDealtRows = (players: ComputedPlayerState[], level: RowLevel, fightDurationMs?: number): MetricRow[] => {
+  const byType = new Map<string, { damage: number; hits: number; maxDamage: number | null }>();
+  for (const player of players) {
+    for (const row of player.damageTakenBreakdown ?? []) {
+      const key = JSON.stringify(row.enemyType);
+      const found = byType.get(key);
+      if (found) {
+        found.damage += row.totalDamage;
+        found.hits += row.hits;
+        found.maxDamage = found.maxDamage === null ? row.maxDamage : Math.max(found.maxDamage, row.maxDamage);
+      } else byType.set(key, { damage: row.totalDamage, hits: row.hits, maxDamage: row.maxDamage });
+    }
+  }
+  const total = [...byType.values()].reduce((sum, { damage }) => sum + damage, 0);
+
+  return [...byType.entries()]
+    .map(([key, { damage, hits, maxDamage }]) => ({
+      key: `enemy:${key}`,
+      label: key,
+      kind: "enemy" as const,
+      value: damage,
+      columns:
+        level === "players"
+          ? [format(damage), rateOver(damage, fightDurationMs), share(damage, total)]
+          : damageColumns(damage, hits, NOT_RECORDED, maxDamage === null ? NOT_RECORDED : format(maxDamage), total),
+      // The pin model has no enemy-type pin; the hover card decomposes instead.
+      pinOnClick: null,
+      colorSlot: -1,
+    }))
+    .sort((a, b) => b.value - a.value);
+};
+
 export const damageDone: MetricDescriptor = {
   labelKey: "ui.logs.metric-damage-done",
   supportsHostility: true,
@@ -149,7 +199,12 @@ export const damageDone: MetricDescriptor = {
     perTarget: true,
   },
 
-  rows: ({ players, level, pins }): MetricRow[] => {
+  rows: ({ players, level, pins, fightDurationMs, hostility }): MetricRow[] => {
+    // The enemy side answers one question at every level — what each enemy
+    // dealt to the (scoped) party — so it ignores the drill level entirely
+    // except for which column shape that answer takes.
+    if (hostility === "enemy") return enemyDealtRows(players, level, fightDurationMs);
+
     if (level === "players") {
       const total = players.reduce((sum, p) => sum + p.totalDamage, 0);
       return [...players]
