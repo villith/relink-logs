@@ -563,8 +563,9 @@ pub struct OnContinueSBAChainEvent {
 pub struct SbaGainEvent {
     /// The generating player's slot key (`PLAYER_SLOT_INDEX_BASE | slot`).
     pub actor_index: u32,
-    /// Raw action id off the causing `DamageInstance` (+0x16C), classified into
-    /// an `ActionType` by the parser exactly as a damage event's is.
+    /// Raw action id off the causing `DamageInstance` (+0x16C). The parser files
+    /// a gain as `ActionType::Normal(action_id)` — a gain carries no classification
+    /// flags, and grant-eligible hits are expected to classify as Normal anyway.
     pub action_id: u32,
     /// Gauge added by this hit, measured across the game's own grant call.
     pub amount: f32,

@@ -92,5 +92,6 @@ fn variant(event: &Message) -> &'static str {
         Message::OnQuestElapsedTime(_) => "OnQuestElapsedTime",
         Message::StatusApply(_) => "StatusApply",
         Message::StatusRemove(_) => "StatusRemove",
+        Message::SbaGain(_) => "SbaGain",
     }
 }

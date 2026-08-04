@@ -2453,6 +2453,7 @@ fn connect_and_run_parser(app: AppHandle) {
                                 protocol::Message::OnContinueSBAChain(event) => {
                                     state.on_continue_sba_chain(event);
                                 }
+                                protocol::Message::SbaGain(_) => {} // TODO(sba-per-ability B4): dispatch to parser
                                 protocol::Message::OnDeathEvent(event) => {
                                     state.on_death_event(event);
                                 }
