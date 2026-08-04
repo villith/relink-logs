@@ -8,14 +8,18 @@ use crate::{event, hooks::diag::readable, hooks::ffi::DamageInstance, process::P
 
 use super::{actor_idx, actor_type_id};
 
-/// Depth counter for "we are inside the game's damage processing on this
-/// thread". Read by the SBA hook to decide whether a gauge grant belongs to the
-/// hit currently being processed. A COUNTER, not a bool: damage processing can
-/// re-enter (a hit that triggers a reaction that deals damage), and a bool would
-/// be cleared by the inner frame while the outer one is still live.
-#[cfg(feature = "hookdiag")]
+/// Who is dealing damage on this thread right now, and with what — the
+/// attribution a gauge grant nested inside damage processing belongs to.
+/// (Static RE, v2.0.3: the grant is a synchronous callee of ProcessDamageEvent
+/// via source-actor vtable +0x70 → +0x80, so the top of this stack names it.)
+///
+/// A STACK, not a single value: damage processing re-enters (a hit that
+/// triggers a reaction that deals damage), and the gauge granted by the inner
+/// hit must not be filed against the outer one. The top of the stack is the hit
+/// currently being processed.
 thread_local! {
-    pub static DAMAGE_DEPTH: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+    pub static DAMAGE_ATTRIBUTION: std::cell::RefCell<Vec<(u32, u32)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
 }
 
 type ProcessDamageEventFunc =
@@ -339,7 +343,7 @@ const PROCESS_DAMAGE_EVENT_SIG: &str = "e8 $ { ' } 66 83 bc 24 ? ? ? ? ?";
 /// scripted percent-max-HP hit; 27.7M on Defy Infinity) flows ONLY through here.
 /// Anchored on the preceding `ret; int3*10` padding, cursor on the entry; the
 /// prologue reads rcx/rdx/r8d (3 args, matches the decompile). Verified unique,
-/// target_rva=0x1fbd260.
+/// target_rva=0x1fb7150 (v2.0.3; was 0x1fbd260 on 2.0.2).
 const PROCESS_DAMAGE_BYPASS_SIG: &str = "c3 cc cc cc cc cc cc cc cc cc cc ' 41 57 41 56 41 55 \
      41 54 56 57 55 53 48 83 ec 28 44 89 c6 48 89 d7 48 89 cb 48 8b 41 08 4c 8b 30";
 
@@ -635,18 +639,6 @@ impl OnProcessDamageHook {
     }
 
     fn run(&self, a1: *const usize, a2: *const usize, a3: *const usize, a4: u8) -> usize {
-        #[cfg(feature = "hookdiag")]
-        let _damage_depth_guard = {
-            struct Guard;
-            impl Drop for Guard {
-                fn drop(&mut self) {
-                    DAMAGE_DEPTH.with(|d| d.set(d.get().saturating_sub(1)));
-                }
-            }
-            DAMAGE_DEPTH.with(|d| d.set(d.get() + 1));
-            Guard
-        };
-
         // hookdiag: process_damage still resolves; log its callers once so we can locate
         // the adjacent (broken) death handler. Fires constantly, so log only the first N.
         #[cfg(feature = "hookdiag")]
@@ -768,6 +760,42 @@ impl OnProcessDamageHook {
             })
         };
 
+        // The damage-instance view over `a2`. A reference, not a copy: reads
+        // after the call still see whatever the game wrote in the meantime
+        // (`damage` and friends), same as the previous post-call construction —
+        // only `action_id` (an INPUT field the game does not mutate) is read
+        // pre-call below.
+        let damage_instance = unsafe { NonNull::new(a2 as *mut DamageInstance).unwrap().as_ref() };
+
+        // Push this hit's attribution BEFORE the original call — the game's
+        // per-hit SBA gauge grant runs synchronously inside it (static RE,
+        // v2.0.3: source vtable +0x70 -> +0x80), so the SBA hook needs the top
+        // of the stack in place while that call is in flight. Only a
+        // player-attributed source pushes: `player_slot_key_for_source` mirrors
+        // `emit_zero_damage_guard`'s attribution and already returns `None` for
+        // enemy/unowned sources (pets/avatars resolve to their owner), which
+        // matches `SbaGainEvent` being local-player-only. The guard only exists
+        // when a push happened, so a skipped push never pops a frame it didn't
+        // push.
+        struct AttributionGuard;
+        impl Drop for AttributionGuard {
+            fn drop(&mut self) {
+                DAMAGE_ATTRIBUTION.with(|stack| {
+                    stack.borrow_mut().pop();
+                });
+            }
+        }
+        let _attribution_guard: Option<AttributionGuard> = pre_call_source_ptr
+            .and_then(|ptr| super::player_slot_key_for_source(ptr as *const usize))
+            .map(|source_actor_index| {
+                DAMAGE_ATTRIBUTION.with(|stack| {
+                    stack
+                        .borrow_mut()
+                        .push((source_actor_index, damage_instance.action_id));
+                });
+                AttributionGuard
+            });
+
         let original_value = unsafe { ProcessDamageEvent.call(a1, a2, a3, a4) };
 
         #[cfg(feature = "hookdiag")]
@@ -811,7 +839,6 @@ impl OnProcessDamageHook {
         // #[cfg(feature = "hookdiag")]
         // crate::hooks::diag::probe_player_instance(source_specified_instance_ptr);
 
-        let damage_instance = unsafe { NonNull::new(a2 as *mut DamageInstance).unwrap().as_ref() };
         let damage: i32 = damage_instance.damage;
 
         // Source-side accumulator delta (diagnostics; see the pre-call snapshot

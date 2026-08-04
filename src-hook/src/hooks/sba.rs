@@ -391,7 +391,7 @@ impl OnHandleSBAUpdateHook {
                 static BRACKET: AtomicU32 = AtomicU32::new(0);
                 static IN_DAMAGE: AtomicU32 = AtomicU32::new(0);
                 let total = BRACKET.fetch_add(1, AtomicOrdering::Relaxed) + 1;
-                let depth = crate::hooks::damage::DAMAGE_DEPTH.with(|d| d.get());
+                let depth = crate::hooks::damage::DAMAGE_ATTRIBUTION.with(|s| s.borrow().len());
                 if depth > 0 {
                     IN_DAMAGE.fetch_add(1, AtomicOrdering::Relaxed);
                 }
@@ -404,12 +404,38 @@ impl OnHandleSBAUpdateHook {
             }
         }
 
+        // The gauge before the game's own grant. `a1` is the SBA component;
+        // +0x7C is the gauge float (+0x80 its max) — the same offsets
+        // `poll_slots_and_emit`/`log_sba_slot_poll` read per slot.
+        use crate::hooks::diag::read_f32_guarded;
+        let before = read_f32_guarded(a1 as usize, 0x7C);
+
         let ret = unsafe { OnSBAUpdate.call(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) };
 
-        // Production: after the game applied this (local) gauge update, poll ALL
-        // FOUR party slots and emit slot-keyed gauge events. Replaces the old
-        // per-entity emission — that only ever covered the local player online,
-        // and its actor-idx key merged same-character players.
+        // Attributed gain: only meaningful nested inside a hit we classified,
+        // which is what the damage stack says. Outside one the grant came from
+        // somewhere with no action to name (a chain, a scripted award), and the
+        // poll below is the honest record of it.
+        if let Some((actor_index, action_id)) =
+            crate::hooks::damage::DAMAGE_ATTRIBUTION.with(|stack| stack.borrow().last().copied())
+        {
+            let after = read_f32_guarded(a1 as usize, 0x7C);
+            if let (Some(before), Some(after)) = (before, after) {
+                let amount = after - before;
+                // A burst resetting the bar reads as a large negative; only a
+                // real increase is a gain.
+                if amount > 0.0 && amount.is_finite() {
+                    let _ = self.tx.send(Message::SbaGain(protocol::SbaGainEvent {
+                        actor_index,
+                        action_id,
+                        amount,
+                    }));
+                }
+            }
+        }
+
+        // Unchanged: the four-slot poll stays the source of every player's
+        // gauge LEVEL, and the only source at all for remote members.
         poll_slots_and_emit(&self.tx);
 
         ret
