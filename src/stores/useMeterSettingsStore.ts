@@ -93,7 +93,13 @@ export const DEFAULT_HEADER_SEGMENTS: HeaderSegment[] = [
  * `classic` is the original four-tab view (Overview / SBA / Equipment / Builds),
  * kept because it is what every existing user has muscle memory for, and because
  * the redesign changes how a number is reached, not just how it looks. Both are
- * maintained; only `analysis` gains new metrics. */
+ * maintained; only `analysis` gains new metrics.
+ *
+ * DEV BUILDS ONLY at present. `analysis` is unfinished, so `ViewPage` ignores
+ * this setting entirely outside dev and renders Classic — see the guard there
+ * for why it ignores rather than defaults. The stored value therefore governs
+ * nothing in a release build; leave it as it is rather than "fixing" the
+ * default below to match what users see. */
 export type LogsViewMode = "analysis" | "classic";
 
 interface MeterSettings {
