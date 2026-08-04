@@ -65,6 +65,15 @@ describe("auditRows", () => {
     expect(entry.displayName).toBe("siunaus");
     expect(entry.characterType).toBe("Pl1000");
   });
+
+  /** The rail's read of a person: gold for pure luck, red for anything else —
+   * so a farmer is never listed looking like the cheats around them. */
+  it("reads a purely lucky person as lucky, and anyone else as a cheat", () => {
+    const lucky = player("lucky", [row(1, 100, perfect, 1)]);
+
+    expect(auditRows([lucky])[0].tone).toBe("lucky");
+    expect(auditRows([siunaus])[0].tone).toBe("cheat");
+  });
 });
 
 describe("caseFor", () => {
@@ -146,6 +155,14 @@ describe("caseFor", () => {
    * chips say what is wrong with the build, not how often it was measured. */
   it("summarises what the person is flagged for, each violation once", () => {
     expect(caseFor(siunaus).violations).toEqual(["impossibleSigil", "perfectSummons"]);
+  });
+
+  /** The case reads the same tone as the rail: the pane's heading and the row
+   * that opened it must never disagree about the same person. */
+  it("carries the case's tone, matching the rail's", () => {
+    expect(caseFor(siunaus).tone).toBe("cheat");
+    expect(caseFor(player("lucky", [row(1, 100, perfect, 1)])).tone).toBe("lucky");
+    expect(caseFor(player("empty", [])).tone).toBeUndefined();
   });
 
   /** A person with no findings has no fight to read gear from, and the page

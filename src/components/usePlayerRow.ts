@@ -4,6 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, LegalityFinding, MeterColumns, PlayerData, visibleColumns } from "@/types";
 import { PLAYER_COLORS, computeSupPercentage, humanizeNumbers, resolvePlayerColor } from "@/utils";
+import { TONE_COLOR, findingsTone } from "@/violations";
 
 export type ColumnValue = {
   value: string | number;
@@ -60,12 +61,13 @@ export const usePlayerRow = (
   // narrower choice under it, and on streamer mode — which hides names
   // precisely so nothing about a player reaches the stream.
   //
-  // One colour, not two: the meter has no room to explain the difference
-  // between proof and long odds, and a yellow that a reader cannot interpret
-  // is just a second kind of accusation.
+  // Red for a cheat; gold when everything against the build is luck (a full
+  // set of perfect summons). The gates apply to both — gold is a nicer thing
+  // to say about someone, but it is still saying something.
+  const tone = findingsTone(legality?.[partySlotIndex] ?? []);
   const legalityColor =
-    show_flagged_builds && highlight_illegal_builds && !streamer_mode && (legality?.[partySlotIndex]?.length ?? 0) > 0
-      ? "red"
+    show_flagged_builds && highlight_illegal_builds && !streamer_mode && tone !== undefined
+      ? TONE_COLOR[tone]
       : undefined;
 
   const [totalDamage, totalDamageUnit] = humanizeNumbers(player.totalDamage);
