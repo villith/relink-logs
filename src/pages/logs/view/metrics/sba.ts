@@ -4,8 +4,8 @@ import type { MetricDescriptor, MetricRow } from "./types";
  * binary older than the field. A zero would claim the player built no gauge. */
 const NOT_RECORDED = "—";
 
-/** Gauge figures are whole tenths of a percent; a suffix would only lose
- * precision at the magnitudes a fight produces. */
+/** Gauge units are tenths of a percent; sub-unit precision is noise at the
+ * magnitudes a fight produces, and a suffix would only lose precision. */
 const whole = (value: number): string => String(Math.round(value));
 
 /** SBA is a per-player gauge. The rows rank by the gauge each player

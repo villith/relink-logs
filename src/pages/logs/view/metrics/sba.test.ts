@@ -42,6 +42,11 @@ describe("sba descriptor", () => {
     const rows = sba.rows(input("players", players));
     expect(rows.map((row) => row.key)).toEqual(["player:0", "player:1"]);
     expect(rows[0].value).toBe(2400);
+    // A gauge belongs to a player, not a skill — there is no level to descend
+    // to, so an "abilities" request still comes back as the same player rows.
+    expect(sba.rows(input("abilities", players)).map((row) => row.key)).toEqual(["player:0", "player:1"]);
+    // No pin: there is no per-ability attribution on the wire to descend into.
+    expect(rows.every((row) => row.pinOnClick === null)).toBe(true);
   });
 
   it("reports the generated total and the current level as separate columns", () => {
@@ -55,5 +60,12 @@ describe("sba descriptor", () => {
     const rows = sba.rows(input("players", [player(0, { sba: 640 })]));
     expect(rows[0].value).toBe(640);
     expect(rows[0].columns).toEqual(["—", "640"]);
+  });
+
+  it("does not fall back to the level when the generated total is present but zero", () => {
+    // `??` not `||`: a genuine zero total is a real figure, not a missing one.
+    const rows = sba.rows(input("players", [player(0, { sba: 250, sbaGenerated: 0 })]));
+    expect(rows[0].value).toBe(0);
+    expect(rows[0].columns).toEqual(["0", "250"]);
   });
 });
