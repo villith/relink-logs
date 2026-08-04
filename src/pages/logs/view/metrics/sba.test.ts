@@ -10,7 +10,7 @@ const player = (
   values: {
     sba: number;
     sbaGenerated?: number;
-    skillBreakdown?: { action: number; damage: number; sbaGenerated?: number }[];
+    skillBreakdown?: { action: number; damage?: number; sbaGenerated?: number }[];
   }
 ) =>
   ({
@@ -33,9 +33,9 @@ const player = (
       actionType: { Normal: s.action },
       childCharacterType: "Pl0000",
       hits: 1,
-      minDamage: s.damage,
-      maxDamage: s.damage,
-      totalDamage: s.damage,
+      minDamage: s.damage ?? 0,
+      maxDamage: s.damage ?? 0,
+      totalDamage: s.damage ?? 0,
       sbaGenerated: s.sbaGenerated,
       totalStunValue: 0,
       maxStunValue: 0,
@@ -102,7 +102,7 @@ describe("sba descriptor", () => {
 });
 
 describe("sba drill-down", () => {
-  // Ungrouped action ids (see damageDone.test.ts): 100/101 on Pl0000 fold into
+  // Ungrouped action ids (see damageDone.test.ts): 100/110 on Pl0000 fold into
   // the shipped "normal-attack" group, which would test the grouping logic
   // rather than the SBA split.
   const owner = () =>
@@ -160,5 +160,31 @@ describe("sba drill-down", () => {
     const remote = player(1, { sba: 0, sbaGenerated: 500, skillBreakdown: [] });
     const rows = sba.rows(input("abilities", [remote], { source: 1, targets: [], ability: null }));
     expect(rows).toEqual([]);
+  });
+
+  it("sums a skill group's gains and drops attribution-less abilities", () => {
+    // 100 and 110 both fold into Pl0000's shipped "normal-attack" group; 9001 is
+    // ungrouped and carries damage but no attribution (a damage-only entry from
+    // a log predating per-skill SBA), so the zero-filter must drop it.
+    const rows = sba.rows(
+      input(
+        "abilities",
+        [
+          player(0, {
+            sba: 0,
+            sbaGenerated: 200,
+            skillBreakdown: [
+              { action: 100, sbaGenerated: 120 },
+              { action: 110, sbaGenerated: 80 },
+              { action: 9001, damage: 50 },
+            ],
+          }),
+        ],
+        { source: 0, targets: [], ability: null }
+      )
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].value).toBe(200);
+    expect(rows[0].key).toMatch(/normal-attack/);
   });
 });
