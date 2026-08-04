@@ -269,14 +269,13 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         "sba_vtable_grant_33bc050",
         sba::OnVtableGrant33bc050Hook::new().setup(&process),
     );
-    // hookdiag-only: log-only detour of the per-hit gauge-grant virtual
-    // (0x9b41b0) — tests whether the statically-derived grant path actually
-    // runs per hit at runtime (see sba::OnSBAGrantProbeHook). Never placed
-    // in a build without the feature.
-    #[cfg(feature = "hookdiag")]
+    // The per-hit gauge-grant virtual (0x9b41b0): the taken-side grant path —
+    // hits players RECEIVE grant a flat award through it with nothing parked
+    // on the thread, which is what the Unknown rises were (see
+    // sba::OnSBAGrantHook). Parks DamageTaken for the duration of each call.
     try_step(
-        "sba_grant_probe",
-        sba::OnSBAGrantProbeHook::new().setup(&process),
+        "sba_taken_grant",
+        sba::OnSBAGrantHook::new().setup(&process),
     );
 
     // DEV BUILDS ONLY. The one hook that changes game behavior rather than observing it;
