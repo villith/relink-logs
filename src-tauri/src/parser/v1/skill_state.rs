@@ -84,6 +84,13 @@ pub struct SkillState {
     /// Per-enemy-type share of this skill's damage (same-type spawns merge).
     #[serde(default)]
     pub targets: Vec<SkillTargetState>,
+    /// Gauge this skill generated, summed over the hits attributed to it.
+    ///
+    /// LOCAL PLAYER ONLY: a remote member's gauge is synced rather than granted
+    /// by a hit we can see, so their rows carry 0 and the UI must say so rather
+    /// than presenting a zero as a measurement.
+    #[serde(default)]
+    pub sba_generated: f64,
 }
 
 impl SkillState {
@@ -107,6 +114,7 @@ impl SkillState {
             overcap_base_sum: 0.0,
             overcap_cap_sum: 0.0,
             targets: Vec::new(),
+            sba_generated: 0.0,
         }
     }
 

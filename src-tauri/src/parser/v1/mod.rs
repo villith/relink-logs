@@ -1266,6 +1266,15 @@ impl DerivedEncounterState {
         }
     }
 
+    /// Files one attributed gauge gain against the player's causing skill row.
+    /// Dropped when the player has no row yet — a gain always trails the hit
+    /// that produced it, so a missing row means the hit itself was filtered out.
+    fn process_sba_gain(&mut self, actor_index: u32, action: ActionType, amount: f64) {
+        if let Some(player) = self.party.get_mut(&actor_index) {
+            player.add_sba_gain(action, amount);
+        }
+    }
+
     /// A gauge forced to a known level (attempt / perform / chain), which
     /// generates nothing.
     fn process_sba_level(&mut self, actor_index: u32, value: f64) {
@@ -2590,6 +2599,13 @@ impl Parser {
                         event.sba_added as f64,
                     );
                 }
+                Message::SbaGain(event) => {
+                    self.derived_state.process_sba_gain(
+                        event.actor_index,
+                        ActionType::Normal(event.action_id),
+                        event.amount as f64,
+                    );
+                }
                 Message::OnAttemptSBA(event) => {
                     self.derived_state
                         .process_sba_level(event.actor_index, 800.0);
@@ -3315,6 +3331,28 @@ impl Parser {
         let player_index = event.actor_index;
         if let Some(player) = self.derived_state.party.get_mut(&player_index) {
             player.apply_sba(event.sba_value as f64, event.sba_added as f64);
+        }
+
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
+        }
+    }
+
+    /// Handles one attributed SBA gain (local player only — see `SbaGainEvent`).
+    pub fn on_sba_gain(&mut self, event: protocol::SbaGainEvent) {
+        self.encounter.push_event(
+            Utc::now().timestamp_millis(),
+            Message::SbaGain(event.clone()),
+        );
+
+        // The gain carries a raw action id and no classification bits — the
+        // wire type's doc states the design: file it as Normal(id). Echo/DoT
+        // actions that would classify otherwise are not expected to grant gauge
+        // (the game gates the grant on the hit's own damage field); the live
+        // verification task checks that assumption.
+        let action = ActionType::Normal(event.action_id);
+        if let Some(player) = self.derived_state.party.get_mut(&event.actor_index) {
+            player.add_sba_gain(action, event.amount as f64);
         }
 
         if let Some(window) = &self.window_handle {
@@ -6217,6 +6255,43 @@ mod tests {
         assert_eq!(
             player.sba_generated, 500.0,
             "total generated is the sum of every sba_added"
+        );
+    }
+
+    /// An attributed gain lands in the same breakdown row the causing hit did, so
+    /// the SBA drill-down and the damage drill-down name the same skills.
+    #[test]
+    fn sba_gain_attributes_to_the_causing_skill_row() {
+        let mut parser = Parser::default();
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 1,
+            amount: 12.5,
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(1))
+            .expect("the causing skill's row");
+        assert_eq!(row.sba_generated, 12.5);
+        // The PLAYER total is NOT touched by a gain — it comes from the gauge poll,
+        // which covers all four members; attribution covers only the local player,
+        // and adding both would double-count them.
+        assert_eq!(
+            player.sba_generated, 0.0,
+            "a gain splits the total, it does not add to it"
         );
     }
 

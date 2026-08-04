@@ -256,6 +256,23 @@ impl PlayerState {
         }
     }
 
+    /// Files one attributed gauge gain against the breakdown row of the action
+    /// that caused it.
+    ///
+    /// Keyed by `(action, character_type)` through `breakdown_row_mut`, the same
+    /// find-or-create the damage path uses — so a gain always lands in a row the
+    /// damage tables already show rather than inventing a parallel one.
+    ///
+    /// Deliberately does NOT touch `self.sba_generated`. The player total comes
+    /// from the gauge poll, which covers all four party members; attribution
+    /// covers only the local player. Adding here as well would double the local
+    /// player's total while leaving everyone else's alone — this SPLITS the
+    /// total, it does not contribute to it.
+    pub fn add_sba_gain(&mut self, action: ActionType, amount: f64) {
+        self.breakdown_row_mut(action, self.character_type)
+            .sba_generated += amount;
+    }
+
     /// Folds one delta-path stun accrual that has no damage event of its own
     /// (Perfect Guard counters, non-guard stun procs) into this player: the
     /// delta-path total plus a zero-damage breakdown `action` row that counts the
