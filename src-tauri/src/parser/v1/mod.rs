@@ -1267,8 +1267,15 @@ impl DerivedEncounterState {
     }
 
     /// Files one attributed gauge gain against the player's causing skill row.
-    /// Dropped when the player has no row yet — a gain always trails the hit
-    /// that produced it, so a missing row means the hit itself was filtered out.
+    ///
+    /// Dropped when the player has no row yet. NOTE the wire ordering: the grant
+    /// runs INSIDE the game's damage processing, so a `SbaGain` precedes its own
+    /// causing `DamageEvent` on the pipe — the first hit of an encounter therefore
+    /// arrives before the reset that the damage event triggers, and its gain is
+    /// wiped with the pre-encounter log. That first-hit loss is accepted: it is
+    /// bounded by one hit's gauge and joins the same unattributed residue as
+    /// chain/scripted awards. Revisit with a pending hold if live verification
+    /// shows the residue matters.
     fn process_sba_gain(&mut self, actor_index: u32, action: ActionType, amount: f64) {
         if let Some(player) = self.party.get_mut(&actor_index) {
             player.add_sba_gain(action, amount);
@@ -3350,10 +3357,15 @@ impl Parser {
         // actions that would classify otherwise are not expected to grant gauge
         // (the game gates the grant on the hit's own damage field); the live
         // verification task checks that assumption.
-        let action = ActionType::Normal(event.action_id);
-        if let Some(player) = self.derived_state.party.get_mut(&event.actor_index) {
-            player.add_sba_gain(action, event.amount as f64);
-        }
+        //
+        // Routed through `process_sba_gain` rather than folded in here directly
+        // so the classification decision and the drop-if-no-row behavior (see
+        // its doc for the wire-ordering / first-hit-loss note) live in one place.
+        self.derived_state.process_sba_gain(
+            event.actor_index,
+            ActionType::Normal(event.action_id),
+            event.amount as f64,
+        );
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -6292,6 +6304,47 @@ mod tests {
         assert_eq!(
             player.sba_generated, 0.0,
             "a gain splits the total, it does not add to it"
+        );
+    }
+
+    /// The wire order is gain-then-damage (the grant runs inside damage
+    /// processing), so an encounter's opening gain arrives before any party row
+    /// exists and is dropped — pinned here as accepted behavior, while a gain
+    /// after the row exists lands.
+    #[test]
+    fn sba_gain_before_first_damage_event_is_dropped_not_held() {
+        let mut parser = Parser::default();
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 1,
+            amount: 7.0,
+        });
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 1,
+            amount: 12.5,
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(1))
+            .expect("row for the causing skill");
+        assert_eq!(
+            row.sba_generated, 12.5,
+            "only the post-row gain lands; the opener is accepted residue"
         );
     }
 
