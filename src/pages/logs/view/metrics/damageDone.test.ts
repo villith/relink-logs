@@ -505,5 +505,7 @@ describe("damageDone enemy side", () => {
     expect(rows[0].columns).toHaveLength(6);
     // min is blank: DamageTakenState carries no minimum.
     expect(rows[0].columns[2]).toBe("—");
+    // max folds across both victims' rows for 0xaa (500, 300) to the larger.
+    expect(rows[0].columns[3]).toBe("500");
   });
 });

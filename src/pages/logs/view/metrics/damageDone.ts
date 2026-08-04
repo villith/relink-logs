@@ -78,7 +78,8 @@ export const parseEnemyRow = (label: string): EnemyType | null => {
   }
 };
 
-/** What the pinned ability dealt to each enemy TYPE.
+/** What the pinned ability dealt to each enemy TYPE — the opposite direction
+ * from `enemyDealtRows` below, which asks what enemies dealt to the party.
  *
  * `SkillState.targets` is optional because cached payloads predate it, and it
  * carries no per-enemy extremes — those columns are honestly blank rather than
@@ -120,9 +121,10 @@ const rateOver = (amount: number, fightDurationMs?: number): string =>
   !fightDurationMs || fightDurationMs <= 0 ? NOT_RECORDED : format(amount / (fightDurationMs / 1000));
 
 /** Enemy types ranked by what they dealt TO the party, folded from the
- * per-victim incoming breakdown. Empty on logs recorded before damage-taken
- * capture (2026-08-04) — those recorded no incoming events at all, and the
- * table's empty state says so.
+ * per-victim incoming breakdown — the opposite direction from `enemyRows`
+ * above, which asks what a pinned ability dealt to each enemy type. Empty on
+ * logs recorded before damage-taken capture (2026-08-04) — those recorded no
+ * incoming events at all, and the table's empty state says so.
  *
  * At the players level this answers one question with three columns (amount,
  * rate, share), same as the friendly side. Below it, every OTHER damageDone
@@ -130,9 +132,10 @@ const rateOver = (amount: number, fightDurationMs?: number): string =>
  * must too or it renders three cells under a six-column header. Min stays
  * blank there because `DamageTakenState` — unlike `SkillState` — never
  * recorded a minimum; max is the largest single hit any breakdown row for
- * that type carried. */
+ * that type carried, and unlike `SkillState.maxDamage` it is never `null` —
+ * `DamageTakenState` is a newer type with no legacy-payload gap to guard. */
 const enemyDealtRows = (players: ComputedPlayerState[], level: RowLevel, fightDurationMs?: number): MetricRow[] => {
-  const byType = new Map<string, { damage: number; hits: number; maxDamage: number | null }>();
+  const byType = new Map<string, { damage: number; hits: number; maxDamage: number }>();
   for (const player of players) {
     for (const row of player.damageTakenBreakdown ?? []) {
       const key = JSON.stringify(row.enemyType);
@@ -140,7 +143,7 @@ const enemyDealtRows = (players: ComputedPlayerState[], level: RowLevel, fightDu
       if (found) {
         found.damage += row.totalDamage;
         found.hits += row.hits;
-        found.maxDamage = found.maxDamage === null ? row.maxDamage : Math.max(found.maxDamage, row.maxDamage);
+        found.maxDamage = Math.max(found.maxDamage, row.maxDamage);
       } else byType.set(key, { damage: row.totalDamage, hits: row.hits, maxDamage: row.maxDamage });
     }
   }
@@ -155,7 +158,7 @@ const enemyDealtRows = (players: ComputedPlayerState[], level: RowLevel, fightDu
       columns:
         level === "players"
           ? [format(damage), rateOver(damage, fightDurationMs), share(damage, total)]
-          : damageColumns(damage, hits, NOT_RECORDED, maxDamage === null ? NOT_RECORDED : format(maxDamage), total),
+          : damageColumns(damage, hits, NOT_RECORDED, format(maxDamage), total),
       // The pin model has no enemy-type pin; the hover card decomposes instead.
       pinOnClick: null,
       colorSlot: -1,
