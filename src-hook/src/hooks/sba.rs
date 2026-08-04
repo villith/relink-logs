@@ -517,6 +517,20 @@ impl Drop for CauseGuard {
     }
 }
 
+/// hookdiag: one `SBASITE <name> n=<n>` line per grant-site fire (rate-limited),
+/// so a live round can say WHICH detours fired — the aggregate SBAGAIN "named"
+/// bucket cannot. Live round 1 (2026-08-04) needed exactly this to tell whether
+/// Perfect Guard grants were absent or merely masked by the generic percent
+/// API's inner `Effect(0)` guard.
+#[cfg(feature = "hookdiag")]
+fn log_site_fire(name: &str, counter: &std::sync::atomic::AtomicU32) {
+    use std::sync::atomic::Ordering as AtomicOrdering;
+    let n = counter.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+    if n <= 8 || n % 16 == 0 {
+        log::info!("SBASITE {name} n={n}");
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Grant-site detours (v2.0.3 caller map of the gauge update, derived
 // 2026-08-04): pass-through hooks on the named routes into the gauge update.
@@ -656,6 +670,11 @@ impl OnJustGuardGrantHook {
     }
 
     fn run(a1: *const usize, a2: *const usize) -> usize {
+        #[cfg(feature = "hookdiag")]
+        {
+            static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            log_site_fire("just_guard", &N);
+        }
         let _guard = CauseGuard::park(protocol::SbaGainCause::PerfectGuard);
         unsafe { OnJustGuardGrant.call(a1, a2) }
     }
@@ -689,6 +708,11 @@ impl OnEffectGrantHook {
     }
 
     fn run(a1: *const usize) -> usize {
+        #[cfg(feature = "hookdiag")]
+        {
+            static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            log_site_fire("effect_record", &N);
+        }
         // Key unread for now: the site fires from a hashmap walk whose record
         // pointer is a local. `Effect(0)` still separates "an effect granted
         // this" from "nobody knows", which is the whole point of the bucket.
@@ -730,7 +754,20 @@ impl OnGaugePercentGrantHook {
 
     #[allow(clippy::too_many_arguments)]
     fn run(a1: *const usize, a2: f32, a3: u8, a4: u8, a5: u8, a6: u32, a7: u8, a8: u8) -> usize {
-        let _guard = CauseGuard::park(protocol::SbaGainCause::Effect(0));
+        #[cfg(feature = "hookdiag")]
+        {
+            static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            log_site_fire("percent_api", &N);
+        }
+        // Park only when no more specific site already parked one: this is the
+        // shared entry point, and live round 1 showed the just-guard site's
+        // PerfectGuard being overwritten here — the generic API is the INNER
+        // frame, so parking unconditionally masks every caller that named
+        // itself. An enclosing cause always outranks the generic bucket.
+        let _guard = match CauseGuard::current() {
+            None => Some(CauseGuard::park(protocol::SbaGainCause::Effect(0))),
+            Some(_) => None,
+        };
         unsafe { OnGaugePercentGrant.call(a1, a2, a3, a4, a5, a6, a7, a8) }
     }
 }
@@ -775,6 +812,11 @@ impl OnQuestStartGaugeHook {
         a7: u8,
         a8: u32,
     ) -> usize {
+        #[cfg(feature = "hookdiag")]
+        {
+            static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            log_site_fire("quest_start", &N);
+        }
         let _guard = CauseGuard::park(protocol::SbaGainCause::QuestStart);
         unsafe { OnQuestStartGauge.call(a1, a2, a3, a4, a5, a6, a7, a8) }
     }
@@ -809,6 +851,11 @@ impl OnQuestStartGaugeSoloHook {
     }
 
     fn run(a1: u32, a2: *const usize, a3: u8, a4: u32) -> usize {
+        #[cfg(feature = "hookdiag")]
+        {
+            static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            log_site_fire("quest_start_solo", &N);
+        }
         let _guard = CauseGuard::park(protocol::SbaGainCause::QuestStart);
         unsafe { OnQuestStartGaugeSolo.call(a1, a2, a3, a4) }
     }
@@ -842,6 +889,11 @@ impl OnVtableGrant191be40Hook {
     }
 
     fn run(a1: *const usize) -> usize {
+        #[cfg(feature = "hookdiag")]
+        {
+            static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            log_site_fire("vtable_191be40", &N);
+        }
         let _guard = CauseGuard::park(protocol::SbaGainCause::Site(site::VTABLE_GRANT_191BE40));
         unsafe { OnVtableGrant191be40.call(a1) }
     }
@@ -874,6 +926,11 @@ impl OnVtableGrant33bbc20Hook {
     }
 
     fn run(a1: *const usize, a2: *const usize) -> usize {
+        #[cfg(feature = "hookdiag")]
+        {
+            static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            log_site_fire("vtable_33bbc20", &N);
+        }
         let _guard = CauseGuard::park(protocol::SbaGainCause::Site(site::VTABLE_GRANT_33BBC20));
         unsafe { OnVtableGrant33bbc20.call(a1, a2) }
     }
@@ -906,6 +963,11 @@ impl OnVtableGrant33bc050Hook {
     }
 
     fn run(a1: *const usize) -> usize {
+        #[cfg(feature = "hookdiag")]
+        {
+            static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            log_site_fire("vtable_33bc050", &N);
+        }
         let _guard = CauseGuard::park(protocol::SbaGainCause::Site(site::VTABLE_GRANT_33BC050));
         unsafe { OnVtableGrant33bc050.call(a1) }
     }
