@@ -56,6 +56,14 @@ pub(super) fn disable() {
     super::disable_quiet("OnContinueSBAChain", &OnContinueSBAChain);
     super::disable_quiet("OnRemoteSBAUpdate", &OnRemoteSBAUpdate);
     super::disable_quiet("OnSBARegisterHit", &OnSBARegisterHit);
+    super::disable_quiet("OnJustGuardGrant", &OnJustGuardGrant);
+    super::disable_quiet("OnEffectGrant", &OnEffectGrant);
+    super::disable_quiet("OnGaugePercentGrant", &OnGaugePercentGrant);
+    super::disable_quiet("OnQuestStartGauge", &OnQuestStartGauge);
+    super::disable_quiet("OnQuestStartGaugeSolo", &OnQuestStartGaugeSolo);
+    super::disable_quiet("OnVtableGrant191be40", &OnVtableGrant191be40);
+    super::disable_quiet("OnVtableGrant33bbc20", &OnVtableGrant33bbc20);
+    super::disable_quiet("OnVtableGrant33bc050", &OnVtableGrant33bc050);
     #[cfg(feature = "hookdiag")]
     super::disable_quiet("OnSBAGrant", &OnSBAGrant);
 }
@@ -456,7 +464,16 @@ fn poll_slots_and_emit(tx: &event::Tx) {
 
 /// Stable tags for grant sites that have no gameplay name yet — the payload of
 /// `SbaGainCause::Site`. Never renumber: a stored log carries these.
-#[allow(dead_code)] // referenced from Task 14's vtable-site detours when they land
+///
+/// NOT hooked, and why: v2.0.3 has one more `UNCONDITIONAL_CALL` into the
+/// gauge wrapper, at rva 0x3940da3, that Ghidra attributes to no function.
+/// FindEntry on the analyzed DB (2026-08-04) found no containing function and
+/// its backward-prologue guess (0x3940660) did not hold up, so there is no
+/// verified entry to detour — a detour on a guessed entry is how the game
+/// crashes. Rises reaching the gauge update from that site land in
+/// `SbaGainCause::Unknown`, whose amounts the SBAUNK hookdiag line logs; if
+/// live data shows a persistent Unknown bucket, that call site is the first
+/// place to look.
 pub(crate) mod site {
     pub const VTABLE_GRANT_191BE40: u32 = 1;
     pub const VTABLE_GRANT_33BBC20: u32 = 2;
@@ -481,7 +498,6 @@ thread_local! {
 struct CauseGuard(Option<protocol::SbaGainCause>);
 
 impl CauseGuard {
-    #[allow(dead_code)] // the first grant-site detour (just-guard) lands next
     fn park(cause: protocol::SbaGainCause) -> Self {
         CauseGuard(
             PENDING_CAUSE
@@ -498,6 +514,400 @@ impl CauseGuard {
 impl Drop for CauseGuard {
     fn drop(&mut self) {
         let _ = PENDING_CAUSE.try_with(|c| c.set(self.0));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Grant-site detours (v2.0.3 caller map of the gauge update, derived
+// 2026-08-04): pass-through hooks on the named routes into the gauge update.
+// Each parks its cause on PENDING_CAUSE for the duration of the original call
+// and forwards every argument verbatim; the gauge-update hook reads the cause
+// back (see `resolve_cause`). Every signature below is DIRECT-ENTRY, confirmed
+// as a function entry with the stated arity (Ghidra InspectFunc + prologue,
+// 2026-08-04) and verified to exactly 1 sigscan match — a wrong-arity detour
+// leaves a register garbage and takes the game down with it.
+// ---------------------------------------------------------------------------
+
+/// Just-guard grant site (v2.0.3 entry 0x1f36f70; strings `core_pl_just_guard`,
+/// `core_pl_just_guard_frend`). Reads a `{gauge%, other%}` pair from a
+/// hash-keyed effect record and grants the first through the gauge wrapper, so
+/// the gauge update runs as a synchronous callee of this frame. Prologue reads
+/// rcx+rdx only (`mov rdi,rdx / mov rsi,rcx`) — arity 2.
+type OnJustGuardGrantFunc = unsafe extern "system" fn(*const usize, *const usize) -> usize;
+
+/// Anchored on the tail of the small preceding function (`mov al,1 / jmp`),
+/// cursor at the entry. sigscan 2026-08-04: exactly 1 match, cursor=0x1f36f70.
+const ON_JUST_GUARD_GRANT_SIG: &str = "b0 01 eb ea ' 55 41 57 41 56 56 57 53 48 81 ec 68 04 00 00 48 8d ac 24 80 00 00 00 c5 78 29 85 d0 03 00 00";
+
+/// Effect-record grant (v2.0.3 entry 0x26f9640), called from 0x9b31b0 in the
+/// damage-side chain; grants from a hash-keyed `{sba%, other%}` record. The
+/// leading candidate for damage-taken and sigil-driven awards (Nimble
+/// Onslaught). Prologue reads rcx only (`mov rsi,rcx`, then rcx fields) —
+/// arity 1.
+type OnEffectGrantFunc = unsafe extern "system" fn(*const usize) -> usize;
+
+/// int3 padding + prologue through the xmm10 spill. sigscan 2026-08-04:
+/// exactly 1 match, cursor=0x26f9640.
+const ON_EFFECT_GRANT_SIG: &str = "cc cc cc cc ' 55 41 56 56 57 53 48 81 ec 30 02 00 00 48 8d ac 24 80 00 00 00 c5 78 29 95 a0 01 00 00 c5 78 29 8d 90 01 00 00";
+
+/// Generic "add gauge %" API (v2.0.3 entry 0xbcaa90; `param_2 * 100 * scale`,
+/// rounded), callers 0x9d5420 / 0xb94800. The highest-arity site here and the
+/// easiest to get wrong: 8 args, the second in xmm1 — the declaration mirrors
+/// how `OnSBAUpdateFunc` mixes pointer and float args under the MS x64 ABI.
+/// Prologue reads r8d+r9d early (`mov ebx,r9d / mov edi,r8d`) and the stack
+/// args in the body.
+type OnGaugePercentGrantFunc =
+    unsafe extern "system" fn(*const usize, f32, u8, u8, u8, u32, u8, u8) -> usize;
+
+/// Anchored on the tail of the preceding function (`jmp` short + int3), cursor
+/// at the entry. sigscan 2026-08-04: exactly 1 match, cursor=0xbcaa90.
+const ON_GAUGE_PERCENT_GRANT_SIG: &str = "eb d3 cc ' 55 41 56 56 57 53 48 81 ec 90 01 00 00 48 8d ac 24 80 00 00 00 c5 f8 29 b5 00 01 00 00 48 c7 85 f8 00 00 00 fe ff ff ff 44 89 cb 44 89 c7";
+
+/// Quest-start / per-slot initial gauge (v2.0.3 entry 0x6c50f0; strings
+/// `PlayerBahamut`, `PlayerNPC`, `pl_solo_type`). Fires once per quest load.
+/// Prologue reads edx+r8d+r9d (`mov r14d,r9d / mov r15d,r8d / mov r12d,edx`)
+/// plus stack args — arity 8 per the decompile.
+type OnQuestStartGaugeFunc = unsafe extern "system" fn(
+    *const usize,
+    u32,
+    u32,
+    u32,
+    *const usize,
+    *const u8,
+    u8,
+    u32,
+) -> usize;
+
+/// int3 padding + prologue through the register moves. sigscan 2026-08-04:
+/// exactly 1 match, cursor=0x6c50f0.
+const ON_QUEST_START_GAUGE_SIG: &str = "cc cc cc cc ' 55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec 48 01 00 00 48 8d ac 24 80 00 00 00 48 c7 85 c0 00 00 00 fe ff ff ff 45 89 ce 45 89 c7 41 89 d4";
+
+/// Quest-start gauge, single-player variant (v2.0.3 entry 0x6c4910; string
+/// `Player_{}`). Prologue reads ecx+rdx+r8d+r9d (`mov ebx,r8d / mov rdi,rdx /
+/// mov r14d,ecx / cmp r9d,-1`) — arity 4.
+type OnQuestStartGaugeSoloFunc = unsafe extern "system" fn(u32, *const usize, u8, u32) -> usize;
+
+/// int3 padding + prologue through the `cmp r9d,-1`. sigscan 2026-08-04:
+/// exactly 1 match, cursor=0x6c4910.
+const ON_QUEST_START_GAUGE_SOLO_SIG: &str = "cc cc cc cc ' 55 41 57 41 56 56 57 53 48 81 ec e8 00 00 00 48 8d ac 24 80 00 00 00 48 c7 45 60 fe ff ff ff 44 89 c3 48 89 d7 41 89 ce 41 83 f9 ff";
+
+/// Unnamed vtable-registered % grant (v2.0.3 entry 0x191be40; no strings, no
+/// gameplay identity yet — hence `Site(VTABLE_GRANT_191BE40)`). Prologue reads
+/// rcx only (`mov edx,[rcx+0x10]`) — arity 1.
+type OnVtableGrant191be40Func = unsafe extern "system" fn(*const usize) -> usize;
+
+/// Padding + prologue, stopping BEFORE the RIP-relative `mov rbx,[rip+..]` so
+/// no displacement byte is baked in. sigscan 2026-08-04: exactly 1 match,
+/// cursor=0x191be40.
+const ON_VTABLE_GRANT_191BE40_SIG: &str = "c3 cc cc cc cc cc cc ' 56 57 48 83 ec 68 c5 f8 29 74 24 50 8b 51 10 85 d2 0f 84 a3 01 00 00 48 8b 41 18 4c 8b 41 20";
+
+/// Unnamed % grant (v2.0.3 entry 0x33bbc20). Prologue reads rcx+rdx
+/// (`mov rbx,rdx / mov rdi,rcx`) — arity 2.
+type OnVtableGrant33bbc20Func = unsafe extern "system" fn(*const usize, *const usize) -> usize;
+
+/// Padding + prologue through the `mov r14d,[rcx+0x171d8]` field read.
+/// sigscan 2026-08-04: exactly 1 match, cursor=0x33bbc20.
+const ON_VTABLE_GRANT_33BBC20_SIG: &str = "c3 cc cc cc cc cc ' 41 56 56 57 53 48 83 ec 68 c5 f8 29 74 24 50 48 89 d3 48 89 cf 48 8d b1 a0 be ff ff 44 8b b1 d8 71 01 00";
+
+/// Unnamed % grant (v2.0.3 entry 0x33bc050). Prologue reads rcx only
+/// (`mov rsi,rcx`, then rcx fields) — arity 1.
+type OnVtableGrant33bc050Func = unsafe extern "system" fn(*const usize) -> usize;
+
+/// Padding + prologue through the `[rsi+0xc228]` lea. sigscan 2026-08-04:
+/// exactly 1 match, cursor=0x33bc050.
+const ON_VTABLE_GRANT_33BC050_SIG: &str = "cc ' 56 48 83 ec 60 c5 f8 29 74 24 50 48 89 ce 48 8b 89 20 c2 00 00 48 85 c9 0f 84 ec 00 00 00 48 8d 86 28 c2 00 00";
+
+static_detour! {
+    static OnJustGuardGrant: unsafe extern "system" fn(*const usize, *const usize) -> usize;
+    static OnEffectGrant: unsafe extern "system" fn(*const usize) -> usize;
+    static OnGaugePercentGrant: unsafe extern "system" fn(*const usize, f32, u8, u8, u8, u32, u8, u8) -> usize;
+    static OnQuestStartGauge: unsafe extern "system" fn(*const usize, u32, u32, u32, *const usize, *const u8, u8, u32) -> usize;
+    static OnQuestStartGaugeSolo: unsafe extern "system" fn(u32, *const usize, u8, u32) -> usize;
+    static OnVtableGrant191be40: unsafe extern "system" fn(*const usize) -> usize;
+    static OnVtableGrant33bbc20: unsafe extern "system" fn(*const usize, *const usize) -> usize;
+    static OnVtableGrant33bc050: unsafe extern "system" fn(*const usize) -> usize;
+}
+
+/// PRODUCTION detour of the just-guard gauge grant: parks
+/// [`protocol::SbaGainCause::PerfectGuard`] for the duration of the original
+/// call. Forwards both args verbatim; no other side effects.
+pub struct OnJustGuardGrantHook;
+
+impl OnJustGuardGrantHook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(original) = process.search_address(ON_JUST_GUARD_GRANT_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on just guard grant");
+
+            unsafe {
+                let func: OnJustGuardGrantFunc = std::mem::transmute(original);
+                OnJustGuardGrant.initialize(func, |a1, a2| Self::run(a1, a2))?;
+                OnJustGuardGrant.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find just_guard_grant"));
+        }
+
+        Ok(())
+    }
+
+    fn run(a1: *const usize, a2: *const usize) -> usize {
+        let _guard = CauseGuard::park(protocol::SbaGainCause::PerfectGuard);
+        unsafe { OnJustGuardGrant.call(a1, a2) }
+    }
+}
+
+/// PRODUCTION detour of the effect-record gauge grant: parks
+/// [`protocol::SbaGainCause::Effect`] for the duration of the original call.
+/// Forwards its arg verbatim; no other side effects.
+pub struct OnEffectGrantHook;
+
+impl OnEffectGrantHook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(original) = process.search_address(ON_EFFECT_GRANT_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on effect grant");
+
+            unsafe {
+                let func: OnEffectGrantFunc = std::mem::transmute(original);
+                OnEffectGrant.initialize(func, |a1| Self::run(a1))?;
+                OnEffectGrant.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find effect_grant"));
+        }
+
+        Ok(())
+    }
+
+    fn run(a1: *const usize) -> usize {
+        // Key unread for now: the site fires from a hashmap walk whose record
+        // pointer is a local. `Effect(0)` still separates "an effect granted
+        // this" from "nobody knows", which is the whole point of the bucket.
+        let _guard = CauseGuard::park(protocol::SbaGainCause::Effect(0));
+        unsafe { OnEffectGrant.call(a1) }
+    }
+}
+
+/// PRODUCTION detour of the generic "add gauge %" API: parks
+/// [`protocol::SbaGainCause::Effect`] for the duration of the original call.
+/// If a more specific site (just-guard, effect-record) also fired for the same
+/// rise, its guard nests INSIDE this one and wins — the correct precedence.
+/// Forwards all eight args verbatim; no other side effects.
+pub struct OnGaugePercentGrantHook;
+
+impl OnGaugePercentGrantHook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(original) = process.search_address(ON_GAUGE_PERCENT_GRANT_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on gauge percent grant");
+
+            unsafe {
+                let func: OnGaugePercentGrantFunc = std::mem::transmute(original);
+                OnGaugePercentGrant.initialize(func, |a1, a2, a3, a4, a5, a6, a7, a8| {
+                    Self::run(a1, a2, a3, a4, a5, a6, a7, a8)
+                })?;
+                OnGaugePercentGrant.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find gauge_percent_grant"));
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn run(a1: *const usize, a2: f32, a3: u8, a4: u8, a5: u8, a6: u32, a7: u8, a8: u8) -> usize {
+        let _guard = CauseGuard::park(protocol::SbaGainCause::Effect(0));
+        unsafe { OnGaugePercentGrant.call(a1, a2, a3, a4, a5, a6, a7, a8) }
+    }
+}
+
+/// PRODUCTION detour of the quest-start / per-slot initial gauge award: parks
+/// [`protocol::SbaGainCause::QuestStart`] for the duration of the original
+/// call. Fires once per quest load. Forwards all args verbatim.
+pub struct OnQuestStartGaugeHook;
+
+impl OnQuestStartGaugeHook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(original) = process.search_address(ON_QUEST_START_GAUGE_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on quest start gauge");
+
+            unsafe {
+                let func: OnQuestStartGaugeFunc = std::mem::transmute(original);
+                OnQuestStartGauge.initialize(func, |a1, a2, a3, a4, a5, a6, a7, a8| {
+                    Self::run(a1, a2, a3, a4, a5, a6, a7, a8)
+                })?;
+                OnQuestStartGauge.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find quest_start_gauge"));
+        }
+
+        Ok(())
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn run(
+        a1: *const usize,
+        a2: u32,
+        a3: u32,
+        a4: u32,
+        a5: *const usize,
+        a6: *const u8,
+        a7: u8,
+        a8: u32,
+    ) -> usize {
+        let _guard = CauseGuard::park(protocol::SbaGainCause::QuestStart);
+        unsafe { OnQuestStartGauge.call(a1, a2, a3, a4, a5, a6, a7, a8) }
+    }
+}
+
+/// PRODUCTION detour of the single-player quest-start gauge award: parks
+/// [`protocol::SbaGainCause::QuestStart`] for the duration of the original
+/// call. Forwards all args verbatim.
+pub struct OnQuestStartGaugeSoloHook;
+
+impl OnQuestStartGaugeSoloHook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(original) = process.search_address(ON_QUEST_START_GAUGE_SOLO_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on quest start gauge solo");
+
+            unsafe {
+                let func: OnQuestStartGaugeSoloFunc = std::mem::transmute(original);
+                OnQuestStartGaugeSolo
+                    .initialize(func, |a1, a2, a3, a4| Self::run(a1, a2, a3, a4))?;
+                OnQuestStartGaugeSolo.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find quest_start_gauge_solo"));
+        }
+
+        Ok(())
+    }
+
+    fn run(a1: u32, a2: *const usize, a3: u8, a4: u32) -> usize {
+        let _guard = CauseGuard::park(protocol::SbaGainCause::QuestStart);
+        unsafe { OnQuestStartGaugeSolo.call(a1, a2, a3, a4) }
+    }
+}
+
+/// PRODUCTION detour of the unnamed vtable grant at 0x191be40: parks
+/// [`protocol::SbaGainCause::Site`] with its stable tag. Live data showing WHEN
+/// it fires is what will earn it a real name.
+pub struct OnVtableGrant191be40Hook;
+
+impl OnVtableGrant191be40Hook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(original) = process.search_address(ON_VTABLE_GRANT_191BE40_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on vtable grant 191be40");
+
+            unsafe {
+                let func: OnVtableGrant191be40Func = std::mem::transmute(original);
+                OnVtableGrant191be40.initialize(func, |a1| Self::run(a1))?;
+                OnVtableGrant191be40.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find vtable_grant_191be40"));
+        }
+
+        Ok(())
+    }
+
+    fn run(a1: *const usize) -> usize {
+        let _guard = CauseGuard::park(protocol::SbaGainCause::Site(site::VTABLE_GRANT_191BE40));
+        unsafe { OnVtableGrant191be40.call(a1) }
+    }
+}
+
+/// PRODUCTION detour of the unnamed vtable grant at 0x33bbc20 (see the
+/// 0x191be40 hook).
+pub struct OnVtableGrant33bbc20Hook;
+
+impl OnVtableGrant33bbc20Hook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(original) = process.search_address(ON_VTABLE_GRANT_33BBC20_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on vtable grant 33bbc20");
+
+            unsafe {
+                let func: OnVtableGrant33bbc20Func = std::mem::transmute(original);
+                OnVtableGrant33bbc20.initialize(func, |a1, a2| Self::run(a1, a2))?;
+                OnVtableGrant33bbc20.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find vtable_grant_33bbc20"));
+        }
+
+        Ok(())
+    }
+
+    fn run(a1: *const usize, a2: *const usize) -> usize {
+        let _guard = CauseGuard::park(protocol::SbaGainCause::Site(site::VTABLE_GRANT_33BBC20));
+        unsafe { OnVtableGrant33bbc20.call(a1, a2) }
+    }
+}
+
+/// PRODUCTION detour of the unnamed vtable grant at 0x33bc050 (see the
+/// 0x191be40 hook).
+pub struct OnVtableGrant33bc050Hook;
+
+impl OnVtableGrant33bc050Hook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(original) = process.search_address(ON_VTABLE_GRANT_33BC050_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on vtable grant 33bc050");
+
+            unsafe {
+                let func: OnVtableGrant33bc050Func = std::mem::transmute(original);
+                OnVtableGrant33bc050.initialize(func, |a1| Self::run(a1))?;
+                OnVtableGrant33bc050.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find vtable_grant_33bc050"));
+        }
+
+        Ok(())
+    }
+
+    fn run(a1: *const usize) -> usize {
+        let _guard = CauseGuard::park(protocol::SbaGainCause::Site(site::VTABLE_GRANT_33BC050));
+        unsafe { OnVtableGrant33bc050.call(a1) }
     }
 }
 

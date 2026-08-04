@@ -234,6 +234,41 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         "sba_register_hit",
         sba::OnSBARegisterHitHook::new().setup(&process),
     );
+    // Cause-parking grant sites (see the grant-site block in sba.rs): each
+    // parks a named SbaGainCause while the game's own grant routine runs, so
+    // the gauge hook can caption rises no damaging hit explains.
+    try_step(
+        "sba_just_guard_grant",
+        sba::OnJustGuardGrantHook::new().setup(&process),
+    );
+    try_step(
+        "sba_effect_grant",
+        sba::OnEffectGrantHook::new().setup(&process),
+    );
+    try_step(
+        "sba_percent_grant",
+        sba::OnGaugePercentGrantHook::new().setup(&process),
+    );
+    try_step(
+        "sba_quest_start_gauge",
+        sba::OnQuestStartGaugeHook::new().setup(&process),
+    );
+    try_step(
+        "sba_quest_start_gauge_solo",
+        sba::OnQuestStartGaugeSoloHook::new().setup(&process),
+    );
+    try_step(
+        "sba_vtable_grant_191be40",
+        sba::OnVtableGrant191be40Hook::new().setup(&process),
+    );
+    try_step(
+        "sba_vtable_grant_33bbc20",
+        sba::OnVtableGrant33bbc20Hook::new().setup(&process),
+    );
+    try_step(
+        "sba_vtable_grant_33bc050",
+        sba::OnVtableGrant33bc050Hook::new().setup(&process),
+    );
     // hookdiag-only: log-only detour of the per-hit gauge-grant virtual
     // (0x9b41b0) — tests whether the statically-derived grant path actually
     // runs per hit at runtime (see sba::OnSBAGrantProbeHook). Never placed
