@@ -47,7 +47,7 @@ import {
 import { actionsForPin } from "../abilitySkills";
 import { rowLevelFor } from "../deriveRows";
 import { buffs, enemyHolderKey, heldByRoster, slotsOf } from "../metrics/buffs";
-import { damageDone } from "../metrics/damageDone";
+import { damageDone, parseEnemyRow } from "../metrics/damageDone";
 import { debuffs } from "../metrics/debuffs";
 import { sba } from "../metrics/sba";
 import { stun } from "../metrics/stun";
@@ -100,13 +100,17 @@ const METRIC_TABS: MetricTab[] = Object.entries(METRICS).map(([value, descriptor
   labelKey: descriptor.labelKey,
 }));
 
-/** i18next key naming a status table's rows, which are effects and then the
- * actors holding one — neither of which the level-based keys describe. */
-const STATUS_ROWS_LABEL_KEY = {
+/** i18next key naming what a row is, by KIND — for the tables whose rows the
+ * level alone does not describe: a status table's effects and the actors
+ * holding one, and a damage drill-down that decomposed into enemies or
+ * players instead of member skills. */
+const KIND_ROWS_LABEL_KEY = {
   status: "ui.logs.rows-by-effect",
   player: "ui.logs.rows-by-player",
-  // A debuff holder is an enemy spawn, so it reads "Enemy" to the user.
+  // A debuff holder is an enemy spawn, and a damage row's `enemy` is an enemy
+  // type — both read as "Enemy" to the user.
   target: "ui.logs.rows-by-enemy",
+  enemy: "ui.logs.rows-by-enemy",
   ability: "ui.logs.rows-by-ability",
 } as const;
 
@@ -121,7 +125,9 @@ const ROWS_LABEL_KEY = {
 const DRILL_LABEL_KEY = {
   players: "ui.logs.chart-dps-label",
   abilities: "ui.logs.chart-drill-ability-label",
-  // The table lists the group's members here; the chart still stacks by enemy.
+  // The chart always stacks by enemy here. The table agrees when the pinned row
+  // held one action and decomposed into enemies too, and lists the group's
+  // members when it held several — the plot stays the coarser of the two.
   skills: "ui.logs.chart-drill-target-label",
 } as const;
 
@@ -189,11 +195,16 @@ export const AnalysisView = () => {
 
   const [pins, setPins] = useSelectorParams();
   const [metricKey, setMetricKey] = useState<string>("damage");
-  // Which side's holders the status tables show. Follows the tab's natural
-  // side on every tab/log switch (Buffs → friendly, Debuffs → enemy), which is
-  // exactly what the tables showed before the switch existed.
+  // Which side's holders the status tables show. Independent of the tab:
+  // polarity (buff vs debuff) and holder side are two axes, and Warcraft Logs
+  // opens BOTH its aura tabs on Friendlies. Pinning Debuffs to the enemy side
+  // made the switch look like a consequence of the tab and hid the ailments the
+  // party was carrying, which is the first thing a Debuffs tab should answer.
+  //
+  // Reset per LOG, not per tab: a side chosen on Buffs still means the same
+  // thing on Debuffs, so switching tabs must not undo it.
   const [hostility, setHostility] = useState<Hostility>("friendly");
-  useEffect(() => setHostility(metricKey === "debuffs" ? "enemy" : "friendly"), [metricKey, id]);
+  useEffect(() => setHostility("friendly"), [id]);
   // Committed window as [start, end] second indexes; null = the full fight. The
   // in-flight drag lives inside DpsChart — nothing outside it needs to know
   // about a selection that has not been released yet.
@@ -544,10 +555,15 @@ export const AnalysisView = () => {
   const isStatusMetric = metric.labelKind("players") === "status";
   const statusRowKind = statusRowKindFor(pins.ability, hostility);
 
+  // A descriptor that can produce more than one shape of row at one level says
+  // so on the rows themselves (`MetricRow.kind`). Every row of a table shares a
+  // shape, so the first of them settles it for the header too.
+  const declaredKind = rows[0]?.kind;
+
   // What a row's label and its icon are BOTH resolved against. One value rather
   // than the same expression in each callback: the two must never disagree, or
   // a row pairs one kind's name with another kind's art.
-  const rowKind = isStatusMetric ? statusRowKind : metric.labelKind(level);
+  const rowKind = declaredKind ?? (isStatusMetric ? statusRowKind : metric.labelKind(level));
 
   // One colour per slotless status row, shared with the chart bands below so a
   // row and its band can never disagree.
@@ -572,6 +588,9 @@ export const AnalysisView = () => {
         const segment = targetRowSegment(row.label);
         return segment === null ? undefined : enemyIconUrl(targetEntries[segment]?.enemyType ?? null);
       }
+      // An enemy TYPE row carries the type itself, so it needs no spawn to look
+      // one up through.
+      if (rowKind === "enemy") return enemyIconUrl(parseEnemyRow(row.label));
       return abilityRowIconUrl(row.label, identityPlayers, playerByIndex.get(pins.source ?? -1)?.player);
     },
     [rowKind, playerByIndex, targetEntries, identityPlayers, pins.source]
@@ -590,7 +609,9 @@ export const AnalysisView = () => {
             ? labelForSource(Number(row.label))
             : rowKind === "target"
               ? targetRowLabel(row.label, labelForTarget)
-              : labelForAbility(row.label);
+              : rowKind === "enemy"
+                ? translateEnemyType(parseEnemyRow(row.label))
+                : labelForAbility(row.label);
       const icon = rowIconUrl(row);
       if (!icon) return name;
       return (
@@ -682,9 +703,15 @@ export const AnalysisView = () => {
     [labelForAbility, identityPlayers, labelForSource, palette, playerData, playerByIndex]
   );
 
+  // Null for a metric with no breakdown behind its rows (SBA is a gauge
+  // reading; the status tables' rows are effects and holders). Those tabs used
+  // to inherit the damage card and explain a gauge with damage figures.
   const rowSections = useCallback(
-    (row: MetricRow) => cardSectionsFor({ row, level, players, pins, color: rowColor(row), labels: sectionLabels }),
-    [level, players, pins, rowColor, sectionLabels]
+    (row: MetricRow) =>
+      metric.card
+        ? cardSectionsFor({ row, level, players, pins, color: rowColor(row), labels: sectionLabels, card: metric.card })
+        : null,
+    [metric, level, players, pins, rowColor, sectionLabels]
   );
   // What the plot shows follows the metric tabs. Each metric brings its own
   // bucketed series from the base load, so switching tabs never refetches.
@@ -968,13 +995,15 @@ export const AnalysisView = () => {
         imported={imported}
       />
 
-      <MetricTabs tabs={METRIC_TABS} value={metricKey} onChange={setMetricKey} />
+      {/* Above the tabs, where Warcraft Logs puts it: the side is a property of
+          the whole view, not of one tab, and rendering it below the switcher
+          shifted every control under it each time the tab changed. Only the
+          status tabs can operate it — see HostilityToggle's `disabled`. */}
+      <Box style={{ padding: "8px 16px 0" }}>
+        <HostilityToggle value={hostility} onChange={setHostility} disabled={!isStatusMetric} />
+      </Box>
 
-      {isStatusMetric && (
-        <Box style={{ padding: "8px 16px 0" }}>
-          <HostilityToggle value={hostility} onChange={setHostility} />
-        </Box>
-      )}
+      <MetricTabs tabs={METRIC_TABS} value={metricKey} onChange={setMetricKey} />
 
       <PinBar
         options={labelledOptions}
@@ -1008,16 +1037,30 @@ export const AnalysisView = () => {
           renderLabel={renderLabel}
           rowColor={rowColor}
           rowSections={rowSections}
+          cardAmount={metric.card}
           rowToggle={rowToggle}
           timelineMs={fightDurationMs}
           emptyKey={
             // Every log recorded before the hook emitted status events has none
             // of these, which is not something clearing a pin can fix.
-            isStatusMetric && statusIntervals.length === 0 ? "ui.logs.buffs-empty" : undefined
+            isStatusMetric && statusIntervals.length === 0
+              ? "ui.logs.buffs-empty"
+              : // A remote player's SBA breakdown is genuinely empty — attribution
+                // only works for the local player — so an empty table here is not
+                // a missing pin, it is the honest answer.
+                metricKey === "sba" && level !== "players"
+                ? "ui.logs.sba-no-breakdown"
+                : undefined
           }
           // Same discriminator `renderLabel` uses, so the header can never name
           // something other than what the rows under it are.
-          rowsLabelKey={isStatusMetric ? STATUS_ROWS_LABEL_KEY[statusRowKind] : ROWS_LABEL_KEY[level]}
+          rowsLabelKey={
+            declaredKind
+              ? KIND_ROWS_LABEL_KEY[declaredKind]
+              : isStatusMetric
+                ? KIND_ROWS_LABEL_KEY[statusRowKind]
+                : ROWS_LABEL_KEY[level]
+          }
         />
       </Box>
     </Box>

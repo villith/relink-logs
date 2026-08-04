@@ -455,6 +455,7 @@
       "hostility-enemies": "Enemies",
       "hostility-disabled-hint": "Only the Buffs and Debuffs tabs have enemy-side figures",
       "buffs-empty": "No status effects were recorded for this log",
+      "sba-no-breakdown": "Per-ability SBA is only recorded for your own character",
       "rows-by-effect": "Effect",
       "rows-by-enemy": "Enemy",
       "rows-by-player": "Player",
