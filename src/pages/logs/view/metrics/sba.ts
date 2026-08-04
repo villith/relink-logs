@@ -26,6 +26,13 @@ const CAUSE_LABEL_KEYS: Record<SbaSourceState["kind"], string> = {
   unknown: "ui.logs.sba-cause-unknown",
 };
 
+/** Effect-record keys we have SEEN live and identified. Everything else renders
+ * as "Effect 0x<key>" — an honest hash beats a guessed name. Add entries only
+ * from a live capture where the key co-occurred with a known sigil/effect. */
+const KNOWN_EFFECT_KEYS: Record<number, string> = {
+  0xdeadbeef: "ui.logs.sba-effect-test-entry", // wiring test only; never occurs in game
+};
+
 /** Rows for the causes no skill row can hold. Keyed by cause (plus id where one
  * discriminates), so they never collide with `skill:` keys. */
 const sourceRows = (owner: ComputedPlayerState, total: number): MetricRow[] =>
@@ -34,11 +41,14 @@ const sourceRows = (owner: ComputedPlayerState, total: number): MetricRow[] =>
     .map((source) => ({
       key: source.id === null ? `source:${source.kind}` : `source:${source.kind}:${source.id}`,
       label: source.kind,
-      labelKey: CAUSE_LABEL_KEYS[source.kind] ?? CAUSE_LABEL_KEYS.unknown,
+      labelKey:
+        source.kind === "effect" && source.id !== null && KNOWN_EFFECT_KEYS[source.id]
+          ? KNOWN_EFFECT_KEYS[source.id]
+          : CAUSE_LABEL_KEYS[source.kind] ?? CAUSE_LABEL_KEYS.unknown,
       // Keys are hashes; hex is how every other tool in this repo prints them.
       // Site tags are small ordinals and stay decimal.
       labelParams:
-        source.id === null
+        source.id === null || (source.kind === "effect" && KNOWN_EFFECT_KEYS[source.id])
           ? undefined
           : { id: source.kind === "effect" ? `0x${source.id.toString(16).toUpperCase()}` : source.id },
       value: source.generated,

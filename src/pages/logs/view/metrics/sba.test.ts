@@ -322,6 +322,26 @@ describe("sba drill-down", () => {
     expect(effect?.labelParams).toEqual({ id: "0x7EDD69D0" });
   });
 
+  it("names a known effect key instead of showing the hash", () => {
+    const rows = sba.rows(
+      input(
+        "abilities",
+        [
+          player(0, {
+            sba: 0,
+            sbaGenerated: 100,
+            skillBreakdown: [{ action: 9001, sbaGenerated: 90 }],
+            sbaSources: [{ kind: "effect", id: 0xdeadbeef, generated: 10 }],
+          }),
+        ],
+        { source: 0, targets: [], ability: null }
+      )
+    );
+    const effect = rows.find((row) => row.key === "source:effect:3735928559");
+    expect(effect?.labelKey).toBe("ui.logs.sba-effect-test-entry");
+    expect(effect?.labelParams).toBeUndefined();
+  });
+
   it("counts sources against the unattributed remainder", () => {
     // The remainder is what NOTHING explains — a named cause is an explanation,
     // so it must shrink the remainder, not sit alongside a remainder that still

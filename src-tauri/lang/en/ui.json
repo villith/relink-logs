@@ -466,6 +466,7 @@
       "sba-cause-quest-start": "Quest start",
       "sba-cause-site": "Unnamed source {{id}}",
       "sba-cause-unknown": "Unidentified",
+      "sba-effect-test-entry": "Test effect (never shown)",
       "rows-by-effect": "Effect",
       "rows-by-enemy": "Enemy",
       "rows-by-player": "Player",
