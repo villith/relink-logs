@@ -454,6 +454,26 @@ fn poll_slots_and_emit(tx: &event::Tx) {
     }
 }
 
+/// Stable tags for grant sites that have no gameplay name yet — the payload of
+/// `SbaGainCause::Site`. Never renumber: a stored log carries these.
+#[allow(dead_code)] // referenced from Task 14's vtable-site detours when they land
+pub(crate) mod site {
+    pub const VTABLE_GRANT_191BE40: u32 = 1;
+    pub const VTABLE_GRANT_33BBC20: u32 = 2;
+    pub const VTABLE_GRANT_33BC050: u32 = 3;
+}
+
+/// Placeholder for the grant-site cause channel (Phase B): no site parks a
+/// cause yet, so `current()` is inert. The Phase B tasks replace this with a
+/// save/restore thread-local mirroring [`HitGuard`].
+struct CauseGuard;
+
+impl CauseGuard {
+    fn current() -> Option<protocol::SbaGainCause> {
+        None
+    }
+}
+
 /// Gets called when your SBA gauge value needs to update with a given value.
 #[derive(Clone)]
 pub struct OnHandleSBAUpdateHook {
@@ -548,7 +568,7 @@ impl OnHandleSBAUpdateHook {
             // A burst resetting the bar reads as a large negative; only
             // a real increase is a gain.
             if amount > 0.0 && amount.is_finite() {
-                self.attribute_and_emit_gain(a1, amount);
+                self.attribute_and_emit_gain(a1, amount, a9, a11);
             }
         }
 
@@ -559,76 +579,125 @@ impl OnHandleSBAUpdateHook {
         ret
     }
 
-    /// Attributes one measured gauge rise on component `a1` to the hit being
-    /// registered on this thread and emits `SbaGain` when every check passes;
-    /// any failed step skips the emit (the slot poll remains the record of the
-    /// gauge LEVEL either way).
-    fn attribute_and_emit_gain(&self, a1: *const usize, amount: f32) {
-        let outcome = self.try_emit_gain(a1, amount);
+    /// Resolves the cause of one measured rise on component `a1`, emits
+    /// `SbaGain` with it, and keeps per-cause counters under `hookdiag`; an
+    /// `Err` from the resolver skips the emit (the slot poll remains the
+    /// record of the gauge LEVEL either way).
+    fn attribute_and_emit_gain(&self, a1: *const usize, amount: f32, a9: u8, a11: u8) {
+        let outcome = self.resolve_cause(a1, a9, a11);
+
+        if let Ok((actor_index, cause)) = outcome {
+            let action_id = match cause {
+                protocol::SbaGainCause::Skill(protocol::ActionType::Normal(id)) => id,
+                _ => 0,
+            };
+            let _ = self.tx.send(Message::SbaGain(protocol::SbaGainEvent {
+                actor_index,
+                action_id,
+                amount,
+                cause: Some(cause),
+            }));
+        }
 
         // The next game patch is diagnosed from these: how many rises there
-        // were, how many were emitted, and why the rest were skipped.
+        // were and what cause each resolved to (or why none could be).
         #[cfg(feature = "hookdiag")]
         {
             use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
             static RISES: AtomicU32 = AtomicU32::new(0);
-            static EMITS: AtomicU32 = AtomicU32::new(0);
-            static NO_HIT: AtomicU32 = AtomicU32::new(0);
-            static NOT_INSTANCE: AtomicU32 = AtomicU32::new(0);
-            static NO_OWNER: AtomicU32 = AtomicU32::new(0);
-            static NO_SOURCE: AtomicU32 = AtomicU32::new(0);
-            static MISMATCH: AtomicU32 = AtomicU32::new(0);
-            static UNREADABLE: AtomicU32 = AtomicU32::new(0);
-            static LINK: AtomicU32 = AtomicU32::new(0);
-            static SBA: AtomicU32 = AtomicU32::new(0);
-            static SUPP: AtomicU32 = AtomicU32::new(0);
+            static SKILL: AtomicU32 = AtomicU32::new(0);
+            static TAKEN: AtomicU32 = AtomicU32::new(0);
+            static PARTY: AtomicU32 = AtomicU32::new(0);
+            static DIRECTOR: AtomicU32 = AtomicU32::new(0);
+            static NAMED: AtomicU32 = AtomicU32::new(0);
+            static UNKNOWN: AtomicU32 = AtomicU32::new(0);
+            static FAILED: AtomicU32 = AtomicU32::new(0);
             match outcome {
-                Ok(()) => &EMITS,
-                Err("no_parked_hit") => &NO_HIT,
-                Err("hit_not_instance") => &NOT_INSTANCE,
-                Err("owner_unresolved") => &NO_OWNER,
-                Err("source_unresolved") => &NO_SOURCE,
-                Err("actor_mismatch") => &MISMATCH,
-                Err("link_attack") => &LINK,
-                Err("sba") => &SBA,
-                Err("supplementary") => &SUPP,
-                Err(_) => &UNREADABLE,
+                Ok((_, protocol::SbaGainCause::Skill(_))) => &SKILL,
+                Ok((_, protocol::SbaGainCause::DamageTaken)) => &TAKEN,
+                Ok((_, protocol::SbaGainCause::PartyAward)) => &PARTY,
+                Ok((_, protocol::SbaGainCause::DirectorAward)) => &DIRECTOR,
+                Ok((_, protocol::SbaGainCause::Unknown)) => &UNKNOWN,
+                Ok(_) => &NAMED,
+                Err(_) => &FAILED,
             }
             .fetch_add(1, AtomicOrdering::Relaxed);
             let rises = RISES.fetch_add(1, AtomicOrdering::Relaxed) + 1;
             if rises <= 8 || rises % 32 == 0 {
                 log::info!(
-                    "SBAGAIN rises={rises} emits={} no_hit={} not_instance={} no_owner={} \
-                     no_source={} mismatch={} unreadable={} link={} sba={} supp={} last={} \
-                     amount={amount:.2} tid={:?}",
-                    EMITS.load(AtomicOrdering::Relaxed),
-                    NO_HIT.load(AtomicOrdering::Relaxed),
-                    NOT_INSTANCE.load(AtomicOrdering::Relaxed),
-                    NO_OWNER.load(AtomicOrdering::Relaxed),
-                    NO_SOURCE.load(AtomicOrdering::Relaxed),
-                    MISMATCH.load(AtomicOrdering::Relaxed),
-                    UNREADABLE.load(AtomicOrdering::Relaxed),
-                    LINK.load(AtomicOrdering::Relaxed),
-                    SBA.load(AtomicOrdering::Relaxed),
-                    SUPP.load(AtomicOrdering::Relaxed),
-                    outcome.err().unwrap_or("emit"),
-                    std::thread::current().id(),
+                    "SBAGAIN rises={rises} skill={} taken={} party={} director={} named={} \
+                     unknown={} failed={} last={outcome:?} amount={amount:.2} a9={a9} a11={a11}",
+                    SKILL.load(AtomicOrdering::Relaxed),
+                    TAKEN.load(AtomicOrdering::Relaxed),
+                    PARTY.load(AtomicOrdering::Relaxed),
+                    DIRECTOR.load(AtomicOrdering::Relaxed),
+                    NAMED.load(AtomicOrdering::Relaxed),
+                    UNKNOWN.load(AtomicOrdering::Relaxed),
+                    FAILED.load(AtomicOrdering::Relaxed),
                 );
+            }
+            // Every UNKNOWN is an unlocated grant site. Log its amount so the
+            // next site can be recognised by its constant (the broadcast award
+            // was found exactly this way — a flat 35.00 among variable hits).
+            if matches!(outcome, Ok((_, protocol::SbaGainCause::Unknown))) {
+                log::info!("SBAUNK amount={amount:.2} a3-a11 flags a9={a9} a11={a11}");
             }
         }
         let _ = outcome;
     }
 
-    /// The attribution pipeline proper; the `Err` string is the skip reason
-    /// the hookdiag counters bucket on.
-    fn try_emit_gain(&self, a1: *const usize, amount: f32) -> Result<(), &'static str> {
+    /// Resolves the cause of one measured rise on component `a1`, or an `Err`
+    /// naming why nothing could be filed (the `hookdiag` counters bucket on it).
+    ///
+    /// ORDER MATTERS. The flag check comes first because a four-slot broadcast
+    /// can fire while an unrelated hit is parked on this thread — live capture
+    /// 2026-08-04 caught exactly that, a flat 35.00 award landing inside a
+    /// link-attack frame. Checking the parked hit first would caption the
+    /// party's award with whatever the player happened to be swinging.
+    fn resolve_cause(
+        &self,
+        a1: *const usize,
+        a9: u8,
+        a11: u8,
+    ) -> Result<(u32, protocol::SbaGainCause), &'static str> {
         use crate::hooks::diag::{read_ptr_guarded, read_u32_opt_guarded, read_u64_guarded};
+        use protocol::SbaGainCause;
 
-        // The hit currently being registered on this thread (parked by the
-        // register-hit gate detour). None means this rise did not come through
-        // the gate — a scripted/regen award — and stays unattributed: the poll
-        // remains the record.
-        let hit = HitGuard::current().ok_or("no_parked_hit")?;
+        // Who does `a1` (the measured component) belong to — needed by every
+        // arm, so it is resolved first. Same a1+0x10 specified-instance
+        // resolution the SBAUPD diag block uses, including the vfunc probe:
+        // `player_slot_key_for_source`'s fallback arm CALLS the resolved
+        // pointer's +0x58 vtable slot, and a future layout shift could leave
+        // garbage-but-readable bytes there (an arbitrary jump on the game
+        // thread). Probing first makes a drifted layout fail closed.
+        let owner_key = read_ptr_guarded(a1 as usize, 0x10)
+            .filter(|p| *p != 0)
+            .filter(|p| super::summon::vfunc_slot_readable(*p as *const usize, 0x58))
+            .and_then(|p| super::player_slot_key_for_source(p as *const usize))
+            .ok_or("owner_unresolved")?;
+
+        // Flat awards, identified by the arguments the game itself uses to skip
+        // the sigil/stat scaling block inside the gauge update. FIRST, because a
+        // broadcast can fire while an unrelated hit is parked on this thread.
+        if a11 != 0 {
+            return Ok((owner_key, SbaGainCause::DirectorAward));
+        }
+        if a9 != 0 {
+            return Ok((owner_key, SbaGainCause::PartyAward));
+        }
+
+        // A cause parked by one of the named grant sites (Phase B). Nothing
+        // parks one yet, so this is inert until those hooks land.
+        if let Some(cause) = CauseGuard::current() {
+            return Ok((owner_key, cause));
+        }
+
+        // The hit currently being registered on this thread, parked by the
+        // register-hit gate detour. None means the rise did not come through the
+        // gate at all — an unlocated site.
+        let Some(hit) = HitGuard::current() else {
+            return Ok((owner_key, SbaGainCause::Unknown));
+        };
 
         // Cheapest possible sanity check that `hit` really is a DamageInstance
         // before any field of it is trusted: the gate's own first instruction
@@ -639,75 +708,28 @@ impl OnHandleSBAUpdateHook {
         // allocation.)
         read_u32_opt_guarded(hit as usize, 0x158).ok_or("hit_not_instance")?;
 
-        // Who does `a1` (the measured component) belong to — same a1+0x10
-        // specified-instance resolution the SBAUPD diag block uses.
-        //
-        // A raw `[a1+0x10]` read cannot be trusted with a vfunc dispatch:
-        // `player_slot_key_for_source`'s fallback arm CALLS the resolved
-        // pointer's +0x58 vtable slot, and today's valid specified-instance
-        // pointer is only that by convention — a future layout shift could
-        // leave garbage-but-readable bytes there (arbitrary jump on the
-        // game thread in a release build). `status.rs`'s `holder_index`
-        // hits the exact same hazard resolving a non-player holder and
-        // fixes it by probing the vfunc slot before dispatch; mirror that
-        // here so a stale layout fails closed (skip the emit, the poll
-        // remains the record) instead of dispatching through garbage.
-        let owner_key = read_ptr_guarded(a1 as usize, 0x10)
-            .filter(|p| *p != 0)
-            .filter(|p| super::summon::vfunc_slot_readable(*p as *const usize, 0x58))
-            .and_then(|p| super::player_slot_key_for_source(p as *const usize))
-            .ok_or("owner_unresolved")?;
-
         // The SOURCE player of the parked hit — exactly the resolution the
-        // damage detour uses for a damage instance's source, so the two hooks
-        // can never attribute the same hit differently.
-        //
-        // Same vfunc probe as the owner arm above, and it matters MORE here:
-        // `player_slot_key_for_source` only takes its cheap first arm for a
-        // player actor, so every hit a player RECEIVES (enemy source) falls
-        // through to the fallback's raw vtable walk + indirect call — that is
-        // this arm's normal path, not its rare one. Probing +0x58 first turns a
-        // drifted signature into a skipped emit rather than a wild call.
+        // damage detour uses, so the two hooks can never attribute one hit
+        // differently. Same vfunc probe, and it matters MORE here: every hit a
+        // player RECEIVES falls through to the fallback's vtable walk, so that
+        // is this arm's normal path rather than its rare one.
         let source_key = crate::hooks::damage::damage_source_instance_ptr(hit)
             .filter(|p| super::summon::vfunc_slot_readable(*p as *const usize, 0x58))
             .and_then(|p| super::player_slot_key_for_source(p as *const usize))
             .ok_or("source_unresolved")?;
 
-        // The correctness argument, not a sanity check: players also gain
-        // gauge from TAKING hits, and those gains flow through this same gate.
-        // Without requiring the hit's source to BE the gaining player, a gain
-        // caused by a hit the player received would be captioned with the
-        // enemy's move.
+        // Players gain gauge from TAKING hits too, and those flow through this
+        // same gate. That is a real cause, not an error — it just is not the
+        // victim's own action, so it must never be captioned with the enemy's
+        // move. (This arm used to `return Err("actor_mismatch")`.)
         if source_key != owner_key {
-            return Err("actor_mismatch");
+            return Ok((owner_key, SbaGainCause::DamageTaken));
         }
 
         let flags = read_u64_guarded(hit as usize, 0xE8).ok_or("unreadable_fields")?;
         let action_id = read_u32_opt_guarded(hit as usize, 0x16C).ok_or("unreadable_fields")?;
-
-        // Emit ONLY what the parser can file faithfully. It files every gain as
-        // `ActionType::Normal(action_id)`, so a gain whose hit classifies as
-        // anything else would open an orphan breakdown row — a LinkAttack gain
-        // filed as Normal(id) sits next to the real LinkAttack row carrying
-        // gauge and no damage. Requiring Normal is the design's own posture (an
-        // unnamed gain beats a confidently wrong one) applied to all four arms
-        // rather than just supplementary damage.
-        let action_id = match crate::hooks::damage::classify_action_type(flags, action_id) {
-            protocol::ActionType::Normal(id) => id,
-            protocol::ActionType::LinkAttack => return Err("link_attack"),
-            protocol::ActionType::SBA => return Err("sba"),
-            protocol::ActionType::SupplementaryDamage(_) => return Err("supplementary"),
-            // `classify_action_type` produces no other arm today; a future one
-            // is dropped rather than guessed at.
-            _ => return Err("unclassifiable"),
-        };
-
-        let _ = self.tx.send(Message::SbaGain(protocol::SbaGainEvent {
-            actor_index: owner_key,
-            action_id,
-            amount,
-        }));
-        Ok(())
+        let action = crate::hooks::damage::classify_action_type(flags, action_id);
+        Ok((owner_key, SbaGainCause::Skill(action)))
     }
 }
 
