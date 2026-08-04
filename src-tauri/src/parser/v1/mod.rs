@@ -2085,6 +2085,112 @@ pub fn build_taken_ability_chart(
     series
 }
 
+/// One per-enemy-TYPE bucketed series for the analysis view's enemy-side
+/// charts. Type-level, not spawn-level, deliberately: the enemy-side tables
+/// fold by type, and a chart must decompose exactly what its table ranks.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnemySeries {
+    pub enemy_type: EnemyType,
+    pub values: Vec<i64>,
+}
+
+/// Cap on enemy-side chart bands, mirroring the HP chart's rationale: beyond
+/// this the stack is unreadable and the long tail is trash-mob noise.
+const ENEMY_CHART_MAX_SERIES: usize = 8;
+
+fn accumulate_enemy_series(
+    series: &mut Vec<EnemySeries>,
+    enemy_type: EnemyType,
+    bucket: usize,
+    damage: i64,
+    chart_len: usize,
+) {
+    let band = match series.iter_mut().find(|band| band.enemy_type == enemy_type) {
+        Some(band) => band,
+        None => {
+            series.push(EnemySeries {
+                enemy_type,
+                values: vec![0; chart_len],
+            });
+            series.last_mut().expect("just pushed the band above")
+        }
+    };
+    band.values[bucket] += damage;
+}
+
+/// What each enemy TYPE dealt TO the party per bucket — every incoming event,
+/// banded by attacker. Empty on logs recorded before damage-taken capture.
+pub fn build_enemy_dealt_chart(
+    events: &[(i64, Message)],
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+) -> Vec<EnemySeries> {
+    let mut series: Vec<EnemySeries> = Vec::new();
+    for (timestamp, message) in events {
+        let Message::DamageEvent(event) = message else {
+            continue;
+        };
+        if !is_damage_taken_event(event) {
+            continue;
+        }
+        accumulate_enemy_series(
+            &mut series,
+            EnemyType::from_hash(event.source.parent_actor_type),
+            ((timestamp - start_time) / interval) as usize,
+            event.damage.max(0) as i64,
+            chart_len,
+        );
+    }
+    series.sort_by_key(|band| std::cmp::Reverse(band.values.iter().sum::<i64>()));
+    series.truncate(ENEMY_CHART_MAX_SERIES);
+    series
+}
+
+/// What each enemy TYPE RECEIVED from the party per bucket — the counted
+/// dealt events (same phantom/exclusion gates as the DPS chart, so the
+/// chart's area cannot disagree with the table), banded by victim type.
+pub fn build_enemy_received_chart(
+    events: &[(i64, Message)],
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+    filters: MeterFilters,
+) -> Vec<EnemySeries> {
+    let phantoms = PhantomTargets::learned_from(events.iter());
+    let mut series: Vec<EnemySeries> = Vec::new();
+    for (timestamp, message) in events {
+        let Message::DamageEvent(event) = message else {
+            continue;
+        };
+        if is_damage_taken_event(event)
+            || phantoms.is_phantom(event)
+            || is_excluded(event, &filters)
+        {
+            continue;
+        }
+        // Only player-dealt damage: an unknown source is an enemy (or an
+        // unmapped proxy), which the meter itself does not count either.
+        if matches!(
+            CharacterType::from_hash(event.source.parent_actor_type),
+            CharacterType::Unknown(_)
+        ) {
+            continue;
+        }
+        accumulate_enemy_series(
+            &mut series,
+            EnemyType::from_hash(event.target.parent_actor_type),
+            ((timestamp - start_time) / interval) as usize,
+            event.damage.max(0) as i64,
+            chart_len,
+        );
+    }
+    series.sort_by_key(|band| std::cmp::Reverse(band.values.iter().sum::<i64>()));
+    series.truncate(ENEMY_CHART_MAX_SERIES);
+    series
+}
+
 /// Build the per-player stun chart: stun applied per bucket, keyed by actor
 /// index.
 ///
@@ -4443,6 +4549,61 @@ mod tests {
         assert_eq!(bands[0].values, vec![300, 0, 100]);
         assert_eq!(bands[1].action_id, ActionType::Normal(9002));
         assert_eq!(bands[1].values, vec![0, 0, 200]);
+    }
+
+    /// Enemy-DEALT series: incoming events banded by ATTACKER type.
+    #[test]
+    fn enemy_dealt_chart_bands_attackers() {
+        let mut other_attacker = damage_taken_by_slot0(9001, 200);
+        other_attacker.source.actor_type = 0xBEEF_CAFE;
+        other_attacker.source.parent_actor_type = 0xBEEF_CAFE;
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (
+                1_200,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 300)),
+            ),
+            (3_000, Message::DamageEvent(other_attacker)),
+        ];
+
+        let bands = build_enemy_dealt_chart(&events, 1_000, 1_000, 3);
+
+        assert_eq!(bands.len(), 2);
+        assert_eq!(bands[0].enemy_type, EnemyType::from_hash(0xDEAD_BEEF));
+        assert_eq!(bands[0].values, vec![300, 0, 0]);
+        assert_eq!(bands[1].values, vec![0, 0, 200]);
+    }
+
+    /// Enemy-RECEIVED series: player-dealt events banded by TARGET type;
+    /// incoming events never leak in.
+    #[test]
+    fn enemy_received_chart_bands_victims_of_party_damage() {
+        let mut second_target = damage_from(PLAYER_HASH, 100, 400);
+        second_target.target.actor_type = 0x5678;
+        second_target.target.parent_actor_type = 0x5678;
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (2_000, Message::DamageEvent(second_target)),
+            (
+                2_000,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 300)),
+            ),
+        ];
+
+        let bands = build_enemy_received_chart(&events, 1_000, 1_000, 3, MeterFilters::default());
+
+        assert_eq!(bands.len(), 2);
+        // damage_from targets 0x1234 (see its fixture); it leads with 1000.
+        assert_eq!(bands[0].enemy_type, EnemyType::from_hash(0x1234));
+        assert_eq!(bands[0].values, vec![1_000, 0, 0]);
+        assert_eq!(bands[1].enemy_type, EnemyType::from_hash(0x5678));
+        assert_eq!(bands[1].values, vec![0, 400, 0]);
     }
 
     /// Two hits from the same enemy action fold into one breakdown row; a
