@@ -21,6 +21,11 @@ type OnCheckSBACollisionFunc = unsafe extern "system" fn(*const usize, f32) -> u
 type OnContinueSBAChainFunc = unsafe extern "system" fn(*const usize, *const usize) -> usize;
 type OnRemoteSBAUpdateFunc =
     unsafe extern "system" fn(*const usize, *const usize, f32, f32) -> usize;
+/// hookdiag-only: the per-hit gauge GRANT virtual (see `OnSBAGrantProbeHook`).
+/// 3 args, all read by the body per the decompiler — arity must match or the
+/// detour faults the game.
+#[cfg(feature = "hookdiag")]
+type OnSBAGrantFunc = unsafe extern "system" fn(*const usize, *const usize, u32) -> usize;
 
 static_detour! {
     static OnSBAUpdate: unsafe extern "system" fn(*const usize, f32, u32, u8, u8, f32, u8, u8, u8, u8, u8) -> usize;
@@ -30,6 +35,13 @@ static_detour! {
     static OnRemoteSBAUpdate: unsafe extern "system" fn(*const usize, *const usize, f32, f32) -> usize;
 }
 
+// hookdiag-only: log-only probe detour of the per-hit gauge-grant virtual
+// (v2.0.3 entry rva 0x9b41b0). Never placed in a build without the feature.
+#[cfg(feature = "hookdiag")]
+static_detour! {
+    static OnSBAGrant: unsafe extern "system" fn(*const usize, *const usize, u32) -> usize;
+}
+
 #[cfg(any(feature = "eject", test))]
 pub(super) fn disable() {
     super::disable_quiet("OnSBAUpdate", &OnSBAUpdate);
@@ -37,12 +49,24 @@ pub(super) fn disable() {
     super::disable_quiet("OnCheckSBACollision", &OnCheckSBACollision);
     super::disable_quiet("OnContinueSBAChain", &OnContinueSBAChain);
     super::disable_quiet("OnRemoteSBAUpdate", &OnRemoteSBAUpdate);
+    #[cfg(feature = "hookdiag")]
+    super::disable_quiet("OnSBAGrant", &OnSBAGrant);
 }
 
 // v2.0.2: call-follow sig at the unique gauge-update call site, resolving to the clean
 // entry 0xbb8840 (sigscan: 1 match). Arity fixed to the decompiler-verified 11 args (see
 // OnSBAUpdateFunc above) — the previous 6-arg declaration corrupted the in-game gauge.
 const ON_HANDLE_SBA_UPDATE_SIG: &str = "48 89 f1 c5 f8 28 ce 41 89 d8 e8 $ { ' } c4 c1 78 2e f8";
+
+// hookdiag: direct-entry signature for the per-hit gauge-grant virtual
+// FUN_1409b41b0 (v2.0.3 rva 0x9b41b0; static RE claims ProcessDamageEvent →
+// source vtable +0x70 → +0x80 → THIS → FUN_140bb1c00 → our hooked gauge
+// update). Anchored on the int3 padding before the entry plus the prologue
+// through the first `vmovaps [rbp+0x3c0],xmm15` (the xmm15 spill is what
+// disambiguates it from the one same-prologue sibling at 0x89600).
+// sigscan 2026-08-04: exactly 1 match, cursor_rva=0x9b41b0.
+#[cfg(feature = "hookdiag")]
+const ON_SBA_GRANT_SIG: &str = "cc cc cc cc ' 55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec 58 04 00 00 48 8d ac 24 80 00 00 00 c5 78 29 bd c0 03 00 00";
 
 // ---------------------------------------------------------------------------
 // v2.0.2 slot-poll path (remote SBA recovery, derived 2026-07-17)
@@ -397,8 +421,9 @@ impl OnHandleSBAUpdateHook {
                 }
                 if total % 64 == 0 {
                     log::info!(
-                        "SBABRACKET total={total} in_damage={} depth={depth} delta={a2}",
+                        "SBABRACKET total={total} in_damage={} depth={depth} delta={a2} tid={:?}",
                         IN_DAMAGE.load(AtomicOrdering::Relaxed),
+                        std::thread::current().id(),
                     );
                 }
             }
@@ -463,6 +488,74 @@ impl OnHandleSBAUpdateHook {
         // Unchanged: the four-slot poll stays the source of every player's
         // gauge LEVEL, and the only source at all for remote members.
         poll_slots_and_emit(&self.tx);
+
+        ret
+    }
+}
+
+/// hookdiag-only, LOG-ONLY probe of the per-hit gauge GRANT virtual (v2.0.3
+/// entry 0x9b41b0) — the H3 test: static RE says this is a synchronous callee
+/// of ProcessDamageEvent that feeds our hooked gauge update, but live
+/// SBABRACKET data shows zero gauge updates nested inside damage processing.
+/// Detouring the grant itself tells us whether it runs per hit at all, on
+/// which thread, and with what attribution-stack depth.
+///
+/// Forwards all three args unchanged and returns the original's return value;
+/// no other side effects. All memory reads SEH-guarded. The `actor + 0x23B0`
+/// component offset (gauge f32 at +0x7C) is UNVERIFIED — testing it is part
+/// of this probe's job, so a `None` gauge is still logged.
+#[cfg(feature = "hookdiag")]
+pub struct OnSBAGrantProbeHook;
+
+#[cfg(feature = "hookdiag")]
+impl OnSBAGrantProbeHook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(on_sba_grant_original) = process.search_address(ON_SBA_GRANT_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on sba grant (diag)");
+
+            unsafe {
+                let func: OnSBAGrantFunc = std::mem::transmute(on_sba_grant_original);
+                OnSBAGrant.initialize(func, |a1, a2, a3| Self::run(a1, a2, a3))?;
+                OnSBAGrant.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find sba_grant (diag)"));
+        }
+
+        Ok(())
+    }
+
+    fn run(actor: *const usize, damage_instance: *const usize, mode: u32) -> usize {
+        use crate::hooks::diag::{read_f32_guarded, read_u32_guarded};
+        use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
+
+        // UNVERIFIED offset under test: the SBA component claimed to live
+        // inline at actor+0x23B0, gauge f32 at +0x7C (the same field the
+        // gauge-update hook and the slot poll read on their component ptr).
+        let component = actor as usize + 0x23B0;
+        let before = read_f32_guarded(component, 0x7C);
+
+        let ret = unsafe { OnSBAGrant.call(actor, damage_instance, mode) };
+
+        let after = read_f32_guarded(component, 0x7C);
+
+        static N: AtomicU32 = AtomicU32::new(0);
+        let n = N.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+        if n <= 32 || n % 16 == 0 {
+            let action_id = read_u32_guarded(damage_instance as usize, 0x16C);
+            let damage = read_u32_guarded(damage_instance as usize, 0xD4) as i32;
+            let depth = crate::hooks::damage::DAMAGE_ATTRIBUTION.with(|s| s.borrow().len());
+            log::info!(
+                "SBAGRANT n={n} tid={:?} mode={mode} action={action_id} dmg={damage} \
+                 depth={depth} gauge {before:?}->{after:?}",
+                std::thread::current().id(),
+            );
+        }
 
         ret
     }

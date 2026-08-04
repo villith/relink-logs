@@ -795,9 +795,45 @@ impl OnProcessDamageHook {
             }
         }
         let original_value = {
-            let _attribution_guard: Option<AttributionGuard> = pre_call_source_ptr
-                .and_then(|ptr| super::player_slot_key_for_source(ptr as *const usize))
-                .map(|source_actor_index| {
+            let attribution_key = pre_call_source_ptr
+                .and_then(|ptr| super::player_slot_key_for_source(ptr as *const usize));
+
+            // hookdiag: H1 probe — does the attribution push actually happen?
+            // Counts pushes vs skips (pre-call source resolution failures /
+            // non-player sources) and stamps the thread id, so the SBABRACKET
+            // tid in sba.rs can confirm or refute H2 (gauge updates on a
+            // different thread than damage processing).
+            #[cfg(feature = "hookdiag")]
+            {
+                use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
+                static PUSHES: AtomicU32 = AtomicU32::new(0);
+                static SKIPS: AtomicU32 = AtomicU32::new(0);
+                static RUNS: AtomicU32 = AtomicU32::new(0);
+                let tid = std::thread::current().id();
+                match attribution_key {
+                    Some(key) => {
+                        let pushes = PUSHES.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+                        if pushes <= 4 {
+                            log::info!(
+                                "SBAPUSH first key={key:#x} action={raw_action_id} tid={tid:?}"
+                            );
+                        }
+                    }
+                    None => {
+                        SKIPS.fetch_add(1, AtomicOrdering::Relaxed);
+                    }
+                }
+                if RUNS.fetch_add(1, AtomicOrdering::Relaxed) % 64 == 0 {
+                    log::info!(
+                        "SBAPUSH pushes={} skips={} tid={tid:?}",
+                        PUSHES.load(AtomicOrdering::Relaxed),
+                        SKIPS.load(AtomicOrdering::Relaxed),
+                    );
+                }
+            }
+
+            let _attribution_guard: Option<AttributionGuard> =
+                attribution_key.map(|source_actor_index| {
                     DAMAGE_ATTRIBUTION.with(|stack| {
                         stack.borrow_mut().push((source_actor_index, raw_action_id));
                     });

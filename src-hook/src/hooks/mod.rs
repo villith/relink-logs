@@ -225,6 +225,15 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         "sba_continue_chain",
         OnContinueSBAChainHook::new(tx.clone()).setup(&process),
     );
+    // hookdiag-only: log-only detour of the per-hit gauge-grant virtual
+    // (0x9b41b0) — tests whether the statically-derived grant path actually
+    // runs per hit at runtime (see sba::OnSBAGrantProbeHook). Never placed
+    // in a build without the feature.
+    #[cfg(feature = "hookdiag")]
+    try_step(
+        "sba_grant_probe",
+        sba::OnSBAGrantProbeHook::new().setup(&process),
+    );
 
     // DEV BUILDS ONLY. The one hook that changes game behavior rather than observing it;
     // it no-ops unless hook-config.json asks for it (see hooks/assist.rs).
