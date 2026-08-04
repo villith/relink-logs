@@ -14,6 +14,7 @@ import {
   PlayerData,
   PlayerState,
   Sigil,
+  SkillRow,
   SkillState,
   SkillTargetState,
   SortDirection,
@@ -31,7 +32,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import summonBonusValues from "../src-tauri/assets/summon-bonus-values.json";
 
 import { renderTemplate } from "./labelTemplate";
-import { abilitySourceKeys, stripTierSuffix, summonClassSource } from "./skillNameSources";
+import { resolveSkillName, stripTierSuffix, summonClassSource } from "./skillNameSources";
 import { DEFAULT_PLAYER_LABEL, type BarFillMode } from "./stores/useMeterSettingsStore";
 
 export const EMPTY_ID = 2289754288;
@@ -91,15 +92,58 @@ export const isSupplementaryAction = (actionType: SkillState["actionType"]): boo
  */
 export const isSkillGroup = (
   row: ComputedSkillGroup | ComputedSkillState
-): row is ComputedSkillGroup & { actionType: { Group: string } } =>
+): row is ComputedSkillGroup & { actionType: { Group: string } } => hasGroupAction(row);
+
+/** The group test on its own, over the two fields any hit carries.
+ *
+ * `isSkillGroup` narrows to a full `ComputedSkillGroup`, which is only truthful
+ * for the rows the breakdown builds; callers holding a bare `SkillRow` need the
+ * same shape test without that promise. Both spell it once, here. */
+const hasGroupAction = (row: SkillRow): row is SkillRow & { actionType: { Group: string } } =>
   typeof row.actionType === "object" && Object.hasOwn(row.actionType, "Group");
 
+/** Bodies that swing on a player's behalf but are not the player: Ferry's
+ * ghosts (Geegee/Beebee/Kikiriki/Nicola) and her Umlauf satellite.
+ *
+ * Named bodies only. A player wearing a different body is still the player —
+ * Id's transformation (`Pl2000`) and Cagliostro's clone both proc supplementary
+ * damage normally, and the game logs each proc under the body that earned it,
+ * which is how these two lists were told apart. */
+const COMPANION_BODIES: readonly string[] = ["Pl0700Ghost", "Pl0700GhostSatellite"];
+
 /**
- * Only Normal skill hits can trigger supplementary damage — Link Attacks, Skybound
- * Arts and damage-over-time cannot. (Groups are frontend merges of Normal skills.)
+ * Whether a hit came from something fighting alongside the player rather than
+ * from the player's own body: a called summon, a Primal Burst, or one of
+ * Ferry's named pets.
+ *
+ * One question with one answer. The three tests were asked separately at the
+ * one call site that needed them, which left the concept unnamed and gave the
+ * next metric that wants it nothing to call.
  */
-export const isSupEligibleAction = (actionType: SkillState["actionType"]): boolean =>
-  typeof actionType === "object" && (Object.hasOwn(actionType, "Normal") || Object.hasOwn(actionType, "Group"));
+export const isCompanionHit = (skill: SkillRow): boolean => {
+  if (isSummonHit(skill)) return true;
+  if (hasGroupAction(skill) && skill.actionType.Group === PRIMAL_BURST_GROUP) return true;
+
+  return COMPANION_BODIES.includes(String(skill.childCharacterType));
+};
+
+/**
+ * Whether a breakdown row's damage belongs in the Sup% eligible base.
+ *
+ * Only a player's own Normal skill hits can trigger supplementary damage. Link
+ * Attacks, Skybound Arts and damage-over-time cannot, and neither can the
+ * companions: pets and summons deal Normal-typed damage but no proc is ever
+ * logged under either, so counting their damage only dilutes the number.
+ * (Groups are frontend merges of Normal skills, scoped to the body they came
+ * from, so the same two tests apply.)
+ */
+export const isSupEligibleRow = (skill: SkillRow): boolean => {
+  const { actionType } = skill;
+  if (typeof actionType !== "object") return false;
+  if (!Object.hasOwn(actionType, "Normal") && !hasGroupAction(skill)) return false;
+
+  return !isCompanionHit(skill);
+};
 
 export type SupPercentages = {
   /** Supp damage relative to supp-eligible (Normal skill) damage — the proc-quality
@@ -107,7 +151,7 @@ export type SupPercentages = {
    * and a 100% proc rate this tops out at +60%. */
   eligible: number;
   /** Supp damage as a share of the player's total damage, ineligible sources
-   * (Link Attack, SBA, DoT) included. */
+   * (Link Attack, SBA, DoT, pets, summons) included. */
   overall: number;
 };
 
@@ -120,7 +164,7 @@ export const computeSupPercentage = (player: PlayerState): SupPercentages => {
   for (const skill of player.skillBreakdown) {
     if (isSupplementaryAction(skill.actionType)) {
       suppDamage += skill.totalDamage;
-    } else if (isSupEligibleAction(skill.actionType)) {
+    } else if (isSupEligibleRow(skill)) {
       eligibleDamage += skill.totalDamage;
     }
   }
@@ -823,14 +867,28 @@ export const PRIMAL_BURST_CLASSES: readonly string[] = ["5418b8f8", "32776c5b", 
 /** The skill-group key the three bodies condense into. */
 export const PRIMAL_BURST_GROUP = "primal-burst";
 
+/** The body-class hash of a called summon's hit, or null when the hit is not
+ * one: every summon reports the same shared summon-attack action from an
+ * unresolved `So####` body, which is what separates a summon from a player's
+ * own alternate body.
+ *
+ * Answers with the hash rather than a boolean so a caller that needs to know
+ * WHICH summon does not re-run the test to find out. */
+const summonHitBodyHash = (skill: SkillRow): string | null => {
+  if (typeof skill.actionType !== "object" || !Object.hasOwn(skill.actionType, "Normal")) return null;
+  if ((skill.actionType as { Normal: number }).Normal !== SUMMON_ATTACK_ACTION_ID) return null;
+
+  return summonBodyHash(skill.childCharacterType);
+};
+
+/** True for a hit dealt by a called summon. */
+export const isSummonHit = (skill: SkillRow): boolean => summonHitBodyHash(skill) !== null;
+
 /** True for a summon hit dealt by one of the Primal Burst bodies. Owns the
  * hash-format detail (lowercase, zero-padded to eight) so callers never
  * re-derive it. */
-export const isPrimalBurstHit = (skill: SkillState): boolean => {
-  if (typeof skill.actionType !== "object" || !Object.hasOwn(skill.actionType, "Normal")) return false;
-  if ((skill.actionType as { Normal: number }).Normal !== SUMMON_ATTACK_ACTION_ID) return false;
-
-  const bodyHash = summonBodyHash(skill.childCharacterType);
+export const isPrimalBurstHit = (skill: SkillRow): boolean => {
+  const bodyHash = summonHitBodyHash(skill);
 
   return bodyHash !== null && PRIMAL_BURST_CLASSES.includes(bodyHash);
 };
@@ -874,7 +932,7 @@ export const summonDisplayName = (bodyClassHash: string): string | null => {
   return stripTierSuffix(text);
 };
 
-export const getSkillName = (characterType: CharacterType, skill: SkillState) => {
+export const getSkillName = (characterType: CharacterType, skill: SkillRow) => {
   switch (true) {
     case skill.actionType === "LinkAttack":
       return t([`skills.${characterType}.link-attack`, "skills.default.link-attack"]);
@@ -910,19 +968,13 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
         return t(SUMMON_FALLBACK_KEYS, { id: skillID });
       }
 
-      return t(
-        [
-          `skills.${skill.childCharacterType}.${skillID}`,
-          `skills.${characterType}.${skillID}`,
-          // The generated abilities bundle, via the bridge map: ui.json keys rows
-          // by action id, abilities.json by ability hash. Sits behind the ui.json
-          // keys so a hand-authored label still wins.
-          ...abilitySourceKeys(String(characterType), String(skill.childCharacterType), skillID),
-          `skills.default.${skillID}`,
-          `skills.default.unknown-skill`,
-        ],
-        { id: skillID }
-      );
+      // ui.json labels and the bridge's game names, in the order the
+      // skill_name_resolution mode dictates — labels ahead of every bridge
+      // name by default; see SkillNameResolutionMode.
+      const resolved = resolveSkillName([String(skill.childCharacterType), String(characterType)], skillID);
+      if (resolved !== null) return resolved;
+
+      return t([`skills.default.${skillID}`, `skills.default.unknown-skill`], { id: skillID });
     }
     case typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "Group"): {
       const actionType = skill.actionType as { Group: string };
@@ -940,6 +992,37 @@ export const getSkillName = (characterType: CharacterType, skill: SkillState) =>
       return t("ui.unknown");
   }
 };
+
+/** Name for a status row's cause id, or empty when no table names it.
+ *
+ * A cause in the character bands is the applying character's action id, so it
+ * resolves through the same language-major lookup the damage meter uses —
+ * every candidate character's table then bridge entry per language (the row's
+ * CASTERS — see `causeCandidatesFor`), then the `causes.default` band entries
+ * (sigil/trait, equipment, environment, perfect guard).
+ *
+ * `causes.default`, never `skills.default`: the shared skills table names the
+ * DAMAGE id space, and the two spaces only coincide within one character's own
+ * band. Its 99999 is the conflux effect action, while cause 99999 arrives
+ * under Shield in quests with no conflux at all — a cause band the shared
+ * damage table would name wrongly. */
+export const causeSkillName = (candidates: CharacterType[], causeId: number): string => {
+  const probe = (id: number): string => {
+    // The same label/bridge resolution the damage rows use, mode included.
+    const resolved = resolveSkillName(candidates.map(String), id);
+    return resolved ?? t(`causes.default.${id}`, { defaultValue: "" });
+  };
+  const exact = probe(causeId);
+  if (exact) return exact;
+  // The game numbers action variants within a decade (1600/1601/1602 are all
+  // Flamek Thunder charge levels) and stamps computed causes as base+count
+  // (Fraux stores stance stacks as 20000+n), so a miss retries the decade
+  // base. Only the decade: a hundreds-floor crosses into different actions
+  // (1110 is not a variant of 1100), which is where names become fabrications.
+  const decade = causeId - (causeId % 10);
+  return decade !== causeId && decade > 0 ? probe(decade) : "";
+};
+
 const tryParseInt = (intString: string | number, defaultValue = 0) => {
   if (typeof intString === "number") {
     if (isNaN(intString)) return defaultValue;
@@ -969,6 +1052,16 @@ export const humanizeNumbers = (n: number) => {
   if (n >= 1e12) return [(n / 1e12).toFixed(1), "t"];
   else return [tryParseInt(n).toFixed(0), ""];
 };
+
+/// The single-string form of `humanizeNumbers`, for the callers that render the
+/// figure as text rather than styling the number and its suffix apart.
+export const humanizeNumber = (n: number): string => humanizeNumbers(n).join("");
+
+/// Share of `total` to one decimal, or "0.0%" when there is no total to divide
+/// by. Distinct from `percent` in `metrics/buffs.ts`, which clamps and rounds
+/// differently on purpose — this is the plain contribution-of-total form.
+export const share = (value: number, total: number): string =>
+  total === 0 ? "0.0%" : `${((value / total) * 100).toFixed(1)}%`;
 
 /// Takes a number of milliseconds and returns a string in the format of MM:SS.
 export const millisecondsToElapsedFormat = (ms: number): string => {
@@ -1374,6 +1467,18 @@ export const translateEnemyTypeId = (id: number): string => {
   const hash = toHashString(id);
   return t([`enemies:${hash}.text`, `enemies.unknown.${hash}`, "enemies.unknown-type"], { id: hash });
 };
+
+/** The game's own name for a status effect, or `""` where it has none.
+ *
+ * Keyed by `status.tbl`'s decimal `StatusId` — the value the hook puts in
+ * `StatusApplyEvent.status_id` — rather than by a hash like every other bundle,
+ * because statuses are the one table the runtime identifies by row id.
+ *
+ * Empty rather than a placeholder on a miss: the bundle names 156 of the 168
+ * rows; the rest are internal (`nayde1`, `mspl1900_01`) with no text at all.
+ * `statusLabelFor` reads empty as "unnamed" and falls back to "Effect <id>",
+ * which is the documented shipping path. */
+export const translateStatusName = (statusId: number): string => t(`statuses:${statusId}.text`, { defaultValue: "" });
 
 // A string form usable as a map key ("Em1000" and { Unknown: 0x1234 } stay distinct).
 const enemyTypeKey = (type: EnemyType): string => (typeof type === "string" ? `s:${type}` : `h:${type.Unknown}`);

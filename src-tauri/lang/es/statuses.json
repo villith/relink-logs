@@ -1,0 +1,302 @@
+{
+  "0": {
+    "key": "atkup",
+    "text": "ATQ ↑"
+  },
+  "1": {
+    "key": "defup",
+    "text": "DEF ↑"
+  },
+  "10": {
+    "key": "protect",
+    "text": "Remplazo"
+  },
+  "1000": {
+    "key": "poison",
+    "text": "Veneno"
+  },
+  "1001": {
+    "key": "burn",
+    "text": "Quemadura"
+  },
+  "1002": {
+    "key": "slow",
+    "text": "Lentitud"
+  },
+  "1003": {
+    "key": "stun",
+    "text": "Aturdimiento"
+  },
+  "1004": {
+    "key": "freeze",
+    "text": "Congelación"
+  },
+  "1005": {
+    "key": "frostbite",
+    "text": "Frío glacial"
+  },
+  "1006": {
+    "key": "sandman",
+    "text": "Tumba de arena"
+  },
+  "1007": {
+    "key": "paralysis",
+    "text": "Parálisis"
+  },
+  "1008": {
+    "key": "waterprison",
+    "text": "Tortura acuática"
+  },
+  "1011": {
+    "key": "darkburn",
+    "text": "Llama oscura"
+  },
+  "1012": {
+    "key": "TXT_STATUS_BINDAILMENT",
+    "text": "Atadura"
+  },
+  "1015": {
+    "key": "TXT_STATUS_CAPTUREAILMENT",
+    "text": "Atadura"
+  },
+  "1016": {
+    "key": "disableability",
+    "text": "Habilidades anuladas"
+  },
+  "1017": {
+    "key": "disableougi",
+    "text": "Arcanos anulados"
+  },
+  "1018": {
+    "key": "darkpoison",
+    "text": "Infortunio"
+  },
+  "1019": {
+    "key": "fear",
+    "text": "Petrificación"
+  },
+  "1020": {
+    "key": "arvessfermare",
+    "text": "Bloqueo de la Arvess"
+  },
+  "1021": {
+    "key": "elementweak",
+    "text": "Fricción elemental"
+  },
+  "11": {
+    "key": "protected",
+    "text": "Cobertura"
+  },
+  "125": {
+    "key": "blacksnipper",
+    "text": "Sinergia crustácea"
+  },
+  "134": {
+    "key": "stundown",
+    "text": "Resistencia al aturdimiento ↓"
+  },
+  "140": {
+    "key": "antiburn",
+    "text": "Inmunidad a quemadura"
+  },
+  "141": {
+    "key": "antifreeze",
+    "text": "Inmunidad a frío glacial/congelación"
+  },
+  "142": {
+    "key": "antidraw",
+    "text": "Firmeza"
+  },
+  "145": {
+    "key": "em2510",
+    "text": "Zancada descoordinada"
+  },
+  "17": {
+    "key": "antidebuff",
+    "text": "Inmune a perjuicios"
+  },
+  "18": {
+    "key": "drain",
+    "text": "Absorber"
+  },
+  "2": {
+    "key": "atkdown",
+    "text": "ATQ ↓"
+  },
+  "20": {
+    "key": "guts",
+    "text": "Último estertor"
+  },
+  "21": {
+    "key": "strength",
+    "text": "Fuerza"
+  },
+  "22": {
+    "key": "gyakkyou",
+    "text": "Resiliencia"
+  },
+  "23": {
+    "key": "criticalup",
+    "text": "Probabilidad de crítico ↑"
+  },
+  "24": {
+    "key": "hateup",
+    "text": "Animosidad ↑"
+  },
+  "25": {
+    "key": "autorevive",
+    "text": "Revivir automáticamente"
+  },
+  "26": {
+    "key": "magicvortex",
+    "text": "Vórtice místico"
+  },
+  "27": {
+    "key": "concentration",
+    "text": "Atención"
+  },
+  "28": {
+    "key": "ironmeiden",
+    "text": "Dama de hierro"
+  },
+  "29": {
+    "key": "idodragon",
+    "text": "Forma dragón"
+  },
+  "3": {
+    "key": "defdown",
+    "text": "DEF ↓"
+  },
+  "30": {
+    "key": "idosuper",
+    "text": "Fuerza divina"
+  },
+  "31": {
+    "key": "undead",
+    "text": "Inmortal"
+  },
+  "32": {
+    "key": "TXT_STATE_BOSSARTSAURA",
+    "text": "Sed de sangre"
+  },
+  "33": {
+    "key": "phantasmagoria",
+    "text": "Fantasmagoría"
+  },
+  "36": {
+    "key": "em1806",
+    "text": "Gloria abismal"
+  },
+  "37": {
+    "key": "maxhpdown",
+    "text": "VIT máx. ↓"
+  },
+  "38": {
+    "key": "doubletap",
+    "text": "Doblete"
+  },
+  "4": {
+    "key": "damagecut",
+    "text": "Daño reducido"
+  },
+  "41": {
+    "key": "barrier",
+    "text": "Escudo"
+  },
+  "42": {
+    "key": "dmgup",
+    "text": "Más daño"
+  },
+  "43": {
+    "key": "sharpshoot",
+    "text": "Tiro certero"
+  },
+  "44": {
+    "key": "senrai",
+    "text": "Tempestad desatada"
+  },
+  "45": {
+    "key": "colorwing",
+    "text": "Alas multicolor"
+  },
+  "46": {
+    "key": "armorparge",
+    "text": "Destrozaarmaduras"
+  },
+  "5": {
+    "key": "regeneration",
+    "text": "Regeneración"
+  },
+  "50": {
+    "key": "risingnova",
+    "text": "Nova naciente"
+  },
+  "51": {
+    "key": "dmgdown",
+    "text": "Daño causado ↓"
+  },
+  "52": {
+    "key": "bravecarol",
+    "text": "Cántico de bravura"
+  },
+  "53": {
+    "key": "playwithfire",
+    "text": "Jugando con fuego"
+  },
+  "54": {
+    "key": "rebuildstun",
+    "text": "Cielo dinámico"
+  },
+  "55": {
+    "key": "rebuildweak",
+    "text": "Cielo carmesí"
+  },
+  "56": {
+    "key": "dmglimitup",
+    "text": "Límite de daño ↑"
+  },
+  "57": {
+    "key": "atkupadd",
+    "text": "ATQ acumulativo ↑"
+  },
+  "58": {
+    "key": "defupadd",
+    "text": "DEF acumulativa ↑"
+  },
+  "59": {
+    "key": "defdownadd",
+    "text": "DEF acumulativa ↓"
+  },
+  "6": {
+    "key": "muteki",
+    "text": "Invulnerabilidad"
+  },
+  "67": {
+    "key": "atkdownadd",
+    "text": "ATQ acumulativo ↓"
+  },
+  "69": {
+    "key": "mspl0200_02",
+    "text": "Filo celeste"
+  },
+  "7": {
+    "key": "tsuigeki",
+    "text": "Daño adicional"
+  },
+  "79": {
+    "key": "mspl0700_01",
+    "text": "Vínculo espectral"
+  },
+  "8": {
+    "key": "hyperarmor",
+    "text": "Resolución"
+  },
+  "84": {
+    "key": "abdmgup",
+    "text": "Daño de habilidades ↑"
+  },
+  "9": {
+    "key": "illusion",
+    "text": "Reflejo"
+  }
+}

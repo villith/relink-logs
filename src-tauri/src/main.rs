@@ -1049,36 +1049,35 @@ fn fetch_logs(
         })
         .unwrap_or(db::logs::SortDirection::Descending);
 
+    let filters = db::logs::LogFilters {
+        enemy_id: filter_by_enemy_id,
+        quest_id: filter_by_quest_id,
+        cleared: quest_completed,
+        player_id: &filter_by_player_id,
+        player_character: &filter_by_player_character,
+        flagged_only,
+    };
+
     let logs = db::logs::get_logs(
         &conn,
-        filter_by_enemy_id,
-        filter_by_quest_id,
+        &filters,
         per_page,
         offset,
         &sort_type_param,
         &sort_direction_param,
-        quest_completed,
-        &filter_by_player_id,
-        &filter_by_player_character,
-        flagged_only,
     )
     .map_err(|e| e.to_string())?;
 
-    let log_count = db::logs::get_logs_count(
-        &conn,
-        filter_by_enemy_id,
-        filter_by_quest_id,
-        quest_completed,
-        &filter_by_player_id,
-        &filter_by_player_character,
-        flagged_only,
-    )
-    .map_err(|e| e.to_string())?;
+    let counts = db::logs::get_counts(&conn, &filters).map_err(|e| e.to_string())?;
+    let log_count = counts.logs;
 
     let page_ids: Vec<i64> = logs.iter().map(|log| log.id()).collect();
     let legality = db::legality::findings_for_logs(&conn, &page_ids).map_err(|e| e.to_string())?;
 
-    let page_count = (log_count as f64 / per_page as f64).ceil() as u32;
+    // Pages hold a fixed number of CHAINS, not of rows, so a Repeat Quest chain
+    // is never cut across a page boundary — see `page_chain_keys`. `log_count`
+    // stays the run count: it is the "N saved" figure, which is about the logs.
+    let page_count = (counts.chains as f64 / per_page as f64).ceil() as u32;
 
     let mut enemy_ids = Vec::new();
     let mut quest_ids = Vec::new();
@@ -1266,7 +1265,28 @@ struct EncounterStateResponse {
     /// Per-spawn selectable targets for the filter dropdown, in first-hit
     /// order — 1:1 with the HP chart's series (same instance numbers).
     target_entries: Vec<v1::TargetSegment>,
+    /// Every distinct (source, target, ability) combination inside the current
+    /// window, with the selector pins NOT applied — the analysis view cascades
+    /// its three selectors from this without a round trip per keystroke.
+    selection_facts: Vec<v1::SelectionFact>,
+    /// The analysis view's drill-down chart, present only on a scoped fetch that
+    /// pinned a source: what that player's damage was made of, one band per
+    /// breakdown row. Empty at every other level — with nothing pinned the
+    /// per-player `dps_chart` already answers.
+    ability_chart: Vec<v1::AbilityChartSeries>,
+    /// The drill-down chart one level further in: with a source AND an ability
+    /// pinned, what that ability hit, one band per enemy spawn.
+    target_chart: Vec<v1::TargetChartSeries>,
+    /// Every window an actor held a status effect for, per actor and never
+    /// merged, spanning the FULL fight. The Buffs and Debuffs tables compute
+    /// their own uptime from these, so a scrub window narrows the view without
+    /// another round trip. Empty on logs recorded before status capture.
+    status_intervals: Vec<v1::StatusInterval>,
     dps_chart: HashMap<u32, Vec<i32>>,
+    /// Stun applied per DPS-chart bucket. Separate from `dps_chart` because
+    /// stun reconciles two capture paths with max(), not a sum — see
+    /// `build_player_stun_chart`.
+    stun_chart: HashMap<u32, Vec<f64>>,
     /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
     /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
     hp_chart: Vec<v1::HpChartSeries>,
@@ -1306,6 +1326,130 @@ struct ParseOptions {
     /// must never silently get contested damage folded into its totals.
     #[serde(default)]
     filters: v1::MeterFilters,
+    /// Which source actors and abilities the selector bar has pinned. Absent or
+    /// empty means "All" on every dimension — the shipped default.
+    #[serde(default)]
+    selection: v1::SelectionFilter,
+}
+
+// Per-second buckets: the quest-details charts and the window scrubber both
+// work in whole seconds, so a bucket index IS the elapsed second.
+const DPS_INTERVAL: i64 = 1_000;
+const SBA_INTERVAL: i64 = 1_000;
+
+/// The analysis view's drill-down chart series for the current pins.
+///
+/// The chart follows the row level, so what it decomposes is decided entirely by
+/// what is pinned: a source alone means "what was this player's damage made
+/// of", a source and an ability means "what did this ability hit". Nothing
+/// pinned needs no series at all — that level is the per-player `dps_chart` the
+/// base load already carries — so both come back empty and the caller pays
+/// nothing for a fetch that only moved the window.
+///
+/// Only the FIRST pinned source and ability are read: the selector bar pins one
+/// of each, and a chart that stacked two players' abilities together would have
+/// no meaningful total.
+///
+/// `segments`/`assignment` are the caller's segmentation of the UNWINDOWED log,
+/// passed in rather than recomputed: the caller already needs it for
+/// `selection_facts`, and segmenting twice per fetch is two more full passes
+/// over a log that can hold hundreds of thousands of events. Sharing it is also
+/// what makes a band and a target-dropdown entry mean the same spawn.
+fn build_drill_charts(
+    parser: &v1::Parser,
+    options: &ParseOptions,
+    segments: &[v1::TargetSegment],
+    assignment: &[Option<usize>],
+) -> (Vec<v1::AbilityChartSeries>, Vec<v1::TargetChartSeries>) {
+    let Some(&source_index) = options.selection.source_indices.first() else {
+        return (Vec::new(), Vec::new());
+    };
+
+    let start_time = parser.start_time();
+    // Whole-fight geometry, so a bucket index is still the elapsed second no
+    // matter what window the same fetch applied to the derived state.
+    let chart_len = (parser.full_log_duration() / DPS_INTERVAL) as usize + 1;
+
+    match options.selection.abilities.first() {
+        Some(&ability) => {
+            let target_chart = v1::build_target_damage_chart(
+                &parser.encounter.raw_event_log,
+                &parser.encounter.player_data,
+                segments,
+                assignment,
+                source_index,
+                ability,
+                start_time,
+                DPS_INTERVAL,
+                chart_len,
+                &options.target_spans,
+                options.filters,
+            );
+            (Vec::new(), target_chart)
+        }
+        None => {
+            let ability_chart = v1::build_ability_damage_chart(
+                &parser.encounter.raw_event_log,
+                &parser.encounter.player_data,
+                source_index,
+                start_time,
+                DPS_INTERVAL,
+                chart_len,
+                &options.target_spans,
+                options.filters,
+            );
+            (ability_chart, Vec::new())
+        }
+    }
+}
+
+/// The per-player damage chart for a scope with NO source pinned.
+///
+/// The base-load `dps_chart` is built with no pins at all, so an enemy or
+/// ability pin left the plot showing the whole fight while the table beside it
+/// had narrowed — measured on log 1566, where pinning one enemy halved the
+/// table's totals and did not move a single line.
+///
+/// Empty with a source pinned: [`build_drill_charts`] already answers there, and
+/// its bands are target-filtered. Empty with nothing narrowing, so a fetch that
+/// only moved the window pays nothing.
+///
+/// Damage only, by construction — this is the damage tab's series. Stun's two
+/// capture paths reconcile with `max()` and its network messages carry no target
+/// at all, so a target-filtered stun chart would be a fiction; the SBA gauge has
+/// no decomposition.
+fn build_scoped_player_chart(
+    parser: &v1::Parser,
+    options: &ParseOptions,
+) -> HashMap<u32, Vec<i32>> {
+    if !options.selection.source_indices.is_empty()
+        || (options.target_spans.is_empty() && options.selection.abilities.is_empty())
+    {
+        return HashMap::new();
+    }
+
+    let player_indices: Vec<u32> = parser
+        .derived_state
+        .party
+        .values()
+        .map(|player| player.index)
+        .collect();
+
+    // Whole-fight geometry, exactly as `build_drill_charts` uses: the view slices
+    // its chart client-side, so a bucket index must stay the elapsed second.
+    let chart_len = (parser.full_log_duration() / DPS_INTERVAL) as usize + 1;
+
+    v1::build_player_dps_chart(
+        &parser.encounter.raw_event_log,
+        &parser.encounter.player_data,
+        &player_indices,
+        parser.start_time(),
+        DPS_INTERVAL,
+        chart_len,
+        &options.target_spans,
+        &options.selection.abilities,
+        options.filters,
+    )
 }
 
 // `(async)` so the decompress + full reparse runs off the main thread — this is
@@ -1344,9 +1488,43 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     let mut parser = parser::deserialize_version(&blob, version).map_err(|e| e.to_string())?;
 
     parser.filters = options.filters;
+    parser.selection = options.selection.clone();
     parser.reparse_with_options_window(&options.target_spans, options.from_ms, options.up_to_ms);
 
     if options.state_only {
+        // Included even here, unlike the charts: it is one pass over the events
+        // with no buffers to build, and the analysis view's selectors have to
+        // re-cascade against the new window on the very fetch that applies it.
+        // The segmentation is over the UNWINDOWED log, exactly as the base load
+        // computes `target_entries` — a fact's `target_segment` indexes into
+        // those, so the two must be the same segmentation or a pin would point
+        // at a different enemy on a scoped fetch than on the load.
+        let (segments, assignment) =
+            v1::segment_targets_indexed(&parser.encounter.raw_event_log, parser.start_time());
+        let selection_facts = v1::selection_facts(
+            &parser.encounter.raw_event_log,
+            parser.start_time(),
+            options.from_ms,
+            options.up_to_ms,
+            &assignment,
+        );
+
+        // The drill-down chart. Built here rather than on the base load because
+        // it is the pins that decide what it decomposes, and only a pinned
+        // source narrows it enough to be worth sending: the unpinned case is
+        // the per-player `dps_chart` the base load already carries.
+        //
+        // Deliberately spans the FULL fight, ignoring `from_ms`/`up_to_ms`: the
+        // view slices its chart client-side from whole-fight buckets, so a
+        // pre-sliced series would be windowed twice and a bucket index would
+        // stop being the elapsed second.
+        let (ability_chart, target_chart) =
+            build_drill_charts(&parser, &options, &segments, &assignment);
+        // The level above those: no source pinned, but an enemy or an ability
+        // still narrowing the fight. Without it the plot kept drawing the whole
+        // party's whole fight beside a table that had already narrowed.
+        let dps_chart = build_scoped_player_chart(&parser, &options);
+
         // Only the fields the scrub commit actually consumes; everything else stays at its
         // Default so a new response field doesn't have to be mirrored as a hand-written
         // zero here (where forgetting it would silently return stale-looking data).
@@ -1359,6 +1537,10 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             room_index,
             imported,
             legality: findings,
+            selection_facts,
+            ability_chart,
+            target_chart,
+            dps_chart,
             ..Default::default()
         });
     }
@@ -1368,15 +1550,23 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
     // sizing from the truncated duration would index out of bounds.
     let duration = parser.full_log_duration();
 
-    // Per-second buckets: the quest-details charts and the window scrubber both
-    // work in whole seconds, so a bucket index IS the elapsed second.
-    const DPS_INTERVAL: i64 = 1_000;
-    const SBA_INTERVAL: i64 = 1_000;
-
     let start_time = parser.start_time();
     // Dropdown entries are ALWAYS the unfiltered segmentation — the user picks
     // from everything the fight contained, whatever is currently selected.
-    let target_entries = v1::segment_targets(&parser.encounter.raw_event_log, start_time);
+    // Indexed, because a `SelectionFact` names the SEGMENT it hit rather than
+    // the game's actor index (which is recycled between bosses) — and those
+    // indices are into this very vector, which ships as `target_entries`.
+    let (target_entries, assignment) =
+        v1::segment_targets_indexed(&parser.encounter.raw_event_log, start_time);
+    // Windowed, but never narrowed by the pins themselves: each selector must
+    // keep offering everything the OTHER pins still allow.
+    let selection_facts = v1::selection_facts(
+        &parser.encounter.raw_event_log,
+        start_time,
+        options.from_ms,
+        options.up_to_ms,
+        &assignment,
+    );
 
     let player_indices: Vec<u32> = parser
         .derived_state
@@ -1385,6 +1575,17 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         .map(|player| player.index)
         .collect();
     let player_dps = v1::build_player_dps_chart(
+        &parser.encounter.raw_event_log,
+        &parser.encounter.player_data,
+        &player_indices,
+        start_time,
+        DPS_INTERVAL,
+        (duration / DPS_INTERVAL) as usize + 1,
+        &options.target_spans,
+        &options.selection.abilities,
+        options.filters,
+    );
+    let player_stun = v1::build_player_stun_chart(
         &parser.encounter.raw_event_log,
         &parser.encounter.player_data,
         &player_indices,
@@ -1402,6 +1603,19 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         DPS_INTERVAL,
         (duration / DPS_INTERVAL) as usize + 1,
         &options.target_spans,
+    );
+
+    // Closed against the end of the full log, not the scrub window: an interval
+    // still open at the last event runs to the end of the fight, and closing it
+    // at a window edge instead would report a buff as having dropped there.
+    // Segmented against the same `target_entries` the response ships, so a
+    // debuff row names the SPAWN that held it. Without it a recycled boss id
+    // merged two enemies' windows into one row labelled with a bare number.
+    let status_intervals = v1::assemble_intervals(
+        &parser.encounter.raw_event_log,
+        start_time,
+        duration,
+        &target_entries,
     );
 
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
@@ -1436,7 +1650,13 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         room_index,
         imported,
         legality: findings,
+        // Nothing to decompose on the base load: it is the unpinned fight, which
+        // is exactly the level `dps_chart` already draws.
+        ability_chart: Vec::new(),
+        target_chart: Vec::new(),
+        status_intervals,
         dps_chart: player_dps,
+        stun_chart: player_stun,
         hp_chart,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
         sba_chart_len: (duration / SBA_INTERVAL) as usize + 1,
@@ -1444,6 +1664,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         sba_events,
         death_events,
         target_entries,
+        selection_facts,
     })
 }
 
@@ -2267,6 +2488,12 @@ fn connect_and_run_parser(app: AppHandle) {
                                 }
                                 protocol::Message::OnStunEffect(event) => {
                                     state.on_stun_effect(event);
+                                }
+                                protocol::Message::StatusApply(event) => {
+                                    state.on_status_apply(event);
+                                }
+                                protocol::Message::StatusRemove(event) => {
+                                    state.on_status_remove(event);
                                 }
                             }
                         }

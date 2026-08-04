@@ -1,7 +1,7 @@
 {
   "name": "relink-logs",
   "private": true,
-  "version": "1.12.8-2",
+  "version": "1.12.8-4",
   "type": "module",
   "scripts": {
     "dev": "node scripts/clean-target.mjs --quiet && node scripts/build-hook-dev.mjs && vite",
@@ -12,7 +12,8 @@
     "format": "prettier --write --ignore-unknown --ext js,jsx,ts,tsx src ./src",
     "format-check": "prettier --check --ignore-unknown --ext js,jsx,ts,tsx src ./src",
     "tauri": "tauri",
-    "test": "vitest",
+    "tauri:debug": "node scripts/tauri-dev-debug.mjs",
+    "test": "vitest run",
     "bump": "node scripts/bump-version.mjs",
     "clean:target": "node scripts/clean-target.mjs",
     "prepare": "husky"

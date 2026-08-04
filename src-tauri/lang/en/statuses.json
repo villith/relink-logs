@@ -1,0 +1,545 @@
+{
+  "0": {
+    "key": "atkup",
+    "text": "ATK↑"
+  },
+  "1": {
+    "key": "defup",
+    "text": "DEF↑"
+  },
+  "10": {
+    "key": "protect",
+    "text": "Substitute"
+  },
+  "100": {
+    "text": "Näed Seitset Excel"
+  },
+  "1000": {
+    "key": "poison",
+    "text": "Poison"
+  },
+  "1001": {
+    "key": "burn",
+    "text": "Burn"
+  },
+  "1002": {
+    "key": "slow",
+    "text": "Slow"
+  },
+  "1003": {
+    "key": "stun",
+    "text": "Dizzy"
+  },
+  "1004": {
+    "key": "freeze",
+    "text": "Glaciate"
+  },
+  "1005": {
+    "key": "frostbite",
+    "text": "Frostbite"
+  },
+  "1006": {
+    "key": "sandman",
+    "text": "Sandtomb"
+  },
+  "1007": {
+    "key": "paralysis",
+    "text": "Paralysis"
+  },
+  "1008": {
+    "key": "waterprison",
+    "text": "Held Under"
+  },
+  "101": {
+    "text": "Näed Nelja Excel"
+  },
+  "1011": {
+    "key": "darkburn",
+    "text": "Darkflame"
+  },
+  "1012": {
+    "key": "TXT_STATUS_BINDAILMENT",
+    "text": "Bound"
+  },
+  "1015": {
+    "key": "TXT_STATUS_CAPTUREAILMENT",
+    "text": "Bound"
+  },
+  "1016": {
+    "key": "disableability",
+    "text": "Skill Sealed"
+  },
+  "1017": {
+    "key": "disableougi",
+    "text": "SBA Sealed"
+  },
+  "1018": {
+    "key": "darkpoison",
+    "text": "Blight"
+  },
+  "1019": {
+    "key": "fear",
+    "text": "Petrified"
+  },
+  "102": {
+    "text": "Embrasque Unleashed"
+  },
+  "1020": {
+    "key": "arvessfermare",
+    "text": "Arvess Fermare"
+  },
+  "1021": {
+    "key": "elementweak",
+    "text": "Elemental Friction"
+  },
+  "103": {
+    "text": "Enhanced Damage Skills"
+  },
+  "104": {
+    "text": "Enhanced Combo Finishers"
+  },
+  "105": {
+    "text": "Avalanche"
+  },
+  "106": {
+    "text": "Limitless Light"
+  },
+  "107": {
+    "text": "Lucent Refuge"
+  },
+  "108": {
+    "text": "Bell of War"
+  },
+  "109": {
+    "text": "Piercing Gleam"
+  },
+  "11": {
+    "key": "protected",
+    "text": "Covered"
+  },
+  "110": {
+    "text": "Dawnray"
+  },
+  "111": {
+    "text": "Dull Point"
+  },
+  "112": {
+    "text": "Ultimatum"
+  },
+  "113": {
+    "text": "Fall Flat"
+  },
+  "114": {
+    "text": "Wild Showman"
+  },
+  "115": {
+    "text": "Daredevil"
+  },
+  "116": {
+    "text": "Sovereign"
+  },
+  "117": {
+    "text": "Star Sea"
+  },
+  "118": {
+    "text": "Flamek Unleashed"
+  },
+  "119": {
+    "text": "Enhanced Upright"
+  },
+  "120": {
+    "text": "Enhanced Reversed"
+  },
+  "121": {
+    "text": "Enhanced Upright+"
+  },
+  "122": {
+    "text": "Enhanced Reversed+"
+  },
+  "123": {
+    "text": "Enhanced Combo Finishers"
+  },
+  "124": {
+    "text": "Malice"
+  },
+  "125": {
+    "key": "blacksnipper",
+    "text": "Pincer Synergy"
+  },
+  "126": {
+    "text": "Inversa"
+  },
+  "127": {
+    "text": "Enhanced Clincher"
+  },
+  "128": {
+    "text": "Rise of Justice"
+  },
+  "129": {
+    "text": "Pain of Death"
+  },
+  "130": {
+    "text": "Kiss of the Devil"
+  },
+  "131": {
+    "text": "Collapse of the Tower"
+  },
+  "132": {
+    "text": "Melody of Judgement"
+  },
+  "133": {
+    "text": "Samudaya"
+  },
+  "134": {
+    "key": "stundown",
+    "text": "Stun Resistance↓"
+  },
+  "135": {
+    "text": "Charisma"
+  },
+  "136": {
+    "text": "Booming Beatdown"
+  },
+  "137": {
+    "text": "Flame Wolf"
+  },
+  "138": {
+    "text": "Blood-Drinking Blade"
+  },
+  "139": {
+    "text": "Dual Raid"
+  },
+  "140": {
+    "key": "antiburn",
+    "text": "Burn Immunity"
+  },
+  "141": {
+    "key": "antifreeze",
+    "text": "Frostbite/Glaciate Immunity"
+  },
+  "142": {
+    "key": "antidraw",
+    "text": "Rooted"
+  },
+  "144": {
+    "text": "Daybreak"
+  },
+  "145": {
+    "key": "em2510",
+    "text": "Unstable"
+  },
+  "146": {
+    "text": "Proto-White World"
+  },
+  "147": {
+    "text": "Fractured World"
+  },
+  "148": {
+    "text": "Chaos Shift"
+  },
+  "149": {
+    "text": "Fractured World"
+  },
+  "17": {
+    "key": "antidebuff",
+    "text": "Debuff Immunity"
+  },
+  "18": {
+    "key": "drain",
+    "text": "Drain"
+  },
+  "2": {
+    "key": "atkdown",
+    "text": "ATK↓"
+  },
+  "20": {
+    "key": "guts",
+    "text": "Guts"
+  },
+  "21": {
+    "key": "strength",
+    "text": "Strength"
+  },
+  "22": {
+    "key": "gyakkyou",
+    "text": "Jammed"
+  },
+  "23": {
+    "key": "criticalup",
+    "text": "Critical Hit Rate↑"
+  },
+  "24": {
+    "key": "hateup",
+    "text": "Hostility↑"
+  },
+  "25": {
+    "key": "autorevive",
+    "text": "Autorevive"
+  },
+  "26": {
+    "key": "magicvortex",
+    "text": "Mystic Vortex"
+  },
+  "27": {
+    "key": "concentration",
+    "text": "Focused"
+  },
+  "28": {
+    "key": "ironmeiden",
+    "text": "Iron Maiden"
+  },
+  "29": {
+    "key": "idodragon",
+    "text": "Dragonform"
+  },
+  "3": {
+    "key": "defdown",
+    "text": "DEF↓"
+  },
+  "30": {
+    "key": "idosuper",
+    "text": "Godmight"
+  },
+  "31": {
+    "key": "undead",
+    "text": "Undying"
+  },
+  "32": {
+    "key": "TXT_STATE_BOSSARTSAURA",
+    "text": "Bloodthirst"
+  },
+  "33": {
+    "key": "phantasmagoria",
+    "text": "Phantasmagoria"
+  },
+  "36": {
+    "key": "em1806",
+    "text": "Abyssal Glory"
+  },
+  "37": {
+    "key": "maxhpdown",
+    "text": "Max HP↓"
+  },
+  "38": {
+    "key": "doubletap",
+    "text": "Double Tap"
+  },
+  "4": {
+    "key": "damagecut",
+    "text": "DMG Cut"
+  },
+  "41": {
+    "key": "barrier",
+    "text": "Shield"
+  },
+  "42": {
+    "key": "dmgup",
+    "text": "DMG↑"
+  },
+  "43": {
+    "key": "sharpshoot",
+    "text": "Deadshot"
+  },
+  "44": {
+    "key": "senrai",
+    "text": "Bring the Thunder"
+  },
+  "45": {
+    "key": "colorwing",
+    "text": "Chromatic Wings"
+  },
+  "46": {
+    "key": "armorparge",
+    "text": "Deathmatch Finale"
+  },
+  "47": {
+    "text": "Näed Nulli"
+  },
+  "48": {
+    "text": "Näed Seitset"
+  },
+  "49": {
+    "text": "Näed Nelja"
+  },
+  "5": {
+    "key": "regeneration",
+    "text": "Regen"
+  },
+  "50": {
+    "key": "risingnova",
+    "text": "Rising Nova"
+  },
+  "51": {
+    "key": "dmgdown",
+    "text": "DMG↓"
+  },
+  "52": {
+    "key": "bravecarol",
+    "text": "Battle Hymn"
+  },
+  "53": {
+    "key": "playwithfire",
+    "text": "Play with Fire"
+  },
+  "54": {
+    "key": "rebuildstun",
+    "text": "Sage"
+  },
+  "55": {
+    "key": "rebuildweak",
+    "text": "Cardinal"
+  },
+  "56": {
+    "key": "dmglimitup",
+    "text": "DMG Cap↑"
+  },
+  "57": {
+    "key": "atkupadd",
+    "text": "Stackable ATK↑"
+  },
+  "58": {
+    "key": "defupadd",
+    "text": "Stackable DEF↑"
+  },
+  "59": {
+    "key": "defdownadd",
+    "text": "Stackable DEF↓"
+  },
+  "6": {
+    "key": "muteki",
+    "text": "Invincibility"
+  },
+  "60": {
+    "text": "Heliotrope Aura"
+  },
+  "61": {
+    "text": "Enhanced Freeflutter"
+  },
+  "62": {
+    "text": "Enhanced Dawnfly"
+  },
+  "63": {
+    "text": "Kaleidoscope"
+  },
+  "64": {
+    "text": "Dragonsbane Pulse"
+  },
+  "65": {
+    "text": "Dark Zeal"
+  },
+  "66": {
+    "text": "Combat Healer"
+  },
+  "67": {
+    "key": "atkdownadd",
+    "text": "Stackable ATK↓"
+  },
+  "68": {
+    "text": "Ares Surge"
+  },
+  "69": {
+    "key": "mspl0200_02",
+    "text": "Blade Blue"
+  },
+  "7": {
+    "key": "tsuigeki",
+    "text": "Supplementary DMG"
+  },
+  "70": {
+    "text": "Super Bull's Eye Blast"
+  },
+  "71": {
+    "text": "Superstar"
+  },
+  "72": {
+    "text": "Sniper Elite"
+  },
+  "73": {
+    "text": "Shell Shock"
+  },
+  "74": {
+    "text": "Noble Order"
+  },
+  "75": {
+    "text": "Diamond Cutter"
+  },
+  "76": {
+    "text": "Divine Justice"
+  },
+  "77": {
+    "text": "Ultrafist"
+  },
+  "78": {
+    "text": "Loving Trust"
+  },
+  "79": {
+    "key": "mspl0700_01",
+    "text": "Spiritbond"
+  },
+  "8": {
+    "key": "hyperarmor",
+    "text": "Stout Heart"
+  },
+  "81": {
+    "text": "Magic Chain"
+  },
+  "82": {
+    "text": "Ebony Glint"
+  },
+  "83": {
+    "text": "Stoked Charge"
+  },
+  "84": {
+    "key": "abdmgup",
+    "text": "Skill DMG↑"
+  },
+  "85": {
+    "text": "Molten Edge"
+  },
+  "86": {
+    "text": "Super Collapse"
+  },
+  "87": {
+    "text": "Arts Superiór"
+  },
+  "88": {
+    "text": "Grynoth Unleashed"
+  },
+  "89": {
+    "text": "Flash Cut"
+  },
+  "9": {
+    "key": "illusion",
+    "text": "Mirror Image"
+  },
+  "90": {
+    "text": "Payback"
+  },
+  "91": {
+    "text": "Heroic Vigor"
+  },
+  "92": {
+    "text": "Truth"
+  },
+  "93": {
+    "text": "Synergy Boost"
+  },
+  "94": {
+    "text": "Loop Master"
+  },
+  "95": {
+    "text": "Arvess Unleashed"
+  },
+  "96": {
+    "text": "Heavy Hammer"
+  },
+  "97": {
+    "text": "Spiral Rose Bloomed"
+  },
+  "98": {
+    "text": "Lost Love Bloomed"
+  },
+  "99": {
+    "text": "Näed Nulli Excel"
+  }
+}

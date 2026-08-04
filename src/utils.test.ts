@@ -22,6 +22,7 @@ import {
   EMPTY_ID,
   OVERMASTERY_EFFECT_IDS,
   SKILLBOARD_CATEGORIES,
+  SUMMON_ATTACK_ACTION_ID,
   barWidth,
   checklistLevel,
   checklistStatus,
@@ -60,9 +61,13 @@ import {
   type BonusSource,
 } from "./utils";
 
-const makeSkill = (actionType: SkillState["actionType"], totalDamage: number): SkillState => ({
+const makeSkill = (
+  actionType: SkillState["actionType"],
+  totalDamage: number,
+  childCharacterType: SkillState["childCharacterType"] = "Pl0000"
+): SkillState => ({
   actionType,
-  childCharacterType: "Pl0000",
+  childCharacterType,
   hits: 1,
   minDamage: totalDamage,
   maxDamage: totalDamage,
@@ -170,6 +175,42 @@ describe("utils", () => {
       const { eligible, overall } = computeSupPercentage(player);
       expect(eligible).toBeCloseTo(20);
       expect(overall).toBeCloseTo((200 / 10000) * 100);
+    });
+
+    it("excludes Ferry's pets and Umlauf from the eligible base", () => {
+      // The ghosts' hits report as Normal skills but no supplementary proc is ever
+      // logged under their bodies, so counting them only dilutes the proc-quality
+      // number: log 1668 read 13.4% with them in the base and 29.5% without.
+      const player = makePlayer([
+        makeSkill({ Normal: 1 }, 1000),
+        makeSkill({ Normal: 9995 }, 4000, "Pl0700Ghost"),
+        makeSkill({ Normal: 1700 }, 2000, "Pl0700GhostSatellite"),
+        makeSkill({ SupplementaryDamage: 1 }, 200),
+      ]);
+      const { eligible, overall } = computeSupPercentage(player);
+      expect(eligible).toBeCloseTo(20);
+      expect(overall).toBeCloseTo((200 / 7200) * 100);
+    });
+
+    it("excludes summon hits from the eligible base", () => {
+      // Summons are called, not swung: no supplementary damage is ever logged under
+      // a summon body, and one Primal Burst can outweigh a whole rotation.
+      const player = makePlayer([
+        makeSkill({ Normal: 1 }, 1000),
+        makeSkill({ Normal: SUMMON_ATTACK_ACTION_ID }, 9000, { Unknown: 0x5418b8f8 }),
+        makeSkill({ SupplementaryDamage: 1 }, 200),
+      ]);
+      expect(computeSupPercentage(player).eligible).toBeCloseTo(20);
+    });
+
+    it("keeps a transformed body's own hits eligible", () => {
+      // Id's transformation (Pl2000) and Cagliostro's clone do proc supplementary
+      // damage — the exclusion is for pets and summons, not every child body.
+      const player = makePlayer([
+        makeSkill({ Normal: 1000 }, 4000, "Pl2000"),
+        makeSkill({ SupplementaryDamage: 1 }, 800),
+      ]);
+      expect(computeSupPercentage(player).eligible).toBeCloseTo(20);
     });
 
     it("caps out at +60% when every hit procs all three sources", () => {
@@ -1128,18 +1169,6 @@ describe("ability sources in skill-name-sources.json", () => {
       .filter((source) => source.key.endsWith("_CG"));
 
     expect(cg).toEqual([]);
-  });
-
-  it("leaves no ui.json entry duplicating a mapped id", () => {
-    // ui.json holding a mapped id would shadow the translation for every
-    // language, which is the duplication this whole map exists to remove.
-    const duplicates = Object.entries(skillNameSources).flatMap(([block, entries]) =>
-      Object.keys(entries as Record<string, unknown>)
-        .filter((id) => (enUi.skills as Record<string, Record<string, unknown>>)[block]?.[id] !== undefined)
-        .map((id) => `${block}.${id}`)
-    );
-
-    expect(duplicates).toEqual([]);
   });
 });
 

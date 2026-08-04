@@ -1,9 +1,10 @@
 import { useShallow } from "zustand/react/shallow";
 
-import SkillGroupMapping from "@/assets/skill-groups";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, ComputedSkillGroup, ComputedSkillState } from "@/types";
-import { PRIMAL_BURST_GROUP, getSkillName, isPrimalBurstHit, isSkillGroup } from "@/utils";
+import { getSkillName, isSkillGroup } from "@/utils";
+
+import { skillGroupFor } from "./skillGrouping";
 
 /** Folds one more skill into an existing group row. */
 const mergedGroup = (group: ComputedSkillGroup, skill: ComputedSkillState): ComputedSkillGroup => ({
@@ -97,38 +98,12 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
     const skills: Array<ComputedSkillGroup | ComputedSkillGroup> = [];
 
     for (const skill of computedSkills) {
-      // The three Primal Burst bodies are distinct classes sharing one action
-      // id, so the per-character map (action ids under a character) can never
-      // join them — they group on the body class instead.
-      if (isPrimalBurstHit(skill)) {
-        upsertGroup(skills, PRIMAL_BURST_GROUP, skill, null);
-        continue;
-      }
+      // The rule itself lives in skillGrouping.ts, shared with the analysis
+      // view's stacked chart so a band and a row group the same way.
+      const key = skillGroupFor(skill);
 
-      const skillGroupIndex = typeof skill.childCharacterType !== "string" ? -1 : skill.childCharacterType;
-      const skillGroupMapping = SkillGroupMapping[skillGroupIndex] || {};
-
-      if (typeof skill.actionType == "object" && Object.hasOwn(skill.actionType, "Normal")) {
-        const actionType = skill.actionType as { Normal: number };
-        let wasGroupedSkill = false;
-
-        for (const group in skillGroupMapping) {
-          const skillBelongsToGroup = skillGroupMapping[group].skills.includes(actionType.Normal);
-
-          if (skillBelongsToGroup) {
-            upsertGroup(skills, group, skill, skill.childCharacterType);
-            wasGroupedSkill = true;
-
-            break;
-          }
-        }
-
-        if (!wasGroupedSkill) {
-          skills.push(skill);
-        }
-      } else {
-        skills.push(skill);
-      }
+      if (key === null) skills.push(skill);
+      else upsertGroup(skills, key.group, skill, key.childCharacterType);
     }
 
     skillsToShow = skills;

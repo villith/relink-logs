@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use strum_macros::Display;
 
-#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Clone, Copy, Display)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Hash, Clone, Copy, Display)]
 pub enum CharacterType {
     /// Gran
     Pl0000,

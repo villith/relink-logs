@@ -3,9 +3,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import enAbilities from "../src-tauri/lang/en/abilities.json";
 import enSigils from "../src-tauri/lang/en/sigils.json";
+import enStatuses from "../src-tauri/lang/en/statuses.json";
 import enTraits from "../src-tauri/lang/en/traits.json";
 import enUi from "../src-tauri/lang/en/ui.json";
-import { translateAbilityId, translateSigilId, translateTraitId } from "./utils";
+import { translateAbilityId, translateSigilId, translateStatusName, translateTraitId } from "./utils";
 
 /// Guards the shipped en lang bundles against the ids the hook actually reports.
 /// An id's runtime value is its .tbl Key hash, which usually — but not always —
@@ -17,7 +18,7 @@ describe("lang bundles", () => {
     await i18next.init({
       lng: "en",
       defaultNS: "ui",
-      resources: { en: { ui: enUi, traits: enTraits, sigils: enSigils, abilities: enAbilities } },
+      resources: { en: { ui: enUi, traits: enTraits, sigils: enSigils, abilities: enAbilities, statuses: enStatuses } },
       interpolation: { escapeValue: false },
     });
   });
@@ -52,5 +53,33 @@ describe("lang bundles", () => {
   it("falls back to the generic label for an id no bundle covers", () => {
     expect(translateTraitId(0xdeadbeef)).toBe("Unknown (deadbeef)");
     expect(translateAbilityId(0xdeadbeef)).toBe("Unknown (deadbeef)");
+  });
+
+  it("names a status by the id the hook emits", () => {
+    // status.tbl's StatusId, decimal, exactly as StatusApplyEvent carries it —
+    // not a hash like every other bundle, which is why this has its own test.
+    // The name is the game's own buff-icon TITLE ("ATK\u2191"), not the longer
+    // description on the same row ("ATK is boosted").
+    expect(translateStatusName(0)).toBe("ATK\u2191");
+    expect(translateStatusName(4)).toBe("DMG Cut");
+    expect(translateStatusName(1000)).toBe("Poison");
+  });
+
+  it("names the character-signature statuses the first extraction left blank", () => {
+    // The first bundle only carried the ~77 rows whose titles the extraction
+    // surfaced; the character-signature buffs have real names too. Observed on
+    // log 1636: Sandalphon's aura and Fraux's stance buffs all rendered as
+    // "Effect <id>" without these rows.
+    expect(translateStatusName(47)).toBe("Näed Nulli");
+    expect(translateStatusName(60)).toBe("Heliotrope Aura");
+    expect(translateStatusName(119)).toBe("Enhanced Upright");
+  });
+
+  it("answers empty for a status the game never names", () => {
+    // A handful of rows are internal and carry no text at all. Empty is the
+    // contract statusLabelFor expects: it is what makes the row fall back to
+    // "Effect <id>" rather than printing a blank name.
+    expect(translateStatusName(12)).toBe("");
+    expect(translateStatusName(999999)).toBe("");
   });
 });

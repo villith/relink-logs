@@ -1,0 +1,302 @@
+{
+  "0": {
+    "key": "atkup",
+    "text": "ANG↑"
+  },
+  "1": {
+    "key": "defup",
+    "text": "ABW↑"
+  },
+  "10": {
+    "key": "protect",
+    "text": "Ersetzen"
+  },
+  "1000": {
+    "key": "poison",
+    "text": "Gift"
+  },
+  "1001": {
+    "key": "burn",
+    "text": "Brennen"
+  },
+  "1002": {
+    "key": "slow",
+    "text": "Langsam"
+  },
+  "1003": {
+    "key": "stun",
+    "text": "Schwindel"
+  },
+  "1004": {
+    "key": "freeze",
+    "text": "Gletscher"
+  },
+  "1005": {
+    "key": "frostbite",
+    "text": "Frostbeulen"
+  },
+  "1006": {
+    "key": "sandman",
+    "text": "Sandgrab"
+  },
+  "1007": {
+    "key": "paralysis",
+    "text": "Lähmung"
+  },
+  "1008": {
+    "key": "waterprison",
+    "text": "Unterdrückung"
+  },
+  "1011": {
+    "key": "darkburn",
+    "text": "Dunkelflamme"
+  },
+  "1012": {
+    "key": "TXT_STATUS_BINDAILMENT",
+    "text": "Gebunden"
+  },
+  "1015": {
+    "key": "TXT_STATUS_CAPTUREAILMENT",
+    "text": "Gebunden"
+  },
+  "1016": {
+    "key": "disableability",
+    "text": "Fähigkeit versiegelt"
+  },
+  "1017": {
+    "key": "disableougi",
+    "text": "HK versiegelt"
+  },
+  "1018": {
+    "key": "darkpoison",
+    "text": "Zerstörung"
+  },
+  "1019": {
+    "key": "fear",
+    "text": "Versteinert"
+  },
+  "1020": {
+    "key": "arvessfermare",
+    "text": "Arvess Fermare"
+  },
+  "1021": {
+    "key": "elementweak",
+    "text": "Elementarreibung"
+  },
+  "11": {
+    "key": "protected",
+    "text": "Bedeckt"
+  },
+  "125": {
+    "key": "blacksnipper",
+    "text": "Krabben-Synergie"
+  },
+  "134": {
+    "key": "stundown",
+    "text": "Betäubungsresistenz↓"
+  },
+  "140": {
+    "key": "antiburn",
+    "text": "Brennen-Immunität"
+  },
+  "141": {
+    "key": "antifreeze",
+    "text": "Frostbeulen-/Gletscher-Immunität"
+  },
+  "142": {
+    "key": "antidraw",
+    "text": "Starker Stand"
+  },
+  "145": {
+    "key": "em2510",
+    "text": "Zehenspitzengang"
+  },
+  "17": {
+    "key": "antidebuff",
+    "text": "Schwächungs-Immunität"
+  },
+  "18": {
+    "key": "drain",
+    "text": "Entziehen"
+  },
+  "2": {
+    "key": "atkdown",
+    "text": "ANG↓"
+  },
+  "20": {
+    "key": "guts",
+    "text": "Mumm"
+  },
+  "21": {
+    "key": "strength",
+    "text": "Stärke"
+  },
+  "22": {
+    "key": "gyakkyou",
+    "text": "Eingeklemmt"
+  },
+  "23": {
+    "key": "criticalup",
+    "text": "Kritische Trefferrate↑"
+  },
+  "24": {
+    "key": "hateup",
+    "text": "Feindseligkeit↑"
+  },
+  "25": {
+    "key": "autorevive",
+    "text": "Automatisches Wiederbeleben"
+  },
+  "26": {
+    "key": "magicvortex",
+    "text": "Mystischer Wirbel"
+  },
+  "27": {
+    "key": "concentration",
+    "text": "Konzentriert"
+  },
+  "28": {
+    "key": "ironmeiden",
+    "text": "Eiserne Jungfrau"
+  },
+  "29": {
+    "key": "idodragon",
+    "text": "Drachenform"
+  },
+  "3": {
+    "key": "defdown",
+    "text": "ABW↓"
+  },
+  "30": {
+    "key": "idosuper",
+    "text": "Gottesmacht"
+  },
+  "31": {
+    "key": "undead",
+    "text": "Unsterblich"
+  },
+  "32": {
+    "key": "TXT_STATE_BOSSARTSAURA",
+    "text": "Blutdurst"
+  },
+  "33": {
+    "key": "phantasmagoria",
+    "text": "Phantasmagoria"
+  },
+  "36": {
+    "key": "em1806",
+    "text": "Ruhm des Abgrunds"
+  },
+  "37": {
+    "key": "maxhpdown",
+    "text": "Max. LP↓"
+  },
+  "38": {
+    "key": "doubletap",
+    "text": "Doppelschuss"
+  },
+  "4": {
+    "key": "damagecut",
+    "text": "Schadensverringerung"
+  },
+  "41": {
+    "key": "barrier",
+    "text": "Schild"
+  },
+  "42": {
+    "key": "dmgup",
+    "text": "Verbesserter Schaden"
+  },
+  "43": {
+    "key": "sharpshoot",
+    "text": "Todesschuss"
+  },
+  "44": {
+    "key": "senrai",
+    "text": "Bring den Donner"
+  },
+  "45": {
+    "key": "colorwing",
+    "text": "Chromatische Flügel"
+  },
+  "46": {
+    "key": "armorparge",
+    "text": "Zermalmer"
+  },
+  "5": {
+    "key": "regeneration",
+    "text": "Regenerieren"
+  },
+  "50": {
+    "key": "risingnova",
+    "text": "Aufblitzende Nova"
+  },
+  "51": {
+    "key": "dmgdown",
+    "text": "Verrringerter Schaden"
+  },
+  "52": {
+    "key": "bravecarol",
+    "text": "Kantate der Tapferkeit"
+  },
+  "53": {
+    "key": "playwithfire",
+    "text": "Spiel mit dem Feuer"
+  },
+  "54": {
+    "key": "rebuildstun",
+    "text": "Seuchenhimmel"
+  },
+  "55": {
+    "key": "rebuildweak",
+    "text": "Magentahimmel"
+  },
+  "56": {
+    "key": "dmglimitup",
+    "text": "Erhöhte Schadensobergrenze"
+  },
+  "57": {
+    "key": "atkupadd",
+    "text": "ANG↑ (kumulierbar)"
+  },
+  "58": {
+    "key": "defupadd",
+    "text": "ABW↑ (kumulierbar)"
+  },
+  "59": {
+    "key": "defdownadd",
+    "text": "ABW↓ (kumulierbar)"
+  },
+  "6": {
+    "key": "muteki",
+    "text": "Unantastbar"
+  },
+  "67": {
+    "key": "atkdownadd",
+    "text": "ANG↓ (kumulierbar)"
+  },
+  "69": {
+    "key": "mspl0200_02",
+    "text": "Azurklinge"
+  },
+  "7": {
+    "key": "tsuigeki",
+    "text": "Zusätzlicher Schaden"
+  },
+  "79": {
+    "key": "mspl0700_01",
+    "text": "Geisterhafte Verbindung"
+  },
+  "8": {
+    "key": "hyperarmor",
+    "text": "Starkes Herz"
+  },
+  "84": {
+    "key": "abdmgup",
+    "text": "Erhöhter Fähigkeitenschaden"
+  },
+  "9": {
+    "key": "illusion",
+    "text": "Spiegelbild"
+  }
+}

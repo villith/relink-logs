@@ -2,11 +2,24 @@
 
 use protocol::OvermasteryInfo;
 
-use super::{chased_effects, is_empty, Finding, Rule, Subject, Value};
+use super::{is_empty, Finding, Rule, Subject, Value};
 use crate::overmastery::stock_tables;
 
 /// The game always rolls four overmasteries; fewer means a partial read.
 const OVERMASTERY_SLOT_COUNT: usize = 4;
+
+/// The three Stun Power Up ids.
+///
+/// Written out rather than derived, and guarded by
+/// `the_stun_ids_are_the_category_3_params_of_the_lv1_pool`. All three exist
+/// only in the Lv1 (700 MSP) pool — the Lv2 and Lv3 pools carry one apiece —
+/// so a set holding all three names its own meditation size without the log
+/// having to record it.
+const STUN_IDS: [u32; 3] = [0x6cb3_8ef3, 0xa354_5ca1, 0x59fb_b7d8];
+
+/// How many maxed stuns the report takes. Three is also the ceiling: a roll
+/// never draws the same key twice, and there are only three stun ids.
+const MAXED_STUN_COUNT: usize = STUN_IDS.len();
 
 /// Float comparison tolerance. Ladder values are whole numbers or tenths, so
 /// this only absorbs f32 representation error. The smallest gap between two
@@ -14,29 +27,49 @@ const OVERMASTERY_SLOT_COUNT: usize = 4;
 /// this, so no legitimate value can be mistaken for its neighbour.
 const EPSILON: f32 = 1e-3;
 
-/// Chance that one slot rolls the top level, taking the most favourable
-/// meditation size — the reading most generous to the player. Stock tables
-/// weight the top level at 100/100/1800 of 10000, so this is 0.18.
+/// The meditation size the report is about. Only this pool carries three stun
+/// ids, so it is the only size that can produce the set.
+const LV1_TIER: usize = 0;
+
+/// Chance that one Lv1 meditation produces the reported set: all three stun
+/// ids among the four categories it draws, each landing on the top rung.
 ///
-/// Derived once: it is a fold over the whole `level_weights` grid and the
-/// answer is a property of the baked tables, not of the build being audited.
-fn best_max_level_chance() -> f64 {
+/// Unlike the four-maxed report this replaced, the size is not a guess — three
+/// stuns can only have come from the Lv1 pool — so there is no need to quote
+/// the reading most generous to the player. This is the whole probability.
+///
+/// Both halves come from the baked tables, so a patch that reweights the
+/// ladders or resizes the pool reprices the claim instead of leaving a stale
+/// constant behind. Every pool entry carries weight 1 and a roll never repeats
+/// a key, which makes the category draw a uniform 4-subset: the sets holding
+/// all three stuns are the `n - 3` ways to fill the one remaining slot, out of
+/// `C(n, 4)`. On stock v2.0.2 that is 20/8855 × 0.01³ — 1 in 442,750,000.
+///
+/// Derived once: the answer is a property of the baked tables, not of the
+/// build being audited.
+fn triple_stun_chance() -> f64 {
     static CHANCE: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
     *CHANCE.get_or_init(|| {
         let tables = stock_tables();
-        let sizes = tables.level_weights.first().map_or(0, |row| row.len());
+        let pool_size = tables.pools.get(LV1_TIER).map_or(0, Vec::len) as u64;
+        if pool_size < OVERMASTERY_SLOT_COUNT as u64 {
+            return 0.0;
+        }
 
-        (0..sizes)
-            .map(|size| {
-                let total: u32 = tables.level_weights.iter().map(|row| row[size]).sum();
-                let top = tables.level_weights.last().map_or(0, |row| row[size]);
-                if total == 0 {
-                    0.0
-                } else {
-                    f64::from(top) / f64::from(total)
-                }
-            })
-            .fold(0.0_f64, f64::max)
+        // C(n, 4) = n(n-1)(n-2)(n-3)/24, as a falling product so no factorial
+        // overflows. Both literals are the slot count: 4 terms, and 4! = 24.
+        // Non-zero by the guard above, so there is nothing further to check.
+        let subsets = (pool_size - 3..=pool_size).product::<u64>() / 24;
+        let with_all_three = pool_size - MAXED_STUN_COUNT as u64;
+
+        let total: u32 = tables.level_weights.iter().map(|row| row[LV1_TIER]).sum();
+        let top = tables.level_weights.last().map_or(0, |row| row[LV1_TIER]);
+        if total == 0 {
+            return 0.0;
+        }
+        let top_level = f64::from(top) / f64::from(total);
+
+        with_all_three as f64 / subsets as f64 * top_level.powi(MAXED_STUN_COUNT as i32)
     })
 }
 
@@ -61,7 +94,7 @@ fn magnitude_unread(value: f32) -> bool {
 
 /// Rules 8 and 9. Silent without a full set of four overmasteries, and
 /// silent about any slot whose magnitude was never read — including rule 9,
-/// which cannot conclude "all four maxed" from a value it never saw.
+/// which cannot conclude "three maxed stuns" from a value it never saw.
 pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
     let Some(info) = info else {
         return Vec::new();
@@ -73,11 +106,11 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
     let tables = stock_tables();
     let mut findings = Vec::new();
     // COUNTED, not a flag cleared on every rejection path. The rule fires only
-    // when all four slots are affirmatively proven maxed, so a path that forgets
+    // when all three stuns are affirmatively proven maxed, so a path that forgets
     // to speak fails CLOSED (no finding). A `bool` set false on each rejection
     // fails OPEN — one forgotten branch is a false accusation, which is the one
     // outcome this module exists to prevent.
-    let mut maxed_slots = 0usize;
+    let mut maxed_stuns = 0usize;
 
     for (index, mastery) in info.overmasteries.iter().enumerate() {
         // An empty/unread slot is missing data, not an unknown id.
@@ -125,32 +158,30 @@ pub fn audit_overmastery(info: Option<&OvermasteryInfo>) -> Vec<Finding> {
             continue;
         }
 
-        // Only the five chased effects count toward the tally (see
-        // `chased_effects`). A maxed Health Up is a coincidence nobody rerolled
-        // for, and counting it made an ordinary endgame set a report.
-        //
-        // The threshold stays at all four slots, so this is strictly narrower:
-        // a single uncounted slot puts the tally permanently out of reach for
-        // that set, whatever the other three did.
+        // Only maxed STUNS count toward the tally (user, 2026-08-01). The
+        // report used to take any four maxed chased effects, which a Lv3
+        // meditation lands once in 62,872 rolls — reachable by a patient player
+        // running this app's own Overmastery Predictor, so it had stopped
+        // telling cheats apart from users. Three maxed stuns is the one
+        // perfection nobody can reach: it exists only in the Lv1 pool, at 1 in
+        // 442,750,000, and prediction buys no shortcut because every roll must
+        // still be paid for to advance the RNG stream.
         let top = param.values[param.values.len() - 1];
-        if (top - mastery.value).abs() < EPSILON
-            && chased_effects::overmastery_is_chased(mastery.id)
-        {
-            maxed_slots += 1;
+        if (top - mastery.value).abs() < EPSILON && STUN_IDS.contains(&mastery.id) {
+            maxed_stuns += 1;
         }
     }
 
-    if maxed_slots == OVERMASTERY_SLOT_COUNT {
+    if maxed_stuns == MAXED_STUN_COUNT {
         findings.push(Finding {
             rule: Rule::OvermasteryAllMaxed,
             subject: Subject::Overmasteries,
-            observed: Value::Count(OVERMASTERY_SLOT_COUNT),
-            // Nothing is being exceeded here: four maxed slots are a legal
+            observed: Value::Count(MAXED_STUN_COUNT),
+            // Nothing is being exceeded here: three maxed stuns are a legal
             // roll, merely an improbable one, so there is no allowed value to
-            // name and `odds` is the payload. The previous `Count(4)` on both
-            // sides conveyed nothing.
+            // name and `odds` is the payload.
             allowed: Value::None,
-            odds: Some(best_max_level_chance().powi(OVERMASTERY_SLOT_COUNT as i32)),
+            odds: Some(triple_stun_chance()),
             evidence: None,
         });
     }
@@ -167,26 +198,22 @@ mod tests {
     const ATTACK: u32 = 0xc4925bd7;
     const HEALTH: u32 = 0x52a207b5;
     const CRIT: u32 = 0x45c65767;
+    /// The three Stun Power Up ids, all on the 0.1,0.1,0.2,…,2.0 ladder.
+    /// `STUN` is the one the Lv2 and Lv3 pools also carry; the other two are
+    /// Lv1-only, which is what makes a set of three self-identifying.
     const STUN: u32 = 0x6cb38ef3;
+    const STUN_B: u32 = 0xa354_5ca1;
+    const STUN_C: u32 = 0x59fb_b7d8;
 
-    /// The two other chased effects, both on the 1,1,2,4,6,8,10,12,16,20
-    /// ladder. Attack Power Up and Stun Power Up above complete the set of
-    /// five names the count rule recognises.
+    /// Damage Cap Ups, on the 1,1,2,4,6,8,10,12,16,20 ladder. Maxed, they used
+    /// to complete the old four-chased-effects trigger.
     const NA_DMG_CAP: u32 = 0x43b7_581d;
     const SKILL_DMG_CAP: u32 = 0x9c55_5433;
-    /// Skill Damage UP — the same ladder as the cap ups and a stat that looks
-    /// just as maxed, but not one the rule counts. The near-miss is the point.
-    const SKILL_DMG: u32 = 0x9a97_c049;
 
-    /// Four maxed slots that the rule must recognise: all four are chased
-    /// effects. `flags_all_four_at_maximum` pins the finding it produces.
-    fn four_chased_maxed() -> OvermasteryInfo {
-        info(&[
-            (ATTACK, 1000.0),
-            (STUN, 2.0),
-            (NA_DMG_CAP, 20.0),
-            (SKILL_DMG_CAP, 20.0),
-        ])
+    /// The trigger: all three Stun Power Ups at the top of their ladder, with
+    /// a fourth slot the rule does not care about.
+    fn three_maxed_stuns() -> OvermasteryInfo {
+        info(&[(STUN, 2.0), (STUN_B, 2.0), (STUN_C, 2.0), (HEALTH, 600.0)])
     }
 
     fn info(entries: &[(u32, f32)]) -> OvermasteryInfo {
@@ -236,60 +263,63 @@ mod tests {
         assert_eq!(findings[0].observed, Value::OvermasteryId(0xdeadbeef));
     }
 
-    /// THE EFFECT SCOPE (user, 2026-07-30). Only Attack Power Up, Stun Power Up
-    /// and the three Damage Cap Ups count toward the tally, so a maxed Health
-    /// Up or Critical Hit Rate Up is no longer evidence of anything — and with
-    /// two of the four slots uncounted the tally can never reach four.
-    ///
-    /// THE PRODUCTION CASE the scope was requested for: a real set of four
-    /// maxed rolls, two of them chased and two not, which the rule reported.
+    /// THE RESCOPING (user, 2026-08-01). Four maxed rolls out of the chased
+    /// five used to be the trigger, at 1 in 62,872 on a Lv3 meditation — odds a
+    /// player running this app's own Overmastery Predictor can actually reach,
+    /// so the report had stopped separating cheats from patient users. It is
+    /// now deliberately silent.
     #[test]
-    fn a_maxed_set_containing_an_uncounted_effect_is_not_reported() {
+    fn four_maxed_chased_effects_are_no_longer_flagged() {
         let info = info(&[
+            (ATTACK, 1000.0),
+            (STUN, 2.0),
             (NA_DMG_CAP, 20.0),
             (SKILL_DMG_CAP, 20.0),
-            (CRIT, 20.0),
-            (SKILL_DMG, 20.0),
         ]);
         assert_eq!(
             audit_overmastery(Some(&info)),
             vec![],
-            "a set with two uncounted effects was reported as all-maxed"
+            "the old four-chased-effects trigger still fires"
         );
     }
 
-    /// The counterpart, so the scope cannot pass by silencing the rule
-    /// outright: four maxed CHASED effects are still the finding.
+    /// The trigger: three maxed Stun Power Ups. Only the Lv1 pool carries three
+    /// stun ids, so this set names its own meditation size, and at 1 in 442.75
+    /// million per roll no amount of prediction reaches it — every roll must
+    /// still be paid for to advance the stream.
     #[test]
-    fn flags_all_four_at_maximum() {
-        let info = four_chased_maxed();
-        let findings = audit_overmastery(Some(&info));
+    fn flags_three_maxed_stuns() {
+        let findings = audit_overmastery(Some(&three_maxed_stuns()));
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::OvermasteryAllMaxed);
         // The claim is about the whole set, so the subject is the whole set —
         // pointing at slot 0 made the audit page display a single overmastery.
         assert_eq!(findings[0].subject, Subject::Overmasteries);
         let odds = findings[0].odds.expect("maxed roll reports odds");
-        // 0.18^4 on a large meditation.
-        assert!((odds - 0.18_f64.powi(4)).abs() < 1e-9, "odds were {odds}");
-        // All four slots are at maximum, which is the observation. There is
-        // no ceiling being exceeded — the roll is legal, merely improbable —
-        // so `allowed` names nothing and `odds` carries the real payload.
-        assert_eq!(findings[0].observed, Value::Count(OVERMASTERY_SLOT_COUNT));
+        // 20/8855 category draws × 0.01³ level draws, on a small meditation.
+        let expected = 20.0 / 8855.0 * 0.01_f64.powi(3);
+        assert!((odds - expected).abs() < 1e-15, "odds were {odds}");
+        // Three stuns at maximum is the observation. There is no ceiling being
+        // exceeded — the roll is legal, merely improbable — so `allowed` names
+        // nothing and `odds` carries the real payload.
+        assert_eq!(findings[0].observed, Value::Count(MAXED_STUN_COUNT));
         assert_eq!(findings[0].allowed, Value::None);
     }
 
-    /// All four slots are chased effects, so only the count can hold the rule
-    /// back — which is what makes this a test of the threshold rather than of
-    /// the scope.
+    /// The near-miss the threshold exists for. Two maxed stuns beside two other
+    /// maxed effects is an ordinary lucky set.
     #[test]
-    fn three_maxed_slots_are_not_flagged() {
-        let info = info(&[
-            (ATTACK, 1000.0),
-            (STUN, 2.0),
-            (NA_DMG_CAP, 20.0),
-            (SKILL_DMG_CAP, 16.0),
-        ]);
+    fn two_maxed_stuns_are_not_flagged() {
+        let info = info(&[(STUN, 2.0), (STUN_B, 2.0), (ATTACK, 1000.0), (CRIT, 20.0)]);
+        assert_eq!(audit_overmastery(Some(&info)), vec![]);
+    }
+
+    /// All three stun ids are present, so only the LEVEL can hold the rule
+    /// back — which is what makes this a test of the top-of-ladder condition
+    /// rather than of the count.
+    #[test]
+    fn three_stuns_below_the_top_are_not_flagged() {
+        let info = info(&[(STUN, 2.0), (STUN_B, 2.0), (STUN_C, 1.6), (HEALTH, 600.0)]);
         assert_eq!(audit_overmastery(Some(&info)), vec![]);
     }
 
@@ -320,11 +350,11 @@ mod tests {
         assert_eq!(findings[0].observed, Value::Amount(777.0));
     }
 
-    /// "All four maxed" cannot be concluded from magnitudes that were never
-    /// read. Three maxed slots beside one unread slot must stay silent.
+    /// "Three maxed stuns" cannot be concluded from a magnitude that was never
+    /// read. Two maxed stuns beside an unread third must stay silent.
     #[test]
-    fn all_maxed_does_not_fire_on_a_set_containing_an_unread_slot() {
-        let mut info = four_chased_maxed();
+    fn an_unread_stun_cannot_complete_the_count() {
+        let mut info = three_maxed_stuns();
         info.overmasteries[1].value = 0.0;
         assert_eq!(audit_overmastery(Some(&info)), vec![]);
     }
@@ -354,9 +384,9 @@ mod tests {
     #[test]
     fn sentinel_ids_are_missing_data_not_unknown_ids() {
         for sentinel in [0x887a_e0b0_u32, 0] {
-            // The other three are maxed CHASED effects, so nothing but the
-            // sentinel guard itself can be keeping the all-maxed rule quiet.
-            let mut info = four_chased_maxed();
+            // The other three are maxed STUNS, so nothing but the sentinel
+            // guard itself can be keeping the all-maxed rule quiet.
+            let mut info = three_maxed_stuns();
             info.overmasteries[0] = Overmastery {
                 id: sentinel,
                 flags: 0,
@@ -366,6 +396,54 @@ mod tests {
                 audit_overmastery(Some(&info)),
                 vec![],
                 "sentinel id {sentinel:08x} was accused (or all-maxed fired past it)"
+            );
+        }
+    }
+
+    /// THE DRIFT GUARD for [`STUN_IDS`].
+    ///
+    /// The ids are written out rather than derived, so a game update that
+    /// renumbers them — or adds a fourth stun id — would switch this report off
+    /// with nothing to notice it. Pin every property the rule leans on: each id
+    /// is a real param of category 3 topping at 2.0, all three live in the Lv1
+    /// pool, the Lv1 pool holds exactly these three and no more, and the larger
+    /// pools carry one apiece (which is what makes three self-identifying).
+    #[test]
+    fn the_stun_ids_are_the_category_3_params_of_the_lv1_pool() {
+        let tables = stock_tables();
+
+        for id in STUN_IDS {
+            let param = tables
+                .params
+                .get(&id)
+                .unwrap_or_else(|| panic!("stun id {id:08x} left the ladder table"));
+            assert_eq!(param.kind, 3, "stun id {id:08x} changed category");
+            assert_eq!(param.values[param.values.len() - 1], 2.0);
+        }
+
+        let stuns_in = |tier: usize| -> Vec<u32> {
+            tables.pools[tier]
+                .iter()
+                .map(|entry| entry.key)
+                .filter(|key| tables.params.get(key).is_some_and(|p| p.kind == 3))
+                .collect()
+        };
+
+        let mut lv1 = stuns_in(0);
+        lv1.sort_unstable();
+        let mut expected = STUN_IDS;
+        expected.sort_unstable();
+        assert_eq!(
+            lv1, expected,
+            "the Lv1 pool no longer holds exactly the three stun ids the rule counts"
+        );
+
+        for tier in [1, 2] {
+            assert_eq!(
+                stuns_in(tier).len(),
+                1,
+                "pool {tier} gained a second stun id — three stuns no longer \
+                 proves a Lv1 meditation"
             );
         }
     }

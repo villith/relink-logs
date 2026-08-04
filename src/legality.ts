@@ -75,33 +75,6 @@ const limitKey = (finding: LegalityFinding): string => {
   return unnamed ? `${key}-unnamed` : key;
 };
 
-/** Below this, a percentage stops conveying anything — `0.0000000010%` is a
- * row of zeroes, not a quantity — so the odds are stated in words instead. */
-const BEYOND_CHANCE = 1e-9;
-
-/**
- * Odds as the percentage a reader can picture, or words when the number has
- * stopped meaning anything.
- *
- * "1 in 953" was the old form and it failed twice over: the denominator had no
- * unit, and a reader has to invert it to judge it. A percentage needs neither
- * step. Significant digits rather than fixed decimals, because these span nine
- * orders of magnitude and `0.00%` is not an answer.
- */
-const describeChance = (t: TFunction, odds: number | null): string => {
-  if (odds === null || odds === undefined || odds <= 0) return "";
-  if (odds < BEYOND_CHANCE) return t("ui.legality.chance-impossible");
-
-  const percent = odds * 100;
-  // `toPrecision` gives exponent form below 1e-6; expanded with `toFixed`,
-  // since "1.2e-5%" is worse than the row of zeroes it was avoiding.
-  const written = Number(percent.toPrecision(2))
-    .toFixed(Math.max(0, 1 - Math.floor(Math.log10(percent))))
-    .replace(/\.?0+$/, "");
-
-  return t("ui.legality.chance-percent", { percent: written });
-};
-
 /**
  * What the game allows, phrased to sit immediately after a gear line —
  * `max 20`, `doesn't roll on this summon`, `max +50`.
@@ -124,8 +97,12 @@ export const describeLimit = (
    * reading "+75%" leaves the reader to finish the comparison. */
   allowed?: string
 ): string =>
+  // No probability reaches the template. The two report rules used to quote
+  // one; it priced the draws honestly and the question dishonestly, since a
+  // farmer rerolls hundreds of times, so the claim is now the count alone
+  // (user, 2026-08-03). `finding.odds` survives on the wire and is simply not
+  // rendered anywhere.
   t(limitKey(finding), {
     observed: displayValue(finding.observed, slot),
     allowed: allowed ?? displayValue(finding.allowed, slot),
-    chance: describeChance(t, finding.odds),
   });

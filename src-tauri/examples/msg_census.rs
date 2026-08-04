@@ -90,5 +90,7 @@ fn variant(event: &Message) -> &'static str {
         Message::OnTrialStart(_) => "OnTrialStart",
         Message::OnTrialEnd(_) => "OnTrialEnd",
         Message::OnQuestElapsedTime(_) => "OnQuestElapsedTime",
+        Message::StatusApply(_) => "StatusApply",
+        Message::StatusRemove(_) => "StatusRemove",
     }
 }

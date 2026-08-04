@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DEFAULT_ROLLS } from "./useOvermasterySelectionsStore";
+
 const KEY = "overmastery-selections";
 const katalina = "18e2f9f9";
 const entry = {
@@ -43,5 +45,17 @@ describe("useOvermasterySelectionsStore persistence", () => {
     (await freshStore()).getState().save(katalina, entry);
     const reloaded = await freshStore();
     expect(reloaded.getState().lastCharacter).toBe(katalina);
+  });
+
+  it("remembers the roll count across reloads", async () => {
+    (await freshStore()).getState().setRolls(120);
+    const reloaded = await freshStore();
+    expect(reloaded.getState().rolls).toBe(120);
+  });
+
+  it("keeps the default roll count for state persisted before it existed", async () => {
+    // What a pre-upgrade user's row looks like: selections, no `rolls`.
+    localStorage.setItem(KEY, JSON.stringify({ state: { selections: {}, lastCharacter: null }, version: 1 }));
+    expect((await freshStore()).getState().rolls).toBe(DEFAULT_ROLLS);
   });
 });

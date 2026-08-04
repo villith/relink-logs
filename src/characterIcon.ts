@@ -1,3 +1,5 @@
+import { iconsByName } from "./iconMap";
+
 /**
  * Resolves a character id to its menu icon.
  *
@@ -15,9 +17,7 @@ const ICONS = import.meta.glob<string>("./assets/character-icons/mini/*.png", {
   import: "default",
 });
 
-const BY_ID = new Map(
-  Object.entries(ICONS).map(([path, url]) => [path.slice(path.lastIndexOf("/") + 1, -".png".length), url])
-);
+const BY_ID = iconsByName(ICONS);
 
 /**
  * Ids that share another character's art.
