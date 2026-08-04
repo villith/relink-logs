@@ -32,6 +32,10 @@ const CAUSE_LABEL_KEYS: Record<SbaSourceState["kind"], string> = {
  * from a live capture where the key co-occurred with a known sigil/effect. */
 const KNOWN_EFFECT_KEYS: Record<number, string> = {
   0xdeadbeef: "ui.logs.sba-effect-test-entry", // wiring test only; never occurs in game
+  // The just-dodge handler's gauge record (v2.0.3 FUN_1426f9640, live log
+  // 1694). Newer hooks park the PerfectDodge cause directly; this entry names
+  // the logs stored in between.
+  0xd2c8e10a: "ui.logs.sba-cause-perfect-dodge",
 };
 
 /** Rows for the causes no skill row can hold. Keyed by cause (plus id where one

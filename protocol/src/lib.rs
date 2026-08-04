@@ -583,9 +583,11 @@ pub enum SbaGainCause {
     /// A rise with nothing parked and no flag set — an unlocated site. Its
     /// amount is logged under `hookdiag` so the next site can be found.
     Unknown,
-    /// The perfect-dodge grant (entry pending Task B2's live capture;
-    /// live-identified 2026-08-04 as the flat per-dodge award, e.g. Nimble
-    /// Onslaught's 8.43). Appended last per the append-only rule.
+    /// A rise inside the just-dodge reward handler (v2.0.3 `0x26f9640`, the
+    /// same frame the `Effect(0xD2C8E10A)` record grant runs in — briefly
+    /// emitted under that key before the frame's semantic was live-confirmed,
+    /// ~42.15 gauge per perfect dodge, log 1694 2026-08-04). Appended last per
+    /// the append-only rule.
     PerfectDodge,
 }
 

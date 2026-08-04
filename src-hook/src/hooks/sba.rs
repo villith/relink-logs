@@ -21,10 +21,9 @@ type OnCheckSBACollisionFunc = unsafe extern "system" fn(*const usize, f32) -> u
 type OnContinueSBAChainFunc = unsafe extern "system" fn(*const usize, *const usize) -> usize;
 type OnRemoteSBAUpdateFunc =
     unsafe extern "system" fn(*const usize, *const usize, f32, f32) -> usize;
-/// hookdiag-only: the per-hit gauge GRANT virtual (see `OnSBAGrantProbeHook`).
+/// The per-hit gauge GRANT virtual (see `OnSBAGrantHook`).
 /// 3 args, all read by the body per the decompiler — arity must match or the
 /// detour faults the game.
-#[cfg(feature = "hookdiag")]
 type OnSBAGrantFunc = unsafe extern "system" fn(*const usize, *const usize, u32) -> usize;
 /// The register-hit gate (see `OnSBARegisterHitHook`). Ghidra v2.0.3
 /// (entry 0x9adaa0): arity 2 — `(rcx, rdx=damage instance)`; no incoming
@@ -41,9 +40,7 @@ static_detour! {
     static OnSBARegisterHit: unsafe extern "system" fn(*const usize, *const usize) -> usize;
 }
 
-// hookdiag-only: log-only probe detour of the per-hit gauge-grant virtual
-// (v2.0.3 entry rva 0x9b41b0). Never placed in a build without the feature.
-#[cfg(feature = "hookdiag")]
+// PRODUCTION: the per-hit gauge-grant virtual (v2.0.3 entry rva 0x9b41b0).
 static_detour! {
     static OnSBAGrant: unsafe extern "system" fn(*const usize, *const usize, u32) -> usize;
 }
@@ -64,7 +61,6 @@ pub(super) fn disable() {
     super::disable_quiet("OnVtableGrant191be40", &OnVtableGrant191be40);
     super::disable_quiet("OnVtableGrant33bbc20", &OnVtableGrant33bbc20);
     super::disable_quiet("OnVtableGrant33bc050", &OnVtableGrant33bc050);
-    #[cfg(feature = "hookdiag")]
     super::disable_quiet("OnSBAGrant", &OnSBAGrant);
 }
 
@@ -82,7 +78,6 @@ const ON_HANDLE_SBA_UPDATE_SIG: &str = "48 89 f1 c5 f8 28 ce 41 89 d8 e8 $ { ' }
 // through the first `vmovaps [rbp+0x3c0],xmm15` (the xmm15 spill is what
 // disambiguates it from the one same-prologue sibling at 0x89600).
 // sigscan 2026-08-04: exactly 1 match, cursor_rva=0x9b41b0.
-#[cfg(feature = "hookdiag")]
 const ON_SBA_GRANT_SIG: &str = "cc cc cc cc ' 55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec 58 04 00 00 48 8d ac 24 80 00 00 00 c5 78 29 bd c0 03 00 00";
 
 // PRODUCTION: direct-entry signature for the register-hit gate (v2.0.3 entry
@@ -707,25 +702,23 @@ impl OnEffectGrantHook {
         Ok(())
     }
 
-    /// The effect-record key of the one hashmap walk in this function that
-    /// feeds the SBA gauge. The function (v2.0.3 `FUN_1426f9640`, the
-    /// just-dodge reward handler — it fires the `core_pl_just_dodge` cue) does
-    /// four walks over the effect map, each keyed by a compile-time immediate;
-    /// only the `0xD2C8E10A` walk reads `record+0x8` (gauge %) and calls the
-    /// gauge wrapper (`FUN_140bb1c00(entity+0x3230, ..)`). The other walks are
-    /// status applies, a recovery apply, and a cooldown decrement — none touch
-    /// the gauge (decompiles of 0x9ee8a0 / 0x21ec130, 2026-08-04). The key is
-    /// not readable off `a1` (record pointers are locals), so the constant IS
-    /// the honest per-frame key.
-    const GAUGE_WALK_KEY: u32 = 0xD2C8_E10A;
-
     fn run(a1: *const usize) -> usize {
         #[cfg(feature = "hookdiag")]
         {
             static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
             log_site_fire("effect_record", &N);
         }
-        let _guard = CauseGuard::park(protocol::SbaGainCause::Effect(Self::GAUGE_WALK_KEY));
+        // This function (v2.0.3 `FUN_1426f9640`) IS the just-dodge reward
+        // handler — it fires the `core_pl_just_dodge` cue, and of its four
+        // constant-keyed effect-map walks only the `0xD2C8E10A` one feeds the
+        // gauge (`record+0x8` % -> `FUN_140bb1c00(entity+0x3230, ..)`; the
+        // others are status applies, a recovery, and a cooldown decrement —
+        // decompiles of 0x9ee8a0 / 0x21ec130, 2026-08-04). Live 2026-08-04
+        // (log 1694): ~42.15 gauge per perfect dodge through this frame. So
+        // the frame's semantic, not the record key, is the honest cause.
+        // (Logs stored before this park carry `Effect(0xD2C8E10A)` — the
+        // frontend maps that key to the same "Perfect Dodge" label.)
+        let _guard = CauseGuard::park(protocol::SbaGainCause::PerfectDodge);
         unsafe { OnEffectGrant.call(a1) }
     }
 }
@@ -1249,24 +1242,28 @@ impl OnHandleSBAUpdateHook {
     }
 }
 
-/// hookdiag-only, LOG-ONLY probe of the per-hit gauge GRANT virtual (v2.0.3
-/// entry 0x9b41b0) — the H3 test: static RE claimed this is a synchronous
-/// callee of ProcessDamageEvent that feeds our hooked gauge update. REFUTED
-/// live (c0d06e1): this probe fired ZERO times while the local player's gauge
-/// rose on hits, so that statically-traced chain is dead at runtime. Kept as
-/// the standing check that it stays dead across patches. The LIVE per-hit
-/// path is the register-hit gate 0x9adaa0 (see `OnSBARegisterHitHook`), whose
-/// synchronous callee chain ends at our hooked gauge update — not 0x9b41b0.
+/// PRODUCTION detour of the per-hit gauge GRANT virtual (v2.0.3 entry
+/// 0x9b41b0, dispatched as vtable slot +0x80 by the target-side hit notifier
+/// 0x27d4590): parks [`protocol::SbaGainCause::DamageTaken`] for the duration
+/// of the original call, deferring to any enclosing named cause.
 ///
-/// Forwards all three args unchanged and returns the original's return value;
-/// no other side effects. All memory reads SEH-guarded. The `actor + 0x23B0`
-/// component offset (gauge f32 at +0x7C) is UNVERIFIED — testing it is part
-/// of this probe's job, so a `None` gauge is still logged.
-#[cfg(feature = "hookdiag")]
-pub struct OnSBAGrantProbeHook;
+/// History, both halves live-proven:
+/// - The local player's OWN hits do NOT route here (the H3 test, c0d06e1:
+///   zero fires while the local player's gauge rose on their hits — that path
+///   is the register-hit gate 0x9adaa0, see `OnSBARegisterHitHook`).
+/// - Hits players RECEIVE do (2026-08-04, log 1694): NPC-inflicted hits on
+///   party slots fired this virtual with the attacker's `DamageInstance` and
+///   granted the victim a flat award (8.435/hit that round) via the walk
+///   chain 0x1fb5d60 -> 0x1fb7330 -> 0x27d4590 -> here -> 0xbb1c00. Those
+///   rises previously resolved `Unknown`: the register gate parks nothing on
+///   this path, so nothing was on the thread when the update measured them.
+///
+/// Forwards all three args unchanged and returns the original's return value.
+/// Zero-damage fires and full-gauge fires produce no rise; parking on them is
+/// harmless because a cause is only read when a rise is measured.
+pub struct OnSBAGrantHook;
 
-#[cfg(feature = "hookdiag")]
-impl OnSBAGrantProbeHook {
+impl OnSBAGrantHook {
     pub fn new() -> Self {
         Self
     }
@@ -1274,7 +1271,7 @@ impl OnSBAGrantProbeHook {
     pub fn setup(&self, process: &Process) -> Result<()> {
         if let Ok(on_sba_grant_original) = process.search_address(ON_SBA_GRANT_SIG) {
             #[cfg(feature = "console")]
-            println!("found on sba grant (diag)");
+            println!("found on sba grant");
 
             unsafe {
                 let func: OnSBAGrantFunc = std::mem::transmute(on_sba_grant_original);
@@ -1282,36 +1279,42 @@ impl OnSBAGrantProbeHook {
                 OnSBAGrant.enable()?;
             }
         } else {
-            return Err(anyhow!("Could not find sba_grant (diag)"));
+            return Err(anyhow!("Could not find sba_grant"));
         }
 
         Ok(())
     }
 
     fn run(actor: *const usize, damage_instance: *const usize, mode: u32) -> usize {
-        use crate::hooks::diag::{read_f32_guarded, read_u32_guarded};
-        use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
+        #[cfg(feature = "hookdiag")]
+        let before = crate::hooks::diag::read_f32_guarded(actor as usize + 0x23B0, 0x7C);
 
-        // UNVERIFIED offset under test: the SBA component claimed to live
-        // inline at actor+0x23B0, gauge f32 at +0x7C (the same field the
-        // gauge-update hook and the slot poll read on their component ptr).
-        let component = actor as usize + 0x23B0;
-        let before = read_f32_guarded(component, 0x7C);
-
+        // Defer to an enclosing named cause, the same precedence rule as the
+        // percent API: this is the shared taken-side grant, so an outer frame
+        // that already named the rise must win over the generic caption.
+        let _guard = match CauseGuard::current() {
+            None => Some(CauseGuard::park(protocol::SbaGainCause::DamageTaken)),
+            Some(_) => None,
+        };
         let ret = unsafe { OnSBAGrant.call(actor, damage_instance, mode) };
 
-        let after = read_f32_guarded(component, 0x7C);
+        #[cfg(feature = "hookdiag")]
+        {
+            use crate::hooks::diag::{read_f32_guarded, read_u32_guarded};
+            use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
 
-        static N: AtomicU32 = AtomicU32::new(0);
-        let n = N.fetch_add(1, AtomicOrdering::Relaxed) + 1;
-        if n <= 32 || n % 16 == 0 {
-            let action_id = read_u32_guarded(damage_instance as usize, 0x16C);
-            let damage = read_u32_guarded(damage_instance as usize, 0xD4) as i32;
-            log::info!(
-                "SBAGRANT n={n} tid={:?} mode={mode} action={action_id} dmg={damage} \
-                 gauge {before:?}->{after:?}",
-                std::thread::current().id(),
-            );
+            let after = read_f32_guarded(actor as usize + 0x23B0, 0x7C);
+            static N: AtomicU32 = AtomicU32::new(0);
+            let n = N.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+            if n <= 32 || n % 16 == 0 {
+                let action_id = read_u32_guarded(damage_instance as usize, 0x16C);
+                let damage = read_u32_guarded(damage_instance as usize, 0xD4) as i32;
+                log::info!(
+                    "SBAGRANT n={n} tid={:?} mode={mode} action={action_id} dmg={damage} \
+                     gauge {before:?}->{after:?}",
+                    std::thread::current().id(),
+                );
+            }
         }
 
         ret
