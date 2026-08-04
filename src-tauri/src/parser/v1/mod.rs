@@ -30,7 +30,7 @@ mod status;
 
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
-use player_state::PlayerState;
+use player_state::{PlayerState, SbaSourceKind};
 pub use status::{assemble_intervals, StatusInterval};
 
 pub struct AdjustedDamageInstance<'a> {
@@ -1050,6 +1050,11 @@ pub struct DerivedEncounterState {
     /// survive.
     #[serde(skip)]
     pending_player_stun_effect: HashMap<u32, Vec<f64>>,
+    /// Non-skill gauge causes seen before their player's row existed, held by
+    /// slot key. Quest-start gauge genuinely arrives before anyone has dealt
+    /// damage, so dropping it would lose a real, nameable chunk of the bar.
+    #[serde(skip)]
+    pending_player_sba_sources: HashMap<u32, Vec<(SbaSourceKind, Option<u32>, f64)>>,
     /// Players whose most recent stun-capable hit was filtered out of the meters
     /// (see [`is_excluded`]).
     ///
@@ -1085,6 +1090,7 @@ impl Default for DerivedEncounterState {
             pending_player_pg_stun: HashMap::new(),
             pending_player_pg_quickening: HashMap::new(),
             pending_player_stun_effect: HashMap::new(),
+            pending_player_sba_sources: HashMap::new(),
             stun_suppressed_players: HashSet::new(),
             status: ParserStatus::Stopped,
             party: HashMap::new(),
@@ -1266,28 +1272,52 @@ impl DerivedEncounterState {
         }
     }
 
-    /// Files one attributed gauge gain against the player's causing skill row.
+    /// Files one attributed gauge gain against whatever its cause names.
+    ///
+    /// `Skill` goes to the breakdown row the causing hit opened, through the
+    /// raw-action memo (see [`PlayerState::add_sba_gain`]). Every other cause is
+    /// gauge no hit produced and goes to the player's source list — a cause must
+    /// never be able to open a breakdown row, because a row with no hits is a
+    /// row the damage and stun tables would have to show.
     ///
     /// NOTE the wire ordering — or rather, the absence of one. The hook emits a
     /// gain from the game's gauge-update path, which is entered through a
     /// separate register-hit gate and not necessarily on the thread the damage
     /// path runs on, so a `SbaGain` and the `DamageEvent` for the same hit can
-    /// interleave arbitrarily at the shared `Tx`. (The earlier note here claimed
-    /// the grant runs INSIDE damage processing and therefore always precedes its
-    /// own damage event; that was design #1, refuted live in c0d06e1.)
-    ///
-    /// Dropped when the PLAYER has no party row yet — a fail-closed choice:
-    /// with no ordering guarantee, a gain that arrives before the player's
-    /// first damage event has nothing to file against, and inventing a player
-    /// from a gain alone would put a damage-less row in the meter. The cost is
-    /// bounded at the dropped gain itself, which joins the same unattributed
-    /// residue as chain/scripted awards.
-    ///
-    /// A gain whose SKILL has no breakdown row yet is a different case and is
-    /// held, not dropped — see [`PlayerState::add_sba_gain`].
-    fn process_sba_gain(&mut self, actor_index: u32, action: ActionType, amount: f64) {
-        if let Some(player) = self.party.get_mut(&actor_index) {
-            player.add_sba_gain(action, amount);
+    /// interleave arbitrarily at the shared `Tx`. A SKILL gain whose player has
+    /// no party row yet is therefore dropped (fail-closed: inventing a player
+    /// from a gain alone would put a damage-less row in the meter), while one
+    /// whose skill merely has no row yet is held — see
+    /// [`PlayerState::add_sba_gain`].
+    fn process_sba_gain(&mut self, actor_index: u32, cause: protocol::SbaGainCause, amount: f64) {
+        use protocol::SbaGainCause;
+
+        let (kind, id) = match cause {
+            SbaGainCause::Skill(action) => {
+                if let Some(player) = self.party.get_mut(&actor_index) {
+                    player.add_sba_gain(action, amount);
+                }
+                return;
+            }
+            SbaGainCause::DamageTaken => (SbaSourceKind::DamageTaken, None),
+            SbaGainCause::PerfectGuard => (SbaSourceKind::PerfectGuard, None),
+            SbaGainCause::Effect(id) => (SbaSourceKind::Effect, Some(id)),
+            SbaGainCause::PartyAward => (SbaSourceKind::PartyAward, None),
+            SbaGainCause::DirectorAward => (SbaSourceKind::DirectorAward, None),
+            SbaGainCause::QuestStart => (SbaSourceKind::QuestStart, None),
+            SbaGainCause::Site(tag) => (SbaSourceKind::Site, Some(tag)),
+            SbaGainCause::Unknown => (SbaSourceKind::Unknown, None),
+        };
+
+        match self.party.get_mut(&actor_index) {
+            Some(player) => player.add_sba_source(kind, id, amount),
+            // Held rather than dropped: unlike a skill gain, a source has no row
+            // to wait for and quest-start gauge legitimately precedes every hit.
+            None => self
+                .pending_player_sba_sources
+                .entry(actor_index)
+                .or_default()
+                .push((kind, id, amount)),
         }
     }
 
@@ -1309,6 +1339,7 @@ impl DerivedEncounterState {
         let pending_pg_stun = self.pending_player_pg_stun.remove(&actor_index);
         let pending_pg_quickening = self.pending_player_pg_quickening.remove(&actor_index);
         let pending_stun_effect = self.pending_player_stun_effect.remove(&actor_index);
+        let pending_sources = self.pending_player_sba_sources.remove(&actor_index);
 
         let player = self
             .party
@@ -1333,6 +1364,11 @@ impl DerivedEncounterState {
         if let Some(pending) = pending_stun_effect {
             for amount in pending {
                 player.add_stun_effect(amount);
+            }
+        }
+        if let Some(sources) = pending_sources {
+            for (kind, id, amount) in sources {
+                player.add_sba_source(kind, id, amount);
             }
         }
     }
@@ -2616,9 +2652,15 @@ impl Parser {
                     );
                 }
                 Message::SbaGain(event) => {
+                    let cause =
+                        event
+                            .cause
+                            .unwrap_or(protocol::SbaGainCause::Skill(ActionType::Normal(
+                                event.action_id,
+                            )));
                     self.derived_state.process_sba_gain(
                         event.actor_index,
-                        ActionType::Normal(event.action_id),
+                        cause,
                         event.amount as f64,
                     );
                 }
@@ -3361,23 +3403,17 @@ impl Parser {
             Message::SbaGain(event.clone()),
         );
 
-        // The gain carries a raw action id and no classification bits, and
-        // Normal(id) is the only shape it can take. That is safe because the
-        // HOOK classifies before emitting and drops any gain whose causing hit
-        // does not classify as Normal (link attack, SBA, supplementary) — those
-        // would otherwise be filed as Normal(id) here and credited to whichever
-        // Normal row happens to share the id, next to the real one. So this is
-        // no longer an unchecked assumption: it is enforced upstream, at the
-        // cost of a small unattributed residue.
-        //
-        // Routed through `process_sba_gain` rather than folded in here directly
-        // so the classification decision and the drop-if-no-row behavior (see
-        // its doc for the ordering note) live in one place.
-        self.derived_state.process_sba_gain(
-            event.actor_index,
-            ActionType::Normal(event.action_id),
-            event.amount as f64,
-        );
+        // The cause is resolved in the HOOK, where the gauge rise, the parked
+        // hit and the update's own flag arguments are all in scope. `None` only
+        // appears in logs stored before causes existed, and means what it used
+        // to: the hit's own Normal action.
+        let cause = event
+            .cause
+            .unwrap_or(protocol::SbaGainCause::Skill(ActionType::Normal(
+                event.action_id,
+            )));
+        self.derived_state
+            .process_sba_gain(event.actor_index, cause, event.amount as f64);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -6361,6 +6397,147 @@ mod tests {
         assert_eq!(
             row.sba_generated, 12.5,
             "only the post-row gain lands; the opener is accepted residue"
+        );
+    }
+
+    /// A party award is the whole party's, not the swinging player's: it must
+    /// land as a SOURCE even when a hit is on the books.
+    #[test]
+    fn party_award_lands_as_a_source_not_on_a_skill_row() {
+        let mut parser = Parser::default();
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 0,
+            amount: 35.0,
+            cause: Some(protocol::SbaGainCause::PartyAward),
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        assert_eq!(player.sba_sources.len(), 1);
+        assert_eq!(player.sba_sources[0].generated, 35.0);
+        assert!(
+            player
+                .skill_breakdown
+                .iter()
+                .all(|skill| skill.sba_generated == 0.0),
+            "no skill row absorbs a party award"
+        );
+    }
+
+    /// A gain stored before causes existed keeps its old meaning exactly.
+    #[test]
+    fn a_causeless_gain_is_read_as_the_hits_own_action() {
+        let mut parser = Parser::default();
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 1,
+            amount: 12.5,
+            cause: None,
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(1))
+            .expect("the causing skill's row");
+        assert_eq!(row.sba_generated, 12.5);
+        assert!(player.sba_sources.is_empty());
+    }
+
+    /// A link attack's gain lands on the link-attack row — the Normal-only
+    /// filter that used to drop it is gone, and the row memo is keyed by the
+    /// classified action, so nothing has to be flattened.
+    #[test]
+    fn a_link_attack_gain_lands_on_the_link_attack_row() {
+        let mut parser = Parser::default();
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        event.action_id = ActionType::LinkAttack;
+        parser.on_damage_event(event);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 0,
+            amount: 9.0,
+            cause: Some(protocol::SbaGainCause::Skill(ActionType::LinkAttack)),
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::LinkAttack)
+            .expect("link attack row");
+        assert_eq!(row.sba_generated, 9.0);
+    }
+
+    /// A source arriving before ITS OWN player's row exists — the fight already
+    /// started off someone else's hit, say an ally bursting before this player
+    /// has swung — is HELD against the slot and folded in when the row appears,
+    /// rather than dropped.
+    ///
+    /// A source before the fight's FIRST hit is a different case and stays
+    /// dropped: the encounter reset on that hit wipes every pre-fight event,
+    /// including the gauge-poll rises the player TOTAL is built from, so
+    /// holding the source would explain gauge the total never counted and push
+    /// "% explained" past 100.
+    #[test]
+    fn a_source_arriving_before_the_player_row_is_held() {
+        let mut parser = Parser::default();
+
+        // An ally's hit starts the encounter; the gaining player hasn't swung.
+        let mut opener = a_damage_event();
+        opener.source.parent_index = 0xF000_0001;
+        parser.on_damage_event(opener);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 0,
+            amount: 100.0,
+            cause: Some(protocol::SbaGainCause::PartyAward),
+        });
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        assert_eq!(
+            player.sba_sources.iter().map(|s| s.generated).sum::<f64>(),
+            100.0
         );
     }
 
