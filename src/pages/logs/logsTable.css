@@ -1,0 +1,114 @@
+/* Repeat Quest chain blocks in the quest list.
+ *
+ * These rows set their own background rather than letting Mantine's `striped`
+ * decide it. That stripe is POSITIONAL —
+ * `:where(tr):where([data-striped='odd']:nth-of-type(odd))` counts `tr`
+ * siblings inside the tbody — so a chain's summary row was banded or not
+ * according to how many rows happened to precede it on the page, and every
+ * chain flipped the parity of every row after it. The one row whose whole job
+ * is to look unlike the others had its appearance decided by an accident of
+ * index.
+ *
+ * Selectors are deliberately two classes deep: Mantine's own rules are wrapped
+ * in `:where()` and so carry zero specificity, but the striping is applied to
+ * the same element, and matching it plainly would leave the winner up to
+ * stylesheet order.
+ */
+
+.logs-table {
+  /* The analysis view's accent (`--an-accent` in analysis.css, and
+     PLAYER_COLORS[3]), declared once here rather than written as a literal at
+     each use. That token is scoped to `.analysis-tokens`, which does not wrap
+     this table, so it cannot simply be referenced — but a single declaration
+     keeps the two places this table needs it in step with each other. */
+  --logs-accent: #00b8d9;
+}
+
+/* The whole chain reads as one object lifted off the page: the band brightest,
+   its runs a step above the page behind them, everything outside untouched.
+   Three tones rather than a rule alone — a single hairline is easy to miss in a
+   striped list, and the runs have to look like they belong to the band even
+   when the eye is halfway down the block. */
+/* A wash of the chain's own colour over the band, kept to 14% so the row stays
+   a surface the text sits on rather than becoming a coloured bar. `transparent`
+   in the fallback leaves the plain dark band when no colour was handed down. */
+.logs-table tbody tr.logs-chain-summary {
+  cursor: pointer;
+  background-color: var(--mantine-color-dark-6);
+  background-image: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--logs-chain-color, transparent) 14%, transparent),
+    transparent 60%
+  );
+}
+
+/* The whole band opens and closes the chain, so it answers to the pointer —
+   a step lighter, which is the promise that clicking does something. */
+.logs-table tbody tr.logs-chain-summary:hover {
+  background-color: var(--mantine-color-dark-5);
+}
+
+/* Between the page (#252525) and the band, so the block is visibly one mass. */
+.logs-table tbody tr.logs-chain-run {
+  background-color: #2a2a2a;
+}
+
+.logs-table tbody tr.logs-chain-run:hover {
+  background-color: var(--mantine-color-dark-5);
+}
+
+/* The spine: one continuous edge down the band and every run under it, marking
+   where the block starts and ends without boxing it in. An inset shadow rather
+   than padding on a column — rows touch, so this draws an unbroken line, and
+   every column stays in the track its own header sits in. Indenting the date
+   cell instead read as a misaligned column, not a hierarchy.
+
+   The hue is the chain's own, cycled through the party palette by `Index.tsx`,
+   so two chains running back to back are told apart by colour rather than by
+   spotting where one block of near-identical rows ends. Falls back to a neutral
+   when no colour was handed down. */
+.logs-table tbody tr.logs-chain-summary > td:first-of-type,
+.logs-table tbody tr.logs-chain-run > td:first-of-type {
+  box-shadow: inset 3px 0 0 var(--logs-chain-color, var(--mantine-color-dark-2));
+}
+
+/* The band's disclosure control. Sized to a real hit target and given its own
+   hover and focus states: alone in the actions column it has to read as a
+   button rather than as a glyph that happens to be there.
+
+   30px is the height of the `xs` View buttons it shares a column with, so the
+   band and the runs come out the same height — a shorter control let the cell
+   padding decide the band's height, and the chain's own heading ended up the
+   one row in the block that didn't line up. */
+.logs-chain-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  color: var(--mantine-color-dark-0);
+}
+
+.logs-chain-toggle:hover {
+  background-color: var(--mantine-color-dark-4);
+}
+
+.logs-chain-toggle:focus-visible {
+  outline: 2px solid var(--logs-accent);
+  outline-offset: 1px;
+}
+
+/* Times line up digit-for-digit, which is the whole point of putting a chain's
+   runs under one another. */
+.logs-table .logs-num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The fastest run in a chain. The analysis view's accent, NOT a green: green in
+   this app means "cleared" (see the ✓ two cells away, and QuestSummary's
+   teal.4), so a green record time reads as an outcome rather than a best. */
+.logs-chain-best {
+  color: var(--logs-accent);
+  font-weight: 700;
+}

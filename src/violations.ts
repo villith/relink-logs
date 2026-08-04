@@ -40,6 +40,7 @@ export const VIOLATIONS: Violation[] = [
 
 const BY_RULE: Record<LegalityRule, Violation> = {
   wrightstoneTraitLevel: "impossibleWrightstone",
+  wrightstoneTrait: "impossibleWrightstone",
   sigilTraitLevel: "impossibleSigil",
   sigilLockedPair: "impossibleSigil",
   sigilQuestLockedTrait: "impossibleSigil",

@@ -281,21 +281,20 @@
       "player-flagged": "This build was flagged",
       "limit": {
         "wrightstoneTraitLevel": "max {{allowed}}",
+        "wrightstoneTrait": "can't roll here",
         "sigilTraitLevel": "max {{allowed}}",
         "sigilLockedPair": "wrong pair",
         "sigilQuestLockedTrait": "quest-only trait",
         "sigilSingleTraitOnly": "second trait",
         "overmasteryValue": "off-ladder value",
-        "overmasteryAllMaxed": "3 max Stun Power Up rolls — {{chance}}",
+        "overmasteryAllMaxed": "3 max Stun Power Up rolls",
         "summonTrait": "can't roll here",
         "summonBonusSource": "wrong bonus id — only {{allowed}}",
         "summonBonusSource-unnamed": "wrong bonus id",
         "summonBonusMagnitude": "max {{allowed}}",
-        "summonPerfectCount": "{{observed}} perfect summon rolls — {{chance}}",
+        "summonPerfectCount": "{{observed}} perfect summon rolls",
         "masterTraitCount": "max {{allowed}}"
       },
-      "chance-percent": "{{percent}}% chance",
-      "chance-impossible": "completely impossible",
       "violation": {
         "impossibleSigil": "Impossible Sigil",
         "impossibleWrightstone": "Impossible Wrightstone",
@@ -527,8 +526,10 @@
       "builds": "Builds",
       "ai-companion": "AI",
       "imported-tooltip": "This log was imported from another version of GBFR Logs and may be missing data that version never recorded.",
-      "repeat-chain-count": "×{{count}}",
-      "repeat-chain-tooltip": "Repeated quest — {{count}} runs chained with Repeat Quest. Click to expand or collapse."
+      "repeat-chain-toggle_one": "Show or hide the run in this Repeat Quest chain",
+      "repeat-chain-toggle_other": "Show or hide the {{count}} runs in this Repeat Quest chain",
+      "repeat-chain-select_one": "Select the run in this Repeat Quest chain",
+      "repeat-chain-select_other": "Select all {{count}} runs in this Repeat Quest chain"
     },
     "toolbox": {
       "title": "Toolbox",
@@ -768,7 +769,6 @@
     },
     "Pl0200": {
       "0": "Ares (Link attack bug)",
-      "9998": "Ares",
       "100": "Attack 1",
       "101": "Attack 2",
       "102": "Attack 3",
@@ -800,6 +800,7 @@
       "303": "Aerial Finisher",
       "400": "Launch",
       "410": "Aerial Barrage",
+      "9998": "Ares",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "finisher": "Finisher",
@@ -1601,8 +1602,8 @@
       "400": "Launch",
       "410": "Aerial Barrage",
       "1000": "Deathmatch Finale",
-      "11000": "Mode Change",
       "1410": "Martial Spear Finisher",
+      "11000": "Mode Change",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "combo-finisher": "Combo Finisher",

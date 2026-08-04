@@ -41,6 +41,15 @@ const FIXTURES: Record<LegalityRule, LegalityFinding> = {
     allowed: { kind: "levels", value: [20, 15, 10] },
     odds: null,
   },
+  wrightstoneTrait: {
+    rule: "wrightstoneTrait",
+    subject: { kind: "wrightstone" },
+    // War Elemental, a SIGIL trait. `allowed` is None: the pool is 71 traits,
+    // so the claim is the trait itself rather than a list.
+    observed: { kind: "traitId", value: 0x4c588c27 },
+    allowed: { kind: "none" },
+    odds: null,
+  },
   sigilTraitLevel: {
     rule: "sigilTraitLevel",
     subject: { kind: "sigil", index: 7 },
@@ -165,7 +174,8 @@ describe("which rules speak", () => {
    * prose competing with the item rather than annotating it.
    *
    * Exempt are the rules whose claim IS the text rather than an annotation on
-   * something the line already shows. The two odds rules state a probability.
+   * something the line already shows. The two report rules state a count about
+   * a whole set, which no single gear line shows.
    * `summonBonusSource` names the summons that do grant the bonus, and has to:
    * two ids share every effect's display name, so its line reads "Healing Cap
    * Up" whether or not this summon may hold that one — there is nothing on it
@@ -221,24 +231,20 @@ describe("limit strings", () => {
     expect(describeLimit(t, FIXTURES.wrightstoneTraitLevel, 2)).toBe("max 10");
   });
 
-  /** Severity is gone, so the odds ARE the distinction between a report of
-   * long luck and proof the game could not have produced a build. A rule that
-   * carries them must say them, as a percentage rather than a "1 in N" the
-   * reader has to invert before it means anything. */
-  it("quote the odds on the rules that are reports rather than proof", () => {
-    expect(describeLimit(t, FIXTURES.overmasteryAllMaxed)).toBe("3 max Stun Power Up rolls — 0.038% chance");
-    expect(describeLimit(t, FIXTURES.summonPerfectCount)).toBe("4 perfect summon rolls — 0.0024% chance");
-  });
+  /** NO PROBABILITIES (user, 2026-08-03). The two report rules used to quote a
+   * percentage. It priced the table's draws honestly and the reader's question
+   * dishonestly — a farmer rerolls hundreds of times — so the claim is now the
+   * count alone, and no odds reach any string whatever the finding carries. */
+  it("state the report rules as a count, with no probability", () => {
+    expect(describeLimit(t, FIXTURES.overmasteryAllMaxed)).toBe("3 max Stun Power Up rolls");
+    expect(describeLimit(t, FIXTURES.summonPerfectCount)).toBe("4 perfect summon rolls");
 
-  /** Past a point a percentage is a row of zeroes rather than a quantity, and
-   * words carry it better. */
-  it("give up on a percentage once it stops meaning anything", () => {
     expect(
       describeLimit(t, {
         ...FIXTURES.summonPerfectCount,
         observed: { kind: "count", value: 3 },
         odds: 1 / 96_281_828_704,
       })
-    ).toBe("3 perfect summon rolls — completely impossible");
+    ).toBe("3 perfect summon rolls");
   });
 });

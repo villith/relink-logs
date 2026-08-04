@@ -12,11 +12,13 @@
 //! stones from other sources — accusing a stone for its primary trait would
 //! rest on a table that does not claim to cover it.
 
+use std::collections::HashSet;
+
 use protocol::WeaponState;
 
 use crate::transmarvel;
 
-use super::{Finding, Rule, Subject, Value};
+use super::{is_empty, Finding, Rule, Subject, Value};
 
 /// Highest level any weight row permits: index `n` carries level `n + 1`.
 /// `None` when the lot grants no level at all.
@@ -79,6 +81,49 @@ pub fn stock_slot_ceilings() -> [u32; 3] {
     })
 }
 
+/// Every trait a wrightstone can be engraved with: the four family primaries,
+/// everything reachable through each config's `type_row`, and any slot a config
+/// fixes outright.
+///
+/// Resolved in the two steps the tables require — the `type_row` id selects a
+/// row of `(lot hash, weight)` options in `skill_type_rows`, and each lot hash
+/// then keys `skill_lots` for the traits. Looking the small id up in
+/// `skill_lots` directly always misses.
+pub fn stock_trait_pool() -> &'static HashSet<u32> {
+    static POOL: std::sync::OnceLock<HashSet<u32>> = std::sync::OnceLock::new();
+    POOL.get_or_init(|| {
+        let tables = transmarvel::stock_tables();
+        let mut pool = HashSet::new();
+
+        for config in tables.stone_configs.values() {
+            pool.insert(config.trait1);
+
+            if let Some(options) = tables.skill_type_rows.get(&config.type_row) {
+                for &(lot_hash, _weight) in options {
+                    if let Some(traits) = tables.skill_lots.get(&lot_hash) {
+                        pool.extend(traits.iter().copied());
+                    }
+                }
+            }
+
+            for slot in &config.slots {
+                if slot.skill != 0 {
+                    pool.insert(slot.skill);
+                }
+            }
+        }
+
+        // An empty pool would permit nothing and accuse everyone. The tables are
+        // baked into the binary, so this is schema drift rather than absent live
+        // data, and it must fail loudly rather than silently accuse.
+        assert!(
+            !pool.is_empty(),
+            "no wrightstone traits resolved from the transmarvel tables"
+        );
+        pool
+    })
+}
+
 /// The game engraves exactly three traits on a wrightstone. A shorter list is
 /// a partial remote read, not a shorter stone.
 const STONE_TRAIT_COUNT: usize = 3;
@@ -109,18 +154,43 @@ pub fn audit_wrightstone(state: Option<&WeaponState>) -> Vec<Finding> {
         .zip(ceilings)
         .any(|(pair, ceiling)| pair.level > ceiling);
 
-    if !over_ceiling {
-        return Vec::new();
+    let mut findings = Vec::new();
+
+    if over_ceiling {
+        findings.push(Finding {
+            rule: Rule::WrightstoneTraitLevel,
+            subject: Subject::Wrightstone,
+            observed: Value::Levels(state.wrightstone_traits.iter().map(|p| p.level).collect()),
+            allowed: Value::Levels(ceilings.to_vec()),
+            odds: None,
+            evidence: None,
+        });
     }
 
-    vec![Finding {
-        rule: Rule::WrightstoneTraitLevel,
-        subject: Subject::Wrightstone,
-        observed: Value::Levels(state.wrightstone_traits.iter().map(|p| p.level).collect()),
-        allowed: Value::Levels(ceilings.to_vec()),
-        odds: None,
-        evidence: None,
-    }]
+    // Membership, one finding per offending slot. The two modded stones in the
+    // census had all three slots fabricated, and one finding naming one trait
+    // would leave the other two unstated.
+    //
+    // `allowed` is deliberately `None`: the pool is 71 traits, and a list that
+    // long settles nothing a reader can check. The claim is the trait itself —
+    // a sigil trait on a stone.
+    let pool = stock_trait_pool();
+    findings.extend(
+        state
+            .wrightstone_traits
+            .iter()
+            .filter(|pair| !is_empty(pair.id) && !pool.contains(&pair.id))
+            .map(|pair| Finding {
+                rule: Rule::WrightstoneTrait,
+                subject: Subject::Wrightstone,
+                observed: Value::TraitId(pair.id),
+                allowed: Value::None,
+                odds: None,
+                evidence: None,
+            }),
+    );
+
+    findings
 }
 
 #[cfg(test)]
@@ -264,5 +334,86 @@ mod tests {
     #[test]
     fn stays_silent_on_a_partial_remote_read() {
         assert_eq!(audit_wrightstone(Some(&stone(&[(0xf372f096, 20)]))), vec![]);
+    }
+
+    /// War Elemental is a SIGIL trait. No wrightstone lot grants it, so a stone
+    /// carrying it is a stone the game could not have engraved.
+    #[test]
+    fn flags_a_trait_no_stone_can_carry() {
+        let state = stone(&[(0xf372f096, 20), (0x4c588c27, 15), (0x57ab5b10, 10)]);
+        let findings = audit_wrightstone(Some(&state));
+
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::WrightstoneTrait);
+        assert_eq!(findings[0].subject, Subject::Wrightstone);
+        assert_eq!(findings[0].observed, Value::TraitId(0x4c588c27));
+        // The pool is 71 traits. Listing it would not settle anything a reader
+        // could check, so the claim is the trait itself.
+        assert_eq!(findings[0].allowed, Value::None);
+    }
+
+    /// One finding per off-pool trait: the two modded stones the census found
+    /// had all three slots fabricated, and collapsing that into a single
+    /// finding would name one trait and hide the other two.
+    #[test]
+    fn flags_every_off_pool_trait_on_the_stone() {
+        let state = stone(&[(0x3b71af12, 20), (0xaefeb1bc, 15), (0xfff8cf64, 10)]);
+        let observed: Vec<Value> = audit_wrightstone(Some(&state))
+            .into_iter()
+            .filter(|finding| finding.rule == Rule::WrightstoneTrait)
+            .map(|finding| finding.observed)
+            .collect();
+
+        assert_eq!(
+            observed,
+            vec![
+                Value::TraitId(0x3b71af12),
+                Value::TraitId(0xaefeb1bc),
+                Value::TraitId(0xfff8cf64),
+            ]
+        );
+    }
+
+    /// THE FALSE-ACCUSATION GUARD for the membership rule.
+    ///
+    /// Every trait the gacha configs can produce must pass. The pool is derived
+    /// from the same tables the ceilings are, so a stone the transmarvel itself
+    /// rolled can never be accused by this rule.
+    #[test]
+    fn accuses_nothing_the_gacha_can_roll() {
+        for &trait_id in stock_trait_pool() {
+            let state = stone(&[(trait_id, 20), (0xdc584f60, 15), (0x57ab5b10, 10)]);
+            let findings = audit_wrightstone(Some(&state));
+            assert!(
+                !findings.iter().any(|f| f.rule == Rule::WrightstoneTrait),
+                "trait {trait_id:08x} is in the gacha pool but was accused"
+            );
+        }
+    }
+
+    /// The two rules are separable: a stone can breach a ceiling with perfectly
+    /// ordinary traits, and carry an impossible trait at a legal level.
+    #[test]
+    fn judges_membership_and_level_independently() {
+        let over_cap = stone(&[(0xf372f096, 25), (0xdc584f60, 15), (0x57ab5b10, 10)]);
+        let rules: Vec<Rule> = audit_wrightstone(Some(&over_cap))
+            .iter()
+            .map(|f| f.rule)
+            .collect();
+        assert_eq!(rules, vec![Rule::WrightstoneTraitLevel]);
+
+        let off_pool = stone(&[(0xf372f096, 20), (0x4c588c27, 15), (0x57ab5b10, 10)]);
+        let rules: Vec<Rule> = audit_wrightstone(Some(&off_pool))
+            .iter()
+            .map(|f| f.rule)
+            .collect();
+        assert_eq!(rules, vec![Rule::WrightstoneTrait]);
+    }
+
+    /// An empty slot is missing data, never an impossible trait.
+    #[test]
+    fn never_accuses_an_empty_slot() {
+        let state = stone(&[(0xf372f096, 20), (0, 0), (super::super::EMPTY_ID, 0)]);
+        assert_eq!(audit_wrightstone(Some(&state)), vec![]);
     }
 }

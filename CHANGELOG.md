@@ -5,6 +5,29 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.8
+
+### Notes
+
+- Some Cheat Audit rules have been relaxed slightly
+  - The Perfect Overmasteries rule has been changed to only trigger on 3x max Stun Power from OM1. Perfect Overmastery rolls from OM3 are too commmon to be flagged. [suggested by](https://github.com/Foxschwarzengel)
+  - The Perfect Summons rule now only fires when the character has **four** perfect summons which is extremely unlikely. [issue raised by](https://github.com/KakiraMikoshiJD5)
+
+### Features
+
+- Repeat Quest runs are now grouped in the quest list
+  - The duration/IGT columns for the grouped rows display the best time for that group
+
+### Bug Fixes
+
+- Player level show now show correctly in the Equipment/Build tabs. [contributed by](https://github.com/imnotsureyi-sys)
+- The number of rolls for Overmastery Predictor / Transmarvel Wishlist is now persistent. [reported by](https://github.com/makisevon)
+- The Sup% column now properly excludes pets ( ex. Ferry's ghosts ) / summons because they cannot deal supplementary damage. [reported by](https://github.com/imnotsureyi-sys)
+- Repeated quests now properly show their own in-game time instead of copying the first run of the group. reported by TJL in discord
+- The Cheat Audit will now properly flag:
+  - Invalid wrightstone traits
+  - Immortal Shell+ sigils
+
 ## 1.12.7
 
 ### Features
