@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use protocol::{ActionType, DamageEvent};
 use serde::{Deserialize, Serialize};
 
-use crate::parser::constants::{CharacterType, FerrySkillId};
+use crate::parser::constants::{CharacterType, EnemyType, FerrySkillId};
 
 use super::{skill_state::SkillState, AdjustedDamageInstance};
 
@@ -259,6 +259,38 @@ pub struct PlayerState {
     pub overcap_base_sum: f64,
     #[serde(default)]
     pub overcap_cap_sum: f64,
+    /// Damage this player RECEIVED from enemies, summed over the incoming
+    /// events the parser records since damage-taken capture (2026-08-04).
+    /// Older logs never stored those events, so this reads 0 for them.
+    #[serde(default)]
+    pub total_damage_taken: u64,
+    /// How many enemy hits landed on this player (echoes of the same rule as
+    /// `total_damage_taken`: only recorded, damage-bearing incoming events).
+    #[serde(default)]
+    pub hits_taken: u32,
+    /// Incoming damage broken down per (attacker class, attack), for the
+    /// analysis view's damage-taken table.
+    #[serde(default)]
+    pub damage_taken_breakdown: Vec<DamageTakenState>,
+}
+
+/// One (attacker class, attack) row of a player's incoming damage.
+///
+/// Deliberately NOT a `SkillState` (same posture as [`SbaSourceState`]): every
+/// damage/stun table reads `skill_breakdown`, and keeping incoming rows apart
+/// is what makes "an enemy attack can never show up as one of the player's own
+/// skills" structural.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DamageTakenState {
+    /// The attacker's PARENT class (folded so a boss's child actors land on
+    /// the boss), in the same shape the target tables already speak.
+    pub enemy_type: EnemyType,
+    /// The enemy attack, as the hook classified it.
+    pub action_id: ActionType,
+    pub hits: u32,
+    pub total_damage: u64,
+    pub max_damage: u64,
 }
 
 impl PlayerState {
@@ -287,7 +319,42 @@ impl PlayerState {
             cappable_hits: 0,
             overcap_base_sum: 0.0,
             overcap_cap_sum: 0.0,
+            total_damage_taken: 0,
+            hits_taken: 0,
+            damage_taken_breakdown: Vec::new(),
         }
+    }
+
+    /// Files one incoming (enemy→party) hit on this player: totals plus the
+    /// per-(attacker, attack) breakdown row it belongs to.
+    pub fn add_damage_taken(&mut self, event: &DamageEvent) {
+        let damage = event.damage.max(0) as u64;
+        self.total_damage_taken += damage;
+        self.hits_taken += 1;
+
+        let enemy_type = EnemyType::from_hash(event.source.parent_actor_type);
+        let position = self
+            .damage_taken_breakdown
+            .iter()
+            .position(|row| row.enemy_type == enemy_type && row.action_id == event.action_id);
+        let row = match position {
+            Some(position) => &mut self.damage_taken_breakdown[position],
+            None => {
+                self.damage_taken_breakdown.push(DamageTakenState {
+                    enemy_type,
+                    action_id: event.action_id,
+                    hits: 0,
+                    total_damage: 0,
+                    max_damage: 0,
+                });
+                self.damage_taken_breakdown
+                    .last_mut()
+                    .expect("just pushed the row above")
+            }
+        };
+        row.hits += 1;
+        row.total_damage += damage;
+        row.max_damage = row.max_damage.max(damage);
     }
 
     /// Records one gauge reading. `added` is the increase this event carried —

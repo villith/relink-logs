@@ -327,6 +327,34 @@ export type PlayerState = {
   overcapBaseSum: number;
   /** Sum of damage caps over cappable hits */
   overcapCapSum: number;
+  /** Damage this player RECEIVED from enemies. Optional: a payload from an
+   * older backend has none, and a log recorded before damage-taken capture
+   * (2026-08-04) reads 0 — the tab shows "—" for the former case. */
+  totalDamageTaken?: number;
+  /** How many enemy hits landed on this player. Optional like the total. */
+  hitsTaken?: number;
+  /** Incoming damage per (attacker class, attack). Optional like the total. */
+  damageTakenBreakdown?: DamageTakenState[];
+};
+
+/** One (attacker class, attack) row of a player's incoming damage — mirrors
+ * the Rust `DamageTakenState`. */
+export type DamageTakenState = {
+  enemyType: EnemyType;
+  actionId: ActionType;
+  hits: number;
+  totalDamage: number;
+  maxDamage: number;
+};
+
+/** One band of the damage-taken drill-down chart (mirrors the Rust
+ * `TakenChartSeries`): what one (attacker, attack) dealt TO the pinned victim
+ * per second — the same grouping the taken table's drill rows use, so a band
+ * always corresponds to a row of the table beneath it. */
+export type TakenChartSeries = {
+  enemyType: EnemyType;
+  actionId: ActionType;
+  values: number[];
 };
 
 /** A cause of SBA generation that no skill row can hold — mirrors the Rust

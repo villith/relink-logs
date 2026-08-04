@@ -761,8 +761,12 @@ impl Encounter {
         for (_, message) in self.event_log() {
             match message {
                 Message::DamageEvent(event) => {
-                    coverage.enemy_hp |= event.target_current_hp.is_some();
-                    coverage.overcap |= event.base_damage.is_some();
+                    // An incoming hit's HP pair is the PLAYER's pool, not
+                    // enemy-HP coverage.
+                    if !is_damage_taken_event(event) {
+                        coverage.enemy_hp |= event.target_current_hp.is_some();
+                        coverage.overcap |= event.base_damage.is_some();
+                    }
                 }
                 Message::OnDeathEvent(_) => coverage.deaths = true,
                 Message::OnPlayerStun(_)
@@ -1143,6 +1147,23 @@ impl DerivedEncounterState {
             self.start_time = now;
         }
         self.end_time = now;
+    }
+
+    /// Accumulates an incoming (enemy→party) hit onto the victim's row. Never
+    /// touches the DPS window: taken damage opens an encounter (the live
+    /// path's `ensure_encounter_started` has already run) but the window is
+    /// anchored and stretched only by dealt hits — same posture as guards and
+    /// stun procs.
+    fn process_damage_taken_event(&mut self, event: &DamageEvent) {
+        self.ensure_player_row(
+            event.target.parent_index,
+            CharacterType::from_hash(event.target.parent_actor_type),
+        );
+        let victim = self
+            .party
+            .get_mut(&event.target.parent_index)
+            .expect("ensure_player_row created the row above");
+        victim.add_damage_taken(event);
     }
 
     /// `total_stun_value` = whichever capture path saw the accrual (the two
@@ -1672,6 +1693,22 @@ pub struct SelectionFact {
 /// and filtering by the pins first would collapse every list to what is already
 /// selected. The window IS applied, so the selectors only ever offer a pin that
 /// has something behind it.
+/// True for a hit some enemy dealt TO a party member — the damage-taken
+/// stream, which has its own accumulation and must stay out of every
+/// dealt-damage path (DPS totals, target segments, selection facts, coverage).
+///
+/// Identity-only, both sides: the target carries a party slot key (the hook
+/// slot-keys player victims the same way it keys player sources) and the
+/// source's parent is no known player character. A player-sourced hit on a
+/// player keeps flowing through the dealt pipeline unchanged.
+pub(crate) fn is_damage_taken_event(event: &DamageEvent) -> bool {
+    protocol::is_player_slot_key(event.target.parent_index)
+        && matches!(
+            CharacterType::from_hash(event.source.parent_actor_type),
+            CharacterType::Unknown(_)
+        )
+}
+
 pub fn selection_facts(
     events: &[(i64, Message)],
     start_time: i64,
@@ -1778,6 +1815,13 @@ fn segment_targets_inner(
         let Message::DamageEvent(event) = message else {
             continue;
         };
+        // Party victims are not targets: an incoming hit would otherwise put
+        // the PLAYER in the target dropdown and their HP pool in the enemy-HP
+        // charts. Left unassigned, exactly like a non-damage event, which also
+        // keeps enemy attacks out of `selection_facts`.
+        if is_damage_taken_event(event) {
+            continue;
+        }
         if phantoms.is_phantom(event) {
             continue;
         }
@@ -1950,6 +1994,95 @@ pub fn build_player_dps_chart(
     }
 
     player_dps
+}
+
+/// Per-player, per-second damage TAKEN buckets for the analysis view's Taken
+/// chart, keyed by the victim's slot key.
+///
+/// Only incoming events (see [`is_damage_taken_event`]) count, and only onto
+/// the party keys given — same posture as [`build_player_dps_chart`]. None of
+/// that function's gates apply here: phantom targets and the exclusion filters
+/// are about hits ON enemies, an enemy attack is not a pinnable ability, and
+/// the victim is a player rather than a target span.
+pub fn build_player_taken_chart(
+    events: &[(i64, Message)],
+    player_indices: &[u32],
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+) -> HashMap<u32, Vec<i64>> {
+    let mut player_taken: HashMap<u32, Vec<i64>> = player_indices
+        .iter()
+        .map(|index| (*index, vec![0; chart_len]))
+        .collect();
+
+    for (timestamp, event) in events {
+        let Message::DamageEvent(damage_event) = event else {
+            continue;
+        };
+        if !is_damage_taken_event(damage_event) {
+            continue;
+        }
+        let Some(chart) = player_taken.get_mut(&damage_event.target.parent_index) else {
+            continue;
+        };
+        chart[((timestamp - start_time) / interval) as usize] += damage_event.damage.max(0) as i64;
+    }
+
+    player_taken
+}
+
+/// One band of the damage-taken drill-down chart: what one (attacker class,
+/// attack) dealt TO the pinned victim per bucket — the same (enemy, action)
+/// grouping the taken table's drill rows use, so a band always corresponds to
+/// a row of the table beneath it.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TakenChartSeries {
+    pub enemy_type: EnemyType,
+    pub action_id: ActionType,
+    pub values: Vec<i64>,
+}
+
+/// The taken drill chart: every incoming hit on `victim` (a slot key), banded
+/// by (attacker class, attack), largest total first. Whole-fight geometry like
+/// the other drill charts — the view slices client-side. None of the dealt
+/// gates (phantoms, filters, target spans, ability pins) apply to incoming
+/// hits, so this is a single ungated pass.
+pub fn build_taken_ability_chart(
+    events: &[(i64, Message)],
+    victim: u32,
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+) -> Vec<TakenChartSeries> {
+    let mut series: Vec<TakenChartSeries> = Vec::new();
+    for (timestamp, message) in events {
+        let Message::DamageEvent(event) = message else {
+            continue;
+        };
+        if !is_damage_taken_event(event) || event.target.parent_index != victim {
+            continue;
+        }
+        let enemy_type = EnemyType::from_hash(event.source.parent_actor_type);
+        let band = match series
+            .iter_mut()
+            .find(|band| band.enemy_type == enemy_type && band.action_id == event.action_id)
+        {
+            Some(band) => band,
+            None => {
+                series.push(TakenChartSeries {
+                    enemy_type,
+                    action_id: event.action_id,
+                    values: vec![0; chart_len],
+                });
+                series.last_mut().expect("just pushed the band above")
+            }
+        };
+        band.values[((timestamp - start_time) / interval) as usize] += event.damage.max(0) as i64;
+    }
+    series.sort_by_key(|band| std::cmp::Reverse(band.values.iter().sum::<i64>()));
+    series
 }
 
 /// Build the per-player stun chart: stun applied per bucket, keyed by actor
@@ -2571,6 +2704,14 @@ impl Parser {
             // never reaches `process_damage_event` for an excluded hit and so
             // never moves the window from one.
             if let Message::DamageEvent(event) = event {
+                // Incoming (enemy→party) hits have their own accumulation: no
+                // window extension (they never anchor or stretch the DPS
+                // denominator), no phantom/exclusion filters and no target or
+                // ability pins — the victim is a player, not a dropdown target.
+                if is_damage_taken_event(event) {
+                    self.derived_state.process_damage_taken_event(event);
+                    continue;
+                }
                 // Ahead of the excluded-damage note as well: a marker's damage
                 // was never real, so it belongs in no total, not even the
                 // "excluded" one the user can toggle back on.
@@ -2999,6 +3140,18 @@ impl Parser {
 
         self.encounter
             .push_event(now, Message::DamageEvent(event.clone()));
+
+        // An incoming (enemy→party) hit: recorded above like any other event,
+        // then routed to the taken accumulation. The dealt pipeline below —
+        // phantom learning, exclusion filters, DPS windowing — is about hits
+        // ON enemies and must never see it.
+        if is_damage_taken_event(&event) {
+            self.derived_state.process_damage_taken_event(&event);
+            if let Some(window) = &self.window_handle {
+                let _ = window.emit("encounter-update", &self.derived_state);
+            }
+            return;
+        }
 
         // Recorded above, counted nowhere — same contract as the filters below.
         // Live can only recognise a marker from its first HP-bearing hit
@@ -3537,6 +3690,12 @@ impl Parser {
 
         if event.damage <= 0 {
             return true;
+        }
+
+        // Enemy→party hits are the damage-taken stream: recorded and derived,
+        // never dropped for their unknown source.
+        if is_damage_taken_event(event) {
+            return false;
         }
 
         // Hand-listed non-enemy actors (Eugen's Grenade, skill-spawned markers).
@@ -4116,6 +4275,252 @@ mod tests {
             target_current_hp: None,
             target_max_hp: None,
         }
+    }
+
+    /// An enemy hit ON party slot 0, shaped the way the hook publishes it now
+    /// that player targets are slot-keyed: pointer-like enemy source, target
+    /// keyed by the party slot with the character hash alongside.
+    fn damage_taken_by_slot0(action: u32, damage: i32) -> DamageEvent {
+        DamageEvent {
+            source: Actor {
+                index: 0xF1EB_1234,
+                actor_type: 0xDEAD_BEEF,
+                parent_index: 0xF1EB_1234,
+                parent_actor_type: 0xDEAD_BEEF,
+            },
+            target: Actor {
+                index: 77,
+                actor_type: PLAYER_HASH,
+                parent_index: protocol::player_slot_key(0),
+                parent_actor_type: PLAYER_HASH,
+            },
+            damage,
+            flags: 0,
+            action_id: ActionType::Normal(action),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+            base_damage: None,
+            target_current_hp: Some(9_500),
+            target_max_hp: Some(10_000),
+        }
+    }
+
+    #[test]
+    fn an_enemy_hit_on_a_player_is_recorded_and_derived_as_damage_taken() {
+        let mut parser = Parser::default();
+
+        parser.on_damage_event(damage_taken_by_slot0(9001, 750));
+
+        assert_eq!(
+            parser.encounter.raw_event_log.len(),
+            1,
+            "the hit belongs in the raw log"
+        );
+        let victim = parser
+            .derived_state
+            .party
+            .get(&protocol::player_slot_key(0))
+            .expect("the victim gets a party row");
+        assert_eq!(victim.total_damage_taken, 750);
+        assert_eq!(victim.hits_taken, 1);
+        assert_eq!(victim.total_damage, 0, "taken damage is not dealt damage");
+        assert_eq!(
+            parser.derived_state.total_damage, 0,
+            "taken damage must stay out of the encounter DPS totals"
+        );
+        assert_eq!(victim.damage_taken_breakdown.len(), 1);
+        let row = &victim.damage_taken_breakdown[0];
+        assert_eq!(row.enemy_type, EnemyType::from_hash(0xDEAD_BEEF));
+        assert_eq!(row.action_id, ActionType::Normal(9001));
+        assert_eq!(row.hits, 1);
+        assert_eq!(row.total_damage, 750);
+        assert_eq!(row.max_damage, 750);
+    }
+
+    #[test]
+    fn damage_taken_opens_an_encounter_but_never_anchors_the_dps_window() {
+        let mut parser = Parser::default();
+
+        parser.on_damage_event(damage_taken_by_slot0(9001, 750));
+
+        assert_eq!(
+            parser.status,
+            ParserStatus::InProgress,
+            "an ambush is a fight"
+        );
+        assert!(
+            !parser.derived_state.window_anchored,
+            "the DPS denominator starts at the first dealt hit, same as guards"
+        );
+    }
+
+    #[test]
+    fn reparse_rebuilds_damage_taken_and_keeps_it_out_of_dps() {
+        let mut parser = Parser::default();
+        parser.encounter.raw_event_log.push((
+            1_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+        ));
+        parser.encounter.raw_event_log.push((
+            2_000,
+            Message::DamageEvent(damage_taken_by_slot0(9001, 750)),
+        ));
+
+        parser.reparse();
+
+        assert_eq!(parser.derived_state.total_damage, 1_000);
+        let victim = parser
+            .derived_state
+            .party
+            .get(&protocol::player_slot_key(0))
+            .expect("the victim row is rebuilt from the raw log");
+        assert_eq!(victim.total_damage_taken, 750);
+        assert_eq!(victim.hits_taken, 1);
+    }
+
+    /// Per-player damage taken per second, bucketed for the analysis chart:
+    /// only taken events count, keyed by the victim's slot key, and dealt
+    /// damage never leaks in.
+    #[test]
+    fn taken_chart_buckets_incoming_damage_by_victim() {
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (
+                1_500,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 300)),
+            ),
+            (
+                3_000,
+                Message::DamageEvent(damage_taken_by_slot0(9002, 200)),
+            ),
+        ];
+
+        let chart =
+            build_player_taken_chart(&events, &[protocol::player_slot_key(0)], 1_000, 1_000, 3);
+
+        assert_eq!(
+            chart.get(&protocol::player_slot_key(0)).unwrap(),
+            &vec![300, 0, 200]
+        );
+        assert_eq!(chart.len(), 1, "no series for anyone who took nothing");
+    }
+
+    /// The taken drill chart: one band per (attacker, attack) hitting the
+    /// pinned victim, largest first, other victims' hits excluded.
+    #[test]
+    fn taken_ability_chart_bands_by_attacker_and_attack_for_the_victim() {
+        let mut other_victim = damage_taken_by_slot0(9001, 999);
+        other_victim.target.parent_index = protocol::player_slot_key(1);
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (
+                1_500,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 300)),
+            ),
+            (
+                3_000,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 100)),
+            ),
+            (
+                3_000,
+                Message::DamageEvent(damage_taken_by_slot0(9002, 200)),
+            ),
+            (3_000, Message::DamageEvent(other_victim)),
+        ];
+
+        let bands =
+            build_taken_ability_chart(&events, protocol::player_slot_key(0), 1_000, 1_000, 3);
+
+        assert_eq!(bands.len(), 2);
+        assert_eq!(bands[0].action_id, ActionType::Normal(9001));
+        assert_eq!(bands[0].values, vec![300, 0, 100]);
+        assert_eq!(bands[1].action_id, ActionType::Normal(9002));
+        assert_eq!(bands[1].values, vec![0, 0, 200]);
+    }
+
+    /// Two hits from the same enemy action fold into one breakdown row; a
+    /// different attacker opens its own.
+    #[test]
+    fn damage_taken_breakdown_groups_by_attacker_and_action() {
+        let mut parser = Parser::default();
+
+        parser.on_damage_event(damage_taken_by_slot0(9001, 750));
+        parser.on_damage_event(damage_taken_by_slot0(9001, 250));
+        let mut other_attacker = damage_taken_by_slot0(9001, 100);
+        other_attacker.source.actor_type = 0xBEEF_CAFE;
+        other_attacker.source.parent_actor_type = 0xBEEF_CAFE;
+        parser.on_damage_event(other_attacker);
+
+        let victim = parser
+            .derived_state
+            .party
+            .get(&protocol::player_slot_key(0))
+            .expect("victim row");
+        assert_eq!(victim.total_damage_taken, 1_100);
+        assert_eq!(victim.hits_taken, 3);
+        assert_eq!(victim.damage_taken_breakdown.len(), 2);
+        let same_attack = &victim.damage_taken_breakdown[0];
+        assert_eq!(same_attack.hits, 2);
+        assert_eq!(same_attack.total_damage, 1_000);
+        assert_eq!(same_attack.max_damage, 750);
+    }
+
+    #[test]
+    fn player_victims_never_become_target_segments() {
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (
+                2_000,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 750)),
+            ),
+        ];
+
+        let segments = segment_targets(&events, 1_000);
+
+        assert_eq!(
+            segments.len(),
+            1,
+            "only the enemy the player hit belongs in the target dropdown"
+        );
+    }
+
+    #[test]
+    fn player_hp_on_a_taken_event_is_not_enemy_hp_coverage() {
+        let encounter = Encounter {
+            raw_event_log: vec![(
+                1_000,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 750)),
+            )],
+            ..Default::default()
+        };
+
+        assert!(!encounter.data_coverage().enemy_hp);
+    }
+
+    #[test]
+    fn enemy_to_enemy_damage_is_still_ignored() {
+        // The same enemy-sourced hit aimed at another enemy (raw index, no
+        // slot key) must keep being dropped — only party victims are recorded.
+        let mut event = damage_taken_by_slot0(9001, 750);
+        event.target.index = 9;
+        event.target.actor_type = 0x1234;
+        event.target.parent_index = 9;
+        event.target.parent_actor_type = 0x1234;
+
+        assert!(Parser::should_ignore_damage_event(&event));
+        assert!(!Parser::should_ignore_damage_event(&damage_taken_by_slot0(
+            9001, 750
+        )));
     }
 
     /// A parser holding one ordinary hit at t=1000 and one Primal Burst at

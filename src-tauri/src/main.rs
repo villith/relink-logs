@@ -1277,6 +1277,10 @@ struct EncounterStateResponse {
     /// The drill-down chart one level further in: with a source AND an ability
     /// pinned, what that ability hit, one band per enemy spawn.
     target_chart: Vec<v1::TargetChartSeries>,
+    /// The damage-taken tab's drill-down chart, present only on a scoped fetch
+    /// that pinned a source: what hit that player, one band per (attacker,
+    /// attack) — the same grouping the taken table's drill rows use.
+    taken_ability_chart: Vec<v1::TakenChartSeries>,
     /// Every window an actor held a status effect for, per actor and never
     /// merged, spanning the FULL fight. The Buffs and Debuffs tables compute
     /// their own uptime from these, so a scrub window narrows the view without
@@ -1287,6 +1291,9 @@ struct EncounterStateResponse {
     /// stun reconciles two capture paths with max(), not a sum — see
     /// `build_player_stun_chart`.
     stun_chart: HashMap<u32, Vec<f64>>,
+    /// Damage TAKEN per DPS-chart bucket, keyed by the victim's slot key. All
+    /// zeroes on logs recorded before damage-taken capture (2026-08-04).
+    taken_chart: HashMap<u32, Vec<i64>>,
     /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
     /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
     hp_chart: Vec<v1::HpChartSeries>,
@@ -1520,6 +1527,19 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         // stop being the elapsed second.
         let (ability_chart, target_chart) =
             build_drill_charts(&parser, &options, &segments, &assignment);
+        // The taken tab's drill bands for the same pinned player. Cheap (one
+        // ungated pass) and metric-agnostic — the backend does not know which
+        // tab is showing, so both drill decompositions ride the same fetch.
+        let taken_ability_chart = match options.selection.source_indices.first() {
+            Some(&victim) => v1::build_taken_ability_chart(
+                &parser.encounter.raw_event_log,
+                victim,
+                parser.start_time(),
+                DPS_INTERVAL,
+                (parser.full_log_duration() / DPS_INTERVAL) as usize + 1,
+            ),
+            None => Vec::new(),
+        };
         // The level above those: no source pinned, but an enemy or an ability
         // still narrowing the fight. Without it the plot kept drawing the whole
         // party's whole fight beside a table that had already narrowed.
@@ -1540,6 +1560,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             selection_facts,
             ability_chart,
             target_chart,
+            taken_ability_chart,
             dps_chart,
             ..Default::default()
         });
@@ -1594,6 +1615,14 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         (duration / DPS_INTERVAL) as usize + 1,
         &options.target_spans,
         options.filters,
+    );
+
+    let player_taken = v1::build_player_taken_chart(
+        &parser.encounter.raw_event_log,
+        &player_indices,
+        start_time,
+        DPS_INTERVAL,
+        (duration / DPS_INTERVAL) as usize + 1,
     );
 
     let hp_chart = v1::build_target_hp_charts(
@@ -1654,9 +1683,11 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         // is exactly the level `dps_chart` already draws.
         ability_chart: Vec::new(),
         target_chart: Vec::new(),
+        taken_ability_chart: Vec::new(),
         status_intervals,
         dps_chart: player_dps,
         stun_chart: player_stun,
+        taken_chart: player_taken,
         hp_chart,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
         sba_chart_len: (duration / SBA_INTERVAL) as usize + 1,

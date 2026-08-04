@@ -8,6 +8,7 @@ import {
   SBAEvent,
   SelectionFact,
   StatusInterval,
+  TakenChartSeries,
   TargetChartSeries,
   TargetEntry,
   TargetSpan,
@@ -20,6 +21,10 @@ interface EncounterStore {
   /** Stun applied per second, keyed by actor index. Empty on a backend that
    * predates the field. */
   stunChart: Record<number, number[]>;
+  /** Damage TAKEN per second, keyed by the victim's slot key. Empty on a
+   * backend that predates the field; all zeroes on logs recorded before
+   * damage-taken capture. */
+  takenChart: Record<number, number[]>;
   /** Enemy HP% per second, one series per charted HP pool (largest first). Empty on old logs. */
   hpChart: HpChartSeries[];
   /** Every window an actor held a status effect for, spanning the whole fight.
@@ -66,6 +71,8 @@ export interface EncounterStateResponse {
   dpsChart: Record<number, number[]>;
   /** Optional so a backend older than the field reads as "no stun series". */
   stunChart?: Record<number, number[]>;
+  /** Optional so a backend older than the field reads as "no taken series". */
+  takenChart?: Record<number, number[]>;
   hpChart: HpChartSeries[];
   /** Optional so a backend older than the field reads as "no status capture" —
    * which is also what every log recorded before the hook emitted these has. */
@@ -85,6 +92,9 @@ export interface EncounterStateResponse {
   abilityChart?: AbilityChartSeries[];
   /** The level below: what the pinned ability hit, one band per enemy spawn. */
   targetChart?: TargetChartSeries[];
+  /** The taken tab's drill bands for the pinned player — one per (attacker,
+   * attack). Scoped fetches only, like the two above; not stored. */
+  takenAbilityChart?: TakenChartSeries[];
   players: PlayerData[];
   /** One vector per PARTY SLOT (0-3), parallel to the unfiltered `players`. */
   legality: LegalityFinding[][];
@@ -100,6 +110,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   encounterState: null,
   dpsChart: {},
   stunChart: {},
+  takenChart: {},
   hpChart: [],
   statusIntervals: [],
   sbaChart: {},
@@ -132,6 +143,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       encounterState: response.encounterState,
       dpsChart: response.dpsChart,
       stunChart: response.stunChart ?? {},
+      takenChart: response.takenChart ?? {},
       hpChart: response.hpChart ?? [],
       statusIntervals: response.statusIntervals ?? [],
       sbaChart: response.sbaChart,

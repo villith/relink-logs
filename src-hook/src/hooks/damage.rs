@@ -1289,7 +1289,11 @@ impl OnProcessDotHook {
                 // target filtering keeps a summon's DoT ticks with its hits.
                 index: target_spawn_id(target as usize),
                 actor_type: target_type_id,
-                parent_index: target_idx,
+                // Slot-keyed like the damage hook's targets: a burn ticking
+                // on a party member is damage taken, and the parser
+                // recognizes the victim by their slot key.
+                parent_index: super::player::player_slot_key_for_actor(target)
+                    .unwrap_or(target_idx),
                 parent_actor_type: target_type_id,
             },
             damage: dmg,
@@ -1347,6 +1351,14 @@ fn build_damage_event(
     });
 
     let target_type_id = actor_type_id(target_specified_instance_ptr as *const usize);
+    // A party-member victim is keyed by their slot, exactly like a player
+    // SOURCE is (see player_keyed_parent): the raw actor index is
+    // character-scoped and would merge two players on the same character, and
+    // the parser's damage-taken stream recognizes victims by their slot key.
+    // Enemies keep the raw game index.
+    let target_parent_index =
+        super::player::player_slot_key_for_actor(target_specified_instance_ptr as *const usize)
+            .unwrap_or_else(|| actor_idx(target_specified_instance_ptr as *const usize));
     DamageEvent {
         source,
         target: Actor {
@@ -1357,7 +1369,7 @@ fn build_damage_event(
             // exists to tell simultaneous same-kind actors apart.
             index: target_spawn_id(target_specified_instance_ptr),
             actor_type: target_type_id,
-            parent_index: actor_idx(target_specified_instance_ptr as *const usize),
+            parent_index: target_parent_index,
             parent_actor_type: target_type_id,
         },
         damage,

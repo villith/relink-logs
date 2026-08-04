@@ -62,8 +62,12 @@ export type MetricRow = {
  * `"enemy"` is an enemy TYPE, as the JSON of an `EnemyType`. Distinct from
  * `"target"` because it names something coarser: the per-skill damage breakdown
  * (`SkillState.targets`) records a type and merges same-type spawns, so a row
- * built from it cannot point at one spawn and must not pretend to. */
-export type LabelKind = "player" | "ability" | "status" | "target" | "enemy";
+ * built from it cannot point at one spawn and must not pretend to.
+ *
+ * `"takenAttack"` is one enemy ATTACK on the damage-taken tab: a JSON
+ * `{enemyType, actionId}` pair (see `takenAttackRowParts`), named as the enemy
+ * plus its attack id — the game data carries no names for enemy actions. */
+export type LabelKind = "player" | "ability" | "status" | "target" | "enemy" | "takenAttack";
 
 /** Which side's holders the status tables are about — WCL's
  * Friendlies/Enemies switch. Polarity (buff vs debuff) is fixed per tab; this

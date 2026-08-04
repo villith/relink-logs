@@ -14,12 +14,14 @@ import { useMeterFilters } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import type {
   AbilityChartSeries,
+  ActionType,
   CharacterType,
   ComputedPlayerState,
   EncounterState,
   EnemyType,
   SelectionFact,
   StatusInterval,
+  TakenChartSeries,
   TargetChartSeries,
 } from "@/types";
 import {
@@ -48,6 +50,7 @@ import { actionsForPin } from "../abilitySkills";
 import { rowLevelFor } from "../deriveRows";
 import { buffs, enemyHolderKey, heldByRoster, slotsOf } from "../metrics/buffs";
 import { damageDone, parseEnemyRow } from "../metrics/damageDone";
+import { damageTaken, takenAttackNameKey, takenAttackRowParts } from "../metrics/damageTaken";
 import { debuffs } from "../metrics/debuffs";
 import { sba } from "../metrics/sba";
 import { stun } from "../metrics/stun";
@@ -86,11 +89,12 @@ import {
 } from "./statusLabel";
 import { withStatusOption } from "./statusOption";
 import { statusRowColors } from "./statusRowColors";
+import { takenCardSectionsFor } from "./takenCardSections";
 import { useUrlQueryString } from "./useUrlQueryString";
 
 /** The metric switcher's contents, in display order. Adding a metric is adding
  * a descriptor here — the frame itself does not change. */
-const METRICS: Record<string, MetricDescriptor> = { damage: damageDone, stun, sba, buffs, debuffs };
+const METRICS: Record<string, MetricDescriptor> = { damage: damageDone, taken: damageTaken, stun, sba, buffs, debuffs };
 
 /** The switcher's contents, derived from METRICS — each descriptor already
  * carries the label the tab shows, and two lists that must agree is one list
@@ -112,6 +116,8 @@ const KIND_ROWS_LABEL_KEY = {
   target: "ui.logs.rows-by-enemy",
   enemy: "ui.logs.rows-by-enemy",
   ability: "ui.logs.rows-by-ability",
+  // A taken row is one enemy attack, which still reads as "Ability".
+  takenAttack: "ui.logs.rows-by-ability",
 } as const;
 
 /** i18next key naming what a row is at each level. */
@@ -146,6 +152,7 @@ export const AnalysisView = () => {
     encounter,
     dpsChart,
     stunChart,
+    takenChart,
     chartLen,
     sbaChart,
     sbaChartLen,
@@ -164,6 +171,7 @@ export const AnalysisView = () => {
       encounter: state.encounterState,
       dpsChart: state.dpsChart,
       stunChart: state.stunChart,
+      takenChart: state.takenChart,
       chartLen: state.chartLen,
       sbaChart: state.sbaChart,
       sbaChartLen: state.sbaChartLen,
@@ -217,6 +225,7 @@ export const AnalysisView = () => {
     facts: SelectionFact[];
     abilityChart: AbilityChartSeries[];
     targetChart: TargetChartSeries[];
+    takenChart: TakenChartSeries[];
     playerChart: Record<number, number[]>;
   } | null>(null);
 
@@ -329,6 +338,7 @@ export const AnalysisView = () => {
           facts: response.selectionFacts ?? [],
           abilityChart: response.abilityChart ?? [],
           targetChart: response.targetChart ?? [],
+          takenChart: response.takenAbilityChart ?? [],
           // Present only when a pin narrows the fight with no source pinned;
           // absent on an older binary, which degrades to the base-load chart.
           playerChart: response.dpsChart ?? {},
@@ -391,6 +401,27 @@ export const AnalysisView = () => {
     // i18n.language: skill names are translated, so a language switch must
     // re-derive them even though it is not read here directly.
     [identityPlayers, playerByIndex, pins.source, i18n.language]
+  );
+
+  // One enemy attack, named as "<Enemy> — Attack <id>": enemy actions carry no
+  // names in the game data, so the id plus the attacker is the honest label.
+  const labelForTakenAttack = useCallback(
+    (enemyType: EnemyType, actionId: ActionType) => {
+      const { key, params } = takenAttackNameKey(actionId);
+      return `${translateEnemyType(enemyType)} — ${t(key, params)}`;
+    },
+    // i18n.language: enemy names are translated.
+    [t, i18n.language]
+  );
+
+  // The row-label form of the same name, off the JSON label the taken rows
+  // carry (see `takenAttackRowParts` — the grammar has one author).
+  const takenAttackLabel = useCallback(
+    (label: string) => {
+      const parts = takenAttackRowParts(label);
+      return parts ? labelForTakenAttack(parts.enemyType, parts.actionId) : label;
+    },
+    [labelForTakenAttack]
   );
 
   // The same rule the quest view's HP-chart legend and target filter label with,
@@ -594,6 +625,11 @@ export const AnalysisView = () => {
       // An enemy TYPE row carries the type itself, so it needs no spawn to look
       // one up through.
       if (rowKind === "enemy") return enemyIconUrl(parseEnemyRow(row.label));
+      // A taken row is an enemy's attack, so it wears the attacker's portrait.
+      if (rowKind === "takenAttack") {
+        const parts = takenAttackRowParts(row.label);
+        return parts ? enemyIconUrl(parts.enemyType) : undefined;
+      }
       return abilityRowIconUrl(row.label, identityPlayers, playerByIndex.get(pins.source ?? -1)?.player);
     },
     [rowKind, playerByIndex, targetEntries, identityPlayers, pins.source]
@@ -618,7 +654,9 @@ export const AnalysisView = () => {
               ? targetRowLabel(row.label, labelForTarget)
               : rowKind === "enemy"
                 ? translateEnemyType(parseEnemyRow(row.label))
-                : labelForAbility(row.label);
+                : rowKind === "takenAttack"
+                  ? takenAttackLabel(row.label)
+                  : labelForAbility(row.label);
       const icon = rowIconUrl(row);
       if (!icon) return name;
       return (
@@ -628,7 +666,7 @@ export const AnalysisView = () => {
         </>
       );
     },
-    [t, rowKind, labelForSource, labelForTarget, labelForAbility, statusDisplayLabel, rowIconUrl]
+    [t, rowKind, labelForSource, labelForTarget, labelForAbility, takenAttackLabel, statusDisplayLabel, rowIconUrl]
   );
 
   const handlePin = useCallback((next: Partial<SelectorPins>) => setPins({ ...pins, ...next }), [pins, setPins]);
@@ -713,12 +751,25 @@ export const AnalysisView = () => {
   // Null for a metric with no breakdown behind its rows (SBA is a gauge
   // reading; the status tables' rows are effects and holders). Those tabs used
   // to inherit the damage card and explain a gauge with damage figures.
+  //
+  // The taken tab has its own card builder: its breakdown is per (attacker,
+  // attack), not per skill, so the skill-based sections would explain incoming
+  // damage with the player's own abilities.
   const rowSections = useCallback(
-    (row: MetricRow) =>
-      metric.card
+    (row: MetricRow) => {
+      if (metricKey === "taken") {
+        return takenCardSectionsFor({
+          row,
+          players,
+          color: rowColor(row),
+          labels: { attack: labelForTakenAttack, enemy: translateEnemyType, enemyIcon: enemyIconUrl },
+        });
+      }
+      return metric.card
         ? cardSectionsFor({ row, level, players, pins, color: rowColor(row), labels: sectionLabels, card: metric.card })
-        : null,
-    [metric, level, players, pins, rowColor, sectionLabels]
+        : null;
+    },
+    [metricKey, metric, level, players, pins, rowColor, sectionLabels, labelForTakenAttack]
   );
   // What the plot shows follows the metric tabs. Each metric brings its own
   // bucketed series from the base load, so switching tabs never refetches.
@@ -746,6 +797,17 @@ export const AnalysisView = () => {
         format: "percent" as const,
       };
     }
+    if (metricKey === "taken") {
+      return {
+        labelKey: "ui.logs.chart-taken-label",
+        source: takenChart,
+        len: chartLen,
+        // Same smoothing as DPS: incoming damage per second off the same buckets.
+        smoothing: DPS_SMOOTHING_WINDOW,
+        scale: 1,
+        format: "amount" as const,
+      };
+    }
     return {
       labelKey: "ui.logs.chart-dps-label",
       source: dpsChart,
@@ -756,7 +818,7 @@ export const AnalysisView = () => {
       scale: 1,
       format: "amount" as const,
     };
-  }, [metricKey, dpsChart, stunChart, chartLen, sbaChart, sbaChartLen]);
+  }, [metricKey, dpsChart, stunChart, takenChart, chartLen, sbaChart, sbaChartLen]);
 
   // The chart follows the ROW LEVEL: a player row is explained by the party's
   // curves, an ability row by that player's skill groups, a hit row by the
@@ -767,9 +829,20 @@ export const AnalysisView = () => {
   // draw — the stun tab narrows to the pinned player instead (below) rather
   // than inventing one. SBA is a per-player gauge with no decomposition at all.
   const drill = useMemo(() => {
-    if (metricKey !== "damage" || !scoped) return null;
+    if ((metricKey !== "damage" && metricKey !== "taken") || !scoped) return null;
     const owner = playerByIndex.get(pins.source ?? -1)?.player;
     if (!owner) return null;
+
+    // The taken tab drills into what HIT the pinned player, one band per
+    // (attacker, attack) — the same grouping as its table rows.
+    if (metricKey === "taken") {
+      if (level === "players" || scoped.takenChart.length === 0) return null;
+      return scoped.takenChart.map((series) => ({
+        key: `taken:${JSON.stringify({ enemyType: series.enemyType, actionId: series.actionId })}`,
+        label: labelForTakenAttack(series.enemyType, series.actionId),
+        values: series.values,
+      }));
+    }
 
     if (level === "abilities" && scoped.abilityChart.length > 0) {
       return foldAbilityChart(scoped.abilityChart, owner.characterType, getSkillName);
@@ -782,7 +855,7 @@ export const AnalysisView = () => {
     }
     return null;
     // i18n.language: both folds produce translated labels.
-  }, [metricKey, scoped, level, pins.source, playerByIndex, targetLabels, i18n.language]);
+  }, [metricKey, scoped, level, pins.source, playerByIndex, targetLabels, labelForTakenAttack, i18n.language]);
 
   // The Stacks plot: one stacked series per holder of the pinned effect, so the
   // height is how many stacks the party held at that moment. Only on the status
@@ -1024,7 +1097,15 @@ export const AnalysisView = () => {
       <DpsChart
         data={shownChartData}
         labels={labels}
-        labelKey={statusSeries ? "ui.logs.chart-stacks-label" : drill ? DRILL_LABEL_KEY[level] : chartMetric.labelKey}
+        labelKey={
+          statusSeries
+            ? "ui.logs.chart-stacks-label"
+            : drill
+              ? metricKey === "taken"
+                ? "ui.logs.chart-taken-drill-label"
+                : DRILL_LABEL_KEY[level]
+              : chartMetric.labelKey
+        }
         format={statusSeries ? "count" : drill ? "amount" : chartMetric.format}
         stacked={overlay !== null}
         onScope={handleScope}
