@@ -45,7 +45,7 @@
       "skills": [210, 220, 230]
     },
     "combo-finisher": {
-      "skills": [211, 221, 240]
+      "skills": [221, 240]
     },
     "aerial-attack": {
       "skills": [300, 310, 320]
