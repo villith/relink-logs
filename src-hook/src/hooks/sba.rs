@@ -419,17 +419,30 @@ impl OnHandleSBAUpdateHook {
         if let Some((actor_index, action_id)) =
             crate::hooks::damage::DAMAGE_ATTRIBUTION.with(|stack| stack.borrow().last().copied())
         {
-            let after = read_f32_guarded(a1 as usize, 0x7C);
-            if let (Some(before), Some(after)) = (before, after) {
-                let amount = after - before;
-                // A burst resetting the bar reads as a large negative; only a
-                // real increase is a gain.
-                if amount > 0.0 && amount.is_finite() {
-                    let _ = self.tx.send(Message::SbaGain(protocol::SbaGainEvent {
-                        actor_index,
-                        action_id,
-                        amount,
-                    }));
+            // Ownership cross-check: the stack top only names whichever hit is
+            // currently being processed on this thread — it does NOT prove
+            // this particular OnSBAUpdate call is that hit's own grant. Other
+            // gauge-raising callers exist (chains, scripted awards) that could
+            // fire synchronously nested inside the hit's damage processing and
+            // touch a DIFFERENT player's component. Resolve who `a1` (the
+            // measured component) actually belongs to — same a1+0x10
+            // specified-instance resolution the SBAUPD diag block uses — and
+            // only credit the gain when it matches the attributed player.
+            let entity_ptr = unsafe { a1.byte_add(0x10).read() } as *const usize;
+            let component_owner = super::player_slot_key_for_source(entity_ptr);
+            if component_owner == Some(actor_index) {
+                let after = read_f32_guarded(a1 as usize, 0x7C);
+                if let (Some(before), Some(after)) = (before, after) {
+                    let amount = after - before;
+                    // A burst resetting the bar reads as a large negative; only
+                    // a real increase is a gain.
+                    if amount > 0.0 && amount.is_finite() {
+                        let _ = self.tx.send(Message::SbaGain(protocol::SbaGainEvent {
+                            actor_index,
+                            action_id,
+                            amount,
+                        }));
+                    }
                 }
             }
         }

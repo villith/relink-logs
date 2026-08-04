@@ -771,16 +771,21 @@ impl OnProcessDamageHook {
             std::ptr::addr_of!((*(a2 as *const DamageInstance)).action_id).read_unaligned()
         };
 
-        // Push this hit's attribution BEFORE the original call — the game's
-        // per-hit SBA gauge grant runs synchronously inside it (static RE,
-        // v2.0.3: source vtable +0x70 -> +0x80), so the SBA hook needs the top
-        // of the stack in place while that call is in flight. Only a
-        // player-attributed source pushes: `player_slot_key_for_source` mirrors
-        // `emit_zero_damage_guard`'s attribution and already returns `None` for
-        // enemy/unowned sources (pets/avatars resolve to their owner), which
-        // matches `SbaGainEvent` being local-player-only. The guard only exists
-        // when a push happened, so a skipped push never pops a frame it didn't
-        // push.
+        // Push this hit's attribution for EXACTLY the duration of the original
+        // call — the game's per-hit SBA gauge grant runs synchronously inside
+        // it (static RE, v2.0.3: source vtable +0x70 -> +0x80), so the SBA hook
+        // needs the top of the stack in place only while that call is in
+        // flight. Scoped to this block (not the whole `run`) so the invariant
+        // is true by construction: the frame pops the moment the call returns,
+        // before any post-call work (stun-delta reads, actor_type_id vfunc
+        // dispatches, event emission) can reach OnSBAUpdate on this thread and
+        // misattribute a gain to a hit that has already finished processing.
+        // Only a player-attributed source pushes: `player_slot_key_for_source`
+        // mirrors `emit_zero_damage_guard`'s attribution and already returns
+        // `None` for enemy/unowned sources (pets/avatars resolve to their
+        // owner), which matches `SbaGainEvent` being local-player-only. The
+        // guard only exists when a push happened, so a skipped push never pops
+        // a frame it didn't push.
         struct AttributionGuard;
         impl Drop for AttributionGuard {
             fn drop(&mut self) {
@@ -789,16 +794,18 @@ impl OnProcessDamageHook {
                 });
             }
         }
-        let _attribution_guard: Option<AttributionGuard> = pre_call_source_ptr
-            .and_then(|ptr| super::player_slot_key_for_source(ptr as *const usize))
-            .map(|source_actor_index| {
-                DAMAGE_ATTRIBUTION.with(|stack| {
-                    stack.borrow_mut().push((source_actor_index, raw_action_id));
+        let original_value = {
+            let _attribution_guard: Option<AttributionGuard> = pre_call_source_ptr
+                .and_then(|ptr| super::player_slot_key_for_source(ptr as *const usize))
+                .map(|source_actor_index| {
+                    DAMAGE_ATTRIBUTION.with(|stack| {
+                        stack.borrow_mut().push((source_actor_index, raw_action_id));
+                    });
+                    AttributionGuard
                 });
-                AttributionGuard
-            });
 
-        let original_value = unsafe { ProcessDamageEvent.call(a1, a2, a3, a4) };
+            unsafe { ProcessDamageEvent.call(a1, a2, a3, a4) }
+        };
 
         #[cfg(feature = "hookdiag")]
         if let Some(pre) = stun_probe_pre {
