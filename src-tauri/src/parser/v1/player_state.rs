@@ -119,6 +119,18 @@ pub struct PlayerState {
     pub dps: f64,
     pub skill_breakdown: Vec<SkillState>,
     pub sba: f64,
+    /// Total gauge this player GENERATED over the fight — the sum of every
+    /// `OnUpdateSBAEvent::sba_added`.
+    ///
+    /// Distinct from `sba`, which is the gauge LEVEL and reads 0 right after a
+    /// burst: a level answers "how full is it now", which ranks nobody. This is
+    /// the contribution figure the SBA table sorts by.
+    ///
+    /// `#[serde(default)]` because logs stored before this field existed carry
+    /// no value for it — and the number is rebuilt from the raw event log on
+    /// every reparse anyway, so an old blob loses nothing.
+    #[serde(default)]
+    pub sba_generated: f64,
     pub total_stun_value: f64,
     pub stun_per_second: f64,
     /// Stun measured as accumulator deltas across ProcessDamageEvent (the solo
@@ -184,6 +196,7 @@ impl PlayerState {
             total_damage: 0,
             dps: 0.0,
             sba: 0.0,
+            sba_generated: 0.0,
             stun_per_second: 0.0,
             total_stun_value: 0.0,
             stun_delta_sum: 0.0,
@@ -199,6 +212,16 @@ impl PlayerState {
         }
     }
 
+    /// Records one gauge reading. `added` is the increase this event carried —
+    /// the game's own figure, not a difference we compute, so a burst resetting
+    /// the gauge to 0 contributes nothing rather than a large negative.
+    pub fn apply_sba(&mut self, sba: f64, added: f64) {
+        self.sba = sba;
+        self.sba_generated += added.max(0.0);
+    }
+
+    /// A gauge level with no generation attached — the attempt/perform/chain
+    /// events, which force the gauge to a known value rather than adding to it.
     pub fn set_sba(&mut self, sba: f64) {
         self.sba = sba;
     }

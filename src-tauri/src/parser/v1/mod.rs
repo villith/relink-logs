@@ -1254,6 +1254,26 @@ impl DerivedEncounterState {
         }
     }
 
+    /// Folds one gauge reading into a player's row during a reparse.
+    ///
+    /// Silently skipped when the player has no row yet: unlike stun there is
+    /// nothing to hold pending, because the gauge is a LEVEL — a later event
+    /// carries the running total again, so an early reading lost before the
+    /// player's first damage event costs at most its own `added`.
+    fn process_sba_update(&mut self, actor_index: u32, value: f64, added: f64) {
+        if let Some(player) = self.party.get_mut(&actor_index) {
+            player.apply_sba(value, added);
+        }
+    }
+
+    /// A gauge forced to a known level (attempt / perform / chain), which
+    /// generates nothing.
+    fn process_sba_level(&mut self, actor_index: u32, value: f64) {
+        if let Some(player) = self.party.get_mut(&actor_index) {
+            player.set_sba(value);
+        }
+    }
+
     /// Creates a player's party row before their first damage event, from the
     /// character type the identity snapshot carries — a player who only guards
     /// must still show their Perfect Guard rows. Folds in any guard/stun state
@@ -2559,6 +2579,27 @@ impl Parser {
                         event.stun_amount as f64,
                     );
                 }
+                // The reparse is what the log viewer reads, so an SBA event
+                // dropped here is an SBA tab of zeroes however well the hook
+                // captured it. No target/selection gating: the gauge is a
+                // property of the player, not of a hit on some enemy.
+                Message::OnUpdateSBA(event) => {
+                    self.derived_state.process_sba_update(
+                        event.actor_index,
+                        event.sba_value as f64,
+                        event.sba_added as f64,
+                    );
+                }
+                Message::OnAttemptSBA(event) => {
+                    self.derived_state
+                        .process_sba_level(event.actor_index, 800.0);
+                }
+                Message::OnPerformSBA(event) => {
+                    self.derived_state.process_sba_level(event.actor_index, 0.0);
+                }
+                Message::OnContinueSBAChain(event) => {
+                    self.derived_state.process_sba_level(event.actor_index, 0.0);
+                }
                 _ => {}
             }
         }
@@ -3273,7 +3314,7 @@ impl Parser {
 
         let player_index = event.actor_index;
         if let Some(player) = self.derived_state.party.get_mut(&player_index) {
-            player.set_sba(event.sba_value as f64);
+            player.apply_sba(event.sba_value as f64, event.sba_added as f64);
         }
 
         if let Some(window) = &self.window_handle {
@@ -6139,6 +6180,44 @@ mod tests {
         // An empty window stays at zero rather than picking up stale state.
         parser.reparse_with_options_window(&[], Some(1_000), Some(3_000));
         assert_eq!(parser.derived_state.total_damage, 0);
+    }
+
+    /// Regression: `reparse_with_options_window` swallowed `OnUpdateSBA` in its
+    /// `_ => {}` arm, so every STORED log reported `sba = 0.0` for every player
+    /// and the analysis view's SBA tab was a list of zeroes. The live path set it;
+    /// the reparse the log viewer actually uses never did.
+    #[test]
+    fn reparse_replays_sba_events() {
+        let mut parser = Parser::default();
+        // A damage event first: the party row is created from damage, and an SBA
+        // event for a player with no row must not be silently dropped.
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.on_sba_update(protocol::OnUpdateSBAEvent {
+            actor_index: 0xF000_0000,
+            sba_value: 300.0,
+            sba_added: 300.0,
+        });
+        parser.on_sba_update(protocol::OnUpdateSBAEvent {
+            actor_index: 0xF000_0000,
+            sba_value: 500.0,
+            sba_added: 200.0,
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        assert_eq!(player.sba, 500.0, "last gauge value survives a reparse");
+        assert_eq!(
+            player.sba_generated, 500.0,
+            "total generated is the sum of every sba_added"
+        );
     }
 
     /// Regression: the SBA chart walks the FULL event log, so it must size its
