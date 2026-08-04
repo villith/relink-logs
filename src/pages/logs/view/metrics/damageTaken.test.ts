@@ -153,3 +153,107 @@ describe("damageTaken descriptor", () => {
     expect(takenAttackNameKey("LinkAttack")).toEqual({ key: "ui.logs.taken-attack-other" });
   });
 });
+
+const dealerPlayer = (index: number, targets: { enemy: number; total: number; hits: number }[]) =>
+  ({
+    index,
+    partyIndex: index,
+    characterType: "Pl0000",
+    totalDamage: targets.reduce((sum, target) => sum + target.total, 0),
+    dps: 0,
+    percentage: 0,
+    sba: 0,
+    totalStunValue: 0,
+    stunPerSecond: 0,
+    lastDamageTime: 0,
+    cappedHits: 0,
+    cappableHits: 0,
+    overcapBaseSum: 0,
+    overcapCapSum: 0,
+    skillBreakdown: [
+      {
+        actionType: { Normal: 100 },
+        childCharacterType: "Pl0000",
+        hits: targets.reduce((sum, target) => sum + target.hits, 0),
+        minDamage: 1,
+        maxDamage: 1,
+        totalDamage: targets.reduce((sum, target) => sum + target.total, 0),
+        totalStunValue: 0,
+        maxStunValue: 0,
+        cappedHits: 0,
+        cappableHits: 0,
+        overcapBaseSum: 0,
+        overcapCapSum: 0,
+        targets: targets.map((target) => ({
+          enemyType: { Unknown: target.enemy },
+          totalDamage: target.total,
+          hits: target.hits,
+        })),
+      },
+    ],
+  }) as unknown as ComputedPlayerState;
+
+describe("damageTaken enemy side", () => {
+  it("ranks enemy types by damage received from the party", () => {
+    const players = [
+      dealerPlayer(0, [{ enemy: 0xaa, total: 5_000, hits: 5 }]),
+      dealerPlayer(1, [
+        { enemy: 0xaa, total: 3_000, hits: 3 },
+        { enemy: 0xbb, total: 1_000, hits: 1 },
+      ]),
+    ];
+
+    // The friendly side (no hostility) is unaffected by the dealer-shaped
+    // fixture above: it still ranks by `totalDamageTaken`, which this fixture
+    // never sets, so both rows read "not recorded" — but the row count itself
+    // (one per player) proves the friendly path was actually exercised, not
+    // vacuously true of an empty array.
+    const rows = damageTaken.rows(input("players", players, NO_PINS, 100_000) as never);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].kind).toBeUndefined(); // friendly side unchanged
+
+    // input() passes hostility nowhere — call rows directly with it instead:
+    const enemyRows = damageTaken.rows({
+      encounter: { totalDamage: 0 } as never,
+      partyData: [null, null],
+      players,
+      level: "players",
+      pins: NO_PINS,
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    } as never);
+
+    expect(enemyRows.map((row) => row.key)).toEqual([
+      `enemy:${JSON.stringify({ Unknown: 0xaa })}`,
+      `enemy:${JSON.stringify({ Unknown: 0xbb })}`,
+    ]);
+    expect(enemyRows[0].kind).toBe("enemy");
+    expect(enemyRows[0].value).toBe(8_000);
+    // Amount, DTPS over the 100s window.
+    expect(enemyRows[0].columns).toEqual(["8.0k", "80"]);
+  });
+
+  it("fills the four-column drill-down shape below the players level", () => {
+    const players = [
+      dealerPlayer(0, [{ enemy: 0xaa, total: 5_000, hits: 5 }]),
+      dealerPlayer(1, [
+        { enemy: 0xaa, total: 3_000, hits: 3 },
+        { enemy: 0xbb, total: 1_000, hits: 1 },
+      ]),
+    ];
+
+    const enemyRows = damageTaken.rows({
+      encounter: { totalDamage: 0 } as never,
+      partyData: [null, null],
+      players,
+      level: "abilities",
+      pins: NO_PINS,
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    } as never);
+
+    // Amount, hits, average hit, DTPS — matching `columnKeys("abilities")`,
+    // not the two-column players-level shape.
+    expect(enemyRows[0].columns).toEqual(["8.0k", "8", "1.0k", "80"]);
+  });
+});

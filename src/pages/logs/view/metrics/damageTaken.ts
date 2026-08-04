@@ -1,6 +1,7 @@
-import type { ActionType, DamageTakenState, EnemyType } from "@/types";
+import type { ActionType, ComputedPlayerState, DamageTakenState, EnemyType } from "@/types";
 import { humanizeNumber } from "@/utils";
 
+import type { RowLevel } from "../deriveRows";
 import type { MetricDescriptor, MetricRow } from "./types";
 
 const format = humanizeNumber;
@@ -77,6 +78,53 @@ const attackRows = (breakdown: DamageTakenState[], fightDurationMs?: number): Me
     .sort((a, b) => b.value - a.value);
 };
 
+/** Enemy types ranked by damage RECEIVED from the (scoped) party, folded from
+ * the per-ability per-enemy dealt rows — present in every log ever recorded,
+ * unlike the incoming stream the friendly side reads.
+ *
+ * At the players level this answers the same amount+DTPS question as the
+ * friendly side, so it takes the same two columns. Below it, `columnKeys`
+ * switches to the four-column drill-down shape every other damage-taken row
+ * fills (see `attackRows`), and this one must too or it renders two cells
+ * under a four-column header. Unlike `damageDone`'s enemy side, nothing here
+ * needs blanking: `SkillTargetState` carries both damage and hits honestly. */
+const enemyReceivedRows = (players: ComputedPlayerState[], level: RowLevel, fightDurationMs?: number): MetricRow[] => {
+  const byType = new Map<string, { damage: number; hits: number }>();
+  for (const player of players) {
+    for (const skill of player.skillBreakdown) {
+      for (const target of skill.targets ?? []) {
+        const key = JSON.stringify(target.enemyType);
+        const found = byType.get(key);
+        if (found) {
+          found.damage += target.totalDamage;
+          found.hits += target.hits;
+        } else byType.set(key, { damage: target.totalDamage, hits: target.hits });
+      }
+    }
+  }
+
+  return [...byType.entries()]
+    .map(([key, { damage, hits }]) => ({
+      key: `enemy:${key}`,
+      label: key,
+      kind: "enemy" as const,
+      value: damage,
+      columns:
+        level === "players"
+          ? [format(damage), dtps(damage, fightDurationMs)]
+          : [
+              format(damage),
+              String(hits),
+              format(hits === 0 ? 0 : Math.round(damage / hits)),
+              dtps(damage, fightDurationMs),
+            ],
+      // The pin model has no enemy-type pin; the hover card decomposes instead.
+      pinOnClick: null,
+      colorSlot: -1,
+    }))
+    .sort((a, b) => b.value - a.value);
+};
+
 /** Damage taken: players ranked by what they RECEIVED (amount + DTPS, the
  * Warcraft Logs shape), a pinned player (or the whole party) decomposed into
  * the attacks that dealt it. Logs recorded before the parser kept incoming
@@ -103,7 +151,9 @@ export const damageTaken: MetricDescriptor = {
     perTarget: false,
   },
 
-  rows: ({ players, level, pins, fightDurationMs }): MetricRow[] => {
+  rows: ({ players, level, pins, fightDurationMs, hostility }): MetricRow[] => {
+    if (hostility === "enemy") return enemyReceivedRows(players, level, fightDurationMs);
+
     if (level === "players") {
       return [...players]
         .sort((a, b) => (b.totalDamageTaken ?? 0) - (a.totalDamageTaken ?? 0))
