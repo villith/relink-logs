@@ -7,6 +7,7 @@ import type { MetricDescriptor } from "./types";
  * the maths would drift. */
 export const debuffs: MetricDescriptor = {
   labelKey: "ui.logs.metric-debuffs",
+  supportsHostility: true,
   columnKeys: () => ["ui.logs.buff-uptime", "ui.logs.buff-count"],
   // See buffs.labelKind: the holder kind comes from the hostility at render
   // time, and both tabs default to the friendly holders, so the status-blind

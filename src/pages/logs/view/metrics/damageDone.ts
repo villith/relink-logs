@@ -115,6 +115,7 @@ const enemyRows = (skills: SkillState[], total: number): MetricRow[] => {
 
 export const damageDone: MetricDescriptor = {
   labelKey: "ui.logs.metric-damage-done",
+  supportsHostility: true,
 
   // Players are ranked by damage and rate; below that a rate over one skill
   // means little, so the second column becomes how often it landed and the

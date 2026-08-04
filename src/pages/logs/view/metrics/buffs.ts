@@ -217,6 +217,7 @@ export const statusTabRows = (input: Parameters<MetricDescriptor["rows"]>[0], ha
 
 export const buffs: MetricDescriptor = {
   labelKey: "ui.logs.metric-buffs",
+  supportsHostility: true,
   columnKeys: () => ["ui.logs.buff-uptime", "ui.logs.buff-count"],
   // Holder-row kinds are decided by the HOSTILITY at render time
   // (`statusRowKindFor`); this only marks the tab as a status table.

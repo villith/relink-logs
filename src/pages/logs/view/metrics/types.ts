@@ -100,6 +100,10 @@ export type MetricCard = {
 export type MetricDescriptor = {
   /** i18next key for the switcher label. */
   labelKey: string;
+  /** Whether the Friendlies/Enemies toggle operates on this tab. Absent =
+   * disabled (SBA is a per-player gauge and stun has no honest enemy-side
+   * decomposition — its two capture paths reconcile with max()). */
+  supportsHostility?: boolean;
   /** i18next keys for the numeric column headers at a given level.
    *
    * A function of the level, not a fixed list: descending from players to

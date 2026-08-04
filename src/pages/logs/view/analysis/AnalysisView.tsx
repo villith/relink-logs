@@ -1077,10 +1077,11 @@ export const AnalysisView = () => {
 
       {/* Above the tabs, where Warcraft Logs puts it: the side is a property of
           the whole view, not of one tab, and rendering it below the switcher
-          shifted every control under it each time the tab changed. Only the
-          status tabs can operate it — see HostilityToggle's `disabled`. */}
+          shifted every control under it each time the tab changed. Only tabs
+          that declare `supportsHostility` can operate it — see
+          HostilityToggle's `disabled`. */}
       <Box style={{ padding: "8px 16px 0" }}>
-        <HostilityToggle value={hostility} onChange={setHostility} disabled={!isStatusMetric} />
+        <HostilityToggle value={hostility} onChange={setHostility} disabled={!metric.supportsHostility} />
       </Box>
 
       <MetricTabs tabs={METRIC_TABS} value={metricKey} onChange={setMetricKey} />

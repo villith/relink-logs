@@ -84,6 +84,7 @@ const attackRows = (breakdown: DamageTakenState[], fightDurationMs?: number): Me
  * nobody was ever hit. */
 export const damageTaken: MetricDescriptor = {
   labelKey: "ui.logs.metric-damage-taken",
+  supportsHostility: true,
 
   columnKeys: (level) =>
     level === "players"
