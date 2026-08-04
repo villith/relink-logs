@@ -1268,14 +1268,22 @@ impl DerivedEncounterState {
 
     /// Files one attributed gauge gain against the player's causing skill row.
     ///
-    /// Dropped when the player has no row yet. NOTE the wire ordering: the grant
-    /// runs INSIDE the game's damage processing, so a `SbaGain` precedes its own
-    /// causing `DamageEvent` on the pipe — the first hit of an encounter therefore
-    /// arrives before the reset that the damage event triggers, and its gain is
-    /// wiped with the pre-encounter log. That first-hit loss is accepted: it is
-    /// bounded by one hit's gauge and joins the same unattributed residue as
-    /// chain/scripted awards. Revisit with a pending hold if live verification
-    /// shows the residue matters.
+    /// NOTE the wire ordering — or rather, the absence of one. The hook emits a
+    /// gain from the game's gauge-update path, which is entered through a
+    /// separate register-hit gate and not necessarily on the thread the damage
+    /// path runs on, so a `SbaGain` and the `DamageEvent` for the same hit can
+    /// interleave arbitrarily at the shared `Tx`. (The earlier note here claimed
+    /// the grant runs INSIDE damage processing and therefore always precedes its
+    /// own damage event; that was design #1, refuted live in c0d06e1.)
+    ///
+    /// Dropped when the player has no row yet — a fail-closed choice: with no
+    /// ordering guarantee, a gain that arrives before the player's first damage
+    /// event has no row to file against, and inventing one from a gain alone
+    /// would put a damage-less row in the breakdown. How often that happens is
+    /// unverified in either direction; the cost is bounded at the dropped gain
+    /// itself, which joins the same unattributed residue as chain/scripted
+    /// awards. Revisit with a pending hold if live capture shows the residue
+    /// matters.
     fn process_sba_gain(&mut self, actor_index: u32, action: ActionType, amount: f64) {
         if let Some(player) = self.party.get_mut(&actor_index) {
             player.add_sba_gain(action, amount);
@@ -3352,15 +3360,18 @@ impl Parser {
             Message::SbaGain(event.clone()),
         );
 
-        // The gain carries a raw action id and no classification bits — the
-        // wire type's doc states the design: file it as Normal(id). Echo/DoT
-        // actions that would classify otherwise are not expected to grant gauge
-        // (the game gates the grant on the hit's own damage field); the live
-        // verification task checks that assumption.
+        // The gain carries a raw action id and no classification bits, and
+        // Normal(id) is the only shape it can take. That is safe because the
+        // HOOK classifies before emitting and drops any gain whose causing hit
+        // does not classify as Normal (link attack, SBA, supplementary) — those
+        // would otherwise be filed as Normal(id) here and open an orphan
+        // breakdown row carrying gauge and no damage, next to the real one. So
+        // this is no longer an unchecked assumption: it is enforced upstream,
+        // at the cost of a small unattributed residue.
         //
         // Routed through `process_sba_gain` rather than folded in here directly
         // so the classification decision and the drop-if-no-row behavior (see
-        // its doc for the wire-ordering / first-hit-loss note) live in one place.
+        // its doc for the ordering note) live in one place.
         self.derived_state.process_sba_gain(
             event.actor_index,
             ActionType::Normal(event.action_id),

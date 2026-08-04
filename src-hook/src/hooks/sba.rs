@@ -63,6 +63,8 @@ pub(super) fn disable() {
 // v2.0.2: call-follow sig at the unique gauge-update call site, resolving to the clean
 // entry 0xbb8840 (sigscan: 1 match). Arity fixed to the decompiler-verified 11 args (see
 // OnSBAUpdateFunc above) — the previous 6-arg declaration corrupted the in-game gauge.
+// The sig is a call-follow, so it tracks the entry across patches: that same function is
+// rva 0xbb1fc0 on v2.0.3, which is what the register-hit chain below ends at.
 const ON_HANDLE_SBA_UPDATE_SIG: &str = "48 89 f1 c5 f8 28 ce 41 89 d8 e8 $ { ' } c4 c1 78 2e f8";
 
 // hookdiag: direct-entry signature for the per-hit gauge-grant virtual
@@ -95,6 +97,13 @@ thread_local! {
     /// decoding here would throw nearly all the work away. Sound because the
     /// value only ever lives inside the guard's scope, which is inside the
     /// detour frame that owns the object.
+    ///
+    /// Residual: a gauge rise that did NOT come through the gate but happens
+    /// to run nested inside a gate call on the same thread (a scripted award
+    /// fired from within hit processing) reads the parked hit and is credited
+    /// to it. Far narrower than the time window this replaced — it needs the
+    /// same thread AND an enclosing gate frame, not merely proximity — but not
+    /// impossible.
     static PENDING_HIT: std::cell::Cell<Option<*const usize>> =
         const { std::cell::Cell::new(None) };
 }
@@ -565,18 +574,23 @@ impl OnHandleSBAUpdateHook {
             static RISES: AtomicU32 = AtomicU32::new(0);
             static EMITS: AtomicU32 = AtomicU32::new(0);
             static NO_HIT: AtomicU32 = AtomicU32::new(0);
+            static NOT_INSTANCE: AtomicU32 = AtomicU32::new(0);
             static NO_OWNER: AtomicU32 = AtomicU32::new(0);
             static NO_SOURCE: AtomicU32 = AtomicU32::new(0);
             static MISMATCH: AtomicU32 = AtomicU32::new(0);
             static UNREADABLE: AtomicU32 = AtomicU32::new(0);
+            static LINK: AtomicU32 = AtomicU32::new(0);
+            static SBA: AtomicU32 = AtomicU32::new(0);
             static SUPP: AtomicU32 = AtomicU32::new(0);
             match outcome {
                 Ok(()) => &EMITS,
                 Err("no_parked_hit") => &NO_HIT,
+                Err("hit_not_instance") => &NOT_INSTANCE,
                 Err("owner_unresolved") => &NO_OWNER,
                 Err("source_unresolved") => &NO_SOURCE,
                 Err("actor_mismatch") => &MISMATCH,
-                Err("unreadable_fields") => &UNREADABLE,
+                Err("link_attack") => &LINK,
+                Err("sba") => &SBA,
                 Err("supplementary") => &SUPP,
                 Err(_) => &UNREADABLE,
             }
@@ -584,14 +598,18 @@ impl OnHandleSBAUpdateHook {
             let rises = RISES.fetch_add(1, AtomicOrdering::Relaxed) + 1;
             if rises <= 8 || rises % 32 == 0 {
                 log::info!(
-                    "SBAGAIN rises={rises} emits={} no_hit={} no_owner={} no_source={} \
-                     mismatch={} unreadable={} supp={} last={} amount={amount:.2} tid={:?}",
+                    "SBAGAIN rises={rises} emits={} no_hit={} not_instance={} no_owner={} \
+                     no_source={} mismatch={} unreadable={} link={} sba={} supp={} last={} \
+                     amount={amount:.2} tid={:?}",
                     EMITS.load(AtomicOrdering::Relaxed),
                     NO_HIT.load(AtomicOrdering::Relaxed),
+                    NOT_INSTANCE.load(AtomicOrdering::Relaxed),
                     NO_OWNER.load(AtomicOrdering::Relaxed),
                     NO_SOURCE.load(AtomicOrdering::Relaxed),
                     MISMATCH.load(AtomicOrdering::Relaxed),
                     UNREADABLE.load(AtomicOrdering::Relaxed),
+                    LINK.load(AtomicOrdering::Relaxed),
+                    SBA.load(AtomicOrdering::Relaxed),
                     SUPP.load(AtomicOrdering::Relaxed),
                     outcome.err().unwrap_or("emit"),
                     std::thread::current().id(),
@@ -611,6 +629,15 @@ impl OnHandleSBAUpdateHook {
         // the gate — a scripted/regen award — and stays unattributed: the poll
         // remains the record.
         let hit = HitGuard::current().ok_or("no_parked_hit")?;
+
+        // Cheapest possible sanity check that `hit` really is a DamageInstance
+        // before any field of it is trusted: the gate's own first instruction
+        // tests the byte at +0x158, so that byte must at least be mapped. If a
+        // future patch drifts ON_SBA_REGISTER_HIT_SIG onto a different function,
+        // its rdx is some foreign struct and this fails at step one instead of
+        // walking it. (Reads the u32 covering the byte — same guard, no
+        // allocation.)
+        read_u32_opt_guarded(hit as usize, 0x158).ok_or("hit_not_instance")?;
 
         // Who does `a1` (the measured component) belong to — same a1+0x10
         // specified-instance resolution the SBAUPD diag block uses.
@@ -634,7 +661,15 @@ impl OnHandleSBAUpdateHook {
         // The SOURCE player of the parked hit — exactly the resolution the
         // damage detour uses for a damage instance's source, so the two hooks
         // can never attribute the same hit differently.
+        //
+        // Same vfunc probe as the owner arm above, and it matters MORE here:
+        // `player_slot_key_for_source` only takes its cheap first arm for a
+        // player actor, so every hit a player RECEIVES (enemy source) falls
+        // through to the fallback's raw vtable walk + indirect call — that is
+        // this arm's normal path, not its rare one. Probing +0x58 first turns a
+        // drifted signature into a skipped emit rather than a wild call.
         let source_key = crate::hooks::damage::damage_source_instance_ptr(hit)
+            .filter(|p| super::summon::vfunc_slot_readable(*p as *const usize, 0x58))
             .and_then(|p| super::player_slot_key_for_source(p as *const usize))
             .ok_or("source_unresolved")?;
 
@@ -650,16 +685,22 @@ impl OnHandleSBAUpdateHook {
         let flags = read_u64_guarded(hit as usize, 0xE8).ok_or("unreadable_fields")?;
         let action_id = read_u32_opt_guarded(hit as usize, 0x16C).ok_or("unreadable_fields")?;
 
-        // Supplementary damage should not generate gauge; if the classifier
-        // says this hit is a supp proc, skip rather than emit — an unnamed
-        // gain beats a confidently wrong one. The wire carries the RAW
-        // action_id (the parser files a gain as `ActionType::Normal(id)`).
-        if matches!(
-            crate::hooks::damage::classify_action_type(flags, action_id),
-            protocol::ActionType::SupplementaryDamage(_)
-        ) {
-            return Err("supplementary");
-        }
+        // Emit ONLY what the parser can file faithfully. It files every gain as
+        // `ActionType::Normal(action_id)`, so a gain whose hit classifies as
+        // anything else would open an orphan breakdown row — a LinkAttack gain
+        // filed as Normal(id) sits next to the real LinkAttack row carrying
+        // gauge and no damage. Requiring Normal is the design's own posture (an
+        // unnamed gain beats a confidently wrong one) applied to all four arms
+        // rather than just supplementary damage.
+        let action_id = match crate::hooks::damage::classify_action_type(flags, action_id) {
+            protocol::ActionType::Normal(id) => id,
+            protocol::ActionType::LinkAttack => return Err("link_attack"),
+            protocol::ActionType::SBA => return Err("sba"),
+            protocol::ActionType::SupplementaryDamage(_) => return Err("supplementary"),
+            // `classify_action_type` produces no other arm today; a future one
+            // is dropped rather than guessed at.
+            _ => return Err("unclassifiable"),
+        };
 
         let _ = self.tx.send(Message::SbaGain(protocol::SbaGainEvent {
             actor_index: owner_key,
@@ -1003,5 +1044,33 @@ impl OnRemoteSBAUpdateHook {
         }
 
         ret
+    }
+}
+
+#[cfg(test)]
+mod hit_guard_tests {
+    use super::HitGuard;
+
+    /// The nesting invariant the whole attribution rests on: a nested
+    /// register-hit call must RESTORE its caller's hit on drop, not clear the
+    /// slot. A clear-on-drop would leave every gauge rise after an inner hit
+    /// unattributed (or, worse, attributed to nothing while an outer hit is
+    /// still being processed). Pure Rust — no game process involved; the
+    /// pointers are opaque markers, never dereferenced.
+    #[test]
+    fn nested_guards_restore_the_enclosing_hit() {
+        let a = 0x1000usize as *const usize;
+        let b = 0x2000usize as *const usize;
+
+        assert_eq!(HitGuard::current(), None);
+        let outer = HitGuard::park(a);
+        assert_eq!(HitGuard::current(), Some(a));
+        {
+            let _inner = HitGuard::park(b);
+            assert_eq!(HitGuard::current(), Some(b));
+        }
+        assert_eq!(HitGuard::current(), Some(a));
+        drop(outer);
+        assert_eq!(HitGuard::current(), None);
     }
 }
