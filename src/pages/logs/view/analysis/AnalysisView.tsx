@@ -74,6 +74,7 @@ import { cardSectionsFor } from "./cardSections";
 import { buildSeriesPoints } from "./chartSeries";
 import { formatChartDebug } from "./debugSummary";
 import { foldAbilityChart, foldTargetChart } from "./drillSeries";
+import { enemyDealtCardSectionsFor, enemyReceivedCardSectionsFor } from "./hostilityCardSections";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { identityPartyOf } from "./partyIdentity";
 import { abilityRowIconUrl } from "./rowIcon";
@@ -748,6 +749,15 @@ export const AnalysisView = () => {
     [labelForAbility, identityPlayers, labelForSource, palette, playerData, playerByIndex]
   );
 
+  // The enemy-side cards' lookups: the same ones the friendly card already
+  // injects, plus the enemy-attack namer the taken tab uses. Extended rather
+  // than restated so an ability, a player and their colour cannot be named one
+  // way on the friendly side and another on the enemy side.
+  const hostilityLabels = useMemo(
+    () => ({ ...sectionLabels, attack: labelForTakenAttack }),
+    [sectionLabels, labelForTakenAttack]
+  );
+
   // Null for a metric with no breakdown behind its rows (SBA is a gauge
   // reading; the status tables' rows are effects and holders). Those tabs used
   // to inherit the damage card and explain a gauge with damage figures.
@@ -757,6 +767,18 @@ export const AnalysisView = () => {
   // damage with the player's own abilities.
   const rowSections = useCallback(
     (row: MetricRow) => {
+      // Enemy-side rows have their own decompositions, in both directions: the
+      // skill-based builder would explain an ENEMY with the party's abilities,
+      // which is nonsense whichever tab it happens on.
+      if (hostility === "enemy" && metric.supportsHostility) {
+        if (metricKey === "damage")
+          return enemyDealtCardSectionsFor({ row, players, color: rowColor(row), labels: hostilityLabels });
+        if (metricKey === "taken")
+          return enemyReceivedCardSectionsFor({ row, players, color: rowColor(row), labels: hostilityLabels });
+        // The status tabs' enemy side lists effect uptime, which the damage
+        // card cannot decompose — they carry no `card` either way.
+        return null;
+      }
       if (metricKey === "taken") {
         return takenCardSectionsFor({
           row,
@@ -769,7 +791,7 @@ export const AnalysisView = () => {
         ? cardSectionsFor({ row, level, players, pins, color: rowColor(row), labels: sectionLabels, card: metric.card })
         : null;
     },
-    [metricKey, metric, level, players, pins, rowColor, sectionLabels, labelForTakenAttack]
+    [hostility, metricKey, metric, level, players, pins, rowColor, sectionLabels, hostilityLabels, labelForTakenAttack]
   );
   // What the plot shows follows the metric tabs. Each metric brings its own
   // bucketed series from the base load, so switching tabs never refetches.
