@@ -281,7 +281,7 @@
       "player-flagged": "This build was flagged",
       "limit": {
         "wrightstoneTraitLevel": "max {{allowed}}",
-        "wrightstoneTrait": "can't be engraved",
+        "wrightstoneTrait": "can't roll here",
         "sigilTraitLevel": "max {{allowed}}",
         "sigilLockedPair": "wrong pair",
         "sigilQuestLockedTrait": "quest-only trait",
