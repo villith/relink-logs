@@ -707,16 +707,25 @@ impl OnEffectGrantHook {
         Ok(())
     }
 
+    /// The effect-record key of the one hashmap walk in this function that
+    /// feeds the SBA gauge. The function (v2.0.3 `FUN_1426f9640`, the
+    /// just-dodge reward handler — it fires the `core_pl_just_dodge` cue) does
+    /// four walks over the effect map, each keyed by a compile-time immediate;
+    /// only the `0xD2C8E10A` walk reads `record+0x8` (gauge %) and calls the
+    /// gauge wrapper (`FUN_140bb1c00(entity+0x3230, ..)`). The other walks are
+    /// status applies, a recovery apply, and a cooldown decrement — none touch
+    /// the gauge (decompiles of 0x9ee8a0 / 0x21ec130, 2026-08-04). The key is
+    /// not readable off `a1` (record pointers are locals), so the constant IS
+    /// the honest per-frame key.
+    const GAUGE_WALK_KEY: u32 = 0xD2C8_E10A;
+
     fn run(a1: *const usize) -> usize {
         #[cfg(feature = "hookdiag")]
         {
             static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
             log_site_fire("effect_record", &N);
         }
-        // Key unread for now: the site fires from a hashmap walk whose record
-        // pointer is a local. `Effect(0)` still separates "an effect granted
-        // this" from "nobody knows", which is the whole point of the bucket.
-        let _guard = CauseGuard::park(protocol::SbaGainCause::Effect(0));
+        let _guard = CauseGuard::park(protocol::SbaGainCause::Effect(Self::GAUGE_WALK_KEY));
         unsafe { OnEffectGrant.call(a1) }
     }
 }
