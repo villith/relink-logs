@@ -11,9 +11,11 @@ const player = (
     sba: number;
     sbaGenerated?: number;
     skillBreakdown?: { action: number; damage?: number; sbaGenerated?: number }[];
+    sbaSources?: { kind: string; id?: number; generated: number }[];
   }
 ) =>
   ({
+    sbaSources: (values.sbaSources ?? []).map((s) => ({ kind: s.kind, id: s.id ?? null, generated: s.generated })),
     index,
     partyIndex: index,
     characterType: "Pl0000",
@@ -160,6 +162,167 @@ describe("sba drill-down", () => {
     const remote = player(1, { sba: 0, sbaGenerated: 500, skillBreakdown: [] });
     const rows = sba.rows(input("abilities", [remote], { source: 1, targets: [], ability: null }));
     expect(rows).toEqual([]);
+  });
+
+  it("names the gauge no ability accounts for, so the shares add up", () => {
+    // Live log 1681: only 58-69% of a player's generated gauge comes from a
+    // damaging hit the hook can caption. The rest is real gauge from perfect
+    // dodges, an ally's burst and chain awards — none of which reach the
+    // attribution path. Leaving it out made the shares stop short of 100% with
+    // nothing saying why.
+    const rows = sba.rows(
+      input(
+        "abilities",
+        [
+          player(0, {
+            sba: 0,
+            sbaGenerated: 400,
+            skillBreakdown: [
+              { action: 9001, sbaGenerated: 200 },
+              { action: 9002, sbaGenerated: 100 },
+            ],
+          }),
+        ],
+        { source: 0, targets: [], ability: null }
+      )
+    );
+
+    const residue = rows.find((row) => row.key === "skill:unattributed");
+    expect(residue).toBeDefined();
+    expect(residue?.value).toBe(100);
+    expect(residue?.columns).toEqual(["100", "25.0%"]);
+    // Named by the table, not by the ability join: there is no ability here.
+    expect(residue?.labelKey).toBe("ui.logs.sba-unattributed");
+    expect(residue?.pinOnClick).toBeNull();
+    expect(residue?.colorSlot).toBe(-1);
+  });
+
+  it("ranks the unattributed remainder among the abilities by size", () => {
+    const rows = sba.rows(
+      input(
+        "abilities",
+        [
+          player(0, {
+            sba: 0,
+            sbaGenerated: 1000,
+            skillBreakdown: [
+              { action: 9001, sbaGenerated: 200 },
+              { action: 9002, sbaGenerated: 100 },
+            ],
+          }),
+        ],
+        { source: 0, targets: [], ability: null }
+      )
+    );
+    expect(rows.map((row) => row.key)).toEqual(["skill:unattributed", "skill:Normal:9001", "skill:Normal:9002"]);
+  });
+
+  it("adds no remainder row when every gain is accounted for", () => {
+    const rows = sba.rows(input("abilities", [owner()], { source: 0, targets: [], ability: null }));
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:9001", "skill:Normal:9002"]);
+  });
+
+  it("adds no remainder row for a sub-unit gap, which would only draw a zero", () => {
+    // Gauge units are tenths of a percent and the column rounds to whole ones,
+    // so a 0.3 remainder would render as a row reading "0".
+    const rows = sba.rows(
+      input(
+        "abilities",
+        [player(0, { sba: 0, sbaGenerated: 300.3, skillBreakdown: [{ action: 9001, sbaGenerated: 300 }] })],
+        { source: 0, targets: [], ability: null }
+      )
+    );
+    expect(rows).toHaveLength(1);
+  });
+
+  it("adds no remainder row when nothing at all is attributed", () => {
+    // A player with no attribution has no split to be the remainder OF, and the
+    // table's own empty state explains that case properly.
+    const remote = player(1, { sba: 0, sbaGenerated: 500, skillBreakdown: [] });
+    const rows = sba.rows(input("abilities", [remote], { source: 1, targets: [], ability: null }));
+    expect(rows).toEqual([]);
+  });
+
+  it("adds no remainder row for a log served without a generated total", () => {
+    // No total means no denominator: the gap would be the negative of what IS
+    // attributed, which is not a measurement.
+    const rows = sba.rows(
+      input("abilities", [player(0, { sba: 0, skillBreakdown: [{ action: 9001, sbaGenerated: 200 }] })], {
+        source: 0,
+        targets: [],
+        ability: null,
+      })
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].key).toBe("skill:Normal:9001");
+  });
+
+  it("lists non-skill causes beside the abilities", () => {
+    const rows = sba.rows(
+      input(
+        "abilities",
+        [
+          player(0, {
+            sba: 0,
+            sbaGenerated: 400,
+            skillBreakdown: [{ action: 9001, sbaGenerated: 200 }],
+            sbaSources: [
+              { kind: "partyAward", generated: 150 },
+              { kind: "damageTaken", generated: 50 },
+            ],
+          }),
+        ],
+        { source: 0, targets: [], ability: null }
+      )
+    );
+
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:9001", "source:partyAward", "source:damageTaken"]);
+    const party = rows.find((row) => row.key === "source:partyAward");
+    expect(party?.labelKey).toBe("ui.logs.sba-cause-party-award");
+    expect(party?.columns).toEqual(["150", "37.5%"]);
+    expect(party?.pinOnClick).toBeNull();
+  });
+
+  it("names an effect source by its id", () => {
+    const rows = sba.rows(
+      input(
+        "abilities",
+        [
+          player(0, {
+            sba: 0,
+            sbaGenerated: 100,
+            skillBreakdown: [{ action: 9001, sbaGenerated: 90 }],
+            sbaSources: [{ kind: "effect", id: 4242, generated: 10 }],
+          }),
+        ],
+        { source: 0, targets: [], ability: null }
+      )
+    );
+    const effect = rows.find((row) => row.key === "source:effect:4242");
+    expect(effect?.labelKey).toBe("ui.logs.sba-cause-effect");
+    expect(effect?.labelParams).toEqual({ id: 4242 });
+  });
+
+  it("counts sources against the unattributed remainder", () => {
+    // The remainder is what NOTHING explains — a named cause is an explanation,
+    // so it must shrink the remainder, not sit alongside a remainder that still
+    // counts it as missing.
+    const rows = sba.rows(
+      input(
+        "abilities",
+        [
+          player(0, {
+            sba: 0,
+            sbaGenerated: 400,
+            skillBreakdown: [{ action: 9001, sbaGenerated: 200 }],
+            sbaSources: [{ kind: "partyAward", generated: 150 }],
+          }),
+        ],
+        { source: 0, targets: [], ability: null }
+      )
+    );
+    const residue = rows.find((row) => row.key === "skill:unattributed");
+    expect(residue?.value).toBe(50);
   });
 
   it("sums a skill group's gains and drops attribution-less abilities", () => {

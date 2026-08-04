@@ -21,6 +21,16 @@ export type MetricRow = {
    * enemy). The table resolves the slot to a colour, so descriptors stay pure
    * functions with no reach into the settings store. */
   colorSlot: number;
+  /** i18next key naming this row directly, for a row that names no ability,
+   * player or effect at all — today only the SBA table's unattributed
+   * remainder. Where it is set the table draws `t(labelKey)` and no icon,
+   * bypassing the `kind` resolution entirely: there is nothing to resolve, and
+   * putting a sentinel through the ability join would print whatever that join
+   * makes of a name it has never seen. */
+  labelKey?: string;
+  /** Interpolation values for `labelKey`, for a self-naming row whose text
+   * carries a discriminator ("Effect 4242"). Ignored without `labelKey`. */
+  labelParams?: Record<string, string | number>;
   /** What this row is, where the level alone cannot say.
    *
    * `MetricDescriptor.labelKind` answers per LEVEL, which holds until one level

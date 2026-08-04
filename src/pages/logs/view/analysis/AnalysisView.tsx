@@ -576,6 +576,9 @@ export const AnalysisView = () => {
   // roster has portraits at all (see enemyIcon.ts).
   const rowIconUrl = useCallback(
     (row: MetricRow): string | undefined => {
+      // A self-naming row depicts nothing (see `MetricRow.labelKey`); the
+      // ability join below would answer with whichever art its fallback picks.
+      if (row.labelKey) return undefined;
       if (rowKind === "status") {
         const statusId = statusIdOfKey(row.label);
         return statusId === null ? undefined : statusIconUrl(statusId);
@@ -598,6 +601,10 @@ export const AnalysisView = () => {
 
   const renderLabel = useCallback(
     (row: MetricRow) => {
+      // A row that names itself (see `MetricRow.labelKey`) resolves against
+      // nothing: it is not an ability, a player or an effect, and sending its
+      // sentinel through one of those joins would print that join's guess.
+      if (row.labelKey) return t(row.labelKey, row.labelParams);
       // Effect names come from status.tbl via the generated `statuses` bundle;
       // the ~90 internal statuses the game never names answer empty and fall
       // back to "Effect <id>". The cause resolves through `causeSkillName`,
@@ -621,7 +628,7 @@ export const AnalysisView = () => {
         </>
       );
     },
-    [rowKind, labelForSource, labelForTarget, labelForAbility, statusDisplayLabel, rowIconUrl]
+    [t, rowKind, labelForSource, labelForTarget, labelForAbility, statusDisplayLabel, rowIconUrl]
   );
 
   const handlePin = useCallback((next: Partial<SelectorPins>) => setPins({ ...pins, ...next }), [pins, setPins]);
