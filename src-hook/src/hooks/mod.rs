@@ -225,6 +225,15 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         "sba_continue_chain",
         OnContinueSBAChainHook::new(tx.clone()).setup(&process),
     );
+    // PRODUCTION: the register-hit gate (v2.0.3 entry 0x9adaa0) whose
+    // synchronous callee chain performs the gauge update. Parks the causing
+    // hit's damage instance on a thread-local so sba_update can attribute the
+    // gain — without it every SbaGain stays unemitted (the gauge-level poll
+    // still works).
+    try_step(
+        "sba_register_hit",
+        sba::OnSBARegisterHitHook::new().setup(&process),
+    );
     // hookdiag-only: log-only detour of the per-hit gauge-grant virtual
     // (0x9b41b0) — tests whether the statically-derived grant path actually
     // runs per hit at runtime (see sba::OnSBAGrantProbeHook). Never placed

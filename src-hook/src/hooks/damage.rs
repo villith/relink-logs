@@ -8,36 +8,6 @@ use crate::{event, hooks::diag::readable, hooks::ffi::DamageInstance, process::P
 
 use super::{actor_idx, actor_type_id};
 
-/// The most recent player-attributable hit per party slot, written by the
-/// damage detour and read by the SBA hook when that player's gauge rises.
-///
-/// GLOBAL, not thread-local: damage processing runs on a worker-thread pool
-/// while gauge updates arrive on another thread (live-verified — the c0d06e1
-/// diag run saw damage on tids 24-27 and every one of 1600+ gauge updates on a
-/// thread with an empty attribution stack, in_damage=0), so no stack
-/// discipline can connect the two. Each entry packs
-/// `(action_id: u32) << 32 | (timestamp_ms: u32 since hook init)` into one
-/// `AtomicU64` so readers never see a torn pair. Zero means "never written".
-pub static LAST_PLAYER_HIT: [std::sync::atomic::AtomicU64; 4] = [
-    std::sync::atomic::AtomicU64::new(0),
-    std::sync::atomic::AtomicU64::new(0),
-    std::sync::atomic::AtomicU64::new(0),
-    std::sync::atomic::AtomicU64::new(0),
-];
-
-/// Milliseconds since the hook's shared monotonic epoch (first call wins).
-/// The single clock behind [`LAST_PLAYER_HIT`]'s timestamps: the damage detour
-/// stamps writes with it and the SBA hook measures freshness against it, so
-/// both sides MUST use this function. Wraps after ~49 days — irrelevant, the
-/// comparison window is 50ms and uses `wrapping_sub`.
-pub fn hook_now_ms() -> u32 {
-    static EPOCH: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
-    EPOCH
-        .get_or_init(std::time::Instant::now)
-        .elapsed()
-        .as_millis() as u32
-}
-
 type ProcessDamageEventFunc =
     unsafe extern "system" fn(*const usize, *const usize, *const usize, u8) -> usize;
 
@@ -185,9 +155,10 @@ fn classify_zero_damage_guard(
     ZeroDamageGuard::None
 }
 
-/// Flag-bit → [`ActionType`] classification, shared by both damage detours so
-/// the bit table can never diverge between them.
-fn classify_action_type(flags: u64, action_id: u32) -> ActionType {
+/// Flag-bit → [`ActionType`] classification, shared by both damage detours
+/// (and the SBA gain attribution in `sba.rs`) so the bit table can never
+/// diverge between them.
+pub(crate) fn classify_action_type(flags: u64, action_id: u32) -> ActionType {
     if ((1 << 7 | 1 << 50) & flags) != 0 {
         ActionType::LinkAttack
     } else if (SBA_FLAGS & flags) != 0 {
@@ -222,7 +193,7 @@ fn f32_delta(previous: Option<f32>, current: Option<f32>) -> f32 {
 /// The source specified instance behind a damage event's `a2`:
 /// `a2+0x18 -> entity -> +0x70`, both hops guarded; `None` for a
 /// null/unreadable source.
-fn damage_source_instance_ptr(a2: *const usize) -> Option<usize> {
+pub(crate) fn damage_source_instance_ptr(a2: *const usize) -> Option<usize> {
     // Same two-hop specified-instance resolution as every other parent link;
     // reuse the shared SEH-guarded, unit-tested helper so the version-fragile
     // +0x70 offset and its null checks live in exactly one place.
@@ -776,73 +747,13 @@ impl OnProcessDamageHook {
             })
         };
 
-        // Raw pre-call read of ONLY action_id (an INPUT field the game does not
-        // mutate) — via `addr_of!` on the dereferenced raw pointer, never
-        // through a `&DamageInstance`. A shared reference held across the
-        // original call below would be formally UB (the game mutates the
-        // pointee, e.g. `damage`), even though it happens to compile fine; the
-        // full `&DamageInstance` view is constructed post-call instead, same as
-        // before this attribution read existed.
-        let raw_action_id = unsafe {
-            std::ptr::addr_of!((*(a2 as *const DamageInstance)).action_id).read_unaligned()
-        };
-
-        // Resolve who to credit this hit to BEFORE the original call (the
-        // source pointer is a pre-call snapshot anyway). Only a
-        // player-attributed source is recorded: `player_slot_key_for_source`
-        // mirrors `emit_zero_damage_guard`'s attribution and already returns
-        // `None` for enemy/unowned sources (pets/avatars resolve to their
-        // owner), which matches `SbaGainEvent` being local-player-only.
-        let attribution_key = pre_call_source_ptr
-            .and_then(|ptr| super::player_slot_key_for_source(ptr as *const usize));
+        // SBA gain attribution lives entirely in sba.rs now: the game's own
+        // register-hit gate (0x9adaa0) parks the causing damage instance on a
+        // thread-local for the duration of its call, and the gauge-update hook
+        // — a synchronous callee of that gate — reads it back. No cross-thread
+        // map, no freshness window; this detour records nothing for it.
 
         let original_value = unsafe { ProcessDamageEvent.call(a1, a2, a3, a4) };
-
-        // Record this hit in the per-slot last-hit map the SBA hook attributes
-        // gauge rises from. The old design pushed a thread-local stack around
-        // the call above so a "synchronous gauge grant" could read it — refuted
-        // live (c0d06e1): damage runs on a worker pool, gauge updates arrive on
-        // another thread, and the statically-traced grant virtual (0x9b41b0)
-        // never fires. A cross-thread map with a freshness window (sba.rs) is
-        // the stun-message precedent, hook-side. Written AFTER the call so the
-        // timestamp sits as close as possible to the gauge update it explains.
-        if let Some(key) = attribution_key {
-            if let Some(slot) = protocol::party_slot_of(key) {
-                let packed = ((raw_action_id as u64) << 32) | (hook_now_ms() as u64);
-                LAST_PLAYER_HIT[slot].store(packed, std::sync::atomic::Ordering::Relaxed);
-            }
-        }
-
-        // hookdiag: count map writes vs skips (source resolution failures /
-        // non-player sources) and stamp the thread id, so the SBABRACKET tid
-        // in sba.rs documents the cross-thread hop the freshness window
-        // bridges.
-        #[cfg(feature = "hookdiag")]
-        {
-            use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
-            static WRITES: AtomicU32 = AtomicU32::new(0);
-            static SKIPS: AtomicU32 = AtomicU32::new(0);
-            static RUNS: AtomicU32 = AtomicU32::new(0);
-            let tid = std::thread::current().id();
-            match attribution_key {
-                Some(key) => {
-                    let writes = WRITES.fetch_add(1, AtomicOrdering::Relaxed) + 1;
-                    if writes <= 4 {
-                        log::info!("SBAHIT first key={key:#x} action={raw_action_id} tid={tid:?}");
-                    }
-                }
-                None => {
-                    SKIPS.fetch_add(1, AtomicOrdering::Relaxed);
-                }
-            }
-            if RUNS.fetch_add(1, AtomicOrdering::Relaxed) % 64 == 0 {
-                log::info!(
-                    "SBAHIT writes={} skips={} tid={tid:?}",
-                    WRITES.load(AtomicOrdering::Relaxed),
-                    SKIPS.load(AtomicOrdering::Relaxed),
-                );
-            }
-        }
 
         #[cfg(feature = "hookdiag")]
         if let Some(pre) = stun_probe_pre {

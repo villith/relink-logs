@@ -26,6 +26,11 @@ type OnRemoteSBAUpdateFunc =
 /// detour faults the game.
 #[cfg(feature = "hookdiag")]
 type OnSBAGrantFunc = unsafe extern "system" fn(*const usize, *const usize, u32) -> usize;
+/// The register-hit gate (see `OnSBARegisterHitHook`). Ghidra v2.0.3
+/// (entry 0x9adaa0): arity 2 — `(rcx, rdx=damage instance)`; no incoming
+/// r8/r9/stack args are read. Returns void in the game; the `usize` return
+/// here is harmless (we just forward whatever is in rax).
+type OnSBARegisterHitFunc = unsafe extern "system" fn(*const usize, *const usize) -> usize;
 
 static_detour! {
     static OnSBAUpdate: unsafe extern "system" fn(*const usize, f32, u32, u8, u8, f32, u8, u8, u8, u8, u8) -> usize;
@@ -33,6 +38,7 @@ static_detour! {
     static OnCheckSBACollision: unsafe extern "system" fn(*const usize, f32) -> usize;
     static OnContinueSBAChain: unsafe extern "system" fn(*const usize, *const usize) -> usize;
     static OnRemoteSBAUpdate: unsafe extern "system" fn(*const usize, *const usize, f32, f32) -> usize;
+    static OnSBARegisterHit: unsafe extern "system" fn(*const usize, *const usize) -> usize;
 }
 
 // hookdiag-only: log-only probe detour of the per-hit gauge-grant virtual
@@ -49,6 +55,7 @@ pub(super) fn disable() {
     super::disable_quiet("OnCheckSBACollision", &OnCheckSBACollision);
     super::disable_quiet("OnContinueSBAChain", &OnContinueSBAChain);
     super::disable_quiet("OnRemoteSBAUpdate", &OnRemoteSBAUpdate);
+    super::disable_quiet("OnSBARegisterHit", &OnSBARegisterHit);
     #[cfg(feature = "hookdiag")]
     super::disable_quiet("OnSBAGrant", &OnSBAGrant);
 }
@@ -67,6 +74,109 @@ const ON_HANDLE_SBA_UPDATE_SIG: &str = "48 89 f1 c5 f8 28 ce 41 89 d8 e8 $ { ' }
 // sigscan 2026-08-04: exactly 1 match, cursor_rva=0x9b41b0.
 #[cfg(feature = "hookdiag")]
 const ON_SBA_GRANT_SIG: &str = "cc cc cc cc ' 55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec 58 04 00 00 48 8d ac 24 80 00 00 00 c5 78 29 bd c0 03 00 00";
+
+// PRODUCTION: direct-entry signature for the register-hit gate (v2.0.3 entry
+// rva 0x9adaa0), the function that sits directly above the gauge chain — its
+// synchronous callee chain 0x9adaa0 -> 0x9add30 -> 0xbb1c00 -> 0xbb1fc0 ends
+// at the very function ON_HANDLE_SBA_UPDATE_SIG resolves to. Anchored on the
+// prologue plus the first act (`cmp byte [rdx+0x158],0` / `jnz` past the SBA
+// logic), cursor at the entry.
+// sigscan 2026-08-04: exactly 1 match, cursor_rva=0x9adaa0.
+const ON_SBA_REGISTER_HIT_SIG: &str = "' 41 57 41 56 41 55 41 54 56 57 55 53 48 83 ec 38 80 ba 58 01 00 00 00 0f 85 ? ? ? ? c5 fa 10 05 ? ? ? ?";
+
+thread_local! {
+    /// The damage instance of the hit currently being registered on this
+    /// thread. The game's gauge update is a synchronous callee of the register
+    /// -hit gate (verified: gate -> wrapper -> gauge-add -> gauge-update), so
+    /// whatever is parked here when the gauge moves is the hit that moved it.
+    ///
+    /// Raw pointer, decoded only by the reader: this gate fires on every
+    /// registered hit while the gauge moves on a small fraction of them, so
+    /// decoding here would throw nearly all the work away. Sound because the
+    /// value only ever lives inside the guard's scope, which is inside the
+    /// detour frame that owns the object.
+    static PENDING_HIT: std::cell::Cell<Option<*const usize>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Parks a damage instance on [`PENDING_HIT`] and restores the PREVIOUS value
+/// on drop. SAVE/RESTORE, not set/clear: register-hit calls can nest (a hit
+/// that triggers a reaction that registers another hit), and a clear-on-drop
+/// would erase the enclosing hit and misattribute everything after it.
+///
+/// All TLS access goes through `try_with` so a call during thread teardown
+/// degrades to "nothing parked" instead of panicking inside the game.
+struct HitGuard(Option<*const usize>);
+
+impl HitGuard {
+    fn park(damage_instance: *const usize) -> Self {
+        HitGuard(
+            PENDING_HIT
+                .try_with(|c| c.replace(Some(damage_instance)))
+                .unwrap_or(None),
+        )
+    }
+
+    /// The currently parked hit, if any (`None` also covers TLS teardown).
+    fn current() -> Option<*const usize> {
+        PENDING_HIT.try_with(|c| c.get()).ok().flatten()
+    }
+}
+
+impl Drop for HitGuard {
+    fn drop(&mut self) {
+        let _ = PENDING_HIT.try_with(|c| c.set(self.0));
+    }
+}
+
+/// PRODUCTION detour of the register-hit gate (v2.0.3 entry 0x9adaa0, two
+/// static callers): parks the hit's damage instance (`a2`) on [`PENDING_HIT`]
+/// for the duration of the original call, so the gauge-update hook — which the
+/// game runs as a synchronous callee of this gate — can name the hit that
+/// moved the gauge. Forwards both args verbatim; no other side effects.
+pub struct OnSBARegisterHitHook;
+
+impl OnSBARegisterHitHook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(on_sba_register_hit_original) = process.search_address(ON_SBA_REGISTER_HIT_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on sba register hit");
+
+            unsafe {
+                let func: OnSBARegisterHitFunc = std::mem::transmute(on_sba_register_hit_original);
+                OnSBARegisterHit.initialize(func, |a1, a2| Self::run(a1, a2))?;
+                OnSBARegisterHit.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find sba_register_hit"));
+        }
+
+        Ok(())
+    }
+
+    fn run(a1: *const usize, a2: *const usize) -> usize {
+        #[cfg(feature = "hookdiag")]
+        {
+            use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
+            static N: AtomicU32 = AtomicU32::new(0);
+            let n = N.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+            if n <= 4 || n % 256 == 0 {
+                log::info!(
+                    "SBAGATE n={n} tid={:?} nested={}",
+                    std::thread::current().id(),
+                    HitGuard::current().is_some(),
+                );
+            }
+        }
+
+        let _guard = HitGuard::park(a2);
+        unsafe { OnSBARegisterHit.call(a1, a2) }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // v2.0.2 slot-poll path (remote SBA recovery, derived 2026-07-17)
@@ -335,16 +445,6 @@ fn poll_slots_and_emit(tx: &event::Tx) {
     }
 }
 
-/// A gauge rise is attributed to the owner's most recent hit only when that
-/// hit is effectively simultaneous. Cross-thread scheduling puts the gauge
-/// update within a frame or two of the hit; regen ticks and scripted awards
-/// arrive on their own cadence and must fall outside. One frame is ~16ms;
-/// 50ms covers the scheduling jitter without swallowing a regen tick that
-/// merely lands near a hit — though it can: a tick inside the window after a
-/// hit IS misattributed to it, bounded at one tick's worth and accepted, like
-/// the first-hit loss on the parser side.
-const SBA_ATTRIBUTION_FRESH_WINDOW_MS: u32 = 50;
-
 /// Gets called when your SBA gauge value needs to update with a given value.
 #[derive(Clone)]
 pub struct OnHandleSBAUpdateHook {
@@ -429,18 +529,91 @@ impl OnHandleSBAUpdateHook {
 
         let ret = unsafe { OnSBAUpdate.call(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) };
 
-        // Attributed gain: credit this gauge rise to the owning player's most
-        // recent hit, read from the damage detour's cross-thread last-hit map
-        // (`damage::LAST_PLAYER_HIT`). The previous design read a thread-local
-        // stack pushed around ProcessDamageEvent — refuted live (c0d06e1):
-        // damage runs on a worker pool while these gauge updates arrive on a
-        // different thread (in_damage=0 over 1600+ events), so the stack was
-        // always empty here and no gain was ever emitted.
-        //
-        // Resolve who `a1` (the measured component) belongs to FIRST — same
-        // a1+0x10 specified-instance resolution the SBAUPD diag block uses —
-        // and only consult that owner's own map slot, so one player's rise can
-        // never be credited to another player's hit.
+        // Attributed gain: this gauge update runs as a synchronous callee of
+        // the register-hit gate (OnSBARegisterHitHook), so the damage instance
+        // parked on this thread IS the hit that moved the gauge — no map, no
+        // timing window.
+        let after = read_f32_guarded(a1 as usize, 0x7C);
+        if let (Some(before), Some(after)) = (before, after) {
+            let amount = after - before;
+            // A burst resetting the bar reads as a large negative; only
+            // a real increase is a gain.
+            if amount > 0.0 && amount.is_finite() {
+                self.attribute_and_emit_gain(a1, amount);
+            }
+        }
+
+        // Unchanged: the four-slot poll stays the source of every player's
+        // gauge LEVEL, and the only source at all for remote members.
+        poll_slots_and_emit(&self.tx);
+
+        ret
+    }
+
+    /// Attributes one measured gauge rise on component `a1` to the hit being
+    /// registered on this thread and emits `SbaGain` when every check passes;
+    /// any failed step skips the emit (the slot poll remains the record of the
+    /// gauge LEVEL either way).
+    fn attribute_and_emit_gain(&self, a1: *const usize, amount: f32) {
+        let outcome = self.try_emit_gain(a1, amount);
+
+        // The next game patch is diagnosed from these: how many rises there
+        // were, how many were emitted, and why the rest were skipped.
+        #[cfg(feature = "hookdiag")]
+        {
+            use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
+            static RISES: AtomicU32 = AtomicU32::new(0);
+            static EMITS: AtomicU32 = AtomicU32::new(0);
+            static NO_HIT: AtomicU32 = AtomicU32::new(0);
+            static NO_OWNER: AtomicU32 = AtomicU32::new(0);
+            static NO_SOURCE: AtomicU32 = AtomicU32::new(0);
+            static MISMATCH: AtomicU32 = AtomicU32::new(0);
+            static UNREADABLE: AtomicU32 = AtomicU32::new(0);
+            static SUPP: AtomicU32 = AtomicU32::new(0);
+            match outcome {
+                Ok(()) => &EMITS,
+                Err("no_parked_hit") => &NO_HIT,
+                Err("owner_unresolved") => &NO_OWNER,
+                Err("source_unresolved") => &NO_SOURCE,
+                Err("actor_mismatch") => &MISMATCH,
+                Err("unreadable_fields") => &UNREADABLE,
+                Err("supplementary") => &SUPP,
+                Err(_) => &UNREADABLE,
+            }
+            .fetch_add(1, AtomicOrdering::Relaxed);
+            let rises = RISES.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+            if rises <= 8 || rises % 32 == 0 {
+                log::info!(
+                    "SBAGAIN rises={rises} emits={} no_hit={} no_owner={} no_source={} \
+                     mismatch={} unreadable={} supp={} last={} amount={amount:.2} tid={:?}",
+                    EMITS.load(AtomicOrdering::Relaxed),
+                    NO_HIT.load(AtomicOrdering::Relaxed),
+                    NO_OWNER.load(AtomicOrdering::Relaxed),
+                    NO_SOURCE.load(AtomicOrdering::Relaxed),
+                    MISMATCH.load(AtomicOrdering::Relaxed),
+                    UNREADABLE.load(AtomicOrdering::Relaxed),
+                    SUPP.load(AtomicOrdering::Relaxed),
+                    outcome.err().unwrap_or("emit"),
+                    std::thread::current().id(),
+                );
+            }
+        }
+        let _ = outcome;
+    }
+
+    /// The attribution pipeline proper; the `Err` string is the skip reason
+    /// the hookdiag counters bucket on.
+    fn try_emit_gain(&self, a1: *const usize, amount: f32) -> Result<(), &'static str> {
+        use crate::hooks::diag::{read_ptr_guarded, read_u32_opt_guarded, read_u64_guarded};
+
+        // The hit currently being registered on this thread (parked by the
+        // register-hit gate detour). None means this rise did not come through
+        // the gate — a scripted/regen award — and stays unattributed: the poll
+        // remains the record.
+        let hit = HitGuard::current().ok_or("no_parked_hit")?;
+
+        // Who does `a1` (the measured component) belong to — same a1+0x10
+        // specified-instance resolution the SBAUPD diag block uses.
         //
         // A raw `[a1+0x10]` read cannot be trusted with a vfunc dispatch:
         // `player_slot_key_for_source`'s fallback arm CALLS the resolved
@@ -452,72 +625,48 @@ impl OnHandleSBAUpdateHook {
         // fixes it by probing the vfunc slot before dispatch; mirror that
         // here so a stale layout fails closed (skip the emit, the poll
         // remains the record) instead of dispatching through garbage.
-        let component_owner = crate::hooks::diag::read_ptr_guarded(a1 as usize, 0x10)
+        let owner_key = read_ptr_guarded(a1 as usize, 0x10)
             .filter(|p| *p != 0)
             .filter(|p| super::summon::vfunc_slot_readable(*p as *const usize, 0x58))
-            .and_then(|p| super::player_slot_key_for_source(p as *const usize));
+            .and_then(|p| super::player_slot_key_for_source(p as *const usize))
+            .ok_or("owner_unresolved")?;
 
-        // The owner's last recorded hit, if any: `(action_id, age in ms)`.
-        // The entry is NOT cleared after use — a multi-hit skill raises the
-        // gauge several times off one recorded hit and every rise belongs to
-        // that skill. The cost is the converse overlap: a regen tick landing
-        // inside the window after a hit is misattributed to it — rarer,
-        // bounded at one tick's worth, and accepted (like the first-hit loss
-        // on the parser side).
-        let owner_last_hit = component_owner
-            .and_then(protocol::party_slot_of)
-            .map(|slot| {
-                crate::hooks::damage::LAST_PLAYER_HIT[slot]
-                    .load(std::sync::atomic::Ordering::Relaxed)
-            })
-            .filter(|packed| *packed != 0)
-            .map(|packed| {
-                let age_ms = crate::hooks::damage::hook_now_ms().wrapping_sub(packed as u32);
-                ((packed >> 32) as u32, age_ms)
-            });
+        // The SOURCE player of the parked hit — exactly the resolution the
+        // damage detour uses for a damage instance's source, so the two hooks
+        // can never attribute the same hit differently.
+        let source_key = crate::hooks::damage::damage_source_instance_ptr(hit)
+            .and_then(|p| super::player_slot_key_for_source(p as *const usize))
+            .ok_or("source_unresolved")?;
 
-        #[cfg(feature = "hookdiag")]
-        {
-            use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
-            static BRACKET: AtomicU32 = AtomicU32::new(0);
-            static FRESH: AtomicU32 = AtomicU32::new(0);
-            let total = BRACKET.fetch_add(1, AtomicOrdering::Relaxed) + 1;
-            let age_ms = owner_last_hit.map(|(_, age)| age).unwrap_or(u32::MAX);
-            if age_ms <= SBA_ATTRIBUTION_FRESH_WINDOW_MS {
-                FRESH.fetch_add(1, AtomicOrdering::Relaxed);
-            }
-            if total % 64 == 0 {
-                log::info!(
-                    "SBABRACKET total={total} fresh={} age_ms={age_ms} delta={a2} tid={:?}",
-                    FRESH.load(AtomicOrdering::Relaxed),
-                    std::thread::current().id(),
-                );
-            }
+        // The correctness argument, not a sanity check: players also gain
+        // gauge from TAKING hits, and those gains flow through this same gate.
+        // Without requiring the hit's source to BE the gaining player, a gain
+        // caused by a hit the player received would be captioned with the
+        // enemy's move.
+        if source_key != owner_key {
+            return Err("actor_mismatch");
         }
 
-        if let (Some(owner_key), Some((action_id, age_ms))) = (component_owner, owner_last_hit) {
-            if age_ms <= SBA_ATTRIBUTION_FRESH_WINDOW_MS {
-                let after = read_f32_guarded(a1 as usize, 0x7C);
-                if let (Some(before), Some(after)) = (before, after) {
-                    let amount = after - before;
-                    // A burst resetting the bar reads as a large negative; only
-                    // a real increase is a gain.
-                    if amount > 0.0 && amount.is_finite() {
-                        let _ = self.tx.send(Message::SbaGain(protocol::SbaGainEvent {
-                            actor_index: owner_key,
-                            action_id,
-                            amount,
-                        }));
-                    }
-                }
-            }
+        let flags = read_u64_guarded(hit as usize, 0xE8).ok_or("unreadable_fields")?;
+        let action_id = read_u32_opt_guarded(hit as usize, 0x16C).ok_or("unreadable_fields")?;
+
+        // Supplementary damage should not generate gauge; if the classifier
+        // says this hit is a supp proc, skip rather than emit — an unnamed
+        // gain beats a confidently wrong one. The wire carries the RAW
+        // action_id (the parser files a gain as `ActionType::Normal(id)`).
+        if matches!(
+            crate::hooks::damage::classify_action_type(flags, action_id),
+            protocol::ActionType::SupplementaryDamage(_)
+        ) {
+            return Err("supplementary");
         }
 
-        // Unchanged: the four-slot poll stays the source of every player's
-        // gauge LEVEL, and the only source at all for remote members.
-        poll_slots_and_emit(&self.tx);
-
-        ret
+        let _ = self.tx.send(Message::SbaGain(protocol::SbaGainEvent {
+            actor_index: owner_key,
+            action_id,
+            amount,
+        }));
+        Ok(())
     }
 }
 
@@ -526,7 +675,9 @@ impl OnHandleSBAUpdateHook {
 /// callee of ProcessDamageEvent that feeds our hooked gauge update. REFUTED
 /// live (c0d06e1): this probe fired ZERO times while the local player's gauge
 /// rose on hits, so that statically-traced chain is dead at runtime. Kept as
-/// the standing check that it stays dead across patches.
+/// the standing check that it stays dead across patches. The LIVE per-hit
+/// path is the register-hit gate 0x9adaa0 (see `OnSBARegisterHitHook`), whose
+/// synchronous callee chain ends at our hooked gauge update — not 0x9b41b0.
 ///
 /// Forwards all three args unchanged and returns the original's return value;
 /// no other side effects. All memory reads SEH-guarded. The `actor + 0x23B0`
