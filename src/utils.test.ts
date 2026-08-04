@@ -8,7 +8,16 @@ import enBranches from "../src-tauri/lang/en/skillboard-branches.json";
 import enSummons from "../src-tauri/lang/en/summons.json";
 import enUi from "../src-tauri/lang/en/ui.json";
 import { stripTierSuffix } from "./skillNameSources";
-import { EnemyState, EquippedSummon, PlayerState, Sigil, SkillState, WeaponInfo, WeaponState } from "./types";
+import {
+  EnemyState,
+  EquippedSummon,
+  PlayerData,
+  PlayerState,
+  Sigil,
+  SkillState,
+  WeaponInfo,
+  WeaponState,
+} from "./types";
 import {
   EMPTY_ID,
   OVERMASTERY_EFFECT_IDS,
@@ -30,6 +39,7 @@ import {
   formatBonusAmount,
   formatSummonBonusValue,
   getBossHpTarget,
+  getPlayerLevel,
   groupBonuses,
   hasQuestElapsedTime,
   humanizeNumbers,
@@ -87,6 +97,26 @@ const makePlayer = (skills: SkillState[]): PlayerState => ({
 });
 
 describe("utils", () => {
+  describe("getPlayerLevel", () => {
+    const playerWithLevels = (recordLevel?: number, legacyLevel?: number): PlayerData =>
+      ({
+        stats: recordLevel === undefined ? null : { level: recordLevel },
+        playerStats: legacyLevel === undefined ? null : { level: legacyLevel },
+      }) as PlayerData;
+
+    it("prefers the recovered record level over the legacy level", () => {
+      expect(getPlayerLevel(playerWithLevels(100, 1))).toBe(100);
+    });
+
+    it("falls back to the legacy level for older logs", () => {
+      expect(getPlayerLevel(playerWithLevels(undefined, 100))).toBe(100);
+    });
+
+    it("preserves the existing level 1 fallback when neither source has a value", () => {
+      expect(getPlayerLevel(playerWithLevels())).toBe(1);
+    });
+  });
+
   it("toHash", () => {
     expect(toHash(1)).toBe("1");
     expect(toHash(255)).toBe("ff");
