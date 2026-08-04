@@ -1276,14 +1276,15 @@ impl DerivedEncounterState {
     /// the grant runs INSIDE damage processing and therefore always precedes its
     /// own damage event; that was design #1, refuted live in c0d06e1.)
     ///
-    /// Dropped when the player has no row yet — a fail-closed choice: with no
-    /// ordering guarantee, a gain that arrives before the player's first damage
-    /// event has no row to file against, and inventing one from a gain alone
-    /// would put a damage-less row in the breakdown. How often that happens is
-    /// unverified in either direction; the cost is bounded at the dropped gain
-    /// itself, which joins the same unattributed residue as chain/scripted
-    /// awards. Revisit with a pending hold if live capture shows the residue
-    /// matters.
+    /// Dropped when the PLAYER has no party row yet — a fail-closed choice:
+    /// with no ordering guarantee, a gain that arrives before the player's
+    /// first damage event has nothing to file against, and inventing a player
+    /// from a gain alone would put a damage-less row in the meter. The cost is
+    /// bounded at the dropped gain itself, which joins the same unattributed
+    /// residue as chain/scripted awards.
+    ///
+    /// A gain whose SKILL has no breakdown row yet is a different case and is
+    /// held, not dropped — see [`PlayerState::add_sba_gain`].
     fn process_sba_gain(&mut self, actor_index: u32, action: ActionType, amount: f64) {
         if let Some(player) = self.party.get_mut(&actor_index) {
             player.add_sba_gain(action, amount);
@@ -3364,10 +3365,10 @@ impl Parser {
         // Normal(id) is the only shape it can take. That is safe because the
         // HOOK classifies before emitting and drops any gain whose causing hit
         // does not classify as Normal (link attack, SBA, supplementary) — those
-        // would otherwise be filed as Normal(id) here and open an orphan
-        // breakdown row carrying gauge and no damage, next to the real one. So
-        // this is no longer an unchecked assumption: it is enforced upstream,
-        // at the cost of a small unattributed residue.
+        // would otherwise be filed as Normal(id) here and credited to whichever
+        // Normal row happens to share the id, next to the real one. So this is
+        // no longer an unchecked assumption: it is enforced upstream, at the
+        // cost of a small unattributed residue.
         //
         // Routed through `process_sba_gain` rather than folded in here directly
         // so the classification decision and the drop-if-no-row behavior (see
@@ -6294,6 +6295,7 @@ mod tests {
             actor_index: 0xF000_0000,
             action_id: 1,
             amount: 12.5,
+            cause: None,
         });
 
         parser.reparse();
@@ -6318,17 +6320,19 @@ mod tests {
         );
     }
 
-    /// The wire order is gain-then-damage (the grant runs inside damage
-    /// processing), so an encounter's opening gain arrives before any party row
-    /// exists and is dropped — pinned here as accepted behavior, while a gain
-    /// after the row exists lands.
+    /// A gain that beats the player's FIRST damage event has no party row to
+    /// file against and is dropped — pinned here as accepted behavior, while a
+    /// gain after the row exists lands. (Distinct from a gain that beats its own
+    /// SKILL's first hit, which `PlayerState` holds; that one only needs the
+    /// player to exist.)
     #[test]
-    fn sba_gain_before_first_damage_event_is_dropped_not_held() {
+    fn sba_gain_before_the_players_first_damage_event_is_dropped() {
         let mut parser = Parser::default();
         parser.on_sba_gain(protocol::SbaGainEvent {
             actor_index: 0xF000_0000,
             action_id: 1,
             amount: 7.0,
+            cause: None,
         });
 
         let mut event = a_damage_event();
@@ -6339,6 +6343,7 @@ mod tests {
             actor_index: 0xF000_0000,
             action_id: 1,
             amount: 12.5,
+            cause: None,
         });
 
         parser.reparse();
