@@ -1305,6 +1305,7 @@ impl DerivedEncounterState {
             SbaGainCause::PartyAward => (SbaSourceKind::PartyAward, None),
             SbaGainCause::DirectorAward => (SbaSourceKind::DirectorAward, None),
             SbaGainCause::QuestStart => (SbaSourceKind::QuestStart, None),
+            SbaGainCause::PerfectDodge => (SbaSourceKind::PerfectDodge, None),
             SbaGainCause::Site(tag) => (SbaSourceKind::Site, Some(tag)),
             SbaGainCause::Unknown => (SbaSourceKind::Unknown, None),
         };

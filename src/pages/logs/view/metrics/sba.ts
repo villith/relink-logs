@@ -22,6 +22,7 @@ const CAUSE_LABEL_KEYS: Record<SbaSourceState["kind"], string> = {
   partyAward: "ui.logs.sba-cause-party-award",
   directorAward: "ui.logs.sba-cause-director-award",
   questStart: "ui.logs.sba-cause-quest-start",
+  perfectDodge: "ui.logs.sba-cause-perfect-dodge",
   site: "ui.logs.sba-cause-site",
   unknown: "ui.logs.sba-cause-unknown",
 };

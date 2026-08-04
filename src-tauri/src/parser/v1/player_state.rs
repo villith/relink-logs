@@ -150,6 +150,7 @@ pub enum SbaSourceKind {
     PartyAward,
     DirectorAward,
     QuestStart,
+    PerfectDodge,
     Site,
     Unknown,
 }
@@ -965,6 +966,19 @@ mod tests {
 
         assert!(player_state.skill_breakdown.is_empty());
         assert_eq!(player_state.sba_sources.len(), 2);
+    }
+
+    /// Every new cause kind must stay a SOURCE — pinned per-kind so adding one
+    /// without routing it here fails a test, not a live fight.
+    #[test]
+    fn a_perfect_dodge_files_as_a_source() {
+        let mut player_state = empty_player();
+        player_state.add_sba_source(SbaSourceKind::PerfectDodge, None, 8.43);
+        assert!(player_state.skill_breakdown.is_empty());
+        assert_eq!(
+            player_state.sba_sources[0].kind,
+            SbaSourceKind::PerfectDodge
+        );
     }
 
     /// Repeats of one cause aggregate, and an id discriminates two effects.

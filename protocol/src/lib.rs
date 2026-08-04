@@ -583,6 +583,10 @@ pub enum SbaGainCause {
     /// A rise with nothing parked and no flag set — an unlocated site. Its
     /// amount is logged under `hookdiag` so the next site can be found.
     Unknown,
+    /// The perfect-dodge grant (entry pending Task B2's live capture;
+    /// live-identified 2026-08-04 as the flat per-dodge award, e.g. Nimble
+    /// Onslaught's 8.43). Appended last per the append-only rule.
+    PerfectDodge,
 }
 
 /// Emitted for EVERY measured gauge rise whose owner resolves, with a `cause`
@@ -842,6 +846,21 @@ mod sba_gain_tests {
             back.cause,
             Some(SbaGainCause::Skill(ActionType::LinkAttack))
         );
+    }
+
+    /// New variants append; an old event without one still decodes (the
+    /// backward-compat contract every cause addition must re-prove).
+    #[test]
+    fn perfect_dodge_round_trips() {
+        let event = SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 0,
+            amount: 8.43,
+            cause: Some(SbaGainCause::PerfectDodge),
+        };
+        let blob = cbor4ii::serde::to_vec(Vec::new(), &event).expect("encode");
+        let back: SbaGainEvent = cbor4ii::serde::from_slice(&blob).expect("decode");
+        assert_eq!(back.cause, Some(SbaGainCause::PerfectDodge));
     }
 }
 

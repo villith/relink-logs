@@ -333,7 +333,16 @@ export type PlayerState = {
  * `SbaSourceState`. `kind` is a stable machine key; the table maps it to an
  * i18n key rather than displaying it. */
 export type SbaSourceState = {
-  kind: "damageTaken" | "perfectGuard" | "effect" | "partyAward" | "directorAward" | "questStart" | "site" | "unknown";
+  kind:
+    | "damageTaken"
+    | "perfectGuard"
+    | "effect"
+    | "partyAward"
+    | "directorAward"
+    | "questStart"
+    | "perfectDodge"
+    | "site"
+    | "unknown";
   id: number | null;
   generated: number;
 };

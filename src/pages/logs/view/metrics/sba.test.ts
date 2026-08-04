@@ -342,6 +342,24 @@ describe("sba drill-down", () => {
     expect(effect?.labelParams).toBeUndefined();
   });
 
+  it("labels a perfect-dodge source", () => {
+    const rows = sba.rows(
+      input(
+        "abilities",
+        [
+          player(0, {
+            sba: 0,
+            sbaGenerated: 100,
+            skillBreakdown: [{ action: 9001, sbaGenerated: 90 }],
+            sbaSources: [{ kind: "perfectDodge", generated: 10 }],
+          }),
+        ],
+        { source: 0, targets: [], ability: null }
+      )
+    );
+    expect(rows.find((row) => row.key === "source:perfectDodge")?.labelKey).toBe("ui.logs.sba-cause-perfect-dodge");
+  });
+
   it("counts sources against the unattributed remainder", () => {
     // The remainder is what NOTHING explains — a named cause is an explanation,
     // so it must shrink the remainder, not sit alongside a remainder that still
