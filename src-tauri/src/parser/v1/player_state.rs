@@ -126,9 +126,10 @@ pub struct PlayerState {
     /// burst: a level answers "how full is it now", which ranks nobody. This is
     /// the contribution figure the SBA table sorts by.
     ///
-    /// `#[serde(default)]` because logs stored before this field existed carry
-    /// no value for it — and the number is rebuilt from the raw event log on
-    /// every reparse anyway, so an old blob loses nothing.
+    /// `#[serde(default)]` is defensive, matching the neighbouring stun fields:
+    /// stored blobs carry only the raw `Encounter`, and derived state is
+    /// rebuilt from it on every reparse, so nothing is ever deserialized into
+    /// this field from disk.
     #[serde(default)]
     pub sba_generated: f64,
     pub total_stun_value: f64,
