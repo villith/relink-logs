@@ -222,6 +222,11 @@ export type SkillState = {
   maxDamage: number | null;
   /** Total damage of the skill */
   totalDamage: number;
+  /** Skybound Arts gauge this skill generated. Local player only — a remote
+   * member's gauge is synced rather than granted by a hit the hook can see, so
+   * their rows are 0 and the table must say so rather than ranking them.
+   * Optional: a backend older than the field sends nothing (dev HMR skew). */
+  sbaGenerated?: number;
   /** Total stun value of the skill hits */
   totalStunValue: number;
   /** Maximum recorded stun value of the skill */
