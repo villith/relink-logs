@@ -385,6 +385,23 @@ impl OnHandleSBAUpdateHook {
                 );
             }
             log_sba_slot_poll();
+
+            {
+                use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
+                static BRACKET: AtomicU32 = AtomicU32::new(0);
+                static IN_DAMAGE: AtomicU32 = AtomicU32::new(0);
+                let total = BRACKET.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+                let depth = crate::hooks::damage::DAMAGE_DEPTH.with(|d| d.get());
+                if depth > 0 {
+                    IN_DAMAGE.fetch_add(1, AtomicOrdering::Relaxed);
+                }
+                if total % 64 == 0 {
+                    log::info!(
+                        "SBABRACKET total={total} in_damage={} depth={depth} delta={a2}",
+                        IN_DAMAGE.load(AtomicOrdering::Relaxed),
+                    );
+                }
+            }
         }
 
         let ret = unsafe { OnSBAUpdate.call(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) };

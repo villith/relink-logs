@@ -8,6 +8,16 @@ use crate::{event, hooks::diag::readable, hooks::ffi::DamageInstance, process::P
 
 use super::{actor_idx, actor_type_id};
 
+/// Depth counter for "we are inside the game's damage processing on this
+/// thread". Read by the SBA hook to decide whether a gauge grant belongs to the
+/// hit currently being processed. A COUNTER, not a bool: damage processing can
+/// re-enter (a hit that triggers a reaction that deals damage), and a bool would
+/// be cleared by the inner frame while the outer one is still live.
+#[cfg(feature = "hookdiag")]
+thread_local! {
+    pub static DAMAGE_DEPTH: std::cell::Cell<u32> = const { std::cell::Cell::new(0) };
+}
+
 type ProcessDamageEventFunc =
     unsafe extern "system" fn(*const usize, *const usize, *const usize, u8) -> usize;
 
@@ -625,6 +635,18 @@ impl OnProcessDamageHook {
     }
 
     fn run(&self, a1: *const usize, a2: *const usize, a3: *const usize, a4: u8) -> usize {
+        #[cfg(feature = "hookdiag")]
+        let _damage_depth_guard = {
+            struct Guard;
+            impl Drop for Guard {
+                fn drop(&mut self) {
+                    DAMAGE_DEPTH.with(|d| d.set(d.get().saturating_sub(1)));
+                }
+            }
+            DAMAGE_DEPTH.with(|d| d.set(d.get() + 1));
+            Guard
+        };
+
         // hookdiag: process_damage still resolves; log its callers once so we can locate
         // the adjacent (broken) death handler. Fires constantly, so log only the first N.
         #[cfg(feature = "hookdiag")]
