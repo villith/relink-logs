@@ -7,7 +7,7 @@ markdown in the app.
 
 ## 1.12.9
 
-## Notes
+### Notes
 
 - The Perfect Summon rule is no longer classified as a "cheat". Instead, players with Perfect Summons will be displayed in **gold** color because they are extremely lucky ✨
 
