@@ -8,16 +8,16 @@ use crate::{event, hooks::diag::readable, hooks::ffi::DamageInstance, process::P
 
 use super::{actor_idx, actor_type_id};
 
-/// Who is dealing damage on this thread right now, and with what — the
-/// attribution a gauge grant nested inside damage processing belongs to.
-/// (Static RE, v2.0.3: the grant is a synchronous callee of ProcessDamageEvent
-/// via source-actor vtable +0x70 → +0x80, so the top of this stack names it.)
-///
-/// A STACK, not a single value: damage processing re-enters (a hit that
-/// triggers a reaction that deals damage), and the gauge granted by the inner
-/// hit must not be filed against the outer one. The top of the stack is the hit
-/// currently being processed.
 thread_local! {
+    /// Who is dealing damage on this thread right now, and with what — the
+    /// attribution a gauge grant nested inside damage processing belongs to.
+    /// (Static RE, v2.0.3: the grant is a synchronous callee of ProcessDamageEvent
+    /// via source-actor vtable +0x70 → +0x80, so the top of this stack names it.)
+    ///
+    /// A STACK, not a single value: damage processing re-enters (a hit that
+    /// triggers a reaction that deals damage), and the gauge granted by the inner
+    /// hit must not be filed against the outer one. The top of the stack is the hit
+    /// currently being processed.
     pub static DAMAGE_ATTRIBUTION: std::cell::RefCell<Vec<(u32, u32)>> =
         const { std::cell::RefCell::new(Vec::new()) };
 }
@@ -760,12 +760,16 @@ impl OnProcessDamageHook {
             })
         };
 
-        // The damage-instance view over `a2`. A reference, not a copy: reads
-        // after the call still see whatever the game wrote in the meantime
-        // (`damage` and friends), same as the previous post-call construction —
-        // only `action_id` (an INPUT field the game does not mutate) is read
-        // pre-call below.
-        let damage_instance = unsafe { NonNull::new(a2 as *mut DamageInstance).unwrap().as_ref() };
+        // Raw pre-call read of ONLY action_id (an INPUT field the game does not
+        // mutate) — via `addr_of!` on the dereferenced raw pointer, never
+        // through a `&DamageInstance`. A shared reference held across the
+        // original call below would be formally UB (the game mutates the
+        // pointee, e.g. `damage`), even though it happens to compile fine; the
+        // full `&DamageInstance` view is constructed post-call instead, same as
+        // before this attribution stack existed.
+        let raw_action_id = unsafe {
+            std::ptr::addr_of!((*(a2 as *const DamageInstance)).action_id).read_unaligned()
+        };
 
         // Push this hit's attribution BEFORE the original call — the game's
         // per-hit SBA gauge grant runs synchronously inside it (static RE,
@@ -789,9 +793,7 @@ impl OnProcessDamageHook {
             .and_then(|ptr| super::player_slot_key_for_source(ptr as *const usize))
             .map(|source_actor_index| {
                 DAMAGE_ATTRIBUTION.with(|stack| {
-                    stack
-                        .borrow_mut()
-                        .push((source_actor_index, damage_instance.action_id));
+                    stack.borrow_mut().push((source_actor_index, raw_action_id));
                 });
                 AttributionGuard
             });
@@ -839,6 +841,7 @@ impl OnProcessDamageHook {
         // #[cfg(feature = "hookdiag")]
         // crate::hooks::diag::probe_player_instance(source_specified_instance_ptr);
 
+        let damage_instance = unsafe { NonNull::new(a2 as *mut DamageInstance).unwrap().as_ref() };
         let damage: i32 = damage_instance.damage;
 
         // Source-side accumulator delta (diagnostics; see the pre-call snapshot
