@@ -300,7 +300,26 @@ describe("sba drill-down", () => {
     );
     const effect = rows.find((row) => row.key === "source:effect:4242");
     expect(effect?.labelKey).toBe("ui.logs.sba-cause-effect");
-    expect(effect?.labelParams).toEqual({ id: 4242 });
+    expect(effect?.labelParams).toEqual({ id: "0x1092" });
+  });
+
+  it("formats an effect key as hex, because it is a hash, not a count", () => {
+    const rows = sba.rows(
+      input(
+        "abilities",
+        [
+          player(0, {
+            sba: 0,
+            sbaGenerated: 100,
+            skillBreakdown: [{ action: 9001, sbaGenerated: 90 }],
+            sbaSources: [{ kind: "effect", id: 0x7edd69d0, generated: 10 }],
+          }),
+        ],
+        { source: 0, targets: [], ability: null }
+      )
+    );
+    const effect = rows.find((row) => row.key === "source:effect:2128439760");
+    expect(effect?.labelParams).toEqual({ id: "0x7EDD69D0" });
   });
 
   it("counts sources against the unattributed remainder", () => {

@@ -35,7 +35,12 @@ const sourceRows = (owner: ComputedPlayerState, total: number): MetricRow[] =>
       key: source.id === null ? `source:${source.kind}` : `source:${source.kind}:${source.id}`,
       label: source.kind,
       labelKey: CAUSE_LABEL_KEYS[source.kind] ?? CAUSE_LABEL_KEYS.unknown,
-      labelParams: source.id === null ? undefined : { id: source.id },
+      // Keys are hashes; hex is how every other tool in this repo prints them.
+      // Site tags are small ordinals and stay decimal.
+      labelParams:
+        source.id === null
+          ? undefined
+          : { id: source.kind === "effect" ? `0x${source.id.toString(16).toUpperCase()}` : source.id },
       value: source.generated,
       columns: [whole(source.generated), share(source.generated, total)],
       // A cause carries no target and no member skills to descend into.
