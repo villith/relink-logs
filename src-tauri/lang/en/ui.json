@@ -279,6 +279,7 @@
       "open-log": "open",
       "detail-unavailable": "This fight's gear could not be loaded, so the items can't be named.",
       "player-flagged": "This build was flagged",
+      "player-lucky": "Blessed by RNG",
       "limit": {
         "wrightstoneTraitLevel": "max {{allowed}}",
         "wrightstoneTrait": "can't roll here",
@@ -300,7 +301,7 @@
         "impossibleWrightstone": "Impossible Wrightstone",
         "impossibleSummon": "Impossible Summon",
         "impossibleOvermastery": "Impossible Overmastery",
-        "perfectSummons": "Perfect Summons",
+        "perfectSummons": "Blessed by RNG",
         "perfectOvermasteries": "Perfect Overmasteries",
         "masterTraits": "Master Traits"
       },

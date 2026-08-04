@@ -6,6 +6,7 @@ import { describeLimit } from "@/legality";
 import { markedLines } from "@/legalityLines";
 import { LegalityFinding } from "@/types";
 import { translateTraitId } from "@/utils";
+import { TONE_COLOR, findingsTone } from "@/violations";
 
 import { FindingsExplanation } from "./LegalityMark";
 
@@ -87,9 +88,15 @@ export const FlaggedGear = ({
   const marks = findings.map((finding) => ({ finding, ...markedLines(finding, lines) }));
   const markedAnywhere = new Set(marks.flatMap((mark) => mark.lines));
 
-  // Red says WHICH line. The heading only takes it when no line did — otherwise
-  // it repeats what the line below already says.
-  const headingRed = findings.length > 0 && markedAnywhere.size === 0;
+  // The colour says WHICH line, and its tone says what kind of claim marked it:
+  // red for a cheat, gold for pure luck — with a cheat winning when both mark
+  // the same line, since luck does not soften proof.
+  const lineTone = (index: number) =>
+    findingsTone(marks.filter((mark) => mark.lines.includes(index)).map((mark) => mark.finding));
+
+  // The heading only takes the mark when no line did — otherwise it repeats
+  // what the line below already says.
+  const headingTone = markedAnywhere.size === 0 ? findingsTone(findings) : undefined;
 
   /** The phrases for a line, or for the heading when `index` is omitted. Empty
    * unless this surface prints them beside the gear. */
@@ -108,7 +115,12 @@ export const FlaggedGear = ({
             otherwise invisible to anything but a human eye — including the
             tests that keep the two surfaces marking the same thing. */}
         {/* eslint-disable-next-line i18next/no-literal-string -- already-translated item name */}
-        <Text size="xs" fw={nameWeight} c={headingRed ? "red" : undefined} data-flagged={headingRed || undefined}>
+        <Text
+          size="xs"
+          fw={nameWeight}
+          c={headingTone && TONE_COLOR[headingTone]}
+          data-flagged={headingTone !== undefined || undefined}
+        >
           {name}
         </Text>
         {limits().map((limit, index) => (
@@ -117,24 +129,22 @@ export const FlaggedGear = ({
           </Text>
         ))}
       </Group>
-      {lines.map((line, index) => (
-        <Group key={index} gap={10} wrap="wrap" pl={9}>
-          {/* eslint-disable-next-line i18next/no-literal-string -- already-translated trait line */}
-          <Text
-            size="xs"
-            fw={300}
-            c={markedAnywhere.has(index) ? "red" : undefined}
-            data-flagged={markedAnywhere.has(index) || undefined}
-          >
-            {`- ${line.text}`}
-          </Text>
-          {limits(index).map((limit, limitIndex) => (
-            <Text size="xs" key={limitIndex}>
-              {limit}
+      {lines.map((line, index) => {
+        const tone = lineTone(index);
+        return (
+          <Group key={index} gap={10} wrap="wrap" pl={9}>
+            {/* eslint-disable-next-line i18next/no-literal-string -- already-translated trait line */}
+            <Text size="xs" fw={300} c={tone && TONE_COLOR[tone]} data-flagged={tone !== undefined || undefined}>
+              {`- ${line.text}`}
             </Text>
-          ))}
-        </Group>
-      ))}
+            {limits(index).map((limit, limitIndex) => (
+              <Text size="xs" key={limitIndex}>
+                {limit}
+              </Text>
+            ))}
+          </Group>
+        );
+      })}
       {children}
     </Box>
   );

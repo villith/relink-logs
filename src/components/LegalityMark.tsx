@@ -3,6 +3,7 @@ import { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { LegalityFinding } from "@/types";
+import { TONE_COLOR, findingsTone } from "@/violations";
 
 import { FindingDetail } from "./FindingDetail";
 
@@ -43,10 +44,11 @@ export const FindingsExplanation = ({ findings, title }: { findings: LegalityFin
  * is being claimed. With no findings it renders its children untouched and adds
  * no tooltip, so a clean build looks exactly as it did before.
  *
- * There is one colour. Severity used to split this red/yellow, but "Impossible"
- * and "Improbable" are adjectives a reader has to decode; what actually
- * separates proof from luck is the claim itself, so the odds line below carries
- * it instead.
+ * Two colours, drawn from the findings' tone: red for a cheat, gold for a set
+ * that is nothing but luck ("Blessed by RNG"). Not the old red/yellow severity
+ * split — that graded HOW damning the same accusation was, which a reader
+ * could not decode. Gold is a different claim entirely: nothing here is
+ * impossible, this person just rolled it.
  */
 export const LegalityMark = ({
   findings,
@@ -59,13 +61,14 @@ export const LegalityMark = ({
   title?: string;
   children: ReactNode;
 }) => {
-  if (findings.length === 0) return <>{children}</>;
+  const tone = findingsTone(findings);
+  if (tone === undefined) return <>{children}</>;
 
   return (
     <Tooltip multiline w={340} withArrow color="dark" label={<FindingsExplanation findings={findings} title={title} />}>
       {/* `span` keeps the wrapped node's own layout: these wrap table cells,
           headings and inline text alike, so the mark must not introduce a box. */}
-      <Text span c="red" inherit style={{ cursor: "help" }}>
+      <Text span c={TONE_COLOR[tone]} inherit style={{ cursor: "help" }}>
         {children}
       </Text>
     </Tooltip>
@@ -79,8 +82,14 @@ export const LegalityMark = ({
 export const LegalityPlayerName = ({ findings, children }: { findings: LegalityFinding[]; children: ReactNode }) => {
   const { t } = useTranslation();
 
+  // A gold name gets a gold heading: "this build was flagged" over a mark that
+  // means "extremely lucky" would take back what the colour just said.
+  const tone = findingsTone(findings);
+  const title =
+    tone === undefined ? undefined : t(tone === "lucky" ? "ui.legality.player-lucky" : "ui.legality.player-flagged");
+
   return (
-    <LegalityMark findings={findings} title={findings.length > 0 ? t("ui.legality.player-flagged") : undefined}>
+    <LegalityMark findings={findings} title={title}>
       {children}
     </LegalityMark>
   );
