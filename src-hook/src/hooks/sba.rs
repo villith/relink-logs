@@ -335,6 +335,16 @@ fn poll_slots_and_emit(tx: &event::Tx) {
     }
 }
 
+/// A gauge rise is attributed to the owner's most recent hit only when that
+/// hit is effectively simultaneous. Cross-thread scheduling puts the gauge
+/// update within a frame or two of the hit; regen ticks and scripted awards
+/// arrive on their own cadence and must fall outside. One frame is ~16ms;
+/// 50ms covers the scheduling jitter without swallowing a regen tick that
+/// merely lands near a hit — though it can: a tick inside the window after a
+/// hit IS misattributed to it, bounded at one tick's worth and accepted, like
+/// the first-hit loss on the parser side.
+const SBA_ATTRIBUTION_FRESH_WINDOW_MS: u32 = 50;
+
 /// Gets called when your SBA gauge value needs to update with a given value.
 #[derive(Clone)]
 pub struct OnHandleSBAUpdateHook {
@@ -409,24 +419,6 @@ impl OnHandleSBAUpdateHook {
                 );
             }
             log_sba_slot_poll();
-
-            {
-                use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
-                static BRACKET: AtomicU32 = AtomicU32::new(0);
-                static IN_DAMAGE: AtomicU32 = AtomicU32::new(0);
-                let total = BRACKET.fetch_add(1, AtomicOrdering::Relaxed) + 1;
-                let depth = crate::hooks::damage::DAMAGE_ATTRIBUTION.with(|s| s.borrow().len());
-                if depth > 0 {
-                    IN_DAMAGE.fetch_add(1, AtomicOrdering::Relaxed);
-                }
-                if total % 64 == 0 {
-                    log::info!(
-                        "SBABRACKET total={total} in_damage={} depth={depth} delta={a2} tid={:?}",
-                        IN_DAMAGE.load(AtomicOrdering::Relaxed),
-                        std::thread::current().id(),
-                    );
-                }
-            }
         }
 
         // The gauge before the game's own grant. `a1` is the SBA component;
@@ -437,38 +429,74 @@ impl OnHandleSBAUpdateHook {
 
         let ret = unsafe { OnSBAUpdate.call(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11) };
 
-        // Attributed gain: only meaningful nested inside a hit we classified,
-        // which is what the damage stack says. Outside one the grant came from
-        // somewhere with no action to name (a chain, a scripted award), and the
-        // poll below is the honest record of it.
-        if let Some((actor_index, action_id)) =
-            crate::hooks::damage::DAMAGE_ATTRIBUTION.with(|stack| stack.borrow().last().copied())
+        // Attributed gain: credit this gauge rise to the owning player's most
+        // recent hit, read from the damage detour's cross-thread last-hit map
+        // (`damage::LAST_PLAYER_HIT`). The previous design read a thread-local
+        // stack pushed around ProcessDamageEvent — refuted live (c0d06e1):
+        // damage runs on a worker pool while these gauge updates arrive on a
+        // different thread (in_damage=0 over 1600+ events), so the stack was
+        // always empty here and no gain was ever emitted.
+        //
+        // Resolve who `a1` (the measured component) belongs to FIRST — same
+        // a1+0x10 specified-instance resolution the SBAUPD diag block uses —
+        // and only consult that owner's own map slot, so one player's rise can
+        // never be credited to another player's hit.
+        //
+        // A raw `[a1+0x10]` read cannot be trusted with a vfunc dispatch:
+        // `player_slot_key_for_source`'s fallback arm CALLS the resolved
+        // pointer's +0x58 vtable slot, and today's valid specified-instance
+        // pointer is only that by convention — a future layout shift could
+        // leave garbage-but-readable bytes there (arbitrary jump on the
+        // game thread in a release build). `status.rs`'s `holder_index`
+        // hits the exact same hazard resolving a non-player holder and
+        // fixes it by probing the vfunc slot before dispatch; mirror that
+        // here so a stale layout fails closed (skip the emit, the poll
+        // remains the record) instead of dispatching through garbage.
+        let component_owner = crate::hooks::diag::read_ptr_guarded(a1 as usize, 0x10)
+            .filter(|p| *p != 0)
+            .filter(|p| super::summon::vfunc_slot_readable(*p as *const usize, 0x58))
+            .and_then(|p| super::player_slot_key_for_source(p as *const usize));
+
+        // The owner's last recorded hit, if any: `(action_id, age in ms)`.
+        // The entry is NOT cleared after use — a multi-hit skill raises the
+        // gauge several times off one recorded hit and every rise belongs to
+        // that skill. The cost is the converse overlap: a regen tick landing
+        // inside the window after a hit is misattributed to it — rarer,
+        // bounded at one tick's worth, and accepted (like the first-hit loss
+        // on the parser side).
+        let owner_last_hit = component_owner
+            .and_then(protocol::party_slot_of)
+            .map(|slot| {
+                crate::hooks::damage::LAST_PLAYER_HIT[slot]
+                    .load(std::sync::atomic::Ordering::Relaxed)
+            })
+            .filter(|packed| *packed != 0)
+            .map(|packed| {
+                let age_ms = crate::hooks::damage::hook_now_ms().wrapping_sub(packed as u32);
+                ((packed >> 32) as u32, age_ms)
+            });
+
+        #[cfg(feature = "hookdiag")]
         {
-            // Ownership cross-check: the stack top only names whichever hit is
-            // currently being processed on this thread — it does NOT prove
-            // this particular OnSBAUpdate call is that hit's own grant. Other
-            // gauge-raising callers exist (chains, scripted awards) that could
-            // fire synchronously nested inside the hit's damage processing and
-            // touch a DIFFERENT player's component. Resolve who `a1` (the
-            // measured component) actually belongs to — same a1+0x10
-            // specified-instance resolution the SBAUPD diag block uses — and
-            // only credit the gain when it matches the attributed player.
-            //
-            // A raw `[a1+0x10]` read cannot be trusted with a vfunc dispatch:
-            // `player_slot_key_for_source`'s fallback arm CALLS the resolved
-            // pointer's +0x58 vtable slot, and today's valid specified-instance
-            // pointer is only that by convention — a future layout shift could
-            // leave garbage-but-readable bytes there (arbitrary jump on the
-            // game thread in a release build). `status.rs`'s `holder_index`
-            // hits the exact same hazard resolving a non-player holder and
-            // fixes it by probing the vfunc slot before dispatch; mirror that
-            // here so a stale layout fails closed (skip the emit, the poll
-            // remains the record) instead of dispatching through garbage.
-            let component_owner = crate::hooks::diag::read_ptr_guarded(a1 as usize, 0x10)
-                .filter(|p| *p != 0)
-                .filter(|p| super::summon::vfunc_slot_readable(*p as *const usize, 0x58))
-                .and_then(|p| super::player_slot_key_for_source(p as *const usize));
-            if component_owner == Some(actor_index) {
+            use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
+            static BRACKET: AtomicU32 = AtomicU32::new(0);
+            static FRESH: AtomicU32 = AtomicU32::new(0);
+            let total = BRACKET.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+            let age_ms = owner_last_hit.map(|(_, age)| age).unwrap_or(u32::MAX);
+            if age_ms <= SBA_ATTRIBUTION_FRESH_WINDOW_MS {
+                FRESH.fetch_add(1, AtomicOrdering::Relaxed);
+            }
+            if total % 64 == 0 {
+                log::info!(
+                    "SBABRACKET total={total} fresh={} age_ms={age_ms} delta={a2} tid={:?}",
+                    FRESH.load(AtomicOrdering::Relaxed),
+                    std::thread::current().id(),
+                );
+            }
+        }
+
+        if let (Some(owner_key), Some((action_id, age_ms))) = (component_owner, owner_last_hit) {
+            if age_ms <= SBA_ATTRIBUTION_FRESH_WINDOW_MS {
                 let after = read_f32_guarded(a1 as usize, 0x7C);
                 if let (Some(before), Some(after)) = (before, after) {
                     let amount = after - before;
@@ -476,7 +504,7 @@ impl OnHandleSBAUpdateHook {
                     // a real increase is a gain.
                     if amount > 0.0 && amount.is_finite() {
                         let _ = self.tx.send(Message::SbaGain(protocol::SbaGainEvent {
-                            actor_index,
+                            actor_index: owner_key,
                             action_id,
                             amount,
                         }));
@@ -494,11 +522,11 @@ impl OnHandleSBAUpdateHook {
 }
 
 /// hookdiag-only, LOG-ONLY probe of the per-hit gauge GRANT virtual (v2.0.3
-/// entry 0x9b41b0) — the H3 test: static RE says this is a synchronous callee
-/// of ProcessDamageEvent that feeds our hooked gauge update, but live
-/// SBABRACKET data shows zero gauge updates nested inside damage processing.
-/// Detouring the grant itself tells us whether it runs per hit at all, on
-/// which thread, and with what attribution-stack depth.
+/// entry 0x9b41b0) — the H3 test: static RE claimed this is a synchronous
+/// callee of ProcessDamageEvent that feeds our hooked gauge update. REFUTED
+/// live (c0d06e1): this probe fired ZERO times while the local player's gauge
+/// rose on hits, so that statically-traced chain is dead at runtime. Kept as
+/// the standing check that it stays dead across patches.
 ///
 /// Forwards all three args unchanged and returns the original's return value;
 /// no other side effects. All memory reads SEH-guarded. The `actor + 0x23B0`
@@ -549,10 +577,9 @@ impl OnSBAGrantProbeHook {
         if n <= 32 || n % 16 == 0 {
             let action_id = read_u32_guarded(damage_instance as usize, 0x16C);
             let damage = read_u32_guarded(damage_instance as usize, 0xD4) as i32;
-            let depth = crate::hooks::damage::DAMAGE_ATTRIBUTION.with(|s| s.borrow().len());
             log::info!(
                 "SBAGRANT n={n} tid={:?} mode={mode} action={action_id} dmg={damage} \
-                 depth={depth} gauge {before:?}->{after:?}",
+                 gauge {before:?}->{after:?}",
                 std::thread::current().id(),
             );
         }
