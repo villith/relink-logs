@@ -203,10 +203,15 @@ fn quest_locked_homes() -> &'static HashMap<u32, HashSet<u32>> {
 }
 
 /// The sigils that can never carry a second trait, whatever the tables say
-/// about anything else: Stout Heart and Stout Heart+. A user-confirmed game
-/// rule — deliberately NOT the whole `SecondTrait::Nothing` class, whose 514
-/// gem.tbl rows are untrusted.
-pub const SINGLE_TRAIT_SIGILS: [u32; 2] = [0xcb5f29c1, 0x26ddcd39];
+/// about anything else: Stout Heart, Stout Heart+ and Immortal Shell. A
+/// user-confirmed game rule — deliberately NOT the whole `SecondTrait::Nothing`
+/// class, whose 514 gem.tbl rows are untrusted.
+///
+/// Immortal Shell**+** is deliberately absent, and generalising from its base
+/// sigil to the pair (as Stout Heart's two ids invite) accuses every honest
+/// owner: the + fixes a crab trait as its second, so carrying two traits is its
+/// normal state.
+pub const SINGLE_TRAIT_SIGILS: [u32; 3] = [0xcb5f29c1, 0x26ddcd39, 0x49434696];
 
 /// The four sigil rules. Empty slots and sigil ids the table does not know
 /// are skipped entirely.
@@ -347,6 +352,9 @@ mod tests {
     const STOUT_HEART_TRAIT: u32 = 0xa1a8_e39d;
     const STOUT_HEART_PLUS_SIGIL: u32 = 0x26dd_cd39;
     const STOUT_HEART_PLUS_TRAIT: u32 = 0xcac6_aff2;
+    /// The + is a different animal from the base sigil above: it FIXES a crab
+    /// trait as its second.
+    const IMMORTAL_SHELL_PLUS_SIGIL: u32 = 0x66cb_28ba;
 
     // ---- Production counter-examples, all four from the user's own logs ----
     /// Damage Cap V+ `b0cb5c64`, trait1 DMG Cap. gem.tbl's `+0x04` column reads
@@ -594,6 +602,51 @@ mod tests {
             assert_eq!(findings[0].rule, Rule::SigilSingleTraitOnly);
             assert_eq!(findings[0].observed, Value::TraitId(STEADY_FOCUS));
         }
+    }
+
+    /// Immortal Shell holds one trait, exactly as Stout Heart does
+    /// (user-confirmed 2026-08-03).
+    #[test]
+    fn immortal_shell_can_never_carry_a_second_trait() {
+        let trait1 = stock_sigils()[&IMMORTAL_SHELL_SIGIL].trait1;
+
+        assert_eq!(
+            audit_sigils(&[sigil(IMMORTAL_SHELL_SIGIL, (trait1, 15), (0, 0))]),
+            vec![]
+        );
+
+        let findings = audit_sigils(&[sigil(
+            IMMORTAL_SHELL_SIGIL,
+            (trait1, 15),
+            (STEADY_FOCUS, 10),
+        )]);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::SigilSingleTraitOnly);
+        assert_eq!(findings[0].observed, Value::TraitId(STEADY_FOCUS));
+    }
+
+    /// THE TRAP the base sigil sets for this rule.
+    ///
+    /// Immortal Shell+ is NOT single-trait: the table fixes a crab trait as its
+    /// second, so every legitimate owner carries two. Adding the + id alongside
+    /// the base one — the shape Stout Heart has, and the obvious generalisation
+    /// — accuses all of them.
+    #[test]
+    fn immortal_shell_plus_legitimately_carries_its_fixed_second_trait() {
+        let entry = &stock_sigils()[&IMMORTAL_SHELL_PLUS_SIGIL];
+        let SecondTrait::Fixed(fixed) = entry.second else {
+            panic!("Immortal Shell+ fixes a second trait");
+        };
+
+        assert!(!SINGLE_TRAIT_SIGILS.contains(&IMMORTAL_SHELL_PLUS_SIGIL));
+        assert_eq!(
+            audit_sigils(&[sigil(
+                IMMORTAL_SHELL_PLUS_SIGIL,
+                (entry.trait1, 20),
+                (fixed, 20)
+            )]),
+            vec![]
+        );
     }
 
     /// The Stout Heart ids and the table agree these sigils take no second

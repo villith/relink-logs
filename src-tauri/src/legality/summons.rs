@@ -40,21 +40,24 @@
 //!
 //! * A single perfect summon is ordinary — 42 of 72 real players in the
 //!   production census own at least one (the rarest single config is only
-//!   1 in 18,333, and a confirmed-legitimate player owns it). The rule
-//!   therefore only speaks at two or more, where 26 of 72 stood at census
-//!   time — the user chose to see that list, knowing its size.
+//!   1 in 18,333, and a confirmed-legitimate player owns it). Two is not
+//!   remarkable either: 26 of 72 stood there at census time, better than a
+//!   third of everyone owning any. The rule therefore only speaks at FOUR or
+//!   more (user-raised 2026-08-03, from an original threshold of two).
 //! * Guaranteed-variant summons (`rolled: false`) are excluded: their fixed
 //!   config is a probability-1 drop, not a roll.
 //! * A bonus outside this summon's own lots does not count as perfect — its
 //!   window is unknown, so it cannot be "top". That keeps a modded summon
-//!   from inflating a probability the report would then price as if it had
-//!   been rolled.
-//! * The reported odds are the product of each counted summon's single-draw
-//!   config probability. That is the honest table price of the draws, but it
-//!   OVERSTATES rarity for a farmer who rolls hundreds of times and equips
-//!   the best — which is exactly why this rule reports rather than accuses.
-//!   The odds the UI prints beside it are what carries that distinction to a
-//!   reader now that findings no longer carry a severity.
+//!   from inflating the count.
+//! * The COUNT is the whole claim. This used to multiply each counted
+//!   summon's single-draw config probability into an `odds`, but that price
+//!   is honest only about draws and knowingly blind to a farmer who rolls
+//!   hundreds of times and equips the best — so it measured something nobody
+//!   was asking about. Removed 2026-08-03 (user); the finding carries no odds
+//!   and no surface prints a probability for it.
+//! * Summons are counted per EQUIPPED SLOT, not per distinct id: four copies
+//!   of one perfect Lucilius is the most obviously fabricated set there is,
+//!   and deduplicating by id would reduce it to a count of one.
 //!
 //! # Why levels are deliberately NOT judged, but magnitudes are
 //!
@@ -85,9 +88,12 @@ use super::{
 /// One candidate of a summon's main-trait or equip-bonus lot, as generated.
 #[derive(Debug, Clone, Deserialize)]
 struct RawCandidate {
-    /// This candidate's share of its lot's total weight.
-    weight: u32,
     /// `(level, weight)` pairs, ascending.
+    ///
+    /// The generated file also carries the candidate's own pick weight. It is
+    /// not read: nothing judges or prices how likely a candidate was to be
+    /// drawn, only whether its level sits at the top of its window, and serde
+    /// drops the unlisted field for us.
     levels: Vec<(u32, u32)>,
 }
 
@@ -102,10 +108,14 @@ struct RawEntry {
     bonuses: HashMap<String, RawCandidate>,
 }
 
-/// One candidate's share of its lot and its level curve.
+/// One candidate's level curve.
+///
+/// The candidate's own pick weight is deliberately not kept: nothing judges or
+/// prices how likely a candidate was to be drawn, only whether the level sits
+/// at the top of its window. It stays on [`RawCandidate`] because the generated
+/// file carries it.
 #[derive(Debug, Clone)]
 pub struct Candidate {
-    weight: u32,
     levels: Vec<(u32, u32)>,
 }
 
@@ -143,54 +153,6 @@ impl Lot {
             .find(|&&(_, weight)| weight > 0)
             .map(|&(level, _)| level)
     }
-
-    /// The top of a candidate's level window, but only where landing on it was
-    /// a ROLL. `None` when the candidate's window holds a single level: the top
-    /// is then also the floor, and it lands there with certainty.
-    ///
-    /// Every rolled watched boss offers five ordinary main traits on an 11-15
-    /// curve plus one "special" on a singleton curve at level 15 — War
-    /// Elemental (Rolan, Lilith), Berserker Echo (Lucilius), Spartan Echo
-    /// (Beelzebub), Stout Heart (Behemoth III, Vrazarek). A special is at the
-    /// top of its window the instant it drops, so counting it as a perfect roll
-    /// prices certainty as luck.
-    ///
-    /// Distinct from [`Lot::top_level`], which the magnitude ceiling still
-    /// wants: a ceiling is about what a summon CAN display, and a fixed-level
-    /// candidate displays its magnitude just as surely as a rolled one.
-    pub fn rolled_top_level(&self, id: u32) -> Option<u32> {
-        let candidate = self.candidates.get(&id)?;
-        let mut live = candidate
-            .levels
-            .iter()
-            .filter(|&&(_, weight)| weight > 0)
-            .map(|&(level, _)| level);
-        // Levels are ascending, so the last live one is the top — and reaching
-        // `last` at all proves a second level existed to have rolled instead.
-        live.next()?;
-        live.last()
-    }
-
-    /// Probability of ONE roll of this lot landing exactly `(id, level)`.
-    /// `None` when the outcome is off-table or the table degenerates (zero
-    /// total weight) — a price it cannot state must not be stated as zero.
-    pub fn config_odds(&self, id: u32, level: u32) -> Option<f64> {
-        let candidate = self.candidates.get(&id)?;
-        let level_weight = candidate
-            .levels
-            .iter()
-            .find(|&&(step, _)| step == level)
-            .map(|&(_, weight)| weight)?;
-        let lot_total: u64 = self.candidates.values().map(|c| u64::from(c.weight)).sum();
-        let level_total: u64 = candidate.levels.iter().map(|&(_, w)| u64::from(w)).sum();
-        if lot_total == 0 || level_total == 0 || level_weight == 0 {
-            return None;
-        }
-        Some(
-            (f64::from(candidate.weight) / lot_total as f64)
-                * (f64::from(level_weight) / level_total as f64),
-        )
-    }
 }
 
 /// The acquisition roll space of one summon.
@@ -211,7 +173,6 @@ fn build_lot(raw: HashMap<String, RawCandidate>) -> Lot {
             Some((
                 parse_hex(&id)?,
                 Candidate {
-                    weight: candidate.weight,
                     levels: candidate.levels,
                 },
             ))
@@ -381,41 +342,37 @@ fn summon_rules() -> &'static SummonRules {
 }
 
 /// How many perfect summons an equipped set must carry before the count is
-/// reported. One is ordinary (42 of 72 census players own one); the user set
-/// the reporting threshold at two.
-pub const PERFECT_SUMMON_FLAG_COUNT: usize = 2;
+/// reported. One is ordinary (42 of 72 census players own one), and two is
+/// common enough to be unremarkable (26 of 72 — better than a third of the
+/// players who own any). The user raised the threshold from two to four on
+/// 2026-08-03.
+pub const PERFECT_SUMMON_FLAG_COUNT: usize = 4;
 
-/// The single-draw price of this summon's exact config, or `None` when the
-/// summon does not count as "perfect": a guaranteed variant (its fixed config
-/// is a probability-1 drop, not a roll), a bonus granting an effect nobody
-/// farms for, a slot below the top of its window, a slot whose window holds
-/// only one level, or a trait/bonus outside the summon's own lots (its window
-/// is unknown).
-fn perfect_config_odds(entry: &SummonEntry, summon: &EquippedSummon) -> Option<f64> {
+/// Whether this summon counts as "perfect": both slots at the top of their
+/// windows in the summon's OWN lots, with a bonus granting an effect players
+/// actually chase.
+///
+/// False for a guaranteed variant (its fixed config is a probability-1 drop,
+/// not a roll), a bonus granting an effect nobody farms for, a slot below the
+/// top of its window, or a trait/bonus outside the summon's own lots — whose
+/// window is unknown, so "top" is unknowable and a modded summon cannot inflate
+/// the count.
+///
+/// A single-level ("special") main DOES count, and needs no special case to:
+/// its top level is simply the only level it has.
+fn is_perfect(entry: &SummonEntry, summon: &EquippedSummon) -> bool {
     if !entry.rolled {
-        return None;
+        return false;
     }
     // Perfection is only interesting about a stat a player would reroll for
     // (see `chased_effects`) — a maxed Healing Cap Up is a coincidence, not a
-    // farm. The main trait is scoped by its window instead: its namespace has
-    // no notion of these effects, and `rolled_top_level` below is what keeps
-    // the certainty-shaped mains out.
+    // farm. The main trait carries no such scope: its namespace has no notion
+    // of these effects, so its own window is all there is to judge it by.
     if !summon_bonus_values::effect_of(summon.bonus_id).is_some_and(chased_effects::is_chased) {
-        return None;
+        return false;
     }
-    if entry.main_traits.rolled_top_level(summon.main_trait_id)? != summon.main_trait_level {
-        return None;
-    }
-    if entry.bonuses.rolled_top_level(summon.bonus_id)? != summon.bonus_level {
-        return None;
-    }
-    let main = entry
-        .main_traits
-        .config_odds(summon.main_trait_id, summon.main_trait_level)?;
-    let bonus = entry
-        .bonuses
-        .config_odds(summon.bonus_id, summon.bonus_level)?;
-    Some(main * bonus)
+    entry.main_traits.top_level(summon.main_trait_id) == Some(summon.main_trait_level)
+        && entry.bonuses.top_level(summon.bonus_id) == Some(summon.bonus_level)
 }
 
 /// The highest magnitude any bonus of `effect` can display on a summon of this
@@ -527,28 +484,28 @@ pub fn audit_summons(summons: &[EquippedSummon]) -> Vec<Finding> {
     }
 
     // The perfect-count report (see the module docs). Only the watched boss
-    // summons are counted; the odds multiply the counted summons' single-draw
-    // prices — the honest table price of the draws, knowingly blind to
-    // farming, which is why this is Improbable.
-    let perfect: Vec<f64> = summons
+    // summons are counted.
+    let perfect = summons
         .iter()
         .filter(|summon| rules.perfect_watched.contains(&summon.summon_id))
-        .filter_map(|summon| {
+        .filter(|summon| {
             stock_summons()
                 .get(&summon.summon_id)
-                .and_then(|entry| perfect_config_odds(entry, summon))
+                .is_some_and(|entry| is_perfect(entry, summon))
         })
-        .collect();
+        .count();
 
-    if perfect.len() >= PERFECT_SUMMON_FLAG_COUNT {
+    if perfect >= PERFECT_SUMMON_FLAG_COUNT {
         findings.push(Finding {
             rule: Rule::SummonPerfectCount,
             subject: Subject::Summons,
-            observed: Value::Count(perfect.len()),
-            // Nothing is exceeded: the set is legal, merely improbable, so
-            // `odds` is the payload (the `OvermasteryAllMaxed` idiom).
+            observed: Value::Count(perfect),
+            // Nothing is exceeded: the set is legal, merely remarkable. The
+            // COUNT is the whole claim — this used to multiply the counted
+            // summons' single-draw prices into an `odds`, which nothing shows
+            // any more (user, 2026-08-03).
             allowed: Value::None,
-            odds: Some(perfect.iter().product()),
+            odds: None,
             evidence: None,
         });
     }
@@ -589,10 +546,40 @@ mod tests {
     /// Healing Cap 6-9 on Behemoth III.
     const LUCILIUS_ROLLED: u32 = 0x6e59_68fc;
     const ALPHA: u32 = 0xdbe1_d775;
+    const GAMMA: u32 = 0x5c86_2e13;
     const LUCILIUS_NA_DMG_CAP: u32 = 0x9245_dfa4;
     const BEHEMOTH_III_ROLLED: u32 = 0xe4b7_dcf9;
     const UPLIFT: u32 = 0xb5ff_9fd3;
     const BEHEMOTH_BONUS: u32 = 0xa353_9fbb;
+    /// The other watched bosses the count report needs now that it starts at
+    /// four. Every trait and bonus used with them below is in their own lots,
+    /// so the configs are legal as well as perfect.
+    const BEELZEBUB_ROLLED: u32 = 0xa7ef_f558;
+    const LILITH_ROLLED: u32 = 0xdfab_70b7;
+    const ROLAN_ROLLED: u32 = 0x0f98_6ed9;
+    const TYRANNY: u32 = 0x71f1_1a9b;
+
+    /// PADDING for the "X does not count as perfect" tests below, which each
+    /// need the set to sit exactly one counted summon short of the threshold.
+    ///
+    /// Without it those tests lose their teeth the moment the threshold rises:
+    /// a set holding one perfect summon beside the thing under test stays
+    /// silent whether or not the rule wrongly counts it, so the assertion
+    /// passes for the wrong reason. Padded to three, the test fires the instant
+    /// X is counted. Deliberately Beelzebub, Lilith and Rolan — the tests below
+    /// use Lucilius and Behemoth III, and a repeated id would be counted twice
+    /// and blow the budget these exist to hold.
+    fn perfect_beelzebub() -> EquippedSummon {
+        summon(BEELZEBUB_ROLLED, (DMG_CAP, 15), (BOSS_SET_NA_DMG_CAP, 9))
+    }
+
+    fn perfect_lilith() -> EquippedSummon {
+        summon(LILITH_ROLLED, (TYRANNY, 15), (BOSS_SET_NA_DMG_CAP, 9))
+    }
+
+    fn perfect_rolan() -> EquippedSummon {
+        summon(ROLAN_ROLLED, (UPLIFT, 15), (BOSS_SET_NA_DMG_CAP, 9))
+    }
 
     /// Two of the eleven boss-only equip bonuses, granted by Rolan, Lucilius,
     /// Beelzebub and Lilith alone. `2ea9ca80` reaches Healing Cap Up +75%
@@ -831,26 +818,55 @@ mod tests {
         assert_eq!(audit_summons(&equipped), vec![]);
     }
 
-    /// The user-requested report: two perfect watched bosses together are
-    /// worth a row. Improbable with the multiplied single-draw price — never
-    /// proof.
+    /// THE BOUNDARY. Three is silent (user-raised 2026-08-03): 26 of 72 census
+    /// players stood at two, which is a quarter of the database reported for
+    /// what a determined farmer reaches, so the threshold moved to four and the
+    /// report names only the builds that are genuinely remarkable.
     #[test]
-    fn two_perfect_watched_summons_are_reported_as_improbable() {
+    fn three_perfect_watched_summons_are_not_reported() {
         let equipped = [
             summon(LUCILIUS_ROLLED, (ALPHA, 15), (LUCILIUS_NA_DMG_CAP, 9)),
             summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BEHEMOTH_BONUS, 9)),
+            perfect_beelzebub(),
+        ];
+        assert_eq!(audit_summons(&equipped), vec![]);
+    }
+
+    /// The user-requested report: four perfect watched bosses together are
+    /// worth a row. A COUNT and nothing else — never proof.
+    #[test]
+    fn four_perfect_watched_summons_are_reported() {
+        let equipped = [
+            summon(LUCILIUS_ROLLED, (ALPHA, 15), (LUCILIUS_NA_DMG_CAP, 9)),
+            summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BEHEMOTH_BONUS, 9)),
+            perfect_beelzebub(),
+            perfect_lilith(),
         ];
         let findings = audit_summons(&equipped);
         assert_eq!(findings.len(), 1);
         assert_eq!(findings[0].rule, Rule::SummonPerfectCount);
         assert_eq!(findings[0].subject, Subject::Summons);
-        assert_eq!(findings[0].observed, Value::Count(2));
+        assert_eq!(findings[0].observed, Value::Count(4));
         assert_eq!(findings[0].allowed, Value::None);
-        let odds = findings[0].odds.expect("the odds are the payload");
-        assert!(
-            odds > 0.0 && odds < 1e-4,
-            "odds {odds} should be tiny but non-zero"
-        );
+        // The count is the whole claim; no probability is computed or shown.
+        assert_eq!(findings[0].odds, None);
+    }
+
+    /// FOUR OF THE SAME SUMMON (user, 2026-08-03): the same Lucilius, the same
+    /// Gamma, the same maxed Normal Attack Damage Cap Up, four times over.
+    ///
+    /// The count is over EQUIPPED SLOTS, not distinct summon ids, and this is
+    /// the shape that would slip through a rule that deduplicated by id — the
+    /// most obviously fabricated set there is, reduced to a count of one.
+    #[test]
+    fn four_copies_of_one_perfect_summon_are_still_reported() {
+        let lucilius = || summon(LUCILIUS_ROLLED, (GAMMA, 15), (LUCILIUS_NA_DMG_CAP, 9));
+        let equipped = [lucilius(), lucilius(), lucilius(), lucilius()];
+
+        let findings = audit_summons(&equipped);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::SummonPerfectCount);
+        assert_eq!(findings[0].observed, Value::Count(4));
     }
 
     /// The display names of some summon ids, read from the same lang file the
@@ -924,30 +940,55 @@ mod tests {
         assert_eq!(owners.len(), 4, "expected four names, got {owners:?}");
     }
 
-    /// THE SPECIAL-CANDIDATE GUARD (user, 2026-07-30).
+    /// THE SPECIAL CANDIDATES (user-reversed 2026-08-03).
     ///
     /// Every rolled watched boss offers five ordinary main traits on an 11-15
     /// curve plus ONE "special" pinned to a single-level curve at 15 (War
     /// Elemental on Rolan and Lilith, Berserker Echo on Lucilius, Spartan Echo
-    /// on Beelzebub, Stout Heart on Behemoth III and Vrazarek). A special is at
-    /// "the top of its window" the instant it drops — there is no other level
-    /// it could have taken — so calling that a perfect roll prices certainty as
-    /// though it were luck.
+    /// on Beelzebub, Stout Heart on Behemoth III and Vrazarek).
+    ///
+    /// These were excluded from 2026-07-30 to 2026-08-03, on the reasoning that
+    /// a level which could not have been anything else is certainty rather than
+    /// luck. That left a hole: three specials beside three maxed chased bonuses
+    /// could never be reported however deliberate the build. They now count,
+    /// and no arithmetic was added to make it work — a single-level candidate's
+    /// config odds are already just its draw weight.
     #[test]
-    fn a_main_trait_that_can_only_ever_be_fifteen_is_not_a_perfect_roll() {
+    fn a_main_trait_that_can_only_ever_be_fifteen_still_counts() {
         let equipped = [
             summon(
                 LUCILIUS_ROLLED,
                 (BERSERKER_ECHO, 15),
                 (LUCILIUS_NA_DMG_CAP, 9),
             ),
-            summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BEHEMOTH_BONUS, 9)),
+            perfect_beelzebub(),
+            perfect_lilith(),
+            perfect_rolan(),
         ];
-        assert_eq!(
-            audit_summons(&equipped),
-            vec![],
-            "a single-level main trait was counted as a perfect roll"
-        );
+        let findings = audit_summons(&equipped);
+        assert_eq!(findings.len(), 1);
+        assert_eq!(findings[0].rule, Rule::SummonPerfectCount);
+        assert_eq!(findings[0].observed, Value::Count(4));
+    }
+
+    /// A special main and an ordinary maxed one are the same claim now: the
+    /// report counts summons and states nothing about how likely the set was.
+    #[test]
+    fn a_special_main_reads_the_same_as_an_ordinary_maxed_one() {
+        let report_for = |main: u32| {
+            let equipped = [
+                summon(LUCILIUS_ROLLED, (main, 15), (LUCILIUS_NA_DMG_CAP, 9)),
+                perfect_beelzebub(),
+                perfect_lilith(),
+                perfect_rolan(),
+            ];
+            audit_summons(&equipped)
+                .into_iter()
+                .find(|finding| finding.rule == Rule::SummonPerfectCount)
+                .expect("three perfect summons are reported")
+        };
+
+        assert_eq!(report_for(BERSERKER_ECHO), report_for(ALPHA));
     }
 
     /// The same trait on an ordinary multi-level curve still counts — the guard
@@ -958,6 +999,8 @@ mod tests {
         let equipped = [
             summon(LUCILIUS_ROLLED, (ALPHA, 15), (LUCILIUS_NA_DMG_CAP, 9)),
             summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BEHEMOTH_BONUS, 9)),
+            perfect_beelzebub(),
+            perfect_lilith(),
         ];
         assert!(
             audit_summons(&equipped)
@@ -977,6 +1020,9 @@ mod tests {
         let equipped = [
             summon(LUCILIUS_ROLLED, (ALPHA, 15), (BOSS_SET_HEALING_CAP, 9)),
             summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (STANDARD_HEALING_CAP, 9)),
+            perfect_beelzebub(),
+            perfect_lilith(),
+            perfect_rolan(),
         ];
         assert_eq!(
             audit_summons(&equipped),
@@ -997,6 +1043,9 @@ mod tests {
                 (CRIT_RATE_UP, 9),
             ),
             summon(GOLDSLIME_III, (GOLDSLIME_MAIN, 15), (GOLDSLIME_BONUS, 9)),
+            perfect_beelzebub(),
+            perfect_lilith(),
+            perfect_rolan(),
         ];
         assert_eq!(audit_summons(&equipped), vec![]);
     }
@@ -1068,6 +1117,8 @@ mod tests {
         let equipped = [
             summon(VRAZAREK_III, (DMG_CAP, 15), (VRAZAREK_BONUS, 4)),
             summon(LUCILIUS_ROLLED, (ALPHA, 15), (LUCILIUS_NA_DMG_CAP, 9)),
+            perfect_beelzebub(),
+            perfect_lilith(),
         ];
         assert_eq!(
             audit_summons(&equipped),
@@ -1088,6 +1139,8 @@ mod tests {
                     (LUCILIUS_NA_DMG_CAP, bonus_level),
                 ),
                 summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BEHEMOTH_BONUS, 9)),
+                perfect_beelzebub(),
+                perfect_lilith(),
             ];
             assert_eq!(
                 audit_summons(&equipped),
@@ -1111,6 +1164,8 @@ mod tests {
         let equipped = [
             summon(BEHEMOTH_III_ROLLED, (UPLIFT, 15), (BOSS_SET_HEALING_CAP, 9)),
             summon(LUCILIUS_ROLLED, (ALPHA, 15), (LUCILIUS_NA_DMG_CAP, 9)),
+            perfect_beelzebub(),
+            perfect_lilith(),
         ];
         let findings = audit_summons(&equipped);
         assert!(

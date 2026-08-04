@@ -15,6 +15,7 @@ const t = render as never;
  * added in Rust fails `tsc` here until someone says what it is a violation of. */
 const EXPECTED: Record<LegalityRule, Violation> = {
   wrightstoneTraitLevel: "impossibleWrightstone",
+  wrightstoneTrait: "impossibleWrightstone",
   sigilTraitLevel: "impossibleSigil",
   sigilLockedPair: "impossibleSigil",
   sigilQuestLockedTrait: "impossibleSigil",

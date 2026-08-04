@@ -281,21 +281,20 @@
       "player-flagged": "This build was flagged",
       "limit": {
         "wrightstoneTraitLevel": "max {{allowed}}",
+        "wrightstoneTrait": "can't be engraved",
         "sigilTraitLevel": "max {{allowed}}",
         "sigilLockedPair": "wrong pair",
         "sigilQuestLockedTrait": "quest-only trait",
         "sigilSingleTraitOnly": "second trait",
         "overmasteryValue": "off-ladder value",
-        "overmasteryAllMaxed": "3 max Stun Power Up rolls — {{chance}}",
+        "overmasteryAllMaxed": "3 max Stun Power Up rolls",
         "summonTrait": "can't roll here",
         "summonBonusSource": "wrong bonus id — only {{allowed}}",
         "summonBonusSource-unnamed": "wrong bonus id",
         "summonBonusMagnitude": "max {{allowed}}",
-        "summonPerfectCount": "{{observed}} perfect summon rolls — {{chance}}",
+        "summonPerfectCount": "{{observed}} perfect summon rolls",
         "masterTraitCount": "max {{allowed}}"
       },
-      "chance-percent": "{{percent}}% chance",
-      "chance-impossible": "completely impossible",
       "violation": {
         "impossibleSigil": "Impossible Sigil",
         "impossibleWrightstone": "Impossible Wrightstone",
@@ -770,7 +769,6 @@
     },
     "Pl0200": {
       "0": "Ares (Link attack bug)",
-      "9998": "Ares",
       "100": "Attack 1",
       "101": "Attack 2",
       "102": "Attack 3",
@@ -802,6 +800,7 @@
       "303": "Aerial Finisher",
       "400": "Launch",
       "410": "Aerial Barrage",
+      "9998": "Ares",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "finisher": "Finisher",
@@ -1603,8 +1602,8 @@
       "400": "Launch",
       "410": "Aerial Barrage",
       "1000": "Deathmatch Finale",
-      "11000": "Mode Change",
       "1410": "Martial Spear Finisher",
+      "11000": "Mode Change",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "combo-finisher": "Combo Finisher",

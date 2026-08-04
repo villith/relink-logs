@@ -153,26 +153,20 @@ describe("describeLimit", () => {
     expect(calls[0].observed).toBeUndefined();
   });
 
-  /** The odds-carrying rules quote them inside their own limit line, so the
-   * chance has to reach the template. Found by key rather than by position:
-   * building the chance is itself a translation, so it lands first. */
-  it("hands the chance to a rule that quotes it", () => {
+  /** NO PROBABILITIES ANYWHERE (user, 2026-08-03).
+   *
+   * The two report rules used to quote a percentage inside their own limit
+   * line. It measured the honest table price of the draws, which is not the
+   * question anyone was asking of a farmer who rerolls hundreds of times, so
+   * it was removed rather than left to be read as if it meant something. The
+   * claim is now the count alone.
+   */
+  it("quotes no probability, whatever odds the finding carries", () => {
     const { calls, t } = capture();
     describeLimit(t, longOdds);
 
-    const limit = calls.find((call) => call.key === "ui.legality.limit.summonPerfectCount");
-    expect(limit?.chance).toBe("ui.legality.chance-percent");
-    expect(calls.find((call) => call.key === "ui.legality.chance-percent")?.percent).toBe("0.000047");
-  });
-
-  /** Below a point a percentage is a row of zeroes rather than a quantity, and
-   * words carry it better. */
-  it("stops quoting a percentage once it has stopped meaning anything", () => {
-    const { calls, t } = capture();
-    describeLimit(t, { ...longOdds, odds: 1 / 96_281_828_704 });
-
-    expect(calls.some((call) => call.key === "ui.legality.chance-impossible")).toBe(true);
-    expect(calls.some((call) => call.key === "ui.legality.chance-percent")).toBe(false);
+    expect(calls.every((call) => !String(call.key).startsWith("ui.legality.chance"))).toBe(true);
+    expect(calls.some((call) => "chance" in call)).toBe(false);
   });
 
   it("falls back to the rule's own key rather than rendering nothing", () => {

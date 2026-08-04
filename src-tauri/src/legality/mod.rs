@@ -44,7 +44,12 @@ pub const EMPTY_ID: u32 = game_reader::EMPTY_KEY;
 /// the sweep revisit logs already stamped 5 and WITHDRAW the verdicts it now
 /// declines to make. Without it the cutoff would only ever govern logs nobody
 /// had judged yet, i.e. nothing already in the database.
-pub const RULES_VERSION: u32 = 7;
+/// 8: wrightstones gained a trait-MEMBERSHIP rule ([`Rule::WrightstoneTrait`]),
+/// Immortal Shell joined the single-trait sigils, and the perfect-summon report
+/// moved from two to three. The first two accuse builds nobody was accusing
+/// before and the third WITHDRAWS a report from every two-perfect player in the
+/// database, so all three need the sweep to revisit already-judged logs.
+pub const RULES_VERSION: u32 = 8;
 
 /// Encounters recorded before this are never audited: epoch millis for
 /// 2026-07-09T00:00:00Z, inclusive (a log stamped exactly this is judged).
@@ -126,6 +131,14 @@ pub enum Rule {
     /// (primary, secondary1, secondary2) — index, not sorted rank, is what
     /// each level is checked against.
     WrightstoneTraitLevel,
+    /// A trait engraved on a wrightstone that no stone config can produce —
+    /// a sigil-only trait on a stone.
+    ///
+    /// Judged against the union of every transmarvel config's reachable
+    /// traits, which is the same table the ceilings come from. A 875-log
+    /// census found 6 off-pool readings in 4908, belonging to 2 of 87 players
+    /// and both carrying a whole stone of them — see `legality_stone_probe`.
+    WrightstoneTrait,
     /// A sigil carrying BOTH traits with a level above its own ceiling
     /// (default 15; raised only where the table declares it).
     SigilTraitLevel,
@@ -525,15 +538,17 @@ mod tests {
     ///   never reach the threshold, and the reachability case below would pass
     ///   without the rule ever judging a magnitude. It is the overmastery twin
     ///   of Behemoth's deliberately-unmaxed bonus below.
-    /// * **Summons** — Lucilius `6e5968fc` and Behemoth III `e4b7dcf9`, both
-    ///   `rolled: true`, both on the perfect-count WATCH LIST, each carrying
-    ///   a genuine candidate of its own lots: Lucilius main `5c862e13` (Gamma,
-    ///   window 11-15) with bonus `9245dfa4`, Behemoth III main `b5ff9fd3`
-    ///   (Uplift, 11-15) with bonus `a3539fbb`. Lucilius sits at the TOP of
-    ///   both windows on purpose: ONE perfect summon is legal and unreported
-    ///   (42 of 72 census players own one). Behemoth deliberately sits one step
-    ///   below its bonus top (8 of 9) so the perfect COUNT stays at one and the
-    ///   >=2 report must stay quiet — the summon twin of Stun's
+    /// * **Summons** — Lucilius `6e5968fc`, Behemoth III `e4b7dcf9`, Beelzebub
+    ///   `a7eff558` and Lilith `dfab70b7`, all `rolled: true`, all on the
+    ///   perfect-count WATCH LIST, each carrying a genuine candidate of its own
+    ///   lots: Lucilius main `5c862e13` (Gamma, window 11-15) with bonus
+    ///   `9245dfa4`, Behemoth III main `b5ff9fd3` (Uplift, 11-15) with bonus
+    ///   `a3539fbb`, Beelzebub main `dc584f60` (DMG Cap, 11-15) and Lilith main
+    ///   `71f11a9b` (Tyranny, 11-15), both with bonus `9245dfa4`. Three of them
+    ///   sit at the TOP of both windows on purpose: three perfect summons are
+    ///   legal and unreported. Behemoth deliberately sits one step below its
+    ///   bonus top (8 of 9) so the perfect COUNT stays at three and the >=4
+    ///   report must stay quiet — the summon twin of Stun's
     ///   deliberately-unmaxed overmastery above.
     ///
     ///   Both bonuses are Damage Cap Ups and both mains are on 11-15 curves,
@@ -605,6 +620,20 @@ mod tests {
                     main_trait_level: 15,
                     bonus_id: 0xa353_9fbb,
                     bonus_level: 8,
+                },
+                EquippedSummon {
+                    summon_id: 0xa7ef_f558,
+                    main_trait_id: 0xdc58_4f60,
+                    main_trait_level: 15,
+                    bonus_id: 0x9245_dfa4,
+                    bonus_level: 9,
+                },
+                EquippedSummon {
+                    summon_id: 0xdfab_70b7,
+                    main_trait_id: 0x71f1_1a9b,
+                    main_trait_level: 15,
+                    bonus_id: 0x9245_dfa4,
+                    bonus_level: 9,
                 },
             ],
             weapon_state: Some(WeaponState {
@@ -704,7 +733,7 @@ mod tests {
     /// proving the rule saw the fixture's data and judged it rather than
     /// skipping it as unreadable.
     ///
-    /// All ten rules, so the guard covers the whole module and not merely
+    /// All thirteen rules, so the guard covers the whole module and not merely
     /// one rule per file. One case worth reading closely: nudging the third
     /// Stun alone to the top of its ladder fires `OvermasteryAllMaxed`, which
     /// can only happen if the other two stun magnitudes were read, matched
@@ -718,6 +747,19 @@ mod tests {
         assert!(
             fires(&build, Rule::WrightstoneTraitLevel),
             "the level rule never judged the fixture's stone"
+        );
+
+        // Wrightstone: a SIGIL trait engraved on a stone. Level untouched, so
+        // this also proves the two stone rules are separable.
+        let mut build = legal_build();
+        stone(&mut build).wrightstone_traits[1].id = WAR_ELEMENTAL;
+        assert!(
+            fires(&build, Rule::WrightstoneTrait),
+            "the membership rule never judged the fixture's stone"
+        );
+        assert!(
+            !fires(&build, Rule::WrightstoneTraitLevel),
+            "a legal set of levels was accused"
         );
 
         // Sigils: an over-cap level on the two-trait sigil, a broken locked
@@ -801,10 +843,10 @@ mod tests {
             "the magnitude rule never judged the fixture's summons"
         );
 
-        // Nudging Behemoth's bonus alone to its top makes a SECOND perfect
-        // watched summon, which can only fire if Lucilius' top-of-window
-        // state was also read and recognised — the summon twin of the Stun
-        // case above.
+        // Nudging Behemoth's bonus alone to its top makes a FOURTH perfect
+        // watched summon, which can only fire if the other three's
+        // top-of-window state was also read and recognised — the summon twin
+        // of the Stun case above.
         let mut build = legal_build();
         build.summons[1].bonus_level = 9;
         assert!(
@@ -1050,6 +1092,7 @@ mod tests {
         accused.summons[1].bonus_level = 9;
         accused.sigils[0].first_trait_level = 30;
         masteries(&mut accused)[3].value = 0.7;
+        stone(&mut accused).wrightstone_traits[1].id = WAR_ELEMENTAL;
 
         // The third stun to the top of its ladder makes all three maxed;
         // Behemoth's bonus to the top of its window makes a second perfect
@@ -1072,8 +1115,9 @@ mod tests {
         assert_eq!(
             (RULES_VERSION, snapshot.join("\n").as_str()),
             (
-                7,
-                "SigilTraitLevel Sigil(0) Level(30) -> Level(15) odds=None\n\
+                8,
+                "WrightstoneTrait Wrightstone TraitId(1280871463) -> None odds=None\n\
+                 SigilTraitLevel Sigil(0) Level(30) -> Level(15) odds=None\n\
                  OvermasteryValue Overmastery(3) Amount(0.7) -> Amount(2.0) odds=None\n\
                  SummonBonusSource Summon(1) SummonBonusId(782879360) -> \
                  SummonIds([261648089, 789923164, 1851353340, 2237464972]) \
@@ -1081,8 +1125,7 @@ mod tests {
                  SummonBonusMagnitude Summon(1) Amount(75.0) -> Amount(50.0) odds=None\n\
                  OvermasteryAllMaxed Overmasteries Count(3) -> None \
                  odds=Some(2.2586109542631282e-9)\n\
-                 SummonPerfectCount Summons Count(2) -> None \
-                 odds=Some(2.4793388429752063e-8)"
+                 SummonPerfectCount Summons Count(4) -> None odds=None"
             ),
             "the rules changed what they say — update this snapshot AND bump \
              RULES_VERSION, or every stored log keeps the old verdicts forever"
@@ -1091,6 +1134,9 @@ mod tests {
 
     /// DMG Cap: a real trait, out of place everywhere the cases above use it.
     const DMG_CAP: u32 = 0xdc58_4f60;
+    /// War Elemental: a SIGIL trait, and one of the six the production census
+    /// caught on fabricated wrightstones. No stone config can produce it.
+    const WAR_ELEMENTAL: u32 = 0x4c58_8c27;
     /// The boss-set Healing Cap Up, granted by Rolan, Lucilius, Beelzebub and
     /// Lilith alone and reaching +75% where the standard set stops at +50%.
     const BOSS_SET_HEALING_CAP: u32 = 0x2ea9_ca80;

@@ -144,7 +144,6 @@ describe("CheatAudit", () => {
           `ui.legality.limit.wrightstoneTraitLevel:${JSON.stringify({
             observed: allowed === 20 ? 30 : 20,
             allowed,
-            chance: "",
           })}`
         )
       ).toBeTruthy();

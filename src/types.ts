@@ -866,6 +866,7 @@ export interface HookStatusSnapshot {
  * gear line the limit sits under.) */
 export type LegalityRule =
   | "wrightstoneTraitLevel"
+  | "wrightstoneTrait"
   | "sigilTraitLevel"
   | "sigilLockedPair"
   | "sigilQuestLockedTrait"
