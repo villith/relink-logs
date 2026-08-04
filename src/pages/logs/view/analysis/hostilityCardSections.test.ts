@@ -58,6 +58,28 @@ describe("enemyDealtCardSectionsFor", () => {
     expect(sections?.[1].entries.map((entry) => entry.label)).toEqual(["player 0", "player 1"]);
   });
 
+  it("folds one attack across every player it hit", () => {
+    const players = [
+      player(0, {
+        damageTakenBreakdown: [
+          { enemyType: { Unknown: 0xaa }, actionId: { Normal: 7 }, hits: 1, totalDamage: 400, maxDamage: 400 },
+        ],
+      }),
+      player(1, {
+        damageTakenBreakdown: [
+          { enemyType: { Unknown: 0xaa }, actionId: { Normal: 7 }, hits: 1, totalDamage: 100, maxDamage: 100 },
+        ],
+      }),
+    ];
+
+    const sections = enemyDealtCardSectionsFor({ row: enemyRow(0xaa), players, color: "red", labels });
+
+    // One attack row summing both victims; the split by victim is the job of
+    // the by-target section beneath it.
+    expect(sections?.[0].entries).toEqual([expect.objectContaining({ label: 'atk:{"Normal":7}', value: 500 })]);
+    expect(sections?.[1].entries.map((entry) => entry.value)).toEqual([400, 100]);
+  });
+
   it("returns null for an attacker nothing recorded against", () => {
     expect(
       enemyDealtCardSectionsFor({ row: enemyRow(0xcc), players: [player(0, {})], color: "red", labels })
