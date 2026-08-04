@@ -463,14 +463,41 @@ pub(crate) mod site {
     pub const VTABLE_GRANT_33BC050: u32 = 3;
 }
 
-/// Placeholder for the grant-site cause channel (Phase B): no site parks a
-/// cause yet, so `current()` is inert. The Phase B tasks replace this with a
-/// save/restore thread-local mirroring [`HitGuard`].
-struct CauseGuard;
+thread_local! {
+    /// The named grant site currently executing on this thread, if any.
+    ///
+    /// Same contract as [`PENDING_HIT`]: the game's gauge update runs as a
+    /// synchronous callee of these sites, so whatever is parked when the gauge
+    /// moves is what moved it. SAVE/RESTORE rather than set/clear because sites
+    /// can nest (a guard that triggers an effect that grants again), and a
+    /// clear-on-drop would erase the enclosing cause.
+    static PENDING_CAUSE: std::cell::Cell<Option<protocol::SbaGainCause>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// Parks a cause on [`PENDING_CAUSE`] and restores the previous value on drop.
+/// All TLS access goes through `try_with`, so a call during thread teardown
+/// degrades to "nothing parked" instead of panicking inside the game.
+struct CauseGuard(Option<protocol::SbaGainCause>);
 
 impl CauseGuard {
+    #[allow(dead_code)] // the first grant-site detour (just-guard) lands next
+    fn park(cause: protocol::SbaGainCause) -> Self {
+        CauseGuard(
+            PENDING_CAUSE
+                .try_with(|c| c.replace(Some(cause)))
+                .unwrap_or(None),
+        )
+    }
+
     fn current() -> Option<protocol::SbaGainCause> {
-        None
+        PENDING_CAUSE.try_with(|c| c.get()).ok().flatten()
+    }
+}
+
+impl Drop for CauseGuard {
+    fn drop(&mut self) {
+        let _ = PENDING_CAUSE.try_with(|c| c.set(self.0));
     }
 }
 
