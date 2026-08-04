@@ -1149,6 +1149,14 @@ impl OnHandleSBAUpdateHook {
             // was found exactly this way — a flat 35.00 among variable hits).
             if matches!(outcome, Ok((_, protocol::SbaGainCause::Unknown))) {
                 log::info!("SBAUNK amount={amount:.2} a3-a11 flags a9={a9} a11={a11}");
+                // The return-address chain names the caller no static pass
+                // could (0x3940da3 has no containing function in Ghidra).
+                // First few only: the walk is comparatively expensive and the
+                // dodge grant repeats with identical frames.
+                static WALKS: AtomicU32 = AtomicU32::new(0);
+                if crate::hooks::diag::first_n(&WALKS, 6) {
+                    crate::hooks::diag::log_callers("sba_unknown_rise");
+                }
             }
         }
         let _ = outcome;
