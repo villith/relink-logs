@@ -68,7 +68,7 @@ import { QuestSummary } from "./QuestSummary";
 import { RegroupStrip } from "./RegroupStrip";
 import { abilityLabelFor } from "./abilityLabel";
 import "./analysis.css";
-import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker } from "./chartMarkers";
+import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "./chartMarkers";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
@@ -131,6 +131,14 @@ const DRILL_LABEL_KEY = {
   // members when it held several — the plot stays the coarser of the two.
   skills: "ui.logs.chart-drill-target-label",
 } as const;
+
+/** Tooltip line per marker kind. Sibling of `DpsChart`'s `MARKER_LABEL_KEY`, but
+ * a separate key set: those name the control-row checkboxes, these are the
+ * strings the tooltip lists under a marker line. */
+const MARKER_LINE_KEY: Record<MarkerKind, string> = {
+  death: "ui.logs.chart-marker-death-line",
+  sba: "ui.logs.chart-marker-sba-line",
+};
 
 /** Bucket index → "M:SS", for the window readout. */
 const bucketLabel = (bucket: number) => millisecondsToElapsedFormat(bucket * DPS_BUCKET_MS);
@@ -822,19 +830,22 @@ export const AnalysisView = () => {
   // `SBA_MARKER_COLOR`, which is picked to collide with no party colour.
   // Unknown actors (enemy deaths) are dropped by the extractor itself.
   const chartMarkers: ChartMarker[] = useMemo(() => {
-    const knownActors = new Set(identityPlayers.map((player) => player.index));
+    const knownActors = new Set(playerByIndex.keys());
     return extractMarkers({ deathEvents, sbaEvents, window: statusWindow, knownActors }).map((event) => ({
       kind: event.kind,
       atMs: event.atMs,
       color:
         event.kind === "death"
-          ? resolvePlayerColor(palette, playerData, playerByIndex.get(event.actorIndex)?.slot ?? 0, 0)
+          ? // The `?? 0` cannot fire here, unlike the other `resolvePlayerColor`
+            // call sites: `knownActors` is `playerByIndex`'s own key set, so the
+            // extractor only ever returns markers this map can resolve. It stays
+            // because the optional chain still types as `number | undefined` — no
+            // marker is silently coloured as party slot 0.
+            resolvePlayerColor(palette, playerData, playerByIndex.get(event.actorIndex)?.slot ?? 0, 0)
           : SBA_MARKER_COLOR,
-      label: t(event.kind === "death" ? "ui.logs.chart-marker-death-line" : "ui.logs.chart-marker-sba-line", {
-        name: labelForSource(event.actorIndex),
-      }),
+      label: t(MARKER_LINE_KEY[event.kind], { name: labelForSource(event.actorIndex) }),
     }));
-  }, [identityPlayers, deathEvents, sbaEvents, statusWindow, palette, playerData, playerByIndex, labelForSource, t]);
+  }, [deathEvents, sbaEvents, statusWindow, palette, playerData, playerByIndex, labelForSource, t]);
 
   const rowColor = useCallback(
     (row: MetricRow) => {
