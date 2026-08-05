@@ -100,6 +100,7 @@ export const ChartTooltip = ({
   //
   // `visibility` and not a null return, because it keeps the box in layout —
   // an empty box is the very thing that parks the wrapper.
+  const nothingToShow = landed.length === 0 && (markers?.length ?? 0) === 0;
   return (
     <Paper
       data-testid="chart-tooltip"
@@ -108,7 +109,7 @@ export const ChartTooltip = ({
       withBorder
       shadow="md"
       radius="md"
-      style={landed.length === 0 && (markers?.length ?? 0) === 0 ? { visibility: "hidden" } : undefined}
+      style={nothingToShow ? { visibility: "hidden" } : undefined}
     >
       <Text fw={500} mb={5}>
         {label}

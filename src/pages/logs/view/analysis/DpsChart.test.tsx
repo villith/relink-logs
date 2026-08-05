@@ -117,6 +117,26 @@ describe("ChartTooltip", () => {
       { kind: "death", atMs: 183_000, color: "#f00", label: "☠ Rain died" },
     ]);
     expect(screen.getByText("☠ Rain died")).toBeTruthy();
+
+    // Existence alone doesn't pin the ordering constraint this task exists to
+    // enforce — check DOM position too, the same way "orders entries by
+    // value" above does.
+    const rows = [...document.querySelectorAll('[data-testid="chart-tooltip"] > p')].map((row) => row.textContent);
+    const seriesRowIndex = rows.findIndex((text) => text?.includes("Rain"));
+    const markerRowIndex = rows.findIndex((text) => text === "☠ Rain died");
+    expect(seriesRowIndex).toBeGreaterThanOrEqual(0);
+    expect(markerRowIndex).toBeGreaterThan(seriesRowIndex);
+  });
+
+  it("renders every marker when more than one lands in the same bucket", () => {
+    // chartMarkers.ts documents that ties at the same atMs can co-occur and are
+    // unordered — two players SBA-ing together, or two deaths at once.
+    renderTooltip([{ dataKey: "0", name: "0", value: 1000, color: "#f00" }], LABELS, [
+      { kind: "death", atMs: 183_000, color: "#f00", label: "☠ Rain died" },
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "✦ Manmoth — Skybound Art" },
+    ]);
+    expect(screen.getByText("☠ Rain died")).toBeTruthy();
+    expect(screen.getByText("✦ Manmoth — Skybound Art")).toBeTruthy();
   });
 
   it("stays visible for a bucket where nothing landed but a marker did", () => {
@@ -129,5 +149,21 @@ describe("ChartTooltip", () => {
     const card = container.querySelector<HTMLElement>('[data-testid="chart-tooltip"]');
     expect(card!.style.visibility).not.toBe("hidden");
     expect(screen.getByText("✦ Manmoth — Skybound Art")).toBeTruthy();
+  });
+
+  it("still hides the card when an explicit empty markers array accompanies all-zero series", () => {
+    // The zero-series test above omits `markers` entirely, exercising
+    // `undefined?.length ?? 0`; pin the `[].length` branch of the same guard
+    // explicitly, since this guard is exactly what this task changed.
+    const { container } = renderTooltip(
+      [
+        { dataKey: "0", name: "0", value: 0, color: "#f00" },
+        { dataKey: "1", name: "1", value: 0, color: "#0f0" },
+      ],
+      LABELS,
+      []
+    );
+    const card = container.querySelector<HTMLElement>('[data-testid="chart-tooltip"]');
+    expect(card!.style.visibility).toBe("hidden");
   });
 });
