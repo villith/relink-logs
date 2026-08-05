@@ -2501,10 +2501,42 @@ pub struct TargetChartSeries {
     pub values: Vec<i32>,
 }
 
+/// The pre-remap half of the gate chain [`counted_hits`] and the analysis
+/// view's [`groups::aggregate_groups`] share: phantom targets and the
+/// contested-source exclusion filter. Split from [`bucket_for`] because a
+/// caller's own ability narrowing belongs BETWEEN these two halves — it must
+/// see the raw event (the remap never touches `action_id`, but it does
+/// rewrite `source`, which a source narrowing downstream must see remapped).
+fn survives_shared_gates(
+    event: &DamageEvent,
+    phantoms: &PhantomTargets,
+    filters: MeterFilters,
+) -> bool {
+    !phantoms.is_phantom(event) && !is_excluded(event, &filters)
+}
+
+/// The post-remap half of the gate chain: the target-span window and the
+/// bucket bounds, applied to an already-remapped event. `None` means the hit
+/// is out of the selected window or lands past the chart entirely.
+fn bucket_for(
+    rel_ts: i64,
+    event: &DamageEvent,
+    target_spans: &[TargetSpan],
+    interval: i64,
+    chart_len: usize,
+) -> Option<usize> {
+    if !target_selected(rel_ts, event, target_spans) {
+        return None;
+    }
+    let bucket = (rel_ts / interval) as usize;
+    (bucket < chart_len).then_some(bucket)
+}
+
 /// The hits from one source that a drill-down chart counts, in log order, as
 /// `(position in the log, bucket, remapped event)`.
 ///
-/// The gate chain the drill charts share, written once: phantom targets, the
+/// The gate chain the drill charts share, written once (see
+/// [`survives_shared_gates`]/[`bucket_for`]): phantom targets, the
 /// contested-source filter, the optional ability pin, the dragon-form remap,
 /// the target spans and the bucket bounds. Each chart's own docs promise that
 /// its area equals the total the table reports — a promise only as good as
@@ -2535,7 +2567,7 @@ fn counted_hits<'a>(
                 return None;
             };
 
-            if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
+            if !survives_shared_gates(damage_event, &phantoms, filters) {
                 return None;
             }
             if ability.is_some_and(|pinned| damage_event.action_id != pinned) {
@@ -2548,14 +2580,7 @@ fn counted_hits<'a>(
             }
 
             let rel_ts = timestamp - start_time;
-            if !target_selected(rel_ts, &damage_event, target_spans) {
-                return None;
-            }
-
-            let bucket = (rel_ts / interval) as usize;
-            if bucket >= chart_len {
-                return None;
-            }
+            let bucket = bucket_for(rel_ts, &damage_event, target_spans, interval, chart_len)?;
 
             Some((position, bucket, damage_event))
         })
