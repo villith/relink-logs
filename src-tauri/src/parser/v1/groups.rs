@@ -83,6 +83,18 @@ pub enum AbilityFilter {
     },
 }
 
+/// One admitted span of the analysis view's aura filter, in ms relative to
+/// the fight's start (the same base as `rel_ts`). Start-inclusive,
+/// END-EXCLUSIVE — the status pipeline's own interval convention (the
+/// frontend's `clipToWindow` overlaps `[startMs, endMs)`), which is what
+/// these are clipped from.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimeWindow {
+    pub from_ms: i64,
+    pub up_to_ms: i64,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupQuery {
@@ -106,6 +118,14 @@ pub struct GroupQuery {
     pub from_ms: Option<i64>,
     #[serde(default)]
     pub up_to_ms: Option<i64>,
+    /// The aura filter's admitted windows. `None` = no mask; `Some` keeps
+    /// only events whose timestamp falls inside the UNION of the windows
+    /// (`from_ms <= t < up_to_ms`). `Some(vec![])` therefore matches NOTHING —
+    /// the effect was never up inside the chart window — following the same
+    /// "a stale filter narrows to nothing, never widens" convention as an
+    /// empty `Friendly::actions` list, NOT treated as "no mask".
+    #[serde(default)]
+    pub windows: Option<Vec<TimeWindow>>,
 }
 
 /// What one row/band is. Universe-typed like the filters; `Other` is the
@@ -427,6 +447,20 @@ pub fn aggregate_groups(
             || query.up_to_ms.is_some_and(|up_to| rel_ts > up_to)
         {
             continue;
+        }
+
+        // The aura filter's window union gates BOTH streams too — like the
+        // scrub window, it is a property of the query, not of either walk.
+        // Start-inclusive, end-exclusive (the status intervals' own edge
+        // convention — unlike the scrub window above, which is inclusive at
+        // both ends because buckets are).
+        if let Some(windows) = &query.windows {
+            if !windows
+                .iter()
+                .any(|window| window.from_ms <= rel_ts && rel_ts < window.up_to_ms)
+            {
+                continue;
+            }
         }
 
         let (key, damage, bucket) = if dealt_stream {
@@ -891,6 +925,7 @@ mod tests {
             top_n: None,
             from_ms: None,
             up_to_ms: None,
+            windows: None,
         }
     }
 
@@ -905,6 +940,7 @@ mod tests {
             top_n: None,
             from_ms: None,
             up_to_ms: None,
+            windows: None,
         }
     }
 
@@ -919,6 +955,7 @@ mod tests {
             top_n: None,
             from_ms: None,
             up_to_ms: None,
+            windows: None,
         }
     }
 
@@ -933,6 +970,7 @@ mod tests {
             top_n: None,
             from_ms: None,
             up_to_ms: None,
+            windows: None,
         }
     }
 
@@ -1986,5 +2024,170 @@ mod tests {
         .expect("a stale segment reference is not a validation error");
 
         assert_eq!(aggregates, Vec::new());
+    }
+
+    // --- the aura filter's windows mask -------------------------------------
+
+    #[test]
+    fn deserializes_aura_windows() {
+        let value = json!({
+            "metric": "damage",
+            "hostility": "friendly",
+            "groupBy": "source",
+            "windows": [{ "fromMs": 1000, "upToMs": 5000 }]
+        });
+        let query: GroupQuery = serde_json::from_value(value).expect("valid GroupQuery JSON");
+
+        assert_eq!(
+            query.windows,
+            Some(vec![TimeWindow {
+                from_ms: 1_000,
+                up_to_ms: 5_000
+            }])
+        );
+    }
+
+    #[test]
+    fn windows_keep_only_events_inside_the_union_with_half_open_edges() {
+        // start_time is 1_000, so the events sit at rel_ts 0 / 1000 / 2000 / 3000.
+        let events = vec![
+            (1_000, Message::DamageEvent(player_hit(0, 9, 100, 1))), // rel 0 - before the window
+            (2_000, Message::DamageEvent(player_hit(0, 9, 100, 10))), // rel 1000 - AT from: kept (inclusive)
+            (3_000, Message::DamageEvent(player_hit(0, 9, 100, 100))), // rel 2000 - inside: kept
+            (4_000, Message::DamageEvent(player_hit(0, 9, 100, 1_000))), // rel 3000 - AT upTo: dropped (exclusive)
+        ];
+        let mut query = friendly_damage_query(Dimension::Source);
+        query.windows = Some(vec![TimeWindow {
+            from_ms: 1_000,
+            up_to_ms: 3_000,
+        }]);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            4,
+            MeterFilters::default(),
+        )
+        .expect("a windows mask is not a validation error");
+
+        assert_eq!(aggregates.len(), 1);
+        assert_eq!(aggregates[0].key, GroupKey::Player { index: 0 });
+        assert_eq!(
+            aggregates[0].measure.amount, 110,
+            "10 at the from edge + 100 inside"
+        );
+        assert_eq!(aggregates[0].measure.hits, 2);
+        assert_eq!(aggregates[0].series, vec![0, 10, 100, 0]);
+    }
+
+    #[test]
+    fn windows_union_admits_an_event_in_any_window() {
+        let events = vec![
+            (1_000, Message::DamageEvent(player_hit(0, 9, 100, 1))), // rel 0 - first window
+            (2_000, Message::DamageEvent(player_hit(0, 9, 100, 10))), // rel 1000 - the gap
+            (3_000, Message::DamageEvent(player_hit(0, 9, 100, 100))), // rel 2000 - second window
+        ];
+        let mut query = friendly_damage_query(Dimension::Source);
+        query.windows = Some(vec![
+            TimeWindow {
+                from_ms: 0,
+                up_to_ms: 1_000,
+            },
+            TimeWindow {
+                from_ms: 2_000,
+                up_to_ms: 3_000,
+            },
+        ]);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            3,
+            MeterFilters::default(),
+        )
+        .expect("a windows mask is not a validation error");
+
+        assert_eq!(
+            aggregates[0].measure.amount, 101,
+            "the gap's 10 is masked out"
+        );
+    }
+
+    #[test]
+    fn absent_windows_is_the_identity_and_empty_windows_matches_nothing() {
+        let events = vec![(1_000, Message::DamageEvent(player_hit(0, 9, 100, 500)))];
+
+        let unmasked = friendly_damage_query(Dimension::Source);
+        let all = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &unmasked,
+            1_000,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("no mask is supported");
+        assert_eq!(all[0].measure.amount, 500);
+
+        // Some(vec![]) narrows to NOTHING - the same "a stale filter narrows,
+        // never widens" convention as an empty Friendly::actions list.
+        let mut masked = friendly_damage_query(Dimension::Source);
+        masked.windows = Some(Vec::new());
+        let none = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &masked,
+            1_000,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("an empty windows list is not a validation error");
+        assert_eq!(none, Vec::new());
+    }
+
+    #[test]
+    fn windows_mask_the_taken_stream_too() {
+        const GOBLIN: u32 = 0xAAAA_0001;
+        let events = vec![
+            (1_000, Message::DamageEvent(enemy_hit(GOBLIN, 0, 9001, 400))), // rel 0 - masked out
+            (2_000, Message::DamageEvent(enemy_hit(GOBLIN, 0, 9001, 100))), // rel 1000 - kept
+        ];
+        let mut query = taken_friendly_query(Dimension::Source);
+        query.windows = Some(vec![TimeWindow {
+            from_ms: 1_000,
+            up_to_ms: 2_000,
+        }]);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            2,
+            MeterFilters::default(),
+        )
+        .expect("a windows mask on the taken stream is supported");
+
+        assert_eq!(aggregates.len(), 1);
+        assert_eq!(aggregates[0].measure.amount, 100);
     }
 }

@@ -4852,6 +4852,7 @@ mod tests {
             top_n: None,
             from_ms: None,
             up_to_ms: None,
+            windows: None,
         };
         let aggregates = aggregate_groups(
             &parser.encounter.raw_event_log,
