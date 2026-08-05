@@ -46,3 +46,20 @@ export const buildSeriesPoints = ({
 
   return points;
 };
+
+/** The Total series' key. A reserved word rather than a player index or a
+ * row-key grammar, so it can never collide with a real series. */
+export const TOTAL_SERIES_KEY = "total";
+
+/** Adds a Total value to every point: the sum of ALL listed series, whatever
+ * the legend later hides — Warcraft Logs' Total likewise ignores legend state.
+ * Summing the already-smoothed points is exact: a trailing moving average is
+ * linear, so the sum of the smoothed series IS the smoothed sum. */
+export const withTotalSeries = (
+  points: Record<string, number>[],
+  keys: (string | number)[]
+): Record<string, number>[] =>
+  points.map((point) => ({
+    ...point,
+    [TOTAL_SERIES_KEY]: keys.reduce((sum: number, key) => sum + (point[String(key)] ?? 0), 0),
+  }));

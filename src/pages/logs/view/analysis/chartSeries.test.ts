@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSeriesPoints } from "./chartSeries";
+import { buildSeriesPoints, TOTAL_SERIES_KEY, withTotalSeries } from "./chartSeries";
 
 describe("buildSeriesPoints", () => {
   it("plots string-keyed series, so a drill-down band is not forced into an actor index", () => {
@@ -62,5 +62,33 @@ describe("buildSeriesPoints", () => {
 
   it("returns nothing when the metric has no buckets", () => {
     expect(buildSeriesPoints({ source: {}, len: 0, keys: [1], smoothing: 1, scale: 1 })).toEqual([]);
+  });
+});
+
+describe("withTotalSeries", () => {
+  it("sums every listed series per bucket", () => {
+    const points = withTotalSeries(
+      [
+        { "0": 100, "1": 50 },
+        { "0": 0, "1": 25 },
+      ],
+      ["0", "1"]
+    );
+    expect(points).toEqual([
+      { "0": 100, "1": 50, [TOTAL_SERIES_KEY]: 150 },
+      { "0": 0, "1": 25, [TOTAL_SERIES_KEY]: 25 },
+    ]);
+  });
+
+  it("counts a key the point lacks as zero", () => {
+    // The legend declares one series per player, and a key the data lacks
+    // plots as a gap — the Total must not become NaN over it.
+    const points = withTotalSeries([{ "0": 10 }], ["0", "9"]);
+    expect(points[0][TOTAL_SERIES_KEY]).toBe(10);
+  });
+
+  it("accepts numeric keys, matching buildSeriesPoints' key union", () => {
+    const points = withTotalSeries([{ "7": 3 }], [7]);
+    expect(points[0][TOTAL_SERIES_KEY]).toBe(3);
   });
 });
