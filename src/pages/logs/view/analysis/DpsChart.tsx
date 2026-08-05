@@ -324,35 +324,46 @@ export const DpsChart = ({
     ));
   }, [bands, data, maxIndex]);
 
-  // Marker lines, in the same chart space and with the same ms→bucket
-  // conversion the bands use. Memoised for the same hover-rerender reason.
-  const markerLines = useMemo(() => {
+  // Each shown marker paired with the x value of the bucket it lands in — the
+  // same ms→bucket conversion the bands use, done once for the two consumers
+  // below (the lines and the tooltip lookup), which would otherwise repeat the
+  // clamp-and-convert and walk the markers twice for the same answer.
+  const bucketedMarkers = useMemo(() => {
     const bucket = (index: number) => Math.max(0, Math.min(maxIndex, index));
-    return shownMarkers.map((marker, index) => (
-      <ReferenceLine
-        key={`marker-${index}`}
-        x={data[bucket(Math.floor(marker.atMs / DPS_BUCKET_MS))]?.timestamp}
-        stroke={marker.color}
-        strokeDasharray="3 3"
-        label={{ value: MARKER_GLYPH[marker.kind], position: "top", fill: marker.color, fontSize: 10 }}
-      />
-    ));
+    return shownMarkers.map((marker) => ({
+      marker,
+      timestamp: data[bucket(Math.floor(marker.atMs / DPS_BUCKET_MS))]?.timestamp,
+    }));
   }, [shownMarkers, data, maxIndex]);
+
+  // Marker lines, in the same chart space as the bands. Memoised for the same
+  // hover-rerender reason.
+  const markerLines = useMemo(
+    () =>
+      bucketedMarkers.map(({ marker, timestamp }, index) => (
+        <ReferenceLine
+          key={`marker-${index}`}
+          x={timestamp}
+          stroke={marker.color}
+          strokeDasharray="3 3"
+          label={{ value: MARKER_GLYPH[marker.kind], position: "top", fill: marker.color, fontSize: 10 }}
+        />
+      )),
+    [bucketedMarkers]
+  );
 
   // The markers of each bucket, keyed by that bucket's x label — which is what
   // the recharts tooltip hands its content, so the lookup is one map get.
   const markersByLabel = useMemo(() => {
-    const bucket = (index: number) => Math.max(0, Math.min(maxIndex, index));
     const byLabel = new Map<string, ChartMarker[]>();
-    for (const marker of shownMarkers) {
-      const key = data[bucket(Math.floor(marker.atMs / DPS_BUCKET_MS))]?.timestamp;
-      if (key === undefined) continue;
-      const group = byLabel.get(key);
+    for (const { marker, timestamp } of bucketedMarkers) {
+      if (timestamp === undefined) continue;
+      const group = byLabel.get(timestamp);
       if (group) group.push(marker);
-      else byLabel.set(key, [marker]);
+      else byLabel.set(timestamp, [marker]);
     }
     return byLabel;
-  }, [shownMarkers, data, maxIndex]);
+  }, [bucketedMarkers]);
 
   const scopeBand = band && band[0] !== band[1] && (
     <ReferenceArea
