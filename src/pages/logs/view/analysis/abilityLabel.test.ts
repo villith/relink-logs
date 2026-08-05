@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CharacterType, ComputedPlayerState, SkillRow, SkillState } from "@/types";
 
-import { abilityLabelFor } from "./abilityLabel";
+import { abilityLabelFor, abilityOwnerFor } from "./abilityLabel";
 
 /** Stands in for `getSkillName`: names an action against its owner, and reports
  * the unnamed case the way the real chain's `skills.default.unknown-skill`
@@ -88,5 +88,27 @@ describe("abilityLabelFor", () => {
     const preferred = player(1, "Pl1400", [{ Normal: 2000 }]);
 
     expect(abilityLabelFor("Normal:1000", PARTY, SKILL_NAME, preferred)).toBe("Pl1000 Light Blast");
+  });
+});
+
+describe("abilityOwnerFor", () => {
+  it("answers the first player whose breakdown owns the key", () => {
+    expect(abilityOwnerFor("Normal:2000", PARTY)).toBe(PARTY[1]);
+  });
+
+  it("prefers the pinned player over the party scan on a colliding id", () => {
+    // Same collision abilityLabelFor guards: two characters sharing an id.
+    const collision = [player(0, "Pl1000", [{ Normal: 1000 }]), player(1, "Pl1400", [{ Normal: 1000 }])];
+    expect(abilityOwnerFor("Normal:1000", collision, collision[1])).toBe(collision[1]);
+  });
+
+  it("matches a group pin on the row key", () => {
+    // Against the REAL table: Gran's 100 is "normal-attack".
+    const gran = player(4, "Pl0000", [{ Normal: 100 }]);
+    expect(abilityOwnerFor('Group:normal-attack@"Pl0000"', [gran])).toBe(gran);
+  });
+
+  it("answers undefined when nobody used it", () => {
+    expect(abilityOwnerFor("Normal:99999", PARTY)).toBeUndefined();
   });
 });
