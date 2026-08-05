@@ -1,6 +1,7 @@
 import type { ActionType, ComputedPlayerState, DamageTakenState, EnemyType } from "@/types";
 import { humanizeNumber, ratePerSecond } from "@/utils";
 
+import { skillsForAbilityKey } from "../abilitySkills";
 import { enemyRowKey, playersColumns } from "./damageDone";
 import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
 
@@ -188,5 +189,67 @@ export const damageTaken: MetricDescriptor = {
     const breakdown = owner ? owner.damageTakenBreakdown ?? [] : players.flatMap((p) => p.damageTakenBreakdown ?? []);
 
     return attackRows(breakdown, fightDurationMs);
+  },
+
+  // The table's in-place nesting (Package C). The friendly side's ability rows
+  // are enemy ATTACKS; party-wide, each splits per VICTIM — this tab's source
+  // dimension — out of every scoped player's `damageTakenBreakdown`, matched
+  // by the same (attacker, attack) JSON the row key spells. The enemy side's
+  // ability rows are the party's own abilities (the dealt stream), so they
+  // split per dealing player. Either way a pinned source leaves one child,
+  // which would only restate the parent — null instead.
+  children: ({ row, players, level, pins, fightDurationMs, hostility }): MetricRow[] | null => {
+    if (level !== "abilities" || pins.source !== null) return null;
+
+    if (hostility === "enemy") {
+      if (!row.key.startsWith("skill:")) return null;
+      const key = row.key.slice("skill:".length);
+      return players
+        .map((player) => ({ player, skills: skillsForAbilityKey(player.skillBreakdown, key) }))
+        .filter(({ skills }) => skills.length > 0)
+        .map(({ player, skills }): MetricRow => {
+          const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
+          const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
+          return {
+            key: `player:${player.index}`,
+            label: String(player.index),
+            kind: "player",
+            value: damage,
+            columns: drilldownColumns(damage, hits, fightDurationMs),
+            // A leaf: the enemy side's pin universes belong to the enemy
+            // role-mapping, and a player child must not pin into them.
+            pinOnClick: null,
+            colorSlot: player.partyIndex,
+          };
+        })
+        .sort((a, b) => b.value - a.value);
+    }
+
+    if (!row.key.startsWith("taken:")) return null;
+    const label = row.key.slice("taken:".length);
+    return players
+      .map((player) => ({
+        player,
+        entries: (player.damageTakenBreakdown ?? []).filter(
+          (entry) => JSON.stringify({ enemyType: entry.enemyType, actionId: entry.actionId }) === label
+        ),
+      }))
+      .filter(({ entries }) => entries.length > 0)
+      .map(({ player, entries }): MetricRow => {
+        const damage = entries.reduce((sum, entry) => sum + entry.totalDamage, 0);
+        const hits = entries.reduce((sum, entry) => sum + entry.hits, 0);
+        return {
+          key: `player:${player.index}`,
+          label: String(player.index),
+          kind: "player",
+          value: damage,
+          columns: drilldownColumns(damage, hits, fightDurationMs),
+          // Clicking a victim child pins that victim — the machine keeps the
+          // attack pin, so the next state is that victim's drill.
+          pinOnClick: { source: player.index },
+          colorSlot: player.partyIndex,
+        };
+      })
+      .sort((a, b) => b.value - a.value);
   },
 };

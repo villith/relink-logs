@@ -4,6 +4,7 @@ import type { ComputedPlayerState } from "@/types";
 
 import type { SelectorPins } from "../selectorOptions";
 import { damageTaken, takenAttackNameKey, takenAttackRowParts } from "./damageTaken";
+import type { MetricRow } from "./types";
 
 const player = (
   index: number,
@@ -340,5 +341,138 @@ describe("damageTaken enemy side", () => {
     } as never);
 
     expect(enemyRows).toEqual([]);
+  });
+});
+
+describe("damageTaken.children — per-source split", () => {
+  const abilityRow = (key: string, label = ""): MetricRow => ({
+    key,
+    label,
+    kind: key.startsWith("taken:") ? "takenAttack" : "ability",
+    value: 0,
+    columns: [],
+    pinOnClick: null,
+    colorSlot: -1,
+  });
+
+  const ATTACK = JSON.stringify({ enemyType: { Unknown: 0xaa }, actionId: { Normal: 1 } });
+
+  const VICTIMS = [
+    player(0, {
+      totalDamageTaken: 500,
+      damageTakenBreakdown: [{ enemy: 0xaa, action: 1, hits: 1, total: 500, max: 500 }],
+    }),
+    player(1, {
+      totalDamageTaken: 300,
+      damageTakenBreakdown: [{ enemy: 0xaa, action: 1, hits: 1, total: 300, max: 300 }],
+    }),
+  ];
+
+  it("splits a party-wide attack row into one child per victim", () => {
+    const children = damageTaken.children!({
+      row: abilityRow(`taken:${ATTACK}`, ATTACK),
+      players: VICTIMS,
+      level: "abilities",
+      pins: NO_PINS,
+      fightDurationMs: 100_000,
+      hostility: "friendly",
+    })!;
+
+    expect(children.map((child) => child.key)).toEqual(["player:0", "player:1"]);
+    expect(children[0].kind).toBe("player");
+    expect(children[0].pinOnClick).toEqual({ source: 0 });
+    expect(children.map((child) => child.colorSlot)).toEqual([0, 1]);
+    // Amount, hits, average, DTPS over the 100s window — the taken drill shape.
+    expect(children[0].columns).toEqual(["500", "1", "500", "5"]);
+  });
+
+  it("answers null with a victim pinned — one child would restate the parent", () => {
+    const children = damageTaken.children!({
+      row: abilityRow(`taken:${ATTACK}`, ATTACK),
+      players: VICTIMS,
+      level: "abilities",
+      pins: { source: 0, targets: [], ability: null },
+      fightDurationMs: 100_000,
+      hostility: "friendly",
+    });
+    expect(children).toBeNull();
+  });
+
+  /** A dealing player, for the enemy side (the dealt stream). */
+  const dealer = (index: number, damage: number, hits: number) =>
+    ({
+      index,
+      partyIndex: index,
+      characterType: "Pl0000",
+      totalDamage: damage,
+      skillBreakdown: [
+        {
+          actionType: { Normal: 9001 },
+          childCharacterType: "Pl0000",
+          hits,
+          minDamage: 1,
+          maxDamage: 1,
+          totalDamage: damage,
+          totalStunValue: 0,
+          maxStunValue: 0,
+          cappedHits: 0,
+          cappableHits: 0,
+          overcapBaseSum: 0,
+          overcapCapSum: 0,
+        },
+      ],
+    }) as unknown as ComputedPlayerState;
+
+  it("splits an enemy-side ability row (the dealt stream) per dealing player", () => {
+    const children = damageTaken.children!({
+      row: abilityRow("skill:Normal:9001"),
+      players: [dealer(0, 5_000, 5), dealer(1, 3_000, 3)],
+      level: "abilities",
+      pins: NO_PINS,
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    })!;
+
+    expect(children.map((child) => child.key)).toEqual(["player:0", "player:1"]);
+    expect(children[0].columns).toEqual(["5.0k", "5", "1.0k", "50"]);
+    // Leaves: the enemy side's pin universes belong to the enemy role-mapping,
+    // and a player child pinning into them would pin the wrong thing.
+    expect(children.every((child) => child.pinOnClick === null)).toBe(true);
+  });
+
+  it("answers null for a row in the wrong grammar for its side", () => {
+    expect(
+      damageTaken.children!({
+        row: abilityRow("skill:Normal:9001"),
+        players: VICTIMS,
+        level: "abilities",
+        pins: NO_PINS,
+        fightDurationMs: 100_000,
+        hostility: "friendly",
+      })
+    ).toBeNull();
+    expect(
+      damageTaken.children!({
+        row: abilityRow(`taken:${ATTACK}`, ATTACK),
+        players: [dealer(0, 100, 1)],
+        level: "abilities",
+        pins: NO_PINS,
+        fightDurationMs: 100_000,
+        hostility: "enemy",
+      })
+    ).toBeNull();
+  });
+
+  it("answers null off the abilities level", () => {
+    expect(
+      damageTaken.children!({
+        row: abilityRow(`taken:${ATTACK}`, ATTACK),
+        players: VICTIMS,
+        level: "players",
+        pins: NO_PINS,
+        fightDurationMs: 100_000,
+        hostility: "friendly",
+      })
+    ).toBeNull();
   });
 });
