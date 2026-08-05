@@ -4794,10 +4794,32 @@ mod tests {
         let mut parser = Parser::default();
         // Two spawns of the SAME enemy type (damage_onto keeps actor_type
         // 0x1234 for any target index): segments 0 and 1, instances #1 and #2.
+        //
+        // Non-damage events are interleaved (before both, and between them) so
+        // the raw-log index diverges from the damage-event ordinal: the first
+        // damage event sits at raw index 1 (ordinal 0) and the second at raw
+        // index 3 (ordinal 1). This pins `segment_targets_indexed`'s
+        // `event_index` to the raw log's position, not a filtered count — a
+        // refactor that enumerated only damage events would still line up
+        // ordinals 0/1 with segments 0/1 and pass regardless.
+        parser.encounter.raw_event_log.push((
+            900,
+            Message::OnPlayerStun(OnPlayerStunEvent {
+                actor_index: 0,
+                stun_amount: 0.0,
+            }),
+        ));
         parser
             .encounter
             .raw_event_log
             .push((1_000, Message::DamageEvent(damage_onto(9, 100, 400))));
+        parser.encounter.raw_event_log.push((
+            1_500,
+            Message::OnPlayerStun(OnPlayerStunEvent {
+                actor_index: 0,
+                stun_amount: 0.0,
+            }),
+        ));
         parser
             .encounter
             .raw_event_log
