@@ -69,6 +69,7 @@ import { RegroupStrip } from "./RegroupStrip";
 import { abilityLabelFor } from "./abilityLabel";
 import "./analysis.css";
 import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "./chartMarkers";
+import { chartPresentation } from "./chartPresentation";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
@@ -121,16 +122,6 @@ const METRIC_TABS: MetricTab[] = Object.entries(METRICS).map(([value, descriptor
   value,
   labelKey: descriptor.labelKey,
 }));
-
-/** What the plot is titled once it decomposes a pinned row, per level. */
-const DRILL_LABEL_KEY = {
-  players: "ui.logs.chart-dps-label",
-  abilities: "ui.logs.chart-drill-ability-label",
-  // The chart always stacks by enemy here. The table agrees when the pinned row
-  // held one action and decomposed into enemies too, and lists the group's
-  // members when it held several — the plot stays the coarser of the two.
-  skills: "ui.logs.chart-drill-target-label",
-} as const;
 
 /** Tooltip line per marker kind. Sibling of `DpsChart`'s `MARKER_LABEL_KEY`, but
  * a separate key set: those name the control-row checkboxes, these are the
@@ -588,12 +579,6 @@ export const AnalysisView = () => {
   );
 
   const metric = METRICS[metricKey] ?? damageDone;
-
-  // Whether the enemy side is actually on screen. `hostility` above is already
-  // the EFFECTIVE side (the resolver's rule: a metric with no enemy side reads
-  // friendly whatever the URL says), so this one spelling keeps the chart, its
-  // title, the hover cards and the empty state agreeing about what is showing.
-  const enemySide = hostility === "enemy";
 
   // The window the status tables measure, in milliseconds from the fight's
   // start. Buckets are inclusive at both ends, so the last one runs to the start
@@ -1103,31 +1088,22 @@ export const AnalysisView = () => {
   // keeps drawing the whole fight beside a table that has halved. Damage only:
   // it is the only metric a target span can narrow honestly (see
   // `build_scoped_player_chart`).
-  // Whichever series is drawn INSTEAD of the per-player ones. Stack counts and
-  // group bands are the same shape and are consumed identically, so they are
-  // one branch here rather than the same ternary spelled out per field.
-  const overlay = statusSeries ?? effectSeries ?? groupOverlay;
-
-  // WHICH of those the plot ended up drawing, recognised from the value itself
-  // rather than re-derived from the pins, so the title cannot disagree with
-  // what is on screen. "scoped" is the groups path's per-player lines (the
-  // query's filters applied); "drill" its stacked bands.
-  const chartSource: "base" | "scoped" | "stacks" | "drill" =
-    overlay === null
-      ? groupPlayerSeries
-        ? "scoped"
-        : "base"
-      : overlay === statusSeries || overlay === effectSeries
-        ? "stacks"
-        : "drill";
-
-  // The Total series draws exactly where the chart draws independent LINES:
-  // the groups path's source grouping on the friendly side (Damage Done and
-  // Damage Taken), from either the group series or the base-chart fallback.
-  // Stacked charts (drills, and the whole enemy side) already show the total
-  // as the stack's height, and a Total series inside a Mantine stacked
-  // AreaChart would be ADDED to the stack and double it.
-  const withTotal = groupsPath && spec.groupBy === "source" && hostility === "friendly" && overlay === null;
+  // Which series won, what that makes the plot, and how it is titled and
+  // formatted — one pure fold of the series above (see chartPresentation.ts),
+  // so the heading can never disagree with what is on screen.
+  const { overlay, chartSource, withTotal, labelKey, format, stacked } = chartPresentation({
+    statusSeries,
+    effectSeries,
+    groupOverlay,
+    groupPlayerSeries,
+    groupsPath,
+    groupBy: spec.groupBy,
+    hostility,
+    metricKey,
+    level,
+    metricLabelKey: chartMetric.labelKey,
+    metricFormat: chartMetric.format,
+  });
 
   const chartData: ChartDatapoint[] = useMemo(() => {
     const source = overlay
@@ -1303,32 +1279,9 @@ export const AnalysisView = () => {
       <DpsChart
         data={shownChartData}
         labels={labels}
-        // Titled after what is DRAWN, never after what the pins would suggest.
-        labelKey={
-          chartSource === "stacks"
-            ? // Pinned, the plot is one effect's stack depths; unpinned it is
-              // the effects themselves as holder counts.
-              statusSeries !== null
-              ? "ui.logs.chart-stacks-label"
-              : "ui.logs.chart-effects-label"
-            : groupOverlay !== null
-              ? // The enemy side inverts which way the damage flows, so both
-                // of these name both ends. Reusing the friendly titles would
-                // leave the heading unchanged across a toggle that swapped
-                // the plotted quantity for its opposite.
-                enemySide
-                ? metricKey === "damage"
-                  ? "ui.logs.chart-enemy-dealt-label"
-                  : "ui.logs.chart-enemy-received-label"
-                : metricKey === "taken"
-                  ? "ui.logs.chart-taken-drill-label"
-                  : DRILL_LABEL_KEY[level]
-              : chartMetric.labelKey
-        }
-        // An overlay of any kind plots an amount; the base sources keep their
-        // metric's own format (the SBA gauge is a percent).
-        format={chartSource === "stacks" ? "count" : groupOverlay !== null ? "amount" : chartMetric.format}
-        stacked={overlay !== null}
+        labelKey={labelKey}
+        format={format}
+        stacked={stacked}
         onScope={handleScope}
         fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
         toLabel={range === null ? fullLabel : bucketLabel(range[1])}
