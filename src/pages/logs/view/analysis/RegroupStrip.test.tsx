@@ -10,7 +10,12 @@ vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => k
 const TABS: RegroupTab[] = [
   { dim: "source", labelKey: "ui.logs.groupby-damage-source", active: true },
   { dim: "ability", labelKey: "ui.logs.groupby-damage-ability", active: false },
-  { dim: "target", labelKey: "", active: false, disabledReason: "ui.logs.stun-no-target-dimension" },
+  {
+    dim: "target",
+    labelKey: "ui.logs.groupby-generic-target",
+    active: false,
+    disabledReason: "ui.logs.stun-no-target-dimension",
+  },
 ];
 
 const renderIt = (props: Partial<React.ComponentProps<typeof RegroupStrip>> = {}) =>
@@ -21,10 +26,11 @@ const renderIt = (props: Partial<React.ComponentProps<typeof RegroupStrip>> = {}
   );
 
 describe("RegroupStrip", () => {
-  it("renders one control per tabs entry, labelled for enabled tabs", () => {
+  it("renders one control per tabs entry, every one of them labelled", () => {
     renderIt();
     expect(screen.getByRole("tab", { name: "ui.logs.groupby-damage-source" })).toBeTruthy();
     expect(screen.getByRole("tab", { name: "ui.logs.groupby-damage-ability" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "ui.logs.groupby-generic-target" })).toBeTruthy();
     expect(screen.getAllByRole("tab")).toHaveLength(3);
   });
 
@@ -54,7 +60,7 @@ describe("RegroupStrip", () => {
     const onRegroup = vi.fn();
     renderIt({ onRegroup });
 
-    const disabledTab = screen.getAllByRole("tab").at(-1)!;
+    const disabledTab = screen.getByRole("tab", { name: "ui.logs.groupby-generic-target" });
     expect(disabledTab.getAttribute("aria-disabled")).toBe("true");
 
     fireEvent.click(disabledTab);
@@ -73,17 +79,28 @@ describe("RegroupStrip", () => {
   it("roves focus with the arrow keys, skipping a disabled tab, and wraps", () => {
     const tabs: RegroupTab[] = [
       { dim: "source", labelKey: "ui.logs.groupby-damage-source", active: true },
-      { dim: "ability", labelKey: "", active: false, disabledReason: "ui.logs.stun-no-target-dimension" },
+      {
+        dim: "ability",
+        labelKey: "ui.logs.groupby-generic-ability",
+        active: false,
+        disabledReason: "ui.logs.sba-no-breakdown",
+      },
       { dim: "target", labelKey: "ui.logs.groupby-damage-target", active: false },
     ];
-    renderIt({ tabs });
+    const onRegroup = vi.fn();
+    renderIt({ tabs, onRegroup });
 
     const [first, , third] = screen.getAllByRole("tab");
     first.focus();
     fireEvent.keyDown(first, { key: "ArrowRight" });
     expect(document.activeElement).toBe(third);
+    expect(onRegroup).toHaveBeenCalledTimes(1);
+    expect(onRegroup).toHaveBeenCalledWith("target");
 
+    // Wraps past the disabled ability tab back onto the already-active
+    // source tab — focus follows, but the active no-op guard still holds.
     fireEvent.keyDown(third, { key: "ArrowRight" });
     expect(document.activeElement).toBe(first);
+    expect(onRegroup).toHaveBeenCalledTimes(1);
   });
 });

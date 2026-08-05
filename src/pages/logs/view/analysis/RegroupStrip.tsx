@@ -16,8 +16,8 @@ export type RegroupStripProps = {
  * is the override. Every dimension is always listed — an unsupported one is
  * disabled with its reason, never hidden, so a hole is visible.
  *
- * MetricTabs' smaller sibling: the same ARIA-tabs pattern (role="tablist" /
- * role="tab", `aria-selected` marks the active one, roving tabindex with
+ * MetricTabs' smaller sibling: the intended ARIA-tabs pattern (role="tablist"
+ * / role="tab", `aria-selected` marks the active one, roving tabindex with
  * ArrowLeft/ArrowRight moving focus), one size down. The one wrinkle
  * MetricTabs never needed: a disabled dimension has no control to land on, so
  * the roving cycle skips it.
