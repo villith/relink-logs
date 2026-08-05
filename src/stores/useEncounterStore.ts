@@ -26,11 +26,15 @@ interface EncounterStore {
    * backend that predates the field; all zeroes on logs recorded before
    * damage-taken capture. */
   takenChart: Record<number, number[]>;
-  /** Damage each enemy TYPE dealt to the party per second — Damage Done's enemy
-   * side. Empty on logs recorded before damage-taken capture. */
+  /** Damage each enemy TYPE DEALT to the party per second — which is what the
+   * Damage Done tab ranks on its enemy side. "Dealt" is relative to the ENEMY:
+   * the toggle names WHO acted, not which side of the party's fight the tab
+   * shows. Empty on logs recorded before damage-taken capture. */
   enemyDealtChart: EnemySeries[];
-  /** Damage each enemy TYPE received from the party per second — Damage Taken's
-   * enemy side. Present on every log. */
+  /** Damage each enemy TYPE RECEIVED from the party per second — what the
+   * Damage Taken tab ranks on its enemy side, by that same rule. Built from
+   * dealt events, so unlike the one above it does not depend on damage-taken
+   * capture — logs recorded before that carry this series too. */
   enemyReceivedChart: EnemySeries[];
   /** Enemy HP% per second, one series per charted HP pool (largest first). Empty on old logs. */
   hpChart: HpChartSeries[];

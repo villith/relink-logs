@@ -1324,11 +1324,16 @@ struct EncounterStateResponse {
     /// Damage TAKEN per DPS-chart bucket, keyed by the victim's slot key. All
     /// zeroes on logs recorded before damage-taken capture (2026-08-04).
     taken_chart: HashMap<u32, Vec<i64>>,
-    /// Per-enemy-type dealt-to-party buckets for Damage Done's enemy side.
-    /// Empty on logs recorded before damage-taken capture (2026-08-04).
+    /// Damage each enemy TYPE DEALT to the party, per DPS-chart bucket — which
+    /// is what Damage Done ranks on its enemy side. "Dealt" is relative to the
+    /// ENEMY: the toggle names WHO acted, not which side of the party's fight
+    /// the tab shows. Empty on logs recorded before damage-taken capture
+    /// (2026-08-04).
     enemy_dealt_chart: Vec<v1::EnemySeries>,
-    /// Per-enemy-type received-from-party buckets for Damage Taken's enemy
-    /// side. Works on every log (built from dealt events).
+    /// Damage each enemy TYPE RECEIVED from the party, per DPS-chart bucket —
+    /// what Damage Taken ranks on its enemy side, by that same rule. Built from
+    /// dealt events, so unlike its sibling it does not depend on the 2026-08-04
+    /// damage-taken capture — logs recorded before that carry this series too.
     enemy_received_chart: Vec<v1::EnemySeries>,
     /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
     /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
