@@ -122,10 +122,12 @@
   cursor: pointer;
 }
 
-/* A skill-group member behind an expanded parent: the same row anatomy,
- * indented so the hierarchy reads at a glance. */
+/* A child behind an expanded parent (a member variant or one source's share):
+ * the same row anatomy, indented and on a muted panel so the hierarchy reads
+ * at a glance without stealing the parents' contrast. */
 .analysis-subrow {
   padding-left: 28px;
+  background-color: var(--an-panel);
 }
 
 /* The skill-group expand control. Same anatomy as the band toggle: on the

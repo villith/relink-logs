@@ -429,3 +429,74 @@ describe("timeline rows", () => {
     expect(container.querySelector(".analysis-track")).toBeNull();
   });
 });
+
+describe("children accessor", () => {
+  const child = (key: string, value: number): MetricRow => ({
+    key,
+    label: key,
+    value,
+    columns: [String(value), ""],
+    pinOnClick: null,
+    colorSlot: 0,
+  });
+
+  const parent = (children?: MetricRow[]): MetricRow => ({
+    key: "skill:parent",
+    label: "skill:parent",
+    value: 100,
+    columns: ["100", "1"],
+    pinOnClick: null,
+    colorSlot: 0,
+    ...(children ? { children } : {}),
+  });
+
+  it("prefers the accessor's children over the row's own", () => {
+    // Party-wide, the per-source split REPLACES the member variants the
+    // groups fetch attached — the spec's two reading modes.
+    const { container } = renderTable({
+      rows: [parent([child("skill:member", 40), child("skill:member2", 60)])],
+      rowChildren: () => [child("player:0", 70), child("player:1", 30)],
+    });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(screen.getByText("player:0")).toBeTruthy();
+    expect(screen.queryByText("skill:member")).toBeNull();
+  });
+
+  it("falls back to the row's own children when the accessor answers null", () => {
+    // The drilled case: a pinned source's parent carries its member variants.
+    const { container } = renderTable({
+      rows: [parent([child("skill:member", 40), child("skill:member2", 60)])],
+      rowChildren: () => null,
+    });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(screen.getByText("skill:member")).toBeTruthy();
+  });
+
+  it("hides the chevron below two children — one child only restates its parent", () => {
+    const { container } = renderTable({
+      rows: [parent()],
+      rowChildren: () => [child("player:0", 100)],
+    });
+    expect(container.querySelectorAll(".analysis-row-expand")).toHaveLength(0);
+  });
+
+  it("reports its open state to assistive tech", () => {
+    const { container } = renderTable({
+      rows: [parent()],
+      rowChildren: () => [child("player:0", 70), child("player:1", 30)],
+    });
+    const chevron = container.querySelector(".analysis-row-expand")!;
+    expect(chevron.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(chevron);
+    expect(chevron.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("gives accessor children the subrow anatomy", () => {
+    const { container } = renderTable({
+      rows: [parent()],
+      rowChildren: () => [child("player:0", 70), child("player:1", 30)],
+    });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(container.querySelectorAll(".analysis-subrow")).toHaveLength(2);
+  });
+});

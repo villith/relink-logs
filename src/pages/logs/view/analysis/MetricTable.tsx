@@ -38,6 +38,13 @@ export type MetricTableProps = {
    * thing to feed it. Absent, no row grows a control and the table keeps the
    * DOM it has. */
   rowToggle?: (row: MetricRow) => { shown: boolean; onToggle: () => void } | null;
+  /** Child rows behind one row, resolved by the caller — the descriptor's
+   * `children` accessor bound to the current derived state. Null (or no
+   * accessor) falls back to the row's OWN `children`, the groups path's
+   * member variants — which is the drilled reading. Injected for the same
+   * reason as `rowSections`: the per-source split needs the derived party,
+   * which the table deliberately knows nothing about. */
+  rowChildren?: (row: MetricRow) => MetricRow[] | null;
   /** Length of the window `MetricRow.timeline` spans, in milliseconds — the
    * denominator that turns a window into a position. Zero (or absent) makes
    * every row fall back to its magnitude bar, which is what a fight with no
@@ -70,6 +77,7 @@ export const MetricTable = ({
   rowSections,
   cardAmount,
   rowToggle,
+  rowChildren,
   timelineMs = 0,
   emptyKey = "ui.logs.no-rows",
 }: MetricTableProps) => {
@@ -83,6 +91,15 @@ export const MetricTable = ({
   const sectionsByRow = useMemo(
     () => (rowSections ? new Map(rows.map((row) => [row.key, rowSections(row)])) : null),
     [rows, rowSections]
+  );
+
+  // Resolved once per row set, same as `sectionsByRow`: the accessor scans the
+  // whole party's breakdown per row, and its answer only changes when the rows
+  // do. Null falls back to the row's own children — the member variants the
+  // groups fold attached — so one prop serves both reading modes.
+  const childrenByRow = useMemo(
+    () => new Map(rows.map((row) => [row.key, rowChildren?.(row) ?? row.children ?? []])),
+    [rows, rowChildren]
   );
 
   // Which skill-group parents are open. Transient like `banded`, and reset
@@ -115,16 +132,22 @@ export const MetricTable = ({
       </Box>
 
       {rows.map((row) => {
-        // One renderer for the row and its member subrows, so the two can
-        // never drift apart. A subrow is the same anatomy indented: no band
-        // toggle, no timeline, no expansion of its own — only group parents
-        // carry children, and only status rows (which have none) timelines.
+        const childRows = childrenByRow.get(row.key) ?? [];
+
+        // One renderer for the row and its subrows (member variants or the
+        // per-source split), so the two can never drift apart. A subrow is the
+        // same anatomy indented: no band toggle, no timeline, no expansion of
+        // its own — only top-level parents carry children, and only status
+        // rows (which have none) timelines.
         const rowElement = (rowData: MetricRow, nested: boolean) => {
           const toggle = nested ? null : rowToggle?.(rowData);
           // A row with windows to place draws a positional timeline instead of
           // a magnitude bar — asked three times below, so it is answered once.
           const positional = !nested && Boolean(rowData.timeline) && timelineMs > 0;
-          const hasChildren = !nested && (rowData.children?.length ?? 0) > 0;
+          // Only rows offering a real CHOICE expand: below two children the
+          // expansion restates its parent (the spec's ≥2 rule). `childRows`
+          // is the outer row's — only the outer call can pass nested=false.
+          const hasChildren = !nested && childRows.length >= 2;
           const isExpanded = expanded.has(rowData.key);
           return (
             // A div, not a button. The controls inside it are real <button>s,
@@ -264,7 +287,7 @@ export const MetricTable = ({
           <Fragment key={row.key}>
             {parent}
             {expanded.has(row.key) &&
-              row.children?.map((child) => <Fragment key={child.key}>{rowElement(child, true)}</Fragment>)}
+              childRows.map((child) => <Fragment key={child.key}>{rowElement(child, true)}</Fragment>)}
           </Fragment>
         );
       })}
