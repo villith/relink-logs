@@ -522,6 +522,7 @@
       "expand-row": "Expand",
       "chart-drag-hint": "Drag to scope · double-click to reset",
       "chart-legend-label": "Chart series",
+      "chart-total-label": "Total",
       "quest-cleared": "Cleared",
       "quest-failed": "Not cleared",
       "no-rows": "Nothing matches the current pins. Clear one to see more.",

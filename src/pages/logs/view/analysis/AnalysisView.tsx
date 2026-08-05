@@ -69,7 +69,7 @@ import { QuestSummary } from "./QuestSummary";
 import { RegroupStrip } from "./RegroupStrip";
 import { abilityLabelFor } from "./abilityLabel";
 import "./analysis.css";
-import { buildSeriesPoints } from "./chartSeries";
+import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { groupBandsFor, groupRowsFor } from "./machine/groupRows";
@@ -1072,6 +1072,14 @@ export const AnalysisView = () => {
   const chartSource: "base" | "scoped" | "stacks" | "drill" =
     overlay === null ? (groupPlayerSeries ? "scoped" : "base") : overlay === statusSeries ? "stacks" : "drill";
 
+  // The Total series draws exactly where the chart draws independent LINES:
+  // the groups path's source grouping on the friendly side (Damage Done and
+  // Damage Taken), from either the group series or the base-chart fallback.
+  // Stacked charts (drills, and the whole enemy side) already show the total
+  // as the stack's height, and a Total series inside a Mantine stacked
+  // AreaChart would be ADDED to the stack and double it.
+  const withTotal = groupsPath && spec.groupBy === "source" && hostility === "friendly" && overlay === null;
+
   const chartData: ChartDatapoint[] = useMemo(() => {
     const source = overlay
       ? Object.fromEntries(overlay.map((series) => [series.key, series.values]))
@@ -1086,7 +1094,7 @@ export const AnalysisView = () => {
         ? Math.max(0, ...Object.values(groupPlayerSeries).map((values) => values.length))
         : chartMetric.len;
 
-    return buildSeriesPoints({
+    const points = buildSeriesPoints({
       source: source as Record<string, number[]>,
       len,
       keys,
@@ -1098,8 +1106,14 @@ export const AnalysisView = () => {
       // The group series are raw damage like `dpsChart`, so their scale is 1
       // on the damage tab either way — kept explicit rather than accidental.
       scale: overlay || groupPlayerSeries ? 1 : chartMetric.scale,
-    }).map((point, bucket) => ({ ...point, timestamp: bucketLabel(bucket) })) as ChartDatapoint[];
-  }, [chartMetric, chartIndexes, overlay, groupPlayerSeries, statusSeries]);
+    });
+    // Summed over ALL fetched series, not the legend-visible ones — the values
+    // are baked into the data, so hiding a player later cannot lower the Total.
+    return (withTotal ? withTotalSeries(points, keys) : points).map((point, bucket) => ({
+      ...point,
+      timestamp: bucketLabel(bucket),
+    })) as ChartDatapoint[];
+  }, [chartMetric, chartIndexes, overlay, groupPlayerSeries, statusSeries, withTotal]);
 
   const labels: Label = useMemo(
     () =>
@@ -1113,22 +1127,37 @@ export const AnalysisView = () => {
             partySlotIndex: position,
             color: HP_SERIES_COLORS[position % HP_SERIES_COLORS.length],
           }))
-        : identityPlayers
-            .filter((player) => chartIndexes.includes(player.index))
-            .map((player) => ({
-              name: String(player.index),
-              // The legend carries no rank or position, so it names the
-              // character too — otherwise two AI players are told apart by
-              // colour alone.
-              label: legendLabelFor(
-                labelForSource(player.index),
-                translateCharacterType(player.characterType),
-                player_label_template
-              ),
-              partySlotIndex: player.partyIndex,
-              color: colors[player.partyIndex % colors.length] ?? PLAYER_COLORS[0],
-            })),
-    [overlay, identityPlayers, chartIndexes, labelForSource, colors, player_label_template]
+        : [
+            // First in the array so recharts draws it FIRST — the player lines
+            // sit on top of the neutral dashed Total, never under it.
+            ...(withTotal
+              ? [
+                  {
+                    name: TOTAL_SERIES_KEY,
+                    label: t("ui.logs.chart-total-label"),
+                    partySlotIndex: -1,
+                    color: "var(--mantine-color-gray-5)",
+                    strokeDasharray: "6 4",
+                  },
+                ]
+              : []),
+            ...identityPlayers
+              .filter((player) => chartIndexes.includes(player.index))
+              .map((player) => ({
+                name: String(player.index),
+                // The legend carries no rank or position, so it names the
+                // character too — otherwise two AI players are told apart by
+                // colour alone.
+                label: legendLabelFor(
+                  labelForSource(player.index),
+                  translateCharacterType(player.characterType),
+                  player_label_template
+                ),
+                partySlotIndex: player.partyIndex,
+                color: colors[player.partyIndex % colors.length] ?? PLAYER_COLORS[0],
+              })),
+          ],
+    [overlay, identityPlayers, chartIndexes, labelForSource, colors, player_label_template, withTotal, t]
   );
 
   // The chart IS the window: committing does not shade the rest of the fight,
