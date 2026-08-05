@@ -106,11 +106,12 @@ export const takenAbilityCardSectionsFor = ({
    * narrowed — the scoped party's taken breakdowns are NOT pin-filtered by
    * the backend (taken events bypass the selection gates), so the card must
    * apply the pin itself or it would total more than the row it explains.
-   * The same drift can run the other way under an active TARGET pin: the
-   * backend narrows the row to the pinned attacker SPAWN's lifespan, which
-   * `damageTakenBreakdown` (no segments, no timestamps) cannot mirror — so
-   * with same-type respawns the card can total more than the row, the same
-   * type-level approximation this builder already documents above. */
+   * Under an active TARGET pin the same drift can also arise from the
+   * opposite side — there the backend narrows the row to the pinned attacker
+   * SPAWN's lifespan, which `damageTakenBreakdown` (no segments, no
+   * timestamps) cannot mirror — so with same-type respawns the card can total
+   * more than the row, the same type-level approximation this builder already
+   * documents above. */
   source: number | null;
   color: string;
   labels: TakenVictimLabels;

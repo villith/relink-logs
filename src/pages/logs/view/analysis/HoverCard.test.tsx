@@ -2,7 +2,7 @@ import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { HoverCard, HoverCardBody, type CardSection } from "./HoverCard";
+import { HoverCard, HoverCardBody, SECTION_ENTRY_CAP, type CardSection } from "./HoverCard";
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
@@ -54,13 +54,12 @@ describe("HoverCardBody", () => {
     expect(screen.getByText("1.0")).toBeTruthy();
   });
 
-  it("caps a section at its top five entries, silently — WCL's behavior", () => {
-    // No "+N more" row: the sixth-largest entry and everything below it
+  it("caps a section at its top entries, silently — WCL's behavior", () => {
+    // No "+N more" row: the entry past the cap and everything below it
     // simply do not render.
-    renderBody([section("ui.logs.hover-by-ability", 6)]);
-    expect(screen.getByText("entry 0")).toBeTruthy();
-    expect(screen.getByText("entry 4")).toBeTruthy();
-    expect(screen.queryByText("entry 5")).toBeNull();
+    renderBody([section("ui.logs.hover-by-ability", SECTION_ENTRY_CAP + 1)]);
+    expect(screen.getByText(`entry ${SECTION_ENTRY_CAP - 1}`)).toBeTruthy();
+    expect(screen.queryByText(`entry ${SECTION_ENTRY_CAP}`)).toBeNull();
   });
 
   it("keeps shares computed over the FULL total, never the shown five", () => {

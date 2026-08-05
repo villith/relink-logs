@@ -38,9 +38,9 @@ const extreme = (value: number | null): string => (value === null ? NOT_RECORDED
 const columnsFor = (ctx: GroupRowsContext, measure: GroupMeasure, total: number): string[] => {
   const { amount, hits } = measure;
   if (ctx.groupBy === "source") {
-    return ctx.metric === "damage"
-      ? [format(amount), ratePerSecond(amount, ctx.fightDurationMs), share(amount, total)]
-      : [format(amount), ratePerSecond(amount, ctx.fightDurationMs)];
+    // Amount, rate, share of the fetched total — the players-level shape both
+    // metrics' columnKeys("players") headers promise.
+    return [format(amount), ratePerSecond(amount, ctx.fightDurationMs), share(amount, total)];
   }
   return ctx.metric === "damage"
     ? damageColumns(amount, hits, extreme(measure.min), extreme(measure.max), total)

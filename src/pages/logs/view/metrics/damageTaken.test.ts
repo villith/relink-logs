@@ -58,7 +58,7 @@ const input = (
   }) as never;
 
 describe("damageTaken descriptor", () => {
-  it("ranks players by the damage they took, reporting amount and DTPS", () => {
+  it("ranks players by the damage they took, reporting amount, DTPS and share of the party total", () => {
     const players = [
       player(0, { totalDamageTaken: 1_000, hitsTaken: 4 }),
       player(1, { totalDamageTaken: 6_000, hitsTaken: 2 }),
@@ -69,8 +69,8 @@ describe("damageTaken descriptor", () => {
 
     expect(rows.map((row) => row.key)).toEqual(["player:1", "player:0"]);
     expect(rows[0].value).toBe(6_000);
-    expect(rows[0].columns).toEqual(["6.0k", "60"]);
-    expect(rows[1].columns).toEqual(["1.0k", "10"]);
+    expect(rows[0].columns).toEqual(["6.0k", "60", "85.7%"]);
+    expect(rows[1].columns).toEqual(["1.0k", "10", "14.3%"]);
   });
 
   it("reports a log recorded before damage-taken capture as not recorded", () => {
@@ -79,7 +79,7 @@ describe("damageTaken descriptor", () => {
     const rows = damageTaken.rows(input("players", [player(0, {})]));
 
     expect(rows[0].value).toBe(0);
-    expect(rows[0].columns).toEqual(["—", "—"]);
+    expect(rows[0].columns).toEqual(["—", "—", "—"]);
   });
 
   it("descends a pinned player into per-attack rows with hit figures", () => {
@@ -152,6 +152,60 @@ describe("damageTaken descriptor", () => {
     expect(takenAttackNameKey({ DamageOverTime: 1 })).toEqual({ key: "ui.logs.taken-dot" });
     expect(takenAttackNameKey("LinkAttack")).toEqual({ key: "ui.logs.taken-attack-other" });
   });
+
+  it("heads the players level with amount, DTPS and share — the Damage Done shape", () => {
+    expect(damageTaken.columnKeys("players")).toEqual([
+      "ui.logs.column-damage-taken",
+      "ui.logs.column-dtps",
+      "ui.logs.column-share",
+    ]);
+    // Drill level unchanged.
+    expect(damageTaken.columnKeys("abilities")).toEqual([
+      "ui.logs.column-damage-taken",
+      "ui.skill-columns.hits",
+      "ui.skill-columns.average",
+      "ui.logs.column-dtps",
+    ]);
+  });
+
+  it("keeps the enemy side's players-level share in step", () => {
+    const attacker = {
+      ...player(0, {}),
+      skillBreakdown: [
+        {
+          actionType: { Normal: 1 },
+          childCharacterType: "Pl0000",
+          hits: 4,
+          minDamage: 1,
+          maxDamage: 300,
+          totalDamage: 400,
+          totalStunValue: 0,
+          maxStunValue: 0,
+          cappedHits: 0,
+          cappableHits: 0,
+          overcapBaseSum: 0,
+          overcapCapSum: 0,
+          targets: [
+            { enemyType: { Unknown: 0xaa }, hits: 3, totalDamage: 300 },
+            { enemyType: { Unknown: 0xbb }, hits: 1, totalDamage: 100 },
+          ],
+        },
+      ],
+    } as unknown as ComputedPlayerState;
+
+    const rows = damageTaken.rows({
+      encounter: {} as never,
+      partyData: [null, null],
+      players: [attacker],
+      level: "players",
+      pins: NO_PINS,
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    } as never);
+
+    expect(rows[0].columns).toEqual(["300", "3", "75.0%"]);
+    expect(rows[1].columns).toEqual(["100", "1", "25.0%"]);
+  });
 });
 
 const dealerPlayer = (index: number, targets: { enemy: number; total: number; hits: number }[]) =>
@@ -210,7 +264,7 @@ describe("damageTaken enemy side", () => {
 
     expect(rows).toHaveLength(2);
     expect(rows[0].kind).toBeUndefined();
-    expect(rows[0].columns).toEqual(["—", "—"]);
+    expect(rows[0].columns).toEqual(["—", "—", "—"]);
   });
 
   it("ranks enemy types by damage received from the party", () => {
@@ -239,8 +293,8 @@ describe("damageTaken enemy side", () => {
     ]);
     expect(enemyRows[0].kind).toBe("enemy");
     expect(enemyRows[0].value).toBe(8_000);
-    // Amount, DTPS over the 100s window.
-    expect(enemyRows[0].columns).toEqual(["8.0k", "80"]);
+    // Amount, DTPS, share of the party total received (8,000 + 1,000) over the 100s window.
+    expect(enemyRows[0].columns).toEqual(["8.0k", "80", "88.9%"]);
   });
 
   it("fills the four-column drill-down shape below the players level", () => {

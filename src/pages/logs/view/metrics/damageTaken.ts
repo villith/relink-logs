@@ -1,5 +1,5 @@
 import type { ActionType, ComputedPlayerState, DamageTakenState, EnemyType } from "@/types";
-import { humanizeNumber, ratePerSecond } from "@/utils";
+import { humanizeNumber, ratePerSecond, share } from "@/utils";
 
 import { enemyRowKey } from "./damageDone";
 import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
@@ -86,13 +86,14 @@ const attackRows = (breakdown: DamageTakenState[], fightDurationMs?: number): Me
  * 2026-08-04 — `targets` itself is still optional per skill (cached payloads
  * predate it), hence the `?? []` below.
  *
- * At the players level this answers the same amount+DTPS question as the
- * friendly side, so it takes the same two columns. Below it, `columnKeys`
+ * At the players level this answers the same amount+DTPS+share question as
+ * the friendly side, so it takes the same three columns (share computed over
+ * this fold's own total, not the friendly side's). Below it, `columnKeys`
  * switches to the four-column drill-down shape every other damage-taken row
- * fills (see `drilldownColumns`), and this one must too or it renders two
- * cells under a four-column header. Unlike `damageDone`'s enemy side, nothing
- * here needs blanking: `SkillTargetState` carries both damage and hits
- * honestly. */
+ * fills (see `drilldownColumns`), and this one must too or it renders rows
+ * that don't match a four-column header. Unlike `damageDone`'s enemy side,
+ * nothing here needs blanking: `SkillTargetState` carries both damage and
+ * hits honestly. */
 const enemyReceivedRows = (players: ComputedPlayerState[], level: RowLevel, fightDurationMs?: number): MetricRow[] => {
   const byType = new Map<string, { enemyType: EnemyType; damage: number; hits: number }>();
   for (const player of players) {
@@ -108,6 +109,8 @@ const enemyReceivedRows = (players: ComputedPlayerState[], level: RowLevel, figh
     }
   }
 
+  const total = [...byType.values()].reduce((sum, { damage }) => sum + damage, 0);
+
   return [...byType.entries()]
     .map(([key, { enemyType, damage, hits }]) => ({
       key: enemyRowKey(enemyType),
@@ -116,7 +119,7 @@ const enemyReceivedRows = (players: ComputedPlayerState[], level: RowLevel, figh
       value: damage,
       columns:
         level === "players"
-          ? [format(damage), ratePerSecond(damage, fightDurationMs)]
+          ? [format(damage), ratePerSecond(damage, fightDurationMs), share(damage, total)]
           : drilldownColumns(damage, hits, fightDurationMs),
       // The pin model has no enemy-type pin; the hover card decomposes instead.
       pinOnClick: null,
@@ -125,18 +128,18 @@ const enemyReceivedRows = (players: ComputedPlayerState[], level: RowLevel, figh
     .sort((a, b) => b.value - a.value);
 };
 
-/** Damage taken: players ranked by what they RECEIVED (amount + DTPS, the
- * Warcraft Logs shape), a pinned player (or the whole party) decomposed into
- * the attacks that dealt it. Logs recorded before the parser kept incoming
- * events carry no figures at all — those rows read "—" rather than claiming
- * nobody was ever hit. */
+/** Damage taken: players ranked by what they RECEIVED (amount + DTPS + share
+ * of the party total, the Damage Done shape), a pinned player (or the whole
+ * party) decomposed into the attacks that dealt it. Logs recorded before the
+ * parser kept incoming events carry no figures at all — those rows read "—"
+ * rather than claiming nobody was ever hit. */
 export const damageTaken: MetricDescriptor = {
   labelKey: "ui.logs.metric-damage-taken",
   supportsHostility: true,
 
   columnKeys: (level) =>
     level === "players"
-      ? ["ui.logs.column-damage-taken", "ui.logs.column-dtps"]
+      ? ["ui.logs.column-damage-taken", "ui.logs.column-dtps", "ui.logs.column-share"]
       : ["ui.logs.column-damage-taken", "ui.skill-columns.hits", "ui.skill-columns.average", "ui.logs.column-dtps"],
 
   labelKind: (level) => (level === "players" ? "player" : "takenAttack"),
@@ -158,6 +161,9 @@ export const damageTaken: MetricDescriptor = {
     if (hostility === "enemy") return enemyReceivedRows(players, level, fightDurationMs);
 
     if (level === "players") {
+      // Share of the party total taken — the same last column Damage Done's
+      // players level carries, closing the §6 inconsistency.
+      const total = players.reduce((sum, p) => sum + (p.totalDamageTaken ?? 0), 0);
       return [...players]
         .sort((a, b) => (b.totalDamageTaken ?? 0) - (a.totalDamageTaken ?? 0))
         .map((p) => ({
@@ -166,8 +172,12 @@ export const damageTaken: MetricDescriptor = {
           value: p.totalDamageTaken ?? 0,
           columns:
             p.totalDamageTaken === undefined
-              ? [NOT_RECORDED, NOT_RECORDED]
-              : [format(p.totalDamageTaken), ratePerSecond(p.totalDamageTaken, fightDurationMs)],
+              ? [NOT_RECORDED, NOT_RECORDED, NOT_RECORDED]
+              : [
+                  format(p.totalDamageTaken),
+                  ratePerSecond(p.totalDamageTaken, fightDurationMs),
+                  share(p.totalDamageTaken, total),
+                ],
           pinOnClick: { source: p.index },
           colorSlot: p.partyIndex,
         }));

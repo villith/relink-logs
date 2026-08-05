@@ -60,6 +60,17 @@ describe("groupRowsFor — player rows", () => {
     );
     expect(rows[0].pinOnClick).toEqual({ targets: [1] });
   });
+
+  it("adds the taken source grouping's share of the fetched total", () => {
+    const rows = groupRowsFor(
+      [agg({ kind: "player", index: 0 }, measure(3000, 2)), agg({ kind: "player", index: 1 }, measure(1000, 1))],
+      ctx({ metric: "taken", groupBy: "source" })
+    );
+
+    // Amount, DTPS, share — the same players-level shape as damage, matching
+    // damageTaken.columnKeys("players")'s three headers.
+    expect(rows[0].columns).toEqual([humanizeNumber(3000), ratePerSecond(3000, 10_000), share(3000, 4000)]);
+  });
 });
 
 describe("groupRowsFor — skill-group fold", () => {
