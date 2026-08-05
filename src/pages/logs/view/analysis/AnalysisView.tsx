@@ -125,29 +125,6 @@ const METRIC_TABS: MetricTab[] = Object.entries(METRICS).map(([value, descriptor
   labelKey: descriptor.labelKey,
 }));
 
-/** i18next key naming what a row is, by KIND — for the tables whose rows the
- * level alone does not describe: a status table's effects and the actors
- * holding one, and a damage drill-down that decomposed into enemies or
- * players instead of member skills. */
-const KIND_ROWS_LABEL_KEY = {
-  status: "ui.logs.rows-by-effect",
-  player: "ui.logs.rows-by-player",
-  // A debuff holder is an enemy spawn, and a damage row's `enemy` is an enemy
-  // type — both read as "Enemy" to the user.
-  target: "ui.logs.rows-by-enemy",
-  enemy: "ui.logs.rows-by-enemy",
-  ability: "ui.logs.rows-by-ability",
-  // A taken row is one enemy attack, which still reads as "Ability".
-  takenAttack: "ui.logs.rows-by-ability",
-} as const;
-
-/** i18next key naming what a row is at each level. */
-const ROWS_LABEL_KEY = {
-  players: "ui.logs.rows-by-player",
-  abilities: "ui.logs.rows-by-ability",
-  skills: "ui.logs.rows-by-skill",
-} as const;
-
 /** What the plot is titled once it decomposes a pinned row, per level. */
 const DRILL_LABEL_KEY = {
   players: "ui.logs.chart-dps-label",
@@ -720,23 +697,27 @@ export const AnalysisView = () => {
       // A self-naming row depicts nothing (see `MetricRow.labelKey`); the
       // ability join below would answer with whichever art its fallback picks.
       if (row.labelKey) return undefined;
-      if (rowKind === "status") {
+      // The row's own kind wins, exactly as in `renderLabel` — the two share
+      // one discriminator so a row can never pair one kind's name with
+      // another kind's art.
+      const kind = row.kind ?? rowKind;
+      if (kind === "status") {
         const statusId = statusIdOfKey(row.label);
         return statusId === null ? undefined : statusIconUrl(statusId);
       }
-      if (rowKind === "player") {
+      if (kind === "player") {
         const character = playerByIndex.get(Number(row.label))?.player.characterType;
         return typeof character === "string" ? characterIconUrl(character) : undefined;
       }
-      if (rowKind === "target") {
+      if (kind === "target") {
         const segment = targetRowSegment(row.label);
         return segment === null ? undefined : enemyIconUrl(targetEntries[segment]?.enemyType ?? null);
       }
       // An enemy TYPE row carries the type itself, so it needs no spawn to look
       // one up through.
-      if (rowKind === "enemy") return enemyIconUrl(parseEnemyRow(row.label));
+      if (kind === "enemy") return enemyIconUrl(parseEnemyRow(row.label));
       // A taken row is an enemy's attack, so it wears the attacker's portrait.
-      if (rowKind === "takenAttack") {
+      if (kind === "takenAttack") {
         const parts = takenAttackRowParts(row.label);
         return parts ? enemyIconUrl(parts.enemyType) : undefined;
       }
@@ -751,20 +732,23 @@ export const AnalysisView = () => {
       // nothing: it is not an ability, a player or an effect, and sending its
       // sentinel through one of those joins would print that join's guess.
       if (row.labelKey) return t(row.labelKey, row.labelParams);
+      // The row's own kind wins — the groups path declares one per row — and
+      // the table-level discriminator stands in for the legacy descriptors.
+      const kind = row.kind ?? rowKind;
       // Effect names come from status.tbl via the generated `statuses` bundle;
       // the ~90 internal statuses the game never names answer empty and fall
       // back to "Effect <id>". The cause resolves through `causeSkillName`,
       // which bridges the effect-entry id at `+0x4c` to the acting skill.
       const name =
-        rowKind === "status"
+        kind === "status"
           ? statusDisplayLabel(row.label)
-          : rowKind === "player"
+          : kind === "player"
             ? labelForSource(Number(row.label))
-            : rowKind === "target"
+            : kind === "target"
               ? targetRowLabel(row.label, labelForTarget)
-              : rowKind === "enemy"
+              : kind === "enemy"
                 ? translateEnemyType(parseEnemyRow(row.label))
-                : rowKind === "takenAttack"
+                : kind === "takenAttack"
                   ? takenAttackLabel(row.label)
                   : labelForAbility(row.label);
       const icon = rowIconUrl(row);
@@ -1320,41 +1304,13 @@ export const AnalysisView = () => {
           cardAmount={metric.card}
           rowToggle={rowToggle}
           timelineMs={fightDurationMs}
-          emptyKey={
-            // Every log recorded before the hook emitted status events has none
-            // of these, which is not something clearing a pin can fix.
-            isStatusMetric && statusIntervals.length === 0
-              ? "ui.logs.buffs-empty"
-              : // A remote player's SBA breakdown is genuinely empty — attribution
-                // only works for the local player — so an empty table here is not
-                // a missing pin, it is the honest answer.
-                metricKey === "sba" && level !== "players"
-                ? "ui.logs.sba-no-breakdown"
-                : // Damage Done's enemy side ranks enemies by what they dealt
-                  // TO the party, which is the damage-taken stream — a log
-                  // recorded before that capture existed has none of it, and
-                  // clearing a pin will not bring it back.
-                  enemySide && metricKey === "damage"
-                  ? "ui.logs.enemy-dealt-empty"
-                  : undefined
-          }
-          // Same discriminator `renderLabel` uses, so the header can never name
-          // something other than what the rows under it are.
-          //
-          // With no rows there is no kind to read, and the enemy side is the one
-          // case the level cannot stand in for: an empty enemy table would head
-          // its column "Player" above a message about missing enemy damage.
-          // After the status branch — a status table's own empty header already
-          // accounts for the toggle, via `statusRowKind`.
-          rowsLabelKey={
-            declaredKind
-              ? KIND_ROWS_LABEL_KEY[declaredKind]
-              : isStatusMetric
-                ? KIND_ROWS_LABEL_KEY[statusRowKind]
-                : enemySide
-                  ? KIND_ROWS_LABEL_KEY.enemy
-                  : ROWS_LABEL_KEY[level]
-          }
+          // The resolver names the honest empty states (see `emptyKeyFor`).
+          // The aura tabs' key means "this log never recorded status events",
+          // so it applies only when the fight truly has no intervals — with
+          // intervals in hand an empty status table IS about the pins, and
+          // the table's own default says so.
+          emptyKey={isStatusMetric && statusIntervals.length > 0 ? undefined : spec.table.emptyKey}
+          rowsLabelKey={spec.table.rowsLabelKey}
         />
       </Box>
     </Box>

@@ -85,4 +85,32 @@ describe("resolveViewSpec", () => {
     expect(spec.table.rowsLabelKey).toBe("ui.logs.rows-by-enemy");
     expect(spec.regroupTabs.find((tab) => tab.dim === "source")?.labelKey).toBe("ui.logs.groupby-damage-source-enemy");
   });
+
+  it("heads the interval metrics' ability rows as effects", () => {
+    expect(resolveViewSpec(state({ metric: "buffs" }), CAPABILITIES.buffs).table.rowsLabelKey).toBe(
+      "ui.logs.rows-by-effect"
+    );
+    // With the effect pinned the rows are its holders.
+    expect(
+      resolveViewSpec(state({ metric: "buffs", ability: "status:1:2" }), CAPABILITIES.buffs).table.rowsLabelKey
+    ).toBe("ui.logs.rows-by-player");
+    expect(
+      resolveViewSpec(state({ metric: "debuffs", hostility: "enemy", ability: "status:1:2" }), CAPABILITIES.debuffs)
+        .table.rowsLabelKey
+    ).toBe("ui.logs.rows-by-enemy");
+  });
+
+  it("names the honest empty states and leaves the rest to the pins default", () => {
+    expect(resolveViewSpec(state({ metric: "buffs" }), CAPABILITIES.buffs).table.emptyKey).toBe("ui.logs.buffs-empty");
+    expect(resolveViewSpec(state({ metric: "sba", source: 1 }), CAPABILITIES.sba).table.emptyKey).toBe(
+      "ui.logs.sba-no-breakdown"
+    );
+    expect(resolveViewSpec(state({ hostility: "enemy" }), CAPABILITIES.damage).table.emptyKey).toBe(
+      "ui.logs.enemy-dealt-empty"
+    );
+    expect(resolveViewSpec(DEFAULT_STATE, CAPABILITIES.damage).table.emptyKey).toBeUndefined();
+    expect(
+      resolveViewSpec(state({ metric: "taken", hostility: "enemy" }), CAPABILITIES.taken).table.emptyKey
+    ).toBeUndefined();
+  });
 });

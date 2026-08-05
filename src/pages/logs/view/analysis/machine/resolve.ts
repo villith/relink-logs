@@ -97,14 +97,15 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
           topN: GROUP_TOP_N,
         };
 
+  const emptyKey = emptyKeyFor(state, caps);
+
   return {
     groupBy,
     regroupTabs,
     table: {
       columnKeys: caps.columnKeys(groupBy),
-      rowsLabelKey: rowsLabelKeyFor(groupBy, hostility),
-      // emptyKey wiring lands with the view integration (Task 14) — the
-      // resolver's field exists now so the shape is stable.
+      rowsLabelKey: rowsLabelKeyFor(groupBy, hostility, caps),
+      ...(emptyKey === undefined ? {} : { emptyKey }),
     },
     chart: {
       source:
@@ -122,13 +123,29 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
 };
 
 /** i18next key naming what a row IS under this grouping. Reuses the existing
- * rows-by-* keys (see KIND_ROWS_LABEL_KEY in AnalysisView.tsx). `hostility`
- * must already be the effective hostility (see resolveViewSpec). */
-const rowsLabelKeyFor = (groupBy: Dimension, hostility: Hostility): string => {
+ * rows-by-* keys. `hostility` must already be the effective hostility (see
+ * resolveViewSpec). The interval metrics' ability rows are EFFECTS, not
+ * ability casts, and their header has always said so. */
+const rowsLabelKeyFor = (groupBy: Dimension, hostility: Hostility, caps: MetricCapabilities): string => {
   const enemySide = hostility === "enemy";
   if (groupBy === "source") return enemySide ? "ui.logs.rows-by-enemy" : "ui.logs.rows-by-player";
   if (groupBy === "target") return enemySide ? "ui.logs.rows-by-player" : "ui.logs.rows-by-enemy";
-  return "ui.logs.rows-by-ability";
+  return caps.dataPath === "intervals" ? "ui.logs.rows-by-effect" : "ui.logs.rows-by-ability";
+};
+
+/** What an EMPTY table should say, where the honest reason is not "clear a
+ * pin": the aura tabs are empty on any log recorded before status capture
+ * (the view applies this only when the fight recorded no intervals at all);
+ * a remote player's SBA breakdown is genuinely unattributable; and Damage
+ * Done's enemy side reads the damage-taken stream, which logs recorded
+ * before that capture simply lack. */
+const emptyKeyFor = (state: AnalysisState, caps: MetricCapabilities): string | undefined => {
+  if (caps.dataPath === "intervals") return "ui.logs.buffs-empty";
+  if (state.metric === "sba" && state.source !== null) return "ui.logs.sba-no-breakdown";
+  if (state.metric === "damage" && caps.supportsHostility && state.hostility === "enemy") {
+    return "ui.logs.enemy-dealt-empty";
+  }
+  return undefined;
 };
 
 /** Existing chart-title keys, chosen by what is DRAWN. */
