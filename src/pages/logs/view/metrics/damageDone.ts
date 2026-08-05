@@ -33,6 +33,21 @@ export const damageColumns = (damage: number, hits: number, min: string, max: st
   share(damage, total),
 ];
 
+/** The numeric columns a players-level row fills, in header order: amount, its
+ * per-second rate, and its share of that level's own total. Written once
+ * because BOTH metrics' `columnKeys("players")` promise this same shape and
+ * four different folds land on it — the two metrics' enemy sides, damage
+ * taken's friendly side, and the analysis machine's source grouping. They have
+ * to stay one shape or cells render under the wrong headers.
+ *
+ * `damageDone`'s friendly side is deliberately not a caller: it prints the
+ * backend-computed `dps` rather than deriving a rate from the fight duration. */
+export const playersColumns = (amount: number, total: number, fightDurationMs?: number): string[] => [
+  format(amount),
+  ratePerSecond(amount, fightDurationMs),
+  share(amount, total),
+];
+
 /** Rows for a set of ability (or member-skill) groups. */
 const abilityRows = (groups: AbilitySkills[], total: number, colorSlot: number, pinnable: boolean): MetricRow[] =>
   groups
@@ -168,7 +183,7 @@ const enemyDealtRows = (players: ComputedPlayerState[], level: RowLevel, fightDu
       value: damage,
       columns:
         level === "players"
-          ? [format(damage), ratePerSecond(damage, fightDurationMs), share(damage, total)]
+          ? playersColumns(damage, total, fightDurationMs)
           : damageColumns(damage, hits, NOT_RECORDED, format(maxDamage), total),
       // The pin model has no enemy-type pin; the hover card decomposes instead.
       pinOnClick: null,

@@ -1,9 +1,9 @@
 import type { ActionType, CharacterType, GroupAggregate, GroupKey, GroupMeasure } from "@/types";
-import { humanizeNumber, ratePerSecond, share } from "@/utils";
+import { humanizeNumber } from "@/utils";
 
 import { abilityKey } from "../../abilityKey";
 import { abilityRowKey, groupOfPin } from "../../abilitySkills";
-import { damageColumns, enemyRowKey } from "../../metrics/damageDone";
+import { damageColumns, enemyRowKey, playersColumns } from "../../metrics/damageDone";
 import { drilldownColumns } from "../../metrics/damageTaken";
 import type { Hostility, MetricRow } from "../../metrics/types";
 import type { Dimension } from "./state";
@@ -38,9 +38,9 @@ const extreme = (value: number | null): string => (value === null ? NOT_RECORDED
 const columnsFor = (ctx: GroupRowsContext, measure: GroupMeasure, total: number): string[] => {
   const { amount, hits } = measure;
   if (ctx.groupBy === "source") {
-    // Amount, rate, share of the fetched total — the players-level shape both
-    // metrics' columnKeys("players") headers promise.
-    return [format(amount), ratePerSecond(amount, ctx.fightDurationMs), share(amount, total)];
+    // Both metrics' `columnKeys("players")` promise the same shape here, so
+    // this branch is metric-agnostic.
+    return playersColumns(amount, total, ctx.fightDurationMs);
   }
   return ctx.metric === "damage"
     ? damageColumns(amount, hits, extreme(measure.min), extreme(measure.max), total)

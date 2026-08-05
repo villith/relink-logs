@@ -1,7 +1,7 @@
 import type { ActionType, ComputedPlayerState, DamageTakenState, EnemyType } from "@/types";
-import { humanizeNumber, ratePerSecond, share } from "@/utils";
+import { humanizeNumber, ratePerSecond } from "@/utils";
 
-import { enemyRowKey } from "./damageDone";
+import { enemyRowKey, playersColumns } from "./damageDone";
 import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
 
 const format = humanizeNumber;
@@ -119,7 +119,7 @@ const enemyReceivedRows = (players: ComputedPlayerState[], level: RowLevel, figh
       value: damage,
       columns:
         level === "players"
-          ? [format(damage), ratePerSecond(damage, fightDurationMs), share(damage, total)]
+          ? playersColumns(damage, total, fightDurationMs)
           : drilldownColumns(damage, hits, fightDurationMs),
       // The pin model has no enemy-type pin; the hover card decomposes instead.
       pinOnClick: null,
@@ -173,11 +173,7 @@ export const damageTaken: MetricDescriptor = {
           columns:
             p.totalDamageTaken === undefined
               ? [NOT_RECORDED, NOT_RECORDED, NOT_RECORDED]
-              : [
-                  format(p.totalDamageTaken),
-                  ratePerSecond(p.totalDamageTaken, fightDurationMs),
-                  share(p.totalDamageTaken, total),
-                ],
+              : playersColumns(p.totalDamageTaken, total, fightDurationMs),
           pinOnClick: { source: p.index },
           colorSlot: p.partyIndex,
         }));
