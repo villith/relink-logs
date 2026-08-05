@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { StatusInterval } from "@/types";
 
-import { buildStatusSeries } from "./statusChart";
+import { buildEffectSeries, buildStatusSeries } from "./statusChart";
 
 const interval = (over: Partial<StatusInterval>): StatusInterval => ({
   actorIndex: 0,
@@ -109,5 +109,78 @@ describe("buildStatusSeries", () => {
     });
 
     expect(series[0].values).toEqual([1, 0]);
+  });
+});
+
+const holderKeyOf = (i: StatusInterval) => `player:${i.actorIndex}`;
+const labelOf = (key: string) => `L(${key})`;
+
+describe("buildEffectSeries", () => {
+  it("gives one series per effect, counting holders per bucket", () => {
+    const series = buildEffectSeries({
+      intervals: [
+        interval({ actorIndex: 0, startMs: 0, endMs: 2_000 }),
+        interval({ actorIndex: 1, startMs: 1_000, endMs: 3_000 }),
+      ],
+      bucketMs: 1_000,
+      len: 3,
+      topN: 8,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series).toEqual([{ key: "status:10:500", label: "L(status:10:500)", values: [1, 2, 1] }]);
+  });
+
+  it("counts a holder once however many of their windows overlap a bucket", () => {
+    const series = buildEffectSeries({
+      intervals: [
+        interval({ actorIndex: 0, startMs: 0, endMs: 2_000 }),
+        interval({ actorIndex: 0, startMs: 500, endMs: 1_500 }),
+      ],
+      bucketMs: 1_000,
+      len: 2,
+      topN: 8,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series[0].values).toEqual([1, 1]);
+  });
+
+  it("keeps separate causes of one status as separate series, like the table rows", () => {
+    const series = buildEffectSeries({
+      intervals: [interval({ abilityId: 500 }), interval({ abilityId: 900 })],
+      bucketMs: 1_000,
+      len: 1,
+      topN: 8,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series.map((entry) => entry.key).sort()).toEqual(["status:10:500", "status:10:900"]);
+  });
+
+  it("ranks by merged uptime and caps at topN", () => {
+    const series = buildEffectSeries({
+      intervals: [
+        interval({ statusId: 1, startMs: 0, endMs: 1_000 }),
+        interval({ statusId: 2, startMs: 0, endMs: 3_000 }),
+        interval({ statusId: 3, startMs: 0, endMs: 2_000 }),
+      ],
+      bucketMs: 1_000,
+      len: 3,
+      topN: 2,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series.map((entry) => entry.key)).toEqual(["status:2:500", "status:3:500"]);
+  });
+
+  it("answers empty for an empty chart", () => {
+    expect(
+      buildEffectSeries({ intervals: [interval({})], bucketMs: 1_000, len: 0, topN: 8, labelOf, holderKeyOf })
+    ).toEqual([]);
   });
 });

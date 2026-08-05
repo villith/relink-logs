@@ -1,6 +1,6 @@
 import type { StatusInterval } from "@/types";
 
-import { isStatusPin, statusPinKey } from "../statusUptime";
+import { isStatusPin, statusPinKey, uptimeMs } from "../statusUptime";
 
 /** One chart overlay band, ready to plot: a stable series key, the name the
  * legend shows, and one value per bucket — the shape the group bands and the
@@ -81,4 +81,78 @@ export const buildStatusSeries = ({
     .map((series) => ({ series, covered: series.values.reduce((n, value) => (value ? n + 1 : n), 0) }))
     .sort((a, b) => b.covered - a.covered)
     .map(({ series }) => series);
+};
+
+/** The TOP-LEVEL aura chart: one series per effect (the top `topN` by merged
+ * uptime, the same ranking the table's effect rows sort by), Y = how many
+ * holders had the effect active in that bucket.
+ *
+ * This is what makes the machine's `chart:"stacks"` declaration true with no
+ * effect pinned — the analog of Warcraft Logs' pre-selection buff overview,
+ * drawn from the effects themselves rather than WCL's raid-damage context
+ * chart. Pinning an effect switches to `buildStatusSeries`' per-holder stack
+ * counts, one level down.
+ *
+ * A holder is counted ONCE per bucket however many of their windows overlap
+ * it — the same merge rule `uptimeMs` applies to durations. Effects are keyed
+ * by `statusPinKey` (effect AND cause), so the series decompose exactly as the
+ * table's rows do. */
+export const buildEffectSeries = ({
+  intervals,
+  bucketMs,
+  len,
+  topN,
+  labelOf,
+  holderKeyOf,
+}: {
+  /** Already narrowed to one side and polarity — the caller applies the same
+   * roster/`isHarmful` split the table rows use. */
+  intervals: StatusInterval[];
+  bucketMs: number;
+  /** How many buckets the chart holds. */
+  len: number;
+  topN: number;
+  labelOf: (key: string) => string;
+  /** What a distinct holder IS — a player index on the friendly side, a spawn
+   * on the enemy side (`enemyHolderKey`). */
+  holderKeyOf: (interval: StatusInterval) => string;
+}): DrillSeries[] => {
+  if (len <= 0 || bucketMs <= 0) return [];
+
+  const byEffect = new Map<string, StatusInterval[]>();
+  for (const interval of intervals) {
+    const key = statusPinKey(interval);
+    const group = byEffect.get(key);
+    if (group) group.push(interval);
+    else byEffect.set(key, [interval]);
+  }
+
+  return [...byEffect.entries()]
+    .map(([key, group]) => ({ key, group, uptime: uptimeMs(group) }))
+    .sort((a, b) => b.uptime - a.uptime)
+    .slice(0, topN)
+    .map(({ key, group }) => {
+      // Presence per (holder, bucket) first, so overlapping windows of one
+      // holder cannot count them twice.
+      const coveredByHolder = new Map<string, Uint8Array>();
+      for (const interval of group) {
+        const holder = holderKeyOf(interval);
+        let covered = coveredByHolder.get(holder);
+        if (!covered) {
+          covered = new Uint8Array(len);
+          coveredByHolder.set(holder, covered);
+        }
+        const first = Math.max(0, Math.floor(interval.startMs / bucketMs));
+        // Inclusive of the bucket the window ends in — the same sub-bucket
+        // rule buildStatusSeries applies.
+        const last = Math.min(len - 1, Math.floor((interval.endMs - 1) / bucketMs));
+        for (let bucket = first; bucket <= last; bucket += 1) covered[bucket] = 1;
+      }
+
+      const values = new Array<number>(len).fill(0);
+      for (const covered of coveredByHolder.values()) {
+        for (let bucket = 0; bucket < len; bucket += 1) values[bucket] += covered[bucket];
+      }
+      return { key, label: labelOf(key), values };
+    });
 };
