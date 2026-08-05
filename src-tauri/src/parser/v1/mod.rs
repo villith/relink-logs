@@ -47,6 +47,12 @@ pub struct AdjustedDamageInstance<'a> {
     /// (supplementary damage, DoT, hits with no cap info) must count toward
     /// neither the capped-hit tallies nor their denominators.
     pub is_cappable: bool,
+    /// The enemy SPAWN the hit landed on, as an index into the shared
+    /// `segment_targets_indexed` segmentation — set only by the reparse walk,
+    /// which has the full log to segment. The live path leaves it `None`
+    /// (the overlay never reads per-spawn shares; the saved log is reparsed
+    /// and comes out segmented).
+    pub target_segment: Option<usize>,
 }
 
 impl<'a> AdjustedDamageInstance<'a> {
@@ -73,6 +79,7 @@ impl<'a> AdjustedDamageInstance<'a> {
             stun_damage,
             is_capped,
             is_cappable,
+            target_segment: None,
         }
     }
 
@@ -83,6 +90,13 @@ impl<'a> AdjustedDamageInstance<'a> {
             return None;
         }
         cap_detection::overcap_contribution(self.event.base_damage, self.event.damage_cap)
+    }
+
+    /// The reparse walk's way of stamping the shared spawn segmentation onto
+    /// a hit without touching every other `from_damage_event` call site.
+    pub fn with_target_segment(mut self, target_segment: Option<usize>) -> Self {
+        self.target_segment = target_segment;
+        self
     }
 }
 
