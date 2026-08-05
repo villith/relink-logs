@@ -94,8 +94,17 @@ import { statusRowColors } from "./statusRowColors";
 import { takenCardSectionsFor } from "./takenCardSections";
 import { useUrlQueryString } from "./useUrlQueryString";
 
-/** The metric switcher's contents, in display order. Adding a metric is adding
- * a descriptor here — the frame itself does not change. */
+/** The metric switcher's contents, in display order. Adding a metric that only
+ * has a friendly side is adding a descriptor here — the frame itself does not
+ * change.
+ *
+ * An ENEMY side still costs more than the descriptor: which hover card
+ * decomposes its rows (`rowSections`), which series its bands come from
+ * (`hostilitySeriesFor`), what the plot is titled and what an empty table says
+ * all branch on `metricKey` rather than reading the descriptor. Folding those
+ * four onto `MetricDescriptor` is a deliberate follow-up — worth doing when a
+ * third hostility-capable damage tab exists to generalise against, not
+ * speculatively against two. */
 const METRICS: Record<string, MetricDescriptor> = { damage: damageDone, taken: damageTaken, stun, sba, buffs, debuffs };
 
 /** The switcher's contents, derived from METRICS — each descriptor already
@@ -1164,9 +1173,12 @@ export const AnalysisView = () => {
           the whole view, not of one tab, and rendering it below the switcher
           shifted every control under it each time the tab changed. Only tabs
           that declare `supportsHostility` can operate it — see
-          HostilityToggle's `disabled`. */}
+          HostilityToggle's `disabled`. Tested `!== true` rather than falsily,
+          matching `enemySide` above: one spelling of "this tab has an enemy
+          side" keeps the control offering it and the code rendering it from
+          disagreeing. */}
       <Box style={{ padding: "8px 16px 0" }}>
-        <HostilityToggle value={hostility} onChange={setHostility} disabled={!metric.supportsHostility} />
+        <HostilityToggle value={hostility} onChange={setHostility} disabled={metric.supportsHostility !== true} />
       </Box>
 
       <MetricTabs tabs={METRIC_TABS} value={metricKey} onChange={setMetricKey} />
@@ -1203,7 +1215,16 @@ export const AnalysisView = () => {
                   : DRILL_LABEL_KEY[level]
                 : chartMetric.labelKey
         }
-        format={chartSource === "stacks" ? "count" : overlay ? "amount" : chartMetric.format}
+        // Off `chartSource` for the same reason as the title: an overlay of any
+        // kind plots an amount, and reading the drawn source rather than
+        // re-testing `overlay` keeps every description of the plot on one const.
+        format={
+          chartSource === "stacks"
+            ? "count"
+            : chartSource === "enemy" || chartSource === "drill"
+              ? "amount"
+              : chartMetric.format
+        }
         stacked={overlay !== null}
         onScope={handleScope}
         fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
@@ -1245,12 +1266,20 @@ export const AnalysisView = () => {
           }
           // Same discriminator `renderLabel` uses, so the header can never name
           // something other than what the rows under it are.
+          //
+          // With no rows there is no kind to read, and the enemy side is the one
+          // case the level cannot stand in for: an empty enemy table would head
+          // its column "Player" above a message about missing enemy damage.
+          // After the status branch — a status table's own empty header already
+          // accounts for the toggle, via `statusRowKind`.
           rowsLabelKey={
             declaredKind
               ? KIND_ROWS_LABEL_KEY[declaredKind]
               : isStatusMetric
                 ? KIND_ROWS_LABEL_KEY[statusRowKind]
-                : ROWS_LABEL_KEY[level]
+                : enemySide
+                  ? KIND_ROWS_LABEL_KEY.enemy
+                  : ROWS_LABEL_KEY[level]
           }
         />
       </Box>

@@ -62,12 +62,22 @@ const abilityRows = (groups: AbilitySkills[], total: number, colorSlot: number, 
     })
     .sort((a, b) => b.value - a.value);
 
+/** The table row key naming one enemy TYPE, and the label that goes with it:
+ * the label IS the type's JSON, and the key is that JSON under an `enemy:`
+ * prefix the view matches on.
+ *
+ * Four folds across three files emit these rows — `enemyRows` and
+ * `enemyDealtRows` below, `enemyReceivedRows` on the taken tab, and
+ * `hostilitySeriesFor`'s chart bands — and a band only lines up with the row it
+ * decomposes if all four spell the key identically, so they all spell it here.
+ * `parseEnemyRow` is the matching reader. */
+export const enemyRowKey = (type: EnemyType): string => `enemy:${JSON.stringify(type)}`;
+
 /** The `EnemyType` an `enemy` row's label spells, or null for anything that is
  * not one.
  *
- * The label IS the type's JSON — `enemyRows` writes it and the view reads it,
- * so the grammar has one author. Tolerant of a malformed label for the same
- * reason `statusLabelFor` is of a stale pin: `translateEnemyType` and
+ * The reading half of `enemyRowKey` above. Tolerant of a malformed label for
+ * the same reason `statusLabelFor` is of a stale pin: `translateEnemyType` and
  * `enemyIconUrl` both answer null with "unknown", which beats throwing inside
  * a row renderer. */
 export const parseEnemyRow = (label: string): EnemyType | null => {
@@ -87,7 +97,7 @@ export const parseEnemyRow = (label: string): EnemyType | null => {
  * parser, so these rows name a type and pin nothing: the target pin selects a
  * SPAWN, and a type cannot choose between two of them. */
 const enemyRows = (skills: SkillState[], total: number): MetricRow[] => {
-  const byType = new Map<string, { damage: number; hits: number }>();
+  const byType = new Map<string, { enemyType: EnemyType; damage: number; hits: number }>();
   for (const skill of skills) {
     for (const target of skill.targets ?? []) {
       // JSON, not String(): EnemyType is `string | { Unknown: number }`, and
@@ -98,13 +108,13 @@ const enemyRows = (skills: SkillState[], total: number): MetricRow[] => {
       if (found) {
         found.damage += target.totalDamage;
         found.hits += target.hits;
-      } else byType.set(key, { damage: target.totalDamage, hits: target.hits });
+      } else byType.set(key, { enemyType: target.enemyType, damage: target.totalDamage, hits: target.hits });
     }
   }
 
   return [...byType.entries()]
-    .map(([key, { damage, hits }]) => ({
-      key: `enemy:${key}`,
+    .map(([key, { enemyType, damage, hits }]) => ({
+      key: enemyRowKey(enemyType),
       label: key,
       kind: "enemy" as const,
       value: damage,
@@ -130,7 +140,7 @@ const enemyRows = (skills: SkillState[], total: number): MetricRow[] => {
  * that type carried, and unlike `SkillState.maxDamage` it is never `null` —
  * `DamageTakenState` is a newer type with no legacy-payload gap to guard. */
 const enemyDealtRows = (players: ComputedPlayerState[], level: RowLevel, fightDurationMs?: number): MetricRow[] => {
-  const byType = new Map<string, { damage: number; hits: number; maxDamage: number }>();
+  const byType = new Map<string, { enemyType: EnemyType; damage: number; hits: number; maxDamage: number }>();
   for (const player of players) {
     for (const row of player.damageTakenBreakdown ?? []) {
       const key = JSON.stringify(row.enemyType);
@@ -139,14 +149,20 @@ const enemyDealtRows = (players: ComputedPlayerState[], level: RowLevel, fightDu
         found.damage += row.totalDamage;
         found.hits += row.hits;
         found.maxDamage = Math.max(found.maxDamage, row.maxDamage);
-      } else byType.set(key, { damage: row.totalDamage, hits: row.hits, maxDamage: row.maxDamage });
+      } else
+        byType.set(key, {
+          enemyType: row.enemyType,
+          damage: row.totalDamage,
+          hits: row.hits,
+          maxDamage: row.maxDamage,
+        });
     }
   }
   const total = [...byType.values()].reduce((sum, { damage }) => sum + damage, 0);
 
   return [...byType.entries()]
-    .map(([key, { damage, hits, maxDamage }]) => ({
-      key: `enemy:${key}`,
+    .map(([key, { enemyType, damage, hits, maxDamage }]) => ({
+      key: enemyRowKey(enemyType),
       label: key,
       kind: "enemy" as const,
       value: damage,

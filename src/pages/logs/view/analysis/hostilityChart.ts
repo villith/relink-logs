@@ -1,5 +1,7 @@
 import type { EnemySeries, EnemyType } from "@/types";
 
+import { enemyRowKey } from "../metrics/damageDone";
+
 import type { DrillSeries } from "./drillSeries";
 
 /** The enemy side's stacked bands: one per enemy TYPE, ready to plot.
@@ -53,10 +55,11 @@ export const hostilitySeriesFor = ({
   if (source === null || source.length === 0) return null;
 
   return source.map((series) => ({
-    // The table's OWN row key — `enemyRows` in metrics/damageDone.ts builds the
-    // same string — so a band and the row it decomposes are one key rather than
-    // two spellings of one enemy.
-    key: `enemy:${JSON.stringify(series.enemyType)}`,
+    // The table's OWN row key, from the same constructor the rows these bands
+    // decompose use — `enemyDealtRows` (Damage Done) and `enemyReceivedRows`
+    // (Damage Taken) — so a band and its row are one key rather than two
+    // spellings of one enemy.
+    key: enemyRowKey(series.enemyType),
     label: enemyName(series.enemyType),
     values: series.values,
   }));

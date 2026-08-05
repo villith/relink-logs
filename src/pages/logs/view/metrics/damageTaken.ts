@@ -2,6 +2,7 @@ import type { ActionType, ComputedPlayerState, DamageTakenState, EnemyType } fro
 import { humanizeNumber, ratePerSecond } from "@/utils";
 
 import type { RowLevel } from "../deriveRows";
+import { enemyRowKey } from "./damageDone";
 import type { MetricDescriptor, MetricRow } from "./types";
 
 const format = humanizeNumber;
@@ -94,7 +95,7 @@ const attackRows = (breakdown: DamageTakenState[], fightDurationMs?: number): Me
  * here needs blanking: `SkillTargetState` carries both damage and hits
  * honestly. */
 const enemyReceivedRows = (players: ComputedPlayerState[], level: RowLevel, fightDurationMs?: number): MetricRow[] => {
-  const byType = new Map<string, { damage: number; hits: number }>();
+  const byType = new Map<string, { enemyType: EnemyType; damage: number; hits: number }>();
   for (const player of players) {
     for (const skill of player.skillBreakdown) {
       for (const target of skill.targets ?? []) {
@@ -103,14 +104,14 @@ const enemyReceivedRows = (players: ComputedPlayerState[], level: RowLevel, figh
         if (found) {
           found.damage += target.totalDamage;
           found.hits += target.hits;
-        } else byType.set(key, { damage: target.totalDamage, hits: target.hits });
+        } else byType.set(key, { enemyType: target.enemyType, damage: target.totalDamage, hits: target.hits });
       }
     }
   }
 
   return [...byType.entries()]
-    .map(([key, { damage, hits }]) => ({
-      key: `enemy:${key}`,
+    .map(([key, { enemyType, damage, hits }]) => ({
+      key: enemyRowKey(enemyType),
       label: key,
       kind: "enemy" as const,
       value: damage,

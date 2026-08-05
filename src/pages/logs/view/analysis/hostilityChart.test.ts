@@ -61,9 +61,10 @@ describe("hostilitySeriesFor", () => {
   });
 
   it("keys each band by the table's own enemy row key", () => {
-    // `enemy:<JSON of the type>` — the string metrics/damageDone.ts writes for
-    // the row this band decomposes. Two spellings would silently decouple the
-    // chart from the table.
+    // `enemy:<JSON of the type>` — the grammar `enemyRowKey` in
+    // metrics/damageDone.ts writes for the row this band decomposes. Pinned as
+    // a literal here on purpose: the row builders' own suites assert the same
+    // shape independently, so nothing checks the constructor against itself.
     expect(call("damage")?.map((band) => band.key)).toEqual(['enemy:"Gallanza"', 'enemy:"Maglielle"']);
   });
 
