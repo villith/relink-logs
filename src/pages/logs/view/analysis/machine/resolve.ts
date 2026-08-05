@@ -23,6 +23,16 @@ export type GroupQuery = {
 
 export type RegroupTab = { dim: Dimension; labelKey: string; active: boolean; disabledReason?: string };
 
+/** Fallback label for a disabled tab: `groupLabelKey` is a placeholder
+ * ("", per-hostility) on an unsupported dimension (see UNSUPPORTED in
+ * capabilities.ts), so a disabled tab still needs SOME visible name — a bare
+ * "Source"/"Ability"/"Target", the one thing true regardless of hostility. */
+const GENERIC_LABEL_KEY: Record<Dimension, string> = {
+  source: "ui.logs.groupby-generic-source",
+  ability: "ui.logs.groupby-generic-ability",
+  target: "ui.logs.groupby-generic-target",
+};
+
 export type ViewSpec = {
   groupBy: Dimension;
   regroupTabs: RegroupTab[];
@@ -65,7 +75,7 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
     const decl = caps.dimensions[dim];
     return {
       dim,
-      labelKey: decl.supported ? decl.groupLabelKey[hostility] : "",
+      labelKey: decl.supported ? decl.groupLabelKey[hostility] : GENERIC_LABEL_KEY[dim],
       active: dim === groupBy,
       ...(decl.supported ? {} : { disabledReason: decl.disabledReasonKey }),
     };

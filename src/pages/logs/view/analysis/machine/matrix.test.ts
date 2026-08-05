@@ -32,8 +32,10 @@ describe("the full state matrix", () => {
       const caps = CAPABILITIES[state.metric];
       const spec = resolveViewSpec(state, caps);
       expect(spec.regroupTabs.filter((tab) => tab.active)).toHaveLength(1);
-      // Every disabled tab must say why.
+      // Every tab — enabled or disabled — must have something to display.
       for (const tab of spec.regroupTabs) {
+        expect(tab.labelKey, `${state.metric}/${tab.dim}`).toBeTruthy();
+        // Every disabled tab must say why.
         if (!caps.dimensions[tab.dim].supported) {
           expect(tab.disabledReason, `${state.metric}/${tab.dim}`).toBeTruthy();
         }

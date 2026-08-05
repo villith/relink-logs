@@ -69,4 +69,21 @@ describe("RegroupStrip", () => {
     const tooltip = await screen.findByRole("tooltip");
     expect(tooltip.textContent).toBe("ui.logs.stun-no-target-dimension");
   });
+
+  it("roves focus with the arrow keys, skipping a disabled tab, and wraps", () => {
+    const tabs: RegroupTab[] = [
+      { dim: "source", labelKey: "ui.logs.groupby-damage-source", active: true },
+      { dim: "ability", labelKey: "", active: false, disabledReason: "ui.logs.stun-no-target-dimension" },
+      { dim: "target", labelKey: "ui.logs.groupby-damage-target", active: false },
+    ];
+    renderIt({ tabs });
+
+    const [first, , third] = screen.getAllByRole("tab");
+    first.focus();
+    fireEvent.keyDown(first, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(third);
+
+    fireEvent.keyDown(third, { key: "ArrowRight" });
+    expect(document.activeElement).toBe(first);
+  });
 });

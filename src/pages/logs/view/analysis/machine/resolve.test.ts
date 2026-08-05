@@ -36,6 +36,9 @@ describe("resolveViewSpec", () => {
     const target = spec.regroupTabs.find((tab) => tab.dim === "target");
     expect(spec.regroupTabs).toHaveLength(3);
     expect(target?.disabledReason).toBe("ui.logs.stun-no-target-dimension");
+    // A disabled tab still needs a visible name — the placeholder groupLabelKey
+    // capabilities.ts declares for an unsupported dimension is never it.
+    expect(target?.labelKey).toBe("ui.logs.groupby-generic-target");
     expect(spec.regroupTabs.find((tab) => tab.dim === "source")?.active).toBe(true);
   });
 
