@@ -183,8 +183,9 @@ export type SkillTargetState = {
   /** The enemy SPAWN this share landed on, as an index into `targetEntries` —
    * the same segment the groups path keys by, so a card and the table can
    * never number spawns differently. Absent on payloads from before the
-   * field existed (and from the live meter path); those entries aggregate at
-   * the type level and render un-numbered. */
+   * field existed (and from the live meter path), or where the segmenter
+   * declined to place the event; those entries aggregate at the type level
+   * and render un-numbered. */
   segment?: number;
   hits: number;
   totalDamage: number;

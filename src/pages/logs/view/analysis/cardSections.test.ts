@@ -231,10 +231,10 @@ describe("cardSectionsFor", () => {
   });
 
   it("gives an ability row its targets, and nothing else", () => {
-    // No Source section: the abilities level is only reached with a source
-    // already pinned, so it would always be one row at 100%. No hit-statistics
-    // section either — every section here renders as a share and a bar, which
-    // is meaningless over min/max/avg, so those live in the table's columns.
+    // No Source section — a source IS pinned here, so it would always be one
+    // row at 100%. No hit-statistics section either — every section here
+    // renders as a share and a bar, which is meaningless over min/max/avg, so
+    // those live in the table's columns.
     const sections = call("abilities", "skill:Normal:9001");
     expect(sections?.map((s) => s.headingKey)).toEqual(["ui.logs.hover-by-target"]);
   });
@@ -301,13 +301,17 @@ describe("cardSectionsFor", () => {
       players,
       pins: { source: 0, targets: [], ability: null },
       color: "rgb(1,2,3)",
-      labels: { ...LABELS, target: (segment: number) => `spawn:${segment}` },
+      labels: {
+        ...LABELS,
+        target: (segment: number) => `spawn:${segment}`,
+        targetIcon: (segment: number) => `icon:${segment}`,
+      },
       card: DAMAGE_CARD,
     });
 
     expect(sections?.[1].entries).toEqual([
-      { key: "target:0", label: "spawn:0", value: 60, icon: undefined },
-      { key: "target:1", label: "spawn:1", value: 40, icon: undefined },
+      { key: "target:0", label: "spawn:0", value: 60, icon: "icon:0" },
+      { key: "target:1", label: "spawn:1", value: 40, icon: "icon:1" },
     ]);
   });
 
@@ -433,5 +437,61 @@ describe("the card follows the metric", () => {
 
     expect(sections?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-source"]);
     expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([20, 5]);
+  });
+
+  it("gives a party-wide stun ability row its by-source section even with no per-enemy record", () => {
+    const sections = cardSectionsFor({
+      row: row("skill:Normal:9001"),
+      level: "abilities",
+      players: PARTY,
+      pins: { source: null, targets: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: LABELS,
+      card: STUN_CARD,
+    });
+
+    expect(sections?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-source"]);
+    expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([20, 5]);
+  });
+});
+
+describe("cardSectionsFor at the abilities level, party-wide", () => {
+  // The RegroupStrip's "Done by ability" reaches this level with NO source
+  // pinned — the state the machine refactor regressed (WCL comparison §2):
+  // the card silently vanished because the branch resolved its owner from
+  // pins.source alone.
+  const UNPINNED = { source: null, targets: [] as number[], ability: null };
+
+  it("gives a party-wide ability row a card with by-source and by-target sections", () => {
+    const sections = callWith("abilities", "skill:Normal:9001", UNPINNED);
+
+    expect(sections?.map((section) => section.headingKey)).toEqual([
+      "ui.logs.hover-by-source",
+      "ui.logs.hover-by-target",
+    ]);
+  });
+
+  it("splits the ability across the players who dealt it, in their own colours", () => {
+    const sections = callWith("abilities", "skill:Normal:9001", UNPINNED);
+
+    expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([200, 50]);
+    expect(sections?.[0].entries.map((entry) => entry.color)).toEqual(["#000", "#001"]);
+  });
+
+  it("totals the targets across every player's copy of the ability", () => {
+    const sections = callWith("abilities", "skill:Normal:9001", UNPINNED);
+
+    // 250 damage total across both players, whatever the per-target split.
+    expect(sections?.[1].entries.reduce((sum, entry) => sum + entry.value, 0)).toBe(250);
+  });
+
+  it("keeps the pinned shape unchanged — by target alone", () => {
+    const sections = callWith("abilities", "skill:Normal:9001", { source: 0, targets: [], ability: null });
+
+    expect(sections?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-target"]);
+  });
+
+  it("still answers null for a pinned source missing from the scoped party", () => {
+    expect(callWith("abilities", "skill:Normal:9001", { source: 42, targets: [], ability: null })).toBeNull();
   });
 });

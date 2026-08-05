@@ -46,7 +46,8 @@ export type SectionLabels = {
  * Spawn-keyed where an entry carries a `segment` — the same identity the
  * table's target rows use, labelled through the same lookup — and type-keyed
  * for entries from payloads that predate the field, which can only speak at
- * the type level and render un-numbered.
+ * the type level and render un-numbered, or where the segmenter declined to
+ * place the event.
  *
  * `targets` is optional on SkillState because cached payloads predate it. An
  * absent list means the breakdown is unavailable, not that nothing was hit —
@@ -106,17 +107,18 @@ export const aggregateAbilities = (
     .sort((a, b) => b.value - a.value);
 };
 
-/** Per-player totals for ONE action, across the whole scoped party.
+/** Per-player totals for one row's skills, across the whole scoped party.
  *
- * Keyed by the raw action rather than by `abilityRowKey`, because this explains
- * a row at the skills level — one member of a pinned group — and that row is
- * already merged by action id.
+ * `skillsOf` names each player's contributing breakdown rows — an action-key
+ * match at the skills level, an ability-row match (skill groups included) at
+ * the abilities level — so one fold serves both without re-deriving either
+ * grouping rule here.
  *
  * Each entry carries the player's own colour: a section colour would paint the
  * whole party one shade and lose the only thing this section is for. */
 export const aggregateSources = (
   players: ComputedPlayerState[],
-  actionKey: string,
+  skillsOf: (player: ComputedPlayerState) => SkillState[],
   sourceLabel: (index: number) => string,
   sourceColor: (index: number) => string,
   valueOf: (skill: SkillState) => number,
@@ -128,9 +130,7 @@ export const aggregateSources = (
       label: sourceLabel(player.index),
       color: sourceColor(player.index),
       icon: sourceIcon?.(player.index),
-      value: player.skillBreakdown
-        .filter((skill) => abilityKey(skill.actionType) === actionKey)
-        .reduce((sum, skill) => sum + valueOf(skill), 0),
+      value: skillsOf(player).reduce((sum, skill) => sum + valueOf(skill), 0),
     }))
     .filter((entry) => entry.value > 0)
     .sort((a, b) => b.value - a.value);
@@ -140,9 +140,10 @@ const TARGET_COLOR = "var(--mantine-color-red-6)";
 /** The hover card's sections for one row, or null when the row has nothing to
  * decompose.
  *
- * A player is explained by ability and by target. An ability is explained by
- * target alone — the abilities level is reached only with a source pinned, so a
- * source section there would always hold one row at 100%. A member skill is
+ * The rule: sections are the dimensions the pins have NOT fixed. A player is
+ * explained by ability and by target. An ability is explained by target — and
+ * by source too when no source is pinned, because the RegroupStrip reaches
+ * the abilities level party-wide ("Done by ability"). A member skill is
  * explained by source AND target, because an ability may be pinned with no
  * friendly at all, and then the source is exactly what varies. */
 export const cardSectionsFor = ({
@@ -201,16 +202,38 @@ export const cardSectionsFor = ({
   }
 
   if (level === "abilities") {
+    // Owner = the pinned player if any, else the whole party: the
+    // RegroupStrip's "Done by ability" reaches this level with NO source
+    // pinned. A pinned source missing from the scoped party still has
+    // genuinely nothing to show.
     const owner = players.find((candidate) => candidate.index === pins.source);
+    if (pins.source !== null && !owner) return null;
+    const scoped = owner ? [owner] : players;
+    const rowKey = row.key.replace(/^skill:/, "");
     // EVERY skill under the ability, not the first: the row above sums them, so
     // explaining it with one contributor describes a fraction of what it says.
-    const skills = skillsForAbilityKey(owner?.skillBreakdown ?? [], row.key.replace(/^skill:/, ""));
+    const skills = scoped.flatMap((player) => skillsForAbilityKey(player.skillBreakdown, rowKey));
     if (skills.length === 0) return null;
 
-    // By target alone — the abilities level is reached only with a source
-    // pinned, so a source section would always hold one row at 100%. A metric
-    // with no per-enemy record therefore has nothing to say here at all.
-    const sections = targetSection(skills);
+    const sections: CardSection[] = [];
+    // Party-wide, who dealt it is a free dimension — the by-source section is
+    // what stands in for Warcraft Logs' per-source nested rows. With an owner
+    // pinned it would always be one row at 100%, so it is omitted there.
+    if (!owner) {
+      sections.push({
+        headingKey: "ui.logs.hover-by-source",
+        color,
+        entries: aggregateSources(
+          players,
+          (player) => skillsForAbilityKey(player.skillBreakdown, rowKey),
+          labels.source,
+          labels.sourceColor,
+          card.valueOf,
+          labels.sourceIcon
+        ),
+      });
+    }
+    sections.push(...targetSection(skills));
     return sections.length === 0 ? null : sections;
   }
 
@@ -234,7 +257,7 @@ export const cardSectionsFor = ({
         color,
         entries: aggregateSources(
           players,
-          actionKey,
+          (player) => player.skillBreakdown.filter((skill) => abilityKey(skill.actionType) === actionKey),
           labels.source,
           labels.sourceColor,
           card.valueOf,
