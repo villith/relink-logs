@@ -11,6 +11,7 @@ import { bandOpacity, type Band } from "../statusBands";
 
 import { ChartLegend } from "./ChartLegend";
 import "./analysis.css";
+import type { ChartMarker } from "./chartMarkers";
 import { windowFromDrag } from "./scopeWindow";
 
 /** How a plotted value reads as text.
@@ -60,12 +61,16 @@ export const ChartTooltip = ({
   payload,
   format,
   labels,
+  markers,
 }: {
   label: string;
   payload: Record<string, any>[] | undefined; // eslint-disable-line
   format: "amount" | "percent" | "count";
   /** The series descriptors, so a payload entry can be named. */
   labels: Label;
+  /** Event markers that landed in THIS bucket, already named and coloured —
+   * appended under the series rows, Warcraft Logs' behavior. */
+  markers?: ChartMarker[];
 }) => {
   if (!payload) return null;
 
@@ -103,7 +108,7 @@ export const ChartTooltip = ({
       withBorder
       shadow="md"
       radius="md"
-      style={landed.length === 0 ? { visibility: "hidden" } : undefined}
+      style={landed.length === 0 && (markers?.length ?? 0) === 0 ? { visibility: "hidden" } : undefined}
     >
       <Text fw={500} mb={5}>
         {label}
@@ -120,6 +125,11 @@ export const ChartTooltip = ({
           </Text>
         );
       })}
+      {(markers ?? []).map((marker, index) => (
+        <Text key={`marker-${index}`} fz="sm" c={marker.color}>
+          {marker.label}
+        </Text>
+      ))}
     </Paper>
   );
 };

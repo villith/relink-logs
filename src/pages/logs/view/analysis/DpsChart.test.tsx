@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Label } from "../DetailCharts";
 
+import type { ChartMarker } from "./chartMarkers";
 import { ChartTooltip } from "./DpsChart";
 
 const LABELS: Label = [
@@ -11,10 +12,10 @@ const LABELS: Label = [
   { name: "1", label: "Manmoth", partySlotIndex: 1, color: "#0f0" },
 ];
 
-const renderTooltip = (payload: Record<string, unknown>[], labels: Label = LABELS) =>
+const renderTooltip = (payload: Record<string, unknown>[], labels: Label = LABELS, markers?: ChartMarker[]) =>
   render(
     <MantineProvider>
-      <ChartTooltip label="03:03" payload={payload} format="amount" labels={labels} />
+      <ChartTooltip label="03:03" payload={payload} format="amount" labels={labels} markers={markers} />
     </MantineProvider>
   );
 
@@ -109,5 +110,24 @@ describe("ChartTooltip", () => {
       bands
     );
     expect(screen.getByText("Reginleiv Recidiv")).toBeTruthy();
+  });
+
+  it("appends the bucket's marker lines after the series rows", () => {
+    renderTooltip([{ dataKey: "0", name: "0", value: 1000, color: "#f00" }], LABELS, [
+      { kind: "death", atMs: 183_000, color: "#f00", label: "☠ Rain died" },
+    ]);
+    expect(screen.getByText("☠ Rain died")).toBeTruthy();
+  });
+
+  it("stays visible for a bucket where nothing landed but a marker did", () => {
+    // The zero-suppression guard hides the card when every series is zero; a
+    // marker is exactly the content that must still show there — a death is
+    // usually WHY the bucket is all zeroes.
+    const { container } = renderTooltip([{ dataKey: "0", name: "0", value: 0, color: "#f00" }], LABELS, [
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "✦ Manmoth — Skybound Art" },
+    ]);
+    const card = container.querySelector<HTMLElement>('[data-testid="chart-tooltip"]');
+    expect(card!.style.visibility).not.toBe("hidden");
+    expect(screen.getByText("✦ Manmoth — Skybound Art")).toBeTruthy();
   });
 });
