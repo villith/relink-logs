@@ -32,7 +32,8 @@ export type ViewSpec = {
   fetch: GroupQuery | null;
 };
 
-/** Chart band cap — same rationale as the enemy-series cap (palette size). */
+/** Chart band cap — matches the analysis chart's own eight-entry band palette
+ * (4 user colors + PLAYER_COLORS, built in AnalysisView.tsx). */
 export const GROUP_TOP_N = 8;
 
 export const resolveGroupBy = (state: AnalysisState, caps: MetricCapabilities): Dimension => {
@@ -55,12 +56,16 @@ const actorRef = (dim: "source" | "target", index: number | null, hostility: Hos
 
 export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities): ViewSpec => {
   const groupBy = resolveGroupBy(state, caps);
+  // Effective hostility: `side=enemy` is reachable in the URL on any metric,
+  // including one whose capabilities don't support it, so every field below
+  // must resolve against this, never against state.hostility directly.
+  const hostility = caps.supportsHostility ? state.hostility : "friendly";
 
   const regroupTabs: RegroupTab[] = DIMENSIONS.map((dim) => {
     const decl = caps.dimensions[dim];
     return {
       dim,
-      labelKey: decl.supported ? decl.groupLabelKey[caps.supportsHostility ? state.hostility : "friendly"] : "",
+      labelKey: decl.supported ? decl.groupLabelKey[hostility] : "",
       active: dim === groupBy,
       ...(decl.supported ? {} : { disabledReason: decl.disabledReasonKey }),
     };
@@ -70,11 +75,13 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
     caps.dataPath !== "groups"
       ? null
       : {
+          // Sound while dataPath "groups" is declared only by damage and
+          // taken (see CAPABILITIES) — both share this metric union.
           metric: state.metric as "damage" | "taken",
-          hostility: caps.supportsHostility ? state.hostility : "friendly",
+          hostility,
           groupBy,
-          source: actorRef("source", state.source, state.hostility),
-          target: actorRef("target", state.target, state.hostility),
+          source: actorRef("source", state.source, hostility),
+          target: actorRef("target", state.target, hostility),
           // A status pin names an effect; no event query can narrow by it.
           ability: state.ability !== null && !isStatusPin(state.ability) ? state.ability : null,
           topN: GROUP_TOP_N,
@@ -85,7 +92,7 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
     regroupTabs,
     table: {
       columnKeys: caps.columnKeys(groupBy),
-      rowsLabelKey: rowsLabelKeyFor(groupBy, state.hostility, caps),
+      rowsLabelKey: rowsLabelKeyFor(groupBy, hostility),
       // emptyKey wiring lands with the view integration (Task 14) — the
       // resolver's field exists now so the shape is stable.
     },
@@ -105,9 +112,10 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
 };
 
 /** i18next key naming what a row IS under this grouping. Reuses the existing
- * rows-by-* keys (see KIND_ROWS_LABEL_KEY in AnalysisView.tsx). */
-const rowsLabelKeyFor = (groupBy: Dimension, hostility: Hostility, caps: MetricCapabilities): string => {
-  const enemySide = caps.supportsHostility && hostility === "enemy";
+ * rows-by-* keys (see KIND_ROWS_LABEL_KEY in AnalysisView.tsx). `hostility`
+ * must already be the effective hostility (see resolveViewSpec). */
+const rowsLabelKeyFor = (groupBy: Dimension, hostility: Hostility): string => {
+  const enemySide = hostility === "enemy";
   if (groupBy === "source") return enemySide ? "ui.logs.rows-by-enemy" : "ui.logs.rows-by-player";
   if (groupBy === "target") return enemySide ? "ui.logs.rows-by-player" : "ui.logs.rows-by-enemy";
   return "ui.logs.rows-by-ability";

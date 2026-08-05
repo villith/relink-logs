@@ -61,8 +61,25 @@ describe("resolveViewSpec", () => {
     expect(spec.fetch?.source).toEqual({ kind: "enemySpawn", segment: 7 });
   });
 
-  it("keeps a status pin out of the query and flags a foreign-grammar ability", () => {
+  it("keeps a status pin out of the query", () => {
     const spec = resolveViewSpec(state({ metric: "damage", ability: "status:1:2" }), CAPABILITIES.damage);
     expect(spec.fetch?.ability).toBeNull();
+  });
+
+  it("picks the chart shape from what is drawn", () => {
+    expect(resolveViewSpec(state({ metric: "sba" }), CAPABILITIES.sba).chart).toMatchObject({
+      source: "base",
+      format: "percent",
+    });
+    expect(resolveViewSpec(state({ metric: "buffs" }), CAPABILITIES.buffs).chart).toMatchObject({
+      source: "stacks",
+      format: "count",
+    });
+  });
+
+  it("inverts the row label and regroup-tab vocabulary on the enemy side", () => {
+    const spec = resolveViewSpec(state({ hostility: "enemy" }), CAPABILITIES.damage);
+    expect(spec.table.rowsLabelKey).toBe("ui.logs.rows-by-enemy");
+    expect(spec.regroupTabs.find((tab) => tab.dim === "source")?.labelKey).toBe("ui.logs.groupby-damage-source-enemy");
   });
 });
