@@ -454,7 +454,7 @@
       "hostility-label": "Hostility",
       "hostility-friendlies": "Friendlies",
       "hostility-enemies": "Enemies",
-      "hostility-disabled-hint": "Only the Buffs and Debuffs tabs have enemy-side figures",
+      "hostility-disabled-hint": "SBA and Stun are recorded per player only — neither has an enemy side",
       "buffs-empty": "No status effects were recorded for this log",
       "enemy-dealt-empty": "No incoming damage recorded — logs from before damage-taken capture carry none.",
       "sba-no-breakdown": "Per-ability SBA is only recorded for your own character",
