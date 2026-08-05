@@ -903,6 +903,7 @@ export const AnalysisView = () => {
       // The player's OWN party colour, resolved through the identity party so a
       // scoped fetch's renumbered slots cannot recolour them mid-drill.
       sourceColor: (index: number) => resolvePlayerColor(palette, playerData, playerByIndex.get(index)?.slot ?? 0, 0),
+      character: translateCharacterType,
       // The same art the rows above the card show, resolved the same way, so
       // hovering a row cannot show its members under different pictures.
       abilityIcon: (key: string, owner?: ComputedPlayerState) => abilityRowIconUrl(key, identityPlayers, owner),

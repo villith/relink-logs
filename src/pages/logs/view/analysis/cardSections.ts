@@ -1,11 +1,12 @@
-import type { ComputedPlayerState, EnemyType, SkillState, SkillTargetState, TargetEntry } from "@/types";
+import type { CharacterType, ComputedPlayerState, EnemyType, SkillState, SkillTargetState, TargetEntry } from "@/types";
 
 import { abilityKey } from "../abilityKey";
-import { groupSkillsForRows, skillsForAbilityKey } from "../abilitySkills";
+import { childOfPin, groupSkillsForRows, skillsForAbilityKey } from "../abilitySkills";
 import type { MetricCard, MetricRow, RowLevel } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
 
 import type { CardSection } from "./HoverCard";
+import { qualifyDuplicateLabels } from "./labelCollision";
 import { targetRowSegment } from "./statusLabel";
 
 /** Name lookups the view injects, so this stays a pure function: skill and
@@ -22,6 +23,11 @@ export type SectionLabels = {
   source: (index: number) => string;
   /** That player's own party colour, so a source row matches their bar. */
   sourceColor: (index: number) => string;
+  /** A character's display name, for qualifying two same-named ability entries
+   * from different bodies (Id vs his dragonform) — applied only on collision,
+   * by the same helper the table's parent rows use. Optional so tests and
+   * older callers stay unqualified rather than broken. */
+  character?: (type: CharacterType) => string;
   /** The entities' art, all optional so tests and older callers stay
    * text-only. The ability icon takes the owner for the same collision reason
    * the ability NAME does. */
@@ -94,18 +100,28 @@ export const aggregateAbilities = (
   skills: SkillState[],
   abilityLabel: (key: string) => string,
   valueOf: (skill: SkillState) => number,
-  abilityIcon?: (key: string) => string | undefined
+  abilityIcon?: (key: string) => string | undefined,
+  characterName?: (type: CharacterType) => string
 ) => {
   // `groupSkillsForRows` owns the condensing rule; re-deriving it here is what
   // produced the double-draw above in the first place.
-  return groupSkillsForRows(skills)
-    .map(({ key, skills: grouped }) => ({
-      key,
-      label: abilityLabel(key),
-      value: grouped.reduce((sum, skill) => sum + valueOf(skill), 0),
-      icon: abilityIcon?.(key),
-    }))
-    .sort((a, b) => b.value - a.value);
+  const entries = groupSkillsForRows(skills).map(({ key, skills: grouped }) => ({
+    key,
+    label: abilityLabel(key),
+    value: grouped.reduce((sum, skill) => sum + valueOf(skill), 0),
+    icon: abilityIcon?.(key),
+  }));
+  // Two same-named groups from different bodies (Id vs his dragonform) read
+  // identically; the collision-only qualifier names the body — the same rule
+  // the table's parent rows apply, through the same helper.
+  const labels = qualifyDuplicateLabels(
+    entries.map((entry) => {
+      if (!characterName) return { label: entry.label, qualifier: "" };
+      const child = childOfPin(entry.key);
+      return { label: entry.label, qualifier: child === null ? "" : characterName(child) };
+    })
+  );
+  return entries.map((entry, position) => ({ ...entry, label: labels[position] })).sort((a, b) => b.value - a.value);
 };
 
 /** Per-player totals for one row's skills, across the whole scoped party.
@@ -195,7 +211,8 @@ export const cardSectionsFor = ({
           player.skillBreakdown,
           (key) => labels.ability(key, player),
           card.valueOf,
-          labels.abilityIcon && ((key) => labels.abilityIcon?.(key, player))
+          labels.abilityIcon && ((key) => labels.abilityIcon?.(key, player)),
+          labels.character
         ),
       },
       ...targetSection(player.skillBreakdown),
