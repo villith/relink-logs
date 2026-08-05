@@ -154,6 +154,8 @@ export const AnalysisView = () => {
     dpsChart,
     stunChart,
     takenChart,
+    enemyDealtChart,
+    enemyReceivedChart,
     chartLen,
     sbaChart,
     sbaChartLen,
@@ -173,6 +175,8 @@ export const AnalysisView = () => {
       dpsChart: state.dpsChart,
       stunChart: state.stunChart,
       takenChart: state.takenChart,
+      enemyDealtChart: state.enemyDealtChart,
+      enemyReceivedChart: state.enemyReceivedChart,
       chartLen: state.chartLen,
       sbaChart: state.sbaChart,
       sbaChartLen: state.sbaChartLen,
@@ -525,6 +529,14 @@ export const AnalysisView = () => {
   const metric = METRICS[metricKey] ?? damageDone;
   const level = rowLevelFor(pins);
 
+  // Whether the enemy side is actually on screen. The toggle's value is per LOG,
+  // not per tab, so `hostility === "enemy"` alone is not enough: on a tab that
+  // cannot switch (SBA, Stun — see HostilityToggle's `disabled`) it stays
+  // "enemy" while the friendly table is what renders. One spelling, so the
+  // chart, its title, the hover cards and the empty state cannot disagree about
+  // which side is showing.
+  const enemySide = hostility === "enemy" && metric.supportsHostility === true;
+
   // The window the status tables measure, in milliseconds from the fight's
   // start. Buckets are inclusive at both ends, so the last one runs to the start
   // of the one after it — the same conversion the scoped fetch and the chart
@@ -770,7 +782,7 @@ export const AnalysisView = () => {
       // Enemy-side rows have their own decompositions, in both directions: the
       // skill-based builder would explain an ENEMY with the party's abilities,
       // which is nonsense whichever tab it happens on.
-      if (hostility === "enemy" && metric.supportsHostility) {
+      if (enemySide) {
         if (metricKey === "damage")
           return enemyDealtCardSectionsFor({ row, players, color: rowColor(row), labels: hostilityLabels });
         if (metricKey === "taken")
@@ -791,7 +803,7 @@ export const AnalysisView = () => {
         ? cardSectionsFor({ row, level, players, pins, color: rowColor(row), labels: sectionLabels, card: metric.card })
         : null;
     },
-    [hostility, metricKey, metric, level, players, pins, rowColor, sectionLabels, hostilityLabels, labelForTakenAttack]
+    [enemySide, metricKey, metric, level, players, pins, rowColor, sectionLabels, hostilityLabels, labelForTakenAttack]
   );
   // What the plot shows follows the metric tabs. Each metric brings its own
   // bucketed series from the base load, so switching tabs never refetches.
@@ -918,6 +930,35 @@ export const AnalysisView = () => {
     identityPlayers,
   ]);
 
+  // The enemy-side plot: one stacked band per enemy TYPE, decomposing exactly
+  // what the enemy-side table ranks — who was hitting the party on Damage Done,
+  // where the party's damage went on Damage Taken. Same `{key, label, values}`
+  // shape as the Stacks and drill overlays, so it rides the same path below;
+  // the backend already caps it at eight bands.
+  //
+  // The key is the table's own row key (`enemy:<JSON of the type>`), so a band
+  // and the row it decomposes are the same string rather than two spellings of
+  // one enemy.
+  //
+  // Both series come off the BASE load, so they always span the whole fight: a
+  // pin does not narrow them, exactly as the taken and enemy-HP charts already
+  // behave. The window slice below still applies, so scrubbing crops them.
+  const hostilitySeries = useMemo(() => {
+    if (!enemySide) return null;
+    const source = metricKey === "damage" ? enemyDealtChart : metricKey === "taken" ? enemyReceivedChart : null;
+    // Null, not an empty array: the status tabs' enemy side has no per-enemy
+    // damage series at all, and a log recorded before damage-taken capture has
+    // no dealt series — both must fall through to the chart already drawn
+    // rather than blank it.
+    if (!source || source.length === 0) return null;
+    return source.map((series) => ({
+      key: `enemy:${JSON.stringify(series.enemyType)}`,
+      label: translateEnemyType(series.enemyType),
+      values: series.values,
+    }));
+    // i18n.language: the labels are translated enemy names.
+  }, [enemySide, metricKey, enemyDealtChart, enemyReceivedChart, i18n.language]);
+
   // Which series the per-player chart draws. identityPlayers, not players: these
   // charts hold the whole party, so a pin must not drop curves from the plot.
   //
@@ -946,7 +987,13 @@ export const AnalysisView = () => {
   // drill-down bands are the same shape and are consumed identically, so they
   // are one branch here rather than the same ternary spelled out per field.
   // Which of the two it is still matters for smoothing and scale below.
-  const overlay = statusSeries ?? drill;
+  //
+  // The enemy side REPLACES the drill rather than losing to it: the drill bands
+  // decompose one pinned player, and beside an enemy table that player's row is
+  // not on screen at all. With no enemy series to draw (an old log, or a status
+  // tab) the plot keeps whatever the metric's own source is, which is still
+  // about the fight rather than about a row nobody can see.
+  const overlay = statusSeries ?? (enemySide ? hostilitySeries : drill);
 
   const chartData: ChartDatapoint[] = useMemo(() => {
     const source = overlay
@@ -1039,7 +1086,18 @@ export const AnalysisView = () => {
       formatChartDebug({
         metric: metricKey,
         level,
-        chart: statusSeries ? "stacks" : drill ? "drill" : scopedPlayers ? "scoped" : "base",
+        // Same precedence as `overlay` above, including the drill the enemy
+        // side suppresses — a readout that disagreed with the plot would be
+        // worse than none.
+        chart: statusSeries
+          ? "stacks"
+          : hostilitySeries
+            ? "enemy"
+            : drill && !enemySide
+              ? "drill"
+              : scopedPlayers
+                ? "scoped"
+                : "base",
         series: labels.length,
         len: chartData.length,
         shown: shownChartData.length,
@@ -1053,6 +1111,8 @@ export const AnalysisView = () => {
       metricKey,
       level,
       statusSeries,
+      hostilitySeries,
+      enemySide,
       drill,
       scopedPlayers,
       labels,
@@ -1123,13 +1183,24 @@ export const AnalysisView = () => {
         labelKey={
           statusSeries
             ? "ui.logs.chart-stacks-label"
-            : drill
-              ? metricKey === "taken"
-                ? "ui.logs.chart-taken-drill-label"
-                : DRILL_LABEL_KEY[level]
-              : chartMetric.labelKey
+            : // The enemy side inverts which way the damage flows, so it names
+              // both ends explicitly. Reusing the friendly titles would leave
+              // the heading unchanged across a toggle that swapped the plotted
+              // quantity for its opposite.
+              hostilitySeries
+              ? metricKey === "damage"
+                ? "ui.logs.chart-enemy-dealt-label"
+                : "ui.logs.chart-enemy-received-label"
+              : // `!enemySide`: the enemy side suppresses the drill (see
+                // `overlay`), so titling the plot after it would name bands
+                // that are not being drawn.
+                drill && !enemySide
+                ? metricKey === "taken"
+                  ? "ui.logs.chart-taken-drill-label"
+                  : DRILL_LABEL_KEY[level]
+                : chartMetric.labelKey
         }
-        format={statusSeries ? "count" : drill ? "amount" : chartMetric.format}
+        format={statusSeries ? "count" : overlay ? "amount" : chartMetric.format}
         stacked={overlay !== null}
         onScope={handleScope}
         fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
@@ -1161,7 +1232,13 @@ export const AnalysisView = () => {
                 // a missing pin, it is the honest answer.
                 metricKey === "sba" && level !== "players"
                 ? "ui.logs.sba-no-breakdown"
-                : undefined
+                : // Damage Done's enemy side ranks enemies by what they dealt
+                  // TO the party, which is the damage-taken stream — a log
+                  // recorded before that capture existed has none of it, and
+                  // clearing a pin will not bring it back.
+                  enemySide && metricKey === "damage"
+                  ? "ui.logs.enemy-dealt-empty"
+                  : undefined
           }
           // Same discriminator `renderLabel` uses, so the header can never name
           // something other than what the rows under it are.

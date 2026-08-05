@@ -11,8 +11,9 @@ export type ChartDebugFacts = {
   level: string;
   /** Which series the plot is drawn from. `stacks` is the status drill: one
    * series per holder of the pinned effect, plotting stack depth rather than
-   * any of the three damage-shaped sources. */
-  chart: "base" | "scoped" | "drill" | "stacks";
+   * any of the three damage-shaped sources. `enemy` is the enemy side's own
+   * decomposition, one band per enemy type, which replaces the drill there. */
+  chart: "base" | "scoped" | "drill" | "stacks" | "enemy";
   /** Series (legend entries) plotted. */
   series: number;
   /** Buckets the series were built over. */
