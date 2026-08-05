@@ -98,8 +98,8 @@ const MIXED_MARKER_COLOR = "var(--mantine-color-gray-5)";
 
 /** Control-row label per marker kind. */
 const MARKER_LABEL_KEY: Record<MarkerKind, string> = {
-  death: "ui.logs.chart-markers-deaths",
-  sba: "ui.logs.chart-markers-sba",
+  death: "ui.logs.chart-marker-deaths",
+  sba: "ui.logs.chart-marker-sba",
 };
 
 // recharts types a tooltip entry as Payload<any, any>, which has no index

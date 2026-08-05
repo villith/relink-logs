@@ -830,7 +830,7 @@ export const AnalysisView = () => {
         event.kind === "death"
           ? resolvePlayerColor(palette, playerData, playerByIndex.get(event.actorIndex)?.slot ?? 0, 0)
           : SBA_MARKER_COLOR,
-      label: t(event.kind === "death" ? "ui.logs.marker-death-line" : "ui.logs.marker-sba-line", {
+      label: t(event.kind === "death" ? "ui.logs.chart-marker-death-line" : "ui.logs.chart-marker-sba-line", {
         name: labelForSource(event.actorIndex),
       }),
     }));
