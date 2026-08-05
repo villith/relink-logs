@@ -54,10 +54,22 @@ describe("HoverCardBody", () => {
     expect(screen.getByText("1.0")).toBeTruthy();
   });
 
-  it("renders every entry — long lists are never truncated", () => {
-    renderBody([section("ui.logs.hover-by-ability", 24)]);
+  it("caps a section at its top five entries, silently — WCL's behavior", () => {
+    // No "+N more" row: the sixth-largest entry and everything below it
+    // simply do not render.
+    renderBody([section("ui.logs.hover-by-ability", 6)]);
     expect(screen.getByText("entry 0")).toBeTruthy();
-    expect(screen.getByText("entry 23")).toBeTruthy();
+    expect(screen.getByText("entry 4")).toBeTruthy();
+    expect(screen.queryByText("entry 5")).toBeNull();
+  });
+
+  it("keeps shares computed over the FULL total, never the shown five", () => {
+    // values 6..1 sum to 21. The largest entry's share is 6/21 = 28.6%;
+    // re-normalizing over the visible five (6/20 = 30.0%) would silently
+    // claim the section sums to 100%.
+    renderBody([section("ui.logs.hover-by-target", 6)]);
+    expect(screen.getByText("28.6%")).toBeTruthy();
+    expect(screen.queryByText("30.0%")).toBeNull();
   });
 
   it("scales bars against the section's largest entry", () => {

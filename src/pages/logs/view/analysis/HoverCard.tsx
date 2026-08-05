@@ -45,13 +45,22 @@ export type HoverCardBodyProps = {
   sections: CardSection[];
 } & CardAmount;
 
+/** WCL's cap: a section shows its top five entries and stays silent about
+ * the rest — no "+N more" row. Applied after the builders' descending sort,
+ * so the five are always the largest. */
+export const SECTION_ENTRY_CAP = 5;
+
 const Section = ({ headingKey, color, entries, amountKey, format }: CardSection & CardAmount) => {
   const { t } = useTranslation();
   if (entries.length === 0) return null;
 
+  // Top five only; every builder sorts descending, so the slice IS the
+  // largest five. `total` stays over the FULL list — a capped section's
+  // shares must not re-normalize to 100%.
+  const shown = entries.slice(0, SECTION_ENTRY_CAP);
   // Scaled to the section's largest entry, not its total: a three-row target
   // list scaled to the total would be three slivers.
-  const largest = Math.max(...entries.map((entry) => entry.value));
+  const largest = Math.max(...shown.map((entry) => entry.value));
   const total = entries.reduce((sum, entry) => sum + entry.value, 0);
 
   return (
@@ -69,7 +78,7 @@ const Section = ({ headingKey, color, entries, amountKey, format }: CardSection 
           {t("ui.logs.column-share")}
         </Text>
       </Box>
-      {entries.map((entry) => {
+      {shown.map((entry) => {
         return (
           <Box key={entry.key} className="analysis-card-row">
             <Box
@@ -96,10 +105,9 @@ const Section = ({ headingKey, color, entries, amountKey, format }: CardSection 
 /** The card's contents, separated from its positioning so it can be tested
  * without a cursor.
  *
- * Long lists are capped by the portal's max-height rather than truncated per
- * section, so the card never grows past 70vh. A party's top damage dealer can
- * carry 30+ abilities, which measured 873px in a 1124px viewport before the
- * cap. */
+ * Each section truncates to its top `SECTION_ENTRY_CAP` entries; the
+ * portal's 70vh max-height stays as the guard behind that, since a card can
+ * still stack several sections. */
 export const HoverCardBody = ({ sections, amountKey, format }: HoverCardBodyProps) => (
   <Box>
     {sections.map((section) => (
