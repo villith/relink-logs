@@ -1,5 +1,6 @@
 import type { ActionType, ComputedPlayerState, EnemyType } from "@/types";
 
+import { takenAttackRowParts } from "../metrics/damageTaken";
 import type { MetricRow } from "../metrics/types";
 
 import type { CardSection } from "./HoverCard";
@@ -18,10 +19,9 @@ export type TakenSectionLabels = {
  * target section paints them. */
 const SOURCE_COLOR = "var(--mantine-color-red-6)";
 
-/** The taken tab's hover card: a player row is explained by the attacks that
+/** The taken tab's hover card for a PLAYER row: explained by the attacks that
  * hit them and by the enemies those attacks came from — Warcraft Logs' two
- * sections. Drill rows carry no card at all: one row already fixes the
- * attacker, the attack AND the victim, so there is nothing left to decompose. */
+ * sections. Drilled attack rows have their own builder below. */
 export const takenCardSectionsFor = ({
   row,
   players,
@@ -72,5 +72,83 @@ export const takenCardSectionsFor = ({
   return [
     { headingKey: "ui.logs.hover-by-ability", color, entries: entriesOf(byAttack) },
     { headingKey: "ui.logs.hover-by-source", color: SOURCE_COLOR, entries: entriesOf(byEnemy) },
+  ];
+};
+
+/** Who the injected victim lookups are: the party's own names and colours,
+ * the same ones every by-source section injects. */
+export type TakenVictimLabels = {
+  source: (index: number) => string;
+  sourceColor: (index: number) => string;
+  sourceIcon?: (index: number) => string | undefined;
+};
+
+/** The taken tab's hover card for a DRILLED attack row (`taken:<json>`): one
+ * enemy attack split across the victims who took it — the dimension the
+ * grouping leaves free. Under a victim pin the split narrows to that victim
+ * and holds one row at 100%, keeping the card's shape as pins change (the
+ * same posture as the skills-level source section).
+ *
+ * No attacker-spawn section: `DamageTakenState` carries no segment and the
+ * segmenter deliberately never assigns taken events one (see
+ * `segment_targets_inner`), so a per-spawn split of the attacker is not
+ * derivable — the row's own label already names the attacker TYPE. */
+export const takenAbilityCardSectionsFor = ({
+  row,
+  players,
+  source,
+  color,
+  labels,
+}: {
+  row: MetricRow;
+  players: ComputedPlayerState[];
+  /** The pinned victim, narrowing the split the way the table rows are
+   * narrowed — the scoped party's taken breakdowns are NOT pin-filtered by
+   * the backend (taken events bypass the selection gates), so the card must
+   * apply the pin itself or it would total more than the row it explains. */
+  source: number | null;
+  color: string;
+  labels: TakenVictimLabels;
+}): CardSection[] | null => {
+  if (!row.key.startsWith("taken:")) return null;
+  // The label IS the JSON `takenAttackRowParts` reads — the grammar has one
+  // author (`attackRows` / `groupRowsFor`'s enemyAttack case).
+  const parts = takenAttackRowParts(row.label);
+  if (parts === null) return null;
+  const enemyKey = JSON.stringify(parts.enemyType);
+  const actionKey = JSON.stringify(parts.actionId);
+
+  const scoped = source === null ? players : players.filter((player) => player.index === source);
+  const byVictim: { key: string; label: string; value: number; color: string; icon?: string }[] = [];
+  for (const player of scoped) {
+    let took = 0;
+    // Optional because a log recorded before damage-taken capture (2026-08-04)
+    // has no incoming events at all — no rows rather than zeroed ones.
+    for (const entry of player.damageTakenBreakdown ?? []) {
+      // JSON halves compared separately, not one re-stringified object:
+      // property order must not decide equality.
+      if (JSON.stringify(entry.enemyType) !== enemyKey || JSON.stringify(entry.actionId) !== actionKey) continue;
+      took += entry.totalDamage;
+    }
+    if (took > 0) {
+      byVictim.push({
+        key: `victim:${player.index}`,
+        label: labels.source(player.index),
+        value: took,
+        // Each victim in their OWN party colour.
+        color: labels.sourceColor(player.index),
+        icon: labels.sourceIcon?.(player.index),
+      });
+    }
+  }
+  // Nobody recorded taking it — no card, rather than an empty one.
+  if (byVictim.length === 0) return null;
+
+  return [
+    {
+      headingKey: "ui.logs.hover-by-source",
+      color,
+      entries: byVictim.sort((a, b) => b.value - a.value),
+    },
   ];
 };

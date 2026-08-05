@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ComputedPlayerState } from "@/types";
 
 import type { MetricRow } from "../metrics/types";
-import { takenCardSectionsFor } from "./takenCardSections";
+import { takenAbilityCardSectionsFor, takenCardSectionsFor } from "./takenCardSections";
 
 const breakdownPlayer = (index: number, breakdown: { enemy: number; action: number; total: number }[]) =>
   ({
@@ -57,8 +57,79 @@ describe("takenCardSectionsFor", () => {
     ).toBeNull();
   });
 
-  it("answers a non-player row with no card — drill rows fix every dimension", () => {
+  it("answers a non-player row with no card — drill rows have their own builder", () => {
     const row: MetricRow = { ...playerRow(0), key: "taken:whatever" };
     expect(takenCardSectionsFor({ row, players: [breakdownPlayer(0, [])], color: "red", labels })).toBeNull();
+  });
+});
+
+describe("takenAbilityCardSectionsFor", () => {
+  const attackLabel = JSON.stringify({ enemyType: { Unknown: 0xaa }, actionId: { Normal: 1 } });
+  const attackRow: MetricRow = {
+    key: `taken:${attackLabel}`,
+    label: attackLabel,
+    value: 0,
+    columns: [],
+    pinOnClick: null,
+    colorSlot: -1,
+  };
+  const party = [
+    breakdownPlayer(0, [
+      { enemy: 0xaa, action: 1, total: 300 },
+      // A different attack from the same enemy must stay out of this row.
+      { enemy: 0xaa, action: 2, total: 500 },
+    ]),
+    breakdownPlayer(1, [{ enemy: 0xaa, action: 1, total: 100 }]),
+  ];
+  const victimLabels = {
+    source: (index: number) => `player:${index}`,
+    sourceColor: (index: number) => `#00${index}`,
+  };
+
+  it("splits a drilled attack across the victims who took it, in their colours", () => {
+    const sections = takenAbilityCardSectionsFor({
+      row: attackRow,
+      players: party,
+      source: null,
+      color: "red",
+      labels: victimLabels,
+    });
+
+    expect(sections?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-source"]);
+    expect(sections?.[0].entries.map((entry) => [entry.label, entry.value, entry.color])).toEqual([
+      ["player:0", 300, "#000"],
+      ["player:1", 100, "#001"],
+    ]);
+  });
+
+  it("narrows to the pinned victim, keeping the card's shape — one row at 100%", () => {
+    const sections = takenAbilityCardSectionsFor({
+      row: attackRow,
+      players: party,
+      source: 1,
+      color: "red",
+      labels: victimLabels,
+    });
+
+    expect(sections?.[0].entries.map((entry) => [entry.label, entry.value])).toEqual([["player:1", 100]]);
+  });
+
+  it("answers a row that is not a taken attack with no card", () => {
+    const notAttack: MetricRow = { ...attackRow, key: "player:0", label: "0" };
+    expect(
+      takenAbilityCardSectionsFor({ row: notAttack, players: party, source: null, color: "red", labels: victimLabels })
+    ).toBeNull();
+  });
+
+  it("answers null when nobody recorded taking the attack", () => {
+    expect(
+      takenAbilityCardSectionsFor({
+        row: attackRow,
+        players: [breakdownPlayer(0, [])],
+        source: null,
+        color: "red",
+        labels: victimLabels,
+      })
+    ).toBeNull();
   });
 });

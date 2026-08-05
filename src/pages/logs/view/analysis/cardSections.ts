@@ -278,7 +278,10 @@ const sortedEntries = <T extends { value: number }>(entries: T[]): T[] =>
  * row's spawn segment. An entry without a segment (a payload from before the
  * field) matches by the spawn's TYPE instead — exact for a lone spawn, and
  * the same same-type-spawns-merge approximation the taken tab already
- * documents for data that cannot speak per spawn.
+ * documents for data that cannot speak per spawn. A segment-less entry can
+ * also come from a CURRENT payload the segmenter declined to place; that
+ * unplaced damage lands in every same-type spawn's card, so a card can total
+ * slightly more than its row.
  *
  * Damage figures only, deliberately: `SkillTargetState` records damage and
  * hits and nothing else, and only the damage tab declares this card. */
