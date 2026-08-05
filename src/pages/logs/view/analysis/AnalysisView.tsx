@@ -46,7 +46,7 @@ import {
   type ChartDatapoint,
   type Label,
 } from "../DetailCharts";
-import { actionsForPin } from "../abilitySkills";
+import { actionsForPin, childOfPin } from "../abilitySkills";
 import { buffs, enemyHolderKey, heldByRoster, narrowedStatusIntervals, slotsOf } from "../metrics/buffs";
 import { damageDone, parseEnemyRow } from "../metrics/damageDone";
 import { damageTaken, takenAttackNameKey, takenAttackRowParts } from "../metrics/damageTaken";
@@ -66,11 +66,12 @@ import { MetricTabs, type MetricTab } from "./MetricTabs";
 import { PinBar } from "./PinBar";
 import { QuestSummary } from "./QuestSummary";
 import { RegroupStrip } from "./RegroupStrip";
-import { abilityLabelFor } from "./abilityLabel";
+import { abilityLabelFor, abilityOwnerFor } from "./abilityLabel";
 import "./analysis.css";
 import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "./chartMarkers";
 import { chartPresentation } from "./chartPresentation";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
+import { qualifiedAbilityLabels } from "./labelCollision";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { groupBandsFor, groupRowsFor } from "./machine/groupRows";
@@ -664,6 +665,39 @@ export const AnalysisView = () => {
     hostility,
   ]);
 
+  // Child rows behind one table row — the descriptor's split bound to the
+  // current derived state. The groups fetch produces the PARENTS; the children
+  // come synchronously from the scoped derived party (the same data the hover
+  // cards decompose), so expanding costs no fetch. Metrics without nesting
+  // semantics declare no accessor and their rows keep only what they carry.
+  const rowChildren = useCallback(
+    (row: MetricRow) =>
+      metric.children ? metric.children({ row, players, level, pins, hostility, fightDurationMs }) : null,
+    [metric, players, level, pins, hostility, fightDurationMs]
+  );
+
+  // The character that tells two same-labelled ability rows apart: the child
+  // character a group key carries (Id's own kit vs his dragonform's), else the
+  // key's owning player — found by the same scan the label itself is named
+  // through, so the qualifier can never name a different owner than the label.
+  const abilityQualifier = useCallback(
+    (key: string) => {
+      const child = childOfPin(key);
+      if (child !== null) return translateCharacterType(child);
+      const owner = abilityOwnerFor(key, identityPlayers, playerByIndex.get(pins.source ?? -1)?.player);
+      return owner ? translateCharacterType(owner.characterType) : "";
+    },
+    // i18n.language: character names are translated.
+    [identityPlayers, playerByIndex, pins.source, i18n.language]
+  );
+
+  // Duplicate parent labels carry their owner's character, only on collision —
+  // the same rule the chart legend applies to duplicate player names.
+  const abilityRowLabels = useMemo(
+    () => qualifiedAbilityLabels(rows, labelForAbility, abilityQualifier),
+    [rows, labelForAbility, abilityQualifier]
+  );
+
   const isStatusMetric = metric.labelKind("players") === "status";
   const statusRowKind = statusRowKindFor(pins.ability, hostility);
 
@@ -744,7 +778,7 @@ export const AnalysisView = () => {
                 ? translateEnemyType(parseEnemyRow(row.label))
                 : kind === "takenAttack"
                   ? takenAttackLabel(row.label)
-                  : labelForAbility(row.label);
+                  : abilityRowLabels.get(row.key) ?? labelForAbility(row.label);
       const icon = rowIconUrl(row);
       if (!icon) return name;
       return (
@@ -754,7 +788,17 @@ export const AnalysisView = () => {
         </>
       );
     },
-    [t, rowKind, labelForSource, labelForTarget, labelForAbility, takenAttackLabel, statusDisplayLabel, rowIconUrl]
+    [
+      t,
+      rowKind,
+      labelForSource,
+      labelForTarget,
+      labelForAbility,
+      takenAttackLabel,
+      statusDisplayLabel,
+      rowIconUrl,
+      abilityRowLabels,
+    ]
   );
 
   // A row click pins its dimension through the machine's transition, so the
@@ -1301,6 +1345,7 @@ export const AnalysisView = () => {
           renderLabel={renderLabel}
           rowColor={rowColor}
           rowSections={rowSections}
+          rowChildren={rowChildren}
           cardAmount={metric.card}
           timelineMs={fightDurationMs}
           // The resolver names the honest empty states (see `emptyKeyFor`).
