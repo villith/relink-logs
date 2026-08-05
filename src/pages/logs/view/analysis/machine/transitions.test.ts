@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CAPABILITIES } from "./capabilities";
 import { resolveGroupBy } from "./resolve";
 import { DEFAULT_STATE, type AnalysisState } from "./state";
-import { clearPin, pinRow, regroup, setHostility, setMetric, setWindow } from "./transitions";
+import { clearPin, pinRow, regroup, setAura, setHostility, setMetric, setWindow } from "./transitions";
 
 const state = (over: Partial<AnalysisState>): AnalysisState => ({ ...DEFAULT_STATE, ...over });
 
@@ -75,5 +75,44 @@ describe("axis housekeeping", () => {
     expect(regrouped.by).toBe("target");
     // But the resolver ignores it and returns the supported default
     expect(resolveGroupBy(regrouped, CAPABILITIES.sba)).toBe("source");
+  });
+});
+
+describe("aura filter housekeeping", () => {
+  it("setAura sets and clears the filter without touching pins or by", () => {
+    const pinned = state({ source: 1, by: "source" });
+    const withAura = setAura(pinned, "src:status:4:1");
+    expect(withAura.aura).toBe("src:status:4:1");
+    expect(withAura.source).toBe(1);
+    expect(withAura.by).toBe("source");
+    expect(setAura(withAura, null).aura).toBeNull();
+  });
+
+  it("clearing the anchoring pin clears the aura", () => {
+    expect(clearPin(state({ source: 1, aura: "src:status:4:1" }), "source").aura).toBeNull();
+    expect(clearPin(state({ target: 0, aura: "tgt:status:4:1" }), "target").aura).toBeNull();
+  });
+
+  it("clearing an UNRELATED pin keeps the aura", () => {
+    const s = state({ source: 1, target: 0, aura: "src:status:4:1" });
+    expect(clearPin(s, "target").aura).toBe("src:status:4:1");
+    expect(clearPin(s, "ability").aura).toBe("src:status:4:1");
+  });
+
+  it("re-pinning the anchor to a DIFFERENT actor clears the aura; same actor keeps it", () => {
+    const s = state({ source: 1, aura: "src:status:4:1" });
+    expect(pinRow(s, { dim: "source", value: 2 }).aura).toBeNull();
+    expect(pinRow(s, { dim: "source", value: 1 }).aura).toBe("src:status:4:1");
+    expect(pinRow(s, { dim: "ability", value: "skill:9" }).aura).toBe("src:status:4:1");
+  });
+
+  it("setHostility clears the aura with the actor pins it depends on", () => {
+    expect(setHostility(state({ source: 1, aura: "src:status:4:1" }), "enemy").aura).toBeNull();
+  });
+
+  it("setMetric keeps the aura, like the window", () => {
+    // damage → taken keeps the source pin, so the anchor survives; the
+    // resolver decides whether the destination tab honors the filter.
+    expect(setMetric(state({ source: 1, aura: "src:status:4:1" }), "taken").aura).toBe("src:status:4:1");
   });
 });

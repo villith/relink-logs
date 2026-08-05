@@ -2,20 +2,28 @@ import type { Hostility } from "../../metrics/types";
 import { isStatusPin } from "../../statusUptime";
 import type { MetricCapabilities } from "./capabilities";
 import { resolveGroupBy } from "./resolve";
-import type { AnalysisState, Dimension, MetricKey } from "./state";
+import { auraAnchorOf, type AnalysisState, type Dimension, type MetricKey } from "./state";
 
 export type PinValue = { dim: "source" | "target"; value: number } | { dim: "ability"; value: string };
 
+/** Drops the aura filter when the actor pin it is anchored to is about to
+ * change or clear — the chips belong to that actor, and a window mask computed
+ * for the old one would silently filter by the wrong holder. */
+const withoutAuraOn = (state: AnalysisState, dim: Dimension): AnalysisState =>
+  auraAnchorOf(state.aura) === dim ? { ...state, aura: null } : state;
+
 /** Row click: pin the row's dimension. Drops the `by` override so the derived
- * default advances to the next free dimension — WCL's exact behavior. */
-export const pinRow = (state: AnalysisState, pin: PinValue): AnalysisState => ({
-  ...state,
-  [pin.dim]: pin.value,
-  by: null,
-});
+ * default advances to the next free dimension — WCL's exact behavior. An aura
+ * anchored to the dimension dies with a CHANGE of actor (its chips were the
+ * old actor's); re-pinning the same value keeps it. */
+export const pinRow = (state: AnalysisState, pin: PinValue): AnalysisState => {
+  const current = pin.dim === "source" ? state.source : pin.dim === "target" ? state.target : state.ability;
+  const base = current === pin.value ? state : withoutAuraOn(state, pin.dim);
+  return { ...base, [pin.dim]: pin.value, by: null };
+};
 
 export const clearPin = (state: AnalysisState, dim: Dimension): AnalysisState => ({
-  ...state,
+  ...withoutAuraOn(state, dim),
   [dim]: null,
 });
 
@@ -46,6 +54,8 @@ export const setHostility = (state: AnalysisState, hostility: Hostility): Analys
   source: null,
   target: null,
   ability: state.ability !== null && isStatusPin(state.ability) ? state.ability : null,
+  // The aura is anchored to an actor pin, and both just cleared.
+  aura: null,
   by: null,
 });
 
@@ -60,3 +70,7 @@ export const regroup = (state: AnalysisState, dim: Dimension, caps: MetricCapabi
   const derived = resolveGroupBy({ ...state, by: null }, caps);
   return { ...state, by: dim === derived ? null : dim };
 };
+
+/** Selects (or clears) the Auras Filter. No `by` reset: a filter narrows the
+ * data, it does not advance the drill the way a pin does. */
+export const setAura = (state: AnalysisState, aura: string | null): AnalysisState => ({ ...state, aura });
