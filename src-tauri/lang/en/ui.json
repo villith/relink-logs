@@ -518,6 +518,7 @@
       "chart-drill-ability-label": "Damage per second, by skill",
       "chart-drill-target-label": "Damage per second, by enemy",
       "chart-stacks-label": "Stacks",
+      "chart-other-label": "Other",
       "chart-drag-hint": "Drag to scope · double-click to reset",
       "chart-legend-label": "Chart series",
       "quest-cleared": "Cleared",

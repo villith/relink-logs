@@ -41,7 +41,7 @@ export const takenAttackNameKey = (actionId: ActionType): { key: string; params?
  * once because `attackRows` and `enemyReceivedRows` are two different folds
  * that both land on this same shape, and it has to stay one shape for both to
  * line up under one header. */
-const drilldownColumns = (damage: number, hits: number, fightDurationMs?: number): string[] => [
+export const drilldownColumns = (damage: number, hits: number, fightDurationMs?: number): string[] => [
   format(damage),
   String(hits),
   format(hits === 0 ? 0 : Math.round(damage / hits)),

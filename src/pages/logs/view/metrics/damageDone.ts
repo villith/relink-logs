@@ -23,8 +23,9 @@ const extreme = (values: (number | null)[], pick: (values: number[]) => number):
 
 /** The numeric columns every damage row below the players level fills, in
  * header order. Written once because the three shapes of drill-down row have to
- * line up under ONE header — see `columnKeys`. */
-const damageColumns = (damage: number, hits: number, min: string, max: string, total: number): string[] => [
+ * line up under ONE header — see `columnKeys`. Exported for the analysis
+ * machine's group fold, which fills the same header. */
+export const damageColumns = (damage: number, hits: number, min: string, max: string, total: number): string[] => [
   format(damage),
   String(hits),
   min,

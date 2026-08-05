@@ -39,6 +39,10 @@ export type MetricRow = {
    * players who used it, depending on which of those the pins have left free.
    * Absent, the level's own kind stands. */
   kind?: LabelKind;
+  /** Member rows behind a skill-group parent on the groups path, each
+   * pinnable by its raw action. The table renders them indented behind an
+   * expand control; a row without them has nothing to expand. */
+  children?: MetricRow[];
   /** Contiguous windows this row's effect was up, in MILLISECONDS FROM THE
    * START OF THE MEASURED WINDOW, overlaps merged.
    *
