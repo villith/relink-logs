@@ -47,7 +47,6 @@ import {
   type Label,
 } from "../DetailCharts";
 import { actionsForPin } from "../abilitySkills";
-import { rowLevelFor } from "../deriveRows";
 import { buffs, enemyHolderKey, heldByRoster, slotsOf } from "../metrics/buffs";
 import { damageDone, parseEnemyRow } from "../metrics/damageDone";
 import { damageTaken, takenAttackNameKey, takenAttackRowParts } from "../metrics/damageTaken";
@@ -59,7 +58,6 @@ import { deriveSelectorOptions, type SelectorPins } from "../selectorOptions";
 import { toBands } from "../statusBands";
 import { clipToWindow, isStatusPin, statusPinKey } from "../statusUptime";
 import { buildTargetLabels } from "../targetLabels";
-import { useSelectorParams } from "../useSelectorParams";
 
 import { DebugBar } from "./DebugBar";
 import { DpsChart } from "./DpsChart";
@@ -68,6 +66,7 @@ import { MetricTable } from "./MetricTable";
 import { MetricTabs, type MetricTab } from "./MetricTabs";
 import { PinBar } from "./PinBar";
 import { QuestSummary } from "./QuestSummary";
+import { RegroupStrip } from "./RegroupStrip";
 import { abilityLabelFor } from "./abilityLabel";
 import "./analysis.css";
 import { cardSectionsFor } from "./cardSections";
@@ -77,6 +76,18 @@ import { foldAbilityChart, foldTargetChart } from "./drillSeries";
 import { enemyDealtCardSectionsFor, enemyReceivedCardSectionsFor } from "./hostilityCardSections";
 import { hostilitySeriesFor } from "./hostilityChart";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
+import { CAPABILITIES, levelFor } from "./machine/capabilities";
+import { resolveViewSpec } from "./machine/resolve";
+import type { MetricKey } from "./machine/state";
+import {
+  clearPin,
+  setHostility as hostilityTransition,
+  setMetric as metricTransition,
+  pinRow,
+  regroup,
+  setWindow as windowTransition,
+} from "./machine/transitions";
+import { useAnalysisState } from "./machine/useAnalysisState";
 import { identityPartyOf } from "./partyIdentity";
 import { abilityRowIconUrl } from "./rowIcon";
 import { buildStatusSeries } from "./statusChart";
@@ -216,22 +227,32 @@ export const AnalysisView = () => {
       }))
     );
 
-  const [pins, setPins] = useSelectorParams();
-  const [metricKey, setMetricKey] = useState<string>("damage");
-  // Which side's holders the status tables show. Independent of the tab:
-  // polarity (buff vs debuff) and holder side are two axes, and Warcraft Logs
-  // opens BOTH its aura tabs on Friendlies. Pinning Debuffs to the enemy side
-  // made the switch look like a consequence of the tab and hid the ailments the
-  // party was carrying, which is the first thing a Debuffs tab should answer.
-  //
-  // Reset per LOG, not per tab: a side chosen on Buffs still means the same
-  // thing on Debuffs, so switching tabs must not undo it.
-  const [hostility, setHostility] = useState<Hostility>("friendly");
-  useEffect(() => setHostility("friendly"), [id]);
+  // The machine: the URL holds the WHOLE state (metric, side, pins, window,
+  // grouping override), the resolver turns it into everything the view shows.
+  const [state, setState] = useAnalysisState();
+  const caps = CAPABILITIES[state.metric];
+  const spec = useMemo(() => resolveViewSpec(state, caps), [state, caps]);
+
+  const metricKey = state.metric;
+  // Effective hostility — the resolver's own rule: `side=enemy` is reachable
+  // in the URL on any metric, and one that has no enemy side reads friendly.
+  const hostility: Hostility = caps.supportsHostility ? state.hostility : "friendly";
   // Committed window as [start, end] second indexes; null = the full fight. The
   // in-flight drag lives inside DpsChart — nothing outside it needs to know
   // about a selection that has not been released yet.
-  const [range, setRange] = useState<[number, number] | null>(null);
+  const range = state.window;
+  // The legacy pin shape the pre-machine derivations still consume; dies with
+  // them (plan 14d). `targets` carries at most the machine's ONE target.
+  const pins: SelectorPins = useMemo(
+    () => ({
+      source: state.source,
+      targets: state.target === null ? [] : [state.target],
+      ability: state.ability,
+    }),
+    [state.source, state.target, state.ability]
+  );
+  // The legacy row level is a projection of the resolved grouping.
+  const level = levelFor(spec.groupBy);
   // Meter state, facts and drill-down chart re-derived under the current pins
   // and window. Null means "nothing pinned and no window", i.e. the base load
   // already says it.
@@ -259,7 +280,6 @@ export const AnalysisView = () => {
       .then((result) => {
         if (generation !== loadGeneration.current) return;
         loadFromResponse(result as EncounterStateResponse);
-        setRange(null);
         setScoped(null);
       })
       .catch((e) => {
@@ -537,15 +557,12 @@ export const AnalysisView = () => {
   );
 
   const metric = METRICS[metricKey] ?? damageDone;
-  const level = rowLevelFor(pins);
 
-  // Whether the enemy side is actually on screen. The toggle's value is per LOG,
-  // not per tab, so `hostility === "enemy"` alone is not enough: on a tab that
-  // cannot switch (SBA, Stun — see HostilityToggle's `disabled`) it stays
-  // "enemy" while the friendly table is what renders. One spelling, so the
-  // chart, its title, the hover cards and the empty state cannot disagree about
-  // which side is showing.
-  const enemySide = hostility === "enemy" && metric.supportsHostility === true;
+  // Whether the enemy side is actually on screen. `hostility` above is already
+  // the EFFECTIVE side (the resolver's rule: a metric with no enemy side reads
+  // friendly whatever the URL says), so this one spelling keeps the chart, its
+  // title, the hover cards and the empty state agreeing about what is showing.
+  const enemySide = hostility === "enemy";
 
   // The window the status tables measure, in milliseconds from the fight's
   // start. Buckets are inclusive at both ends, so the last one runs to the start
@@ -692,7 +709,43 @@ export const AnalysisView = () => {
     [t, rowKind, labelForSource, labelForTarget, labelForAbility, takenAttackLabel, statusDisplayLabel, rowIconUrl]
   );
 
-  const handlePin = useCallback((next: Partial<SelectorPins>) => setPins({ ...pins, ...next }), [pins, setPins]);
+  // A row click pins its dimension through the machine's transition, so the
+  // `by` override drops and the derived default advances — WCL's behavior.
+  // The payload still arrives in the legacy `SelectorPins` wire shape.
+  const handlePin = useCallback(
+    (next: Partial<SelectorPins>) => {
+      if (next.source !== undefined && next.source !== null) {
+        setState(pinRow(state, { dim: "source", value: next.source }));
+      } else if (next.targets !== undefined && next.targets.length > 0) {
+        setState(pinRow(state, { dim: "target", value: next.targets[0] }));
+      } else if (next.ability !== undefined && next.ability !== null) {
+        setState(pinRow(state, { dim: "ability", value: next.ability }));
+      }
+    },
+    [state, setState]
+  );
+
+  // The selector bar hands back whole pin sets. A change per dimension routes
+  // through the same transitions a row click uses: an addition pins (and
+  // advances the default), a removal only clears its own dimension.
+  const handlePinsChange = useCallback(
+    (next: SelectorPins) => {
+      const target = next.targets.length > 0 ? next.targets[0] : null;
+      let draft = state;
+      if (next.source !== state.source) {
+        draft = next.source === null ? clearPin(draft, "source") : pinRow(draft, { dim: "source", value: next.source });
+      }
+      if (target !== state.target) {
+        draft = target === null ? clearPin(draft, "target") : pinRow(draft, { dim: "target", value: target });
+      }
+      if (next.ability !== state.ability) {
+        draft =
+          next.ability === null ? clearPin(draft, "ability") : pinRow(draft, { dim: "ability", value: next.ability });
+      }
+      if (draft !== state) setState(draft);
+    },
+    [state, setState]
+  );
 
   // Which status rows are shaded onto the chart. Component state, not the URL:
   // it is a transient way of reading the plot, unlike the pins, which say what
@@ -1144,13 +1197,13 @@ export const AnalysisView = () => {
   const handleScope = useCallback(
     (next: [number, number] | null) => {
       if (next === null) {
-        setRange(null);
+        setState(windowTransition(state, null));
         return;
       }
-      const offset = range === null ? 0 : range[0];
-      setRange([next[0] + offset, next[1] + offset]);
+      const offset = state.window === null ? 0 : state.window[0];
+      setState(windowTransition(state, [next[0] + offset, next[1] + offset]));
     },
-    [range]
+    [state, setState]
   );
 
   if (!shownEncounter) return null;
@@ -1178,19 +1231,31 @@ export const AnalysisView = () => {
           side" keeps the control offering it and the code rendering it from
           disagreeing. */}
       <Box style={{ padding: "8px 16px 0" }}>
-        <HostilityToggle value={hostility} onChange={setHostility} disabled={metric.supportsHostility !== true} />
+        <HostilityToggle
+          value={hostility}
+          onChange={(side) => setState(hostilityTransition(state, side))}
+          disabled={!caps.supportsHostility}
+        />
       </Box>
 
-      <MetricTabs tabs={METRIC_TABS} value={metricKey} onChange={setMetricKey} />
+      <MetricTabs
+        tabs={METRIC_TABS}
+        value={metricKey}
+        onChange={(value) => setState(metricTransition(state, value as MetricKey))}
+      />
 
       <PinBar
         options={labelledOptions}
         pins={pins}
-        onChange={setPins}
+        onChange={handlePinsChange}
         windowLabel={windowLabel}
         fullLabel={fullLabel}
-        onClearWindow={() => setRange(null)}
+        onClearWindow={() => setState(windowTransition(state, null))}
       />
+
+      {/* WCL's "Done By …" strip: the resolved grouping is only a default, and
+          this is the override (`by` in the URL). */}
+      <RegroupStrip tabs={spec.regroupTabs} onRegroup={(dim) => setState(regroup(state, dim, caps))} />
 
       <DpsChart
         data={shownChartData}
@@ -1238,7 +1303,7 @@ export const AnalysisView = () => {
       <Box style={{ padding: "4px 16px 14px" }}>
         <MetricTable
           rows={rows}
-          columnKeys={metric.columnKeys(level)}
+          columnKeys={spec.table.columnKeys}
           onPin={handlePin}
           renderLabel={renderLabel}
           rowColor={rowColor}

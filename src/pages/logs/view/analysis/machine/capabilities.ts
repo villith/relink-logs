@@ -51,8 +51,9 @@ const SUPPORTED = (friendly: string, enemy: string): DimensionDecl => ({
 /** The legacy `RowLevel` a dimension corresponds to, for descriptors whose
  * `columnKeys` still speak the old players/abilities/skills vocabulary — see
  * the analysis-machine plan's mapping (source→players, ability→abilities,
- * target→skills). Column headers do not change in this phase. */
-const levelFor = (dim: Dimension): RowLevel =>
+ * target→skills). Column headers do not change in this phase. Exported for
+ * the view, whose legacy row/card builders still take a level. */
+export const levelFor = (dim: Dimension): RowLevel =>
   dim === "source" ? "players" : dim === "ability" ? "abilities" : "skills";
 
 export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
