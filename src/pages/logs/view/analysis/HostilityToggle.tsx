@@ -24,9 +24,9 @@ const SIDES: { value: Hostility; labelKey: string }[] = [
  * tabs that cannot use it moved every control below it each time the tab
  * changed. Disabled rather than merely inert: SBA and Stun are recorded per
  * player only, so neither has a side to pivot to, and a live switch that
- * silently does nothing is worse than one that says so. The tooltip
- * (`hostility-disabled-hint`) says that in the same words — the two are read
- * together and must not drift again. */
+ * silently does nothing is worse than one that says so — which is what the
+ * tooltip (`hostility-disabled-hint`) tells the user. Both were last corrected
+ * together, when the damage tabs grew an enemy side and falsified them. */
 export const HostilityToggle = ({
   value,
   onChange,
