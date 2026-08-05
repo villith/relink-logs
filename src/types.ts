@@ -367,6 +367,11 @@ export type WireGroupQuery = {
   topN: number;
   fromMs?: number;
   upToMs?: number;
+  /** The aura filter's admitted spans, ms relative to the fight's start,
+   * start-inclusive end-exclusive (mirrors the Rust `TimeWindow`). Absent =
+   * no mask; present-but-EMPTY matches nothing — the effect was never up
+   * inside the chart window. */
+  windows?: { fromMs: number; upToMs: number }[];
 };
 
 /** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`). */
