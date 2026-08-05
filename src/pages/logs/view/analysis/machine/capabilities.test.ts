@@ -23,6 +23,15 @@ describe("CAPABILITIES", () => {
     expect(CAPABILITIES.sba.supportsHostility).toBe(false);
   });
 
+  it("offers the aura filter on the groups path only", () => {
+    expect(CAPABILITIES.damage.supportsAuraFilter).toBe(true);
+    expect(CAPABILITIES.taken.supportsAuraFilter).toBe(true);
+    expect(CAPABILITIES.stun.supportsAuraFilter).toBe(false);
+    expect(CAPABILITIES.sba.supportsAuraFilter).toBe(false);
+    expect(CAPABILITIES.buffs.supportsAuraFilter).toBe(false);
+    expect(CAPABILITIES.debuffs.supportsAuraFilter).toBe(false);
+  });
+
   it("routes each metric to its data path", () => {
     expect(CAPABILITIES.damage.dataPath).toBe("groups");
     expect(CAPABILITIES.taken.dataPath).toBe("groups");

@@ -31,6 +31,10 @@ export type MetricCapabilities = {
    * from a raw event walk), or the status intervals (aura tabs). */
   dataPath: DataPath;
   supportsHostility: boolean;
+  /** Whether the aura chip strips (and the windows mask on the group query)
+   * operate on this tab. True only for the groups path: the mask is an event
+   * filter, and only damage/taken answer from an event walk. */
+  supportsAuraFilter: boolean;
   /** Default-grouping priority. The derivation rule picks the first unpinned
    * supported entry; all pinned → the last entry (one-row table). */
   dimensionOrder: Dimension[];
@@ -69,6 +73,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
   damage: {
     dataPath: "groups",
     supportsHostility: true,
+    supportsAuraFilter: true,
     dimensionOrder: ["source", "ability", "target"],
     dimensions: {
       source: SUPPORTED("ui.logs.groupby-damage-source", "ui.logs.groupby-damage-source-enemy"),
@@ -86,6 +91,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
   taken: {
     dataPath: "groups",
     supportsHostility: true,
+    supportsAuraFilter: true,
     dimensionOrder: ["source", "ability", "target"],
     dimensions: {
       source: SUPPORTED("ui.logs.groupby-taken-source", "ui.logs.groupby-taken-source-enemy"),
@@ -105,6 +111,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
   stun: {
     dataPath: "derived",
     supportsHostility: false,
+    supportsAuraFilter: false,
     dimensionOrder: ["source", "ability"],
     dimensions: {
       source: SUPPORTED("ui.logs.groupby-stun-source", "ui.logs.groupby-stun-source"),
@@ -119,6 +126,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
   sba: {
     dataPath: "derived",
     supportsHostility: false,
+    supportsAuraFilter: false,
     dimensionOrder: ["source"],
     dimensions: {
       source: SUPPORTED("ui.logs.groupby-sba-source", "ui.logs.groupby-sba-source"),
@@ -134,6 +142,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
   buffs: {
     dataPath: "intervals",
     supportsHostility: true,
+    supportsAuraFilter: false,
     dimensionOrder: ["ability", "source"],
     dimensions: {
       source: SUPPORTED("ui.logs.groupby-status-holder", "ui.logs.groupby-status-holder-enemy"),
@@ -149,6 +158,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
   debuffs: {
     dataPath: "intervals",
     supportsHostility: true,
+    supportsAuraFilter: false,
     dimensionOrder: ["ability", "source"],
     dimensions: {
       source: SUPPORTED("ui.logs.groupby-status-holder", "ui.logs.groupby-status-holder-enemy"),
