@@ -61,7 +61,7 @@ export const encodeState = (state: AnalysisState): RawState => ({
 });
 
 const nonNegativeInt = (raw: string | null): number | null => {
-  if (raw === null) return null;
+  if (raw === null || raw.trim() === "") return null;
   const value = Number(raw);
   return Number.isInteger(value) && value >= 0 ? value : null;
 };
@@ -77,7 +77,7 @@ export const decodeState = (raw: RawState): AnalysisState => {
     hostility: raw.side === "enemy" ? "enemy" : "friendly",
     source: nonNegativeInt(raw.src),
     target: nonNegativeInt(raw.tgt),
-    ability: raw.abil,
+    ability: raw.abil === "" ? null : raw.abil,
     window: from !== null && to !== null && from <= to ? [from, to] : null,
     by: DIMENSIONS.includes(raw.by as Dimension) ? (raw.by as Dimension) : null,
   };

@@ -56,5 +56,24 @@ describe("URL codec", () => {
     expect(decoded.ability).toBe("skill:1");
     expect(decoded.window).toBeNull();
     expect(decoded.by).toBeNull();
+
+    // Empty strings degrade to null
+    expect(
+      decodeState({ metric: null, side: null, src: "", tgt: null, abil: null, from: null, to: null, by: null }).source
+    ).toBeNull();
+    expect(
+      decodeState({ metric: null, side: null, src: null, tgt: null, abil: "", from: null, to: null, by: null }).ability
+    ).toBeNull();
+
+    // Inverted window degrades
+    expect(
+      decodeState({ metric: null, side: null, src: null, tgt: null, abil: null, from: "9", to: "3", by: null }).window
+    ).toBeNull();
+
+    // Float rejects
+    expect(
+      decodeState({ metric: null, side: null, src: "1.5", tgt: null, abil: null, from: null, to: null, by: null })
+        .source
+    ).toBeNull();
   });
 });
