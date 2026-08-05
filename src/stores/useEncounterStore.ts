@@ -3,6 +3,7 @@ import {
   DeathEvent,
   EncounterState,
   EnemySeries,
+  GroupAggregate,
   HpChartSeries,
   LegalityFinding,
   PlayerData,
@@ -51,6 +52,9 @@ interface EncounterStore {
   /** Every (source, target, ability) combination in the current window, with
    * the selector pins NOT applied — the analysis view cascades from this. */
   selectionFacts: SelectionFact[];
+  /** The (filters × groupBy) aggregates for the last `groupQuery` sent — table
+   * rows and chart bands from ONE grouping. Empty when no query was sent. */
+  groups: GroupAggregate[];
   /** Selected target spawn spans; empty = all. */
   selectedTargetSpans: TargetSpan[];
   selectedPlayers: string[];
@@ -100,6 +104,10 @@ export interface EncounterStateResponse {
   targetEntries: TargetEntry[];
   /** Optional so a backend older than the field reads as "nothing to cascade". */
   selectionFacts?: SelectionFact[];
+  /** The analysis view's generic aggregation, sent only when the request
+   * carried a `groupQuery`. Optional so a frontend ahead of its backend
+   * degrades to no groups rather than an error. */
+  groups?: GroupAggregate[];
   /** The analysis view's drill-down chart, sent only on a scoped fetch that
    * pinned a source. Not stored: it belongs to one set of pins, and the store
    * holds the base load. Optional so a frontend ahead of its backend — the Rust
@@ -137,6 +145,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   sbaChartLen: 0,
   targetEntries: [],
   selectionFacts: [],
+  groups: [],
   selectedTargetSpans: [],
   selectedPlayers: [],
   players: [],
@@ -172,6 +181,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       sbaChartLen: response.sbaChartLen,
       targetEntries: response.targetEntries ?? [],
       selectionFacts: response.selectionFacts ?? [],
+      groups: response.groups ?? [],
       players: filteredPlayers,
       legality: filteredLegality,
       questId: response.questId,

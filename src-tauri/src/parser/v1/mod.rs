@@ -31,8 +31,8 @@ mod status;
 
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
 pub use groups::{
-    AbilityFilter, ActorRef, Dimension, GroupAggregate, GroupHostility, GroupKey, GroupMeasure,
-    GroupMetric, GroupQuery, GroupQueryError,
+    aggregate_groups, AbilityFilter, ActorRef, Dimension, GroupAggregate, GroupHostility, GroupKey,
+    GroupMeasure, GroupMetric, GroupQuery, GroupQueryError,
 };
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::{PlayerState, SbaSourceKind};

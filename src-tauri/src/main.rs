@@ -1338,6 +1338,9 @@ struct EncounterStateResponse {
     /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
     /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
     hp_chart: Vec<v1::HpChartSeries>,
+    /// The (filters × groupBy) aggregates for `group_query` — table rows and
+    /// chart bands from ONE grouping. Empty when no query was sent.
+    groups: Vec<v1::GroupAggregate>,
     sba_chart: HashMap<u32, Vec<f32>>,
     sba_events: Vec<(i64, protocol::Message)>,
     death_events: Vec<(i64, protocol::Message)>,
@@ -1378,6 +1381,10 @@ struct ParseOptions {
     /// empty means "All" on every dimension — the shipped default.
     #[serde(default)]
     selection: v1::SelectionFilter,
+    /// The analysis view's generic aggregation request; None = no groups in
+    /// the response. Replaces the pin-shaped drill-chart triggers.
+    #[serde(default)]
+    group_query: Option<v1::GroupQuery>,
 }
 
 // Per-second buckets: the quest-details charts and the window scrubber both
@@ -1500,6 +1507,36 @@ fn build_scoped_player_chart(
     )
 }
 
+/// The analysis view's generic (filters × groupBy) aggregation, present only
+/// when the view sent a `group_query` — absent, this is a query-free fetch
+/// (e.g. a scrub commit) and the response carries no groups at all.
+///
+/// `segments`/`assignment` are the caller's segmentation of the UNWINDOWED
+/// log, exactly as `build_drill_charts` requires: sharing it is what makes a
+/// band and a target-dropdown entry mean the same spawn.
+fn build_groups(
+    parser: &v1::Parser,
+    options: &ParseOptions,
+    segments: &[v1::TargetSegment],
+    assignment: &[Option<usize>],
+) -> Result<Vec<v1::GroupAggregate>, String> {
+    match &options.group_query {
+        Some(query) => v1::aggregate_groups(
+            &parser.encounter.raw_event_log,
+            &parser.encounter.player_data,
+            segments,
+            assignment,
+            query,
+            parser.start_time(),
+            DPS_INTERVAL,
+            (parser.full_log_duration() / DPS_INTERVAL) as usize + 1,
+            options.filters,
+        )
+        .map_err(|e| format!("group query rejected: {e}")),
+        None => Ok(Vec::new()),
+    }
+}
+
 // `(async)` so the decompress + full reparse runs off the main thread — this is
 // called on every log open, filter change, and brush release.
 #[tauri::command(async)]
@@ -1585,6 +1622,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         // still narrowing the fight. Without it the plot kept drawing the whole
         // party's whole fight beside a table that had already narrowed.
         let dps_chart = build_scoped_player_chart(&parser, &options);
+        let groups = build_groups(&parser, &options, &segments, &assignment)?;
 
         // Only the fields the scrub commit actually consumes; everything else stays at its
         // Default so a new response field doesn't have to be mirrored as a hand-written
@@ -1603,6 +1641,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             target_chart,
             taken_ability_chart,
             dps_chart,
+            groups,
             ..Default::default()
         });
     }
@@ -1702,6 +1741,8 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         &target_entries,
     );
 
+    let groups = build_groups(&parser, &options, &target_entries, &assignment)?;
+
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 
     let sba_events = parser
@@ -1746,6 +1787,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         enemy_dealt_chart: enemy_dealt,
         enemy_received_chart: enemy_received,
         hp_chart,
+        groups,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
         sba_chart_len: (duration / SBA_INTERVAL) as usize + 1,
         sba_chart,

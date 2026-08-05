@@ -357,6 +357,32 @@ export type TakenChartSeries = {
   values: number[];
 };
 
+/** Which universe an index names — mirrors the Rust `ActorRef`. A `source`/
+ * `target` filter on a `GroupQuery` is one of these; which universe is valid
+ * depends on the query's (metric, hostility) role-mapping. */
+export type GroupActorRef = { kind: "player"; index: number } | { kind: "enemySpawn"; segment: number };
+
+/** What one `GroupAggregate` row/band is (mirrors the Rust `GroupKey`).
+ * Universe-typed like `GroupActorRef`; `other` is the top-N rollup so a
+ * capped chart still sums to the table. */
+export type GroupKey =
+  | { kind: "player"; index: number }
+  | { kind: "enemySpawn"; segment: number; enemyType: EnemyType; instance: number }
+  | { kind: "enemyType"; enemyType: EnemyType }
+  | { kind: "friendlyAbility"; actionType: ActionType; childCharacterType: CharacterType }
+  | { kind: "enemyAttack"; enemyType: EnemyType; actionId: ActionType }
+  | { kind: "other" };
+
+/** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`). */
+export type GroupMeasure = { amount: number; hits: number; min: number | null; max: number | null };
+
+/** One (filters × groupBy) row/band pair from `aggregate_groups` (mirrors the
+ * Rust `GroupAggregate`): the table (`key` + `measure`) and the chart
+ * (`key` + `series`) come from the same grouping, so the two can never
+ * disagree. `series` is a whole-fight per-bucket band, same buckets as
+ * `dpsChart` — the view slices it client-side. */
+export type GroupAggregate = { key: GroupKey; measure: GroupMeasure; series: number[] };
+
 /** One per-enemy-type bucketed series for the enemy-side charts (mirrors the
  * Rust `EnemySeries`). */
 export type EnemySeries = {
