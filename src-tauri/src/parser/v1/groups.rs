@@ -108,6 +108,10 @@ pub struct GroupQuery {
     rename_all_fields = "camelCase"
 )]
 pub enum GroupKey {
+    /// The hook's player slot key (`target.parent_index`) on the taken
+    /// stream, the event's source parent index on the dealt stream — always
+    /// the same value `ActorRef::Player { index }` filters against for the
+    /// query that produced this row, so the two never disagree.
     Player {
         index: u32,
     },
@@ -176,6 +180,17 @@ pub enum GroupQueryError {
 impl std::fmt::Display for GroupQueryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            // The ability grammar is STREAM-determined (dealt vs. taken), not
+            // hostility-determined like `source`/`target`'s universe — see
+            // `aggregate_groups`'s `friendly_action_filter`/
+            // `enemy_action_filter` — so it gets its own wording rather than
+            // the shared "hostility universe" phrasing below.
+            GroupQueryError::WrongUniverse { field: "ability" } => {
+                write!(
+                    f,
+                    "ability filter grammar does not match the event stream this query walks"
+                )
+            }
             GroupQueryError::WrongUniverse { field } => {
                 write!(f, "'{field}' is not in this query's hostility universe")
             }
@@ -252,12 +267,21 @@ pub fn aggregate_groups(
     chart_len: usize,
     filters: MeterFilters,
 ) -> Result<Vec<GroupAggregate>, GroupQueryError> {
-    let dealt_stream = matches!(
-        (query.metric, query.hostility),
-        (GroupMetric::Damage, GroupHostility::Friendly)
-            | (GroupMetric::Taken, GroupHostility::Enemy)
-    );
-    let source_is_player = query.hostility == GroupHostility::Friendly;
+    // One exhaustive match rather than two independently-derived booleans: a
+    // future fifth (metric, hostility) combination is a compile error here
+    // (`GroupMetric`/`GroupHostility` would grow a variant, and this match
+    // stops being exhaustive), not a silently-wrong taken-stream default
+    // falling out of an `if`/`else` that quietly covers "anything else".
+    let (dealt_stream, source_is_player) = match (query.metric, query.hostility) {
+        // dealt stream, source = Player (attacker) — Task 8's original.
+        (GroupMetric::Damage, GroupHostility::Friendly) => (true, true),
+        // taken stream, source = EnemySpawn/EnemyType (attacker).
+        (GroupMetric::Damage, GroupHostility::Enemy) => (false, false),
+        // taken stream, source = Player (victim).
+        (GroupMetric::Taken, GroupHostility::Friendly) => (false, true),
+        // dealt stream, source = EnemySpawn (victim).
+        (GroupMetric::Taken, GroupHostility::Enemy) => (true, false),
+    };
 
     if let Some(source) = query.source {
         let in_universe = if source_is_player {
@@ -504,6 +528,10 @@ pub fn aggregate_groups(
                 Dimension::Target if !source_is_player => GroupKey::Player {
                     index: damage_event.target.parent_index,
                 },
+                // The remaining `Source`/`Target` case is always the enemy
+                // universe (the one not matched above) — same rule as the
+                // dealt branch's own catch-all, just with no segment to
+                // resolve on this stream (see the doc comment above).
                 Dimension::Source | Dimension::Target => GroupKey::EnemyType {
                     enemy_type: attacker_type,
                 },
@@ -1619,6 +1647,78 @@ mod tests {
         assert_eq!(
             result,
             Err(GroupQueryError::WrongUniverse { field: "ability" })
+        );
+    }
+
+    /// The one (metric, hostility) × ability-grammar corner none of the
+    /// earlier tests touch: `taken`+`enemy` walks the DEALT stream (same row
+    /// as `damage`+`friendly` in the role-mapping table), so it is the
+    /// dealt stream's `Friendly` grammar that is valid here, and the taken
+    /// stream's `EnemyAttack` grammar that is wrong-universe — the mirror
+    /// image of `taken_friendly_rejects_a_friendly_ability_filter` above.
+    #[test]
+    fn taken_enemy_accepts_friendly_ability_filters_and_rejects_enemy_attack_ones() {
+        let events = vec![
+            (1_000, Message::DamageEvent(player_hit(0, 9, 100, 500))),
+            // Different action, same attacker: must be narrowed away below.
+            (1_500, Message::DamageEvent(player_hit(0, 9, 200, 300))),
+            (2_000, Message::DamageEvent(player_hit(1, 9, 100, 250))),
+        ];
+        let mut narrowed = taken_enemy_query(Dimension::Target);
+        narrowed.ability = Some(AbilityFilter::Friendly {
+            actions: vec![ActionType::Normal(100)],
+        });
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &narrowed,
+            1_000,
+            1_000,
+            2,
+            MeterFilters::default(),
+        )
+        .expect("taken+enemy accepts the dealt stream's own (friendly) ability grammar");
+
+        assert_eq!(
+            aggregates.len(),
+            2,
+            "one row per attacker; the action-200 hit is narrowed away"
+        );
+        assert_eq!(aggregates[0].key, GroupKey::Player { index: 0 });
+        assert_eq!(
+            aggregates[0].measure.amount, 500,
+            "only the action-100 hit, not the 300-damage action-200 one"
+        );
+        assert_eq!(aggregates[1].key, GroupKey::Player { index: 1 });
+        assert_eq!(aggregates[1].measure.amount, 250);
+        assert_invariants(&aggregates, 750);
+
+        let rejected = GroupQuery {
+            ability: Some(AbilityFilter::EnemyAttack {
+                enemy_type: EnemyType::Unknown(1),
+                action_id: ActionType::Normal(1),
+            }),
+            ..taken_enemy_query(Dimension::Target)
+        };
+        let result = aggregate_groups(
+            &[],
+            &Default::default(),
+            &[],
+            &[],
+            &rejected,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        );
+
+        assert_eq!(
+            result,
+            Err(GroupQueryError::WrongUniverse { field: "ability" }),
+            "the taken stream's grammar cannot pin a dealt-stream (taken+enemy) query"
         );
     }
 
