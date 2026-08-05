@@ -35,12 +35,21 @@ describe("CAPABILITIES", () => {
   it("declares which hover card explains each grouping", () => {
     expect(CAPABILITIES.damage.cardKind("source", "friendly")).toBe("skill");
     expect(CAPABILITIES.damage.cardKind("ability", "friendly")).toBe("skill");
-    // A target row fixes every dimension a card could decompose.
-    expect(CAPABILITIES.damage.cardKind("target", "friendly")).toBe("none");
+    // A friendly target row still leaves ability and source free — the card
+    // decomposes both (the old "fixes every dimension" rationale was wrong).
+    expect(CAPABILITIES.damage.cardKind("target", "friendly")).toBe("skill");
     expect(CAPABILITIES.damage.cardKind("source", "enemy")).toBe("enemyDealt");
+    // The enemy-side builders decompose attacker/victim rows only; the other
+    // groupings' rows have no builder, and the declaration says so rather
+    // than promising a card that arrives null.
+    expect(CAPABILITIES.damage.cardKind("ability", "enemy")).toBe("none");
+    expect(CAPABILITIES.damage.cardKind("target", "enemy")).toBe("none");
     expect(CAPABILITIES.taken.cardKind("source", "friendly")).toBe("taken");
-    expect(CAPABILITIES.taken.cardKind("ability", "friendly")).toBe("none");
+    expect(CAPABILITIES.taken.cardKind("ability", "friendly")).toBe("taken");
+    expect(CAPABILITIES.taken.cardKind("target", "friendly")).toBe("none");
     expect(CAPABILITIES.taken.cardKind("source", "enemy")).toBe("enemyReceived");
+    expect(CAPABILITIES.taken.cardKind("ability", "enemy")).toBe("none");
+    expect(CAPABILITIES.taken.cardKind("target", "enemy")).toBe("none");
     expect(CAPABILITIES.stun.cardKind("source", "friendly")).toBe("skill");
     expect(CAPABILITIES.sba.cardKind("source", "friendly")).toBe("none");
     expect(CAPABILITIES.buffs.cardKind("ability", "friendly")).toBe("none");

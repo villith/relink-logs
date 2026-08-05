@@ -11,9 +11,10 @@ export type DataPath = "groups" | "derived" | "intervals";
 
 /** Which hover-card builder explains a row under a given grouping — the
  * existing builders, chosen by declaration instead of the view's metric/side
- * ternaries. `"none"` is a real answer (a target row fixes every dimension a
- * card could decompose), declared rather than discovered as a null at
- * runtime. */
+ * ternaries. `"none"` is a real answer (a gauge reading or an interval row
+ * has nothing a skill walk can decompose, and the enemy side has builders
+ * for its source grouping's rows only), declared rather than discovered as a
+ * null at runtime. */
 export type CardKind = "skill" | "taken" | "enemyDealt" | "enemyReceived" | "none";
 
 export type DimensionDecl = {
@@ -75,8 +76,10 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       target: SUPPORTED("ui.logs.groupby-damage-target", "ui.logs.groupby-damage-target-enemy"),
     },
     columnKeys: (dim) => damageDone.columnKeys(levelFor(dim)),
-    // A target row fixes every dimension a damage card could decompose.
-    cardKind: (dim, hostility) => (hostility === "enemy" ? "enemyDealt" : dim === "target" ? "none" : "skill"),
+    // Friendly rows decompose at every grouping — a target row still leaves
+    // ability and source free (see targetCardSectionsFor). The enemy side
+    // has a builder only for its attacker rows.
+    cardKind: (dim, hostility) => (hostility === "enemy" ? (dim === "source" ? "enemyDealt" : "none") : "skill"),
     chartFromGroups: true,
   },
 
@@ -90,9 +93,12 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       target: SUPPORTED("ui.logs.groupby-taken-target", "ui.logs.groupby-taken-target-enemy"),
     },
     columnKeys: (dim) => damageTaken.columnKeys(levelFor(dim)),
-    // Only a victim row decomposes (attacks and attackers); a drill row
-    // already fixes all three, so it carries no card.
-    cardKind: (dim, hostility) => (hostility === "enemy" ? "enemyReceived" : dim === "source" ? "taken" : "none"),
+    // A victim row decomposes (attacks and attackers), and a drilled attack
+    // row decomposes across its victims. The target grouping's rows are
+    // attacker TYPES with no per-spawn data behind them, and the enemy side
+    // has a builder only for its victim rows.
+    cardKind: (dim, hostility) =>
+      hostility === "enemy" ? (dim === "source" ? "enemyReceived" : "none") : dim === "target" ? "none" : "taken",
     chartFromGroups: true,
   },
 
