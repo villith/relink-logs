@@ -1,8 +1,6 @@
 import {
-  AbilityChartSeries,
   DeathEvent,
   EncounterState,
-  EnemySeries,
   GroupAggregate,
   HpChartSeries,
   LegalityFinding,
@@ -10,8 +8,6 @@ import {
   SBAEvent,
   SelectionFact,
   StatusInterval,
-  TakenChartSeries,
-  TargetChartSeries,
   TargetEntry,
   TargetSpan,
 } from "@/types";
@@ -27,16 +23,6 @@ interface EncounterStore {
    * backend that predates the field; all zeroes on logs recorded before
    * damage-taken capture. */
   takenChart: Record<number, number[]>;
-  /** Damage each enemy TYPE DEALT to the party per second — which is what the
-   * Damage Done tab ranks on its enemy side. "Dealt" is relative to the ENEMY:
-   * the toggle names WHO acted, not which side of the party's fight the tab
-   * shows. Empty on logs recorded before damage-taken capture. */
-  enemyDealtChart: EnemySeries[];
-  /** Damage each enemy TYPE RECEIVED from the party per second — what the
-   * Damage Taken tab ranks on its enemy side, by that same rule. Built from
-   * dealt events, so unlike the one above it does not depend on damage-taken
-   * capture — logs recorded before that carry this series too. */
-  enemyReceivedChart: EnemySeries[];
   /** Enemy HP% per second, one series per charted HP pool (largest first). Empty on old logs. */
   hpChart: HpChartSeries[];
   /** Every window an actor held a status effect for, spanning the whole fight.
@@ -88,10 +74,6 @@ export interface EncounterStateResponse {
   stunChart?: Record<number, number[]>;
   /** Optional so a backend older than the field reads as "no taken series". */
   takenChart?: Record<number, number[]>;
-  /** Optional so a backend older than the field reads as "no enemy series". */
-  enemyDealtChart?: EnemySeries[];
-  /** Optional like the one above. */
-  enemyReceivedChart?: EnemySeries[];
   hpChart: HpChartSeries[];
   /** Optional so a backend older than the field reads as "no status capture" —
    * which is also what every log recorded before the hook emitted these has. */
@@ -108,16 +90,6 @@ export interface EncounterStateResponse {
    * carried a `groupQuery`. Optional so a frontend ahead of its backend
    * degrades to no groups rather than an error. */
   groups?: GroupAggregate[];
-  /** The analysis view's drill-down chart, sent only on a scoped fetch that
-   * pinned a source. Not stored: it belongs to one set of pins, and the store
-   * holds the base load. Optional so a frontend ahead of its backend — the Rust
-   * binary does not hot-reload — degrades to the per-player chart. */
-  abilityChart?: AbilityChartSeries[];
-  /** The level below: what the pinned ability hit, one band per enemy spawn. */
-  targetChart?: TargetChartSeries[];
-  /** The taken tab's drill bands for the pinned player — one per (attacker,
-   * attack). Scoped fetches only, like the two above; not stored. */
-  takenAbilityChart?: TakenChartSeries[];
   players: PlayerData[];
   /** One vector per PARTY SLOT (0-3), parallel to the unfiltered `players`. */
   legality: LegalityFinding[][];
@@ -134,8 +106,6 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   dpsChart: {},
   stunChart: {},
   takenChart: {},
-  enemyDealtChart: [],
-  enemyReceivedChart: [],
   hpChart: [],
   statusIntervals: [],
   sbaChart: {},
@@ -170,8 +140,6 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       dpsChart: response.dpsChart,
       stunChart: response.stunChart ?? {},
       takenChart: response.takenChart ?? {},
-      enemyDealtChart: response.enemyDealtChart ?? [],
-      enemyReceivedChart: response.enemyReceivedChart ?? [],
       hpChart: response.hpChart ?? [],
       statusIntervals: response.statusIntervals ?? [],
       sbaChart: response.sbaChart,

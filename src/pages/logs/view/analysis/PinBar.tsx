@@ -1,4 +1,4 @@
-import { ActionIcon, Box, MultiSelect, Select, Text } from "@mantine/core";
+import { ActionIcon, Box, Select, Text } from "@mantine/core";
 import { X } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
@@ -52,19 +52,19 @@ export const PinBar = ({ options, pins, onChange, windowLabel, fullLabel, onClea
         searchable
         onChange={(value) => onChange({ ...pins, source: value === null ? null : Number(value) })}
       />
-      <MultiSelect
+      {/* Single like the machine's target axis (WCL's): one spawn or All —
+          `targets` still travels as a list only because the legacy pin shape
+          does. */}
+      <Select
         w={210}
         size="xs"
-        // Mantine's xs MultiSelect wraps its value in a pill container, which
-        // makes it 33px against the Selects' 30px and misaligns the row.
-        styles={{ input: { minHeight: 30, height: 30 } }}
         data={options.targets}
-        value={pins.targets.map(String)}
+        value={pins.targets.length === 0 ? null : String(pins.targets[0])}
         placeholder={t("ui.logs.selector-all-enemies")}
         aria-label={t("ui.logs.selector-target")}
         clearable
         searchable
-        onChange={(values) => onChange({ ...pins, targets: values.map(Number) })}
+        onChange={(value) => onChange({ ...pins, targets: value === null ? [] : [Number(value)] })}
       />
       <Select
         w={220}

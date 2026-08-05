@@ -69,4 +69,15 @@ describe("PinBar", () => {
     fireEvent.click(screen.getByLabelText("ui.logs.window-reset"));
     expect(onClearWindow).toHaveBeenCalled();
   });
+
+  it("pins ONE target — the machine's target axis is single, like WCL's", () => {
+    const onChange = vi.fn();
+    renderIt({ onChange });
+
+    const target = screen.getByPlaceholderText("ui.logs.selector-all-enemies");
+    fireEvent.click(target);
+    fireEvent.click(screen.getByText("Vulkan Bolla Nihilla"));
+
+    expect(onChange).toHaveBeenCalledWith({ source: null, targets: [1], ability: null });
+  });
 });

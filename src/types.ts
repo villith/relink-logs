@@ -131,31 +131,6 @@ export type ActionType =
   | { Group: string };
 
 /**
- * One band of the analysis view's ability drill-down chart (mirrors the Rust
- * `AbilityChartSeries`): what one breakdown row of the pinned player dealt per
- * second. Keyed exactly as a `skillBreakdown` row is — same action, same child
- * character — so a band always corresponds to a row of the table beneath it and
- * both fold into skill groups by the same rule.
- *
- * Present only on a scoped fetch that pinned a source; empty otherwise.
- */
-export type AbilityChartSeries = SkillRow & {
-  values: number[];
-};
-
-/**
- * One band of the target drill-down chart (mirrors the Rust
- * `TargetChartSeries`): what the pinned ability dealt to one enemy spawn per
- * second. Carries the spawn's `instance`, so a band names the same enemy the
- * target dropdown and the HP chart do.
- */
-export type TargetChartSeries = {
-  enemyType: EnemyType;
-  instance: number;
-  values: number[];
-};
-
-/**
  * One window during which one actor held one status effect (mirrors the Rust
  * `StatusInterval`).
  *
@@ -347,16 +322,6 @@ export type DamageTakenState = {
   maxDamage: number;
 };
 
-/** One band of the damage-taken drill-down chart (mirrors the Rust
- * `TakenChartSeries`): what one (attacker, attack) dealt TO the pinned victim
- * per second — the same grouping the taken table's drill rows use, so a band
- * always corresponds to a row of the table beneath it. */
-export type TakenChartSeries = {
-  enemyType: EnemyType;
-  actionId: ActionType;
-  values: number[];
-};
-
 /** Which universe an index names — mirrors the Rust `ActorRef`. A `source`/
  * `target` filter on a `GroupQuery` is one of these; which universe is valid
  * depends on the query's (metric, hostility) role-mapping. */
@@ -406,13 +371,6 @@ export type GroupMeasure = { amount: number; hits: number; min: number | null; m
  * disagree. `series` is a whole-fight per-bucket band, same buckets as
  * `dpsChart` — the view slices it client-side. */
 export type GroupAggregate = { key: GroupKey; measure: GroupMeasure; series: number[] };
-
-/** One per-enemy-type bucketed series for the enemy-side charts (mirrors the
- * Rust `EnemySeries`). */
-export type EnemySeries = {
-  enemyType: EnemyType;
-  values: number[];
-};
 
 /** A cause of SBA generation that no skill row can hold — mirrors the Rust
  * `SbaSourceState`. `kind` is a stable machine key; the table maps it to an

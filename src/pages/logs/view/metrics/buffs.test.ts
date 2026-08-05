@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import type { ComputedPlayerState, StatusInterval } from "@/types";
 
-import type { RowLevel } from "../deriveRows";
 import type { SelectorPins } from "../selectorOptions";
+import type { RowLevel } from "./types";
 
 import { buffs, narrowedByPins } from "./buffs";
 import { debuffs } from "./debuffs";

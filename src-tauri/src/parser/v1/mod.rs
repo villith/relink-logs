@@ -56,7 +56,7 @@ impl<'a> AdjustedDamageInstance<'a> {
     pub fn from_damage_event(event: &'a DamageEvent, player_data: Option<&'a PlayerData>) -> Self {
         let stun_damage = event.stun_value.unwrap_or(0.0) as f64;
 
-        // Supplementary damage is never subject to the damage cap — the cap value it
+        // Supplementary damage is never subject to the damage cap â€” the cap value it
         // carries belongs to the hit that triggered it. Newer hooks already strip the
         // cap at the source, but old logs recorded it, so it must be enforced here too.
         let is_supplementary = matches!(
@@ -351,7 +351,7 @@ impl From<protocol::WeaponState> for WeaponState {
 /// Folds a fresh weapon-state read into the already-known one for the same
 /// player. Identity refreshes re-read the record repeatedly, and reads of
 /// REMOTE players are often partial (the wrightstone item id never syncs, and
-/// awakening / innate skills can read empty before the network sync lands) —
+/// awakening / innate skills can read empty before the network sync lands) â€”
 /// so a later sparse read must not wipe fields an earlier read recovered.
 /// A different weapon id replaces the state wholesale (a real re-equip in the
 /// lobby); the same weapon id keeps the best-known value per field. The
@@ -567,13 +567,13 @@ impl PlayerData {
         &self.display_name
     }
 
-    /// True when this slot names somebody — what the quest list's party column
+    /// True when this slot names somebody â€” what the quest list's party column
     /// and the player filters display.
     pub fn has_identity(&self) -> bool {
         !self.display_name.is_empty() || !self.character_name.is_empty()
     }
 
-    /// True when this slot carries any recovered build data — anything the log
+    /// True when this slot carries any recovered build data â€” anything the log
     /// page's equipment panes and the cheat audit read.
     pub fn has_equipment(&self) -> bool {
         !self.sigils.is_empty()
@@ -628,7 +628,7 @@ impl EnemyState {
             // ...EXCEPT once the tracked pool is dead. This key is the game's actor
             // index, which is reused across boss phases and summon waves, so latching
             // on "largest ever seen" left a killed 50m phase-1 pool pinned at 0% while
-            // a live 30m phase-2 pool was being hit — every later report failed
+            // a live 30m phase-2 pool was being hit â€” every later report failed
             // `max >= known` and could never take over. A different pool arriving after
             // the tracked one hit zero replaces it outright.
             let tracked_pool_is_dead = self.current_hp == Some(0);
@@ -675,14 +675,14 @@ impl Encounter {
     }
 
     /// Audits every occupied party slot and stores the verdicts against
-    /// `log_id`. Clean players write nothing — a slot with no row reads as
+    /// `log_id`. Clean players write nothing â€” a slot with no row reads as
     /// clean, so storing empty verdicts would only cost space.
     ///
     /// The save path and the startup sweep are the two callers, and they must
     /// agree on what a stored row carries; keeping the walk here means a change
     /// to that reaches both.
     ///
-    /// APPENDS. `log_id` must carry no findings yet — a freshly inserted log, or
+    /// APPENDS. `log_id` must carry no findings yet â€” a freshly inserted log, or
     /// one the caller has just passed to [`crate::db::legality::clear_findings`]
     /// (which is what the sweep does). Re-running this over a log that already
     /// has rows stores every verdict twice, and nothing downstream deduplicates.
@@ -784,7 +784,7 @@ impl Encounter {
                 | Message::OnContinueSBAChain(_) => coverage.sba_events = true,
                 _ => {}
             }
-            // Every event-derived flag is already true — the rest of a long
+            // Every event-derived flag is already true â€” the rest of a long
             // fight's log has nothing left to prove.
             if coverage.enemy_hp
                 && coverage.overcap
@@ -805,7 +805,7 @@ impl Encounter {
     /// derivation the meter's rows are built from (see `ensure_player_row`),
     /// so the import backfill can fill the quest list's character columns for
     /// logs whose source never recorded player identity. Display names are
-    /// not recoverable — nothing in a damage event carries them.
+    /// not recoverable â€” nothing in a damage event carries them.
     pub fn derive_party_characters(&self) -> Vec<CharacterType> {
         let mut seen_parents = Vec::new();
         let mut characters = Vec::new();
@@ -1019,7 +1019,7 @@ pub struct DerivedEncounterState {
     end_time: i64,
     /// True once the DPS window has been anchored, either by the encounter's
     /// first counted damage event or by an explicit scrub window. Guards and
-    /// stun procs open an encounter but must not anchor it — see
+    /// stun procs open an encounter but must not anchor it â€” see
     /// [`Self::extend_window`].
     #[serde(skip)]
     window_anchored: bool,
@@ -1035,7 +1035,7 @@ pub struct DerivedEncounterState {
     #[serde(default)]
     stun_delta_sum: f64,
     /// Encounter-wide stun via network stun messages (online path; may also
-    /// fire solo, where it duplicates the delta path — `total_stun_value` is
+    /// fire solo, where it duplicates the delta path â€” `total_stun_value` is
     /// max(delta, messages) so the paths can never double-count).
     #[serde(default)]
     stun_message_sum: f64,
@@ -1128,7 +1128,7 @@ impl DerivedEncounterState {
     }
 
     /// Opens the window at an explicitly chosen point (the logs-page scrubber)
-    /// so [`Self::extend_window`] leaves its start alone — the user picked that
+    /// so [`Self::extend_window`] leaves its start alone â€” the user picked that
     /// range and the first hit inside it must not override them.
     fn start_pinned(&mut self, now: i64) {
         self.start(now);
@@ -1139,8 +1139,8 @@ impl DerivedEncounterState {
     /// first damage.
     ///
     /// **Only damage moves this window.** A Perfect Guard, a stun proc or a
-    /// Quickening guard can open an *encounter* — they are real events and
-    /// belong in the log (see `ensure_encounter_started`) — but they are not
+    /// Quickening guard can open an *encounter* â€” they are real events and
+    /// belong in the log (see `ensure_encounter_started`) â€” but they are not
     /// damage, and dividing a fight's damage by time in which nobody attacked
     /// understates DPS. A fight that opens with a long defensive phase
     /// (Lucilius' Paradise Lost is ~30s of it) would otherwise be measured over
@@ -1154,10 +1154,10 @@ impl DerivedEncounterState {
         self.end_time = now;
     }
 
-    /// Accumulates an incoming (enemy→party) hit onto the victim's row. Never
+    /// Accumulates an incoming (enemyâ†’party) hit onto the victim's row. Never
     /// touches the DPS window: taken damage opens an encounter (the live
     /// path's `ensure_encounter_started` has already run) but the window is
-    /// anchored and stretched only by dealt hits — same posture as guards and
+    /// anchored and stretched only by dealt hits â€” same posture as guards and
     /// stun procs.
     fn process_damage_taken_event(&mut self, event: &DamageEvent) {
         self.ensure_player_row(
@@ -1172,7 +1172,7 @@ impl DerivedEncounterState {
     }
 
     /// `total_stun_value` = whichever capture path saw the accrual (the two
-    /// paths observe the same accumulator, so max() dedupes them — the
+    /// paths observe the same accumulator, so max() dedupes them â€” the
     /// encounter-level mirror of `PlayerState::refresh_total_stun`).
     fn refresh_total_stun(&mut self) {
         self.total_stun_value = self.stun_delta_sum.max(self.stun_message_sum);
@@ -1260,7 +1260,7 @@ impl DerivedEncounterState {
     }
 
     /// Folds one network stun-apply message (`OnPlayerStun`) into the encounter.
-    /// This is the ONLINE stun source — the accumulator-delta path reads 0 there
+    /// This is the ONLINE stun source â€” the accumulator-delta path reads 0 there
     /// because enemy stun is host-authoritative and lands asynchronously.
     /// Totals are max(delta, messages) at both encounter and player level, so a
     /// mode where both paths fire (solo loopback) can never double-count.
@@ -1289,7 +1289,7 @@ impl DerivedEncounterState {
     /// Folds one gauge reading into a player's row during a reparse.
     ///
     /// Silently skipped when the player has no row yet: unlike stun there is
-    /// nothing to hold pending, because the gauge is a LEVEL — a later event
+    /// nothing to hold pending, because the gauge is a LEVEL â€” a later event
     /// carries the running total again, so an early reading lost before the
     /// player's first damage event costs at most its own `added`.
     fn process_sba_update(&mut self, actor_index: u32, value: f64, added: f64) {
@@ -1302,18 +1302,18 @@ impl DerivedEncounterState {
     ///
     /// `Skill` goes to the breakdown row the causing hit opened, through the
     /// raw-action memo (see [`PlayerState::add_sba_gain`]). Every other cause is
-    /// gauge no hit produced and goes to the player's source list — a cause must
+    /// gauge no hit produced and goes to the player's source list â€” a cause must
     /// never be able to open a breakdown row, because a row with no hits is a
     /// row the damage and stun tables would have to show.
     ///
-    /// NOTE the wire ordering — or rather, the absence of one. The hook emits a
+    /// NOTE the wire ordering â€” or rather, the absence of one. The hook emits a
     /// gain from the game's gauge-update path, which is entered through a
     /// separate register-hit gate and not necessarily on the thread the damage
     /// path runs on, so a `SbaGain` and the `DamageEvent` for the same hit can
     /// interleave arbitrarily at the shared `Tx`. A SKILL gain whose player has
     /// no party row yet is therefore dropped (fail-closed: inventing a player
     /// from a gain alone would put a damage-less row in the meter), while one
-    /// whose skill merely has no row yet is held — see
+    /// whose skill merely has no row yet is held â€” see
     /// [`PlayerState::add_sba_gain`].
     fn process_sba_gain(&mut self, actor_index: u32, cause: protocol::SbaGainCause, amount: f64) {
         use protocol::SbaGainCause;
@@ -1357,7 +1357,7 @@ impl DerivedEncounterState {
     }
 
     /// Creates a player's party row before their first damage event, from the
-    /// character type the identity snapshot carries — a player who only guards
+    /// character type the identity snapshot carries â€” a player who only guards
     /// must still show their Perfect Guard rows. Folds in any guard/stun state
     /// already held pending for the slot. No-op (beyond the pending fold) when
     /// the row already exists.
@@ -1417,13 +1417,13 @@ impl DerivedEncounterState {
         amount: f64,
     ) {
         // A guard the LOCAL player made always registers its stun in-call, so 0
-        // here means the guard applied none — the redundant counter events the
+        // here means the guard applied none â€” the redundant counter events the
         // game fires alongside the real one (live capture 07-22: bursts of 30-40
         // within 150ms, no stun anywhere in the burst). Remote players are the
         // opposite case: their stun is host-authoritative and structurally
         // unobservable from this process (821 of 821 captured remote guards read
         // 0), so 0 carries no information there and the guard still counts. An
-        // unidentified slot stays countable — unknown is not local.
+        // unidentified slot stays countable â€” unknown is not local.
         if amount <= 0.0 && is_remote_slot(player_data, actor_index) == Some(false) {
             return;
         }
@@ -1450,7 +1450,7 @@ impl DerivedEncounterState {
     }
 
     /// Counts one guarded Quickening (The World) for the player: a hits-only
-    /// breakdown row. No stun or damage is tracked — the marker carries no
+    /// breakdown row. No stun or damage is tracked â€” the marker carries no
     /// measurable stun and the scripted counter damage is intentionally
     /// untracked (user decision). Row creation as in
     /// [`Self::process_perfect_guard_stun`].
@@ -1508,13 +1508,13 @@ impl DerivedEncounterState {
 }
 
 /// v2.0.2: the hook can no longer resolve Id's dragon form (Pl2000) to its Pl1900
-/// owner — the parent-link offset vanished in the patch — so dragon events arrive
+/// owner â€” the parent-link offset vanished in the patch â€” so dragon events arrive
 /// parented to themselves and would open a separate party row. Remap them onto the
 /// party's Id (Pl1900) player at derive time. The raw event log keeps the original
 /// event, so a future hook-side parent fix reparses history cleanly.
 ///
 /// Falls back to the unmapped event when no Pl1900 player is known (e.g. an AI Id,
-/// which has no identity on v2.0.2) — same split behavior as before, never lost damage.
+/// which has no identity on v2.0.2) â€” same split behavior as before, never lost damage.
 pub fn remap_dragon_form(
     player_data: &[Option<PlayerData>; 4],
     event: &DamageEvent,
@@ -1538,8 +1538,8 @@ pub fn remap_dragon_form(
 /// The character a player-identity/load event should record in its party slot.
 ///
 /// Pl2000 (Id's dragon form) events resolve to the Id player (Pl1900) instead of
-/// being dropped: a recruited crewmate Id fights entirely in dragon form — its
-/// Pl1900 base actor may never deal a hit — so dragon-sourced events are the only
+/// being dropped: a recruited crewmate Id fights entirely in dragon form â€” its
+/// Pl1900 base actor may never deal a hit â€” so dragon-sourced events are the only
 /// identity the meter ever sees for that player (live logs 344-346, 2026-07-23,
 /// where slot 4 stayed empty all quest). Slot-scoped, so two Ids in one party
 /// each keep their own entry. `None` means ignore the event: its slot is owned by
@@ -1560,8 +1560,8 @@ fn slot_character_for_identity(
 }
 
 /// Resolves the character type behind a player slot key (`0xF0000000 | slot`)
-/// from the identity snapshots. Identity events land at quest load — before a
-/// guard is possible — so this lets guard handlers create a party row for a
+/// from the identity snapshots. Identity events land at quest load â€” before a
+/// guard is possible â€” so this lets guard handlers create a party row for a
 /// player who has not dealt any damage yet. `None` for non-slot-key values or
 /// slots with no identity (the caller then falls back to holding the guard
 /// pending).
@@ -1575,7 +1575,7 @@ fn character_type_for_slot_key(
 }
 
 /// Whether the slot's player belongs to a REMOTE client, or `None` while the
-/// slot has no identity yet (locality unknown — callers must not assume local).
+/// slot has no identity yet (locality unknown â€” callers must not assume local).
 ///
 /// This decides whether a measurement of 0 means "nothing happened" or "not
 /// observable here": the hook reads the enemy's stun accumulator across the
@@ -1607,9 +1607,9 @@ pub struct HpChartSeries {
 }
 
 /// A caller-selected slice of one target spawn's lifetime (the selectable half
-/// of a [`TargetSegment`]). The spawn id alone is NOT unique across a fight —
+/// of a [`TargetSegment`]). The spawn id alone is NOT unique across a fight â€”
 /// the game reuses freed actor instances (wave 2's sword lands on wave 1's
-/// pointer) — so selections carry the segment's time span too.
+/// pointer) â€” so selections carry the segment's time span too.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetSpan {
@@ -1620,7 +1620,7 @@ pub struct TargetSpan {
 
 /// One contiguous lifetime of one enemy spawn: a `target.index` key from its
 /// first damage event until a respawn boundary (its max HP changes, or its HP
-/// jumps back to near-full — see [`segment_targets`]). The quest-details
+/// jumps back to near-full â€” see [`segment_targets`]). The quest-details
 /// target dropdown lists exactly these, and the HP chart draws one series per
 /// segment, so the two stay in 1:1 parity (matching `instance` numbers).
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -1631,7 +1631,7 @@ pub struct TargetSegment {
     ///
     /// `id` above is the spawn's INSTANCE POINTER folded to 32 bits, which is
     /// what tells two simultaneous same-kind actors apart. The status hook
-    /// cannot report that — it sees the actor, not the damage instance — and
+    /// cannot report that â€” it sees the actor, not the damage instance â€” and
     /// sends this index instead, so it is the only field the two capture paths
     /// share and the only one a status window can be matched on.
     ///
@@ -1642,7 +1642,7 @@ pub struct TargetSegment {
     /// reuse by time.
     pub actor_index: u32,
     pub enemy_type: EnemyType,
-    /// 1-based, chronological within `enemy_type` — the "#n" in both UIs.
+    /// 1-based, chronological within `enemy_type` â€” the "#n" in both UIs.
     pub instance: u32,
     /// The pool's max HP (`None` on logs recorded before HP capture).
     pub max_hp: Option<u64>,
@@ -1652,11 +1652,11 @@ pub struct TargetSegment {
 }
 
 // A respawn behind a reused key must show REAL evidence, not just a value
-// rising toward full — on pre-per-spawn-id logs several simultaneous summons
+// rising toward full â€” on pre-per-spawn-id logs several simultaneous summons
 // interleave on one key, and "sword A at 90%, then a splash hit on near-full
 // sword B" must not read as a respawn. Evidence = the jump lands near full AND
 // either the pool was nearly dead, or the key went quiet for a wave-length gap
-// (waves are minutes apart; interleaved hits are milliseconds apart — and the
+// (waves are minutes apart; interleaved hits are milliseconds apart â€” and the
 // gap also catches a wave despawning mid-HP at a boss phase change).
 const RESPAWN_FRACTION: f64 = 0.95;
 const NEARLY_DEAD_FRACTION: f64 = 0.25;
@@ -1672,7 +1672,7 @@ const RESPAWN_QUIET_GAP_MS: i64 = 30_000;
 pub struct SelectionFact {
     pub source_actor_type: u32,
     pub source_index: u32,
-    /// Index into the [`TargetSegment`] vector this fight segments into — i.e.
+    /// Index into the [`TargetSegment`] vector this fight segments into â€” i.e.
     /// into the `targetEntries` the same response carries.
     ///
     /// The SEGMENT, never `target.index`: the game frees a dead boss's actor
@@ -1686,7 +1686,7 @@ pub struct SelectionFact {
     /// The body the hit came from, filed the way `skill_breakdown` files it.
     ///
     /// Present so the ability selector can condense its list into skill groups
-    /// with the same rule the table uses — grouping is per child character, and
+    /// with the same rule the table uses â€” grouping is per child character, and
     /// the action alone cannot say which group it belongs to.
     pub child_character_type: CharacterType,
 }
@@ -1698,7 +1698,7 @@ pub struct SelectionFact {
 /// and filtering by the pins first would collapse every list to what is already
 /// selected. The window IS applied, so the selectors only ever offer a pin that
 /// has something behind it.
-/// True for a hit some enemy dealt TO a party member — the damage-taken
+/// True for a hit some enemy dealt TO a party member â€” the damage-taken
 /// stream, which has its own accumulation and must stay out of every
 /// dealt-damage path (DPS totals, target segments, selection facts, coverage).
 ///
@@ -1768,7 +1768,7 @@ pub fn selection_facts(
 
 /// Split every damage-event target into [`TargetSegment`]s, in first-hit
 /// order. Events without HP data still open/extend segments (DoT-only spans,
-/// old logs) — they just can't trigger respawn boundaries.
+/// old logs) â€” they just can't trigger respawn boundaries.
 pub fn segment_targets(events: &[(i64, Message)], start_time: i64) -> Vec<TargetSegment> {
     segment_targets_inner(events, start_time, false).0
 }
@@ -1788,7 +1788,7 @@ pub fn segment_targets_indexed(
 }
 
 /// The shared segmenter. `track` is opt-in because the assignment vector costs
-/// one entry per event and only the audit tooling reads it — the interactive
+/// one entry per event and only the audit tooling reads it â€” the interactive
 /// callers (`fetch_encounter_state` on every log open, target-filter change and
 /// filter toggle) would otherwise allocate and populate it just to drop it.
 fn segment_targets_inner(
@@ -1811,7 +1811,7 @@ fn segment_targets_inner(
         Vec::new()
     };
 
-    // Markers are not enemies, so they get no dropdown entry and no HP series —
+    // Markers are not enemies, so they get no dropdown entry and no HP series â€”
     // and because the assignment vector is pre-filled with `None`, skipping one
     // leaves its slot unassigned, exactly like a non-damage event.
     let phantoms = PhantomTargets::learned_from(events.iter());
@@ -1853,7 +1853,7 @@ fn segment_targets_inner(
             segments.push(TargetSegment {
                 id: key,
                 // The bridge to the status events, which know an enemy only by
-                // this index — see `TargetSegment::actor_index`.
+                // this index â€” see `TargetSegment::actor_index`.
                 actor_index: event.target.parent_index,
                 enemy_type: EnemyType::from_hash(event.target.parent_actor_type),
                 instance: 0, // numbered below
@@ -1880,7 +1880,7 @@ fn segment_targets_inner(
             let segment = &mut segments[state.position];
             segment.end_ms = rel_ts;
             // `last_ts` is the quiet-gap clock, so EVERY event touching this key resets
-            // it — including hp-less ones (DoT ticks). Updating it only on hp-carrying
+            // it â€” including hp-less ones (DoT ticks). Updating it only on hp-carrying
             // events let a boss that took nothing but DoT for 30s, then healed to full at
             // a phase change, read as a respawn and split into a phantom second instance.
             state.last_ts = rel_ts;
@@ -1916,7 +1916,7 @@ fn segment_targets_inner(
 /// Whether a damage event's target passes the quest-details filter: with no
 /// spans selected everything passes; otherwise one of the selected spawn spans
 /// (id + time window) must match. Spans let the UI select ONE summon out of
-/// several sharing an enemy type — and one wave out of several reusing an
+/// several sharing an enemy type â€” and one wave out of several reusing an
 /// instance id.
 pub fn target_selected(
     rel_ts: i64,
@@ -1937,11 +1937,11 @@ pub fn target_selected(
 /// players the meter itself shows, and damage credited to anyone else is dropped
 /// rather than inventing a row for them.
 ///
-/// A bucket index IS the elapsed second — both the quest-details charts and the
-/// window scrubber work in whole seconds — so `chart_len` must be sized from the
+/// A bucket index IS the elapsed second â€” both the quest-details charts and the
+/// window scrubber work in whole seconds â€” so `chart_len` must be sized from the
 /// FULL log duration even when a scrub cutoff truncates the derived state, or
 /// this indexes out of bounds.
-// Eight independent inputs with no natural grouping — the event log, who to
+// Eight independent inputs with no natural grouping â€” the event log, who to
 // build rows for, the bucket geometry, and the two filters. Bundling them into
 // a struct would only move the same list somewhere less readable.
 #[allow(clippy::too_many_arguments)]
@@ -1954,7 +1954,7 @@ pub fn build_player_dps_chart(
     chart_len: usize,
     target_spans: &[TargetSpan],
     // Actions to keep (empty = all), the same rule `matches_selection` applies
-    // to the derived state — so a chart drawn under an ability pin cannot
+    // to the derived state â€” so a chart drawn under an ability pin cannot
     // disagree with the table beneath it.
     abilities: &[ActionType],
     filters: MeterFilters,
@@ -1977,14 +1977,14 @@ pub fn build_player_dps_chart(
             continue;
         }
 
-        // The RAW action, read before the dragon-form remap below — that remap
+        // The RAW action, read before the dragon-form remap below â€” that remap
         // rewrites the source, never the action, so the two are independent.
         if !abilities.is_empty() && !abilities.contains(&damage_event.action_id) {
             continue;
         }
 
         // Attribute dragon-form (Id/Pl2000) damage to the Id player, matching the
-        // remap the party table uses — otherwise the party (keyed by the remapped
+        // remap the party table uses â€” otherwise the party (keyed by the remapped
         // index) has no bucket for the raw Pl2000 index and the chart drops it.
         let damage_event = remap_dragon_form(player_data, damage_event);
 
@@ -2005,7 +2005,7 @@ pub fn build_player_dps_chart(
 /// chart, keyed by the victim's slot key.
 ///
 /// Only incoming events (see [`is_damage_taken_event`]) count, and only onto
-/// the party keys given — same posture as [`build_player_dps_chart`]. None of
+/// the party keys given â€” same posture as [`build_player_dps_chart`]. None of
 /// that function's gates apply here: phantom targets and the exclusion filters
 /// are about hits ON enemies, an enemy attack is not a pinnable ability, and
 /// the victim is a player rather than a target span.
@@ -2037,242 +2037,20 @@ pub fn build_player_taken_chart(
     player_taken
 }
 
-/// One band of the damage-taken drill-down chart: what one (attacker class,
-/// attack) dealt TO the pinned victim per bucket — the same (enemy, action)
-/// grouping the taken table's drill rows use, so a band always corresponds to
-/// a row of the table beneath it.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TakenChartSeries {
-    pub enemy_type: EnemyType,
-    pub action_id: ActionType,
-    pub values: Vec<i64>,
-}
-
-/// The taken drill chart: every incoming hit on `victim` (a slot key), banded
-/// by (attacker class, attack), largest total first. Whole-fight geometry like
-/// the other drill charts — the view slices client-side. None of the dealt
-/// gates (phantoms, filters, target spans, ability pins) apply to incoming
-/// hits, so this is a single ungated pass.
-pub fn build_taken_ability_chart(
-    events: &[(i64, Message)],
-    victim: u32,
-    start_time: i64,
-    interval: i64,
-    chart_len: usize,
-) -> Vec<TakenChartSeries> {
-    let mut series: Vec<TakenChartSeries> = Vec::new();
-    for (timestamp, message) in events {
-        let Message::DamageEvent(event) = message else {
-            continue;
-        };
-        if !is_damage_taken_event(event) || event.target.parent_index != victim {
-            continue;
-        }
-        let enemy_type = EnemyType::from_hash(event.source.parent_actor_type);
-        let band = match series
-            .iter_mut()
-            .find(|band| band.enemy_type == enemy_type && band.action_id == event.action_id)
-        {
-            Some(band) => band,
-            None => {
-                series.push(TakenChartSeries {
-                    enemy_type,
-                    action_id: event.action_id,
-                    values: vec![0; chart_len],
-                });
-                series.last_mut().expect("just pushed the band above")
-            }
-        };
-        band.values[((timestamp - start_time) / interval) as usize] += event.damage.max(0) as i64;
-    }
-    series.sort_by_key(|band| std::cmp::Reverse(band.values.iter().sum::<i64>()));
-    series
-}
-
-/// One per-enemy-TYPE bucketed series for the analysis view's enemy-side
-/// charts. Type-level, not spawn-level, deliberately: the enemy-side tables
-/// fold by type, and a chart must decompose exactly what its table ranks.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EnemySeries {
-    pub enemy_type: EnemyType,
-    pub values: Vec<i64>,
-}
-
-/// Cap on enemy-side chart bands. Deliberately the SAME number as
-/// [`HP_CHART_MAX_SERIES`], not merely a similar one: every stacked chart in
-/// the app draws its bands from the frontend's `HP_SERIES_COLORS`, which has
-/// exactly that many entries, so a band past it wraps the palette and reads as
-/// a duplicate of an earlier series. A smaller cap would buy nothing in
-/// readability that the sort does not already buy (the tail bands are the
-/// thinnest ones) while dropping types the palette can still tell apart.
-///
-/// This is a top-N view of an UNCAPPED table: neither enemy-side table limits
-/// its rows, and the Damage Taken enemy side routinely carries more types than
-/// this, so on such a fight the table lists them all while the stack shows only
-/// the biggest — the plotted area is legitimately short of the summed column.
-/// [`rank_and_cap_enemy_series`] logs whenever that happens, so the shortfall is
-/// explicable from the log rather than looking like lost damage.
-const ENEMY_CHART_MAX_SERIES: usize = HP_CHART_MAX_SERIES;
-
-/// Fold one hit into the band for `enemy_type`, opening that band on first
-/// sight. `bucket` indexes `values` unchecked, exactly like the sibling chart
-/// builders: a bucket index IS the elapsed second, so `chart_len` must be
-/// sized from the FULL log duration even when a scrub cutoff truncates the
-/// derived state, or this indexes out of bounds.
-fn accumulate_enemy_series(
-    series: &mut Vec<EnemySeries>,
-    enemy_type: EnemyType,
-    bucket: usize,
-    damage: i64,
-    chart_len: usize,
-) {
-    let band = match series.iter_mut().find(|band| band.enemy_type == enemy_type) {
-        Some(band) => band,
-        None => {
-            series.push(EnemySeries {
-                enemy_type,
-                values: vec![0; chart_len],
-            });
-            series.last_mut().expect("just pushed the band above")
-        }
-    };
-    band.values[bucket] += damage;
-}
-
-/// Rank finished enemy bands biggest-first and keep the top
-/// [`ENEMY_CHART_MAX_SERIES`], shared by both enemy builders so the two can
-/// never drift apart on what they show or on what they say about it.
-///
-/// The sort has to precede the truncate, and it has to rank by WHOLE-FIGHT
-/// total: keeping the first bands seen, or the ones leading a single bucket,
-/// would drop the boss for a trash mob that opened the fight.
-///
-/// What the cap drops is logged rather than silently truncated, exactly as
-/// [`build_target_damage_chart`] does it — the enemy-side tables are uncapped,
-/// so a reader comparing the stack against the column needs the log line to
-/// explain the missing area. `label` names which of the two charts truncated.
-fn rank_and_cap_enemy_series(series: &mut Vec<EnemySeries>, label: &str) {
-    series.sort_by_key(|band| std::cmp::Reverse(band.values.iter().sum::<i64>()));
-    if series.len() > ENEMY_CHART_MAX_SERIES {
-        log::info!(
-            "{label}: showing the {ENEMY_CHART_MAX_SERIES} biggest of {} enemy types",
-            series.len()
-        );
-        series.truncate(ENEMY_CHART_MAX_SERIES);
-    }
-}
-
-/// Damage each enemy TYPE DEALT TO the party, per bucket — every incoming
-/// event, banded by the attacker that landed it. Empty on logs recorded
-/// before damage-taken capture.
-///
-/// `chart_len` must be sized from the FULL log duration, or this indexes out
-/// of bounds — see [`accumulate_enemy_series`].
-pub fn build_enemy_dealt_chart(
-    events: &[(i64, Message)],
-    start_time: i64,
-    interval: i64,
-    chart_len: usize,
-) -> Vec<EnemySeries> {
-    let mut series: Vec<EnemySeries> = Vec::new();
-    for (timestamp, message) in events {
-        let Message::DamageEvent(event) = message else {
-            continue;
-        };
-        if !is_damage_taken_event(event) {
-            continue;
-        }
-        accumulate_enemy_series(
-            &mut series,
-            EnemyType::from_hash(event.source.parent_actor_type),
-            ((timestamp - start_time) / interval) as usize,
-            event.damage.max(0) as i64,
-            chart_len,
-        );
-    }
-    rank_and_cap_enemy_series(&mut series, "enemy dealt chart");
-    series
-}
-
-/// Damage each enemy TYPE RECEIVED FROM the party, per bucket — the counted
-/// dealt events (same phantom/exclusion gates as the DPS chart, so the
-/// chart's area cannot disagree with the table), banded by the victim that
-/// absorbed them.
-///
-/// That agreement is asserted, not merely intended: see
-/// `enemy_charts_agree_with_the_tables_they_decompose`, which walks one mixed
-/// log through both this and [`build_enemy_dealt_chart`] and compares every
-/// band against the derived rows the frontend ranks. Add a gate here (or to the
-/// reparse loop) without adding it to the other side and that test says so.
-///
-/// `chart_len` must be sized from the FULL log duration, or this indexes out
-/// of bounds — see [`accumulate_enemy_series`].
-pub fn build_enemy_received_chart(
-    events: &[(i64, Message)],
-    start_time: i64,
-    interval: i64,
-    chart_len: usize,
-    filters: MeterFilters,
-) -> Vec<EnemySeries> {
-    let phantoms = PhantomTargets::learned_from(events.iter());
-    let mut series: Vec<EnemySeries> = Vec::new();
-    for (timestamp, message) in events {
-        let Message::DamageEvent(event) = message else {
-            continue;
-        };
-        if is_damage_taken_event(event)
-            || phantoms.is_phantom(event)
-            || is_excluded(event, &filters)
-        {
-            continue;
-        }
-        // Only player-dealt damage: an unknown source is an enemy (or an
-        // unmapped proxy), which the meter itself does not count either.
-        //
-        // Defensive, not load-bearing, on any log THIS parser recorded:
-        // `should_ignore_damage_event` already drops an unknown-source hit at
-        // the ingest door unless its victim is slot-keyed (the taken stream,
-        // gated above), so an enemy-on-enemy hit never reaches the raw log and
-        // this gate never fires. It is kept for the logs we do not control —
-        // legacy blobs, and event logs repopulated from another recorder —
-        // where such a hit can be present. And it is NOT implied by the taken
-        // check above, which gates only the conjunction of a slot-keyed victim
-        // AND an unknown source, so removing it would leak on exactly those
-        // logs.
-        if matches!(
-            CharacterType::from_hash(event.source.parent_actor_type),
-            CharacterType::Unknown(_)
-        ) {
-            continue;
-        }
-        accumulate_enemy_series(
-            &mut series,
-            EnemyType::from_hash(event.target.parent_actor_type),
-            ((timestamp - start_time) / interval) as usize,
-            event.damage.max(0) as i64,
-            chart_len,
-        );
-    }
-    rank_and_cap_enemy_series(&mut series, "enemy received chart");
-    series
-}
-
 /// Build the per-player stun chart: stun applied per bucket, keyed by actor
 /// index.
 ///
 /// Not a clone of [`build_player_dps_chart`], because stun does not simply
 /// accumulate. It arrives by two independent paths that observe the SAME game
-/// accumulator — per-hit deltas on damage events (the solo path) and network
+/// accumulator â€” per-hit deltas on damage events (the solo path) and network
 /// stun messages (the online path, where the delta method structurally reads
-/// 0) — and the meter reconciles them with `max(delta_sum, message_sum)`, not a
+/// 0) â€” and the meter reconciles them with `max(delta_sum, message_sum)`, not a
 /// sum. Solo loopback fires both for one accrual, so adding them double-counts.
 ///
 /// `max` does not decompose per bucket (`max` of sums is not the sum of
 /// `max`es), so this walks the log once to learn which path won FOR EACH PLAYER
 /// and then buckets only that path. The series therefore sums to exactly the
-/// `total_stun_value` the table reports — a chart's area cannot disagree with
+/// `total_stun_value` the table reports â€” a chart's area cannot disagree with
 /// the row total it sits under.
 ///
 /// Every gate the reparse loop applies is mirrored here: phantom and filter
@@ -2375,7 +2153,7 @@ pub fn build_player_stun_chart(
         }
     }
 
-    // Per player, keep whichever path saw the accrual — the bucketed mirror of
+    // Per player, keep whichever path saw the accrual â€” the bucketed mirror of
     // `PlayerState::refresh_total_stun`.
     player_indices
         .iter()
@@ -2399,9 +2177,9 @@ pub fn build_player_stun_chart(
 /// Within a bucket the last report wins. Old logs carry no HP data and yield
 /// no series.
 ///
-/// `segments` MUST be [`segment_targets`] of the same `events`/`start_time` —
+/// `segments` MUST be [`segment_targets`] of the same `events`/`start_time` â€”
 /// sharing the caller's segmentation (rather than recomputing it) is what
-/// guarantees the 1:1 chart↔dropdown parity.
+/// guarantees the 1:1 chartâ†”dropdown parity.
 pub fn build_target_hp_charts(
     events: &[(i64, Message)],
     segments: &[TargetSegment],
@@ -2434,7 +2212,7 @@ pub fn build_target_hp_charts(
             continue;
         }
         // Newest matching segment wins. A respawn boundary gives the closing segment an
-        // `end_ms` equal to the opening one's `start_ms`, and both bounds are inclusive —
+        // `end_ms` equal to the opening one's `start_ms`, and both bounds are inclusive â€”
         // scanning forward charted the new wave's first (near-full) report onto the dead
         // wave's line, which reads as a heal.
         let Some(position) = positions_by_id
@@ -2469,42 +2247,10 @@ pub fn build_target_hp_charts(
     charts
 }
 
-/// One band of the analysis view's ability drill-down chart: what one breakdown
-/// row of one player dealt per bucket.
-///
-/// Keyed exactly as `skill_breakdown` keys its rows — same action, same child
-/// character — so a band always corresponds to a row of the table beneath it,
-/// and the frontend can fold bands into skill groups with the same rule it
-/// folds rows by. The raw key, not the group: grouping is a display concern the
-/// parser has never known about, and folding a sum is lossless while splitting
-/// one is not.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AbilityChartSeries {
-    pub action_type: ActionType,
-    pub child_character_type: CharacterType,
-    pub values: Vec<i32>,
-}
-
-/// One band of the target drill-down chart: what one pinned ability dealt to one
-/// spawn segment per bucket.
-///
-/// Carries the segment's `instance` rather than merging same-type spawns, so a
-/// band lines up with the target dropdown, the enemy-HP chart above it and the
-/// target pin. Merging down to the type is something the frontend can still do;
-/// splitting a merged series is not.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TargetChartSeries {
-    pub enemy_type: EnemyType,
-    pub instance: u32,
-    pub values: Vec<i32>,
-}
-
-/// The pre-remap half of the gate chain [`counted_hits`] and the analysis
-/// view's [`groups::aggregate_groups`] share: phantom targets and the
+/// The pre-remap half of the gate chain the analysis view's
+/// [`groups::aggregate_groups`] applies: phantom targets and the
 /// contested-source exclusion filter. Split from [`bucket_for`] because a
-/// caller's own ability narrowing belongs BETWEEN these two halves — it must
+/// caller's own ability narrowing belongs BETWEEN these two halves â€” it must
 /// see the raw event (the remap never touches `action_id`, but it does
 /// rewrite `source`, which a source narrowing downstream must see remapped).
 fn survives_shared_gates(
@@ -2532,191 +2278,6 @@ fn bucket_for(
     (bucket < chart_len).then_some(bucket)
 }
 
-/// The hits from one source that a drill-down chart counts, in log order, as
-/// `(position in the log, bucket, remapped event)`.
-///
-/// The gate chain the drill charts share, written once (see
-/// [`survives_shared_gates`]/[`bucket_for`]): phantom targets, the
-/// contested-source filter, the optional ability pin, the dragon-form remap,
-/// the target spans and the bucket bounds. Each chart's own docs promise that
-/// its area equals the total the table reports — a promise only as good as
-/// these gates agreeing, which hand-kept copies of them cannot guarantee.
-///
-/// `ability` is applied BEFORE the remap, which is safe because the remap
-/// rewrites only the event's source, never its `action_id` — and it keeps the
-/// clone off the hits the pin rejects.
-#[allow(clippy::too_many_arguments)]
-fn counted_hits<'a>(
-    events: &'a [(i64, Message)],
-    player_data: &'a [Option<PlayerData>; 4],
-    source_index: u32,
-    ability: Option<ActionType>,
-    start_time: i64,
-    interval: i64,
-    chart_len: usize,
-    target_spans: &'a [TargetSpan],
-    filters: MeterFilters,
-) -> impl Iterator<Item = (usize, usize, DamageEvent)> + 'a {
-    let phantoms = PhantomTargets::learned_from(events.iter());
-
-    events
-        .iter()
-        .enumerate()
-        .filter_map(move |(position, (timestamp, event))| {
-            let Message::DamageEvent(damage_event) = event else {
-                return None;
-            };
-
-            if !survives_shared_gates(damage_event, &phantoms, filters) {
-                return None;
-            }
-            if ability.is_some_and(|pinned| damage_event.action_id != pinned) {
-                return None;
-            }
-
-            let damage_event = remap_dragon_form(player_data, damage_event);
-            if damage_event.source.parent_index != source_index {
-                return None;
-            }
-
-            let rel_ts = timestamp - start_time;
-            let bucket = bucket_for(rel_ts, &damage_event, target_spans, interval, chart_len)?;
-
-            Some((position, bucket, damage_event))
-        })
-}
-
-/// Damage buckets for one player, split by breakdown row.
-///
-/// Every gate the meter applies is applied here too — see [`counted_hits`] — so
-/// the chart's area equals the total the table reports. Bands come back largest
-/// first, which is also the table's order.
-///
-/// `chart_len` must be sized from the FULL log duration, exactly as
-/// [`build_player_dps_chart`] requires: a bucket index IS the elapsed second.
-#[allow(clippy::too_many_arguments)]
-pub fn build_ability_damage_chart(
-    events: &[(i64, Message)],
-    player_data: &[Option<PlayerData>; 4],
-    source_index: u32,
-    start_time: i64,
-    interval: i64,
-    chart_len: usize,
-    target_spans: &[TargetSpan],
-    filters: MeterFilters,
-) -> Vec<AbilityChartSeries> {
-    // One keying per call: it is stateful and must see this player's hits in log
-    // order, which is exactly what walking the log once gives it.
-    let mut keying = player_state::BreakdownKeying::default();
-    let mut series: Vec<AbilityChartSeries> = Vec::new();
-
-    for (_, bucket, damage_event) in counted_hits(
-        events,
-        player_data,
-        source_index,
-        None,
-        start_time,
-        interval,
-        chart_len,
-        target_spans,
-        filters,
-    ) {
-        let (action_type, child_character_type) = keying.key_for(&damage_event);
-        let found = series.iter_mut().find(|s| {
-            s.action_type == action_type && s.child_character_type == child_character_type
-        });
-        let band = match found {
-            Some(band) => band,
-            None => {
-                series.push(AbilityChartSeries {
-                    action_type,
-                    child_character_type,
-                    values: vec![0; chart_len],
-                });
-                series.last_mut().expect("band pushed just above")
-            }
-        };
-        band.values[bucket] += damage_event.damage;
-    }
-
-    // Stable, so bands with equal totals keep the order they first landed in.
-    series
-        .sort_by_key(|band| std::cmp::Reverse(band.values.iter().map(|v| *v as i64).sum::<i64>()));
-    series
-}
-
-/// Damage buckets for one player's one ability, split by the enemy spawn it hit.
-///
-/// `segments`/`assignment` MUST come from [`segment_targets_indexed`] over the
-/// same events: sharing the segmentation is what guarantees a band and a
-/// dropdown entry mean the same enemy. Time cannot substitute for it — a phase
-/// change opens a segment at the same millisecond the outgoing one ends.
-///
-/// The ability is matched on the RAW `action_id`, the same rule
-/// [`matches_selection`] applies to the derived state, so this chart and the
-/// table beneath it always agree about what is pinned.
-///
-/// Capped at [`HP_CHART_MAX_SERIES`] like the HP chart, for the same reason:
-/// one summon wave can spawn a dozen pools. What the cap drops is logged rather
-/// than silently truncated.
-#[allow(clippy::too_many_arguments)]
-pub fn build_target_damage_chart(
-    events: &[(i64, Message)],
-    player_data: &[Option<PlayerData>; 4],
-    segments: &[TargetSegment],
-    assignment: &[Option<usize>],
-    source_index: u32,
-    ability: ActionType,
-    start_time: i64,
-    interval: i64,
-    chart_len: usize,
-    target_spans: &[TargetSpan],
-    filters: MeterFilters,
-) -> Vec<TargetChartSeries> {
-    let mut values_by_segment: Vec<Option<Vec<i32>>> = vec![None; segments.len()];
-
-    for (position, bucket, damage_event) in counted_hits(
-        events,
-        player_data,
-        source_index,
-        Some(ability),
-        start_time,
-        interval,
-        chart_len,
-        target_spans,
-        filters,
-    ) {
-        let Some(Some(segment)) = assignment.get(position) else {
-            continue;
-        };
-        let band = values_by_segment[*segment].get_or_insert_with(|| vec![0; chart_len]);
-        band[bucket] += damage_event.damage;
-    }
-
-    let mut charts: Vec<TargetChartSeries> = values_by_segment
-        .into_iter()
-        .enumerate()
-        .filter_map(|(index, values)| {
-            values.map(|values| TargetChartSeries {
-                enemy_type: segments[index].enemy_type,
-                instance: segments[index].instance,
-                values,
-            })
-        })
-        .collect();
-
-    charts
-        .sort_by_key(|band| std::cmp::Reverse(band.values.iter().map(|v| *v as i64).sum::<i64>()));
-    if charts.len() > HP_CHART_MAX_SERIES {
-        log::info!(
-            "target drill chart: showing the {HP_CHART_MAX_SERIES} biggest of {} spawns hit",
-            charts.len()
-        );
-        charts.truncate(HP_CHART_MAX_SERIES);
-    }
-    charts
-}
-
 /// The parser for the encounter.
 #[derive(Debug, Serialize, Deserialize, Default)]
 pub struct Parser {
@@ -2735,7 +2296,7 @@ pub struct Parser {
     pub filters: MeterFilters,
 
     /// Which source actors and abilities the quest view's selector bar has
-    /// pinned. Skipped for the same reason as [`Self::filters`] — it is what
+    /// pinned. Skipped for the same reason as [`Self::filters`] â€” it is what
     /// someone is currently looking at, not something about the fight.
     /// [`Default`] is every dimension unpinned, so the live path and every
     /// caller that never sets it derive the whole encounter.
@@ -2785,14 +2346,14 @@ pub struct Parser {
     /// first completed save after a quest load and stamped onto every later
     /// normal save, until a boundary that implies leaving the chain (quest
     /// load, wipe/retire, training, Conflux) clears it. Repeat runs are
-    /// exactly the runs that start without a quest load in between — the game
+    /// exactly the runs that start without a quest load in between â€” the game
     /// skips `on_load_quest_state` on Repeat Quest.
     #[serde(skip)]
     repeat_chain_anchor: Option<i64>,
 
     /// The party's verdicts as last computed, so the per-hit identity path can
     /// re-broadcast them without re-auditing four builds. Recomputed only when
-    /// the party actually changes — see [`Parser::insert_player_data`].
+    /// the party actually changes â€” see [`Parser::insert_player_data`].
     #[serde(skip)]
     last_party_legality: [Vec<crate::legality::Finding>; 4],
 }
@@ -2843,7 +2404,7 @@ impl Parser {
 
     /// [`Self::reparse`] restricted to a window: the derived state covers only
     /// events inside `[from_ms, up_to_ms]` (both relative to the first event,
-    /// `None` = unbounded). Drives the quest-details window scrubber — the
+    /// `None` = unbounded). Drives the quest-details window scrubber â€” the
     /// derived start time moves to the window start, so DPS and stun/s are
     /// computed over the window's duration, not the full fight's.
     ///
@@ -2874,7 +2435,7 @@ impl Parser {
         self.phantom_targets = PhantomTargets::learned_from(self.encounter.event_log());
         self.derived_state = Default::default();
         // `Default` means Stopped, but a reparse says nothing about whether the
-        // fight is over — the live path reparses on a filter toggle mid-fight.
+        // fight is over â€” the live path reparses on a filter toggle mid-fight.
         // `ensure_encounter_started` only runs at the START of an encounter, so
         // without this the overlay would render the rest of the fight as
         // finished (frozen clock, latched party).
@@ -2903,10 +2464,10 @@ impl Parser {
             // never reaches `process_damage_event` for an excluded hit and so
             // never moves the window from one.
             if let Message::DamageEvent(event) = event {
-                // Incoming (enemy→party) hits have their own accumulation: no
+                // Incoming (enemyâ†’party) hits have their own accumulation: no
                 // window extension (they never anchor or stretch the DPS
                 // denominator), no phantom/exclusion filters and no target or
-                // ability pins — the victim is a player, not a dropdown target.
+                // ability pins â€” the victim is a player, not a dropdown target.
                 if is_damage_taken_event(event) {
                     self.derived_state.process_damage_taken_event(event);
                     continue;
@@ -3020,10 +2581,10 @@ impl Parser {
         }
     }
 
-    /// Duration of the FULL raw event log (first event → last event, ms, min 1),
+    /// Duration of the FULL raw event log (first event â†’ last event, ms, min 1),
     /// independent of any scrub cutoff on the derived state. Anything that walks
     /// the full event log (the quest-details charts) MUST size its buffers from
-    /// this — `derived_state.duration()` shrinks under a scrub cutoff and made
+    /// this â€” `derived_state.duration()` shrinks under a scrub cutoff and made
     /// the full-log walks index out of bounds.
     pub fn full_log_duration(&self) -> i64 {
         self.encounter
@@ -3090,12 +2651,12 @@ impl Parser {
     }
 
     /// Handles the quest-load boundary (v2.0.2: fired by OnLoadQuestHook when the NEXT
-    /// quest loads). If the current encounter was in progress — a quest that failed or
-    /// was retired emits no result screen, so it is still open here — stop it and save
+    /// quest loads). If the current encounter was in progress â€” a quest that failed or
+    /// was retired emits no result screen, so it is still open here â€” stop it and save
     /// it under the quest id it was stamped with at ITS OWN load. Only afterwards stamp
     /// the event's quest id, which is the INCOMING quest's (the hooked loader reads
     /// mgr+0xDC8 to look up the quest being loaded, so the slot is already repopulated
-    /// when the hook reads it) — stamping first labeled a failed quest's log with the
+    /// when the hook reads it) â€” stamping first labeled a failed quest's log with the
     /// quest that was just started.
     pub fn on_area_enter_event(&mut self, event: AreaEnterEvent) {
         // Leaving to a normal area ends any active Conflux run (the common case the manager
@@ -3103,7 +2664,7 @@ impl Parser {
         // stamped with its run_id/room_index and writes room_count/duration/completed, so we
         // must NOT then also save it as a normal (run_id-null) encounter below.
         if self.active_run_id.is_some() {
-            // Left Conflux for a normal area → run ended, but not via the reward path.
+            // Left Conflux for a normal area â†’ run ended, but not via the reward path.
             self.finalize_active_run(false);
         } else if self.status == ParserStatus::InProgress {
             self.update_status(ParserStatus::Stopped);
@@ -3111,14 +2672,14 @@ impl Parser {
         } else {
             // Idle: no fight to end (any prior one is already saved). Clear the
             // stale derived state so the emitted Stopped encounter reads empty
-            // (total_damage 0) — that's how the overlay tells idle from a result.
+            // (total_damage 0) â€” that's how the overlay tells idle from a result.
             self.reset();
             self.update_status(ParserStatus::Stopped);
         }
 
         // Fresh encounter: stamp the incoming quest (0 = guarded read failed, keep it
         // unknown rather than storing a bogus id). quest_timer is only ever written by
-        // the completion path — clear it so a later failed quest can't inherit it.
+        // the completion path â€” clear it so a later failed quest can't inherit it.
         self.encounter.quest_id =
             (event.last_known_quest_id != 0).then_some(event.last_known_quest_id);
         self.encounter.quest_timer = None;
@@ -3134,7 +2695,7 @@ impl Parser {
         }
     }
 
-    /// Handles one tick of the in-game quest timer — the clock the result
+    /// Handles one tick of the in-game quest timer â€” the clock the result
     /// screen reports as the clear time.
     ///
     /// This is display data only; DPS is measured against wall clock. Its value
@@ -3143,7 +2704,7 @@ impl Parser {
     /// leave it blank.
     ///
     /// It lives on the encounter rather than in the raw event log because the
-    /// encounter is what gets serialised — the log would only be re-deriving a
+    /// encounter is what gets serialised â€” the log would only be re-deriving a
     /// field that is already stored.
     pub fn on_quest_elapsed_time(&mut self, event: QuestElapsedTimeEvent) {
         self.record_in_game_time(event.elapsed_time_in_secs);
@@ -3168,10 +2729,10 @@ impl Parser {
     pub fn on_quest_complete_event(&mut self, event: QuestCompleteEvent) {
         // Rooms and runs have their own save path (on_conflux_room_enter /
         // finalize_active_run), so a completion during an active run must not save the
-        // room as a normal quest log — that would double-count it. But the hook only
+        // room as a normal quest log â€” that would double-count it. But the hook only
         // forwards genuine type-5 result screens, so seeing one mid-run means the run
-        // was cleared — record that for finalize (the manager dtor rarely fires, and
-        // the usual end path — exiting to town — can't tell cleared from abandoned).
+        // was cleared â€” record that for finalize (the manager dtor rarely fires, and
+        // the usual end path â€” exiting to town â€” can't tell cleared from abandoned).
         if self.active_run_id.is_some() {
             self.active_run_completed = true;
             return;
@@ -3220,7 +2781,7 @@ impl Parser {
         }
 
         // v2.0.2: the area-enter hook (the old between-quest wipe point) no longer
-        // installs, so the quest boundary is where stale identities must die — actor
+        // installs, so the quest boundary is where stale identities must die â€” actor
         // indices get reused across quests, and entries carried over would attach the
         // previous quest's names to the next quest's actors. Cleared AFTER the save
         // above (the save reads player_data for the p1..p4 columns); every player's
@@ -3229,7 +2790,7 @@ impl Parser {
 
         // A Repeat Quest chain never revisits the quest-load boundary, so per-run
         // state must also die here: the next chained run records its own clear
-        // time (keep-the-max made nine 109–137s clears all store a stale 142),
+        // time (keep-the-max made nine 109â€“137s clears all store a stale 142),
         // and a wipe on a later run must not read as completed.
         self.encounter.quest_timer = None;
         self.encounter.quest_completed = false;
@@ -3273,7 +2834,7 @@ impl Parser {
     }
 
     /// Handles the retire/fail boundary (v2.0.2): fired the moment the player
-    /// confirms retire/abandon (the game's retire-select flag hook) — quests that
+    /// confirms retire/abandon (the game's retire-select flag hook) â€” quests that
     /// end this way show no result screen, so without this the log sat open until
     /// the next quest load. Saves the in-progress encounter as not-completed under
     /// the quest id stamped at its own load (the event's id is only a fallback for
@@ -3304,7 +2865,7 @@ impl Parser {
         self.encounter.reset_player_data();
 
         // Quest boundary: the same per-run clears as the completion path. The
-        // wipe/retire also ends any Repeat Quest chain — continuing from here
+        // wipe/retire also ends any Repeat Quest chain â€” continuing from here
         // goes through a full quest load.
         self.encounter.quest_timer = None;
         self.encounter.quest_completed = false;
@@ -3313,8 +2874,8 @@ impl Parser {
 
     /// Starts the encounter (discard stale state, set the start time, mark
     /// InProgress) if it isn't already running. The encounter's opening event
-    /// is not necessarily a damage event — a dedicated guarder can perfect-guard
-    /// the boss's first attack before anyone deals damage — so every entry point
+    /// is not necessarily a damage event â€” a dedicated guarder can perfect-guard
+    /// the boss's first attack before anyone deals damage â€” so every entry point
     /// that records into the live encounter must call this before pushing.
     /// Otherwise the first damage event's `reset()` would wipe an earlier guard
     /// from both the meter and the raw event log (unrecoverable on reparse).
@@ -3340,9 +2901,9 @@ impl Parser {
         self.encounter
             .push_event(now, Message::DamageEvent(event.clone()));
 
-        // An incoming (enemy→party) hit: recorded above like any other event,
-        // then routed to the taken accumulation. The dealt pipeline below —
-        // phantom learning, exclusion filters, DPS windowing — is about hits
+        // An incoming (enemyâ†’party) hit: recorded above like any other event,
+        // then routed to the taken accumulation. The dealt pipeline below â€”
+        // phantom learning, exclusion filters, DPS windowing â€” is about hits
         // ON enemies and must never see it.
         if is_damage_taken_event(&event) {
             self.derived_state.process_damage_taken_event(&event);
@@ -3352,7 +2913,7 @@ impl Parser {
             return;
         }
 
-        // Recorded above, counted nowhere — same contract as the filters below.
+        // Recorded above, counted nowhere â€” same contract as the filters below.
         // Live can only recognise a marker from its first HP-bearing hit
         // onward, so a few earlier hits may sit in the overlay's running total;
         // the saved log is reparsed from the raw events and comes out exact.
@@ -3364,7 +2925,7 @@ impl Parser {
         // Recorded above, counted nowhere: the raw log is the source of truth,
         // so turning the setting on and reparsing brings this hit back. The
         // return also keeps it out of `derived_state.end_time`, matching the
-        // reparse path, and suppresses the `encounter-update` emit below —
+        // reparse path, and suppresses the `encounter-update` emit below â€”
         // nothing the frontend renders changed.
         if is_excluded(&event, &self.filters) {
             self.derived_state.note_excluded_damage(&event);
@@ -3394,7 +2955,7 @@ impl Parser {
         let character_type = CharacterType::from_hash(event.character_type);
 
         // Id's transformation resolves to the Id player (or is ignored when its
-        // slot belongs to someone else) — see slot_character_for_identity.
+        // slot belongs to someone else) â€” see slot_character_for_identity.
         let Some(character_type) = slot_character_for_identity(
             &self.encounter.player_data,
             character_type,
@@ -3450,7 +3011,7 @@ impl Parser {
         let character_type = CharacterType::from_hash(event.character_type);
 
         // Id's transformation resolves to the Id player (or is ignored when its
-        // slot belongs to someone else) — see slot_character_for_identity.
+        // slot belongs to someone else) â€” see slot_character_for_identity.
         let Some(character_type) = slot_character_for_identity(
             &self.encounter.player_data,
             character_type,
@@ -3583,7 +3144,7 @@ impl Parser {
     /// position == party slot.
     fn insert_player_data(&mut self, player_data: PlayerData, party_index: u8) {
         let Some(slot) = self.encounter.player_data.get_mut(party_index as usize) else {
-            // 0xFF placeholder or corrupt slot — never clobber a real slot with it.
+            // 0xFF placeholder or corrupt slot â€” never clobber a real slot with it.
             return;
         };
         // The identity path publishes on EVERY damage hit (`hooks/damage.rs`
@@ -3595,7 +3156,7 @@ impl Parser {
         // and runs every rule over them. That is gated on a real change here.
         //
         // The two emits are NOT gated. They are the frontend's only source for
-        // the party — `useMeter` holds no fetch for it — so a meter that mounts
+        // the party â€” `useMeter` holds no fetch for it â€” so a meter that mounts
         // or reloads mid-fight would otherwise draw four unnamed, uncoloured
         // rows for the rest of the quest, a settled party never changing again.
         // Note the guard is a derived `PartialEq` over structs holding `f32`
@@ -3626,7 +3187,7 @@ impl Parser {
         })
     }
 
-    /// Handles one per-hit stun message from the network stun-apply hook — the
+    /// Handles one per-hit stun message from the network stun-apply hook â€” the
     /// online stun source (the damage-event delta path reads 0 in lobbies).
     pub fn on_player_stun(&mut self, event: OnPlayerStunEvent) {
         let now = Utc::now().timestamp_millis();
@@ -3690,8 +3251,8 @@ impl Parser {
     /// intervals across a reparse.
     ///
     /// Recorded ONLY inside a running encounter, and deliberately never opens
-    /// one. Statuses fire constantly outside combat — party buffs on load,
-    /// food, regen in town — so starting a fight on one would fill the log with
+    /// one. Statuses fire constantly outside combat â€” party buffs on load,
+    /// food, regen in town â€” so starting a fight on one would fill the log with
     /// empty quests. The cost is a buff pre-cast before the first hit of a
     /// pull: it is dropped rather than back-dated, because `ensure_encounter_started`
     /// is what makes an event survive the first damage event's `reset()` and
@@ -3749,7 +3310,7 @@ impl Parser {
         }
     }
 
-    /// Handles one attributed SBA gain (local player only — see `SbaGainEvent`).
+    /// Handles one attributed SBA gain (local player only â€” see `SbaGainEvent`).
     pub fn on_sba_gain(&mut self, event: protocol::SbaGainEvent) {
         self.encounter.push_event(
             Utc::now().timestamp_millis(),
@@ -3862,7 +3423,7 @@ impl Parser {
     /// Persist the current encounter (if it has damage) and notify the frontend of
     /// the result via the `app` handle. Shared by the normal-area, game-disconnect,
     /// and Conflux-room-enter save points, which all end an in-progress normal
-    /// encounter the same way. Does not touch parser status — callers own that.
+    /// encounter the same way. Does not touch parser status â€” callers own that.
     fn save_and_emit_encounter(&mut self) {
         if !self.has_damage() {
             return;
@@ -3891,15 +3452,15 @@ impl Parser {
             return true;
         }
 
-        // Enemy→party hits are the damage-taken stream: recorded and derived,
+        // Enemyâ†’party hits are the damage-taken stream: recorded and derived,
         // never dropped for their unknown source.
         if is_damage_taken_event(event) {
             return false;
         }
 
         // Hand-listed non-enemy actors (Eugen's Grenade, skill-spawned markers).
-        // The learned tiny-HP rule can't run here — it needs an HP read this
-        // event may not carry — so it is applied on the derive path instead,
+        // The learned tiny-HP rule can't run here â€” it needs an HP read this
+        // event may not carry â€” so it is applied on the derive path instead,
         // which is also what makes it retroactive for already-recorded logs.
         if is_excluded_target_type(event) {
             return true;
@@ -3916,8 +3477,8 @@ impl Parser {
 
     /// The game process closed (named pipe disconnected). The parser instance is
     /// dropped right after, so anything unsaved here is lost. An abandoned quest
-    /// (retire → town → quit) emits NO result screen and never reaches another
-    /// quest-load boundary — this is its only save point.
+    /// (retire â†’ town â†’ quit) emits NO result screen and never reaches another
+    /// quest-load boundary â€” this is its only save point.
     pub fn on_game_disconnect(&mut self) {
         if self.active_run_id.is_some() {
             // Mid-Conflux quit: saves the in-progress room and closes the run row.
@@ -3958,7 +3519,7 @@ impl Parser {
     ///
     /// Run identity comes from `manager_ptr`: the first room, or any room whose manager
     /// differs from the active run's, OPENS a new run (the previous run, if any, is
-    /// finalized first — a run can end by the next run starting even if the dtor was
+    /// finalized first â€” a run can end by the next run starting even if the dtor was
     /// missed).
     pub fn on_conflux_room_enter(&mut self, event: ConfluxRoomEnterEvent) {
         let is_new_run =
@@ -3969,7 +3530,7 @@ impl Parser {
             // ended with no result screen (fail/retire) followed straight by a Conflux
             // run. The hook's quest-load boundary cut is deliberately suppressed on
             // room loads (it would finalize the run every room), so save the leftover
-            // as a normal log now — otherwise its damage merges into room 1.
+            // as a normal log now â€” otherwise its damage merges into room 1.
             if self.active_run_id.is_none() && self.status == ParserStatus::InProgress {
                 self.update_status(ParserStatus::Stopped);
                 self.save_and_emit_encounter();
@@ -3980,7 +3541,7 @@ impl Parser {
             self.repeat_chain_anchor = None;
 
             // Close out any prior run before opening the new one (defensive: normally the
-            // manager dtor already finalized it). Superseded by a new run → not "completed".
+            // manager dtor already finalized it). Superseded by a new run â†’ not "completed".
             if self.active_run_id.is_some() {
                 self.finalize_active_run(false);
             }
@@ -3988,7 +3549,7 @@ impl Parser {
         } else {
             // Same run, next room: save the room we were just recording, then advance the
             // index. The index advances for EVERY room transition, not only damage-bearing
-            // ones — a room where the player dealt no recorded damage (shop/rest/skipped)
+            // ones â€” a room where the player dealt no recorded damage (shop/rest/skipped)
             // produces no saved room row, but must still consume its own index so its
             // buffs (tagged with `active_room_index` in on_conflux_buff_acquired) don't
             // bleed onto the next room that DOES get saved.
@@ -4047,7 +3608,7 @@ impl Parser {
     /// The Conflux run ends (manager destroyed). Finalizes the active run.
     ///
     /// We deliberately do NOT require `event.manager_ptr == active_run_manager`: live logs
-    /// show the `EndlessModeQuestManager` dtor is unreliable — it fires rarely (≈once/session)
+    /// show the `EndlessModeQuestManager` dtor is unreliable â€” it fires rarely (â‰ˆonce/session)
     /// and when it does the freed pointer often does not match the manager the reception
     /// dispatcher reported for the active run (heap churn / a different manager object being
     /// torn down). Since only one run is ever active at a time, any manager-dtor is treated as
@@ -4057,7 +3618,7 @@ impl Parser {
         if self.active_run_id.is_none() {
             return;
         }
-        // The dtor is the run's natural end (reward/exit reached) → completed.
+        // The dtor is the run's natural end (reward/exit reached) â†’ completed.
         self.finalize_active_run(true);
     }
 
@@ -4066,7 +3627,7 @@ impl Parser {
     /// "next run started"/"left to a normal area" defensive paths.
     ///
     /// `completed` records whether the run reached its natural end vs. was ended by leaving
-    /// or being superseded by a new run — it drives the ✓ shown in the Conflux tab. Only the
+    /// or being superseded by a new run â€” it drives the âœ“ shown in the Conflux tab. Only the
     /// dtor path passes `true`, but a type-5 result screen observed mid-run
     /// (`active_run_completed`) also marks the run cleared regardless of the end path.
     fn finalize_active_run(&mut self, completed: bool) {
@@ -4242,13 +3803,13 @@ mod legality_save_tests {
     /// log view and the audit page never have to re-run the rules.
     ///
     /// Also pins the STAMP. Without it every freshly saved log would look
-    /// stale to the startup sweep and be re-audited on the next launch — the
+    /// stale to the startup sweep and be re-audited on the next launch â€” the
     /// sweep would never converge and the write here would be pointless work.
     /// Behemoth III with the boss-set Healing Cap Up at its top: +75% against
     /// a +50% ceiling, so both summon-bonus rules fire.
     fn illegal_player() -> PlayerData {
         let mut player = PlayerData {
-            display_name: "炎顺帝".to_string(),
+            display_name: "ç‚Žé¡ºå¸".to_string(),
             ..Default::default()
         };
         player.summons = vec![EquippedSummon {
@@ -4266,7 +3827,7 @@ mod legality_save_tests {
         let mut parser = super::tests::parser_with_memory_db();
 
         // Inside the audited window. The default is epoch 0, which the cutoff
-        // would skip — leaving this test green for the wrong reason.
+        // would skip â€” leaving this test green for the wrong reason.
         parser.derived_state.start_time = crate::legality::AUDIT_CUTOFF_MS;
         parser.encounter.player_data[2] = Some(illegal_player());
 
@@ -4279,7 +3840,7 @@ mod legality_save_tests {
         let stored = crate::db::legality::findings_for_log(conn, log_id).expect("read findings");
         assert_eq!(stored.len(), 2, "both summon-bonus rules should be stored");
         assert!(stored.iter().all(|row| row.player_index == 2));
-        assert!(stored.iter().all(|row| row.display_name == "炎顺帝"));
+        assert!(stored.iter().all(|row| row.display_name == "ç‚Žé¡ºå¸"));
 
         let stamp: Option<u32> = conn
             .query_row(
@@ -4296,7 +3857,7 @@ mod legality_save_tests {
     /// pre-cutoff start time is stamped current on the way in, so no sweep
     /// would ever revisit it and withdraw what the rules said about it.
     ///
-    /// It is still saved and still stamped — only the audit is skipped.
+    /// It is still saved and still stamped â€” only the audit is skipped.
     #[test]
     fn an_encounter_older_than_the_cutoff_is_saved_without_being_audited() {
         let mut parser = super::tests::parser_with_memory_db();
@@ -4378,7 +3939,7 @@ mod tests {
 
     /// The REAL migration list, not a hand-copied one. It used to be a copy,
     /// which meant a schema the save path depends on could be added without
-    /// these tests noticing — and the save path now also writes findings, so
+    /// these tests noticing â€” and the save path now also writes findings, so
     /// a copy would have been missing a whole table.
     pub(super) fn parser_with_memory_db() -> Parser {
         let mut conn = rusqlite::Connection::open_in_memory().unwrap();
@@ -4389,10 +3950,10 @@ mod tests {
         }
     }
 
-    /// Zeta's character hash — any real player hash works; an `Unknown` parent
+    /// Zeta's character hash â€” any real player hash works; an `Unknown` parent
     /// is dropped by `should_ignore_damage_event` on the live path.
     const PLAYER_HASH: u32 = 0x28AC1108;
-    /// So0300 "(Primal Burst) Catastrophe" — taken from the shared list rather
+    /// So0300 "(Primal Burst) Catastrophe" â€” taken from the shared list rather
     /// than restated, so a hash correction after a game patch reaches the tests.
     const PRIMAL_BURST_BODY: u32 = protocol::PRIMAL_BURST_BODY_HASHES[0];
 
@@ -4408,7 +3969,7 @@ mod tests {
 
     #[test]
     fn a_status_applied_outside_a_fight_does_not_open_an_encounter() {
-        // Statuses fire constantly in town — party buffs on load, food, regen.
+        // Statuses fire constantly in town â€” party buffs on load, food, regen.
         // Opening an encounter on one would fill the log with empty quests.
         let mut parser = Parser::default();
 
@@ -4608,301 +4169,6 @@ mod tests {
         assert_eq!(chart.len(), 1, "no series for anyone who took nothing");
     }
 
-    /// The taken drill chart: one band per (attacker, attack) hitting the
-    /// pinned victim, largest first, other victims' hits excluded.
-    #[test]
-    fn taken_ability_chart_bands_by_attacker_and_attack_for_the_victim() {
-        let mut other_victim = damage_taken_by_slot0(9001, 999);
-        other_victim.target.parent_index = protocol::player_slot_key(1);
-        let events = vec![
-            (
-                1_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
-            ),
-            (
-                1_500,
-                Message::DamageEvent(damage_taken_by_slot0(9001, 300)),
-            ),
-            (
-                3_000,
-                Message::DamageEvent(damage_taken_by_slot0(9001, 100)),
-            ),
-            (
-                3_000,
-                Message::DamageEvent(damage_taken_by_slot0(9002, 200)),
-            ),
-            (3_000, Message::DamageEvent(other_victim)),
-        ];
-
-        let bands =
-            build_taken_ability_chart(&events, protocol::player_slot_key(0), 1_000, 1_000, 3);
-
-        assert_eq!(bands.len(), 2);
-        assert_eq!(bands[0].action_id, ActionType::Normal(9001));
-        assert_eq!(bands[0].values, vec![300, 0, 100]);
-        assert_eq!(bands[1].action_id, ActionType::Normal(9002));
-        assert_eq!(bands[1].values, vec![0, 0, 200]);
-    }
-
-    /// Enemy-DEALT series: incoming events banded by ATTACKER type.
-    #[test]
-    fn enemy_dealt_chart_bands_attackers() {
-        let mut other_attacker = damage_taken_by_slot0(9001, 200);
-        other_attacker.source.actor_type = 0xBEEF_CAFE;
-        other_attacker.source.parent_actor_type = 0xBEEF_CAFE;
-        let events = vec![
-            (
-                1_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
-            ),
-            (
-                1_200,
-                Message::DamageEvent(damage_taken_by_slot0(9001, 300)),
-            ),
-            (3_000, Message::DamageEvent(other_attacker)),
-        ];
-
-        let bands = build_enemy_dealt_chart(&events, 1_000, 1_000, 3);
-
-        assert_eq!(bands.len(), 2);
-        assert_eq!(bands[0].enemy_type, EnemyType::from_hash(0xDEAD_BEEF));
-        assert_eq!(bands[0].values, vec![300, 0, 0]);
-        assert_eq!(bands[1].values, vec![0, 0, 200]);
-    }
-
-    /// The band cap keeps the BIGGEST attackers, not the first ones seen: the
-    /// sort has to happen before the truncate, and it has to rank by
-    /// whole-fight total rather than by whatever landed in one bucket.
-    #[test]
-    fn enemy_dealt_chart_caps_to_the_biggest_bands_not_the_earliest() {
-        // Two attackers more than the cap allows. Each opens with a chip hit in
-        // bucket 0 and lands its real damage in bucket 2, with the two ordered
-        // inversely: attacker 0 arrives first and leads bucket 0, the last
-        // attacker arrives last and wins the fight. So arrival order, bucket-0
-        // order and total order are three different rankings, and only the last
-        // one is the right answer.
-        const ATTACKERS: i32 = ENEMY_CHART_MAX_SERIES as i32 + 2;
-        let mut events: Vec<(i64, Message)> = Vec::new();
-        for i in 0..ATTACKERS {
-            for (timestamp, damage) in [(1_000, ATTACKERS - i), (3_000, (i + 1) * 10)] {
-                let mut hit = damage_taken_by_slot0(9001, damage);
-                hit.source.actor_type = 0xE000 + i as u32;
-                hit.source.parent_actor_type = 0xE000 + i as u32;
-                events.push((timestamp, Message::DamageEvent(hit)));
-            }
-        }
-
-        let bands = build_enemy_dealt_chart(&events, 1_000, 1_000, 3);
-
-        assert_eq!(bands.len(), ENEMY_CHART_MAX_SERIES);
-        // Biggest first, so the kept types run from the last attacker down —
-        // which is also the reverse of both arrival order and bucket-0 order.
-        let kept: Vec<EnemyType> = bands.iter().map(|band| band.enemy_type).collect();
-        let expected: Vec<EnemyType> = (2..ATTACKERS as u32)
-            .rev()
-            .map(|i| EnemyType::from_hash(0xE000 + i))
-            .collect();
-        assert_eq!(kept, expected, "the two weakest attackers are dropped");
-        assert_eq!(
-            bands[0].values,
-            vec![1, 0, ATTACKERS as i64 * 10],
-            "the biggest total is the smallest opener"
-        );
-    }
-
-    /// The invariant the whole enemy side of the analysis view rests on: a
-    /// chart band's total equals the table total the frontend ranks that enemy
-    /// type by. The two sides are computed by completely different code — the
-    /// tables fall out of the reparse loop, the chart builders walk the raw log
-    /// themselves — so every gate one applies the other has to apply too, and
-    /// nothing but a test can notice when that stops being true.
-    ///
-    /// One mixed log covers every gate at once: two enemy types taking party
-    /// damage, two attacker types dealing it, a phantom marker, an excluded
-    /// (Primal Burst) source, and an enemy-on-enemy hit.
-    #[test]
-    fn enemy_charts_agree_with_the_tables_they_decompose() {
-        /// An UNLISTED 1-HP marker (see `phantom_targets`). Deliberately not one
-        /// of `EXCLUDED_TARGET_TYPES`: a listed type is stopped at the ingest
-        /// door and never reaches either side, whereas this one is recorded and
-        /// then dropped by the learned rule on both paths — which is the gate
-        /// under test.
-        const MARKER: u32 = 0x60b55c0f;
-        /// The enemy `damage_from` already targets, named for the assertions.
-        const FIRST_ENEMY: u32 = 0x1234;
-        const SECOND_ENEMY: u32 = 0x5678;
-        /// The attacker `damage_taken_by_slot0` already carries.
-        const FIRST_ATTACKER: u32 = 0xDEAD_BEEF;
-        const SECOND_ATTACKER: u32 = 0xBEEF_CAFE;
-
-        let mut second_target = damage_from(PLAYER_HASH, 100, 400);
-        second_target.target.actor_type = SECOND_ENEMY;
-        second_target.target.parent_actor_type = SECOND_ENEMY;
-
-        let mut second_attacker = damage_taken_by_slot0(9002, 200);
-        second_attacker.source.actor_type = SECOND_ATTACKER;
-        second_attacker.source.parent_actor_type = SECOND_ATTACKER;
-
-        // Enemy hits enemy: the incoming fixture aimed at a raw enemy index
-        // instead of a party slot. Sized to be conspicuous — if it ever leaked
-        // through it would land on FIRST_ENEMY's band and swamp its 1_000.
-        let mut enemy_on_enemy = damage_taken_by_slot0(9003, 500_000);
-        enemy_on_enemy.target = Actor {
-            index: 9,
-            actor_type: FIRST_ENEMY,
-            parent_index: 9,
-            parent_actor_type: FIRST_ENEMY,
-        };
-
-        // Fed through the live ingest door rather than pushed straight into the
-        // raw log, so the log under test holds exactly what a real recording
-        // would hold — including the enemy-on-enemy hit's absence.
-        let mut parser = Parser::default();
-        for event in [
-            damage_from(PLAYER_HASH, 100, 1_000),
-            second_target,
-            damage_taken_by_slot0(9001, 300),
-            second_attacker,
-            damage_on_target(MARKER, 20, 546_000, Some(1)),
-            damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000),
-            enemy_on_enemy,
-        ] {
-            parser.on_damage_event(event);
-        }
-        assert_eq!(
-            parser.encounter.raw_event_log.len(),
-            6,
-            "six of the seven are recorded; the enemy-on-enemy hit is dropped \
-             at the door, which is why the chart's unknown-source gate only has \
-             to defend against logs this parser did not record"
-        );
-
-        parser.reparse();
-
-        // One bucket wide enough to swallow the whole fixture: this is about
-        // band TOTALS agreeing with row totals, and bucket geometry is covered
-        // by the sibling tests. `on_damage_event` stamps wall-clock times, so
-        // the fixture spans milliseconds, not the seconds a literal would.
-        let start_time = parser.start_time();
-        let received = build_enemy_received_chart(
-            &parser.encounter.raw_event_log,
-            start_time,
-            60_000,
-            2,
-            parser.filters,
-        );
-        let dealt = build_enemy_dealt_chart(&parser.encounter.raw_event_log, start_time, 60_000, 2);
-
-        // Damage Taken, enemy side: rows come from every player's per-skill
-        // target breakdown, folded by enemy type.
-        let table_received = fold_by_enemy_type(
-            parser
-                .derived_state
-                .party
-                .values()
-                .flat_map(|player| &player.skill_breakdown)
-                .flat_map(|skill| &skill.targets)
-                .map(|target| (target.enemy_type, target.total_damage)),
-        );
-        // Damage Done, enemy side: rows come from every player's damage-taken
-        // breakdown, folded by the attacker type that dealt it.
-        let table_dealt = fold_by_enemy_type(
-            parser
-                .derived_state
-                .party
-                .values()
-                .flat_map(|player| &player.damage_taken_breakdown)
-                .map(|row| (row.enemy_type, row.total_damage)),
-        );
-
-        // Spelled out rather than left implicit, so a fixture that silently
-        // stopped exercising a gate (say, the marker being dropped at the door
-        // by a future patch) fails here instead of passing vacuously on two
-        // equal-but-wrong sides.
-        assert_eq!(
-            table_received,
-            vec![
-                (EnemyType::from_hash(FIRST_ENEMY), 1_000),
-                (EnemyType::from_hash(SECOND_ENEMY), 400),
-            ],
-            "the marker, the Primal Burst and the enemy-on-enemy hit are all out \
-             of the table"
-        );
-        assert_eq!(
-            table_dealt,
-            vec![
-                (EnemyType::from_hash(FIRST_ATTACKER), 300),
-                (EnemyType::from_hash(SECOND_ATTACKER), 200),
-            ]
-        );
-
-        assert_eq!(
-            band_totals(&received),
-            table_received,
-            "the Damage Taken enemy chart must decompose exactly the table above it"
-        );
-        assert_eq!(
-            band_totals(&dealt),
-            table_dealt,
-            "the Damage Done enemy chart must decompose exactly the table above it"
-        );
-    }
-
-    /// Sum `(enemy_type, damage)` pairs into one total per type, biggest first.
-    ///
-    /// A `HashMap` would be the obvious shape, but `EnemyType` is neither `Hash`
-    /// nor `Ord`; a vector in the charts' own sort order costs nothing at these
-    /// sizes and lets the two sides be compared whole, ordering included.
-    fn fold_by_enemy_type(rows: impl Iterator<Item = (EnemyType, u64)>) -> Vec<(EnemyType, u64)> {
-        let mut totals: Vec<(EnemyType, u64)> = Vec::new();
-        for (enemy_type, damage) in rows {
-            match totals.iter_mut().find(|(kind, _)| *kind == enemy_type) {
-                Some((_, total)) => *total += damage,
-                None => totals.push((enemy_type, damage)),
-            }
-        }
-        totals.sort_by_key(|(_, total)| std::cmp::Reverse(*total));
-        totals
-    }
-
-    /// Each band's whole-fight total, in the shape [`fold_by_enemy_type`]
-    /// produces — the chart side of the invariant comparison.
-    fn band_totals(series: &[EnemySeries]) -> Vec<(EnemyType, u64)> {
-        series
-            .iter()
-            .map(|band| (band.enemy_type, band.values.iter().sum::<i64>() as u64))
-            .collect()
-    }
-
-    /// Enemy-RECEIVED series: player-dealt events banded by TARGET type;
-    /// incoming events never leak in.
-    #[test]
-    fn enemy_received_chart_bands_victims_of_party_damage() {
-        let mut second_target = damage_from(PLAYER_HASH, 100, 400);
-        second_target.target.actor_type = 0x5678;
-        second_target.target.parent_actor_type = 0x5678;
-        let events = vec![
-            (
-                1_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
-            ),
-            (2_000, Message::DamageEvent(second_target)),
-            (
-                2_000,
-                Message::DamageEvent(damage_taken_by_slot0(9001, 300)),
-            ),
-        ];
-
-        let bands = build_enemy_received_chart(&events, 1_000, 1_000, 3, MeterFilters::default());
-
-        assert_eq!(bands.len(), 2);
-        // damage_from targets 0x1234 (see its fixture); it leads with 1000.
-        assert_eq!(bands[0].enemy_type, EnemyType::from_hash(0x1234));
-        assert_eq!(bands[0].values, vec![1_000, 0, 0]);
-        assert_eq!(bands[1].enemy_type, EnemyType::from_hash(0x5678));
-        assert_eq!(bands[1].values, vec![0, 400, 0]);
-    }
-
     /// Two hits from the same enemy action fold into one breakdown row; a
     /// different attacker opens its own.
     #[test]
@@ -4968,7 +4234,7 @@ mod tests {
     #[test]
     fn enemy_to_enemy_damage_is_still_ignored() {
         // The same enemy-sourced hit aimed at another enemy (raw index, no
-        // slot key) must keep being dropped — only party victims are recorded.
+        // slot key) must keep being dropped â€” only party victims are recorded.
         let mut event = damage_taken_by_slot0(9001, 750);
         event.target.index = 9;
         event.target.actor_type = 0x1234;
@@ -5080,7 +4346,7 @@ mod tests {
 
     /// One charged Flamek Thunder as the game reports it: the hit that lands on
     /// the enemy plus the two identical hits on the 1-HP markers the cast spawns
-    /// (log 562, t+8784ms — all three at the same millisecond, same damage).
+    /// (log 562, t+8784ms â€” all three at the same millisecond, same damage).
     fn parser_with_a_phantom_cast() -> Parser {
         const MARKER: u32 = crate::parser::v1::phantom_targets::EXCLUDED_TARGET_TYPES[1];
         let mut parser = Parser::default();
@@ -5168,7 +4434,7 @@ mod tests {
 
     #[test]
     fn excluded_primal_burst_carries_its_stun_out_with_it() {
-        // The row is gone entirely, so its stun must go too — otherwise the
+        // The row is gone entirely, so its stun must go too â€” otherwise the
         // meter shows stun that no visible row accounts for. Asserted as a
         // comparison rather than an absolute: the exact stun a hit contributes
         // depends on the accumulator scaling, but including the burst must
@@ -5204,7 +4470,7 @@ mod tests {
         );
     }
 
-    /// [`damage_from`] with no per-hit stun delta — the online shape, where the
+    /// [`damage_from`] with no per-hit stun delta â€” the online shape, where the
     /// accumulator reads 0 and stun arrives as `OnPlayerStun` messages instead.
     fn stunless_damage_from(body: u32, action: u32, damage: i32) -> DamageEvent {
         DamageEvent {
@@ -5293,7 +4559,7 @@ mod tests {
         // Toggling a filter mid-fight reparses. `reparse` rebuilds derived state
         // from Default, whose status is Stopped, so without re-applying the
         // parser's own status the overlay would switch to its finished-fight
-        // rendering (frozen clock, latched party) for the rest of the fight —
+        // rendering (frozen clock, latched party) for the rest of the fight â€”
         // `ensure_encounter_started` never runs again inside one encounter.
         let mut parser = Parser::default();
         parser.on_damage_event(damage_from(PLAYER_HASH, 100, 1_000));
@@ -5455,7 +4721,7 @@ mod tests {
         );
     }
 
-    /// `damage_from`, but landing on a chosen enemy — the drill-down target
+    /// `damage_from`, but landing on a chosen enemy â€” the drill-down target
     /// chart is the only thing that cares which one was hit.
     fn damage_onto(target_index: u32, action: u32, damage: i32) -> DamageEvent {
         let mut event = damage_from(PLAYER_HASH, action, damage);
@@ -5465,125 +4731,12 @@ mod tests {
     }
 
     #[test]
-    fn ability_chart_splits_one_player_by_breakdown_row() {
-        let events = vec![
-            (
-                1_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
-            ),
-            (
-                2_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 200, 300)),
-            ),
-            (
-                3_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 500)),
-            ),
-        ];
-
-        let series = build_ability_damage_chart(
-            &events,
-            &Default::default(),
-            0,
-            1_000,
-            1_000,
-            3,
-            &[],
-            MeterFilters::default(),
-        );
-
-        assert_eq!(series.len(), 2, "one band per ability");
-        // Largest first: action 100 totals 1500 against action 200's 300.
-        assert_eq!(series[0].action_type, ActionType::Normal(100));
-        assert_eq!(series[0].values, vec![1_000, 0, 500]);
-        assert_eq!(series[1].action_type, ActionType::Normal(200));
-        assert_eq!(series[1].values, vec![0, 300, 0]);
-    }
-
-    #[test]
-    fn ability_chart_area_equals_the_players_total() {
-        // The invariant that makes the chart trustworthy: a band's area is part
-        // of the row total beneath it, so the whole stack is the player total.
-        let mut parser = Parser::default();
-        for (timestamp, action, damage) in
-            [(1_000, 100, 1_000), (2_000, 200, 300), (2_500, 100, 500)]
-        {
-            parser.encounter.raw_event_log.push((
-                timestamp,
-                Message::DamageEvent(damage_from(PLAYER_HASH, action, damage)),
-            ));
-        }
-        parser.reparse();
-
-        let series = build_ability_damage_chart(
-            &parser.encounter.raw_event_log,
-            &parser.encounter.player_data,
-            0,
-            parser.start_time(),
-            1_000,
-            3,
-            &[],
-            MeterFilters::default(),
-        );
-
-        let charted: i64 = series
-            .iter()
-            .flat_map(|band| band.values.iter())
-            .map(|value| *value as i64)
-            .sum();
-        let table_total = parser
-            .derived_state
-            .party
-            .values()
-            .next()
-            .unwrap()
-            .total_damage;
-        assert_eq!(charted, table_total as i64);
-    }
-
-    #[test]
-    fn ability_chart_drops_other_players_and_filtered_hits() {
-        let mut other = damage_from(PLAYER_HASH, 100, 9_999);
-        other.source.parent_index = 3;
-
-        let events = vec![
-            (
-                1_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
-            ),
-            (1_500, Message::DamageEvent(other)),
-            (
-                2_000,
-                Message::DamageEvent(damage_from(
-                    PRIMAL_BURST_BODY,
-                    SUMMON_ATTACK_ACTION_ID,
-                    3_000,
-                )),
-            ),
-        ];
-
-        let series = build_ability_damage_chart(
-            &events,
-            &Default::default(),
-            0,
-            1_000,
-            1_000,
-            2,
-            &[],
-            MeterFilters::default(),
-        );
-
-        assert_eq!(series.len(), 1);
-        assert_eq!(series[0].values, vec![1_000, 0]);
-    }
-
-    #[test]
     fn a_spawn_records_the_actor_index_the_status_events_use() {
         // A damage event names its target twice: `index` is the target's
         // instance pointer folded to 32 bits, which is what tells two
         // simultaneous same-kind actors apart, and `parent_index` is the game's
-        // own actor index. A status apply can only report the second — the
-        // status hook sees the actor, not the damage instance — so the segment
+        // own actor index. A status apply can only report the second â€” the
+        // status hook sees the actor, not the damage instance â€” so the segment
         // has to keep it or an enemy's debuffs can never be matched to it.
         //
         // The real values from log 1614, where all 11 enemy-held intervals
@@ -5600,64 +4753,6 @@ mod tests {
             segments[0].actor_index, 977_212_104,
             "the bridge to the status events"
         );
-    }
-
-    #[test]
-    fn target_chart_splits_one_ability_by_spawn() {
-        let events = vec![
-            (1_000, Message::DamageEvent(damage_onto(9, 100, 1_000))),
-            (2_000, Message::DamageEvent(damage_onto(11, 100, 400))),
-            // A different ability: pinning action 100 must exclude it.
-            (2_000, Message::DamageEvent(damage_onto(9, 200, 7_777))),
-            (3_000, Message::DamageEvent(damage_onto(9, 100, 250))),
-        ];
-        let (segments, assignment) = segment_targets_indexed(&events, 1_000);
-
-        let series = build_target_damage_chart(
-            &events,
-            &Default::default(),
-            &segments,
-            &assignment,
-            0,
-            ActionType::Normal(100),
-            1_000,
-            1_000,
-            3,
-            &[],
-            MeterFilters::default(),
-        );
-
-        assert_eq!(series.len(), 2, "one band per spawn hit");
-        assert_eq!(series[0].values, vec![1_000, 0, 250]);
-        assert_eq!(series[1].values, vec![0, 400, 0]);
-        // Instances come from the shared segmentation, so a band names the same
-        // enemy the target dropdown does.
-        assert_eq!(
-            series.iter().map(|s| s.instance).collect::<Vec<_>>(),
-            vec![segments[0].instance, segments[1].instance]
-        );
-    }
-
-    #[test]
-    fn target_chart_is_empty_when_the_ability_never_landed() {
-        let events = vec![(1_000, Message::DamageEvent(damage_onto(9, 100, 1_000)))];
-        let (segments, assignment) = segment_targets_indexed(&events, 1_000);
-
-        let series = build_target_damage_chart(
-            &events,
-            &Default::default(),
-            &segments,
-            &assignment,
-            0,
-            ActionType::Normal(999),
-            1_000,
-            1_000,
-            1,
-            &[],
-            MeterFilters::default(),
-        );
-
-        assert!(series.is_empty(), "no band for an ability with no hits");
     }
 
     #[test]
@@ -5680,7 +4775,7 @@ mod tests {
         );
 
         // Player 0 dealt the damage but has no row requested, so it is dropped
-        // rather than invented — same as the pre-extraction loop.
+        // rather than invented â€” same as the pre-extraction loop.
         assert_eq!(chart.len(), 1);
         assert_eq!(chart.get(&7).unwrap(), &vec![0]);
     }
@@ -5699,7 +4794,7 @@ mod tests {
     #[test]
     fn stun_chart_buckets_the_delta_path_when_it_is_the_one_that_saw_the_accrual() {
         // `damage_from` carries stun_value 50.0, so two hits give a delta sum of
-        // 100 against a message sum of 0 — the solo case.
+        // 100 against a message sum of 0 â€” the solo case.
         let events = vec![
             (
                 1_000,
@@ -5754,7 +4849,7 @@ mod tests {
     #[test]
     fn stun_chart_never_sums_the_two_paths_together() {
         // Solo loopback fires BOTH paths for the same accrual. total_stun_value
-        // is max(delta, messages), so the chart must pick a path — summing would
+        // is max(delta, messages), so the chart must pick a path â€” summing would
         // draw double the stun the table beneath it reports.
         let events = vec![
             (
@@ -5923,7 +5018,7 @@ mod tests {
         assert_eq!(
             parser.encounter.raw_event_log.len(),
             2,
-            "the raw log keeps everything — it is the source of truth"
+            "the raw log keeps everything â€” it is the source of truth"
         );
         assert_eq!(parser.derived_state.total_damage, 1_000);
         let player = parser.derived_state.party.get(&0).unwrap();
@@ -5993,7 +5088,7 @@ mod tests {
         }
     }
 
-    /// A fight that never reaches a result screen — a wipe, a retire — still
+    /// A fight that never reaches a result screen â€” a wipe, a retire â€” still
     /// gets an in-game time, because the ticker reported one while it ran.
     /// Sourcing it only from the completion event would leave every failed
     /// attempt blank, which is most of a progression session.
@@ -6072,7 +5167,7 @@ mod tests {
     }
 
     /// A guard is a real encounter event and belongs in the log, but it is not
-    /// damage — dividing a fight's damage by a window that opened before anyone
+    /// damage â€” dividing a fight's damage by a window that opened before anyone
     /// attacked understates DPS. Lucilius is the worst case: Paradise Lost is
     /// ~30s of guarding and dodging before the first hit lands.
     #[test]
@@ -6136,7 +5231,7 @@ mod tests {
     }
 
     /// The scrubber picks the window explicitly, so the first-hit anchor must
-    /// leave it alone — otherwise dragging the handle to a quiet stretch would
+    /// leave it alone â€” otherwise dragging the handle to a quiet stretch would
     /// silently snap back to the first hit inside it.
     #[test]
     fn an_explicit_scrub_window_keeps_its_own_start() {
@@ -6245,7 +5340,7 @@ mod tests {
         assert_eq!(state.total_stun_value, 55.0);
 
         // Solo shape: the hit stun ALSO arrives duplicated as a message (30),
-        // but the guard stun exists only on the delta path — the max() dedupe
+        // but the guard stun exists only on the delta path â€” the max() dedupe
         // must not lose it.
         state.process_stun_message(0, 0xF000_0000, 30.0);
         let player = state.party.get(&0xF000_0000).expect("player row");
@@ -6261,7 +5356,7 @@ mod tests {
     }
 
     /// A non-guard stun-effect proc (Eugen's sticky grenade) routes to the
-    /// player's own `StunEffect` row — never Perfect Guard — and one landing
+    /// player's own `StunEffect` row â€” never Perfect Guard â€” and one landing
     /// before the player's first damage event folds in on row creation.
     #[test]
     fn stun_effect_routes_to_its_own_row_and_survives_pending() {
@@ -6302,7 +5397,7 @@ mod tests {
 
     /// Every Perfect Guard also materializes as a zero-damage breakdown row on
     /// the guarding player (name via `ActionType::PerfectGuard`), counting
-    /// guards as hits and carrying only stun — including guards held pending
+    /// guards as hits and carrying only stun â€” including guards held pending
     /// before the player's first damage event.
     #[test]
     fn perfect_guard_stun_creates_a_breakdown_row_counting_guards() {
@@ -6440,7 +5535,7 @@ mod tests {
 
     /// A guarded Quickening (The World) is counted as its own hits-only
     /// breakdown row (`ActionType::PerfectGuardQuickening`): no stun, no
-    /// damage, and no contribution to any stun/damage total — including guards
+    /// damage, and no contribution to any stun/damage total â€” including guards
     /// held pending before the player's first damage event.
     #[test]
     fn perfect_guard_quickening_counts_hits_only() {
@@ -6475,7 +5570,7 @@ mod tests {
     }
 
     /// A guard from a player who never attacks must still show. Identity
-    /// events land at quest load — before any guard is possible — so the
+    /// events land at quest load â€” before any guard is possible â€” so the
     /// guard handlers create the party row from the identity snapshot instead
     /// of holding the guard until the player's first damage event (which may
     /// never come for a dedicated guarder).
@@ -6532,7 +5627,7 @@ mod tests {
     }
 
     /// A REMOTE player's guard applies its stun host-side, so it arrives as a
-    /// NETWORK stun message trailing the guard — live capture 07-22: the three
+    /// NETWORK stun message trailing the guard â€” live capture 07-22: the three
     /// real remote guards were each followed at +100/+100/+101ms by a message
     /// carrying 188.4/188.4/125.6, while that slot's skill messages carried
     /// 12-71. Without a guard attribution that stun silently lands on whatever
@@ -6712,7 +5807,7 @@ mod tests {
 
     /// Regression: `targets` is keyed on the game's actor index, which is REUSED across
     /// boss phases and summon waves. Latching on the largest pool ever seen left a killed
-    /// phase-1 pool pinned at 0% forever — a smaller phase-2 pool could never satisfy
+    /// phase-1 pool pinned at 0% forever â€” a smaller phase-2 pool could never satisfy
     /// `max >= known`, so the overlay read "HP 0.0%" while the player fought a live enemy.
     #[test]
     fn target_hp_lets_a_new_pool_replace_a_dead_one_under_a_reused_index() {
@@ -6734,7 +5829,7 @@ mod tests {
         }
         assert_eq!(state.targets[&1].current_hp, Some(0));
 
-        // Phase 2 reuses the index with a SMALLER pool — it must take over.
+        // Phase 2 reuses the index with a SMALLER pool â€” it must take over.
         let event = hit(29_000_000, 30_000_000);
         let instance = AdjustedDamageInstance::from_damage_event(&event, None);
         state.process_damage_event(3_000, &instance);
@@ -6819,7 +5914,7 @@ mod tests {
 
     /// Lucilius' summon waves: every wave's swords report the SAME collapsed
     /// game index (and a freed instance id can be reused), so a pool whose HP
-    /// jumps back UP to near-full is a new spawn behind a reused key — it must
+    /// jumps back UP to near-full is a new spawn behind a reused key â€” it must
     /// open a new series, while an ordinary partial heal must not.
     #[test]
     fn hp_charts_split_a_new_series_when_a_pool_respawns_at_full() {
@@ -6841,7 +5936,7 @@ mod tests {
             hit(6_000, 7, 140, 141),   // near-full + was nearly dead = wave 2, bucket 2
             hit(7_000, 7, 60, 141),    // wave 2, bucket 2: last report wins
             hit(8_000, 9, 100, 200),   // separate pool...
-            hit(8_500, 9, 120, 200),   // ...healed to 60% — no respawn evidence
+            hit(8_500, 9, 120, 200),   // ...healed to 60% â€” no respawn evidence
             hit(9_000, 11, 90, 141),   // third pool, despawns mid-HP (64%)...
             hit(45_000, 11, 140, 141), // ...back near full after a 36s quiet gap = new wave
         ];
@@ -6870,7 +5965,7 @@ mod tests {
         assert_eq!(charts[4].values[15], percent(140.0)); // quiet-gap respawn
     }
 
-    /// Old logs carry no HP data at all — targets must still segment (one
+    /// Old logs carry no HP data at all â€” targets must still segment (one
     /// segment per spawn id) so the filter dropdown has entries to offer.
     #[test]
     fn segment_targets_covers_hp_less_logs() {
@@ -6949,8 +6044,8 @@ mod tests {
     ///
     /// The game frees a dead boss's actor index and hands the SAME one to a
     /// later boss: Wilinus Icewyrm and Vrazarek Firewyrm both arrived as index
-    /// `3926405961`. `segment_targets` already tells them apart — different max
-    /// HP opens a new segment — so a fact must name the SEGMENT it hit, not the
+    /// `3926405961`. `segment_targets` already tells them apart â€” different max
+    /// HP opens a new segment â€” so a fact must name the SEGMENT it hit, not the
     /// index. Keyed by the index, the two dragons collapsed into one dropdown
     /// entry, one of them vanished from the list entirely, and pinning the
     /// survivor showed the other's damage too.
@@ -6997,7 +6092,7 @@ mod tests {
     }
 
     /// A hit on a phantom marker actor has no segment, so it can never be
-    /// offered as a target — the dropdown lists enemies, not markers.
+    /// offered as a target â€” the dropdown lists enemies, not markers.
     #[test]
     fn selection_facts_skip_events_with_no_segment() {
         let events = vec![(1_000, Message::DamageEvent(a_damage_event()))];
@@ -7077,7 +6172,7 @@ mod tests {
             "the window still spans the whole fight"
         );
 
-        // An unpinned selection restores everything — the raw log is untouched.
+        // An unpinned selection restores everything â€” the raw log is untouched.
         parser.selection = SelectionFilter::default();
         parser.reparse();
         assert_eq!(parser.derived_state.total_damage, 700);
@@ -7211,7 +6306,7 @@ mod tests {
             .find(|skill| skill.action_type == ActionType::Normal(1))
             .expect("the causing skill's row");
         assert_eq!(row.sba_generated, 12.5);
-        // The PLAYER total is NOT touched by a gain — it comes from the gauge poll,
+        // The PLAYER total is NOT touched by a gain â€” it comes from the gauge poll,
         // which covers all four members; attribution covers only the local player,
         // and adding both would double-count them.
         assert_eq!(
@@ -7221,7 +6316,7 @@ mod tests {
     }
 
     /// A gain that beats the player's FIRST damage event has no party row to
-    /// file against and is dropped — pinned here as accepted behavior, while a
+    /// file against and is dropped â€” pinned here as accepted behavior, while a
     /// gain after the row exists lands. (Distinct from a gain that beats its own
     /// SKILL's first hit, which `PlayerState` holds; that one only needs the
     /// player to exist.)
@@ -7329,7 +6424,7 @@ mod tests {
         assert!(player.sba_sources.is_empty());
     }
 
-    /// A link attack's gain lands on the link-attack row — the Normal-only
+    /// A link attack's gain lands on the link-attack row â€” the Normal-only
     /// filter that used to drop it is gone, and the row memo is keyed by the
     /// classified action, so nothing has to be flattened.
     #[test]
@@ -7362,9 +6457,9 @@ mod tests {
         assert_eq!(row.sba_generated, 9.0);
     }
 
-    /// A source arriving before ITS OWN player's row exists — the fight already
+    /// A source arriving before ITS OWN player's row exists â€” the fight already
     /// started off someone else's hit, say an ally bursting before this player
-    /// has swung — is HELD against the slot and folded in when the row appears,
+    /// has swung â€” is HELD against the slot and folded in when the row appears,
     /// rather than dropped.
     ///
     /// A source before the fight's FIRST hit is a different case and stays
@@ -7407,7 +6502,7 @@ mod tests {
 
     /// Regression: the SBA chart walks the FULL event log, so it must size its
     /// buffers from the full log too. Sizing from `derived_state.duration()`
-    /// crashed the app on scrub — a cutoff truncates the derived duration, and
+    /// crashed the app on scrub â€” a cutoff truncates the derived duration, and
     /// any SBA event after the scrub point then indexed past the buffer.
     #[test]
     fn sba_chart_spans_the_full_log_even_with_a_scrub_cutoff() {
@@ -7451,7 +6546,7 @@ mod tests {
     #[test]
     fn trial_end_saves_an_encounter_that_has_damage() {
         // Training has no quest flow, so Quit Training is the ONLY boundary that
-        // can close the run — without it the log sat open until the next quest.
+        // can close the run â€” without it the log sat open until the next quest.
         let mut parser = parser_with_memory_db();
 
         parser.on_damage_event(a_damage_event());
@@ -7524,7 +6619,7 @@ mod tests {
     #[test]
     fn quest_fail_event_saves_the_encounter_immediately() {
         // The retire/fail hook fires the moment the player confirms retire (or the
-        // fail screen shows) — the log must be saved right there, not deferred to
+        // fail screen shows) â€” the log must be saved right there, not deferred to
         // the next quest load.
         let mut parser = parser_with_memory_db();
 
@@ -7678,7 +6773,7 @@ mod tests {
     /// nothing per-run may rely on `on_area_enter_event` to clear it. The
     /// keep-the-max rule in `record_in_game_time` made every chained run
     /// faster than the slowest-so-far store the stale maximum (nine 142s rows
-    /// for 109–137s clears).
+    /// for 109â€“137s clears).
     #[test]
     fn chained_repeat_run_stores_its_own_faster_clear_time() {
         let mut parser = parser_with_memory_db();
@@ -7812,7 +6907,7 @@ mod tests {
         assert_eq!(group, None, "a load-started run belongs to no chain");
     }
 
-    /// A wipe mid-chain still happened inside the chain — it joins the group
+    /// A wipe mid-chain still happened inside the chain â€” it joins the group
     /// (and ends it; whatever follows goes through a quest load).
     #[test]
     fn a_wiped_repeat_run_joins_the_group() {
@@ -7893,7 +6988,7 @@ mod tests {
             "result screen must not end/save the run itself"
         );
 
-        // Back to town — the path that used to mark the run ✗.
+        // Back to town â€” the path that used to mark the run âœ—.
         parser.on_area_enter_event(area_enter(0xAAAA));
         assert!(
             parser.active_run_id.is_none(),
@@ -7908,7 +7003,7 @@ mod tests {
             Some(true),
             "mid-run result screen marks the run cleared"
         );
-        // Only the room log exists — the completion must not also save a normal log.
+        // Only the room log exists â€” the completion must not also save a normal log.
         let log_count: i64 = conn
             .query_row("SELECT COUNT(*) FROM logs", [], |r| r.get(0))
             .unwrap();
@@ -7991,11 +7086,11 @@ mod tests {
         // Single-player + 3 AI companions: the hook claims the AI slot records with
         // BLANKED names (their snapshots carry the local profile's name) and emits an
         // identity event before each actor's damage. The saved log row must carry all
-        // four slots' character types — this is the logs-table "Name" column showing
+        // four slots' character types â€” this is the logs-table "Name" column showing
         // one entry instead of four.
         let mut parser = parser_with_memory_db();
 
-        // (character hash, party slot, actor index, display name) — hashes as captured
+        // (character hash, party slot, actor index, display name) â€” hashes as captured
         // live on v2.0.2: Eustace local + Zeta/Ferry/Cagliostro-style AI companions.
         let party: [(u32, u8, u32, &str); 4] = [
             (0x91418145, 0, 4_217_578_216, "Manmoth"),
@@ -8065,7 +7160,7 @@ mod tests {
     fn identity_events_slot_players_by_party_index() {
         // v2.0.2: actor_index is a pointer-like value with no meaningful order, and the
         // LOCAL player is flagged is_online in a lobby. The party slot from the identity
-        // snapshot is the only stable position — player_data[N] must be party slot N.
+        // snapshot is the only stable position â€” player_data[N] must be party slot N.
         let mut parser = Parser::default();
 
         parser.on_player_identity_event(identity_event(
@@ -8110,7 +7205,7 @@ mod tests {
     }
 
     fn identity_event_with_weapon(state: protocol::WeaponState) -> PlayerIdentityEvent {
-        let mut event = identity_event("ふみ", 0x2AF678E8, 1, 42, true);
+        let mut event = identity_event("ãµã¿", 0x2AF678E8, 1, 42, true);
         event.weapon_state = Some(state);
         event
     }
@@ -8119,7 +7214,7 @@ mod tests {
     fn sparse_weapon_state_refresh_keeps_recovered_fields() {
         // Online quests: identity refreshes re-read the record while the remote
         // player's network sync is still partial, and the stored state was
-        // last-write-wins — one late sparse read wiped awakening, innate skills
+        // last-write-wins â€” one late sparse read wiped awakening, innate skills
         // and the wrightstone an earlier read had recovered (Jumbo Crab log 542).
         let mut parser = Parser::default();
 
@@ -8161,7 +7256,7 @@ mod tests {
     #[test]
     fn leveled_innate_skills_beat_an_unleveled_refresh() {
         // A refresh can carry the innate skill IDS but no levels (the level pair
-        // array reads zero when the id lookup misses) — that read must not
+        // array reads zero when the id lookup misses) â€” that read must not
         // replace a previously recovered leveled set, but a leveled one may.
         let mut parser = Parser::default();
 
@@ -8187,7 +7282,7 @@ mod tests {
     #[test]
     fn a_different_weapon_id_replaces_the_state_wholesale() {
         // A different weapon id is a real re-equip (lobby loadout change), not a
-        // partial read — carrying the old weapon's fields over would fabricate
+        // partial read â€” carrying the old weapon's fields over would fabricate
         // a hybrid loadout.
         let mut parser = Parser::default();
 
@@ -8209,7 +7304,7 @@ mod tests {
     #[test]
     fn encounter_reset_clears_stale_player_data() {
         // v2.0.2: the area-enter hook is dead, so nothing wiped player_data between
-        // quests — stale names attached to reused actor indices. The encounter reset
+        // quests â€” stale names attached to reused actor indices. The encounter reset
         // (first damage after a Stopped encounter) must clear it; live identity events
         // repopulate it immediately.
         let mut parser = parser_with_memory_db();
@@ -8255,7 +7350,7 @@ mod tests {
 
     #[test]
     fn dragon_identity_populates_an_empty_slot_as_id() {
-        // A recruited crewmate Id fights entirely as its Pl2000 dragon actor — the
+        // A recruited crewmate Id fights entirely as its Pl2000 dragon actor â€” the
         // Pl1900 base actor may never deal a hit, so dragon-sourced identity events
         // are the ONLY ones that ever arrive for that player (live logs 344-346,
         // 2026-07-23: slot 4 stayed empty for the whole quest). They must fill the
@@ -8439,7 +7534,7 @@ mod tests {
     #[test]
     fn town_overmasteries_and_level_persist_across_empty_inquest_refresh() {
         // v2.0.2: overmasteries + level come from the town loadout, which is NULL
-        // in-quest — so an in-quest identity refresh carries none. The town-sighting
+        // in-quest â€” so an in-quest identity refresh carries none. The town-sighting
         // values must survive that empty refresh (mirrors the sigil/summon merge).
         let mut parser = parser_with_memory_db();
 
@@ -8503,7 +7598,7 @@ mod tests {
             parser.on_conflux_room_enter(room_enter(100 + room, MGR));
             parser.on_damage_event(a_damage_event());
         }
-        // Leave Conflux for a normal area — no dtor fires.
+        // Leave Conflux for a normal area â€” no dtor fires.
         parser.on_area_enter_event(protocol::AreaEnterEvent {
             last_known_quest_id: 0,
             last_known_elapsed_time_in_secs: 0,
@@ -8522,7 +7617,7 @@ mod tests {
     #[test]
     fn live_cap_counts_use_exact_base_over_cap() {
         // Exact detection (base > cap) is correct per-hit with no learning phase, so
-        // the live counts are final immediately — no convergence pass at quest end.
+        // the live counts are final immediately â€” no convergence pass at quest end.
         // A hit is capped iff its pre-cap base exceeds the cap, regardless of the
         // final (post-crit) damage number.
         let mut parser = parser_with_memory_db();
@@ -8567,7 +7662,7 @@ mod tests {
         assert_eq!(skill_capped, 100);
 
         // Overcap %: 100 hits at base 1500/cap 1000 + 10 at 900/1000.
-        // Σbase = 100*1500 + 10*900 = 159_000; Σcap = 110*1000 = 110_000.
+        // Î£base = 100*1500 + 10*900 = 159_000; Î£cap = 110*1000 = 110_000.
         assert_eq!(player.overcap_base_sum, 159_000.0);
         assert_eq!(player.overcap_cap_sum, 110_000.0);
     }
@@ -8576,7 +7671,7 @@ mod tests {
     fn game_disconnect_saves_in_progress_encounter() {
         // Abandoning a quest emits NO result screen, and quitting the game right
         // after means no next quest load ever fires the boundary cut. The pipe
-        // disconnect is the last chance to save — the parser is dropped after it.
+        // disconnect is the last chance to save â€” the parser is dropped after it.
         let mut parser = parser_with_memory_db();
 
         parser.on_damage_event(a_damage_event());
@@ -8616,7 +7711,7 @@ mod tests {
         // A normal quest that ends with no result screen (fail/retire) leaves an
         // InProgress encounter behind, and the hook's quest-load boundary cut is
         // deliberately suppressed on Conflux room loads. Entering a run must
-        // therefore save the leftover as a normal log itself — otherwise its
+        // therefore save the leftover as a normal log itself â€” otherwise its
         // damage merges into room 1.
         let mut parser = parser_with_memory_db();
         const MGR: u64 = 0x3333_0000_100;
@@ -8659,7 +7754,7 @@ mod tests {
         parser.on_conflux_room_enter(room_enter(1, MGR_A));
         parser.on_damage_event(a_damage_event());
 
-        // A new manager arrives WITHOUT a dtor — should finalize run A and open run B.
+        // A new manager arrives WITHOUT a dtor â€” should finalize run A and open run B.
         parser.on_conflux_room_enter(room_enter(2, MGR_B));
         parser.on_damage_event(a_damage_event());
         parser.on_conflux_run_end(protocol::ConfluxRunEndEvent { manager_ptr: MGR_B });
@@ -8901,15 +7996,15 @@ mod tests {
         assert_eq!(total_hits, 101);
         assert_eq!(player.capped_hits, 100, "base==cap hit is not capped");
 
-        // Overcap %: Σbase = 100*1500 + 1000 = 151_000; Σcap = 101*1000.
+        // Overcap %: Î£base = 100*1500 + 1000 = 151_000; Î£cap = 101*1000.
         assert_eq!(player.overcap_base_sum, 151_000.0);
         assert_eq!(player.overcap_cap_sum, 101_000.0);
     }
 }
 
 /// Stored logs are CBOR (see [`Encounter::to_blob`]), which keys every struct
-/// field by NAME — so renaming a field silently breaks every log already on
-/// disk unless the new name is optional. Bincode, the hook→parser wire, hides
+/// field by NAME â€” so renaming a field silently breaks every log already on
+/// disk unless the new name is optional. Bincode, the hookâ†’parser wire, hides
 /// this: it is positional, and hook and parser ship together, so a rename that
 /// round-trips fine there can still be unreadable on disk. These tests pin the
 /// stored shapes real logs were written with.
@@ -8933,7 +8028,7 @@ mod stored_log_compat {
     }
 
     /// The same block as the protocol carries it inside `raw_event_log`'s
-    /// identity messages — no `rename_all` there, so its keys differ.
+    /// identity messages â€” no `rename_all` there, so its keys differ.
     #[derive(Serialize)]
     struct OldProtocolRecordStats {
         level: u32,
@@ -8996,7 +8091,7 @@ mod stored_log_compat {
 
     /// A whole stored encounter through the real entry point, not just the leaf
     /// struct: zstd framing, `Encounter`'s own field names, and the block nested
-    /// behind `Option<RecordStats>`. Covers the player-data path only — the
+    /// behind `Option<RecordStats>`. Covers the player-data path only â€” the
     /// protocol copy inside `raw_event_log` is pinned by the leaf test above.
     #[test]
     fn pre_rename_encounter_blob_still_loads() {
@@ -9064,7 +8159,7 @@ mod stored_log_compat {
     /// These three carry no `#[serde(default)]`, and they do not need one: they
     /// are `Option`, and serde's missing-field path tries `deserialize_option`
     /// first, so an absent key reads back as `None`. That is the whole reason
-    /// `critical_rate` broke and these did not — it is a plain `f32`. The tests
+    /// `critical_rate` broke and these did not â€” it is a plain `f32`. The tests
     /// below pin that distinction, because it is the thing that decides whether
     /// a new field needs an attribute.
     #[derive(Serialize)]
@@ -9151,16 +8246,16 @@ mod stored_log_compat {
 /// The `PlayerData` -> `LegalityInputs` bridge, tested with data in it.
 ///
 /// `legality_inputs` lives here because `PlayerData`'s fields are private to
-/// this module, and it is exercised nowhere else — `audit_player` has no
+/// this module, and it is exercised nowhere else â€” `audit_player` has no
 /// production caller yet. A bridge test built on `PlayerData::default()`
 /// asserts nothing about the bridge: every rule is silent on empty input BY
 /// DESIGN, so replacing any field's conversion with an empty value leaves such
 /// a test green while the rule it feeds stops working in production forever.
 ///
 /// So this fixture populates every field the bridge carries and pins the exact
-/// set of rules that comes back. Dropping ANY single field — `skillboard` to
+/// set of rules that comes back. Dropping ANY single field â€” `skillboard` to
 /// `Vec::new()`, `weapon_state`/`overmastery_info` to `None`, `sigils` or
-/// `summons` to empty, `character_type` to something unrecognised — removes
+/// `summons` to empty, `character_type` to something unrecognised â€” removes
 /// its rule from that set and fails the assertion.
 #[cfg(test)]
 mod legality_bridge_tests {
@@ -9176,7 +8271,7 @@ mod legality_bridge_tests {
     /// The Fortification family's primary trait (a legal wrightstone primary).
     const HP_TRAIT: u32 = 0xf372_f096;
     const SUPPLEMENTARY_DMG: u32 = 0x57ab_5b10;
-    /// Wheel of Fate III — DMG Cap is not a candidate of any of its lots.
+    /// Wheel of Fate III â€” DMG Cap is not a candidate of any of its lots.
     const WHEEL_OF_FATE_III: u32 = 0x47e2_ae71;
     const CRIT_RATE_UP: u32 = 0x00d1_71e0;
     /// Overmastery ids: Attack, Health, Critical Hit Rate, Stun Power.

@@ -1,7 +1,15 @@
 import type { ComputedPlayerState, EncounterState, PlayerData, SkillState, StatusInterval } from "@/types";
 
-import type { RowLevel } from "../deriveRows";
 import type { SelectorPins } from "../selectorOptions";
+
+/** What a row represents at the current pin state — the legacy descriptors'
+ * level vocabulary, a projection of the machine's grouping dimension
+ * (source→players, ability→abilities, target→skills; see `levelFor`).
+ *
+ * `"skills"` and not `"hits"`: the parser cannot produce per-hit rows, and this
+ * level lists the pinned ability's MEMBER SKILLS — what a condensed group is
+ * made of — so a name promising hits misleads. */
+export type RowLevel = "players" | "abilities" | "skills";
 
 /** One row of the generic metric table, already reduced to what it renders. */
 export type MetricRow = {

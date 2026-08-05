@@ -2,8 +2,7 @@ import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
 
 import { abilityKey } from "../abilityKey";
 import { groupSkillsForRows, skillsForAbilityKey } from "../abilitySkills";
-import type { RowLevel } from "../deriveRows";
-import type { MetricCard, MetricRow } from "../metrics/types";
+import type { MetricCard, MetricRow, RowLevel } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
 
 import type { CardSection } from "./HoverCard";

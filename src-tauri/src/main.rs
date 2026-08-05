@@ -1299,18 +1299,6 @@ struct EncounterStateResponse {
     /// window, with the selector pins NOT applied — the analysis view cascades
     /// its three selectors from this without a round trip per keystroke.
     selection_facts: Vec<v1::SelectionFact>,
-    /// The analysis view's drill-down chart, present only on a scoped fetch that
-    /// pinned a source: what that player's damage was made of, one band per
-    /// breakdown row. Empty at every other level — with nothing pinned the
-    /// per-player `dps_chart` already answers.
-    ability_chart: Vec<v1::AbilityChartSeries>,
-    /// The drill-down chart one level further in: with a source AND an ability
-    /// pinned, what that ability hit, one band per enemy spawn.
-    target_chart: Vec<v1::TargetChartSeries>,
-    /// The damage-taken tab's drill-down chart, present only on a scoped fetch
-    /// that pinned a source: what hit that player, one band per (attacker,
-    /// attack) — the same grouping the taken table's drill rows use.
-    taken_ability_chart: Vec<v1::TakenChartSeries>,
     /// Every window an actor held a status effect for, per actor and never
     /// merged, spanning the FULL fight. The Buffs and Debuffs tables compute
     /// their own uptime from these, so a scrub window narrows the view without
@@ -1324,17 +1312,6 @@ struct EncounterStateResponse {
     /// Damage TAKEN per DPS-chart bucket, keyed by the victim's slot key. All
     /// zeroes on logs recorded before damage-taken capture (2026-08-04).
     taken_chart: HashMap<u32, Vec<i64>>,
-    /// Damage each enemy TYPE DEALT to the party, per DPS-chart bucket — which
-    /// is what Damage Done ranks on its enemy side. "Dealt" is relative to the
-    /// ENEMY: the toggle names WHO acted, not which side of the party's fight
-    /// the tab shows. Empty on logs recorded before damage-taken capture
-    /// (2026-08-04).
-    enemy_dealt_chart: Vec<v1::EnemySeries>,
-    /// Damage each enemy TYPE RECEIVED from the party, per DPS-chart bucket —
-    /// what Damage Taken ranks on its enemy side, by that same rule. Built from
-    /// dealt events, so unlike its sibling it does not depend on the 2026-08-04
-    /// damage-taken capture — logs recorded before that carry this series too.
-    enemy_received_chart: Vec<v1::EnemySeries>,
     /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
     /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
     hp_chart: Vec<v1::HpChartSeries>,
@@ -1392,128 +1369,14 @@ struct ParseOptions {
 const DPS_INTERVAL: i64 = 1_000;
 const SBA_INTERVAL: i64 = 1_000;
 
-/// The analysis view's drill-down chart series for the current pins.
-///
-/// The chart follows the row level, so what it decomposes is decided entirely by
-/// what is pinned: a source alone means "what was this player's damage made
-/// of", a source and an ability means "what did this ability hit". Nothing
-/// pinned needs no series at all — that level is the per-player `dps_chart` the
-/// base load already carries — so both come back empty and the caller pays
-/// nothing for a fetch that only moved the window.
-///
-/// Only the FIRST pinned source and ability are read: the selector bar pins one
-/// of each, and a chart that stacked two players' abilities together would have
-/// no meaningful total.
-///
-/// `segments`/`assignment` are the caller's segmentation of the UNWINDOWED log,
-/// passed in rather than recomputed: the caller already needs it for
-/// `selection_facts`, and segmenting twice per fetch is two more full passes
-/// over a log that can hold hundreds of thousands of events. Sharing it is also
-/// what makes a band and a target-dropdown entry mean the same spawn.
-fn build_drill_charts(
-    parser: &v1::Parser,
-    options: &ParseOptions,
-    segments: &[v1::TargetSegment],
-    assignment: &[Option<usize>],
-) -> (Vec<v1::AbilityChartSeries>, Vec<v1::TargetChartSeries>) {
-    let Some(&source_index) = options.selection.source_indices.first() else {
-        return (Vec::new(), Vec::new());
-    };
-
-    let start_time = parser.start_time();
-    // Whole-fight geometry, so a bucket index is still the elapsed second no
-    // matter what window the same fetch applied to the derived state.
-    let chart_len = (parser.full_log_duration() / DPS_INTERVAL) as usize + 1;
-
-    match options.selection.abilities.first() {
-        Some(&ability) => {
-            let target_chart = v1::build_target_damage_chart(
-                &parser.encounter.raw_event_log,
-                &parser.encounter.player_data,
-                segments,
-                assignment,
-                source_index,
-                ability,
-                start_time,
-                DPS_INTERVAL,
-                chart_len,
-                &options.target_spans,
-                options.filters,
-            );
-            (Vec::new(), target_chart)
-        }
-        None => {
-            let ability_chart = v1::build_ability_damage_chart(
-                &parser.encounter.raw_event_log,
-                &parser.encounter.player_data,
-                source_index,
-                start_time,
-                DPS_INTERVAL,
-                chart_len,
-                &options.target_spans,
-                options.filters,
-            );
-            (ability_chart, Vec::new())
-        }
-    }
-}
-
-/// The per-player damage chart for a scope with NO source pinned.
-///
-/// The base-load `dps_chart` is built with no pins at all, so an enemy or
-/// ability pin left the plot showing the whole fight while the table beside it
-/// had narrowed — measured on log 1566, where pinning one enemy halved the
-/// table's totals and did not move a single line.
-///
-/// Empty with a source pinned: [`build_drill_charts`] already answers there, and
-/// its bands are target-filtered. Empty with nothing narrowing, so a fetch that
-/// only moved the window pays nothing.
-///
-/// Damage only, by construction — this is the damage tab's series. Stun's two
-/// capture paths reconcile with `max()` and its network messages carry no target
-/// at all, so a target-filtered stun chart would be a fiction; the SBA gauge has
-/// no decomposition.
-fn build_scoped_player_chart(
-    parser: &v1::Parser,
-    options: &ParseOptions,
-) -> HashMap<u32, Vec<i32>> {
-    if !options.selection.source_indices.is_empty()
-        || (options.target_spans.is_empty() && options.selection.abilities.is_empty())
-    {
-        return HashMap::new();
-    }
-
-    let player_indices: Vec<u32> = parser
-        .derived_state
-        .party
-        .values()
-        .map(|player| player.index)
-        .collect();
-
-    // Whole-fight geometry, exactly as `build_drill_charts` uses: the view slices
-    // its chart client-side, so a bucket index must stay the elapsed second.
-    let chart_len = (parser.full_log_duration() / DPS_INTERVAL) as usize + 1;
-
-    v1::build_player_dps_chart(
-        &parser.encounter.raw_event_log,
-        &parser.encounter.player_data,
-        &player_indices,
-        parser.start_time(),
-        DPS_INTERVAL,
-        chart_len,
-        &options.target_spans,
-        &options.selection.abilities,
-        options.filters,
-    )
-}
-
 /// The analysis view's generic (filters × groupBy) aggregation, present only
 /// when the view sent a `group_query` — absent, this is a query-free fetch
 /// (e.g. a scrub commit) and the response carries no groups at all.
 ///
 /// `segments`/`assignment` are the caller's segmentation of the UNWINDOWED
-/// log, exactly as `build_drill_charts` requires: sharing it is what makes a
-/// band and a target-dropdown entry mean the same spawn.
+/// log, passed in rather than recomputed (the caller already needs it for
+/// `selection_facts`): sharing it is what makes an aggregate's spawn key and
+/// a target-dropdown entry mean the same enemy.
 fn build_groups(
     parser: &v1::Parser,
     options: &ParseOptions,
@@ -1594,34 +1457,10 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             &assignment,
         );
 
-        // The drill-down chart. Built here rather than on the base load because
-        // it is the pins that decide what it decomposes, and only a pinned
-        // source narrows it enough to be worth sending: the unpinned case is
-        // the per-player `dps_chart` the base load already carries.
-        //
-        // Deliberately spans the FULL fight, ignoring `from_ms`/`up_to_ms`: the
-        // view slices its chart client-side from whole-fight buckets, so a
-        // pre-sliced series would be windowed twice and a bucket index would
-        // stop being the elapsed second.
-        let (ability_chart, target_chart) =
-            build_drill_charts(&parser, &options, &segments, &assignment);
-        // The taken tab's drill bands for the same pinned player. Cheap (one
-        // ungated pass) and metric-agnostic — the backend does not know which
-        // tab is showing, so both drill decompositions ride the same fetch.
-        let taken_ability_chart = match options.selection.source_indices.first() {
-            Some(&victim) => v1::build_taken_ability_chart(
-                &parser.encounter.raw_event_log,
-                victim,
-                parser.start_time(),
-                DPS_INTERVAL,
-                (parser.full_log_duration() / DPS_INTERVAL) as usize + 1,
-            ),
-            None => Vec::new(),
-        };
-        // The level above those: no source pinned, but an enemy or an ability
-        // still narrowing the fight. Without it the plot kept drawing the whole
-        // party's whole fight beside a table that had already narrowed.
-        let dps_chart = build_scoped_player_chart(&parser, &options);
+        // The group aggregation: the analysis view's table rows and chart
+        // bands under the current pins, window and grouping. Its series span
+        // the FULL fight (the view slices client-side), while its measures
+        // honor the query's own scrub window.
         let groups = build_groups(&parser, &options, &segments, &assignment)?;
 
         // Only the fields the scrub commit actually consumes; everything else stays at its
@@ -1637,10 +1476,6 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             imported,
             legality: findings,
             selection_facts,
-            ability_chart,
-            target_chart,
-            taken_ability_chart,
-            dps_chart,
             groups,
             ..Default::default()
         });
@@ -1705,20 +1540,6 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         (duration / DPS_INTERVAL) as usize + 1,
     );
 
-    let enemy_dealt = v1::build_enemy_dealt_chart(
-        &parser.encounter.raw_event_log,
-        start_time,
-        DPS_INTERVAL,
-        (duration / DPS_INTERVAL) as usize + 1,
-    );
-    let enemy_received = v1::build_enemy_received_chart(
-        &parser.encounter.raw_event_log,
-        start_time,
-        DPS_INTERVAL,
-        (duration / DPS_INTERVAL) as usize + 1,
-        options.filters,
-    );
-
     let hp_chart = v1::build_target_hp_charts(
         &parser.encounter.raw_event_log,
         &target_entries,
@@ -1775,17 +1596,10 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         room_index,
         imported,
         legality: findings,
-        // Nothing to decompose on the base load: it is the unpinned fight, which
-        // is exactly the level `dps_chart` already draws.
-        ability_chart: Vec::new(),
-        target_chart: Vec::new(),
-        taken_ability_chart: Vec::new(),
         status_intervals,
         dps_chart: player_dps,
         stun_chart: player_stun,
         taken_chart: player_taken,
-        enemy_dealt_chart: enemy_dealt,
-        enemy_received_chart: enemy_received,
         hp_chart,
         groups,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,

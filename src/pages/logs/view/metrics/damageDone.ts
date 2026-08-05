@@ -2,8 +2,7 @@ import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
 import { humanizeNumber, ratePerSecond, share } from "@/utils";
 
 import { groupSkillsForRows, mergeSkillsByAction, type AbilitySkills } from "../abilitySkills";
-import type { RowLevel } from "../deriveRows";
-import type { MetricDescriptor, MetricRow } from "./types";
+import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
 
 const format = humanizeNumber;
 

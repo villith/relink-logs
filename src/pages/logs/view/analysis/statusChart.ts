@@ -2,13 +2,12 @@ import type { StatusInterval } from "@/types";
 
 import { isStatusPin, statusPinKey } from "../statusUptime";
 
-import type { DrillSeries } from "./drillSeries";
+/** One chart overlay band, ready to plot: a stable series key, the name the
+ * legend shows, and one value per bucket — the shape the group bands and the
+ * status stacks share, so the two overlays stay one branch at the call site. */
+export type DrillSeries = { key: string; label: string; values: number[] };
 
-/** One holder's stack count over the fight, one value per chart bucket.
- *
- * The same shape as a drill-down band, and consumed by the same chart code —
- * an alias rather than a twin so the two overlays stay one branch at the call
- * site instead of two identical ones. */
+/** One holder's stack count over the fight, one value per chart bucket. */
 export type StatusSeries = DrillSeries;
 
 /** Per-holder stack counts for the pinned effect, bucketed for the chart.

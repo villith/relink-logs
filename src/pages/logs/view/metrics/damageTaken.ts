@@ -1,9 +1,8 @@
 import type { ActionType, ComputedPlayerState, DamageTakenState, EnemyType } from "@/types";
 import { humanizeNumber, ratePerSecond } from "@/utils";
 
-import type { RowLevel } from "../deriveRows";
 import { enemyRowKey } from "./damageDone";
-import type { MetricDescriptor, MetricRow } from "./types";
+import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
 
 const format = humanizeNumber;
 

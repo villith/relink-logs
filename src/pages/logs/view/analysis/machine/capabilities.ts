@@ -1,11 +1,10 @@
-import type { RowLevel } from "../../deriveRows";
 import { buffs } from "../../metrics/buffs";
 import { damageDone } from "../../metrics/damageDone";
 import { damageTaken } from "../../metrics/damageTaken";
 import { debuffs } from "../../metrics/debuffs";
 import { sba } from "../../metrics/sba";
 import { stun } from "../../metrics/stun";
-import type { Hostility } from "../../metrics/types";
+import type { Hostility, RowLevel } from "../../metrics/types";
 import type { Dimension, MetricKey } from "./state";
 
 export type DataPath = "groups" | "derived" | "intervals";
