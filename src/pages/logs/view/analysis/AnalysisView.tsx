@@ -47,7 +47,14 @@ import {
   type Label,
 } from "../DetailCharts";
 import { actionsForPin, childOfPin } from "../abilitySkills";
-import { buffs, enemyHolderKey, heldByRoster, narrowedStatusIntervals, slotsOf } from "../metrics/buffs";
+import {
+  buffs,
+  enemyHolderKey,
+  heldByRoster,
+  narrowedByPins,
+  narrowedStatusIntervals,
+  slotsOf,
+} from "../metrics/buffs";
 import { damageDone, parseEnemyRow } from "../metrics/damageDone";
 import { damageTaken, takenAttackNameKey, takenAttackRowParts } from "../metrics/damageTaken";
 import { debuffs } from "../metrics/debuffs";
@@ -1132,7 +1139,10 @@ export const AnalysisView = () => {
     // sides would otherwise grow one series mislabeled by the other side's key.
     const roster = slotsOf(identityPlayers);
     const series = buildStatusSeries({
-      intervals: heldByRoster(statusIntervals, roster, hostility === "friendly"),
+      // The same narrowing the table applies (`narrowedByPins`): a pinned
+      // holder shows that holder's stack curve alone — the holder×effect
+      // drill's chart half.
+      intervals: narrowedByPins(heldByRoster(statusIntervals, roster, hostility === "friendly"), pins, hostility),
       pinnedKey: pins.ability,
       bucketMs: DPS_BUCKET_MS,
       len: chartLen,
@@ -1146,16 +1156,7 @@ export const AnalysisView = () => {
           : { key: `player:${interval.actorIndex}`, label: labelForSource(interval.actorIndex) },
     });
     return series.length > 0 ? series : null;
-  }, [
-    isStatusMetric,
-    statusIntervals,
-    pins.ability,
-    chartLen,
-    hostility,
-    labelForTarget,
-    labelForSource,
-    identityPlayers,
-  ]);
+  }, [isStatusMetric, statusIntervals, pins, chartLen, hostility, labelForTarget, labelForSource, identityPlayers]);
 
   // The top-level aura chart: no effect pinned, so the effects THEMSELVES are
   // the series — the top 8 by uptime (the table's own ranking), Y = holders

@@ -22,6 +22,19 @@ describe("pinRow", () => {
     s = pinRow(s, { dim: "target", value: 0 });
     expect(resolveGroupBy(s, CAPABILITIES.damage)).toBe("target"); // terminal, never dead
   });
+
+  it("walks the holder×effect drill on the aura tabs to the one-row terminal", () => {
+    let s = state({ metric: "buffs" });
+    expect(resolveGroupBy(s, CAPABILITIES.buffs)).toBe("ability"); // effect rows
+    s = pinRow(s, { dim: "ability", value: "status:10:500" });
+    expect(resolveGroupBy(s, CAPABILITIES.buffs)).toBe("source"); // holder rows
+    s = pinRow(s, { dim: "source", value: 1 });
+    // Both pinned → the last supported dimension: the single holder×effect
+    // row (URL: abil=status:10:500&src=1 — expressible before, unreachable).
+    expect(resolveGroupBy(s, CAPABILITIES.buffs)).toBe("source");
+    expect(s.ability).toBe("status:10:500");
+    expect(s.source).toBe(1);
+  });
 });
 
 describe("axis housekeeping", () => {

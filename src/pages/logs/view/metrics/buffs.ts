@@ -53,6 +53,7 @@ export const statusRows = ({
   pinnedKey,
   slotOf,
   holderOf = (interval) => ({ key: `player:${interval.actorIndex}`, label: String(interval.actorIndex) }),
+  pinOf,
   window,
 }: {
   intervals: StatusInterval[];
@@ -60,6 +61,13 @@ export const statusRows = ({
   pinnedKey: string | null;
   slotOf: (actorIndex: number) => number;
   holderOf?: (interval: StatusInterval) => { key: string; label: string };
+  /** What clicking a holder row pins, or absent/null to keep it a leaf.
+   * The holder×effect drill: with an effect pinned, pinning the holder too
+   * reaches the machine's one-row terminal. Friendly holders pin their player
+   * into Source; enemy holders stay leaves — on the enemy side Source means
+   * the CASTER (see `narrowedByPins`), so pinning the holder there would
+   * filter by the wrong actor. */
+  pinOf?: (interval: StatusInterval) => Partial<SelectorPins> | null;
   /** The measured window, for the rows' timelines. Absent leaves them off and
    * the table falls back to its magnitude bar. */
   window?: { startMs: number; endMs: number };
@@ -101,7 +109,7 @@ export const statusRows = ({
         label: holderLevel ? holderOf(group[0]).label : key,
         value: uptime,
         columns: [percent(uptime, fightDurationMs), String(applications(group))],
-        pinOnClick: holderLevel ? null : { ability: key },
+        pinOnClick: holderLevel ? pinOf?.(group[0]) ?? null : { ability: key },
         // An effect row spans the party, so no one slot's colour is right.
         colorSlot: holderLevel ? slotOf(group[0].actorIndex) : -1,
         timeline: timelineOf(group),
@@ -201,9 +209,10 @@ export const narrowedByPins = (
  * its holder rows, and building it twice per render buys nothing.
  *
  * Not every status reader wants all three steps — `statusSeries` (the Stacks
- * plot) deliberately stops after the roster split, because a pinned effect key
- * already implies both the polarity and the pins. Routing it through here would
- * change what it draws; it is not a call site this function is missing. */
+ * plot) composes the roster split with `narrowedByPins` itself and skips the
+ * POLARITY filter, because a pinned effect key already implies it. Routing it
+ * through here would change what it draws; it is not a call site this function
+ * is missing. */
 export const narrowedStatusIntervals = ({
   intervals,
   slots,
@@ -248,6 +257,7 @@ export const statusTabRows = (input: Parameters<MetricDescriptor["rows"]>[0], ha
     // Enemies have no party slot, so their holder rows take the neutral slot.
     slotOf: hostility === "friendly" ? (actorIndex) => slots.get(actorIndex) ?? -1 : () => -1,
     holderOf: hostility === "friendly" ? undefined : enemyHolderOf,
+    pinOf: hostility === "friendly" ? (interval) => ({ source: interval.actorIndex }) : undefined,
     window: statusWindow,
   });
 };

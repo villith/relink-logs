@@ -134,8 +134,16 @@ describe("buffs descriptor", () => {
     expect(buffs.rows(input("skills", "status:10:500"))[1].colorSlot).toBe(1);
   });
 
-  it("makes holder rows leaves", () => {
-    expect(buffs.rows(input("skills", "status:10:500")).every((r) => r.pinOnClick === null)).toBe(true);
+  it("pins a friendly holder row into Source — the holder×effect drill", () => {
+    const rows = buffs.rows(input("skills", "status:10:500"));
+    expect(rows[0].pinOnClick).toEqual({ source: 0 }); // Narmaya
+    expect(rows[1].pinOnClick).toEqual({ source: 1 }); // Eugen
+  });
+
+  it("keeps enemy holder rows leaves — Source means the CASTER on that side", () => {
+    const rows = buffs.rows(input("players", "status:32:700", MIXED_SIDES, PLAYERS, "enemy"));
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.pinOnClick === null)).toBe(true);
   });
 
   it("sums applications across every holder of an effect", () => {
