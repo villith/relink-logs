@@ -1,7 +1,7 @@
 import type { Hostility } from "../../metrics/types";
 import { isStatusPin } from "../../statusUptime";
 import type { MetricCapabilities } from "./capabilities";
-import { DIMENSIONS, isPinned, type AnalysisState, type Dimension } from "./state";
+import { DIMENSIONS, auraAnchorOf, isPinned, type AnalysisState, type Dimension } from "./state";
 
 /** A universe-typed actor reference — which side's population an index names.
  * Mirrors the Rust `ActorRef` in parser/v1/groups.rs; the two must agree. */
@@ -18,6 +18,12 @@ export type GroupQuery = {
    * `actionsForPin` at fetch time (it needs the fight's skill list); the
    * resolver only decides whether the pin belongs in the query at all. */
   ability: string | null;
+  /** The raw aura filter (`src:status:…`/`tgt:status:…`), or null. Like
+   * `ability`, the view expands it at fetch time — into the effect's active
+   * windows, which need the fight's status intervals — the resolver only
+   * decides whether it belongs in the query at all: declared support AND its
+   * anchoring pin present (a hand-edited URL can carry one without). */
+  aura: string | null;
   topN: number;
 };
 
@@ -94,6 +100,7 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
           target: actorRef("target", state.target, hostility),
           // A status pin names an effect; no event query can narrow by it.
           ability: state.ability !== null && !isStatusPin(state.ability) ? state.ability : null,
+          aura: auraInQuery(state, caps),
           topN: GROUP_TOP_N,
         };
 
@@ -120,6 +127,18 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
     selectors: DIMENSIONS.map((dim) => ({ dim, enabled: caps.dimensions[dim].supported })),
     fetch,
   };
+};
+
+/** Whether the state's aura filter belongs in the group query: the tab
+ * declares support and the pin the aura is anchored to is actually present.
+ * Anything else (hand-edited URL, anchor cleared by an older app) is null —
+ * the mask must never outlive the chips that explain it. */
+const auraInQuery = (state: AnalysisState, caps: MetricCapabilities): string | null => {
+  if (state.aura === null || !caps.supportsAuraFilter) return null;
+  const anchor = auraAnchorOf(state.aura);
+  if (anchor === "source") return state.source !== null ? state.aura : null;
+  if (anchor === "target") return state.target !== null ? state.aura : null;
+  return null;
 };
 
 /** i18next key naming what a row IS under this grouping. Reuses the existing

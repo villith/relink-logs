@@ -114,3 +114,26 @@ describe("resolveViewSpec", () => {
     ).toBeUndefined();
   });
 });
+
+describe("the aura filter", () => {
+  it("never affects the grouping", () => {
+    const base = state({ source: 1 });
+    const withAura = state({ source: 1, aura: "src:status:4:1" });
+    expect(resolveGroupBy(withAura, CAPABILITIES.damage)).toBe(resolveGroupBy(base, CAPABILITIES.damage));
+    expect(resolveViewSpec(withAura, CAPABILITIES.damage).groupBy).toBe(
+      resolveViewSpec(base, CAPABILITIES.damage).groupBy
+    );
+  });
+
+  it("rides the fetch only when its anchoring pin is present", () => {
+    expect(resolveViewSpec(state({ source: 1, aura: "src:status:4:1" }), CAPABILITIES.damage).fetch?.aura).toBe(
+      "src:status:4:1"
+    );
+    expect(
+      resolveViewSpec(state({ metric: "taken", target: 0, aura: "tgt:status:4:1" }), CAPABILITIES.taken).fetch?.aura
+    ).toBe("tgt:status:4:1");
+    // Hand-edited URL: an aura whose anchor pin is absent filters nothing.
+    expect(resolveViewSpec(state({ aura: "src:status:4:1" }), CAPABILITIES.damage).fetch?.aura).toBeNull();
+    expect(resolveViewSpec(state({ source: 1, aura: "tgt:status:4:1" }), CAPABILITIES.damage).fetch?.aura).toBeNull();
+  });
+});
