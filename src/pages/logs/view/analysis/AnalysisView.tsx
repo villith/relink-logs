@@ -77,6 +77,7 @@ import { RegroupStrip } from "./RegroupStrip";
 import { abilityLabelFor, abilityOwnerFor } from "./abilityLabel";
 import "./analysis.css";
 import { auraExcludedBands, auraHolderIntervals, auraWireWindows, type AuraHolder } from "./auraWindows";
+import { CAUSE_CLASS_LABEL_KEY, causeClassOfKey, withProvenance } from "./causeClass";
 import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "./chartMarkers";
 import { chartPresentation } from "./chartPresentation";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
@@ -793,6 +794,31 @@ export const AnalysisView = () => {
   // row and its band can never disagree.
   const rowColors = useMemo(() => (isStatusMetric ? statusRowColors(rows) : null), [isStatusMetric, rows]);
 
+  // The effects table's provenance (spec §3): each row's cause class as a
+  // SOURCE cell, and the rows grouped into titled sections ordered
+  // Skill → Sigil/Trait → Field → Unknown. Effect level only — a holder row
+  // is one actor, not a cause — and the sections are visual grouping alone.
+  const effectLevel = isStatusMetric && !isStatusPin(pins.ability);
+
+  // A cause is classed `skill` only when a name actually resolves for it —
+  // through the row's own casters, the same pipeline the labels use.
+  const classOfRow = useCallback(
+    (row: MetricRow) =>
+      causeClassOfKey(row.key, (causeId) => {
+        const candidates = causeCandidates.get(row.key) ?? [];
+        return causeNameFor(causeId, (cause) => causeSkillName(candidates, cause)) !== "";
+      }),
+    // i18n.language: the skill tables the resolution reads are translated.
+    [causeCandidates, i18n.language]
+  );
+
+  const shownRows = useMemo(
+    () => (effectLevel ? withProvenance(rows, classOfRow, (cls) => t(CAUSE_CLASS_LABEL_KEY[cls])) : rows),
+    [effectLevel, rows, classOfRow, t]
+  );
+
+  const sectionLabelOf = useCallback((row: MetricRow) => t(CAUSE_CLASS_LABEL_KEY[classOfRow(row)]), [classOfRow, t]);
+
   // The art beside a row's name, by the same discriminator the name uses, so
   // a row can never pair one kind's name with another kind's icon. Undefined
   // is the honest answer for most of what has none: combo actions are not
@@ -1445,8 +1471,13 @@ export const AnalysisView = () => {
 
       <Box style={{ padding: "4px 16px 14px" }}>
         <MetricTable
-          rows={rows}
-          columnKeys={spec.table.columnKeys}
+          rows={shownRows}
+          // The SOURCE header rides the same `effectLevel` condition that
+          // prepends the cells, so the two can never disagree — deliberately
+          // NOT declared on the descriptor's columnKeys: a `by` regroup can
+          // move groupBy without moving the rows off the effect level, and
+          // the PIN (not the grouping) is what statusRows keys the level on.
+          columnKeys={effectLevel ? ["ui.logs.buff-source", ...spec.table.columnKeys] : spec.table.columnKeys}
           onPin={handlePin}
           renderLabel={renderLabel}
           rowColor={rowColor}
@@ -1454,6 +1485,7 @@ export const AnalysisView = () => {
           rowChildren={rowChildren}
           cardAmount={metric.card}
           timelineMs={fightDurationMs}
+          sectionLabel={effectLevel ? sectionLabelOf : undefined}
           // The resolver names the honest empty states (see `emptyKeyFor`).
           // The aura tabs' key means "this log never recorded status events",
           // so it applies only when the fight truly has no intervals — with
