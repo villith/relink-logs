@@ -3,7 +3,7 @@ import { NuqsAdapter } from "nuqs/adapters/react-router/v6";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { AnalysisState } from "./state";
+import { DEFAULT_STATE, type AnalysisState } from "./state";
 import { useAnalysisState } from "./useAnalysisState";
 
 const FULL_STATE: AnalysisState = {
@@ -25,18 +25,24 @@ const Harness = () => {
     <>
       <output data-testid="state">{JSON.stringify(state)}</output>
       <button onClick={() => setState(FULL_STATE)}>set</button>
+      <button onClick={() => setState(DEFAULT_STATE)}>reset</button>
     </>
   );
 };
 
-const renderHarness = () =>
-  render(
-    <MemoryRouter>
+// The react-router v6 adapter reads the initial search params from the REAL
+// `location.search`, not from MemoryRouter's in-memory history — so a
+// pre-seeded URL has to land on `window.location` too, or nuqs never sees it.
+const renderHarness = (initialEntries?: string[]) => {
+  if (initialEntries !== undefined) window.history.replaceState(null, "", initialEntries[0]);
+  return render(
+    <MemoryRouter initialEntries={initialEntries}>
       <NuqsAdapter>
         <Harness />
       </NuqsAdapter>
     </MemoryRouter>
   );
+};
 
 // nuqs writes the REAL window URL, which outlives a render.
 afterEach(() => window.history.replaceState(null, "", "/"));
@@ -71,5 +77,32 @@ describe("useAnalysisState", () => {
     expect(search).toContain("by=target");
     expect(search).toContain("from=10");
     expect(search).toContain("to=95");
+  });
+
+  it("clears the URL when reset to DEFAULT_STATE", async () => {
+    renderHarness();
+
+    fireEvent.click(screen.getByText("set"));
+    await waitFor(() => expect(window.location.search).toContain("metric=taken"));
+
+    fireEvent.click(screen.getByText("reset"));
+
+    await waitFor(() => expect(window.location.search).toBe(""));
+  });
+
+  it("decodes a pre-seeded URL on mount", async () => {
+    renderHarness(["/?metric=taken&side=enemy&from=10&to=95"]);
+
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId("state").textContent ?? "")).toEqual({
+        metric: "taken",
+        hostility: "enemy",
+        source: null,
+        target: null,
+        ability: null,
+        window: [10, 95],
+        by: null,
+      })
+    );
   });
 });
