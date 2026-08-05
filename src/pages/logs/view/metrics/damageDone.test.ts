@@ -4,6 +4,7 @@ import type { ComputedPlayerState, EnemyType, SkillTargetState } from "@/types";
 
 import type { SelectorPins } from "../selectorOptions";
 import { damageDone, parseEnemyRow } from "./damageDone";
+import type { MetricRow } from "./types";
 
 /** A per-enemy entry of a skill's breakdown, as the parser ships it. */
 const hit = (enemyType: EnemyType, totalDamage: number, hits: number): SkillTargetState => ({
@@ -507,5 +508,80 @@ describe("damageDone enemy side", () => {
     expect(rows[0].columns[2]).toBe("—");
     // max folds across both victims' rows for 0xaa (500, 300) to the larger.
     expect(rows[0].columns[3]).toBe("500");
+  });
+});
+
+describe("damageDone.children — party-wide per-source split", () => {
+  const abilityRow = (key: string): MetricRow => ({
+    key,
+    label: key.replace(/^skill:/, ""),
+    kind: "ability",
+    value: 0,
+    columns: [],
+    pinOnClick: null,
+    colorSlot: -1,
+  });
+
+  const childrenOf = (
+    key: string,
+    players: ComputedPlayerState[],
+    pins: SelectorPins = NO_PINS,
+    hostility?: "friendly" | "enemy",
+    level: "players" | "abilities" | "skills" = "abilities"
+  ) => damageDone.children!({ row: abilityRow(key), players, level, pins, hostility, fightDurationMs: 100_000 });
+
+  const party = [
+    player(0, 300, [
+      { action: 9001, damage: 200, hits: 2, min: 50, max: 150 },
+      { action: 9002, damage: 100 },
+    ]),
+    player(1, 100, [{ action: 9001, damage: 100, hits: 1, min: 100, max: 100 }]),
+  ];
+
+  it("splits a party-wide ability row into one child per player who used it", () => {
+    const children = childrenOf("skill:Normal:9001", party)!;
+
+    expect(children.map((child) => child.key)).toEqual(["player:0", "player:1"]);
+    expect(children.map((child) => child.kind)).toEqual(["player", "player"]);
+    expect(children[0].pinOnClick).toEqual({ source: 0 });
+    expect(children.map((child) => child.colorSlot)).toEqual([0, 1]);
+    // The six damage drill-down cells, shared against the party total (400).
+    expect(children[0].columns).toEqual(["200", "2", "50", "150", "100", "50.0%"]);
+    expect(children[1].columns).toEqual(["100", "1", "100", "100", "100", "25.0%"]);
+  });
+
+  it("sums a group parent's members per player", () => {
+    // Against the REAL table: Gran's 100/110/120 are all "normal-attack".
+    const grouped = [
+      player(0, 50, [
+        { action: 100, damage: 30 },
+        { action: 110, damage: 20 },
+      ]),
+      player(1, 10, [{ action: 120, damage: 10 }]),
+    ];
+    const children = childrenOf('skill:Group:normal-attack@"Pl0000"', grouped)!;
+
+    expect(children.map((child) => child.key)).toEqual(["player:0", "player:1"]);
+    expect(children.map((child) => child.value)).toEqual([50, 10]);
+  });
+
+  it("answers null with a source pinned — the parent already carries its variants", () => {
+    expect(childrenOf("skill:Normal:9001", party, { source: 0, targets: [], ability: null })).toBeNull();
+  });
+
+  it("answers null on the enemy side — incoming rows carry no spawn identity", () => {
+    expect(childrenOf("skill:Normal:9001", party, NO_PINS, "enemy")).toBeNull();
+  });
+
+  it("answers null off the abilities level", () => {
+    expect(childrenOf("skill:Normal:9001", party, NO_PINS, undefined, "players")).toBeNull();
+  });
+
+  it("answers null for a row whose key names no ability", () => {
+    expect(childrenOf("other", party)).toBeNull();
+  });
+
+  it("returns a lone user as a single child — the table hides the chevron below two", () => {
+    expect(childrenOf("skill:Normal:9002", party)).toHaveLength(1);
   });
 });

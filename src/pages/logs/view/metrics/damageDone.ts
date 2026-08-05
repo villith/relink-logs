@@ -1,7 +1,7 @@
 import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
 import { humanizeNumber, ratePerSecond, share } from "@/utils";
 
-import { groupSkillsForRows, mergeSkillsByAction, type AbilitySkills } from "../abilitySkills";
+import { groupSkillsForRows, mergeSkillsByAction, skillsForAbilityKey, type AbilitySkills } from "../abilitySkills";
 import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
 
 const format = humanizeNumber;
@@ -291,5 +291,51 @@ export const damageDone: MetricDescriptor = {
       if (enemies.length > 0) return enemies;
     }
     return abilityRows(members, total, colorSlot, false);
+  },
+
+  // The table's in-place nesting (Package C): a party-wide ability row splits
+  // into one child per player who used it, out of the scoped derived state —
+  // synchronously, no new fetch. With a source pinned the groups-path parent
+  // already carries its member VARIANTS as `MetricRow.children`, so this
+  // answers null and the table falls back to them. The enemy side's ability
+  // rows are enemy ATTACKS, and their honest per-source split is per SPAWN —
+  // which `DamageTakenState` does not record — so they stay leaves rather
+  // than pretending victims are sources.
+  children: ({ row, players, level, pins, hostility }): MetricRow[] | null => {
+    if (level !== "abilities" || hostility === "enemy" || pins.source !== null) return null;
+    if (!row.key.startsWith("skill:")) return null;
+    const key = row.key.slice("skill:".length);
+    const total = players.reduce((sum, player) => sum + player.totalDamage, 0);
+    return players
+      .map((player) => ({ player, skills: skillsForAbilityKey(player.skillBreakdown, key) }))
+      .filter(({ skills }) => skills.length > 0)
+      .map(({ player, skills }): MetricRow => {
+        const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
+        const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
+        return {
+          key: `player:${player.index}`,
+          label: String(player.index),
+          kind: "player",
+          value: damage,
+          columns: damageColumns(
+            damage,
+            hits,
+            extreme(
+              skills.map((skill) => skill.minDamage),
+              (values) => Math.min(...values)
+            ),
+            extreme(
+              skills.map((skill) => skill.maxDamage),
+              (values) => Math.max(...values)
+            ),
+            total
+          ),
+          // Clicking a player child pins that player — the machine keeps the
+          // ability free, so the next state is that player's drill.
+          pinOnClick: { source: player.index },
+          colorSlot: player.partyIndex,
+        };
+      })
+      .sort((a, b) => b.value - a.value);
   },
 };

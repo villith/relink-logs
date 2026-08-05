@@ -158,4 +158,20 @@ export type MetricDescriptor = {
      * uses its natural side: Buffs → friendly, Debuffs → enemy. */
     hostility?: Hostility;
   }) => MetricRow[];
+  /** Child rows behind ONE row at the current level, or null where it has
+   * none — the table's in-place nesting. Party-wide ability rows split per
+   * SOURCE out of the derived state, synchronously (the same data the hover
+   * cards decompose — no fetch); with a source pinned the groups-path parent
+   * already carries its member variants on `MetricRow.children`, so the
+   * accessor answers null and the table falls back to those. Optional
+   * because only the damage tabs have nesting semantics — stun/SBA and the
+   * aura tables have nothing honest to nest. */
+  children?: (input: {
+    row: MetricRow;
+    players: ComputedPlayerState[];
+    level: RowLevel;
+    pins: SelectorPins;
+    hostility?: Hostility;
+    fightDurationMs?: number;
+  }) => MetricRow[] | null;
 };
