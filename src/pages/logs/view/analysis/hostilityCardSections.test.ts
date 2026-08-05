@@ -23,6 +23,15 @@ const labels = {
   sourceColor: () => "blue",
 };
 
+/** The same lookups with art attached. Distinguishable per section AND per
+ * index, so a section fed the other one's icon fails loudly rather than
+ * matching a shared placeholder. */
+const iconLabels = {
+  ...labels,
+  sourceIcon: (index: number) => `src-icon-${index}`,
+  abilityIcon: (key: string) => `ab-icon-${key}`,
+};
+
 const player = (index: number, parts: object) =>
   ({
     index,
@@ -31,6 +40,29 @@ const player = (index: number, parts: object) =>
     skillBreakdown: [],
     ...parts,
   }) as unknown as ComputedPlayerState;
+
+/** A player whose skills carry only the fields these builders read. `targets`
+ * is omitted outright where the case has none — the point of that case is a
+ * cached payload from before the field existed, which an empty array would not
+ * reproduce. */
+const dealer = (index: number, skills: { action: number; targets?: { enemy: number; total: number }[] }[]) =>
+  player(index, {
+    skillBreakdown: skills.map((skill) => ({
+      actionType: { Normal: skill.action },
+      childCharacterType: "Pl0000",
+      hits: 1,
+      totalDamage: 0,
+      ...(skill.targets === undefined
+        ? {}
+        : {
+            targets: skill.targets.map((target) => ({
+              enemyType: { Unknown: target.enemy },
+              totalDamage: target.total,
+              hits: 1,
+            })),
+          }),
+    })),
+  });
 
 describe("enemyDealtCardSectionsFor", () => {
   it("explains an attacker by its attacks and by its victims", () => {
@@ -85,6 +117,24 @@ describe("enemyDealtCardSectionsFor", () => {
       enemyDealtCardSectionsFor({ row: enemyRow(0xcc), players: [player(0, {})], color: "red", labels })
     ).toBeNull();
   });
+
+  it("puts each victim's own art on their row, and no art on the attacks", () => {
+    const players = [
+      player(1, {
+        damageTakenBreakdown: [
+          { enemyType: { Unknown: 0xaa }, actionId: { Normal: 7 }, hits: 1, totalDamage: 400, maxDamage: 400 },
+        ],
+      }),
+    ];
+
+    const sections = enemyDealtCardSectionsFor({ row: enemyRow(0xaa), players, color: "red", labels: iconLabels });
+
+    // Keyed by the player's own index, not their position in the list.
+    expect(sections?.[1].entries[0].icon).toBe("src-icon-1");
+    // Deliberate: every attack here belongs to the row's OWN enemy, whose
+    // portrait the row above the card already shows.
+    expect(sections?.[0].entries[0].icon).toBeUndefined();
+  });
 });
 
 describe("enemyReceivedCardSectionsFor", () => {
@@ -121,5 +171,30 @@ describe("enemyReceivedCardSectionsFor", () => {
     expect(sections?.[0].entries).toEqual([expect.objectContaining({ label: "player 0", value: 600, color: "blue" })]);
     expect(sections?.[1].headingKey).toBe("ui.logs.hover-by-ability");
     expect(sections?.[1].entries[0].value).toBe(600);
+  });
+
+  it("returns null for a victim nobody dealt to", () => {
+    const players = [dealer(0, [{ action: 100, targets: [{ enemy: 0xbb, total: 100 }] }])];
+
+    expect(enemyReceivedCardSectionsFor({ row: enemyRow(0xaa), players, color: "red", labels })).toBeNull();
+  });
+
+  it("tolerates a cached payload whose skills predate `targets`", () => {
+    // No per-enemy breakdown at all, which means "unavailable" — not that the
+    // skill hit nothing. Either way there is nothing to decompose.
+    const players = [dealer(0, [{ action: 100 }])];
+
+    expect(enemyReceivedCardSectionsFor({ row: enemyRow(0xaa), players, color: "red", labels })).toBeNull();
+  });
+
+  it("gives each section its own art — player portraits to sources, ability art to abilities", () => {
+    const players = [dealer(2, [{ action: 100, targets: [{ enemy: 0xaa, total: 600 }] }])];
+
+    const sections = enemyReceivedCardSectionsFor({ row: enemyRow(0xaa), players, color: "red", labels: iconLabels });
+
+    expect(sections?.[0].entries[0].icon).toBe("src-icon-2");
+    // The ability key, not the player index: the two lookups must not be
+    // crossed, and a shared placeholder would hide it if they were.
+    expect(sections?.[1].entries[0].icon).toBe("ab-icon-Normal:100");
   });
 });
