@@ -178,9 +178,42 @@ describe("buildEffectSeries", () => {
     expect(series.map((entry) => entry.key)).toEqual(["status:2:500", "status:3:500"]);
   });
 
-  it("answers empty for an empty chart", () => {
+  it("returns nothing when the chart has no buckets", () => {
     expect(
       buildEffectSeries({ intervals: [interval({})], bucketMs: 1_000, len: 0, topN: 8, labelOf, holderKeyOf })
     ).toEqual([]);
+  });
+
+  it("discards the portion of an interval that starts before the chart", () => {
+    // Window is bucket 0 [0,1000) and bucket 1 [1000,2000). The interval
+    // starts 500ms before the chart; that early sliver must not be written to
+    // a negative index, and the holder must still be counted in the buckets
+    // its window genuinely covers.
+    const series = buildEffectSeries({
+      intervals: [interval({ actorIndex: 0, startMs: -500, endMs: 1_500 })],
+      bucketMs: 1_000,
+      len: 2,
+      topN: 8,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series[0].values).toEqual([1, 1]);
+  });
+
+  it("fills to the last bucket for an interval that ends past the chart", () => {
+    // The window is only 2 buckets (2000ms) long; the interval runs to
+    // 5000ms. It must fill bucket 1 and stop — not run past values.length.
+    const series = buildEffectSeries({
+      intervals: [interval({ actorIndex: 0, startMs: 0, endMs: 5_000 })],
+      bucketMs: 1_000,
+      len: 2,
+      topN: 8,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series[0].values).toEqual([1, 1]);
+    expect(series[0].values).toHaveLength(2);
   });
 });
