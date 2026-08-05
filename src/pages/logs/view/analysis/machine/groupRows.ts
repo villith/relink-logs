@@ -225,3 +225,40 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
     return b.value - a.value;
   });
 };
+
+/** One chart band per aggregate, keyed by the SAME row-key grammar
+ * `groupRowsFor` gives the table, with friendly abilities folded by the same
+ * skill-group rule (summing their series) — so a band and the row it
+ * decomposes are one thing, which is the whole point of the shared
+ * aggregation. Sorted largest-first with `other` last, like the rows. */
+export const groupBandsFor = (aggregates: GroupAggregate[]): { key: string; values: number[] }[] => {
+  const bands = new Map<string, number[]>();
+  for (const { key, series } of aggregates) {
+    const bandKey =
+      key.kind === "player"
+        ? `player:${key.index}`
+        : key.kind === "enemySpawn"
+          ? `target:${key.segment}`
+          : key.kind === "enemyType"
+            ? enemyRowKey(key.enemyType)
+            : key.kind === "enemyAttack"
+              ? `taken:${JSON.stringify({ enemyType: key.enemyType, actionId: key.actionId })}`
+              : key.kind === "friendlyAbility"
+                ? `skill:${abilityRowOf(key)}`
+                : "other";
+    const found = bands.get(bandKey);
+    if (found) {
+      for (let bucket = 0; bucket < series.length; bucket++) found[bucket] = (found[bucket] ?? 0) + series[bucket];
+    } else {
+      bands.set(bandKey, [...series]);
+    }
+  }
+  return [...bands.entries()]
+    .map(([key, values]) => ({ key, values, total: values.reduce((sum, value) => sum + value, 0) }))
+    .sort((a, b) => {
+      if (a.key === "other") return 1;
+      if (b.key === "other") return -1;
+      return b.total - a.total;
+    })
+    .map(({ key, values }) => ({ key, values }));
+};

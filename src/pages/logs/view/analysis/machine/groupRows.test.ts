@@ -12,7 +12,7 @@ vi.mock("@/assets/skill-groups", () => ({
 import type { GroupAggregate, GroupKey, GroupMeasure } from "@/types";
 import { humanizeNumber, ratePerSecond, share } from "@/utils";
 
-import { groupRowsFor, type GroupRowsContext } from "./groupRows";
+import { groupBandsFor, groupRowsFor, type GroupRowsContext } from "./groupRows";
 
 const measure = (amount: number, hits = 1, min: number | null = null, max: number | null = null): GroupMeasure => ({
   amount,
@@ -157,6 +157,35 @@ describe("groupRowsFor — enemy rows", () => {
     expect(rows[0].pinOnClick).toEqual({ ability: label });
     // The four-column taken drill-down shape: amount, hits, average, DTPS.
     expect(rows[0].columns).toEqual([humanizeNumber(600), "3", humanizeNumber(200), ratePerSecond(600, 10_000)]);
+  });
+});
+
+describe("groupBandsFor", () => {
+  it("keys bands by the same grammar as the rows and folds skill-group members' series", () => {
+    const bands = groupBandsFor([
+      {
+        key: { kind: "friendlyAbility", actionType: { Normal: 100 }, childCharacterType: "Pl0000" },
+        measure: measure(300),
+        series: [100, 200],
+      },
+      {
+        key: { kind: "friendlyAbility", actionType: { Normal: 110 }, childCharacterType: "Pl0000" },
+        measure: measure(100),
+        series: [0, 100],
+      },
+      { key: { kind: "player", index: 2 }, measure: measure(50), series: [50] },
+    ]);
+
+    expect(bands.map((band) => band.key)).toEqual(['skill:Group:normal-attack@"Pl0000"', "player:2"]);
+    expect(bands[0].values).toEqual([100, 300]);
+  });
+
+  it("keeps the other rollup last however large its series", () => {
+    const bands = groupBandsFor([
+      { key: { kind: "other" }, measure: measure(9000), series: [9000] },
+      { key: { kind: "player", index: 0 }, measure: measure(10), series: [10] },
+    ]);
+    expect(bands.map((band) => band.key)).toEqual(["player:0", "other"]);
   });
 });
 

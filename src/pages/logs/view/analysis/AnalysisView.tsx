@@ -13,16 +13,16 @@ import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounter
 import { useMeterFilters } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import type {
-  AbilityChartSeries,
   ActionType,
   CharacterType,
   ComputedPlayerState,
   EncounterState,
   EnemyType,
+  GroupAbilityFilter,
+  GroupAggregate,
   SelectionFact,
   StatusInterval,
-  TakenChartSeries,
-  TargetChartSeries,
+  WireGroupQuery,
 } from "@/types";
 import {
   PLAYER_COLORS,
@@ -72,11 +72,10 @@ import "./analysis.css";
 import { cardSectionsFor } from "./cardSections";
 import { buildSeriesPoints } from "./chartSeries";
 import { formatChartDebug, type ChartDebugFacts } from "./debugSummary";
-import { foldAbilityChart, foldTargetChart } from "./drillSeries";
 import { enemyDealtCardSectionsFor, enemyReceivedCardSectionsFor } from "./hostilityCardSections";
-import { hostilitySeriesFor } from "./hostilityChart";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
+import { groupBandsFor, groupRowsFor } from "./machine/groupRows";
 import { resolveViewSpec } from "./machine/resolve";
 import type { MetricKey } from "./machine/state";
 import {
@@ -175,13 +174,12 @@ export const AnalysisView = () => {
     dpsChart,
     stunChart,
     takenChart,
-    enemyDealtChart,
-    enemyReceivedChart,
     chartLen,
     sbaChart,
     sbaChartLen,
     targetEntries,
     selectionFacts: baseFacts,
+    groups: baseGroups,
     statusIntervals,
     playerData,
     questId,
@@ -196,13 +194,12 @@ export const AnalysisView = () => {
       dpsChart: state.dpsChart,
       stunChart: state.stunChart,
       takenChart: state.takenChart,
-      enemyDealtChart: state.enemyDealtChart,
-      enemyReceivedChart: state.enemyReceivedChart,
       chartLen: state.chartLen,
       sbaChart: state.sbaChart,
       sbaChartLen: state.sbaChartLen,
       targetEntries: state.targetEntries,
       selectionFacts: state.selectionFacts,
+      groups: state.groups,
       statusIntervals: state.statusIntervals,
       playerData: state.players,
       questId: state.questId,
@@ -253,16 +250,12 @@ export const AnalysisView = () => {
   );
   // The legacy row level is a projection of the resolved grouping.
   const level = levelFor(spec.groupBy);
-  // Meter state, facts and drill-down chart re-derived under the current pins
-  // and window. Null means "nothing pinned and no window", i.e. the base load
-  // already says it.
+  // Meter state, facts and group aggregates re-derived under the current
+  // pins, window and grouping. Null means "the base load already says it".
   const [scoped, setScoped] = useState<{
     state: EncounterState;
     facts: SelectionFact[];
-    abilityChart: AbilityChartSeries[];
-    targetChart: TargetChartSeries[];
-    takenChart: TakenChartSeries[];
-    playerChart: Record<number, number[]>;
+    groups: GroupAggregate[];
   } | null>(null);
 
   // Responses are not ordered with respect to their requests (the command is
@@ -271,12 +264,22 @@ export const AnalysisView = () => {
   const loadGeneration = useRef(0);
   const scopeGeneration = useRef(0);
 
+  // The wire query the base load sent (as its JSON identity), so the scoped
+  // effect can tell "the base response already answered this grouping" from
+  // "a regroup needs its own fetch". Refs rather than deps: the base load
+  // must not re-run — full charts and party — on every pin or regroup.
+  const wireQueryRef = useRef<WireGroupQuery | undefined>(undefined);
+  const baseQueryKeyRef = useRef<string | null>(null);
+
   // The base load: the full fight, unpinned. Owns the charts, the party and the
-  // quest metadata, none of which a pin changes.
+  // quest metadata, none of which a pin changes. Carries the CURRENT group
+  // query too, so the groups path has rows and bands on first paint.
   useEffect(() => {
     const generation = ++loadGeneration.current;
     scopeGeneration.current += 1;
-    invoke("fetch_encounter_state", { id: Number(id), options: { filters } })
+    const groupQuery = wireQueryRef.current;
+    baseQueryKeyRef.current = groupQuery === undefined ? null : JSON.stringify(groupQuery);
+    invoke("fetch_encounter_state", { id: Number(id), options: { filters, groupQuery } })
       .then((result) => {
         if (generation !== loadGeneration.current) return;
         loadFromResponse(result as EncounterStateResponse);
@@ -331,9 +334,47 @@ export const AnalysisView = () => {
     [pins.ability, everySkill]
   );
 
-  // The scoped fetch: everything the selector bar and the window change. Sends
-  // `stateOnly` because the charts stay from the base load — the backend still
-  // returns selection facts there, so the cascade re-narrows with the window.
+  // The resolver's fetch, expanded into the wire shape: the raw ability pin
+  // becomes whichever `AbilityFilter` grammar the query's event stream reads
+  // (a friendly action list on the dealt stream, one enemy attack on the
+  // taken one — a pin in the wrong grammar for the stream narrows nothing),
+  // and the committed window is stamped on so the measures follow the scrub.
+  const wireQuery = useMemo((): WireGroupQuery | undefined => {
+    if (spec.fetch === null) return undefined;
+    const dealtStream = (spec.fetch.metric === "damage") === (spec.fetch.hostility === "friendly");
+    let ability: GroupAbilityFilter | null = null;
+    if (spec.fetch.ability !== null) {
+      const attack = takenAttackRowParts(spec.fetch.ability);
+      if (dealtStream && attack === null) {
+        ability = { kind: "friendly", actions: actionsForPin(spec.fetch.ability, everySkill) };
+      } else if (!dealtStream && attack !== null) {
+        ability = { kind: "enemyAttack", enemyType: attack.enemyType, actionId: attack.actionId };
+      }
+    }
+    return {
+      metric: spec.fetch.metric,
+      hostility: spec.fetch.hostility,
+      groupBy: spec.fetch.groupBy,
+      source: spec.fetch.source,
+      target: spec.fetch.target,
+      ability,
+      topN: spec.fetch.topN,
+      // Buckets are inclusive at both ends, so the cutoff has to admit all of
+      // the last one — `end * 1000` would window one bucket short.
+      ...(state.window === null
+        ? {}
+        : { fromMs: state.window[0] * DPS_BUCKET_MS, upToMs: (state.window[1] + 1) * DPS_BUCKET_MS - 1 }),
+    };
+  }, [spec.fetch, everySkill, state.window]);
+  wireQueryRef.current = wireQuery;
+  // The query's JSON identity, for "is a refetch needed at all" below — the
+  // object is rebuilt every render, so identity comparison would always refetch.
+  const wireQueryKey = useMemo(() => (wireQuery === undefined ? null : JSON.stringify(wireQuery)), [wireQuery]);
+
+  // The scoped fetch: everything the selector bar, the window and the grouping
+  // change. Sends `stateOnly` because the charts stay from the base load — the
+  // backend still returns selection facts there, so the cascade re-narrows
+  // with the window — and carries the group query for the groups-path table.
   useEffect(() => {
     // A status pin narrows nothing the backend knows about — the request below
     // deliberately sends `abilities: []` for one. Counting it as "pinned"
@@ -341,7 +382,10 @@ export const AnalysisView = () => {
     // whose result was byte-identical to the base load already in the store.
     const pinned =
       pins.source !== null || (pins.ability !== null && !isStatusPin(pins.ability)) || targetSpans.length > 0;
-    if (!pinned && range === null) {
+    // A regroup with nothing pinned still needs ITS grouping's aggregates —
+    // unless the base load already fetched this exact query.
+    const needsGroups = wireQueryKey !== null && wireQueryKey !== baseQueryKeyRef.current;
+    if (!pinned && range === null && !needsGroups) {
       setScoped(null);
       return;
     }
@@ -360,30 +404,31 @@ export const AnalysisView = () => {
         // the last one — `end * 1000` would reparse a window one bucket short.
         ...(range === null ? {} : { fromMs: range[0] * DPS_BUCKET_MS, upToMs: (range[1] + 1) * DPS_BUCKET_MS - 1 }),
         stateOnly: true,
+        groupQuery: wireQueryRef.current,
       },
     })
       .then((result) => {
         if (generation !== scopeGeneration.current) return;
         const response = result as EncounterStateResponse;
         // Normalised here, at the boundary: the Rust binary does not hot-reload,
-        // so a frontend ahead of its backend must degrade to "no drill chart"
+        // so a frontend ahead of its backend must degrade to "no groups"
         // rather than throw on a field the running binary never sends.
         setScoped({
           state: response.encounterState,
           facts: response.selectionFacts ?? [],
-          abilityChart: response.abilityChart ?? [],
-          targetChart: response.targetChart ?? [],
-          takenChart: response.takenAbilityChart ?? [],
-          // Present only when a pin narrows the fight with no source pinned;
-          // absent on an older binary, which degrades to the base-load chart.
-          playerChart: response.dpsChart ?? {},
+          groups: response.groups ?? [],
         });
       })
       .catch((e) => {
         if (generation !== scopeGeneration.current) return;
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
-  }, [id, filters, pins.source, pins.ability, pinnedActions, targetSpans, range]);
+  }, [id, filters, pins.source, pins.ability, pinnedActions, targetSpans, range, wireQueryKey]);
+
+  // Which aggregates the groups path renders: the scoped fetch's when one is
+  // in hand, else the base load's — valid only while the current query IS the
+  // one the base load sent (the effect above refetches whenever it is not).
+  const groups = scoped?.groups ?? baseGroups;
 
   const shownEncounter = scoped?.state ?? encounter;
 
@@ -589,39 +634,64 @@ export const AnalysisView = () => {
     [statusIntervals, statusWindow]
   );
 
-  const rows = useMemo(
-    () =>
-      shownEncounter
-        ? metric.rows({
-            encounter: shownEncounter,
-            partyData: playerData,
-            players,
-            // The full party: `players` is the scoped one, and the status tables
-            // use their roster to tell a buff from a debuff — a pinned source
-            // would file the rest of the party's buffs as enemy-held.
-            roster: identityPlayers,
-            level,
-            pins,
-            statusIntervals: windowedIntervals,
-            fightDurationMs,
-            statusWindow,
-            hostility,
-          })
-        : [],
-    [
-      metric,
-      shownEncounter,
-      playerData,
-      players,
-      identityPlayers,
-      level,
-      pins,
-      windowedIntervals,
-      fightDurationMs,
-      statusWindow,
-      hostility,
-    ]
+  // Party slot per player index, for the group fold's row colours.
+  const partySlots = useMemo(
+    () => new Map(identityPlayers.map((player) => [player.index, player.partyIndex])),
+    [identityPlayers]
   );
+
+  // Which machinery produces rows is the metric's declared data path: the
+  // groups path folds the fetched aggregates; the derived and interval paths
+  // keep their descriptors exactly as before the machine.
+  const groupsPath = caps.dataPath === "groups";
+
+  const rows = useMemo(() => {
+    if (groupsPath) {
+      return groupRowsFor(groups, {
+        metric: metricKey as "damage" | "taken",
+        groupBy: spec.groupBy,
+        hostility,
+        partySlots,
+        source: state.source,
+        fightDurationMs,
+      });
+    }
+    return shownEncounter
+      ? metric.rows({
+          encounter: shownEncounter,
+          partyData: playerData,
+          players,
+          // The full party: `players` is the scoped one, and the status tables
+          // use their roster to tell a buff from a debuff — a pinned source
+          // would file the rest of the party's buffs as enemy-held.
+          roster: identityPlayers,
+          level,
+          pins,
+          statusIntervals: windowedIntervals,
+          fightDurationMs,
+          statusWindow,
+          hostility,
+        })
+      : [];
+  }, [
+    groupsPath,
+    groups,
+    metricKey,
+    spec.groupBy,
+    partySlots,
+    state.source,
+    metric,
+    shownEncounter,
+    playerData,
+    players,
+    identityPlayers,
+    level,
+    pins,
+    windowedIntervals,
+    fightDurationMs,
+    statusWindow,
+    hostility,
+  ]);
 
   const isStatusMetric = metric.labelKind("players") === "status";
   const statusRowKind = statusRowKindFor(pins.ability, hostility);
@@ -917,42 +987,43 @@ export const AnalysisView = () => {
     };
   }, [metricKey, dpsChart, stunChart, takenChart, chartLen, sbaChart, sbaChartLen]);
 
-  // The chart follows the ROW LEVEL: a player row is explained by the party's
-  // curves, an ability row by that player's skill groups, a hit row by the
-  // targets the ability hit. Null keeps the per-player chart.
-  //
-  // Damage only. Stun's two capture paths reconcile with max(), which does not
-  // decompose per ability, so there is no honest per-ability stun series to
-  // draw — the stun tab narrows to the pinned player instead (below) rather
-  // than inventing one. SBA is a per-player gauge with no decomposition at all.
-  const drill = useMemo(() => {
-    if ((metricKey !== "damage" && metricKey !== "taken") || !scoped) return null;
-    const owner = playerByIndex.get(pins.source ?? -1)?.player;
-    if (!owner) return null;
+  // Display name for one chart band, off the same row-key grammar the table's
+  // rows carry — a band and the row it decomposes must read identically.
+  const bandLabelFor = useCallback(
+    (key: string): string => {
+      if (key === "other") return t("ui.logs.chart-other-label");
+      if (key.startsWith("player:")) return labelForSource(Number(key.slice("player:".length)));
+      if (key.startsWith("target:")) return labelForTarget(Number(key.slice("target:".length)));
+      if (key.startsWith("enemy:")) return translateEnemyType(parseEnemyRow(key.slice("enemy:".length)));
+      if (key.startsWith("taken:")) return takenAttackLabel(key.slice("taken:".length));
+      if (key.startsWith("skill:")) return labelForAbility(key.slice("skill:".length));
+      return key;
+    },
+    // i18n.language: every branch produces a translated name.
+    [t, labelForSource, labelForTarget, takenAttackLabel, labelForAbility, i18n.language]
+  );
 
-    // The taken tab drills into what HIT the pinned player, one band per
-    // (attacker, attack) — the same grouping as its table rows.
-    if (metricKey === "taken") {
-      if (level === "players" || scoped.takenChart.length === 0) return null;
-      return scoped.takenChart.map((series) => ({
-        key: `taken:${JSON.stringify({ enemyType: series.enemyType, actionId: series.actionId })}`,
-        label: labelForTakenAttack(series.enemyType, series.actionId),
-        values: series.values,
-      }));
+  // The groups path's source grouping on the friendly side is the per-player
+  // chart the base load used to own — one LINE per player in party colours,
+  // not a stacked overlay — narrowed by whatever the query filtered, which is
+  // exactly what the old scoped per-player rebuild provided.
+  const groupPlayerSeries = useMemo(() => {
+    if (!groupsPath || spec.groupBy !== "source" || hostility !== "friendly") return null;
+    const byIndex: Record<number, number[]> = {};
+    for (const aggregate of groups) {
+      if (aggregate.key.kind === "player") byIndex[aggregate.key.index] = aggregate.series;
     }
+    return Object.keys(byIndex).length > 0 ? byIndex : null;
+  }, [groupsPath, spec.groupBy, hostility, groups]);
 
-    if (level === "abilities" && scoped.abilityChart.length > 0) {
-      return foldAbilityChart(scoped.abilityChart, owner.characterType, getSkillName);
-    }
-    if (level === "skills" && scoped.targetChart.length > 0) {
-      return foldTargetChart(
-        scoped.targetChart,
-        (enemyType, instance) => targetLabels.get(targetLabelKey(enemyType, instance)) ?? translateEnemyType(enemyType)
-      );
-    }
-    return null;
-    // i18n.language: both folds produce translated labels.
-  }, [metricKey, scoped, level, pins.source, playerByIndex, targetLabels, labelForTakenAttack, i18n.language]);
+  // Every other grouping (and the whole enemy side) stacks the aggregates'
+  // bands — the same series whose sums the table's rows report, so the chart
+  // and the table cannot disagree.
+  const groupOverlay = useMemo(() => {
+    if (!groupsPath || (spec.groupBy === "source" && hostility === "friendly")) return null;
+    if (groups.length === 0) return null;
+    return groupBandsFor(groups).map(({ key, values }) => ({ key, label: bandLabelFor(key), values }));
+  }, [groupsPath, spec.groupBy, hostility, groups, bandLabelFor]);
 
   // The Stacks plot: one stacked series per holder of the pinned effect, so the
   // height is how many stacks the party held at that moment. Only on the status
@@ -993,100 +1064,47 @@ export const AnalysisView = () => {
     identityPlayers,
   ]);
 
-  // The enemy-side plot: one stacked band per enemy TYPE, decomposing exactly
-  // what the enemy-side table ranks. Same `{key, label, values}` shape as the
-  // Stacks and drill overlays, so it rides the same path below; the backend
-  // already caps it at eight bands.
-  //
-  // Which series each tab draws lives in `hostilitySeriesFor` — it is the one
-  // mapping this feature has inverted before, so it is a tested pure function
-  // rather than a ternary in a component with no test harness.
-  //
-  // Both series come off the BASE load, so they always span the whole fight: a
-  // pin does not narrow them, exactly as the taken and enemy-HP charts already
-  // behave. The window slice below still applies, so scrubbing crops them.
-  const hostilitySeries = useMemo(
-    () =>
-      enemySide
-        ? hostilitySeriesFor({
-            metricKey,
-            dealt: enemyDealtChart,
-            received: enemyReceivedChart,
-            enemyName: translateEnemyType,
-          })
-        : null,
-    // i18n.language: the labels are translated enemy names.
-    [enemySide, metricKey, enemyDealtChart, enemyReceivedChart, i18n.language]
-  );
-
   // Which series the per-player chart draws. identityPlayers, not players: these
   // charts hold the whole party, so a pin must not drop curves from the plot.
   //
-  // The exception is a level whose own decomposition is missing — a metric with
-  // no drill-down (stun, SBA), or a fight whose bands came back empty. Showing
-  // the whole party there answers a question nobody asked; narrowing to the
-  // pinned player is the most the data supports. Declared after `drill` because
-  // it reads it.
+  // The exception is a pinned source on a metric with no decomposition to
+  // draw (stun, SBA): showing the whole party there answers a question nobody
+  // asked, and narrowing to the pinned player is the most the data supports.
   const chartIndexes = useMemo(() => {
     const everyone = identityPlayers.map((player) => player.index);
-    if (drill || pins.source === null) return everyone;
+    if (statusSeries || groupOverlay || groupPlayerSeries || pins.source === null) return everyone;
     return everyone.filter((index) => index === pins.source);
-  }, [identityPlayers, drill, pins.source]);
+  }, [identityPlayers, statusSeries, groupOverlay, groupPlayerSeries, pins.source]);
 
   // With no source pinned, an enemy or ability pin still narrows the fight, and
   // the backend rebuilds the per-player series under it — otherwise the plot
   // keeps drawing the whole fight beside a table that has halved. Damage only:
   // it is the only metric a target span can narrow honestly (see
   // `build_scoped_player_chart`).
-  const scopedPlayers = useMemo(
-    () => (metricKey === "damage" && scoped && Object.keys(scoped.playerChart).length > 0 ? scoped.playerChart : null),
-    [metricKey, scoped]
-  );
-
   // Whichever series is drawn INSTEAD of the per-player ones. Stack counts and
-  // drill-down bands are the same shape and are consumed identically, so they
-  // are one branch here rather than the same ternary spelled out per field.
-  // Which of the two it is still matters for smoothing and scale below.
-  //
-  // The enemy side REPLACES the drill rather than losing to it: the drill bands
-  // decompose one pinned player, and beside an enemy table that player's row is
-  // not on screen at all. With no enemy series to draw (an old log, or a status
-  // tab) the plot keeps whatever the metric's own source is, which is still
-  // about the fight rather than about a row nobody can see.
-  const overlay = statusSeries ?? (enemySide ? hostilitySeries : drill);
+  // group bands are the same shape and are consumed identically, so they are
+  // one branch here rather than the same ternary spelled out per field.
+  const overlay = statusSeries ?? groupOverlay;
 
   // WHICH of those the plot ended up drawing, recognised from the value itself
-  // rather than re-derived from the pins. Everything that has to describe the
-  // plot — its title and the dev readout — reads this one const, so the
-  // precedence above is stated exactly once: change `overlay` and the title and
-  // the readout follow, with no third site to forget.
-  //
-  // Identity comparison, and `overlay === null` first: the three sources are
-  // distinct arrays whenever they exist, but two absent ones are both null and
-  // would match each other.
+  // rather than re-derived from the pins, so the title and the dev readout
+  // cannot disagree with what is on screen. "scoped" here is the groups path's
+  // per-player lines (the query's filters applied); "drill" its stacked bands.
   const chartSource: ChartDebugFacts["chart"] =
-    overlay === null
-      ? scopedPlayers
-        ? "scoped"
-        : "base"
-      : overlay === statusSeries
-        ? "stacks"
-        : overlay === hostilitySeries
-          ? "enemy"
-          : "drill";
+    overlay === null ? (groupPlayerSeries ? "scoped" : "base") : overlay === statusSeries ? "stacks" : "drill";
 
   const chartData: ChartDatapoint[] = useMemo(() => {
     const source = overlay
       ? Object.fromEntries(overlay.map((series) => [series.key, series.values]))
-      : scopedPlayers ?? chartMetric.source;
+      : groupPlayerSeries ?? chartMetric.source;
     const keys = overlay ? overlay.map((series) => series.key) : chartIndexes;
-    // Drill and scoped series are built over the whole fight from the same
-    // per-second buckets, so their own length is authoritative — the base load's
+    // Group series are built over the whole fight from the same per-second
+    // buckets, so their own length is authoritative — the base load's
     // chartLen belongs to a different fetch.
     const len = overlay
       ? Math.max(0, ...overlay.map((series) => series.values.length))
-      : scopedPlayers
-        ? Math.max(0, ...Object.values(scopedPlayers).map((values) => values.length))
+      : groupPlayerSeries
+        ? Math.max(0, ...Object.values(groupPlayerSeries).map((values) => values.length))
         : chartMetric.len;
 
     return buildSeriesPoints({
@@ -1098,11 +1116,11 @@ export const AnalysisView = () => {
       // second at four stacks reads as one, and every edge of what is really a
       // step function becomes a ramp.
       smoothing: statusSeries ? 1 : chartMetric.smoothing,
-      // The scoped per-player chart is raw damage like `dpsChart`, so its scale
-      // is 1 on the damage tab either way — kept explicit rather than accidental.
-      scale: overlay || scopedPlayers ? 1 : chartMetric.scale,
+      // The group series are raw damage like `dpsChart`, so their scale is 1
+      // on the damage tab either way — kept explicit rather than accidental.
+      scale: overlay || groupPlayerSeries ? 1 : chartMetric.scale,
     }).map((point, bucket) => ({ ...point, timestamp: bucketLabel(bucket) })) as ChartDatapoint[];
-  }, [chartMetric, chartIndexes, overlay, scopedPlayers, statusSeries]);
+  }, [chartMetric, chartIndexes, overlay, groupPlayerSeries, statusSeries]);
 
   const labels: Label = useMemo(
     () =>
@@ -1260,36 +1278,27 @@ export const AnalysisView = () => {
       <DpsChart
         data={shownChartData}
         labels={labels}
-        // Titled after what is DRAWN (`chartSource`), never after what the pins
-        // would suggest — the two come apart on the enemy side, which suppresses
-        // the drill.
+        // Titled after what is DRAWN, never after what the pins would suggest.
         labelKey={
           chartSource === "stacks"
             ? "ui.logs.chart-stacks-label"
-            : // The enemy side inverts which way the damage flows, so both of
-              // these name both ends. Reusing the friendly titles would leave
-              // the heading unchanged across a toggle that swapped the plotted
-              // quantity for its opposite.
-              chartSource === "enemy"
-              ? metricKey === "damage"
-                ? "ui.logs.chart-enemy-dealt-label"
-                : "ui.logs.chart-enemy-received-label"
-              : chartSource === "drill"
-                ? metricKey === "taken"
+            : groupOverlay !== null
+              ? // The enemy side inverts which way the damage flows, so both
+                // of these name both ends. Reusing the friendly titles would
+                // leave the heading unchanged across a toggle that swapped
+                // the plotted quantity for its opposite.
+                enemySide
+                ? metricKey === "damage"
+                  ? "ui.logs.chart-enemy-dealt-label"
+                  : "ui.logs.chart-enemy-received-label"
+                : metricKey === "taken"
                   ? "ui.logs.chart-taken-drill-label"
                   : DRILL_LABEL_KEY[level]
-                : chartMetric.labelKey
+              : chartMetric.labelKey
         }
-        // Off `chartSource` for the same reason as the title: an overlay of any
-        // kind plots an amount, and reading the drawn source rather than
-        // re-testing `overlay` keeps every description of the plot on one const.
-        format={
-          chartSource === "stacks"
-            ? "count"
-            : chartSource === "enemy" || chartSource === "drill"
-              ? "amount"
-              : chartMetric.format
-        }
+        // An overlay of any kind plots an amount; the base sources keep their
+        // metric's own format (the SBA gauge is a percent).
+        format={chartSource === "stacks" ? "count" : groupOverlay !== null ? "amount" : chartMetric.format}
         stacked={overlay !== null}
         onScope={handleScope}
         fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}

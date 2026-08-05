@@ -373,6 +373,30 @@ export type GroupKey =
   | { kind: "enemyAttack"; enemyType: EnemyType; actionId: ActionType }
   | { kind: "other" };
 
+/** The ability filter of a wire `GroupQuery` (mirrors the Rust
+ * `AbilityFilter`): a friendly pin ships pre-expanded into its member actions
+ * (`actionsForPin` owns skill-group knowledge); an enemy attack is one
+ * (type, action) pair. */
+export type GroupAbilityFilter =
+  | { kind: "friendly"; actions: ActionType[] }
+  | { kind: "enemyAttack"; enemyType: EnemyType; actionId: ActionType };
+
+/** The wire aggregation request (mirrors the Rust `GroupQuery`). The
+ * resolver's own `GroupQuery` (machine/resolve.ts) carries the RAW ability
+ * pin; the view expands it into this shape at fetch time, and stamps the
+ * committed scrub window on so the measures follow the scrub. */
+export type WireGroupQuery = {
+  metric: "damage" | "taken";
+  hostility: "friendly" | "enemy";
+  groupBy: "source" | "ability" | "target";
+  source: GroupActorRef | null;
+  target: GroupActorRef | null;
+  ability: GroupAbilityFilter | null;
+  topN: number;
+  fromMs?: number;
+  upToMs?: number;
+};
+
 /** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`). */
 export type GroupMeasure = { amount: number; hits: number; min: number | null; max: number | null };
 
