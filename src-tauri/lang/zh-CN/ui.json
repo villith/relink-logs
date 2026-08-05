@@ -150,7 +150,7 @@
       "damage-description": "总伤害",
       "damage-percentage": "%",
       "damage-percentage-description": "总伤害占比",
-      "sup-percentage": "追击率",
+      "sup-percentage": "追击",
       "sup-percentage-description": "追击触发的额外伤害",
       "sba": "奥义",
       "sba-description": "实时奥义槽数值",
