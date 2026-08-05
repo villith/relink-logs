@@ -383,3 +383,51 @@
 .analysis-hostility-disabled .analysis-hostility-option {
   cursor: default;
 }
+
+/* The aura chip strips (WCL's Source/Target Auras Filter), between the chart
+ * and the table. Chips wrap; the selected one takes the accent outline the
+ * window chip already uses, and carries the ✕ that clears it. */
+.analysis-aura-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--an-line);
+}
+
+.analysis-aura-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  border: 1px solid var(--an-line-strong);
+  border-radius: 4px;
+  background-color: var(--an-panel);
+}
+
+.analysis-aura-chip-selected {
+  border-color: var(--an-accent);
+  background-color: rgba(0, 184, 217, 0.09);
+  padding-right: 2px;
+}
+
+.analysis-aura-chip-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--an-ink-2);
+  cursor: pointer;
+}
+
+.analysis-aura-chip-selected .analysis-aura-chip-button {
+  color: var(--an-ink);
+  padding-right: 2px;
+}
+
+.analysis-aura-chip-uptime {
+  font-size: 11px;
+  color: var(--an-ink-3);
+}
