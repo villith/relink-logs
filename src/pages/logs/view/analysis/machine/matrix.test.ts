@@ -6,8 +6,9 @@ import { DEFAULT_STATE, DIMENSIONS, METRIC_KEYS, type AnalysisState } from "./st
 
 /** Every meaningful shape of the state space. Pin VALUES don't change the
  * resolution — only pin PRESENCE does — so one representative value per
- * dimension enumerates the machine. */
-export const allStates = (): AnalysisState[] => {
+ * dimension enumerates the machine. `window` is deliberately left at
+ * DEFAULT_STATE's null — see the invariance assertion below. */
+const allStates = (): AnalysisState[] => {
   const states: AnalysisState[] = [];
   for (const metric of METRIC_KEYS) {
     for (const hostility of ["friendly", "enemy"] as const) {
@@ -15,9 +16,7 @@ export const allStates = (): AnalysisState[] => {
         for (const ability of [null, metric === "buffs" || metric === "debuffs" ? "status:10:3" : "skill:5"]) {
           for (const target of [null, 0]) {
             for (const by of [null, ...DIMENSIONS]) {
-              for (const window of [null, [5, 20] as [number, number]]) {
-                states.push({ ...DEFAULT_STATE, metric, hostility, source, ability, target, by, window });
-              }
+              states.push({ ...DEFAULT_STATE, metric, hostility, source, ability, target, by });
             }
           }
         }
@@ -30,17 +29,24 @@ export const allStates = (): AnalysisState[] => {
 describe("the full state matrix", () => {
   it("resolves every state to a spec with an active grouping and no silent holes", () => {
     for (const state of allStates()) {
-      const spec = resolveViewSpec(state, CAPABILITIES[state.metric]);
+      const caps = CAPABILITIES[state.metric];
+      const spec = resolveViewSpec(state, caps);
       expect(spec.regroupTabs.filter((tab) => tab.active)).toHaveLength(1);
       // Every disabled tab must say why.
       for (const tab of spec.regroupTabs) {
-        if (!CAPABILITIES[state.metric].dimensions[tab.dim].supported) {
+        if (!caps.dimensions[tab.dim].supported) {
           expect(tab.disabledReason, `${state.metric}/${tab.dim}`).toBeTruthy();
         }
       }
+      // window never affects resolution today — assert it explicitly, so the
+      // moment it starts mattering, a test fails naming it.
+      expect(resolveViewSpec({ ...state, window: [5, 20] }, caps)).toEqual(spec);
     }
   });
 
+  // Row: metric hostility pins by → groupBy chart.source chart.titleKey fetch|local
+  // pins: S/A/T = source/ability/target pinned (fixed order), - = unpinned;
+  // · = no by override.
   it("matches the reviewed snapshot — a diff here is a behavior change", () => {
     const rows = allStates().map((state) => {
       const spec = resolveViewSpec(state, CAPABILITIES[state.metric]);
@@ -54,7 +60,6 @@ describe("the full state matrix", () => {
         state.hostility,
         pins,
         state.by ?? "·",
-        state.window ? "win" : "···",
         "→",
         spec.groupBy,
         spec.chart.source,

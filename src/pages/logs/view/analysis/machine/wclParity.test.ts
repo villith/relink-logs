@@ -7,7 +7,7 @@ import { DEFAULT_STATE, type AnalysisState } from "./state";
 const state = (over: Partial<AnalysisState>): AnalysisState => ({ ...DEFAULT_STATE, ...over });
 
 /** Each case: the WCL report state it mirrors → the grouping WCL showed.
- * Report P6CwHkgFR9Krf1Bz fight 10 unless noted. */
+ * Report P6CwHkgFR9Krf1Bz fight 10 unless noted. Verified 2026-08-04. */
 const CASES: { name: string; state: AnalysisState; groupBy: string }[] = [
   { name: "?type=damage-done → Done By Source", state: DEFAULT_STATE, groupBy: "source" },
   { name: "?type=damage-done&source=14 → Done By Ability", state: state({ source: 14 }), groupBy: "ability" },
