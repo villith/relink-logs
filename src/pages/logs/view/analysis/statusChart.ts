@@ -142,6 +142,13 @@ export const buildEffectSeries = ({
           covered = new Uint8Array(len);
           coveredByHolder.set(holder, covered);
         }
+        // `covered` is a Uint8Array, which silently drops writes at negative
+        // or out-of-range indices anyway, so these clamps do NOT protect
+        // `values` — the written bucket set is the same either way. What they
+        // actually bound is the loop's iteration count: without Math.max, a
+        // sufficiently negative startMs walks from a huge negative `first` up
+        // to `last`, one iteration per bucket that never lands. Don't drop
+        // them as dead defensive code.
         const first = Math.max(0, Math.floor(interval.startMs / bucketMs));
         // Inclusive of the bucket the window ends in — the same sub-bucket
         // rule buildStatusSeries applies.
