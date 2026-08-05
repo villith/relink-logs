@@ -55,9 +55,10 @@ import { sba } from "../metrics/sba";
 import { stun } from "../metrics/stun";
 import type { Hostility, MetricDescriptor, MetricRow } from "../metrics/types";
 import { deriveSelectorOptions, type SelectorPins } from "../selectorOptions";
-import { clipToWindow, isStatusPin, statusPinKey } from "../statusUptime";
+import { clipToWindow, isStatusPin, statusPinKey, uptimeMs } from "../statusUptime";
 import { buildTargetLabels } from "../targetLabels";
 
+import { AuraStrip, type AuraChip } from "./AuraStrip";
 import { DebugBar } from "./DebugBar";
 import { DpsChart, type StackMode } from "./DpsChart";
 import { HostilityToggle } from "./HostilityToggle";
@@ -68,6 +69,7 @@ import { QuestSummary } from "./QuestSummary";
 import { RegroupStrip } from "./RegroupStrip";
 import { abilityLabelFor, abilityOwnerFor } from "./abilityLabel";
 import "./analysis.css";
+import { auraExcludedBands, auraHolderIntervals, auraWireWindows, type AuraHolder } from "./auraWindows";
 import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "./chartMarkers";
 import { chartPresentation } from "./chartPresentation";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
@@ -75,9 +77,10 @@ import { qualifiedAbilityLabels } from "./labelCollision";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { groupBandsFor, groupRowsFor } from "./machine/groupRows";
-import { GROUP_TOP_N, resolveViewSpec } from "./machine/resolve";
-import type { MetricKey } from "./machine/state";
+import { GROUP_TOP_N, resolveViewSpec, universeOf } from "./machine/resolve";
+import { auraAnchorOf, auraPinKey, type MetricKey } from "./machine/state";
 import {
+  setAura as auraTransition,
   clearPin,
   setHostility as hostilityTransition,
   setMetric as metricTransition,
@@ -249,6 +252,35 @@ export const AnalysisView = () => {
   const wireQueryRef = useRef<WireGroupQuery | undefined>(undefined);
   const baseQueryKeyRef = useRef<string | null>(null);
 
+  // The window the status tables measure, in milliseconds from the fight's
+  // start. Buckets are inclusive at both ends, so the last one runs to the start
+  // of the one after it — the same conversion the scoped fetch and the chart
+  // bands use, kept in one place so the three cannot drift.
+  //
+  // Declared HERE, above the fetch memos, because the aura filter's window mask
+  // rides the group query: `auraWindows` clips against this, and `wireQuery`
+  // reads that. Below them it would be a use-before-declaration.
+  const statusWindow = useMemo(
+    () => ({
+      startMs: (range === null ? 0 : range[0]) * DPS_BUCKET_MS,
+      endMs: (range === null ? chartLen : range[1] + 1) * DPS_BUCKET_MS,
+    }),
+    [range, chartLen]
+  );
+
+  // The uptime denominator: the window's own length, so a scrubbed table reports
+  // uptime WITHIN the window rather than diluting it across a fight the chart is
+  // no longer showing. The window spans whole buckets, so it is never SHORTER
+  // than the intervals inside it — which is what a `(chartLen - 1)` denominator
+  // was, against intervals the backend closes at the exact final millisecond.
+  const fightDurationMs = statusWindow.endMs - statusWindow.startMs;
+
+  // Cropped to that same window, so numerator and denominator measure one span.
+  const windowedIntervals = useMemo(
+    () => clipToWindow(statusIntervals, statusWindow.startMs, statusWindow.endMs),
+    [statusIntervals, statusWindow]
+  );
+
   // The base load: the full fight, unpinned. Owns the charts, the party and the
   // quest metadata, none of which a pin changes. Carries the CURRENT group
   // query too, so the groups path has rows and bands on first paint.
@@ -312,6 +344,22 @@ export const AnalysisView = () => {
     [pins.ability, everySkill]
   );
 
+  // The active aura's admitted windows — the pinned holder's intervals of the
+  // chosen effect, clipped to the chart window. Computed here rather than in
+  // the resolver because they need the fight's status intervals. Undefined =
+  // no aura in the query; an EMPTY array is a real mask (the effect was never
+  // up inside the window) and narrows to nothing.
+  const auraWindows = useMemo(() => {
+    const aura = spec.fetch?.aura ?? null;
+    if (aura === null) return undefined;
+    const anchor = auraAnchorOf(aura);
+    const index = anchor === "source" ? state.source : state.target;
+    if (anchor === null || index === null) return undefined;
+    const holder: AuraHolder =
+      universeOf(anchor, hostility) === "player" ? { kind: "player", index } : { kind: "enemySpawn", segment: index };
+    return auraWireWindows(auraHolderIntervals(statusIntervals, auraPinKey(aura), holder), statusWindow);
+  }, [spec.fetch, state.source, state.target, hostility, statusIntervals, statusWindow]);
+
   // The resolver's fetch, expanded into the wire shape: the raw ability pin
   // becomes whichever `AbilityFilter` grammar the query's event stream reads
   // (a friendly action list on the dealt stream, one enemy attack on the
@@ -342,8 +390,11 @@ export const AnalysisView = () => {
       ...(state.window === null
         ? {}
         : { fromMs: state.window[0] * DPS_BUCKET_MS, upToMs: (state.window[1] + 1) * DPS_BUCKET_MS - 1 }),
+      // The aura mask rides the same query, so the table, the rows and the
+      // chart bands all answer for the same filtered fight.
+      ...(auraWindows === undefined ? {} : { windows: auraWindows }),
     };
-  }, [spec.fetch, everySkill, state.window]);
+  }, [spec.fetch, everySkill, state.window, auraWindows]);
   wireQueryRef.current = wireQuery;
   // The query's JSON identity, for "is a refetch needed at all" below — the
   // object is rebuilt every render, so identity comparison would always refetch.
@@ -557,6 +608,51 @@ export const AnalysisView = () => {
     [t, causeCandidates, i18n.language]
   );
 
+  // The aura chip strips (WCL's Source/Target Auras Filter): the effects the
+  // pinned actor held inside the current chart window, uptime measured
+  // against that same window. Which universe the pin names follows the
+  // hostility role-mapping (`universeOf`), the same rule the group query's
+  // refs use — so a source chip strip on the enemy side is that SPAWN's
+  // effects, not a player's.
+  const auraChipsFor = useCallback(
+    (anchor: "src" | "tgt"): AuraChip[] => {
+      const dim = anchor === "src" ? ("source" as const) : ("target" as const);
+      const index = anchor === "src" ? state.source : state.target;
+      if (index === null) return [];
+      const holder: AuraHolder =
+        universeOf(dim, hostility) === "player" ? { kind: "player", index } : { kind: "enemySpawn", segment: index };
+      const held = windowedIntervals.filter((interval) =>
+        holder.kind === "player" ? interval.actorIndex === holder.index : interval.targetSegment === holder.segment
+      );
+      const byKey = new Map<string, StatusInterval[]>();
+      for (const interval of held) {
+        const key = statusPinKey(interval);
+        const group = byKey.get(key);
+        if (group) group.push(interval);
+        else byKey.set(key, [interval]);
+      }
+      return [...byKey.entries()]
+        .map(([key, group]) => ({
+          aura: `${anchor}:${key}`,
+          label: statusDisplayLabel(key),
+          uptimePercent:
+            fightDurationMs === 0 ? 0 : Math.min(100, Math.round((uptimeMs(group) / fightDurationMs) * 100)),
+          selected: state.aura === `${anchor}:${key}`,
+        }))
+        .sort((a, b) => b.uptimePercent - a.uptimePercent);
+    },
+    [state.source, state.target, state.aura, hostility, windowedIntervals, statusDisplayLabel, fightDurationMs]
+  );
+
+  const sourceAuraChips = useMemo(
+    () => (caps.supportsAuraFilter ? auraChipsFor("src") : []),
+    [caps.supportsAuraFilter, auraChipsFor]
+  );
+  const targetAuraChips = useMemo(
+    () => (caps.supportsAuraFilter ? auraChipsFor("tgt") : []),
+    [caps.supportsAuraFilter, auraChipsFor]
+  );
+
   const labelledOptions = useMemo(
     () => ({
       sources: labelSourceOptions(options.sources, labelForSource, characterForSource, player_label_template),
@@ -580,31 +676,6 @@ export const AnalysisView = () => {
   );
 
   const metric = METRICS[metricKey] ?? damageDone;
-
-  // The window the status tables measure, in milliseconds from the fight's
-  // start. Buckets are inclusive at both ends, so the last one runs to the start
-  // of the one after it — the same conversion the scoped fetch and the chart
-  // bands use, kept in one place so the three cannot drift.
-  const statusWindow = useMemo(
-    () => ({
-      startMs: (range === null ? 0 : range[0]) * DPS_BUCKET_MS,
-      endMs: (range === null ? chartLen : range[1] + 1) * DPS_BUCKET_MS,
-    }),
-    [range, chartLen]
-  );
-
-  // The uptime denominator: the window's own length, so a scrubbed table reports
-  // uptime WITHIN the window rather than diluting it across a fight the chart is
-  // no longer showing. The window spans whole buckets, so it is never SHORTER
-  // than the intervals inside it — which is what a `(chartLen - 1)` denominator
-  // was, against intervals the backend closes at the exact final millisecond.
-  const fightDurationMs = statusWindow.endMs - statusWindow.startMs;
-
-  // Cropped to that same window, so numerator and denominator measure one span.
-  const windowedIntervals = useMemo(
-    () => clipToWindow(statusIntervals, statusWindow.startMs, statusWindow.endMs),
-    [statusIntervals, statusWindow]
-  );
 
   // Party slot per player index, for the group fold's row colours.
   const partySlots = useMemo(
@@ -1238,6 +1309,17 @@ export const AnalysisView = () => {
     [overlay, identityPlayers, chartIndexes, labelForSource, colors, player_label_template, withTotal, t]
   );
 
+  // The aura filter's EXCLUDED regions, shaded onto the plot in the neutral
+  // ink so they read as "off" rather than as another effect. The band
+  // mechanism inverted: the data drawn IS the kept part, so the shading marks
+  // what the filter removed. Undefined rather than empty when nothing is
+  // masked, so a chart with no aura renders exactly as it did before.
+  const auraBands = useMemo(() => {
+    if (auraWindows === undefined) return undefined;
+    const excluded = auraExcludedBands(auraWindows, statusWindow);
+    return excluded.length === 0 ? undefined : excluded.map((band) => ({ color: "var(--an-ink-3)", band }));
+  }, [auraWindows, statusWindow]);
+
   // The chart IS the window: committing does not shade the rest of the fight,
   // it stops drawing it. Sliced client-side from the base load — the reparse
   // that `range` triggers is for the table, which needs figures no bucketed
@@ -1331,12 +1413,34 @@ export const AnalysisView = () => {
         fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
         toLabel={range === null ? fullLabel : bucketLabel(range[1])}
         markers={chartMarkers}
+        bands={auraBands}
         stackMode={chartSource === "stacks" ? stackMode : undefined}
         onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
       />
 
       {/* Dev builds only, the same guard the Debug tab uses. */}
       {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
+
+      {/* The Auras Filter (spec: between chart and table). Each strip exists
+          only while its actor pin does — AuraStrip renders nothing for an
+          empty chip list — and one aura is active at a time: selecting on
+          either strip replaces the other's selection. */}
+      {caps.supportsAuraFilter && (
+        <>
+          <AuraStrip
+            titleKey="ui.logs.aura-source-title"
+            chips={sourceAuraChips}
+            onSelect={(aura) => setState(auraTransition(state, aura))}
+            onClear={() => setState(auraTransition(state, null))}
+          />
+          <AuraStrip
+            titleKey="ui.logs.aura-target-title"
+            chips={targetAuraChips}
+            onSelect={(aura) => setState(auraTransition(state, aura))}
+            onClear={() => setState(auraTransition(state, null))}
+          />
+        </>
+      )}
 
       <Box style={{ padding: "4px 16px 14px" }}>
         <MetricTable
