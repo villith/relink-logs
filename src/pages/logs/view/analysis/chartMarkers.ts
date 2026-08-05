@@ -14,9 +14,21 @@ export type MarkerEvent = { kind: MarkerKind; atMs: number; actorIndex: number }
  * from the chart window's start) plus the tooltip line for its bucket. */
 export type ChartMarker = { kind: MarkerKind; atMs: number; color: string; label: string };
 
-/** The SBA markers' colour — the analysis view's own accent (analysis.css),
- * distinct from every party colour. Deaths take the dead player's colour. */
-export const SBA_MARKER_COLOR = "var(--an-accent)";
+/** The SBA markers' colour. Deaths take the dead player's colour, so this one
+ * has to stay distinct from three sets at once, all of which share the plot:
+ *
+ * - every party colour (`DEFAULT_METER_COLORS` and `PLAYER_COLORS`' overflow
+ *   entries) — an SBA line wearing one would read as that player's death line,
+ *   the two differing only by glyph;
+ * - `--an-accent` (analysis.css), which is also the drag-scope `ReferenceArea`
+ *   in `DpsChart` — mid-drag the selection edge and the SBA lines would merge;
+ * - the Total series' neutral grey, `--mantine-color-gray-5`.
+ *
+ * Mantine's grape-4 (#da77f2) is a hue none of those three use, so it reads as
+ * "not a player" at a glance. Re-check it against all three before changing it:
+ * the previous value WAS `--an-accent` (#00b8d9), which is byte-identical to
+ * `DEFAULT_METER_COLORS[3]`, so every SBA line drew in slot 4's colour. */
+export const SBA_MARKER_COLOR = "var(--mantine-color-grape-4)";
 
 /** Death and SBA-activation markers for the chart, rebased onto `window` (the
  * same `{startMs, endMs}` span the status tables and bands measure — event

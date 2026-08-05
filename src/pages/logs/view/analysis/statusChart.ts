@@ -13,15 +13,19 @@ export type StatusSeries = DrillSeries;
 /** Per-holder stack counts for the pinned effect, bucketed for the chart.
  *
  * This is the plot Warcraft Logs switches to when a buff is selected: one
- * series per holder, STACKED, so the height at any moment is how many stacks
- * the party held between them. Our chart previously did not change at all on a
- * status drill — the table dropped to holder rows beside a plot still drawing
- * whole-fight DPS.
+ * series per holder, each carrying that holder's own stack count. How they
+ * COMPOSE is the user's choice — the chart's Normal | Stacked control, opening
+ * on Normal — so the series either overlap (each height is one holder's depth)
+ * or sum (the height is what the party held between them). Our chart previously
+ * did not change at all on a status drill — the table dropped to holder rows
+ * beside a plot still drawing whole-fight DPS.
  *
  * A stack count belongs on an axis rather than in a table cell: it varies
  * across a window, so a cell can only report the peak. The band shading over
- * the DPS plot (`bandOpacity`) says the same thing far more coarsely, and stays
- * for the effect rows, where there is no single holder to draw.
+ * the DPS plot (`bandOpacity`) says the same thing far more coarsely; nothing
+ * feeds it today — the approved "Source/Target Auras Filter" follow-up is the
+ * one that will wire it, for the effect rows, where there is no single holder
+ * to draw.
  *
  * Where one holder's windows OVERLAP the deeper stack wins rather than the sum:
  * two sources of one effect on one actor is one effect at whatever depth it

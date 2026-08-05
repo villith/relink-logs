@@ -53,8 +53,10 @@ export type DpsChartProps = {
    * compared rather than added. */
   stacked?: boolean;
   /** Status-effect windows to shade, already rebased onto this chart's window
-   * by `toBands`. Only the Buffs and Debuffs metrics pass any; absent, the
-   * chart draws exactly what it draws today. */
+   * by `toBands`. NOTHING passes any today — don't go hunting for the caller;
+   * the capability is kept for the approved "Source/Target Auras Filter"
+   * follow-up, which is the next thing to feed it. Absent, the chart draws
+   * exactly what it draws today. */
   bands?: { color: string; band: Band }[];
   /** Death/SBA event markers, already rebased onto this chart's window (like
    * `bands`). Drawn as vertical reference lines and appended to the tooltip of
@@ -85,6 +87,14 @@ export type DpsChartProps = {
  * of JSX text (recharts label props) so the i18next literal rule stays clean;
  * the tooltip lines carry their own translated text instead. */
 const MARKER_GLYPH: Record<MarkerKind, string> = { death: "☠", sba: "✦" };
+
+/** The stroke a deduped marker line takes when the markers it stands for do NOT
+ * agree on a colour — two players dying in one bucket, each in their own party
+ * colour. Neither colour is right for the single line, and keeping the first
+ * would silently claim the bucket for one of them, so it goes neutral (the same
+ * grey the Total series uses) and the tooltip, which still lists every marker,
+ * names who died. */
+const MIXED_MARKER_COLOR = "var(--mantine-color-gray-5)";
 
 /** Control-row label per marker kind. */
 const MARKER_LABEL_KEY: Record<MarkerKind, string> = {
@@ -363,19 +373,31 @@ export const DpsChart = ({
 
   // Marker lines, in the same chart space as the bands. Memoised for the same
   // hover-rerender reason.
-  const markerLines = useMemo(
-    () =>
-      bucketedMarkers.map(({ marker, timestamp }, index) => (
-        <ReferenceLine
-          key={`marker-${index}`}
-          x={timestamp}
-          stroke={marker.color}
-          strokeDasharray="3 3"
-          label={{ value: MARKER_GLYPH[marker.kind], position: "top", fill: marker.color, fontSize: 10 }}
-        />
-      )),
-    [bucketedMarkers]
-  );
+  //
+  // ONE line per kind per bucket. Co-located markers are the norm, not the edge
+  // case: an SBA chain is `OnPerformSBA` plus up to three `OnContinueSBAChain`
+  // within a second or two, so a full-party SBA drew four identical lines and
+  // four ✦ glyphs on the same x, and two deaths in a bucket drew one line over
+  // the other. The dedup is deliberately NOT applied to `markersByLabel` below
+  // — the tooltip must still list every marker individually.
+  const markerLines = useMemo(() => {
+    const lines = new Map<string, { kind: MarkerKind; timestamp: string | undefined; color: string }>();
+    for (const { marker, timestamp } of bucketedMarkers) {
+      const key = `${marker.kind}@${timestamp}`;
+      const drawn = lines.get(key);
+      if (!drawn) lines.set(key, { kind: marker.kind, timestamp, color: marker.color });
+      else if (drawn.color !== marker.color) drawn.color = MIXED_MARKER_COLOR;
+    }
+    return [...lines.values()].map(({ kind, timestamp, color }, index) => (
+      <ReferenceLine
+        key={`marker-${index}`}
+        x={timestamp}
+        stroke={color}
+        strokeDasharray="3 3"
+        label={{ value: MARKER_GLYPH[kind], position: "top", fill: color, fontSize: 10 }}
+      />
+    ));
+  }, [bucketedMarkers]);
 
   // The markers of each bucket, keyed by that bucket's x label — which is what
   // the recharts tooltip hands its content, so the lookup is one map get.

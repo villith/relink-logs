@@ -32,9 +32,11 @@ export type MetricTableProps = {
    * is how every tab's tooltip came to report damage. Absent, rows carry no
    * card, whatever `rowSections` returns. */
   cardAmount?: CardAmount;
-  /** Per-row eye toggle, or null where a row has nothing to show. Only the
-   * status metrics pass it; absent, no row grows a control and the table keeps
-   * the DOM it has. */
+  /** Per-row eye toggle, or null where a row has nothing to show. NOTHING
+   * passes it today — don't go hunting for the caller; the capability is kept
+   * for the approved "Source/Target Auras Filter" follow-up, which is the next
+   * thing to feed it. Absent, no row grows a control and the table keeps the
+   * DOM it has. */
   rowToggle?: (row: MetricRow) => { shown: boolean; onToggle: () => void } | null;
   /** Length of the window `MetricRow.timeline` spans, in milliseconds — the
    * denominator that turns a window into a position. Zero (or absent) makes

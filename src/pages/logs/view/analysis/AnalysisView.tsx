@@ -42,6 +42,7 @@ import {
   DPS_BUCKET_MS,
   DPS_SMOOTHING_WINDOW,
   HP_SERIES_COLORS,
+  mantineColorVar,
   type ChartDatapoint,
   type Label,
 } from "../DetailCharts";
@@ -818,9 +819,9 @@ export const AnalysisView = () => {
 
   // Death and SBA markers, rebased onto the same window the chart shows and
   // resolved to display form here — the extractor stays pure of names and
-  // colours. Deaths wear the dead player's party colour; SBA lines the
-  // analysis accent. Unknown actors (enemy deaths) are dropped by the
-  // extractor itself.
+  // colours. Deaths wear the dead player's party colour; SBA lines wear
+  // `SBA_MARKER_COLOR`, which is picked to collide with no party colour.
+  // Unknown actors (enemy deaths) are dropped by the extractor itself.
   const chartMarkers: ChartMarker[] = useMemo(() => {
     const knownActors = new Set(identityPlayers.map((player) => player.index));
     return extractMarkers({ deathEvents, sbaEvents, window: statusWindow, knownActors }).map((event) => ({
@@ -1004,10 +1005,12 @@ export const AnalysisView = () => {
     return groupBandsFor(groups).map(({ key, values }) => ({ key, label: bandLabelFor(key), values }));
   }, [groupsPath, spec.groupBy, hostility, groups, bandLabelFor]);
 
-  // The Stacks plot: one stacked series per holder of the pinned effect, so the
-  // height is how many stacks the party held at that moment. Only on the status
-  // tabs, and only with an effect pinned — an effect row spans every holder and
-  // has no single series to draw.
+  // The Stacks plot: one series per holder of the pinned effect, each its own
+  // stack count. The Normal | Stacked control decides whether they overlap or
+  // sum — Normal by default — so the height reads as one holder's depth or as
+  // the party's total accordingly. Only on the status tabs, and only with an
+  // effect pinned — an effect row spans every holder and has no single series
+  // to draw.
   //
   // `statusIntervals`, not `windowedIntervals`: the chart is cropped by the
   // parent (`shownChartData`), so cropping again here would shorten the series
@@ -1151,12 +1154,20 @@ export const AnalysisView = () => {
       // Drilled in, the bands are one player's own output split up, so the
       // party palette says nothing about them — they take the categorical one
       // the enemy-HP chart already uses, in the same largest-first order.
+      //
+      // Resolved to a CSS var here rather than left as Mantine's "red.6"
+      // shorthand: the same value reaches our own legend, which writes it
+      // straight into `backgroundColor` (ChartLegend), where a shorthand is not
+      // valid CSS and the swatch renders colourless. Mantine's `getThemeColor`
+      // returns a non-theme string unchanged, so the plotted line is the same
+      // colour either way — and this matches `statusRowColors`, which already
+      // resolves the same palette for the table rows.
       overlay
         ? overlay.map((series, position) => ({
             name: series.key,
             label: series.label,
             partySlotIndex: position,
-            color: HP_SERIES_COLORS[position % HP_SERIES_COLORS.length],
+            color: mantineColorVar(HP_SERIES_COLORS[position % HP_SERIES_COLORS.length]),
           }))
         : [
             // First in the array so recharts draws it FIRST — the player lines
