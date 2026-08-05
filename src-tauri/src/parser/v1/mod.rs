@@ -2095,9 +2095,21 @@ pub struct EnemySeries {
     pub values: Vec<i64>,
 }
 
-/// Cap on enemy-side chart bands, mirroring the HP chart's rationale: beyond
-/// this the stack is unreadable and the long tail is trash-mob noise.
-const ENEMY_CHART_MAX_SERIES: usize = 8;
+/// Cap on enemy-side chart bands. Deliberately the SAME number as
+/// [`HP_CHART_MAX_SERIES`], not merely a similar one: every stacked chart in
+/// the app draws its bands from the frontend's `HP_SERIES_COLORS`, which has
+/// exactly that many entries, so a band past it wraps the palette and reads as
+/// a duplicate of an earlier series. A smaller cap would buy nothing in
+/// readability that the sort does not already buy (the tail bands are the
+/// thinnest ones) while dropping types the palette can still tell apart.
+///
+/// This is a top-N view of an UNCAPPED table: neither enemy-side table limits
+/// its rows, and the Damage Taken enemy side routinely carries more types than
+/// this, so on such a fight the table lists them all while the stack shows only
+/// the biggest — the plotted area is legitimately short of the summed column.
+/// [`rank_and_cap_enemy_series`] logs whenever that happens, so the shortfall is
+/// explicable from the log rather than looking like lost damage.
+const ENEMY_CHART_MAX_SERIES: usize = HP_CHART_MAX_SERIES;
 
 /// Fold one hit into the band for `enemy_type`, opening that band on first
 /// sight. `bucket` indexes `values` unchecked, exactly like the sibling chart
@@ -2122,6 +2134,29 @@ fn accumulate_enemy_series(
         }
     };
     band.values[bucket] += damage;
+}
+
+/// Rank finished enemy bands biggest-first and keep the top
+/// [`ENEMY_CHART_MAX_SERIES`], shared by both enemy builders so the two can
+/// never drift apart on what they show or on what they say about it.
+///
+/// The sort has to precede the truncate, and it has to rank by WHOLE-FIGHT
+/// total: keeping the first bands seen, or the ones leading a single bucket,
+/// would drop the boss for a trash mob that opened the fight.
+///
+/// What the cap drops is logged rather than silently truncated, exactly as
+/// [`build_target_damage_chart`] does it — the enemy-side tables are uncapped,
+/// so a reader comparing the stack against the column needs the log line to
+/// explain the missing area. `label` names which of the two charts truncated.
+fn rank_and_cap_enemy_series(series: &mut Vec<EnemySeries>, label: &str) {
+    series.sort_by_key(|band| std::cmp::Reverse(band.values.iter().sum::<i64>()));
+    if series.len() > ENEMY_CHART_MAX_SERIES {
+        log::info!(
+            "{label}: showing the {ENEMY_CHART_MAX_SERIES} biggest of {} enemy types",
+            series.len()
+        );
+        series.truncate(ENEMY_CHART_MAX_SERIES);
+    }
 }
 
 /// Damage each enemy TYPE DEALT TO the party, per bucket — every incoming
@@ -2152,8 +2187,7 @@ pub fn build_enemy_dealt_chart(
             chart_len,
         );
     }
-    series.sort_by_key(|band| std::cmp::Reverse(band.values.iter().sum::<i64>()));
-    series.truncate(ENEMY_CHART_MAX_SERIES);
+    rank_and_cap_enemy_series(&mut series, "enemy dealt chart");
     series
 }
 
@@ -2161,6 +2195,12 @@ pub fn build_enemy_dealt_chart(
 /// dealt events (same phantom/exclusion gates as the DPS chart, so the
 /// chart's area cannot disagree with the table), banded by the victim that
 /// absorbed them.
+///
+/// That agreement is asserted, not merely intended: see
+/// `enemy_charts_agree_with_the_tables_they_decompose`, which walks one mixed
+/// log through both this and [`build_enemy_dealt_chart`] and compares every
+/// band against the derived rows the frontend ranks. Add a gate here (or to the
+/// reparse loop) without adding it to the other side and that test says so.
 ///
 /// `chart_len` must be sized from the FULL log duration, or this indexes out
 /// of bounds — see [`accumulate_enemy_series`].
@@ -2185,10 +2225,17 @@ pub fn build_enemy_received_chart(
         }
         // Only player-dealt damage: an unknown source is an enemy (or an
         // unmapped proxy), which the meter itself does not count either.
-        // NOT implied by the taken check above, which gates only the
-        // conjunction of a slot-keyed victim AND an unknown source — an
-        // enemy-on-enemy hit, or any hit whose victim is not slot-keyed,
-        // reaches here with an unknown source and needs dropping here.
+        //
+        // Defensive, not load-bearing, on any log THIS parser recorded:
+        // `should_ignore_damage_event` already drops an unknown-source hit at
+        // the ingest door unless its victim is slot-keyed (the taken stream,
+        // gated above), so an enemy-on-enemy hit never reaches the raw log and
+        // this gate never fires. It is kept for the logs we do not control —
+        // legacy blobs, and event logs repopulated from another recorder —
+        // where such a hit can be present. And it is NOT implied by the taken
+        // check above, which gates only the conjunction of a slot-keyed victim
+        // AND an unknown source, so removing it would leak on exactly those
+        // logs.
         if matches!(
             CharacterType::from_hash(event.source.parent_actor_type),
             CharacterType::Unknown(_)
@@ -2203,8 +2250,7 @@ pub fn build_enemy_received_chart(
             chart_len,
         );
     }
-    series.sort_by_key(|band| std::cmp::Reverse(band.values.iter().sum::<i64>()));
-    series.truncate(ENEMY_CHART_MAX_SERIES);
+    rank_and_cap_enemy_series(&mut series, "enemy received chart");
     series
 }
 
@@ -4599,14 +4645,16 @@ mod tests {
     /// whole-fight total rather than by whatever landed in one bucket.
     #[test]
     fn enemy_dealt_chart_caps_to_the_biggest_bands_not_the_earliest() {
-        // Ten attackers. Each opens with a chip hit in bucket 0 and lands its
-        // real damage in bucket 2, with the two ordered inversely: attacker 0
-        // arrives first and leads bucket 0, attacker 9 arrives last and wins
-        // the fight. So arrival order, bucket-0 order and total order are three
-        // different rankings, and only the last one is the right answer.
+        // Two attackers more than the cap allows. Each opens with a chip hit in
+        // bucket 0 and lands its real damage in bucket 2, with the two ordered
+        // inversely: attacker 0 arrives first and leads bucket 0, the last
+        // attacker arrives last and wins the fight. So arrival order, bucket-0
+        // order and total order are three different rankings, and only the last
+        // one is the right answer.
+        const ATTACKERS: i32 = ENEMY_CHART_MAX_SERIES as i32 + 2;
         let mut events: Vec<(i64, Message)> = Vec::new();
-        for i in 0..10i32 {
-            for (timestamp, damage) in [(1_000, 10 - i), (3_000, (i + 1) * 10)] {
+        for i in 0..ATTACKERS {
+            for (timestamp, damage) in [(1_000, ATTACKERS - i), (3_000, (i + 1) * 10)] {
                 let mut hit = damage_taken_by_slot0(9001, damage);
                 hit.source.actor_type = 0xE000 + i as u32;
                 hit.source.parent_actor_type = 0xE000 + i as u32;
@@ -4617,22 +4665,183 @@ mod tests {
         let bands = build_enemy_dealt_chart(&events, 1_000, 1_000, 3);
 
         assert_eq!(bands.len(), ENEMY_CHART_MAX_SERIES);
+        // Biggest first, so the kept types run from the last attacker down —
+        // which is also the reverse of both arrival order and bucket-0 order.
         let kept: Vec<EnemyType> = bands.iter().map(|band| band.enemy_type).collect();
-        let expected: Vec<EnemyType> = (2..10)
+        let expected: Vec<EnemyType> = (2..ATTACKERS as u32)
             .rev()
-            .map(|i: u32| EnemyType::from_hash(0xE000 + i))
+            .map(|i| EnemyType::from_hash(0xE000 + i))
             .collect();
         assert_eq!(kept, expected, "the two weakest attackers are dropped");
-        let totals: Vec<i64> = bands
-            .iter()
-            .map(|band| band.values.iter().sum::<i64>())
-            .collect();
-        assert_eq!(totals, vec![101, 92, 83, 74, 65, 56, 47, 38]);
         assert_eq!(
             bands[0].values,
-            vec![1, 0, 100],
+            vec![1, 0, ATTACKERS as i64 * 10],
             "the biggest total is the smallest opener"
         );
+    }
+
+    /// The invariant the whole enemy side of the analysis view rests on: a
+    /// chart band's total equals the table total the frontend ranks that enemy
+    /// type by. The two sides are computed by completely different code — the
+    /// tables fall out of the reparse loop, the chart builders walk the raw log
+    /// themselves — so every gate one applies the other has to apply too, and
+    /// nothing but a test can notice when that stops being true.
+    ///
+    /// One mixed log covers every gate at once: two enemy types taking party
+    /// damage, two attacker types dealing it, a phantom marker, an excluded
+    /// (Primal Burst) source, and an enemy-on-enemy hit.
+    #[test]
+    fn enemy_charts_agree_with_the_tables_they_decompose() {
+        /// An UNLISTED 1-HP marker (see `phantom_targets`). Deliberately not one
+        /// of `EXCLUDED_TARGET_TYPES`: a listed type is stopped at the ingest
+        /// door and never reaches either side, whereas this one is recorded and
+        /// then dropped by the learned rule on both paths — which is the gate
+        /// under test.
+        const MARKER: u32 = 0x60b55c0f;
+        /// The enemy `damage_from` already targets, named for the assertions.
+        const FIRST_ENEMY: u32 = 0x1234;
+        const SECOND_ENEMY: u32 = 0x5678;
+        /// The attacker `damage_taken_by_slot0` already carries.
+        const FIRST_ATTACKER: u32 = 0xDEAD_BEEF;
+        const SECOND_ATTACKER: u32 = 0xBEEF_CAFE;
+
+        let mut second_target = damage_from(PLAYER_HASH, 100, 400);
+        second_target.target.actor_type = SECOND_ENEMY;
+        second_target.target.parent_actor_type = SECOND_ENEMY;
+
+        let mut second_attacker = damage_taken_by_slot0(9002, 200);
+        second_attacker.source.actor_type = SECOND_ATTACKER;
+        second_attacker.source.parent_actor_type = SECOND_ATTACKER;
+
+        // Enemy hits enemy: the incoming fixture aimed at a raw enemy index
+        // instead of a party slot. Sized to be conspicuous — if it ever leaked
+        // through it would land on FIRST_ENEMY's band and swamp its 1_000.
+        let mut enemy_on_enemy = damage_taken_by_slot0(9003, 500_000);
+        enemy_on_enemy.target = Actor {
+            index: 9,
+            actor_type: FIRST_ENEMY,
+            parent_index: 9,
+            parent_actor_type: FIRST_ENEMY,
+        };
+
+        // Fed through the live ingest door rather than pushed straight into the
+        // raw log, so the log under test holds exactly what a real recording
+        // would hold — including the enemy-on-enemy hit's absence.
+        let mut parser = Parser::default();
+        for event in [
+            damage_from(PLAYER_HASH, 100, 1_000),
+            second_target,
+            damage_taken_by_slot0(9001, 300),
+            second_attacker,
+            damage_on_target(MARKER, 20, 546_000, Some(1)),
+            damage_from(PRIMAL_BURST_BODY, SUMMON_ATTACK_ACTION_ID, 3_000),
+            enemy_on_enemy,
+        ] {
+            parser.on_damage_event(event);
+        }
+        assert_eq!(
+            parser.encounter.raw_event_log.len(),
+            6,
+            "six of the seven are recorded; the enemy-on-enemy hit is dropped \
+             at the door, which is why the chart's unknown-source gate only has \
+             to defend against logs this parser did not record"
+        );
+
+        parser.reparse();
+
+        // One bucket wide enough to swallow the whole fixture: this is about
+        // band TOTALS agreeing with row totals, and bucket geometry is covered
+        // by the sibling tests. `on_damage_event` stamps wall-clock times, so
+        // the fixture spans milliseconds, not the seconds a literal would.
+        let start_time = parser.start_time();
+        let received = build_enemy_received_chart(
+            &parser.encounter.raw_event_log,
+            start_time,
+            60_000,
+            2,
+            parser.filters,
+        );
+        let dealt = build_enemy_dealt_chart(&parser.encounter.raw_event_log, start_time, 60_000, 2);
+
+        // Damage Taken, enemy side: rows come from every player's per-skill
+        // target breakdown, folded by enemy type.
+        let table_received = fold_by_enemy_type(
+            parser
+                .derived_state
+                .party
+                .values()
+                .flat_map(|player| &player.skill_breakdown)
+                .flat_map(|skill| &skill.targets)
+                .map(|target| (target.enemy_type, target.total_damage)),
+        );
+        // Damage Done, enemy side: rows come from every player's damage-taken
+        // breakdown, folded by the attacker type that dealt it.
+        let table_dealt = fold_by_enemy_type(
+            parser
+                .derived_state
+                .party
+                .values()
+                .flat_map(|player| &player.damage_taken_breakdown)
+                .map(|row| (row.enemy_type, row.total_damage)),
+        );
+
+        // Spelled out rather than left implicit, so a fixture that silently
+        // stopped exercising a gate (say, the marker being dropped at the door
+        // by a future patch) fails here instead of passing vacuously on two
+        // equal-but-wrong sides.
+        assert_eq!(
+            table_received,
+            vec![
+                (EnemyType::from_hash(FIRST_ENEMY), 1_000),
+                (EnemyType::from_hash(SECOND_ENEMY), 400),
+            ],
+            "the marker, the Primal Burst and the enemy-on-enemy hit are all out \
+             of the table"
+        );
+        assert_eq!(
+            table_dealt,
+            vec![
+                (EnemyType::from_hash(FIRST_ATTACKER), 300),
+                (EnemyType::from_hash(SECOND_ATTACKER), 200),
+            ]
+        );
+
+        assert_eq!(
+            band_totals(&received),
+            table_received,
+            "the Damage Taken enemy chart must decompose exactly the table above it"
+        );
+        assert_eq!(
+            band_totals(&dealt),
+            table_dealt,
+            "the Damage Done enemy chart must decompose exactly the table above it"
+        );
+    }
+
+    /// Sum `(enemy_type, damage)` pairs into one total per type, biggest first.
+    ///
+    /// A `HashMap` would be the obvious shape, but `EnemyType` is neither `Hash`
+    /// nor `Ord`; a vector in the charts' own sort order costs nothing at these
+    /// sizes and lets the two sides be compared whole, ordering included.
+    fn fold_by_enemy_type(rows: impl Iterator<Item = (EnemyType, u64)>) -> Vec<(EnemyType, u64)> {
+        let mut totals: Vec<(EnemyType, u64)> = Vec::new();
+        for (enemy_type, damage) in rows {
+            match totals.iter_mut().find(|(kind, _)| *kind == enemy_type) {
+                Some((_, total)) => *total += damage,
+                None => totals.push((enemy_type, damage)),
+            }
+        }
+        totals.sort_by_key(|(_, total)| std::cmp::Reverse(*total));
+        totals
+    }
+
+    /// Each band's whole-fight total, in the shape [`fold_by_enemy_type`]
+    /// produces — the chart side of the invariant comparison.
+    fn band_totals(series: &[EnemySeries]) -> Vec<(EnemyType, u64)> {
+        series
+            .iter()
+            .map(|band| (band.enemy_type, band.values.iter().sum::<i64>() as u64))
+            .collect()
     }
 
     /// Enemy-RECEIVED series: player-dealt events banded by TARGET type;
