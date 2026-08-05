@@ -19,6 +19,11 @@ export type AnalysisState = {
   window: [number, number] | null;
   /** Explicit grouping override — WCL's `by`. Null = derived default. */
   by: Dimension | null;
+  /** The active Auras Filter: `src:`/`tgt:` (which actor pin anchors it) plus
+   * the status pin key of the chosen effect, or null. A FILTER, not a grouping
+   * dimension — `resolveGroupBy` never reads it (like `window`). Cleared
+   * whenever the anchoring pin clears or changes (see transitions.ts). */
+  aura: string | null;
 };
 
 export const METRIC_KEYS: MetricKey[] = ["damage", "taken", "stun", "sba", "buffs", "debuffs"];
@@ -32,6 +37,7 @@ export const DEFAULT_STATE: AnalysisState = {
   ability: null,
   window: null,
   by: null,
+  aura: null,
 };
 
 export const isPinned = (state: AnalysisState, dim: Dimension): boolean =>
@@ -47,6 +53,7 @@ export type RawState = {
   from: string | null;
   to: string | null;
   by: string | null;
+  aura: string | null;
 };
 
 export const encodeState = (state: AnalysisState): RawState => ({
@@ -58,6 +65,7 @@ export const encodeState = (state: AnalysisState): RawState => ({
   from: state.window === null ? null : String(state.window[0]),
   to: state.window === null ? null : String(state.window[1]),
   by: state.by,
+  aura: state.aura,
 });
 
 const nonNegativeInt = (raw: string | null): number | null => {
@@ -65,6 +73,20 @@ const nonNegativeInt = (raw: string | null): number | null => {
   const value = Number(raw);
   return Number.isInteger(value) && value >= 0 ? value : null;
 };
+
+/** How an aura filter is spelled: which actor pin anchors it, then the status
+ * pin key of the chosen effect. The anchor is in the value because with BOTH
+ * actors pinned a bare status key cannot say whose windows to mask by — and
+ * the clearing rule ("the aura dies with its pin") needs to know too. */
+const AURA_KEY = /^(src|tgt):status:\d+:(\d+|unknown)$/;
+
+/** The dimension an aura filter is anchored to, or null for no/invalid aura. */
+export const auraAnchorOf = (aura: string | null): "source" | "target" | null =>
+  aura === null || !AURA_KEY.test(aura) ? null : aura.startsWith("src:") ? "source" : "target";
+
+/** The `status:…` pin key inside an aura value — both anchors are 4 chars.
+ * Only call on a value `AURA_KEY` admits (the codec guarantees state.aura is). */
+export const auraPinKey = (aura: string): string => aura.slice(4);
 
 /** Every field degrades to its default on its own — one bad value must not
  * discard the others. There is deliberately NO legacy decoding: the old
@@ -80,5 +102,6 @@ export const decodeState = (raw: RawState): AnalysisState => {
     ability: raw.abil === "" ? null : raw.abil,
     window: from !== null && to !== null && from <= to ? [from, to] : null,
     by: DIMENSIONS.includes(raw.by as Dimension) ? (raw.by as Dimension) : null,
+    aura: raw.aura !== null && AURA_KEY.test(raw.aura) ? raw.aura : null,
   };
 };
