@@ -69,6 +69,7 @@ import { QuestSummary } from "./QuestSummary";
 import { RegroupStrip } from "./RegroupStrip";
 import { abilityLabelFor } from "./abilityLabel";
 import "./analysis.css";
+import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker } from "./chartMarkers";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
@@ -151,6 +152,8 @@ export const AnalysisView = () => {
     chartLen,
     sbaChart,
     sbaChartLen,
+    sbaEvents,
+    deathEvents,
     targetEntries,
     selectionFacts: baseFacts,
     groups: baseGroups,
@@ -171,6 +174,8 @@ export const AnalysisView = () => {
       chartLen: state.chartLen,
       sbaChart: state.sbaChart,
       sbaChartLen: state.sbaChartLen,
+      sbaEvents: state.sbaEvents,
+      deathEvents: state.deathEvents,
       targetEntries: state.targetEntries,
       selectionFacts: state.selectionFacts,
       groups: state.groups,
@@ -836,6 +841,26 @@ export const AnalysisView = () => {
   // same colour in the table as in the plot above it.
   const palette = useMemo(() => [...colors, ...PLAYER_COLORS.slice(4)], [colors]);
 
+  // Death and SBA markers, rebased onto the same window the chart shows and
+  // resolved to display form here — the extractor stays pure of names and
+  // colours. Deaths wear the dead player's party colour; SBA lines the
+  // analysis accent. Unknown actors (enemy deaths) are dropped by the
+  // extractor itself.
+  const chartMarkers: ChartMarker[] = useMemo(() => {
+    const knownActors = new Set(identityPlayers.map((player) => player.index));
+    return extractMarkers({ deathEvents, sbaEvents, window: statusWindow, knownActors }).map((event) => ({
+      kind: event.kind,
+      atMs: event.atMs,
+      color:
+        event.kind === "death"
+          ? resolvePlayerColor(palette, playerData, playerByIndex.get(event.actorIndex)?.slot ?? 0, 0)
+          : SBA_MARKER_COLOR,
+      label: t(event.kind === "death" ? "ui.logs.marker-death-line" : "ui.logs.marker-sba-line", {
+        name: labelForSource(event.actorIndex),
+      }),
+    }));
+  }, [identityPlayers, deathEvents, sbaEvents, statusWindow, palette, playerData, playerByIndex, labelForSource, t]);
+
   const rowColor = useCallback(
     (row: MetricRow) => {
       if (row.colorSlot < 0) return rowColors?.get(row.key) ?? "var(--an-ink-3)";
@@ -1287,6 +1312,7 @@ export const AnalysisView = () => {
         fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
         toLabel={range === null ? fullLabel : bucketLabel(range[1])}
         bands={chartBands}
+        markers={chartMarkers}
       />
 
       {/* Dev builds only, the same guard the Debug tab uses. */}

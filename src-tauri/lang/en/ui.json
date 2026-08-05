@@ -525,6 +525,8 @@
       "chart-total-label": "Total",
       "chart-markers-deaths": "Deaths",
       "chart-markers-sba": "SBA",
+      "marker-death-line": "☠ {{name}} died",
+      "marker-sba-line": "✦ {{name}} — Skybound Art",
       "quest-cleared": "Cleared",
       "quest-failed": "Not cleared",
       "no-rows": "Nothing matches the current pins. Clear one to see more.",
