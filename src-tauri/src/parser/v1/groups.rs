@@ -187,6 +187,11 @@ impl std::error::Error for GroupQueryError {}
 /// role-mapping (a later task) selects which key-extraction arm below
 /// applies; the `match` on `query.group_by` is written so adding that
 /// selection is a new arm, not a rewrite of this one.
+///
+/// `segments`/`assignment` MUST come from `segment_targets_indexed` over the
+/// same `events`, exactly as [`super::build_target_damage_chart`] requires:
+/// sharing the segmentation is what guarantees a `Dimension::Target` band
+/// means the same enemy the target dropdown does.
 #[allow(clippy::too_many_arguments)]
 pub fn aggregate_groups(
     events: &[(i64, Message)],
@@ -252,6 +257,14 @@ pub fn aggregate_groups(
     // Interleaving with other sources' events is harmless: only the events
     // routed to THIS keying (below) ever touch it, so its own subsequence
     // stays in order regardless of what else is between them.
+    //
+    // It only ever sees hits that survive every gate above, so a narrow
+    // ability/target-span filter can starve `last_known_pet_skill` or the
+    // first-supplementary memo of the very hit that would have set them —
+    // `build_ability_damage_chart` has the identical gap under a target span,
+    // and the two are left to share it deliberately rather than diverge: a
+    // chart and this aggregation must key a hit the same way, and inventing a
+    // fix here that chart doesn't have would do the opposite.
     let mut keyings: Vec<(u32, player_state::BreakdownKeying)> = Vec::new();
 
     for (position, (timestamp, message)) in events.iter().enumerate() {
@@ -319,6 +332,14 @@ pub fn aggregate_groups(
                 }
             }
             Dimension::Target => {
+                // Believed unreachable for real enemy-target damage:
+                // `assignment` is total over every target-bearing damage
+                // event by construction (`segment_targets_indexed` assigns a
+                // segment to each one it doesn't itself drop as a taken/
+                // phantom hit, both of which this walk has already excluded
+                // above). If it ever DID fire, this row's damage would be
+                // dropped here while `Dimension::Source` still counts it —
+                // the two dimensions' totals could diverge.
                 let Some(Some(segment_index)) = assignment.get(position) else {
                     continue;
                 };
@@ -868,6 +889,127 @@ mod tests {
             charted_amount, 2_000,
             "the 3 real rows still sum to the fight total"
         );
+    }
+
+    /// The three gates a source-less, filter-less query relies on entirely by
+    /// itself — nothing upstream has already narrowed the log for it:
+    ///
+    /// * a damage-TAKEN event (enemy source, player target) must not mint a
+    ///   `GroupKey::Player` for the enemy's pointer-like index — shaped
+    ///   exactly like `damage_taken_by_slot0` in `mod.rs`'s own tests;
+    /// * a dragon-form (Pl2000) hit must remap onto its Pl1900 owner's row
+    ///   BEFORE any source narrowing runs — shaped like
+    ///   `dragon_form_damage_attributes_to_the_id_player`;
+    /// * a phantom-target hit (Eugen's Grenade, hand-excluded) must not
+    ///   inflate the row of the player who "dealt" it.
+    ///
+    /// This is the only aggregator test that exercises any of the three —
+    /// every other test's synthetic log is clean, deliberately, so a
+    /// dropped gate here would ship silently.
+    #[test]
+    fn source_dimension_drops_taken_and_phantom_hits_and_remaps_dragon_form_before_the_source_filter(
+    ) {
+        let mut player_data: [Option<PlayerData>; 4] = Default::default();
+        player_data[0] = Some(PlayerData {
+            actor_index: 5,
+            character_type: CharacterType::Pl1900,
+            ..Default::default()
+        });
+
+        // Enemy source (pointer-like index), player target — `mod.rs`'s own
+        // `damage_taken_by_slot0`, inlined rather than imported (private to
+        // that test module).
+        let taken = DamageEvent {
+            source: Actor {
+                index: 0xF1EB_1234,
+                actor_type: 0xDEAD_BEEF,
+                parent_index: 0xF1EB_1234,
+                parent_actor_type: 0xDEAD_BEEF,
+            },
+            target: Actor {
+                index: 77,
+                actor_type: PLAYER_HASH,
+                parent_index: protocol::player_slot_key(0),
+                parent_actor_type: PLAYER_HASH,
+            },
+            damage: 750,
+            flags: 0,
+            action_id: ActionType::Normal(9001),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+            base_damage: None,
+            target_current_hp: Some(9_500),
+            target_max_hp: Some(10_000),
+        };
+
+        // Self-parented Pl2000, matching `dragon_form_damage_attributes_to_the_id_player`.
+        // The remap must rewrite this onto the Pl1900 owner above (actor_index 5).
+        let mut dragon = player_hit(200, 9, 100, 700);
+        dragon.source = Actor {
+            index: 200,
+            actor_type: 0xF5755C0E,
+            parent_actor_type: 0xF5755C0E,
+            parent_index: 200,
+        };
+
+        // Eugen's Grenade — hand-excluded, no HP read needed, cheaper than the
+        // learned (HP-history) phantom rule.
+        let mut phantom = player_hit(0, 999, 100, 99_999);
+        phantom.target.actor_type = 0x022a350f;
+        phantom.target.parent_actor_type = 0x022a350f;
+
+        let events = vec![
+            (1_000, Message::DamageEvent(player_hit(0, 9, 100, 500))),
+            (1_000, Message::DamageEvent(player_hit(1, 9, 100, 300))),
+            (1_000, Message::DamageEvent(taken)),
+            (1_000, Message::DamageEvent(dragon)),
+            (1_000, Message::DamageEvent(phantom)),
+        ];
+        let query = friendly_damage_query(Dimension::Source);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &player_data,
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by source is supported");
+
+        assert_eq!(
+            aggregates.len(),
+            3,
+            "the taken and phantom hits open no row of their own"
+        );
+        assert!(
+            aggregates
+                .iter()
+                .all(|a| a.key != GroupKey::Player { index: 0xF1EB_1234 }),
+            "the enemy's pointer index must never become a Player row"
+        );
+        let player0 = aggregates
+            .iter()
+            .find(|a| a.key == GroupKey::Player { index: 0 })
+            .expect("player 0's row");
+        assert_eq!(
+            player0.measure.amount, 500,
+            "the phantom hit must not inflate player 0's total"
+        );
+        let player1 = aggregates
+            .iter()
+            .find(|a| a.key == GroupKey::Player { index: 1 })
+            .expect("player 1's row");
+        assert_eq!(player1.measure.amount, 300);
+        let dragon_owner = aggregates
+            .iter()
+            .find(|a| a.key == GroupKey::Player { index: 5 })
+            .expect("the dragon hit lands on its Pl1900 owner's row");
+        assert_eq!(dragon_owner.measure.amount, 700);
     }
 
     #[test]
