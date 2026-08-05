@@ -2447,6 +2447,14 @@ impl Parser {
         // HP read, so judging it as events stream past would drop only the few
         // that happen to reveal the pool.
         self.phantom_targets = PhantomTargets::learned_from(self.encounter.event_log());
+        // The shared spawn segmentation — the SAME `segment_targets_indexed`
+        // over the SAME unwindowed raw log that `fetch_encounter_state` uses
+        // for `target_entries` and the groups path's assignment, so a
+        // SkillTargetState's `segment` indexes the very vector the frontend
+        // holds. Computed here (not passed in) because identical inputs give
+        // identical output, and the reparse has many callers.
+        let (_, target_assignment) =
+            segment_targets_indexed(&self.encounter.raw_event_log, log_start);
         self.derived_state = Default::default();
         // `Default` means Stopped, but a reparse says nothing about whether the
         // fight is over â€” the live path reparses on a filter toggle mid-fight.
@@ -2464,7 +2472,7 @@ impl Parser {
         }
         let cutoff = up_to_ms.map(|up_to| log_start + up_to);
 
-        for (timestamp, event) in self.encounter.event_log() {
+        for (event_index, (timestamp, event)) in self.encounter.event_log().enumerate() {
             if cutoff.is_some_and(|cutoff| *timestamp > cutoff) {
                 break;
             }
@@ -2520,7 +2528,15 @@ impl Parser {
                             .find(|player| player.actor_index == event.source.parent_index);
 
                         let damage_instance =
-                            AdjustedDamageInstance::from_damage_event(&event, player_data);
+                            AdjustedDamageInstance::from_damage_event(&event, player_data)
+                                // The event's own position in the raw log —
+                                // the dragon-form remap rewrites the SOURCE,
+                                // never the target, so the assignment made
+                                // over the unremapped log still names this
+                                // hit's spawn.
+                                .with_target_segment(
+                                    target_assignment.get(event_index).copied().flatten(),
+                                );
 
                         self.derived_state
                             .process_damage_event(*timestamp, &damage_instance);
@@ -4767,6 +4783,82 @@ mod tests {
             segments[0].actor_index, 977_212_104,
             "the bridge to the status events"
         );
+    }
+
+    /// The spec's shared-segment guarantee: the card path (SkillState.targets)
+    /// and the groups path (aggregate_groups grouped by Target) must assign
+    /// identical segments, because both must come from
+    /// `segment_targets_indexed` over the same raw log — never re-derived.
+    #[test]
+    fn skill_target_entries_carry_the_groups_path_spawn_segments() {
+        let mut parser = Parser::default();
+        // Two spawns of the SAME enemy type (damage_onto keeps actor_type
+        // 0x1234 for any target index): segments 0 and 1, instances #1 and #2.
+        parser
+            .encounter
+            .raw_event_log
+            .push((1_000, Message::DamageEvent(damage_onto(9, 100, 400))));
+        parser
+            .encounter
+            .raw_event_log
+            .push((2_000, Message::DamageEvent(damage_onto(10, 100, 600))));
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0)
+            .expect("the dealing player's row");
+        assert_eq!(player.skill_breakdown.len(), 1, "one action, one skill row");
+        let mut card_path: Vec<(Option<usize>, u64)> = player.skill_breakdown[0]
+            .targets
+            .iter()
+            .map(|target| (target.segment, target.total_damage))
+            .collect();
+        card_path.sort();
+
+        let (segments, assignment) =
+            segment_targets_indexed(&parser.encounter.raw_event_log, parser.start_time());
+        let query = GroupQuery {
+            metric: GroupMetric::Damage,
+            hostility: GroupHostility::Friendly,
+            group_by: Dimension::Target,
+            source: None,
+            target: None,
+            ability: None,
+            top_n: None,
+            from_ms: None,
+            up_to_ms: None,
+        };
+        let aggregates = aggregate_groups(
+            &parser.encounter.raw_event_log,
+            &Default::default(),
+            &segments,
+            &assignment,
+            &query,
+            parser.start_time(),
+            1_000,
+            2,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by target is supported");
+        let mut groups_path: Vec<(Option<usize>, u64)> = aggregates
+            .iter()
+            .map(|aggregate| match aggregate.key {
+                GroupKey::EnemySpawn { segment, .. } => {
+                    (Some(segment), aggregate.measure.amount as u64)
+                }
+                ref other => panic!("expected spawn keys, got {other:?}"),
+            })
+            .collect();
+        groups_path.sort();
+
+        assert_eq!(
+            card_path, groups_path,
+            "the card path and the groups path must name the same spawns"
+        );
+        assert_eq!(card_path, vec![(Some(0), 400), (Some(1), 600)]);
     }
 
     #[test]
