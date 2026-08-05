@@ -273,6 +273,59 @@ describe("cardSectionsFor", () => {
   it("gives an unknown row no card", () => {
     expect(call("players", "player:99")).toBeNull();
   });
+
+  it("numbers a player's targets per spawn when the entries carry segments", () => {
+    // Two spawns of ONE type must be two rows named like the table's target
+    // rows — not merged into a type row the table would contradict.
+    const players = [
+      {
+        index: 0,
+        partyIndex: 0,
+        characterType: "Pl1400",
+        totalDamage: 100,
+        skillBreakdown: [
+          {
+            ...skill(9001, 100, 10),
+            targets: [
+              { enemyType: "Em0003", segment: 0, hits: 5, totalDamage: 60 },
+              { enemyType: "Em0003", segment: 1, hits: 5, totalDamage: 40 },
+            ],
+          },
+        ],
+      },
+    ] as unknown as ComputedPlayerState[];
+
+    const sections = cardSectionsFor({
+      row: row("player:0"),
+      level: "players",
+      players,
+      pins: { source: 0, targets: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: { ...LABELS, target: (segment: number) => `spawn:${segment}` },
+      card: DAMAGE_CARD,
+    });
+
+    expect(sections?.[1].entries).toEqual([
+      { key: "target:0", label: "spawn:0", value: 60, icon: undefined },
+      { key: "target:1", label: "spawn:1", value: 40, icon: undefined },
+    ]);
+  });
+
+  it("falls back to the un-numbered type for entries that predate the segment field", () => {
+    // The fixture's targets carry no segment — an old cached payload. The
+    // spawn labeler being INJECTED must not change how those render.
+    const sections = cardSectionsFor({
+      row: row("player:0"),
+      level: "players",
+      players: PLAYERS,
+      pins: { source: 0, targets: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: { ...LABELS, target: (segment: number) => `spawn:${segment}` },
+      card: DAMAGE_CARD,
+    });
+
+    expect(sections?.[1].entries.map((entry) => entry.label)).toEqual(["enemy:Em0003", "enemy:unknown-7"]);
+  });
 });
 
 describe("cardSectionsFor at the skills level", () => {

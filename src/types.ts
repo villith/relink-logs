@@ -175,11 +175,17 @@ export type StatusInterval = {
  * needing a cast that would hide a real drift between a band and a row. */
 export type SkillRow = Pick<SkillState, "actionType" | "childCharacterType">;
 
-/** Per-enemy-type share of one skill's damage (mirrors the Rust
- * `SkillTargetState`); same-type spawns merge into one entry. Computed under
- * the active target/time filters, like the rest of the derived state. */
+/** Per-enemy share of one skill's damage (mirrors the Rust
+ * `SkillTargetState`). Computed under the active target/time filters, like
+ * the rest of the derived state. */
 export type SkillTargetState = {
   enemyType: EnemyType;
+  /** The enemy SPAWN this share landed on, as an index into `targetEntries` —
+   * the same segment the groups path keys by, so a card and the table can
+   * never number spawns differently. Absent on payloads from before the
+   * field existed (and from the live meter path); those entries aggregate at
+   * the type level and render un-numbered. */
+  segment?: number;
   hits: number;
   totalDamage: number;
 };

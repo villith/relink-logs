@@ -27,6 +27,13 @@ export type SectionLabels = {
   abilityIcon?: (key: string, owner?: ComputedPlayerState) => string | undefined;
   enemyIcon?: (type: EnemyType) => string | undefined;
   sourceIcon?: (index: number) => string | undefined;
+  /** One enemy SPAWN's display name (name + "#N" once a name repeats) — the
+   * SAME labelling the table's target rows resolve through, injected so the
+   * card's "#2" and the table's "#2" can never name different spawns.
+   * Optional so tests and older callers fall back to the type name. */
+  target?: (segment: number) => string;
+  /** That spawn's portrait, resolved through `targetEntries` by the view. */
+  targetIcon?: (segment: number) => string | undefined;
 };
 
 /** Per-enemy totals summed across a set of skills.
@@ -36,33 +43,41 @@ export type SectionLabels = {
  * `MetricCard.perTarget` rather than passing an accessor here — a metric with
  * no per-enemy record must omit the section, not fill it with damage.
  *
+ * Spawn-keyed where an entry carries a `segment` — the same identity the
+ * table's target rows use, labelled through the same lookup — and type-keyed
+ * for entries from payloads that predate the field, which can only speak at
+ * the type level and render un-numbered.
+ *
  * `targets` is optional on SkillState because cached payloads predate it. An
  * absent list means the breakdown is unavailable, not that nothing was hit —
  * which is why a missing list yields no entries rather than a zero row. */
 export const aggregateTargets = (
   skills: SkillState[],
-  enemyLabel: (type: EnemyType) => string,
-  enemyIcon?: (type: EnemyType) => string | undefined
+  labels: Pick<SectionLabels, "enemy" | "enemyIcon" | "target" | "targetIcon">
 ) => {
-  const byType = new Map<string, { key: string; label: string; value: number; icon?: string }>();
+  const folded = new Map<string, { key: string; label: string; value: number; icon?: string }>();
   for (const skill of skills) {
     for (const target of skill.targets ?? []) {
-      // JSON, not String(): EnemyType is `string | { Unknown: number }`, and
-      // String() renders every Unknown variant as "[object Object]", merging
-      // every unidentified spawn into a single row.
-      const key = JSON.stringify(target.enemyType);
-      const found = byType.get(key);
-      if (found) found.value += target.totalDamage;
-      else
-        byType.set(key, {
-          key,
-          label: enemyLabel(target.enemyType),
-          value: target.totalDamage,
-          icon: enemyIcon?.(target.enemyType),
-        });
+      // JSON for the type half, not String(): EnemyType is
+      // `string | { Unknown: number }`, and String() renders every Unknown
+      // variant as "[object Object]", merging every unidentified spawn into
+      // a single row.
+      const key = target.segment !== undefined ? `target:${target.segment}` : JSON.stringify(target.enemyType);
+      const found = folded.get(key);
+      if (found) {
+        found.value += target.totalDamage;
+        continue;
+      }
+      const label =
+        target.segment !== undefined && labels.target ? labels.target(target.segment) : labels.enemy(target.enemyType);
+      const icon =
+        target.segment !== undefined && labels.targetIcon
+          ? labels.targetIcon(target.segment)
+          : labels.enemyIcon?.(target.enemyType);
+      folded.set(key, { key, label, value: target.totalDamage, icon });
     }
   }
-  return [...byType.values()].sort((a, b) => b.value - a.value);
+  return [...folded.values()].sort((a, b) => b.value - a.value);
 };
 
 /** Per-ability totals, summed across every skill the table would draw as ONE
@@ -161,7 +176,7 @@ export const cardSectionsFor = ({
           {
             headingKey: "ui.logs.hover-by-target",
             color: TARGET_COLOR,
-            entries: aggregateTargets(skills, labels.enemy, labels.enemyIcon),
+            entries: aggregateTargets(skills, labels),
           },
         ]
       : [];

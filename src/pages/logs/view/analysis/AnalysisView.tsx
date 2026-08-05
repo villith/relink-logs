@@ -873,8 +873,21 @@ export const AnalysisView = () => {
         const character = playerByIndex.get(index)?.player.characterType;
         return typeof character === "string" ? characterIconUrl(character) : undefined;
       },
+      // The SAME spawn naming (and art) the table's target rows resolve
+      // through, so a card's "#2" can never name a different spawn.
+      target: labelForTarget,
+      targetIcon: (segment: number) => enemyIconUrl(targetEntries[segment]?.enemyType ?? null),
     }),
-    [labelForAbility, identityPlayers, labelForSource, palette, playerData, playerByIndex]
+    [
+      labelForAbility,
+      identityPlayers,
+      labelForSource,
+      palette,
+      playerData,
+      playerByIndex,
+      labelForTarget,
+      targetEntries,
+    ]
   );
 
   // The enemy-side cards' lookups: the same ones the friendly card already
