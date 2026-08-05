@@ -36,6 +36,28 @@ describe("extractMarkers", () => {
     expect(markers).toEqual([{ kind: "death", atMs: 5_000, actorIndex: 1 }]);
   });
 
+  it("includes an event at exactly startMs and excludes one at exactly endMs", () => {
+    const markers = extractMarkers({
+      deathEvents: [death(10_000, 0), death(90_000, 1)],
+      sbaEvents: [],
+      window: { startMs: 10_000, endMs: 90_000 },
+      knownActors: KNOWN,
+    });
+    expect(markers).toEqual([{ kind: "death", atMs: 0, actorIndex: 0 }]);
+  });
+
+  it("returns nothing for a zero-width window or empty event lists", () => {
+    expect(
+      extractMarkers({
+        deathEvents: [death(50_000, 0)],
+        sbaEvents: [perform(50_000, 1)],
+        window: { startMs: 50_000, endMs: 50_000 },
+        knownActors: KNOWN,
+      })
+    ).toEqual([]);
+    expect(extractMarkers({ deathEvents: [], sbaEvents: [], window: FULL, knownActors: KNOWN })).toEqual([]);
+  });
+
   it("drops an actor the party does not know — enemy deaths are out of scope", () => {
     const markers = extractMarkers({
       deathEvents: [death(1_000, 4026531840)],

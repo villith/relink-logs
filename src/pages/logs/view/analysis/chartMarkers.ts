@@ -58,5 +58,8 @@ export const extractMarkers = ({
     }
   }
 
+  // Ties (same atMs) are unordered by design — don't infer meaning from the
+  // fact that deaths are pushed before SBAs above; that's an implementation
+  // detail of the loop order, not a contract.
   return markers.sort((a, b) => a.atMs - b.atMs);
 };
