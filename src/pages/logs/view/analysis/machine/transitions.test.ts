@@ -36,7 +36,24 @@ describe("axis housekeeping", () => {
     const after = setHostility(state({ source: 1, target: 2, by: "target" }), "enemy");
     expect(after.source).toBeNull();
     expect(after.target).toBeNull();
+    expect(after.by).toBeNull();
     expect(after.hostility).toBe("enemy");
+    // Non-status ability pins clear; status pins survive
+    expect(setHostility(state({ ability: "skill:9" }), "enemy").ability).toBeNull();
+    expect(setHostility(state({ ability: "status:4:1" }), "enemy").ability).toBe("status:4:1");
+    // Window survives
+    expect(setHostility(state({ window: [3, 9] }), "enemy").window).toEqual([3, 9]);
+  });
+
+  it("setMetric keeps source and window pins, clears by; same metric is a no-op", () => {
+    const s = state({ source: 1, window: [3, 9], by: "target" });
+    const taken = setMetric(s, "taken");
+    expect(taken.source).toBe(1);
+    expect(taken.window).toEqual([3, 9]);
+    expect(taken.by).toBeNull();
+    // Same metric is no-op
+    const unchanged = setMetric(s, "damage");
+    expect(unchanged).toBe(s);
   });
 
   it("setWindow keeps pins; clearPin clears one dimension only", () => {
@@ -51,5 +68,12 @@ describe("axis housekeeping", () => {
   it("regroup sets the override; regrouping to the derived default clears it", () => {
     expect(regroup(DEFAULT_STATE, "target", CAPABILITIES.damage).by).toBe("target");
     expect(regroup(state({ by: "target" }), "source", CAPABILITIES.damage).by).toBeNull();
+  });
+
+  it("unsupported regroup overrides are written but inert at the resolver", () => {
+    const regrouped = regroup(state({ metric: "sba" }), "target", CAPABILITIES.sba);
+    expect(regrouped.by).toBe("target");
+    // But the resolver ignores it and returns the supported default
+    expect(resolveGroupBy(regrouped, CAPABILITIES.sba)).toBe("source");
   });
 });

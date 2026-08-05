@@ -27,20 +27,25 @@ const abilityCrosses = (ability: string, from: MetricKey, to: MetricKey): boolea
   return from === to;
 };
 
-export const setMetric = (state: AnalysisState, metric: MetricKey): AnalysisState => ({
-  ...state,
-  metric,
-  ability: state.ability !== null && abilityCrosses(state.ability, state.metric, metric) ? state.ability : null,
-  by: null,
-});
+export const setMetric = (state: AnalysisState, metric: MetricKey): AnalysisState => {
+  if (metric === state.metric) return state;
+  return {
+    ...state,
+    metric,
+    ability: state.ability !== null && abilityCrosses(state.ability, state.metric, metric) ? state.ability : null,
+    by: null,
+  };
+};
 
 /** The sides swap which universe source/target draw from, so actor pins from
- * the old side name nobody on the new one. */
+ * the old side name nobody on the new one. Ability clears for the same reason
+ * UNLESS it is a status pin, whose effect names the same thing on both sides. */
 export const setHostility = (state: AnalysisState, hostility: Hostility): AnalysisState => ({
   ...state,
   hostility,
   source: null,
   target: null,
+  ability: state.ability !== null && isStatusPin(state.ability) ? state.ability : null,
   by: null,
 });
 
