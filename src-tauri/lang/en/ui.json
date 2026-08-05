@@ -527,6 +527,7 @@
       "chart-markers-sba": "SBA",
       "marker-death-line": "☠ {{name}} died",
       "marker-sba-line": "✦ {{name}} — Skybound Art",
+      "chart-stack-toggle-label": "Chart stacking mode",
       "chart-stack-normal": "Normal",
       "chart-stack-stacked": "Stacked",
       "quest-cleared": "Cleared",

@@ -63,7 +63,18 @@ export type DpsChartProps = {
   /** For the STACKS chart (aura holder/effect series): whether the areas
    * overlap ("normal", WCL's default) or sum into a stack. Absent, a stacked
    * chart stacks — the damage drills are decompositions whose stack height IS
-   * the total, and they get no toggle. */
+   * the total, and they get no toggle.
+   *
+   * Layered under `stacked` above, which is the coarser choice: `stacked`
+   * picks an AreaChart over a LineChart at all, and only then does this pick
+   * that AreaChart's internal type. Meaningless when `stacked` is false.
+   *
+   * The default here reads as a contradiction against AnalysisView's
+   * `useState<StackMode>("normal")` — deliberately, because the two reach
+   * disjoint cases. This default applies ONLY where the prop is omitted, which
+   * is exactly the charts that never get a toggle (the drills), and it keeps
+   * them stacking as they always have; the "normal" there is the toggle's own
+   * opening position on the one chart that has one. */
   stackMode?: StackMode;
   /** Providing this renders the Normal | Stacked SegmentedControl in the
    * chart header. */
@@ -398,6 +409,10 @@ export const DpsChart = ({
           {onStackModeChange && (
             <SegmentedControl
               size="xs"
+              // "Normal" and "Stacked" name the options but not the choice, so
+              // the radiogroup announces nothing about WHAT is being set — the
+              // same reason View.tsx labels its own SegmentedControl.
+              aria-label={t("ui.logs.chart-stack-toggle-label")}
               value={stackMode}
               onChange={(value) => onStackModeChange(value as StackMode)}
               data={[
