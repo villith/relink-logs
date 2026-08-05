@@ -42,7 +42,6 @@ import {
   DPS_BUCKET_MS,
   DPS_SMOOTHING_WINDOW,
   HP_SERIES_COLORS,
-  mantineColorVar,
   type ChartDatapoint,
   type Label,
 } from "../DetailCharts";
@@ -56,7 +55,6 @@ import { isHarmful } from "../metrics/statusPolarity";
 import { stun } from "../metrics/stun";
 import type { Hostility, MetricDescriptor, MetricRow } from "../metrics/types";
 import { deriveSelectorOptions, type SelectorPins } from "../selectorOptions";
-import { toBands } from "../statusBands";
 import { clipToWindow, isStatusPin, statusPinKey } from "../statusUptime";
 import { buildTargetLabels } from "../targetLabels";
 
@@ -804,41 +802,11 @@ export const AnalysisView = () => {
     [state, setState]
   );
 
-  // Which status rows are shaded onto the chart. Component state, not the URL:
-  // it is a transient way of reading the plot, unlike the pins, which say what
-  // the page is about.
-  const [banded, setBanded] = useState<Set<string>>(new Set());
-
-  // A key from the Buffs table means nothing on the Debuffs one, and a band left
-  // behind would shade a fight the user never asked about. `id` for the same
-  // reason: the route reuses this component across logs, and a status key is a
-  // GLOBAL effect id, so a stale band silently matches in the next log and opens
-  // it pre-shaded.
-  useEffect(() => setBanded(new Set()), [metricKey, id]);
-
-  // Normal | Stacked for the stacks chart. Component-local like the band
-  // toggles: a way of reading the plot, not what the page is about. Reset per
-  // metric/log for the same stale-state reason as `banded`.
+  // Normal | Stacked for the stacks chart. Component-local: a way of reading
+  // the plot, not what the page is about. Reset per metric/log because a mode
+  // chosen for one chart says nothing about the next one.
   const [stackMode, setStackMode] = useState<StackMode>("normal");
   useEffect(() => setStackMode("normal"), [metricKey, id]);
-
-  const rowToggle = useCallback(
-    (row: MetricRow) => {
-      // Only the effect rows: a holder row is one actor's share of a band the
-      // effect row already draws.
-      if (!isStatusMetric || !isStatusPin(row.key)) return null;
-      return {
-        shown: banded.has(row.key),
-        onToggle: () =>
-          setBanded((previous) => {
-            const next = new Set(previous);
-            if (!next.delete(row.key)) next.add(row.key);
-            return next;
-          }),
-      };
-    },
-    [isStatusMetric, banded]
-  );
 
   // Chart series, mirroring the classic view's shaping so the same fight draws
   // the same picture in both.
@@ -1232,21 +1200,6 @@ export const AnalysisView = () => {
     [chartData, range]
   );
 
-  // The enabled rows' windows, rebased onto whatever the chart is currently
-  // showing. Undefined rather than empty when nothing is banded, so a chart
-  // with no bands renders exactly as it did before this existed.
-  const chartBands = useMemo(() => {
-    if (banded.size === 0) return undefined;
-
-    return [...banded].flatMap((key, index) => {
-      // The row's own colour is the normal path; the index fallback only fires
-      // for a band whose row scrolled out of the current pin level.
-      const color = rowColors?.get(key) ?? mantineColorVar(HP_SERIES_COLORS[index % HP_SERIES_COLORS.length]);
-      const held = intervalsByPinKey.get(key) ?? [];
-      return toBands(held, statusWindow).map((band) => ({ color, band }));
-    });
-  }, [banded, intervalsByPinKey, statusWindow, rowColors]);
-
   // The dev-only readout: the whole machine state plus what the spec resolved
   // it to — one JSON line a report can paste, replacing the hand-kept
   // key=value formatter the machine made redundant.
@@ -1353,7 +1306,6 @@ export const AnalysisView = () => {
         onScope={handleScope}
         fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
         toLabel={range === null ? fullLabel : bucketLabel(range[1])}
-        bands={chartBands}
         markers={chartMarkers}
         stackMode={chartSource === "stacks" ? stackMode : undefined}
         onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
@@ -1371,7 +1323,6 @@ export const AnalysisView = () => {
           rowColor={rowColor}
           rowSections={rowSections}
           cardAmount={metric.card}
-          rowToggle={rowToggle}
           timelineMs={fightDurationMs}
           // The resolver names the honest empty states (see `emptyKeyFor`).
           // The aura tabs' key means "this log never recorded status events",
