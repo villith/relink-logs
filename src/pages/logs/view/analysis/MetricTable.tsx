@@ -1,6 +1,6 @@
 import { Box, Text, UnstyledButton } from "@mantine/core";
-import { Eye, EyeSlash } from "@phosphor-icons/react";
-import { useMemo } from "react";
+import { CaretDown, CaretUp, Eye, EyeSlash } from "@phosphor-icons/react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MetricRow } from "../metrics/types";
@@ -83,6 +83,12 @@ export const MetricTable = ({
     [rows, rowSections]
   );
 
+  // Which skill-group parents are open. Transient like `banded`, and reset
+  // when the rows change identity: a regroup or refetch hands the table new
+  // rows, and expansion keyed to the old ones would leak onto them.
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  useEffect(() => setExpanded(new Set()), [rows]);
+
   if (rows.length === 0) {
     return (
       <Text size="sm" c="dimmed" ta="center" py="lg">
@@ -107,112 +113,157 @@ export const MetricTable = ({
       </Box>
 
       {rows.map((row) => {
-        const toggle = rowToggle?.(row);
-        // A row with windows to place draws a positional timeline instead of a
-        // magnitude bar — asked three times below, so it is answered once.
-        const positional = Boolean(row.timeline) && timelineMs > 0;
-        const button = (
-          // A div, not a button. The band toggle inside it is a real <button>,
-          // and a button may not contain interactive content — the row used to
-          // be an UnstyledButton with a focusable role="button" span in it,
-          // which is invalid and made the two fight over focus and clicks.
-          //
-          // Focusable and Enter/Space-activated by hand, which is what the
-          // <button> was giving for free: a row in a grid is allowed to take
-          // focus, and losing keyboard pinning to fix the nesting would be a
-          // poor trade.
-          <Box
-            role="row"
-            className={`analysis-row${row.pinOnClick ? " analysis-row-pinnable" : ""}`}
-            tabIndex={row.pinOnClick ? 0 : undefined}
-            onClick={() => row.pinOnClick && onPin(row.pinOnClick)}
-            onKeyDown={(event: React.KeyboardEvent) => {
-              if (!row.pinOnClick || (event.key !== "Enter" && event.key !== " ")) return;
-              event.preventDefault();
-              onPin(row.pinOnClick);
-            }}
-          >
-            {!positional && (
-              <Box
-                data-metric-bar
-                className="analysis-bar"
-                style={{
-                  // largest === 0 when every row is zero (a fight with no stun,
-                  // say). Guarding here keeps those rows visible at zero width
-                  // instead of rendering NaN.
-                  width: largest === 0 ? "0%" : `${(row.value / largest) * 100}%`,
-                  backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
-                }}
-              />
-            )}
-            {/* A real button now that the row is not one. Still stops
-                propagation, so banding a row does not also pin it — including
-                on the keyboard, where the row above listens for the same keys. */}
-            {toggle && (
-              <UnstyledButton
-                aria-pressed={toggle.shown}
-                aria-label={t("ui.logs.buff-band-toggle")}
-                className="analysis-row-toggle"
-                style={{ opacity: toggle.shown ? 1 : 0.35 }}
-                onClick={(event: React.MouseEvent) => {
-                  event.stopPropagation();
-                  toggle.onToggle();
-                }}
-                onKeyDown={(event: React.KeyboardEvent) => {
-                  if (event.key !== "Enter" && event.key !== " ") return;
-                  event.stopPropagation();
-                }}
-              >
-                {toggle.shown ? <Eye size={14} weight="fill" /> : <EyeSlash size={14} />}
-              </UnstyledButton>
-            )}
-            <Text role="gridcell" className={`analysis-name${positional ? " analysis-name-fixed" : ""}`}>
-              {renderLabel ? renderLabel(row) : row.label}
-            </Text>
-            {positional && row.timeline && (
-              // Positional, not proportional: Warcraft Logs' uptime bar marks
-              // WHEN the effect was up, and the % column beside it already says
-              // how much. Its own cell between the name and the numbers, so the
-              // pieces never sit under text. One piece per contiguous window —
-              // `toBands` merged the overlaps.
-              <Box className="analysis-track" aria-hidden>
-                {row.timeline.map((span, spanIndex) => (
-                  <Box
-                    key={spanIndex}
-                    className="analysis-timeline-piece"
-                    style={{
-                      left: `${(span.startMs / timelineMs) * 100}%`,
-                      width: `${((span.endMs - span.startMs) / timelineMs) * 100}%`,
-                      // A window shorter than a pixel is still a real window; at
-                      // zero width it would vanish from a row that reports it.
-                      minWidth: "2px",
-                      backgroundColor: rowColor ? rowColor(row) : FALLBACK_COLOR,
-                    }}
-                  />
-                ))}
-              </Box>
-            )}
-            {row.columns.map((value, columnIndex) => (
-              <Text
-                key={columnIndex}
-                role="gridcell"
-                className={`analysis-cell${columnIndex === 0 ? "" : " analysis-cell-muted"}`}
-              >
-                {value}
+        // One renderer for the row and its member subrows, so the two can
+        // never drift apart. A subrow is the same anatomy indented: no band
+        // toggle, no timeline, no expansion of its own — only group parents
+        // carry children, and only status rows (which have none) timelines.
+        const rowElement = (rowData: MetricRow, nested: boolean) => {
+          const toggle = nested ? null : rowToggle?.(rowData);
+          // A row with windows to place draws a positional timeline instead of
+          // a magnitude bar — asked three times below, so it is answered once.
+          const positional = !nested && Boolean(rowData.timeline) && timelineMs > 0;
+          const hasChildren = !nested && (rowData.children?.length ?? 0) > 0;
+          const isExpanded = expanded.has(rowData.key);
+          return (
+            // A div, not a button. The controls inside it are real <button>s,
+            // and a button may not contain interactive content — the row used
+            // to be an UnstyledButton with a focusable role="button" span in
+            // it, which is invalid and made the two fight over focus and
+            // clicks.
+            //
+            // Focusable and Enter/Space-activated by hand, which is what the
+            // <button> was giving for free: a row in a grid is allowed to take
+            // focus, and losing keyboard pinning to fix the nesting would be a
+            // poor trade.
+            <Box
+              role="row"
+              className={`analysis-row${nested ? " analysis-subrow" : ""}${rowData.pinOnClick ? " analysis-row-pinnable" : ""}`}
+              tabIndex={rowData.pinOnClick ? 0 : undefined}
+              onClick={() => rowData.pinOnClick && onPin(rowData.pinOnClick)}
+              onKeyDown={(event: React.KeyboardEvent) => {
+                if (!rowData.pinOnClick || (event.key !== "Enter" && event.key !== " ")) return;
+                event.preventDefault();
+                onPin(rowData.pinOnClick);
+              }}
+            >
+              {!positional && (
+                <Box
+                  data-metric-bar
+                  className="analysis-bar"
+                  style={{
+                    // largest === 0 when every row is zero (a fight with no
+                    // stun, say). Guarding here keeps those rows visible at
+                    // zero width instead of rendering NaN.
+                    width: largest === 0 ? "0%" : `${(rowData.value / largest) * 100}%`,
+                    backgroundColor: rowColor ? rowColor(rowData) : FALLBACK_COLOR,
+                  }}
+                />
+              )}
+              {/* A real button now that the row is not one. Still stops
+                  propagation, so banding a row does not also pin it — including
+                  on the keyboard, where the row above listens for the same keys. */}
+              {toggle && (
+                <UnstyledButton
+                  aria-pressed={toggle.shown}
+                  aria-label={t("ui.logs.buff-band-toggle")}
+                  className="analysis-row-toggle"
+                  style={{ opacity: toggle.shown ? 1 : 0.35 }}
+                  onClick={(event: React.MouseEvent) => {
+                    event.stopPropagation();
+                    toggle.onToggle();
+                  }}
+                  onKeyDown={(event: React.KeyboardEvent) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.stopPropagation();
+                  }}
+                >
+                  {toggle.shown ? <Eye size={14} weight="fill" /> : <EyeSlash size={14} />}
+                </UnstyledButton>
+              )}
+              {/* The skill-group expand control — its own button for the same
+                  nesting reason as the band toggle, and stopping propagation
+                  because opening a group must not also pin it. */}
+              {hasChildren && (
+                <UnstyledButton
+                  aria-expanded={isExpanded}
+                  aria-label={t("ui.logs.expand-row")}
+                  className="analysis-row-expand"
+                  onClick={(event: React.MouseEvent) => {
+                    event.stopPropagation();
+                    setExpanded((previous) => {
+                      const next = new Set(previous);
+                      if (!next.delete(rowData.key)) next.add(rowData.key);
+                      return next;
+                    });
+                  }}
+                  onKeyDown={(event: React.KeyboardEvent) => {
+                    if (event.key !== "Enter" && event.key !== " ") return;
+                    event.stopPropagation();
+                  }}
+                >
+                  {isExpanded ? <CaretUp size={12} /> : <CaretDown size={12} />}
+                </UnstyledButton>
+              )}
+              <Text role="gridcell" className={`analysis-name${positional ? " analysis-name-fixed" : ""}`}>
+                {renderLabel ? renderLabel(rowData) : rowData.label}
               </Text>
-            ))}
-          </Box>
-        );
+              {positional && rowData.timeline && (
+                // Positional, not proportional: Warcraft Logs' uptime bar marks
+                // WHEN the effect was up, and the % column beside it already
+                // says how much. Its own cell between the name and the numbers,
+                // so the pieces never sit under text. One piece per contiguous
+                // window — `toBands` merged the overlaps.
+                <Box className="analysis-track" aria-hidden>
+                  {rowData.timeline.map((span, spanIndex) => (
+                    <Box
+                      key={spanIndex}
+                      className="analysis-timeline-piece"
+                      style={{
+                        left: `${(span.startMs / timelineMs) * 100}%`,
+                        width: `${((span.endMs - span.startMs) / timelineMs) * 100}%`,
+                        // A window shorter than a pixel is still a real window;
+                        // at zero width it would vanish from a row that reports
+                        // it.
+                        minWidth: "2px",
+                        backgroundColor: rowColor ? rowColor(rowData) : FALLBACK_COLOR,
+                      }}
+                    />
+                  ))}
+                </Box>
+              )}
+              {rowData.columns.map((value, columnIndex) => (
+                <Text
+                  key={columnIndex}
+                  role="gridcell"
+                  className={`analysis-cell${columnIndex === 0 ? "" : " analysis-cell-muted"}`}
+                >
+                  {value}
+                </Text>
+              ))}
+            </Box>
+          );
+        };
+
+        const button = rowElement(row, false);
 
         // The key moves off the row and onto whichever element is the list
         // child: HoverCard clones its child and would otherwise lose it.
         const sections = sectionsByRow?.get(row.key);
-        if (!sections || sections.length === 0 || !cardAmount) return <Box key={row.key}>{button}</Box>;
+        const parent =
+          !sections || sections.length === 0 || !cardAmount ? (
+            <Box>{button}</Box>
+          ) : (
+            <HoverCard sections={sections} {...cardAmount}>
+              {button}
+            </HoverCard>
+          );
 
         return (
-          <HoverCard key={row.key} sections={sections} {...cardAmount}>
-            {button}
-          </HoverCard>
+          <Fragment key={row.key}>
+            {parent}
+            {expanded.has(row.key) &&
+              row.children?.map((child) => <Fragment key={child.key}>{rowElement(child, true)}</Fragment>)}
+          </Fragment>
         );
       })}
     </Box>

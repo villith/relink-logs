@@ -122,6 +122,23 @@
   cursor: pointer;
 }
 
+/* A skill-group member behind an expanded parent: the same row anatomy,
+ * indented so the hierarchy reads at a glance. */
+.analysis-subrow {
+  padding-left: 28px;
+}
+
+/* The skill-group expand control. Same anatomy as the band toggle: on the
+ * bar, so it takes `position: relative` or the fill paints over it. */
+.analysis-row-expand {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 6px;
+  cursor: pointer;
+}
+
 .analysis-name {
   flex: 1;
   min-width: 0;

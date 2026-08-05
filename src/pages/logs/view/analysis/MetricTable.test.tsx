@@ -249,6 +249,95 @@ describe("MetricTable", () => {
   });
 });
 
+describe("subrows", () => {
+  const child = (key: string, value: number): MetricRow => ({
+    key,
+    label: key,
+    value,
+    columns: [String(value), ""],
+    pinOnClick: { ability: key },
+    colorSlot: 0,
+  });
+
+  const parentRows = (): MetricRow[] => [
+    {
+      key: "skill:group",
+      label: "skill:group",
+      value: 400,
+      columns: ["400", "4"],
+      pinOnClick: { ability: "group" },
+      colorSlot: 0,
+      children: [child("skill:Normal:100", 300), child("skill:Normal:110", 100)],
+    },
+    {
+      key: "skill:Normal:999",
+      label: "skill:Normal:999",
+      value: 50,
+      columns: ["50", "1"],
+      pinOnClick: null,
+      colorSlot: 0,
+    },
+  ];
+
+  it("renders an expand control only on rows with children", () => {
+    const { container } = renderTable({ rows: parentRows() });
+    const chevrons = container.querySelectorAll(".analysis-row-expand");
+    expect(chevrons).toHaveLength(1);
+    expect(chevrons[0].getAttribute("aria-label")).toBe("ui.logs.expand-row");
+    expect(chevrons[0].tagName).toBe("BUTTON");
+  });
+
+  it("reveals the children as indented rows on expand, without pinning the parent", () => {
+    const onPin = vi.fn();
+    const { container } = renderTable({ rows: parentRows(), onPin });
+
+    expect(screen.queryByText("skill:Normal:100")).toBeNull();
+
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(onPin).not.toHaveBeenCalled();
+
+    expect(screen.getByText("skill:Normal:100")).toBeTruthy();
+    expect(screen.getByText("skill:Normal:110")).toBeTruthy();
+    expect(container.querySelectorAll(".analysis-subrow")).toHaveLength(2);
+  });
+
+  it("pins a clicked child by the child's own payload", () => {
+    const onPin = vi.fn();
+    const { container } = renderTable({ rows: parentRows(), onPin });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+
+    screen.getByText("skill:Normal:110").click();
+    expect(onPin).toHaveBeenCalledWith({ ability: "skill:Normal:110" });
+  });
+
+  it("collapses again on a second click", () => {
+    const { container } = renderTable({ rows: parentRows() });
+    const chevron = container.querySelector(".analysis-row-expand")!;
+    fireEvent.click(chevron);
+    fireEvent.click(chevron);
+    expect(screen.queryByText("skill:Normal:100")).toBeNull();
+  });
+
+  it("resets expansion when the rows change identity", () => {
+    const { container, rerender } = renderTable({ rows: parentRows() });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(screen.getByText("skill:Normal:100")).toBeTruthy();
+
+    // A regroup or refetch hands the table a NEW rows array; stale expansion
+    // keyed to the old rows must not leak onto it.
+    rerender(
+      <MantineProvider>
+        <MetricTable
+          rows={parentRows()}
+          columnKeys={["ui.logs.total-damage", "ui.meter-columns.dps"]}
+          onPin={() => {}}
+        />
+      </MantineProvider>
+    );
+    expect(screen.queryByText("skill:Normal:100")).toBeNull();
+  });
+});
+
 describe("timeline rows", () => {
   const row = (over: Partial<MetricRow> = {}): MetricRow => ({
     key: "status:10:500",

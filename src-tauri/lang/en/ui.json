@@ -519,6 +519,7 @@
       "chart-drill-target-label": "Damage per second, by enemy",
       "chart-stacks-label": "Stacks",
       "chart-other-label": "Other",
+      "expand-row": "Expand",
       "chart-drag-hint": "Drag to scope · double-click to reset",
       "chart-legend-label": "Chart series",
       "quest-cleared": "Cleared",
