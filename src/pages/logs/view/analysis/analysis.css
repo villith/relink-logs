@@ -431,3 +431,10 @@
   font-size: 11px;
   color: var(--an-ink-3);
 }
+
+/* A provenance section's subheader inside the effects table — the same
+ * small-caps voice as the column heads, spaced off the run above it. Visual
+ * grouping only; it is not a row and takes no interaction. */
+.analysis-section-head {
+  padding: 8px 8px 2px;
+}

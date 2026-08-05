@@ -500,3 +500,27 @@ describe("children accessor", () => {
     expect(container.querySelectorAll(".analysis-subrow")).toHaveLength(2);
   });
 });
+
+describe("section subheaders", () => {
+  const sectioned: MetricRow[] = [
+    { key: "a", label: "a", value: 3, columns: ["3"], pinOnClick: null, colorSlot: -1 },
+    { key: "b", label: "b", value: 2, columns: ["2"], pinOnClick: null, colorSlot: -1 },
+    { key: "c", label: "c", value: 1, columns: ["1"], pinOnClick: null, colorSlot: -1 },
+  ];
+
+  it("draws one muted header per section change, not per row", () => {
+    renderTable({
+      rows: sectioned,
+      columnKeys: ["ui.logs.buff-uptime"],
+      sectionLabel: (row) => (row.key === "c" ? "Unknown" : "Skill"),
+    });
+    // Two runs → two headers: Skill above a, Unknown above c — none above b.
+    expect(screen.getAllByText("Skill")).toHaveLength(1);
+    expect(screen.getAllByText("Unknown")).toHaveLength(1);
+  });
+
+  it("draws no headers without the prop — every other table is untouched", () => {
+    renderTable({ rows: sectioned, columnKeys: ["ui.logs.buff-uptime"] });
+    expect(screen.queryByText("Skill")).toBeNull();
+  });
+});

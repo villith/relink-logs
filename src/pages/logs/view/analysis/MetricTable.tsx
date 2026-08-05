@@ -54,6 +54,12 @@ export type MetricTableProps = {
    * usual reason for one — but a log that never recorded the metric at all has
    * nothing to do with the pins, and saying so sends the user clearing them. */
   emptyKey?: string;
+  /** A section name per row, for tables whose rows group into titled runs
+   * (the effects table's provenance sections). When the name changes between
+   * two consecutive rows the table draws a muted subheader above the second —
+   * purely visual: no state, nothing collapses, rows keep their own order.
+   * The caller passes rows already sorted so equal sections are adjacent. */
+  sectionLabel?: (row: MetricRow) => string | null;
 };
 
 const FALLBACK_COLOR = "var(--an-ink-3)";
@@ -80,6 +86,7 @@ export const MetricTable = ({
   rowChildren,
   timelineMs = 0,
   emptyKey = "ui.logs.no-rows",
+  sectionLabel,
 }: MetricTableProps) => {
   const { t } = useTranslation();
 
@@ -131,7 +138,7 @@ export const MetricTable = ({
         ))}
       </Box>
 
-      {rows.map((row) => {
+      {rows.map((row, rowIndex) => {
         const childRows = childrenByRow.get(row.key) ?? [];
 
         // One renderer for the row and its subrows (member variants or the
@@ -283,8 +290,17 @@ export const MetricTable = ({
             </HoverCard>
           );
 
+        // A subheader is drawn only where the section CHANGES, so a run of
+        // rows sharing one is titled once. Purely visual: not a row, takes no
+        // interaction, and absent the prop nothing is drawn at all.
+        const section = sectionLabel?.(row) ?? null;
+        const previousSection = rowIndex === 0 ? null : sectionLabel?.(rows[rowIndex - 1]) ?? null;
+
         return (
           <Fragment key={row.key}>
+            {section !== null && section !== previousSection && (
+              <Text className="analysis-label analysis-section-head">{section}</Text>
+            )}
             {parent}
             {expanded.has(row.key) &&
               childRows.map((child) => <Fragment key={child.key}>{rowElement(child, true)}</Fragment>)}
