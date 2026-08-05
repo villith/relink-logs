@@ -23,12 +23,17 @@ use super::{
 pub mod audit;
 mod cap_detection;
 mod filters;
+mod groups;
 pub mod phantom_targets;
 mod player_state;
 mod skill_state;
 mod status;
 
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
+pub use groups::{
+    AbilityFilter, ActorRef, Dimension, GroupAggregate, GroupHostility, GroupKey, GroupMeasure,
+    GroupMetric, GroupQuery, GroupQueryError,
+};
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::{PlayerState, SbaSourceKind};
 pub use status::{assemble_intervals, StatusInterval};
