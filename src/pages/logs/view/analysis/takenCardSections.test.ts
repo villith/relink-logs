@@ -132,4 +132,31 @@ describe("takenAbilityCardSectionsFor", () => {
       })
     ).toBeNull();
   });
+
+  it("answers a taken: row whose label is not the attack-JSON grammar with no card", () => {
+    const garbage: MetricRow = { ...attackRow, key: "taken:garbage", label: "garbage" };
+    expect(
+      takenAbilityCardSectionsFor({ row: garbage, players: party, source: null, color: "red", labels: victimLabels })
+    ).toBeNull();
+  });
+
+  it("keeps a breakdown entry for the same action but a DIFFERENT enemy type out of the split", () => {
+    const otherEnemyParty = [
+      breakdownPlayer(0, [
+        { enemy: 0xaa, action: 1, total: 300 },
+        // Same action id, different enemy — must not join the drilled row.
+        { enemy: 0xbb, action: 1, total: 999 },
+      ]),
+    ];
+
+    const sections = takenAbilityCardSectionsFor({
+      row: attackRow,
+      players: otherEnemyParty,
+      source: null,
+      color: "red",
+      labels: victimLabels,
+    });
+
+    expect(sections?.[0].entries.map((entry) => [entry.label, entry.value])).toEqual([["player:0", 300]]);
+  });
 });

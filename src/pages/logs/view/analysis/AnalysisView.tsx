@@ -69,9 +69,7 @@ import { QuestSummary } from "./QuestSummary";
 import { RegroupStrip } from "./RegroupStrip";
 import { abilityLabelFor } from "./abilityLabel";
 import "./analysis.css";
-import { cardSectionsFor } from "./cardSections";
 import { buildSeriesPoints } from "./chartSeries";
-import { enemyDealtCardSectionsFor, enemyReceivedCardSectionsFor } from "./hostilityCardSections";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { groupBandsFor, groupRowsFor } from "./machine/groupRows";
@@ -87,6 +85,7 @@ import {
 } from "./machine/transitions";
 import { useAnalysisState } from "./machine/useAnalysisState";
 import { identityPartyOf } from "./partyIdentity";
+import { rowCardSectionsFor } from "./rowCardSections";
 import { abilityRowIconUrl } from "./rowIcon";
 import { buildStatusSeries } from "./statusChart";
 import {
@@ -100,7 +99,6 @@ import {
 } from "./statusLabel";
 import { withStatusOption } from "./statusOption";
 import { statusRowColors } from "./statusRowColors";
-import { takenCardSectionsFor } from "./takenCardSections";
 import { useUrlQueryString } from "./useUrlQueryString";
 
 /** The metric switcher's contents, in display order. Adding a metric that only
@@ -899,60 +897,25 @@ export const AnalysisView = () => {
     [sectionLabels, labelForTakenAttack]
   );
 
-  // Null for a metric with no breakdown behind its rows (SBA is a gauge
-  // reading; the status tables' rows are effects and holders). Those tabs used
-  // to inherit the damage card and explain a gauge with damage figures.
-  //
-  // The taken tab has its own card builder: its breakdown is per (attacker,
-  // attack), not per skill, so the skill-based sections would explain incoming
-  // damage with the player's own abilities.
   // Which card explains a row is DECLARED per (grouping, side) — see
-  // `MetricCapabilities.cardKind`. The builders themselves are unchanged; a
-  // builder handed a row it cannot decompose still answers null, and a
-  // declared "none" skips the work outright.
+  // `MetricCapabilities.cardKind` — and routed by `rowCardSectionsFor`, the
+  // pure dispatch the presence test exercises. The view only supplies the
+  // name/colour lookups and the scoped party.
   const rowSections = useCallback(
-    (row: MetricRow) => {
-      switch (caps.cardKind(spec.groupBy, hostility)) {
-        case "enemyDealt":
-          return enemyDealtCardSectionsFor({ row, players, color: rowColor(row), labels: hostilityLabels });
-        case "enemyReceived":
-          return enemyReceivedCardSectionsFor({ row, players, color: rowColor(row), labels: hostilityLabels });
-        case "taken":
-          return takenCardSectionsFor({
-            row,
-            players,
-            color: rowColor(row),
-            labels: { attack: labelForTakenAttack, enemy: translateEnemyType, enemyIcon: enemyIconUrl },
-          });
-        case "skill":
-          return metric.card
-            ? cardSectionsFor({
-                row,
-                level,
-                players,
-                pins,
-                color: rowColor(row),
-                labels: sectionLabels,
-                card: metric.card,
-              })
-            : null;
-        default:
-          return null;
-      }
-    },
-    [
-      caps,
-      spec.groupBy,
-      hostility,
-      metric,
-      level,
-      players,
-      pins,
-      rowColor,
-      sectionLabels,
-      hostilityLabels,
-      labelForTakenAttack,
-    ]
+    (row: MetricRow) =>
+      rowCardSectionsFor({
+        cardKind: caps.cardKind(spec.groupBy, hostility),
+        groupBy: spec.groupBy,
+        row,
+        level,
+        players,
+        pins,
+        targetEntries,
+        color: rowColor(row),
+        labels: hostilityLabels,
+        card: metric.card,
+      }),
+    [caps, spec.groupBy, hostility, level, players, pins, targetEntries, rowColor, hostilityLabels, metric]
   );
   // What the plot shows follows the metric tabs. Each metric brings its own
   // bucketed series from the base load, so switching tabs never refetches.
