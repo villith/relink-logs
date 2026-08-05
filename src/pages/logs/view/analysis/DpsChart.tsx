@@ -1,8 +1,8 @@
 import { AreaChart, LineChart } from "@mantine/charts";
-import { Box, Paper, Text } from "@mantine/core";
+import { Box, Checkbox, Group, Paper, Text } from "@mantine/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ReferenceArea } from "recharts";
+import { ReferenceArea, ReferenceLine } from "recharts";
 
 import { humanizeNumber } from "@/utils";
 
@@ -11,7 +11,7 @@ import { bandOpacity, type Band } from "../statusBands";
 
 import { ChartLegend } from "./ChartLegend";
 import "./analysis.css";
-import type { ChartMarker } from "./chartMarkers";
+import type { ChartMarker, MarkerKind } from "./chartMarkers";
 import { windowFromDrag } from "./scopeWindow";
 
 /** How a plotted value reads as text.
@@ -52,6 +52,21 @@ export type DpsChartProps = {
    * by `toBands`. Only the Buffs and Debuffs metrics pass any; absent, the
    * chart draws exactly what it draws today. */
   bands?: { color: string; band: Band }[];
+  /** Death/SBA event markers, already rebased onto this chart's window (like
+   * `bands`). Drawn as vertical reference lines and appended to the tooltip of
+   * the bucket they land in; a control row above the plot toggles each kind. */
+  markers?: ChartMarker[];
+};
+
+/** The glyph a marker's reference line wears at the top of the plot. Kept out
+ * of JSX text (recharts label props) so the i18next literal rule stays clean;
+ * the tooltip lines carry their own translated text instead. */
+const MARKER_GLYPH: Record<MarkerKind, string> = { death: "☠", sba: "✦" };
+
+/** Control-row label per marker kind. */
+const MARKER_LABEL_KEY: Record<MarkerKind, string> = {
+  death: "ui.logs.chart-markers-deaths",
+  sba: "ui.logs.chart-markers-sba",
 };
 
 // recharts types a tooltip entry as Payload<any, any>, which has no index
@@ -155,6 +170,7 @@ export const DpsChart = ({
   toLabel,
   stacked = false,
   bands,
+  markers,
 }: DpsChartProps) => {
   const { t } = useTranslation();
   const anchor = useRef<number | null>(null);
@@ -167,6 +183,28 @@ export const DpsChart = ({
   // output. That is accepted deliberately: comparing two groups directly is the
   // reason to hide the others.
   const [hidden, setHidden] = useState<Set<string>>(new Set());
+
+  // Which marker KINDS are hidden. Component-local like the legend's hidden
+  // set, but not reset with it: hiding deaths is a way of reading every chart,
+  // not a property of one pin's series keys.
+  const [hiddenMarkerKinds, setHiddenMarkerKinds] = useState<Set<MarkerKind>>(new Set());
+
+  const markerKinds = useMemo(
+    () => (["death", "sba"] as const).filter((kind) => (markers ?? []).some((marker) => marker.kind === kind)),
+    [markers]
+  );
+
+  const shownMarkers = useMemo(
+    () => (markers ?? []).filter((marker) => !hiddenMarkerKinds.has(marker.kind)),
+    [markers, hiddenMarkerKinds]
+  );
+
+  const toggleMarkerKind = (kind: MarkerKind) =>
+    setHiddenMarkerKinds((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(kind)) next.add(kind);
+      return next;
+    });
 
   // The keys the current pins produce. A hidden band must not survive a pin
   // change: under the next player the keys differ, and a set carried across
@@ -247,7 +285,15 @@ export const DpsChart = ({
   const tooltip = {
     content: (
       { label, payload }: { label?: unknown; payload?: Record<string, any>[] } // eslint-disable-line
-    ) => <ChartTooltip label={String(label ?? "")} payload={payload} format={format} labels={labels} />,
+    ) => (
+      <ChartTooltip
+        label={String(label ?? "")}
+        payload={payload}
+        format={format}
+        labels={labels}
+        markers={markersByLabel.get(String(label ?? ""))}
+      />
+    ),
   };
 
   // Status bands, drawn under the scope selection in the same chart space. A
@@ -278,6 +324,36 @@ export const DpsChart = ({
     ));
   }, [bands, data, maxIndex]);
 
+  // Marker lines, in the same chart space and with the same ms→bucket
+  // conversion the bands use. Memoised for the same hover-rerender reason.
+  const markerLines = useMemo(() => {
+    const bucket = (index: number) => Math.max(0, Math.min(maxIndex, index));
+    return shownMarkers.map((marker, index) => (
+      <ReferenceLine
+        key={`marker-${index}`}
+        x={data[bucket(Math.floor(marker.atMs / DPS_BUCKET_MS))]?.timestamp}
+        stroke={marker.color}
+        strokeDasharray="3 3"
+        label={{ value: MARKER_GLYPH[marker.kind], position: "top", fill: marker.color, fontSize: 10 }}
+      />
+    ));
+  }, [shownMarkers, data, maxIndex]);
+
+  // The markers of each bucket, keyed by that bucket's x label — which is what
+  // the recharts tooltip hands its content, so the lookup is one map get.
+  const markersByLabel = useMemo(() => {
+    const bucket = (index: number) => Math.max(0, Math.min(maxIndex, index));
+    const byLabel = new Map<string, ChartMarker[]>();
+    for (const marker of shownMarkers) {
+      const key = data[bucket(Math.floor(marker.atMs / DPS_BUCKET_MS))]?.timestamp;
+      if (key === undefined) continue;
+      const group = byLabel.get(key);
+      if (group) group.push(marker);
+      else byLabel.set(key, [marker]);
+    }
+    return byLabel;
+  }, [shownMarkers, data, maxIndex]);
+
   const scopeBand = band && band[0] !== band[1] && (
     <ReferenceArea
       x1={data[Math.min(band[0], band[1])]?.timestamp}
@@ -291,9 +367,22 @@ export const DpsChart = ({
 
   return (
     <Box style={{ padding: "10px 16px 8px" }}>
-      <Text className="analysis-label" style={{ marginBottom: 5 }}>
-        {t(labelKey)}
-      </Text>
+      <Box style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+        <Text className="analysis-label">{t(labelKey)}</Text>
+        {markerKinds.length > 0 && (
+          <Group gap="sm">
+            {markerKinds.map((kind) => (
+              <Checkbox
+                key={kind}
+                size="xs"
+                label={t(MARKER_LABEL_KEY[kind])}
+                checked={!hiddenMarkerKinds.has(kind)}
+                onChange={() => toggleMarkerKind(kind)}
+              />
+            ))}
+          </Group>
+        )}
+      </Box>
       {/* Double-click sits on the wrapper, not in `lineChartProps`: recharts'
           CategoricalChartProps has no onDoubleClick, and the wrapper sees the
           same gesture anywhere over the plot. */}
@@ -310,11 +399,13 @@ export const DpsChart = ({
             tooltipProps={tooltip}
           >
             {statusBands}
+            {markerLines}
             {scopeBand}
           </AreaChart>
         ) : (
           <LineChart {...shared} lineChartProps={interaction} tooltipProps={tooltip}>
             {statusBands}
+            {markerLines}
             {scopeBand}
           </LineChart>
         )}
