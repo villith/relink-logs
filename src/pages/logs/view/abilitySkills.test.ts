@@ -17,6 +17,7 @@ import { parseAbilityKey } from "./abilityKey";
 import {
   abilityRowKey,
   actionsForPin,
+  childOfPin,
   groupSkillsForRows,
   mergeSkillsByAction,
   skillsForAbilityKey,
@@ -189,5 +190,30 @@ describe("abilityRowKey — supplementary damage", () => {
 
   it("does not fold anything else onto the echo row", () => {
     expect(abilityRowKey(skill({ DamageOverTime: 0 }))).not.toBe(abilityRowKey(skill({ SupplementaryDamage: 0 })));
+  });
+});
+
+describe("childOfPin", () => {
+  it("reads the child character out of a group pin", () => {
+    expect(childOfPin('Group:normal-attack@"Pl0900"')).toBe("Pl0900");
+  });
+
+  it("reads an Unknown-body child as its object form", () => {
+    expect(childOfPin('Group:some-group@{"Unknown":123}')).toEqual({ Unknown: 123 });
+  });
+
+  it("answers null for a raw action key", () => {
+    expect(childOfPin("Normal:100")).toBeNull();
+    expect(childOfPin("LinkAttack")).toBeNull();
+  });
+
+  it("answers null for a group that spans bodies", () => {
+    // The ANY_CHILD sentinel — only Primal Burst, whose classes share one id.
+    expect(childOfPin("Group:some-group@*")).toBeNull();
+  });
+
+  it("answers null rather than throwing on anything malformed", () => {
+    expect(childOfPin("Group:normal-attack@notjson")).toBeNull();
+    expect(childOfPin("nonsense")).toBeNull();
   });
 });
