@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { ComputedPlayerState, EnemyType } from "@/types";
+import type { ComputedPlayerState, EnemyType, TargetEntry } from "@/types";
 
 import type { MetricCard, MetricRow } from "../metrics/types";
 
-import { cardSectionsFor } from "./cardSections";
+import { cardSectionsFor, targetCardSectionsFor } from "./cardSections";
 
 /** What the damage tab measures. Spelled here rather than imported from the
  * descriptor so a change of heart there shows up as a failing expectation
@@ -452,6 +452,99 @@ describe("the card follows the metric", () => {
 
     expect(sections?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-source"]);
     expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([20, 5]);
+  });
+});
+
+describe("targetCardSectionsFor", () => {
+  // Two spawns of ONE enemy type: the row's card must count its own spawn
+  // and nothing of its same-type sibling.
+  const SPAWN_PARTY = [
+    {
+      index: 0,
+      partyIndex: 0,
+      characterType: "Pl1400",
+      totalDamage: 160,
+      skillBreakdown: [
+        {
+          ...skill(9001, 100, 10),
+          targets: [
+            { enemyType: "Em0003", segment: 0, hits: 6, totalDamage: 60 },
+            { enemyType: "Em0003", segment: 1, hits: 4, totalDamage: 40 },
+          ],
+        },
+        {
+          ...skill(9002, 60, 6),
+          targets: [{ enemyType: "Em0003", segment: 1, hits: 6, totalDamage: 60 }],
+        },
+      ],
+    },
+    {
+      index: 1,
+      partyIndex: 1,
+      characterType: "Pl1400",
+      totalDamage: 50,
+      skillBreakdown: [
+        {
+          ...skill(9001, 50, 5),
+          targets: [{ enemyType: "Em0003", segment: 1, hits: 5, totalDamage: 50 }],
+        },
+      ],
+    },
+  ] as unknown as ComputedPlayerState[];
+
+  const ENTRIES = [
+    { id: 9, actorIndex: 9, enemyType: "Em0003", instance: 1, maxHp: null, startMs: 0, endMs: 1_000 },
+    { id: 10, actorIndex: 10, enemyType: "Em0003", instance: 2, maxHp: null, startMs: 0, endMs: 1_000 },
+  ] as TargetEntry[];
+
+  const callTarget = (key: string, players = SPAWN_PARTY, targetEntries = ENTRIES) =>
+    targetCardSectionsFor({ row: row(key), players, targetEntries, color: "rgb(1,2,3)", labels: LABELS });
+
+  it("explains a spawn row by ability and by source", () => {
+    expect(callTarget("target:1")?.map((section) => section.headingKey)).toEqual([
+      "ui.logs.hover-by-ability",
+      "ui.logs.hover-by-source",
+    ]);
+  });
+
+  it("counts only the row's own spawn, never its same-type sibling", () => {
+    const sections = callTarget("target:1");
+
+    // Spawn 1 took 40+50 of 9001 and 60 of 9002; spawn 0's 60 stays out.
+    expect(sections?.[0].entries.map((entry) => [entry.key, entry.value])).toEqual([
+      ["Normal:9001", 90],
+      ["Normal:9002", 60],
+    ]);
+    expect(sections?.[1].entries.map((entry) => [entry.label, entry.value])).toEqual([
+      ["player:0", 100],
+      ["player:1", 50],
+    ]);
+  });
+
+  it("colours each source with the player's own colour", () => {
+    expect(callTarget("target:1")?.[1].entries.map((entry) => entry.color)).toEqual(["#000", "#001"]);
+  });
+
+  it("matches segment-less entries by the spawn's type — the old-payload fallback", () => {
+    const legacy = [
+      {
+        index: 0,
+        partyIndex: 0,
+        characterType: "Pl1400",
+        totalDamage: 100,
+        skillBreakdown: [{ ...skill(9001, 100, 10), targets: [{ enemyType: "Em0003", hits: 10, totalDamage: 100 }] }],
+      },
+    ] as unknown as ComputedPlayerState[];
+
+    const sections = callTarget("target:0", legacy);
+    expect(sections?.[1].entries.map((entry) => entry.value)).toEqual([100]);
+  });
+
+  it("answers null for anything that names no live spawn", () => {
+    expect(callTarget("enemy:whatever")).toBeNull();
+    expect(callTarget("player:0")).toBeNull();
+    // A stale URL's segment indexes no entry — no card, never a guess.
+    expect(callTarget("target:99")).toBeNull();
   });
 });
 

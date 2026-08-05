@@ -1,4 +1,4 @@
-import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
+import type { ComputedPlayerState, EnemyType, SkillState, SkillTargetState, TargetEntry } from "@/types";
 
 import { abilityKey } from "../abilityKey";
 import { groupSkillsForRows, skillsForAbilityKey } from "../abilitySkills";
@@ -6,6 +6,7 @@ import type { MetricCard, MetricRow, RowLevel } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
 
 import type { CardSection } from "./HoverCard";
+import { targetRowSegment } from "./statusLabel";
 
 /** Name lookups the view injects, so this stays a pure function: skill and
  * enemy names need i18n, and player names and colours need the settings store. */
@@ -210,9 +211,10 @@ export const cardSectionsFor = ({
     if (pins.source !== null && !owner) return null;
     const scoped = owner ? [owner] : players;
     const rowKey = row.key.replace(/^skill:/, "");
+    const skillsOf = (player: ComputedPlayerState) => skillsForAbilityKey(player.skillBreakdown, rowKey);
     // EVERY skill under the ability, not the first: the row above sums them, so
     // explaining it with one contributor describes a fraction of what it says.
-    const skills = scoped.flatMap((player) => skillsForAbilityKey(player.skillBreakdown, rowKey));
+    const skills = scoped.flatMap(skillsOf);
     if (skills.length === 0) return null;
 
     const sections: CardSection[] = [];
@@ -223,14 +225,7 @@ export const cardSectionsFor = ({
       sections.push({
         headingKey: "ui.logs.hover-by-source",
         color,
-        entries: aggregateSources(
-          players,
-          (player) => skillsForAbilityKey(player.skillBreakdown, rowKey),
-          labels.source,
-          labels.sourceColor,
-          card.valueOf,
-          labels.sourceIcon
-        ),
+        entries: aggregateSources(scoped, skillsOf, labels.source, labels.sourceColor, card.valueOf, labels.sourceIcon),
       });
     }
     sections.push(...targetSection(skills));
@@ -269,4 +264,98 @@ export const cardSectionsFor = ({
   }
 
   return null;
+};
+
+const sortedEntries = <T extends { value: number }>(entries: T[]): T[] =>
+  [...entries].sort((a, b) => b.value - a.value);
+
+/** Damage, friendly side: one enemy SPAWN row ("Done to enemy", and the
+ * source+ability drill's rows) explained by what hit it and who dealt that —
+ * the two dimensions a target pin leaves free, which is why declaring these
+ * rows `"none"` was wrong (WCL comparison §3.3).
+ *
+ * Aggregated from every scoped player's skills' target entries matching the
+ * row's spawn segment. An entry without a segment (a payload from before the
+ * field) matches by the spawn's TYPE instead — exact for a lone spawn, and
+ * the same same-type-spawns-merge approximation the taken tab already
+ * documents for data that cannot speak per spawn.
+ *
+ * Damage figures only, deliberately: `SkillTargetState` records damage and
+ * hits and nothing else, and only the damage tab declares this card. */
+export const targetCardSectionsFor = ({
+  row,
+  players,
+  targetEntries,
+  color,
+  labels,
+}: {
+  row: MetricRow;
+  players: ComputedPlayerState[];
+  /** The response's spawn vector, for resolving the row's segment to a type. */
+  targetEntries: TargetEntry[];
+  /** The row's own colour, so the by-ability section matches its bar. */
+  color: string;
+  labels: SectionLabels;
+}): CardSection[] | null => {
+  const segment = targetRowSegment(row.key);
+  if (segment === null) return null;
+  const entry = targetEntries[segment];
+  // A stale segment indexes nothing — no card rather than a guess, the same
+  // convention the target-span filter uses for a stale URL.
+  if (!entry) return null;
+  const typeKey = JSON.stringify(entry.enemyType);
+
+  const matches = (target: SkillTargetState): boolean =>
+    target.segment !== undefined ? target.segment === segment : JSON.stringify(target.enemyType) === typeKey;
+
+  const bySource: { key: string; label: string; value: number; color: string; icon?: string }[] = [];
+  const byAbility = new Map<string, { label: string; value: number; icon?: string }>();
+  for (const player of players) {
+    let dealt = 0;
+    for (const skill of player.skillBreakdown) {
+      let skillDealt = 0;
+      // `targets` is optional because cached payloads predate it; an absent
+      // list means the breakdown is unavailable, not that nothing was hit.
+      for (const target of skill.targets ?? []) {
+        if (matches(target)) skillDealt += target.totalDamage;
+      }
+      if (skillDealt === 0) continue;
+      dealt += skillDealt;
+      // Keyed by the raw action, and named against its OWN player: the parser
+      // emits one `SkillState` per (action, child character), so this also
+      // merges a player and their summon back into the one ability — the
+      // same fold `enemyReceivedCardSectionsFor` uses.
+      const key = abilityKey(skill.actionType);
+      const ability = byAbility.get(key);
+      if (ability) ability.value += skillDealt;
+      else
+        byAbility.set(key, {
+          label: labels.ability(key, player),
+          value: skillDealt,
+          icon: labels.abilityIcon?.(key, player),
+        });
+    }
+    if (dealt > 0) {
+      bySource.push({
+        key: `source:${player.index}`,
+        label: labels.source(player.index),
+        value: dealt,
+        // Each player in their OWN party colour: one colour across the
+        // section would lose the only thing it is for.
+        color: labels.sourceColor(player.index),
+        icon: labels.sourceIcon?.(player.index),
+      });
+    }
+  }
+  // Nothing recorded against this spawn — no card, rather than an empty one.
+  if (bySource.length === 0) return null;
+
+  return [
+    {
+      headingKey: "ui.logs.hover-by-ability",
+      color,
+      entries: sortedEntries([...byAbility.entries()].map(([key, ability]) => ({ key, ...ability }))),
+    },
+    { headingKey: "ui.logs.hover-by-source", color, entries: sortedEntries(bySource) },
+  ];
 };
