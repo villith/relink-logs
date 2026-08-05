@@ -125,7 +125,7 @@
       "skills": [2, 22, 32]
     },
     "grenade": {
-      "skills": [210, 215]
+      "skills": [210, 215, 220]
     }
   },
   "Pl0600": {
@@ -374,6 +374,9 @@
     },
     "talviyo": {
       "skills": [2600, 2601, 2603, 2604]
+    },
+    "alone-in-heaven": {
+      "skills": [2500, 2520]
     }
   },
   "Pl2200": {
@@ -549,6 +552,9 @@
     },
     "combo-finisher": {
       "skills": [950, 951, 952, 953, 954]
+    },
+    "claws-of-reversal": {
+      "skills": [2010, 2020]
     }
   }
 }
