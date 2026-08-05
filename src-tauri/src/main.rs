@@ -441,17 +441,14 @@ fn set_debug_mode(app: AppHandle, state: State<DebugMode>, enabled: bool) {
     state.0.store(enabled, Ordering::Release);
 }
 
-/// Config file the injected hook reads ONCE at startup. It lives in the data
-/// dir the HOOK resolves at runtime — `dirs::data_dir()/gbfr-logs` on
-/// Windows; on Linux the hook runs inside the Proton prefix, so the same
-/// logical path lands inside `pfx/drive_c/...` and we write it there.
+/// Config file the injected hook reads ONCE at startup. Portable: lives in
+/// `<exe_dir>/portable_data/` next to the hook DLL, which resolves its own
+/// directory at runtime via `__ImageBase`. On Linux the hook runs inside the
+/// Proton prefix, so the path lands inside `pfx/drive_c/...` and we write it
+/// there.
 fn hook_config_path() -> Result<std::path::PathBuf, String> {
     #[cfg(not(target_os = "linux"))]
-    let mut path = {
-        let mut path = tauri::api::path::data_dir().ok_or("Could not find the data folder")?;
-        path.push("gbfr-logs");
-        path
-    };
+    let mut path = gbfr_logs::portable::portable_root();
     #[cfg(target_os = "linux")]
     let mut path = {
         use gbfr_logs::linux_support::steam;
@@ -1485,9 +1482,9 @@ fn delete_logs(ids: Vec<u64>) -> Result<(), String> {
 }
 
 /// Dev reload diagnostics that land in a file we can always read, regardless of
-/// the app's log level/target: `%APPDATA%\gbfr-logs\reload-debug.log`, next to
-/// the hook's own gbfr-logs.txt. Also mirrors to the normal `info!` sink. The
-/// file write happens only in debug builds; release still gets the `info!`.
+/// the app's log level/target: `<exe_dir>/portable_data/hook-logs/reload-debug.log`,
+/// next to the hook's own gbfr-logs.txt. Also mirrors to the normal `info!` sink.
+/// The file write happens only in debug builds; release still gets the `info!`.
 #[cfg(windows)]
 fn reload_dbg(msg: &str) {
     info!("{msg}");
@@ -1499,15 +1496,16 @@ fn reload_dbg(msg: &str) {
             chrono::Local::now().format("%Y-%m-%d %H:%M:%S%.3f")
         );
         // Best-effort: a logging hiccup must never disrupt the reload flow.
-        if let Some(path) = tauri::api::path::data_dir() {
-            let path = path.join("gbfr-logs").join("reload-debug.log");
-            if let Ok(mut f) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open(&path)
-            {
-                let _ = f.write_all(line.as_bytes());
-            }
+        let path = gbfr_logs::portable::portable_root()
+            .join("hook-logs")
+            .join("reload-debug.log");
+        let _ = std::fs::create_dir_all(path.parent().unwrap());
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+        {
+            let _ = f.write_all(line.as_bytes());
         }
     }
 }
