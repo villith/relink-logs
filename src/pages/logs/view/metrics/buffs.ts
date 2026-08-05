@@ -185,6 +185,48 @@ export const narrowedByPins = (
     return true;
   });
 
+/** The intervals one status tab shows: held by the chosen SIDE, of the tab's
+ * POLARITY, and admitted by the Source and Enemy pins — `heldByRoster`, then
+ * `isHarmful`, then `narrowedByPins`, in that order.
+ *
+ * It exists so the aura CHART and the aura TABLE cannot drift. Both used to
+ * spell the three steps out for themselves, which meant a change to
+ * `narrowedByPins`' semantics, or to which roster a call site built its slots
+ * from, would silently make the plot draw a different set of effects from the
+ * rows underneath it — with no type error and no failing test to say so. One
+ * composition, two callers, no way to change one without the other.
+ *
+ * Takes the prebuilt slots rather than the players, for the same reason
+ * `heldByRoster` does: `statusTabRows` needs the same map afterwards to colour
+ * its holder rows, and building it twice per render buys nothing.
+ *
+ * Not every status reader wants all three steps — `statusSeries` (the Stacks
+ * plot) deliberately stops after the roster split, because a pinned effect key
+ * already implies both the polarity and the pins. Routing it through here would
+ * change what it draws; it is not a call site this function is missing. */
+export const narrowedStatusIntervals = ({
+  intervals,
+  slots,
+  hostility,
+  harmful,
+  pins,
+}: {
+  intervals: StatusInterval[];
+  /** The roster map from `slotsOf`, built from the IDENTITY party. */
+  slots: Map<number, number>;
+  hostility: Hostility;
+  /** Which polarity the tab shows: Buffs false, Debuffs true. */
+  harmful: boolean;
+  pins: SelectorPins;
+}): StatusInterval[] =>
+  narrowedByPins(
+    heldByRoster(intervals, slots, hostility === "friendly").filter(
+      (interval) => isHarmful(interval.statusId) === harmful
+    ),
+    pins,
+    hostility
+  );
+
 /** Rows for one status tab: the tab fixes the POLARITY (Buffs shows
  * beneficial effects, Debuffs harmful ones — the game's own
  * `PositiveStatusOrNegativeStatus` flag via `isHarmful`), the hostility
@@ -199,13 +241,8 @@ export const statusTabRows = (input: Parameters<MetricDescriptor["rows"]>[0], ha
   const { statusIntervals, fightDurationMs, players, roster, pins, statusWindow } = input;
   const hostility: Hostility = input.hostility ?? "friendly";
   const slots = slotsOf(roster ?? players);
-  const held = heldByRoster(statusIntervals ?? [], slots, hostility === "friendly");
   return statusRows({
-    intervals: narrowedByPins(
-      held.filter((interval) => isHarmful(interval.statusId) === harmful),
-      pins,
-      hostility
-    ),
+    intervals: narrowedStatusIntervals({ intervals: statusIntervals ?? [], slots, hostility, harmful, pins }),
     fightDurationMs: fightDurationMs ?? 0,
     pinnedKey: pins.ability,
     // Enemies have no party slot, so their holder rows take the neutral slot.

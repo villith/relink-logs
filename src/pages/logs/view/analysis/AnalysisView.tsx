@@ -47,12 +47,11 @@ import {
   type Label,
 } from "../DetailCharts";
 import { actionsForPin } from "../abilitySkills";
-import { buffs, enemyHolderKey, heldByRoster, narrowedByPins, slotsOf } from "../metrics/buffs";
+import { buffs, enemyHolderKey, heldByRoster, narrowedStatusIntervals, slotsOf } from "../metrics/buffs";
 import { damageDone, parseEnemyRow } from "../metrics/damageDone";
 import { damageTaken, takenAttackNameKey, takenAttackRowParts } from "../metrics/damageTaken";
 import { debuffs } from "../metrics/debuffs";
 import { sba } from "../metrics/sba";
-import { isHarmful } from "../metrics/statusPolarity";
 import { stun } from "../metrics/stun";
 import type { Hostility, MetricDescriptor, MetricRow } from "../metrics/types";
 import { deriveSelectorOptions, type SelectorPins } from "../selectorOptions";
@@ -1056,11 +1055,16 @@ export const AnalysisView = () => {
   // shorten the series against a chart that is already the window.
   const effectSeries = useMemo(() => {
     if (!isStatusMetric || isStatusPin(pins.ability)) return null;
-    const roster = slotsOf(identityPlayers);
-    const held = heldByRoster(statusIntervals, roster, hostility === "friendly");
-    const polar = held.filter((interval) => isHarmful(interval.statusId) === (metricKey === "debuffs"));
     const series = buildEffectSeries({
-      intervals: narrowedByPins(polar, pins, hostility),
+      // The one composition the table rows use (`statusTabRows`), so the plot
+      // cannot draw a different set of effects from the rows underneath it.
+      intervals: narrowedStatusIntervals({
+        intervals: statusIntervals,
+        slots: slotsOf(identityPlayers),
+        hostility,
+        harmful: metricKey === "debuffs",
+        pins,
+      }),
       bucketMs: DPS_BUCKET_MS,
       len: chartLen,
       // The same cap as the group bands — both feed the eight-colour palette.
