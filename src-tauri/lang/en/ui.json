@@ -441,6 +441,7 @@
       "metric-stun": "Stun",
       "metric-sba": "SBA",
       "metric-tablist-label": "Metric",
+      "regroup-tablist-label": "Group by",
       "metric-damage-taken": "Damage Taken",
       "metric-buffs": "Buffs",
       "metric-debuffs": "Debuffs",
