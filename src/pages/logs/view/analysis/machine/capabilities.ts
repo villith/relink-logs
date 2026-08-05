@@ -9,6 +9,13 @@ import type { Dimension, MetricKey } from "./state";
 
 export type DataPath = "groups" | "derived" | "intervals";
 
+/** Which hover-card builder explains a row under a given grouping — the
+ * existing builders, chosen by declaration instead of the view's metric/side
+ * ternaries. `"none"` is a real answer (a target row fixes every dimension a
+ * card could decompose), declared rather than discovered as a null at
+ * runtime. */
+export type CardKind = "skill" | "taken" | "enemyDealt" | "enemyReceived" | "none";
+
 export type DimensionDecl = {
   supported: boolean;
   /** i18next key stating WHY, where supported is false. */
@@ -29,6 +36,8 @@ export type MetricCapabilities = {
   dimensions: Record<Dimension, DimensionDecl>;
   /** Header keys for the numeric columns when grouped by `dim`. */
   columnKeys: (dim: Dimension) => string[];
+  /** Which hover card explains a row under this grouping and side. */
+  cardKind: (dim: Dimension, hostility: Hostility) => CardKind;
   /** Whether the chart stacks the fetched groups' series. False = the metric's
    * base chart keeps drawing (stun/SBA gauges, aura stacks/bands). */
   chartFromGroups: boolean;
@@ -66,6 +75,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       target: SUPPORTED("ui.logs.groupby-damage-target", "ui.logs.groupby-damage-target-enemy"),
     },
     columnKeys: (dim) => damageDone.columnKeys(levelFor(dim)),
+    // A target row fixes every dimension a damage card could decompose.
+    cardKind: (dim, hostility) => (hostility === "enemy" ? "enemyDealt" : dim === "target" ? "none" : "skill"),
     chartFromGroups: true,
   },
 
@@ -79,6 +90,9 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       target: SUPPORTED("ui.logs.groupby-taken-target", "ui.logs.groupby-taken-target-enemy"),
     },
     columnKeys: (dim) => damageTaken.columnKeys(levelFor(dim)),
+    // Only a victim row decomposes (attacks and attackers); a drill row
+    // already fixes all three, so it carries no card.
+    cardKind: (dim, hostility) => (hostility === "enemy" ? "enemyReceived" : dim === "source" ? "taken" : "none"),
     chartFromGroups: true,
   },
 
@@ -92,6 +106,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       target: UNSUPPORTED("ui.logs.stun-no-target-dimension"),
     },
     columnKeys: (dim) => stun.columnKeys(levelFor(dim)),
+    cardKind: (dim) => (dim === "target" ? "none" : "skill"),
     chartFromGroups: false,
   },
 
@@ -105,6 +120,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       target: UNSUPPORTED("ui.logs.sba-no-breakdown"),
     },
     columnKeys: (dim) => sba.columnKeys(levelFor(dim)),
+    // A gauge reading has nothing to decompose.
+    cardKind: () => "none",
     chartFromGroups: false,
   },
 
@@ -118,6 +135,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       target: UNSUPPORTED("ui.logs.status-no-target-dimension"),
     },
     columnKeys: (dim) => buffs.columnKeys(levelFor(dim)),
+    // Effect and holder rows are windows, not sums over skills.
+    cardKind: () => "none",
     chartFromGroups: false,
   },
 
@@ -131,6 +150,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       target: UNSUPPORTED("ui.logs.status-no-target-dimension"),
     },
     columnKeys: (dim) => debuffs.columnKeys(levelFor(dim)),
+    cardKind: () => "none",
     chartFromGroups: false,
   },
 };

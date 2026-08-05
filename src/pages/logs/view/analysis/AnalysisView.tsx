@@ -71,7 +71,6 @@ import { abilityLabelFor } from "./abilityLabel";
 import "./analysis.css";
 import { cardSectionsFor } from "./cardSections";
 import { buildSeriesPoints } from "./chartSeries";
-import { formatChartDebug, type ChartDebugFacts } from "./debugSummary";
 import { enemyDealtCardSectionsFor, enemyReceivedCardSectionsFor } from "./hostilityCardSections";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
@@ -894,33 +893,53 @@ export const AnalysisView = () => {
   // The taken tab has its own card builder: its breakdown is per (attacker,
   // attack), not per skill, so the skill-based sections would explain incoming
   // damage with the player's own abilities.
+  // Which card explains a row is DECLARED per (grouping, side) — see
+  // `MetricCapabilities.cardKind`. The builders themselves are unchanged; a
+  // builder handed a row it cannot decompose still answers null, and a
+  // declared "none" skips the work outright.
   const rowSections = useCallback(
     (row: MetricRow) => {
-      // Enemy-side rows have their own decompositions, in both directions: the
-      // skill-based builder would explain an ENEMY with the party's abilities,
-      // which is nonsense whichever tab it happens on.
-      if (enemySide) {
-        if (metricKey === "damage")
+      switch (caps.cardKind(spec.groupBy, hostility)) {
+        case "enemyDealt":
           return enemyDealtCardSectionsFor({ row, players, color: rowColor(row), labels: hostilityLabels });
-        if (metricKey === "taken")
+        case "enemyReceived":
           return enemyReceivedCardSectionsFor({ row, players, color: rowColor(row), labels: hostilityLabels });
-        // The status tabs' enemy side lists effect uptime, which the damage
-        // card cannot decompose — they carry no `card` either way.
-        return null;
+        case "taken":
+          return takenCardSectionsFor({
+            row,
+            players,
+            color: rowColor(row),
+            labels: { attack: labelForTakenAttack, enemy: translateEnemyType, enemyIcon: enemyIconUrl },
+          });
+        case "skill":
+          return metric.card
+            ? cardSectionsFor({
+                row,
+                level,
+                players,
+                pins,
+                color: rowColor(row),
+                labels: sectionLabels,
+                card: metric.card,
+              })
+            : null;
+        default:
+          return null;
       }
-      if (metricKey === "taken") {
-        return takenCardSectionsFor({
-          row,
-          players,
-          color: rowColor(row),
-          labels: { attack: labelForTakenAttack, enemy: translateEnemyType, enemyIcon: enemyIconUrl },
-        });
-      }
-      return metric.card
-        ? cardSectionsFor({ row, level, players, pins, color: rowColor(row), labels: sectionLabels, card: metric.card })
-        : null;
     },
-    [enemySide, metricKey, metric, level, players, pins, rowColor, sectionLabels, hostilityLabels, labelForTakenAttack]
+    [
+      caps,
+      spec.groupBy,
+      hostility,
+      metric,
+      level,
+      players,
+      pins,
+      rowColor,
+      sectionLabels,
+      hostilityLabels,
+      labelForTakenAttack,
+    ]
   );
   // What the plot shows follows the metric tabs. Each metric brings its own
   // bucketed series from the base load, so switching tabs never refetches.
@@ -1071,10 +1090,10 @@ export const AnalysisView = () => {
   const overlay = statusSeries ?? groupOverlay;
 
   // WHICH of those the plot ended up drawing, recognised from the value itself
-  // rather than re-derived from the pins, so the title and the dev readout
-  // cannot disagree with what is on screen. "scoped" here is the groups path's
-  // per-player lines (the query's filters applied); "drill" its stacked bands.
-  const chartSource: ChartDebugFacts["chart"] =
+  // rather than re-derived from the pins, so the title cannot disagree with
+  // what is on screen. "scoped" is the groups path's per-player lines (the
+  // query's filters applied); "drill" its stacked bands.
+  const chartSource: "base" | "scoped" | "stacks" | "drill" =
     overlay === null ? (groupPlayerSeries ? "scoped" : "base") : overlay === statusSeries ? "stacks" : "drill";
 
   const chartData: ChartDatapoint[] = useMemo(() => {
@@ -1160,37 +1179,12 @@ export const AnalysisView = () => {
     });
   }, [banded, intervalsByPinKey, statusWindow, rowColors]);
 
-  // What the plot was actually drawn from, for the dev-only readout. Read off
-  // the very values the chart consumed rather than recomputed from the pins, so
-  // the line cannot disagree with what is on screen.
+  // The dev-only readout: the whole machine state plus what the spec resolved
+  // it to — one JSON line a report can paste, replacing the hand-kept
+  // key=value formatter the machine made redundant.
   const debugChart = useMemo(
-    () =>
-      formatChartDebug({
-        metric: metricKey,
-        level,
-        chart: chartSource,
-        series: labels.length,
-        len: chartData.length,
-        shown: shownChartData.length,
-        window: range,
-        scoped: scoped !== null,
-        spans: targetSpans.length,
-        actions: pinnedActions.length,
-        bands: chartBands?.length ?? 0,
-      }),
-    [
-      metricKey,
-      level,
-      chartSource,
-      labels,
-      chartData,
-      shownChartData,
-      range,
-      scoped,
-      targetSpans,
-      pinnedActions,
-      chartBands,
-    ]
+    () => JSON.stringify({ state, groupBy: spec.groupBy, chart: spec.chart.source, fetch: spec.fetch !== null }),
+    [state, spec]
   );
 
   // Indexes arrive relative to the data the chart was given, so a drag while

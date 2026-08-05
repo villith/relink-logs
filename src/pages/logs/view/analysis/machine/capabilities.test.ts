@@ -32,6 +32,20 @@ describe("CAPABILITIES", () => {
     expect(CAPABILITIES.debuffs.dataPath).toBe("intervals");
   });
 
+  it("declares which hover card explains each grouping", () => {
+    expect(CAPABILITIES.damage.cardKind("source", "friendly")).toBe("skill");
+    expect(CAPABILITIES.damage.cardKind("ability", "friendly")).toBe("skill");
+    // A target row fixes every dimension a card could decompose.
+    expect(CAPABILITIES.damage.cardKind("target", "friendly")).toBe("none");
+    expect(CAPABILITIES.damage.cardKind("source", "enemy")).toBe("enemyDealt");
+    expect(CAPABILITIES.taken.cardKind("source", "friendly")).toBe("taken");
+    expect(CAPABILITIES.taken.cardKind("ability", "friendly")).toBe("none");
+    expect(CAPABILITIES.taken.cardKind("source", "enemy")).toBe("enemyReceived");
+    expect(CAPABILITIES.stun.cardKind("source", "friendly")).toBe("skill");
+    expect(CAPABILITIES.sba.cardKind("source", "friendly")).toBe("none");
+    expect(CAPABILITIES.buffs.cardKind("ability", "friendly")).toBe("none");
+  });
+
   it("names every supported dimension's regroup tab on both sides", () => {
     for (const caps of Object.values(CAPABILITIES)) {
       for (const dim of caps.dimensionOrder) {
