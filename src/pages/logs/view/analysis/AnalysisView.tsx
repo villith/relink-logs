@@ -7,6 +7,7 @@ import { useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
 import { characterIconUrl } from "@/characterIcon";
+import { emKeyOf, enemyAttackOrdinal } from "@/enemyAttackNames";
 import { enemyIconUrl } from "@/enemyIcon";
 import { statusIconUrl } from "@/statusIcon";
 import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
@@ -524,10 +525,19 @@ export const AnalysisView = () => {
   // names in the game data, so the id plus the attacker is the honest label.
   const labelForTakenAttack = useCallback(
     (enemyType: EnemyType, actionId: ActionType) => {
+      // A derived callout name wins; the raw id is the fallback, not a peer.
+      // Most attacks have no derived pair (the id→ordinal edge is live-capture
+      // work), so this falls through to "Attack N" far more often than not.
+      const ordinal = enemyAttackOrdinal(enemyType, actionId);
+      const emKey = ordinal === null ? null : emKeyOf(enemyType);
+      if (ordinal !== null && emKey !== null) {
+        const name = t(`enemy-attacks:${emKey}.${ordinal}`, { defaultValue: "" });
+        if (name !== "") return `${translateEnemyType(enemyType)} — ${name}`;
+      }
       const { key, params } = takenAttackNameKey(actionId);
       return `${translateEnemyType(enemyType)} — ${t(key, params)}`;
     },
-    // i18n.language: enemy names are translated.
+    // i18n.language: both the enemy and the attack names are translated.
     [t, i18n.language]
   );
 
