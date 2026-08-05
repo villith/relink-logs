@@ -1,0 +1,340 @@
+{
+  "EM0005": {
+    "1": "Surra"
+  },
+  "EM0015": {
+    "1": "Tatami Gaeshi"
+  },
+  "EM0102": {
+    "1": "Portal do Inferno"
+  },
+  "EM0103": {
+    "1": "Barragem de Ossos"
+  },
+  "EM0500": {
+    "1": "Urro Destruidor",
+    "2": "Ruína do Urro Destruidor"
+  },
+  "EM0501": {
+    "1": "Explosão de Água"
+  },
+  "EM0502": {
+    "1": "Explosão de Lava",
+    "2": "Devastação da Explosão de Lava"
+  },
+  "EM0706": {
+    "1": "Raio Congelante",
+    "2": "Tumba Glacial",
+    "3": "Nistagmo"
+  },
+  "EM1500": {
+    "1": "Abalaterra"
+  },
+  "EM1600": {
+    "1": "Redemoinho"
+  },
+  "EM1700": {
+    "1": "Massacre Caótico",
+    "2": "Garra da Morte"
+  },
+  "EM1800": {
+    "1": "Maldição Dracônica"
+  },
+  "EM1801": {
+    "1": "Meteoro Dracônico"
+  },
+  "EM1802": {
+    "1": "Granizada"
+  },
+  "EM1803": {
+    "1": "Deslizamento"
+  },
+  "EM1804": {
+    "1": "Turbilhão"
+  },
+  "EM1805": {
+    "1": "Trovoada Cataclísmica"
+  },
+  "EM1806": {
+    "1": "Vórtice Sombrio",
+    "2": "Abismo Voraz",
+    "3": "Desespero"
+  },
+  "EM1900": {
+    "1": "Aumento Turbo",
+    "2": "Campo de Estase",
+    "3": "Estouro de Carnificina"
+  },
+  "EM2000": {
+    "1": "Lança Marcial",
+    "2": "Morte Tempestuosa",
+    "3": "Tormenta do Véu Prateado",
+    "4": "Grande Empalamento"
+  },
+  "EM2100": {
+    "1": "Espada Ópera",
+    "2": "Sinfonia Superior",
+    "3": "Valsa de Sandrilla"
+  },
+  "EM2200": {
+    "1": "Condenação"
+  },
+  "EM2300": {
+    "1": "Condenação: Terminus",
+    "2": "Mortalidade Final",
+    "3": "Conexão da Alma",
+    "4": "Flagelo",
+    "5": "Transmutação da Alma",
+    "6": "Esmagada da Ruína"
+  },
+  "EM2400": {
+    "1": "Nox Atra"
+  },
+  "EM2510": {
+    "1": "Correndo com Tesouras"
+  },
+  "EM3100": {
+    "1": "Lâmina Apocalipse",
+    "2": "Iniciação de Anomalia",
+    "3": "Deslocamento Elemental",
+    "4": "Mar de Silêncio",
+    "5": "Mar de Opulência",
+    "6": "Mar de Marés",
+    "7": "Prece para o Lar",
+    "8": "Voz Ressonante",
+    "9": "Protocolo de Extermínio",
+    "10": "Raio Axial",
+    "11": "Arco Cromático",
+    "12": "Sinal Vermelho",
+    "13": "Sinal Vermelho +",
+    "14": "Sinal Azul",
+    "15": "Sinal Azul +",
+    "16": "Sinal Amarelo",
+    "17": "Sinal Amarelo +"
+  },
+  "EM7000": {
+    "1": "O Grande Cataclisma",
+    "2": "Catástrofe",
+    "3": "Reginleiv",
+    "4": "Arcádia: Erythros",
+    "5": "Chuva Escarlate",
+    "6": "Arcádia: Kyanos",
+    "7": "Onda Argêntea",
+    "8": "Arcádia: Xanthos",
+    "9": "Colapso Tectônico",
+    "10": "Arcádia: Khloros",
+    "11": "Vento Definhante",
+    "12": "Julgamento Absoluto",
+    "13": "Supernova",
+    "14": "Crista Fatal",
+    "15": "Catástrofe: Zero",
+    "16": "Acerto de Contas",
+    "17": "Raio do Eclipse"
+  },
+  "EM7100": {
+    "1": "Odium",
+    "2": "Auxilium",
+    "3": "Investida Conectada",
+    "4": "Cólera",
+    "5": "Massa Flammae"
+  },
+  "EM7110": {
+    "1": "Erupção do Vazio",
+    "2": "Ascensão da Sombra",
+    "3": "Massacre Furioso"
+  },
+  "EM7200": {
+    "1": "Ciclone Selvagem",
+    "2": "Floreio Arrebatador"
+  },
+  "EM7201": {
+    "1": "Ira da Deusa",
+    "2": "Espada Palpitante",
+    "3": "Transfiguração",
+    "4": "Rajada Estridente",
+    "5": "Anel da Morte",
+    "6": "Xibalbá"
+  },
+  "EM7210": {
+    "1": "Tempestade Oca"
+  },
+  "EM7211": {
+    "1": "Última Tormenta",
+    "2": "Rasgador do Vazio",
+    "3": "Transfiguração",
+    "4": "Tempestade de Flechas",
+    "5": "Tempestade Desalmada"
+  },
+  "EM7300": {
+    "1": "Explosão Lobo Prateado",
+    "2": "Limiar da Morte",
+    "3": "Brando Total",
+    "4": "Varredura Final",
+    "5": "Avalanche",
+    "6": "Desolação Glacial",
+    "7": "Cristalização",
+    "8": "Isolamento Glacial"
+  },
+  "EM7310": {
+    "1": "Isolamento do Vazio",
+    "2": "Nox Aeterna",
+    "3": "Temporal Hostil",
+    "4": "Raio do Vazio",
+    "5": "Tormenta Lupina do Vazio",
+    "6": "Esfera Criogênica"
+  },
+  "EM7400": {
+    "1": "Chama do Deserto",
+    "2": "Sobrecarga de Defesa"
+  },
+  "EM7500": {
+    "1": "Julgamento Final",
+    "2": "Salvação",
+    "3": "Condenação",
+    "4": "Portal da Salvação: Ananda",
+    "5": "Portal do Silêncio: Mauna",
+    "6": "Portal do Suplício: Kala",
+    "7": "Portal da Eternidade: Amartya",
+    "8": "Portal da Verdade: Satya",
+    "9": "Portal do Celeste: Krsna",
+    "10": "Luz da Perdição",
+    "11": "Prelúdio",
+    "12": "Dobra Dimensional"
+  },
+  "EM7600": {
+    "1": "Chama de Hélice",
+    "2": "Alter Ego: Insanis",
+    "3": "Transcendência da Razão",
+    "4": "Armagedon",
+    "5": "Id Rompido",
+    "6": "A Ira",
+    "7": "Divindade Despótica",
+    "8": "Luz do Apocalipse",
+    "9": "Ciclo Cósmico: Destruição",
+    "10": "Luz da Salvação",
+    "11": "Criação",
+    "12": "Ira Primordial",
+    "13": "Asa de Dédalo",
+    "14": "Síncotron",
+    "15": "Blitz Ômega"
+  },
+  "EM7700": {
+    "1": "Fusão Celestial",
+    "2": "Rebelião Final",
+    "3": "Paraíso Perdido",
+    "4": "Sete Trombetas",
+    "5": "O Fim",
+    "6": "Arca de Gofer",
+    "7": "Estigma",
+    "8": "Punição",
+    "9": "Asas Divinas",
+    "10": "Ruína",
+    "11": "Trindade do Terror",
+    "12": "Halphas",
+    "13": "Réquiem",
+    "14": "Xaphan",
+    "15": "Asas do Pecado",
+    "16": "Mastema",
+    "17": "Nada Absoluto",
+    "18": "Evangelho Sombrio",
+    "19": "Agaliarept",
+    "20": "Nêmesis",
+    "21": "Cruz Sinfônica"
+  },
+  "EM8000": {
+    "1": "Cien Mil Espadas",
+    "2": "Brilho das 7 Estrelas",
+    "3": "Carro Magnifico",
+    "4": "Lápide",
+    "5": "Emblema",
+    "6": "Fonte di Energia",
+    "7": "Guaina Perduta"
+  },
+  "EM8100": {
+    "1": "Caçadora de Asteroides",
+    "2": "Ira da Estrela e da Coroa",
+    "3": "Depravação",
+    "4": "Decisão",
+    "5": "Conflito de 2 Coroas",
+    "6": "Picada no Trovão",
+    "7": "Ritos das Cordas Ecoadas",
+    "8": "Monstro Interior",
+    "9": "Sizígia da Estrela e da Coroa",
+    "10": "Ira da Estrela e da Coroa+",
+    "11": "Ira da Estrela e da Coroa++",
+    "12": "Fonte Celestial"
+  },
+  "EM8200": {
+    "1": "Caoscalibur: Ignição",
+    "2": "Salve o Rei",
+    "3": "Legião do Caos",
+    "4": "Cadeia Furiosa",
+    "5": "Aliado Sufocado",
+    "6": "Los Endos",
+    "7": "Arqui-inimigo",
+    "8": "Unissônico"
+  },
+  "EM8300": {
+    "1": "Nova Ordem Mundial",
+    "2": "Esfera Celestial",
+    "3": "Nova Desordem Mundial",
+    "4": "Arcarum: O Mundo Além",
+    "5": "Ascensão da Justiça",
+    "6": "Amarras do Enforcado",
+    "7": "Dor da Morte",
+    "8": "Teatro da Temperança",
+    "9": "Beijo do Diabo",
+    "10": "Colapso da Torre",
+    "11": "Disparo da Estrela",
+    "12": "Reflexo da Lua",
+    "13": "Calor do Sol",
+    "14": "Melodia do Julgamento",
+    "15": "Roda da Fortuna",
+    "19": "Invocar Idean",
+    "20": "Manipulação de Sephira",
+    "21": "Ascensão da Justiça+",
+    "22": "Ascensão da Justiça++",
+    "23": "Dor da Morte+",
+    "24": "Dor da Morte++",
+    "25": "Beijo do Diabo+",
+    "26": "Beijo do Diabo++",
+    "27": "Colapso da Torre+",
+    "28": "Colapso da Torre++",
+    "29": "Melodia do Julgamento+",
+    "30": "Melodia do Julgamento++",
+    "31": "Celeridade"
+  },
+  "EM8400": {
+    "1": "Sors Tua",
+    "2": "Dum Vita Est",
+    "3": "Teste dos Seis Dragões",
+    "4": "Rationale Exitium",
+    "8": "Virtus Halos",
+    "9": "Venator",
+    "10": "Excisão de Antinomia",
+    "11": "Devoratio",
+    "12": "Garra Vermelha",
+    "13": "Turbilhão Azul",
+    "14": "Queda da Rocha Dourada",
+    "15": "Bico Esmeralda",
+    "16": "Chama Branca",
+    "17": "Maldição Sombria",
+    "18": "Fogo Vívido",
+    "19": "Atração Fatal",
+    "20": "Paroxismo Universal",
+    "21": "Colapso Absoluto",
+    "22": "Refração Multirraio",
+    "23": "Tempestade Necrótica",
+    "24": "Teste do Vermelhão",
+    "25": "Teste do Azul",
+    "26": "Teste do Dourado",
+    "27": "Teste da Esmeralda",
+    "28": "Teste do Branco",
+    "29": "Teste do Sombrio",
+    "33": "Degradação Causal",
+    "34": "Para Bellum",
+    "35": "Teste Final",
+    "36": "Pilares do Mundo",
+    "38": "Amplificação Causal"
+  }
+}

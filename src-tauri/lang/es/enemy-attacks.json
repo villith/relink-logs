@@ -1,0 +1,340 @@
+{
+  "EM0005": {
+    "1": "Envite"
+  },
+  "EM0015": {
+    "1": "Aporreo de escudo\n"
+  },
+  "EM0102": {
+    "1": "Puerta al infierno"
+  },
+  "EM0103": {
+    "1": "Bombardeo óseo"
+  },
+  "EM0500": {
+    "1": "Rugido atronador",
+    "2": "Litorrueda sísmica"
+  },
+  "EM0501": {
+    "1": "Hidrochorro"
+  },
+  "EM0502": {
+    "1": "Erupción",
+    "2": "Litocañón abrasador"
+  },
+  "EM0706": {
+    "1": "Rayo gélido",
+    "2": "Tumba gélida",
+    "3": "Nistagmo"
+  },
+  "EM1500": {
+    "1": "Terremoto"
+  },
+  "EM1600": {
+    "1": "Remolino"
+  },
+  "EM1700": {
+    "1": "Masacre caótica",
+    "2": "Garra letal"
+  },
+  "EM1800": {
+    "1": "Maldición dracónica"
+  },
+  "EM1801": {
+    "1": "Meteoro dracónico"
+  },
+  "EM1802": {
+    "1": "Helada"
+  },
+  "EM1803": {
+    "1": "Desprendimiento"
+  },
+  "EM1804": {
+    "1": "Maremágnum"
+  },
+  "EM1805": {
+    "1": "Trueno cataclísmico"
+  },
+  "EM1806": {
+    "1": "Vórtice sombrío",
+    "2": "Abismo voraz",
+    "3": "Desesperación"
+  },
+  "EM1900": {
+    "1": "Turbopotencia",
+    "2": "Campo de estasis",
+    "3": "Explosión infernal"
+  },
+  "EM2000": {
+    "1": "Lanza marcial",
+    "2": "Muerte tempestuosa",
+    "3": "Tormenta de hojas plateadas",
+    "4": "Puercoespín"
+  },
+  "EM2100": {
+    "1": "Ópera plateada",
+    "2": "Sinfonía sublime",
+    "3": "Vals de Sandrilla"
+  },
+  "EM2200": {
+    "1": "Sentencia"
+  },
+  "EM2300": {
+    "1": "Sentencia: Términus",
+    "2": "Mortalidad última",
+    "3": "Conexión espiritual",
+    "4": "Azote",
+    "5": "Transmutación del alma",
+    "6": "Ofensiva devastadora"
+  },
+  "EM2400": {
+    "1": "Noche aciaga"
+  },
+  "EM2510": {
+    "1": "Revuelo de tenazas deslizantes"
+  },
+  "EM3100": {
+    "1": "Hoja del apocalipsis",
+    "2": "Instalación de Hutchison",
+    "3": "Cambio elemental",
+    "4": "Mar de silencio",
+    "5": "Mar de opulencia",
+    "6": "Mar de las corrientes",
+    "7": "Plegaria hacia casa",
+    "8": "Voz resonante",
+    "9": "Protocolo de eliminación",
+    "10": "Rayo axiomático",
+    "11": "Arco cromático",
+    "12": "Señal roja",
+    "13": "Señal roja +",
+    "14": "Señal azul",
+    "15": "Señal azul +",
+    "16": "Señal amarilla",
+    "17": "Señal amarilla +"
+  },
+  "EM7000": {
+    "1": "Cataclismo final",
+    "2": "Catástrofe",
+    "3": "Reginleif",
+    "4": "Arcadia: Eritros",
+    "5": "Lluvia escarlata",
+    "6": "Arcadia: Kianos",
+    "7": "Ola argenta",
+    "8": "Arcadia: Xantos",
+    "9": "Derrumbe tectónico",
+    "10": "Arcadia: Kloros",
+    "11": "Viento marchitante",
+    "12": "Conexión Ascendentis",
+    "13": "Supernova",
+    "14": "Emblema Fatal",
+    "15": "Catástrofe: Cero",
+    "16": "Ajuste de cuentas",
+    "17": "Rayo del eclipse"
+  },
+  "EM7100": {
+    "1": "Odio",
+    "2": "Auxilio",
+    "3": "Carga conectada",
+    "4": "Ira",
+    "5": "Massa flammae"
+  },
+  "EM7110": {
+    "1": "Erupción del vacío",
+    "2": "Elevación oscura",
+    "3": "Arremetida furiosa"
+  },
+  "EM7200": {
+    "1": "Ciclón salvaje",
+    "2": "Filo del viento esmeralda"
+  },
+  "EM7201": {
+    "1": "Cólera de la diosa",
+    "2": "Danza de espada",
+    "3": "Transformación",
+    "4": "Ráfaga ensordecedora",
+    "5": "Anillo de la muerte",
+    "6": "Xibalbá"
+  },
+  "EM7210": {
+    "1": "Tormenta lejana"
+  },
+  "EM7211": {
+    "1": "Última tempestad",
+    "2": "Desgarrabismos",
+    "3": "Transformación",
+    "4": "Flecha certera",
+    "5": "Tormenta despiadada"
+  },
+  "EM7300": {
+    "1": "Auge del lobo plateado",
+    "2": "Umbral de la muerte",
+    "3": "Resplandor níveo",
+    "4": "Exterminio",
+    "5": "Avalancha",
+    "6": "Desolación glacial",
+    "7": "Cristalización",
+    "8": "Aislamiento gélido"
+  },
+  "EM7310": {
+    "1": "Aislamiento nihilista",
+    "2": "Noche eterna",
+    "3": "Granizada incesante",
+    "4": "Rayo abismal",
+    "5": "Tempestad nihilista",
+    "6": "Esfera criogénica"
+  },
+  "EM7400": {
+    "1": "Fulgor desértico",
+    "2": "Frenesí defensivo"
+  },
+  "EM7500": {
+    "1": "Juicio final",
+    "2": "Salvación",
+    "3": "Perdición",
+    "4": "Portal de la Salvación: Ananda",
+    "5": "Portal del Silencio: Mauna",
+    "6": "Portal de la Penitencia: Kala",
+    "7": "Portal de la Eternidad: Amartya",
+    "8": "Portal de la Verdad: Satiá",
+    "9": "Portal del Cielo: Krishna",
+    "10": "Luz de la perdición",
+    "11": "Preludio",
+    "12": "Paso dimensional"
+  },
+  "EM7600": {
+    "1": "Fulgor helicoidal",
+    "2": "Alter ego: Insanis",
+    "3": "Trascendencia de la razón",
+    "4": "Armagedón",
+    "5": "Iz quebrado",
+    "6": "Furia celestial",
+    "7": "Deidad déspota",
+    "8": "Luz del apocalipsis",
+    "9": "Ciclo cósmico: Destrucción",
+    "10": "Luz de la liberación",
+    "11": "Creación",
+    "12": "Ira primordial",
+    "13": "Ala de Dédalo",
+    "14": "Sincrotrón",
+    "15": "Bombardeo omega"
+  },
+  "EM7700": {
+    "1": "Fusión celestial",
+    "2": "Rebelión final",
+    "3": "Paraíso perdido",
+    "4": "Trompetas del apocalipsis",
+    "5": "El fin",
+    "6": "Arca de siete parejas",
+    "7": "Estigma",
+    "8": "Penitencia",
+    "9": "Alas sagradas",
+    "10": "Ruina",
+    "11": "Trinidad del terror",
+    "12": "Halphas",
+    "13": "Réquiem",
+    "14": "Xaphan",
+    "15": "Alas sacrílegas",
+    "16": "Mastema",
+    "17": "Nada absoluta",
+    "18": "Góspel funesto",
+    "19": "Agaliarept",
+    "20": "Némesis",
+    "21": "Sinfonía X"
+  },
+  "EM8000": {
+    "1": "Cien mil espadas",
+    "2": "Resplandor de siete estrellas",
+    "3": "Grand chariot",
+    "4": "Lápidas",
+    "5": "Emblema",
+    "6": "Fuente de energía",
+    "7": "Vaina perdida"
+  },
+  "EM8100": {
+    "1": "Asteroidenjäger",
+    "2": "Furia borealis",
+    "3": "Perversión",
+    "4": "Factor decisivo",
+    "5": "Choque de diarcas",
+    "6": "Descarga tempestuosa",
+    "7": "Recital de arquería",
+    "8": "Del revés",
+    "9": "Formación diarca heptaestelar",
+    "10": "Furia borealis +",
+    "11": "Furia borealis ++",
+    "12": "Puntería empírea"
+  },
+  "EM8200": {
+    "1": "Calibre caótico: ignición",
+    "2": "Trono del soberano",
+    "3": "Legiones del caos",
+    "4": "Cadena arrolladora",
+    "5": "Mate de la coz",
+    "6": "Los endos",
+    "7": "Archienemigo",
+    "8": "Unisónico"
+  },
+  "EM8300": {
+    "1": "Orden del nuevo mundo",
+    "2": "Esfera celeste",
+    "3": "Dominio del nuevo mundo",
+    "4": "Resurgir de los arcana",
+    "5": "Ascensión de la justicia",
+    "6": "Nudo del ahorcado",
+    "7": "Dolor de la muerte",
+    "8": "Actuación de la templanza",
+    "9": "Beso del diablo",
+    "10": "Estruendo de la torre",
+    "11": "Disparo de la estrella",
+    "12": "Reflejo de la luna",
+    "13": "Calor del sol",
+    "14": "Melodía del juicio",
+    "15": "Rueda de la fortuna",
+    "19": "Briznas nocionales",
+    "20": "Manipulación de Céfira",
+    "21": "Ascensión de la justicia +",
+    "22": "Ascensión de la justicia ++",
+    "23": "Dolor de la muerte +",
+    "24": "Dolor de la muerte ++",
+    "25": "Beso del diablo +",
+    "26": "Beso del diablo ++",
+    "27": "Estruendo de la torre +",
+    "28": "Estruendo de la torre ++",
+    "29": "Melodía del juicio +",
+    "30": "Melodía del juicio ++",
+    "31": "Gestación"
+  },
+  "EM8400": {
+    "1": "Sors tua",
+    "2": "Dum vita est",
+    "3": "Prueba del Dragón Célico",
+    "4": "Exitium rationis",
+    "8": "Halos virtuosae",
+    "9": "Venator",
+    "10": "Descomposición paradójica",
+    "11": "Devoratio",
+    "12": "Garra cinabrio",
+    "13": "Vorágine cerúlea",
+    "14": "Derrumbe dorado",
+    "15": "Pico viridián",
+    "16": "Brillo albo",
+    "17": "Maleficio azabache",
+    "18": "Llamas intensas",
+    "19": "Magnetismo feroz",
+    "20": "Megaterremoto cósmico",
+    "21": "Colapso total",
+    "22": "Funeral atronador",
+    "23": "Tormenta necrótica",
+    "24": "Prueba suprema cinabrio",
+    "25": "Prueba suprema cerúlea",
+    "26": "Prueba suprema dorada",
+    "27": "Prueba suprema viridián",
+    "28": "Prueba suprema alba",
+    "29": "Prueba suprema azabache",
+    "33": "Atenuación de la causalidad",
+    "34": "Para bellum",
+    "35": "Última prueba",
+    "36": "Convocación separaplanos",
+    "38": "Amplificación de la causalidad"
+  }
+}

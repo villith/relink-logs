@@ -1,0 +1,340 @@
+{
+  "EM0005": {
+    "1": "Verprügeln"
+  },
+  "EM0015": {
+    "1": "Tatami-Taktik"
+  },
+  "EM0102": {
+    "1": "Höllentor"
+  },
+  "EM0103": {
+    "1": "Knochensalve"
+  },
+  "EM0500": {
+    "1": "Verheerende Walze",
+    "2": "Vernichtende Walze"
+  },
+  "EM0501": {
+    "1": "Eisiges Rollen"
+  },
+  "EM0502": {
+    "1": "Lavawalze",
+    "2": "Lavakomet"
+  },
+  "EM0706": {
+    "1": "Froststrahl",
+    "2": "Eisgrab",
+    "3": "Nystagmus"
+  },
+  "EM1500": {
+    "1": "Erdrüttler"
+  },
+  "EM1600": {
+    "1": "Wirbelwind"
+  },
+  "EM1700": {
+    "1": "Chaos-Massaker",
+    "2": "Todesklaue"
+  },
+  "EM1800": {
+    "1": "Drachenfluch"
+  },
+  "EM1801": {
+    "1": "Drachenmeteor"
+  },
+  "EM1802": {
+    "1": "Hagelsturm"
+  },
+  "EM1803": {
+    "1": "Erdrutsch"
+  },
+  "EM1804": {
+    "1": "Mahlstrom"
+  },
+  "EM1805": {
+    "1": "Verheerender Donner"
+  },
+  "EM1806": {
+    "1": "Schattenwirbel",
+    "2": "Hungriger Abgrund",
+    "3": "Verzweiflung"
+  },
+  "EM1900": {
+    "1": "Turbo-Verstärkung",
+    "2": "Stasisfeld",
+    "3": "Metzelstoß"
+  },
+  "EM2000": {
+    "1": "Martialischer Speer",
+    "2": "Stürmischer Tod",
+    "3": "Silberschleiersturm",
+    "4": "Tausend Stiche"
+  },
+  "EM2100": {
+    "1": "Schwertoper",
+    "2": "Symphonie Superieur",
+    "3": "Sandrillas Walzer"
+  },
+  "EM2200": {
+    "1": "Verurteilt"
+  },
+  "EM2300": {
+    "1": "Verurteilt: Terminus",
+    "2": "Endgültiger Tod",
+    "3": "Seelenband",
+    "4": "Plage",
+    "5": "Seelentransformation",
+    "6": "Verheerender Hieb"
+  },
+  "EM2400": {
+    "1": "Nox Atra"
+  },
+  "EM2510": {
+    "1": "Bodenschäler"
+  },
+  "EM3100": {
+    "1": "Klinge der Apokalypse",
+    "2": "Hutchinson-Installation",
+    "3": "Elementwechsel",
+    "4": "Ozean der Stille",
+    "5": "Ozean des Überflusses",
+    "6": "Ozean der Gezeiten",
+    "7": "Gebet an die Heimat",
+    "8": "Nachklingende Stimme",
+    "9": "Terminierungsprotokoll",
+    "10": "Achsenstrahl",
+    "11": "Bunter Bogen",
+    "12": "Rotes Signal",
+    "13": "Rotes Signal +",
+    "14": "Blaues Signal",
+    "15": "Blaues Signal +",
+    "16": "Gelbes Signal",
+    "17": "Gelbes Signal +"
+  },
+  "EM7000": {
+    "1": "Großes Unheil",
+    "2": "Katastrophe",
+    "3": "Reginleif",
+    "4": "Arkadien: Erythros",
+    "5": "Purpurregen",
+    "6": "Arkadien: Kyanos",
+    "7": "Silberwelle",
+    "8": "Arkadien: Xanthos",
+    "9": "Tektonischer Kollaps",
+    "10": "Arkadien: Khloros",
+    "11": "Welkender Wind",
+    "12": "Erhabener Aufstieg",
+    "13": "Supernova",
+    "14": "Tödliches Wappen",
+    "15": "Katastrophe: Null",
+    "16": "Die Rechnung begleichen",
+    "17": "Ekliptischer Strahl"
+  },
+  "EM7100": {
+    "1": "Odium",
+    "2": "Auxilium",
+    "3": "Verbundener Himmelssturm",
+    "4": "Ira",
+    "5": "Massa Flammae"
+  },
+  "EM7110": {
+    "1": "Leerenausbruch",
+    "2": "Dunkler Aufstand",
+    "3": "Wilder Ansturm"
+  },
+  "EM7200": {
+    "1": "Wilder Zyklon",
+    "2": "Smaragdsturm"
+  },
+  "EM7201": {
+    "1": "Zorn der Göttin",
+    "2": "Flatterschwert",
+    "3": "Wandlung",
+    "4": "Kreischende Sturmbö",
+    "5": "Ring des Todes",
+    "6": "Xibalbá"
+  },
+  "EM7210": {
+    "1": "Sturm der Leere"
+  },
+  "EM7211": {
+    "1": "Letztes Gewitter",
+    "2": "Leerenreißer",
+    "3": "Wandlung",
+    "4": "Pfeilhagel",
+    "5": "Seelenloser Sturm"
+  },
+  "EM7300": {
+    "1": "Silberwolf-Eruption",
+    "2": "Schwelle des Todes",
+    "3": "Whiteout",
+    "4": "Letzter Feger",
+    "5": "Lawine",
+    "6": "Eisige Verwüstung",
+    "7": "Kristallisierung",
+    "8": "Eisige Einsamkeit"
+  },
+  "EM7310": {
+    "1": "Nihil-Sequestrierung",
+    "2": "Nox Aeterna",
+    "3": "Abholder Eissturm",
+    "4": "Leerenstrahl",
+    "5": "Nihil-Wolfssturm",
+    "6": "Kryosphäre"
+  },
+  "EM7400": {
+    "1": "Wüstenfeuer",
+    "2": "Defensive Überladung"
+  },
+  "EM7500": {
+    "1": "Jüngstes Gericht",
+    "2": "Salvatio",
+    "3": "Damnatio",
+    "4": "Tor der Erlösung: Ananda",
+    "5": "Tor der Stille: Mauna",
+    "6": "Tor der Buße: Kala",
+    "7": "Tor der Ewigkeit: Amartya",
+    "8": "Tor der Wahrheit: Satya",
+    "9": "Tor der Himmlischen: Krsna",
+    "10": "Licht der Verdammnis",
+    "11": "Auftakt",
+    "12": "Dimensionsverzerrung"
+  },
+  "EM7600": {
+    "1": "Höllen-Feuer",
+    "2": "Alter Ego: Insanis",
+    "3": "Überlegenheit der Vernunft",
+    "4": "Armageddon",
+    "5": "Gespaltener Id",
+    "6": "Der Jähzorn",
+    "7": "Willkürliche Gottheit",
+    "8": "Licht der Apokalypse",
+    "9": "Kreislauf des Kosmos: Zerstörung",
+    "10": "Licht der Befreiung",
+    "11": "Schöpfung",
+    "12": "Astralwut",
+    "13": "Daedalus-Flügel",
+    "14": "Synchrotron",
+    "15": "Omegablitz"
+  },
+  "EM7700": {
+    "1": "Himmelsfusion",
+    "2": "Letzte Rebellion",
+    "3": "Das verlorene Paradies",
+    "4": "Apokalyptische Bläser",
+    "5": "Das Ende",
+    "6": "Gelbholzarche",
+    "7": "Stigma",
+    "8": "Bestrafung",
+    "9": "Heilige Flügel",
+    "10": "Verderben",
+    "11": "Dreiheit des Schreckens",
+    "12": "Halphas",
+    "13": "Requiem",
+    "14": "Xaphan",
+    "15": "Schwingen der Sünde",
+    "16": "Mastema",
+    "17": "Absolutes Nichts",
+    "18": "Dunkles Evangelium",
+    "19": "Agaliarept",
+    "20": "Nemesis",
+    "21": "Symphonie X"
+  },
+  "EM8000": {
+    "1": "Cien Mil Espadas",
+    "2": "Siebenstern-Brillanz",
+    "3": "Großer Wagen",
+    "4": "Grabstein",
+    "5": "Emblem",
+    "6": "Quell der Macht",
+    "7": "Verlorene Schwertscheide"
+  },
+  "EM8100": {
+    "1": "Asteroidenjäger",
+    "2": "Wut des Großen Wagens",
+    "3": "Verderbtheit",
+    "4": "Trumpf",
+    "5": "Krieg zweier Kronen",
+    "6": "Sturmpfeilhagel",
+    "7": "Läuterungsritual",
+    "8": "Entfesselter Schrecken",
+    "9": "Sieben Sterne, Zwei Kronen",
+    "10": "Wut des Großen Wagens +",
+    "11": "Wut des Großen Wagens ++",
+    "12": "Caelum-Dämonenauge"
+  },
+  "EM8200": {
+    "1": "Chaoskaliber-Zündung",
+    "2": "Thron des Regenten",
+    "3": "Legionen des Chaos",
+    "4": "Steigende Kette",
+    "5": "Ersticktes Matt",
+    "6": "Großes Finale",
+    "7": "Erzfeind",
+    "8": "Unisonic"
+  },
+  "EM8300": {
+    "1": "Neue Weltordnung",
+    "2": "Himmlische Sphäre",
+    "3": "Neues Regiment",
+    "4": "Arcarum-Reinkarnation",
+    "5": "Aufstieg der Gerechtigkeit",
+    "6": "Fessel der Gehängten",
+    "7": "Todesschmerz",
+    "8": "Schauspiel der Mäßigung",
+    "9": "Kuss des Teufels",
+    "10": "Turmbrecher",
+    "11": "Sternenschuss",
+    "12": "Abglanz des Monds",
+    "13": "Hitze der Sonne",
+    "14": "Hymne des Urteils",
+    "15": "Rad der Fortuna",
+    "19": "Tropfen der Erkenntnis",
+    "20": "Sephira-Sandkiste",
+    "21": "Aufstieg der Gerechtigkeit +",
+    "22": "Aufstieg der Gerechtigkeit ++",
+    "23": "Todesschmerz +",
+    "24": "Todesschmerz ++",
+    "25": "Kuss des Teufels +",
+    "26": "Kuss des Teufels ++",
+    "27": "Turmbrecher +",
+    "28": "Turmbrecher ++",
+    "29": "Hymne des Urteils +",
+    "30": "Hymne des Urteils ++",
+    "31": "Ungeboren"
+  },
+  "EM8400": {
+    "1": "Hand des Schicksals",
+    "2": "Endgültigkeit",
+    "3": "Prüfung der Himmelsdrachen",
+    "4": "Rationalis Detractio",
+    "8": "Machtringe",
+    "9": "Venator",
+    "10": "Paradoxer Zerfall",
+    "11": "Vertilgen",
+    "12": "Rote Hitzeklauen",
+    "13": "Blaue Spirale",
+    "14": "Goldener Felsschlag",
+    "15": "Grüne Böe",
+    "16": "Weißer Blitz",
+    "17": "Schwarzer Fluch",
+    "18": "Fokussierte Flamme",
+    "19": "Brutale Anziehung",
+    "20": "Weltenbeben",
+    "21": "Systematische Demolierung",
+    "22": "Blitzblüten",
+    "23": "Nekrotischer Sturm",
+    "24": "Ultimative Prüfung: Rot",
+    "25": "Ultimative Prüfung: Blau",
+    "26": "Ultimative Prüfung: Gold",
+    "27": "Ultimative Prüfung: Grün",
+    "28": "Ultimative Prüfung: Weiß",
+    "29": "Ultimative Prüfung: Schwarz",
+    "33": "Kausaler Schwund",
+    "34": "Parabellum",
+    "35": "Letzte Prüfung",
+    "36": "Kosmische Erweckung",
+    "38": "Kausalitätsverstärkung"
+  }
+}

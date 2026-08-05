@@ -1,0 +1,340 @@
+{
+  "EM0005": {
+    "1": "Pestaggio"
+  },
+  "EM0015": {
+    "1": "Scuotimento del tatami"
+  },
+  "EM0102": {
+    "1": "Cancelli infernali"
+  },
+  "EM0103": {
+    "1": "Raffica d'ossa"
+  },
+  "EM0500": {
+    "1": "Rotolamento devastante",
+    "2": "Rotolamento roccioso estremo"
+  },
+  "EM0501": {
+    "1": "Rotolamento gelido"
+  },
+  "EM0502": {
+    "1": "Rotolamento scottante",
+    "2": "Rotolamento ustionante estremo"
+  },
+  "EM0706": {
+    "1": "Raggio congelante",
+    "2": "Tomba glaciale",
+    "3": "Nistagmo"
+  },
+  "EM1500": {
+    "1": "Scuotiterra"
+  },
+  "EM1600": {
+    "1": "Vortice"
+  },
+  "EM1700": {
+    "1": "Massacro caotico",
+    "2": "Zampata mortale"
+  },
+  "EM1800": {
+    "1": "Condanna draconica"
+  },
+  "EM1801": {
+    "1": "Meteora draconica"
+  },
+  "EM1802": {
+    "1": "Grandine"
+  },
+  "EM1803": {
+    "1": "Smottamento"
+  },
+  "EM1804": {
+    "1": "Maelstrom"
+  },
+  "EM1805": {
+    "1": "Tuono devastante"
+  },
+  "EM1806": {
+    "1": "Vortice ombra",
+    "2": "Abisso famelico",
+    "3": "Disperazione"
+  },
+  "EM1900": {
+    "1": "Accelerazione turbo",
+    "2": "Campo di stasi",
+    "3": "Detonazione massacrante"
+  },
+  "EM2000": {
+    "1": "Lancia marziale",
+    "2": "Tempesta mortale",
+    "3": "Tempesta del Velo argenteo",
+    "4": "Tempesta di colpi trascendenti"
+  },
+  "EM2100": {
+    "1": "Melodia di spade",
+    "2": "Sinfonia superlativa",
+    "3": "Walzer di Sandrilla"
+  },
+  "EM2200": {
+    "1": "Sentenza"
+  },
+  "EM2300": {
+    "1": "Sentenza: Terminus",
+    "2": "Mortalità ineludibile",
+    "3": "Legame d'anime",
+    "4": "Flagello",
+    "5": "Trasmutazione d'anima",
+    "6": "Colpo catastrofico"
+  },
+  "EM2400": {
+    "1": "Nox atra"
+  },
+  "EM2510": {
+    "1": "Tripudio di chele rasoterra"
+  },
+  "EM3100": {
+    "1": "Lama dell'apocalisse",
+    "2": "Installazione di Hutchison",
+    "3": "Conversione elementale",
+    "4": "Oceano del silenzio",
+    "5": "Oceano dell'opulenza",
+    "6": "Oceano delle maree",
+    "7": "Preghiera verso casa",
+    "8": "Voce possente",
+    "9": "Protocollo di interruzione",
+    "10": "Raggio asse",
+    "11": "Arco cromatico",
+    "12": "Segnale rosso",
+    "13": "Segnale rosso +",
+    "14": "Segnale blu",
+    "15": "Segnale blu +",
+    "16": "Segnale giallo",
+    "17": "Segnale giallo +"
+  },
+  "EM7000": {
+    "1": "Crollo celeste",
+    "2": "Catastrofe",
+    "3": "Reginleif",
+    "4": "Arcadia: Erythros",
+    "5": "Pioggia scarlatta",
+    "6": "Arcadia: Kyanos",
+    "7": "Ondata argentea",
+    "8": "Arcadia: Xanthos",
+    "9": "Collasso tettonico",
+    "10": "Arcadia: Khloros",
+    "11": "Vento del declino",
+    "12": "Legame asceso",
+    "13": "Supernova",
+    "14": "Stemma fatale",
+    "15": "Catastrofe: Zero",
+    "16": "Resa dei conti",
+    "17": "Raggio d'eclissi"
+  },
+  "EM7100": {
+    "1": "Odium",
+    "2": "Auxilium",
+    "3": "Tecnica di legame",
+    "4": "Ira",
+    "5": "Massa flammae"
+  },
+  "EM7110": {
+    "1": "Vuoto dirompente",
+    "2": "Marea oscura",
+    "3": "Assalto furioso"
+  },
+  "EM7200": {
+    "1": "Ciclone selvaggio",
+    "2": "Lama della tempesta di giada"
+  },
+  "EM7201": {
+    "1": "Collera della dea",
+    "2": "Danza di spada",
+    "3": "Trasfigurazione",
+    "4": "Stridore di tempesta",
+    "5": "Anello della morte",
+    "6": "Xibalba"
+  },
+  "EM7210": {
+    "1": "Tempesta vacua"
+  },
+  "EM7211": {
+    "1": "Ultima tempesta",
+    "2": "Squarcio nel vuoto",
+    "3": "Trasfigurazione",
+    "4": "Raffica di frecce",
+    "5": "Tempesta desolata"
+  },
+  "EM7300": {
+    "1": "Impeto del lupo argento",
+    "2": "Soglia mortale",
+    "3": "Bufera",
+    "4": "Sferzata finale",
+    "5": "Valanga",
+    "6": "Desolazione glaciale",
+    "7": "Cristallizzazione",
+    "8": "Isolamento glaciale"
+  },
+  "EM7310": {
+    "1": "Isolamento fatuo",
+    "2": "Nox aeterna",
+    "3": "Ghiaccio ostile",
+    "4": "Raggio antimateria",
+    "5": "Fatuitempesta del lupo",
+    "6": "Sfera criogenica"
+  },
+  "EM7400": {
+    "1": "Luci del deserto",
+    "2": "Sovraccarico difensivo"
+  },
+  "EM7500": {
+    "1": "Giudizio inappellabile",
+    "2": "Salvatio",
+    "3": "Damnatio",
+    "4": "Portale della salvezza: Ananda",
+    "5": "Portale del silenzio: Mauna",
+    "6": "Portale della penitenza: Kala",
+    "7": "Portale dell'eternità: Amartya",
+    "8": "Portale della verità: Satya",
+    "9": "Portale del ceruleo: Krsna",
+    "10": "Luce della perdizione",
+    "11": "Preludio",
+    "12": "Salto dimensionale"
+  },
+  "EM7600": {
+    "1": "Lampo elicoidale",
+    "2": "Alter ego: Insanis",
+    "3": "Trascendenza della ragione",
+    "4": "Armageddon",
+    "5": "Id frammentato",
+    "6": "Furia",
+    "7": "Divinità dispotica",
+    "8": "Luce apocalittica",
+    "9": "Ciclo cosmico: Distruzione",
+    "10": "Luce della salvezza",
+    "11": "Creazione",
+    "12": "Rabbia primordiale",
+    "13": "Ala di Dedalo",
+    "14": "Synchrotron",
+    "15": "Blitz omega"
+  },
+  "EM7700": {
+    "1": "Fusione celeste",
+    "2": "Ribellione finale",
+    "3": "Paradiso perduto",
+    "4": "Sette squilli",
+    "5": "La fine",
+    "6": "Arca di Rodibosco",
+    "7": "Stigma",
+    "8": "Castigo",
+    "9": "Ali sacre",
+    "10": "Rovina",
+    "11": "Trinità del terrore",
+    "12": "Halphas",
+    "13": "Requiem",
+    "14": "Xaphan",
+    "15": "Ali del peccato",
+    "16": "Mastema",
+    "17": "Nulla assoluto",
+    "18": "Lamento oscuro",
+    "19": "Agaliarept",
+    "20": "Nemesi",
+    "21": "Sinfonia X"
+  },
+  "EM8000": {
+    "1": "Cien Mil Espadas",
+    "2": "Lucentezza delle sette stelle",
+    "3": "Grande carro",
+    "4": "Lapide",
+    "5": "Emblema",
+    "6": "Fonte di energia",
+    "7": "Guaina perduta"
+  },
+  "EM8100": {
+    "1": "Jaeger asteroide",
+    "2": "Furia delle luci del nord",
+    "3": "Depravazione",
+    "4": "Fattore chiave",
+    "5": "Disputa dei due sovrani",
+    "6": "Pioggia di frecce tonanti",
+    "7": "Rito della corda risonante",
+    "8": "Manifestazione interiore",
+    "9": "Sette stelle, due sovrani",
+    "10": "Furia delle luci del nord+",
+    "11": "Furia delle luci del nord++",
+    "12": "Occhio del firmamento"
+  },
+  "EM8200": {
+    "1": "Calibrocaos: irradiazione",
+    "2": "Trono del dominatore",
+    "3": "Legione del caos",
+    "4": "Catena furiosa",
+    "5": "Matto affogato",
+    "6": "Los endos",
+    "7": "Arcinemico",
+    "8": "Unisonico"
+  },
+  "EM8300": {
+    "1": "Ordine del nuovo mondo",
+    "2": "Sfera celestiale",
+    "3": "Dominio del nuovo mondo",
+    "4": "Trasmigrazione Arcarum",
+    "5": "Ascesa della Giustizia",
+    "6": "Legacci dell'Appeso",
+    "7": "Dolore della Morte",
+    "8": "Teatro della Temperanza",
+    "9": "Bacio del Diavolo",
+    "10": "Crollo della Torre",
+    "11": "Caduta della Stella",
+    "12": "Riflesso della Luna",
+    "13": "Calore del Sole",
+    "14": "Melodia del Giudizio",
+    "15": "Ruota della Fortuna",
+    "19": "Gocce di idea",
+    "20": "Sandbox di Sephira",
+    "21": "Ascesa della Giustizia +",
+    "22": "Ascesa della Giustizia ++",
+    "23": "Dolore della Morte +",
+    "24": "Dolore della Morte ++",
+    "25": "Bacio del Diavolo +",
+    "26": "Bacio del Diavolo ++",
+    "27": "Crollo della Torre +",
+    "28": "Crollo della Torre ++",
+    "29": "Melodia del Giudizio +",
+    "30": "Melodia del Giudizio ++",
+    "31": "Primi movimenti"
+  },
+  "EM8400": {
+    "1": "Sors tua",
+    "2": "Dum vita est",
+    "3": "Ordalia del drago celeste",
+    "4": "Exitium rationis",
+    "8": "Halos virtutis",
+    "9": "Venator",
+    "10": "Riduzione del paradosso",
+    "11": "Devoratio",
+    "12": "Artigli di fuoco scarlatto",
+    "13": "Vortice ceruleo",
+    "14": "Valanga dorata",
+    "15": "Rostro smeraldino",
+    "16": "Lampo bianco",
+    "17": "Maleficio oscuro",
+    "18": "Fiamme inclementi",
+    "19": "Attrattore brutale",
+    "20": "Squasso del creato",
+    "21": "Collasso universale",
+    "22": "Disfatta fulminante",
+    "23": "Tempesta necrotica",
+    "24": "Ordalia suprema scarlatta",
+    "25": "Ordalia suprema cerulea",
+    "26": "Ordalia suprema dorata",
+    "27": "Ordalia suprema smeraldina",
+    "28": "Ordalia suprema nivea",
+    "29": "Ordalia suprema oscura",
+    "33": "Causalità attenuata",
+    "34": "Para bellum",
+    "35": "Ordalia finale",
+    "36": "Resurrezione spaccamondi",
+    "38": "Causalità amplificata"
+  }
+}

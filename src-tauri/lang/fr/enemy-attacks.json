@@ -1,0 +1,340 @@
+{
+  "EM0005": {
+    "1": "Heurt de bouclier"
+  },
+  "EM0015": {
+    "1": "Renversement tatami"
+  },
+  "EM0102": {
+    "1": "Porte infernale"
+  },
+  "EM0103": {
+    "1": "Os de la damnation"
+  },
+  "EM0500": {
+    "1": "Rugissement ravageur",
+    "2": "Croc tellurique"
+  },
+  "EM0501": {
+    "1": "Roulade de glace"
+  },
+  "EM0502": {
+    "1": "Explosion de lave",
+    "2": "Croc incendiaire"
+  },
+  "EM0706": {
+    "1": "Rayon glaçant",
+    "2": "Tombe glaciale",
+    "3": "Nystagmus"
+  },
+  "EM1500": {
+    "1": "Commotion terrestre"
+  },
+  "EM1600": {
+    "1": "Tourbillon"
+  },
+  "EM1700": {
+    "1": "Massacre chaotique",
+    "2": "Griffe mortelle"
+  },
+  "EM1800": {
+    "1": "Sort draconique"
+  },
+  "EM1801": {
+    "1": "Pluie météorique"
+  },
+  "EM1802": {
+    "1": "Grêle cinglante"
+  },
+  "EM1803": {
+    "1": "Glissement de terrain"
+  },
+  "EM1804": {
+    "1": "Maelström"
+  },
+  "EM1805": {
+    "1": "Foudre cataclysmique"
+  },
+  "EM1806": {
+    "1": "Vortex sombre",
+    "2": "Abîme avide",
+    "3": "Désespoir"
+  },
+  "EM1900": {
+    "1": "Mode turbo",
+    "2": "Champ de stase",
+    "3": "Carnage dévastateur"
+  },
+  "EM2000": {
+    "1": "Lance martiale",
+    "2": "Tempête mortelle",
+    "3": "Tempête du voile d'argent",
+    "4": "Mille aiguilles"
+  },
+  "EM2100": {
+    "1": "Opéra des lames",
+    "2": "Symphonie supérieure",
+    "3": "Valse de Sandrilla"
+  },
+  "EM2200": {
+    "1": "Sentence"
+  },
+  "EM2300": {
+    "1": "Sentence : Terminus",
+    "2": "Âme mortelle",
+    "3": "Lien spirituel",
+    "4": "Calamité",
+    "5": "Transmutation d'âme",
+    "6": "Coup funeste"
+  },
+  "EM2400": {
+    "1": "Nox Atra"
+  },
+  "EM2510": {
+    "1": "Déluge de pinces gratte-sol"
+  },
+  "EM3100": {
+    "1": "Lame apocalyptique",
+    "2": "Installation d'Hutchison",
+    "3": "Transition élémentaire",
+    "4": "Mer du silence",
+    "5": "Mer de l'opulence",
+    "6": "Mer des tumultes",
+    "7": "Prière familière",
+    "8": "Voix retentissante",
+    "9": "Protocole extrême",
+    "10": "Rayon axé",
+    "11": "Arc chromatique",
+    "12": "Signal rouge",
+    "13": "Signal rouge +",
+    "14": "Signal bleu",
+    "15": "Signal bleu +",
+    "16": "Signal jaune",
+    "17": "Signal jaune +"
+  },
+  "EM7000": {
+    "1": "Cataclysme",
+    "2": "Catastrophe",
+    "3": "Reginleif",
+    "4": "Arcadia : Erythros",
+    "5": "Pluie écarlate",
+    "6": "Arcadia : Kyanos",
+    "7": "Vague argentée",
+    "8": "Arcadia : Xanthos",
+    "9": "Collision tectonique",
+    "10": "Arcadia : Khloros",
+    "11": "Vent pernicieux",
+    "12": "Lien d'élévation",
+    "13": "Supernova",
+    "14": "Sceau funeste",
+    "15": "Catastrophe : Zéro",
+    "16": "Règlement de comptes",
+    "17": "Rayon d’éclipse"
+  },
+  "EM7100": {
+    "1": "Odium",
+    "2": "Auxilium",
+    "3": "Charge de lien",
+    "4": "Ire",
+    "5": "Masse de flammes"
+  },
+  "EM7110": {
+    "1": "Éruption du vide",
+    "2": "Soulèvement sinistre",
+    "3": "Assaut furieux"
+  },
+  "EM7200": {
+    "1": "Cyclone sauvage",
+    "2": "Lame Tempête d'émeraude"
+  },
+  "EM7201": {
+    "1": "Courroux de la déesse",
+    "2": "Lame voltigeuse",
+    "3": "Transfiguration",
+    "4": "Rafale hurlante",
+    "5": "Cercle funeste",
+    "6": "Xibalba"
+  },
+  "EM7210": {
+    "1": "Tempête sourde"
+  },
+  "EM7211": {
+    "1": "Tempête finale",
+    "2": "Déchirure du vide",
+    "3": "Transfiguration",
+    "4": "Rafale de flèches",
+    "5": "Tempête sans âme"
+  },
+  "EM7300": {
+    "1": "Élan du Loup d'argent",
+    "2": "Seuil funeste",
+    "3": "Voile blanc",
+    "4": "Élimination finale",
+    "5": "Avalanche",
+    "6": "Désolation glaciale",
+    "7": "Cristallisation",
+    "8": "Isolement glacé"
+  },
+  "EM7310": {
+    "1": "Séquestration du néant",
+    "2": "Nox Aeterna",
+    "3": "Bise sinistre",
+    "4": "Rayon du vide",
+    "5": "Assaut du loup du néant",
+    "6": "Sphère cryogénique"
+  },
+  "EM7400": {
+    "1": "Éclat du désert",
+    "2": "Surcharge défensive"
+  },
+  "EM7500": {
+    "1": "Jugement dernier",
+    "2": "Salvation",
+    "3": "Damnation",
+    "4": "Portail du salut : Ananda",
+    "5": "Portail du silence : Mauna",
+    "6": "Portail de la pénitence : Kala",
+    "7": "Portail de l'éternité : Amartya",
+    "8": "Portail de la vérité : Satya",
+    "9": "Portail de l'azur : Krsna",
+    "10": "Lumière de la perdition",
+    "11": "Prélude",
+    "12": "Distorsion dimensionnelle"
+  },
+  "EM7600": {
+    "1": "Éclat du vortex",
+    "2": "Alter ego : Insanis",
+    "3": "Transcendance de la raison",
+    "4": "Armageddon",
+    "5": "Id fracturé",
+    "6": "Rage divine",
+    "7": "Divinité despotique",
+    "8": "Lumière de l'apocalypse",
+    "9": "Cycle cosmique : Destruction",
+    "10": "Lumière de la délivrance",
+    "11": "Création",
+    "12": "Rage primordiale",
+    "13": "Aile de Dédale",
+    "14": "Synchrotron",
+    "15": "Omega Blitz"
+  },
+  "EM7700": {
+    "1": "Fusion céleste",
+    "2": "Rébellion finale",
+    "3": "Paradise Lost",
+    "4": "Trompettes de l'Apocalypse",
+    "5": "Grand final",
+    "6": "Arche d'ébène",
+    "7": "Stigmates",
+    "8": "Châtiment",
+    "9": "Ailes sacrées",
+    "10": "Ruine",
+    "11": "Trinité de la terreur",
+    "12": "Halphas",
+    "13": "Requiem",
+    "14": "Xaphan",
+    "15": "Ailes du péché",
+    "16": "Mastema",
+    "17": "Néant absolu",
+    "18": "Évangile obscur",
+    "19": "Agaliarept",
+    "20": "Némésis",
+    "21": "Symphonie X"
+  },
+  "EM8000": {
+    "1": "Cien Mil Espadas",
+    "2": "Brillance des sept étoiles",
+    "3": "La Grande Ourse",
+    "4": "Pierre tombale",
+    "5": "Emblème",
+    "6": "Fontaine d'Énergie",
+    "7": "Gaine perdue"
+  },
+  "EM8100": {
+    "1": "Chasseuse d'astéroïde",
+    "2": "Orage boréal",
+    "3": "Dépravation",
+    "4": "Facteur décisif",
+    "5": "Dissidence des deux rois",
+    "6": "Pluie de foudres",
+    "7": "Rite des cordes vibrantes",
+    "8": "Manifestation intérieure",
+    "9": "Deux rois aux sept étoiles",
+    "10": "Orage boréal+",
+    "11": "Orage boréal++",
+    "12": "Œil démoniaque céleste"
+  },
+  "EM8200": {
+    "1": "Chaos Caliber : Ignition",
+    "2": "Trône du souverain",
+    "3": "Chai Legio",
+    "4": "Chaîne furieuse",
+    "5": "Mat à l'étouffée",
+    "6": "Los Endos",
+    "7": "Archennemi",
+    "8": "Unisonique"
+  },
+  "EM8300": {
+    "1": "Nouvel ordre mondial",
+    "2": "Sphère céleste",
+    "3": "Suprématie nouvelle",
+    "4": "Réincarnation des Arcarums",
+    "5": "Essor de la justice",
+    "6": "Lien du pendu",
+    "7": "Douleur de la mort",
+    "8": "Jeu de la tempérance",
+    "9": "Baiser du Diable",
+    "10": "Chute de la Tour",
+    "11": "Tir de l’étoile",
+    "12": "Reflet de la lune",
+    "13": "Ardeur du soleil",
+    "14": "Mélodie du jugement",
+    "15": "Roue de la fortune",
+    "19": "Goutte de l'Idéal",
+    "20": "Sablier de Séphira",
+    "21": "Essor de la justice +",
+    "22": "Essor de la justice ++",
+    "23": "Douleur de la mort +",
+    "24": "Douleur de la mort ++",
+    "25": "Baiser du Diable +",
+    "26": "Baiser du Diable ++",
+    "27": "Chute de la Tour +",
+    "28": "Chute de la Tour ++",
+    "29": "Mélodie du jugement +",
+    "30": "Mélodie du jugement ++",
+    "31": "Gestation"
+  },
+  "EM8400": {
+    "1": "Sors tua",
+    "2": "Dum vita est",
+    "3": "Épreuve du dragon du firmament",
+    "4": "Ratio exitium",
+    "8": "Halo de vertus",
+    "9": "Venator",
+    "10": "Réduction des paradoxes",
+    "11": "Devoratio",
+    "12": "Griffes ardentes du Vermillon",
+    "13": "Coeur du vortex de l'Azur",
+    "14": "Projection de roches de l'Or",
+    "15": "Bec de l'Émeraude",
+    "16": "Éclat de la Lumière",
+    "17": "Malédiction des Ténèbres",
+    "18": "Flammes intenses",
+    "19": "Attraction féroce",
+    "20": "Secousse du ciel et de la terre",
+    "21": "Effondrement intégral",
+    "22": "Floraison des mille éclairs",
+    "23": "Tempête nécrotique",
+    "24": "Épreuve de l'Ultime Vérité : Vermillon",
+    "25": "Épreuve de l'Ultime Vérité : Azur",
+    "26": "Épreuve de l'Ultime Vérité : Or",
+    "27": "Épreuve de l'Ultime Vérité : Émeraude",
+    "28": "Épreuve de l'Ultime Vérité : Blanc",
+    "29": "Épreuve de l'Ultime Vérité : Noir",
+    "33": "Décomposition de causalité",
+    "34": "Para bellum",
+    "35": "Ultime épreuve",
+    "36": "Séparation et résurrection",
+    "38": "Croissance de causalité"
+  }
+}
