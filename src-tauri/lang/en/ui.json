@@ -530,6 +530,7 @@
       "chart-stack-toggle-label": "Chart stacking mode",
       "chart-stack-normal": "Normal",
       "chart-stack-stacked": "Stacked",
+      "chart-effects-label": "Effect uptime (holders)",
       "quest-cleared": "Cleared",
       "quest-failed": "Not cleared",
       "no-rows": "Nothing matches the current pins. Clear one to see more.",

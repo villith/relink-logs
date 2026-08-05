@@ -47,11 +47,12 @@ import {
   type Label,
 } from "../DetailCharts";
 import { actionsForPin } from "../abilitySkills";
-import { buffs, enemyHolderKey, heldByRoster, slotsOf } from "../metrics/buffs";
+import { buffs, enemyHolderKey, heldByRoster, narrowedByPins, slotsOf } from "../metrics/buffs";
 import { damageDone, parseEnemyRow } from "../metrics/damageDone";
 import { damageTaken, takenAttackNameKey, takenAttackRowParts } from "../metrics/damageTaken";
 import { debuffs } from "../metrics/debuffs";
 import { sba } from "../metrics/sba";
+import { isHarmful } from "../metrics/statusPolarity";
 import { stun } from "../metrics/stun";
 import type { Hostility, MetricDescriptor, MetricRow } from "../metrics/types";
 import { deriveSelectorOptions, type SelectorPins } from "../selectorOptions";
@@ -74,7 +75,7 @@ import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSer
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { groupBandsFor, groupRowsFor } from "./machine/groupRows";
-import { resolveViewSpec } from "./machine/resolve";
+import { GROUP_TOP_N, resolveViewSpec } from "./machine/resolve";
 import type { MetricKey } from "./machine/state";
 import {
   clearPin,
@@ -88,7 +89,7 @@ import { useAnalysisState } from "./machine/useAnalysisState";
 import { identityPartyOf } from "./partyIdentity";
 import { rowCardSectionsFor } from "./rowCardSections";
 import { abilityRowIconUrl } from "./rowIcon";
-import { buildStatusSeries } from "./statusChart";
+import { buildEffectSeries, buildStatusSeries } from "./statusChart";
 import {
   causeCandidatesOf,
   causeNameFor,
@@ -1074,6 +1075,31 @@ export const AnalysisView = () => {
     identityPlayers,
   ]);
 
+  // The top-level aura chart: no effect pinned, so the effects THEMSELVES are
+  // the series — the top 8 by uptime (the table's own ranking), Y = holders
+  // with the effect active. Same polarity, side and pin narrowing as the
+  // table rows (`statusTabRows`), so the chart draws the rows above it.
+  //
+  // `statusIntervals`, not `windowedIntervals`, for the same reason as
+  // `statusSeries`: the parent crops the chart, and cropping twice would
+  // shorten the series against a chart that is already the window.
+  const effectSeries = useMemo(() => {
+    if (!isStatusMetric || isStatusPin(pins.ability)) return null;
+    const roster = slotsOf(identityPlayers);
+    const held = heldByRoster(statusIntervals, roster, hostility === "friendly");
+    const polar = held.filter((interval) => isHarmful(interval.statusId) === (metricKey === "debuffs"));
+    const series = buildEffectSeries({
+      intervals: narrowedByPins(polar, pins, hostility),
+      bucketMs: DPS_BUCKET_MS,
+      len: chartLen,
+      // The same cap as the group bands — both feed the eight-colour palette.
+      topN: GROUP_TOP_N,
+      labelOf: statusDisplayLabel,
+      holderKeyOf: (interval) => (hostility === "enemy" ? enemyHolderKey(interval) : `player:${interval.actorIndex}`),
+    });
+    return series.length > 0 ? series : null;
+  }, [isStatusMetric, pins, identityPlayers, statusIntervals, hostility, metricKey, chartLen, statusDisplayLabel]);
+
   // Which series the per-player chart draws. identityPlayers, not players: these
   // charts hold the whole party, so a pin must not drop curves from the plot.
   //
@@ -1082,9 +1108,9 @@ export const AnalysisView = () => {
   // asked, and narrowing to the pinned player is the most the data supports.
   const chartIndexes = useMemo(() => {
     const everyone = identityPlayers.map((player) => player.index);
-    if (statusSeries || groupOverlay || groupPlayerSeries || pins.source === null) return everyone;
+    if (statusSeries || effectSeries || groupOverlay || groupPlayerSeries || pins.source === null) return everyone;
     return everyone.filter((index) => index === pins.source);
-  }, [identityPlayers, statusSeries, groupOverlay, groupPlayerSeries, pins.source]);
+  }, [identityPlayers, statusSeries, effectSeries, groupOverlay, groupPlayerSeries, pins.source]);
 
   // With no source pinned, an enemy or ability pin still narrows the fight, and
   // the backend rebuilds the per-player series under it — otherwise the plot
@@ -1094,14 +1120,20 @@ export const AnalysisView = () => {
   // Whichever series is drawn INSTEAD of the per-player ones. Stack counts and
   // group bands are the same shape and are consumed identically, so they are
   // one branch here rather than the same ternary spelled out per field.
-  const overlay = statusSeries ?? groupOverlay;
+  const overlay = statusSeries ?? effectSeries ?? groupOverlay;
 
   // WHICH of those the plot ended up drawing, recognised from the value itself
   // rather than re-derived from the pins, so the title cannot disagree with
   // what is on screen. "scoped" is the groups path's per-player lines (the
   // query's filters applied); "drill" its stacked bands.
   const chartSource: "base" | "scoped" | "stacks" | "drill" =
-    overlay === null ? (groupPlayerSeries ? "scoped" : "base") : overlay === statusSeries ? "stacks" : "drill";
+    overlay === null
+      ? groupPlayerSeries
+        ? "scoped"
+        : "base"
+      : overlay === statusSeries || overlay === effectSeries
+        ? "stacks"
+        : "drill";
 
   // The Total series draws exactly where the chart draws independent LINES:
   // the groups path's source grouping on the friendly side (Damage Done and
@@ -1133,7 +1165,7 @@ export const AnalysisView = () => {
       // refuses smoothing. Averaged over a trailing window a buff held for one
       // second at four stacks reads as one, and every edge of what is really a
       // step function becomes a ramp.
-      smoothing: statusSeries ? 1 : chartMetric.smoothing,
+      smoothing: statusSeries || effectSeries ? 1 : chartMetric.smoothing,
       // The group series are raw damage like `dpsChart`, so their scale is 1
       // on the damage tab either way — kept explicit rather than accidental.
       scale: overlay || groupPlayerSeries ? 1 : chartMetric.scale,
@@ -1144,7 +1176,7 @@ export const AnalysisView = () => {
       ...point,
       timestamp: bucketLabel(bucket),
     })) as ChartDatapoint[];
-  }, [chartMetric, chartIndexes, overlay, groupPlayerSeries, statusSeries, withTotal]);
+  }, [chartMetric, chartIndexes, overlay, groupPlayerSeries, statusSeries, effectSeries, withTotal]);
 
   const labels: Label = useMemo(
     () =>
@@ -1295,7 +1327,11 @@ export const AnalysisView = () => {
         // Titled after what is DRAWN, never after what the pins would suggest.
         labelKey={
           chartSource === "stacks"
-            ? "ui.logs.chart-stacks-label"
+            ? // Pinned, the plot is one effect's stack depths; unpinned it is
+              // the effects themselves as holder counts.
+              statusSeries !== null
+              ? "ui.logs.chart-stacks-label"
+              : "ui.logs.chart-effects-label"
             : groupOverlay !== null
               ? // The enemy side inverts which way the damage flows, so both
                 // of these name both ends. Reusing the friendly titles would
