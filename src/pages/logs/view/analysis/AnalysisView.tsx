@@ -60,7 +60,7 @@ import { clipToWindow, isStatusPin, statusPinKey } from "../statusUptime";
 import { buildTargetLabels } from "../targetLabels";
 
 import { DebugBar } from "./DebugBar";
-import { DpsChart } from "./DpsChart";
+import { DpsChart, type StackMode } from "./DpsChart";
 import { HostilityToggle } from "./HostilityToggle";
 import { MetricTable } from "./MetricTable";
 import { MetricTabs, type MetricTab } from "./MetricTabs";
@@ -815,6 +815,12 @@ export const AnalysisView = () => {
   // it pre-shaded.
   useEffect(() => setBanded(new Set()), [metricKey, id]);
 
+  // Normal | Stacked for the stacks chart. Component-local like the band
+  // toggles: a way of reading the plot, not what the page is about. Reset per
+  // metric/log for the same stale-state reason as `banded`.
+  const [stackMode, setStackMode] = useState<StackMode>("normal");
+  useEffect(() => setStackMode("normal"), [metricKey, id]);
+
   const rowToggle = useCallback(
     (row: MetricRow) => {
       // Only the effect rows: a holder row is one actor's share of a band the
@@ -1313,6 +1319,8 @@ export const AnalysisView = () => {
         toLabel={range === null ? fullLabel : bucketLabel(range[1])}
         bands={chartBands}
         markers={chartMarkers}
+        stackMode={chartSource === "stacks" ? stackMode : undefined}
+        onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
       />
 
       {/* Dev builds only, the same guard the Debug tab uses. */}

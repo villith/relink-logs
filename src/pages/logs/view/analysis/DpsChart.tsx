@@ -1,5 +1,5 @@
 import { AreaChart, LineChart } from "@mantine/charts";
-import { Box, Checkbox, Group, Paper, Text } from "@mantine/core";
+import { Box, Checkbox, Group, Paper, SegmentedControl, Text } from "@mantine/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReferenceArea, ReferenceLine } from "recharts";
@@ -24,6 +24,10 @@ export const formatChartValue = (format: DpsChartProps["format"], value: number)
   if (format === "count") return String(value);
   return humanizeNumber(value);
 };
+
+/** How the stacks chart composes its series: Warcraft Logs' "Normal"
+ * (overlapping areas — the default) or summed into a stack. */
+export type StackMode = "normal" | "stacked";
 
 export type DpsChartProps = {
   /** Already sliced to the committed window, so the chart IS the window. */
@@ -56,6 +60,14 @@ export type DpsChartProps = {
    * `bands`). Drawn as vertical reference lines and appended to the tooltip of
    * the bucket they land in; a control row above the plot toggles each kind. */
   markers?: ChartMarker[];
+  /** For the STACKS chart (aura holder/effect series): whether the areas
+   * overlap ("normal", WCL's default) or sum into a stack. Absent, a stacked
+   * chart stacks — the damage drills are decompositions whose stack height IS
+   * the total, and they get no toggle. */
+  stackMode?: StackMode;
+  /** Providing this renders the Normal | Stacked SegmentedControl in the
+   * chart header. */
+  onStackModeChange?: (mode: StackMode) => void;
 };
 
 /** The glyph a marker's reference line wears at the top of the plot. Kept out
@@ -171,6 +183,8 @@ export const DpsChart = ({
   stacked = false,
   bands,
   markers,
+  stackMode = "stacked",
+  onStackModeChange,
 }: DpsChartProps) => {
   const { t } = useTranslation();
   const anchor = useRef<number | null>(null);
@@ -380,19 +394,28 @@ export const DpsChart = ({
     <Box style={{ padding: "10px 16px 8px" }}>
       <Box style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
         <Text className="analysis-label">{t(labelKey)}</Text>
-        {markerKinds.length > 0 && (
-          <Group gap="sm">
-            {markerKinds.map((kind) => (
-              <Checkbox
-                key={kind}
-                size="xs"
-                label={t(MARKER_LABEL_KEY[kind])}
-                checked={!hiddenMarkerKinds.has(kind)}
-                onChange={() => toggleMarkerKind(kind)}
-              />
-            ))}
-          </Group>
-        )}
+        <Group gap="sm">
+          {onStackModeChange && (
+            <SegmentedControl
+              size="xs"
+              value={stackMode}
+              onChange={(value) => onStackModeChange(value as StackMode)}
+              data={[
+                { value: "normal", label: t("ui.logs.chart-stack-normal") },
+                { value: "stacked", label: t("ui.logs.chart-stack-stacked") },
+              ]}
+            />
+          )}
+          {markerKinds.map((kind) => (
+            <Checkbox
+              key={kind}
+              size="xs"
+              label={t(MARKER_LABEL_KEY[kind])}
+              checked={!hiddenMarkerKinds.has(kind)}
+              onChange={() => toggleMarkerKind(kind)}
+            />
+          ))}
+        </Group>
       </Box>
       {/* Double-click sits on the wrapper, not in `lineChartProps`: recharts'
           CategoricalChartProps has no onDoubleClick, and the wrapper sees the
@@ -403,7 +426,8 @@ export const DpsChart = ({
           // where two bands are close, without the fills darkening into one mass.
           <AreaChart
             {...shared}
-            type="stacked"
+            // "default" overlaps the areas (WCL's Normal); "stacked" sums them.
+            type={stackMode === "normal" ? "default" : "stacked"}
             strokeWidth={1}
             fillOpacity={0.3}
             areaChartProps={interaction}
