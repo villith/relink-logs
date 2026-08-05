@@ -124,6 +124,15 @@ pub enum GroupKey {
         enemy_type: EnemyType,
         action_id: ActionType,
     },
+    /// An enemy attacker's TYPE, standing in for [`GroupKey::EnemySpawn`] on
+    /// the taken stream: `segment_targets_indexed`'s assignment only ever
+    /// covers dealt (player→enemy) events (see `segment_targets_inner`,
+    /// which skips every `is_damage_taken_event` hit before assigning one),
+    /// so an attacker on the taken stream has no segment to key by — only
+    /// its type.
+    EnemyType {
+        enemy_type: EnemyType,
+    },
     Other,
 }
 
@@ -148,13 +157,16 @@ pub struct GroupAggregate {
 
 /// Errors a `GroupQuery` can fail validation with before [`aggregate_groups`]
 /// ever walks the event log.
+///
+/// `GroupMetric` and `GroupHostility` are both two-variant enums, and the
+/// role-mapping table in [`aggregate_groups`] gives every one of the four
+/// combinations a meaning — there is no "unsupported (metric, hostility)"
+/// left to reject, only a ref or ability filter drawn from the wrong universe
+/// for the combination requested.
 #[derive(Debug, PartialEq)]
 pub enum GroupQueryError {
     /// A ref from the wrong universe for the query's hostility role-mapping.
     WrongUniverse { field: &'static str },
-    /// A grouping the metric does not declare (should be unreachable from the
-    /// resolver; rejected rather than guessed).
-    UnsupportedGrouping,
 }
 
 // main.rs stringifies every `#[tauri::command]` error with `.to_string()`
@@ -166,9 +178,6 @@ impl std::fmt::Display for GroupQueryError {
         match self {
             GroupQueryError::WrongUniverse { field } => {
                 write!(f, "'{field}' is not in this query's hostility universe")
-            }
-            GroupQueryError::UnsupportedGrouping => {
-                write!(f, "this metric/hostility combination is not supported yet")
             }
         }
     }
@@ -182,16 +191,55 @@ impl std::error::Error for GroupQueryError {}
 /// event log, so a caller cannot ask for a table and a chart that tell
 /// different stories about the same query.
 ///
-/// Scoped to [`GroupMetric::Damage`] + [`GroupHostility::Friendly`] for now —
-/// every other combination is `Err(UnsupportedGrouping)` until the hostility
-/// role-mapping (a later task) selects which key-extraction arm below
-/// applies; the `match` on `query.group_by` is written so adding that
-/// selection is a new arm, not a rewrite of this one.
+/// The hostility role-mapping (spec §3) decides which events are walked and
+/// what `Dimension::Source`/`Dimension::Target` mean:
+///
+/// ```text
+/// (metric, hostility) → which events are walked and what the dims mean
+/// damage + friendly:  dealt stream,  source = Player,     target = EnemySpawn   (already implemented)
+/// damage + enemy:     taken stream,  source = EnemySpawn, target = Player       (WCL's hostility=1: rows = attacker enemies)
+/// taken  + friendly:  taken stream,  source = Player (victim), target = EnemySpawn (attacker)
+/// taken  + enemy:     dealt stream,  source = EnemySpawn (victim), target = Player (attacker)
+/// ```
+///
+/// Two independent facts drive the walk below:
+///
+/// * `dealt_stream` — which events are walked. True for the player→enemy
+///   stream Task 8 already implemented (full gate chain: phantoms, the
+///   contested-source filter, the friendly ability grammar, the dragon-form
+///   remap, target spans); false for the enemy→player stream
+///   [`super::build_taken_ability_chart`] walks (a single ungated pass, the
+///   enemy-attack ability grammar, no remap — none of the dealt gates mean
+///   anything for a hit a PLAYER never dealt). On EITHER stream the attacker
+///   is always the physical `event.source` and the victim always the
+///   physical `event.target` — `dealt_stream` alone decides which universe
+///   (Player vs. EnemySpawn/EnemyType) the attacker and the victim belong
+///   to: attacker = Player, victim = Enemy when true; the reverse when false.
+/// * `source_is_player` — whether the query's `source` role names the Player
+///   universe or the Enemy one (`hostility: Friendly`/`Enemy`, independent of
+///   which stream is walked). Combined with `dealt_stream` above, this says
+///   which physical actor field (and which `Dimension`) backs each
+///   `GroupKey`: e.g. `taken`+`enemy` walks the dealt stream like
+///   `damage`+`friendly` (`dealt_stream` true both ways) but flips which
+///   dimension is the Player one (`source_is_player` false vs. true).
+///
+/// On the taken stream, an enemy attacker is `GroupKey::EnemyType`, never
+/// `GroupKey::EnemySpawn`: `segment_targets_indexed`'s assignment only ever
+/// covers dealt events (`segment_targets_inner` drops every
+/// `is_damage_taken_event` hit before assigning one a segment), so an
+/// attacker there has no segment to key by. An `ActorRef::EnemySpawn{segment}`
+/// FILTER on the taken stream still works — it resolves to that segment's
+/// `enemy_type` and time span from `segments`, then keeps only taken events
+/// whose source enemy TYPE matches and whose timestamp falls in the span.
+/// This is the same honest approximation the old takenCardSections used:
+/// same-type simultaneous spawns merge, which is also why the taken ability
+/// table's own rows are keyed per (attacker TYPE, attack) rather than per
+/// spawn.
 ///
 /// `segments`/`assignment` MUST come from `segment_targets_indexed` over the
 /// same `events`, exactly as [`super::build_target_damage_chart`] requires:
-/// sharing the segmentation is what guarantees a `Dimension::Target` band
-/// means the same enemy the target dropdown does.
+/// sharing the segmentation is what guarantees an `EnemySpawn` band means the
+/// same enemy the target dropdown does.
 #[allow(clippy::too_many_arguments)]
 pub fn aggregate_groups(
     events: &[(i64, Message)],
@@ -204,30 +252,70 @@ pub fn aggregate_groups(
     chart_len: usize,
     filters: MeterFilters,
 ) -> Result<Vec<GroupAggregate>, GroupQueryError> {
-    if query.metric != GroupMetric::Damage || query.hostility != GroupHostility::Friendly {
-        return Err(GroupQueryError::UnsupportedGrouping);
-    }
+    let dealt_stream = matches!(
+        (query.metric, query.hostility),
+        (GroupMetric::Damage, GroupHostility::Friendly)
+            | (GroupMetric::Taken, GroupHostility::Enemy)
+    );
+    let source_is_player = query.hostility == GroupHostility::Friendly;
 
     if let Some(source) = query.source {
-        if !matches!(source, ActorRef::Player { .. }) {
+        let in_universe = if source_is_player {
+            matches!(source, ActorRef::Player { .. })
+        } else {
+            matches!(source, ActorRef::EnemySpawn { .. })
+        };
+        if !in_universe {
             return Err(GroupQueryError::WrongUniverse { field: "source" });
         }
     }
     if let Some(target) = query.target {
-        if !matches!(target, ActorRef::EnemySpawn { .. }) {
+        let in_universe = if source_is_player {
+            matches!(target, ActorRef::EnemySpawn { .. })
+        } else {
+            matches!(target, ActorRef::Player { .. })
+        };
+        if !in_universe {
             return Err(GroupQueryError::WrongUniverse { field: "target" });
         }
     }
-    let action_filter = match &query.ability {
-        None => None,
-        Some(AbilityFilter::Friendly { actions }) => Some(actions.as_slice()),
-        // Task 9 revisits: an enemy attack cannot pin a friendly-damage query.
+    // Each stream has exactly one valid ability grammar: the dealt stream's
+    // events carry a friendly action id, the taken stream's carry an enemy
+    // attack — see `AbilityFilter`'s own doc for why the two shapes differ.
+    let friendly_action_filter = match &query.ability {
+        Some(AbilityFilter::Friendly { actions }) if dealt_stream => Some(actions.as_slice()),
+        Some(AbilityFilter::Friendly { .. }) => {
+            return Err(GroupQueryError::WrongUniverse { field: "ability" })
+        }
+        _ => None,
+    };
+    let enemy_action_filter = match &query.ability {
+        Some(AbilityFilter::EnemyAttack {
+            enemy_type,
+            action_id,
+        }) if !dealt_stream => Some((*enemy_type, *action_id)),
         Some(AbilityFilter::EnemyAttack { .. }) => {
             return Err(GroupQueryError::WrongUniverse { field: "ability" })
         }
+        _ => None,
     };
 
-    let source_index = match query.source {
+    // Whichever ref names the Player universe always narrows the ATTACKER on
+    // the dealt stream and the VICTIM on the taken stream (see the doc
+    // comment above); whichever names the Enemy universe narrows the
+    // opposite actor.
+    let player_ref = if source_is_player {
+        query.source
+    } else {
+        query.target
+    };
+    let enemy_ref = if source_is_player {
+        query.target
+    } else {
+        query.source
+    };
+
+    let player_index_filter = match player_ref {
         Some(ActorRef::Player { index }) => Some(index),
         _ => None,
     };
@@ -236,16 +324,34 @@ pub fn aggregate_groups(
     // "everything" (an empty `target_spans` would mean the latter — see
     // `target_selected`). Same convention as `AnalysisView`'s own target-span
     // memo: a stale reference narrows to nothing, it never widens.
-    let target_spans: Vec<TargetSpan> = match query.target {
-        Some(ActorRef::EnemySpawn { segment }) => match segments.get(segment) {
-            Some(entry) => vec![TargetSpan {
-                id: entry.id,
-                start_ms: entry.start_ms,
-                end_ms: entry.end_ms,
-            }],
-            None => return Ok(Vec::new()),
-        },
-        _ => Vec::new(),
+    let target_spans: Vec<TargetSpan> = if dealt_stream {
+        match enemy_ref {
+            Some(ActorRef::EnemySpawn { segment }) => match segments.get(segment) {
+                Some(entry) => vec![TargetSpan {
+                    id: entry.id,
+                    start_ms: entry.start_ms,
+                    end_ms: entry.end_ms,
+                }],
+                None => return Ok(Vec::new()),
+            },
+            _ => Vec::new(),
+        }
+    } else {
+        Vec::new()
+    };
+    // The taken stream's own version of the same filter — no per-spawn
+    // segment to match against (see the doc comment above), so this matches
+    // by (attacker enemy TYPE, timestamp within the segment's span) instead.
+    let taken_enemy_filter: Option<(EnemyType, i64, i64)> = if dealt_stream {
+        None
+    } else {
+        match enemy_ref {
+            Some(ActorRef::EnemySpawn { segment }) => match segments.get(segment) {
+                Some(entry) => Some((entry.enemy_type, entry.start_ms, entry.end_ms)),
+                None => return Ok(Vec::new()),
+            },
+            _ => None,
+        }
     };
 
     let phantoms = PhantomTargets::learned_from(events.iter());
@@ -264,92 +370,150 @@ pub fn aggregate_groups(
     // `build_ability_damage_chart` has the identical gap under a target span,
     // and the two are left to share it deliberately rather than diverge: a
     // chart and this aggregation must key a hit the same way, and inventing a
-    // fix here that chart doesn't have would do the opposite.
+    // fix here that chart doesn't have would do the opposite. Only ever
+    // touched on the dealt stream — the taken stream has no such state.
     let mut keyings: Vec<(u32, player_state::BreakdownKeying)> = Vec::new();
 
     for (position, (timestamp, message)) in events.iter().enumerate() {
         let Message::DamageEvent(damage_event) = message else {
             continue;
         };
-
-        // Friendly dealt-damage only. The ingest gate
-        // (`should_ignore_damage_event`) guarantees every DEALT hit already
-        // has a known player source, but a damage-TAKEN event still carries
-        // an enemy pointer in that same field — undropped, it would mint a
-        // bogus `GroupKey::Player` for every enemy actor that ever hit the
-        // party.
-        if is_damage_taken_event(damage_event) {
-            continue;
-        }
-        if !survives_shared_gates(damage_event, &phantoms, filters) {
-            continue;
-        }
-        // `Some(&[])` (every sibling action was expanded away — a stale pin)
-        // narrows to nothing, matching the convention above; `None` means no
-        // ability filter was requested at all.
-        if let Some(actions) = action_filter {
-            if actions.is_empty() || !actions.contains(&damage_event.action_id) {
-                continue;
-            }
-        }
-
-        let damage_event = remap_dragon_form(player_data, damage_event);
-
-        if let Some(wanted) = source_index {
-            if damage_event.source.parent_index != wanted {
-                continue;
-            }
-        }
-
         let rel_ts = timestamp - start_time;
-        let Some(bucket) = bucket_for(rel_ts, &damage_event, &target_spans, interval, chart_len)
-        else {
-            continue;
-        };
 
-        let key = match query.group_by {
-            Dimension::Source => GroupKey::Player {
-                index: damage_event.source.parent_index,
-            },
-            Dimension::Ability => {
-                let keying = match keyings
-                    .iter()
-                    .position(|(index, _)| *index == damage_event.source.parent_index)
-                {
-                    Some(position) => &mut keyings[position].1,
-                    None => {
-                        keyings.push((
-                            damage_event.source.parent_index,
-                            player_state::BreakdownKeying::default(),
-                        ));
-                        &mut keyings.last_mut().expect("just pushed").1
-                    }
-                };
-                let (action_type, child_character_type) = keying.key_for(&damage_event);
-                GroupKey::FriendlyAbility {
-                    action_type,
-                    child_character_type,
+        // `dealt_stream` wants dealt hits; the taken stream wants the
+        // opposite. A mismatch skips the event entirely rather than opening
+        // a bogus row for it — e.g. an unfiltered damage-taken event must
+        // never mint a `GroupKey::Player` from its enemy source pointer.
+        if is_damage_taken_event(damage_event) == dealt_stream {
+            continue;
+        }
+
+        let (key, damage, bucket) = if dealt_stream {
+            if !survives_shared_gates(damage_event, &phantoms, filters) {
+                continue;
+            }
+            // `Some(&[])` (every sibling action was expanded away — a stale
+            // pin) narrows to nothing, matching the out-of-range convention
+            // above; `None` means no ability filter was requested at all.
+            if let Some(actions) = friendly_action_filter {
+                if actions.is_empty() || !actions.contains(&damage_event.action_id) {
+                    continue;
                 }
             }
-            Dimension::Target => {
+
+            let damage_event = remap_dragon_form(player_data, damage_event);
+
+            if let Some(wanted) = player_index_filter {
+                if damage_event.source.parent_index != wanted {
+                    continue;
+                }
+            }
+
+            let Some(bucket) =
+                bucket_for(rel_ts, &damage_event, &target_spans, interval, chart_len)
+            else {
+                continue;
+            };
+
+            let key = match query.group_by {
+                Dimension::Source if source_is_player => GroupKey::Player {
+                    index: damage_event.source.parent_index,
+                },
+                Dimension::Target if !source_is_player => GroupKey::Player {
+                    index: damage_event.source.parent_index,
+                },
+                // The remaining `Source`/`Target` case is always the enemy
+                // universe (the one not matched above).
+                //
                 // Believed unreachable for real enemy-target damage:
                 // `assignment` is total over every target-bearing damage
                 // event by construction (`segment_targets_indexed` assigns a
                 // segment to each one it doesn't itself drop as a taken/
                 // phantom hit, both of which this walk has already excluded
                 // above). If it ever DID fire, this row's damage would be
-                // dropped here while `Dimension::Source` still counts it —
+                // dropped here while the Player dimension still counts it —
                 // the two dimensions' totals could diverge.
-                let Some(Some(segment_index)) = assignment.get(position) else {
+                Dimension::Source | Dimension::Target => {
+                    let Some(Some(segment_index)) = assignment.get(position).copied() else {
+                        continue;
+                    };
+                    let segment = &segments[segment_index];
+                    GroupKey::EnemySpawn {
+                        segment: segment_index,
+                        enemy_type: segment.enemy_type,
+                        instance: segment.instance,
+                    }
+                }
+                Dimension::Ability => {
+                    let keying = match keyings
+                        .iter()
+                        .position(|(index, _)| *index == damage_event.source.parent_index)
+                    {
+                        Some(position) => &mut keyings[position].1,
+                        None => {
+                            keyings.push((
+                                damage_event.source.parent_index,
+                                player_state::BreakdownKeying::default(),
+                            ));
+                            &mut keyings.last_mut().expect("just pushed").1
+                        }
+                    };
+                    let (action_type, child_character_type) = keying.key_for(&damage_event);
+                    GroupKey::FriendlyAbility {
+                        action_type,
+                        child_character_type,
+                    }
+                }
+            };
+
+            (key, damage_event.damage.max(0) as i64, bucket)
+        } else {
+            // The taken stream: a single ungated pass, exactly as
+            // `build_taken_ability_chart` documents — none of the dealt
+            // gates (phantoms, contested-source exclusion, dragon-form
+            // remap, target spans) apply to a hit a player never dealt. The
+            // victim is `target.parent_index` (a player slot key); the
+            // attacker is the enemy in `source`.
+            let attacker_type = EnemyType::from_hash(damage_event.source.parent_actor_type);
+
+            if let Some((enemy_type, action_id)) = enemy_action_filter {
+                if attacker_type != enemy_type || damage_event.action_id != action_id {
                     continue;
-                };
-                let segment = &segments[*segment_index];
-                GroupKey::EnemySpawn {
-                    segment: *segment_index,
-                    enemy_type: segment.enemy_type,
-                    instance: segment.instance,
                 }
             }
+            if let Some(wanted) = player_index_filter {
+                if damage_event.target.parent_index != wanted {
+                    continue;
+                }
+            }
+            if let Some((enemy_type, start_ms, end_ms)) = taken_enemy_filter {
+                if attacker_type != enemy_type || rel_ts < start_ms || rel_ts > end_ms {
+                    continue;
+                }
+            }
+
+            let bucket = (rel_ts / interval) as usize;
+            if bucket >= chart_len {
+                continue;
+            }
+
+            let key = match query.group_by {
+                Dimension::Source if source_is_player => GroupKey::Player {
+                    index: damage_event.target.parent_index,
+                },
+                Dimension::Target if !source_is_player => GroupKey::Player {
+                    index: damage_event.target.parent_index,
+                },
+                Dimension::Source | Dimension::Target => GroupKey::EnemyType {
+                    enemy_type: attacker_type,
+                },
+                Dimension::Ability => GroupKey::EnemyAttack {
+                    enemy_type: attacker_type,
+                    action_id: damage_event.action_id,
+                },
+            };
+
+            (key, damage_event.damage.max(0) as i64, bucket)
         };
 
         let entry = match aggregates.iter().position(|aggregate| aggregate.key == key) {
@@ -364,7 +528,6 @@ pub fn aggregate_groups(
             }
         };
 
-        let damage = damage_event.damage.max(0) as i64;
         entry.measure.amount += damage;
         entry.measure.hits += 1;
         entry.measure.min = Some(entry.measure.min.map_or(damage, |min| min.min(damage)));
@@ -550,6 +713,21 @@ mod tests {
     }
 
     #[test]
+    fn serializes_the_enemy_type_group_key() {
+        let key = GroupKey::EnemyType {
+            enemy_type: EnemyType::Unknown(0x5678),
+        };
+
+        assert_eq!(
+            serde_json::to_value(&key).expect("GroupKey serializes"),
+            json!({
+                "kind": "enemyType",
+                "enemyType": { "Unknown": 0x5678u32 }
+            })
+        );
+    }
+
+    #[test]
     fn serializes_the_other_group_key() {
         assert_eq!(
             serde_json::to_value(GroupKey::Other).expect("GroupKey serializes"),
@@ -622,6 +800,41 @@ mod tests {
         }
     }
 
+    /// A hit landing on party slot `victim_slot` (0..=3) from an enemy of
+    /// `attacker_hash`, for `action`/`damage` — same shape as `mod.rs`'s own
+    /// `damage_taken_by_slot0`, generalized so tests can distinguish
+    /// multiple attacker types and victims. `is_damage_taken_event` needs
+    /// the target's PARENT to carry a real player slot key and the source's
+    /// parent hash to resolve to `CharacterType::Unknown`; any non-player
+    /// hash satisfies the latter, so `attacker_hash` doubles as the enemy's
+    /// identity (`EnemyType::from_hash` is a bare wrap of the hash — see
+    /// `constants::EnemyType`).
+    fn enemy_hit(attacker_hash: u32, victim_slot: u8, action: u32, damage: i32) -> DamageEvent {
+        DamageEvent {
+            source: Actor {
+                index: 0xF1EB_0000 | (attacker_hash & 0xFFFF),
+                actor_type: attacker_hash,
+                parent_index: 0xF1EB_0000 | (attacker_hash & 0xFFFF),
+                parent_actor_type: attacker_hash,
+            },
+            target: Actor {
+                index: 77,
+                actor_type: PLAYER_HASH,
+                parent_index: protocol::player_slot_key(victim_slot),
+                parent_actor_type: PLAYER_HASH,
+            },
+            damage,
+            flags: 0,
+            action_id: ActionType::Normal(action),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+            base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
+        }
+    }
+
     fn friendly_damage_query(group_by: Dimension) -> GroupQuery {
         GroupQuery {
             metric: GroupMetric::Damage,
@@ -632,6 +845,59 @@ mod tests {
             ability: None,
             top_n: None,
         }
+    }
+
+    fn taken_friendly_query(group_by: Dimension) -> GroupQuery {
+        GroupQuery {
+            metric: GroupMetric::Taken,
+            hostility: GroupHostility::Friendly,
+            group_by,
+            source: None,
+            target: None,
+            ability: None,
+            top_n: None,
+        }
+    }
+
+    fn damage_enemy_query(group_by: Dimension) -> GroupQuery {
+        GroupQuery {
+            metric: GroupMetric::Damage,
+            hostility: GroupHostility::Enemy,
+            group_by,
+            source: None,
+            target: None,
+            ability: None,
+            top_n: None,
+        }
+    }
+
+    fn taken_enemy_query(group_by: Dimension) -> GroupQuery {
+        GroupQuery {
+            metric: GroupMetric::Taken,
+            hostility: GroupHostility::Enemy,
+            group_by,
+            source: None,
+            target: None,
+            ability: None,
+            top_n: None,
+        }
+    }
+
+    /// Folds a set of enemy-side aggregates (`EnemySpawn` or `EnemyType`
+    /// rows — whichever the query produced) down to one total per enemy
+    /// TYPE, so a per-spawn grouping and a type-only grouping over the same
+    /// events can be compared directly.
+    fn amount_by_enemy_type(aggregates: &[GroupAggregate]) -> std::collections::BTreeMap<u32, i64> {
+        let mut totals = std::collections::BTreeMap::new();
+        for aggregate in aggregates {
+            let EnemyType::Unknown(hash) = match &aggregate.key {
+                GroupKey::EnemySpawn { enemy_type, .. } => *enemy_type,
+                GroupKey::EnemyType { enemy_type } => *enemy_type,
+                other => panic!("unexpected key in an enemy-side fold: {other:?}"),
+            };
+            *totals.entry(hash).or_insert(0) += aggregate.measure.amount;
+        }
+        totals
     }
 
     /// Every aggregate's series must sum to its own measure, and the whole
@@ -1010,6 +1276,34 @@ mod tests {
             .find(|a| a.key == GroupKey::Player { index: 5 })
             .expect("the dragon hit lands on its Pl1900 owner's row");
         assert_eq!(dragon_owner.measure.amount, 700);
+
+        // The reviewer's deferred nit on Task 8: the remap must run BEFORE
+        // the source filter is applied, not just before the key is built —
+        // otherwise a source-pinned query for the Pl1900 owner (actor_index
+        // 5, who never appears as a raw `.source` in the log above) would
+        // wrongly see zero hits.
+        let mut pinned_query = query.clone();
+        pinned_query.source = Some(ActorRef::Player { index: 5 });
+        let pinned = aggregate_groups(
+            &events,
+            &player_data,
+            &[],
+            &[],
+            &pinned_query,
+            1_000,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by source is supported");
+
+        assert_eq!(
+            pinned.len(),
+            1,
+            "only the remapped dragon hit matches actor_index 5"
+        );
+        assert_eq!(pinned[0].key, GroupKey::Player { index: 5 });
+        assert_eq!(pinned[0].measure.amount, 700);
     }
 
     #[test]
@@ -1090,31 +1384,372 @@ mod tests {
         );
     }
 
+    // --- taken + enemy-side aggregation ------------------------------------
+    //
+    // The role-mapping table's other three rows (spec §3, and the table in
+    // `aggregate_groups`'s own doc comment): `taken`+`friendly` and
+    // `damage`+`enemy` both walk the enemy→player TAKEN stream;
+    // `taken`+`enemy` walks the same player→enemy DEALT stream
+    // `damage`+`friendly` does, just flipping which dimension is the Player
+    // one.
+
     #[test]
-    fn unsupported_metric_hostility_combinations_are_rejected() {
-        let taken = GroupQuery {
-            metric: GroupMetric::Taken,
-            ..friendly_damage_query(Dimension::Source)
-        };
-        let enemy = GroupQuery {
-            hostility: GroupHostility::Enemy,
-            ..friendly_damage_query(Dimension::Source)
+    fn taken_friendly_grouped_by_source_keys_by_victim_player() {
+        const GOBLIN: u32 = 0xAAAA_0001;
+        const WOLF: u32 = 0xAAAA_0002;
+        let events = vec![
+            (1_000, Message::DamageEvent(enemy_hit(GOBLIN, 0, 9001, 400))),
+            (2_000, Message::DamageEvent(enemy_hit(WOLF, 1, 9002, 250))),
+            (3_000, Message::DamageEvent(enemy_hit(GOBLIN, 0, 9001, 100))),
+        ];
+        let query = taken_friendly_query(Dimension::Source);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            3,
+            MeterFilters::default(),
+        )
+        .expect("taken grouped by source is supported");
+
+        assert_eq!(aggregates.len(), 2, "one row per victim player");
+        assert_eq!(
+            aggregates[0].key,
+            GroupKey::Player {
+                index: protocol::player_slot_key(0)
+            }
+        );
+        assert_eq!(aggregates[0].measure.amount, 500, "400 + 100");
+        assert_eq!(
+            aggregates[1].key,
+            GroupKey::Player {
+                index: protocol::player_slot_key(1)
+            }
+        );
+        assert_eq!(aggregates[1].measure.amount, 250);
+
+        assert_invariants(&aggregates, 750);
+    }
+
+    #[test]
+    fn taken_friendly_grouped_by_ability_keys_by_enemy_attack() {
+        const GOBLIN: u32 = 0xAAAA_0001;
+        let events = vec![
+            (1_000, Message::DamageEvent(enemy_hit(GOBLIN, 0, 9001, 400))),
+            (2_000, Message::DamageEvent(enemy_hit(GOBLIN, 0, 9002, 100))),
+            (3_000, Message::DamageEvent(enemy_hit(GOBLIN, 1, 9001, 50))),
+        ];
+        let query = taken_friendly_query(Dimension::Ability);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            3,
+            MeterFilters::default(),
+        )
+        .expect("taken grouped by ability is supported");
+
+        assert_eq!(aggregates.len(), 2, "one row per (enemy type, action)");
+        assert_eq!(
+            aggregates[0].key,
+            GroupKey::EnemyAttack {
+                enemy_type: EnemyType::Unknown(GOBLIN),
+                action_id: ActionType::Normal(9001),
+            }
+        );
+        assert_eq!(aggregates[0].measure.amount, 450, "400 + 50, two victims");
+        assert_eq!(
+            aggregates[1].key,
+            GroupKey::EnemyAttack {
+                enemy_type: EnemyType::Unknown(GOBLIN),
+                action_id: ActionType::Normal(9002),
+            }
+        );
+        assert_eq!(aggregates[1].measure.amount, 100);
+
+        assert_invariants(&aggregates, 550);
+    }
+
+    #[test]
+    fn taken_friendly_grouped_by_target_keys_by_attacker_enemy_type() {
+        const GOBLIN: u32 = 0xAAAA_0001;
+        const WOLF: u32 = 0xAAAA_0002;
+        let events = vec![
+            (1_000, Message::DamageEvent(enemy_hit(GOBLIN, 0, 9001, 400))),
+            (2_000, Message::DamageEvent(enemy_hit(WOLF, 1, 9002, 250))),
+            (3_000, Message::DamageEvent(enemy_hit(GOBLIN, 2, 9001, 100))),
+        ];
+        let query = taken_friendly_query(Dimension::Target);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            3,
+            MeterFilters::default(),
+        )
+        .expect("taken grouped by target is supported");
+
+        assert_eq!(aggregates.len(), 2, "one row per attacker enemy type");
+        assert_eq!(
+            aggregates[0].key,
+            GroupKey::EnemyType {
+                enemy_type: EnemyType::Unknown(GOBLIN)
+            }
+        );
+        assert_eq!(aggregates[0].measure.amount, 500, "400 + 100");
+        assert_eq!(
+            aggregates[1].key,
+            GroupKey::EnemyType {
+                enemy_type: EnemyType::Unknown(WOLF)
+            }
+        );
+        assert_eq!(aggregates[1].measure.amount, 250);
+
+        assert_invariants(&aggregates, 750);
+    }
+
+    /// `damage`+`enemy` walks the same taken stream as `taken`+`friendly`
+    /// above, over the exact same events — just naming the attacker
+    /// `Source` instead of `Target` — so this is that same test's fixture
+    /// with the query flipped, expecting the same rows.
+    #[test]
+    fn damage_enemy_grouped_by_source_matches_taken_friendly_grouped_by_target() {
+        const GOBLIN: u32 = 0xAAAA_0001;
+        const WOLF: u32 = 0xAAAA_0002;
+        let events = vec![
+            (1_000, Message::DamageEvent(enemy_hit(GOBLIN, 0, 9001, 400))),
+            (2_000, Message::DamageEvent(enemy_hit(WOLF, 1, 9002, 250))),
+            (3_000, Message::DamageEvent(enemy_hit(GOBLIN, 2, 9001, 100))),
+        ];
+        let query = damage_enemy_query(Dimension::Source);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            3,
+            MeterFilters::default(),
+        )
+        .expect("damage+enemy grouped by source is supported");
+
+        assert_eq!(aggregates.len(), 2);
+        assert_eq!(
+            aggregates[0].key,
+            GroupKey::EnemyType {
+                enemy_type: EnemyType::Unknown(GOBLIN)
+            }
+        );
+        assert_eq!(aggregates[0].measure.amount, 500);
+        assert_eq!(
+            aggregates[1].key,
+            GroupKey::EnemyType {
+                enemy_type: EnemyType::Unknown(WOLF)
+            }
+        );
+        assert_eq!(aggregates[1].measure.amount, 250);
+
+        assert_invariants(&aggregates, 750);
+    }
+
+    #[test]
+    fn damage_enemy_rejects_a_source_from_the_player_universe() {
+        let query = GroupQuery {
+            source: Some(ActorRef::Player { index: 0 }),
+            ..damage_enemy_query(Dimension::Source)
         };
 
-        for query in [taken, enemy] {
-            let result = aggregate_groups(
-                &[],
-                &Default::default(),
-                &[],
-                &[],
-                &query,
-                0,
+        let result = aggregate_groups(
+            &[],
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        );
+
+        assert_eq!(
+            result,
+            Err(GroupQueryError::WrongUniverse { field: "source" })
+        );
+    }
+
+    #[test]
+    fn taken_friendly_rejects_a_friendly_ability_filter() {
+        let query = GroupQuery {
+            ability: Some(AbilityFilter::Friendly {
+                actions: vec![ActionType::Normal(1)],
+            }),
+            ..taken_friendly_query(Dimension::Source)
+        };
+
+        let result = aggregate_groups(
+            &[],
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        );
+
+        assert_eq!(
+            result,
+            Err(GroupQueryError::WrongUniverse { field: "ability" })
+        );
+    }
+
+    /// The symmetry invariant (spec §3): friendly `Damage` grouped by
+    /// `Target` (per spawn, folded here by type since two goblin hits land
+    /// on the same spawn) and enemy-side `Taken` (`taken`+`enemy`) grouped
+    /// by `Source` walk the SAME dealt-stream events — the role-mapping
+    /// table's two rows for the dealt stream — so their totals per enemy
+    /// type must agree.
+    #[test]
+    fn friendly_damage_by_target_and_taken_enemy_by_source_agree_per_enemy_type() {
+        const GOBLIN_TARGET: u32 = 9;
+        const WOLF_TARGET: u32 = 10;
+        let events = vec![
+            (
                 1_000,
-                1,
-                MeterFilters::default(),
-            );
-            assert_eq!(result, Err(GroupQueryError::UnsupportedGrouping));
-        }
+                Message::DamageEvent(player_hit(0, GOBLIN_TARGET, 100, 400)),
+            ),
+            (
+                2_000,
+                Message::DamageEvent(player_hit(1, GOBLIN_TARGET, 100, 100)),
+            ),
+            (
+                3_000,
+                Message::DamageEvent(player_hit(0, WOLF_TARGET, 200, 250)),
+            ),
+        ];
+        let (segments, assignment) = segment_targets_indexed(&events, 1_000);
+
+        let friendly_by_target = friendly_damage_query(Dimension::Target);
+        let friendly = aggregate_groups(
+            &events,
+            &Default::default(),
+            &segments,
+            &assignment,
+            &friendly_by_target,
+            1_000,
+            1_000,
+            3,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by target is supported");
+
+        let taken_by_source = taken_enemy_query(Dimension::Source);
+        let taken = aggregate_groups(
+            &events,
+            &Default::default(),
+            &segments,
+            &assignment,
+            &taken_by_source,
+            1_000,
+            1_000,
+            3,
+            MeterFilters::default(),
+        )
+        .expect("taken+enemy grouped by source is supported");
+
+        assert_invariants(&friendly, 750);
+        assert_invariants(&taken, 750);
+        assert_eq!(
+            amount_by_enemy_type(&friendly),
+            amount_by_enemy_type(&taken),
+            "the same dealt hits, viewed from either side, must agree per enemy type"
+        );
+    }
+
+    /// An `ActorRef::EnemySpawn{segment}` filter on the taken stream, where
+    /// there is no per-spawn segment to match against directly (see
+    /// `aggregate_groups`'s doc comment) — it narrows by (attacker enemy
+    /// TYPE, timestamp within the segment's span) instead.
+    #[test]
+    fn an_enemy_spawn_filter_on_the_taken_stream_narrows_by_type_and_span() {
+        const GOBLIN: u32 = 0xAAAA_0001;
+
+        // A dealt-stream pair that opens and holds one goblin segment
+        // spanning rel_ts 0..2_000ms.
+        let mut open = player_hit(0, 9, 100, 10);
+        open.target.actor_type = GOBLIN;
+        open.target.parent_actor_type = GOBLIN;
+        open.target_current_hp = Some(900);
+        open.target_max_hp = Some(1_000);
+        let mut close = player_hit(0, 9, 100, 10);
+        close.target.actor_type = GOBLIN;
+        close.target.parent_actor_type = GOBLIN;
+        close.target_current_hp = Some(800);
+        close.target_max_hp = Some(1_000);
+        let dealt_events = vec![
+            (1_000, Message::DamageEvent(open)),
+            (3_000, Message::DamageEvent(close)),
+        ];
+        let (segments, assignment) = segment_targets_indexed(&dealt_events, 1_000);
+        assert_eq!(segments.len(), 1, "one goblin segment");
+        assert_eq!(segments[0].start_ms, 0);
+        assert_eq!(segments[0].end_ms, 2_000);
+
+        // Taken events: one inside the span (rel_ts 1_000), one outside
+        // (rel_ts 5_000).
+        let inside = enemy_hit(GOBLIN, 0, 9001, 300);
+        let outside = enemy_hit(GOBLIN, 0, 9001, 999);
+        let taken_events = vec![
+            (2_000, Message::DamageEvent(inside)),
+            (6_000, Message::DamageEvent(outside)),
+        ];
+
+        let mut query = damage_enemy_query(Dimension::Source);
+        query.source = Some(ActorRef::EnemySpawn { segment: 0 });
+
+        let aggregates = aggregate_groups(
+            &taken_events,
+            &Default::default(),
+            &segments,
+            &assignment,
+            &query,
+            1_000,
+            1_000,
+            6,
+            MeterFilters::default(),
+        )
+        .expect("damage+enemy with an enemy-spawn source filter is supported");
+
+        assert_eq!(aggregates.len(), 1);
+        assert_eq!(
+            aggregates[0].key,
+            GroupKey::EnemyType {
+                enemy_type: EnemyType::Unknown(GOBLIN)
+            }
+        );
+        assert_eq!(
+            aggregates[0].measure.amount, 300,
+            "only the in-span hit counts; the out-of-span hit is dropped"
+        );
     }
 
     #[test]
