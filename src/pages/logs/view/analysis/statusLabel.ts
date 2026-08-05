@@ -10,9 +10,14 @@ const STATUS_KEY = /^status:(\d+):(\d+|unknown)$/;
 
 /** The effect id inside a `status:<effect>:<cause>` key, or null for anything
  * that is not one — the same tolerance `statusLabelFor` shows a stale pin. */
-export const statusIdOfKey = (key: string): number | null => {
+export const statusIdOfKey = (key: string): number | null => statusKeyParts(key)?.statusId ?? null;
+
+/** Both ids inside a `status:<effect>:<cause>` key, or null for anything that
+ * is not one. `causeId` null = the literal `unknown` cause. */
+export const statusKeyParts = (key: string): { statusId: number; causeId: number | null } | null => {
   const parsed = STATUS_KEY.exec(key);
-  return parsed === null ? null : Number(parsed[1]);
+  if (parsed === null) return null;
+  return { statusId: Number(parsed[1]), causeId: parsed[2] === "unknown" ? null : Number(parsed[2]) };
 };
 
 /** What a status table's rows currently ARE, for labelling them and for naming
