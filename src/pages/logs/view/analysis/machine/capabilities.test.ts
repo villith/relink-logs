@@ -1,7 +1,9 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import { CAPABILITIES } from "./capabilities";
-import { METRIC_KEYS } from "./state";
+import { DIMENSIONS, METRIC_KEYS } from "./state";
 
 describe("CAPABILITIES", () => {
   it("declares every metric", () => {
@@ -37,6 +39,63 @@ describe("CAPABILITIES", () => {
         if (!decl.supported) continue;
         expect(decl.groupLabelKey.friendly).toMatch(/^ui\.logs\./);
         expect(decl.groupLabelKey.enemy).toMatch(/^ui\.logs\./);
+      }
+    }
+  });
+
+  // The upcoming derivation rule ("first unpinned supported entry") walks
+  // `dimensionOrder` and trusts every entry in it to be pinnable, and trusts
+  // every pinnable dimension to be reachable by walking it — so the two lists
+  // must name exactly the same set, in both directions.
+  it("keeps dimensionOrder exactly the set of supported dimensions", () => {
+    for (const [metric, caps] of Object.entries(CAPABILITIES)) {
+      for (const dim of caps.dimensionOrder) {
+        expect(caps.dimensions[dim].supported, `${metric}.dimensionOrder lists unsupported dimension "${dim}"`).toBe(
+          true
+        );
+      }
+      for (const dim of DIMENSIONS) {
+        if (caps.dimensions[dim].supported) {
+          expect(caps.dimensionOrder, `${metric}.dimensionOrder is missing supported dimension "${dim}"`).toContain(
+            dim
+          );
+        }
+      }
+    }
+  });
+});
+
+describe("CAPABILITIES against the real ui.json", () => {
+  const ui = JSON.parse(readFileSync("src-tauri/lang/en/ui.json", "utf-8"));
+
+  /** Walks a dotted key ("ui.logs.groupby-damage-source") into the nested
+   * ui.json object, the same grammar the app's i18next keys already use. */
+  const resolve = (dottedKey: string): unknown =>
+    dottedKey
+      .split(".")
+      .reduce(
+        (node: unknown, part) =>
+          typeof node === "object" && node !== null ? (node as Record<string, unknown>)[part] : undefined,
+        ui
+      );
+
+  it("resolves every supported dimension's groupLabelKey", () => {
+    for (const caps of Object.values(CAPABILITIES)) {
+      for (const dim of DIMENSIONS) {
+        const decl = caps.dimensions[dim];
+        if (!decl.supported) continue;
+        expect(typeof resolve(decl.groupLabelKey.friendly)).toBe("string");
+        expect(typeof resolve(decl.groupLabelKey.enemy)).toBe("string");
+      }
+    }
+  });
+
+  it("resolves every disabledReasonKey", () => {
+    for (const caps of Object.values(CAPABILITIES)) {
+      for (const dim of DIMENSIONS) {
+        const reasonKey = caps.dimensions[dim].disabledReasonKey;
+        if (reasonKey === undefined) continue;
+        expect(typeof resolve(reasonKey)).toBe("string");
       }
     }
   });

@@ -35,6 +35,8 @@ export type MetricCapabilities = {
   chartFromGroups: boolean;
 };
 
+// `groupLabelKey` here is a placeholder (empty strings, no ui.json entry) —
+// consumers MUST check `supported` before reading it.
 const UNSUPPORTED = (reasonKey: string): DimensionDecl => ({
   supported: false,
   disabledReasonKey: reasonKey,
