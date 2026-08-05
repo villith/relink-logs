@@ -1,10 +1,31 @@
-﻿import { formatBonusAmount, humanizeNumbers, overmasteryAmountFromKind, translateOvermasteryId } from "@/utils";
-import { Button, Group, ScrollArea, Select, Stack, Table, Text, TextInput, Title } from "@mantine/core";
+import {
+  formatBonusAmount,
+  humanizeNumbers,
+  overmasteryAmountFromKind,
+  toHashString,
+  translateOvermasteryId,
+} from "@/utils";
+import {
+  Alert,
+  Button,
+  Group,
+  MultiSelect,
+  ScrollArea,
+  Select,
+  Stack,
+  Table,
+  Tabs,
+  Text,
+  TextInput,
+  Title,
+} from "@mantine/core";
+import { CheckCircle, XCircle } from "@phosphor-icons/react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { backendErrorMessage } from "@/backendErrors";
-import { OvermasteryMastery } from "@/types";
+import { useTabParam } from "@/hooks/useTabParam";
+import { OvermasteryCharacterPrediction, OvermasteryMastery } from "@/types";
 
 import { ANY, anyOption } from "./traitOptions";
 
@@ -12,18 +33,15 @@ import ToolPage from "./ToolPage";
 
 import useOvermasteryPredictor, {
   emptySlots,
+  IndexedRoll,
   MAX_ROLLS,
-  rollMatches,
-  rollMatchesKinds,
   slotOptions,
-  sortRollForDisplay,
+  splitRollMatches,
   wantedKindSet,
 } from "./useOvermasteryPredictor";
 
 /** The magnitude the game shows for a rolled effect: "+1000", "+20%", "+10". */
 const formatValue = (m: OvermasteryMastery): string => formatBonusAmount(overmasteryAmountFromKind(m.kind, m.value));
-
-type IndexedRoll = { roll: OvermasteryMastery[]; index: number };
 
 /** Total MSP to reach a roll, k-shortened: 220000 -> "220k MSP". */
 const formatMsp = (total: number): string => humanizeNumbers(total).join("") + " MSP";
@@ -72,14 +90,71 @@ const RollTable = ({ rolls, mspCost, wanted }: { rolls: IndexedRoll[]; mspCost: 
 /** Descending so the common "high level" goals are next to Any. */
 const LEVEL_OPTIONS = Array.from({ length: 10 }, (_, i) => String(10 - i));
 
+/** One character's results, ready to render: their tab's label and whether
+ * their stream ever hits the goal, plus the two tables behind it. */
+type CharacterTab = {
+  /** Character id hash as 8-hex — the tab value, and the picker's option value. */
+  value: string;
+  label: string;
+  result: OvermasteryCharacterPrediction;
+  fullMatches: IndexedRoll[];
+  belowLevel: IndexedRoll[];
+};
+
+/** Whether this character's stream reaches the goal at all, at a glance —
+ * the whole point of predicting several of them side by side. */
+const MatchMark = ({ matched }: { matched: boolean }) => {
+  const { t } = useTranslation();
+  return matched ? (
+    <CheckCircle weight="fill" color="var(--mantine-color-teal-5)" aria-label={t("ui.toolbox.om-tab-matches")} />
+  ) : (
+    <XCircle color="var(--mantine-color-dimmed)" aria-label={t("ui.toolbox.om-tab-no-match")} />
+  );
+};
+
+/** The results for the character whose tab is open. */
+const CharacterResults = ({ tab, wanted, filtered }: { tab: CharacterTab; wanted: Set<number>; filtered: boolean }) => {
+  const { t } = useTranslation();
+  const { result, fullMatches, belowLevel } = tab;
+  // Per character, not a whole-tool banner: one character being unreadable
+  // (or unseeded) leaves everyone else's results perfectly good.
+  const errorMessage = backendErrorMessage(t, "overmastery", result.error);
+  if (errorMessage) return <Alert color="red">{errorMessage}</Alert>;
+  if (!result.prediction) return null;
+  if (result.prediction.unpredictable) return <Alert color="orange">{t("ui.toolbox.om-unpredictable")}</Alert>;
+
+  return (
+    <ScrollArea.Autosize mah="calc(100vh - 210px)" type="auto" offsetScrollbars>
+      <Stack gap="xs">
+        {filtered && fullMatches.length === 0 && (
+          <Text size="sm">{t("ui.toolbox.om-no-match", { rolls: result.prediction.rolls.length })}</Text>
+        )}
+        <Text size="xs" c="dimmed">
+          {t("ui.toolbox.om-results-caveat")}
+        </Text>
+        {fullMatches.length > 0 && (
+          <RollTable rolls={fullMatches} mspCost={result.prediction.mspCost} wanted={wanted} />
+        )}
+        {belowLevel.length > 0 && (
+          <>
+            <Title order={6}>{t("ui.toolbox.om-below-level", "Matches below minimum level")}</Title>
+            <RollTable rolls={belowLevel} mspCost={result.prediction.mspCost} wanted={wanted} />
+          </>
+        )}
+      </Stack>
+    </ScrollArea.Autosize>
+  );
+};
+
 const OvermasteryPredictor = () => {
   const { t } = useTranslation();
   const {
     form,
     setForm,
-    selectCharacter,
+    selectCharacters,
+    characters,
     status,
-    prediction,
+    results,
     error,
     predicting,
     stale,
@@ -104,36 +179,50 @@ const OvermasteryPredictor = () => {
     setForm({ ...form, wanted: form.wanted.map((s, i) => (i === index ? { ...s, ...patch } : s)) });
 
   const wanted = useMemo(() => wantedKindSet(filters), [filters]);
-  // One pass: `rollMatches` is a backtracking search, so it runs once per
-  // roll and only displayed rolls get sorted. Empty filters accept every
-  // roll, so fullMatches = all and belowLevel = none.
-  const { fullMatches, belowLevel } = useMemo(() => {
-    const full: IndexedRoll[] = [];
-    const below: IndexedRoll[] = [];
-    (prediction?.rolls ?? []).forEach((roll, index) => {
-      if (rollMatches(roll, filters)) full.push({ roll: sortRollForDisplay(roll, filters, wanted), index });
-      else if (rollMatchesKinds(roll, filters)) below.push({ roll: sortRollForDisplay(roll, filters, wanted), index });
-    });
-    return { fullMatches: full, belowLevel: below };
-  }, [prediction, filters, wanted]);
+
+  const labels = useMemo(() => new Map(characterOptions.map((o) => [o.value, o.label])), [characterOptions]);
+
+  /** One tab per character the last Predict covered, in the order it asked
+   * for them. A character whose label the roster no longer offers still gets
+   * a tab under their raw hash rather than silently losing their results. */
+  const tabs = useMemo<CharacterTab[]>(
+    () =>
+      results.map((result) => {
+        const value = toHashString(result.charId);
+        const split = result.prediction
+          ? splitRollMatches(result.prediction.rolls, filters, wanted)
+          : { fullMatches: [], belowLevel: [] };
+        return { value, label: labels.get(value) ?? value, result, ...split };
+      }),
+    [results, filters, wanted, labels]
+  );
+
+  // The open tab lives in the URL, so leaving the toolbox and coming back
+  // returns to the character that was being read.
+  const [tab, setTab] = useTabParam(
+    tabs.map((c) => c.value),
+    tabs[0]?.value ?? ""
+  );
 
   return (
     <ToolPage
       title={t("ui.toolbox.overmastery-predictor", "Overmastery Predictor")}
       gameNotRunning={status && !status.gameRunning ? t("ui.toolbox.om-game-not-running") : null}
-      unpredictable={prediction?.unpredictable ? t("ui.toolbox.om-unpredictable") : null}
+      unpredictable={null}
       error={error ? errorMessage : null}
       stale={stale}
     >
       <Group align="flex-start" gap="xl" wrap="nowrap">
         <Stack gap="sm" style={{ flexShrink: 0 }}>
-          <Select
-            label={t("ui.toolbox.om-character", "Character")}
-            placeholder={t("ui.toolbox.om-select-character", "Select a character...")}
+          <MultiSelect
+            label={t("ui.toolbox.om-characters", "Characters")}
+            placeholder={t("ui.toolbox.om-select-characters", "Select characters...")}
             searchable
-            data={characterOptions}
-            value={form.character}
-            onChange={selectCharacter}
+            clearable
+            hidePickedOptions
+            data={[{ value: ANY, label: t("ui.toolbox.om-any-character", "Any (whole roster)") }, ...characterOptions]}
+            value={form.characters}
+            onChange={selectCharacters}
             disabled={busy}
             w={330}
           />
@@ -185,34 +274,36 @@ const OvermasteryPredictor = () => {
               disabled={busy}
               w={130}
             />
-            <Button onClick={predict} loading={predicting} disabled={busy || !form.character || form.rolls < 1}>
+            <Button onClick={predict} loading={predicting} disabled={busy || characters.length === 0 || form.rolls < 1}>
               {t("ui.toolbox.om-predict", "Predict")}
             </Button>
           </Group>
         </Stack>
-        {prediction && !prediction.unpredictable && (
-          <ScrollArea.Autosize
-            mah="calc(100vh - 150px)"
-            type="auto"
-            style={{ flexGrow: 1, minWidth: 0 }}
-            offsetScrollbars
-          >
-            <Stack gap="xs">
-              {filters.length > 0 && fullMatches.length === 0 && (
-                <Text size="sm">{t("ui.toolbox.om-no-match", { rolls: prediction.rolls.length })}</Text>
-              )}
-              <Text size="xs" c="dimmed">
-                {t("ui.toolbox.om-results-caveat")}
-              </Text>
-              {fullMatches.length > 0 && <RollTable rolls={fullMatches} mspCost={prediction.mspCost} wanted={wanted} />}
-              {belowLevel.length > 0 && (
-                <>
-                  <Title order={6}>{t("ui.toolbox.om-below-level", "Matches below minimum level")}</Title>
-                  <RollTable rolls={belowLevel} mspCost={prediction.mspCost} wanted={wanted} />
-                </>
-              )}
-            </Stack>
-          </ScrollArea.Autosize>
+        {tabs.length > 0 && (
+          // `keepMounted={false}`: a whole-roster prediction is up to 19
+          // characters' worth of roll tables, and only one is ever looked at.
+          <Tabs value={tab} onChange={setTab} keepMounted={false} style={{ flexGrow: 1, minWidth: 0 }}>
+            <Tabs.List>
+              {tabs.map((character) => (
+                <Tabs.Tab
+                  key={character.value}
+                  value={character.value}
+                  // Nothing is wanted, so there is no match to report — every
+                  // roll trivially "matches" and a tick would say nothing.
+                  rightSection={
+                    filters.length > 0 ? <MatchMark matched={character.fullMatches.length > 0} /> : undefined
+                  }
+                >
+                  {character.label}
+                </Tabs.Tab>
+              ))}
+            </Tabs.List>
+            {tabs.map((character) => (
+              <Tabs.Panel key={character.value} value={character.value} pt="sm">
+                <CharacterResults tab={character} wanted={wanted} filtered={filters.length > 0} />
+              </Tabs.Panel>
+            ))}
+          </Tabs>
         )}
       </Group>
     </ToolPage>

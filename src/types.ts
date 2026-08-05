@@ -872,6 +872,16 @@ export type OvermasteryPrediction = {
   mspCost: number;
 };
 
+/** One character's slice of a batch prediction. Exactly one of
+ * `prediction`/`error` is set: a character the live roster doesn't hold has
+ * no stream to simulate, but the rest of the batch is still good. */
+export type OvermasteryCharacterPrediction = {
+  /** Character id hash, as the number the query asked for. */
+  charId: number;
+  prediction: OvermasteryPrediction | null;
+  error: string | null;
+};
+
 /** Toolbox / Transmarvel Wishlist — mirrors src-tauri/src/transmarvel/mod.rs. */
 export type TransmarvelStatus = {
   gameRunning: boolean;

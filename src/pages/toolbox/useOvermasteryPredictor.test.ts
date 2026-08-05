@@ -14,16 +14,21 @@ vi.mock("react-i18next", () => ({
 
 import { invoke } from "@tauri-apps/api";
 
+import { ANY } from "./traitOptions";
+
 import useOvermasteryPredictor, {
   activeFilters,
   buildCharacterOptions,
+  effectiveCharacters,
   initialForm,
+  normalizeCharacterSelection,
   restoreForm,
   rollMatches,
   rollMatchesKinds,
   sanitizeSelection,
   slotOptions,
   sortRollForDisplay,
+  splitRollMatches,
   wantedKindSet,
   WantedSlot,
 } from "./useOvermasteryPredictor";
@@ -99,6 +104,81 @@ describe("useOvermasteryPredictor roll count", () => {
     // Clearing the input reads as 0 — an editing state, not a chosen count.
     act(() => result.current.setForm({ ...result.current.form, rolls: 0 }));
     expect(useOvermasterySelectionsStore.getState().rolls).toBe(120);
+  });
+});
+
+describe("useOvermasteryPredictor goal persistence", () => {
+  const KATALINA = "18e2f9f9";
+  /** A goal the tier-2 pool actually offers: kind 0 (ATK Up) at level 8+. */
+  const goal = [slot("0", 8), slot(null), slot(null), slot(null)];
+
+  beforeEach(() => {
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValue({ gameRunning: true, roster: [] });
+    useOvermasterySelectionsStore.setState({ selections: {}, lastCharacters: [], rolls: DEFAULT_ROLLS });
+  });
+
+  const mounted = async () => {
+    const rendered = renderHook(() => useOvermasteryPredictor());
+    await waitFor(() => expect(rendered.result.current.loading).toBe(false));
+    return rendered;
+  };
+
+  /** Pick `characters`, set a tier-2 ATK>=8 goal, and wait for the write. */
+  const setGoal = async (rendered: Awaited<ReturnType<typeof mounted>>, characters: string[]) => {
+    const { result } = rendered;
+    act(() => result.current.selectCharacters(characters));
+    act(() => result.current.setForm({ ...result.current.form, tier: "2", wanted: goal }));
+    await waitFor(() => expect(result.current.form.wanted).toEqual(goal));
+  };
+
+  it("starts the next session on the goal set for a named character", async () => {
+    const first = await mounted();
+    await setGoal(first, [KATALINA]);
+    first.unmount();
+
+    const next = (await mounted()).result.current;
+    expect(next.form.characters).toEqual([KATALINA]);
+    expect(next.form.wanted).toEqual(goal);
+  });
+
+  it("starts the next session on the goal set for the whole roster", async () => {
+    const first = await mounted();
+    await setGoal(first, [ANY]);
+    first.unmount();
+
+    const next = (await mounted()).result.current;
+    expect(next.form.characters).toEqual([ANY]);
+    expect(next.form.wanted).toEqual(goal);
+  });
+
+  it("keeps the roster-wide goal apart from a single character's", async () => {
+    // Reading the whole roster at once is its own workspace: the goal set
+    // there must not overwrite what each character has saved for themselves.
+    const rendered = await mounted();
+    await setGoal(rendered, [KATALINA]);
+
+    act(() => rendered.result.current.selectCharacters([ANY]));
+    act(() =>
+      rendered.result.current.setForm({
+        ...rendered.result.current.form,
+        wanted: [slot("1", 3), slot(null), slot(null), slot(null)],
+      })
+    );
+    await waitFor(() => expect(useOvermasterySelectionsStore.getState().selections[ANY]).toBeTruthy());
+
+    expect(useOvermasterySelectionsStore.getState().selections[KATALINA].wanted).toEqual(goal);
+  });
+
+  it("restores the roster-wide goal when the whole roster is picked again", async () => {
+    const rendered = await mounted();
+    await setGoal(rendered, [ANY]);
+
+    act(() => rendered.result.current.selectCharacters([KATALINA]));
+    await waitFor(() => expect(rendered.result.current.form.characters).toEqual([KATALINA]));
+
+    act(() => rendered.result.current.selectCharacters([ANY]));
+    await waitFor(() => expect(rendered.result.current.form.wanted).toEqual(goal));
   });
 });
 
@@ -353,36 +433,141 @@ describe("wantedKindSet", () => {
 describe("restoreForm", () => {
   it("restores the last character's saved tier and slots on startup", () => {
     const saved = { tier: "0", wanted: [slot("0", 8), slot(null), slot(null), slot(null)] };
-    expect(restoreForm("18e2f9f9", { "18e2f9f9": saved })).toEqual({
+    expect(restoreForm(["18e2f9f9"], { "18e2f9f9": saved })).toEqual({
       ...initialForm,
-      character: "18e2f9f9",
+      characters: ["18e2f9f9"],
       tier: "0",
       wanted: saved.wanted,
     });
   });
 
-  it("keeps the character but defaults the rest when their entry is missing or invalid", () => {
-    expect(restoreForm("18e2f9f9", {})).toEqual({ ...initialForm, character: "18e2f9f9" });
-    expect(restoreForm("18e2f9f9", { "18e2f9f9": { tier: "bogus", wanted: [] } })).toEqual({
+  it("restores a multi-character selection from the first character's saved goal", () => {
+    // The goal is shared across the selection and saved under each of them,
+    // so the first is as good as any — and is the one the pills lead with.
+    const saved = { tier: "0", wanted: [slot("0", 8), slot(null), slot(null), slot(null)] };
+    expect(restoreForm(["18e2f9f9", "079df0cc"], { "18e2f9f9": saved })).toEqual({
       ...initialForm,
-      character: "18e2f9f9",
+      characters: ["18e2f9f9", "079df0cc"],
+      tier: "0",
+      wanted: saved.wanted,
+    });
+  });
+
+  it("restores the whole-roster goal from the Any entry, not from any one character", () => {
+    const roster = { tier: "0", wanted: [slot("0", 8), slot(null), slot(null), slot(null)] };
+    const katalina = { tier: "1", wanted: [slot("1", 3), slot(null), slot(null), slot(null)] };
+    expect(restoreForm([ANY], { [ANY]: roster, "18e2f9f9": katalina })).toEqual({
+      ...initialForm,
+      characters: [ANY],
+      tier: "0",
+      wanted: roster.wanted,
+    });
+  });
+
+  it("defaults the goal when the whole roster has never been worked on", () => {
+    const katalina = { tier: "1", wanted: [slot("1", 3), slot(null), slot(null), slot(null)] };
+    expect(restoreForm([ANY], { "18e2f9f9": katalina })).toEqual({ ...initialForm, characters: [ANY] });
+  });
+
+  it("keeps the characters but defaults the rest when the entry is missing or invalid", () => {
+    expect(restoreForm(["18e2f9f9"], {})).toEqual({ ...initialForm, characters: ["18e2f9f9"] });
+    expect(restoreForm(["18e2f9f9"], { "18e2f9f9": { tier: "bogus", wanted: [] } })).toEqual({
+      ...initialForm,
+      characters: ["18e2f9f9"],
     });
   });
 
   it("returns the plain initial form when no character was remembered", () => {
-    expect(restoreForm(null, {})).toEqual(initialForm);
+    expect(restoreForm([], {})).toEqual(initialForm);
+  });
+
+  it("ignores a remembered selection that is not a list of hashes", () => {
+    for (const bad of [undefined, null, "18e2f9f9", 7, [1, null]]) {
+      expect(restoreForm(bad, {}).characters).toEqual([]);
+    }
   });
 
   it("restores the stored roll count, with or without a remembered character", () => {
-    expect(restoreForm(null, {}, 120).rolls).toBe(120);
-    expect(restoreForm("18e2f9f9", {}, 120)).toEqual({ ...initialForm, character: "18e2f9f9", rolls: 120 });
+    expect(restoreForm([], {}, 120).rolls).toBe(120);
+    expect(restoreForm(["18e2f9f9"], {}, 120)).toEqual({ ...initialForm, characters: ["18e2f9f9"], rolls: 120 });
   });
 
   it("falls back to the default roll count for anything the form could not have written", () => {
     // 0 is the cleared input, never persisted; the rest are hand-edited rows.
     for (const bad of [undefined, null, 0, -5, 501, 12.5, "50", NaN]) {
-      expect(restoreForm(null, {}, bad).rolls).toBe(initialForm.rolls);
+      expect(restoreForm([], {}, bad).rolls).toBe(initialForm.rolls);
     }
+  });
+});
+
+describe("normalizeCharacterSelection", () => {
+  it("collapses the selection to Any when Any is newly picked", () => {
+    expect(normalizeCharacterSelection(["18e2f9f9"], ["18e2f9f9", ANY])).toEqual([ANY]);
+  });
+
+  it("drops Any as soon as a named character is picked beside it", () => {
+    expect(normalizeCharacterSelection([ANY], [ANY, "18e2f9f9"])).toEqual(["18e2f9f9"]);
+  });
+
+  it("leaves an all-named selection alone, in the order picked", () => {
+    expect(normalizeCharacterSelection(["18e2f9f9"], ["18e2f9f9", "079df0cc"])).toEqual(["18e2f9f9", "079df0cc"]);
+  });
+
+  it("allows clearing the selection outright", () => {
+    expect(normalizeCharacterSelection([ANY], [])).toEqual([]);
+    expect(normalizeCharacterSelection(["18e2f9f9"], [])).toEqual([]);
+  });
+});
+
+describe("effectiveCharacters", () => {
+  const options = [
+    { value: "2a26b1b2", label: "Gran" },
+    { value: "18e2f9f9", label: "Katalina" },
+    { value: "079df0cc", label: "Rackam" },
+  ];
+
+  it("expands Any to the whole roster, in roster order", () => {
+    expect(effectiveCharacters([ANY], options)).toEqual(["2a26b1b2", "18e2f9f9", "079df0cc"]);
+  });
+
+  it("keeps a named selection in the order it was picked", () => {
+    expect(effectiveCharacters(["079df0cc", "2a26b1b2"], options)).toEqual(["079df0cc", "2a26b1b2"]);
+  });
+
+  it("drops characters this save's roster no longer offers", () => {
+    // A remembered selection outlives the save it was made on.
+    expect(effectiveCharacters(["079df0cc", "deadbeef"], options)).toEqual(["079df0cc"]);
+  });
+
+  it("is empty when the roster was never read", () => {
+    expect(effectiveCharacters([ANY], [])).toEqual([]);
+    expect(effectiveCharacters(["079df0cc"], [])).toEqual([]);
+  });
+});
+
+describe("splitRollMatches", () => {
+  const rolls = [
+    [mastery(0, 9), mastery(1, 2)], // ATK at 9 — a full match
+    [mastery(0, 3), mastery(1, 2)], // ATK present but only level 3
+    [mastery(1, 9), mastery(2, 9)], // no ATK at all
+  ];
+  const filters = [{ kind: 0, minLevel: 8 }];
+
+  it("splits rolls into full matches and trait-only matches, keeping roll numbers", () => {
+    const { fullMatches, belowLevel } = splitRollMatches(rolls, filters);
+    expect(fullMatches.map((m) => m.index)).toEqual([0]);
+    expect(belowLevel.map((m) => m.index)).toEqual([1]);
+  });
+
+  it("sorts each shown roll for display, wanted effects first", () => {
+    const { fullMatches } = splitRollMatches([[mastery(1, 2), mastery(0, 9)]], filters);
+    expect(fullMatches[0].roll).toEqual([mastery(0, 9), mastery(1, 2)]);
+  });
+
+  it("counts every roll as a full match when nothing is wanted", () => {
+    const { fullMatches, belowLevel } = splitRollMatches(rolls, []);
+    expect(fullMatches).toHaveLength(3);
+    expect(belowLevel).toHaveLength(0);
   });
 });
 

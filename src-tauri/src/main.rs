@@ -345,13 +345,25 @@ async fn fetch_overmastery_status(
     }
 }
 
+/// Most characters one batch prediction will simulate. The roster is far
+/// smaller than this; the cap is only so a malformed query can't ask for an
+/// unbounded pile of simulation.
+const MAX_PREDICTED_CHARACTERS: usize = 64;
+
 /// Toolbox / Overmastery Predictor: fresh RNG snapshot + simulate the next N
-/// meditation rolls for one character and size.
+/// meditation rolls at one size, for each requested character.
+///
+/// The whole batch is simulated from a *single* snapshot: the per-character
+/// results are shown side by side, so they must agree about the RNG state
+/// they were computed from — and the staleness watch must be able to speak
+/// for all of them at once. A per-character failure (someone the live roster
+/// doesn't hold) is reported in that character's entry rather than failing
+/// the batch; only the whole-read failures below are errors.
 #[tauri::command(async)]
 async fn predict_overmastery(
     query: overmastery::OvermasteryQuery,
     hook: State<'_, HookStatus>,
-) -> Result<overmastery::OvermasteryPrediction, String> {
+) -> Result<Vec<overmastery::OvermasteryCharacterPrediction>, String> {
     let tables = overmastery::stock_tables();
     if query.tier >= tables.tiers.len() {
         return Err("invalid-tier".to_string());
@@ -363,20 +375,38 @@ async fn predict_overmastery(
     if snap.slot_override != u32::MAX {
         return Err("rng-override-active".to_string());
     }
-    let char_idx = overmastery::char_slot_index(&snap.roster, query.char_id)
-        .ok_or_else(|| "character-not-found".to_string())?;
-    let slot = overmastery::rng_slot(query.tier as u32, char_idx);
-    let slot_state = *snap
-        .slots
-        .get(slot as usize)
-        .ok_or_else(|| "slot-out-of-range".to_string())?;
-    Ok(overmastery::OvermasteryPrediction {
-        rolls: overmastery::simulate(slot_state, query.tier, tables, rolls),
-        slot,
-        slot_state,
-        unpredictable: slot_state == 0,
-        msp_cost: tables.tiers[query.tier].msp_cost,
-    })
+    Ok(query
+        .char_ids
+        .iter()
+        .take(MAX_PREDICTED_CHARACTERS)
+        .map(|&char_id| {
+            let predicted = overmastery::char_slot_index(&snap.roster, char_id)
+                .ok_or("character-not-found")
+                .and_then(|char_idx| {
+                    let slot = overmastery::rng_slot(query.tier as u32, char_idx);
+                    let slot_state = *snap.slots.get(slot as usize).ok_or("slot-out-of-range")?;
+                    Ok(overmastery::OvermasteryPrediction {
+                        rolls: overmastery::simulate(slot_state, query.tier, tables, rolls),
+                        slot,
+                        slot_state,
+                        unpredictable: slot_state == 0,
+                        msp_cost: tables.tiers[query.tier].msp_cost,
+                    })
+                });
+            match predicted {
+                Ok(prediction) => overmastery::OvermasteryCharacterPrediction {
+                    char_id,
+                    prediction: Some(prediction),
+                    error: None,
+                },
+                Err(e) => overmastery::OvermasteryCharacterPrediction {
+                    char_id,
+                    prediction: None,
+                    error: Some(e.to_string()),
+                },
+            }
+        })
+        .collect())
 }
 
 /// Toolbox: current RNG state of one slot, for staleness polling against a

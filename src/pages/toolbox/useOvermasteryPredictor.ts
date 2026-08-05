@@ -2,10 +2,17 @@ import characterIdHashes from "@/assets/character-id-hashes.json";
 import overmasteryCategories from "@/assets/overmastery-categories.json";
 import { assignable } from "@/pages/toolbox/matching";
 import { sanitizeRollCount } from "@/pages/toolbox/rollCount";
+import { ANY } from "@/pages/toolbox/traitOptions";
 import useGameStatus from "@/pages/toolbox/useGameStatus";
 import useRngSlotStaleness from "@/pages/toolbox/useRngSlotStaleness";
 import { DEFAULT_ROLLS, useOvermasterySelectionsStore } from "@/stores/useOvermasterySelectionsStore";
-import { CharacterType, OvermasteryMastery, OvermasteryPrediction, OvermasteryStatus } from "@/types";
+import {
+  CharacterType,
+  OvermasteryCharacterPrediction,
+  OvermasteryMastery,
+  OvermasteryPrediction,
+  OvermasteryStatus,
+} from "@/types";
 import { toHashString, translateCharacterType, translateOvermasteryId } from "@/utils";
 import { invoke } from "@tauri-apps/api";
 import { useEffect, useMemo, useState } from "react";
@@ -27,8 +34,9 @@ export type WantedSlot = {
 };
 
 export type OvermasteryForm = {
-  /** Character id hash as 8-hex string, or null. */
-  character: string | null;
+  /** Characters to predict for: 8-hex id hashes, or the single `ANY`
+   * wildcard standing for the whole roster. */
+  characters: string[];
   /** Overmastery level tier 0/1/2 (Lvl 1/2/3; "meditation size" in game data). */
   tier: string;
   /** One slot per possible overmastery on a roll. */
@@ -40,7 +48,7 @@ export type OvermasteryForm = {
 export const emptySlots = (): WantedSlot[] => Array.from({ length: 4 }, () => ({ kind: null, minLevel: null }));
 
 export const initialForm: OvermasteryForm = {
-  character: null,
+  characters: [],
   tier: "2",
   wanted: emptySlots(),
   rolls: DEFAULT_ROLLS,
@@ -89,6 +97,33 @@ export const sortRollForDisplay = (
     const bWanted = wanted.has(b.kind) ? 0 : 1;
     return aWanted - bWanted || b.level - a.level;
   });
+};
+
+/** One roll of a prediction, carrying the roll number it was found at so the
+ * table can price it even after the non-matching rolls are dropped. */
+export type IndexedRoll = { roll: OvermasteryMastery[]; index: number };
+
+/** One character's rolls, split into the two tables the results show: rolls
+ * that meet every filter outright, and rolls that hold the wanted traits but
+ * not at the levels asked for. Rolls matching neither are dropped.
+ *
+ * One pass over the rolls: `rollMatches` is a backtracking search, so it runs
+ * once per roll and only the rolls that survive get sorted. Empty filters
+ * accept every roll, so `fullMatches` is all of them and `belowLevel` none.
+ */
+export const splitRollMatches = (
+  rolls: OvermasteryMastery[][],
+  filters: WantedFilter[],
+  wanted: Set<number> = wantedKindSet(filters)
+): { fullMatches: IndexedRoll[]; belowLevel: IndexedRoll[] } => {
+  const fullMatches: IndexedRoll[] = [];
+  const belowLevel: IndexedRoll[] = [];
+  rolls.forEach((roll, index) => {
+    if (rollMatches(roll, filters)) fullMatches.push({ roll: sortRollForDisplay(roll, filters, wanted), index });
+    else if (rollMatchesKinds(roll, filters))
+      belowLevel.push({ roll: sortRollForDisplay(roll, filters, wanted), index });
+  });
+  return { fullMatches, belowLevel };
 };
 
 /** Options for slot `index`: a trait can only roll as often as it exists in
@@ -140,20 +175,46 @@ export const sanitizeSelection = (value: unknown, categories: CategoryPools = CA
 /** This tool's roll-count guard — see `sanitizeRollCount`. */
 export const sanitizeRolls = (value: unknown): number => sanitizeRollCount(value, MAX_ROLLS, DEFAULT_ROLLS);
 
-/** Startup form: restore the last-worked-on character and their saved
- * selections, plus the account-wide roll count (falling back to defaults for
- * whatever is missing/invalid). */
+/** Startup form: restore the last-worked-on character selection and its saved
+ * goal, plus the account-wide roll count (falling back to defaults for
+ * whatever is missing/invalid).
+ *
+ * The goal is shared across a selection and saved under every entry in it, so
+ * the first entry is as good a source as any — and is the one the picker's
+ * pills lead with. `Any` keys its own entry: reading the whole roster at once
+ * is its own workspace, with a roster-wide goal that is nobody's in
+ * particular. Its sentinel is not 8 hex digits, so it cannot collide with a
+ * character hash.
+ */
 export const restoreForm = (
-  lastCharacter: string | null,
+  lastCharacters: unknown,
   selections: Record<string, unknown>,
   rolls?: unknown
 ): OvermasteryForm => {
   const base = { ...initialForm, rolls: sanitizeRolls(rolls) };
-  if (!lastCharacter) return base;
-  const saved = sanitizeSelection(selections[lastCharacter]);
-  return saved
-    ? { ...base, character: lastCharacter, tier: saved.tier, wanted: saved.wanted }
-    : { ...base, character: lastCharacter };
+  if (!Array.isArray(lastCharacters)) return base;
+  const characters = lastCharacters.filter((c): c is string => typeof c === "string");
+  if (characters.length === 0) return base;
+  const saved = sanitizeSelection(selections[characters[0]]);
+  return saved ? { ...base, characters, tier: saved.tier, wanted: saved.wanted } : { ...base, characters };
+};
+
+/**
+ * The character picker's selection after a change, keeping `Any` exclusive:
+ * it stands for "the whole roster", so it is meaningless beside a named pick.
+ * Adding it clears the named picks; naming someone while it is on drops it.
+ */
+export const normalizeCharacterSelection = (previous: string[], next: string[]): string[] => {
+  if (!next.includes(ANY)) return next;
+  return previous.includes(ANY) ? next.filter((c) => c !== ANY) : [ANY];
+};
+
+/** The characters a selection actually predicts for: `Any` expands to the
+ * whole roster, and named picks the roster no longer offers are dropped — a
+ * remembered selection outlives the save it was made on. */
+export const effectiveCharacters = (selection: string[], options: CharacterOption[]): string[] => {
+  const offered = new Set(options.map((o) => o.value));
+  return selection.includes(ANY) ? options.map((o) => o.value) : selection.filter((c) => offered.has(c));
 };
 
 export type CharacterOption = { value: string; label: string };
@@ -188,40 +249,61 @@ export default function useOvermasteryPredictor() {
   // which read the module-level i18n instance.
   const { i18n } = useTranslation();
   const [form, setForm] = useState<OvermasteryForm>(() => {
-    const { lastCharacter, selections, rolls } = useOvermasterySelectionsStore.getState();
-    return restoreForm(lastCharacter, selections, rolls);
+    const { lastCharacters, selections, rolls } = useOvermasterySelectionsStore.getState();
+    return restoreForm(lastCharacters, selections, rolls);
   });
   // The character picker is built from `status.roster`, so a status read
   // taken before the game was up would leave the tool unusable — the shared
   // hook re-reads on visibility so the roster and banner recover on their own.
   const { status, error, setError, loading } = useGameStatus<OvermasteryStatus>("fetch_overmastery_status");
-  const [prediction, setPrediction] = useState<OvermasteryPrediction | null>(null);
+  const [results, setResults] = useState<OvermasteryCharacterPrediction[]>([]);
   const [predicting, setPredicting] = useState(false);
   const selections = useOvermasterySelectionsStore((s) => s.selections);
   const saveSelection = useOvermasterySelectionsStore((s) => s.save);
+  const saveLastCharacters = useOvermasterySelectionsStore((s) => s.setLastCharacters);
   const saveRolls = useOvermasterySelectionsStore((s) => s.setRolls);
 
-  const [stale, setStale] = useRngSlotStaleness(prediction);
+  // One watch over every predicted stream: the results are one batch off one
+  // RNG snapshot, so any of their slots moving makes all of them stale.
+  const watched = useMemo(
+    () => results.map((r) => r.prediction).filter((p): p is OvermasteryPrediction => p !== null),
+    [results]
+  );
+  const [stale, setStale] = useRngSlotStaleness(watched);
 
-  /** Selecting a character restores their saved tier + wanted slots (empty
-   * slots when nothing usable is stored) and drops the previous character's
-   * results. */
-  const selectCharacter = (character: string | null) => {
-    setPrediction(null);
+  /** Changing the picker drops the previous results. Narrowing to a single
+   * pick — one character, or `Any` for the whole roster — also restores that
+   * pick's saved tier + wanted slots (empty slots when nothing usable is
+   * stored); with several picked the goal is shared, so there is no one saved
+   * goal to restore and the current one carries over. */
+  const selectCharacters = (picked: string[]) => {
+    setResults([]);
     setError(null);
     setStale(false);
     setForm((f) => {
-      if (!character) return { ...f, character: null };
-      const saved = sanitizeSelection(selections[character]);
+      const characters = normalizeCharacterSelection(f.characters, picked);
+      if (characters.length !== 1) return { ...f, characters };
+      const saved = sanitizeSelection(selections[characters[0]]);
       return saved
-        ? { ...f, character, tier: saved.tier, wanted: saved.wanted }
-        : { ...f, character, wanted: emptySlots() };
+        ? { ...f, characters, tier: saved.tier, wanted: saved.wanted }
+        : { ...f, characters, wanted: emptySlots() };
     });
   };
 
+  // The goal is shared across the selection, so it is saved under every entry
+  // in it: whichever of them is picked alone next restores it. `Any` keys its
+  // own entry rather than writing through to the whole roster — reading
+  // everyone at once must not overwrite what each character saved for
+  // themselves.
   useEffect(() => {
-    if (form.character) saveSelection(form.character, { tier: form.tier, wanted: form.wanted });
-  }, [form.character, form.tier, form.wanted, saveSelection]);
+    for (const character of form.characters) {
+      saveSelection(character, { tier: form.tier, wanted: form.wanted });
+    }
+  }, [form.characters, form.tier, form.wanted, saveSelection]);
+
+  useEffect(() => {
+    saveLastCharacters(form.characters);
+  }, [form.characters, saveLastCharacters]);
 
   // A cleared field reads as 0 and is not a count the user chose; keep the
   // stored one until they type a real number again.
@@ -244,23 +326,32 @@ export default function useOvermasteryPredictor() {
     [form.tier, i18n.language]
   );
 
+  /** Who a Predict would actually run for — the picker's selection resolved
+   * against this save's roster. */
+  const characters = useMemo(
+    () => effectiveCharacters(form.characters, characterOptions),
+    [form.characters, characterOptions]
+  );
+
+  // The whole batch comes back off one RNG snapshot, so the per-character
+  // tabs can never disagree about the state they were simulated from.
   const predict = async () => {
-    if (!form.character) return;
+    if (characters.length === 0) return;
     setPredicting(true);
     setError(null);
     setStale(false);
     try {
-      setPrediction(
-        await invoke<OvermasteryPrediction>("predict_overmastery", {
+      setResults(
+        await invoke<OvermasteryCharacterPrediction[]>("predict_overmastery", {
           query: {
-            charId: parseInt(form.character, 16),
+            charIds: characters.map((c) => parseInt(c, 16)),
             tier: parseInt(form.tier, 10),
             rolls: form.rolls,
           },
         })
       );
     } catch (e) {
-      setPrediction(null);
+      setResults([]);
       setError(String(e));
     } finally {
       setPredicting(false);
@@ -272,9 +363,10 @@ export default function useOvermasteryPredictor() {
   return {
     form,
     setForm,
-    selectCharacter,
+    selectCharacters,
+    characters,
     status,
-    prediction,
+    results,
     error,
     predicting,
     stale,

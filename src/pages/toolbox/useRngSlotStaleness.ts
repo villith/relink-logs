@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api";
+import { useMemo } from "react";
 
 import useStalenessWatch from "./useStalenessWatch";
 
@@ -18,10 +19,27 @@ export type RngSlotPrediction = {
  *
  * The backend read is generic (`ToolboxRequest::RngSlot`), so both tools poll
  * through this one hook rather than each issuing the call themselves.
+ *
+ * A list of predictions is one result set drawn from one snapshot (the
+ * Overmastery Predictor's per-character tabs), so any one of their slots
+ * moving makes the whole set stale. Pass a stable list — a fresh array every
+ * render would restart the watch every render.
  */
-export default function useRngSlotStaleness<T extends RngSlotPrediction>(prediction: T | null) {
-  return useStalenessWatch(prediction && !prediction.unpredictable ? prediction : null, async (watched) => {
-    const current = await invoke<number | null>("fetch_rng_slot", { slot: watched.slot });
-    return current !== null && current !== watched.slotState;
+export default function useRngSlotStaleness<T extends RngSlotPrediction>(prediction: T | T[] | null) {
+  const watched = useMemo(() => {
+    const predictable = (Array.isArray(prediction) ? prediction : prediction ? [prediction] : []).filter(
+      (p) => !p.unpredictable
+    );
+    // Deduped by slot: characters can share one, and each is a memory read.
+    const slots = [...new Map(predictable.map((p) => [p.slot, p])).values()];
+    return slots.length > 0 ? slots : null;
+  }, [prediction]);
+
+  return useStalenessWatch(watched, async (slots) => {
+    for (const p of slots) {
+      const current = await invoke<number | null>("fetch_rng_slot", { slot: p.slot });
+      if (current !== null && current !== p.slotState) return true;
+    }
+    return false;
   });
 }
