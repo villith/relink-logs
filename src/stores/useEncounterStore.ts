@@ -2,6 +2,7 @@ import {
   AbilityChartSeries,
   DeathEvent,
   EncounterState,
+  EnemySeries,
   HpChartSeries,
   LegalityFinding,
   PlayerData,
@@ -25,6 +26,12 @@ interface EncounterStore {
    * backend that predates the field; all zeroes on logs recorded before
    * damage-taken capture. */
   takenChart: Record<number, number[]>;
+  /** Damage each enemy TYPE dealt to the party per second — Damage Done's enemy
+   * side. Empty on logs recorded before damage-taken capture. */
+  enemyDealtChart: EnemySeries[];
+  /** Damage each enemy TYPE received from the party per second — Damage Taken's
+   * enemy side. Present on every log. */
+  enemyReceivedChart: EnemySeries[];
   /** Enemy HP% per second, one series per charted HP pool (largest first). Empty on old logs. */
   hpChart: HpChartSeries[];
   /** Every window an actor held a status effect for, spanning the whole fight.
@@ -73,6 +80,10 @@ export interface EncounterStateResponse {
   stunChart?: Record<number, number[]>;
   /** Optional so a backend older than the field reads as "no taken series". */
   takenChart?: Record<number, number[]>;
+  /** Optional so a backend older than the field reads as "no enemy series". */
+  enemyDealtChart?: EnemySeries[];
+  /** Optional like the one above. */
+  enemyReceivedChart?: EnemySeries[];
   hpChart: HpChartSeries[];
   /** Optional so a backend older than the field reads as "no status capture" —
    * which is also what every log recorded before the hook emitted these has. */
@@ -111,6 +122,8 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   dpsChart: {},
   stunChart: {},
   takenChart: {},
+  enemyDealtChart: [],
+  enemyReceivedChart: [],
   hpChart: [],
   statusIntervals: [],
   sbaChart: {},
@@ -144,6 +157,8 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       dpsChart: response.dpsChart,
       stunChart: response.stunChart ?? {},
       takenChart: response.takenChart ?? {},
+      enemyDealtChart: response.enemyDealtChart ?? [],
+      enemyReceivedChart: response.enemyReceivedChart ?? [],
       hpChart: response.hpChart ?? [],
       statusIntervals: response.statusIntervals ?? [],
       sbaChart: response.sbaChart,

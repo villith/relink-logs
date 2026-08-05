@@ -1324,6 +1324,12 @@ struct EncounterStateResponse {
     /// Damage TAKEN per DPS-chart bucket, keyed by the victim's slot key. All
     /// zeroes on logs recorded before damage-taken capture (2026-08-04).
     taken_chart: HashMap<u32, Vec<i64>>,
+    /// Per-enemy-type dealt-to-party buckets for Damage Done's enemy side.
+    /// Empty on logs recorded before damage-taken capture (2026-08-04).
+    enemy_dealt_chart: Vec<v1::EnemySeries>,
+    /// Per-enemy-type received-from-party buckets for Damage Taken's enemy
+    /// side. Works on every log (built from dealt events).
+    enemy_received_chart: Vec<v1::EnemySeries>,
     /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
     /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
     hp_chart: Vec<v1::HpChartSeries>,
@@ -1655,6 +1661,20 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         (duration / DPS_INTERVAL) as usize + 1,
     );
 
+    let enemy_dealt = v1::build_enemy_dealt_chart(
+        &parser.encounter.raw_event_log,
+        start_time,
+        DPS_INTERVAL,
+        (duration / DPS_INTERVAL) as usize + 1,
+    );
+    let enemy_received = v1::build_enemy_received_chart(
+        &parser.encounter.raw_event_log,
+        start_time,
+        DPS_INTERVAL,
+        (duration / DPS_INTERVAL) as usize + 1,
+        options.filters,
+    );
+
     let hp_chart = v1::build_target_hp_charts(
         &parser.encounter.raw_event_log,
         &target_entries,
@@ -1718,6 +1738,8 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         dps_chart: player_dps,
         stun_chart: player_stun,
         taken_chart: player_taken,
+        enemy_dealt_chart: enemy_dealt,
+        enemy_received_chart: enemy_received,
         hp_chart,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
         sba_chart_len: (duration / SBA_INTERVAL) as usize + 1,

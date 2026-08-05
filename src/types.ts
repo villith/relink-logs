@@ -357,6 +357,13 @@ export type TakenChartSeries = {
   values: number[];
 };
 
+/** One per-enemy-type bucketed series for the enemy-side charts (mirrors the
+ * Rust `EnemySeries`). */
+export type EnemySeries = {
+  enemyType: EnemyType;
+  values: number[];
+};
+
 /** A cause of SBA generation that no skill row can hold — mirrors the Rust
  * `SbaSourceState`. `kind` is a stable machine key; the table maps it to an
  * i18n key rather than displaying it. */
