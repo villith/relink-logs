@@ -1,5 +1,5 @@
 import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
-import { humanizeNumber, share } from "@/utils";
+import { humanizeNumber, ratePerSecond, share } from "@/utils";
 
 import { groupSkillsForRows, mergeSkillsByAction, type AbilitySkills } from "../abilitySkills";
 import type { RowLevel } from "../deriveRows";
@@ -115,11 +115,6 @@ const enemyRows = (skills: SkillState[], total: number): MetricRow[] => {
     .sort((a, b) => b.value - a.value);
 };
 
-/** Damage per second over the measured window, or "—" without one (same rule
- * as damageTaken's DTPS — these figures come from scrubbed reparses too). */
-const rateOver = (amount: number, fightDurationMs?: number): string =>
-  !fightDurationMs || fightDurationMs <= 0 ? NOT_RECORDED : format(amount / (fightDurationMs / 1000));
-
 /** Enemy types ranked by what they dealt TO the party, folded from the
  * per-victim incoming breakdown — the opposite direction from `enemyRows`
  * above, which asks what a pinned ability dealt to each enemy type. Empty on
@@ -157,7 +152,7 @@ const enemyDealtRows = (players: ComputedPlayerState[], level: RowLevel, fightDu
       value: damage,
       columns:
         level === "players"
-          ? [format(damage), rateOver(damage, fightDurationMs), share(damage, total)]
+          ? [format(damage), ratePerSecond(damage, fightDurationMs), share(damage, total)]
           : damageColumns(damage, hits, NOT_RECORDED, format(maxDamage), total),
       // The pin model has no enemy-type pin; the hover card decomposes instead.
       pinOnClick: null,

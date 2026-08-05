@@ -194,6 +194,25 @@ const dealerPlayer = (index: number, targets: { enemy: number; total: number; hi
   }) as unknown as ComputedPlayerState;
 
 describe("damageTaken enemy side", () => {
+  it("leaves the friendly side reading its own field, not the enemy fold, on a dealer-shaped fixture", () => {
+    // Guards the hostility gate itself: a dealer-shaped fixture (built for the
+    // enemy-side tests below) sets no `totalDamageTaken`, so if the gate ever
+    // misfired and fell through to the friendly branch — or the enemy fold
+    // leaked into it — this would catch it. The friendly branch has genuinely
+    // nothing to read here, hence "not recorded" rather than the enemy side's
+    // amount+DTPS.
+    const players = [
+      dealerPlayer(0, [{ enemy: 0xaa, total: 5_000, hits: 5 }]),
+      dealerPlayer(1, [{ enemy: 0xaa, total: 3_000, hits: 3 }]),
+    ];
+
+    const rows = damageTaken.rows(input("players", players, NO_PINS, 100_000) as never);
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0].kind).toBeUndefined();
+    expect(rows[0].columns).toEqual(["—", "—"]);
+  });
+
   it("ranks enemy types by damage received from the party", () => {
     const players = [
       dealerPlayer(0, [{ enemy: 0xaa, total: 5_000, hits: 5 }]),
@@ -202,15 +221,6 @@ describe("damageTaken enemy side", () => {
         { enemy: 0xbb, total: 1_000, hits: 1 },
       ]),
     ];
-
-    // The friendly side (no hostility) is unaffected by the dealer-shaped
-    // fixture above: it still ranks by `totalDamageTaken`, which this fixture
-    // never sets, so both rows read "not recorded" — but the row count itself
-    // (one per player) proves the friendly path was actually exercised, not
-    // vacuously true of an empty array.
-    const rows = damageTaken.rows(input("players", players, NO_PINS, 100_000) as never);
-    expect(rows).toHaveLength(2);
-    expect(rows[0].kind).toBeUndefined(); // friendly side unchanged
 
     // input() passes hostility nowhere — call rows directly with it instead:
     const enemyRows = damageTaken.rows({
@@ -255,5 +265,26 @@ describe("damageTaken enemy side", () => {
     // Amount, hits, average hit, DTPS — matching `columnKeys("abilities")`,
     // not the two-column players-level shape.
     expect(enemyRows[0].columns).toEqual(["8.0k", "8", "1.0k", "80"]);
+  });
+
+  it("shows nothing rather than throwing on a log with no per-enemy targets recorded", () => {
+    // `SkillState.targets` is optional — cached payloads predate it — and the
+    // `?? []` in `enemyReceivedRows` is what a payload without it exercises.
+    // Every other fixture in this suite sets `targets`, so this one leaves it
+    // off entirely.
+    const players = [dealerPlayer(0, [])];
+    delete players[0].skillBreakdown[0].targets;
+
+    const enemyRows = damageTaken.rows({
+      encounter: { totalDamage: 0 } as never,
+      partyData: [null, null],
+      players,
+      level: "players",
+      pins: NO_PINS,
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    } as never);
+
+    expect(enemyRows).toEqual([]);
   });
 });

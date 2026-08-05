@@ -1,5 +1,5 @@
 import type { ActionType, ComputedPlayerState, DamageTakenState, EnemyType } from "@/types";
-import { humanizeNumber } from "@/utils";
+import { humanizeNumber, ratePerSecond } from "@/utils";
 
 import type { RowLevel } from "../deriveRows";
 import type { MetricDescriptor, MetricRow } from "./types";
@@ -35,11 +35,17 @@ export const takenAttackNameKey = (actionId: ActionType): { key: string; params?
   return { key: "ui.logs.taken-attack-other" };
 };
 
-/** Damage taken per second over the measured window — the rate column WCL
- * heads "DTPS". No window means no honest rate, and these figures come from
- * scrubbed reparses too, so the denominator must be the window's own length. */
-const dtps = (amount: number, fightDurationMs?: number): string =>
-  !fightDurationMs || fightDurationMs <= 0 ? NOT_RECORDED : format(amount / (fightDurationMs / 1000));
+/** The four-column drill-down shape every damage-taken row below the players
+ * level fills (see `columnKeys`) — amount, hits, average hit, DTPS. Written
+ * once because `attackRows` and `enemyReceivedRows` are two different folds
+ * that both land on this same shape, and it has to stay one shape for both to
+ * line up under one header. */
+const drilldownColumns = (damage: number, hits: number, fightDurationMs?: number): string[] => [
+  format(damage),
+  String(hits),
+  format(hits === 0 ? 0 : Math.round(damage / hits)),
+  ratePerSecond(damage, fightDurationMs),
+];
 
 /** One row per (attacker class, attack), the taken table's drill-down shape.
  *
@@ -64,12 +70,7 @@ const attackRows = (breakdown: DamageTakenState[], fightDurationMs?: number): Me
       label: key,
       kind: "takenAttack" as const,
       value: damage,
-      columns: [
-        format(damage),
-        String(hits),
-        format(hits === 0 ? 0 : Math.round(damage / hits)),
-        dtps(damage, fightDurationMs),
-      ],
+      columns: drilldownColumns(damage, hits, fightDurationMs),
       // An enemy attack is not a pinnable ability — the pin model narrows by
       // the party's own actions — so these rows are leaves.
       pinOnClick: null,
@@ -79,15 +80,19 @@ const attackRows = (breakdown: DamageTakenState[], fightDurationMs?: number): Me
 };
 
 /** Enemy types ranked by damage RECEIVED from the (scoped) party, folded from
- * the per-ability per-enemy dealt rows — present in every log ever recorded,
- * unlike the incoming stream the friendly side reads.
+ * every player's per-ability per-enemy dealt rows (`SkillState.targets`).
+ * Recoverable by reparse from every log ever recorded, unlike the incoming
+ * stream the friendly side reads, which was never captured before
+ * 2026-08-04 — `targets` itself is still optional per skill (cached payloads
+ * predate it), hence the `?? []` below.
  *
  * At the players level this answers the same amount+DTPS question as the
  * friendly side, so it takes the same two columns. Below it, `columnKeys`
  * switches to the four-column drill-down shape every other damage-taken row
- * fills (see `attackRows`), and this one must too or it renders two cells
- * under a four-column header. Unlike `damageDone`'s enemy side, nothing here
- * needs blanking: `SkillTargetState` carries both damage and hits honestly. */
+ * fills (see `drilldownColumns`), and this one must too or it renders two
+ * cells under a four-column header. Unlike `damageDone`'s enemy side, nothing
+ * here needs blanking: `SkillTargetState` carries both damage and hits
+ * honestly. */
 const enemyReceivedRows = (players: ComputedPlayerState[], level: RowLevel, fightDurationMs?: number): MetricRow[] => {
   const byType = new Map<string, { damage: number; hits: number }>();
   for (const player of players) {
@@ -111,13 +116,8 @@ const enemyReceivedRows = (players: ComputedPlayerState[], level: RowLevel, figh
       value: damage,
       columns:
         level === "players"
-          ? [format(damage), dtps(damage, fightDurationMs)]
-          : [
-              format(damage),
-              String(hits),
-              format(hits === 0 ? 0 : Math.round(damage / hits)),
-              dtps(damage, fightDurationMs),
-            ],
+          ? [format(damage), ratePerSecond(damage, fightDurationMs)]
+          : drilldownColumns(damage, hits, fightDurationMs),
       // The pin model has no enemy-type pin; the hover card decomposes instead.
       pinOnClick: null,
       colorSlot: -1,
@@ -152,6 +152,9 @@ export const damageTaken: MetricDescriptor = {
   },
 
   rows: ({ players, level, pins, fightDurationMs, hostility }): MetricRow[] => {
+    // The enemy side answers one question at every level — what each enemy
+    // received from the (scoped) party — so it ignores the drill level
+    // entirely except for which column shape that answer takes.
     if (hostility === "enemy") return enemyReceivedRows(players, level, fightDurationMs);
 
     if (level === "players") {
@@ -164,7 +167,7 @@ export const damageTaken: MetricDescriptor = {
           columns:
             p.totalDamageTaken === undefined
               ? [NOT_RECORDED, NOT_RECORDED]
-              : [format(p.totalDamageTaken), dtps(p.totalDamageTaken, fightDurationMs)],
+              : [format(p.totalDamageTaken), ratePerSecond(p.totalDamageTaken, fightDurationMs)],
           pinOnClick: { source: p.index },
           colorSlot: p.partyIndex,
         }));

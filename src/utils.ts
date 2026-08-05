@@ -1063,6 +1063,15 @@ export const humanizeNumber = (n: number): string => humanizeNumbers(n).join("")
 export const share = (value: number, total: number): string =>
   total === 0 ? "0.0%" : `${((value / total) * 100).toFixed(1)}%`;
 
+/// `amount` spread evenly over `windowMs` as a per-second rate, humanized —
+/// the shape behind both DPS (`damageDone`) and DTPS (`damageTaken`), which
+/// used to duplicate this formula under two names. No window, or one of zero
+/// length, means no honest rate rather than a division by zero — and both
+/// callers' figures can come from a scrubbed reparse too, so the denominator
+/// must be the window's own length, not the whole fight's.
+export const ratePerSecond = (amount: number, windowMs?: number): string =>
+  !windowMs || windowMs <= 0 ? "—" : humanizeNumber(amount / (windowMs / 1000));
+
 /// Takes a number of milliseconds and returns a string in the format of MM:SS.
 export const millisecondsToElapsedFormat = (ms: number): string => {
   const date = new Date(Date.UTC(0, 0, 0, 0, 0, 0, ms));
