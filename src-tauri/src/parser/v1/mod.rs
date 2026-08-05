@@ -2099,6 +2099,11 @@ pub struct EnemySeries {
 /// this the stack is unreadable and the long tail is trash-mob noise.
 const ENEMY_CHART_MAX_SERIES: usize = 8;
 
+/// Fold one hit into the band for `enemy_type`, opening that band on first
+/// sight. `bucket` indexes `values` unchecked, exactly like the sibling chart
+/// builders: a bucket index IS the elapsed second, so `chart_len` must be
+/// sized from the FULL log duration even when a scrub cutoff truncates the
+/// derived state, or this indexes out of bounds.
 fn accumulate_enemy_series(
     series: &mut Vec<EnemySeries>,
     enemy_type: EnemyType,
@@ -2119,8 +2124,12 @@ fn accumulate_enemy_series(
     band.values[bucket] += damage;
 }
 
-/// What each enemy TYPE dealt TO the party per bucket — every incoming event,
-/// banded by attacker. Empty on logs recorded before damage-taken capture.
+/// Damage each enemy TYPE DEALT TO the party, per bucket — every incoming
+/// event, banded by the attacker that landed it. Empty on logs recorded
+/// before damage-taken capture.
+///
+/// `chart_len` must be sized from the FULL log duration, or this indexes out
+/// of bounds — see [`accumulate_enemy_series`].
 pub fn build_enemy_dealt_chart(
     events: &[(i64, Message)],
     start_time: i64,
@@ -2148,9 +2157,13 @@ pub fn build_enemy_dealt_chart(
     series
 }
 
-/// What each enemy TYPE RECEIVED from the party per bucket — the counted
+/// Damage each enemy TYPE RECEIVED FROM the party, per bucket — the counted
 /// dealt events (same phantom/exclusion gates as the DPS chart, so the
-/// chart's area cannot disagree with the table), banded by victim type.
+/// chart's area cannot disagree with the table), banded by the victim that
+/// absorbed them.
+///
+/// `chart_len` must be sized from the FULL log duration, or this indexes out
+/// of bounds — see [`accumulate_enemy_series`].
 pub fn build_enemy_received_chart(
     events: &[(i64, Message)],
     start_time: i64,
@@ -2172,6 +2185,10 @@ pub fn build_enemy_received_chart(
         }
         // Only player-dealt damage: an unknown source is an enemy (or an
         // unmapped proxy), which the meter itself does not count either.
+        // NOT implied by the taken check above, which gates only the
+        // conjunction of a slot-keyed victim AND an unknown source — an
+        // enemy-on-enemy hit, or any hit whose victim is not slot-keyed,
+        // reaches here with an unknown source and needs dropping here.
         if matches!(
             CharacterType::from_hash(event.source.parent_actor_type),
             CharacterType::Unknown(_)
@@ -4575,6 +4592,47 @@ mod tests {
         assert_eq!(bands[0].enemy_type, EnemyType::from_hash(0xDEAD_BEEF));
         assert_eq!(bands[0].values, vec![300, 0, 0]);
         assert_eq!(bands[1].values, vec![0, 0, 200]);
+    }
+
+    /// The band cap keeps the BIGGEST attackers, not the first ones seen: the
+    /// sort has to happen before the truncate, and it has to rank by
+    /// whole-fight total rather than by whatever landed in one bucket.
+    #[test]
+    fn enemy_dealt_chart_caps_to_the_biggest_bands_not_the_earliest() {
+        // Ten attackers. Each opens with a chip hit in bucket 0 and lands its
+        // real damage in bucket 2, with the two ordered inversely: attacker 0
+        // arrives first and leads bucket 0, attacker 9 arrives last and wins
+        // the fight. So arrival order, bucket-0 order and total order are three
+        // different rankings, and only the last one is the right answer.
+        let mut events: Vec<(i64, Message)> = Vec::new();
+        for i in 0..10i32 {
+            for (timestamp, damage) in [(1_000, 10 - i), (3_000, (i + 1) * 10)] {
+                let mut hit = damage_taken_by_slot0(9001, damage);
+                hit.source.actor_type = 0xE000 + i as u32;
+                hit.source.parent_actor_type = 0xE000 + i as u32;
+                events.push((timestamp, Message::DamageEvent(hit)));
+            }
+        }
+
+        let bands = build_enemy_dealt_chart(&events, 1_000, 1_000, 3);
+
+        assert_eq!(bands.len(), ENEMY_CHART_MAX_SERIES);
+        let kept: Vec<EnemyType> = bands.iter().map(|band| band.enemy_type).collect();
+        let expected: Vec<EnemyType> = (2..10)
+            .rev()
+            .map(|i: u32| EnemyType::from_hash(0xE000 + i))
+            .collect();
+        assert_eq!(kept, expected, "the two weakest attackers are dropped");
+        let totals: Vec<i64> = bands
+            .iter()
+            .map(|band| band.values.iter().sum::<i64>())
+            .collect();
+        assert_eq!(totals, vec![101, 92, 83, 74, 65, 56, 47, 38]);
+        assert_eq!(
+            bands[0].values,
+            vec![1, 0, 100],
+            "the biggest total is the smallest opener"
+        );
     }
 
     /// Enemy-RECEIVED series: player-dealt events banded by TARGET type;
