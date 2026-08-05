@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::path::PathBuf;
 
-use anyhow::{Context, Result};
+use anyhow::Result;
 use futures::sink::SinkExt;
 use interprocess::os::windows::named_pipe::tokio::PipeListenerOptionsExt;
 use interprocess::os::windows::named_pipe::{PipeListenerOptions, PipeMode};
