@@ -151,7 +151,7 @@
       "damage-percentage": "%",
       "damage-percentage-description": "总伤害占比",
       "sup-percentage": "追击",
-      "sup-percentage-description": "追击触发的额外伤害",
+      "sup-percentage-description": "追击伤害相对于可触发追击的基础伤害比例",
       "sba": "奥义",
       "sba-description": "实时奥义槽数值",
       "total-stun-value": "昏厥",
