@@ -74,6 +74,12 @@ mod tests {
 
     #[test]
     fn null_object_is_rejected() {
+        // Honest about its own reach: with MODULE_BASE unset this returns at
+        // the `base == 0` guard, so it pins the CONTRACT (a null object never
+        // yields a class) rather than the guarded read's null handling — that
+        // path needs a live process to exercise, exactly as `summon.rs`'s
+        // equivalent test does. Kept so the contract still holds the day
+        // MODULE_BASE is set.
         assert_eq!(super::status_class_of(std::ptr::null()), None);
     }
 }
