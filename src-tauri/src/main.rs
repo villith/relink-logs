@@ -1312,6 +1312,10 @@ struct EncounterStateResponse {
     /// their own uptime from these, so a scrub window narrows the view without
     /// another round trip. Empty on logs recorded before status capture.
     status_intervals: Vec<v1::StatusInterval>,
+    /// Spans of fight time a battle state held (SBA performance, Link Time, an
+    /// enemy's Break), for the analysis chart's shaded windows. Empty on logs
+    /// recorded before the transition events existed.
+    chart_windows: Vec<v1::ChartWindow>,
     dps_chart: HashMap<u32, Vec<i32>>,
     /// Stun applied per DPS-chart bucket. Separate from `dps_chart` because
     /// stun reconciles two capture paths with max(), not a sum — see
@@ -1586,6 +1590,11 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         &target_entries,
     );
 
+    // Same closing rule as the status intervals: a state still active at the
+    // last event ran to the end of what was recorded.
+    let chart_windows =
+        v1::assemble_chart_windows(&parser.encounter.raw_event_log, start_time, duration);
+
     let groups = build_groups(&parser, &options, &target_entries, &assignment);
 
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
@@ -1621,6 +1630,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         imported,
         legality: findings,
         status_intervals,
+        chart_windows,
         dps_chart: player_dps,
         stun_chart: player_stun,
         taken_chart: player_taken,
@@ -2465,6 +2475,12 @@ fn connect_and_run_parser(app: AppHandle) {
                                 }
                                 protocol::Message::StatusRemove(event) => {
                                     state.on_status_remove(event);
+                                }
+                                protocol::Message::LinkTime(event) => {
+                                    state.on_link_time(event);
+                                }
+                                protocol::Message::EnemyMode(event) => {
+                                    state.on_enemy_mode(event);
                                 }
                             }
                         }

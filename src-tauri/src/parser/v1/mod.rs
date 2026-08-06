@@ -28,6 +28,7 @@ pub mod phantom_targets;
 mod player_state;
 mod skill_state;
 mod status;
+mod windows;
 
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
 pub use groups::{
@@ -37,6 +38,7 @@ pub use groups::{
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::{PlayerState, SbaSourceKind};
 pub use status::{assemble_intervals, StatusInterval};
+pub use windows::{assemble_chart_windows, ChartWindow, ChartWindowKind};
 
 pub struct AdjustedDamageInstance<'a> {
     pub event: &'a DamageEvent,
@@ -3401,6 +3403,29 @@ impl Parser {
         }
         let now = Utc::now().timestamp_millis();
         self.encounter.push_event(now, Message::StatusRemove(event));
+    }
+
+    /// Records a Link Time transition. Raw log only (the chart windows are
+    /// assembled on read, see `assemble_chart_windows`), and only inside a
+    /// running encounter — link time cannot exist outside a fight, and the
+    /// transition latch in the hook means a stray pre-fight `false` carries
+    /// no information.
+    pub fn on_link_time(&mut self, event: protocol::LinkTimeEvent) {
+        if self.status != ParserStatus::InProgress {
+            return;
+        }
+        let now = Utc::now().timestamp_millis();
+        self.encounter.push_event(now, Message::LinkTime(event));
+    }
+
+    /// Records an enemy mode transition (Normal / Overdrive / Break). Same
+    /// in-fight rule as [`Self::on_link_time`].
+    pub fn on_enemy_mode(&mut self, event: protocol::EnemyModeEvent) {
+        if self.status != ParserStatus::InProgress {
+            return;
+        }
+        let now = Utc::now().timestamp_millis();
+        self.encounter.push_event(now, Message::EnemyMode(event));
     }
 
     /// Handles one guarded-Quickening marker (The World): counts the guard for
