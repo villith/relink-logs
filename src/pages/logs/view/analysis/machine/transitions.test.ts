@@ -94,38 +94,40 @@ describe("axis housekeeping", () => {
 describe("aura filter housekeeping", () => {
   it("setAura sets and clears the filter without touching pins or by", () => {
     const pinned = state({ source: 1, by: "source" });
-    const withAura = setAura(pinned, "src:status:4:1");
-    expect(withAura.aura).toBe("src:status:4:1");
+    const withAura = setAura(pinned, "src:status:4:1:unknown");
+    expect(withAura.aura).toBe("src:status:4:1:unknown");
     expect(withAura.source).toBe(1);
     expect(withAura.by).toBe("source");
     expect(setAura(withAura, null).aura).toBeNull();
   });
 
   it("clearing the anchoring pin clears the aura", () => {
-    expect(clearPin(state({ source: 1, aura: "src:status:4:1" }), "source").aura).toBeNull();
-    expect(clearPin(state({ target: 0, aura: "tgt:status:4:1" }), "target").aura).toBeNull();
+    expect(clearPin(state({ source: 1, aura: "src:status:4:1:unknown" }), "source").aura).toBeNull();
+    expect(clearPin(state({ target: 0, aura: "tgt:status:4:1:unknown" }), "target").aura).toBeNull();
   });
 
   it("clearing an UNRELATED pin keeps the aura", () => {
-    const s = state({ source: 1, target: 0, aura: "src:status:4:1" });
-    expect(clearPin(s, "target").aura).toBe("src:status:4:1");
-    expect(clearPin(s, "ability").aura).toBe("src:status:4:1");
+    const s = state({ source: 1, target: 0, aura: "src:status:4:1:unknown" });
+    expect(clearPin(s, "target").aura).toBe("src:status:4:1:unknown");
+    expect(clearPin(s, "ability").aura).toBe("src:status:4:1:unknown");
   });
 
   it("re-pinning the anchor to a DIFFERENT actor clears the aura; same actor keeps it", () => {
-    const s = state({ source: 1, aura: "src:status:4:1" });
+    const s = state({ source: 1, aura: "src:status:4:1:unknown" });
     expect(pinRow(s, { dim: "source", value: 2 }).aura).toBeNull();
-    expect(pinRow(s, { dim: "source", value: 1 }).aura).toBe("src:status:4:1");
-    expect(pinRow(s, { dim: "ability", value: "skill:9" }).aura).toBe("src:status:4:1");
+    expect(pinRow(s, { dim: "source", value: 1 }).aura).toBe("src:status:4:1:unknown");
+    expect(pinRow(s, { dim: "ability", value: "skill:9" }).aura).toBe("src:status:4:1:unknown");
   });
 
   it("setHostility clears the aura with the actor pins it depends on", () => {
-    expect(setHostility(state({ source: 1, aura: "src:status:4:1" }), "enemy").aura).toBeNull();
+    expect(setHostility(state({ source: 1, aura: "src:status:4:1:unknown" }), "enemy").aura).toBeNull();
   });
 
   it("setMetric keeps the aura, like the window", () => {
     // damage → taken keeps the source pin, so the anchor survives; the
     // resolver decides whether the destination tab honors the filter.
-    expect(setMetric(state({ source: 1, aura: "src:status:4:1" }), "taken").aura).toBe("src:status:4:1");
+    expect(setMetric(state({ source: 1, aura: "src:status:4:1:unknown" }), "taken").aura).toBe(
+      "src:status:4:1:unknown"
+    );
   });
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { statusPinKey } from "../../statusUptime";
 import {
   DEFAULT_STATE,
   auraAnchorOf,
@@ -50,7 +51,7 @@ describe("URL codec", () => {
       ability: "skill:42",
       window: [10, 95],
       by: "target",
-      aura: "src:status:4:1",
+      aura: "src:status:4:1:unknown",
     });
     expect(decodeState(encodeState(full))).toEqual(full);
   });
@@ -95,23 +96,45 @@ describe("URL codec", () => {
 
 describe("aura grammar", () => {
   it("accepts only anchor:status keys", () => {
-    expect(decodeState({ ...RAW_NONE, aura: "src:status:4:1" }).aura).toBe("src:status:4:1");
-    expect(decodeState({ ...RAW_NONE, aura: "tgt:status:4:unknown" }).aura).toBe("tgt:status:4:unknown");
+    expect(decodeState({ ...RAW_NONE, aura: "src:status:4:1:unknown" }).aura).toBe("src:status:4:1:unknown");
+    expect(decodeState({ ...RAW_NONE, aura: "tgt:status:4:unknown:unknown" }).aura).toBe(
+      "tgt:status:4:unknown:unknown"
+    );
     // No anchor, wrong grammar, wrong anchor spelling — all degrade alone.
     expect(decodeState({ ...RAW_NONE, aura: "status:4:1" }).aura).toBeNull();
     expect(decodeState({ ...RAW_NONE, aura: "src:skill:9" }).aura).toBeNull();
     expect(decodeState({ ...RAW_NONE, aura: "source:status:4:1" }).aura).toBeNull();
+    // The pre-class two-segment spelling is dead: it is not what any chip can
+    // produce any more, so admitting it would only keep a stale URL alive.
+    expect(decodeState({ ...RAW_NONE, aura: "src:status:4:1" }).aura).toBeNull();
+  });
+
+  it("admits what the aura chips actually emit", () => {
+    // The regression this pins: the class segment was added to `statusPinKey`
+    // without being added to AURA_KEY, so every real chip value decoded to null
+    // and the whole filter was inert. Built from the real key builder rather
+    // than a hand-written literal, so the two cannot drift apart again.
+    for (const interval of [
+      { statusId: 10, abilityId: 500, statusClass: 43981 },
+      { statusId: 10, abilityId: null, statusClass: null },
+    ]) {
+      for (const anchor of ["src", "tgt"] as const) {
+        const aura = `${anchor}:${statusPinKey(interval)}`;
+        expect(decodeState({ ...RAW_NONE, aura }).aura).toBe(aura);
+        expect(auraPinKey(aura)).toBe(statusPinKey(interval));
+      }
+    }
   });
 
   it("names the anchoring dimension", () => {
-    expect(auraAnchorOf("src:status:4:1")).toBe("source");
-    expect(auraAnchorOf("tgt:status:4:unknown")).toBe("target");
+    expect(auraAnchorOf("src:status:4:1:unknown")).toBe("source");
+    expect(auraAnchorOf("tgt:status:4:unknown:unknown")).toBe("target");
     expect(auraAnchorOf(null)).toBeNull();
     expect(auraAnchorOf("garbage")).toBeNull();
   });
 
   it("extracts the status pin key", () => {
-    expect(auraPinKey("src:status:4:1")).toBe("status:4:1");
-    expect(auraPinKey("tgt:status:4:unknown")).toBe("status:4:unknown");
+    expect(auraPinKey("src:status:4:1:unknown")).toBe("status:4:1:unknown");
+    expect(auraPinKey("tgt:status:4:unknown:unknown")).toBe("status:4:unknown:unknown");
   });
 });

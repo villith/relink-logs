@@ -1185,7 +1185,10 @@ export const AnalysisView = () => {
   const groupOverlay = useMemo(() => {
     if (!groupsPath || (spec.groupBy === "source" && hostility === "friendly")) return null;
     if (groups.length === 0) return null;
-    return groupBandsFor(groups).map(({ key, values }) => ({ key, label: bandLabelFor(key), values }));
+    // The same cap the query asked for: the backend keeps every row for the
+    // table and appends one `other` band summing the tail, so the chart has to
+    // slice or it stacks that tail twice.
+    return groupBandsFor(groups, GROUP_TOP_N).map(({ key, values }) => ({ key, label: bandLabelFor(key), values }));
   }, [groupsPath, spec.groupBy, hostility, groups, bandLabelFor]);
 
   // The Stacks plot: one series per holder of the pinned effect, each its own

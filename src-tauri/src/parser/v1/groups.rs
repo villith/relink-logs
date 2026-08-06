@@ -1,4 +1,4 @@
-//! The analysis view's generic aggregation: one (filters Ã— groupBy) request
+//! The analysis view's generic aggregation: one (filters × groupBy) request
 //! answering both the table rows and the chart bands from a single grouping,
 //! so the two can never disagree. See
 //! docs/superpowers/specs/2026-08-04-analysis-view-state-machine-design.md.
@@ -13,7 +13,7 @@ use super::{
     MeterFilters, PhantomTargets, PlayerData, TargetSegment, TargetSpan,
 };
 
-/// Which universe an index names â€” the hostility role-mapping decides which
+/// Which universe an index names — the hostility role-mapping decides which
 /// universe each dimension draws from, and a ref from the wrong universe is a
 /// validation error, never a guess.
 ///
@@ -54,7 +54,7 @@ pub enum GroupHostility {
     Enemy,
 }
 
-/// The ability filter's two grammars (spec Â§3): a friendly pin arrives as the
+/// The ability filter's two grammars (spec §3): a friendly pin arrives as the
 /// expanded action-id list (the frontend's `actionsForPin` owns skill-group
 /// knowledge and expands a pin to every sibling `ActionType` before it is
 /// sent); an enemy attack is one (type, action) pair.
@@ -64,7 +64,7 @@ pub enum GroupHostility {
 /// Vec<ActionType>` and `AbilityChartSeries`/`TakenChartSeries`'s own action
 /// fields), and several of its variants (`SupplementaryDamage`,
 /// `DamageOverTime`, ...) wrap the numeric skill id with a discriminant a
-/// bare integer would lose â€” `actionsForPin`'s own contract
+/// bare integer would lose — `actionsForPin`'s own contract
 /// (`src/pages/logs/view/abilitySkills.ts`) returns `ActionType[]`, e.g.
 /// `[{ Normal: 100 }, { Normal: 110 }]`, confirming the tagged shape.
 #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -109,7 +109,7 @@ pub struct GroupQuery {
     pub ability: Option<AbilityFilter>,
     #[serde(default)]
     pub top_n: Option<usize>,
-    /// The committed scrub window, in ms relative to the fight's start â€” the
+    /// The committed scrub window, in ms relative to the fight's start — the
     /// same span `ParseOptions::from_ms`/`up_to_ms` narrow the derived state
     /// to, so a scrubbed table's group rows report the window the chart
     /// shows. Events outside it are skipped; buckets stay whole-fight (the
@@ -138,7 +138,7 @@ pub struct GroupQuery {
 )]
 pub enum GroupKey {
     /// The hook's player slot key (`target.parent_index`) on the taken
-    /// stream, the event's source parent index on the dealt stream â€” always
+    /// stream, the event's source parent index on the dealt stream — always
     /// the same value `ActorRef::Player { index }` filters against for the
     /// query that produced this row, so the two never disagree.
     Player {
@@ -159,9 +159,9 @@ pub enum GroupKey {
     },
     /// An enemy attacker's TYPE, standing in for [`GroupKey::EnemySpawn`] on
     /// the taken stream: `segment_targets_indexed`'s assignment only ever
-    /// covers dealt (playerâ†’enemy) events (see `segment_targets_inner`,
+    /// covers dealt (player→enemy) events (see `segment_targets_inner`,
     /// which skips every `is_damage_taken_event` hit before assigning one),
-    /// so an attacker on the taken stream has no segment to key by â€” only
+    /// so an attacker on the taken stream has no segment to key by — only
     /// its type.
     EnemyType {
         enemy_type: EnemyType,
@@ -183,7 +183,7 @@ pub struct GroupMeasure {
 pub struct GroupAggregate {
     pub key: GroupKey,
     pub measure: GroupMeasure,
-    /// Whole-fight per-bucket band (same buckets as dps_chart) â€” the view
+    /// Whole-fight per-bucket band (same buckets as dps_chart) — the view
     /// slices client-side, exactly like the drill charts it replaces.
     pub series: Vec<i64>,
 }
@@ -193,7 +193,7 @@ pub struct GroupAggregate {
 ///
 /// `GroupMetric` and `GroupHostility` are both two-variant enums, and the
 /// role-mapping table in [`aggregate_groups`] gives every one of the four
-/// combinations a meaning â€” there is no "unsupported (metric, hostility)"
+/// combinations a meaning — there is no "unsupported (metric, hostility)"
 /// left to reject, only a ref or ability filter drawn from the wrong universe
 /// for the combination requested.
 #[derive(Debug, PartialEq)]
@@ -210,9 +210,9 @@ impl std::fmt::Display for GroupQueryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             // The ability grammar is STREAM-determined (dealt vs. taken), not
-            // hostility-determined like `source`/`target`'s universe â€” see
+            // hostility-determined like `source`/`target`'s universe — see
             // `aggregate_groups`'s `friendly_action_filter`/
-            // `enemy_action_filter` â€” so it gets its own wording rather than
+            // `enemy_action_filter` — so it gets its own wording rather than
             // the shared "hostility universe" phrasing below.
             GroupQueryError::WrongUniverse { field: "ability" } => {
                 write!(
@@ -235,11 +235,11 @@ impl std::error::Error for GroupQueryError {}
 /// event log, so a caller cannot ask for a table and a chart that tell
 /// different stories about the same query.
 ///
-/// The hostility role-mapping (spec Â§3) decides which events are walked and
+/// The hostility role-mapping (spec §3) decides which events are walked and
 /// what `Dimension::Source`/`Dimension::Target` mean:
 ///
 /// ```text
-/// (metric, hostility) â†’ which events are walked and what the dims mean
+/// (metric, hostility) → which events are walked and what the dims mean
 /// damage + friendly:  dealt stream,  source = Player,     target = EnemySpawn   (already implemented)
 /// damage + enemy:     taken stream,  source = EnemySpawn, target = Player       (WCL's hostility=1: rows = attacker enemies)
 /// taken  + friendly:  taken stream,  source = Player (victim), target = EnemySpawn (attacker)
@@ -248,18 +248,18 @@ impl std::error::Error for GroupQueryError {}
 ///
 /// Two independent facts drive the walk below:
 ///
-/// * `dealt_stream` â€” which events are walked. True for the playerâ†’enemy
+/// * `dealt_stream` — which events are walked. True for the player→enemy
 ///   stream Task 8 already implemented (full gate chain: phantoms, the
 ///   contested-source filter, the friendly ability grammar, the dragon-form
-///   remap, target spans); false for the enemyâ†’player stream
+///   remap, target spans); false for the enemy→player stream
 ///   [`super::build_taken_ability_chart`] walks (a single ungated pass, the
-///   enemy-attack ability grammar, no remap â€” none of the dealt gates mean
+///   enemy-attack ability grammar, no remap — none of the dealt gates mean
 ///   anything for a hit a PLAYER never dealt). On EITHER stream the attacker
 ///   is always the physical `event.source` and the victim always the
-///   physical `event.target` â€” `dealt_stream` alone decides which universe
+///   physical `event.target` — `dealt_stream` alone decides which universe
 ///   (Player vs. EnemySpawn/EnemyType) the attacker and the victim belong
 ///   to: attacker = Player, victim = Enemy when true; the reverse when false.
-/// * `source_is_player` â€” whether the query's `source` role names the Player
+/// * `source_is_player` — whether the query's `source` role names the Player
 ///   universe or the Enemy one (`hostility: Friendly`/`Enemy`, independent of
 ///   which stream is walked). Combined with `dealt_stream` above, this says
 ///   which physical actor field (and which `Dimension`) backs each
@@ -272,7 +272,7 @@ impl std::error::Error for GroupQueryError {}
 /// covers dealt events (`segment_targets_inner` drops every
 /// `is_damage_taken_event` hit before assigning one a segment), so an
 /// attacker there has no segment to key by. An `ActorRef::EnemySpawn{segment}`
-/// FILTER on the taken stream still works â€” it resolves to that segment's
+/// FILTER on the taken stream still works — it resolves to that segment's
 /// `enemy_type` and time span from `segments`, then keeps only taken events
 /// whose source enemy TYPE matches and whose timestamp falls in the span.
 /// This is the same honest approximation the old takenCardSections used:
@@ -302,7 +302,7 @@ pub fn aggregate_groups(
     // stops being exhaustive), not a silently-wrong taken-stream default
     // falling out of an `if`/`else` that quietly covers "anything else".
     let (dealt_stream, source_is_player) = match (query.metric, query.hostility) {
-        // dealt stream, source = Player (attacker) â€” Task 8's original.
+        // dealt stream, source = Player (attacker) — Task 8's original.
         (GroupMetric::Damage, GroupHostility::Friendly) => (true, true),
         // taken stream, source = EnemySpawn/EnemyType (attacker).
         (GroupMetric::Damage, GroupHostility::Enemy) => (false, false),
@@ -334,7 +334,7 @@ pub fn aggregate_groups(
     }
     // Each stream has exactly one valid ability grammar: the dealt stream's
     // events carry a friendly action id, the taken stream's carry an enemy
-    // attack â€” see `AbilityFilter`'s own doc for why the two shapes differ.
+    // attack — see `AbilityFilter`'s own doc for why the two shapes differ.
     let friendly_action_filter = match &query.ability {
         Some(AbilityFilter::Friendly { actions }) if dealt_stream => Some(actions.as_slice()),
         Some(AbilityFilter::Friendly { .. }) => {
@@ -374,7 +374,7 @@ pub fn aggregate_groups(
     };
 
     // Out-of-range segment: matches nothing rather than falling back to
-    // "everything" (an empty `target_spans` would mean the latter â€” see
+    // "everything" (an empty `target_spans` would mean the latter — see
     // `target_selected`). Same convention as `AnalysisView`'s own target-span
     // memo: a stale reference narrows to nothing, it never widens.
     let target_spans: Vec<TargetSpan> = if dealt_stream {
@@ -392,7 +392,7 @@ pub fn aggregate_groups(
     } else {
         Vec::new()
     };
-    // The taken stream's own version of the same filter â€” no per-spawn
+    // The taken stream's own version of the same filter — no per-spawn
     // segment to match against (see the doc comment above), so this matches
     // by (attacker enemy TYPE, timestamp within the segment's span) instead.
     let taken_enemy_filter: Option<(EnemyType, i64, i64)> = if dealt_stream {
@@ -410,7 +410,7 @@ pub fn aggregate_groups(
     let phantoms = PhantomTargets::learned_from(events.iter());
     let mut aggregates: Vec<GroupAggregate> = Vec::new();
     // One `BreakdownKeying` per (remapped) source index, fed that source's
-    // hits in log order â€” it is stateful (Ferry's pet remap, the
+    // hits in log order — it is stateful (Ferry's pet remap, the
     // supplementary echo family) and must see one player's own hits in the
     // order they happened, exactly like `build_ability_damage_chart` requires.
     // Interleaving with other sources' events is harmless: only the events
@@ -419,12 +419,12 @@ pub fn aggregate_groups(
     //
     // It only ever sees hits that survive every gate above, so a narrow
     // ability/target-span filter can starve `last_known_pet_skill` or the
-    // first-supplementary memo of the very hit that would have set them â€”
+    // first-supplementary memo of the very hit that would have set them —
     // `build_ability_damage_chart` has the identical gap under a target span,
     // and the two are left to share it deliberately rather than diverge: a
     // chart and this aggregation must key a hit the same way, and inventing a
     // fix here that chart doesn't have would do the opposite. Only ever
-    // touched on the dealt stream â€” the taken stream has no such state.
+    // touched on the dealt stream — the taken stream has no such state.
     let mut keyings: Vec<(u32, player_state::BreakdownKeying)> = Vec::new();
 
     for (position, (timestamp, message)) in events.iter().enumerate() {
@@ -435,7 +435,7 @@ pub fn aggregate_groups(
 
         // `dealt_stream` wants dealt hits; the taken stream wants the
         // opposite. A mismatch skips the event entirely rather than opening
-        // a bogus row for it â€” e.g. an unfiltered damage-taken event must
+        // a bogus row for it — e.g. an unfiltered damage-taken event must
         // never mint a `GroupKey::Player` from its enemy source pointer.
         if is_damage_taken_event(damage_event) == dealt_stream {
             continue;
@@ -467,7 +467,7 @@ pub fn aggregate_groups(
             if !survives_shared_gates(damage_event, &phantoms, filters) {
                 continue;
             }
-            // `Some(&[])` (every sibling action was expanded away â€” a stale
+            // `Some(&[])` (every sibling action was expanded away — a stale
             // pin) narrows to nothing, matching the out-of-range convention
             // above; `None` means no ability filter was requested at all.
             if let Some(actions) = friendly_action_filter {
@@ -506,7 +506,7 @@ pub fn aggregate_groups(
                 // segment to each one it doesn't itself drop as a taken/
                 // phantom hit, both of which this walk has already excluded
                 // above). If it ever DID fire, this row's damage would be
-                // dropped here while the Player dimension still counts it â€”
+                // dropped here while the Player dimension still counts it —
                 // the two dimensions' totals could diverge.
                 Dimension::Source | Dimension::Target => {
                     let Some(Some(segment_index)) = assignment.get(position).copied() else {
@@ -544,7 +544,7 @@ pub fn aggregate_groups(
             (key, damage_event.damage.max(0) as i64, bucket)
         } else {
             // The taken stream: a single ungated pass, exactly as
-            // `build_taken_ability_chart` documents â€” none of the dealt
+            // `build_taken_ability_chart` documents — none of the dealt
             // gates (phantoms, contested-source exclusion, dragon-form
             // remap, target spans) apply to a hit a player never dealt. The
             // victim is `target.parent_index` (a player slot key); the
@@ -580,7 +580,7 @@ pub fn aggregate_groups(
                     index: damage_event.target.parent_index,
                 },
                 // The remaining `Source`/`Target` case is always the enemy
-                // universe (the one not matched above) â€” same rule as the
+                // universe (the one not matched above) — same rule as the
                 // dealt branch's own catch-all, just with no segment to
                 // resolve on this stream (see the doc comment above).
                 Dimension::Source | Dimension::Target => GroupKey::EnemyType {
@@ -617,7 +617,7 @@ pub fn aggregate_groups(
     // Largest first: the table's own order, and what a chart's legend expects.
     aggregates.sort_by_key(|aggregate| std::cmp::Reverse(aggregate.measure.amount));
 
-    // `top_n` never removes a row â€” the table wants all of them. It only
+    // `top_n` never removes a row — the table wants all of them. It only
     // APPENDS one `Other` band summing whatever sits past the cap, so a chart
     // that slices to the first N bands plus this one still sums to the total
     // the table (unsliced) reports.
@@ -838,13 +838,13 @@ mod tests {
     // --- aggregate_groups -------------------------------------------------
     //
     // Synthetic events built the same shape `mod.rs`'s drill-chart tests use
-    // (`damage_from`/`damage_onto`), not imported â€” those helpers are private
-    // to that test module â€” but replicated minimally here.
+    // (`damage_from`/`damage_onto`), not imported — those helpers are private
+    // to that test module — but replicated minimally here.
 
     use crate::parser::v1::segment_targets_indexed;
     use protocol::{Actor, DamageEvent};
 
-    /// Zeta's character hash, matching `mod.rs`'s own test constant â€” any
+    /// Zeta's character hash, matching `mod.rs`'s own test constant — any
     /// real player hash works; an `Unknown` parent is dropped at ingest by
     /// `should_ignore_damage_event`, and `aggregate_groups` relies on that
     /// same guarantee (see the `is_damage_taken_event` gate below it).
@@ -880,13 +880,13 @@ mod tests {
     }
 
     /// A hit landing on party slot `victim_slot` (0..=3) from an enemy of
-    /// `attacker_hash`, for `action`/`damage` â€” same shape as `mod.rs`'s own
+    /// `attacker_hash`, for `action`/`damage` — same shape as `mod.rs`'s own
     /// `damage_taken_by_slot0`, generalized so tests can distinguish
     /// multiple attacker types and victims. `is_damage_taken_event` needs
     /// the target's PARENT to carry a real player slot key and the source's
     /// parent hash to resolve to `CharacterType::Unknown`; any non-player
     /// hash satisfies the latter, so `attacker_hash` doubles as the enemy's
-    /// identity (`EnemyType::from_hash` is a bare wrap of the hash â€” see
+    /// identity (`EnemyType::from_hash` is a bare wrap of the hash — see
     /// `constants::EnemyType`).
     fn enemy_hit(attacker_hash: u32, victim_slot: u8, action: u32, damage: i32) -> DamageEvent {
         DamageEvent {
@@ -975,7 +975,7 @@ mod tests {
     }
 
     /// Folds a set of enemy-side aggregates (`EnemySpawn` or `EnemyType`
-    /// rows â€” whichever the query produced) down to one total per enemy
+    /// rows — whichever the query produced) down to one total per enemy
     /// TYPE, so a per-spawn grouping and a type-only grouping over the same
     /// events can be compared directly.
     fn amount_by_enemy_type(aggregates: &[GroupAggregate]) -> std::collections::BTreeMap<u32, i64> {
@@ -992,7 +992,7 @@ mod tests {
     }
 
     /// Every aggregate's series must sum to its own measure, and the whole
-    /// set must sum to the total the caller expects the filter to admit â€”
+    /// set must sum to the total the caller expects the filter to admit —
     /// the invariant that makes a table and a chart drawn from the same
     /// aggregation unable to disagree.
     fn assert_invariants(aggregates: &[GroupAggregate], expected_total: i64) {
@@ -1180,7 +1180,7 @@ mod tests {
         // The frontend expands a pin into its sibling actions; an empty
         // expansion means the pin is stale. `AnalysisView`'s own target-span
         // memo narrows a stale reference to nothing rather than widening it
-        // back to "no filter" â€” this mirrors that convention for abilities.
+        // back to "no filter" — this mirrors that convention for abilities.
         let events = vec![(1_000, Message::DamageEvent(player_hit(0, 9, 100, 500)))];
         let mut query = friendly_damage_query(Dimension::Source);
         query.ability = Some(AbilityFilter::Friendly { actions: vec![] });
@@ -1238,7 +1238,7 @@ mod tests {
         assert_eq!(aggregates[3].series, vec![1_000]);
 
         // The table (all 4 rows, Other included) intentionally does NOT sum
-        // to the fight total here â€” Other duplicates rows 1 and 2, which is
+        // to the fight total here — Other duplicates rows 1 and 2, which is
         // the point: a chart can slice to [row 0, Other] and still show the
         // whole fight in `top_n` bands.
         let charted_amount: i64 = aggregates[..3].iter().map(|a| a.measure.amount).sum();
@@ -1249,18 +1249,18 @@ mod tests {
     }
 
     /// The three gates a source-less, filter-less query relies on entirely by
-    /// itself â€” nothing upstream has already narrowed the log for it:
+    /// itself — nothing upstream has already narrowed the log for it:
     ///
     /// * a damage-TAKEN event (enemy source, player target) must not mint a
-    ///   `GroupKey::Player` for the enemy's pointer-like index â€” shaped
+    ///   `GroupKey::Player` for the enemy's pointer-like index — shaped
     ///   exactly like `damage_taken_by_slot0` in `mod.rs`'s own tests;
     /// * a dragon-form (Pl2000) hit must remap onto its Pl1900 owner's row
-    ///   BEFORE any source narrowing runs â€” shaped like
+    ///   BEFORE any source narrowing runs — shaped like
     ///   `dragon_form_damage_attributes_to_the_id_player`;
     /// * a phantom-target hit (Eugen's Grenade, hand-excluded) must not
     ///   inflate the row of the player who "dealt" it.
     ///
-    /// This is the only aggregator test that exercises any of the three â€”
+    /// This is the only aggregator test that exercises any of the three —
     /// every other test's synthetic log is clean, deliberately, so a
     /// dropped gate here would ship silently.
     #[test]
@@ -1273,7 +1273,7 @@ mod tests {
             ..Default::default()
         });
 
-        // Enemy source (pointer-like index), player target â€” `mod.rs`'s own
+        // Enemy source (pointer-like index), player target — `mod.rs`'s own
         // `damage_taken_by_slot0`, inlined rather than imported (private to
         // that test module).
         let taken = DamageEvent {
@@ -1310,7 +1310,7 @@ mod tests {
             parent_index: 200,
         };
 
-        // Eugen's Grenade â€” hand-excluded, no HP read needed, cheaper than the
+        // Eugen's Grenade — hand-excluded, no HP read needed, cheaper than the
         // learned (HP-history) phantom rule.
         let mut phantom = player_hit(0, 999, 100, 99_999);
         phantom.target.actor_type = 0x022a350f;
@@ -1369,7 +1369,7 @@ mod tests {
         assert_eq!(dragon_owner.measure.amount, 700);
 
         // The reviewer's deferred nit on Task 8: the remap must run BEFORE
-        // the source filter is applied, not just before the key is built â€”
+        // the source filter is applied, not just before the key is built —
         // otherwise a source-pinned query for the Pl1900 owner (actor_index
         // 5, who never appears as a raw `.source` in the log above) would
         // wrongly see zero hits.
@@ -1477,10 +1477,10 @@ mod tests {
 
     // --- taken + enemy-side aggregation ------------------------------------
     //
-    // The role-mapping table's other three rows (spec Â§3, and the table in
+    // The role-mapping table's other three rows (spec §3, and the table in
     // `aggregate_groups`'s own doc comment): `taken`+`friendly` and
-    // `damage`+`enemy` both walk the enemyâ†’player TAKEN stream;
-    // `taken`+`enemy` walks the same playerâ†’enemy DEALT stream
+    // `damage`+`enemy` both walk the enemy→player TAKEN stream;
+    // `taken`+`enemy` walks the same player→enemy DEALT stream
     // `damage`+`friendly` does, just flipping which dimension is the Player
     // one.
 
@@ -1615,8 +1615,8 @@ mod tests {
     }
 
     /// `damage`+`enemy` walks the same taken stream as `taken`+`friendly`
-    /// above, over the exact same events â€” just naming the attacker
-    /// `Source` instead of `Target` â€” so this is that same test's fixture
+    /// above, over the exact same events — just naming the attacker
+    /// `Source` instead of `Target` — so this is that same test's fixture
     /// with the query flipped, expecting the same rows.
     #[test]
     fn damage_enemy_grouped_by_source_matches_taken_friendly_grouped_by_target() {
@@ -1713,11 +1713,11 @@ mod tests {
         );
     }
 
-    /// The one (metric, hostility) Ã— ability-grammar corner none of the
+    /// The one (metric, hostility) × ability-grammar corner none of the
     /// earlier tests touch: `taken`+`enemy` walks the DEALT stream (same row
     /// as `damage`+`friendly` in the role-mapping table), so it is the
     /// dealt stream's `Friendly` grammar that is valid here, and the taken
-    /// stream's `EnemyAttack` grammar that is wrong-universe â€” the mirror
+    /// stream's `EnemyAttack` grammar that is wrong-universe — the mirror
     /// image of `taken_friendly_rejects_a_friendly_ability_filter` above.
     #[test]
     fn taken_enemy_accepts_friendly_ability_filters_and_rejects_enemy_attack_ones() {
@@ -1785,11 +1785,11 @@ mod tests {
         );
     }
 
-    /// The symmetry invariant (spec Â§3): friendly `Damage` grouped by
+    /// The symmetry invariant (spec §3): friendly `Damage` grouped by
     /// `Target` (per spawn, folded here by type since two goblin hits land
     /// on the same spawn) and enemy-side `Taken` (`taken`+`enemy`) grouped
-    /// by `Source` walk the SAME dealt-stream events â€” the role-mapping
-    /// table's two rows for the dealt stream â€” so their totals per enemy
+    /// by `Source` walk the SAME dealt-stream events — the role-mapping
+    /// table's two rows for the dealt stream — so their totals per enemy
     /// type must agree.
     #[test]
     fn friendly_damage_by_target_and_taken_enemy_by_source_agree_per_enemy_type() {
@@ -1850,7 +1850,7 @@ mod tests {
 
     /// An `ActorRef::EnemySpawn{segment}` filter on the taken stream, where
     /// there is no per-spawn segment to match against directly (see
-    /// `aggregate_groups`'s doc comment) â€” it narrows by (attacker enemy
+    /// `aggregate_groups`'s doc comment) — it narrows by (attacker enemy
     /// TYPE, timestamp within the segment's span) instead.
     #[test]
     fn an_enemy_spawn_filter_on_the_taken_stream_narrows_by_type_and_span() {
@@ -1916,7 +1916,7 @@ mod tests {
     }
 
     /// The committed scrub window narrows the walk exactly as the derived
-    /// state narrows under `ParseOptions::from_ms`/`up_to_ms` â€” the table's
+    /// state narrows under `ParseOptions::from_ms`/`up_to_ms` — the table's
     /// figures follow the scrub. Buckets stay whole-fight (the view slices
     /// its chart client-side), so out-of-window buckets are simply zero and
     /// the series still sums to the windowed measure.

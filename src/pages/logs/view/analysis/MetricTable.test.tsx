@@ -480,6 +480,20 @@ describe("children accessor", () => {
     expect(container.querySelectorAll(".analysis-row-expand")).toHaveLength(0);
   });
 
+  it("falls back to the row's own children when the accessor's split restates the parent", () => {
+    // A character-unique ability has ONE user, so the per-source split is a
+    // single row — which the ≥2 rule then refuses to draw a chevron for. Left
+    // to shadow the member variants it would hide an expansion that did have
+    // something to say, on every ability row of a solo log.
+    const { container } = renderTable({
+      rows: [parent([child("skill:member", 40), child("skill:member2", 60)])],
+      rowChildren: () => [child("player:0", 100)],
+    });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(screen.getByText("skill:member")).toBeTruthy();
+    expect(screen.queryByText("player:0")).toBeNull();
+  });
+
   it("reports its open state to assistive tech", () => {
     const { container } = renderTable({
       rows: [parent()],

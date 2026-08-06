@@ -14,7 +14,7 @@ const FULL_STATE: AnalysisState = {
   ability: "skill:42",
   window: [10, 95],
   by: "target",
-  aura: "src:status:4:1",
+  aura: "src:status:4:1:unknown",
 };
 
 /** The real state, the real adapter, the real jsdom URL — the point of this
@@ -80,7 +80,7 @@ describe("useAnalysisState", () => {
     expect(search).toContain("from=10");
     expect(search).toContain("to=95");
     // `:` is legal in a query value, so nuqs leaves it bare — same as `abil`.
-    expect(search).toContain("aura=src:status:4:1");
+    expect(search).toContain("aura=src:status:4:1:unknown");
   });
 
   it("clears the URL when reset to DEFAULT_STATE", async () => {
@@ -112,12 +112,12 @@ describe("useAnalysisState", () => {
   });
 
   it("decodes a pre-seeded aura param on mount", async () => {
-    renderHarness(["/?src=1&aura=src%3Astatus%3A4%3A1"]);
+    renderHarness(["/?src=1&aura=src%3Astatus%3A4%3A1%3Aunknown"]);
 
     await waitFor(() => {
       const decoded = JSON.parse(screen.getByTestId("state").textContent ?? "");
       expect(decoded.source).toBe(1);
-      expect(decoded.aura).toBe("src:status:4:1");
+      expect(decoded.aura).toBe("src:status:4:1:unknown");
     });
   });
 });

@@ -198,6 +198,26 @@ describe("groupBandsFor", () => {
     ]);
     expect(bands.map((band) => band.key)).toEqual(["player:0", "other"]);
   });
+
+  it("slices to topN plus other, so the tail is not stacked twice", () => {
+    // `aggregate_groups` keeps every row for the table and APPENDS `other`
+    // summing ranks topN.. — stacking all of them plus `other` draws the tail
+    // twice and the plot stands `other` too tall.
+    const aggregates = [
+      { key: { kind: "player" as const, index: 0 }, measure: measure(100), series: [100] },
+      { key: { kind: "player" as const, index: 1 }, measure: measure(60), series: [60] },
+      { key: { kind: "player" as const, index: 2 }, measure: measure(30), series: [30] },
+      { key: { kind: "other" as const }, measure: measure(30), series: [30] },
+    ];
+
+    const capped = groupBandsFor(aggregates, 2);
+    expect(capped.map((band) => band.key)).toEqual(["player:0", "player:1", "other"]);
+    // The stack now sums to the fight, not to the fight plus its own tail.
+    expect(capped.reduce((sum, band) => sum + band.values[0], 0)).toBe(190);
+
+    // Uncapped is the old behaviour, kept for a response with no rollup in it.
+    expect(groupBandsFor(aggregates).map((band) => band.key)).toEqual(["player:0", "player:1", "player:2", "other"]);
+  });
 });
 
 describe("groupRowsFor — the Other rollup", () => {
@@ -215,5 +235,22 @@ describe("groupRowsFor — the Other rollup", () => {
     expect(other.labelKey).toBe("ui.logs.chart-other-label");
     expect(other.pinOnClick).toBeNull();
     expect(other.colorSlot).toBe(-1);
+  });
+
+  it("leaves the rollup out of the share denominator", () => {
+    // `other` duplicates rows already in the table, so counting it would divide
+    // every share by the fight plus its own tail — the real rows would never
+    // add up to 100%.
+    const rows = groupRowsFor(
+      [
+        agg({ kind: "player", index: 0 }, measure(750)),
+        agg({ kind: "player", index: 1 }, measure(250)),
+        agg({ kind: "other" }, measure(250)),
+      ],
+      ctx({ groupBy: "source" })
+    );
+    const shareOf = (key: string) => rows.find((row) => row.key === key)?.columns.at(-1);
+    expect(shareOf("player:0")).toBe("75.0%");
+    expect(shareOf("player:1")).toBe("25.0%");
   });
 });

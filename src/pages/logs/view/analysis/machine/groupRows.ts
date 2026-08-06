@@ -89,7 +89,14 @@ const abilityRowOf = (key: FriendlyAbilityKey): string =>
  * each pinnable by its raw action. Rows sort by amount descending with the
  * `other` rollup pinned last — it is the tail, wherever its sum would rank. */
 export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext): MetricRow[] => {
-  const total = aggregates.reduce((sum, aggregate) => sum + aggregate.measure.amount, 0);
+  // `other` is EXCLUDED from the denominator. `aggregate_groups` appends it
+  // without removing the rows it sums ("top_n never removes a row"), so
+  // counting it would add the tail twice and every row's share would come out
+  // low against a total no reading of the fight produces.
+  const total = aggregates.reduce(
+    (sum, aggregate) => (aggregate.key.kind === "other" ? sum : sum + aggregate.measure.amount),
+    0
+  );
 
   // The pinned player's slot colours ability rows, exactly as damageDone
   // colours a pinned breakdown. Only a friendly-side pin names a player —
@@ -230,10 +237,29 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
  * `groupRowsFor` gives the table, with friendly abilities folded by the same
  * skill-group rule (summing their series) — so a band and the row it
  * decomposes are one thing, which is the whole point of the shared
- * aggregation. Sorted largest-first with `other` last, like the rows. */
-export const groupBandsFor = (aggregates: GroupAggregate[]): { key: string; values: number[] }[] => {
+ * aggregation. Sorted largest-first with `other` last, like the rows.
+ *
+ * `topN` is the CHART's half of the backend's cap, and it is not optional in
+ * practice: `aggregate_groups` sorts largest-first and then APPENDS an `other`
+ * band summing ranks `topN..`, keeping every individual row for the table. A
+ * chart that stacks all of them plus `other` therefore draws the tail twice
+ * and stands roughly `other` too tall. Slicing here to the first `topN`
+ * aggregates plus `other` is exactly the composition the Rust doc describes,
+ * and it sums to the same total the (unsliced) table reports. Omitted, every
+ * band is drawn — correct only for a response with no `other` in it. */
+export const groupBandsFor = (aggregates: GroupAggregate[], topN?: number): { key: string; values: number[] }[] => {
+  // Sliced BEFORE the skill-group fold, on the backend's own ranking: `other`
+  // sums the aggregates past the cap, so those are the ones that must go.
+  const capped =
+    topN === undefined || !aggregates.some((aggregate) => aggregate.key.kind === "other")
+      ? aggregates
+      : [
+          ...aggregates.filter((aggregate) => aggregate.key.kind !== "other").slice(0, topN),
+          ...aggregates.filter((aggregate) => aggregate.key.kind === "other"),
+        ];
+
   const bands = new Map<string, number[]>();
-  for (const { key, series } of aggregates) {
+  for (const { key, series } of capped) {
     const bandKey =
       key.kind === "player"
         ? `player:${key.index}`

@@ -104,8 +104,22 @@ export const MetricTable = ({
   // whole party's breakdown per row, and its answer only changes when the rows
   // do. Null falls back to the row's own children — the member variants the
   // groups fold attached — so one prop serves both reading modes.
+  //
+  // A split of FEWER THAN TWO falls back too, by the same ≥2 rule that decides
+  // whether to draw a caret at all: a one-entry expansion restates its parent,
+  // so preferring it over the member variants does not just show nothing — it
+  // hides an expansion that had something to say. Reachable on every
+  // character-unique ability at the "Done by ability" grouping (and so on
+  // every ability row of a solo log), where `damageDone.children` returns the
+  // single player who used it and the group's member actions go unreachable.
   const childrenByRow = useMemo(
-    () => new Map(rows.map((row) => [row.key, rowChildren?.(row) ?? row.children ?? []])),
+    () =>
+      new Map(
+        rows.map((row) => {
+          const split = rowChildren?.(row) ?? null;
+          return [row.key, (split !== null && split.length >= 2 ? split : null) ?? row.children ?? split ?? []];
+        })
+      ),
     [rows, rowChildren]
   );
 

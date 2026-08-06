@@ -77,8 +77,15 @@ const nonNegativeInt = (raw: string | null): number | null => {
 /** How an aura filter is spelled: which actor pin anchors it, then the status
  * pin key of the chosen effect. The anchor is in the value because with BOTH
  * actors pinned a bare status key cannot say whose windows to mask by — and
- * the clearing rule ("the aura dies with its pin") needs to know too. */
-const AURA_KEY = /^(src|tgt):status:\d+:(\d+|unknown)$/;
+ * the clearing rule ("the aura dies with its pin") needs to know too.
+ *
+ * THREE segments after `status:`, because that is what `statusPinKey` spells:
+ * effect, cause, applying class (`statusUptime.statusKey`). This regex is the
+ * gate every aura value passes through on the way back out of the URL, so a
+ * grammar it does not admit makes the whole filter inert — the class segment
+ * was added to the key without being added here, and the chips silently
+ * stopped selecting. Keep the two in step. */
+const AURA_KEY = /^(src|tgt):status:\d+:(\d+|unknown):(\d+|unknown)$/;
 
 /** The dimension an aura filter is anchored to, or null for no/invalid aura. */
 export const auraAnchorOf = (aura: string | null): "source" | "target" | null =>

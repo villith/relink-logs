@@ -993,7 +993,15 @@ fn export_damage_log_to_file(id: u32, options: ParseOptions) -> Result<(), Strin
             // reparsing, so the filter has to be applied here by hand — an
             // export is meant to be what the view shows, and a CSV that still
             // contained rows the table excluded would not add up to it.
+            //
+            // The damage-TAKEN stream is excluded for the same reason every
+            // other dealt-damage path excludes it: this file has one `damage`
+            // column and no side, so an enemy→party hit would land beside the
+            // party's own with a `source_type` of `Unknown(...)`, and summing
+            // the column — which is the whole point of the export — would
+            // overstate party damage by the entire incoming stream.
             if inside_window
+                && !v1::is_damage_taken_event(damage_event)
                 && !v1::is_excluded(damage_event, &options.filters)
                 && v1::target_selected(timestamp, damage_event, &options.target_spans)
             {
@@ -1377,13 +1385,24 @@ const SBA_INTERVAL: i64 = 1_000;
 /// log, passed in rather than recomputed (the caller already needs it for
 /// `selection_facts`): sharing it is what makes an aggregate's spawn key and
 /// a target-dropdown entry mean the same enemy.
+/// The group aggregation for this request, or NO bands.
+///
+/// A rejected query is never fatal to the fetch. Every other stale-reference
+/// case in this path narrows to nothing — an out-of-range spawn segment
+/// aggregates to `Ok(vec![])`, an ability pin that expands to no action ids
+/// matches nothing — and a `GroupQueryError` is the same kind of thing: a pin
+/// left over from a hostility flip or a hand-edited URL. Propagating it would
+/// fail the whole command, so the log page would lose its party table, its
+/// charts, its status intervals and its legality verdicts over one bad
+/// selector. Logged rather than swallowed, because a query the frontend should
+/// never have built is still a bug worth seeing.
 fn build_groups(
     parser: &v1::Parser,
     options: &ParseOptions,
     segments: &[v1::TargetSegment],
     assignment: &[Option<usize>],
-) -> Result<Vec<v1::GroupAggregate>, String> {
-    match &options.group_query {
+) -> Vec<v1::GroupAggregate> {
+    let built = match &options.group_query {
         Some(query) => v1::aggregate_groups(
             &parser.encounter.raw_event_log,
             &parser.encounter.player_data,
@@ -1397,7 +1416,12 @@ fn build_groups(
         )
         .map_err(|e| format!("group query rejected: {e}")),
         None => Ok(Vec::new()),
-    }
+    };
+
+    built.unwrap_or_else(|error| {
+        log::warn!("{error} — the response carries no group aggregates");
+        Vec::new()
+    })
 }
 
 // `(async)` so the decompress + full reparse runs off the main thread — this is
@@ -1461,7 +1485,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         // bands under the current pins, window and grouping. Its series span
         // the FULL fight (the view slices client-side), while its measures
         // honor the query's own scrub window.
-        let groups = build_groups(&parser, &options, &segments, &assignment)?;
+        let groups = build_groups(&parser, &options, &segments, &assignment);
 
         // Only the fields the scrub commit actually consumes; everything else stays at its
         // Default so a new response field doesn't have to be mirrored as a hand-written
@@ -1562,7 +1586,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         &target_entries,
     );
 
-    let groups = build_groups(&parser, &options, &target_entries, &assignment)?;
+    let groups = build_groups(&parser, &options, &target_entries, &assignment);
 
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 
