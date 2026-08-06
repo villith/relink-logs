@@ -1779,10 +1779,22 @@ fn embedded_identity_struct(actor: usize) -> Option<StoredPlayerIdentity> {
 /// This is what damage/SBA/stun attribution uses instead of the shared
 /// character-scoped index.
 pub(crate) fn player_slot_key_for_actor(actor: *const usize) -> Option<u32> {
+    use crate::hooks::diag::read_ptr_guarded;
+
     if actor.is_null() {
         return None;
     }
-    embedded_identity_struct(actor as usize).map(|identity| slot_key(identity.party_index))
+    // Deliberately NOT `embedded_identity_struct`: this path wants only the
+    // slot, and the full read allocates a `Vec<Sigil>` and two `CString`s to
+    // hand back values that are thrown away — on a game thread, per event, and
+    // now once per damage hit for the victim gate too. `snapshot_party_index`
+    // applies the identical acceptance checks; the tests assert the two agree.
+    let record = (actor as usize).checked_add(ACTOR_RECORD_OFFSET)?;
+    let snapshot = read_ptr_guarded(record, PLAYER_IDENTITY_OFFSET)?;
+    if snapshot == 0 {
+        return None;
+    }
+    unsafe { snapshot_party_index(snapshot as *const u8) }.map(slot_key)
 }
 
 #[allow(dead_code)] // used by the hookdiag SBAUPD/SBAPOLL probes

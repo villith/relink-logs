@@ -120,7 +120,10 @@ pub fn party_slot_of(key: u32) -> Option<usize> {
     is_player_slot_key(key).then_some((key & 0x3) as usize)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// `Default` is the all-zero actor: what a hit with no resolvable attacker
+/// sends, which reads as unknown-source damage on the parser side. Derive only
+/// — bincode encodes the fields, so this does not touch the wire format.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Actor {
     /// Index of the actor, unique in the party.
     pub index: u32,

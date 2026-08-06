@@ -21,6 +21,9 @@ static_detour! {
     // The reaction-less direct-apply path (see PROCESS_DAMAGE_BYPASS_SIG): void,
     // 3 args (receiver, damage instance, mode flag).
     static ProcessDamageBypass: unsafe extern "system" fn(*const usize, *const usize, u32);
+    // The player-family hit-apply notifier (see ON_PLAYER_HIT_APPLY_SIG): void,
+    // 3 args (ExPlDamage component, damage instance, mode flag).
+    static OnPlayerHitApply: unsafe extern "system" fn(*const usize, *const usize, u32);
     // One detour per DoT-dealing status subclass; see PROCESS_DOT_SIG.
     static ProcessDotEvent0: unsafe extern "system" fn(*const usize, *const usize) -> usize;
     static ProcessDotEvent1: unsafe extern "system" fn(*const usize, *const usize) -> usize;
@@ -38,6 +41,7 @@ static_detour! {
 pub(super) fn disable() {
     super::disable_quiet("ProcessDamageEvent", &ProcessDamageEvent);
     super::disable_quiet("ProcessDamageBypass", &ProcessDamageBypass);
+    super::disable_quiet("OnPlayerHitApply", &OnPlayerHitApply);
     super::disable_quiet("ProcessDotEvent0", &ProcessDotEvent0);
     super::disable_quiet("ProcessDotEvent1", &ProcessDotEvent1);
     super::disable_quiet("ProcessDotEvent2", &ProcessDotEvent2);
@@ -341,6 +345,26 @@ const PROCESS_DAMAGE_BYPASS_SIG: &str = "c3 cc cc cc cc cc cc cc cc cc cc ' 41 5
 /// to a 2.50 cap and decays (flinch timer), +0xA44 moves <0.01/hit.
 const STUN_ACCUMULATOR_OFFSET: usize = 0xB90;
 
+/// Span an actor instance must prove readable before anything dereferences it:
+/// covers the vtable ptr at +0x00 and the actor index at +0x170. Null alone is
+/// not enough — the object can be mid-teardown with its pages still mapped.
+const ACTOR_SPAN: usize = 0x174;
+
+/// Whether a hit's victim is a party-slot actor.
+///
+/// Player-victim damage belongs to [`OnPlayerHitApplyHook`] alone — it is the
+/// only path that observes the APPLIED amount, which this instance's damage
+/// field never carries for player victims (live-proven 2026-08-05: every
+/// enemy→player evaluation on the dealt paths was either rejected or
+/// zero-damage). Gated on the VICTIM rather than the source so a future variant
+/// that DID carry player-victim damage cannot double-emit.
+///
+/// Returns the resolved slot key so callers can hand it to
+/// [`build_damage_event`] instead of making it walk the identity record again.
+fn player_victim_slot(target_specified_instance_ptr: usize) -> Option<u32> {
+    super::player::player_slot_key_for_actor(target_specified_instance_ptr as *const usize)
+}
+
 impl OnProcessDamageHook {
     pub fn new(tx: event::Tx) -> Self {
         OnProcessDamageHook { tx }
@@ -604,6 +628,14 @@ impl OnProcessDamageHook {
             return;
         }
 
+        // See `player_victim_slot`. Whether a direct-apply hit on a player also
+        // reaches the notifier is unproven (ALTDMG has never fired for one), so
+        // a skip here can only lose a hit the notifier misses — while no gate
+        // could double-count it.
+        if player_victim_slot(target_specified_instance_ptr).is_some() {
+            return;
+        }
+
         let _ = self.tx.send(Message::DamageEvent(build_damage_event(
             damage_instance,
             Actor {
@@ -617,11 +649,15 @@ impl OnProcessDamageHook {
                 parent_index: source_parent_idx,
                 parent_actor_type: source_parent_type_id,
             },
-            target_specified_instance_ptr,
+            Victim {
+                specified_instance_ptr: target_specified_instance_ptr,
+                // Proven not a party slot by the gate above.
+                slot: None,
+                current_hp: target_current_hp,
+                max_hp: target_max_hp,
+            },
             damage,
             added_stun_value,
-            target_current_hp,
-            target_max_hp,
         )));
     }
 
@@ -1076,6 +1112,11 @@ impl OnProcessDamageHook {
             }
         }
 
+        // See `player_victim_slot`.
+        if player_victim_slot(target_specified_instance_ptr).is_some() {
+            return original_value;
+        }
+
         let _ = self.tx.send(Message::DamageEvent(build_damage_event(
             damage_instance,
             Actor {
@@ -1091,11 +1132,15 @@ impl OnProcessDamageHook {
                 parent_index: source_parent_idx,
                 parent_actor_type: source_parent_type_id,
             },
-            target_specified_instance_ptr,
+            Victim {
+                specified_instance_ptr: target_specified_instance_ptr,
+                // Proven not a party slot by the gate above.
+                slot: None,
+                current_hp: target_current_hp,
+                max_hp: target_max_hp,
+            },
             damage,
             added_stun_value,
-            target_current_hp,
-            target_max_hp,
         )));
 
         original_value
@@ -1263,7 +1308,6 @@ impl OnProcessDotHook {
         // garbage. Null alone is not enough: prove the instance spans both offsets first.
         // This path only started running when the 2.0.2 signature fix made it resolve, so
         // it had never actually been exercised in the game before.
-        const ACTOR_SPAN: usize = 0x174; // covers the vtable ptr at +0x00 and idx at +0x170
         if !readable(target as usize, ACTOR_SPAN) || !readable(source as usize, ACTOR_SPAN) {
             return;
         }
@@ -1311,6 +1355,220 @@ impl OnProcessDotHook {
     }
 }
 
+/// The player-family hit-apply notifier `FUN_1427d4590` (v2.0.3 entry
+/// 0x27d4590): vtable slot +0x48 of `ExPlDamage` and the Pl####/Np0000
+/// behavior classes, called once per hit that is ACTUALLY APPLIED to a
+/// player-family actor — after the caller has clamped the damage, subtracted
+/// HP through the actor's +0x150 HP component and stamped
+/// `*(u16*)(instance + 0xC6) = 0xC`. Its own first act is dispatching vtable
+/// slot +0x80, the SBA grant virtual `OnSBAGrantHook` already detours — which
+/// is how this entry was found.
+///
+/// This is the ONLY place applied enemy→player damage is observable
+/// (2026-08-05 RE + live session): ProcessDamageEvent returns a bool in AL
+/// (its ret is NOT a damage value), rejects the per-frame hitbox-overlap
+/// evaluations (damage > 0, AL = 0 — 21,576 in one session), and the
+/// player-victim calls it DOES accept carry `+0xD4 == 0`. The two real apply
+/// paths (the player take-damage virtual 0x9d0290 and the message-driven
+/// apply 0xa7fc80) both bypass the dealt flow and converge here with the
+/// final applied damage in `+0xD4`.
+type OnPlayerHitApplyFunc = unsafe extern "system" fn(*const usize, *const usize, u32);
+
+/// int3 padding + prologue through the slot +0x80 dispatch. The prologue reads
+/// rcx/rdx/r8d — arity 3 (component, damage instance, mode), void return.
+/// sigscan 2026-08-05: exactly 1 match, cursor=0x27d4590.
+const ON_PLAYER_HIT_APPLY_SIG: &str = "cc cc cc cc cc ' 41 57 41 56 56 57 53 48 81 ec c0 00 00 \
+     00 44 89 c3 48 89 d6 48 89 cf 48 8b 01 ff 90 80 00 00 00";
+
+/// Emits the damage-TAKEN stream: one [`DamageEvent`] per hit actually applied
+/// to a party-slot actor. The dealt detours are gated off player victims (see
+/// `run`/`run_bypass`), so this detour is the single author of taken events —
+/// the only exception is DoT ticks on players, which stay with the DoT hooks
+/// (their application sums inside `ExStatus::update`, not through a damage
+/// call; whether it ALSO reaches this notifier is a live-verification item —
+/// if taken DoT double-counts, filter `ActionType::DamageOverTime` here).
+#[derive(Clone)]
+pub struct OnPlayerHitApplyHook {
+    tx: event::Tx,
+}
+
+impl OnPlayerHitApplyHook {
+    pub fn new(tx: event::Tx) -> Self {
+        Self { tx }
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(addr) = process.search_address(ON_PLAYER_HIT_APPLY_SIG) {
+            #[cfg(feature = "console")]
+            println!("Found player hit apply");
+
+            let cloned_self = self.clone();
+            unsafe {
+                let func: OnPlayerHitApplyFunc = std::mem::transmute(addr);
+                OnPlayerHitApply.initialize(func, move |a1, a2, a3| cloned_self.run(a1, a2, a3))?;
+                OnPlayerHitApply.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find player_hit_apply"));
+        }
+
+        Ok(())
+    }
+
+    fn run(&self, component: *const usize, damage_instance_ptr: *const usize, mode: u32) {
+        unsafe { OnPlayerHitApply.call(component, damage_instance_ptr, mode) };
+
+        use crate::hooks::diag::{read_ptr_guarded, read_u32_guarded};
+
+        // Cheapest gate first: the notifier also fires from ProcessDamageEvent's
+        // accepted tail for player victims, always with `+0xD4 == 0` — the
+        // apply paths are the only callers that put the final damage there.
+        let damage = read_u32_guarded(damage_instance_ptr as usize, 0xD4) as i32;
+        if damage <= 0 {
+            return;
+        }
+        // `build_damage_event` below reads through `base_damage` at +0x2D4;
+        // the 0xa7fc80 apply builds its instance on the stack, so prove the
+        // span rather than assume the heap layout.
+        if !readable(damage_instance_ptr as usize, 0x2D8) {
+            return;
+        }
+
+        // Victim actor: component[1] dereferenced — the same two-hop walk the
+        // notifier itself (and ProcessDamageEvent) uses to reach the entity.
+        let Some(victim_ptr) = read_ptr_guarded(component as usize, 0x08)
+            .and_then(|entity_ref| read_ptr_guarded(entity_ref, 0x00))
+            .filter(|ptr| *ptr != 0)
+        else {
+            return;
+        };
+        // The slot resolution below falls through to `actor_type_id`, which
+        // CALLS the victim's +0x58 vfunc. `readable(ACTOR_SPAN)` only proves
+        // the object is mapped, not that its vtable slot is — probe the slot
+        // too, exactly as `status::holder_index` does, so a stale layout fails
+        // closed instead of dispatching through a garbage pointer on a game
+        // thread.
+        if !readable(victim_ptr, ACTOR_SPAN)
+            || !super::summon::vfunc_slot_readable(victim_ptr as *const usize, 0x58)
+        {
+            return;
+        }
+        // Party-slot victims only, resolved like a SOURCE so a Pl2000
+        // dragon-form victim files under its owner's slot. Np0000 crew NPCs
+        // and story actors resolve None — the meter has no row for them.
+        let Some(victim_slot) = super::player_slot_key_for_source(victim_ptr as *const usize)
+        else {
+            return;
+        };
+
+        // Attacker: the instance's `+0x18` holds an entity HANDLE, and the
+        // actor is the specified instance at ITS `+0x70` — the same two-hop
+        // resolution every damage detour uses (`damage_source_instance_ptr`).
+        // Calling `actor_type_id` on the handle itself jumps through a
+        // non-vtable qword and crashed the game on the first applied hit
+        // (live, 2026-08-05). Zeroed on the message-driven apply path — those
+        // hits carry no attacker, and an all-zero source still reads as
+        // unknown-source damage taken on the parser side.
+        let source_ptr = damage_source_instance_ptr(damage_instance_ptr).filter(|ptr| {
+            *ptr != 0
+                && readable(*ptr, ACTOR_SPAN)
+                && super::summon::vfunc_slot_readable(*ptr as *const usize, 0x58)
+        });
+        // Resolved once. `player_slot_key_for_source` is
+        // `player_slot_key_for_actor(x).or_else(player_keyed_parent(...))`, so
+        // asking it for the drop verdict and then rebuilding the Actor would
+        // repeat the +0x58 vtable call into game code and the owner walk on
+        // every applied hit — instead, derive the verdict from the parts.
+        let source = match source_ptr {
+            Some(src) => {
+                let src_ptr = src as *const usize;
+                // A PLAYER-sourced hit on a player (self-damage skills) is
+                // dropped: the parser's taken stream requires an unknown
+                // source, and letting it through would file a party member as
+                // an enemy target row on the dealt pipeline instead.
+                if super::player::player_slot_key_for_actor(src_ptr).is_some() {
+                    return;
+                }
+                let src_type = actor_type_id(src_ptr);
+                let src_idx = actor_idx(src_ptr);
+                let (parent_type, parent_idx) =
+                    super::player_keyed_parent(src_type, src_idx, src_ptr);
+                // The owner-resolved half of `player_slot_key_for_source`, for
+                // free from the parts already computed.
+                if protocol::is_player_slot_key(parent_idx) {
+                    return;
+                }
+                Actor {
+                    index: src_idx,
+                    // Resolved so summons sharing a generic body class get
+                    // their own row, exactly as both dealt paths publish them —
+                    // otherwise the same attacker reads as its concrete class
+                    // on the dealt stream and the generic body hash here.
+                    actor_type: super::summon::published_actor_type(src_type, src_ptr),
+                    parent_index: parent_idx,
+                    parent_actor_type: parent_type,
+                }
+            }
+            // The message-driven apply path carries no attacker; an all-zero
+            // source still reads as unknown-source damage taken to the parser.
+            None => Actor::default(),
+        };
+
+        #[cfg(feature = "hookdiag")]
+        {
+            use std::sync::atomic::{AtomicU32, Ordering as AtomicOrdering};
+            static N: AtomicU32 = AtomicU32::new(0);
+            let n = N.fetch_add(1, AtomicOrdering::Relaxed) + 1;
+            if n <= 16 || n % 64 == 0 {
+                // +0xC6 is the caller's applied marker (0xC on both known
+                // apply paths) — logged, not gated on, until live data says
+                // every real apply stamps it.
+                let state = read_u32_guarded(damage_instance_ptr as usize, 0xC4) >> 16;
+                log::info!(
+                    "TAKENAPPLY n={n} slot={victim_slot:#x} dmg={damage} mode={mode} \
+                     state={state:#x} src_type={:#010x} action={}",
+                    source.parent_actor_type,
+                    read_u32_guarded(damage_instance_ptr as usize, 0x16C),
+                );
+            }
+        }
+
+        let damage_instance = unsafe {
+            NonNull::new(damage_instance_ptr as *mut DamageInstance)
+                .unwrap()
+                .as_ref()
+        };
+        let (target_current_hp, target_max_hp) = read_target_hp_pair(victim_ptr).unzip();
+        // `victim_slot` rather than letting the builder resolve it: that lookup
+        // keys only actors carrying a slot identity THEMSELVES, while the
+        // resolution above also covers owned bodies (dragon form).
+        let _ = self.tx.send(Message::DamageEvent(build_damage_event(
+            damage_instance,
+            source,
+            Victim {
+                specified_instance_ptr: victim_ptr,
+                slot: Some(victim_slot),
+                current_hp: target_current_hp,
+                max_hp: target_max_hp,
+            },
+            damage,
+            0.0,
+        )));
+    }
+}
+
+/// The hit's victim, as the calling detour already resolved it. Every caller
+/// has to walk the actor before it can decide whether to emit at all, so the
+/// builder is handed those answers rather than re-deriving any of them.
+struct Victim {
+    specified_instance_ptr: usize,
+    /// The party slot when the victim is a party member, `None` for anything
+    /// else — enemies keep the raw game index.
+    slot: Option<u32>,
+    current_hp: Option<u64>,
+    max_hp: Option<u64>,
+}
+
 /// Assembles the [`DamageEvent`] both damage detours emit, so the send-side
 /// rules live in exactly one place: flag classification, the
 /// supplementary-damage cap/stun strip, the no-cap sentinel, the base-damage
@@ -1318,12 +1576,16 @@ impl OnProcessDotHook {
 fn build_damage_event(
     damage_instance: &DamageInstance,
     source: Actor,
-    target_specified_instance_ptr: usize,
+    target: Victim,
     damage: i32,
     added_stun_value: f32,
-    target_current_hp: Option<u64>,
-    target_max_hp: Option<u64>,
 ) -> DamageEvent {
+    let Victim {
+        specified_instance_ptr: target_specified_instance_ptr,
+        slot: target_slot,
+        current_hp: target_current_hp,
+        max_hp: target_max_hp,
+    } = target;
     let flags = damage_instance.flags;
     let action_type = classify_action_type(flags, damage_instance.action_id);
     let is_supplementary = matches!(action_type, ActionType::SupplementaryDamage(_));
@@ -1356,9 +1618,13 @@ fn build_damage_event(
     // character-scoped and would merge two players on the same character, and
     // the parser's damage-taken stream recognizes victims by their slot key.
     // Enemies keep the raw game index.
+    //
+    // `target_slot` is the caller's already-resolved answer — every caller has
+    // had to ask this question before getting here (the dealt paths to gate
+    // player victims off, the taken path to identify its victim), so resolving
+    // it again here would walk the identity record twice per hit.
     let target_parent_index =
-        super::player::player_slot_key_for_actor(target_specified_instance_ptr as *const usize)
-            .unwrap_or_else(|| actor_idx(target_specified_instance_ptr as *const usize));
+        target_slot.unwrap_or_else(|| actor_idx(target_specified_instance_ptr as *const usize));
     DamageEvent {
         source,
         target: Actor {

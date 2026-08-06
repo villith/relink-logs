@@ -1720,7 +1720,7 @@ pub struct SelectionFact {
 /// slot-keys player victims the same way it keys player sources) and the
 /// source's parent is no known player character. A player-sourced hit on a
 /// player keeps flowing through the dealt pipeline unchanged.
-pub(crate) fn is_damage_taken_event(event: &DamageEvent) -> bool {
+pub fn is_damage_taken_event(event: &DamageEvent) -> bool {
     protocol::is_player_slot_key(event.target.parent_index)
         && matches!(
             CharacterType::from_hash(event.source.parent_actor_type),

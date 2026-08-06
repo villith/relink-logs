@@ -5,7 +5,7 @@ use crate::{event, process::Process};
 
 use self::{
     area::OnAreaEnterHook,
-    damage::{OnProcessDamageHook, OnProcessDotHook},
+    damage::{OnPlayerHitApplyHook, OnProcessDamageHook, OnProcessDotHook},
     endless::{OnEndlessBuffInstallHook, OnEndlessMgrDtorHook, OnReceptionFlowDispatchHook},
     player::{OnLoadPlayerHook, OnLoadPlayerIdentityHook},
     quest::{OnLoadQuestHook, OnQuestCompleteHook},
@@ -101,6 +101,13 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     try_step(
         "process_dot",
         OnProcessDotHook::new(tx.clone()).setup(&process),
+    );
+    // The damage-TAKEN stream: hits applied to party-slot actors, emitted by
+    // the player-family hit-apply notifier. Non-fatal: without it the dealt
+    // meter still works, damage taken just records nothing.
+    try_step(
+        "player_hit_apply",
+        OnPlayerHitApplyHook::new(tx.clone()).setup(&process),
     );
     try_step("death", OnDeathHook::new(tx.clone()).setup(&process));
 
