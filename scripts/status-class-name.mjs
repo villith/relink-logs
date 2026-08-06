@@ -27,6 +27,10 @@ export const prettifyClassName = (className) => {
   // Only a LEADING Buff is noise ("BuffGuardpoint"); a trailing one is meaning.
   if (rest.startsWith("Buff")) rest = rest.slice("Buff".length);
   return rest
+    // A capital that begins a new word after another capital: "ABuff" is
+    // "A Buff". Three real classes need it (Pl2200UpgradeABuff and friends);
+    // it must run before the lower→upper split so both boundaries are seen.
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/\s+/g, " ")
     .trim();

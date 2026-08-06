@@ -7,11 +7,20 @@ test("strips the Status prefix and the actor code, then splits CamelCase", () =>
   assert.equal(prettifyClassName("StatusPl1200UniqueBuffGuardpoint"), "Guardpoint");
   assert.equal(prettifyClassName("StatusPl0200UniqueBuffAres"), "Ares");
   assert.equal(prettifyClassName("StatusPl1100Cover"), "Cover");
+  // Em is the only other actor code prefix that occurs in the real family (12 classes).
+  assert.equal(prettifyClassName("StatusEm1700AttackBuff"), "Attack Buff");
 });
 
 test("handles classes that omit the Status prefix", () => {
   // Naming is inconsistent in the binary — Pl0400ConcentrationEx has no prefix.
   assert.equal(prettifyClassName("Pl0400ConcentrationEx"), "Concentration Ex");
+});
+
+test("splits single-letter words before capitalized words", () => {
+  // Three real classes have uppercase runs before capitalized words.
+  assert.equal(prettifyClassName("StatusPl2200UpgradeABuff"), "Upgrade A Buff");
+  assert.equal(prettifyClassName("StatusPl2200UpgradeBBuff"), "Upgrade B Buff");
+  assert.equal(prettifyClassName("StatusPl2400UniqueDebuffBanGSwing"), "Debuff Ban G Swing");
 });
 
 test("keeps a trailing Buff rather than guessing", () => {
