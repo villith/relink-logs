@@ -1122,7 +1122,7 @@
       "303": "空中连击 4",
       "400": "上挑攻击",
       "410": "下落攻击",
-      "9998": "Shippegaeshi (Just)",
+      "9998": "Shippegaeshi (精准)",
       "skill-groups": {
         "normal-attack": "普通攻击",
         "flashing-void": "闪空",
