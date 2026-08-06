@@ -52,7 +52,14 @@ impl OnDeathHook {
         let ret = unsafe { OnDeathEvent.call(a1) };
 
         let entity_ptr = unsafe { a1.byte_add(0x10).read() as *const usize };
-        let actor_index = unsafe { entity_ptr.byte_add(0x170).read() } as u32;
+        // A player death must carry the same PLAYER SLOT KEY every other event
+        // carries (damage parents, SBA, stun): the parser and the analysis
+        // view's death markers filter this index against the party's keys, and
+        // the raw `+0x170` entity index stopped matching them when attribution
+        // moved to slot keys (v2.0.2) — no marker ever rendered. Enemy deaths
+        // keep the raw index and are filtered out downstream as before.
+        let raw_index = unsafe { entity_ptr.byte_add(0x170).read() } as u32;
+        let actor_index = super::player_slot_key_for_source(entity_ptr).unwrap_or(raw_index);
         let death_counter = unsafe { a1.byte_add(0xEC).read() } as u32;
 
         let event = protocol::Message::OnDeathEvent(protocol::OnDeathEvent {
