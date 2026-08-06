@@ -11,6 +11,10 @@ export type AuraChip = {
   /** Uptime within the current chart window, 0–100 (already rounded). */
   uptimePercent: number;
   selected: boolean;
+  /** The effect's art, resolved by the chip builder the same way the effects
+   * table resolves its rows' — undefined is the honest state for the ~90
+   * internal effects that have none. */
+  iconUrl?: string;
 };
 
 export type AuraStripProps = {
@@ -45,6 +49,7 @@ export const AuraStrip = ({ titleKey, chips, onSelect, onClear }: AuraStripProps
             aria-pressed={chip.selected}
             onClick={() => (chip.selected ? onClear() : onSelect(chip.aura))}
           >
+            {chip.iconUrl && <img className="analysis-row-icon" src={chip.iconUrl} alt="" />}
             <span className="analysis-aura-chip-name">{chip.label}</span>
             <span className="analysis-num analysis-aura-chip-uptime">{`${chip.uptimePercent}%`}</span>
           </UnstyledButton>

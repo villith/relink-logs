@@ -667,13 +667,20 @@ export const AnalysisView = () => {
         else byKey.set(key, [interval]);
       }
       return [...byKey.entries()]
-        .map(([key, group]) => ({
-          aura: `${anchor}:${key}`,
-          label: statusDisplayLabel(key),
-          uptimePercent:
-            fightDurationMs === 0 ? 0 : Math.min(100, Math.round((uptimeMs(group) / fightDurationMs) * 100)),
-          selected: state.aura === `${anchor}:${key}`,
-        }))
+        .map(([key, group]) => {
+          // The same art the effects table shows beside the same name — the
+          // chip is that row's filter form, so the two must wear one picture.
+          const statusId = statusIdOfKey(key);
+          const iconUrl = statusId === null ? undefined : statusIconUrl(statusId);
+          return {
+            aura: `${anchor}:${key}`,
+            label: statusDisplayLabel(key),
+            uptimePercent:
+              fightDurationMs === 0 ? 0 : Math.min(100, Math.round((uptimeMs(group) / fightDurationMs) * 100)),
+            selected: state.aura === `${anchor}:${key}`,
+            ...(iconUrl === undefined ? {} : { iconUrl }),
+          };
+        })
         .sort((a, b) => b.uptimePercent - a.uptimePercent);
     },
     [state.source, state.target, state.aura, hostility, windowedIntervals, statusDisplayLabel, fightDurationMs]
