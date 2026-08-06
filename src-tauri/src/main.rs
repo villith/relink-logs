@@ -1483,11 +1483,14 @@ fn build_ability_series(
     parser: &v1::Parser,
     options: &ParseOptions,
     player_indices: &[u32],
-    chart_len: usize,
 ) -> HashMap<u32, Vec<v1::AbilitySeries>> {
     let Some(query) = &options.ability_series else {
         return HashMap::new();
     };
+
+    // Sized from the FULL log like every other chart, not from the scrub
+    // window: these walk the whole event log, and the view slices client-side.
+    let chart_len = (parser.full_log_duration() / DPS_INTERVAL) as usize + 1;
 
     let wanted: Vec<u32> = match query.player {
         Some(player) => player_indices
@@ -1592,6 +1595,20 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         // honor the query's own scrub window.
         let groups = build_groups(&parser, &options, &segments, &assignment);
 
+        // The drilled Stun/SBA bands, built here too: unlike the other charts
+        // these are NOT carried over from the base load. A drill is a pin
+        // change, and pins are exactly what the scoped fetch answers — and that
+        // fetch sets `state_only`, so building them only below would mean the
+        // drill never received them. Costs nothing undrilled: the query is
+        // absent, and `build_ability_series` returns empty without walking.
+        let player_indices: Vec<u32> = parser
+            .derived_state
+            .party
+            .values()
+            .map(|player| player.index)
+            .collect();
+        let ability_series = build_ability_series(&parser, &options, &player_indices);
+
         // Only the fields the scrub commit actually consumes; everything else stays at its
         // Default so a new response field doesn't have to be mirrored as a hand-written
         // zero here (where forgetting it would silently return stale-looking data).
@@ -1606,6 +1623,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             legality: findings,
             selection_facts,
             groups,
+            ability_series,
             ..Default::default()
         });
     }
@@ -1698,15 +1716,8 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
 
     let groups = build_groups(&parser, &options, &target_entries, &assignment);
 
-    // The drilled Stun/SBA tabs' bands. Sized from the same full-log chart
-    // length as every other chart above, so a band indexes the same buckets the
-    // plot's X axis does.
-    let ability_series = build_ability_series(
-        &parser,
-        &options,
-        &player_indices,
-        (duration / DPS_INTERVAL) as usize + 1,
-    );
+    // The drilled Stun/SBA tabs' bands.
+    let ability_series = build_ability_series(&parser, &options, &player_indices);
 
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 

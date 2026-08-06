@@ -1436,13 +1436,18 @@ export const AnalysisView = () => {
   // Only the derived tabs reach this: everything else either has no `ability`
   // grouping or gets its bands from the group query.
   const abilitySeries = useMemo(() => {
-    if (spec.groupBy !== "ability") return null;
+    // `caps.dataPath`, not just the grouping: `scoped` survives a metric switch
+    // until the NEXT response lands, so going from Stun/ability to Damage/ability
+    // would otherwise draw the previous tab's stun bands over the damage chart
+    // for one render. Gated on the same condition `abilityQuery` requests under,
+    // so the chart can only draw bands this tab actually asked for.
+    if (caps.dataPath !== "derived" || spec.groupBy !== "ability") return null;
     const bands =
       pins.source === null ? Object.values(scopedAbilitySeries).flat() : scopedAbilitySeries[pins.source] ?? [];
     if (bands.length === 0) return null;
     // Same cap as the group bands — both feed the eight-colour palette.
     return abilityBands(bands, GROUP_TOP_N, bandLabelFor);
-  }, [spec.groupBy, pins.source, scopedAbilitySeries, bandLabelFor]);
+  }, [caps.dataPath, spec.groupBy, pins.source, scopedAbilitySeries, bandLabelFor]);
 
   // Which series the per-player chart draws. identityPlayers, not players: these
   // charts hold the whole party, so a pin must not drop curves from the plot.

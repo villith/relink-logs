@@ -66,7 +66,7 @@ pub fn predict(snap: &SynthesisSnapshot, a: &SynthesisSigil, b: &SynthesisSigil)
         .wrapping_add(1);
     let warm = (n.wrapping_mul(9) as u64)
         .wrapping_add(pair_key)
-        .wrapping_add(snap.seed_counter as u64)
+        .wrapping_add(snap.saved_seed as u64)
         % 1000;
 
     let mut s = snap.rng_state;
@@ -111,6 +111,30 @@ pub fn predict(snap: &SynthesisSnapshot, a: &SynthesisSigil, b: &SynthesisSigil)
     }
 }
 
+/// True when the game has latched its synthesis seed.
+///
+/// Entering the synthesis screen copies the live RNG slot into the manager's
+/// saved seed (`FUN_141ce1240`), and every commit restores the slot from that
+/// seed as it returns — both leave the two words equal, so at rest they agree.
+/// While they disagree the player has not opened the screen since the stream
+/// last moved (completing a quest reseeds it), and opening it WILL relatch:
+/// any prediction made now is computed from a seed the game is about to
+/// replace, which is why the first synthesis after a quest reads wrong.
+pub fn seed_latched(snap: &SynthesisSnapshot) -> bool {
+    snap.rng_state == snap.saved_seed
+}
+
+/// How many syntheses this save has performed, as the sum of every pair
+/// counter. Both seed words survive a synthesis untouched (the commit puts the
+/// RNG slot back), so this is the only thing a staleness poll can compare to
+/// notice one — and a synthesis does change its own pair's warm-up.
+pub fn synth_count(snap: &SynthesisSnapshot) -> u32 {
+    snap.pair_counters
+        .values()
+        .copied()
+        .fold(0, u32::wrapping_add)
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SynthesisQuery {
@@ -137,6 +161,10 @@ pub struct SynthesisStatus {
     pub sigil_count: u32,
     /// True when RNG state is 0 (the game will reseed from entropy — unpredictable).
     pub rng_unpredictable: bool,
+    /// False while the game has not latched its synthesis seed — see
+    /// [`seed_latched`]. Predictions made now are computed from a seed the
+    /// game replaces the moment the player opens the synthesis screen.
+    pub seed_latched: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -147,9 +175,15 @@ pub struct SynthesisSearchResponse {
     pub sigil_count: u32,
     pub rng_unpredictable: bool,
     /// Seed identity the search was computed from; when the live values move
-    /// off these, the result list is stale.
+    /// off these, the result list is stale. All three must be compared: a
+    /// synthesis moves only `synth_count`, and relatching moves only the two
+    /// seed words.
     pub rng_state: u32,
-    pub seed_counter: u32,
+    pub saved_seed: u32,
+    pub synth_count: u32,
+    /// False when the game had not latched its seed at search time — see
+    /// [`seed_latched`].
+    pub seed_latched: bool,
 }
 
 /// Item ids of "special" sigils the game refuses as synthesis material
@@ -326,7 +360,7 @@ mod tests {
     /// Full predict() against an independently computed fixture:
     /// A = {t 0x100 l11, t 0x200 l15, rec 5}, B = {t 0x300 l12, empty, rec 7}
     /// pair_key = 0x100+0x200+0x300+(5+7) = 1548; counters empty -> n=1;
-    /// seed_counter = 42 -> warm = (9+1548+42) % 1000 = 599.
+    /// saved_seed = 42 -> warm = (9+1548+42) % 1000 = 599.
     /// rng_state = 123456789; weights {38: (3,7)}.
     /// Expected (Python reference): lucky = true, result = [0x300, 0x200] (0x100 last).
     #[test]
@@ -335,7 +369,7 @@ mod tests {
         let b = sigil(0xB, 0x300, 12, EMPTY_TRAIT, 0, 7);
         let mut snap = SynthesisSnapshot {
             rng_state: 123_456_789,
-            seed_counter: 42,
+            saved_seed: 42,
             ..Default::default()
         };
         snap.level_weights.insert(38, (3, 7));
@@ -352,7 +386,7 @@ mod tests {
         let b = sigil(0xB, 0x300, 12, 0x400, 3, 7);
         let mut snap = SynthesisSnapshot {
             rng_state: 0xdead_beef,
-            seed_counter: 7,
+            saved_seed: 7,
             ..Default::default()
         };
         snap.level_weights.insert(41, (10, 1));
@@ -367,7 +401,7 @@ mod tests {
         let b = sigil(0xB, 0x300, 12, EMPTY_TRAIT, 0, 7);
         let snap = SynthesisSnapshot {
             rng_state: 123_456_789,
-            seed_counter: 42,
+            saved_seed: 42,
             ..Default::default()
         };
         let p = predict(&snap, &a, &b);
@@ -384,7 +418,7 @@ mod tests {
         let b = sigil(0xB, 0x300, 12, EMPTY_TRAIT, 0, 7);
         let mut snap = SynthesisSnapshot {
             rng_state: 123_456_789,
-            seed_counter: 42,
+            saved_seed: 42,
             ..Default::default()
         };
         let base = predict(&snap, &a, &b);
@@ -402,7 +436,7 @@ mod tests {
     fn search_snap() -> SynthesisSnapshot {
         let mut snap = SynthesisSnapshot {
             rng_state: 987_654_321,
-            seed_counter: 42,
+            saved_seed: 42,
             ..Default::default()
         };
         snap.trait_to_item.insert(0x200, 0x9999);
@@ -551,7 +585,7 @@ mod tests {
         let b = sigil(0xB, 0x300, 12, 0x400, 1, 3);
         let mut snap = SynthesisSnapshot {
             rng_state: 987_654_321,
-            seed_counter: 100,
+            saved_seed: 100,
             ..Default::default()
         };
         snap.level_weights.insert(28, (2, 5));
@@ -572,7 +606,7 @@ mod tests {
     fn search_sorts_matches_by_input_levels() {
         let snap = SynthesisSnapshot {
             rng_state: 1,
-            seed_counter: 1,
+            saved_seed: 1,
             sigils: vec![
                 sigil(1, 0x200, 15, 0xA3, 15, 1),
                 sigil(2, 0x300, 15, 0xA4, 15, 2),
@@ -596,6 +630,35 @@ mod tests {
             .map(|m| (m.sigil_a.uid, m.sigil_b.uid))
             .collect();
         assert_eq!(uids, vec![(3, 4), (1, 4), (2, 3), (1, 2)]);
+    }
+
+    /// Entering the synthesis screen latches the live RNG slot into the
+    /// manager's saved seed (`FUN_141ce1240`), and the commit restores the
+    /// slot from that seed on its way out — both leave the two words equal.
+    /// A MISMATCH therefore means the game has not latched since the stream
+    /// last moved, so the seed every prediction used is about to change the
+    /// moment the player opens the screen.
+    #[test]
+    fn seed_is_latched_only_when_the_slot_matches_the_saved_seed() {
+        let mut snap = SynthesisSnapshot {
+            rng_state: 0xabc,
+            saved_seed: 0xabc,
+            ..Default::default()
+        };
+        assert!(seed_latched(&snap));
+        snap.rng_state = 0xabd;
+        assert!(!seed_latched(&snap));
+    }
+
+    /// The search response reports the same tally the staleness poll reads, so
+    /// the poll can compare them; a synthesis moves nothing else it can see.
+    #[test]
+    fn synth_count_totals_the_pair_counters() {
+        let mut snap = SynthesisSnapshot::default();
+        assert_eq!(synth_count(&snap), 0);
+        snap.pair_counters.insert(11, 2);
+        snap.pair_counters.insert(22, 5);
+        assert_eq!(synth_count(&snap), 7);
     }
 
     fn result(trait1: u32, trait2: Option<u32>, lucky: bool) -> Prediction {
@@ -668,7 +731,7 @@ mod tests {
     fn search_drops_pair_whose_result_you_already_own() {
         let snap = SynthesisSnapshot {
             rng_state: 4,
-            seed_counter: 1,
+            saved_seed: 1,
             sigils: vec![
                 sigil(1, 0x200, 11, 0x300, 11, 5),
                 sigil(2, 0x200, 11, 0x300, 11, 9),

@@ -40,8 +40,8 @@ async fn main() -> Result<()> {
         (Ok(a), Ok(Some(b))) => {
             println!(
                 "synthesis: rpc {} sigils (rng {:#x}, seed {}), rpm {} sigils (rng {:#x}, seed {}) => {}",
-                a.sigils.len(), a.rng_state, a.seed_counter,
-                b.sigils.len(), b.rng_state, b.seed_counter,
+                a.sigils.len(), a.rng_state, a.saved_seed,
+                b.sigils.len(), b.rng_state, b.saved_seed,
                 if a == b { "IDENTICAL" } else { "DIFFER (re-run while idle in a menu)" }
             );
         }

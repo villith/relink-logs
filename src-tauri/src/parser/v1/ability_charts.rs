@@ -420,7 +420,6 @@ pub fn build_ability_sba_chart(
                 // `action_id`; the parser reads that as `Skill(Normal(id))`.
                 let cause = gain
                     .cause
-                    .clone()
                     .unwrap_or(SbaGainCause::Skill(ActionType::Normal(gain.action_id)));
 
                 match cause {

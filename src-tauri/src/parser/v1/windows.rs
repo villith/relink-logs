@@ -111,6 +111,12 @@ pub fn corroborated_sba_activations(events: &[(i64, Message)]) -> HashSet<usize>
 /// back, so consecutive activity closer than [`SBA_CLUSTER_GAP_MS`] is one
 /// window: the stretch the boss is actually disabled for. A cluster of one
 /// lone event has no width and draws nothing.
+///
+/// Every window's span is `[start, end)` — end-EXCLUSIVE, the wire mask's own
+/// convention. Link and Break get that for free (their end is the state-exit
+/// transition's timestamp), but an SBA cluster's last activity is its
+/// finisher HIT, so the cluster closes one ms after it — otherwise filtering
+/// by the window drops the finisher, typically its biggest hit.
 pub fn assemble_chart_windows(
     events: &[(i64, Message)],
     start_time: i64,
@@ -138,7 +144,11 @@ pub fn assemble_chart_windows(
             sba_cluster = Some(match sba_cluster {
                 Some((first, last)) if at - last <= SBA_CLUSTER_GAP_MS => (first, at),
                 Some((first, last)) => {
-                    windows.push(window(ChartWindowKind::Sba, first, last, None));
+                    // A cluster of one lone event is a moment, not a span —
+                    // the +1 close must not widen it into a 1ms window.
+                    if last > first {
+                        windows.push(window(ChartWindowKind::Sba, first, last + 1, None));
+                    }
                     (at, at)
                 }
                 None => (at, at),
@@ -180,7 +190,9 @@ pub fn assemble_chart_windows(
         windows.push(window(ChartWindowKind::Link, start, fight_end_ms, None));
     }
     if let Some((first, last)) = sba_cluster {
-        windows.push(window(ChartWindowKind::Sba, first, last, None));
+        if last > first {
+            windows.push(window(ChartWindowKind::Sba, first, last + 1, None));
+        }
     }
     for (actor_index, start) in break_open {
         windows.push(window(
@@ -290,7 +302,9 @@ mod tests {
         // The real shape (log 1786, slot 1): the opening hit lands BEFORE the
         // perform event, ticks follow, and the finisher lands ~8s after the
         // opener. The window is the whole stretch, whichever side of the
-        // perform each hit fell on.
+        // perform each hit fell on — closed one ms AFTER the finisher, so a
+        // half-open `[start, end)` mask still admits the finisher itself
+        // (log 1796: the chain's biggest hit lands at the exact last ms).
         let events = vec![
             sba_damage(187_183, 1),
             perform(189_203, 1),
@@ -304,7 +318,7 @@ mod tests {
             vec![ChartWindow {
                 kind: ChartWindowKind::Sba,
                 start_ms: 187_183,
-                end_ms: 195_450,
+                end_ms: 195_451,
                 actor_index: None
             }]
         );
@@ -334,7 +348,7 @@ mod tests {
         ];
         let windows = assemble_chart_windows(&events, 0, 300_000);
         assert_eq!(windows.len(), 1);
-        assert_eq!((windows[0].start_ms, windows[0].end_ms), (218_285, 244_527));
+        assert_eq!((windows[0].start_ms, windows[0].end_ms), (218_285, 244_528));
     }
 
     #[test]
@@ -349,8 +363,8 @@ mod tests {
         ];
         let windows = assemble_chart_windows(&events, 0, 100_000);
         assert_eq!(windows.len(), 2);
-        assert_eq!((windows[0].start_ms, windows[0].end_ms), (20_000, 27_000));
-        assert_eq!((windows[1].start_ms, windows[1].end_ms), (60_000, 67_000));
+        assert_eq!((windows[0].start_ms, windows[0].end_ms), (20_000, 27_001));
+        assert_eq!((windows[1].start_ms, windows[1].end_ms), (60_000, 67_001));
     }
 
     #[test]
@@ -366,7 +380,7 @@ mod tests {
         ];
         let windows = assemble_chart_windows(&events, 0, 300_000);
         assert_eq!(windows.len(), 1);
-        assert_eq!((windows[0].start_ms, windows[0].end_ms), (180_000, 188_000));
+        assert_eq!((windows[0].start_ms, windows[0].end_ms), (180_000, 188_001));
     }
 
     #[test]
@@ -385,7 +399,7 @@ mod tests {
         );
         // The damage itself still shades — an art demonstrably played.
         let windows = assemble_chart_windows(&events, 0, 100_000);
-        assert_eq!((windows[0].start_ms, windows[0].end_ms), (10_000, 17_000));
+        assert_eq!((windows[0].start_ms, windows[0].end_ms), (10_000, 17_001));
     }
 
     #[test]
@@ -402,7 +416,15 @@ mod tests {
             hit,
         ];
         let windows = assemble_chart_windows(&events, 0, 100_000);
-        assert_eq!((windows[0].start_ms, windows[0].end_ms), (20_000, 26_000));
+        assert_eq!((windows[0].start_ms, windows[0].end_ms), (20_000, 26_001));
+    }
+
+    #[test]
+    fn a_lone_sba_hit_is_a_moment_not_a_window() {
+        // One stray SBA-typed hit with nothing around it: a cluster of one
+        // draws nothing — the end-exclusive close must not widen it to 1ms.
+        let events = vec![sba_damage(30_000, 2)];
+        assert_eq!(assemble_chart_windows(&events, 0, 100_000), Vec::new());
     }
 
     #[test]
