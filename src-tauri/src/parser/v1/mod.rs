@@ -33,7 +33,7 @@ mod windows;
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
 pub use groups::{
     aggregate_groups, AbilityFilter, ActorRef, Dimension, GroupAggregate, GroupHostility, GroupKey,
-    GroupMeasure, GroupMetric, GroupQuery, GroupQueryError,
+    GroupMeasure, GroupMetric, GroupQuery, GroupQueryError, TimeWindow,
 };
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::{PlayerState, SbaSourceKind};
@@ -2513,6 +2513,23 @@ impl Parser {
         from_ms: Option<i64>,
         up_to_ms: Option<i64>,
     ) {
+        self.reparse_with_options(target_spans, from_ms, up_to_ms, None);
+    }
+
+    /// [`Self::reparse_with_options_window`] plus the analysis view's window
+    /// filter: `windows` is a mask of fight-relative spans with the groups
+    /// path's exact semantics (`GroupQuery::windows`) — an event is admitted
+    /// when its timestamp lies inside ANY span (`from_ms <= t < up_to_ms`),
+    /// `Some(&[])` admits nothing, `None` is no mask. Unlike `from_ms`, the
+    /// mask never moves the derived start time: rates stay measured against
+    /// the scrub window, the aura filter's own convention.
+    pub fn reparse_with_options(
+        &mut self,
+        target_spans: &[TargetSpan],
+        from_ms: Option<i64>,
+        up_to_ms: Option<i64>,
+        windows: Option<&[TimeWindow]>,
+    ) {
         let filters = self.filters;
         // Cloned rather than borrowed: the loop below takes `&mut self`.
         let selection = self.selection.clone();
@@ -2552,6 +2569,19 @@ impl Parser {
             }
             if from.is_some_and(|from| *timestamp < from) {
                 continue;
+            }
+            // The window-filter mask: outside every admitted span, the event
+            // does not exist for this derived state — the same `continue` the
+            // scrub bounds use, so every accumulation path downstream (damage,
+            // taken, stun, SBA gauge/gains, statuses) narrows identically.
+            if let Some(windows) = windows {
+                let rel_ts = *timestamp - log_start;
+                if !windows
+                    .iter()
+                    .any(|window| window.from_ms <= rel_ts && rel_ts < window.up_to_ms)
+                {
+                    continue;
+                }
             }
             // Ahead of the window extension in the DamageEvent arm below: an
             // excluded hit must not stretch the encounter window either, or a
@@ -6524,6 +6554,58 @@ mod tests {
         // An empty window stays at zero rather than picking up stale state.
         parser.reparse_with_options_window(&[], Some(1_000), Some(3_000));
         assert_eq!(parser.derived_state.total_damage, 0);
+    }
+
+    /// The analysis view's window filter: a multi-window mask with the groups
+    /// path's exact semantics — an event is admitted when its fight-relative
+    /// timestamp lies inside ANY window (`from_ms <= t < up_to_ms`); `Some`
+    /// of an empty vec matches nothing; `None` is no mask at all.
+    #[test]
+    fn reparse_windows_mask_admits_only_events_inside_a_window() {
+        let mut parser = Parser::default();
+        let base = 10_000;
+
+        for (offset, damage) in [(0, 100), (4_000, 200), (8_000, 400)] {
+            let mut event = a_damage_event();
+            event.damage = damage;
+            parser
+                .encounter
+                .push_event(base + offset, Message::DamageEvent(event));
+        }
+
+        let mask = [
+            TimeWindow {
+                from_ms: 0,
+                up_to_ms: 1_000,
+            },
+            TimeWindow {
+                from_ms: 3_000,
+                up_to_ms: 5_000,
+            },
+        ];
+        parser.reparse_with_options(&[], None, None, Some(&mask));
+        // 0 is inside [0,1000); 4_000 inside [3000,5000); 8_000 in neither.
+        assert_eq!(parser.derived_state.total_damage, 300);
+
+        // The upper edge is EXCLUSIVE, matching the wire windows' convention.
+        let edge = [TimeWindow {
+            from_ms: 0,
+            up_to_ms: 4_000,
+        }];
+        parser.reparse_with_options(&[], None, None, Some(&edge));
+        assert_eq!(parser.derived_state.total_damage, 100);
+
+        // An empty mask matches nothing — a stale filter narrows, never widens.
+        parser.reparse_with_options(&[], None, None, Some(&[]));
+        assert_eq!(parser.derived_state.total_damage, 0);
+
+        // The mask composes with the scrub range.
+        let wide = [TimeWindow {
+            from_ms: 0,
+            up_to_ms: 100_000,
+        }];
+        parser.reparse_with_options(&[], Some(2_000), Some(5_000), Some(&wide));
+        assert_eq!(parser.derived_state.total_damage, 200);
     }
 
     /// Regression: `reparse_with_options_window` swallowed `OnUpdateSBA` in its

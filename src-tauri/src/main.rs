@@ -1374,6 +1374,12 @@ struct ParseOptions {
     /// the response. Replaces the pin-shaped drill-chart triggers.
     #[serde(default)]
     group_query: Option<v1::GroupQuery>,
+    /// The analysis view's window-filter mask for the DERIVED state — the
+    /// same shape and semantics as [`v1::GroupQuery::windows`] (which masks
+    /// the groups aggregation independently; the frontend sends the same
+    /// combined mask to both so a table and its hover cards agree).
+    #[serde(default)]
+    windows: Option<Vec<v1::TimeWindow>>,
 }
 
 // Per-second buckets: the quest-details charts and the window scrubber both
@@ -1465,7 +1471,12 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
 
     parser.filters = options.filters;
     parser.selection = options.selection.clone();
-    parser.reparse_with_options_window(&options.target_spans, options.from_ms, options.up_to_ms);
+    parser.reparse_with_options(
+        &options.target_spans,
+        options.from_ms,
+        options.up_to_ms,
+        options.windows.as_deref(),
+    );
 
     if options.state_only {
         // Included even here, unlike the charts: it is one pass over the events
