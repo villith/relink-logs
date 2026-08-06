@@ -1449,6 +1449,7 @@ export const AnalysisView = () => {
         questCompleted={questCompleted}
         questTimer={questTimer}
         imported={imported}
+        logId={Number.isFinite(Number(id)) ? Number(id) : null}
       />
 
       {/* Above the tabs, where Warcraft Logs puts it: the side is a property of
