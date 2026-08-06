@@ -181,15 +181,10 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
       }
 
       case "other":
-        rows.push({
-          key: "other",
-          label: "",
-          labelKey: "ui.logs.chart-other-label",
-          value: measure.amount,
-          columns: columnsFor(ctx, measure, total),
-          pinOnClick: null,
-          colorSlot: -1,
-        });
+        // Chart-only. The backend keeps every real row and APPENDS this one
+        // summing the tail past topN, so `groupBandsFor` can slice — the
+        // table already lists the whole tail, and a rendered `other` row
+        // double-counts abilities sitting right above it.
         break;
     }
   }
@@ -226,11 +221,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
     });
   }
 
-  return rows.sort((a, b) => {
-    if (a.key === "other") return 1;
-    if (b.key === "other") return -1;
-    return b.value - a.value;
-  });
+  return rows.sort((a, b) => b.value - a.value);
 };
 
 /** One chart band per aggregate, keyed by the SAME row-key grammar

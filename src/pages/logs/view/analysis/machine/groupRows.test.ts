@@ -221,7 +221,11 @@ describe("groupBandsFor", () => {
 });
 
 describe("groupRowsFor — the Other rollup", () => {
-  it("names itself, pins nothing, and stays last however large it is", () => {
+  it("never becomes a table row — it exists for the chart slice alone", () => {
+    // `aggregate_groups` keeps EVERY real row and appends `other` summing the
+    // tail past topN, purely so the chart can slice. The table already lists
+    // the whole tail, so rendering `other` too showed every drilled player a
+    // row that double-counts abilities sitting right above it.
     const rows = groupRowsFor(
       [
         agg({ kind: "player", index: 0 }, measure(100)),
@@ -230,11 +234,7 @@ describe("groupRowsFor — the Other rollup", () => {
       ],
       ctx({ groupBy: "source" })
     );
-    expect(rows.map((row) => row.key)).toEqual(["player:1", "player:0", "other"]);
-    const other = rows[2];
-    expect(other.labelKey).toBe("ui.logs.chart-other-label");
-    expect(other.pinOnClick).toBeNull();
-    expect(other.colorSlot).toBe(-1);
+    expect(rows.map((row) => row.key)).toEqual(["player:1", "player:0"]);
   });
 
   it("leaves the rollup out of the share denominator", () => {
