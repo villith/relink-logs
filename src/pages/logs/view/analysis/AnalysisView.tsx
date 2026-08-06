@@ -1150,6 +1150,10 @@ export const AnalysisView = () => {
   // the plot, not what the page is about. Reset per metric/log because a mode
   // chosen for one chart says nothing about the next one.
   const [stackMode, setStackMode] = useState<StackMode>("normal");
+  // The chart's smoothing window, in buckets. Feeds `chartPresentation` as
+  // `rateSmoothing` rather than overriding its result, so the rate-vs-level rule
+  // still decides: a LEVEL chart stays unsmoothed whatever is chosen here.
+  const [rateSmoothing, setRateSmoothing] = useState<number>(DPS_SMOOTHING_WINDOW);
   useEffect(() => setStackMode("normal"), [metricKey, id]);
 
   // Chart series, mirroring the classic view's shaping so the same fight draws
@@ -1485,7 +1489,7 @@ export const AnalysisView = () => {
     level,
     metricLabelKey: chartMetric.labelKey,
     metricFormat: chartMetric.format,
-    rateSmoothing: DPS_SMOOTHING_WINDOW,
+    rateSmoothing,
   });
 
   // The chart's raw inputs — which series, from where, at what scale — shared
@@ -1729,6 +1733,11 @@ export const AnalysisView = () => {
         bands={maskBands}
         windowBands={stateWindowBands}
         windowTooltips={chartWindowTooltips}
+        smoothing={smoothing}
+        // Offered on RATE charts only. On a level (the undrilled SBA gauge, the
+        // aura stacks) `chartPresentation` pins smoothing to 1 whatever is
+        // chosen, so a control there would be a knob that does nothing.
+        onSmoothingChange={format === "amount" ? setRateSmoothing : undefined}
         stackMode={chartSource === "stacks" ? stackMode : undefined}
         onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
       />

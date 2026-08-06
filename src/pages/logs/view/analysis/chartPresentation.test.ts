@@ -280,6 +280,22 @@ describe("chartPresentation — smoothing", () => {
     expect(chartPresentation({ ...base, statusSeries: series("player:0") }).smoothing).toBe(1);
   });
 
+  it("honours a custom window on a rate chart", () => {
+    // The chart's smoothing control feeds `rateSmoothing`, so the user's choice
+    // reaches every RATE chart through the one existing decision.
+    expect(chartPresentation({ ...base, rateSmoothing: 30 }).smoothing).toBe(30);
+  });
+
+  it("ignores a custom window on a LEVEL chart", () => {
+    // Smoothing a level is wrong at any window, so the control cannot reach one
+    // — which is why the choice rides `rateSmoothing` rather than overriding
+    // the result.
+    const sba = { ...base, metricKey: "sba" as const, metricFormat: "percent" as const, rateSmoothing: 30 };
+
+    expect(chartPresentation(sba).smoothing).toBe(1);
+    expect(chartPresentation({ ...base, statusSeries: series("player:0"), rateSmoothing: 30 }).smoothing).toBe(1);
+  });
+
   it("smooths the damage drill's bands", () => {
     expect(chartPresentation({ ...base, groupOverlay: series("skill:1") }).smoothing).toBe(10);
   });

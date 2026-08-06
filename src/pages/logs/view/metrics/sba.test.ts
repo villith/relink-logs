@@ -417,6 +417,17 @@ describe("sbaCauseLabel", () => {
     });
   });
 
+  it("names Effect(0) as the unidentified generic grant it is, not an effect", () => {
+    // SbaGainCause::Effect(0) is the residual bucket the hook parks when the
+    // generic add-gauge% API fires and no specific grant site claimed the rise
+    // (see OnGaugePercentGrantHook). Rendered through the effect template it
+    // read "Effect 0x0", which looks like a real record keyed zero.
+    expect(sbaCauseLabel("source:effect:0")).toEqual({
+      labelKey: "ui.logs.sba-cause-generic-grant",
+      labelParams: undefined,
+    });
+  });
+
   it("prints an unknown effect key as hex, the way every other tool here does", () => {
     expect(sbaCauseLabel("source:effect:48879")).toEqual({
       labelKey: "ui.logs.sba-cause-effect",

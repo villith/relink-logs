@@ -56,6 +56,15 @@ export const sbaCauseLabel = (
 
   const [kind, rawId] = rowKey.slice("source:".length).split(":");
   const id = rawId === undefined ? null : Number(rawId);
+
+  // `Effect(0)` is not an effect record: it is the residual bucket the hook
+  // parks when the game's generic add-gauge% API fires and no more specific
+  // grant site claimed the rise (see `OnGaugePercentGrantHook`). Through the
+  // effect template it rendered "Effect 0x0", which reads as a real record
+  // keyed zero rather than as "we could not tell". Distinct from
+  // `sba-cause-unknown`, which is a rise with nothing parked at all.
+  if (kind === "effect" && id === 0) return { labelKey: "ui.logs.sba-cause-generic-grant" };
+
   const known = kind === "effect" && id !== null && KNOWN_EFFECT_KEYS[id];
 
   return {

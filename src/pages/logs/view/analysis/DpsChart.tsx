@@ -37,6 +37,11 @@ export const formatChartValue = (format: DpsChartProps["format"], value: number)
  * (overlapping areas — the default) or summed into a stack. */
 export type StackMode = "normal" | "stacked";
 
+/** Selectable trailing-average windows, in buckets. One bucket is one second
+ * (`DPS_BUCKET_MS`), so a value IS its duration in seconds; 1 is "off", since a
+ * one-bucket trailing mean is the bucket itself. */
+const SMOOTHING_OPTIONS = [1, 5, 10, 30];
+
 export type DpsChartProps = {
   /** Already sliced to the committed window, so the chart IS the window. */
   data: ChartDatapoint[];
@@ -95,6 +100,15 @@ export type DpsChartProps = {
    * is exactly the charts that never get a toggle (the drills), and it keeps
    * them stacking as they always have; the "normal" there is the toggle's own
    * opening position on the one chart that has one. */
+  /** The trailing smoothing window in BUCKETS (one bucket is one second), and
+   * its setter. Both present = the control is shown.
+   *
+   * RATE charts only. Smoothing a LEVEL is exactly what `chartPresentation`'s
+   * `smoothing: 1` exists to prevent — averaged, the SBA gauge's discharge and
+   * an aura's stack steps turn into ramps — so the caller withholds the setter
+   * there rather than the control silently doing nothing. */
+  smoothing?: number;
+  onSmoothingChange?: (buckets: number) => void;
   stackMode?: StackMode;
   /** Providing this renders the Normal | Stacked SegmentedControl in the
    * chart header. */
@@ -233,6 +247,8 @@ export const DpsChart = ({
   windowBands,
   windowTooltips,
   markers,
+  smoothing,
+  onSmoothingChange,
   stackMode = "stacked",
   onStackModeChange,
 }: DpsChartProps) => {
@@ -504,6 +520,24 @@ export const DpsChart = ({
       <Box style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
         <Text className="analysis-label">{t(labelKey)}</Text>
         <Group gap="sm">
+          {onSmoothingChange !== undefined && smoothing !== undefined && (
+            <SegmentedControl
+              size="xs"
+              // The options are bare durations, so the radiogroup would announce
+              // nothing about WHAT is being set — same reason the stack toggle
+              // labels itself.
+              aria-label={t("ui.logs.chart-smoothing-label")}
+              value={String(smoothing)}
+              onChange={(value) => onSmoothingChange(Number(value))}
+              data={SMOOTHING_OPTIONS.map((buckets) => ({
+                value: String(buckets),
+                label:
+                  buckets === 1
+                    ? t("ui.logs.chart-smoothing-off")
+                    : t("ui.logs.chart-smoothing-seconds", { seconds: buckets }),
+              }))}
+            />
+          )}
           {onStackModeChange && (
             <SegmentedControl
               size="xs"
