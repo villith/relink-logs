@@ -432,6 +432,14 @@
   color: var(--an-ink-3);
 }
 
+.analysis-window-chip-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
 /* A provenance section's subheader inside the effects table — the same
  * small-caps voice as the column heads, spaced off the run above it. Visual
  * grouping only; it is not a row and takes no interaction. */

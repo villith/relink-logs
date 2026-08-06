@@ -76,6 +76,7 @@ import { MetricTabs, type MetricTab } from "./MetricTabs";
 import { PinBar } from "./PinBar";
 import { QuestSummary } from "./QuestSummary";
 import { RegroupStrip } from "./RegroupStrip";
+import { WindowStrip } from "./WindowStrip";
 import { abilityLabelFor, abilityOwnerFor } from "./abilityLabel";
 import "./analysis.css";
 import { auraExcludedBands, auraHolderIntervals, auraWireWindows, type AuraHolder } from "./auraWindows";
@@ -83,7 +84,7 @@ import { CAUSE_CLASS_LABEL_KEY, causeClassOfKey, withProvenance } from "./causeC
 import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "./chartMarkers";
 import { chartPresentation } from "./chartPresentation";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
-import { windowBandsFor } from "./chartWindowBands";
+import { WINDOW_LABEL_KEY, windowBandsFor } from "./chartWindowBands";
 import {
   intersectWireWindows,
   maskStatusIntervals,
@@ -103,6 +104,7 @@ import {
   setMetric as metricTransition,
   pinRow,
   regroup,
+  setWindowFilter as windowFilterTransition,
   setWindow as windowTransition,
 } from "./machine/transitions";
 import { useAnalysisState } from "./machine/useAnalysisState";
@@ -124,6 +126,7 @@ import {
 import { withStatusOption } from "./statusOption";
 import { statusRowColors } from "./statusRowColors";
 import { useUrlQueryString } from "./useUrlQueryString";
+import { windowChips } from "./windowChips";
 
 /** The metric switcher's contents, in display order. Adding a metric that only
  * has a friendly side is adding a descriptor here — the frame itself does not
@@ -649,6 +652,37 @@ export const AnalysisView = () => {
       return targetLabels.get(targetLabelKey(entry.enemyType, entry.instance)) ?? translateEnemyType(entry.enemyType);
     },
     [targetEntries, targetLabels]
+  );
+
+  // The breaking enemy's display name, through the same spawn table the
+  // target rows use — matched on actor index AND time overlap, because the
+  // game reissues a dead boss's actor index to a later spawn.
+  const breakEnemyOf = useCallback(
+    (actorIndex: number | null, span: { startMs: number; endMs: number }): string | null => {
+      if (actorIndex === null) return null;
+      const segment = targetEntries.findIndex(
+        (entry) => entry.actorIndex === actorIndex && entry.startMs < span.endMs && entry.endMs > span.startMs
+      );
+      return segment === -1 ? null : labelForTarget(segment);
+    },
+    [targetEntries, labelForTarget]
+  );
+
+  // The Windows strip's chips: the filter UI for the battle windows. Declared
+  // here (after `breakEnemyOf`/`labelForTarget`, not immediately after
+  // `maskedIntervals`) because it closes over `breakEnemyOf`, which itself
+  // needs `targetEntries`' spawn table — declared later in this file than
+  // `maskedIntervals`.
+  const windowFilterChips = useMemo(
+    () =>
+      windowChips(chartWindows, state.win, {
+        kindLabel: (kind) => t(WINDOW_LABEL_KEY[kind]),
+        kindChipLabel: (label, count) => t("ui.logs.window-chip-kind", { label, count }),
+        rangeLabel: (startMs, endMs) => `${millisecondsToElapsedFormat(startMs)}–${millisecondsToElapsedFormat(endMs)}`,
+        durationLabel: (ms) => t("ui.logs.window-chip-duration", { seconds: Math.round(ms / 1000) }),
+        breakEnemyLabel: (actorIndex, span) => breakEnemyOf(actorIndex, span),
+      }),
+    [chartWindows, state.win, t, breakEnemyOf, i18n.language]
   );
 
   // A dropdown entry carries no rank, position or colour, so two players the
@@ -1580,6 +1614,14 @@ export const AnalysisView = () => {
 
       {/* Dev builds only, the same guard the Debug tab uses. */}
       {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
+
+      {/* The Windows strip: the battle-window filter's UI, on every tab —
+          unlike the aura strips it needs no pin to anchor it. */}
+      <WindowStrip
+        chips={windowFilterChips}
+        onSelect={(win) => setState(windowFilterTransition(state, win))}
+        onClear={() => setState(windowFilterTransition(state, null))}
+      />
 
       {/* The Auras Filter (spec: between chart and table). Each strip exists
           only while its actor pin does — AuraStrip renders nothing for an
