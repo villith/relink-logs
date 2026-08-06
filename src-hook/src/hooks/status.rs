@@ -116,16 +116,16 @@ const STATUS_REMAINING_OFFSET: usize = 0x80;
 /// that may turn this into a published number.
 const STATUS_STACKS_OFFSET: usize = 0xb0;
 
-/* The ACTOR's current-action id (v2.0.3). Verified statically: FUN_140b06d20 —
-the proven Pl2000 function that applies Burn with cause 1100 — compares
-[RSI+0x1b690] against 0x578 (1400 "Fourfold Vengeance (Dragonform)") and 0xdc
-(220 "Light Blast Finisher"), both real Pl2000 action ids; ten further sites
-compare it against 0x320 (800, Chain Burst). A state enum would not coincide
-with the owning character's own action names.
-
-ONLY ever read on a RESOLVED ACTOR: a VMOVSS float write exists at the same
-displacement on some other object type, so this offset is not universally an
-action id. */
+/// The ACTOR's current-action id (v2.0.3). Verified statically: FUN_140b06d20
+/// — the proven Pl2000 function that applies Burn with cause 1100 — compares
+/// `[RSI+0x1b690]` against `0x578` (1400 "Fourfold Vengeance (Dragonform)") and
+/// `0xdc` (220 "Light Blast Finisher"), both real Pl2000 action ids; ten
+/// further sites compare it against `0x320` (800, Chain Burst). A state enum
+/// would not coincide with the owning character's own action names.
+///
+/// ONLY ever read on a RESOLVED ACTOR: a `VMOVSS` float write exists at the
+/// same displacement on some other object type, so this offset is not
+/// universally an action id.
 const ACTOR_CURRENT_ACTION_OFFSET: usize = 0x1b690;
 
 /// How many qwords of the init ctx struct to dump. The source handle sits at
@@ -221,6 +221,20 @@ fn cause_id_of(status: *const usize) -> Option<u32> {
     diag::read_u32_opt_guarded(status as usize, STATUS_SUBID_OFFSET).filter(|value| *value > 0)
 }
 
+/// The actor behind an entity-info block, or `None` when it cannot be
+/// resolved. Shared because three readers here need the same guarded hop.
+///
+/// NOTE this proves the actor's FIRST `ACTOR_SPAN` bytes are mapped, which is
+/// what a vtable-slot probe needs — it does NOT cover a deep field read. Those
+/// are separately guarded by `read_*_guarded` at their own address.
+fn resolve_actor(info: usize) -> Option<*const usize> {
+    let actor = diag::read_ptr_guarded(info, INFO_ACTOR_OFFSET).unwrap_or(0);
+    if actor == 0 || !readable(actor, ACTOR_SPAN) {
+        return None;
+    }
+    Some(actor as *const usize)
+}
+
 /// The action the CASTER was performing when it applied a status, or `None`.
 ///
 /// Names the rows `cause_id_of` cannot: a passive (a trait effect, a
@@ -228,13 +242,11 @@ fn cause_id_of(status: *const usize) -> Option<u32> {
 /// `+0x4c`, so the game stores a sentinel there — but the actor is still
 /// mid-action, and this field is that action.
 ///
-/// Strict, like the other readers here: 0 is a real "no action", and answering
-/// it for an unreadable address would be indistinguishable from the real thing.
+/// 0 is treated as no action — a reasonable reading of the idle state, but
+/// UNCONFIRMED, unlike `cause_id_of`'s equivalent which the refresh hub's
+/// `< 1` check backs.
 fn caster_action_of(info: usize) -> Option<u32> {
-    let actor = diag::read_ptr_guarded(info, INFO_ACTOR_OFFSET).unwrap_or(0);
-    if actor == 0 || !readable(actor, ACTOR_SPAN) {
-        return None;
-    }
+    let actor = resolve_actor(info)? as usize;
     diag::read_u32_opt_guarded(actor, ACTOR_CURRENT_ACTION_OFFSET).filter(|value| *value > 0)
 }
 
@@ -249,11 +261,7 @@ fn caster_action_of(info: usize) -> Option<u32> {
 /// `None` when the entity cannot be resolved at all: an event naming no actor
 /// would be filed against a slot that is not the one it happened to.
 fn holder_index(info: usize) -> Option<u32> {
-    let actor = diag::read_ptr_guarded(info, INFO_ACTOR_OFFSET).unwrap_or(0);
-    if actor == 0 || !readable(actor, ACTOR_SPAN) {
-        return None;
-    }
-    let actor = actor as *const usize;
+    let actor = resolve_actor(info)?;
     // A non-player holder falls through `player_slot_key_for_source` into
     // `actor_type_id`, which CALLS the actor's +0x58 vfunc — and the dtor runs
     // during owner teardown, where the object can be mid-destruction with the
@@ -462,14 +470,14 @@ fn run_init(tx: &event::Tx, status: *const usize, duration: f32, ctx: *const usi
                 // it is an effect-entry constant, so the UI shows the number
                 // until a mapping from it to a skill exists.
                 ability_id: cause_id_of(status),
+                // +0xb0, but only for the ids status.tbl marks HasLevels;
+                // everything else reports 1. See `stacks_for`.
+                stacks: stacks_for(status_id, raw_stacks_of(status)),
                 // What the object IS, for the rows `ability_id` cannot name.
                 status_class: super::status_class::status_class_of(status),
                 // What the caster was DOING, which names a passive's row even
                 // though no action id was recorded against it.
                 caster_action_id: caster_action_of(ctx as usize),
-                // +0xb0, but only for the ids status.tbl marks HasLevels;
-                // everything else reports 1. See `stacks_for`.
-                stacks: stacks_for(status_id, raw_stacks_of(status)),
             }));
         }
     }

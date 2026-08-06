@@ -674,6 +674,8 @@ pub struct StatusApplyEvent {
     pub status_id: u32,
     /// The action that caused it. `None` when unresolvable.
     pub ability_id: Option<u32>,
+    /// Stack count after this application. 1 for unstacking effects.
+    pub stacks: u32,
     /// The status object's RTTI class, as a hash of its class NAME (never its
     /// vtable address — that moves on a game patch, and a stored address would
     /// silently resolve to a different class afterwards).
@@ -690,8 +692,6 @@ pub struct StatusApplyEvent {
     /// was doing" are different claims, and collapsing them would make the
     /// stored log lie about its own provenance.
     pub caster_action_id: Option<u32>,
-    /// Stack count after this application. 1 for unstacking effects.
-    pub stacks: u32,
 }
 
 /// A status effect ending on an actor. Pairs with [`StatusApplyEvent`] by
