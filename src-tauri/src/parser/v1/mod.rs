@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use anyhow::Result;
 use chrono::Utc;
@@ -1078,6 +1078,20 @@ pub struct DerivedEncounterState {
     /// damage, so dropping it would lose a real, nameable chunk of the bar.
     #[serde(skip)]
     pending_player_sba_sources: HashMap<u32, Vec<(SbaSourceKind, Option<u32>, f64)>>,
+    /// Gauge polls and forced levels seen before their player's row existed:
+    /// the last known level, plus every poll's positive `added` summed. Held
+    /// because SBA is a property of the player, not of any hit — and under a
+    /// source pin the damage events that would create the OTHER players' rows
+    /// are filtered out entirely, so dropping these made pinning one player
+    /// change everyone else's gauge figures.
+    #[serde(skip)]
+    pending_player_sba: HashMap<u32, (f64, f64)>,
+    /// Skill-cause gauge gains seen before their player's row existed. Folded
+    /// through [`PlayerState::add_sba_gain`] on row creation, so they land on
+    /// (or keep waiting for) the causing skill's own row — never inventing a
+    /// player from a gain alone.
+    #[serde(skip)]
+    pending_player_sba_gains: HashMap<u32, Vec<(ActionType, f64)>>,
     /// Players whose most recent stun-capable hit was filtered out of the meters
     /// (see [`is_excluded`]).
     ///
@@ -1114,6 +1128,8 @@ impl Default for DerivedEncounterState {
             pending_player_pg_quickening: HashMap::new(),
             pending_player_stun_effect: HashMap::new(),
             pending_player_sba_sources: HashMap::new(),
+            pending_player_sba: HashMap::new(),
+            pending_player_sba_gains: HashMap::new(),
             stun_suppressed_players: HashSet::new(),
             status: ParserStatus::Stopped,
             party: HashMap::new(),
@@ -1307,8 +1323,15 @@ impl DerivedEncounterState {
     /// carries the running total again, so an early reading lost before the
     /// player's first damage event costs at most its own `added`.
     fn process_sba_update(&mut self, actor_index: u32, value: f64, added: f64) {
-        if let Some(player) = self.party.get_mut(&actor_index) {
-            player.apply_sba(value, added);
+        match self.party.get_mut(&actor_index) {
+            Some(player) => player.apply_sba(value, added),
+            // No row yet: hold the level and the rise until one is created
+            // (see `pending_player_sba`).
+            None => {
+                let pending = self.pending_player_sba.entry(actor_index).or_default();
+                pending.0 = value;
+                pending.1 += added.max(0.0);
+            }
         }
     }
 
@@ -1334,8 +1357,16 @@ impl DerivedEncounterState {
 
         let (kind, id) = match cause {
             SbaGainCause::Skill(action) => {
-                if let Some(player) = self.party.get_mut(&actor_index) {
-                    player.add_sba_gain(action, amount);
+                match self.party.get_mut(&actor_index) {
+                    Some(player) => player.add_sba_gain(action, amount),
+                    // Held rather than dropped (see `pending_player_sba_gains`):
+                    // the fold routes through `add_sba_gain`, so it still cannot
+                    // invent a player or a damage-less row.
+                    None => self
+                        .pending_player_sba_gains
+                        .entry(actor_index)
+                        .or_default()
+                        .push((action, amount)),
                 }
                 return;
             }
@@ -1365,8 +1396,11 @@ impl DerivedEncounterState {
     /// A gauge forced to a known level (attempt / perform / chain), which
     /// generates nothing.
     fn process_sba_level(&mut self, actor_index: u32, value: f64) {
-        if let Some(player) = self.party.get_mut(&actor_index) {
-            player.set_sba(value);
+        match self.party.get_mut(&actor_index) {
+            Some(player) => player.set_sba(value),
+            // A forced level replaces the held level but generates nothing,
+            // so the held rise stays as it is.
+            None => self.pending_player_sba.entry(actor_index).or_default().0 = value,
         }
     }
 
@@ -1381,6 +1415,8 @@ impl DerivedEncounterState {
         let pending_pg_quickening = self.pending_player_pg_quickening.remove(&actor_index);
         let pending_stun_effect = self.pending_player_stun_effect.remove(&actor_index);
         let pending_sources = self.pending_player_sba_sources.remove(&actor_index);
+        let pending_sba = self.pending_player_sba.remove(&actor_index);
+        let pending_sba_gains = self.pending_player_sba_gains.remove(&actor_index);
 
         let player = self
             .party
@@ -1410,6 +1446,16 @@ impl DerivedEncounterState {
         if let Some(sources) = pending_sources {
             for (kind, id, amount) in sources {
                 player.add_sba_source(kind, id, amount);
+            }
+        }
+        if let Some((value, generated)) = pending_sba {
+            // The same shape a poll applies: the last held level, plus the sum
+            // of every positive rise seen while the row didn't exist.
+            player.apply_sba(value, generated);
+        }
+        if let Some(gains) = pending_sba_gains {
+            for (action, amount) in gains {
+                player.add_sba_gain(action, amount);
             }
         }
     }
@@ -2375,6 +2421,20 @@ pub struct Parser {
     #[serde(skip)]
     repeat_chain_anchor: Option<i64>,
 
+    /// Every status currently ACTIVE in the game, keyed the way removes pair
+    /// with applies (holder, effect, causing action) and holding the latest
+    /// apply. Maintained across encounter boundaries, because the statuses a
+    /// fight starts under are applied OUTSIDE it: quest-start buffs (Guts,
+    /// Autorevive, the sigil passives) land seconds before the first damage
+    /// event, and on a Repeat Quest chain they are never re-applied at all.
+    /// [`Self::ensure_encounter_started`] seeds these into each new
+    /// encounter's raw log; a quest load ([`Self::on_area_enter_event`])
+    /// clears the map, so a stale town buff cannot haunt later fights.
+    /// BTreeMap so the seeding order — and with it the stored log — is
+    /// deterministic.
+    #[serde(skip)]
+    standing_statuses: BTreeMap<(u32, u32, Option<u32>), protocol::StatusApplyEvent>,
+
     /// The party's verdicts as last computed, so the per-hit identity path can
     /// re-broadcast them without re-auditing four builds. Recomputed only when
     /// the party actually changes — see [`Parser::insert_player_data`].
@@ -2729,6 +2789,12 @@ impl Parser {
         // exactly the ones that load WITHOUT passing here). Cleared after the
         // save above so a chained run cut by this load still joins its chain.
         self.repeat_chain_anchor = None;
+        // Same boundary for the standing statuses: the incoming area's own
+        // applies fire after this event, and anything still standing from the
+        // previous area (a town buff with no observed remove) must not be
+        // seeded into the next fight. Repeat Quest chains skip this handler,
+        // which is exactly why their persistent buffs survive from run to run.
+        self.standing_statuses.clear();
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("on-area-enter", &self.derived_state);
@@ -2924,6 +2990,16 @@ impl Parser {
             self.reset();
             self.derived_state.start(now);
             self.update_status(ParserStatus::InProgress);
+            // Seed the fight with every status standing at its opening event —
+            // quest-start buffs land before anyone deals damage, and on a
+            // Repeat Quest chain the sigil passives are never re-applied at
+            // all, so without this they exist in no encounter's log. Stamped
+            // `now`: "active when the fight began" is the honest timestamp the
+            // interval assembly can anchor an uptime on.
+            for event in self.standing_statuses.values() {
+                self.encounter
+                    .push_event(now, Message::StatusApply(event.clone()));
+            }
         }
     }
 
@@ -3293,11 +3369,18 @@ impl Parser {
     /// Recorded ONLY inside a running encounter, and deliberately never opens
     /// one. Statuses fire constantly outside combat — party buffs on load,
     /// food, regen in town — so starting a fight on one would fill the log with
-    /// empty quests. The cost is a buff pre-cast before the first hit of a
-    /// pull: it is dropped rather than back-dated, because `ensure_encounter_started`
-    /// is what makes an event survive the first damage event's `reset()` and
-    /// nothing may call it that cannot legitimately begin a fight.
+    /// empty quests. An apply that lands OUTSIDE an encounter is not lost,
+    /// though: it goes into [`Self::standing_statuses`], and the next
+    /// `ensure_encounter_started` seeds it into that encounter's log — which is
+    /// how quest-start buffs (Guts, Autorevive, the sigil passives), applied
+    /// seconds before anyone deals damage, make it into the fight at all.
     pub fn on_status_apply(&mut self, event: protocol::StatusApplyEvent) {
+        // Standing state is maintained unconditionally — it is the record of
+        // what is active NOW, encounter or no encounter.
+        self.standing_statuses.insert(
+            (event.actor_index, event.status_id, event.ability_id),
+            event.clone(),
+        );
         if self.status != ParserStatus::InProgress {
             return;
         }
@@ -3307,8 +3390,12 @@ impl Parser {
 
     /// Records one status effect ending. Same in-fight rule as
     /// [`Self::on_status_apply`]: a buff expiring in town belongs to no
-    /// encounter, and recording it would attach it to the NEXT one.
+    /// encounter, and recording it would attach it to the NEXT one — but it
+    /// always leaves the standing map, so a lapsed buff is never seeded into
+    /// the next fight.
     pub fn on_status_remove(&mut self, event: protocol::StatusRemoveEvent) {
+        self.standing_statuses
+            .remove(&(event.actor_index, event.status_id, event.ability_id));
         if self.status != ParserStatus::InProgress {
             return;
         }
@@ -3340,10 +3427,11 @@ impl Parser {
             Message::OnUpdateSBA(event.clone()),
         );
 
-        let player_index = event.actor_index;
-        if let Some(player) = self.derived_state.party.get_mut(&player_index) {
-            player.apply_sba(event.sba_value as f64, event.sba_added as f64);
-        }
+        self.derived_state.process_sba_update(
+            event.actor_index,
+            event.sba_value as f64,
+            event.sba_added as f64,
+        );
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -3352,10 +3440,15 @@ impl Parser {
 
     /// Handles one attributed SBA gain (local player only — see `SbaGainEvent`).
     pub fn on_sba_gain(&mut self, event: protocol::SbaGainEvent) {
-        self.encounter.push_event(
-            Utc::now().timestamp_millis(),
-            Message::SbaGain(event.clone()),
-        );
+        let now = Utc::now().timestamp_millis();
+        // A gain can be the encounter's opening event: the `QuestStart` grant
+        // fires at quest load, before anyone has dealt damage, and without
+        // this the first damage event's `reset()` erased it from the raw log
+        // (unrecoverable on reparse). Gains only fire in-quest — unlike the
+        // gauge POLL, which ticks in town and must never open an encounter.
+        self.ensure_encounter_started(now);
+        self.encounter
+            .push_event(now, Message::SbaGain(event.clone()));
 
         // The cause is resolved in the HOOK, where the gauge rise, the parked
         // hit and the update's own flag arguments are all in scope. `None` only
@@ -3380,10 +3473,8 @@ impl Parser {
             Message::OnAttemptSBA(event.clone()),
         );
 
-        let player_index = event.actor_index;
-        if let Some(player) = self.derived_state.party.get_mut(&player_index) {
-            player.set_sba(800.0);
-        }
+        self.derived_state
+            .process_sba_level(event.actor_index, 800.0);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -3396,10 +3487,7 @@ impl Parser {
             Message::OnPerformSBA(event.clone()),
         );
 
-        let player_index = event.actor_index;
-        if let Some(player) = self.derived_state.party.get_mut(&player_index) {
-            player.set_sba(0.0);
-        }
+        self.derived_state.process_sba_level(event.actor_index, 0.0);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -3413,10 +3501,7 @@ impl Parser {
             Message::OnContinueSBAChain(event.clone()),
         );
 
-        let player_index = event.actor_index;
-        if let Some(player) = self.derived_state.party.get_mut(&player_index) {
-            player.set_sba(0.0);
-        }
+        self.derived_state.process_sba_level(event.actor_index, 0.0);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -6490,13 +6575,13 @@ mod tests {
         );
     }
 
-    /// A gain that beats the player's FIRST damage event has no party row to
-    /// file against and is dropped — pinned here as accepted behavior, while a
-    /// gain after the row exists lands. (Distinct from a gain that beats its own
-    /// SKILL's first hit, which `PlayerState` holds; that one only needs the
-    /// player to exist.)
+    /// A gain that beats the player's FIRST damage event is held (like the
+    /// non-skill sources) and folded through `add_sba_gain` when the row is
+    /// created, so it still lands on the causing skill's row. (Distinct from a
+    /// gain that beats its own SKILL's first hit, which `PlayerState` holds;
+    /// that one only needs the player to exist.)
     #[test]
-    fn sba_gain_before_the_players_first_damage_event_is_dropped() {
+    fn sba_gain_before_the_players_first_damage_event_is_held() {
         let mut parser = Parser::default();
         parser.on_sba_gain(protocol::SbaGainEvent {
             actor_index: 0xF000_0000,
@@ -6529,9 +6614,201 @@ mod tests {
             .find(|skill| skill.action_type == ActionType::Normal(1))
             .expect("row for the causing skill");
         assert_eq!(
-            row.sba_generated, 12.5,
-            "only the post-row gain lands; the opener is accepted residue"
+            row.sba_generated,
+            7.0 + 12.5,
+            "the opener is held for the row, not dropped"
         );
+    }
+
+    /// A poll that beats the player's first row-creating event — but lands
+    /// inside a running encounter — is held, not dropped: another player's hit
+    /// opens the fight, and every member's gauge is polled from that moment
+    /// even though their own rows appear one by one.
+    #[test]
+    fn sba_poll_before_the_players_first_row_is_held() {
+        let mut parser = Parser::default();
+        let mut opener = a_damage_event();
+        opener.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(opener);
+
+        parser.on_sba_update(protocol::OnUpdateSBAEvent {
+            actor_index: 0xF000_0001,
+            sba_value: 150.0,
+            sba_added: 150.0,
+        });
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0001;
+        parser.on_damage_event(event);
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0001)
+            .expect("party row");
+        assert_eq!(player.sba, 150.0, "the early poll's level survives");
+        assert_eq!(
+            player.sba_generated, 150.0,
+            "the early poll's rise survives"
+        );
+    }
+
+    /// SBA is a property of the player, not of any hit (see the reparse's SBA
+    /// arms) — a source pin must not change anyone's gauge figures. Regression:
+    /// polls for a player with no row yet were dropped, and under a source pin
+    /// the other players' rows are only created by their first damage-TAKEN
+    /// event, so pinning one player visibly changed everyone else's totals.
+    #[test]
+    fn sba_totals_survive_a_source_pin() {
+        let mut parser = Parser::default();
+
+        let mut pinned = a_damage_event();
+        pinned.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(pinned);
+
+        // The other player's own hit — filtered out by the pin below.
+        let mut other = a_damage_event();
+        other.source.parent_index = 0xF000_0001;
+        parser.on_damage_event(other);
+
+        parser.on_sba_update(protocol::OnUpdateSBAEvent {
+            actor_index: 0xF000_0001,
+            sba_value: 300.0,
+            sba_added: 300.0,
+        });
+
+        // The event that finally creates their row under the pin: an enemy hit
+        // ON them (taken events are deliberately not selection-filtered).
+        let mut taken = a_damage_event();
+        taken.source.parent_actor_type = 0;
+        taken.target.parent_index = 0xF000_0001;
+        taken.target.parent_actor_type = 0x2AF6_78E8;
+        parser.on_damage_event(taken);
+
+        parser.selection = SelectionFilter {
+            source_indices: vec![0xF000_0000],
+            ..Default::default()
+        };
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0001)
+            .expect("row created by the taken hit");
+        assert_eq!(player.sba, 300.0, "the poll's level survives the pin");
+        assert_eq!(
+            player.sba_generated, 300.0,
+            "the poll's rise survives the pin"
+        );
+    }
+
+    fn a_status_apply(status_id: u32) -> protocol::StatusApplyEvent {
+        protocol::StatusApplyEvent {
+            actor_index: 0xF000_0000,
+            caster_index: Some(0xF000_0000),
+            status_id,
+            ability_id: None,
+            stacks: 1,
+            status_class: None,
+            caster_action_id: None,
+        }
+    }
+
+    fn recorded_applies(parser: &Parser, status_id: u32) -> usize {
+        parser
+            .encounter
+            .event_log()
+            .filter(|(_, m)| matches!(m, Message::StatusApply(e) if e.status_id == status_id))
+            .count()
+    }
+
+    /// Quest-start buffs (Guts, Autorevive, the sigil passives) land while no
+    /// encounter is running, seconds before the first hit. They must survive
+    /// the first damage event's `reset()`: the standing map seeds them into
+    /// the new encounter's log at its opening event.
+    #[test]
+    fn statuses_standing_at_encounter_start_are_seeded_into_the_log() {
+        let mut parser = Parser::default();
+        parser.on_status_apply(a_status_apply(42));
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        assert_eq!(
+            recorded_applies(&parser, 42),
+            1,
+            "the standing buff is seeded at encounter start"
+        );
+    }
+
+    /// A buff that lapsed before the fight began was not active when it
+    /// started, so it is not seeded.
+    #[test]
+    fn a_status_removed_before_the_encounter_is_not_seeded() {
+        let mut parser = Parser::default();
+        parser.on_status_apply(a_status_apply(42));
+        parser.on_status_remove(protocol::StatusRemoveEvent {
+            actor_index: 0xF000_0000,
+            status_id: 42,
+            ability_id: None,
+        });
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        assert_eq!(recorded_applies(&parser, 42), 0);
+    }
+
+    /// Repeat Quest chains skip the quest-load boundary and never re-apply the
+    /// sigil passives, so the statuses standing when run 1 ended must seed run
+    /// 2's encounter as well.
+    #[test]
+    fn standing_statuses_seed_the_next_chained_encounter() {
+        let mut parser = Parser::default();
+        parser.on_status_apply(a_status_apply(42));
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event.clone());
+
+        // Run 1 ends at the result screen; a chained run starts WITHOUT a
+        // quest load in between.
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 1,
+            elapsed_time_in_secs: 60,
+        });
+        parser.on_damage_event(event);
+
+        assert_eq!(
+            recorded_applies(&parser, 42),
+            1,
+            "run 2's fresh log carries the seeded buff"
+        );
+    }
+
+    /// A quest load is the standing map's boundary: the incoming area's own
+    /// applies fire after it, and anything left from the previous area (a town
+    /// buff with no observed remove) must not haunt the next fight.
+    #[test]
+    fn a_quest_load_clears_the_standing_statuses() {
+        let mut parser = Parser::default();
+        parser.on_status_apply(a_status_apply(42));
+
+        parser.on_area_enter_event(protocol::AreaEnterEvent {
+            last_known_quest_id: 0,
+            last_known_elapsed_time_in_secs: 0,
+        });
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        assert_eq!(recorded_applies(&parser, 42), 0);
     }
 
     /// A party award is the whole party's, not the swinging player's: it must
