@@ -19,6 +19,7 @@ import {
   type WindowBand,
   type WindowKind,
 } from "./chartWindowBands";
+import type { WindowTooltipEntry } from "./chartWindowTooltip";
 import { windowFromDrag } from "./scopeWindow";
 
 /** How a plotted value reads as text.
@@ -71,6 +72,10 @@ export type DpsChartProps = {
    * checkboxes, because the three overlap and reading one often means hiding
    * the others. */
   windowBands?: WindowBand[];
+  /** Hoverable battle-window lines: appended to the tooltip of every bucket
+   * the window covers, the markers' mechanism generalised from a point to a
+   * span. Hidden window KINDS (the checkbox row) suppress their lines. */
+  windowTooltips?: WindowTooltipEntry[];
   /** Death/SBA event markers, already rebased onto this chart's window (like
    * `bands`). Drawn as vertical reference lines and appended to the tooltip of
    * the bucket they land in; a control row above the plot toggles each kind. */
@@ -123,6 +128,7 @@ export const ChartTooltip = ({
   format,
   labels,
   markers,
+  windowLines,
 }: {
   label: string;
   payload: Record<string, any>[] | undefined; // eslint-disable-line
@@ -132,6 +138,9 @@ export const ChartTooltip = ({
   /** Event markers that landed in THIS bucket, already named and coloured —
    * appended under the series rows, Warcraft Logs' behavior. */
   markers?: ChartMarker[];
+  /** Battle-window lines covering THIS bucket, already coloured and worded —
+   * appended under the marker rows. */
+  windowLines?: { color: string; text: string }[];
 }) => {
   if (!payload) return null;
 
@@ -161,7 +170,7 @@ export const ChartTooltip = ({
   //
   // `visibility` and not a null return, because it keeps the box in layout —
   // an empty box is the very thing that parks the wrapper.
-  const nothingToShow = landed.length === 0 && (markers?.length ?? 0) === 0;
+  const nothingToShow = landed.length === 0 && (markers?.length ?? 0) === 0 && (windowLines?.length ?? 0) === 0;
   return (
     <Paper
       data-testid="chart-tooltip"
@@ -192,6 +201,11 @@ export const ChartTooltip = ({
           {marker.label}
         </Text>
       ))}
+      {(windowLines ?? []).map((line, index) => (
+        <Text key={`window-${index}`} fz="sm" c={line.color}>
+          {line.text}
+        </Text>
+      ))}
     </Paper>
   );
 };
@@ -217,6 +231,7 @@ export const DpsChart = ({
   stacked = false,
   bands,
   windowBands,
+  windowTooltips,
   markers,
   stackMode = "stacked",
   onStackModeChange,
@@ -362,6 +377,7 @@ export const DpsChart = ({
         format={format}
         labels={labels}
         markers={markersByLabel.get(String(label ?? ""))}
+        windowLines={windowLinesByLabel.get(String(label ?? ""))}
       />
     ),
   };
@@ -450,6 +466,27 @@ export const DpsChart = ({
     }
     return byLabel;
   }, [bucketedMarkers]);
+
+  // The window lines of each bucket, keyed by the bucket's x label like
+  // markersByLabel — the tooltip's lookup is one map get. Hidden kinds drop
+  // out here so shading and tooltip always agree on what is visible.
+  const windowLinesByLabel = useMemo(() => {
+    const byLabel = new Map<string, { color: string; text: string }[]>();
+    for (const entry of windowTooltips ?? []) {
+      if (hiddenWindowKinds.has(entry.kind)) continue;
+      const from = Math.max(0, Math.floor(entry.startMs / DPS_BUCKET_MS));
+      const upTo = Math.min(maxIndex, Math.ceil(entry.endMs / DPS_BUCKET_MS) - 1);
+      for (let bucket = from; bucket <= upTo; bucket += 1) {
+        const label = data[bucket]?.timestamp;
+        if (label === undefined) continue;
+        const group = byLabel.get(label);
+        const line = { color: entry.color, text: entry.text };
+        if (group) group.push(line);
+        else byLabel.set(label, [line]);
+      }
+    }
+    return byLabel;
+  }, [windowTooltips, hiddenWindowKinds, data, maxIndex]);
 
   const scopeBand = band && band[0] !== band[1] && (
     <ReferenceArea

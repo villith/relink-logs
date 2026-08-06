@@ -31,6 +31,7 @@ import {
   causeSkillName,
   formatInPartyOrder,
   getSkillName,
+  humanizeNumber,
   millisecondsToElapsedFormat,
   resolvePlayerColor,
   targetLabelKey,
@@ -84,13 +85,14 @@ import { CAUSE_CLASS_LABEL_KEY, causeClassOfKey, withProvenance } from "./causeC
 import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "./chartMarkers";
 import { chartPresentation } from "./chartPresentation";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
-import { WINDOW_LABEL_KEY, windowBandsFor } from "./chartWindowBands";
+import { WINDOW_BAND_COLOR, WINDOW_LABEL_KEY, windowBandsFor } from "./chartWindowBands";
 import {
   intersectWireWindows,
   maskStatusIntervals,
   selectedChartWindows,
   windowFilterWireWindows,
 } from "./chartWindowFilter";
+import { windowMetricAmount, windowTooltipEntries } from "./chartWindowTooltip";
 import { qualifiedAbilityLabels } from "./labelCollision";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
@@ -1413,7 +1415,10 @@ export const AnalysisView = () => {
     metricFormat: chartMetric.format,
   });
 
-  const chartData: ChartDatapoint[] = useMemo(() => {
+  // The chart's raw inputs — which series, from where, at what scale — shared
+  // by the plotted data below and the window tooltip's amounts, so the
+  // tooltip can never sum a different fight than the plot draws.
+  const chartInputs = useMemo(() => {
     const source = overlay
       ? Object.fromEntries(overlay.map((series) => [series.key, series.values]))
       : groupPlayerSeries ?? chartMetric.source;
@@ -1426,27 +1431,61 @@ export const AnalysisView = () => {
       : groupPlayerSeries
         ? Math.max(0, ...Object.values(groupPlayerSeries).map((values) => values.length))
         : chartMetric.len;
+    // The group series are raw damage like `dpsChart`, so their scale is 1 on
+    // the damage tab either way — kept explicit rather than accidental.
+    const scale = overlay || groupPlayerSeries ? 1 : chartMetric.scale;
+    return { source: source as Record<string, number[]>, keys, len, scale };
+  }, [chartMetric, chartIndexes, overlay, groupPlayerSeries]);
 
+  const chartData: ChartDatapoint[] = useMemo(() => {
     const points = buildSeriesPoints({
-      source: source as Record<string, number[]>,
-      len,
-      keys,
+      source: chartInputs.source,
+      len: chartInputs.len,
+      keys: chartInputs.keys,
       // A stack count is a LEVEL, not a rate — the same reason the SBA gauge
       // refuses smoothing. Averaged over a trailing window a buff held for one
       // second at four stacks reads as one, and every edge of what is really a
       // step function becomes a ramp.
       smoothing: statusSeries || effectSeries ? 1 : chartMetric.smoothing,
-      // The group series are raw damage like `dpsChart`, so their scale is 1
-      // on the damage tab either way — kept explicit rather than accidental.
-      scale: overlay || groupPlayerSeries ? 1 : chartMetric.scale,
+      scale: chartInputs.scale,
     });
     // Summed over ALL fetched series, not the legend-visible ones — the values
     // are baked into the data, so hiding a player later cannot lower the Total.
-    return (withTotal ? withTotalSeries(points, keys) : points).map((point, bucket) => ({
+    return (withTotal ? withTotalSeries(points, chartInputs.keys) : points).map((point, bucket) => ({
       ...point,
       timestamp: bucketLabel(bucket),
     })) as ChartDatapoint[];
-  }, [chartMetric, chartIndexes, overlay, groupPlayerSeries, statusSeries, effectSeries, withTotal]);
+  }, [chartInputs, chartMetric.smoothing, statusSeries, effectSeries, withTotal]);
+
+  // The hover payload for the shaded windows. Amounts only where the plot's Y
+  // is a rate ("amount" format) — the SBA gauge and the stack charts plot a
+  // LEVEL, and summing a level over buckets answers nothing.
+  const chartWindowTooltips = useMemo(
+    () =>
+      windowTooltipEntries(
+        chartWindows,
+        statusWindow,
+        (span) =>
+          format === "amount"
+            ? windowMetricAmount(chartInputs.source, chartInputs.keys, chartInputs.scale, span)
+            : null,
+        {
+          color: (kind) => WINDOW_BAND_COLOR[kind],
+          text: (span, amount) => {
+            const enemy = span.kind === "break" ? breakEnemyOf(span.actorIndex, span) : null;
+            const kind = t(WINDOW_LABEL_KEY[span.kind]);
+            return t(amount === null ? "ui.logs.chart-window-tooltip" : "ui.logs.chart-window-tooltip-amount", {
+              kind: enemy === null ? kind : t("ui.logs.chart-window-break-of", { kind, enemy }),
+              range: `${millisecondsToElapsedFormat(span.startMs)}–${millisecondsToElapsedFormat(span.endMs)}`,
+              duration: t("ui.logs.window-chip-duration", { seconds: Math.round((span.endMs - span.startMs) / 1000) }),
+              amount: amount === null ? "" : humanizeNumber(amount),
+            });
+          },
+        }
+      ),
+    // i18n.language: every label in the line is translated.
+    [chartWindows, statusWindow, format, chartInputs, breakEnemyOf, t, i18n.language]
+  );
 
   const labels: Label = useMemo(
     () =>
@@ -1609,6 +1648,7 @@ export const AnalysisView = () => {
         markers={chartMarkers}
         bands={maskBands}
         windowBands={stateWindowBands}
+        windowTooltips={chartWindowTooltips}
         stackMode={chartSource === "stacks" ? stackMode : undefined}
         onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
       />
