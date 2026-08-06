@@ -48,6 +48,34 @@ describe("buildSeriesPoints", () => {
     expect(points.map((p) => p["1"])).toEqual([3, 5]);
   });
 
+  it("zeroes buckets outside the admitted mask instead of smearing the average past its edge", () => {
+    // Without the mask, the trailing average would decay over buckets 4-5
+    // (the bleed past a window filter's end) and dilute bucket 2 with the
+    // pre-window zeros (the ramp-in at its start).
+    const points = buildSeriesPoints({
+      source: { 1: [0, 0, 10, 10, 0, 0] },
+      len: 6,
+      keys: [1],
+      smoothing: 3,
+      scale: 1,
+      admitted: [false, false, true, true, false, false],
+    });
+    expect(points.map((p) => p["1"])).toEqual([0, 0, 10, 10, 0, 0]);
+  });
+
+  it("averages only over the admitted buckets inside the trailing window", () => {
+    // Bucket 3's window is 1..3, but only 2..3 are admitted: (6+12)/2 = 9.
+    const points = buildSeriesPoints({
+      source: { 1: [99, 99, 6, 12] },
+      len: 4,
+      keys: [1],
+      smoothing: 3,
+      scale: 1,
+      admitted: [false, false, true, true],
+    });
+    expect(points.map((p) => p["1"])).toEqual([0, 0, 6, 9]);
+  });
+
   it("scales stored values, so an SBA gauge stored in tenths reads as a percent", () => {
     const points = buildSeriesPoints({ source: { 1: [850, 1000] }, len: 2, keys: [1], smoothing: 1, scale: 0.1 });
     expect(points.map((p) => p["1"])).toEqual([85, 100]);

@@ -34,6 +34,28 @@ export const windowFilterWireWindows = (
   return merged;
 };
 
+/** The scrub range (inclusive bucket indexes) covering the selected windows'
+ * hull — what a window chip commits so the chart zooms to the selection. The
+ * end bucket is the last one holding admitted time, so an end exactly on a
+ * bucket edge claims nothing of the next bucket. Null when the selection
+ * resolves to no windows (a stale index): nothing to zoom to. */
+export const windowFilterScrubRange = (selected: ChartWindow[], bucketMs: number): [number, number] | null => {
+  if (selected.length === 0) return null;
+  const startMs = Math.min(...selected.map((span) => span.startMs));
+  const endMs = Math.max(...selected.map((span) => span.endMs));
+  const first = Math.floor(startMs / bucketMs);
+  return [first, Math.max(first, Math.ceil(endMs / bucketMs) - 1)];
+};
+
+/** Which chart buckets the mask admits — a bucket counts as admitted when any
+ * span overlaps it, partial overlap included (the span convention is
+ * `[fromMs, upToMs)`, so a span ending exactly on a bucket edge does not
+ * admit the next bucket). Feeds `buildSeriesPoints`' mask-aware smoothing. */
+export const admittedBucketsOf = (mask: WireWindow[], len: number, bucketMs: number): boolean[] =>
+  Array.from({ length: len }, (_, bucket) =>
+    mask.some((span) => span.fromMs < (bucket + 1) * bucketMs && span.upToMs > bucket * bucketMs)
+  );
+
 /** Status intervals clipped to the mask, for the status TABLES. Each piece
  * keeps the interval's payload, but `applications` is counted ONLY in the
  * span containing the interval's start — the apply moment — so a buff

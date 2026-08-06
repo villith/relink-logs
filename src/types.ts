@@ -200,6 +200,27 @@ export type ChartWindow = {
  * needing a cast that would hide a real drift between a band and a row. */
 export type SkillRow = Pick<SkillState, "actionType" | "childCharacterType">;
 
+/** One per-ability chart band for the drilled Stun/SBA charts (mirrors the Rust
+ * `AbilitySeries`), in the two shapes a band can take.
+ *
+ * A `skill` band names the breakdown ROW it decomposes, not a display group: the
+ * grouping lives here in the frontend (`skillGroupFor`) and the parser is
+ * deliberately free of it, so the fold happens on this side — see `abilityBands`.
+ * It satisfies `SkillRow` structurally, which is what lets it feed
+ * `abilityRowKey` with no cast.
+ *
+ * A `cause` band has no action at all — SBA gauge from a party award, or the
+ * unattributed remainder — so it carries the row key directly, in the same
+ * `source:{kind}[:{id}]` / `skill:unattributed` grammar the SBA table builds its
+ * rows with.
+ *
+ * Values are stun applied per bucket on the Stun tab, gauge GENERATED per bucket
+ * on the SBA tab (drilled in, that chart plots generation rather than the gauge
+ * level — a level cannot be decomposed by contributor). */
+export type AbilitySeries =
+  | ({ kind: "skill"; values: number[] } & SkillRow)
+  | { kind: "cause"; key: string; values: number[] };
+
 /** Per-enemy share of one skill's damage (mirrors the Rust
  * `SkillTargetState`). Computed under the active target/time filters, like
  * the rest of the derived state. */
@@ -881,6 +902,10 @@ export type SynthesisStatus = {
   gameRunning: boolean;
   sigilCount: number;
   rngUnpredictable: boolean;
+  /** False until the game latches its synthesis seed — see `seed_latched` in
+   * src-tauri/src/synthesis/mod.rs. Predictions made now are computed from a
+   * seed the game replaces when the player opens the synthesis screen. */
+  seedLatched: boolean;
 };
 
 export type SynthesisSearchResponse = {
@@ -888,15 +913,22 @@ export type SynthesisSearchResponse = {
   pairsTested: number;
   sigilCount: number;
   rngUnpredictable: boolean;
-  /** Seed identity the search was computed from (staleness detection). */
+  /** Seed identity the search was computed from (staleness detection). All
+   * three move independently: a synthesis moves only `synthCount`. */
   rngState: number;
-  seedCounter: number;
+  savedSeed: number;
+  synthCount: number;
+  seedLatched: boolean;
 };
 
 /** Live synthesis seed identity (fetch_synthesis_seed; null = game not running). */
 export type SynthesisSeed = {
   rngState: number;
-  seedCounter: number;
+  savedSeed: number;
+  synthCount: number;
+  /** True when the game has latched its synthesis seed — see `seed_latched`
+   * in src-tauri/src/synthesis/mod.rs. */
+  latched: boolean;
 };
 
 /** Toolbox / Overmastery Predictor — mirrors src-tauri/src/overmastery/mod.rs. */

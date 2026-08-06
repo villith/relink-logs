@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { SynthesisStatus } from "@/types";
+import { SynthesisSearchResponse, SynthesisSeed, SynthesisStatus } from "@/types";
 
 vi.mock("@tauri-apps/api", () => ({ invoke: vi.fn() }));
 // The real bundle needs an initialized i18next (the app does this at startup;
@@ -43,7 +43,9 @@ describe("useSynthesisHelper loading", () => {
     );
     const { result } = renderHook(() => useSynthesisHelper());
     expect(result.current.loading).toBe(true);
-    await act(async () => resolveStatus({ gameRunning: true, sigilCount: 3, rngUnpredictable: false }));
+    await act(async () =>
+      resolveStatus({ gameRunning: true, sigilCount: 3, rngUnpredictable: false, seedLatched: true })
+    );
     expect(result.current.loading).toBe(false);
     expect(result.current.status?.gameRunning).toBe(true);
   });
@@ -53,6 +55,122 @@ describe("useSynthesisHelper loading", () => {
     const { result } = renderHook(() => useSynthesisHelper());
     await waitFor(() => expect(result.current.loading).toBe(false));
     expect(result.current.error).toBe("game-not-running");
+  });
+});
+
+describe("useSynthesisHelper seed latch", () => {
+  const backend = (statusLatched: boolean, seed: SynthesisSeed | null) =>
+    invokeMock.mockImplementation(async (cmd) => {
+      if (cmd === "fetch_synthesis_seed") return seed;
+      return { gameRunning: true, sigilCount: 2, rngUnpredictable: false, seedLatched: statusLatched };
+    });
+
+  /** Mount and let the on-mount status fetch settle. */
+  const mounted = async () => {
+    const { result } = renderHook(() => useSynthesisHelper());
+    await act(async () => {});
+    return result;
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    invokeMock.mockReset();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("reports the latch state the status arrived with", async () => {
+    backend(false, null);
+    expect((await mounted()).current.seedLatched).toBe(false);
+  });
+
+  // The status only re-reads when the window is hidden and shown again, which
+  // never happens if the logs window sits visible on a second monitor. Without
+  // its own poll the gate would stay shut forever after the player opens the
+  // Sigil Synthesis screen — the one action it is telling them to take.
+  it("reopens the gate once the game latches, with the window never hidden", async () => {
+    backend(false, { rngState: 5, savedSeed: 5, synthCount: 0, latched: true });
+    const result = await mounted();
+    expect(result.current.seedLatched).toBe(false);
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(result.current.seedLatched).toBe(true);
+  });
+
+  it("does not poll once the status already says latched", async () => {
+    backend(true, { rngState: 5, savedSeed: 5, synthCount: 0, latched: true });
+    const result = await mounted();
+    invokeMock.mockClear();
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(invokeMock).not.toHaveBeenCalled();
+    expect(result.current.seedLatched).toBe(true);
+  });
+});
+
+describe("useSynthesisHelper staleness", () => {
+  const searched: SynthesisSearchResponse = {
+    matches: [],
+    pairsTested: 1,
+    sigilCount: 2,
+    rngUnpredictable: false,
+    rngState: 0xabc,
+    savedSeed: 0xabc,
+    synthCount: 3,
+    seedLatched: true,
+  };
+
+  /** Route each toolbox command; `seed` is what the staleness poll reads. */
+  const backend = (seed: SynthesisSeed) =>
+    invokeMock.mockImplementation(async (cmd) => {
+      if (cmd === "search_synthesis") return searched;
+      if (cmd === "fetch_synthesis_seed") return seed;
+      return { gameRunning: true, sigilCount: 2, rngUnpredictable: false, seedLatched: true };
+    });
+
+  /** Mount, run a search with a real trait selected, then drive one 5s tick. */
+  const searchThenTick = async () => {
+    const { result } = renderHook(() => useSynthesisHelper());
+    await act(async () => {
+      result.current.setForm({ ...initialForm, trait1: "50079a1c" });
+    });
+    await act(async () => {
+      await result.current.search();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
+    return result;
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    invokeMock.mockReset();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("stays fresh while the whole seed identity holds", async () => {
+    backend({ rngState: 0xabc, savedSeed: 0xabc, synthCount: 3, latched: true });
+    expect((await searchThenTick()).current.stale).toBe(false);
+  });
+
+  // The commit restores the RNG slot from the saved seed as it returns, so a
+  // synthesis leaves BOTH seed words identical and only the pair-counter tally
+  // moves — yet it changed that pair's warm-up, so the list is stale.
+  it("goes stale when a synthesis happens, which moves neither seed word", async () => {
+    backend({ rngState: 0xabc, savedSeed: 0xabc, synthCount: 4, latched: true });
+    expect((await searchThenTick()).current.stale).toBe(true);
+  });
+
+  // Opening the synthesis screen latches the live slot into the saved seed.
+  it("goes stale when the game relatches its seed", async () => {
+    backend({ rngState: 0xabc, savedSeed: 0xabd, synthCount: 3, latched: false });
+    expect((await searchThenTick()).current.stale).toBe(true);
   });
 });
 

@@ -15,6 +15,7 @@ import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounter
 import { useMeterFilters } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import type {
+  AbilitySeries,
   ActionType,
   CharacterType,
   ComputedPlayerState,
@@ -61,7 +62,7 @@ import {
 import { damageDone, parseEnemyRow } from "../metrics/damageDone";
 import { damageTaken, takenAttackNameKey, takenAttackRowParts } from "../metrics/damageTaken";
 import { debuffs } from "../metrics/debuffs";
-import { sba } from "../metrics/sba";
+import { sba, sbaCauseLabel } from "../metrics/sba";
 import { stun } from "../metrics/stun";
 import type { Hostility, MetricDescriptor, MetricRow } from "../metrics/types";
 import { deriveSelectorOptions, type SelectorPins } from "../selectorOptions";
@@ -78,6 +79,7 @@ import { PinBar } from "./PinBar";
 import { QuestSummary } from "./QuestSummary";
 import { RegroupStrip } from "./RegroupStrip";
 import { WindowStrip } from "./WindowStrip";
+import { abilityBands } from "./abilityBands";
 import { abilityLabelFor, abilityOwnerFor } from "./abilityLabel";
 import "./analysis.css";
 import { auraExcludedBands, auraHolderIntervals, auraWireWindows, type AuraHolder } from "./auraWindows";
@@ -87,9 +89,11 @@ import { chartPresentation } from "./chartPresentation";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
 import { WINDOW_BAND_COLOR, WINDOW_LABEL_KEY, windowBandsFor } from "./chartWindowBands";
 import {
+  admittedBucketsOf,
   intersectWireWindows,
   maskStatusIntervals,
   selectedChartWindows,
+  windowFilterScrubRange,
   windowFilterWireWindows,
 } from "./chartWindowFilter";
 import { windowMetricAmount, windowTooltipEntries } from "./chartWindowTooltip";
@@ -161,6 +165,10 @@ const MARKER_LINE_KEY: Record<MarkerKind, string> = {
 
 /** Bucket index → "M:SS", for the window readout. */
 const bucketLabel = (bucket: number) => millisecondsToElapsedFormat(bucket * DPS_BUCKET_MS);
+
+/** Stable empty map, so the drill memo below does not rebuild every render on a
+ * fresh `{}` literal. */
+const EMPTY_ABILITY_SERIES: Record<number, AbilitySeries[]> = {};
 
 export const AnalysisView = () => {
   const { t, i18n } = useTranslation();
@@ -263,6 +271,9 @@ export const AnalysisView = () => {
     state: EncounterState;
     facts: SelectionFact[];
     groups: GroupAggregate[];
+    /** The drilled Stun/SBA bands, keyed by player. Only this fetch carries
+     * them — the base load ignores pins, and a drill IS a pin. */
+    abilitySeries: Record<number, AbilitySeries[]>;
   } | null>(null);
 
   // Responses are not ordered with respect to their requests (the command is
@@ -471,6 +482,23 @@ export const AnalysisView = () => {
   // array both times — so the effect below keys off this object's JSON
   // identity rather than the raw fields, the same idiom as `wireQuery`/
   // `wireQueryKey`.
+  // The per-ability chart request. Only the derived-path tabs (Stun, SBA) drilled
+  // by ability: damage and taken already get their bands from the group query,
+  // and the aura tabs build theirs client-side from the status intervals.
+  //
+  // Rides the SCOPED fetch rather than the base load, because a drill is a pin
+  // change and the base load deliberately ignores pins.
+  const abilityQuery = useMemo(() => {
+    if (caps.dataPath !== "derived" || spec.groupBy !== "ability") return undefined;
+    return {
+      metric: metricKey as "stun" | "sba",
+      // Stun's ability level widens to the whole party with no source pinned
+      // (see metrics/stun.ts); SBA has no party-wide reading, but its table is
+      // empty there anyway, so one rule covers both.
+      ...(pins.source === null ? {} : { player: pins.source }),
+    };
+  }, [caps.dataPath, spec.groupBy, metricKey, pins.source]);
+
   const scopedOptions = useMemo(
     () => ({
       filters,
@@ -483,9 +511,13 @@ export const AnalysisView = () => {
       // the last one — `end * 1000` would reparse a window one bucket short.
       ...(range === null ? {} : { fromMs: range[0] * DPS_BUCKET_MS, upToMs: (range[1] + 1) * DPS_BUCKET_MS - 1 }),
       ...(maskWindows === undefined ? {} : { windows: maskWindows }),
+      // In `scopedOptions`, not bolted on at the call site like `groupQuery`,
+      // so it lands in `scopedOptionsKey` too — otherwise regrouping to the
+      // ability dimension would change the request without triggering it.
+      ...(abilityQuery === undefined ? {} : { abilitySeries: abilityQuery }),
       stateOnly: true,
     }),
-    [filters, targetSpans, pins.source, pinnedActions, range, maskWindows]
+    [filters, targetSpans, pins.source, pinnedActions, range, maskWindows, abilityQuery]
   );
   const scopedOptionsRef = useRef(scopedOptions);
   scopedOptionsRef.current = scopedOptions;
@@ -499,11 +531,14 @@ export const AnalysisView = () => {
   // rerun, the mask clause below would fall all the way through to a fetch
   // regardless — a mask makes the gate unconditional once inside, so keeping
   // the effect from firing AT ALL on a no-op change is the only lever left.
-  const earlyOutRef = useRef({ pinned: false, isWindowed: false, hasMask: false });
+  const earlyOutRef = useRef({ pinned: false, isWindowed: false, hasMask: false, wantsBands: false });
   earlyOutRef.current = {
     pinned: pins.source !== null || (pins.ability !== null && !isStatusPin(pins.ability)) || targetSpans.length > 0,
     isWindowed: range !== null,
     hasMask: maskWindows !== undefined,
+    // A regroup to the ability dimension with nothing pinned is a real request
+    // (stun's party-wide ability level), and none of the clauses above see it.
+    wantsBands: abilityQuery !== undefined,
   };
 
   // The scoped fetch: everything the selector bar, the window, the grouping
@@ -516,11 +551,11 @@ export const AnalysisView = () => {
   // cascade re-narrows with the window — and carries the group query for the
   // groups-path table.
   useEffect(() => {
-    const { pinned, isWindowed, hasMask } = earlyOutRef.current;
+    const { pinned, isWindowed, hasMask, wantsBands } = earlyOutRef.current;
     // A regroup with nothing pinned still needs ITS grouping's aggregates —
     // unless the base load already fetched this exact query.
     const needsGroups = wireQueryKey !== null && wireQueryKey !== baseQueryKeyRef.current;
-    if (!pinned && !isWindowed && !needsGroups && !hasMask) {
+    if (!pinned && !isWindowed && !needsGroups && !hasMask && !wantsBands) {
       setScoped(null);
       return;
     }
@@ -540,6 +575,10 @@ export const AnalysisView = () => {
           state: response.encounterState,
           facts: response.selectionFacts ?? [],
           groups: response.groups ?? [],
+          // Normalised at the boundary like `groups`: the Rust binary does not
+          // hot-reload, so a frontend ahead of its backend degrades to no bands
+          // — and therefore to the per-player lines — rather than throwing.
+          abilitySeries: response.abilitySeries ?? {},
         });
       })
       .catch((e) => {
@@ -552,6 +591,9 @@ export const AnalysisView = () => {
   // in hand, else the base load's — valid only while the current query IS the
   // one the base load sent (the effect above refetches whenever it is not).
   const groups = scoped?.groups ?? baseGroups;
+  // No base-load fallback: the base load never asks for bands, so an empty map
+  // is the honest answer whenever no scoped response has supplied them.
+  const scopedAbilitySeries = scoped?.abilitySeries ?? EMPTY_ABILITY_SERIES;
 
   const shownEncounter = scoped?.state ?? encounter;
 
@@ -1280,6 +1322,12 @@ export const AnalysisView = () => {
   const bandLabelFor = useCallback(
     (key: string): string => {
       if (key === "other") return t("ui.logs.chart-other-label");
+      // The drilled SBA chart's non-skill bands: named through the SAME namer
+      // the SBA table names its `source:` rows with, so a band and the row it
+      // sits above cannot read differently. Checked before `skill:` because the
+      // unattributed remainder wears a `skill:` key it has no ability for.
+      const cause = sbaCauseLabel(key);
+      if (cause !== null) return t(cause.labelKey, cause.labelParams);
       if (key.startsWith("player:")) return labelForSource(Number(key.slice("player:".length)));
       if (key.startsWith("target:")) return labelForTarget(Number(key.slice("target:".length)));
       if (key.startsWith("enemy:")) return translateEnemyType(parseEnemyRow(key.slice("enemy:".length)));
@@ -1381,6 +1429,21 @@ export const AnalysisView = () => {
     return series.length > 0 ? series : null;
   }, [isStatusMetric, pins, identityPlayers, statusIntervals, hostility, metricKey, chartLen, statusDisplayLabel]);
 
+  // The drilled Stun/SBA plot: the backend's per-breakdown-row bands folded into
+  // the table's ability rows (see `abilityBands` — the parser cannot produce
+  // those keys, so the fold happens here with the same function the table uses).
+  //
+  // Only the derived tabs reach this: everything else either has no `ability`
+  // grouping or gets its bands from the group query.
+  const abilitySeries = useMemo(() => {
+    if (spec.groupBy !== "ability") return null;
+    const bands =
+      pins.source === null ? Object.values(scopedAbilitySeries).flat() : scopedAbilitySeries[pins.source] ?? [];
+    if (bands.length === 0) return null;
+    // Same cap as the group bands — both feed the eight-colour palette.
+    return abilityBands(bands, GROUP_TOP_N, bandLabelFor);
+  }, [spec.groupBy, pins.source, scopedAbilitySeries, bandLabelFor]);
+
   // Which series the per-player chart draws. identityPlayers, not players: these
   // charts hold the whole party, so a pin must not drop curves from the plot.
   //
@@ -1389,9 +1452,10 @@ export const AnalysisView = () => {
   // asked, and narrowing to the pinned player is the most the data supports.
   const chartIndexes = useMemo(() => {
     const everyone = identityPlayers.map((player) => player.index);
-    if (statusSeries || effectSeries || groupOverlay || groupPlayerSeries || pins.source === null) return everyone;
+    if (statusSeries || effectSeries || groupOverlay || abilitySeries || groupPlayerSeries || pins.source === null)
+      return everyone;
     return everyone.filter((index) => index === pins.source);
-  }, [identityPlayers, statusSeries, effectSeries, groupOverlay, groupPlayerSeries, pins.source]);
+  }, [identityPlayers, statusSeries, effectSeries, groupOverlay, abilitySeries, groupPlayerSeries, pins.source]);
 
   // With no source pinned, an enemy or ability pin still narrows the fight, and
   // the backend rebuilds the per-player series under it — otherwise the plot
@@ -1405,6 +1469,7 @@ export const AnalysisView = () => {
     statusSeries,
     effectSeries,
     groupOverlay,
+    abilitySeries,
     groupPlayerSeries,
     groupsPath,
     groupBy: spec.groupBy,
@@ -1448,6 +1513,15 @@ export const AnalysisView = () => {
       // step function becomes a ramp.
       smoothing: statusSeries || effectSeries ? 1 : chartMetric.smoothing,
       scale: chartInputs.scale,
+      // Rate charts only ("amount"): their series are masked to zeros outside
+      // the admitted spans, and the trailing average would smear the last
+      // in-window spike past the mask's edge — 10s of phantom damage after a
+      // window filter's end. The levels (SBA gauge, stack counts) draw
+      // UNmasked full-fight series where zeroing would misread as "the gauge
+      // was empty", so they keep the shading-only treatment.
+      ...(format === "amount" && maskWindows !== undefined
+        ? { admitted: admittedBucketsOf(maskWindows, chartInputs.len, DPS_BUCKET_MS) }
+        : {}),
     });
     // Summed over ALL fetched series, not the legend-visible ones — the values
     // are baked into the data, so hiding a player later cannot lower the Total.
@@ -1455,7 +1529,7 @@ export const AnalysisView = () => {
       ...point,
       timestamp: bucketLabel(bucket),
     })) as ChartDatapoint[];
-  }, [chartInputs, chartMetric.smoothing, statusSeries, effectSeries, withTotal]);
+  }, [chartInputs, chartMetric.smoothing, statusSeries, effectSeries, withTotal, format, maskWindows]);
 
   // The hover payload for the shaded windows. Amounts only where the plot's Y
   // is a rate ("amount" format) — the SBA gauge and the stack charts plot a
@@ -1657,11 +1731,20 @@ export const AnalysisView = () => {
       {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
 
       {/* The Windows strip: the battle-window filter's UI, on every tab —
-          unlike the aura strips it needs no pin to anchor it. */}
+          unlike the aura strips it needs no pin to anchor it. Selecting a
+          chip also COMMITS the scrub window to the selection's bucket hull —
+          the chart zooms to the window through the same mechanism a drag
+          uses, so the readout, the uptime denominators and the fetches all
+          follow. Clearing the chip clears that zoom with it; a stale index
+          resolves to no hull and leaves the scrub alone. */}
       <WindowStrip
         chips={windowFilterChips}
-        onSelect={(win) => setState(windowFilterTransition(state, win))}
-        onClear={() => setState(windowFilterTransition(state, null))}
+        onSelect={(win) => {
+          const scrub = windowFilterScrubRange(selectedChartWindows(chartWindows, win), DPS_BUCKET_MS);
+          const next = windowFilterTransition(state, win);
+          setState(scrub === null ? next : windowTransition(next, scrub));
+        }}
+        onClear={() => setState(windowTransition(windowFilterTransition(state, null), null))}
       />
 
       {/* The Auras Filter (spec: between chart and table). Each strip exists

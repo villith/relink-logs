@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import type { ChartWindow } from "@/types";
 
 import {
+  admittedBucketsOf,
   intersectWireWindows,
   maskStatusIntervals,
   selectedChartWindows,
+  windowFilterScrubRange,
   windowFilterWireWindows,
 } from "./chartWindowFilter";
 
@@ -61,6 +63,40 @@ describe("windowFilterWireWindows", () => {
       endMs: 100_000,
     });
     expect(wire).toEqual([{ fromMs: 10_000, upToMs: 25_000 }]);
+  });
+});
+
+describe("windowFilterScrubRange", () => {
+  it("covers a single window's hull in whole buckets", () => {
+    // Log 1796's SBA window: 222_783..246_171 needs buckets 222 through 246
+    // for the scrub's inclusive-bucket window to admit every masked ms.
+    expect(windowFilterScrubRange([win("sba", 222_783, 246_171)], 1_000)).toEqual([222, 246]);
+  });
+
+  it("a kind selection zooms to the hull from the first start to the last end", () => {
+    expect(windowFilterScrubRange([win("sba", 10_500, 20_000), win("sba", 50_000, 61_200)], 1_000)).toEqual([10, 61]);
+  });
+
+  it("an end exactly on a bucket edge does not claim the next bucket", () => {
+    expect(windowFilterScrubRange([win("link", 5_000, 30_000)], 1_000)).toEqual([5, 29]);
+  });
+
+  it("no windows (a stale index) yields no scrub", () => {
+    expect(windowFilterScrubRange([], 1_000)).toBeNull();
+  });
+});
+
+describe("admittedBucketsOf", () => {
+  it("marks every bucket a span overlaps, partial buckets included", () => {
+    expect(admittedBucketsOf([{ fromMs: 1_500, upToMs: 3_500 }], 5, 1_000)).toEqual([false, true, true, true, false]);
+  });
+
+  it("a span ending exactly on a bucket edge does not admit the next bucket", () => {
+    expect(admittedBucketsOf([{ fromMs: 1_000, upToMs: 2_000 }], 3, 1_000)).toEqual([false, true, false]);
+  });
+
+  it("an empty mask admits nothing", () => {
+    expect(admittedBucketsOf([], 2, 1_000)).toEqual([false, false]);
   });
 });
 

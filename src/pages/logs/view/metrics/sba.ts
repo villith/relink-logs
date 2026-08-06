@@ -38,31 +38,61 @@ const KNOWN_EFFECT_KEYS: Record<number, string> = {
   0xd2c8e10a: "ui.logs.sba-cause-perfect-dodge",
 };
 
+/** The row key the unattributed remainder carries, shared with the backend's
+ * band of the same name so the two are one identity. */
+export const SBA_UNATTRIBUTED_KEY = "skill:unattributed";
+
+/** How to name a `source:` row key, or null when the key is not one.
+ *
+ * Exported because the drilled SBA CHART draws a band per cause and must name it
+ * exactly as the table names the row beneath it — the backend emits these keys
+ * in this same grammar (see `ability_charts.rs`), and re-deriving the naming at
+ * the chart would let a band and its row drift apart. */
+export const sbaCauseLabel = (
+  rowKey: string
+): { labelKey: string; labelParams?: Record<string, string | number> } | null => {
+  if (rowKey === SBA_UNATTRIBUTED_KEY) return { labelKey: "ui.logs.sba-unattributed" };
+  if (!rowKey.startsWith("source:")) return null;
+
+  const [kind, rawId] = rowKey.slice("source:".length).split(":");
+  const id = rawId === undefined ? null : Number(rawId);
+  const known = kind === "effect" && id !== null && KNOWN_EFFECT_KEYS[id];
+
+  return {
+    labelKey: known
+      ? KNOWN_EFFECT_KEYS[id as number]
+      : CAUSE_LABEL_KEYS[kind as SbaSourceState["kind"]] ?? CAUSE_LABEL_KEYS.unknown,
+    // Keys are hashes; hex is how every other tool in this repo prints them.
+    // Site tags are small ordinals and stay decimal.
+    labelParams:
+      id === null || known ? undefined : { id: kind === "effect" ? `0x${id.toString(16).toUpperCase()}` : id },
+  };
+};
+
 /** Rows for the causes no skill row can hold. Keyed by cause (plus id where one
  * discriminates), so they never collide with `skill:` keys. */
 const sourceRows = (owner: ComputedPlayerState, total: number): MetricRow[] =>
   (owner.sbaSources ?? [])
     .filter((source) => source.generated !== 0)
-    .map((source) => ({
-      key: source.id === null ? `source:${source.kind}` : `source:${source.kind}:${source.id}`,
-      label: source.kind,
-      labelKey:
-        source.kind === "effect" && source.id !== null && KNOWN_EFFECT_KEYS[source.id]
-          ? KNOWN_EFFECT_KEYS[source.id]
-          : CAUSE_LABEL_KEYS[source.kind] ?? CAUSE_LABEL_KEYS.unknown,
-      // Keys are hashes; hex is how every other tool in this repo prints them.
-      // Site tags are small ordinals and stay decimal.
-      labelParams:
-        source.id === null || (source.kind === "effect" && KNOWN_EFFECT_KEYS[source.id])
-          ? undefined
-          : { id: source.kind === "effect" ? `0x${source.id.toString(16).toUpperCase()}` : source.id },
-      value: source.generated,
-      columns: [whole(source.generated), share(source.generated, total)],
-      // A cause carries no target and no member skills to descend into.
-      pinOnClick: null,
-      // Not the player's own doing, so not their colour (see the remainder row).
-      colorSlot: -1,
-    }));
+    .map((source) => {
+      const key = source.id === null ? `source:${source.kind}` : `source:${source.kind}:${source.id}`;
+      // Named through the shared namer rather than inline, so the row and the
+      // chart band above it cannot be labelled differently. Never null here:
+      // the key was just built in the `source:` grammar it parses.
+      const named = sbaCauseLabel(key);
+      return {
+        key,
+        label: source.kind,
+        labelKey: named?.labelKey ?? CAUSE_LABEL_KEYS.unknown,
+        labelParams: named?.labelParams,
+        value: source.generated,
+        columns: [whole(source.generated), share(source.generated, total)],
+        // A cause carries no target and no member skills to descend into.
+        pinOnClick: null,
+        // Not the player's own doing, so not their colour (see the remainder row).
+        colorSlot: -1,
+      };
+    });
 
 /** SBA is a per-player gauge, ranked by what each player GENERATED. Descending
  * into a player splits their generation by ability, from the attributed
@@ -156,7 +186,7 @@ const unattributedRow = (attributed: MetricRow[], total: number, generated: numb
 
   return [
     {
-      key: "skill:unattributed",
+      key: SBA_UNATTRIBUTED_KEY,
       // No ability to name, so the table names it (see `MetricRow.labelKey`).
       label: "unattributed",
       labelKey: "ui.logs.sba-unattributed",

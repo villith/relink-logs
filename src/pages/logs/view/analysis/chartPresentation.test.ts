@@ -11,6 +11,7 @@ const base = {
   statusSeries: null,
   effectSeries: null,
   groupOverlay: null,
+  abilitySeries: null,
   groupPlayerSeries: null,
   groupsPath: true,
   groupBy: "source" as const,
@@ -205,5 +206,48 @@ describe("chartPresentation — format and stacked", () => {
     expect(chartPresentation({ ...base, statusSeries: series("player:0") }).stacked).toBe(true);
     expect(chartPresentation({ ...base, effectSeries: series("status:12") }).stacked).toBe(true);
     expect(chartPresentation({ ...base, groupOverlay: series("skill:1") }).stacked).toBe(true);
+  });
+});
+
+describe("chartPresentation — the ability drill", () => {
+  it("stacks the derived tabs' per-ability bands", () => {
+    const result = chartPresentation({ ...base, abilitySeries: series("skill:1") });
+
+    expect(result.chartSource).toBe("ability");
+    expect(result.stacked).toBe(true);
+  });
+
+  it("switches a drilled SBA chart from the gauge level to an amount", () => {
+    // Undrilled the SBA chart plots a LEVEL (percent), which cannot be
+    // decomposed by contributor; drilled it plots generation, which is a rate.
+    const sba = { ...base, metricKey: "sba" as const, metricFormat: "percent" as const };
+
+    expect(chartPresentation(sba).format).toBe("percent");
+    expect(chartPresentation({ ...sba, abilitySeries: series("skill:1") }).format).toBe("amount");
+  });
+
+  it("titles the drill after the metric it decomposes", () => {
+    const stun = { ...base, metricKey: "stun" as const, abilitySeries: series("skill:1") };
+    const sba = { ...base, metricKey: "sba" as const, abilitySeries: series("skill:1") };
+
+    expect(chartPresentation(stun).labelKey).toBe("ui.logs.chart-stun-drill-label");
+    expect(chartPresentation(sba).labelKey).toBe("ui.logs.chart-sba-drill-label");
+  });
+
+  it("never draws a Total beside the stack", () => {
+    // A Total inside a Mantine stacked AreaChart is ADDED to the stack and
+    // doubles its height.
+    expect(chartPresentation({ ...base, abilitySeries: series("skill:1") }).withTotal).toBe(false);
+  });
+
+  it("yields to an aura overlay", () => {
+    // The aura tabs never drill by ability; this only pins the precedence.
+    const result = chartPresentation({
+      ...base,
+      statusSeries: series("player:0"),
+      abilitySeries: series("skill:1"),
+    });
+
+    expect(result.chartSource).toBe("stacks");
   });
 });

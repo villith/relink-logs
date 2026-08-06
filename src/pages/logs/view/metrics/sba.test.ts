@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { ComputedPlayerState } from "@/types";
 
 import type { SelectorPins } from "../selectorOptions";
-import { sba } from "./sba";
+import { SBA_UNATTRIBUTED_KEY, sba, sbaCauseLabel } from "./sba";
 
 const player = (
   index: number,
@@ -406,5 +406,49 @@ describe("sba drill-down", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].value).toBe(200);
     expect(rows[0].key).toMatch(/normal-attack/);
+  });
+});
+
+describe("sbaCauseLabel", () => {
+  it("names a bare cause from its kind", () => {
+    expect(sbaCauseLabel("source:partyAward")).toEqual({
+      labelKey: "ui.logs.sba-cause-party-award",
+      labelParams: undefined,
+    });
+  });
+
+  it("prints an unknown effect key as hex, the way every other tool here does", () => {
+    expect(sbaCauseLabel("source:effect:48879")).toEqual({
+      labelKey: "ui.logs.sba-cause-effect",
+      labelParams: { id: "0xBEEF" },
+    });
+  });
+
+  it("names a KNOWN effect key outright, with no id to print", () => {
+    expect(sbaCauseLabel(`source:effect:${0xd2c8e10a}`)).toEqual({
+      labelKey: "ui.logs.sba-cause-perfect-dodge",
+      labelParams: undefined,
+    });
+  });
+
+  it("keeps a site tag decimal — small ordinals, not hashes", () => {
+    expect(sbaCauseLabel("source:site:3")).toEqual({
+      labelKey: "ui.logs.sba-cause-site",
+      labelParams: { id: 3 },
+    });
+  });
+
+  it("falls back to unknown for a cause the UI has not been taught", () => {
+    expect(sbaCauseLabel("source:somethingNew")?.labelKey).toBe("ui.logs.sba-cause-unknown");
+  });
+
+  it("names the unattributed remainder despite its skill: key", () => {
+    // The remainder wears a `skill:` key but has no ability behind it, so it
+    // must be recognised BEFORE any skill-naming branch.
+    expect(sbaCauseLabel(SBA_UNATTRIBUTED_KEY)).toEqual({ labelKey: "ui.logs.sba-unattributed" });
+  });
+
+  it("declines a real skill key, so skill bands keep their own naming", () => {
+    expect(sbaCauseLabel("skill:Normal:1")).toBeNull();
   });
 });

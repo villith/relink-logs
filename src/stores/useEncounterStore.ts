@@ -1,4 +1,5 @@
 import {
+  AbilitySeries,
   ChartWindow,
   DeathEvent,
   EncounterState,
@@ -34,6 +35,9 @@ interface EncounterStore {
    * the transition events existed. */
   chartWindows: ChartWindow[];
   sbaChart: Record<number, number[]>;
+  /** Per-ability bands for the DRILLED Stun/SBA chart, keyed by player index.
+   * Empty unless the last fetch asked for them — an undrilled tab never does. */
+  abilitySeries: Record<number, AbilitySeries[]>;
   sbaEvents: SBAEvent[];
   deathEvents: DeathEvent[];
   chartLen: number;
@@ -86,6 +90,10 @@ export interface EncounterStateResponse {
   /** Optional so a backend older than the field reads as "no windows". */
   chartWindows?: ChartWindow[];
   sbaChart: Record<number, number[]>;
+  /** The drilled Stun/SBA chart's bands, sent only when the request carried an
+   * `abilitySeries` query. Optional so a frontend ahead of its backend degrades
+   * to no bands — and therefore to the per-player lines — rather than throwing. */
+  abilitySeries?: Record<number, AbilitySeries[]>;
   sbaEvents: SBAEvent[];
   deathEvents: DeathEvent[];
   chartLen: number;
@@ -117,6 +125,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   statusIntervals: [],
   chartWindows: [],
   sbaChart: {},
+  abilitySeries: {},
   sbaEvents: [],
   deathEvents: [],
   chartLen: 0,
@@ -152,6 +161,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       statusIntervals: response.statusIntervals ?? [],
       chartWindows: response.chartWindows ?? [],
       sbaChart: response.sbaChart,
+      abilitySeries: response.abilitySeries ?? {},
       sbaEvents: response.sbaEvents,
       deathEvents: response.deathEvents,
       chartLen: response.chartLen,
