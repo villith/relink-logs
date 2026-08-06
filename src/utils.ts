@@ -1081,6 +1081,24 @@ export const millisecondsToElapsedFormat = (ms: number): string => {
 };
 
 /**
+ * `MM:SS.mmm` — the events table's timestamp, where several hundred events can
+ * share one second and the sub-second order is the whole point.
+ *
+ * A sibling of `millisecondsToElapsedFormat` rather than a widening of it: that
+ * one is the meter's duration readout, which must keep rendering `MM:SS`.
+ *
+ * Arithmetic, not `Date`: `Date.UTC` wraps the minutes field at 60, so a
+ * 90-minute Conflux run would read as `30:00`.
+ */
+export const millisecondsToPreciseElapsedFormat = (ms: number): string => {
+  const total = Math.max(0, Math.floor(ms));
+  const minutes = Math.floor(total / 60_000);
+  const seconds = Math.floor((total % 60_000) / 1_000);
+  const millis = total % 1_000;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(millis).padStart(3, "0")}`;
+};
+
+/**
  * The shortest in-game quest time worth believing, in seconds.
  *
  * Logs recorded before the quest timer was read from the right offset stored a

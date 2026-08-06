@@ -44,6 +44,7 @@ import {
   hasQuestElapsedTime,
   humanizeNumbers,
   mergeTargetBreakdowns,
+  millisecondsToPreciseElapsedFormat,
   moveItem,
   orderedChecklistEntries,
   overmasteryAmountFromId,
@@ -1228,5 +1229,21 @@ describe("barWidth", () => {
     // Nothing has dealt damage yet: divide-by-zero would render NaN%.
     expect(barWidth(0, 0, "relative")).toBe(0);
     expect(barWidth(12, 0, "relative")).toBe(12);
+  });
+});
+
+describe("millisecondsToPreciseElapsedFormat", () => {
+  it("keeps the milliseconds the elapsed format drops", () => {
+    expect(millisecondsToPreciseElapsedFormat(1_500)).toBe("00:01.500");
+    expect(millisecondsToPreciseElapsedFormat(0)).toBe("00:00.000");
+  });
+
+  it("pads every field to a fixed width so a column stays aligned", () => {
+    expect(millisecondsToPreciseElapsedFormat(61_007)).toBe("01:01.007");
+  });
+
+  it("carries past an hour into the minutes field rather than wrapping", () => {
+    // A 90-minute Conflux run must not read as 30:00.000.
+    expect(millisecondsToPreciseElapsedFormat(90 * 60_000)).toBe("90:00.000");
   });
 });
