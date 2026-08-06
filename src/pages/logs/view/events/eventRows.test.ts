@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LogEvent } from "@/types";
 
-import { DEFAULT_KINDS, EVENT_KINDS, eventKind, filterByKind, toEventRow } from "./eventRows";
+import { DEFAULT_KINDS, EVENT_KINDS, eventKind, filterByKind, filterByPins, toEventRow } from "./eventRows";
 
 const actor = (index: number) => ({
   index,
@@ -154,5 +154,53 @@ describe("kind filtering", () => {
   it("returns nothing when no kind is enabled", () => {
     const rows = [damage, death].map(toEventRow);
     expect(filterByKind(rows, new Set())).toEqual([]);
+  });
+});
+
+describe("filterByPins", () => {
+  // damage: source 0, target 9, Normal:100 at 1500ms | death: source 1 |
+  // stun: source 2 | linked: no source at all
+  const rows = [damage, death, stun, linked].map(toEventRow);
+  const spans = [{ actorIndex: 9, startMs: 0, endMs: 10_000 }];
+  const NO_PINS = { source: null, targetSpans: [], abilityKeys: null };
+
+  it("keeps everything with nothing pinned", () => {
+    expect(filterByPins(rows, NO_PINS)).toHaveLength(4);
+  });
+
+  it("narrows to one actor on a source pin", () => {
+    expect(filterByPins(rows, { ...NO_PINS, source: 2 }).map((row) => row.kind)).toEqual(["stun"]);
+  });
+
+  it("drops a row that names no actor while a source is pinned", () => {
+    // A party-wide LinkTime row belongs to nobody; keeping it under a pin would
+    // read as the pin failing to apply.
+    expect(filterByPins(rows, { ...NO_PINS, source: 0 }).map((row) => row.kind)).toEqual(["damage"]);
+  });
+
+  it("narrows to a target SPAWN, matching its actor index and its span", () => {
+    expect(filterByPins(rows, { ...NO_PINS, targetSpans: spans })).toHaveLength(1);
+  });
+
+  it("excludes a hit on the same actor index outside the spawn's span", () => {
+    // The game reissues a dead boss's actor index to a later spawn — matching the
+    // index alone put a second dragon's damage under the first one.
+    expect(filterByPins(rows, { ...NO_PINS, targetSpans: [{ actorIndex: 9, startMs: 0, endMs: 1_000 }] })).toEqual([]);
+  });
+
+  it("narrows to the expanded ability keys", () => {
+    expect(filterByPins(rows, { ...NO_PINS, abilityKeys: new Set(["Normal:100"]) })).toHaveLength(1);
+    expect(filterByPins(rows, { ...NO_PINS, abilityKeys: new Set(["Normal:999"]) })).toEqual([]);
+  });
+
+  it("ANDs the dimensions", () => {
+    expect(filterByPins(rows, { source: 0, targetSpans: spans, abilityKeys: new Set(["Normal:100"]) })).toHaveLength(1);
+    expect(filterByPins(rows, { source: 1, targetSpans: spans, abilityKeys: null })).toEqual([]);
+  });
+
+  it("narrows to nothing on an ability pin that expanded to no action", () => {
+    // An EMPTY set is a real filter (a status pin, or a stale URL naming an
+    // action nobody landed) — distinct from null, which is "no ability pinned".
+    expect(filterByPins(rows, { ...NO_PINS, abilityKeys: new Set<string>() })).toEqual([]);
   });
 });

@@ -169,3 +169,36 @@ export const DEFAULT_KINDS: ReadonlySet<EventKind> = new Set(EVENT_KINDS.filter(
 
 export const filterByKind = (rows: EventRow[], kinds: ReadonlySet<EventKind>): EventRow[] =>
   rows.filter((row) => kinds.has(row.kind));
+
+/** One pinned enemy SPAWN: its actor index plus the span it was alive for. A
+ * span, not an id, because the game reissues a dead boss's actor index. */
+export type EventTargetSpan = { actorIndex: number; startMs: number; endMs: number };
+
+/** The pins, already resolved out of their own index spaces by the view.
+ *
+ * `abilityKeys` is `null` for "no ability pinned" and an EMPTY SET for "pinned,
+ * but it expands to no action" (a status pin, a stale URL) — which narrows to
+ * nothing. Collapsing the two would make a status pin silently show everything. */
+export type EventPins = {
+  source: number | null;
+  targetSpans: EventTargetSpan[];
+  abilityKeys: ReadonlySet<string> | null;
+};
+
+/** The pins applied, ANDed. A row that cannot answer a pinned dimension is
+ * excluded: under a player pin, a party-wide row belongs to nobody, and keeping
+ * it would read as the pin failing to apply. */
+export const filterByPins = (rows: EventRow[], pins: EventPins): EventRow[] =>
+  rows.filter((row) => {
+    if (pins.source !== null && row.sourceIndex !== pins.source) return false;
+    if (pins.targetSpans.length > 0) {
+      const hit = pins.targetSpans.some(
+        (span) => row.targetIndex === span.actorIndex && row.timeMs >= span.startMs && row.timeMs <= span.endMs
+      );
+      if (!hit) return false;
+    }
+    if (pins.abilityKeys !== null && (row.abilityKey === null || !pins.abilityKeys.has(row.abilityKey))) {
+      return false;
+    }
+    return true;
+  });
