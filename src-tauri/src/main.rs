@@ -1534,6 +1534,39 @@ fn build_ability_series(
     }
 }
 
+/// `(async)` for the same reason as [`fetch_encounter_state`]: this decompresses
+/// and deserialises the stored blob, which must not run on the main thread.
+///
+/// `deserialize_encounter`, NOT `deserialize_version`: the events table reads the
+/// RAW log, so replaying it through the derived-state machinery would be pure
+/// waste. It repopulates a legacy log's event vector itself.
+#[tauri::command(async)]
+fn fetch_encounter_events(id: u64, offset: usize, count: usize) -> Result<v1::EventPage, String> {
+    let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT data, version FROM logs WHERE id = ?")
+        .map_err(|e| e.to_string())?;
+    let (blob, version): (Vec<u8>, u8) = stmt
+        .query_row([id], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| e.to_string())?;
+
+    let encounter = parser::deserialize_encounter(&blob, version).map_err(|e| e.to_string())?;
+    // The same rebasing origin `Parser::start_time` uses — the first event in the
+    // log — so a row's timestamp lines up with the chart's own axis.
+    let start_time = encounter
+        .raw_event_log
+        .first()
+        .map(|(ts, _)| *ts)
+        .unwrap_or_default();
+
+    Ok(v1::event_page(
+        &encounter.raw_event_log,
+        start_time,
+        offset,
+        count,
+    ))
+}
+
 // `(async)` so the decompress + full reparse runs off the main thread — this is
 // called on every log open, filter change, and brush release.
 #[tauri::command(async)]
@@ -2934,6 +2967,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             fetch_encounter_state,
+            fetch_encounter_events,
             fetch_logs,
             fetch_conflux_runs,
             fetch_legality_players,
