@@ -458,22 +458,64 @@ export const AnalysisView = () => {
   // object is rebuilt every render, so identity comparison would always refetch.
   const wireQueryKey = useMemo(() => (wireQuery === undefined ? null : JSON.stringify(wireQuery)), [wireQuery]);
 
+  // The scoped fetch's own request, everything `fetch_encounter_state` needs
+  // BESIDES the group query (which rides `wireQueryRef` for the same reason).
+  // `filters`, `targetSpans` and `pinnedActions` are fresh references on most
+  // renders even when nothing they carry has changed — clicking between two
+  // different status pins rebuilds `pinnedActions` to a new but equally EMPTY
+  // array both times — so the effect below keys off this object's JSON
+  // identity rather than the raw fields, the same idiom as `wireQuery`/
+  // `wireQueryKey`.
+  const scopedOptions = useMemo(
+    () => ({
+      filters,
+      targetSpans,
+      selection: {
+        sourceIndices: pins.source === null ? [] : [pins.source],
+        abilities: pinnedActions,
+      },
+      // Buckets are inclusive at both ends, so the cutoff has to admit all of
+      // the last one — `end * 1000` would reparse a window one bucket short.
+      ...(range === null ? {} : { fromMs: range[0] * DPS_BUCKET_MS, upToMs: (range[1] + 1) * DPS_BUCKET_MS - 1 }),
+      ...(maskWindows === undefined ? {} : { windows: maskWindows }),
+      stateOnly: true,
+    }),
+    [filters, targetSpans, pins.source, pinnedActions, range, maskWindows]
+  );
+  const scopedOptionsRef = useRef(scopedOptions);
+  scopedOptionsRef.current = scopedOptions;
+  const scopedOptionsKey = useMemo(() => JSON.stringify(scopedOptions), [scopedOptions]);
+
+  // The early-out's own inputs, in a ref rather than the fetch effect's
+  // dependency array. `pins.ability` flipping between two status pins is a
+  // genuine VALUE change but not a genuine REQUEST change (a status pin
+  // narrows nothing the backend knows about — the request above deliberately
+  // sends `abilities: []` for one); if that value change forced the effect to
+  // rerun, the mask clause below would fall all the way through to a fetch
+  // regardless — a mask makes the gate unconditional once inside, so keeping
+  // the effect from firing AT ALL on a no-op change is the only lever left.
+  const earlyOutRef = useRef({ pinned: false, isWindowed: false, hasMask: false });
+  earlyOutRef.current = {
+    pinned: pins.source !== null || (pins.ability !== null && !isStatusPin(pins.ability)) || targetSpans.length > 0,
+    isWindowed: range !== null,
+    hasMask: maskWindows !== undefined,
+  };
+
   // The scoped fetch: everything the selector bar, the window, the grouping
-  // and the filter masks change. Sends `stateOnly` because the charts stay
-  // from the base load — the backend still returns selection facts there, so
-  // the cascade re-narrows with the window — and carries the group query for
-  // the groups-path table.
+  // and the filter masks change. Keyed on `scopedOptionsKey`/`wireQueryKey` —
+  // the request's own content — not the raw pins/spans/mask, so a request
+  // byte-identical to the last one sent (clicking between two status pins,
+  // for instance) does not repeat a decompress-and-reparse the store already
+  // has the answer to. Sends `stateOnly` because the charts stay from the
+  // base load — the backend still returns selection facts there, so the
+  // cascade re-narrows with the window — and carries the group query for the
+  // groups-path table.
   useEffect(() => {
-    // A status pin narrows nothing the backend knows about — the request below
-    // deliberately sends `abilities: []` for one. Counting it as "pinned"
-    // bought a full decompress-and-reparse of the whole log on every buff click
-    // whose result was byte-identical to the base load already in the store.
-    const pinned =
-      pins.source !== null || (pins.ability !== null && !isStatusPin(pins.ability)) || targetSpans.length > 0;
+    const { pinned, isWindowed, hasMask } = earlyOutRef.current;
     // A regroup with nothing pinned still needs ITS grouping's aggregates —
     // unless the base load already fetched this exact query.
     const needsGroups = wireQueryKey !== null && wireQueryKey !== baseQueryKeyRef.current;
-    if (!pinned && range === null && !needsGroups && maskWindows === undefined) {
+    if (!pinned && !isWindowed && !needsGroups && !hasMask) {
       setScoped(null);
       return;
     }
@@ -481,20 +523,7 @@ export const AnalysisView = () => {
     const generation = ++scopeGeneration.current;
     invoke("fetch_encounter_state", {
       id: Number(id),
-      options: {
-        filters,
-        targetSpans,
-        selection: {
-          sourceIndices: pins.source === null ? [] : [pins.source],
-          abilities: pinnedActions,
-        },
-        // Buckets are inclusive at both ends, so the cutoff has to admit all of
-        // the last one — `end * 1000` would reparse a window one bucket short.
-        ...(range === null ? {} : { fromMs: range[0] * DPS_BUCKET_MS, upToMs: (range[1] + 1) * DPS_BUCKET_MS - 1 }),
-        ...(maskWindows === undefined ? {} : { windows: maskWindows }),
-        stateOnly: true,
-        groupQuery: wireQueryRef.current,
-      },
+      options: { ...scopedOptionsRef.current, groupQuery: wireQueryRef.current },
     })
       .then((result) => {
         if (generation !== scopeGeneration.current) return;
@@ -512,7 +541,7 @@ export const AnalysisView = () => {
         if (generation !== scopeGeneration.current) return;
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
-  }, [id, filters, pins.source, pins.ability, pinnedActions, targetSpans, range, wireQueryKey, maskWindows]);
+  }, [id, scopedOptionsKey, wireQueryKey]);
 
   // Which aggregates the groups path renders: the scoped fetch's when one is
   // in hand, else the base load's — valid only while the current query IS the
