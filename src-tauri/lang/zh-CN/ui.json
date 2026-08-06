@@ -1204,7 +1204,7 @@
       "311": "空中精准 X2",
       "400": "上挑攻击",
       "410": "下落攻击",
-      "9998": "Raging Fist",
+      "9998": "直冲拳",
       "skill-groups": {
         "normal-attack": "普通攻击",
         "combo-finisher": "连击收招",
@@ -1292,7 +1292,7 @@
       "302": "空中连击 3",
       "400": "上挑攻击",
       "410": "下落攻击",
-      "1200": "Phantasmagoria",
+      "1200": "幻术光影",
       "9998": "High-Speed Charge",
       "skill-groups": {
         "normal-attack": "普通攻击",
@@ -1555,9 +1555,9 @@
       "310": "空中连击 收招",
       "400": "上挑攻击",
       "410": "下落攻击",
-      "1000": "Deathmatch Finale",
+      "1000": "铁衣玉碎",
       "1410": "武刹枪 收招",
-      "11000": "Mode Change",
+      "11000": "模式转换",
       "skill-groups": {
         "normal-attack": "普通攻击",
         "combo-finisher": "连击收招",
@@ -1629,7 +1629,7 @@
       "960": "派生收招 2",
       "970": "派生收招 3",
       "980": "派生收招 4",
-      "8000": "Rising Nova",
+      "8000": "新星跃升",
       "skill-groups": {
         "normal-attack": "普通攻击",
         "normal-attack-empowered": "普通攻击 (啖因果)",
