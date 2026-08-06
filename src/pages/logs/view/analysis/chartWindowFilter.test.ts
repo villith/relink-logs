@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import type { ChartWindow } from "@/types";
 
-import { intersectWireWindows, selectedChartWindows, windowFilterWireWindows } from "./chartWindowFilter";
+import {
+  intersectWireWindows,
+  maskStatusIntervals,
+  selectedChartWindows,
+  windowFilterWireWindows,
+} from "./chartWindowFilter";
 
 const win = (kind: ChartWindow["kind"], startMs: number, endMs: number, actorIndex: number | null = null) => ({
   kind,
@@ -77,5 +82,39 @@ describe("intersectWireWindows", () => {
 
   it("disjoint masks intersect to nothing", () => {
     expect(intersectWireWindows([{ fromMs: 0, upToMs: 5_000 }], [{ fromMs: 5_000, upToMs: 9_000 }])).toEqual([]);
+  });
+});
+
+describe("maskStatusIntervals", () => {
+  const interval = (startMs: number, endMs: number, applications: number) => ({ startMs, endMs, applications });
+
+  it("an interval spanning two disjoint mask spans yields two pieces, counted once at the apply moment", () => {
+    const result = maskStatusIntervals(
+      [interval(5_000, 25_000, 3)],
+      [
+        { fromMs: 0, upToMs: 10_000 },
+        { fromMs: 20_000, upToMs: 30_000 },
+      ]
+    );
+    expect(result).toEqual([
+      { startMs: 5_000, endMs: 10_000, applications: 3 },
+      { startMs: 20_000, endMs: 25_000, applications: 0 },
+    ]);
+    expect(result.reduce((total, piece) => total + piece.applications, 0)).toBe(3);
+  });
+
+  it("an interval starting before its first admitting span carries 0 on every piece", () => {
+    const result = maskStatusIntervals([interval(0, 15_000, 4)], [{ fromMs: 10_000, upToMs: 20_000 }]);
+    expect(result).toEqual([{ startMs: 10_000, endMs: 15_000, applications: 0 }]);
+  });
+
+  it("an interval fully inside one span keeps its count", () => {
+    const result = maskStatusIntervals([interval(12_000, 18_000, 2)], [{ fromMs: 10_000, upToMs: 20_000 }]);
+    expect(result).toEqual([{ startMs: 12_000, endMs: 18_000, applications: 2 }]);
+  });
+
+  it("clips piece boundaries to the span", () => {
+    const result = maskStatusIntervals([interval(0, 100_000, 1)], [{ fromMs: 10_000, upToMs: 20_000 }]);
+    expect(result).toEqual([{ startMs: 10_000, endMs: 20_000, applications: 0 }]);
   });
 });

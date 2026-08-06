@@ -84,7 +84,12 @@ import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } f
 import { chartPresentation } from "./chartPresentation";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
 import { windowBandsFor } from "./chartWindowBands";
-import { intersectWireWindows, selectedChartWindows, windowFilterWireWindows } from "./chartWindowFilter";
+import {
+  intersectWireWindows,
+  maskStatusIntervals,
+  selectedChartWindows,
+  windowFilterWireWindows,
+} from "./chartWindowFilter";
 import { qualifiedAbilityLabels } from "./labelCollision";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
@@ -273,9 +278,10 @@ export const AnalysisView = () => {
   // of the one after it — the same conversion the scoped fetch and the chart
   // bands use, kept in one place so the three cannot drift.
   //
-  // Declared HERE, above the fetch memos, because the aura filter's window mask
-  // rides the group query: `auraWindows` clips against this, and `wireQuery`
-  // reads that. Below them it would be a use-before-declaration.
+  // Declared HERE, above the fetch memos, because the filters' window masks
+  // ride the queries: `auraWindows`/`windowFilterWindows` clip against this,
+  // and `wireQuery`/the scoped fetch read the combined mask. Below them it
+  // would be a use-before-declaration.
   const statusWindow = useMemo(
     () => ({
       startMs: (range === null ? 0 : range[0]) * DPS_BUCKET_MS,
@@ -397,18 +403,18 @@ export const AnalysisView = () => {
   }, [auraWindows, windowFilterWindows]);
 
   // The buffs/debuffs tables under the window filter: intervals clipped to the
-  // admitted spans, so uptime and counts report only masked time. The chips
-  // and selector options stay on the UNmasked window — they are pick lists,
-  // and a filter must not hide the things that operate it.
+  // admitted spans, so uptime reports only masked time. `applications` is
+  // re-counted per `maskStatusIntervals`'s start-attribution rule — a piece
+  // counts only in the span containing the interval's original apply moment —
+  // so a buff spanning several admitted spans is still Count 1, not one per
+  // piece. The chips and selector options stay on the UNmasked window — they
+  // are pick lists, and a filter must not hide the things that operate it.
   //
   // Declared here, below `maskWindows`, rather than beside `windowedIntervals`
   // above (which it otherwise reads from) — it depends on `maskWindows`, which
   // depends on `auraWindows`, both declared after `windowedIntervals`.
   const maskedIntervals = useMemo(
-    () =>
-      maskWindows === undefined
-        ? windowedIntervals
-        : maskWindows.flatMap((span) => clipToWindow(windowedIntervals, span.fromMs, span.upToMs)),
+    () => (maskWindows === undefined ? windowedIntervals : maskStatusIntervals(windowedIntervals, maskWindows)),
     [windowedIntervals, maskWindows]
   );
 
@@ -452,10 +458,11 @@ export const AnalysisView = () => {
   // object is rebuilt every render, so identity comparison would always refetch.
   const wireQueryKey = useMemo(() => (wireQuery === undefined ? null : JSON.stringify(wireQuery)), [wireQuery]);
 
-  // The scoped fetch: everything the selector bar, the window and the grouping
-  // change. Sends `stateOnly` because the charts stay from the base load — the
-  // backend still returns selection facts there, so the cascade re-narrows
-  // with the window — and carries the group query for the groups-path table.
+  // The scoped fetch: everything the selector bar, the window, the grouping
+  // and the filter masks change. Sends `stateOnly` because the charts stay
+  // from the base load — the backend still returns selection facts there, so
+  // the cascade re-narrows with the window — and carries the group query for
+  // the groups-path table.
   useEffect(() => {
     // A status pin narrows nothing the backend knows about — the request below
     // deliberately sends `abilities: []` for one. Counting it as "pinned"
@@ -1050,7 +1057,7 @@ export const AnalysisView = () => {
   // `SBA_MARKER_COLOR`, which is picked to collide with no party colour.
   // Unknown actors (enemy deaths) are dropped by the extractor itself.
   // Battle-state windows (SBA performances, Link Time, enemy Breaks), clipped
-  // and rebased onto the same window the markers and aura bands use.
+  // and rebased onto the same window the markers and mask bands use.
   const stateWindowBands = useMemo(() => windowBandsFor(chartWindows, statusWindow), [chartWindows, statusWindow]);
 
   const chartMarkers: ChartMarker[] = useMemo(() => {

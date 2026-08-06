@@ -34,6 +34,27 @@ export const windowFilterWireWindows = (
   return merged;
 };
 
+/** Status intervals clipped to the mask, for the status TABLES. Each piece
+ * keeps the interval's payload, but `applications` is counted ONLY in the
+ * span containing the interval's start — the apply moment — so a buff
+ * crossing three admitted spans still counts once, and one applied outside
+ * the mask entirely counts zero. (Refreshes folded into `applications`
+ * cannot be re-dated, so start-attribution is the honest approximation.) */
+export const maskStatusIntervals = <T extends { startMs: number; endMs: number; applications: number }>(
+  intervals: T[],
+  mask: WireWindow[]
+): T[] =>
+  mask.flatMap((span) =>
+    intervals
+      .filter((interval) => interval.startMs < span.upToMs && interval.endMs > span.fromMs)
+      .map((interval) => ({
+        ...interval,
+        startMs: Math.max(span.fromMs, interval.startMs),
+        endMs: Math.min(span.upToMs, interval.endMs),
+        applications: interval.startMs >= span.fromMs ? interval.applications : 0,
+      }))
+  );
+
 /** Time inside BOTH masks — the aura filter and the window filter compose by
  * intersection. Both inputs sorted and merged (what the two builders return). */
 export const intersectWireWindows = (a: WireWindow[], b: WireWindow[]): WireWindow[] => {
