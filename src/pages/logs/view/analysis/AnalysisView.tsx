@@ -83,6 +83,7 @@ import { CAUSE_CLASS_LABEL_KEY, causeClassOfKey, withProvenance } from "./causeC
 import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "./chartMarkers";
 import { chartPresentation } from "./chartPresentation";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
+import { windowBandsFor } from "./chartWindowBands";
 import { qualifiedAbilityLabels } from "./labelCollision";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
@@ -168,6 +169,7 @@ export const AnalysisView = () => {
     sbaChartLen,
     sbaEvents,
     deathEvents,
+    chartWindows,
     targetEntries,
     selectionFacts: baseFacts,
     groups: baseGroups,
@@ -190,6 +192,7 @@ export const AnalysisView = () => {
       sbaChartLen: state.sbaChartLen,
       sbaEvents: state.sbaEvents,
       deathEvents: state.deathEvents,
+      chartWindows: state.chartWindows,
       targetEntries: state.targetEntries,
       selectionFacts: state.selectionFacts,
       groups: state.groups,
@@ -1008,6 +1011,10 @@ export const AnalysisView = () => {
   // colours. Deaths wear the dead player's party colour; SBA lines wear
   // `SBA_MARKER_COLOR`, which is picked to collide with no party colour.
   // Unknown actors (enemy deaths) are dropped by the extractor itself.
+  // Battle-state windows (SBA performances, Link Time, enemy Breaks), clipped
+  // and rebased onto the same window the markers and aura bands use.
+  const stateWindowBands = useMemo(() => windowBandsFor(chartWindows, statusWindow), [chartWindows, statusWindow]);
+
   const chartMarkers: ChartMarker[] = useMemo(() => {
     const knownActors = new Set(playerByIndex.keys());
     return extractMarkers({ deathEvents, sbaEvents, window: statusWindow, knownActors }).map((event) => ({
@@ -1490,6 +1497,7 @@ export const AnalysisView = () => {
         toLabel={range === null ? fullLabel : bucketLabel(range[1])}
         markers={chartMarkers}
         bands={auraBands}
+        windowBands={stateWindowBands}
         stackMode={chartSource === "stacks" ? stackMode : undefined}
         onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
       />

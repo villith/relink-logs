@@ -12,6 +12,13 @@ import { bandOpacity, type Band } from "../statusBands";
 import { ChartLegend } from "./ChartLegend";
 import "./analysis.css";
 import type { ChartMarker, MarkerKind } from "./chartMarkers";
+import {
+  WINDOW_BAND_COLOR,
+  WINDOW_KINDS,
+  WINDOW_LABEL_KEY,
+  type WindowBand,
+  type WindowKind,
+} from "./chartWindowBands";
 import { windowFromDrag } from "./scopeWindow";
 
 /** How a plotted value reads as text.
@@ -58,6 +65,12 @@ export type DpsChartProps = {
    * follow-up, which is the next thing to feed it. Absent, the chart draws
    * exactly what it draws today. */
   bands?: { color: string; band: Band }[];
+  /** Battle-state windows (SBA performances, Link Time, enemy Breaks), already
+   * clipped and rebased like `bands` — see `windowBandsFor`. Same shading
+   * mechanism, but each KIND gets its own control-row toggle beside the marker
+   * checkboxes, because the three overlap and reading one often means hiding
+   * the others. */
+  windowBands?: WindowBand[];
   /** Death/SBA event markers, already rebased onto this chart's window (like
    * `bands`). Drawn as vertical reference lines and appended to the tooltip of
    * the bucket they land in; a control row above the plot toggles each kind. */
@@ -203,6 +216,7 @@ export const DpsChart = ({
   toLabel,
   stacked = false,
   bands,
+  windowBands,
   markers,
   stackMode = "stacked",
   onStackModeChange,
@@ -228,6 +242,27 @@ export const DpsChart = ({
     () => (["death", "sba"] as const).filter((kind) => (markers ?? []).some((marker) => marker.kind === kind)),
     [markers]
   );
+
+  // Which window KINDS are hidden — same lifecycle reasoning as the marker
+  // kinds: a way of reading every chart, not a property of one pin's series.
+  const [hiddenWindowKinds, setHiddenWindowKinds] = useState<Set<WindowKind>>(new Set());
+
+  const windowKinds = useMemo(
+    () => WINDOW_KINDS.filter((kind) => (windowBands ?? []).some((band) => band.kind === kind)),
+    [windowBands]
+  );
+
+  const shownWindowBands = useMemo(
+    () => (windowBands ?? []).filter((band) => !hiddenWindowKinds.has(band.kind)),
+    [windowBands, hiddenWindowKinds]
+  );
+
+  const toggleWindowKind = (kind: WindowKind) =>
+    setHiddenWindowKinds((previous) => {
+      const next = new Set(previous);
+      if (!next.delete(kind)) next.add(kind);
+      return next;
+    });
 
   const shownMarkers = useMemo(
     () => (markers ?? []).filter((marker) => !hiddenMarkerKinds.has(marker.kind)),
@@ -345,7 +380,11 @@ export const DpsChart = ({
   // the pointer moved across the plot.
   const statusBands = useMemo(() => {
     const bucket = (index: number) => Math.max(0, Math.min(maxIndex, index));
-    return (bands ?? []).map(({ color, band: span }, index) => (
+    // The battle-state windows draw FIRST (under the aura shading): both are
+    // 16%-fill backdrops, and the aura mask is the active filter — it must
+    // stay readable over whatever state happened to hold at the time.
+    const spans = [...shownWindowBands, ...(bands ?? [])];
+    return spans.map(({ color, band: span }, index) => (
       <ReferenceArea
         key={index}
         x1={data[bucket(Math.floor(span.startMs / DPS_BUCKET_MS))]?.timestamp}
@@ -357,7 +396,7 @@ export const DpsChart = ({
         fillOpacity={bandOpacity(span.stacks)}
       />
     ));
-  }, [bands, data, maxIndex]);
+  }, [shownWindowBands, bands, data, maxIndex]);
 
   // Each shown marker paired with the x value of the bucket it lands in — the
   // same ms→bucket conversion the bands use, done once for the two consumers
@@ -443,6 +482,18 @@ export const DpsChart = ({
               ]}
             />
           )}
+          {windowKinds.map((kind) => (
+            <Checkbox
+              key={`window-${kind}`}
+              size="xs"
+              // The band's own colour on the box, so the label names the hue
+              // the plot shades with — identity never rides colour alone.
+              color={WINDOW_BAND_COLOR[kind]}
+              label={t(WINDOW_LABEL_KEY[kind])}
+              checked={!hiddenWindowKinds.has(kind)}
+              onChange={() => toggleWindowKind(kind)}
+            />
+          ))}
           {markerKinds.map((kind) => (
             <Checkbox
               key={kind}

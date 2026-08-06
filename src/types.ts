@@ -179,6 +179,19 @@ export type StatusInterval = {
   applications: number;
 };
 
+/** A span of fight time a battle state held — mirrors the Rust `ChartWindow`
+ * (parser/v1/windows.rs). `sba` is a Skybound Art performance (chains merged),
+ * `link` is Link Time, `break` is one enemy sitting in Break. Milliseconds
+ * from the fight's start, the same clock `StatusInterval` reports on. */
+export type ChartWindow = {
+  kind: "sba" | "link" | "break";
+  startMs: number;
+  endMs: number;
+  /** The breaking enemy's actor index for `break` windows; null for the
+   * party-wide kinds. */
+  actorIndex: number | null;
+};
+
 /** Everything grouping and naming read of a hit: the action and the body it came
  * from.
  *

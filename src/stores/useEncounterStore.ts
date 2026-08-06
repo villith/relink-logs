@@ -1,4 +1,5 @@
 import {
+  ChartWindow,
   DeathEvent,
   EncounterState,
   GroupAggregate,
@@ -28,6 +29,10 @@ interface EncounterStore {
   /** Every window an actor held a status effect for, spanning the whole fight.
    * Empty on logs recorded before status capture. */
   statusIntervals: StatusInterval[];
+  /** Spans a battle state held (an SBA performance, Link Time, an enemy's
+   * Break), for the chart's shaded windows. Empty on logs recorded before
+   * the transition events existed. */
+  chartWindows: ChartWindow[];
   sbaChart: Record<number, number[]>;
   sbaEvents: SBAEvent[];
   deathEvents: DeathEvent[];
@@ -78,6 +83,8 @@ export interface EncounterStateResponse {
   /** Optional so a backend older than the field reads as "no status capture" —
    * which is also what every log recorded before the hook emitted these has. */
   statusIntervals?: StatusInterval[];
+  /** Optional so a backend older than the field reads as "no windows". */
+  chartWindows?: ChartWindow[];
   sbaChart: Record<number, number[]>;
   sbaEvents: SBAEvent[];
   deathEvents: DeathEvent[];
@@ -108,6 +115,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   takenChart: {},
   hpChart: [],
   statusIntervals: [],
+  chartWindows: [],
   sbaChart: {},
   sbaEvents: [],
   deathEvents: [],
@@ -142,6 +150,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       takenChart: response.takenChart ?? {},
       hpChart: response.hpChart ?? [],
       statusIntervals: response.statusIntervals ?? [],
+      chartWindows: response.chartWindows ?? [],
       sbaChart: response.sbaChart,
       sbaEvents: response.sbaEvents,
       deathEvents: response.deathEvents,
