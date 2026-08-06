@@ -1504,27 +1504,32 @@ fn build_ability_series(
         return HashMap::new();
     }
 
+    // ONE scope for both, built from the request — see `v1::ChartScope`. A
+    // builder cannot quietly honour a different subset of these than its
+    // neighbour, which is how the ability charts once ignored the ability pin.
+    let scope = v1::ChartScope {
+        player_data: &parser.encounter.player_data,
+        target_spans: &options.target_spans,
+        abilities: &options.selection.abilities,
+        filters: options.filters,
+    };
+
     match query.metric {
         AbilitySeriesMetric::Stun => v1::build_ability_stun_chart(
             &parser.encounter.raw_event_log,
-            &parser.encounter.player_data,
             &wanted,
             parser.start_time(),
             DPS_INTERVAL,
             chart_len,
-            &options.target_spans,
-            options.filters,
-            &options.selection.abilities,
+            &scope,
         ),
         AbilitySeriesMetric::Sba => v1::build_ability_sba_chart(
             &parser.encounter.raw_event_log,
-            &parser.encounter.player_data,
             &wanted,
             parser.start_time(),
             DPS_INTERVAL,
             chart_len,
-            options.filters,
-            &options.selection.abilities,
+            &scope,
         ),
     }
 }
@@ -1659,26 +1664,29 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         .values()
         .map(|player| player.index)
         .collect();
+    // ONE scope for every chart this response builds — see `v1::ChartScope`.
+    let chart_scope = v1::ChartScope {
+        player_data: &parser.encounter.player_data,
+        target_spans: &options.target_spans,
+        abilities: &options.selection.abilities,
+        filters: options.filters,
+    };
+
     let player_dps = v1::build_player_dps_chart(
         &parser.encounter.raw_event_log,
-        &parser.encounter.player_data,
         &player_indices,
         start_time,
         DPS_INTERVAL,
         (duration / DPS_INTERVAL) as usize + 1,
-        &options.target_spans,
-        &options.selection.abilities,
-        options.filters,
+        &chart_scope,
     );
     let player_stun = v1::build_player_stun_chart(
         &parser.encounter.raw_event_log,
-        &parser.encounter.player_data,
         &player_indices,
         start_time,
         DPS_INTERVAL,
         (duration / DPS_INTERVAL) as usize + 1,
-        &options.target_spans,
-        options.filters,
+        &chart_scope,
     );
 
     let player_taken = v1::build_player_taken_chart(
@@ -1695,7 +1703,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         start_time,
         DPS_INTERVAL,
         (duration / DPS_INTERVAL) as usize + 1,
-        &options.target_spans,
+        &chart_scope,
     );
 
     // Closed against the end of the full log, not the scrub window: an interval

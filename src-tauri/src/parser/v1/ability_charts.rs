@@ -16,11 +16,9 @@ use std::collections::{HashMap, HashSet};
 use protocol::{ActionType, Message, SbaGainCause};
 use serde::Serialize;
 
+use super::chart_scope::ChartScope;
 use super::player_state::BreakdownKeying;
-use super::{
-    is_excluded, is_remote_slot, remap_dragon_form, target_selected, CharacterType, MeterFilters,
-    PhantomTargets, PlayerData, TargetSpan,
-};
+use super::{is_remote_slot, remap_dragon_form, CharacterType, PhantomTargets, PlayerData};
 
 /// A guard that just landed claims the stun message trailing it. Mirrors
 /// `GUARD_STUN_WINDOW_MS` in `player_state.rs`, which owns the live-path rule.
@@ -120,18 +118,15 @@ fn add_at(
 /// rows are keyed by, so filtering here is what keeps the two showing the same
 /// abilities. Filtering raw `action_id`s instead would disagree wherever the
 /// keying rewrites one (Ferry's pet remap, the supplementary fold).
-#[allow(clippy::too_many_arguments)]
 pub fn build_ability_stun_chart(
     events: &[(i64, Message)],
-    player_data: &[Option<PlayerData>; 4],
     player_indices: &[u32],
     start_time: i64,
     interval: i64,
     chart_len: usize,
-    target_spans: &[TargetSpan],
-    filters: MeterFilters,
-    abilities: &[ActionType],
+    scope: &ChartScope,
 ) -> HashMap<u32, Vec<AbilitySeries>> {
+    let player_data = scope.player_data;
     let mut paths: HashMap<u32, StunPaths> = player_indices
         .iter()
         .map(|index| (*index, StunPaths::default()))
@@ -162,7 +157,7 @@ pub fn build_ability_stun_chart(
                 if phantoms.is_phantom(damage_event) {
                     continue;
                 }
-                if is_excluded(damage_event, &filters) {
+                if !scope.counted(damage_event) {
                     if stun_capable(damage_event.action_id) {
                         suppressed.insert(damage_event.source.parent_index);
                     }
@@ -185,7 +180,7 @@ pub fn build_ability_stun_chart(
                     last_stun_attribution.insert(player, key);
                 }
 
-                if target_selected(timestamp - start_time, &damage_event, target_spans) {
+                if scope.selects_target(timestamp - start_time, &damage_event) {
                     add_at(
                         &mut paths.delta,
                         key,
@@ -274,19 +269,14 @@ pub fn build_ability_stun_chart(
 
     paths
         .into_iter()
-        .map(|(player, paths)| (player, resolve_paths(paths, abilities)))
+        .map(|(player, paths)| (player, resolve_paths(paths, scope)))
         .collect()
-}
-
-/// Whether a resolved row survives the selector bar's ability pin. Empty = "All".
-fn pinned(abilities: &[ActionType], action: ActionType) -> bool {
-    abilities.is_empty() || abilities.contains(&action)
 }
 
 /// Keep whichever path saw the accrual, PER ROW (see the `max` note on
 /// [`build_ability_stun_chart`]). Bands that accrued nothing at all are dropped:
 /// an all-zero band is one the legend would name and colour for nothing.
-fn resolve_paths(mut paths: StunPaths, abilities: &[ActionType]) -> Vec<AbilitySeries> {
+fn resolve_paths(mut paths: StunPaths, scope: &ChartScope) -> Vec<AbilitySeries> {
     // `CharacterType` is not `Ord`, so the union is deduped by hash and the
     // ordering is imposed below instead.
     let keys: HashSet<RowKey> = paths
@@ -306,7 +296,7 @@ fn resolve_paths(mut paths: StunPaths, abilities: &[ActionType]) -> Vec<AbilityS
             } else {
                 messages
             };
-            if values.iter().all(|value| *value == 0.0) || !pinned(abilities, key.0) {
+            if values.iter().all(|value| *value == 0.0) || !scope.selects_ability(key.0) {
                 return None;
             }
             Some(AbilitySeries::Skill {
@@ -389,17 +379,15 @@ fn cause_key(cause: &SbaGainCause) -> Option<String> {
 /// also drops the CAUSE bands and the remainder: both describe the whole player
 /// — the remainder is measured against their polled total — so keeping them
 /// beside one ability would make the stack's height mean two different things.
-#[allow(clippy::too_many_arguments)]
 pub fn build_ability_sba_chart(
     events: &[(i64, Message)],
-    player_data: &[Option<PlayerData>; 4],
     player_indices: &[u32],
     start_time: i64,
     interval: i64,
     chart_len: usize,
-    filters: MeterFilters,
-    abilities: &[ActionType],
+    scope: &ChartScope,
 ) -> HashMap<u32, Vec<AbilitySeries>> {
+    let player_data = scope.player_data;
     let mut skills: HashMap<u32, HashMap<RowKey, Vec<f64>>> = player_indices
         .iter()
         .map(|index| (*index, HashMap::new()))
@@ -424,7 +412,7 @@ pub fn build_ability_sba_chart(
             // Damage events open no band of their own here; they teach the
             // keying memo which row each raw action id currently belongs to.
             Message::DamageEvent(damage_event) => {
-                if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
+                if phantoms.is_phantom(damage_event) || !scope.counted(damage_event) {
                     continue;
                 }
                 let damage_event = remap_dragon_form(player_data, damage_event);
@@ -506,9 +494,9 @@ pub fn build_ability_sba_chart(
                 .collect();
 
             // A pin narrows to ONE ability; the whole-player bands stop applying.
-            if !abilities.is_empty() {
+            if !scope.abilities.is_empty() {
                 bands.retain(|band| match band {
-                    AbilitySeries::Skill { action_type, .. } => pinned(abilities, *action_type),
+                    AbilitySeries::Skill { action_type, .. } => scope.selects_ability(*action_type),
                     AbilitySeries::Cause { .. } => false,
                 });
                 sort_bands(&mut bands);
@@ -542,6 +530,7 @@ pub fn build_ability_sba_chart(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::v1::MeterFilters;
     use protocol::{Actor, DamageEvent, OnPlayerStunEvent, OnUpdateSBAEvent, SbaGainEvent};
 
     fn a_damage_event(player: u32, action: ActionType, stun: Option<f32>) -> DamageEvent {
@@ -581,24 +570,21 @@ mod tests {
         })
     }
 
-    fn no_players() -> [Option<PlayerData>; 4] {
-        [None, None, None, None]
+    const NO_PLAYERS: [Option<PlayerData>; 4] = [None, None, None, None];
+
+    fn scope(abilities: &[ActionType]) -> ChartScope<'_> {
+        ChartScope {
+            player_data: &NO_PLAYERS,
+            target_spans: &[],
+            abilities,
+            filters: MeterFilters::default(),
+        }
     }
 
     fn stun_bands(events: &[(i64, Message)], chart_len: usize) -> Vec<AbilitySeries> {
-        build_ability_stun_chart(
-            events,
-            &no_players(),
-            &[0],
-            0,
-            1_000,
-            chart_len,
-            &[],
-            MeterFilters::default(),
-            &[],
-        )
-        .remove(&0)
-        .expect("the requested player always has a row")
+        build_ability_stun_chart(events, &[0], 0, 1_000, chart_len, &scope(&[]))
+            .remove(&0)
+            .expect("the requested player always has a row")
     }
 
     fn values_for(bands: &[AbilitySeries], action: ActionType) -> Vec<f64> {
@@ -817,18 +803,9 @@ mod tests {
     }
 
     fn sba_bands(events: &[(i64, Message)], chart_len: usize) -> Vec<AbilitySeries> {
-        build_ability_sba_chart(
-            events,
-            &no_players(),
-            &[0],
-            0,
-            1_000,
-            chart_len,
-            MeterFilters::default(),
-            &[],
-        )
-        .remove(&0)
-        .expect("the requested player always has a row")
+        build_ability_sba_chart(events, &[0], 0, 1_000, chart_len, &scope(&[]))
+            .remove(&0)
+            .expect("the requested player always has a row")
     }
 
     fn cause_values(bands: &[AbilitySeries], wanted: &str) -> Vec<f64> {
@@ -983,19 +960,10 @@ mod tests {
             (0, stun_hit(0, ActionType::Normal(1), 10.0)),
             (10, stun_hit(0, ActionType::Normal(2), 20.0)),
         ];
-        let bands = build_ability_stun_chart(
-            &events,
-            &no_players(),
-            &[0],
-            0,
-            1_000,
-            1,
-            &[],
-            MeterFilters::default(),
-            &[ActionType::Normal(1)],
-        )
-        .remove(&0)
-        .expect("player row");
+        let bands =
+            build_ability_stun_chart(&events, &[0], 0, 1_000, 1, &scope(&[ActionType::Normal(1)]))
+                .remove(&0)
+                .expect("player row");
 
         assert_eq!(bands.len(), 1);
         assert_eq!(values_for(&bands, ActionType::Normal(1)), vec![10.0]);
@@ -1030,18 +998,10 @@ mod tests {
             (20, sba_gain(0, SbaGainCause::PartyAward, 10.0)),
             (25, sba_poll(0, 200.0, 200.0)),
         ];
-        let bands = build_ability_sba_chart(
-            &events,
-            &no_players(),
-            &[0],
-            0,
-            1_000,
-            1,
-            MeterFilters::default(),
-            &[ActionType::Normal(1)],
-        )
-        .remove(&0)
-        .expect("player row");
+        let bands =
+            build_ability_sba_chart(&events, &[0], 0, 1_000, 1, &scope(&[ActionType::Normal(1)]))
+                .remove(&0)
+                .expect("player row");
 
         assert_eq!(bands.len(), 1, "only the pinned ability survives");
         assert_eq!(values_for(&bands, ActionType::Normal(1)), vec![30.0]);

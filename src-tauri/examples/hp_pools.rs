@@ -12,7 +12,9 @@ use std::path::PathBuf;
 
 use anyhow::{Context, Result};
 use gbfr_logs::parser::constants::EnemyType;
-use gbfr_logs::parser::v1::{build_target_hp_charts, segment_targets, Encounter};
+use gbfr_logs::parser::v1::{
+    build_target_hp_charts, segment_targets, ChartScope, Encounter, MeterFilters,
+};
 use protocol::Message;
 use rusqlite::Connection;
 
@@ -112,7 +114,12 @@ fn main() -> Result<()> {
         start,
         1_000,
         chart_len,
-        &[],
+        &ChartScope {
+            player_data: &Default::default(),
+            target_spans: &[],
+            abilities: &[],
+            filters: MeterFilters::default(),
+        },
     );
     println!("chart series ({}):", charts.len());
     for series in &charts {

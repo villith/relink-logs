@@ -23,6 +23,7 @@ mod ability_charts;
 #[cfg(any(test, feature = "diag"))]
 pub mod audit;
 mod cap_detection;
+mod chart_scope;
 mod filters;
 mod groups;
 pub mod phantom_targets;
@@ -32,6 +33,7 @@ mod status;
 mod windows;
 
 pub use ability_charts::{build_ability_sba_chart, build_ability_stun_chart, AbilitySeries};
+pub use chart_scope::ChartScope;
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
 pub use groups::{
     aggregate_groups, AbilityFilter, ActorRef, Dimension, GroupAggregate, GroupHostility, GroupKey,
@@ -2010,21 +2012,15 @@ pub fn target_selected(
 // Eight independent inputs with no natural grouping — the event log, who to
 // build rows for, the bucket geometry, and the two filters. Bundling them into
 // a struct would only move the same list somewhere less readable.
-#[allow(clippy::too_many_arguments)]
 pub fn build_player_dps_chart(
     events: &[(i64, Message)],
-    player_data: &[Option<PlayerData>; 4],
     player_indices: &[u32],
     start_time: i64,
     interval: i64,
     chart_len: usize,
-    target_spans: &[TargetSpan],
-    // Actions to keep (empty = all), the same rule `matches_selection` applies
-    // to the derived state — so a chart drawn under an ability pin cannot
-    // disagree with the table beneath it.
-    abilities: &[ActionType],
-    filters: MeterFilters,
+    scope: &ChartScope,
 ) -> HashMap<u32, Vec<i32>> {
+    let player_data = scope.player_data;
     let mut player_dps: HashMap<u32, Vec<i32>> = player_indices
         .iter()
         .map(|index| (*index, vec![0; chart_len]))
@@ -2039,13 +2035,13 @@ pub fn build_player_dps_chart(
             continue;
         };
 
-        if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
+        if phantoms.is_phantom(damage_event) || !scope.counted(damage_event) {
             continue;
         }
 
         // The RAW action, read before the dragon-form remap below — that remap
         // rewrites the source, never the action, so the two are independent.
-        if !abilities.is_empty() && !abilities.contains(&damage_event.action_id) {
+        if !scope.selects_ability(damage_event.action_id) {
             continue;
         }
 
@@ -2059,7 +2055,7 @@ pub fn build_player_dps_chart(
         };
 
         // Check to see if the target is in the list of targets to filter by.
-        if target_selected(timestamp - start_time, &damage_event, target_spans) {
+        if scope.selects_target(timestamp - start_time, &damage_event) {
             chart[((timestamp - start_time) / interval) as usize] += damage_event.damage;
         }
     }
@@ -2075,6 +2071,15 @@ pub fn build_player_dps_chart(
 /// that function's gates apply here: phantom targets and the exclusion filters
 /// are about hits ON enemies, an enemy attack is not a pinnable ability, and
 /// the victim is a player rather than a target span.
+/// Damage TAKEN per bucket, keyed by the victim's slot key.
+///
+/// The one chart builder that takes NO [`ChartScope`], stated here so its
+/// absence reads as a decision rather than the omission that produced the
+/// ability-pin bug. None of the gates apply: the contested-source filters and
+/// the ability pin both speak the grammar of a PLAYER's outgoing hits, and this
+/// walks the incoming stream, where the actor is an enemy and the action is an
+/// enemy attack. Narrowing it by either would silently answer a question about
+/// the wrong side of the fight.
 pub fn build_player_taken_chart(
     events: &[(i64, Message)],
     player_indices: &[u32],
@@ -2134,17 +2139,15 @@ pub fn build_player_taken_chart(
 /// credited to the skill before it, the dragon-form remap, and Perfect Guard's
 /// local-versus-remote zero rule. Stun messages carry no target, so target
 /// spans do not gate them (enemy stun is effectively boss-wide).
-#[allow(clippy::too_many_arguments)]
 pub fn build_player_stun_chart(
     events: &[(i64, Message)],
-    player_data: &[Option<PlayerData>; 4],
     player_indices: &[u32],
     start_time: i64,
     interval: i64,
     chart_len: usize,
-    target_spans: &[TargetSpan],
-    filters: MeterFilters,
+    scope: &ChartScope,
 ) -> HashMap<u32, Vec<f64>> {
+    let player_data = scope.player_data;
     let empty = || -> HashMap<u32, Vec<f64>> {
         player_indices
             .iter()
@@ -2171,7 +2174,7 @@ pub fn build_player_stun_chart(
                 if phantoms.is_phantom(damage_event) {
                     continue;
                 }
-                if is_excluded(damage_event, &filters) {
+                if !scope.counted(damage_event) {
                     // `note_excluded_damage`: supplementary and DoT hits never
                     // own a stun message, so they cannot suppress one.
                     if !matches!(
@@ -2195,7 +2198,12 @@ pub fn build_player_stun_chart(
                 let Some(chart) = delta.get_mut(&damage_event.source.parent_index) else {
                     continue;
                 };
-                if target_selected(timestamp - start_time, &damage_event, target_spans) {
+                // The ability pin, which this walk did not apply before the
+                // gates moved onto `ChartScope` — the per-player stun chart
+                // spanned every ability while the table beneath it narrowed.
+                if scope.selects_ability(damage_event.action_id)
+                    && scope.selects_target(timestamp - start_time, &damage_event)
+                {
                     chart[bucket] += damage_event.stun_value.unwrap_or(0.0) as f64;
                 }
             }
@@ -2262,7 +2270,7 @@ pub fn build_target_hp_charts(
     start_time: i64,
     interval: i64,
     chart_len: usize,
-    target_spans: &[TargetSpan],
+    scope: &ChartScope,
 ) -> Vec<HpChartSeries> {
     let mut series_by_segment: Vec<Option<HpChartSeries>> = vec![None; segments.len()];
 
@@ -2284,7 +2292,10 @@ pub fn build_target_hp_charts(
             continue;
         };
         let rel_ts = timestamp - start_time;
-        if !target_selected(rel_ts, event, target_spans) {
+        // The only gate an HP series takes: which SPAWNS are charted. The
+        // ability and contested-source filters are about a hit's attribution,
+        // and an enemy's health is not attributed to anyone.
+        if !scope.selects_target(rel_ts, event) {
             continue;
         }
         // Newest matching segment wins. A respawn boundary gives the closing segment an
@@ -4827,14 +4838,16 @@ mod tests {
 
         let chart = build_player_dps_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         // Buckets are elapsed seconds from the start: hit 1 at 0s, the burst at
@@ -4861,15 +4874,17 @@ mod tests {
 
         let chart = build_player_dps_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             2,
-            &[],
-            &[],
-            MeterFilters {
-                include_primal_burst: true,
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters {
+                    include_primal_burst: true,
+                },
             },
         );
 
@@ -4893,14 +4908,16 @@ mod tests {
 
         let chart = build_player_dps_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            &[ActionType::Normal(100)],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[ActionType::Normal(100)],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(
@@ -4925,14 +4942,16 @@ mod tests {
 
         let chart = build_player_dps_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             2,
-            &[],
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(
@@ -5084,14 +5103,16 @@ mod tests {
 
         let chart = build_player_dps_chart(
             &events,
-            &Default::default(),
             &[7],
             1_000,
             1_000,
             1,
-            &[],
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         // Player 0 dealt the damage but has no row requested, so it is dropped
@@ -5128,13 +5149,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(chart.get(&0).unwrap(), &vec![50.0, 0.0, 50.0]);
@@ -5154,13 +5178,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(chart.get(&0).unwrap(), &vec![30.0, 0.0, 20.0]);
@@ -5181,13 +5208,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             2,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         let series = chart.get(&0).unwrap();
@@ -5228,13 +5258,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         let charted: f64 = chart.get(&0).unwrap().iter().sum();
@@ -5259,13 +5292,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(chart.get(&0).unwrap().iter().sum::<f64>(), 0.0);
@@ -5290,13 +5326,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             2,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(chart.get(&0).unwrap(), &vec![50.0, 25.0]);
@@ -5311,13 +5350,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[7],
             1_000,
             1_000,
             1,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(chart.len(), 1);
@@ -6200,7 +6242,19 @@ mod tests {
         ];
 
         let segments = segment_targets(&events, 0);
-        let charts = build_target_hp_charts(&events, &segments, 0, 3_000, 3, &[]);
+        let charts = build_target_hp_charts(
+            &events,
+            &segments,
+            0,
+            3_000,
+            3,
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
+        );
         assert_eq!(charts.len(), 3);
 
         // Largest pool first; smaller pools never pollute its line.
@@ -6222,14 +6276,39 @@ mod tests {
             start_ms: 0,
             end_ms: 10_000,
         };
-        let charts = build_target_hp_charts(&events, &segments, 0, 3_000, 3, &[span]);
+        let charts = build_target_hp_charts(
+            &events,
+            &segments,
+            0,
+            3_000,
+            3,
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[span],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
+        );
         assert_eq!(charts.len(), 1);
         assert_eq!(charts[0].values, vec![None, Some(75.0), None]);
 
         // Events without HP data can never produce a chart.
         let bare = vec![(0, Message::DamageEvent(a_damage_event()))];
         let bare_segments = segment_targets(&bare, 0);
-        assert!(build_target_hp_charts(&bare, &bare_segments, 0, 3_000, 1, &[]).is_empty());
+        assert!(build_target_hp_charts(
+            &bare,
+            &bare_segments,
+            0,
+            3_000,
+            1,
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
+        )
+        .is_empty());
     }
 
     /// Lucilius' summon waves: every wave's swords report the SAME collapsed
@@ -6262,7 +6341,19 @@ mod tests {
         ];
 
         let segments = segment_targets(&events, 0);
-        let charts = build_target_hp_charts(&events, &segments, 0, 3_000, 16, &[]);
+        let charts = build_target_hp_charts(
+            &events,
+            &segments,
+            0,
+            3_000,
+            16,
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
+        );
         assert_eq!(charts.len(), 5);
 
         // Largest first: the (healed, unsplit) 200-max pool. Instance numbers
