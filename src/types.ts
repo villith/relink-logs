@@ -873,6 +873,62 @@ export type SBAEvent = [
 
 export type DeathEvent = [number, { OnDeathEvent: { actor_index: number; death_counter: number } }];
 
+/** One actor as a damage event reports it. `parent_index` is what an attribution
+ * reads — a summon's hit belongs to the player who called it. */
+type LogEventActor = {
+  index: number;
+  actor_type: number;
+  parent_index: number;
+  parent_actor_type: number;
+};
+
+/**
+ * The payload half of one raw-log event: an externally-tagged
+ * `protocol::Message`. Inner fields stay snake_case because `Message` variants
+ * serialise with serde's DEFAULTS, not camelCase — `SBAEvent` above is the same
+ * mirror, narrower.
+ *
+ * Names only the variants the events table READS. `Message` has 27 and grows by
+ * the append-only rule (see protocol/src/lib.rs), so the projection must cope
+ * with a variant this union does not name — `eventKind` classifies anything
+ * unrecognised as `other` and `toEventRow` reads no field off it that it has not
+ * checked for at runtime. Widen this union when a variant earns its own column
+ * treatment, not merely because it exists.
+ */
+export type LogEventPayload =
+  | {
+      DamageEvent: {
+        source: LogEventActor;
+        target: LogEventActor;
+        damage: number;
+        flags: number;
+        action_id: ActionType;
+      };
+    }
+  | { OnDeathEvent: { actor_index: number; death_counter: number } }
+  | { OnPlayerStun: { actor_index: number; stun_amount: number } }
+  | { OnPerfectGuardStun: { actor_index: number; stun_amount: number } }
+  | { OnPerfectGuardQuickening: { actor_index: number; stun_amount: number } }
+  | { OnStunEffect: { actor_index: number; stun_amount: number } }
+  | { OnAttemptSBA: { actor_index: number } }
+  | { OnPerformSBA: { actor_index: number } }
+  | { OnContinueSBAChain: { actor_index: number } }
+  | { OnUpdateSBA: { actor_index: number; sba_value: number; sba_added: number } }
+  | { SbaGain: { actor_index: number; action_id: number; amount: number } }
+  | { StatusApply: { actor_index: number; status_id: number; stacks: number } }
+  | { StatusRemove: { actor_index: number; status_id: number } }
+  | { LinkTime: { active: boolean } }
+  | { EnemyMode: { actor_index: number; mode: number } };
+
+/** One entry of a log's raw event stream. Mirrors `(i64, protocol::Message)`,
+ * with the timestamp already rebased to the fight start by `event_page`. */
+export type LogEvent = [number, LogEventPayload];
+
+/** Mirrors the Rust `EventPage`. `total` can exceed `events.length` — the
+ * frontend asks for a capped page, and a log past the cap is truncated VISIBLY
+ * (see EventsTab), never silently. */
+export type EventPage = { events: LogEvent[]; total: number };
+
 /** Toolbox / Synthesis Helper — mirrors src-tauri/src/synthesis/mod.rs. */
 export type SynthesisSigil = {
   uid: number;
