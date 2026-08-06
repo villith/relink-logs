@@ -16,8 +16,11 @@ describe("CAPABILITIES", () => {
   });
 
   it("declares the honest limits", () => {
-    expect(CAPABILITIES.sba.dimensions.ability.supported).toBe(false);
-    expect(CAPABILITIES.sba.dimensions.ability.disabledReasonKey).toBe("ui.logs.sba-no-breakdown");
+    // The per-ability split IS supported (metrics/sba.ts builds it); only the
+    // target dimension has nothing behind it — a gain carries no enemy.
+    expect(CAPABILITIES.sba.dimensions.ability.supported).toBe(true);
+    expect(CAPABILITIES.sba.dimensions.target.supported).toBe(false);
+    expect(CAPABILITIES.sba.dimensions.target.disabledReasonKey).toBe("ui.logs.sba-no-target-dimension");
     expect(CAPABILITIES.stun.dimensions.target.supported).toBe(false);
     expect(CAPABILITIES.stun.supportsHostility).toBe(false);
     expect(CAPABILITIES.sba.supportsHostility).toBe(false);

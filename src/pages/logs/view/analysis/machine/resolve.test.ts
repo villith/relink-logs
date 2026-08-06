@@ -21,12 +21,17 @@ describe("resolveGroupBy — the one derivation rule", () => {
 
   it("honors a supported override and ignores an unsupported one", () => {
     expect(resolveGroupBy(state({ by: "target" }), CAPABILITIES.damage)).toBe("target");
-    expect(resolveGroupBy(state({ metric: "sba", by: "ability" }), CAPABILITIES.sba)).toBe("source");
+    expect(resolveGroupBy(state({ metric: "sba", by: "target" }), CAPABILITIES.sba)).toBe("source");
   });
 
   it("skips unsupported dimensions when deriving", () => {
-    // SBA supports only source; with source pinned the default must still be source.
-    expect(resolveGroupBy(state({ metric: "sba", source: 1 }), CAPABILITIES.sba)).toBe("source");
+    // SBA has no target dimension; with source AND ability pinned the default
+    // must land on the last supported entry, never on target.
+    expect(resolveGroupBy(state({ metric: "sba", source: 1, ability: "skill:2" }), CAPABILITIES.sba)).toBe("ability");
+  });
+
+  it("descends into the SBA ability split when a player is pinned", () => {
+    expect(resolveGroupBy(state({ metric: "sba", source: 1 }), CAPABILITIES.sba)).toBe("ability");
   });
 });
 

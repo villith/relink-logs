@@ -127,14 +127,20 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     dataPath: "derived",
     supportsHostility: false,
     supportsAuraFilter: false,
-    dimensionOrder: ["source"],
+    dimensionOrder: ["source", "ability"],
     dimensions: {
       source: SUPPORTED("ui.logs.groupby-sba-source", "ui.logs.groupby-sba-source"),
-      ability: UNSUPPORTED("ui.logs.sba-no-breakdown"),
-      target: UNSUPPORTED("ui.logs.sba-no-breakdown"),
+      // The per-ability split the descriptor already builds (see metrics/sba.ts):
+      // pinning a player descends into what generated THEIR gauge — attributed
+      // skill rows plus the named non-hit causes. Local player only in practice;
+      // a remote member's empty split shows the honest empty-state
+      // (`ui.logs.sba-no-breakdown`, applied by emptyKeyFor in resolve.ts).
+      ability: SUPPORTED("ui.logs.groupby-sba-ability", "ui.logs.groupby-sba-ability"),
+      target: UNSUPPORTED("ui.logs.sba-no-target-dimension"),
     },
     columnKeys: (dim) => sba.columnKeys(levelFor(dim)),
-    // A gauge reading has nothing to decompose.
+    // A gauge reading has nothing a skill walk can decompose — the ability
+    // rows are already the finest grain the capture has.
     cardKind: () => "none",
     chartFromGroups: false,
   },

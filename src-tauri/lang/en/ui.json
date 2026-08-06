@@ -496,6 +496,8 @@
       "groupby-stun-source": "By player",
       "groupby-stun-ability": "By ability",
       "groupby-sba-source": "By player",
+      "groupby-sba-ability": "By ability",
+      "sba-no-target-dimension": "SBA generation is not recorded per enemy",
       "groupby-status-effect": "By effect",
       "groupby-status-holder": "Gained by player",
       "groupby-status-holder-enemy": "Gained by enemy",
