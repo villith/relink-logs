@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { AbilitySeries } from "@/types";
 
 import { abilityBands } from "./abilityBands";
+import { groupBandsFor } from "./machine/groupRows";
 
 const skill = (id: number, values: number[]): AbilitySeries => ({
   kind: "skill",
@@ -67,5 +68,61 @@ describe("abilityBands", () => {
 
   it("is empty for no input", () => {
     expect(abilityBands([], 8, asKey)).toEqual([]);
+  });
+});
+
+describe("abilityBands — key grammar", () => {
+  it("namespaces skill bands with `skill:`, like every other band producer", () => {
+    // The whole app dispatches band and row keys on this prefix — `bandLabelFor`
+    // resolves `skill:` through labelForAbility and falls through to the RAW KEY
+    // otherwise, which is what printed "Normal:1" in the legend and tooltip.
+    const bands = abilityBands([skill(1, [1])], 8, asKey);
+
+    expect(bands[0].key).toBe("skill:Normal:1");
+  });
+
+  it("leaves a cause band's key alone — it is already a full row key", () => {
+    const bands = abilityBands([cause("source:partyAward", [1])], 8, asKey);
+
+    expect(bands[0].key).toBe("source:partyAward");
+  });
+});
+
+describe("abilityBands vs groupBandsFor", () => {
+  it("keys the same ability identically to the damage/taken band path", () => {
+    // The two producers feed ONE consumer (`bandLabelFor`) and one legend, so a
+    // grammar that differs between them shows up as a raw key in the tooltip on
+    // whichever tab got it wrong — which is exactly how this was found.
+    // Normal:100 folds into a skill GROUP, so this also pins the folded spelling.
+    const viaGroups = groupBandsFor([
+      {
+        key: { kind: "friendlyAbility", actionType: { Normal: 100 }, childCharacterType: "Pl0000" },
+        measure: { amount: 300, hits: 1, min: null, max: null },
+        series: [100, 200],
+      },
+    ]);
+    const viaAbility = abilityBands(
+      [{ kind: "skill", actionType: { Normal: 100 }, childCharacterType: "Pl0000", values: [100, 200] }],
+      8,
+      asKey
+    );
+
+    expect(viaAbility.map((band) => band.key)).toEqual(viaGroups.map((band) => band.key));
+    expect(viaAbility[0].key).toBe('skill:Group:normal-attack@"Pl0000"');
+  });
+
+  it("folds skill-group members together the same way too", () => {
+    // Two member actions of one group are ONE band in both paths.
+    const viaAbility = abilityBands(
+      [
+        { kind: "skill", actionType: { Normal: 100 }, childCharacterType: "Pl0000", values: [100, 0] },
+        { kind: "skill", actionType: { Normal: 110 }, childCharacterType: "Pl0000", values: [0, 100] },
+      ],
+      8,
+      asKey
+    );
+
+    expect(viaAbility).toHaveLength(1);
+    expect(viaAbility[0].values).toEqual([100, 100]);
   });
 });

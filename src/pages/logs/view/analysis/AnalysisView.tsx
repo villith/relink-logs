@@ -50,6 +50,7 @@ import {
   type ChartDatapoint,
   type Label,
 } from "../DetailCharts";
+import { skillKeyPayload } from "../abilityKey";
 import { actionsForPin, childOfPin } from "../abilitySkills";
 import {
   buffs,
@@ -1332,7 +1333,8 @@ export const AnalysisView = () => {
       if (key.startsWith("target:")) return labelForTarget(Number(key.slice("target:".length)));
       if (key.startsWith("enemy:")) return translateEnemyType(parseEnemyRow(key.slice("enemy:".length)));
       if (key.startsWith("taken:")) return takenAttackLabel(key.slice("taken:".length));
-      if (key.startsWith("skill:")) return labelForAbility(key.slice("skill:".length));
+      const ability = skillKeyPayload(key);
+      if (ability !== null) return labelForAbility(ability);
       return key;
     },
     // i18n.language: every branch produces a translated name.

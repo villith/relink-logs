@@ -1,7 +1,7 @@
 import type { ActionType, CharacterType, GroupAggregate, GroupKey, GroupMeasure } from "@/types";
 import { humanizeNumber } from "@/utils";
 
-import { abilityKey } from "../../abilityKey";
+import { abilityKey, skillKey } from "../../abilityKey";
 import { abilityRowKey, groupOfPin } from "../../abilitySkills";
 import { damageColumns, enemyRowKey, playersColumns } from "../../metrics/damageDone";
 import { drilldownColumns } from "../../metrics/damageTaken";
@@ -198,7 +198,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
         : [...bucket.members.entries()]
             .map(
               ([memberKey, member]): MetricRow => ({
-                key: `skill:${memberKey}`,
+                key: skillKey(memberKey),
                 label: memberKey,
                 kind: "ability",
                 value: member.measure.amount,
@@ -210,7 +210,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
             .sort((a, b) => b.value - a.value);
 
     rows.push({
-      key: `skill:${rowKey}`,
+      key: skillKey(rowKey),
       label: rowKey,
       kind: "ability",
       value: bucket.measure.amount,
@@ -261,7 +261,7 @@ export const groupBandsFor = (aggregates: GroupAggregate[], topN?: number): { ke
             : key.kind === "enemyAttack"
               ? `taken:${JSON.stringify({ enemyType: key.enemyType, actionId: key.actionId })}`
               : key.kind === "friendlyAbility"
-                ? `skill:${abilityRowOf(key)}`
+                ? skillKey(abilityRowOf(key))
                 : "other";
     const found = bands.get(bandKey);
     if (found) {

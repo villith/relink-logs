@@ -1,5 +1,6 @@
 import type { AbilitySeries } from "@/types";
 
+import { skillKey } from "../abilityKey";
 import { abilityRowKey } from "../abilitySkills";
 import type { DrillSeries } from "./statusChart";
 
@@ -32,7 +33,10 @@ export const abilityBands = (
 
   const byRow = new Map<string, number[]>();
   for (const band of series) {
-    const key = band.kind === "cause" ? band.key : abilityRowKey(band);
+    // `skillKey`, not the bare row key: band keys are namespaced, and a bare
+    // one falls through `bandLabelFor` to print itself. A cause band already
+    // carries a full row key (`source:…`, `skill:unattributed`).
+    const key = band.kind === "cause" ? band.key : skillKey(abilityRowKey(band));
     const values = byRow.get(key) ?? new Array<number>(len).fill(0);
     for (let bucket = 0; bucket < len; bucket++) values[bucket] += band.values[bucket] ?? 0;
     byRow.set(key, values);
