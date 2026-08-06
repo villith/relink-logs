@@ -155,6 +155,9 @@ impl OnLoadQuestHook {
         // A fresh quest restarts the timer from 0; re-arm the publish latch so
         // the new quest's first tick is never swallowed as a duplicate.
         reset_elapsed_time_latch();
+        // Quest boundary: drop the previous fight's tracked enemies (their
+        // specified pointers are dead) and re-arm the link-time latch.
+        super::battle::reset();
 
         // NOTE: the Conflux ROOM-ENTER signal is emitted by the reception-flow dispatcher
         // (hooks/endless.rs), NOT here — that hook fires once per room with the manager
@@ -439,6 +442,9 @@ impl OnQuestFlowEndHook {
                 let func: QuestSequenceTickFunc = std::mem::transmute(quest_sequence_tick);
                 QuestSequenceTick.initialize(func, move |a1| {
                     Self::poll_flow_state(&tx);
+                    // Battle-state transitions (link time, enemy modes) ride
+                    // the same per-frame tick — see hooks/battle.rs.
+                    super::battle::poll(&tx);
                     QuestSequenceTick.call(a1)
                 })?;
                 QuestSequenceTick.enable()?;

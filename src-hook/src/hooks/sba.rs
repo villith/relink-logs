@@ -246,7 +246,7 @@ const ON_HANDLE_REMOTE_SBA_UPDATE_SIG: &str =
 /// is skipped — a miss is just a skipped poll tick). Node layout: left @ +0x00,
 /// right @ +0x10, is_nil @ +0x19, key @ +0x20, value @ +0x28; head node at
 /// map+0x10, root at head+0x08. Guarded reads, bounded depth.
-fn game_stdmap_find(map: usize, key: u32) -> Option<usize> {
+pub(super) fn game_stdmap_find(map: usize, key: u32) -> Option<usize> {
     use crate::hooks::diag::{read_ptr_guarded, read_u32_guarded};
 
     let head = read_ptr_guarded(map, 0x10)?;

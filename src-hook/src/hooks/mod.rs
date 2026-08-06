@@ -16,6 +16,7 @@ use self::{
 };
 
 mod area;
+mod battle;
 // Compiled under `cfg(test)` too, so a plain `cargo test` type-checks and exercises the
 // quest-classification logic. The hook itself is still only INSTALLED behind the feature
 // (see `setup_hooks`), so a release `hook.dll` contains none of this.

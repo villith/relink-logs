@@ -1625,6 +1625,12 @@ fn build_damage_event(
     // it again here would walk the identity record twice per hit.
     let target_parent_index =
         target_slot.unwrap_or_else(|| actor_idx(target_specified_instance_ptr as *const usize));
+    // Every enemy-victim hit funnels through here, so this is where the
+    // battle-state poll learns which enemies exist and where to read their
+    // mode from (see hooks/battle.rs).
+    if target_slot.is_none() {
+        super::battle::note_enemy_target(target_specified_instance_ptr, target_parent_index);
+    }
     DamageEvent {
         source,
         target: Actor {
