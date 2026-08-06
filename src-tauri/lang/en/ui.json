@@ -870,7 +870,6 @@
       "303": "Aerial Finisher",
       "400": "Launch",
       "410": "Aerial Barrage",
-      "9998": "Ares",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "finisher": "Finisher",
@@ -1177,7 +1176,6 @@
       "303": "Aerial Attack 4",
       "400": "Launch",
       "410": "Aerial Barrage",
-      "9998": "Shippegaeshi (Just)",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "flashing-void": "Flashing Void",
@@ -1259,7 +1257,6 @@
       "311": "Aerial Finisher (Perfect)",
       "400": "Launch",
       "410": "Aerial Barrage",
-      "9998": "Raging Fist",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "combo-finisher": "Combo Finisher",
@@ -1347,7 +1344,6 @@
       "400": "Launch",
       "410": "Aerial Barrage",
       "1200": "Phantasmagoria",
-      "9998": "High-Speed Charge",
       "skill-groups": {
         "normal-attack": "Normal Attack",
         "power-strike": "Power Strike",
@@ -1477,7 +1473,6 @@
       "3700": "Ethereal Prison (Chromatic Wings)",
       "6000": "Combo Finisher (Swords)",
       "6001": "Combo Finisher (Swords) (Chromatic Wings)",
-      "9998": "Chromatic Wings (Transformation)",
       "9999": "Chromatic Wings (Transformation)",
       "skill-groups": {
         "normal-attack": "Normal Attack",

@@ -9,10 +9,14 @@ import { statusKeyParts } from "./statusLabel";
  * id bands, and the per-character skill tables). WCL's ten aura sections need
  * game data this pipeline does not have, so no further classes are invented:
  *
- * * `skill` — the cause resolved to a named ACTION: a caster's own skill
- *   table (cause ids are the applying character's action ids), or one of the
- *   named action bands in `causes.default` (800 Chain Burst, 80000 Summon
- *   Attack/Primal Burst, 99993 Darkflame End, 99996/99997 Perfect Guard).
+ * * `skill` — the cause resolved to a NAME through the four-rung chain in
+ *   `causeNameFor`: a caster's own skill table (cause ids are the applying
+ *   character's action ids), one of the named action bands in `causes.default`
+ *   (800 Chain Burst, 80000 Summon Attack/Primal Burst, 99993 Darkflame End,
+ *   99996/99997 Perfect Guard), the action the caster was performing at the
+ *   apply, or the applying status object's own RTTI class. The last two are
+ *   what let a passive land here rather than in Unknown — it has no action id
+ *   of its own, which is precisely what a sentinel cause means.
  * * `sigilTrait` — the passive-gear bands: 9999 (Sigil/Trait Effect) and
  *   10000–10002 (Equipment Effect).
  * * `field` — 1048575 (0xFFFFF), the environment cause. Distinct from

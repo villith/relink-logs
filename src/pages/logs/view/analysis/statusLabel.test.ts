@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  casterActionOf,
   causeCandidatesFor,
   causeLabel,
   causeNameFor,
@@ -107,6 +108,89 @@ describe("causeNameFor", () => {
   });
 });
 
+describe("causeNameFor with the caster-action and class rungs", () => {
+  it("prefers a named cause over both fallbacks", () => {
+    // What the game RECORDED beats anything inferred from it.
+    expect(
+      causeNameFor(
+        1200,
+        () => "Signo Drive",
+        () => "Dread Scythe",
+        () => "Guardpoint"
+      )
+    ).toBe("Signo Drive");
+  });
+
+  it("uses the caster's action when nothing names the cause", () => {
+    // 9998 means no activated action produced the effect, so `nameForCause`
+    // has nothing to look up — but the caster was still mid-action, and the
+    // ability is what a user actually wants to read.
+    expect(
+      causeNameFor(
+        9998,
+        () => "",
+        () => "Dread Scythe",
+        () => "Guardpoint"
+      )
+    ).toBe("Dread Scythe");
+  });
+
+  it("falls back to the class when the caster's action names nothing either", () => {
+    // The class names the MECHANISM rather than the ability — less specific,
+    // still far better than a number.
+    expect(
+      causeNameFor(
+        9998,
+        () => "",
+        () => "",
+        () => "Guardpoint"
+      )
+    ).toBe("Guardpoint");
+  });
+
+  it("falls back to the bare number when neither resolves", () => {
+    // A real but uncurated action id is honest, and the number is the only
+    // thing telling two such rows apart.
+    expect(
+      causeNameFor(
+        1500,
+        () => "",
+        () => "",
+        () => ""
+      )
+    ).toBe("1500");
+  });
+
+  it("still answers empty for the unattributed sentinels", () => {
+    // `causeLabel` owns that test, and a class must not resurrect a row it
+    // already called unattributed.
+    const guardpoint = () => "Guardpoint";
+    expect(causeNameFor(null, () => "", guardpoint, guardpoint)).toBe("");
+    expect(causeNameFor(0, () => "", guardpoint, guardpoint)).toBe("");
+    expect(causeNameFor(0xffffffff, () => "", guardpoint, guardpoint)).toBe("");
+  });
+});
+
+describe("statusLabelFor with a class-named row", () => {
+  it("names the row from its class when the cause resolves to nothing", () => {
+    expect(
+      statusLabelFor("status:7:9998:43981", t, {
+        effect: () => "Molten Edge",
+        cause: () => "Guardpoint",
+      })
+    ).toBe("Molten Edge (Guardpoint)");
+  });
+
+  it("falls back to today's unknown text when nothing resolves", () => {
+    expect(
+      statusLabelFor("status:7:unknown:unknown", t, {
+        effect: () => "Molten Edge",
+        cause: () => "",
+      })
+    ).toBe("Molten Edge (unknown source)");
+  });
+});
+
 describe("causeCandidatesFor", () => {
   // A cause is the CASTER's action id, so only the caster's own tables may
   // name it. A party-wide scan provably misattributed: Eustace's supp-DMG
@@ -141,6 +225,29 @@ describe("causeCandidatesFor", () => {
 
   it("matches the unknown-cause spelling of the key", () => {
     expect(causeCandidatesFor("status:7:unknown:unknown", [interval(7, null, 0)], playerOf)).toEqual(["Pl2700"]);
+  });
+});
+
+describe("casterActionOf", () => {
+  const held = (casterActionId: number | null) => ({ casterActionId });
+
+  it("answers the action every apply on the row agrees on", () => {
+    expect(casterActionOf([held(1200), held(1200)])).toBe(1200);
+  });
+
+  it("answers null where the row's applies disagree", () => {
+    // The caster action is not part of the row key, so one row can span
+    // several. Naming it after whichever sorted first would fabricate — the
+    // class rung is the honest answer instead.
+    expect(casterActionOf([held(1200), held(1300)])).toBeNull();
+  });
+
+  it("lets an apply with no action abstain rather than veto", () => {
+    // Every log written before the field existed carries none at all, and one
+    // unreadable apply must not silence the rest of the row.
+    expect(casterActionOf([held(null), held(1200)])).toBe(1200);
+    expect(casterActionOf([held(null), held(null)])).toBeNull();
+    expect(casterActionOf([])).toBeNull();
   });
 });
 

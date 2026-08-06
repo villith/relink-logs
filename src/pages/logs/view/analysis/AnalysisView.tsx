@@ -9,6 +9,7 @@ import { useShallow } from "zustand/react/shallow";
 import { characterIconUrl } from "@/characterIcon";
 import { emKeyOf, enemyAttackOrdinal } from "@/enemyAttackNames";
 import { enemyIconUrl } from "@/enemyIcon";
+import { statusClassName } from "@/statusClassName";
 import { statusIconUrl } from "@/statusIcon";
 import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
 import { useMeterFilters } from "@/stores/useMeterFilterSync";
@@ -103,9 +104,11 @@ import { rowCardSectionsFor } from "./rowCardSections";
 import { abilityRowIconUrl } from "./rowIcon";
 import { buildEffectSeries, buildStatusSeries } from "./statusChart";
 import {
+  casterActionOf,
   causeCandidatesOf,
   causeNameFor,
   statusIdOfKey,
+  statusKeyParts,
   statusLabelFor,
   statusRowKindFor,
   targetRowLabel,
@@ -617,13 +620,27 @@ export const AnalysisView = () => {
   const statusDisplayLabel = useCallback(
     (key: string) => {
       const candidates = causeCandidates.get(key) ?? [];
+      // The two fallbacks for a row the cause cannot name — a sentinel cause
+      // means no activated action produced the effect. The caster action is
+      // read off the row's own intervals (it is labelling payload, never part
+      // of the key); the class comes out of the key itself.
+      const casterAction = casterActionOf(intervalsByPinKey.get(key) ?? []);
+      const classHash = statusKeyParts(key)?.classHash ?? null;
       return statusLabelFor(key, t, {
         effect: translateStatusName,
-        cause: (id) => causeNameFor(id, (cause) => causeSkillName(candidates, cause)),
+        cause: (id) =>
+          causeNameFor(
+            id,
+            (cause) => causeSkillName(candidates, cause),
+            // The caster action is the same id space as the cause, so it
+            // resolves through the same caster-scoped tables.
+            () => (casterAction === null ? "" : causeSkillName(candidates, casterAction)),
+            () => statusClassName(classHash, t)
+          ),
       });
     },
     // i18n.language: skill and band names are translated.
-    [t, causeCandidates, i18n.language]
+    [t, causeCandidates, intervalsByPinKey, i18n.language]
   );
 
   // The aura chip strips (WCL's Source/Target Auras Filter): the effects the
@@ -816,10 +833,22 @@ export const AnalysisView = () => {
     (row: MetricRow) =>
       causeClassOfKey(row.key, (causeId) => {
         const candidates = causeCandidates.get(row.key) ?? [];
-        return causeNameFor(causeId, (cause) => causeSkillName(candidates, cause)) !== "";
+        // The SAME four rungs the label uses. A row named "Guardpoint" filing
+        // under Unknown would be the section and the label disagreeing about
+        // the same row.
+        const casterAction = casterActionOf(intervalsByPinKey.get(row.key) ?? []);
+        const classHash = statusKeyParts(row.key)?.classHash ?? null;
+        return (
+          causeNameFor(
+            causeId,
+            (cause) => causeSkillName(candidates, cause),
+            () => (casterAction === null ? "" : causeSkillName(candidates, casterAction)),
+            () => statusClassName(classHash, t)
+          ) !== ""
+        );
       }),
     // i18n.language: the skill tables the resolution reads are translated.
-    [causeCandidates, i18n.language]
+    [causeCandidates, intervalsByPinKey, t, i18n.language]
   );
 
   const shownRows = useMemo(
