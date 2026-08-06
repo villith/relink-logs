@@ -24,8 +24,10 @@ describe("windowChips", () => {
     const chips = windowChips(WINDOWS, null, LABELS);
     expect(chips.map((chip) => chip.value)).toEqual(["sba", "sba:0", "sba:1", "break", "break:0"]);
     expect(chips[0].label).toBe("SBA ×2");
+    expect(chips[0].kindLabel).toBe("SBA");
     expect(chips[1].label).toBe("10-20");
     expect(chips[1].durationLabel).toBe("10s");
+    expect(chips[1].kindLabel).toBe("SBA");
   });
 
   it("marks the selected chip", () => {

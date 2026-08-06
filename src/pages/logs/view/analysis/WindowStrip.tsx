@@ -30,6 +30,10 @@ export const WindowStrip = ({ chips, onSelect, onClear }: WindowStripProps) => {
           <UnstyledButton
             className="analysis-aura-chip-button"
             aria-pressed={chip.selected}
+            // A per-window chip's visible label is a bare range ("10-20"),
+            // naming no kind — the kind chip beside it already carries the
+            // kind's name in its label, so it needs no override here.
+            {...(chip.durationLabel !== null ? { "aria-label": `${chip.kindLabel} ${chip.label}` } : {})}
             onClick={() => (chip.selected ? onClear() : onSelect(chip.value))}
           >
             <span

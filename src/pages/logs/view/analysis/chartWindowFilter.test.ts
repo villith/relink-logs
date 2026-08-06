@@ -117,4 +117,29 @@ describe("maskStatusIntervals", () => {
     const result = maskStatusIntervals([interval(0, 100_000, 1)], [{ fromMs: 10_000, upToMs: 20_000 }]);
     expect(result).toEqual([{ startMs: 10_000, endMs: 20_000, applications: 0 }]);
   });
+
+  it("an interval starting exactly at a span's fromMs counts its applications there", () => {
+    const result = maskStatusIntervals(
+      [interval(10_000, 15_000, 5)],
+      [
+        { fromMs: 0, upToMs: 10_000 },
+        { fromMs: 10_000, upToMs: 20_000 },
+      ]
+    );
+    expect(result).toEqual([{ startMs: 10_000, endMs: 15_000, applications: 5 }]);
+  });
+
+  it("an interval starting exactly at a span's upToMs counts zero there — the start belongs to the NEXT span, if any admits it", () => {
+    const result = maskStatusIntervals([interval(10_000, 15_000, 5)], [{ fromMs: 0, upToMs: 10_000 }]);
+    expect(result).toEqual([]);
+
+    const withNextSpan = maskStatusIntervals(
+      [interval(10_000, 15_000, 5)],
+      [
+        { fromMs: 0, upToMs: 10_000 },
+        { fromMs: 10_000, upToMs: 15_000 },
+      ]
+    );
+    expect(withNextSpan).toEqual([{ startMs: 10_000, endMs: 15_000, applications: 5 }]);
+  });
 });

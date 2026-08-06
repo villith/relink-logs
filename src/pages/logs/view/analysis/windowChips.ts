@@ -10,6 +10,11 @@ export type WindowChip = {
    * is in the label). */
   durationLabel: string | null;
   kind: WindowKind;
+  /** The kind's own translated name ("SBA windows"), for a per-window chip's
+   * `aria-label` — its visible `label` is a bare range ("10-20") that names no
+   * kind on its own. A kind chip needs none: its visible label already names
+   * the kind. */
+  kindLabel: string;
   selected: boolean;
 };
 
@@ -40,6 +45,7 @@ export const windowChips = (windows: ChartWindow[], win: string | null, labels: 
         label: labels.kindChipLabel(kindLabel, ofKind.length),
         durationLabel: null,
         kind,
+        kindLabel,
         selected: win === kind,
       },
       ...ofKind.map((span, index) => {
@@ -50,6 +56,7 @@ export const windowChips = (windows: ChartWindow[], win: string | null, labels: 
           label: enemy === null ? range : `${enemy} ${range}`,
           durationLabel: labels.durationLabel(span.endMs - span.startMs),
           kind,
+          kindLabel,
           selected: win === `${kind}:${index}`,
         };
       }),

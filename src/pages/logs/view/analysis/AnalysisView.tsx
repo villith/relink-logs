@@ -682,6 +682,7 @@ export const AnalysisView = () => {
         durationLabel: (ms) => t("ui.logs.window-chip-duration", { seconds: Math.round(ms / 1000) }),
         breakEnemyLabel: (actorIndex, span) => breakEnemyOf(actorIndex, span),
       }),
+    // i18n.language: the kind and duration labels are translated.
     [chartWindows, state.win, t, breakEnemyOf, i18n.language]
   );
 
