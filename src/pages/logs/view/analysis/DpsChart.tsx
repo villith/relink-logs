@@ -476,11 +476,11 @@ export const DpsChart = ({
       if (hiddenWindowKinds.has(entry.kind)) continue;
       const from = Math.max(0, Math.floor(entry.startMs / DPS_BUCKET_MS));
       const upTo = Math.min(maxIndex, Math.ceil(entry.endMs / DPS_BUCKET_MS) - 1);
+      const line = { color: entry.color, text: entry.text };
       for (let bucket = from; bucket <= upTo; bucket += 1) {
         const label = data[bucket]?.timestamp;
         if (label === undefined) continue;
         const group = byLabel.get(label);
-        const line = { color: entry.color, text: entry.text };
         if (group) group.push(line);
         else byLabel.set(label, [line]);
       }

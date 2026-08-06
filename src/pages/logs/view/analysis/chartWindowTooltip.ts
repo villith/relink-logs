@@ -20,7 +20,9 @@ export type WindowTooltipEntry = {
  * the window's buckets (start-inclusive, end-exclusive — a bucket belongs to
  * the window that contains its opening millisecond), scaled the way the chart
  * scales. The SERIES are already narrowed by every active filter (the backend
- * masks them), so this inherits the filters without knowing them. */
+ * masks them), so this inherits the filters without knowing them. Deliberately
+ * pre-smoothing: the sum is the exact metric in the window, where summing the
+ * plotted 10s trailing average would smear damage across the window's edges. */
 export const windowMetricAmount = (
   source: Record<string, number[]>,
   keys: (string | number)[],
