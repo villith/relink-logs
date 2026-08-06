@@ -1,5 +1,6 @@
 import { Box } from "@mantine/core";
 import { invoke } from "@tauri-apps/api";
+import { useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
@@ -50,8 +51,9 @@ import {
   type ChartDatapoint,
   type Label,
 } from "../DetailCharts";
-import { skillKeyPayload } from "../abilityKey";
+import { abilityKey, skillKeyPayload } from "../abilityKey";
 import { actionsForPin, childOfPin } from "../abilitySkills";
+import { EventsTab, type EventLabels } from "../events/EventsTab";
 import {
   buffs,
   enemyHolderKey,
@@ -156,6 +158,18 @@ const METRIC_TABS: MetricTab[] = Object.entries(METRICS).map(([value, descriptor
   labelKey: descriptor.labelKey,
 }));
 
+/** The raw-event-stream tab's value in the strip, and in the `tab` URL param. */
+const EVENTS_TAB = "events";
+
+/** The whole strip: the metrics, then Events.
+ *
+ * Events is appended HERE rather than added to `METRICS` because it is not a
+ * metric — it has no chart, no groupings and no numeric columns, so there is
+ * nothing for `CAPABILITIES`/`resolveViewSpec` to answer for it. It rides its own
+ * `tab` param instead of `state.metric`, and the frame swaps its body for the
+ * chart-and-table block below. */
+const VIEW_TABS: MetricTab[] = [...METRIC_TABS, { value: EVENTS_TAB, labelKey: "ui.logs.events-tab" }];
+
 /** Tooltip line per marker kind. Sibling of `DpsChart`'s `MARKER_LABEL_KEY`, but
  * a separate key set: those name the control-row checkboxes, these are the
  * strings the tooltip lists under a marker line. */
@@ -243,6 +257,14 @@ export const AnalysisView = () => {
   // The machine: the URL holds the WHOLE state (metric, side, pins, window,
   // grouping override), the resolver turns it into everything the view shows.
   const [state, setState] = useAnalysisState();
+  // Which BODY the frame shows. Its own nuqs key rather than a machine field:
+  // Events is not a metric, so putting it in `AnalysisState` would mean a
+  // `MetricKey` the resolver has no spec for. nuqs writes per key, so this and
+  // `useAnalysisState` share the URL without either clobbering the other — and
+  // the pins therefore survive switching between the two bodies, which is the
+  // whole point of sharing the selector bar.
+  const [tab, setTab] = useQueryState("tab", { history: "replace" });
+  const onEvents = tab === EVENTS_TAB;
   const caps = CAPABILITIES[state.metric];
   const spec = useMemo(() => resolveViewSpec(state, caps), [state, caps]);
 
@@ -711,6 +733,47 @@ export const AnalysisView = () => {
       return segment === -1 ? null : labelForTarget(segment);
     },
     [targetEntries, labelForTarget]
+  );
+
+  // The Events body's pins, resolved out of the machine's index spaces into the
+  // ones a raw event carries (see `filterByPins`). Declared here because the
+  // target dimension needs `targetEntries`' spawn table.
+  const eventPins = useMemo(
+    () => ({
+      // Already the same space as a damage event's `source.parent_index`.
+      source: pins.source,
+      // A pinned target is a SPAWN, so it travels as that spawn's actor index
+      // plus its span — the game reissues a dead boss's actor index, and the
+      // index alone would file a later spawn's hits under the earlier one.
+      targetSpans: pins.targets
+        .map((segment) => targetEntries[segment])
+        .filter((entry) => entry !== undefined)
+        .map((entry) => ({ actorIndex: entry.actorIndex, startMs: entry.startMs, endMs: entry.endMs })),
+      // `pinnedActions` is the expansion the view already computes for its own
+      // fetch, so a condensed `Group:` pin matches the raw ids behind it. An
+      // EMPTY set with an ability pinned narrows to nothing, which is the honest
+      // answer for a status pin — it names no action at all.
+      abilityKeys: pins.ability === null ? null : new Set(pinnedActions.map(abilityKey)),
+    }),
+    [pins.source, pins.targets, pins.ability, pinnedActions, targetEntries]
+  );
+
+  // An event's target is a bare actor index, so it is named through the spawn
+  // table by index AND time — the same rule `breakEnemyOf` uses, for the same
+  // reason. A hit the PARTY received names a player, not a spawn.
+  const eventLabels: EventLabels = useMemo(
+    () => ({
+      source: labelForSource,
+      target: (actorIndex, atMs) => {
+        const segment = targetEntries.findIndex(
+          (entry) => entry.actorIndex === actorIndex && entry.startMs <= atMs && entry.endMs >= atMs
+        );
+        if (segment !== -1) return labelForTarget(segment);
+        return playerByIndex.has(actorIndex) ? labelForSource(actorIndex) : String(actorIndex);
+      },
+      ability: labelForAbility,
+    }),
+    [labelForSource, labelForTarget, labelForAbility, targetEntries, playerByIndex]
   );
 
   // The Windows strip's chips: the filter UI for the battle windows. Declared
@@ -1695,18 +1758,31 @@ export const AnalysisView = () => {
           matching `enemySide` above: one spelling of "this tab has an enemy
           side" keeps the control offering it and the code rendering it from
           disagreeing. */}
-      <Box style={{ padding: "8px 16px 0" }}>
-        <HostilityToggle
-          value={hostility}
-          onChange={(side) => setState(hostilityTransition(state, side))}
-          disabled={!caps.supportsHostility}
-        />
-      </Box>
+      {/* Not on Events: a side is a property of a METRIC's two event streams,
+          and the raw stream has both in it by definition. */}
+      {!onEvents && (
+        <Box style={{ padding: "8px 16px 0" }}>
+          <HostilityToggle
+            value={hostility}
+            onChange={(side) => setState(hostilityTransition(state, side))}
+            disabled={!caps.supportsHostility}
+          />
+        </Box>
+      )}
 
       <MetricTabs
-        tabs={METRIC_TABS}
-        value={metricKey}
-        onChange={(value) => setState(metricTransition(state, value as MetricKey))}
+        tabs={VIEW_TABS}
+        value={onEvents ? EVENTS_TAB : metricKey}
+        onChange={(value) => {
+          if (value === EVENTS_TAB) {
+            setTab(EVENTS_TAB);
+            return;
+          }
+          // Leaving Events clears the param rather than storing "metrics": the
+          // metric body is the default, and a default in the URL is noise.
+          setTab(null);
+          setState(metricTransition(state, value as MetricKey));
+        }}
       />
 
       <PinBar
@@ -1718,99 +1794,109 @@ export const AnalysisView = () => {
         onClearWindow={() => setState(windowTransition(state, null))}
       />
 
-      {/* WCL's "Done By …" strip: the resolved grouping is only a default, and
-          this is the override (`by` in the URL). */}
-      <RegroupStrip tabs={spec.regroupTabs} onRegroup={(dim) => setState(regroup(state, dim, caps))} />
+      {/* Everything below the selector bar describes a METRIC — a grouping, a
+          plot, a filter over one of its event streams, a table of its figures.
+          The raw stream has none of those, so Events swaps the whole block
+          rather than sitting alongside it. */}
+      {onEvents ? (
+        <EventsTab id={id} pins={eventPins} labels={eventLabels} />
+      ) : (
+        <>
+          {/* WCL's "Done By …" strip: the resolved grouping is only a default,
+              and this is the override (`by` in the URL). */}
+          <RegroupStrip tabs={spec.regroupTabs} onRegroup={(dim) => setState(regroup(state, dim, caps))} />
 
-      <DpsChart
-        data={shownChartData}
-        labels={labels}
-        labelKey={labelKey}
-        format={format}
-        stacked={stacked}
-        onScope={handleScope}
-        fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
-        toLabel={range === null ? fullLabel : bucketLabel(range[1])}
-        markers={chartMarkers}
-        bands={maskBands}
-        windowBands={stateWindowBands}
-        windowTooltips={chartWindowTooltips}
-        smoothing={smoothing}
-        // Offered on RATE charts only. On a level (the undrilled SBA gauge, the
-        // aura stacks) `chartPresentation` pins smoothing to 1 whatever is
-        // chosen, so a control there would be a knob that does nothing.
-        onSmoothingChange={format === "amount" ? setRateSmoothing : undefined}
-        stackMode={chartSource === "stacks" ? stackMode : undefined}
-        onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
-      />
+          <DpsChart
+            data={shownChartData}
+            labels={labels}
+            labelKey={labelKey}
+            format={format}
+            stacked={stacked}
+            onScope={handleScope}
+            fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
+            toLabel={range === null ? fullLabel : bucketLabel(range[1])}
+            markers={chartMarkers}
+            bands={maskBands}
+            windowBands={stateWindowBands}
+            windowTooltips={chartWindowTooltips}
+            smoothing={smoothing}
+            // Offered on RATE charts only. On a level (the undrilled SBA gauge, the
+            // aura stacks) `chartPresentation` pins smoothing to 1 whatever is
+            // chosen, so a control there would be a knob that does nothing.
+            onSmoothingChange={format === "amount" ? setRateSmoothing : undefined}
+            stackMode={chartSource === "stacks" ? stackMode : undefined}
+            onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
+          />
 
-      {/* Dev builds only, the same guard the Debug tab uses. */}
-      {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
+          {/* Dev builds only, the same guard the Debug tab uses. */}
+          {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
 
-      {/* The Windows strip: the battle-window filter's UI, on every tab —
+          {/* The Windows strip: the battle-window filter's UI, on every tab —
           unlike the aura strips it needs no pin to anchor it. Selecting a
           chip also COMMITS the scrub window to the selection's bucket hull —
           the chart zooms to the window through the same mechanism a drag
           uses, so the readout, the uptime denominators and the fetches all
           follow. Clearing the chip clears that zoom with it; a stale index
           resolves to no hull and leaves the scrub alone. */}
-      <WindowStrip
-        chips={windowFilterChips}
-        onSelect={(win) => {
-          const scrub = windowFilterScrubRange(selectedChartWindows(chartWindows, win), DPS_BUCKET_MS);
-          const next = windowFilterTransition(state, win);
-          setState(scrub === null ? next : windowTransition(next, scrub));
-        }}
-        onClear={() => setState(windowTransition(windowFilterTransition(state, null), null))}
-      />
+          <WindowStrip
+            chips={windowFilterChips}
+            onSelect={(win) => {
+              const scrub = windowFilterScrubRange(selectedChartWindows(chartWindows, win), DPS_BUCKET_MS);
+              const next = windowFilterTransition(state, win);
+              setState(scrub === null ? next : windowTransition(next, scrub));
+            }}
+            onClear={() => setState(windowTransition(windowFilterTransition(state, null), null))}
+          />
 
-      {/* The Auras Filter (spec: between chart and table). Each strip exists
+          {/* The Auras Filter (spec: between chart and table). Each strip exists
           only while its actor pin does — AuraStrip renders nothing for an
           empty chip list — and one aura is active at a time: selecting on
           either strip replaces the other's selection. */}
-      {caps.supportsAuraFilter && (
-        <>
-          <AuraStrip
-            titleKey="ui.logs.aura-source-title"
-            chips={sourceAuraChips}
-            onSelect={(aura) => setState(auraTransition(state, aura))}
-            onClear={() => setState(auraTransition(state, null))}
-          />
-          <AuraStrip
-            titleKey="ui.logs.aura-target-title"
-            chips={targetAuraChips}
-            onSelect={(aura) => setState(auraTransition(state, aura))}
-            onClear={() => setState(auraTransition(state, null))}
-          />
+          {caps.supportsAuraFilter && (
+            <>
+              <AuraStrip
+                titleKey="ui.logs.aura-source-title"
+                chips={sourceAuraChips}
+                onSelect={(aura) => setState(auraTransition(state, aura))}
+                onClear={() => setState(auraTransition(state, null))}
+              />
+              <AuraStrip
+                titleKey="ui.logs.aura-target-title"
+                chips={targetAuraChips}
+                onSelect={(aura) => setState(auraTransition(state, aura))}
+                onClear={() => setState(auraTransition(state, null))}
+              />
+            </>
+          )}
+
+          <Box style={{ padding: "4px 16px 14px" }}>
+            <MetricTable
+              rows={shownRows}
+              // The SOURCE header rides the same `effectLevel` condition that
+              // prepends the cells, so the two can never disagree — deliberately
+              // NOT declared on the descriptor's columnKeys: a `by` regroup can
+              // move groupBy without moving the rows off the effect level, and
+              // the PIN (not the grouping) is what statusRows keys the level on.
+              columnKeys={effectLevel ? ["ui.logs.buff-source", ...spec.table.columnKeys] : spec.table.columnKeys}
+              onPin={handlePin}
+              renderLabel={renderLabel}
+              rowColor={rowColor}
+              rowSections={rowSections}
+              rowChildren={rowChildren}
+              cardAmount={metric.card}
+              timelineMs={fightDurationMs}
+              sectionLabel={effectLevel ? sectionLabelOf : undefined}
+              // The resolver names the honest empty states (see `emptyKeyFor`).
+              // The aura tabs' key means "this log never recorded status events",
+              // so it applies only when the fight truly has no intervals — with
+              // intervals in hand an empty status table IS about the pins, and
+              // the table's own default says so.
+              emptyKey={isStatusMetric && statusIntervals.length > 0 ? undefined : spec.table.emptyKey}
+              rowsLabelKey={spec.table.rowsLabelKey}
+            />
+          </Box>
         </>
       )}
-
-      <Box style={{ padding: "4px 16px 14px" }}>
-        <MetricTable
-          rows={shownRows}
-          // The SOURCE header rides the same `effectLevel` condition that
-          // prepends the cells, so the two can never disagree — deliberately
-          // NOT declared on the descriptor's columnKeys: a `by` regroup can
-          // move groupBy without moving the rows off the effect level, and
-          // the PIN (not the grouping) is what statusRows keys the level on.
-          columnKeys={effectLevel ? ["ui.logs.buff-source", ...spec.table.columnKeys] : spec.table.columnKeys}
-          onPin={handlePin}
-          renderLabel={renderLabel}
-          rowColor={rowColor}
-          rowSections={rowSections}
-          rowChildren={rowChildren}
-          cardAmount={metric.card}
-          timelineMs={fightDurationMs}
-          sectionLabel={effectLevel ? sectionLabelOf : undefined}
-          // The resolver names the honest empty states (see `emptyKeyFor`).
-          // The aura tabs' key means "this log never recorded status events",
-          // so it applies only when the fight truly has no intervals — with
-          // intervals in hand an empty status table IS about the pins, and
-          // the table's own default says so.
-          emptyKey={isStatusMetric && statusIntervals.length > 0 ? undefined : spec.table.emptyKey}
-          rowsLabelKey={spec.table.rowsLabelKey}
-        />
-      </Box>
     </Box>
   );
 };
