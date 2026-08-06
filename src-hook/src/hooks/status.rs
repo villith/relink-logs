@@ -116,6 +116,18 @@ const STATUS_REMAINING_OFFSET: usize = 0x80;
 /// that may turn this into a published number.
 const STATUS_STACKS_OFFSET: usize = 0xb0;
 
+/* The ACTOR's current-action id (v2.0.3). Verified statically: FUN_140b06d20 —
+the proven Pl2000 function that applies Burn with cause 1100 — compares
+[RSI+0x1b690] against 0x578 (1400 "Fourfold Vengeance (Dragonform)") and 0xdc
+(220 "Light Blast Finisher"), both real Pl2000 action ids; ten further sites
+compare it against 0x320 (800, Chain Burst). A state enum would not coincide
+with the owning character's own action names.
+
+ONLY ever read on a RESOLVED ACTOR: a VMOVSS float write exists at the same
+displacement on some other object type, so this offset is not universally an
+action id. */
+const ACTOR_CURRENT_ACTION_OFFSET: usize = 0x1b690;
+
 /// How many qwords of the init ctx struct to dump. The source handle sits at
 /// +0x38..0x48; the window is wide enough to catch an action id / magnitude
 /// living anywhere near it without flooding the log.
@@ -207,6 +219,23 @@ fn status_id_of(status: *const usize) -> Option<u32> {
 /// answering 0 is indistinguishable from the game's own "no specific cause".
 fn cause_id_of(status: *const usize) -> Option<u32> {
     diag::read_u32_opt_guarded(status as usize, STATUS_SUBID_OFFSET).filter(|value| *value > 0)
+}
+
+/// The action the CASTER was performing when it applied a status, or `None`.
+///
+/// Names the rows `cause_id_of` cannot: a passive (a trait effect, a
+/// guardpoint, a summon aura, a transformation) has no action id to write into
+/// `+0x4c`, so the game stores a sentinel there — but the actor is still
+/// mid-action, and this field is that action.
+///
+/// Strict, like the other readers here: 0 is a real "no action", and answering
+/// it for an unreadable address would be indistinguishable from the real thing.
+fn caster_action_of(info: usize) -> Option<u32> {
+    let actor = diag::read_ptr_guarded(info, INFO_ACTOR_OFFSET).unwrap_or(0);
+    if actor == 0 || !readable(actor, ACTOR_SPAN) {
+        return None;
+    }
+    diag::read_u32_opt_guarded(actor, ACTOR_CURRENT_ACTION_OFFSET).filter(|value| *value > 0)
 }
 
 /// The actor a status is on, as the index the parser keys players by.
