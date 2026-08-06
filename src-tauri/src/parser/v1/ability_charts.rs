@@ -322,10 +322,197 @@ fn sort_bands(bands: &mut [AbilitySeries]) {
     });
 }
 
+/// The remainder band's row key. Matches the key `metrics/sba.ts` gives its
+/// unattributed row, so the band and the row are one identity.
+const UNATTRIBUTED_KEY: &str = "skill:unattributed";
+
+/// A non-skill cause's row key, in the `source:{kind}[:{id}]` grammar
+/// `metrics/sba.ts` builds its cause rows with. The kind spellings are
+/// `SbaSourceKind`'s own camelCase serde names — one vocabulary, so a band and
+/// its row cannot be keyed differently.
+fn cause_key(cause: &SbaGainCause) -> Option<String> {
+    let (kind, id) = match cause {
+        // A skill gain belongs on a breakdown row, not a cause band.
+        SbaGainCause::Skill(_) => return None,
+        SbaGainCause::DamageTaken => ("damageTaken", None),
+        SbaGainCause::PerfectGuard => ("perfectGuard", None),
+        SbaGainCause::Effect(id) => ("effect", Some(*id)),
+        SbaGainCause::PartyAward => ("partyAward", None),
+        SbaGainCause::DirectorAward => ("directorAward", None),
+        SbaGainCause::QuestStart => ("questStart", None),
+        SbaGainCause::PerfectDodge => ("perfectDodge", None),
+        SbaGainCause::Site(tag) => ("site", Some(*tag)),
+        SbaGainCause::Unknown => ("unknown", None),
+    };
+    Some(match id {
+        Some(id) => format!("source:{kind}:{id}"),
+        None => format!("source:{kind}"),
+    })
+}
+
+/// Per-ability SBA gauge GENERATED per bucket, keyed by player then band.
+///
+/// Note the quantity: the SBA tab's undrilled chart plots the gauge LEVEL, which
+/// cannot be decomposed by contributor because it discharges to zero on cast.
+/// Drilled in, the chart plots generation instead — a rate, which stacks — and
+/// `chartPresentation` switches the axis with the grouping.
+///
+/// A gain carries a RAW action id, not a row key: the resolved key can differ in
+/// BOTH halves (Ferry's pet remap rewrites the action, a child actor changes the
+/// character), so it is resolved through [`BreakdownKeying::row_for_raw_action`]
+/// — the memo of what the damage path did with that same id. A gain never opens
+/// a row, mirroring `PlayerState::add_sba_gain`: keying one independently is
+/// what produced the hit-less twin of every dragon-form skill in live log 1681.
+///
+/// Three kinds of band come out, mirroring the three kinds of row the table
+/// shows: attributed skills, named non-hit causes, and the remainder. The
+/// remainder exists because attribution comes from `SbaGain` (local player only)
+/// while the total comes from the gauge POLL (all four members) — so without it
+/// the stack would silently undershoot the player row it sits under, by 31-42%
+/// on live log 1681.
+pub fn build_ability_sba_chart(
+    events: &[(i64, Message)],
+    player_data: &[Option<PlayerData>; 4],
+    player_indices: &[u32],
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+    filters: MeterFilters,
+) -> HashMap<u32, Vec<AbilitySeries>> {
+    let mut skills: HashMap<u32, HashMap<RowKey, Vec<f64>>> = player_indices
+        .iter()
+        .map(|index| (*index, HashMap::new()))
+        .collect();
+    let mut causes: HashMap<u32, HashMap<String, Vec<f64>>> = player_indices
+        .iter()
+        .map(|index| (*index, HashMap::new()))
+        .collect();
+    // The poll-derived generation, which covers ALL FOUR members where
+    // attribution covers only the local one. Their difference is the remainder.
+    let mut polled: HashMap<u32, Vec<f64>> = HashMap::new();
+    let mut keying: HashMap<u32, BreakdownKeying> = HashMap::new();
+    let phantoms = PhantomTargets::learned_from(events.iter());
+
+    for (timestamp, event) in events {
+        let bucket = ((timestamp - start_time) / interval) as usize;
+        if bucket >= chart_len {
+            continue;
+        }
+
+        match event {
+            // Damage events open no band of their own here; they teach the
+            // keying memo which row each raw action id currently belongs to.
+            Message::DamageEvent(damage_event) => {
+                if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
+                    continue;
+                }
+                let damage_event = remap_dragon_form(player_data, damage_event);
+                let player = damage_event.source.parent_index;
+                if skills.contains_key(&player) {
+                    keying.entry(player).or_default().key_for(&damage_event);
+                }
+            }
+            Message::SbaGain(gain) => {
+                if !skills.contains_key(&gain.actor_index) {
+                    continue;
+                }
+                // A log stored before causes existed carries its attribution in
+                // `action_id`; the parser reads that as `Skill(Normal(id))`.
+                let cause = gain
+                    .cause
+                    .clone()
+                    .unwrap_or(SbaGainCause::Skill(ActionType::Normal(gain.action_id)));
+
+                match cause {
+                    SbaGainCause::Skill(raw_action) => {
+                        let Some(key) = keying
+                            .get(&gain.actor_index)
+                            .and_then(|keying| keying.row_for_raw_action(raw_action))
+                        else {
+                            // No row has opened for this id yet. The live path
+                            // holds it pending; here it simply has no band, and
+                            // the remainder absorbs it rather than inventing one.
+                            continue;
+                        };
+                        let rows = skills.get_mut(&gain.actor_index).expect("checked above");
+                        add_at(rows, key, bucket, chart_len, gain.amount as f64);
+                    }
+                    other => {
+                        let Some(key) = cause_key(&other) else {
+                            continue;
+                        };
+                        let rows = causes.get_mut(&gain.actor_index).expect("checked above");
+                        rows.entry(key).or_insert_with(|| vec![0.0; chart_len])[bucket] +=
+                            gain.amount as f64;
+                    }
+                }
+            }
+            Message::OnUpdateSBA(update) => {
+                if !skills.contains_key(&update.actor_index) {
+                    continue;
+                }
+                // `sba_added` is the poll's own measured rise. Clamped at zero:
+                // a discharge reads as a fall, and a negative would subtract
+                // from the denominator the remainder is computed against.
+                polled
+                    .entry(update.actor_index)
+                    .or_insert_with(|| vec![0.0; chart_len])[bucket] +=
+                    (update.sba_added as f64).max(0.0);
+            }
+            _ => {}
+        }
+    }
+
+    player_indices
+        .iter()
+        .map(|player| {
+            let skill_rows = skills.remove(player).unwrap_or_default();
+            let cause_rows = causes.remove(player).unwrap_or_default();
+
+            let mut bands: Vec<AbilitySeries> = skill_rows
+                .into_iter()
+                .filter(|(_, values)| values.iter().any(|value| *value != 0.0))
+                .map(|(key, values)| AbilitySeries::Skill {
+                    action_type: key.0,
+                    child_character_type: key.1,
+                    values,
+                })
+                .chain(
+                    cause_rows
+                        .into_iter()
+                        .filter(|(_, values)| values.iter().any(|value| *value != 0.0))
+                        .map(|(key, values)| AbilitySeries::Cause { key, values }),
+                )
+                .collect();
+
+            if let Some(total) = polled.get(player) {
+                let remainder: Vec<f64> = (0..chart_len)
+                    .map(|bucket| {
+                        let named: f64 = bands.iter().map(|band| band.values()[bucket]).sum();
+                        // Floored at zero: the poll lags the gains it covers, so
+                        // one bucket can attribute more than it polled. A
+                        // negative band draws as a notch out of the stack below.
+                        (total[bucket] - named).max(0.0)
+                    })
+                    .collect();
+                if remainder.iter().any(|value| *value != 0.0) {
+                    bands.push(AbilitySeries::Cause {
+                        key: UNATTRIBUTED_KEY.to_string(),
+                        values: remainder,
+                    });
+                }
+            }
+
+            sort_bands(&mut bands);
+            (*player, bands)
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use protocol::{Actor, DamageEvent, OnPlayerStunEvent};
+    use protocol::{Actor, DamageEvent, OnPlayerStunEvent, OnUpdateSBAEvent, SbaGainEvent};
 
     fn a_damage_event(player: u32, action: ActionType, stun: Option<f32>) -> DamageEvent {
         DamageEvent {
@@ -576,6 +763,184 @@ mod tests {
         let bands = stun_bands(&events, 2);
 
         assert_eq!(values_for(&bands, ActionType::Normal(1)), vec![5.0, 0.0]);
+    }
+
+    fn sba_gain(player: u32, cause: SbaGainCause, amount: f32) -> Message {
+        Message::SbaGain(SbaGainEvent {
+            actor_index: player,
+            action_id: match cause {
+                SbaGainCause::Skill(ActionType::Normal(id)) => id,
+                _ => 0,
+            },
+            amount,
+            cause: Some(cause),
+        })
+    }
+
+    fn sba_poll(player: u32, value: f32, added: f32) -> Message {
+        Message::OnUpdateSBA(OnUpdateSBAEvent {
+            actor_index: player,
+            sba_value: value,
+            sba_added: added,
+        })
+    }
+
+    fn sba_bands(events: &[(i64, Message)], chart_len: usize) -> Vec<AbilitySeries> {
+        build_ability_sba_chart(
+            events,
+            &no_players(),
+            &[0],
+            0,
+            1_000,
+            chart_len,
+            MeterFilters::default(),
+        )
+        .remove(&0)
+        .expect("the requested player always has a row")
+    }
+
+    fn cause_values(bands: &[AbilitySeries], wanted: &str) -> Vec<f64> {
+        bands
+            .iter()
+            .find(|band| matches!(band, AbilitySeries::Cause { key, .. } if key == wanted))
+            .unwrap_or_else(|| panic!("a band keyed {wanted}"))
+            .values()
+            .to_vec()
+    }
+
+    #[test]
+    fn a_skill_gain_lands_on_the_causing_row() {
+        let events = vec![
+            (0, stun_hit(0, ActionType::Normal(1), 0.0)),
+            (
+                10,
+                sba_gain(0, SbaGainCause::Skill(ActionType::Normal(1)), 12.5),
+            ),
+            (
+                1_200,
+                sba_gain(0, SbaGainCause::Skill(ActionType::Normal(1)), 7.5),
+            ),
+        ];
+        let bands = sba_bands(&events, 2);
+
+        assert_eq!(values_for(&bands, ActionType::Normal(1)), vec![12.5, 7.5]);
+    }
+
+    #[test]
+    fn a_gain_never_opens_a_row_of_its_own() {
+        // No damage event has opened a row for action 9, so the gain has no band
+        // — mirroring `add_sba_gain`, where keying it independently is what
+        // produced the hit-less dragon-form twins in live log 1681.
+        let events = vec![(
+            10,
+            sba_gain(0, SbaGainCause::Skill(ActionType::Normal(9)), 12.5),
+        )];
+        let bands = sba_bands(&events, 1);
+
+        assert!(
+            !bands
+                .iter()
+                .any(|band| matches!(band, AbilitySeries::Skill { .. })),
+            "no skill band without a damage event to open its row"
+        );
+    }
+
+    #[test]
+    fn named_causes_get_their_own_bands_in_the_tables_grammar() {
+        let events = vec![
+            (0, sba_gain(0, SbaGainCause::PartyAward, 20.0)),
+            (10, sba_gain(0, SbaGainCause::DamageTaken, 5.0)),
+            (20, sba_gain(0, SbaGainCause::Effect(0xD2C8E10A), 42.0)),
+        ];
+        let bands = sba_bands(&events, 1);
+
+        assert_eq!(cause_values(&bands, "source:partyAward"), vec![20.0]);
+        assert_eq!(cause_values(&bands, "source:damageTaken"), vec![5.0]);
+        // An id-carrying cause keeps the id, exactly as metrics/sba.ts does.
+        assert_eq!(
+            cause_values(&bands, &format!("source:effect:{}", 0xD2C8E10Au32)),
+            vec![42.0]
+        );
+    }
+
+    #[test]
+    fn the_remainder_is_the_poll_total_minus_everything_named() {
+        let events = vec![
+            (0, stun_hit(0, ActionType::Normal(1), 0.0)),
+            (
+                10,
+                sba_gain(0, SbaGainCause::Skill(ActionType::Normal(1)), 30.0),
+            ),
+            (20, sba_poll(0, 100.0, 100.0)),
+        ];
+        let bands = sba_bands(&events, 1);
+
+        assert_eq!(
+            cause_values(&bands, UNATTRIBUTED_KEY),
+            vec![70.0],
+            "100 polled minus 30 attributed"
+        );
+    }
+
+    #[test]
+    fn the_stack_height_equals_the_polled_generation() {
+        // The property the remainder exists for: the chart's area matches the
+        // player row above it.
+        let events = vec![
+            (0, stun_hit(0, ActionType::Normal(1), 0.0)),
+            (
+                10,
+                sba_gain(0, SbaGainCause::Skill(ActionType::Normal(1)), 30.0),
+            ),
+            (20, sba_gain(0, SbaGainCause::PartyAward, 10.0)),
+            (30, sba_poll(0, 100.0, 100.0)),
+        ];
+        let bands = sba_bands(&events, 1);
+
+        let height: f64 = bands.iter().map(|band| band.values()[0]).sum();
+        assert_eq!(height, 100.0);
+    }
+
+    #[test]
+    fn the_remainder_never_goes_negative() {
+        // The poll lags the gains it covers, so a bucket can attribute more than
+        // it polled. A negative band would draw as a notch out of the stack.
+        let events = vec![
+            (0, stun_hit(0, ActionType::Normal(1), 0.0)),
+            (
+                10,
+                sba_gain(0, SbaGainCause::Skill(ActionType::Normal(1)), 80.0),
+            ),
+            (20, sba_poll(0, 50.0, 50.0)),
+        ];
+        let bands = sba_bands(&events, 1);
+
+        assert!(
+            bands
+                .iter()
+                .all(|band| band.values().iter().all(|value| *value >= 0.0)),
+            "no band ever plots a negative"
+        );
+    }
+
+    #[test]
+    fn a_discharge_does_not_lower_the_denominator() {
+        // Performing an SBA drops the gauge; `sba_added` must not go negative
+        // and eat into the remainder.
+        let events = vec![
+            (0, stun_hit(0, ActionType::Normal(1), 0.0)),
+            (10, sba_poll(0, 100.0, 100.0)),
+            (1_010, sba_poll(0, 0.0, -100.0)),
+        ];
+        let bands = sba_bands(&events, 2);
+
+        assert_eq!(cause_values(&bands, UNATTRIBUTED_KEY), vec![100.0, 0.0]);
+    }
+
+    #[test]
+    fn a_player_with_no_gauge_activity_draws_nothing() {
+        let events = vec![(0, stun_hit(0, ActionType::Normal(1), 5.0))];
+        assert!(sba_bands(&events, 1).is_empty());
     }
 
     #[test]

@@ -31,7 +31,7 @@ mod skill_state;
 mod status;
 mod windows;
 
-pub use ability_charts::{build_ability_stun_chart, AbilitySeries};
+pub use ability_charts::{build_ability_sba_chart, build_ability_stun_chart, AbilitySeries};
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
 pub use groups::{
     aggregate_groups, AbilityFilter, ActorRef, Dimension, GroupAggregate, GroupHostility, GroupKey,
