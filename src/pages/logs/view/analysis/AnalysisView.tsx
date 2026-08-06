@@ -84,6 +84,7 @@ import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } f
 import { chartPresentation } from "./chartPresentation";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "./chartSeries";
 import { windowBandsFor } from "./chartWindowBands";
+import { intersectWireWindows, selectedChartWindows, windowFilterWireWindows } from "./chartWindowFilter";
 import { qualifiedAbilityLabels } from "./labelCollision";
 import { labelSourceOptions, legendLabelFor } from "./legendLabel";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
@@ -375,6 +376,42 @@ export const AnalysisView = () => {
     return auraWireWindows(auraHolderIntervals(statusIntervals, auraPinKey(aura), holder), statusWindow);
   }, [spec.fetch, state.source, state.target, hostility, statusIntervals, statusWindow]);
 
+  // The window filter's admitted spans. Undefined = no filter; an EMPTY array
+  // is a real mask (a stale individual index) and narrows to nothing.
+  const windowFilterWindows = useMemo(
+    () =>
+      state.win === null
+        ? undefined
+        : windowFilterWireWindows(selectedChartWindows(chartWindows, state.win), statusWindow),
+    [state.win, chartWindows, statusWindow]
+  );
+
+  // What every masked consumer reads: the aura filter and the window filter
+  // INTERSECTED when both are active. One combined mask feeds the group query,
+  // the derived reparse and the excluded shading, so the table, the hover
+  // cards and the plot all answer for the same filtered fight.
+  const maskWindows = useMemo(() => {
+    if (auraWindows === undefined) return windowFilterWindows;
+    if (windowFilterWindows === undefined) return auraWindows;
+    return intersectWireWindows(auraWindows, windowFilterWindows);
+  }, [auraWindows, windowFilterWindows]);
+
+  // The buffs/debuffs tables under the window filter: intervals clipped to the
+  // admitted spans, so uptime and counts report only masked time. The chips
+  // and selector options stay on the UNmasked window — they are pick lists,
+  // and a filter must not hide the things that operate it.
+  //
+  // Declared here, below `maskWindows`, rather than beside `windowedIntervals`
+  // above (which it otherwise reads from) — it depends on `maskWindows`, which
+  // depends on `auraWindows`, both declared after `windowedIntervals`.
+  const maskedIntervals = useMemo(
+    () =>
+      maskWindows === undefined
+        ? windowedIntervals
+        : maskWindows.flatMap((span) => clipToWindow(windowedIntervals, span.fromMs, span.upToMs)),
+    [windowedIntervals, maskWindows]
+  );
+
   // The resolver's fetch, expanded into the wire shape: the raw ability pin
   // becomes whichever `AbilityFilter` grammar the query's event stream reads
   // (a friendly action list on the dealt stream, one enemy attack on the
@@ -405,11 +442,11 @@ export const AnalysisView = () => {
       ...(state.window === null
         ? {}
         : { fromMs: state.window[0] * DPS_BUCKET_MS, upToMs: (state.window[1] + 1) * DPS_BUCKET_MS - 1 }),
-      // The aura mask rides the same query, so the table, the rows and the
-      // chart bands all answer for the same filtered fight.
-      ...(auraWindows === undefined ? {} : { windows: auraWindows }),
+      // The combined aura∩window mask rides the same query, so the table, the
+      // rows and the chart bands all answer for the same filtered fight.
+      ...(maskWindows === undefined ? {} : { windows: maskWindows }),
     };
-  }, [spec.fetch, everySkill, state.window, auraWindows]);
+  }, [spec.fetch, everySkill, state.window, maskWindows]);
   wireQueryRef.current = wireQuery;
   // The query's JSON identity, for "is a refetch needed at all" below — the
   // object is rebuilt every render, so identity comparison would always refetch.
@@ -429,7 +466,7 @@ export const AnalysisView = () => {
     // A regroup with nothing pinned still needs ITS grouping's aggregates —
     // unless the base load already fetched this exact query.
     const needsGroups = wireQueryKey !== null && wireQueryKey !== baseQueryKeyRef.current;
-    if (!pinned && range === null && !needsGroups) {
+    if (!pinned && range === null && !needsGroups && maskWindows === undefined) {
       setScoped(null);
       return;
     }
@@ -447,6 +484,7 @@ export const AnalysisView = () => {
         // Buckets are inclusive at both ends, so the cutoff has to admit all of
         // the last one — `end * 1000` would reparse a window one bucket short.
         ...(range === null ? {} : { fromMs: range[0] * DPS_BUCKET_MS, upToMs: (range[1] + 1) * DPS_BUCKET_MS - 1 }),
+        ...(maskWindows === undefined ? {} : { windows: maskWindows }),
         stateOnly: true,
         groupQuery: wireQueryRef.current,
       },
@@ -467,7 +505,7 @@ export const AnalysisView = () => {
         if (generation !== scopeGeneration.current) return;
         toast.error(`Failed to fetch encounter state: ${e}`);
       });
-  }, [id, filters, pins.source, pins.ability, pinnedActions, targetSpans, range, wireQueryKey]);
+  }, [id, filters, pins.source, pins.ability, pinnedActions, targetSpans, range, wireQueryKey, maskWindows]);
 
   // Which aggregates the groups path renders: the scoped fetch's when one is
   // in hand, else the base load's — valid only while the current query IS the
@@ -755,7 +793,7 @@ export const AnalysisView = () => {
           roster: identityPlayers,
           level,
           pins,
-          statusIntervals: windowedIntervals,
+          statusIntervals: maskedIntervals,
           fightDurationMs,
           statusWindow,
           hostility,
@@ -775,7 +813,7 @@ export const AnalysisView = () => {
     identityPlayers,
     level,
     pins,
-    windowedIntervals,
+    maskedIntervals,
     fightDurationMs,
     statusWindow,
     hostility,
@@ -1392,16 +1430,17 @@ export const AnalysisView = () => {
     [overlay, identityPlayers, chartIndexes, labelForSource, colors, player_label_template, withTotal, t]
   );
 
-  // The aura filter's EXCLUDED regions, shaded onto the plot in the neutral
-  // ink so they read as "off" rather than as another effect. The band
+  // The combined filter's EXCLUDED regions, shaded onto the plot in the
+  // neutral ink so they read as "off" rather than as another effect. The band
   // mechanism inverted: the data drawn IS the kept part, so the shading marks
   // what the filter removed. Undefined rather than empty when nothing is
-  // masked, so a chart with no aura renders exactly as it did before.
-  const auraBands = useMemo(() => {
-    if (auraWindows === undefined) return undefined;
-    const excluded = auraExcludedBands(auraWindows, statusWindow);
+  // masked, so a chart with no aura or window filter renders exactly as it
+  // did before.
+  const maskBands = useMemo(() => {
+    if (maskWindows === undefined) return undefined;
+    const excluded = auraExcludedBands(maskWindows, statusWindow);
     return excluded.length === 0 ? undefined : excluded.map((band) => ({ color: "var(--an-ink-3)", band }));
-  }, [auraWindows, statusWindow]);
+  }, [maskWindows, statusWindow]);
 
   // The chart IS the window: committing does not shade the rest of the fight,
   // it stops drawing it. Sliced client-side from the base load — the reparse
@@ -1497,7 +1536,7 @@ export const AnalysisView = () => {
         fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
         toLabel={range === null ? fullLabel : bucketLabel(range[1])}
         markers={chartMarkers}
-        bands={auraBands}
+        bands={maskBands}
         windowBands={stateWindowBands}
         stackMode={chartSource === "stacks" ? stackMode : undefined}
         onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
