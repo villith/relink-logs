@@ -24,6 +24,12 @@ export type AnalysisState = {
    * dimension — `resolveGroupBy` never reads it (like `window`). Cleared
    * whenever the anchoring pin clears or changes (see transitions.ts). */
   aura: string | null;
+  /** The active window filter: a battle-window kind (`sba`) or one individual
+   * window of a kind (`sba:1`, 0-based within that kind's windows sorted by
+   * start — the order `assemble_chart_windows` returns). A FILTER like `aura`
+   * — `resolveGroupBy` never reads it — but with no anchoring pin, so no
+   * transition clears it besides its own. */
+  win: string | null;
 };
 
 export const METRIC_KEYS: MetricKey[] = ["damage", "taken", "stun", "sba", "buffs", "debuffs"];
@@ -38,6 +44,7 @@ export const DEFAULT_STATE: AnalysisState = {
   window: null,
   by: null,
   aura: null,
+  win: null,
 };
 
 export const isPinned = (state: AnalysisState, dim: Dimension): boolean =>
@@ -54,6 +61,7 @@ export type RawState = {
   to: string | null;
   by: string | null;
   aura: string | null;
+  win: string | null;
 };
 
 export const encodeState = (state: AnalysisState): RawState => ({
@@ -66,6 +74,7 @@ export const encodeState = (state: AnalysisState): RawState => ({
   to: state.window === null ? null : String(state.window[1]),
   by: state.by,
   aura: state.aura,
+  win: state.win,
 });
 
 const nonNegativeInt = (raw: string | null): number | null => {
@@ -95,6 +104,18 @@ export const auraAnchorOf = (aura: string | null): "source" | "target" | null =>
  * Only call on a value `AURA_KEY` admits (the codec guarantees state.aura is). */
 export const auraPinKey = (aura: string): string => aura.slice(4);
 
+/** How a window filter is spelled: the kind, optionally `:index` for one
+ * individual window. The gate every `win` value passes on the way out of the
+ * URL — a value it rejects makes the filter inert, exactly like `AURA_KEY`. */
+const WIN_KEY = /^(sba|link|break)(:\d+)?$/;
+
+/** The kind and 0-based per-kind index a `win` value names; null index = the
+ * whole kind. Only call on a value `WIN_KEY` admits. */
+export const winFilterParts = (win: string): { kind: "sba" | "link" | "break"; index: number | null } => {
+  const [kind, index] = win.split(":");
+  return { kind: kind as "sba" | "link" | "break", index: index === undefined ? null : Number(index) };
+};
+
 /** Every field degrades to its default on its own — one bad value must not
  * discard the others. There is deliberately NO legacy decoding: the old
  * multi-target `tgt` grammar and un-namespaced pins are dead (spec decision). */
@@ -110,5 +131,6 @@ export const decodeState = (raw: RawState): AnalysisState => {
     window: from !== null && to !== null && from <= to ? [from, to] : null,
     by: DIMENSIONS.includes(raw.by as Dimension) ? (raw.by as Dimension) : null,
     aura: raw.aura !== null && AURA_KEY.test(raw.aura) ? raw.aura : null,
+    win: raw.win !== null && WIN_KEY.test(raw.win) ? raw.win : null,
   };
 };

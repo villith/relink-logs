@@ -15,6 +15,7 @@ const FULL_STATE: AnalysisState = {
   window: [10, 95],
   by: "target",
   aura: "src:status:4:1:unknown",
+  win: null,
 };
 
 /** The real state, the real adapter, the real jsdom URL — the point of this
@@ -61,6 +62,7 @@ describe("useAnalysisState", () => {
       window: null,
       by: null,
       aura: null,
+      win: null,
     });
   });
 
@@ -107,6 +109,7 @@ describe("useAnalysisState", () => {
         window: [10, 95],
         by: null,
         aura: null,
+        win: null,
       })
     );
   });

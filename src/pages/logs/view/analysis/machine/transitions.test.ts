@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { CAPABILITIES } from "./capabilities";
 import { resolveGroupBy } from "./resolve";
 import { DEFAULT_STATE, type AnalysisState } from "./state";
-import { clearPin, pinRow, regroup, setAura, setHostility, setMetric, setWindow } from "./transitions";
+import { clearPin, pinRow, regroup, setAura, setHostility, setMetric, setWindow, setWindowFilter } from "./transitions";
 
 const state = (over: Partial<AnalysisState>): AnalysisState => ({ ...DEFAULT_STATE, ...over });
 
@@ -129,5 +129,21 @@ describe("aura filter housekeeping", () => {
     expect(setMetric(state({ source: 1, aura: "src:status:4:1:unknown" }), "taken").aura).toBe(
       "src:status:4:1:unknown"
     );
+  });
+});
+
+describe("setWindowFilter", () => {
+  it("selects and clears", () => {
+    const selected = setWindowFilter(DEFAULT_STATE, "sba:0");
+    expect(selected.win).toBe("sba:0");
+    expect(setWindowFilter(selected, null).win).toBeNull();
+  });
+
+  it("survives pins, metric switches and hostility flips", () => {
+    let state = setWindowFilter(DEFAULT_STATE, "link");
+    state = pinRow(state, { dim: "source", value: 2 });
+    state = setMetric(state, "sba");
+    state = setHostility(state, "enemy");
+    expect(state.win).toBe("link");
   });
 });

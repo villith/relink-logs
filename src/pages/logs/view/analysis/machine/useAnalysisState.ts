@@ -15,10 +15,11 @@ export const useAnalysisState = () => {
   const [to, setTo] = useQueryState("to", { history: "replace" });
   const [by, setBy] = useQueryState("by", { history: "replace" });
   const [aura, setAuraParam] = useQueryState("aura", { history: "replace" });
+  const [win, setWinParam] = useQueryState("win", { history: "replace" });
 
   const state = useMemo(
-    () => decodeState({ metric, side, src, tgt, abil, from, to, by, aura }),
-    [metric, side, src, tgt, abil, from, to, by, aura]
+    () => decodeState({ metric, side, src, tgt, abil, from, to, by, aura, win }),
+    [metric, side, src, tgt, abil, from, to, by, aura, win]
   );
 
   const setState = useCallback(
@@ -33,8 +34,9 @@ export const useAnalysisState = () => {
       setTo(raw.to);
       setBy(raw.by);
       setAuraParam(raw.aura);
+      setWinParam(raw.win);
     },
-    [setMetric, setSide, setSrc, setTgt, setAbil, setFrom, setTo, setBy, setAuraParam]
+    [setMetric, setSide, setSrc, setTgt, setAbil, setFrom, setTo, setBy, setAuraParam, setWinParam]
   );
 
   return [state, setState] as const;

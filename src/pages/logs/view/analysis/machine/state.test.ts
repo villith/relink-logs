@@ -25,6 +25,7 @@ const RAW_NONE: RawState = {
   to: null,
   by: null,
   aura: null,
+  win: null,
 };
 
 describe("isPinned", () => {
@@ -52,6 +53,7 @@ describe("URL codec", () => {
       window: [10, 95],
       by: "target",
       aura: "src:status:4:1:unknown",
+      win: "link",
     });
     expect(decodeState(encodeState(full))).toEqual(full);
   });
@@ -136,5 +138,23 @@ describe("aura grammar", () => {
   it("extracts the status pin key", () => {
     expect(auraPinKey("src:status:4:1:unknown")).toBe("status:4:1:unknown");
     expect(auraPinKey("tgt:status:4:unknown:unknown")).toBe("status:4:unknown:unknown");
+  });
+});
+
+describe("win codec", () => {
+  it("round-trips a kind selection", () => {
+    const win = { ...DEFAULT_STATE, win: "sba" };
+    expect(decodeState(encodeState(win))).toEqual(win);
+  });
+
+  it("round-trips an individual window selection", () => {
+    const win = { ...DEFAULT_STATE, win: "break:2" };
+    expect(decodeState(encodeState(win))).toEqual(win);
+  });
+
+  it("rejects grammar the mask cannot resolve", () => {
+    for (const bad of ["sba:", "dodge", "sba:1:2", "link:-1", ""]) {
+      expect(decodeState({ ...encodeState(DEFAULT_STATE), win: bad }).win).toBeNull();
+    }
   });
 });

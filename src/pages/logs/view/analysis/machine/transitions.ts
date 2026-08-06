@@ -74,3 +74,8 @@ export const regroup = (state: AnalysisState, dim: Dimension, caps: MetricCapabi
 /** Selects (or clears) the Auras Filter. No `by` reset: a filter narrows the
  * data, it does not advance the drill the way a pin does. */
 export const setAura = (state: AnalysisState, aura: string | null): AnalysisState => ({ ...state, aura });
+
+/** Selects (or clears) the window filter. Like `setAura`, a filter narrows
+ * rather than drills, so no `by` reset — and unlike it, a battle window is a
+ * property of the fight, not of any pin, so nothing else clears it. */
+export const setWindowFilter = (state: AnalysisState, win: string | null): AnalysisState => ({ ...state, win });
