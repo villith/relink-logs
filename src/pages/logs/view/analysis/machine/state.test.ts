@@ -8,6 +8,7 @@ import {
   decodeState,
   encodeState,
   isPinned,
+  winFilterParts,
   type AnalysisState,
   type RawState,
 } from "./state";
@@ -156,5 +157,22 @@ describe("win codec", () => {
     for (const bad of ["sba:", "dodge", "sba:1:2", "link:-1", ""]) {
       expect(decodeState({ ...encodeState(DEFAULT_STATE), win: bad }).win).toBeNull();
     }
+  });
+
+  it("survives an out-of-range index — the codec checks grammar, not bounds", () => {
+    // "sba:99" is well-formed WIN_KEY grammar even if the fight never had 99
+    // sba windows; resolving that to an empty mask is the consumer's job
+    // (selectedChartWindows), not the codec's.
+    expect(decodeState({ ...encodeState(DEFAULT_STATE), win: "sba:99" }).win).toBe("sba:99");
+  });
+});
+
+describe("winFilterParts", () => {
+  it("splits a kind selection with a null index", () => {
+    expect(winFilterParts("sba")).toEqual({ kind: "sba", index: null });
+  });
+
+  it("splits an individual window selection", () => {
+    expect(winFilterParts("break:2")).toEqual({ kind: "break", index: 2 });
   });
 });

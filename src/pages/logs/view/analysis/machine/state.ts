@@ -1,3 +1,5 @@
+import type { ChartWindow } from "@/types";
+
 import type { Hostility } from "../../metrics/types";
 
 export type MetricKey = "damage" | "taken" | "stun" | "sba" | "buffs" | "debuffs";
@@ -111,9 +113,9 @@ const WIN_KEY = /^(sba|link|break)(:\d+)?$/;
 
 /** The kind and 0-based per-kind index a `win` value names; null index = the
  * whole kind. Only call on a value `WIN_KEY` admits. */
-export const winFilterParts = (win: string): { kind: "sba" | "link" | "break"; index: number | null } => {
+export const winFilterParts = (win: string): { kind: ChartWindow["kind"]; index: number | null } => {
   const [kind, index] = win.split(":");
-  return { kind: kind as "sba" | "link" | "break", index: index === undefined ? null : Number(index) };
+  return { kind: kind as ChartWindow["kind"], index: index === undefined ? null : Number(index) };
 };
 
 /** Every field degrades to its default on its own — one bad value must not

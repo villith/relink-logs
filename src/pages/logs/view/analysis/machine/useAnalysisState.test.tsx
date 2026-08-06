@@ -15,7 +15,7 @@ const FULL_STATE: AnalysisState = {
   window: [10, 95],
   by: "target",
   aura: "src:status:4:1:unknown",
-  win: null,
+  win: "break:2",
 };
 
 /** The real state, the real adapter, the real jsdom URL — the point of this
@@ -83,6 +83,7 @@ describe("useAnalysisState", () => {
     expect(search).toContain("to=95");
     // `:` is legal in a query value, so nuqs leaves it bare — same as `abil`.
     expect(search).toContain("aura=src:status:4:1:unknown");
+    expect(search).toContain("win=break:2");
   });
 
   it("clears the URL when reset to DEFAULT_STATE", async () => {

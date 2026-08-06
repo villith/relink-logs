@@ -140,10 +140,10 @@ describe("setWindowFilter", () => {
   });
 
   it("survives pins, metric switches and hostility flips", () => {
-    let state = setWindowFilter(DEFAULT_STATE, "link");
-    state = pinRow(state, { dim: "source", value: 2 });
-    state = setMetric(state, "sba");
-    state = setHostility(state, "enemy");
-    expect(state.win).toBe("link");
+    let next = setWindowFilter(DEFAULT_STATE, "link");
+    next = pinRow(next, { dim: "source", value: 2 });
+    next = setMetric(next, "sba");
+    next = setHostility(next, "enemy");
+    expect(next.win).toBe("link");
   });
 });
