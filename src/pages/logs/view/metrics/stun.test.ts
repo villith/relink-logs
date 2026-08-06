@@ -126,3 +126,51 @@ describe("stun descriptor", () => {
     expect(rows[0].columns).toEqual(["80.0", "30.0"]);
   });
 });
+
+describe("stun — rows that applied no stun", () => {
+  const PINNED: SelectorPins = { source: 0, targets: [], ability: null };
+
+  it("drops ability rows whose skills applied no stun", () => {
+    // Most of a rotation is stun-incapable, or lands while the enemy is already
+    // stunned. Listing those is a wall of honest zeros — the same rule
+    // metrics/sba.ts applies to its attributed rows.
+    const roster = [
+      player(0, 20, 2, [
+        { action: 1, stun: 20 },
+        { action: 2, stun: 0 },
+      ]),
+    ];
+    const rows = stun.rows(input("abilities", PINNED, roster));
+
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:1"]);
+  });
+
+  it("drops them one level down too, where rows are a group's members", () => {
+    const roster = [
+      player(0, 5, 1, [
+        { action: 1, stun: 5 },
+        { action: 2, stun: 0 },
+      ]),
+    ];
+    const rows = stun.rows(input("skills", PINNED, roster));
+
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:1"]);
+  });
+
+  it("keeps a row whose stun is real but rounds to 0.0 in the column", () => {
+    // The filter is on the VALUE, not the rendered string: a genuinely tiny
+    // accrual is data, and hiding it would under-report the total above it.
+    const roster = [player(0, 0.04, 0, [{ action: 1, stun: 0.04 }])];
+    const rows = stun.rows(input("abilities", PINNED, roster));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].columns[0]).toBe("0.0");
+  });
+
+  it("still lists players who applied no stun, so the roster stays intact", () => {
+    const roster = [player(0, 20, 2, [{ action: 1, stun: 20 }]), player(1, 0, 0, [])];
+    const rows = stun.rows(input("players", NO_PINS, roster));
+
+    expect(rows).toHaveLength(2);
+  });
+});

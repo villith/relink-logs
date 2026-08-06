@@ -1472,7 +1472,7 @@ export const AnalysisView = () => {
   // Which series won, what that makes the plot, and how it is titled and
   // formatted — one pure fold of the series above (see chartPresentation.ts),
   // so the heading can never disagree with what is on screen.
-  const { overlay, chartSource, withTotal, labelKey, format, stacked } = chartPresentation({
+  const { overlay, chartSource, withTotal, labelKey, format, stacked, smoothing } = chartPresentation({
     statusSeries,
     effectSeries,
     groupOverlay,
@@ -1485,6 +1485,7 @@ export const AnalysisView = () => {
     level,
     metricLabelKey: chartMetric.labelKey,
     metricFormat: chartMetric.format,
+    rateSmoothing: DPS_SMOOTHING_WINDOW,
   });
 
   // The chart's raw inputs — which series, from where, at what scale — shared
@@ -1514,11 +1515,9 @@ export const AnalysisView = () => {
       source: chartInputs.source,
       len: chartInputs.len,
       keys: chartInputs.keys,
-      // A stack count is a LEVEL, not a rate — the same reason the SBA gauge
-      // refuses smoothing. Averaged over a trailing window a buff held for one
-      // second at four stacks reads as one, and every edge of what is really a
-      // step function becomes a ramp.
-      smoothing: statusSeries || effectSeries ? 1 : chartMetric.smoothing,
+      // Decided with the rest of the presentation (see chartPresentation.ts):
+      // rates smooth, levels do not, and which is which follows `format`.
+      smoothing,
       scale: chartInputs.scale,
       // Rate charts only ("amount"): their series are masked to zeros outside
       // the admitted spans, and the trailing average would smear the last
@@ -1536,7 +1535,7 @@ export const AnalysisView = () => {
       ...point,
       timestamp: bucketLabel(bucket),
     })) as ChartDatapoint[];
-  }, [chartInputs, chartMetric.smoothing, statusSeries, effectSeries, withTotal, format, maskWindows]);
+  }, [chartInputs, smoothing, withTotal, format, maskWindows]);
 
   // The hover payload for the shaded windows. Amounts only where the plot's Y
   // is a rate ("amount" format) — the SBA gauge and the stack charts plot a

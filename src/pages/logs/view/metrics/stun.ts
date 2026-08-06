@@ -55,18 +55,26 @@ export const stun: MetricDescriptor = {
     // it takes the largest rather than summing.
     const fold = level === "abilities" ? groupSkillsForRows : mergeSkillsByAction;
 
-    return fold(breakdown)
-      .map(({ key, skills }) => {
-        const total = skills.reduce((sum, skill) => sum + skill.totalStunValue, 0);
-        return {
-          key: `skill:${key}`,
-          label: key,
-          value: total,
-          columns: [oneDecimal(total), oneDecimal(Math.max(...skills.map((skill) => skill.maxStunValue)))],
-          pinOnClick: level === "abilities" ? { ability: key } : null,
-          colorSlot,
-        };
-      })
-      .sort((a, b) => b.value - a.value);
+    return (
+      fold(breakdown)
+        .map(({ key, skills }) => {
+          const total = skills.reduce((sum, skill) => sum + skill.totalStunValue, 0);
+          return {
+            key: `skill:${key}`,
+            label: key,
+            value: total,
+            columns: [oneDecimal(total), oneDecimal(Math.max(...skills.map((skill) => skill.maxStunValue)))],
+            pinOnClick: level === "abilities" ? { ability: key } : null,
+            colorSlot,
+          };
+        })
+        // Most of a rotation applies no stun at all, or lands while the enemy is
+        // already stunned — listing those is a wall of honest zeros (the same rule
+        // `sba` applies to its attributed rows). Filtered on the VALUE, not the
+        // rendered column, so a genuinely tiny accrual that rounds to "0.0" is
+        // kept rather than quietly dropped out of the total above it.
+        .filter((row) => row.value !== 0)
+        .sort((a, b) => b.value - a.value)
+    );
   },
 };

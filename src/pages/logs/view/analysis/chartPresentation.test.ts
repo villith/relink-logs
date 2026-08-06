@@ -20,6 +20,7 @@ const base = {
   level: "players" as const,
   metricLabelKey: "ui.logs.chart-dps-label",
   metricFormat: "amount" as const,
+  rateSmoothing: 10,
 };
 
 describe("chartPresentation — chartSource", () => {
@@ -249,5 +250,37 @@ describe("chartPresentation — the ability drill", () => {
     });
 
     expect(result.chartSource).toBe("stacks");
+  });
+});
+
+describe("chartPresentation — smoothing", () => {
+  it("smooths a rate chart over the trailing window", () => {
+    expect(chartPresentation(base).smoothing).toBe(10);
+  });
+
+  it("leaves the SBA gauge LEVEL untouched", () => {
+    // Smoothing would round off the discharge that IS the reading.
+    const sba = { ...base, metricKey: "sba" as const, metricFormat: "percent" as const };
+
+    expect(chartPresentation(sba).smoothing).toBe(1);
+  });
+
+  it("smooths a DRILLED SBA chart — it plots generation, which is a rate", () => {
+    // The axis switch is not only the format: undrilled this is a level and must
+    // not be smoothed, drilled it is a per-second rate like DPS and stun. Left
+    // unsmoothed it drew raw per-hit gain bursts, one spike per bucket.
+    const sba = { ...base, metricKey: "sba" as const, metricFormat: "percent" as const };
+
+    expect(chartPresentation({ ...sba, abilitySeries: series("skill:1") }).smoothing).toBe(10);
+  });
+
+  it("leaves stack counts untouched", () => {
+    // A stack count is a level too: averaged, a buff held one second at four
+    // stacks reads as one, and every edge of a step function becomes a ramp.
+    expect(chartPresentation({ ...base, statusSeries: series("player:0") }).smoothing).toBe(1);
+  });
+
+  it("smooths the damage drill's bands", () => {
+    expect(chartPresentation({ ...base, groupOverlay: series("skill:1") }).smoothing).toBe(10);
   });
 });

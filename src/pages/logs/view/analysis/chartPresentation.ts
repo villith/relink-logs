@@ -36,6 +36,8 @@ export type ChartPresentation = {
   labelKey: string;
   format: DpsChartProps["format"];
   stacked: boolean;
+  /** Trailing moving-average window in buckets; 1 leaves values untouched. */
+  smoothing: number;
 };
 
 export const chartPresentation = ({
@@ -51,6 +53,7 @@ export const chartPresentation = ({
   level,
   metricLabelKey,
   metricFormat,
+  rateSmoothing,
 }: {
   /** One series per holder of the pinned effect, or null. */
   statusSeries: DrillSeries[] | null;
@@ -77,6 +80,9 @@ export const chartPresentation = ({
   metricLabelKey: string;
   /** The base chart's own format (the SBA gauge is a percent). */
   metricFormat: "amount" | "percent";
+  /** The trailing window a RATE chart smooths over. Injected rather than
+   * imported so this stays a pure fold with no view constants in it. */
+  rateSmoothing: number;
 }): ChartPresentation => {
   // Whichever series is drawn INSTEAD of the per-player ones. Stack counts and
   // group bands are the same shape and are consumed identically, so they are
@@ -112,6 +118,15 @@ export const chartPresentation = ({
   // title, the hover cards and the empty state agreeing about what is showing.
   const enemySide = hostility === "enemy";
 
+  // An overlay of any kind plots an amount; the base sources keep their metric's
+  // own format (the SBA gauge is a percent). A drilled SBA chart plots gauge
+  // GENERATED, an amount, where the undrilled one plots the gauge LEVEL — the
+  // axis follows the grouping, the same way the title does. Hoisted out of the
+  // literal below because `smoothing` keys off it: in this view "amount" IS the
+  // spelling for "this series is a rate".
+  const format: DpsChartProps["format"] =
+    chartSource === "stacks" ? "count" : chartSource === "ability" || groupOverlay !== null ? "amount" : metricFormat;
+
   return {
     overlay,
     chartSource,
@@ -143,14 +158,15 @@ export const chartPresentation = ({
                 ? "ui.logs.chart-taken-drill-label"
                 : DRILL_LABEL_KEY[level]
             : metricLabelKey,
-    // An overlay of any kind plots an amount; the base sources keep their
-    // metric's own format (the SBA gauge is a percent).
-    // A drilled SBA chart plots gauge GENERATED per bucket, an amount, where
-    // the undrilled one plots the gauge LEVEL — a level discharges to zero on
-    // cast and cannot be decomposed by contributor. The axis follows the
-    // grouping, the same way the title above does.
-    format:
-      chartSource === "stacks" ? "count" : chartSource === "ability" || groupOverlay !== null ? "amount" : metricFormat,
+    format,
     stacked: overlay !== null,
+    // RATES are smoothed; LEVELS are not. The SBA gauge and the aura stack
+    // counts are levels — averaged over a trailing window a buff held for one
+    // second at four stacks reads as one, and the discharge that IS the gauge
+    // reading is rounded off. A DRILLED SBA chart is the case that makes this
+    // follow `format` rather than the metric: it plots gauge GENERATED per
+    // bucket, a rate like DPS, and left unsmoothed it drew one spike per
+    // per-hit gain burst.
+    smoothing: format === "amount" ? rateSmoothing : 1,
   };
 };
