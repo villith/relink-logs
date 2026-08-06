@@ -21,6 +21,24 @@ pub struct StatusInterval {
     /// The causing ability. `None` when the hook could not resolve it — the UI
     /// then labels the row with the bare effect name.
     pub ability_id: Option<u32>,
+    /// The applying status object's RTTI class, as a hash of its class NAME.
+    /// Names the row's source where `ability_id` cannot — a passive has no
+    /// action id, which is what a sentinel cause such as 9998 means.
+    ///
+    /// Payload, never part of the pairing key below: the shared scalar-deleting
+    /// destructor resets the object's vftable back to `StatusBase` (that reset
+    /// is what the hook's dtor signature anchors on), so the remove side cannot
+    /// be relied on to report the same class. Keying on it would strand every
+    /// removal and leave intervals open to the end of the fight.
+    pub status_class: Option<u32>,
+    /// The action the caster was performing when it applied this. Names the
+    /// same rows one rung more specifically than the class does — the class
+    /// names the mechanism, this names the ability.
+    ///
+    /// Payload only, for the reason `status_class` is, plus one more: it is
+    /// INFERRED from what the caster was doing rather than recorded by the
+    /// game, so keying on it would split rows by a guess.
+    pub caster_action_id: Option<u32>,
     pub start_ms: i64,
     pub end_ms: i64,
     pub max_stacks: u32,
@@ -127,6 +145,8 @@ pub fn assemble_intervals(
                         caster_index: event.caster_index,
                         status_id: event.status_id,
                         ability_id: event.ability_id,
+                        status_class: event.status_class,
+                        caster_action_id: event.caster_action_id,
                         start_ms: at,
                         // Provisional: a matched remove overwrites it. An enemy
                         // that never sends one is closed at its spawn's end
@@ -198,6 +218,32 @@ mod tests {
                 stacks,
             }),
         )
+    }
+
+    /// `apply` with the provenance fields attached, for the class tests. A
+    /// separate helper rather than two more parameters on `apply`, which every
+    /// other test in this module already calls.
+    fn apply_with_provenance(
+        ts: i64,
+        actor: u32,
+        status: u32,
+        ability: Option<u32>,
+        stacks: u32,
+        status_class: Option<u32>,
+        caster_action_id: Option<u32>,
+    ) -> (i64, Message) {
+        let (ts, message) = apply(ts, actor, status, ability, stacks);
+        match message {
+            Message::StatusApply(event) => (
+                ts,
+                Message::StatusApply(StatusApplyEvent {
+                    status_class,
+                    caster_action_id,
+                    ..event
+                }),
+            ),
+            other => (ts, other),
+        }
     }
 
     fn remove(ts: i64, actor: u32, status: u32, ability: Option<u32>) -> (i64, Message) {
@@ -493,5 +539,59 @@ mod tests {
             intervals[0].max_stacks, 2,
             "the refresh's stack count is kept"
         );
+    }
+
+    #[test]
+    fn the_interval_carries_the_provenance_from_its_apply() {
+        // Both fields are what names a row whose cause is a sentinel: 9998 means
+        // no activated action produced the effect, so `ability_id` cannot.
+        let events = vec![apply_with_provenance(
+            0,
+            1,
+            10,
+            Some(9998),
+            1,
+            Some(0xABCD),
+            Some(1200),
+        )];
+        let intervals = assemble_intervals(&events, 0, 1_000, &[]);
+
+        assert_eq!(intervals[0].status_class, Some(0xABCD));
+        assert_eq!(intervals[0].caster_action_id, Some(1200));
+    }
+
+    #[test]
+    fn a_remove_still_closes_an_interval_that_has_provenance() {
+        // Neither field may join the pairing key. The shared scalar-deleting
+        // destructor resets the object's vftable back to `StatusBase` before the
+        // remove hook could read it — that reset is literally what the hook's
+        // dtor signature anchors on — so a remove cannot supply the same class.
+        // Keyed on it, this remove would not match and the interval would stay
+        // open to the end of the fight.
+        let events = vec![
+            apply_with_provenance(0, 1, 10, Some(9998), 1, Some(0xABCD), Some(1200)),
+            remove(500, 1, 10, Some(9998)),
+        ];
+        let intervals = assemble_intervals(&events, 0, 1_000, &[]);
+
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals[0].end_ms, 500);
+    }
+
+    #[test]
+    fn a_refresh_keeps_the_provenance_of_the_first_apply() {
+        // Within one `(actor, spawn, effect, cause)` the parser still merges, so
+        // the first class wins — the class splits rows ACROSS holders, not
+        // within one window. Pinned so the merge behaviour is a decision rather
+        // than an accident.
+        let events = vec![
+            apply_with_provenance(0, 1, 10, Some(9998), 1, Some(0xABCD), Some(1200)),
+            apply_with_provenance(500, 1, 10, Some(9998), 1, Some(0x1234), Some(1300)),
+        ];
+        let intervals = assemble_intervals(&events, 0, 1_000, &[]);
+
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals[0].status_class, Some(0xABCD));
+        assert_eq!(intervals[0].caster_action_id, Some(1200));
     }
 }
