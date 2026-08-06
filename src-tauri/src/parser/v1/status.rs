@@ -193,6 +193,8 @@ mod tests {
                 caster_index: Some(0),
                 status_id: status,
                 ability_id: ability,
+                status_class: None,
+                caster_action_id: None,
                 stacks,
             }),
         )

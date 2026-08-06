@@ -462,6 +462,11 @@ fn run_init(tx: &event::Tx, status: *const usize, duration: f32, ctx: *const usi
                 // it is an effect-entry constant, so the UI shows the number
                 // until a mapping from it to a skill exists.
                 ability_id: cause_id_of(status),
+                // What the object IS, for the rows `ability_id` cannot name.
+                status_class: super::status_class::status_class_of(status),
+                // What the caster was DOING, which names a passive's row even
+                // though no action id was recorded against it.
+                caster_action_id: caster_action_of(ctx as usize),
                 // +0xb0, but only for the ids status.tbl marks HasLevels;
                 // everything else reports 1. See `stacks_for`.
                 stacks: stacks_for(status_id, raw_stacks_of(status)),

@@ -3993,6 +3993,8 @@ mod tests {
             caster_index: Some(0),
             status_id,
             ability_id: None,
+            status_class: None,
+            caster_action_id: None,
             stacks: 1,
         }
     }

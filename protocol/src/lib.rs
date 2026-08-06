@@ -674,6 +674,22 @@ pub struct StatusApplyEvent {
     pub status_id: u32,
     /// The action that caused it. `None` when unresolvable.
     pub ability_id: Option<u32>,
+    /// The status object's RTTI class, as a hash of its class NAME (never its
+    /// vtable address — that moves on a game patch, and a stored address would
+    /// silently resolve to a different class afterwards).
+    ///
+    /// `None` when the hook could not vouch for one. Names the row's source
+    /// where `ability_id` cannot: a passive has no action id, which is what the
+    /// 9998 sentinel means.
+    pub status_class: Option<u32>,
+    /// The action the caster was performing when it applied this. Names the
+    /// rows `ability_id` cannot, because a passive has no action id to record.
+    ///
+    /// Deliberately SEPARATE from `ability_id`, never substituted into it:
+    /// "the game recorded this cause" and "we inferred it from what the caster
+    /// was doing" are different claims, and collapsing them would make the
+    /// stored log lie about its own provenance.
+    pub caster_action_id: Option<u32>,
     /// Stack count after this application. 1 for unstacking effects.
     pub stacks: u32,
 }
