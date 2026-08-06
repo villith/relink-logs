@@ -95,6 +95,13 @@ pub struct TimeWindow {
     pub up_to_ms: i64,
 }
 
+impl TimeWindow {
+    /// Half-open, the wire windows' convention: `from_ms <= rel_ts < up_to_ms`.
+    pub fn admits(&self, rel_ts: i64) -> bool {
+        self.from_ms <= rel_ts && rel_ts < self.up_to_ms
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupQuery {
@@ -455,10 +462,7 @@ pub fn aggregate_groups(
         // convention — unlike the scrub window above, which is inclusive at
         // both ends because buckets are).
         if let Some(windows) = &query.windows {
-            if !windows
-                .iter()
-                .any(|window| window.from_ms <= rel_ts && rel_ts < window.up_to_ms)
-            {
+            if !windows.iter().any(|window| window.admits(rel_ts)) {
                 continue;
             }
         }

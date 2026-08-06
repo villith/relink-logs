@@ -2520,9 +2520,13 @@ impl Parser {
     /// filter: `windows` is a mask of fight-relative spans with the groups
     /// path's exact semantics (`GroupQuery::windows`) — an event is admitted
     /// when its timestamp lies inside ANY span (`from_ms <= t < up_to_ms`),
-    /// `Some(&[])` admits nothing, `None` is no mask. Unlike `from_ms`, the
-    /// mask never moves the derived start time: rates stay measured against
-    /// the scrub window, the aura filter's own convention.
+    /// `Some(&[])` admits nothing, `None` is no mask. The mask never pins the
+    /// derived start itself: with no scrub `from`, the window still anchors
+    /// on the first ADMITTED hit and ends on the last, so backend rates
+    /// measure the hull of admitted damage — for a single masked span that is
+    /// the span itself, which is the useful reading; multi-span masks include
+    /// the gaps. A caller wanting scrub-window rates pins `from_ms`/`up_to_ms`
+    /// as the analysis view's scrub does.
     pub fn reparse_with_options(
         &mut self,
         target_spans: &[TargetSpan],
@@ -2576,10 +2580,7 @@ impl Parser {
             // taken, stun, SBA gauge/gains, statuses) narrows identically.
             if let Some(windows) = windows {
                 let rel_ts = *timestamp - log_start;
-                if !windows
-                    .iter()
-                    .any(|window| window.from_ms <= rel_ts && rel_ts < window.up_to_ms)
-                {
+                if !windows.iter().any(|window| window.admits(rel_ts)) {
                     continue;
                 }
             }
@@ -6606,6 +6607,71 @@ mod tests {
         }];
         parser.reparse_with_options(&[], Some(2_000), Some(5_000), Some(&wide));
         assert_eq!(parser.derived_state.total_damage, 200);
+    }
+
+    /// The mask gates every accumulation path, not just damage: a stun
+    /// message outside every admitted span must not count either.
+    #[test]
+    fn reparse_windows_mask_drops_non_damage_events_outside_the_mask() {
+        let mut parser = Parser::default();
+        let base = 10_000;
+
+        // Push in chronological order: the reparse loop's `cutoff` break
+        // assumes the raw log is time-ordered.
+        let mut damage_event = a_damage_event();
+        damage_event.damage = 100;
+        parser
+            .encounter
+            .push_event(base, Message::DamageEvent(damage_event));
+        parser.encounter.push_event(
+            base + 500,
+            Message::OnPlayerStun(OnPlayerStunEvent {
+                actor_index: 0xF000_0000,
+                stun_amount: 30.0,
+            }),
+        );
+        parser.encounter.push_event(
+            base + 2_000,
+            Message::OnPlayerStun(OnPlayerStunEvent {
+                actor_index: 0xF000_0000,
+                stun_amount: 50.0,
+            }),
+        );
+
+        let mask = [TimeWindow {
+            from_ms: 0,
+            up_to_ms: 1_000,
+        }];
+        parser.reparse_with_options(&[], None, None, Some(&mask));
+
+        // The +500 stun message is inside [0,1000) and counts; the +2000 one
+        // is outside every admitted span and is dropped, same as a hit.
+        assert_eq!(parser.derived_state.total_stun_value, 30.0);
+    }
+
+    /// Pins the start-anchoring contract the mask's doc comment describes:
+    /// with no scrub `from`, the derived window still anchors on the first
+    /// MASK-ADMITTED hit (not the fight's first hit), so backend rates
+    /// measure the hull of admitted damage.
+    #[test]
+    fn reparse_windows_mask_anchors_start_on_first_admitted_hit() {
+        let mut parser = Parser::default();
+        let base = 10_000;
+
+        for (offset, damage) in [(0, 100), (4_000, 200), (8_000, 400)] {
+            let mut event = a_damage_event();
+            event.damage = damage;
+            parser
+                .encounter
+                .push_event(base + offset, Message::DamageEvent(event));
+        }
+
+        let mask = [TimeWindow {
+            from_ms: 3_000,
+            up_to_ms: 5_000,
+        }];
+        parser.reparse_with_options(&[], None, None, Some(&mask));
+        assert_eq!(parser.derived_state.start_time, base + 4_000);
     }
 
     /// Regression: `reparse_with_options_window` swallowed `OnUpdateSBA` in its
