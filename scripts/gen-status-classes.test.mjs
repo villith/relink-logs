@@ -79,6 +79,14 @@ test("renderRust emits a well-formed rust table: opening, one row per vtable, cl
   assert.ok(rust.trimEnd().endsWith("];"));
 });
 
+test("renderRust marks the table rustfmt::skip so regeneration stays byte-identical", () => {
+  // Without this, rustfmt column-aligns the trailing comments the moment the
+  // module is reachable, so every patch-day regeneration diffs against the
+  // committed file and the pre-commit `cargo fmt --check` fails.
+  const rust = renderRust([{ rva: 0x29b0cf0, hash: 0, class: "StatusBase" }]);
+  assert.ok(rust.includes("#[rustfmt::skip]\npub const STATUS_CLASS_TABLE"));
+});
+
 test("a hash-0 collision on a named class fails loudly instead of merging into the nameless sentinel", () => {
   assert.throws(() => assertHashNotSentinel("StatusPl9999FakeCollision", 0), /hashes to 0/i);
   assert.doesNotThrow(() => assertHashNotSentinel("StatusPl9999FakeCollision", 123));

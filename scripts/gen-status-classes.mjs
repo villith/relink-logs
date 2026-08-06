@@ -84,6 +84,11 @@ export const renderRust = (hook) =>
 //!
 //! Regenerate after a game patch — the RVAs move, the hashes do not.
 
+// rustfmt::skip so THIS generator owns the formatting. Without it rustfmt
+// column-aligns the trailing comments, every regeneration produces a diff
+// against the committed file, and the pre-commit \`cargo fmt --check\` fails on
+// a patch-day regen. Skipping keeps regeneration byte-identical.
+#[rustfmt::skip]
 pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
 ${hook.map((row) => `    (${`0x${row.rva.toString(16).toUpperCase()}`}, ${row.hash}), // ${row.class}`).join("\n")}
 ];
