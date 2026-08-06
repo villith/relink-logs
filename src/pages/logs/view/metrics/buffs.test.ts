@@ -22,6 +22,11 @@ const interval = (
   casterIndex: 0,
   statusId: status,
   abilityId: ability,
+  // Null on both, as every log written before these fields existed reads
+  // back — so these tests are also the proof that a class-less log groups
+  // exactly as it did before the key gained its third segment.
+  statusClass: null,
+  casterActionId: null,
   startMs: start,
   endMs: end,
   maxStacks: stacks,
@@ -80,13 +85,13 @@ describe("buffs descriptor", () => {
   it("gives one row per (effect, cause) when nothing is pinned", () => {
     const rows = buffs.rows(input("players"));
     expect(rows).toHaveLength(2);
-    expect(rows.map((r) => r.key)).toEqual(["status:10:500", "status:20:600"]);
+    expect(rows.map((r) => r.key)).toEqual(["status:10:500:unknown", "status:20:600:unknown"]);
   });
 
   it("leaves enemy-held effects off the friendly Buffs table", () => {
     // Actor 9 is nobody's player index (and Burn is harmful besides) — under
     // the default friendly hostility this table shows neither.
-    expect(buffs.rows(input("players")).some((r) => r.key === "status:1001:700")).toBe(false);
+    expect(buffs.rows(input("players")).some((r) => r.key === "status:1001:700:unknown")).toBe(false);
   });
 
   it("merges overlapping intervals when computing a buff's uptime", () => {
@@ -100,13 +105,13 @@ describe("buffs descriptor", () => {
 
   it("pins the buff into the Ability selector", () => {
     // WCL behaviour: you select the buff, you do not expand it.
-    expect(buffs.rows(input("players"))[0].pinOnClick).toEqual({ ability: "status:10:500" });
+    expect(buffs.rows(input("players"))[0].pinOnClick).toEqual({ ability: "status:10:500:unknown" });
   });
 
   it("gives one row per holder when a buff is pinned", () => {
     // The PIN says which effect, not the level — the level comes from a pin
     // shared with the damage tabs and cannot mean both things.
-    const rows = buffs.rows(input("skills", "status:10:500"));
+    const rows = buffs.rows(input("skills", "status:10:500:unknown"));
     expect(rows).toHaveLength(2);
     expect(rows[0].value).toBe(8_000); // Narmaya, merged
     expect(rows[1].value).toBe(2_000); // Eugen
@@ -115,8 +120,8 @@ describe("buffs descriptor", () => {
   it("gives holder rows for a pinned buff at any level", () => {
     // rowLevelFor no longer descends on a status pin, so the level here is
     // whatever the OTHER pins made it. The rows must not depend on that.
-    expect(buffs.rows(input("players", "status:10:500")).map((r) => r.key)).toEqual(["player:0", "player:1"]);
-    expect(buffs.rows(input("abilities", "status:10:500")).map((r) => r.key)).toEqual(["player:0", "player:1"]);
+    expect(buffs.rows(input("players", "status:10:500:unknown")).map((r) => r.key)).toEqual(["player:0", "player:1"]);
+    expect(buffs.rows(input("abilities", "status:10:500:unknown")).map((r) => r.key)).toEqual(["player:0", "player:1"]);
   });
 
   it("keeps a buff on the Buffs table when the scoped party has been narrowed", () => {
@@ -125,23 +130,23 @@ describe("buffs descriptor", () => {
     // party's buffs as enemy-held.
     const scoped = [{ index: 0, partyIndex: 0 }] as ComputedPlayerState[];
     const rows = buffs.rows(input("abilities", null, INTERVALS, scoped));
-    expect(rows.map((r) => r.key)).toEqual(["status:10:500", "status:20:600"]);
+    expect(rows.map((r) => r.key)).toEqual(["status:10:500:unknown", "status:20:600:unknown"]);
     // Eugen's window still counts toward the effect's uptime.
     expect(rows[0].value).toBe(8_000);
   });
 
   it("colours a holder row by its party slot", () => {
-    expect(buffs.rows(input("skills", "status:10:500"))[1].colorSlot).toBe(1);
+    expect(buffs.rows(input("skills", "status:10:500:unknown"))[1].colorSlot).toBe(1);
   });
 
   it("pins a friendly holder row into Source — the holder×effect drill", () => {
-    const rows = buffs.rows(input("skills", "status:10:500"));
+    const rows = buffs.rows(input("skills", "status:10:500:unknown"));
     expect(rows[0].pinOnClick).toEqual({ source: 0 }); // Narmaya
     expect(rows[1].pinOnClick).toEqual({ source: 1 }); // Eugen
   });
 
   it("keeps enemy holder rows leaves — Source means the CASTER on that side", () => {
-    const rows = buffs.rows(input("players", "status:32:700", MIXED_SIDES, PLAYERS, "enemy"));
+    const rows = buffs.rows(input("players", "status:32:700:unknown", MIXED_SIDES, PLAYERS, "enemy"));
     expect(rows.length).toBeGreaterThan(0);
     expect(rows.every((r) => r.pinOnClick === null)).toBe(true);
   });
@@ -154,7 +159,7 @@ describe("buffs descriptor", () => {
   });
 
   it("counts only a holder's own applications on its row", () => {
-    const rows = buffs.rows(input("skills", "status:10:500"));
+    const rows = buffs.rows(input("skills", "status:10:500:unknown"));
     expect(rows[0].columns[1]).toBe("2"); // Narmaya: two windows
     expect(rows[1].columns[1]).toBe("1"); // Eugen: one
   });
@@ -189,12 +194,12 @@ describe("debuffs descriptor", () => {
     // enemy side made the switch read as a consequence of the tab, and hid the
     // ailments the party was carrying — which is what a Debuffs tab is for.
     // Burn (1001) on Narmaya is the only harmful effect a player holds here.
-    expect(debuffs.rows(input("players", null, MIXED_SIDES)).map((r) => r.key)).toEqual(["status:1001:500"]);
+    expect(debuffs.rows(input("players", null, MIXED_SIDES)).map((r) => r.key)).toEqual(["status:1001:500:unknown"]);
   });
 
   it("gives one row per effect held by a non-player", () => {
     const rows = debuffs.rows(enemySide("players"));
-    expect(rows.map((r) => r.key)).toEqual(["status:1001:700"]);
+    expect(rows.map((r) => r.key)).toEqual(["status:1001:700:unknown"]);
   });
 
   it("counts an enemy's uptime the same way", () => {
@@ -209,14 +214,14 @@ describe("debuffs descriptor", () => {
     // The Four Dragons case end to end: one actor id, two spawns. Keyed on the
     // id the two dragons shared a row labelled with a bare number.
     const recycled = [interval(9, 0, 1_000, 1001, 700, 1, 1, 0), interval(9, 5_000, 9_000, 1001, 700, 1, 1, 1)];
-    const rows = debuffs.rows(enemySide("skills", "status:1001:700", recycled));
+    const rows = debuffs.rows(enemySide("skills", "status:1001:700:unknown", recycled));
     expect(rows.map((r) => r.key)).toEqual(["target:1", "target:0"]);
   });
 
   it("keeps an enemy the segmenter never placed on its own row", () => {
     // A phantom marker actor gets no segment. Its window is real capture, so it
     // keeps a row — labelled by the raw id, which is all that is known.
-    const rows = debuffs.rows(enemySide("skills", "status:1001:700", [interval(9, 0, 6_000, 1001, 700)]));
+    const rows = debuffs.rows(enemySide("skills", "status:1001:700:unknown", [interval(9, 0, 6_000, 1001, 700)]));
     expect(rows.map((r) => r.key)).toEqual(["actor:9"]);
   });
 });
@@ -267,43 +272,43 @@ describe("narrowedByPins", () => {
   });
 
   it("ignores a STATUS ability pin, which selects the effect rather than an actor", () => {
-    expect(narrowedByPins(HELD, pins({ ability: "status:10:500" }), "friendly")).toEqual(HELD);
+    expect(narrowedByPins(HELD, pins({ ability: "status:10:500:unknown" }), "friendly")).toEqual(HELD);
   });
 });
 
 describe("polarity and hostility", () => {
   it("keeps harmful effects off the Buffs table even when a player holds them", () => {
-    expect(buffs.rows(input("players", null, MIXED_SIDES)).map((r) => r.key)).toEqual(["status:10:500"]);
+    expect(buffs.rows(input("players", null, MIXED_SIDES)).map((r) => r.key)).toEqual(["status:10:500:unknown"]);
   });
 
   it("keeps enemy self-buffs off the Debuffs table", () => {
     // Bloodthirst is a buff the enemy gave itself — the exact row the
     // holder-based split used to misfile as a debuff.
     expect(debuffs.rows(input("players", null, MIXED_SIDES, PLAYERS, "enemy")).map((r) => r.key)).toEqual([
-      "status:1001:800",
+      "status:1001:800:unknown",
     ]);
   });
 
   it("shows enemy self-buffs on the Buffs table under enemy hostility", () => {
     expect(buffs.rows(input("players", null, MIXED_SIDES, PLAYERS, "enemy")).map((r) => r.key)).toEqual([
-      "status:32:700",
+      "status:32:700:unknown",
     ]);
   });
 
   it("keys enemy-held holder rows by spawn under enemy hostility", () => {
-    const rows = buffs.rows(input("players", "status:32:700", MIXED_SIDES, PLAYERS, "enemy"));
+    const rows = buffs.rows(input("players", "status:32:700:unknown", MIXED_SIDES, PLAYERS, "enemy"));
     expect(rows.map((r) => r.key)).toEqual(["target:2"]);
     expect(rows[0].colorSlot).toBe(-1);
   });
 
   it("shows ailments on players on the Debuffs table under friendly hostility", () => {
     expect(debuffs.rows(input("players", null, MIXED_SIDES, PLAYERS, "friendly")).map((r) => r.key)).toEqual([
-      "status:1001:500",
+      "status:1001:500:unknown",
     ]);
   });
 
   it("keys player-held holder rows by player under friendly hostility", () => {
-    const rows = debuffs.rows(input("players", "status:1001:500", MIXED_SIDES, PLAYERS, "friendly"));
+    const rows = debuffs.rows(input("players", "status:1001:500:unknown", MIXED_SIDES, PLAYERS, "friendly"));
     expect(rows.map((r) => r.key)).toEqual(["player:0"]);
     expect(rows[0].colorSlot).toBe(0);
   });
@@ -313,7 +318,7 @@ describe("polarity and hostility", () => {
     // coupling this pair of axes was untangled from.
     const buffKeys = buffs.rows(input("players", null, MIXED_SIDES)).map((r) => r.key);
     const debuffKeys = debuffs.rows(input("players", null, MIXED_SIDES)).map((r) => r.key);
-    expect(buffKeys).toEqual(["status:10:500"]);
-    expect(debuffKeys).toEqual(["status:1001:500"]);
+    expect(buffKeys).toEqual(["status:10:500:unknown"]);
+    expect(debuffKeys).toEqual(["status:1001:500:unknown"]);
   });
 });

@@ -7,8 +7,8 @@ import { statusKeyParts } from "./statusLabel";
 
 describe("statusKeyParts", () => {
   it("parses both ids and the unknown cause", () => {
-    expect(statusKeyParts("status:10:500")).toEqual({ statusId: 10, causeId: 500 });
-    expect(statusKeyParts("status:10:unknown")).toEqual({ statusId: 10, causeId: null });
+    expect(statusKeyParts("status:10:500:unknown")).toEqual({ statusId: 10, causeId: 500, classHash: null });
+    expect(statusKeyParts("status:10:unknown:unknown")).toEqual({ statusId: 10, causeId: null, classHash: null });
     expect(statusKeyParts("skill:9")).toBeNull();
     expect(statusKeyParts("player:0")).toBeNull();
   });
@@ -45,9 +45,9 @@ describe("causeClassOf", () => {
 
 describe("causeClassOfKey", () => {
   it("classifies off the row key, resolving names only for real ids", () => {
-    expect(causeClassOfKey("status:10:9999", () => true)).toBe("sigilTrait");
-    expect(causeClassOfKey("status:10:1100", (id) => id === 1100)).toBe("skill");
-    expect(causeClassOfKey("status:10:unknown", () => true)).toBe("unknown");
+    expect(causeClassOfKey("status:10:9999:unknown", () => true)).toBe("sigilTrait");
+    expect(causeClassOfKey("status:10:1100:unknown", (id) => id === 1100)).toBe("skill");
+    expect(causeClassOfKey("status:10:unknown:unknown", () => true)).toBe("unknown");
     expect(causeClassOfKey("not-a-status-key", () => true)).toBe("unknown");
   });
 });
@@ -64,11 +64,11 @@ describe("withProvenance", () => {
 
   // Arrives sorted by uptime, as statusRows sorts.
   const ROWS = [
-    row("status:1:9999", 900), // sigilTrait
-    row("status:2:1100", 800), // skill
-    row("status:3:unknown", 700), // unknown
-    row("status:4:1048575", 600), // field
-    row("status:5:1200", 500), // skill
+    row("status:1:9999:unknown", 900), // sigilTrait
+    row("status:2:1100:unknown", 800), // skill
+    row("status:3:unknown:unknown", 700), // unknown
+    row("status:4:1048575:unknown", 600), // field
+    row("status:5:1200:unknown", 500), // skill
   ];
 
   const classOf = (r: MetricRow) => causeClassOfKey(r.key, (id) => id === 1100 || id === 1200 || id > 0);
@@ -76,11 +76,11 @@ describe("withProvenance", () => {
   it("orders sections Skill → Sigil/Trait → Field → Unknown, keeping uptime order inside each", () => {
     const decorated = withProvenance(ROWS, classOf, (cls) => cls);
     expect(decorated.map((r) => r.key)).toEqual([
-      "status:2:1100",
-      "status:5:1200",
-      "status:1:9999",
-      "status:4:1048575",
-      "status:3:unknown",
+      "status:2:1100:unknown",
+      "status:5:1200:unknown",
+      "status:1:9999:unknown",
+      "status:4:1048575:unknown",
+      "status:3:unknown:unknown",
     ]);
   });
 

@@ -1,10 +1,22 @@
 import type { StatusInterval } from "@/types";
 
-/** Identity of a buff row: the effect AND the ability that caused it.
- * Unresolved causes collapse to one "unknown" bucket per effect rather than
- * scattering — the documented fallback when the hook cannot attribute. */
-export const statusKey = (interval: Pick<StatusInterval, "statusId" | "abilityId">): string =>
-  `${interval.statusId}:${interval.abilityId ?? "unknown"}`;
+/** Identity of a buff row: the effect, the ability that caused it, AND the
+ * status class that applied it. Unresolved causes and classes collapse to one
+ * "unknown" bucket per effect rather than scattering — the documented fallback
+ * when the hook cannot attribute.
+ *
+ * The class segment is ALWAYS written; absence is spelled, not omitted, so the
+ * grammar keeps exactly one shape for its four readers. That is safe because
+ * this key is DERIVED at every use site and never stored — the only
+ * two-segment key that can outlive the change is a bookmarked pin, which
+ * already renders verbatim against an empty table.
+ *
+ * The class splits rows ACROSS holders, not within one: within a single
+ * `(actor, spawn, effect, cause)` the parser still merges, so the first class
+ * wins. `casterActionId` is deliberately NOT here — it is inferred rather than
+ * recorded, and keying on it would split rows by a guess. */
+export const statusKey = (interval: Pick<StatusInterval, "statusId" | "abilityId" | "statusClass">): string =>
+  `${interval.statusId}:${interval.abilityId ?? "unknown"}:${interval.statusClass ?? "unknown"}`;
 
 /** The prefix that keeps a status pin tellable apart from a damage-ability pin
  * in the Ability selector they share. Spelled once, here, beside the key it
@@ -13,7 +25,7 @@ export const statusKey = (interval: Pick<StatusInterval, "statusId" | "abilityId
 export const STATUS_PIN_PREFIX = "status:";
 
 /** `statusKey` prefixed, i.e. the value a status row pins. */
-export const statusPinKey = (interval: Pick<StatusInterval, "statusId" | "abilityId">): string =>
+export const statusPinKey = (interval: Pick<StatusInterval, "statusId" | "abilityId" | "statusClass">): string =>
   `${STATUS_PIN_PREFIX}${statusKey(interval)}`;
 
 /** Whether an Ability pin selects a status effect rather than a damage ability.

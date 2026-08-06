@@ -16,6 +16,10 @@ const interval = (
   casterIndex: 0,
   statusId: status,
   abilityId: ability,
+  // A log written before the provenance fields existed reads back null for
+  // both, so every fixture here is also the class-less regression case.
+  statusClass: null,
+  casterActionId: null,
   startMs: start,
   endMs: end,
   maxStacks: 1,
@@ -32,12 +36,12 @@ describe("auraHolderIntervals", () => {
   ];
 
   it("selects one player holder's windows of one effect", () => {
-    const held = auraHolderIntervals(INTERVALS, "status:10:500", { kind: "player", index: 0 });
+    const held = auraHolderIntervals(INTERVALS, "status:10:500:unknown", { kind: "player", index: 0 });
     expect(held).toEqual([INTERVALS[0]]);
   });
 
   it("selects an enemy holder by SPAWN segment, never actor index", () => {
-    const held = auraHolderIntervals(INTERVALS, "status:10:500", { kind: "enemySpawn", segment: 2 });
+    const held = auraHolderIntervals(INTERVALS, "status:10:500:unknown", { kind: "enemySpawn", segment: 2 });
     expect(held).toEqual([INTERVALS[3]]);
   });
 });

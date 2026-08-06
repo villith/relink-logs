@@ -4,20 +4,29 @@ import type { Hostility, LabelKind } from "../metrics/types";
 import { isStatusPin, statusPinKey } from "../statusUptime";
 import type { AbilityLabelPlayer } from "./abilityLabel";
 
-/** How a status row's key is spelled: the effect, then the ability that caused
- * it, or the literal `unknown` where the hook could not attribute one. */
-const STATUS_KEY = /^status:(\d+):(\d+|unknown)$/;
+/** How a status row's key is spelled: the effect, the ability that caused it,
+ * and the RTTI class that applied it — each of the latter two either a number
+ * or the literal `unknown` where the hook could not attribute one. */
+const STATUS_KEY = /^status:(\d+):(\d+|unknown):(\d+|unknown)$/;
 
-/** The effect id inside a `status:<effect>:<cause>` key, or null for anything
- * that is not one — the same tolerance `statusLabelFor` shows a stale pin. */
+/** The effect id inside a `status:<effect>:<cause>:<class>` key, or null for
+ * anything that is not one — the same tolerance `statusLabelFor` shows a stale
+ * pin. */
 export const statusIdOfKey = (key: string): number | null => statusKeyParts(key)?.statusId ?? null;
 
-/** Both ids inside a `status:<effect>:<cause>` key, or null for anything that
- * is not one. `causeId` null = the literal `unknown` cause. */
-export const statusKeyParts = (key: string): { statusId: number; causeId: number | null } | null => {
+/** All three ids inside a `status:<effect>:<cause>:<class>` key, or null for
+ * anything that is not one. A null `causeId`/`classHash` is the literal
+ * `unknown` segment. */
+export const statusKeyParts = (
+  key: string
+): { statusId: number; causeId: number | null; classHash: number | null } | null => {
   const parsed = STATUS_KEY.exec(key);
   if (parsed === null) return null;
-  return { statusId: Number(parsed[1]), causeId: parsed[2] === "unknown" ? null : Number(parsed[2]) };
+  return {
+    statusId: Number(parsed[1]),
+    causeId: parsed[2] === "unknown" ? null : Number(parsed[2]),
+    classHash: parsed[3] === "unknown" ? null : Number(parsed[3]),
+  };
 };
 
 /** What a status table's rows currently ARE, for labelling them and for naming
@@ -134,7 +143,7 @@ export const causeCandidatesOf = (
  * every interval, so a call per row is quadratic. */
 export const causeCandidatesFor = (
   key: string,
-  intervals: Pick<StatusInterval, "statusId" | "abilityId" | "casterIndex">[],
+  intervals: Pick<StatusInterval, "statusId" | "abilityId" | "statusClass" | "casterIndex">[],
   playerOf: (actorIndex: number) => AbilityLabelPlayer | undefined
 ): CharacterType[] =>
   causeCandidatesOf(
@@ -142,7 +151,7 @@ export const causeCandidatesFor = (
     playerOf
   );
 
-/** Display name for a `status:<effect>:<cause>` row key.
+/** Display name for a `status:<effect>:<cause>:<class>` row key.
  *
  * Reads as `Attack Up (Signo Drive)` — effect first so that two abilities
  * granting one effect sort next to each other, cause in parentheses because

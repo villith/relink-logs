@@ -9,6 +9,8 @@ const interval = (over: Partial<StatusInterval>): StatusInterval => ({
   casterIndex: null,
   statusId: 10,
   abilityId: 500,
+  statusClass: null,
+  casterActionId: null,
   startMs: 0,
   endMs: 1_000,
   maxStacks: 1,
@@ -32,7 +34,7 @@ describe("buildStatusSeries", () => {
         interval({ actorIndex: 0, startMs: 0, endMs: 2_000 }),
         interval({ actorIndex: 1, startMs: 1_000, endMs: 3_000 }),
       ],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 3,
       holderOf,
@@ -47,7 +49,7 @@ describe("buildStatusSeries", () => {
   it("reports the stack count, not merely presence", () => {
     const series = buildStatusSeries({
       intervals: [interval({ startMs: 0, endMs: 2_000, maxStacks: 4 })],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 3,
       holderOf,
@@ -62,7 +64,7 @@ describe("buildStatusSeries", () => {
         interval({ startMs: 0, endMs: 2_000, maxStacks: 2 }),
         interval({ startMs: 1_000, endMs: 2_000, maxStacks: 5 }),
       ],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 3,
       holderOf,
@@ -74,7 +76,7 @@ describe("buildStatusSeries", () => {
   it("ignores intervals of a different effect", () => {
     const series = buildStatusSeries({
       intervals: [interval({ statusId: 99, startMs: 0, endMs: 3_000 }), interval({ startMs: 0, endMs: 1_000 })],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 3,
       holderOf,
@@ -90,7 +92,7 @@ describe("buildStatusSeries", () => {
         interval({ actorIndex: 7, startMs: 0, endMs: 1_000 }),
         interval({ actorIndex: 3, startMs: 0, endMs: 3_000 }),
       ],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 3,
       holderOf,
@@ -102,7 +104,7 @@ describe("buildStatusSeries", () => {
   it("treats a missing stack count as one stack, never none", () => {
     const series = buildStatusSeries({
       intervals: [interval({ startMs: 0, endMs: 1_000, maxStacks: 0 })],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 2,
       holderOf,
@@ -129,7 +131,7 @@ describe("buildEffectSeries", () => {
       holderKeyOf,
     });
 
-    expect(series).toEqual([{ key: "status:10:500", label: "L(status:10:500)", values: [1, 2, 1] }]);
+    expect(series).toEqual([{ key: "status:10:500:unknown", label: "L(status:10:500:unknown)", values: [1, 2, 1] }]);
   });
 
   it("counts a holder once however many of their windows overlap a bucket", () => {
@@ -158,7 +160,7 @@ describe("buildEffectSeries", () => {
       holderKeyOf,
     });
 
-    expect(series.map((entry) => entry.key).sort()).toEqual(["status:10:500", "status:10:900"]);
+    expect(series.map((entry) => entry.key).sort()).toEqual(["status:10:500:unknown", "status:10:900:unknown"]);
   });
 
   it("ranks by merged uptime and caps at topN", () => {
@@ -175,7 +177,7 @@ describe("buildEffectSeries", () => {
       holderKeyOf,
     });
 
-    expect(series.map((entry) => entry.key)).toEqual(["status:2:500", "status:3:500"]);
+    expect(series.map((entry) => entry.key)).toEqual(["status:2:500:unknown", "status:3:500:unknown"]);
   });
 
   it("returns nothing when the chart has no buckets", () => {

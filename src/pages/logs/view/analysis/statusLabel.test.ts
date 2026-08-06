@@ -5,6 +5,7 @@ import {
   causeLabel,
   causeNameFor,
   statusIdOfKey,
+  statusKeyParts,
   statusLabelFor,
   statusRowKindFor,
   targetRowLabel,
@@ -23,21 +24,23 @@ const t = (key: string, vars?: Record<string, unknown>): string =>
 
 describe("statusLabelFor", () => {
   it("reads as the effect with its cause in parentheses", () => {
-    expect(statusLabelFor("status:10:500", t, { effect: () => "Attack Up", cause: () => "Signo Drive" })).toBe(
+    expect(statusLabelFor("status:10:500:unknown", t, { effect: () => "Attack Up", cause: () => "Signo Drive" })).toBe(
       "Attack Up (Signo Drive)"
     );
   });
 
   it("names an unresolved cause rather than dropping the row", () => {
     // The documented fallback for an ability_id the hook could not attribute.
-    expect(statusLabelFor("status:10:unknown", t, { effect: () => "Attack Up", cause: () => "" })).toBe(
+    expect(statusLabelFor("status:10:unknown:unknown", t, { effect: () => "Attack Up", cause: () => "" })).toBe(
       "Attack Up (unknown source)"
     );
   });
 
   it("falls back to the raw effect id when no name exists for it", () => {
     // status.tbl is not extracted yet, so this is the shipping path.
-    expect(statusLabelFor("status:10:500", t, { effect: () => "", cause: () => "500" })).toBe("Effect 10 (500)");
+    expect(statusLabelFor("status:10:500:unknown", t, { effect: () => "", cause: () => "500" })).toBe(
+      "Effect 10 (500)"
+    );
   });
 
   it("hands back anything that is not a status key", () => {
@@ -55,8 +58,8 @@ describe("statusRowKindFor", () => {
   it("answers the holder kind for a status pin from the hostility", () => {
     // The kind used to come from which TAB was open; with the hostility
     // switch, a Debuffs table over friendly holders shows PLAYER rows.
-    expect(statusRowKindFor("status:10:500", "friendly")).toBe("player");
-    expect(statusRowKindFor("status:10:500", "enemy")).toBe("target");
+    expect(statusRowKindFor("status:10:500:unknown", "friendly")).toBe("player");
+    expect(statusRowKindFor("status:10:500:unknown", "enemy")).toBe("target");
   });
 });
 
@@ -119,13 +122,13 @@ describe("causeCandidatesFor", () => {
 
   it("scopes candidates to the casters of the key's own intervals", () => {
     const intervals = [interval(7, 1500, 0), interval(0, 1200, 2)];
-    expect(causeCandidatesFor("status:7:1500", intervals, playerOf)).toEqual(["Pl2700"]);
+    expect(causeCandidatesFor("status:7:1500:unknown", intervals, playerOf)).toEqual(["Pl2700"]);
   });
 
   it("includes the caster's own sub-actor child types", () => {
     // Id's Dragonform Burn arrives from the Pl2000 sub-actor, and only
     // Pl2000's table names its actions — the parent Pl1900 cannot.
-    expect(causeCandidatesFor("status:0:1200", [interval(0, 1200, 2)], playerOf)).toEqual(["Pl1900", "Pl2000"]);
+    expect(causeCandidatesFor("status:0:1200:unknown", [interval(0, 1200, 2)], playerOf)).toEqual(["Pl1900", "Pl2000"]);
   });
 
   it("answers no candidates when no caster resolves to a player", () => {
@@ -133,11 +136,11 @@ describe("causeCandidatesFor", () => {
     // answer is the shared bands and then the number — a name borrowed from
     // whoever happens to be in the party is a fabrication.
     const intervals = [interval(7, 1500, null), interval(7, 1500, 999)];
-    expect(causeCandidatesFor("status:7:1500", intervals, playerOf)).toEqual([]);
+    expect(causeCandidatesFor("status:7:1500:unknown", intervals, playerOf)).toEqual([]);
   });
 
   it("matches the unknown-cause spelling of the key", () => {
-    expect(causeCandidatesFor("status:7:unknown", [interval(7, null, 0)], playerOf)).toEqual(["Pl2700"]);
+    expect(causeCandidatesFor("status:7:unknown:unknown", [interval(7, null, 0)], playerOf)).toEqual(["Pl2700"]);
   });
 });
 
@@ -161,13 +164,40 @@ describe("targetRowLabel", () => {
 
 describe("statusIdOfKey", () => {
   it("reads the effect id out of a status key", () => {
-    expect(statusIdOfKey("status:1001:1100")).toBe(1001);
-    expect(statusIdOfKey("status:10:unknown")).toBe(10);
+    expect(statusIdOfKey("status:1001:1100:unknown")).toBe(1001);
+    expect(statusIdOfKey("status:10:unknown:unknown")).toBe(10);
   });
 
   it("answers null for anything that is not a status key", () => {
     expect(statusIdOfKey("player:0")).toBeNull();
     expect(statusIdOfKey("Normal:1000")).toBeNull();
+  });
+});
+
+describe("statusKeyParts", () => {
+  it("reads all three ids out of a status key", () => {
+    expect(statusKeyParts("status:7:9998:43981")).toEqual({
+      statusId: 7,
+      causeId: 9998,
+      classHash: 43981,
+    });
+  });
+
+  it("reads an absent cause and an absent class as null", () => {
+    expect(statusKeyParts("status:7:unknown:unknown")).toEqual({
+      statusId: 7,
+      causeId: null,
+      classHash: null,
+    });
+  });
+
+  it("refuses anything that is not a status key", () => {
+    expect(statusKeyParts("ability:1200")).toBeNull();
+    // Two segments is the OLD grammar. Keys are derived at every use site and
+    // never stored, so the only way to see one is a stale bookmarked pin —
+    // which must read as "not a status key" and render verbatim, exactly as
+    // any other stale pin does.
+    expect(statusKeyParts("status:7:9998")).toBeNull();
   });
 });
 

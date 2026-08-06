@@ -146,6 +146,18 @@ export type StatusInterval = {
   /** Null when the hook could not resolve the causing ability. The row then
    * falls back to the bare effect name rather than disappearing. */
   abilityId: number | null;
+  /** The applying status object's RTTI class, as a hash of its class NAME.
+   * Names the row's source where `abilityId` cannot — a passive has no action
+   * id, which is what a sentinel cause such as 9998 means. Null when the hook
+   * could not vouch for one, and on every log written before it existed. */
+  statusClass: number | null;
+  /** The action the caster was performing when it applied the effect. Names
+   * the same rows one rung more specifically than `statusClass` does: the
+   * class names the mechanism, this names the ability.
+   *
+   * Deliberately separate from `abilityId` — "the game recorded this cause"
+   * and "we inferred it from what the caster was doing" are different claims. */
+  casterActionId: number | null;
   startMs: number;
   endMs: number;
   /** Peak stacks within the window. Carried for the chart, which is where a

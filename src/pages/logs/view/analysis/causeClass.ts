@@ -47,7 +47,7 @@ export const causeClassOf = (causeId: number | null, hasName: boolean): CauseCla
   return hasName ? "skill" : "unknown";
 };
 
-/** One effect ROW's class, off its `status:<effect>:<cause>` key. A key that
+/** One effect ROW's class, off its `status:<effect>:<cause>:<class>` key. A key that
  * is not a status key files as unknown — the same tolerance the labels show a
  * stale pin. */
 export const causeClassOfKey = (key: string, hasName: (causeId: number) => boolean): CauseClass => {
