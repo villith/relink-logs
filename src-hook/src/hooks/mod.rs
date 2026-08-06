@@ -36,6 +36,10 @@ mod sba;
 // Buff/debuff lifecycle (see hooks/status.rs): emits StatusApply/StatusRemove,
 // and logs a field dump on top of that under `hookdiag`.
 mod status;
+// Resolves a status object's own vtable to a patch-stable class-name hash.
+// See status_class.rs for why this is a name hash, not the raw RVA.
+mod status_class;
+mod status_class_table;
 // Generated from status.tbl's HasLevels column — which ids the +0xb0 stack
 // count is real for. Regenerate with scripts/gen-stackable-statuses.py.
 mod status_levels;

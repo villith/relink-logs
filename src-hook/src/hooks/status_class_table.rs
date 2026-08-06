@@ -8,33 +8,33 @@
 //! Regenerate after a game patch — the RVAs move, the hashes do not.
 
 pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
-    (0x5AB9E08, 641527069), // StatusAttackBuff
-    (0x5AB9EA0, 641527069), // StatusAttackBuff
-    (0x5AB9FE8, 0), // StatusBase
+    (0x5AB9E08, 641527069),  // StatusAttackBuff
+    (0x5AB9EA0, 641527069),  // StatusAttackBuff
+    (0x5AB9FE8, 0),          // StatusBase
     (0x5ABA098, 1576935878), // StatusAttackDebuff
     (0x5ABA130, 1576935878), // StatusAttackDebuff
     (0x5ABA1D8, 4253591202), // StatusDeffenceBuff
     (0x5ABA270, 4253591202), // StatusDeffenceBuff
     (0x5ABA378, 2706820728), // StatusDeffenceDebuff
     (0x5ABA410, 2706820728), // StatusDeffenceDebuff
-    (0x5ABA4B8, 706628826), // StatusDamageCutBuff
-    (0x5ABA550, 706628826), // StatusDamageCutBuff
+    (0x5ABA4B8, 706628826),  // StatusDamageCutBuff
+    (0x5ABA550, 706628826),  // StatusDamageCutBuff
     (0x5ABA5F8, 1968461316), // StatusRegeneBuff
     (0x5ABA768, 2397844126), // StatusInvinsible
     (0x5ABA858, 3582810479), // StatusDoubleAttackBuff
-    (0x5ABA9C8, 450479154), // StatusHyperArmorBuff
-    (0x5ABAA50, 450479154), // StatusHyperArmorBuff
-    (0x5ABAB48, 139717900), // StatusIllusionBuff
+    (0x5ABA9C8, 450479154),  // StatusHyperArmorBuff
+    (0x5ABAA50, 450479154),  // StatusHyperArmorBuff
+    (0x5ABAB48, 139717900),  // StatusIllusionBuff
     (0x5ABAC98, 2088057384), // StatusCoverBuff
     (0x5ABAD88, 1129719443), // StatusCovered
-    (0x5ABAE78, 524137158), // StatusManigansBuff
-    (0x5ABAF10, 524137158), // StatusManigansBuff
-    (0x5ABAF40, 524137158), // StatusManigansBuff
-    (0x5ABB038, 372267043), // StatusPl1200AttackBuff
-    (0x5ABB0D0, 372267043), // StatusPl1200AttackBuff
+    (0x5ABAE78, 524137158),  // StatusManigansBuff
+    (0x5ABAF10, 524137158),  // StatusManigansBuff
+    (0x5ABAF40, 524137158),  // StatusManigansBuff
+    (0x5ABB038, 372267043),  // StatusPl1200AttackBuff
+    (0x5ABB0D0, 372267043),  // StatusPl1200AttackBuff
     (0x5ABB178, 3592040059), // StatusPl1300AttackBuff
     (0x5ABB210, 3592040059), // StatusPl1300AttackBuff
-    (0x5ABB2B8, 0), // StatusEm0001Buff
+    (0x5ABB2B8, 0),          // StatusEm0001Buff
     (0x5ABB3A8, 2814297206), // StatusClearAilment
     (0x5ABB498, 1673779383), // StatusVeil
     (0x5ABB608, 3940532029), // StatusDrainAttackBuff
@@ -44,11 +44,11 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5ABBA98, 3962683380), // StatusAdversityBuff
     (0x5ABBB88, 3127411509), // StatusCriticalRateBuff
     (0x5ABBCF8, 2969804603), // StatusProvocationBuff
-    (0x5ABBDE8, 968096346), // StatusAutoReviveBuff
+    (0x5ABBDE8, 968096346),  // StatusAutoReviveBuff
     (0x5ABBEF8, 3508005972), // StatusDoubleTapBuff
     (0x5ABBFE8, 1735678842), // StatusMagicVortex
     (0x5ABC0D8, 4124047263), // StatusConcentrationBuff
-    (0x5ABC1C8, 798236543), // StatusIronMaidenBuff
+    (0x5ABC1C8, 798236543),  // StatusIronMaidenBuff
     (0x5ABC2B8, 3986817439), // StatusDragonModeBuff
     (0x5ABC3A8, 3067113357), // StatusSuperIdModeBuff
     (0x5ABC4B8, 2893773673), // StatusPl1700UndeadBuff
@@ -57,7 +57,7 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5ABC6E8, 1049525673), // StatusPhantasmaGoria
     (0x5ABC780, 1049525673), // StatusPhantasmaGoria
     (0x5ABC7B0, 1049525673), // StatusPhantasmaGoria
-    (0x5ABC8C8, 620143561), // StatusEm1700AttackBuff
+    (0x5ABC8C8, 620143561),  // StatusEm1700AttackBuff
     (0x5ABC9B8, 3658963385), // StatusEm1700DefenceBuff
     (0x5ABCAA8, 3150227669), // StatusEm1806AuraBuff
     (0x5ABCB40, 3150227669), // StatusEm1806AuraBuff
@@ -67,7 +67,7 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5ABCE80, 2697949828), // StatusAmplifyDamageBuff
     (0x5ABCF88, 1722773459), // StatusDamageLimitBuff
     (0x5ABD018, 1722773459), // StatusDamageLimitBuff
-    (0x5ABD128, 987425699), // StatusPl2300UniqueGaugeUp
+    (0x5ABD128, 987425699),  // StatusPl2300UniqueGaugeUp
     (0x5ABD218, 3384734518), // StatusPl2300ParalysisArrow
     (0x5ABD308, 1948093032), // StatusPl2400SuperModeBuff
     (0x5ABD418, 3688860419), // StatusPl2600UniqueClockAttackBuff
@@ -75,7 +75,7 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5ABD5A8, 1941541321), // StatusPl2600UniqueClockDeffenceBuff
     (0x5ABD630, 1941541321), // StatusPl2600UniqueClockDeffenceBuff
     (0x5ABD650, 1941541321), // StatusPl2600UniqueClockDeffenceBuff
-    (0x5ABD788, 960225271), // StatusPl2600UniqueClockHealBuff
+    (0x5ABD788, 960225271),  // StatusPl2600UniqueClockHealBuff
     (0x5ABD8E8, 2170377092), // StatusPl2600UniqueClockEnhancement
     (0x5ABD9D8, 2952924837), // StatusAmplifyDamageDebuff
     (0x5ABDA70, 2952924837), // StatusAmplifyDamageDebuff
@@ -98,9 +98,9 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5ABE5A8, 3902606718), // StatusPl1400UniqueBuffButterfly
     (0x5ABE640, 3902606718), // StatusPl1400UniqueBuffButterfly
     (0x5ABE670, 3902606718), // StatusPl1400UniqueBuffButterfly
-    (0x5ABE768, 633302470), // StatusPl1100UniqueBuffDragon
-    (0x5ABE820, 633302470), // StatusPl1100UniqueBuffDragon
-    (0x5ABE848, 633302470), // StatusPl1100UniqueBuffDragon
+    (0x5ABE768, 633302470),  // StatusPl1100UniqueBuffDragon
+    (0x5ABE820, 633302470),  // StatusPl1100UniqueBuffDragon
+    (0x5ABE848, 633302470),  // StatusPl1100UniqueBuffDragon
     (0x5ABE928, 3549490574), // StatusPl1100UniqueBuffJust
     (0x5ABE9E0, 3549490574), // StatusPl1100UniqueBuffJust
     (0x5ABEA08, 3549490574), // StatusPl1100UniqueBuffJust
@@ -117,10 +117,10 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5ABF1A0, 1366539842), // StatusStackableAttackBuff
     (0x5ABF258, 3953791310), // StatusStackableDeffenceBuff
     (0x5ABF310, 3953791310), // StatusStackableDeffenceBuff
-    (0x5ABF3C8, 805037566), // StatusStackableDeffenceDebuff
-    (0x5ABF480, 805037566), // StatusStackableDeffenceDebuff
-    (0x5ABF538, 186279698), // StatusStackableAttackDebuff
-    (0x5ABF5F0, 186279698), // StatusStackableAttackDebuff
+    (0x5ABF3C8, 805037566),  // StatusStackableDeffenceDebuff
+    (0x5ABF480, 805037566),  // StatusStackableDeffenceDebuff
+    (0x5ABF538, 186279698),  // StatusStackableAttackDebuff
+    (0x5ABF5F0, 186279698),  // StatusStackableAttackDebuff
     (0x5ABF6A8, 1353744714), // StatusPl0400UniqueBuffConcentrationEx
     (0x5ABF760, 1353744714), // StatusPl0400UniqueBuffConcentrationEx
     (0x5ABF788, 1353744714), // StatusPl0400UniqueBuffConcentrationEx
@@ -128,11 +128,11 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5ABF8B8, 4258842441), // StatusPl0500UniqueBuffAim
     (0x5ABF970, 4258842441), // StatusPl0500UniqueBuffAim
     (0x5ABF998, 4258842441), // StatusPl0500UniqueBuffAim
-    (0x5ABFA78, 336827244), // StatusPl0500UniqueDebuffGrenade
-    (0x5ABFB68, 34466165), // StatusPl1200UniqueBuffNoble
-    (0x5ABFC20, 34466165), // StatusPl1200UniqueBuffNoble
-    (0x5ABFC48, 34466165), // StatusPl1200UniqueBuffNoble
-    (0x5ABFC80, 34466165), // StatusPl1200UniqueBuffNoble
+    (0x5ABFA78, 336827244),  // StatusPl0500UniqueDebuffGrenade
+    (0x5ABFB68, 34466165),   // StatusPl1200UniqueBuffNoble
+    (0x5ABFC20, 34466165),   // StatusPl1200UniqueBuffNoble
+    (0x5ABFC48, 34466165),   // StatusPl1200UniqueBuffNoble
+    (0x5ABFC80, 34466165),   // StatusPl1200UniqueBuffNoble
     (0x5ABFD78, 2432047135), // StatusPl1200UniqueBuffGuardpoint
     (0x5ABFE30, 2432047135), // StatusPl1200UniqueBuffGuardpoint
     (0x5ABFE58, 2432047135), // StatusPl1200UniqueBuffGuardpoint
@@ -156,9 +156,9 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5AC0A18, 3738746311), // StatusAbilityAttackBuff
     (0x5AC0AB0, 3738746311), // StatusAbilityAttackBuff
     (0x5AC0AD8, 3738746311), // StatusAbilityAttackBuff
-    (0x5AC0BD8, 818385240), // StatusPl2500SuperiorBuff
-    (0x5AC0C90, 818385240), // StatusPl2500SuperiorBuff
-    (0x5AC0CB8, 818385240), // StatusPl2500SuperiorBuff
+    (0x5AC0BD8, 818385240),  // StatusPl2500SuperiorBuff
+    (0x5AC0C90, 818385240),  // StatusPl2500SuperiorBuff
+    (0x5AC0CB8, 818385240),  // StatusPl2500SuperiorBuff
     (0x5AC0D98, 1445353470), // StatusPl1000UniqueBuffFlameEmpire
     (0x5AC0E50, 1445353470), // StatusPl1000UniqueBuffFlameEmpire
     (0x5AC0E78, 1445353470), // StatusPl1000UniqueBuffFlameEmpire
@@ -172,9 +172,9 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5AC1370, 1656897975), // StatusPl0900UniqueBuffProvocation
     (0x5AC1398, 1656897975), // StatusPl0900UniqueBuffProvocation
     (0x5AC13D0, 1656897975), // StatusPl0900UniqueBuffProvocation
-    (0x5AC14C8, 208567), // StatusPl0900UniqueBuffCount
-    (0x5AC1580, 208567), // StatusPl0900UniqueBuffCount
-    (0x5AC15A8, 208567), // StatusPl0900UniqueBuffCount
+    (0x5AC14C8, 208567),     // StatusPl0900UniqueBuffCount
+    (0x5AC1580, 208567),     // StatusPl0900UniqueBuffCount
+    (0x5AC15A8, 208567),     // StatusPl0900UniqueBuffCount
     (0x5AC1688, 3453714571), // StatusPl1800UniqueBuffDebuffCount
     (0x5AC1798, 2412709628), // StatusPl1300AbilityCoolTime
     (0x5AC1830, 2412709628), // StatusPl1300AbilityCoolTime
@@ -190,9 +190,9 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5AC1E30, 1727994097), // StatusPl1600ArialBuff
     (0x5AC1E58, 1727994097), // StatusPl1600ArialBuff
     (0x5AC1E90, 1727994097), // StatusPl1600ArialBuff
-    (0x5AC1F88, 399040482), // StatusPl1600ArvessBuff
-    (0x5AC2020, 399040482), // StatusPl1600ArvessBuff
-    (0x5AC2048, 399040482), // StatusPl1600ArvessBuff
+    (0x5AC1F88, 399040482),  // StatusPl1600ArvessBuff
+    (0x5AC2020, 399040482),  // StatusPl1600ArvessBuff
+    (0x5AC2048, 399040482),  // StatusPl1600ArvessBuff
     (0x5AC2168, 2019804602), // StatusPl1600CounterBuff
     (0x5AC2220, 2019804602), // StatusPl1600CounterBuff
     (0x5AC22D8, 1033600927), // StatusPl2600UniqueClockAttackPlusBuff
@@ -206,8 +206,8 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5AC2818, 2236309972), // StatusPl2100WeakElementZoharStrikeDebuff
     (0x5AC2928, 3206938392), // StatusPl2600UniqueClockDeffencePlusBuff
     (0x5AC29B8, 3206938392), // StatusPl2600UniqueClockDeffencePlusBuff
-    (0x5AC2A78, 361342343), // StatusPl2600UniqueClockHealPlusBuff
-    (0x5AC2B08, 361342343), // StatusPl2600UniqueClockHealPlusBuff
+    (0x5AC2A78, 361342343),  // StatusPl2600UniqueClockHealPlusBuff
+    (0x5AC2B08, 361342343),  // StatusPl2600UniqueClockHealPlusBuff
     (0x5AC2BC8, 3690296927), // StatusPl2600UniqueOverClockBuff
     (0x5AC2C78, 3690296927), // StatusPl2600UniqueOverClockBuff
     (0x5AC2CB0, 3690296927), // StatusPl2600UniqueOverClockBuff
@@ -226,18 +226,18 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5AC3568, 1151000662), // StatusPl2300UniqueBuffTwoCrowns
     (0x5AC3678, 3845230707), // StatusPl2300UniqueDebuffTwoCrowns
     (0x5AC3730, 3845230707), // StatusPl2300UniqueDebuffTwoCrowns
-    (0x5AC37E8, 416452336), // StatusPl2400UniqueBuffGSwingJust
-    (0x5AC38A0, 416452336), // StatusPl2400UniqueBuffGSwingJust
-    (0x5AC38D0, 416452336), // StatusPl2400UniqueBuffGSwingJust
-    (0x5AC3900, 416452336), // StatusPl2400UniqueBuffGSwingJust
+    (0x5AC37E8, 416452336),  // StatusPl2400UniqueBuffGSwingJust
+    (0x5AC38A0, 416452336),  // StatusPl2400UniqueBuffGSwingJust
+    (0x5AC38D0, 416452336),  // StatusPl2400UniqueBuffGSwingJust
+    (0x5AC3900, 416452336),  // StatusPl2400UniqueBuffGSwingJust
     (0x5AC39F8, 3387245304), // StatusPl2400UniqueDebuffBanGSwing
     (0x5AC3AE8, 3212522574), // StatusPl2400UniqueAbDmgBuff
     (0x5AC3BA0, 3212522574), // StatusPl2400UniqueAbDmgBuff
     (0x5AC3BC8, 3212522574), // StatusPl2400UniqueAbDmgBuff
     (0x5AC3CA8, 2528099293), // StatusPl2200UpgradeABuff
     (0x5AC3D58, 2528099293), // StatusPl2200UpgradeABuff
-    (0x5AC3E18, 69788560), // StatusPl2200UpgradeBBuff
-    (0x5AC3ED0, 69788560), // StatusPl2200UpgradeBBuff
+    (0x5AC3E18, 69788560),   // StatusPl2200UpgradeBBuff
+    (0x5AC3ED0, 69788560),   // StatusPl2200UpgradeBBuff
     (0x5AC3F88, 2306417869), // StatusPl2200KenshinUpBuff
     (0x5AC4040, 2306417869), // StatusPl2200KenshinUpBuff
     (0x5AC40F8, 2750070646), // StatusPl2400UniqueSpmDamageUpBuff
@@ -247,7 +247,7 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5AC4370, 2768093491), // StatusPl2700UniqueBuffFinish
     (0x5AC4398, 2768093491), // StatusPl2700UniqueBuffFinish
     (0x5AC43D0, 2768093491), // StatusPl2700UniqueBuffFinish
-    (0x5AC44C8, 411742688), // StatusPl2900LowballBuff
+    (0x5AC44C8, 411742688),  // StatusPl2900LowballBuff
     (0x5AC45D8, 3756541899), // StatusPl2900CascadeBuff
     (0x5AC4690, 3756541899), // StatusPl2900CascadeBuff
     (0x5AC4748, 3790236701), // StatusSkill301Buff
@@ -255,11 +255,11 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5AC4828, 3790236701), // StatusSkill301Buff
     (0x5AC4860, 3790236701), // StatusSkill301Buff
     (0x5AC4890, 3790236701), // StatusSkill301Buff
-    (0x5AC4B18, 805812046), // StatusPl2800UniqueUprightBuff
-    (0x5AC4C88, 897005693), // StatusPl2800UniqueReverseBuff
-    (0x5AC4D20, 897005693), // StatusPl2800UniqueReverseBuff
+    (0x5AC4B18, 805812046),  // StatusPl2800UniqueUprightBuff
+    (0x5AC4C88, 897005693),  // StatusPl2800UniqueReverseBuff
+    (0x5AC4D20, 897005693),  // StatusPl2800UniqueReverseBuff
     (0x5AC4DC8, 3255715714), // StatusPl2800UniqueUprightPlusBuff
-    (0x5AC4ED8, 96424886), // StatusPl2800UniqueReversePlusBuff
+    (0x5AC4ED8, 96424886),   // StatusPl2800UniqueReversePlusBuff
     (0x5AC4FC8, 1004792313), // StatusPl1900UniqueBuffSealDebuff
     (0x5AC50B8, 3024487491), // StatusPl2300UniqueBuffClincher
     (0x5AC5170, 3024487491), // StatusPl2300UniqueBuffClincher
@@ -278,11 +278,11 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5AC5BA8, 2984123980), // StatusPl1700UniqueBuffAbility
     (0x5AC5C58, 2984123980), // StatusPl1700UniqueBuffAbility
     (0x5AC5C90, 2984123980), // StatusPl1700UniqueBuffAbility
-    (0x5AC5D68, 862209576), // StatusPl0900UniqueBuffBeatCombo
-    (0x5AC5E20, 862209576), // StatusPl0900UniqueBuffBeatCombo
-    (0x5AC5ED8, 864356490), // StatusPl0000UniqueBuffCover
-    (0x5AC5F90, 864356490), // StatusPl0000UniqueBuffCover
-    (0x5AC5FC0, 864356490), // StatusPl0000UniqueBuffCover
+    (0x5AC5D68, 862209576),  // StatusPl0900UniqueBuffBeatCombo
+    (0x5AC5E20, 862209576),  // StatusPl0900UniqueBuffBeatCombo
+    (0x5AC5ED8, 864356490),  // StatusPl0000UniqueBuffCover
+    (0x5AC5F90, 864356490),  // StatusPl0000UniqueBuffCover
+    (0x5AC5FC0, 864356490),  // StatusPl0000UniqueBuffCover
     (0x5AC6098, 1371684106), // StatusPl0200UniqueBuffAresKeep
     (0x5AC6150, 1371684106), // StatusPl0200UniqueBuffAresKeep
     (0x5AC6208, 1770327264), // StatusBurnInvalidBuff
@@ -304,15 +304,15 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x5AC6E28, 1597141620), // StatusAilmentPoison
     (0x5AC6F18, 1907735909), // StatusAilmentBurn
     (0x5AC7008, 1131927280), // StatusAilmentParalyze
-    (0x5AC70F8, 799504527), // StatusAilmentSlow
+    (0x5AC70F8, 799504527),  // StatusAilmentSlow
     (0x5AC71E8, 4202572017), // StatusAilmentStun
     (0x5AC72D8, 3676227397), // StatusAilmentFrozen
     (0x5AC73C8, 1788507119), // StatusAilmentFrostbite
     (0x5AC7460, 1788507119), // StatusAilmentFrostbite
     (0x5AC7508, 2574461637), // StatusAilmentProvocation
     (0x5AC75F8, 3814078141), // StatusAilmentCapture
-    (0x5AC76E8, 217617910), // StatusAilmentBanAbility
-    (0x5AC77D8, 632601431), // StatusAilmentBanSpecialArts
+    (0x5AC76E8, 217617910),  // StatusAilmentBanAbility
+    (0x5AC77D8, 632601431),  // StatusAilmentBanSpecialArts
     (0x5AC78C8, 1510343344), // StatusAilmentDarkFlame
     (0x5AC7960, 1510343344), // StatusAilmentDarkFlame
     (0x5AC7A08, 2366816130), // StatusAilmentStone
@@ -328,19 +328,19 @@ pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &[
     (0x613A188, 1049525673), // StatusPhantasmaGoria
     (0x613A1A8, 3790236701), // StatusSkill301Buff
     (0x613A1C8, 3940532029), // StatusDrainAttackBuff
-    (0x613A208, 960225271), // StatusPl2600UniqueClockHealBuff
+    (0x613A208, 960225271),  // StatusPl2600UniqueClockHealBuff
     (0x613A248, 3790236701), // StatusSkill301Buff
     (0x613A270, 1968461316), // StatusRegeneBuff
-    (0x613A290, 960225271), // StatusPl2600UniqueClockHealBuff
+    (0x613A290, 960225271),  // StatusPl2600UniqueClockHealBuff
     (0x613A2B0, 1584346057), // StatusPl0800UniqueBuffFinishAbility
     (0x613A2D0, 3790236701), // StatusSkill301Buff
-    (0x613A2E8, 805812046), // StatusPl2800UniqueUprightBuff
+    (0x613A2E8, 805812046),  // StatusPl2800UniqueUprightBuff
     (0x613A308, 2522841538), // StatusPl1000UniqueBuffChargeParry
     (0x613A328, 3582810479), // StatusDoubleAttackBuff
     (0x613A348, 3688860419), // StatusPl2600UniqueClockAttackBuff
     (0x613A368, 2761807628), // StatusPl1400UniqueBuffKagura
     (0x613A388, 2730096112), // StatusPl1200UniqueBuffInvincible
-    (0x613A3A8, 399040482), // StatusPl1600ArvessBuff
+    (0x613A3A8, 399040482),  // StatusPl1600ArvessBuff
     (0x613A3C8, 1914134557), // StatusPl0800UniqueBuffEnhanceFinish
     (0x613A3E8, 3884831012), // StatusPl2300UniqueBuffSniper
     (0x613A408, 3790236701), // StatusSkill301Buff
