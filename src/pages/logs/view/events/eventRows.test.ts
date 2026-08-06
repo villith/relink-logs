@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LogEvent } from "@/types";
 
-import { eventKind, toEventRow } from "./eventRows";
+import { DEFAULT_KINDS, EVENT_KINDS, eventKind, filterByKind, toEventRow } from "./eventRows";
 
 const actor = (index: number) => ({
   index,
@@ -126,5 +126,33 @@ describe("toEventRow", () => {
     expect(row.amount).toBeNull();
     expect(row.detailKey).toBe("ui.logs.events-unknown");
     expect(row.detailParams).toEqual({ variant: "SomeVariantAddedLater" });
+  });
+});
+
+describe("kind filtering", () => {
+  it("excludes the gauge ticks by default and nothing else", () => {
+    // OnUpdateSBA alone is 29% of every stored log, and SbaGain is one per hit —
+    // unfiltered they bury everything.
+    expect(DEFAULT_KINDS.has("sbaTick")).toBe(false);
+    expect(EVENT_KINDS.filter((kind) => !DEFAULT_KINDS.has(kind))).toEqual(["sbaTick"]);
+  });
+
+  it("offers a toggle for every kind the projection can produce", () => {
+    // A kind with no toggle is a row the reader cannot turn off — or, worse, one
+    // that vanishes because no toggle ever enables it.
+    const produced = [damage, death, gaugeTick, stun, guard, perform, applied, linked, future].map(
+      (event) => toEventRow(event).kind
+    );
+    for (const kind of produced) expect(EVENT_KINDS).toContain(kind);
+  });
+
+  it("keeps only the enabled kinds", () => {
+    const rows = [damage, death, gaugeTick].map(toEventRow);
+    expect(filterByKind(rows, new Set(["death"] as const)).map((row) => row.kind)).toEqual(["death"]);
+  });
+
+  it("returns nothing when no kind is enabled", () => {
+    const rows = [damage, death].map(toEventRow);
+    expect(filterByKind(rows, new Set())).toEqual([]);
   });
 });

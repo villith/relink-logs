@@ -148,3 +148,24 @@ export const toEventRow = (event: LogEvent): EventRow => {
       numberAt(body, "stacks"),
   };
 };
+
+/** Every kind, in the order the toggles show them. The one list the toggle strip
+ * and the colour map are both built from, so a kind cannot exist without a way
+ * to turn it off. */
+export const EVENT_KINDS: EventKind[] = [
+  "damage",
+  "stun",
+  "perfectGuard",
+  "sba",
+  "death",
+  "status",
+  "other",
+  "sbaTick",
+];
+
+/** Every kind except the gauge ticks, which are 29%-plus of a log and carry
+ * nothing readable. One toggle brings them back. */
+export const DEFAULT_KINDS: ReadonlySet<EventKind> = new Set(EVENT_KINDS.filter((kind) => kind !== "sbaTick"));
+
+export const filterByKind = (rows: EventRow[], kinds: ReadonlySet<EventKind>): EventRow[] =>
+  rows.filter((row) => kinds.has(row.kind));
