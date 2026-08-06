@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildTables } from "./gen-status-classes.mjs";
+import { assertHashNotSentinel, buildTables, parseCsv, renderRust } from "./gen-status-classes.mjs";
 
 const ROWS = [
   { vtable_rva: 0x29b26c0, class: "StatusPl1200UniqueBuffGuardpoint" },
@@ -56,4 +56,30 @@ test("accepts several vtables for ONE class, mapping them to the same hash", () 
   assert.equal(hook[0].hash, hook[1].hash);
   assert.equal(Object.keys(app).length, 1);
   assert.equal(Object.values(app)[0].name, "Guardpoint");
+});
+
+test("parseCsv skips the header and parses hex rvas", () => {
+  const csv = "vtable_rva,class\r\n0x5abfd78,StatusPl1200UniqueBuffGuardpoint\r\n0x29b0cf0,StatusBase\r\n";
+  assert.deepEqual(parseCsv(csv), [
+    { vtable_rva: 0x5abfd78, class: "StatusPl1200UniqueBuffGuardpoint" },
+    { vtable_rva: 0x29b0cf0, class: "StatusBase" },
+  ]);
+});
+
+test("renderRust emits a well-formed rust table: opening, one row per vtable, closing", () => {
+  const hook = [
+    { rva: 0x29b0cf0, hash: 0, class: "StatusBase" },
+    { rva: 0x29b1640, hash: 123, class: "StatusPl0200UniqueBuffAres" },
+  ];
+  const rust = renderRust(hook);
+  assert.ok(rust.includes("pub const STATUS_CLASS_TABLE: &[(usize, u32)] = &["));
+  for (const row of hook) {
+    assert.ok(rust.includes(`    (0x${row.rva.toString(16).toUpperCase()}, ${row.hash}), // ${row.class}`));
+  }
+  assert.ok(rust.trimEnd().endsWith("];"));
+});
+
+test("a hash-0 collision on a named class fails loudly instead of merging into the nameless sentinel", () => {
+  assert.throws(() => assertHashNotSentinel("StatusPl9999FakeCollision", 0), /hashes to 0/i);
+  assert.doesNotThrow(() => assertHashNotSentinel("StatusPl9999FakeCollision", 123));
 });
