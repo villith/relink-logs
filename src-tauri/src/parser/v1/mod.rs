@@ -19,6 +19,7 @@ use super::{
     v0,
 };
 
+mod ability_charts;
 #[cfg(any(test, feature = "diag"))]
 pub mod audit;
 mod cap_detection;
@@ -30,6 +31,7 @@ mod skill_state;
 mod status;
 mod windows;
 
+pub use ability_charts::{build_ability_stun_chart, AbilitySeries};
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
 pub use groups::{
     aggregate_groups, AbilityFilter, ActorRef, Dimension, GroupAggregate, GroupHostility, GroupKey,
