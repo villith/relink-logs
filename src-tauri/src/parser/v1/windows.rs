@@ -37,11 +37,64 @@ pub struct ChartWindow {
     pub actor_index: Option<u32>,
 }
 
-/// The longest a performer's art is allowed to hold an SBA window open with no
-/// SBA damage event closing it: longer than every character's animation, short
-/// enough that a lost closing edge cannot shade half the fight. The window
-/// closes at whichever comes first.
-const SBA_WINDOW_CAP_MS: i64 = 15_000;
+/// Corroboration window for an activation event (perform/chain): same-actor
+/// SBA damage this close vouches for it. Live data (logs 1783–1792,
+/// 2026-08-05): a real art's damage starts up to ~2.5s BEFORE its perform
+/// lands and its finisher lands within ~1s after it — while the boundary-noise
+/// performs (a Repeat Quest start re-firing the previous fight's leftover
+/// casting state, e.g. logs 1786/1787 at t≈0) sit minutes from any SBA damage.
+const SBA_CORROBORATION_BEFORE_MS: i64 = 5_000;
+const SBA_CORROBORATION_AFTER_MS: i64 = 10_000;
+
+/// Gap that separates two SBA activity clusters. Within one art the largest
+/// observed lull between hits is ~4.0s and between one art's finisher and the
+/// next chained art's opener ~3.0s (same logs); independent arts sit tens of
+/// seconds apart. Two arts closer than this merge — which is also the honest
+/// shading, since each art disables the boss for its own stretch.
+const SBA_CLUSTER_GAP_MS: i64 = 8_000;
+
+/// The raw-log indexes of the activation events (`OnPerformSBA` /
+/// `OnContinueSBAChain`) that same-actor SBA damage corroborates.
+///
+/// The perform capture is a per-frame collision check, and at a Repeat Quest
+/// boundary the previous fight's leftover casting state can fire it once with
+/// nothing behind it — a phantom "X used their art" at the first millisecond
+/// of the next log. A real art ALWAYS records damage from its performer close
+/// by (see the constants above), so an activation with none is dropped — by
+/// the SBA windows here and by `fetch_encounter_state`'s `sba_events` (the
+/// chart markers), which must agree on which activations were real.
+pub fn corroborated_sba_activations(events: &[(i64, Message)]) -> HashSet<usize> {
+    // Every SBA hit's (timestamp, performer), in log order.
+    let sba_damage: Vec<(i64, u32)> = events
+        .iter()
+        .filter_map(|(ts, message)| match message {
+            Message::DamageEvent(event) if event.action_id == ActionType::SBA => {
+                Some((*ts, event.source.parent_index))
+            }
+            _ => None,
+        })
+        .collect();
+
+    events
+        .iter()
+        .enumerate()
+        .filter_map(|(index, (ts, message))| {
+            let actor = match message {
+                Message::OnPerformSBA(event) => event.actor_index,
+                Message::OnContinueSBAChain(event) => event.actor_index,
+                _ => return None,
+            };
+            sba_damage
+                .iter()
+                .any(|(damage_ts, performer)| {
+                    *performer == actor
+                        && *damage_ts >= ts - SBA_CORROBORATION_BEFORE_MS
+                        && *damage_ts <= ts + SBA_CORROBORATION_AFTER_MS
+                })
+                .then_some(index)
+        })
+        .collect()
+}
 
 /// Walks the raw log and pairs each state's transitions into windows.
 ///
@@ -50,14 +103,14 @@ const SBA_WINDOW_CAP_MS: i64 = 15_000;
 /// window still open at the last event closes at `fight_end_ms` — the state
 /// genuinely held to the end of what was recorded.
 ///
-/// SBA windows are DERIVED, not captured: an art's own damage event lands at
-/// the END of its animation, so `OnPerformSBA`/`OnContinueSBAChain` opens (or
-/// extends) the window and each pending performer is retired by their first
-/// `ActionType::SBA` damage event; the window closes when nobody is still
-/// performing. Chained arts therefore merge into one window, matching the
-/// stretch the boss is actually disabled for. Local-lobby exact; a REMOTE
-/// member's perform never emits (the perform hooks are local-only), so online
-/// chains can close early — the honest floor, not a claim of full coverage.
+/// SBA windows are DERIVED, not captured, by CLUSTERING the log's SBA
+/// activity: every SBA-typed damage event plus every corroborated activation
+/// (see [`corroborated_sba_activations`]). An art is not a point — its damage
+/// arrives as an opening hit, mid-animation ticks and a finisher, interleaved
+/// with the perform event on a ±2.5s jitter — and a chain is arts back to
+/// back, so consecutive activity closer than [`SBA_CLUSTER_GAP_MS`] is one
+/// window: the stretch the boss is actually disabled for. A cluster of one
+/// lone event has no width and draws nothing.
 pub fn assemble_chart_windows(
     events: &[(i64, Message)],
     start_time: i64,
@@ -67,24 +120,29 @@ pub fn assemble_chart_windows(
     let mut link_open: Option<i64> = None;
     // Per-enemy: the break's opening timestamp, keyed by actor index.
     let mut break_open: HashMap<u32, i64> = HashMap::new();
-    // The open SBA window's start, plus who still owes it a damage event and
-    // the newest deadline (last perform + cap).
-    let mut sba_open: Option<i64> = None;
-    let mut sba_pending: HashSet<u32> = HashSet::new();
-    let mut sba_deadline: i64 = 0;
+    // The open SBA cluster, as [first, last] activity timestamps.
+    let mut sba_cluster: Option<(i64, i64)> = None;
+    let corroborated = corroborated_sba_activations(events);
 
-    for (ts, message) in events {
+    for (index, (ts, message)) in events.iter().enumerate() {
         let at = ts - start_time;
 
-        // An expired SBA window closes at its deadline BEFORE this event is
-        // considered — a later perform must open a fresh window, not resurrect
-        // one whose closing edge was lost.
-        if let Some(start) = sba_open {
-            if at > sba_deadline {
-                windows.push(window(ChartWindowKind::Sba, start, sba_deadline, None));
-                sba_open = None;
-                sba_pending.clear();
+        let sba_activity = match message {
+            Message::DamageEvent(event) => event.action_id == ActionType::SBA,
+            Message::OnPerformSBA(_) | Message::OnContinueSBAChain(_) => {
+                corroborated.contains(&index)
             }
+            _ => false,
+        };
+        if sba_activity {
+            sba_cluster = Some(match sba_cluster {
+                Some((first, last)) if at - last <= SBA_CLUSTER_GAP_MS => (first, at),
+                Some((first, last)) => {
+                    windows.push(window(ChartWindowKind::Sba, first, last, None));
+                    (at, at)
+                }
+                None => (at, at),
+            });
         }
 
         match message {
@@ -114,30 +172,6 @@ pub fn assemble_chart_windows(
                     _ => {}
                 }
             }
-            Message::OnPerformSBA(event) => {
-                sba_open.get_or_insert(at);
-                sba_pending.insert(event.actor_index);
-                sba_deadline = at + SBA_WINDOW_CAP_MS;
-            }
-            Message::OnContinueSBAChain(event) => {
-                sba_open.get_or_insert(at);
-                sba_pending.insert(event.actor_index);
-                sba_deadline = at + SBA_WINDOW_CAP_MS;
-            }
-            Message::DamageEvent(event) => {
-                if sba_open.is_some()
-                    && event.action_id == ActionType::SBA
-                    && sba_pending.remove(&event.source.parent_index)
-                    && sba_pending.is_empty()
-                {
-                    windows.push(window(
-                        ChartWindowKind::Sba,
-                        sba_open.take().expect("checked is_some above"),
-                        at,
-                        None,
-                    ));
-                }
-            }
             _ => {}
         }
     }
@@ -145,13 +179,8 @@ pub fn assemble_chart_windows(
     if let Some(start) = link_open {
         windows.push(window(ChartWindowKind::Link, start, fight_end_ms, None));
     }
-    if let Some(start) = sba_open {
-        windows.push(window(
-            ChartWindowKind::Sba,
-            start,
-            sba_deadline.min(fight_end_ms.max(start)),
-            None,
-        ));
+    if let Some((first, last)) = sba_cluster {
+        windows.push(window(ChartWindowKind::Sba, first, last, None));
     }
     for (actor_index, start) in break_open {
         windows.push(window(
@@ -162,6 +191,9 @@ pub fn assemble_chart_windows(
         ));
     }
 
+    // A lone event is a moment, not a span — zero width draws nothing and
+    // claims nothing.
+    windows.retain(|w| w.end_ms > w.start_ms);
     windows.sort_by_key(|w| w.start_ms);
     windows
 }
@@ -254,57 +286,123 @@ mod tests {
     }
 
     #[test]
-    fn an_sba_window_opens_on_perform_and_closes_on_the_arts_own_damage() {
-        let events = vec![perform(2_000, 5), sba_damage(8_500, 5)];
-        let windows = assemble_chart_windows(&events, 0, 20_000);
+    fn one_art_spans_its_first_hit_to_its_finisher() {
+        // The real shape (log 1786, slot 1): the opening hit lands BEFORE the
+        // perform event, ticks follow, and the finisher lands ~8s after the
+        // opener. The window is the whole stretch, whichever side of the
+        // perform each hit fell on.
+        let events = vec![
+            sba_damage(187_183, 1),
+            perform(189_203, 1),
+            sba_damage(190_266, 1),
+            sba_damage(191_500, 1),
+            sba_damage(195_450, 1),
+        ];
+        let windows = assemble_chart_windows(&events, 0, 300_000);
         assert_eq!(
             windows,
             vec![ChartWindow {
                 kind: ChartWindowKind::Sba,
-                start_ms: 2_000,
-                end_ms: 8_500,
+                start_ms: 187_183,
+                end_ms: 195_450,
                 actor_index: None
             }]
         );
     }
 
     #[test]
-    fn chained_arts_merge_into_one_window_closed_by_the_last_performer() {
+    fn a_full_chain_is_one_window_spanning_every_art() {
+        // Log 1785's full 4-burst, abbreviated: four performs seconds apart,
+        // each art's damage clustered around its own perform, intra-art lulls
+        // up to ~3s. One window, first hit to the last art's activity — the
+        // boss is disabled for the whole chain.
         let events = vec![
-            perform(2_000, 5),
-            chain(3_000, 6),
-            sba_damage(8_000, 5),
-            sba_damage(14_000, 6),
+            sba_damage(218_285, 0),
+            perform(221_153, 0),
+            sba_damage(225_573, 0),
+            sba_damage(228_270, 1),
+            // A chain-continue counts exactly like a perform (older logs and
+            // online lobbies record them).
+            chain(229_555, 1),
+            sba_damage(231_104, 1),
+            perform(233_371, 2),
+            sba_damage(233_522, 2),
+            sba_damage(237_020, 2),
+            sba_damage(240_020, 3),
+            sba_damage(243_521, 3),
+            perform(244_527, 3),
         ];
-        let windows = assemble_chart_windows(&events, 0, 30_000);
+        let windows = assemble_chart_windows(&events, 0, 300_000);
         assert_eq!(windows.len(), 1);
-        assert_eq!((windows[0].start_ms, windows[0].end_ms), (2_000, 14_000));
+        assert_eq!((windows[0].start_ms, windows[0].end_ms), (218_285, 244_527));
     }
 
     #[test]
-    fn an_sba_window_with_no_closing_damage_is_capped() {
-        // A lost closing edge (remote chain, whiffed capture) must not shade
-        // half the fight — and a later perform opens a FRESH window rather
-        // than resurrecting the expired one.
-        let events = vec![perform(2_000, 5), perform(40_000, 6), sba_damage(46_000, 6)];
-        let windows = assemble_chart_windows(&events, 0, 60_000);
+    fn two_separate_arts_are_two_windows() {
+        let events = vec![
+            sba_damage(20_000, 0),
+            perform(21_000, 0),
+            sba_damage(27_000, 0),
+            sba_damage(60_000, 1),
+            perform(61_000, 1),
+            sba_damage(67_000, 1),
+        ];
+        let windows = assemble_chart_windows(&events, 0, 100_000);
         assert_eq!(windows.len(), 2);
-        assert_eq!(
-            (windows[0].start_ms, windows[0].end_ms),
-            (2_000, 2_000 + SBA_WINDOW_CAP_MS)
-        );
-        assert_eq!((windows[1].start_ms, windows[1].end_ms), (40_000, 46_000));
+        assert_eq!((windows[0].start_ms, windows[0].end_ms), (20_000, 27_000));
+        assert_eq!((windows[1].start_ms, windows[1].end_ms), (60_000, 67_000));
     }
 
     #[test]
-    fn a_non_sba_hit_from_the_performer_does_not_close_the_window() {
-        let mut hit = sba_damage(3_000, 5);
+    fn an_uncorroborated_perform_draws_nothing() {
+        // The Repeat Quest boundary noise (logs 1786/1787): a lone perform at
+        // the fight's first millisecond, minutes from any SBA damage. No
+        // window may come of it — and a later real art is unaffected.
+        let events = vec![
+            perform(0, 1),
+            sba_damage(180_000, 1),
+            perform(181_000, 1),
+            sba_damage(188_000, 1),
+        ];
+        let windows = assemble_chart_windows(&events, 0, 300_000);
+        assert_eq!(windows.len(), 1);
+        assert_eq!((windows[0].start_ms, windows[0].end_ms), (180_000, 188_000));
+    }
+
+    #[test]
+    fn corroboration_is_per_actor_not_per_fight() {
+        // Someone else's SBA damage near a perform does not vouch for it: the
+        // phantom perform can land while another member's real art plays.
+        let events = vec![
+            sba_damage(10_000, 0),
+            perform(11_000, 1),
+            sba_damage(17_000, 0),
+        ];
+        let corroborated = corroborated_sba_activations(&events);
+        assert!(
+            corroborated.is_empty(),
+            "slot 1's perform has no slot-1 damage anywhere near it"
+        );
+        // The damage itself still shades — an art demonstrably played.
+        let windows = assemble_chart_windows(&events, 0, 100_000);
+        assert_eq!((windows[0].start_ms, windows[0].end_ms), (10_000, 17_000));
+    }
+
+    #[test]
+    fn a_non_sba_hit_is_not_sba_activity() {
+        let mut hit = sba_damage(30_000, 5);
         if let Message::DamageEvent(event) = &mut hit.1 {
             event.action_id = ActionType::Normal(42);
         }
-        let events = vec![perform(2_000, 5), hit, sba_damage(9_000, 5)];
-        let windows = assemble_chart_windows(&events, 0, 20_000);
-        assert_eq!((windows[0].start_ms, windows[0].end_ms), (2_000, 9_000));
+        let events = vec![
+            sba_damage(20_000, 5),
+            perform(21_000, 5),
+            sba_damage(26_000, 5),
+            // A normal hit 4s later must not stretch the cluster.
+            hit,
+        ];
+        let windows = assemble_chart_windows(&events, 0, 100_000);
+        assert_eq!((windows[0].start_ms, windows[0].end_ms), (20_000, 26_000));
     }
 
     #[test]

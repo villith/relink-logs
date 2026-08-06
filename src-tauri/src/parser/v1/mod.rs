@@ -38,7 +38,9 @@ pub use groups::{
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::{PlayerState, SbaSourceKind};
 pub use status::{assemble_intervals, StatusInterval};
-pub use windows::{assemble_chart_windows, ChartWindow, ChartWindowKind};
+pub use windows::{
+    assemble_chart_windows, corroborated_sba_activations, ChartWindow, ChartWindowKind,
+};
 
 pub struct AdjustedDamageInstance<'a> {
     pub event: &'a DamageEvent,

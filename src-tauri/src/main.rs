@@ -1599,18 +1599,25 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
 
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 
+    // Activations pass only when same-actor SBA damage corroborates them: the
+    // per-frame perform capture can re-fire the previous fight's leftover
+    // casting state once at a Repeat Quest boundary, and that phantom drew an
+    // "X used their art" marker at the first millisecond of the next log. The
+    // SBA chart windows drop the same events by the same rule, so a marker and
+    // its window can never disagree about whether an art was real.
+    let corroborated = v1::corroborated_sba_activations(&parser.encounter.raw_event_log);
     let sba_events = parser
         .encounter
         .event_log()
-        .filter(|(_, e)| {
-            matches!(
-                e,
-                Message::OnContinueSBAChain(_)
-                    | Message::OnAttemptSBA(_)
-                    | Message::OnPerformSBA(_)
-            )
+        .enumerate()
+        .filter(|(index, (_, e))| match e {
+            Message::OnAttemptSBA(_) => true,
+            Message::OnPerformSBA(_) | Message::OnContinueSBAChain(_) => {
+                corroborated.contains(index)
+            }
+            _ => false,
         })
-        .map(|(ts, e)| (*ts - start_time, e.clone()))
+        .map(|(_, (ts, e))| (*ts - start_time, e.clone()))
         .collect();
 
     let death_events = parser
