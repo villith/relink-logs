@@ -1451,9 +1451,11 @@ export const AnalysisView = () => {
     const bands =
       pins.source === null ? Object.values(scopedAbilitySeries).flat() : scopedAbilitySeries[pins.source] ?? [];
     if (bands.length === 0) return null;
-    // Same cap as the group bands — both feed the eight-colour palette.
-    return abilityBands(bands, GROUP_TOP_N, bandLabelFor);
-  }, [caps.dataPath, spec.groupBy, pins.source, scopedAbilitySeries, bandLabelFor]);
+    // Same cap as the group bands — both feed the eight-colour palette. The
+    // fold follows the table's: a PINNED group's rows are its members, so the
+    // bands must be too, or the chart redraws the band that was just clicked.
+    return abilityBands(bands, GROUP_TOP_N, bandLabelFor, pins.ability === null ? "group" : "action");
+  }, [caps.dataPath, spec.groupBy, pins.source, pins.ability, scopedAbilitySeries, bandLabelFor]);
 
   // Which series the per-player chart draws. identityPlayers, not players: these
   // charts hold the whole party, so a pin must not drop curves from the plot.

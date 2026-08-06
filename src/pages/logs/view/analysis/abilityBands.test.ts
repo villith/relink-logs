@@ -126,3 +126,37 @@ describe("abilityBands vs groupBandsFor", () => {
     expect(viaAbility[0].values).toEqual([100, 100]);
   });
 });
+
+describe("abilityBands — fold mode", () => {
+  it("folds a group's members into one band by default", () => {
+    // 100 and 110 are members of the shipped "normal-attack" group.
+    const bands = abilityBands([skill(100, [10]), skill(110, [5])], 8, asKey);
+
+    expect(bands).toHaveLength(1);
+    expect(bands[0].values).toEqual([15]);
+  });
+
+  it("keeps the members apart when a group is PINNED", () => {
+    // Pinned, the rows ARE the members (see metrics/stun.ts), so folding them
+    // back would redraw the single band that was just clicked.
+    const bands = abilityBands([skill(100, [10]), skill(110, [5])], 8, asKey, "action");
+
+    expect(bands.map((band) => band.key)).toEqual(["skill:Normal:100", "skill:Normal:110"]);
+  });
+
+  it("keys members by action alone, matching mergeSkillsByAction", () => {
+    // A player and their summon on one action id are ONE member skill.
+    const bands = abilityBands(
+      [
+        { kind: "skill", actionType: { Normal: 100 }, childCharacterType: "Pl0000", values: [10] },
+        { kind: "skill", actionType: { Normal: 100 }, childCharacterType: "Pl0300", values: [5] },
+      ],
+      8,
+      asKey,
+      "action"
+    );
+
+    expect(bands).toHaveLength(1);
+    expect(bands[0].values).toEqual([15]);
+  });
+});

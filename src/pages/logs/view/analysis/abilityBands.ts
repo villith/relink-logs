@@ -1,6 +1,6 @@
 import type { AbilitySeries } from "@/types";
 
-import { skillKey } from "../abilityKey";
+import { abilityKey, skillKey } from "../abilityKey";
 import { abilityRowKey } from "../abilitySkills";
 import type { DrillSeries } from "./statusChart";
 
@@ -19,11 +19,19 @@ import type { DrillSeries } from "./statusChart";
  * row key already — they have no action to group by — so they pass through.
  *
  * Ranked and capped like the group bands, with the tail summed into one `other`
- * band rather than dropped, because both feed the same eight-colour palette. */
+ * band rather than dropped, because both feed the same eight-colour palette.
+ *
+ * `foldBy` mirrors the table's own two folds. "group" is `groupSkillsForRows`,
+ * the default. "action" is `mergeSkillsByAction` — used once a group is PINNED,
+ * where the rows are that group's members and folding them back would redraw
+ * the single band that was just clicked. Like that fold, it drops the child
+ * character deliberately: a player and their summon on one action id are one
+ * member skill, not two. */
 export const abilityBands = (
   series: AbilitySeries[],
   topN: number,
-  labelOf: (key: string) => string
+  labelOf: (key: string) => string,
+  foldBy: "group" | "action" = "group"
 ): DrillSeries[] => {
   if (series.length === 0) return [];
 
@@ -36,7 +44,10 @@ export const abilityBands = (
     // `skillKey`, not the bare row key: band keys are namespaced, and a bare
     // one falls through `bandLabelFor` to print itself. A cause band already
     // carries a full row key (`source:…`, `skill:unattributed`).
-    const key = band.kind === "cause" ? band.key : skillKey(abilityRowKey(band));
+    const key =
+      band.kind === "cause"
+        ? band.key
+        : skillKey(foldBy === "action" ? abilityKey(band.actionType) : abilityRowKey(band));
     const values = byRow.get(key) ?? new Array<number>(len).fill(0);
     for (let bucket = 0; bucket < len; bucket++) values[bucket] += band.values[bucket] ?? 0;
     byRow.set(key, values);

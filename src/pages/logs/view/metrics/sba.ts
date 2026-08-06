@@ -1,7 +1,7 @@
 import type { ComputedPlayerState, SbaSourceState } from "@/types";
 import { share } from "@/utils";
 
-import { groupSkillsForRows } from "../abilitySkills";
+import { groupSkillsForRows, mergeSkillsByAction } from "../abilitySkills";
 import type { MetricDescriptor, MetricRow } from "./types";
 
 /** Shown where the backend served no generated total — a log served by a
@@ -145,7 +145,14 @@ export const sba: MetricDescriptor = {
 
     const total = owner.sbaGenerated ?? 0;
 
-    const attributed = groupSkillsForRows(owner.skillBreakdown)
+    // Condensed into skill-group rows until a group is PINNED, at which point
+    // the rows become that group's members — the same descent `stun` makes, and
+    // for the same reason: `levelFor` only yields "skills" for the target
+    // dimension, which neither of these tabs has.
+    const pinnedAbility = pins.ability !== null;
+    const fold = pinnedAbility ? mergeSkillsByAction : groupSkillsForRows;
+
+    const attributed = fold(owner.skillBreakdown)
       .map(({ key, skills }) => {
         const generated = skills.reduce((sum, skill) => sum + (skill.sbaGenerated ?? 0), 0);
         return { key, generated };
@@ -158,11 +165,19 @@ export const sba: MetricDescriptor = {
         label: key,
         value: generated,
         columns: [whole(generated), share(generated, total)],
-        // A gain carries no target, so there is no further dimension to
-        // descend into.
-        pinOnClick: null,
+        // Pinnable into the group's members, like `stun`. A gain carries no
+        // target, so once the rows ARE those members there is nothing further
+        // to descend into.
+        pinOnClick: pinnedAbility ? null : { ability: key },
         colorSlot: owner.partyIndex,
       }));
+
+    // A pinned ability narrows to ONE group's members. The cause rows and the
+    // remainder describe the whole PLAYER — the remainder is measured against
+    // their polled total — so listing them beside one ability's members would
+    // make the column's share denominator mean two different things. The chart
+    // drops them for the same reason (see `build_ability_sba_chart`).
+    if (pinnedAbility) return [...attributed].sort((a, b) => b.value - a.value);
 
     const sources = sourceRows(owner, total);
 

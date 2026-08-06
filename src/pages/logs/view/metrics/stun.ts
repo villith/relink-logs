@@ -49,11 +49,19 @@ export const stun: MetricDescriptor = {
     const breakdown = owner ? owner.skillBreakdown : players.flatMap((p) => p.skillBreakdown);
     const colorSlot = owner ? owner.partyIndex : -1;
 
-    // Condensed into skill-group rows at the abilities level — see
-    // `abilityRowKey` — and NOT condensed one level down, where the rows are the
-    // pinned group's members. Totals add; the max is the biggest single hit, so
-    // it takes the largest rather than summing.
-    const fold = level === "abilities" ? groupSkillsForRows : mergeSkillsByAction;
+    // Condensed into skill-group rows until a group is PINNED, at which point
+    // the rows become that group's members.
+    //
+    // Keyed off the pin rather than off `level`, unlike damage: `levelFor` only
+    // yields "skills" for the target dimension, and stun has none (see
+    // CAPABILITIES), so the member view was unreachable and pinning a group
+    // merely re-folded it into the single row that had just been clicked.
+    // Damage descends through its target dimension; the ability pin is the only
+    // descent these tabs have.
+    //
+    // Totals add; the max is the biggest single hit, so it takes the largest
+    // rather than summing.
+    const fold = pins.ability === null && level === "abilities" ? groupSkillsForRows : mergeSkillsByAction;
 
     return (
       fold(breakdown)
@@ -64,7 +72,9 @@ export const stun: MetricDescriptor = {
             label: key,
             value: total,
             columns: [oneDecimal(total), oneDecimal(Math.max(...skills.map((skill) => skill.maxStunValue)))],
-            pinOnClick: level === "abilities" ? { ability: key } : null,
+            // Once the rows ARE the pinned group's members there is nothing
+            // further to descend into, so they carry no pin of their own.
+            pinOnClick: level === "abilities" && pins.ability === null ? { ability: key } : null,
             colorSlot,
           };
         })

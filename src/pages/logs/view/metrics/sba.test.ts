@@ -146,8 +146,30 @@ describe("sba drill-down", () => {
     expect(rows).toEqual([]);
   });
 
-  it("offers no pin on an ability row, because a gain carries no target to descend into", () => {
+  it("pins an unpinned ability row into its group's members", () => {
+    // A gain carries no TARGET to descend into, but a skill GROUP still has
+    // members — the same descent `stun` offers. Cause rows keep no pin (below).
     const rows = sba.rows(input("abilities", [owner()], { source: 0, targets: [], ability: null }));
+    const skills = rows.filter((row) => row.key.startsWith("skill:") && row.key !== "skill:unattributed");
+
+    expect(skills.length).toBeGreaterThan(0);
+    expect(skills.every((row) => row.pinOnClick !== null)).toBe(true);
+  });
+
+  it("offers no pin on a cause row — a cause has no member skills at all", () => {
+    const rows = sba.rows(input("abilities", [owner()], { source: 0, targets: [], ability: null }));
+    const causes = rows.filter((row) => row.key.startsWith("source:") || row.key === "skill:unattributed");
+
+    expect(causes.every((row) => row.pinOnClick === null)).toBe(true);
+  });
+
+  it("drops the cause rows once an ability is pinned", () => {
+    // The remainder is measured against the player's polled total, so listing
+    // it beside one ability's members would make the share column's denominator
+    // mean two different things. The chart drops them for the same reason.
+    const rows = sba.rows(input("abilities", [owner()], { source: 0, targets: [], ability: "Normal:1" }));
+
+    expect(rows.every((row) => row.key.startsWith("skill:") && row.key !== "skill:unattributed")).toBe(true);
     expect(rows.every((row) => row.pinOnClick === null)).toBe(true);
   });
 

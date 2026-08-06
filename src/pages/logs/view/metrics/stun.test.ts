@@ -174,3 +174,60 @@ describe("stun — rows that applied no stun", () => {
     expect(rows).toHaveLength(2);
   });
 });
+
+describe("stun — decomposing a pinned ability", () => {
+  // Two member actions of one skill group, plus an unrelated ability.
+  const GROUPED = [
+    player(0, 100, 10, [
+      { action: 100, stun: 40 },
+      { action: 110, stun: 25 },
+      { action: 7, stun: 35 },
+    ]),
+  ];
+  const GROUP_KEY = 'Group:normal-attack@"Pl0000"';
+
+  it("folds into skill GROUPS with no ability pinned", () => {
+    const rows = stun.rows(input("abilities", { source: 0, targets: [], ability: null }, GROUPED));
+
+    expect(rows.map((row) => row.key)).toEqual([`skill:${GROUP_KEY}`, "skill:Normal:7"]);
+    expect(rows[0].value).toBe(65);
+  });
+
+  it("decomposes a pinned group into its member ACTIONS", () => {
+    // Damage reaches this view through its target dimension; stun has none, so
+    // the ability pin is what descends. Without this the pin only re-folded the
+    // group into the single row that had just been clicked.
+    //
+    // The breakdown arrives ALREADY narrowed to the pinned group — the scoped
+    // fetch rebuilds the derived state under `selection.abilities` — so this
+    // fold only decides group-versus-member, never which ability.
+    const narrowed = [
+      player(0, 65, 6, [
+        { action: 100, stun: 40 },
+        { action: 110, stun: 25 },
+      ]),
+    ];
+    const rows = stun.rows(input("abilities", { source: 0, targets: [], ability: GROUP_KEY }, narrowed));
+
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:100", "skill:Normal:110"]);
+    expect(rows.map((row) => row.value)).toEqual([40, 25]);
+  });
+
+  it("offers no further pin once the rows ARE the members", () => {
+    const narrowed = [
+      player(0, 65, 6, [
+        { action: 100, stun: 40 },
+        { action: 110, stun: 25 },
+      ]),
+    ];
+    const rows = stun.rows(input("abilities", { source: 0, targets: [], ability: GROUP_KEY }, narrowed));
+
+    expect(rows.every((row) => row.pinOnClick === null)).toBe(true);
+  });
+
+  it("pins the group from an unpinned ability row", () => {
+    const rows = stun.rows(input("abilities", { source: 0, targets: [], ability: null }, GROUPED));
+
+    expect(rows[0].pinOnClick).toEqual({ ability: GROUP_KEY });
+  });
+});
