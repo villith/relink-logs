@@ -22,7 +22,7 @@ pub const TOOLBOX_TCP_ADDR: &str = "127.0.0.1:39372";
 /// each time the event stream connects: on Linux the deployed dinput8 proxy
 /// can be older than the app until the game restarts, and a bincode mismatch
 /// is silent garbage — better "restart the game" than wrong predictions.
-pub const TOOLBOX_PROTOCOL_VERSION: u32 = 3;
+pub const TOOLBOX_PROTOCOL_VERSION: u32 = 4;
 
 /// Version a hook reports when built outside a release (no `HOOK_VERSION`
 /// build env). The app treats this as a dev hook and never flags it as
@@ -86,8 +86,11 @@ pub struct SynthesisSigil {
 pub struct SynthesisSnapshot {
     /// xorshift32 state of RNG slot 0x81 at snapshot time.
     pub rng_state: u32,
-    /// MGR+0x2d8; part of the warm-up count.
-    pub seed_counter: u32,
+    /// MGR+0x2d8, the game's SAVED synthesis seed — not a counter. The game
+    /// latches the live RNG slot into it when the synthesis screen opens and
+    /// restores the slot from it after every commit; it is also an additive
+    /// term in the warm-up count. See `seed_latched` in src-tauri/src/synthesis.
+    pub saved_seed: u32,
     /// pairKey -> times this pair-shape has been synthesized.
     pub pair_counters: HashMap<u64, u32>,
     /// rank(A)+rank(B) -> (lo, hi) level-roll weights.
@@ -97,13 +100,25 @@ pub struct SynthesisSnapshot {
     pub sigils: Vec<SynthesisSigil>,
 }
 
-/// The two live values every synthesis prediction depends on (beyond the
-/// sigil box itself); read cheaply for staleness polling.
+/// The live values every synthesis prediction depends on (beyond the sigil
+/// box itself); read cheaply for staleness polling.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct SynthesisSeed {
     pub rng_state: u32,
-    pub seed_counter: u32,
+    pub saved_seed: u32,
+    /// Total of every pair counter — i.e. how many syntheses this save has
+    /// ever performed. The two words above are BOTH unchanged by a synthesis
+    /// (the commit restores the RNG slot from the saved seed as it returns),
+    /// so this is the only cheap signal that one happened, and one did change
+    /// its pair's warm-up.
+    pub synth_count: u32,
+    /// True when the game has latched its synthesis seed (the two words above
+    /// agree). Carried rather than re-derived client-side so this
+    /// reverse-engineered rule lives in exactly one place; see `seed_latched`
+    /// in src-tauri/src/synthesis/mod.rs for what latching is and why an
+    /// unlatched prediction is guaranteed to miss.
+    pub latched: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -146,7 +161,7 @@ mod tests {
 
         let snap = SynthesisSnapshot {
             rng_state: 1,
-            seed_counter: 2,
+            saved_seed: 2,
             pair_counters: [(3u64, 4u32)].into_iter().collect(),
             level_weights: [(5u32, (6u32, 7u32))].into_iter().collect(),
             trait_to_item: [(8u32, 9u32)].into_iter().collect(),
@@ -182,6 +197,28 @@ mod tests {
             panic!("wrong variant");
         };
         assert_eq!(back, snap);
+    }
+
+    /// The staleness poll's whole job is to notice a synthesis, and a
+    /// synthesis moves ONLY `synth_count` (the commit restores the RNG slot
+    /// from the saved seed on its way out, leaving both seed words identical).
+    /// Pinned because dropping the field from the wire would silently reduce
+    /// the poll to the two words that never move.
+    #[test]
+    fn synthesis_seed_carries_the_synthesis_tally_across_the_wire() {
+        let seed = SynthesisSeed {
+            rng_state: 0xdead_beef,
+            saved_seed: 0xdead_beef,
+            synth_count: 42,
+            latched: true,
+        };
+        let bytes = bincode::serialize(&ToolboxResponse::SynthesisSeed(Ok(seed))).unwrap();
+        let ToolboxResponse::SynthesisSeed(Ok(back)) =
+            bincode::deserialize::<ToolboxResponse>(&bytes).unwrap()
+        else {
+            panic!("wrong variant");
+        };
+        assert_eq!(back, seed);
     }
 
     /// One generic slot read serves both tools: the transmarvel prediction
