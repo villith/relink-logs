@@ -8,7 +8,7 @@ import { winFilterParts } from "./machine/state";
  * the same "narrows, never widens" rule stale target pins follow. */
 export const selectedChartWindows = (windows: ChartWindow[], win: string): ChartWindow[] => {
   const { kind, index } = winFilterParts(win);
-  const ofKind = windows.filter((window) => window.kind === kind).sort((a, b) => a.startMs - b.startMs);
+  const ofKind = windows.filter((span) => span.kind === kind).sort((a, b) => a.startMs - b.startMs);
   if (index === null) return ofKind;
   const one = ofKind[index];
   return one === undefined ? [] : [one];
