@@ -193,11 +193,13 @@ async fn fetch_synthesis_status(
             game_running: false,
             sigil_count: 0,
             rng_unpredictable: false,
+            seed_latched: false,
         }),
         Some(snap) => Ok(synthesis::SynthesisStatus {
             game_running: true,
             sigil_count: snap.sigils.len() as u32,
             rng_unpredictable: snap.rng_state == 0,
+            seed_latched: synthesis::seed_latched(&snap),
         }),
     }
 }
@@ -224,7 +226,9 @@ async fn search_synthesis(
             sigil_count: snap.sigils.len() as u32,
             rng_unpredictable: snap.rng_state == 0,
             rng_state: snap.rng_state,
-            seed_counter: snap.seed_counter,
+            saved_seed: snap.saved_seed,
+            synth_count: synthesis::synth_count(&snap),
+            seed_latched: synthesis::seed_latched(&snap),
         })
     })
     .await
@@ -1331,6 +1335,10 @@ struct EncounterStateResponse {
     /// chart bands from ONE grouping. Empty when no query was sent.
     groups: Vec<v1::GroupAggregate>,
     sba_chart: HashMap<u32, Vec<f32>>,
+    /// Per-ability bands for the DRILLED Stun/SBA charts, keyed by player slot.
+    /// Empty unless the view sent an `ability_series` query — an undrilled log
+    /// pays nothing for this.
+    ability_series: HashMap<u32, Vec<v1::AbilitySeries>>,
     sba_events: Vec<(i64, protocol::Message)>,
     death_events: Vec<(i64, protocol::Message)>,
     chart_len: usize,
@@ -1380,6 +1388,37 @@ struct ParseOptions {
     /// combined mask to both so a table and its hover cards agree).
     #[serde(default)]
     windows: Option<Vec<v1::TimeWindow>>,
+    /// The analysis view's per-ability chart request; None = no bands in the
+    /// response.
+    ///
+    /// Rides this fetch rather than a command of its own: the walk is one extra
+    /// linear pass over a `raw_event_log` this call has already decompressed and
+    /// reparsed, and a drill changes the pins — which refetches anyway.
+    #[serde(default)]
+    ability_series: Option<AbilitySeriesQuery>,
+}
+
+/// Which derived-path metric the per-ability bands are built for.
+///
+/// Only the two the group aggregation cannot serve: damage and taken already
+/// have bands through `group_query`.
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+enum AbilitySeriesMetric {
+    Stun,
+    Sba,
+}
+
+/// The analysis view's per-ability chart request, sent only when a derived-path
+/// tab is drilled in (`groupBy === "ability"`).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AbilitySeriesQuery {
+    metric: AbilitySeriesMetric,
+    /// The pinned player, or None for the whole party — stun's ability level
+    /// widens to the party when no source is pinned (see `metrics/stun.ts`).
+    #[serde(default)]
+    player: Option<u32>,
 }
 
 // Per-second buckets: the quest-details charts and the window scrubber both
@@ -1432,6 +1471,57 @@ fn build_groups(
         log::warn!("{error} — the response carries no group aggregates");
         Vec::new()
     })
+}
+
+/// The per-ability chart bands for this request, or none.
+///
+/// Like [`build_groups`], a request that resolves to nothing is never fatal to
+/// the fetch: a pin left over from a metric switch narrows to an empty map, and
+/// losing the whole log page over one stale selector would be far worse than a
+/// chart falling back to its per-player lines.
+fn build_ability_series(
+    parser: &v1::Parser,
+    options: &ParseOptions,
+    player_indices: &[u32],
+    chart_len: usize,
+) -> HashMap<u32, Vec<v1::AbilitySeries>> {
+    let Some(query) = &options.ability_series else {
+        return HashMap::new();
+    };
+
+    let wanted: Vec<u32> = match query.player {
+        Some(player) => player_indices
+            .iter()
+            .copied()
+            .filter(|index| *index == player)
+            .collect(),
+        None => player_indices.to_vec(),
+    };
+    if wanted.is_empty() {
+        return HashMap::new();
+    }
+
+    match query.metric {
+        AbilitySeriesMetric::Stun => v1::build_ability_stun_chart(
+            &parser.encounter.raw_event_log,
+            &parser.encounter.player_data,
+            &wanted,
+            parser.start_time(),
+            DPS_INTERVAL,
+            chart_len,
+            &options.target_spans,
+            options.filters,
+        ),
+        AbilitySeriesMetric::Sba => v1::build_ability_sba_chart(
+            &parser.encounter.raw_event_log,
+            &parser.encounter.player_data,
+            &wanted,
+            parser.start_time(),
+            DPS_INTERVAL,
+            chart_len,
+            options.filters,
+        ),
+    }
 }
 
 // `(async)` so the decompress + full reparse runs off the main thread — this is
@@ -1608,6 +1698,16 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
 
     let groups = build_groups(&parser, &options, &target_entries, &assignment);
 
+    // The drilled Stun/SBA tabs' bands. Sized from the same full-log chart
+    // length as every other chart above, so a band indexes the same buckets the
+    // plot's X axis does.
+    let ability_series = build_ability_series(
+        &parser,
+        &options,
+        &player_indices,
+        (duration / DPS_INTERVAL) as usize + 1,
+    );
+
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 
     // Activations pass only when same-actor SBA damage corroborates them: the
@@ -1657,6 +1757,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
         sba_chart_len: (duration / SBA_INTERVAL) as usize + 1,
         sba_chart,
+        ability_series,
         sba_events,
         death_events,
         target_entries,
@@ -2884,4 +2985,35 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod ability_series_query_tests {
+    use super::{AbilitySeriesMetric, AbilitySeriesQuery};
+    use serde_json::json;
+
+    /// The wire contract with `AnalysisView`'s `abilityQuery` memo. Locked by a
+    /// test for the same reason `groups.rs` locks `GroupQuery`'s: the frontend
+    /// builds this by hand, and a silent rename would degrade to "no bands"
+    /// rather than to an error anyone would notice.
+    #[test]
+    fn deserializes_a_pinned_request() {
+        let query: AbilitySeriesQuery =
+            serde_json::from_value(json!({ "metric": "stun", "player": 3 }))
+                .expect("valid AbilitySeriesQuery JSON");
+
+        assert_eq!(query.metric, AbilitySeriesMetric::Stun);
+        assert_eq!(query.player, Some(3));
+    }
+
+    /// Stun's ability level widens to the whole party when no source is pinned
+    /// (see `metrics/stun.ts`), so `player` is optional rather than required.
+    #[test]
+    fn defaults_to_every_player() {
+        let query: AbilitySeriesQuery =
+            serde_json::from_value(json!({ "metric": "sba" })).expect("valid JSON");
+
+        assert_eq!(query.metric, AbilitySeriesMetric::Sba);
+        assert_eq!(query.player, None);
+    }
 }
