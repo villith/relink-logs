@@ -113,6 +113,13 @@ fn add_at(
 /// `build_player_stun_chart` uses one level up. Each band therefore sums to the
 /// `total_stun_value` its skill row reports, so the stack's height cannot
 /// disagree with the table underneath it.
+///
+/// `abilities` is the selector bar's ability pin, already expanded to actions
+/// (empty = all). Applied to the finished BANDS rather than to the events: a
+/// band carries the resolved breakdown-row action, which is what the table's
+/// rows are keyed by, so filtering here is what keeps the two showing the same
+/// abilities. Filtering raw `action_id`s instead would disagree wherever the
+/// keying rewrites one (Ferry's pet remap, the supplementary fold).
 #[allow(clippy::too_many_arguments)]
 pub fn build_ability_stun_chart(
     events: &[(i64, Message)],
@@ -123,6 +130,7 @@ pub fn build_ability_stun_chart(
     chart_len: usize,
     target_spans: &[TargetSpan],
     filters: MeterFilters,
+    abilities: &[ActionType],
 ) -> HashMap<u32, Vec<AbilitySeries>> {
     let mut paths: HashMap<u32, StunPaths> = player_indices
         .iter()
@@ -266,14 +274,19 @@ pub fn build_ability_stun_chart(
 
     paths
         .into_iter()
-        .map(|(player, paths)| (player, resolve_paths(paths)))
+        .map(|(player, paths)| (player, resolve_paths(paths, abilities)))
         .collect()
+}
+
+/// Whether a resolved row survives the selector bar's ability pin. Empty = "All".
+fn pinned(abilities: &[ActionType], action: ActionType) -> bool {
+    abilities.is_empty() || abilities.contains(&action)
 }
 
 /// Keep whichever path saw the accrual, PER ROW (see the `max` note on
 /// [`build_ability_stun_chart`]). Bands that accrued nothing at all are dropped:
 /// an all-zero band is one the legend would name and colour for nothing.
-fn resolve_paths(mut paths: StunPaths) -> Vec<AbilitySeries> {
+fn resolve_paths(mut paths: StunPaths, abilities: &[ActionType]) -> Vec<AbilitySeries> {
     // `CharacterType` is not `Ord`, so the union is deduped by hash and the
     // ordering is imposed below instead.
     let keys: HashSet<RowKey> = paths
@@ -293,7 +306,7 @@ fn resolve_paths(mut paths: StunPaths) -> Vec<AbilitySeries> {
             } else {
                 messages
             };
-            if values.iter().all(|value| *value == 0.0) {
+            if values.iter().all(|value| *value == 0.0) || !pinned(abilities, key.0) {
                 return None;
             }
             Some(AbilitySeries::Skill {
@@ -370,6 +383,13 @@ fn cause_key(cause: &SbaGainCause) -> Option<String> {
 /// while the total comes from the gauge POLL (all four members) — so without it
 /// the stack would silently undershoot the player row it sits under, by 31-42%
 /// on live log 1681.
+///
+/// `abilities` is the selector bar's ability pin (empty = all), applied to the
+/// finished bands for the same reason as in [`build_ability_stun_chart`]. A pin
+/// also drops the CAUSE bands and the remainder: both describe the whole player
+/// — the remainder is measured against their polled total — so keeping them
+/// beside one ability would make the stack's height mean two different things.
+#[allow(clippy::too_many_arguments)]
 pub fn build_ability_sba_chart(
     events: &[(i64, Message)],
     player_data: &[Option<PlayerData>; 4],
@@ -378,6 +398,7 @@ pub fn build_ability_sba_chart(
     interval: i64,
     chart_len: usize,
     filters: MeterFilters,
+    abilities: &[ActionType],
 ) -> HashMap<u32, Vec<AbilitySeries>> {
     let mut skills: HashMap<u32, HashMap<RowKey, Vec<f64>>> = player_indices
         .iter()
@@ -484,6 +505,16 @@ pub fn build_ability_sba_chart(
                 )
                 .collect();
 
+            // A pin narrows to ONE ability; the whole-player bands stop applying.
+            if !abilities.is_empty() {
+                bands.retain(|band| match band {
+                    AbilitySeries::Skill { action_type, .. } => pinned(abilities, *action_type),
+                    AbilitySeries::Cause { .. } => false,
+                });
+                sort_bands(&mut bands);
+                return (*player, bands);
+            }
+
             if let Some(total) = polled.get(player) {
                 let remainder: Vec<f64> = (0..chart_len)
                     .map(|bucket| {
@@ -564,6 +595,7 @@ mod tests {
             chart_len,
             &[],
             MeterFilters::default(),
+            &[],
         )
         .remove(&0)
         .expect("the requested player always has a row")
@@ -793,6 +825,7 @@ mod tests {
             1_000,
             chart_len,
             MeterFilters::default(),
+            &[],
         )
         .remove(&0)
         .expect("the requested player always has a row")
@@ -940,6 +973,78 @@ mod tests {
     fn a_player_with_no_gauge_activity_draws_nothing() {
         let events = vec![(0, stun_hit(0, ActionType::Normal(1), 5.0))];
         assert!(sba_bands(&events, 1).is_empty());
+    }
+
+    #[test]
+    fn an_ability_pin_narrows_the_stun_bands_to_that_ability() {
+        // The pin narrows the derived state the TABLE reads, so the chart has to
+        // narrow with it or the two describe different fights.
+        let events = vec![
+            (0, stun_hit(0, ActionType::Normal(1), 10.0)),
+            (10, stun_hit(0, ActionType::Normal(2), 20.0)),
+        ];
+        let bands = build_ability_stun_chart(
+            &events,
+            &no_players(),
+            &[0],
+            0,
+            1_000,
+            1,
+            &[],
+            MeterFilters::default(),
+            &[ActionType::Normal(1)],
+        )
+        .remove(&0)
+        .expect("player row");
+
+        assert_eq!(bands.len(), 1);
+        assert_eq!(values_for(&bands, ActionType::Normal(1)), vec![10.0]);
+    }
+
+    #[test]
+    fn no_ability_pin_keeps_every_stun_band() {
+        let events = vec![
+            (0, stun_hit(0, ActionType::Normal(1), 10.0)),
+            (10, stun_hit(0, ActionType::Normal(2), 20.0)),
+        ];
+        assert_eq!(stun_bands(&events, 1).len(), 2);
+    }
+
+    #[test]
+    fn an_ability_pin_narrows_the_sba_bands_and_drops_the_causes() {
+        // A cause band and the remainder describe the whole PLAYER, not one
+        // ability, and the remainder's denominator is the player's polled total
+        // — neither survives a narrowing to a single skill without lying about
+        // what the stack's height means.
+        let events = vec![
+            (0, stun_hit(0, ActionType::Normal(1), 0.0)),
+            (5, stun_hit(0, ActionType::Normal(2), 0.0)),
+            (
+                10,
+                sba_gain(0, SbaGainCause::Skill(ActionType::Normal(1)), 30.0),
+            ),
+            (
+                15,
+                sba_gain(0, SbaGainCause::Skill(ActionType::Normal(2)), 50.0),
+            ),
+            (20, sba_gain(0, SbaGainCause::PartyAward, 10.0)),
+            (25, sba_poll(0, 200.0, 200.0)),
+        ];
+        let bands = build_ability_sba_chart(
+            &events,
+            &no_players(),
+            &[0],
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+            &[ActionType::Normal(1)],
+        )
+        .remove(&0)
+        .expect("player row");
+
+        assert_eq!(bands.len(), 1, "only the pinned ability survives");
+        assert_eq!(values_for(&bands, ActionType::Normal(1)), vec![30.0]);
     }
 
     #[test]

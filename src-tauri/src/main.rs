@@ -1514,6 +1514,7 @@ fn build_ability_series(
             chart_len,
             &options.target_spans,
             options.filters,
+            &options.selection.abilities,
         ),
         AbilitySeriesMetric::Sba => v1::build_ability_sba_chart(
             &parser.encounter.raw_event_log,
@@ -1523,6 +1524,7 @@ fn build_ability_series(
             DPS_INTERVAL,
             chart_len,
             options.filters,
+            &options.selection.abilities,
         ),
     }
 }
