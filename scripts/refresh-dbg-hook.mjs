@@ -8,13 +8,30 @@
 // The copy is best-effort: if the game is running the DLL is locked, so we WARN and
 // continue (the dev server must still start). Close the game and re-run to pick up
 // the new DLL.
-import { copyFileSync } from "node:fs";
+//
+// It also DELETES any target/debug/hook-dbg.dll: the injector's search is
+// filename-major over [exe dir, CWD], so a hook-dbg.dll next to the dev exe
+// shadows the src-tauri one this script maintains — an orphan there (from the
+// pre-script workflow of copying next to the exe) kept a 2026-08-05 session
+// injecting a day-old hook through every rebuild.
+import { copyFileSync, rmSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const src = resolve(root, "target/release/hook.dll");
 const dst = resolve(root, "src-tauri/hook-dbg.dll");
+const shadow = resolve(root, "target/debug/hook-dbg.dll");
+
+try {
+  rmSync(shadow, { force: true });
+} catch (err) {
+  console.warn(
+    `[refresh-dbg-hook] WARNING: stale ${shadow} exists and could not be removed ` +
+      `(${err.code}) — it SHADOWS the refreshed hook-dbg.dll and the game will ` +
+      `keep loading the old hook. Close the game and delete it.`
+  );
+}
 
 try {
   copyFileSync(src, dst);
