@@ -9,13 +9,13 @@
 //!
 //! * `StatusBase::init(this, f32 duration, ctx)` — vtable slot 2 (+0x10),
 //!   inherited un-overridden by 165 of the family's vtables (v2.0.3 entry
-//!   0x27a7720). The apply path calls it on every application: it copies the
-//!   SOURCE entity handle out of `ctx+0x38..0x48` into `this+0x28..0x38` and
-//!   arms the duration (negative ⇒ infinite: 9999.0 + flag at +0x79; +0x7c
-//!   initial, +0x80 remaining). Whether a REFRESH re-enters here, and whether
-//!   `ctx` carries the acting action id (the "which ability applied this
-//!   Poison" requirement), is exactly what this diag exists to answer — hence
-//!   the raw ctx window dump per call.
+//!   0x27a7720). It copies the SOURCE entity handle out of `ctx+0x38..0x48`
+//!   into `this+0x28..0x38` and arms the duration (negative ⇒ infinite: 9999.0
+//!   + flag at +0x79; +0x7c initial, +0x80 remaining). **It is the REFRESH
+//!   path only** — the apply worker calls it when it finds an existing status
+//!   to re-arm, but compiles the same arming inline when it creates one, so a
+//!   fresh application never enters here. That is what
+//!   [`OnStatusUpdateHook`] exists to cover; see its comment for the evidence.
 //! * the shared `StatusBase` scalar-deleting destructor (v2.0.3 entry
 //!   0x29b0cf0, held by ~147 family vtables as slot 0): every status that
 //!   dies — expired, dispelled (`ExStatus::clearStatus*`), or owner teardown —
@@ -23,11 +23,13 @@
 //!   attribution is a later stage (the removal reason rides the +0x70 virtual,
 //!   whose per-class override count makes it a poor first hook target).
 //!
-//! Both detours emit protocol events — `StatusApply` from `init` (which covers
-//! a refresh: the game re-inits the SAME instance rather than allocating a new
-//! one) and `StatusRemove` from the dtor — and additionally log a field dump
-//! under `hookdiag`. Every field read is guarded: a layout shift must never
-//! fault a game thread.
+//! Both detours emit protocol events — `StatusApply` from `init` (a refresh:
+//! the game re-inits the SAME instance rather than allocating a new one) and
+//! `StatusRemove` from the dtor — and additionally log a field dump under
+//! `hookdiag`. A third detour, [`OnStatusUpdateHook`], walks each holder's
+//! list per frame and reports what the other two cannot see: the FIRST
+//! application of an effect. Every field read is guarded: a layout shift must
+//! never fault a game thread.
 //!
 //! One field the parser's event carries is NOT fully resolvable here, and is
 //! sent as its documented fallback rather than guessed at:
@@ -96,10 +98,11 @@ const STATUS_ID_OFFSET: usize = 0x50;
 const STATUS_SUBID_OFFSET: usize = 0x4c;
 /// Target entity handle triple (3 qwords).
 const STATUS_TARGET_HANDLE: usize = 0x10;
-/// Source entity handle triple (3 qwords) — who applied the status. Written
-/// by `init` from `ctx+0x38..0x48`. Documented rather than read: the apply
-/// detour already has the source's info block as its `ctx` argument.
-#[allow(dead_code)]
+/// Source entity handle triple (3 qwords) — who applied the status. Written by
+/// `init` from `ctx+0x38..0x48`, and by the apply worker's creation branch
+/// directly. The apply detour does not need it (it has the source's info block
+/// as its `ctx` argument), but [`source_info_of`] does: the per-frame walk sees
+/// the object without ever seeing the ctx that produced it.
 const STATUS_SOURCE_HANDLE: usize = 0x28;
 /// Flag bytes +0x78..+0x7b; +0x79 is the infinite-duration flag `init` sets.
 #[cfg(feature = "hookdiag")]
@@ -146,6 +149,7 @@ static_detour! {
 pub(super) fn disable() {
     super::disable_quiet("OnStatusInit", &OnStatusInit);
     super::disable_quiet("OnStatusDtor", &OnStatusDtor);
+    super::disable_quiet("OnStatusUpdate", &OnStatusUpdate);
     disable_variants();
 }
 
@@ -398,6 +402,138 @@ mod stack_tests {
         // field. Falling back to 1 loses a stack count; publishing 70000 would
         // put a fabricated one in the log forever.
         assert_eq!(stacks_for(4, Some(70_000)), 1);
+    }
+}
+
+/// What identifies one live status across frames: the object, the effect, and
+/// the cause.
+///
+/// The object pointer ALONE would not do. The allocator reissues a freed
+/// status's address, so a recycled pointer carrying a different effect would be
+/// mistaken for the one that used to live there and never reported.
+type StatusKey = (usize, u32, Option<u32>);
+
+/// Largest believable number of statuses on one holder. Above this the pair of
+/// list bounds did not come from this list — a torn read (the two halves are not
+/// read atomically) or a shifted layout — and the walk is abandoned rather than
+/// stepping through unrelated memory on a game thread.
+const MAX_PLAUSIBLE_STATUSES: usize = 256;
+
+/// How many `StatusBase*` a holder's list holds, or `None` when the bounds are
+/// not a plausible description of it.
+fn live_count(begin: usize, end: usize) -> Option<usize> {
+    let span = end.checked_sub(begin)?;
+    if span % std::mem::size_of::<usize>() != 0 {
+        return None;
+    }
+    let count = span / std::mem::size_of::<usize>();
+    (count <= MAX_PLAUSIBLE_STATUSES).then_some(count)
+}
+
+/// The entries of `current` that `previous` did not hold — i.e. the statuses
+/// that arrived since the last walk of this holder.
+fn newly_applied(previous: &[StatusKey], current: &[StatusKey]) -> Vec<StatusKey> {
+    // The overwhelmingly common frame is "nothing changed", and the membership
+    // test below is quadratic. Both lists are built in list order, so an
+    // unchanged holder compares equal in one linear pass — which keeps a holder
+    // at the plausibility cap from costing 65k comparisons every frame.
+    if previous == current {
+        return Vec::new();
+    }
+    current
+        .iter()
+        .filter(|key| !previous.contains(key))
+        .copied()
+        .collect()
+}
+
+#[cfg(test)]
+mod list_tests {
+    use super::{live_count, newly_applied, MAX_PLAUSIBLE_STATUSES};
+
+    #[test]
+    fn a_normal_span_yields_its_element_count() {
+        assert_eq!(live_count(0x1000, 0x1018), Some(3));
+    }
+
+    #[test]
+    fn an_empty_vector_holds_nothing() {
+        // A default-constructed `std::vector` is begin == end == nullptr, which
+        // is a holder carrying no statuses — NOT an unreadable list. Rejecting
+        // it would be harmless here but would muddle the two cases.
+        assert_eq!(live_count(0, 0), Some(0));
+        assert_eq!(live_count(0x1000, 0x1000), Some(0));
+    }
+
+    #[test]
+    fn an_end_before_its_begin_is_rejected() {
+        // A torn read of the two halves (they are not read atomically), or a
+        // layout shift. Walking it would run off into unrelated memory.
+        assert_eq!(live_count(0x1018, 0x1000), None);
+    }
+
+    #[test]
+    fn a_misaligned_span_is_rejected() {
+        // The list holds 8-byte pointers; a span that is not a whole number of
+        // them is not this list.
+        assert_eq!(live_count(0x1000, 0x1004), None);
+    }
+
+    #[test]
+    fn an_implausible_count_is_rejected() {
+        // The guard that keeps a shifted layout from turning into a walk of
+        // millions of entries on a game thread — same rule `stacks_for` applies
+        // to its own field.
+        let end = 0x1000 + (MAX_PLAUSIBLE_STATUSES + 1) * 8;
+        assert_eq!(live_count(0x1000, end), None);
+    }
+
+    #[test]
+    fn a_status_absent_last_frame_is_newly_applied() {
+        assert_eq!(
+            newly_applied(&[], &[(0x10, 25, None)]),
+            vec![(0x10, 25, None)]
+        );
+    }
+
+    #[test]
+    fn a_status_still_held_is_not_reported_again() {
+        // The walk runs every frame. Re-reporting a standing buff would inflate
+        // its application count sixty times a second.
+        let previous = [(0x10, 25, None)];
+        assert!(newly_applied(&previous, &previous).is_empty());
+    }
+
+    #[test]
+    fn a_recycled_pointer_holding_a_different_effect_is_newly_applied() {
+        // The allocator reissues a freed status's address. Keyed on the pointer
+        // ALONE, the effect that lands on a recycled one would be taken for the
+        // old occupant and never reported at all.
+        let previous = [(0x10, 25, None)];
+        let current = [(0x10, 6, None)];
+        assert_eq!(newly_applied(&previous, &current), vec![(0x10, 6, None)]);
+    }
+
+    #[test]
+    fn the_same_effect_from_a_second_cause_is_its_own_application() {
+        // Identity is (object, effect, cause) for the same reason the parser's
+        // interval key carries the cause: two abilities granting one effect must
+        // stay separable.
+        let previous = [(0x10, 0, Some(500))];
+        let current = [(0x10, 0, Some(500)), (0x20, 0, Some(600))];
+        assert_eq!(
+            newly_applied(&previous, &current),
+            vec![(0x20, 0, Some(600))]
+        );
+    }
+
+    #[test]
+    fn everything_is_new_on_the_first_walk() {
+        // Injecting mid-quest, or the opening frame of a fight: the holder is
+        // already carrying its quest-start buffs, and those are precisely the
+        // ones the apply path never reported.
+        let current = [(0x10, 20, None), (0x18, 25, None)];
+        assert_eq!(newly_applied(&[], &current).len(), 2);
     }
 }
 
@@ -737,5 +873,350 @@ impl OnStatusDtorVariantsHook {
 
     pub fn setup(&self, process: &Process) -> Result<()> {
         setup_variants(&self.tx, process)
+    }
+}
+
+/* The apply coverage `StatusBase::init` cannot give.
+
+`init` is the REFRESH path, not the apply path — a fact this file asserted the
+opposite of until 2026-08-06. The shared apply worker `FUN_140bcca20` (v2.0.3)
+has two branches: when it finds an existing status with a matching id and cause
+it writes the new cause to `+0x4c` and calls `vtable[0x10]` (the hooked `init`),
+but when it must create one it builds the object from a factory table and arms
+it INLINE — the same `duration < 0 => 9999.0`, `+0x79` flag and `+0x7c`/`+0x80`
+stores that `init` does, compiled straight into the branch — then pushes it onto
+the holder's list. `init` is never entered, so the application was never
+reported.
+
+Measured over one session's hookdiag log, that lost: EVERY application of
+Invincibility (0 inits against 295 removals), Autorevive (0/56), Mirror Image,
+Critical Hit Rate up, Dragonform, Bloodthirst, DMG up, Pincer Synergy and
+Inversa — and all but 36 of ATK up's 240. An effect that is never refreshed had
+no row at all; one that is refreshed opened its window at the first REFRESH, so
+its uptime began late and its count counted refreshes.
+
+Rather than chase the ~350 apply call sites through two front doors, this
+observes the holder itself: `ExStatus::update` ticks one status holder per
+frame, so walking its list and reporting what is new since the last tick catches
+an application whatever path made it. It is also the only way to see a status
+applied before the hook attached, or before the encounter opened.
+
+STRICTLY ADDITIVE: it reports an object only the first time it is seen, and
+removals still ride the dtors above. If it observes nothing new, behaviour is
+what it was.
+
+Verified 1 match on v2.0.3 resolving to the known entry 0xbd5d20. Both argument
+registers come from the PROLOGUE (`MOV R13,RCX` + `VMOVAPS XMM6,XMM1`), not from
+the decompiler, which reports this function as taking `param_1` alone: the fast
+analysis profile disables Decompiler Parameter ID, so it drops the float. A
+one-argument detour here would have left XMM1 garbage on a game thread. */
+
+/// `ExStatus::update(this, f32 delta)` entry. Anchored on the `int3` padding
+/// before the entry plus the whole register-save prologue and the frame-gate
+/// read that follows it, with that read's RIP-relative displacement wildcarded
+/// (it shifts every patch). The prologue alone matches a second, unrelated
+/// function — the gate read is what separates them.
+const STATUS_UPDATE_SIG: &str = "cc cc cc cc ' 55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec d8 01 \
+                                 00 00 48 8d ac 24 80 00 00 00 c5 78 29 a5 40 01 00 00 c5 78 29 9d \
+                                 30 01 00 00 c5 78 29 95 20 01 00 00 c5 78 29 8d 10 01 00 00 c5 78 \
+                                 29 85 00 01 00 00 c5 f8 29 bd f0 00 00 00 c5 f8 29 b5 e0 00 00 00 \
+                                 48 c7 85 d8 00 00 00 fe ff ff ff 48 8b 05 ? ? ? ? f6 40 0a 01";
+
+/// The holder's active-status list: a `std::vector<StatusBase*>`, so begin/end
+/// bound it and the difference is a whole number of pointers. Read from the
+/// creation branch of the apply worker, which push_backs the new status here.
+const EX_STATUS_LIST_BEGIN: usize = 0x18;
+/// End of that vector; see [`EX_STATUS_LIST_BEGIN`].
+const EX_STATUS_LIST_END: usize = 0x20;
+
+type StatusUpdateFunc = unsafe extern "system" fn(*const usize, f32);
+
+static_detour! {
+    static OnStatusUpdate: unsafe extern "system" fn(*const usize, f32);
+}
+
+/// What each holder's list held at its previous tick, keyed by holder.
+///
+/// Cleared whenever the game is outside a quest, which both bounds it (holders
+/// die with their actors, and nothing else ever removes their entry) and makes
+/// the first tick of a fight report everything standing — which is the whole
+/// point, since quest-start buffs are applied before any encounter exists.
+static LAST_SEEN: std::sync::Mutex<Option<std::collections::HashMap<usize, Vec<StatusKey>>>> =
+    std::sync::Mutex::new(None);
+
+thread_local! {
+    /// Per-thread scratch for the current holder's list, so the per-frame walk
+    /// does not allocate. `RefCell` with a FALLIBLE borrow: holders tick on
+    /// whichever thread the game chooses, and a reentrant walk must skip rather
+    /// than panic on a game thread.
+    static SCRATCH: std::cell::RefCell<Vec<StatusKey>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// The entity-info block of whoever APPLIED a status, read from the middle qword
+/// of its source handle triple — the mirror of [`target_info_of`].
+///
+/// This is what lets the walk attribute a caster without the apply ctx that
+/// [`run_init`] receives as an argument: the creation branch writes the source
+/// triple into the object (`+0x28`..`+0x40`) before the status ever ticks.
+fn source_info_of(status: *const usize) -> usize {
+    diag::read_ptr_guarded(
+        status as usize,
+        STATUS_SOURCE_HANDLE + HANDLE_INFO_PTR_OFFSET,
+    )
+    .unwrap_or(0)
+}
+
+/// What the walk actually costs, so a live run reports it instead of leaving it
+/// to inference. Emitted every [`walk_stats::REPORT_EVERY`] walks: the `t` delta
+/// between two reports is the wall time those walks took, and `unreadable`
+/// counts holders whose list span failed its probe — the case that would
+/// otherwise cost an exception unwind per slot, on a game thread.
+#[cfg(feature = "hookdiag")]
+mod walk_stats {
+    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+
+    pub static WALKS: AtomicU64 = AtomicU64::new(0);
+    pub static UNREADABLE: AtomicU64 = AtomicU64::new(0);
+    pub static EMITTED: AtomicU64 = AtomicU64::new(0);
+    pub static MAX_LIST: AtomicUsize = AtomicUsize::new(0);
+
+    pub const REPORT_EVERY: u64 = 20_000;
+
+    pub fn note_list(len: usize) {
+        MAX_LIST.fetch_max(len, Ordering::Relaxed);
+    }
+
+    pub fn note_unreadable() {
+        UNREADABLE.fetch_add(1, Ordering::Relaxed);
+    }
+
+    pub fn note_emitted() {
+        EMITTED.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// True once every [`REPORT_EVERY`] walks.
+    pub fn due() -> bool {
+        WALKS.fetch_add(1, Ordering::Relaxed) % REPORT_EVERY == REPORT_EVERY - 1
+    }
+
+    pub fn snapshot() -> (u64, u64, u64, usize) {
+        (
+            WALKS.load(Ordering::Relaxed),
+            UNREADABLE.load(Ordering::Relaxed),
+            EMITTED.load(Ordering::Relaxed),
+            MAX_LIST.load(Ordering::Relaxed),
+        )
+    }
+}
+
+/// Every status the holder currently carries, as the identity the diff keys on.
+///
+/// `None` when the list bounds are not readable or not plausible — the previous
+/// snapshot is then left alone, so a single bad frame loses nothing.
+fn live_keys(ex_status: *const usize, out: &mut Vec<StatusKey>) -> bool {
+    out.clear();
+    let base = ex_status as usize;
+    let (Some(begin), Some(end)) = (
+        diag::read_ptr_guarded(base, EX_STATUS_LIST_BEGIN),
+        diag::read_ptr_guarded(base, EX_STATUS_LIST_END),
+    ) else {
+        return false;
+    };
+    let Some(count) = live_count(begin, end) else {
+        return false;
+    };
+    if count == 0 {
+        return true;
+    }
+
+    // ONE probe for the whole array rather than one per slot. `IsBadReadPtr` is
+    // ~2 ns on mapped memory but takes an internal exception path on unmapped
+    // memory, so a bogus `begin` that happens to satisfy `live_count` used to
+    // cost up to 256 exception unwinds PER HOLDER PER FRAME — the walk runs on
+    // a game thread, so that is frametime, and it is the shape of a stall that
+    // appears only while some transient actor exists.
+    if !readable(begin, count * std::mem::size_of::<usize>()) {
+        #[cfg(feature = "hookdiag")]
+        walk_stats::note_unreadable();
+        return false;
+    }
+
+    out.reserve(count);
+    for index in 0..count {
+        // The span above is proven mapped, so the element read needs no probe
+        // of its own.
+        let status =
+            unsafe { ((begin + index * std::mem::size_of::<usize>()) as *const usize).read() };
+        if status == 0 {
+            continue;
+        }
+        // One probe of the object, then two direct field reads — the fields sit
+        // inside the span that probe covers. A slot pointing at freed or
+        // unmapped memory is skipped rather than abandoning the holder: the
+        // rest of the list is still good information.
+        if !readable(status, STATUS_ID_OFFSET + std::mem::size_of::<u32>()) {
+            continue;
+        }
+        let status_id = unsafe { ((status + STATUS_ID_OFFSET) as *const u32).read_unaligned() };
+        let cause = unsafe { ((status + STATUS_SUBID_OFFSET) as *const u32).read_unaligned() };
+        out.push((status, status_id, (cause > 0).then_some(cause)));
+    }
+    true
+}
+
+/// Publishes one application observed by the walk.
+///
+/// Every field is read exactly the way [`run_init`] reads it, off the same
+/// object — the two must agree or the parser would file one effect on two rows.
+fn emit_apply(tx: &event::Tx, status: *const usize) {
+    let target_info = target_info_of(status);
+    let source_info = source_info_of(status);
+
+    if let (Some(status_id), Some(actor_index)) = (status_id_of(status), holder_index(target_info))
+    {
+        let _ = tx.send(protocol::Message::StatusApply(protocol::StatusApplyEvent {
+            actor_index,
+            caster_index: holder_index(source_info),
+            status_id,
+            ability_id: cause_id_of(status),
+            stacks: stacks_for(status_id, raw_stacks_of(status)),
+            status_class: super::status_class::status_class_of(status),
+            // A frame later than the apply itself, which is the one fidelity
+            // this path gives up: the caster may have advanced. Actions run far
+            // longer than a frame, so it is nearly always the same one.
+            caster_action_id: caster_action_of(source_info),
+        }));
+    }
+
+    diag::ev!(
+        "status_seen",
+        "this={:#x} id={:?} cause={:?} tgt={:#x} src={:#x}",
+        status as usize,
+        status_id_of(status),
+        cause_id_of(status),
+        target_info,
+        source_info
+    );
+}
+
+/// Diffs one holder's list against its previous tick and reports what is new.
+/// Everything in here runs on a GAME THREAD, and holders tick in parallel, so
+/// the shared map is locked for the map operations ONLY. An earlier version held
+/// it across [`live_keys`] — hundreds of memory probes — which turned one global
+/// mutex into a serialisation point for every status holder in the scene.
+fn observe_holder(tx: &event::Tx, ex_status: *const usize) {
+    // Cheapest check first, and before any lock. Same gate as the apply and
+    // removal paths: statuses tick constantly in town, the lobby and menus,
+    // where no encounter exists to file them against.
+    if !super::quest::in_quest_now() {
+        // Dropping the snapshots is what makes the first tick inside a quest
+        // report the buffs applied during the load. Only ever taken outside a
+        // quest, so it costs nothing in a fight.
+        if let Ok(mut guard) = LAST_SEEN.lock() {
+            if let Some(seen) = guard.as_mut() {
+                seen.clear();
+            }
+        }
+        return;
+    }
+
+    // Read the holder's list WITHOUT the lock held, into a buffer this thread
+    // reuses. The walk runs for every holder every frame, so allocating a fresh
+    // Vec here meant thousands of heap operations a second competing with the
+    // game's own allocator — the contention this file's `readable` comment
+    // records as a previously shipped in-combat slowdown. Reused, the steady
+    // state allocates nothing.
+    let fresh = SCRATCH.with(|scratch| {
+        let Ok(mut current) = scratch.try_borrow_mut() else {
+            return Vec::new();
+        };
+        if !live_keys(ex_status, &mut current) {
+            return Vec::new();
+        }
+
+        #[cfg(feature = "hookdiag")]
+        walk_stats::note_list(current.len());
+
+        // A poisoned lock means another thread panicked mid-walk; skipping this
+        // tick is always safe, where unwrapping would take the game down.
+        let Ok(mut guard) = LAST_SEEN.lock() else {
+            return Vec::new();
+        };
+        let seen = guard.get_or_insert_with(std::collections::HashMap::new);
+
+        // A holder carrying nothing needs no entry: storing an empty list and
+        // storing none are the same answer next tick, and dropping it is what
+        // keeps the map from accumulating a row per enemy ever spawned.
+        if current.is_empty() {
+            seen.remove(&(ex_status as usize));
+            return Vec::new();
+        }
+
+        let previous = seen.entry(ex_status as usize).or_default();
+        let fresh = newly_applied(previous, &current);
+        // Only an actual change touches the stored snapshot, so an unchanged
+        // holder — the overwhelmingly common case — neither allocates nor
+        // copies.
+        if fresh.is_empty() && previous.len() == current.len() {
+            return fresh;
+        }
+        previous.clear();
+        previous.extend_from_slice(&current);
+        fresh
+    });
+
+    #[cfg(feature = "hookdiag")]
+    if walk_stats::due() {
+        let (walks, unreadable, emitted, max_list) = walk_stats::snapshot();
+        let holders = LAST_SEEN
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|seen| seen.len()))
+            .unwrap_or(0);
+        diag::ev!(
+            "status_walk",
+            "walks={walks} unreadable={unreadable} emitted={emitted} \
+             max_list={max_list} holders={holders}"
+        );
+    }
+
+    for (status, _, _) in fresh {
+        #[cfg(feature = "hookdiag")]
+        walk_stats::note_emitted();
+        emit_apply(tx, status as *const usize);
+    }
+}
+
+/// Observes one status holder's per-frame tick, reporting any status that has
+/// appeared in its list since the last one.
+///
+/// The walk runs BEFORE the original: a status the tick is about to expire is
+/// still listed, so an effect that lived a single frame still opens a window.
+#[derive(Clone)]
+pub struct OnStatusUpdateHook {
+    tx: event::Tx,
+}
+
+impl OnStatusUpdateHook {
+    pub fn new(tx: event::Tx) -> Self {
+        Self { tx }
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        let cloned_self = self.clone();
+
+        if let Ok(addr) = process.search_address(STATUS_UPDATE_SIG) {
+            unsafe {
+                let func: StatusUpdateFunc = std::mem::transmute(addr);
+                OnStatusUpdate.initialize(func, move |ex_status, delta| {
+                    observe_holder(&cloned_self.tx, ex_status);
+                    OnStatusUpdate.call(ex_status, delta)
+                })?;
+                OnStatusUpdate.enable()?;
+            }
+            Ok(())
+        } else {
+            Err(anyhow!("Could not find status_update"))
+        }
     }
 }
