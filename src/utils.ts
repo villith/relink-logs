@@ -1286,6 +1286,73 @@ const encounterSummaryCsv = (encounterState: EncounterState): string => {
   return [header, values].join("\n");
 };
 
+/// The header both exports print above a player line.
+const PLAYER_CSV_HEADER = "Name, DMG, DPS, %";
+
+/// The party as both exports rank it: party order, each row carrying its share
+/// of the encounter's damage, then sorted the way the meter is sorted.
+const encounterCsvPlayers = (
+  encounterState: EncounterState,
+  sortType: SortType,
+  sortDirection: SortDirection
+): ComputedPlayerState[] => {
+  const players: ComputedPlayerState[] = formatInPartyOrder(encounterState.party).map((player) => ({
+    ...player,
+    percentage: (player.totalDamage / encounterState.totalDamage) * 100,
+  }));
+
+  sortPlayers(players, sortType, sortDirection);
+
+  return players;
+};
+
+/// One player's row: name, damage, DPS, share of the encounter.
+const playerCsvRow = (player: ComputedPlayerState, partyData: Array<PlayerData | null>): string => {
+  const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
+
+  return [
+    translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player),
+    player.totalDamage,
+    Math.round(player.dps),
+    `${player.percentage?.toFixed(2)}%`,
+  ].join(", ");
+};
+
+/// A player's skill table for the detailed export: biggest hitter first, each
+/// row carrying its share of that player's own damage.
+const skillCsvRows = (player: ComputedPlayerState): string => {
+  const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
+
+  return player.skillBreakdown
+    .map((skill) => ({
+      // Guard the denominator: a guard-only player (all zero-damage Perfect
+      // Guard rows) has totalDamage 0, which would export "NaN%" for every
+      // row — same guard as useSkillBreakdown.
+      percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
+      ...skill,
+    }))
+    .sort((a, b) => b.totalDamage - a.totalDamage)
+    .map((skill) =>
+      [
+        getSkillName(player.characterType, skill),
+        skill.hits,
+        skill.totalDamage,
+        skill.minDamage,
+        skill.maxDamage,
+        Math.round(skill.hits === 0 ? 0 : skill.totalDamage / skill.hits),
+        `${skill.percentage.toFixed(2)}%`,
+      ].join(", ")
+    )
+    .join("\n");
+};
+
+/// Puts an assembled export on the clipboard and says so.
+const copyEncounterCsv = (sections: string[]) => {
+  navigator.clipboard.writeText(sections.join("\n")).then(() => {
+    toast.success(t("ui.copied-to-clipboard"));
+  });
+};
+
 /// Exports the encounter data to the clipboard in a simple format (CSV)
 export const exportSimpleEncounterToClipboard = (
   sortType: SortType,
@@ -1295,52 +1362,20 @@ export const exportSimpleEncounterToClipboard = (
 ) => {
   if (encounterState.totalDamage === 0) return toast.error("Nothing to copy!");
 
-  const encounterData = encounterSummaryCsv(encounterState);
+  const players = encounterCsvPlayers(encounterState, sortType, sortDirection);
 
-  const orderedPlayers = formatInPartyOrder(encounterState.party);
-
-  const players: Array<ComputedPlayerState> = orderedPlayers.map((playerData) => {
-    return {
-      ...playerData,
-      percentage: (playerData.totalDamage / encounterState.totalDamage) * 100,
-    };
-  });
-
-  sortPlayers(players, sortType, sortDirection);
-
-  const playerHeader = "Name, DMG, DPS, %";
-  const playerData = players
-    .map((player) => {
-      const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
-      const computedSkills = player.skillBreakdown.map((skill) => {
-        return {
-          // Guard the denominator: a guard-only player (all zero-damage Perfect
-          // Guard rows) has totalDamage 0, which would export "NaN%" for every
-          // row — same guard as useSkillBreakdown.
-          percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
-          ...skill,
-        };
-      });
-
-      computedSkills.sort((a, b) => b.totalDamage - a.totalDamage);
-
-      const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-
-      return [
-        translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player),
-        player.totalDamage,
-        Math.round(player.dps),
-        `${player.percentage?.toFixed(2)}%`,
-      ].join(", ");
-    })
-    .join("\n");
-
-  navigator.clipboard.writeText([encounterData, playerHeader, playerData].join("\n")).then(() => {
-    toast.success(t("ui.copied-to-clipboard"));
-  });
+  copyEncounterCsv([
+    encounterSummaryCsv(encounterState),
+    PLAYER_CSV_HEADER,
+    players.map((player) => playerCsvRow(player, partyData)).join("\n"),
+  ]);
 };
 
 /// Exports the encounter data to the clipboard in a detailed format (CSV)
+///
+/// The simple export's rows, each followed by that player's own skill table —
+/// so the two share everything above the skill block rather than keeping a
+/// second copy of it.
 export const exportFullEncounterToClipboard = (
   sortType: SortType,
   sortDirection: SortDirection,
@@ -1349,70 +1384,17 @@ export const exportFullEncounterToClipboard = (
 ) => {
   if (encounterState.totalDamage === 0) return toast.error("Nothing to copy!");
 
-  const encounterData = encounterSummaryCsv(encounterState);
+  const skillHeader = ["Skill", "Hits", "Total", "Min", "Max", "Avg", "%"].join(", ");
+  const players = encounterCsvPlayers(encounterState, sortType, sortDirection);
 
-  const playerHeader = "Name, DMG, DPS, %";
-  const orderedPlayers = formatInPartyOrder(encounterState.party);
-
-  const players: Array<ComputedPlayerState> = orderedPlayers.map((playerData) => {
-    return {
-      ...playerData,
-      percentage: (playerData.totalDamage / encounterState.totalDamage) * 100,
-    };
-  });
-
-  sortPlayers(players, sortType, sortDirection);
-
-  const playerData = players
-    .map((player) => {
-      const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
-      const computedSkills = player.skillBreakdown.map((skill) => {
-        return {
-          // Guard the denominator: a guard-only player (all zero-damage Perfect
-          // Guard rows) has totalDamage 0, which would export "NaN%" for every
-          // row — same guard as useSkillBreakdown.
-          percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
-          ...skill,
-        };
-      });
-
-      const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-
-      computedSkills.sort((a, b) => b.totalDamage - a.totalDamage);
-
-      const playerLine = [
-        translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player),
-        player.totalDamage,
-        Math.round(player.dps),
-        `${player.percentage?.toFixed(2)}%`,
-      ].join(", ");
-
-      const skillHeader = ["Skill", "Hits", "Total", "Min", "Max", "Avg", "%"].join(", ");
-
-      const skillLine = computedSkills
-        .map((skill) => {
-          const skillName = getSkillName(player.characterType, skill);
-          const averageHit = skill.hits === 0 ? 0 : skill.totalDamage / skill.hits;
-
-          return [
-            skillName,
-            skill.hits,
-            skill.totalDamage,
-            skill.minDamage,
-            skill.maxDamage,
-            Math.round(averageHit),
-            `${skill.percentage.toFixed(2)}%`,
-          ].join(", ");
-        })
-        .join("\n");
-
-      return [playerHeader, playerLine, skillHeader, skillLine].join("\n");
-    })
-    .join("\n");
-
-  navigator.clipboard.writeText([encounterData, playerData].join("\n")).then(() => {
-    toast.success(t("ui.copied-to-clipboard"));
-  });
+  copyEncounterCsv([
+    encounterSummaryCsv(encounterState),
+    players
+      .map((player) =>
+        [PLAYER_CSV_HEADER, playerCsvRow(player, partyData), skillHeader, skillCsvRows(player)].join("\n")
+      )
+      .join("\n"),
+  ]);
 };
 
 export const PLAYER_COLORS = ["#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#9BCF53", "#380E7F", "#416D19", "#2C568D"];
