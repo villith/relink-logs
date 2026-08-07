@@ -1417,6 +1417,24 @@ export const exportFullEncounterToClipboard = (
 
 export const PLAYER_COLORS = ["#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#9BCF53", "#380E7F", "#416D19", "#2C568D"];
 
+/// The categorical palette for ENEMY actors, the counterpart to PLAYER_COLORS.
+///
+/// A separate list rather than a shared one, and deliberately in hues the four
+/// player DEFAULTS do not occupy (red-orange, amber, green, cyan): the point of
+/// colouring an actor at all is telling friendly from hostile at a glance, and
+/// a boss drawn in the same green as your healer defeats it. Non-collision can
+/// only ever be a default — the first four player colours are user-settable, so
+/// someone who sets one to magenta will collide, and that is their choice.
+///
+/// Indexed by SPAWN, not by actor index: the game reissues a dead boss's actor
+/// index to the next one, so two waves would otherwise share a colour while the
+/// rows insist they are different enemies.
+///
+/// The list only; `pages/logs/view/actorColor.ts` is what resolves an actor to
+/// one of these, and is the single entry point the chart, the table, the pin
+/// selectors and the events stream all go through.
+export const ENEMY_COLORS = ["#F06595", "#CC5DE8", "#845EF7", "#5C7CFA", "#A9B1BD", "#D6336C", "#9775FA", "#4DABF7"];
+
 /// Resolves a player row's chart/overlay color. A filled party slot's color belongs
 /// to the row matched to it. A row that doesn't resolve to a slot picks, by its sort
 /// position, from the remaining colors: first the EMPTY slots' colors (so four
