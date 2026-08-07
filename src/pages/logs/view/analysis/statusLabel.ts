@@ -4,15 +4,29 @@ import type { Hostility, LabelKind } from "../metrics/types";
 import { isStatusPin, statusPinKey } from "../statusUptime";
 import type { AbilityLabelPlayer } from "./abilityLabel";
 
-/** How a status row's key is spelled: the effect, then the ability that caused
- * it, or the literal `unknown` where the hook could not attribute one. */
-const STATUS_KEY = /^status:(\d+):(\d+|unknown)$/;
+/** How a status row's key is spelled: the effect, the ability that caused it,
+ * and the RTTI class that applied it — each of the latter two either a number
+ * or the literal `unknown` where the hook could not attribute one. */
+const STATUS_KEY = /^status:(\d+):(\d+|unknown):(\d+|unknown)$/;
 
-/** The effect id inside a `status:<effect>:<cause>` key, or null for anything
- * that is not one — the same tolerance `statusLabelFor` shows a stale pin. */
-export const statusIdOfKey = (key: string): number | null => {
+/** The effect id inside a `status:<effect>:<cause>:<class>` key, or null for
+ * anything that is not one — the same tolerance `statusLabelFor` shows a stale
+ * pin. */
+export const statusIdOfKey = (key: string): number | null => statusKeyParts(key)?.statusId ?? null;
+
+/** All three ids inside a `status:<effect>:<cause>:<class>` key, or null for
+ * anything that is not one. A null `causeId`/`classHash` is the literal
+ * `unknown` segment. */
+export const statusKeyParts = (
+  key: string
+): { statusId: number; causeId: number | null; classHash: number | null } | null => {
   const parsed = STATUS_KEY.exec(key);
-  return parsed === null ? null : Number(parsed[1]);
+  if (parsed === null) return null;
+  return {
+    statusId: Number(parsed[1]),
+    causeId: parsed[2] === "unknown" ? null : Number(parsed[2]),
+    classHash: parsed[3] === "unknown" ? null : Number(parsed[3]),
+  };
 };
 
 /** What a status table's rows currently ARE, for labelling them and for naming
@@ -67,22 +81,42 @@ export const causeLabel = (id: number | null): string =>
 
 /** Display name for the `+0x4c` cause discriminator.
  *
- * A cause in the character bands IS the applying character's action id — the
- * same id space the damage meter names (established by the status-cause RE
- * investigation: 1100 is "Scourge (Dragonform)" both statically and live) —
- * so it resolves through the same per-character skill tables, with
- * `skills.default` carrying the global bands (sigil/trait, environment,
- * perfect guard). A cause no table names stays a number: id spaces collide
- * across characters, so fabricating a name from a numeric coincidence is the
- * one forbidden move.
+ * Four sources, most specific first:
  *
- * `nameForCause` is injected for the same reason `statusLabelFor` injects its
- * names — the lookup needs i18n and the party, and this stays pure. */
-export const causeNameFor = (id: number | null, nameForCause: (id: number) => string): string => {
+ * 1. the applying character's own skill table, because a cause in the character
+ *    bands IS that character's action id — the same id space the damage meter
+ *    names (established by the status-cause RE investigation: 1100 is "Scourge
+ *    (Dragonform)" both statically and live) — with `skills.default` carrying
+ *    the global bands (sigil/trait, environment, perfect guard);
+ * 2. the action the CASTER was performing at the apply, which names the rows
+ *    the cause cannot: 9998 means no activated action produced the effect (a
+ *    passive, a guardpoint, a summon aura, a transformation), so there is no
+ *    action id recorded — but the caster was still mid-action;
+ * 3. the applying status object's RTTI CLASS, which names the MECHANISM rather
+ *    than the ability — less specific than 2, and available where 2 is not;
+ * 4. the bare number, kept deliberately: a real but uncurated action id is
+ *    honest, and it is the only thing distinguishing two such rows.
+ *
+ * The two inferred rungs sit ABOVE the number, not below it — this function
+ * returns the number whenever nothing names the cause, so anything placed
+ * after it could never fire. A cause no source names stays a number: id spaces
+ * collide across characters, so fabricating a name from a numeric coincidence
+ * is the one forbidden move.
+ *
+ * All three lookups are injected for the same reason `statusLabelFor` injects
+ * its names — they need i18n and the party, and this stays pure. The last two
+ * default, so every existing two-argument caller compiles unchanged. */
+export const causeNameFor = (
+  id: number | null,
+  nameForCause: (id: number) => string,
+  nameForCasterAction: () => string = () => "",
+  nameForClass: () => string = () => ""
+): string => {
   // `causeLabel` owns the unattributed test; re-spelling it here let the two
   // disagree about what counts as "no cause".
   const bare = causeLabel(id);
-  return bare === "" ? "" : nameForCause(id as number) || bare;
+  if (bare === "") return "";
+  return nameForCause(id as number) || nameForCasterAction() || nameForClass() || bare;
 };
 
 /** Candidate character types for naming one status row's cause: the CASTERS
@@ -123,13 +157,38 @@ export const causeCandidatesOf = (
   return [...seen];
 };
 
+/** The action every interval of one row agrees its caster was performing when
+ * the effect landed, or null where they disagree.
+ *
+ * Unanimity rather than the first one seen. A row is `(effect, cause, class)`
+ * across every holder, and the caster action is deliberately NOT part of that
+ * key — it is inferred rather than recorded, so keying on it would split rows
+ * by a guess. One row can therefore span several actions, and naming it after
+ * whichever interval happened to sort first is the same fabrication as naming
+ * a cause from a numeric coincidence. Where they disagree the class rung below
+ * is the honest answer.
+ *
+ * An interval with no caster action ABSTAINS rather than vetoes: every log
+ * written before the field existed carries none at all, and one apply the hook
+ * could not read must not silence the rest of the row. */
+export const casterActionOf = (intervals: Pick<StatusInterval, "casterActionId">[]): number | null => {
+  let agreed: number | null = null;
+  for (const interval of intervals) {
+    const action = interval.casterActionId;
+    if (action === null) continue;
+    if (agreed === null) agreed = action;
+    else if (agreed !== action) return null;
+  }
+  return agreed;
+};
+
 /** `causeCandidatesOf` for one row key, selecting that row's intervals out of
  * the whole fight. Callers with many rows to label should group ONCE by
  * `statusPinKey` and call `causeCandidatesOf` per group instead — this scans
  * every interval, so a call per row is quadratic. */
 export const causeCandidatesFor = (
   key: string,
-  intervals: Pick<StatusInterval, "statusId" | "abilityId" | "casterIndex">[],
+  intervals: Pick<StatusInterval, "statusId" | "abilityId" | "statusClass" | "casterIndex">[],
   playerOf: (actorIndex: number) => AbilityLabelPlayer | undefined
 ): CharacterType[] =>
   causeCandidatesOf(
@@ -137,7 +196,7 @@ export const causeCandidatesFor = (
     playerOf
   );
 
-/** Display name for a `status:<effect>:<cause>` row key.
+/** Display name for a `status:<effect>:<cause>:<class>` row key.
  *
  * Reads as `Attack Up (Signo Drive)` — effect first so that two abilities
  * granting one effect sort next to each other, cause in parentheses because

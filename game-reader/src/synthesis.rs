@@ -16,7 +16,7 @@ const COMMIT_SIG: &str = "55 41 57 41 56 41 55 41 54 56 57 53 48 81 ec ? ? 00 00
 const MGR_ITEM_MAP: u64 = 0x0;
 const MGR_WEIGHT_MAP: u64 = 0x180;
 const MGR_TRAIT_ITEM_MAP: u64 = 0x240;
-const MGR_SEED_COUNTER: u64 = 0x2d8;
+const MGR_SAVED_SEED: u64 = 0x2d8;
 const MGR_PAIR_MAP: u64 = 0x2e0;
 const MGR_UID_MAP: u64 = 0x37f80;
 const RNG_SYNTH_STATE: u64 = 0x81 * 4; // slot 0x81
@@ -75,17 +75,28 @@ fn deref_globals(mem: &impl MemRead, base: u64, rvas: SynthesisRvas) -> Result<(
     Ok((mgr, rng))
 }
 
-/// Light read of just the synthesis seed identity (RNG slot 0x81 state +
-/// manager seed counter) for staleness polling — no map walks.
+/// Light read of the synthesis seed identity for staleness polling: the two
+/// seed words plus the pair-counter tally. Walks only the pair map — one entry
+/// per distinct pair shape ever synthesized, orders of magnitude smaller than
+/// the sigil box a full snapshot walks.
 pub fn take_seed_state(
     mem: &impl MemRead,
     base: u64,
     rvas: SynthesisRvas,
 ) -> Result<SynthesisSeed> {
     let (mgr, rng) = deref_globals(mem, base, rvas)?;
+    let mut synth_count = 0u32;
+    walk_map(mem, mgr + MGR_PAIR_MAP, |node| {
+        synth_count = synth_count.wrapping_add(mem.u32(node + 0x18)?);
+        Ok(())
+    })?;
+    let rng_state = mem.u32(rng + RNG_SYNTH_STATE)?;
+    let saved_seed = mem.u32(mgr + MGR_SAVED_SEED)?;
     Ok(SynthesisSeed {
-        rng_state: mem.u32(rng + RNG_SYNTH_STATE)?,
-        seed_counter: mem.u32(mgr + MGR_SEED_COUNTER)?,
+        rng_state,
+        saved_seed,
+        synth_count,
+        latched: rng_state == saved_seed,
     })
 }
 
@@ -99,7 +110,7 @@ pub fn take_snapshot(
 
     let mut snap = SynthesisSnapshot {
         rng_state: mem.u32(rng + RNG_SYNTH_STATE)?,
-        seed_counter: mem.u32(mgr + MGR_SEED_COUNTER)?,
+        saved_seed: mem.u32(mgr + MGR_SAVED_SEED)?,
         ..Default::default()
     };
     let slot_override = mem.u32(rng + RNG_SLOT_OVERRIDE)?;
@@ -201,7 +212,7 @@ mod tests {
         m.put_u64(BASE + RVAS.rng as u64, RNG);
         m.put_u32(RNG + RNG_SYNTH_STATE, 0xdead);
         m.put_u32(RNG + RNG_SLOT_OVERRIDE, u32::MAX);
-        m.put_u32(MGR + MGR_SEED_COUNTER, 7);
+        m.put_u32(MGR + MGR_SAVED_SEED, 7);
         for off in [
             MGR_ITEM_MAP,
             MGR_WEIGHT_MAP,
@@ -219,7 +230,37 @@ mod tests {
         let m = valid_world();
         let seed = take_seed_state(&m, BASE, RVAS).unwrap();
         assert_eq!(seed.rng_state, 0xdead);
-        assert_eq!(seed.seed_counter, 7);
+        assert_eq!(seed.saved_seed, 7);
+        assert_eq!(seed.synth_count, 0);
+    }
+
+    /// The latch rule, read live so a light poll can tell the player when the
+    /// game is ready to be predicted: the two seed words agree exactly when
+    /// the game has latched (see `seed_latched` in src-tauri/src/synthesis).
+    #[test]
+    fn seed_state_reports_whether_the_game_has_latched() {
+        // valid_world() has the slot at 0xdead and the saved seed at 7.
+        let mut m = valid_world();
+        assert!(!take_seed_state(&m, BASE, RVAS).unwrap().latched);
+        m.put_u32(RNG + RNG_SYNTH_STATE, 7);
+        assert!(take_seed_state(&m, BASE, RVAS).unwrap().latched);
+    }
+
+    /// The commit restores the RNG slot from the saved seed on its way out, so
+    /// a synthesis leaves BOTH seed words untouched and the seed identity alone
+    /// cannot see one happen. The pair-counter tally can: every commit bumps
+    /// its pair's counter, which changes that pair's warm-up.
+    #[test]
+    fn seed_state_totals_the_pair_counters() {
+        let mut m = valid_world();
+        let (n1, n2) = (0x7000_0000u64, 0x7000_0100u64);
+        put_map(&mut m, MGR + MGR_PAIR_MAP, &[n1, n2]);
+        m.put_u64(n1 + 0x10, 11);
+        m.put_u32(n1 + 0x18, 2);
+        m.put_u64(n2 + 0x10, 22);
+        m.put_u32(n2 + 0x18, 5);
+        let seed = take_seed_state(&m, BASE, RVAS).unwrap();
+        assert_eq!(seed.synth_count, 7);
     }
 
     #[test]
@@ -312,7 +353,7 @@ mod tests {
 
         let snap = take_snapshot(&m, BASE, RVAS).unwrap();
         assert_eq!(snap.rng_state, 0xdead);
-        assert_eq!(snap.seed_counter, 7);
+        assert_eq!(snap.saved_seed, 7);
         assert_eq!(snap.pair_counters.get(&99), Some(&2));
         assert_eq!(snap.level_weights.get(&30), Some(&(60, 40)));
         assert_eq!(snap.trait_to_item.get(&0x11), Some(&0xAA));

@@ -120,7 +120,10 @@ pub fn party_slot_of(key: u32) -> Option<usize> {
     is_player_slot_key(key).then_some((key & 0x3) as usize)
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+/// `Default` is the all-zero actor: what a hit with no resolvable attacker
+/// sends, which reads as unknown-source damage on the parser side. Derive only
+/// — bincode encodes the fields, so this does not touch the wire format.
+#[derive(Serialize, Deserialize, Debug, Clone, Default)]
 pub struct Actor {
     /// Index of the actor, unique in the party.
     pub index: u32,
@@ -548,6 +551,84 @@ pub struct OnContinueSBAChainEvent {
     pub actor_index: u32,
 }
 
+/// Why a player's SBA gauge went up.
+///
+/// The game routes every gauge ADDITION through one function (v2.0.3
+/// `FUN_140bb1fc0`), which the hook detours. What differs is how it got there,
+/// and that is what this names. Only `Skill` corresponds to a breakdown row;
+/// every other variant is gauge the player generated without a damaging hit of
+/// their own, and the parser files those on a separate list so a gauge-only
+/// cause can never manufacture a hit-less damage row.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SbaGainCause {
+    /// A damaging hit of the player's own, carrying the same CLASSIFIED action
+    /// the hit's `DamageEvent` carries — so the parser can find the row that
+    /// hit opened, including link attacks and SBA hits.
+    Skill(ActionType),
+    /// A hit the player RECEIVED was being registered when their gauge rose.
+    DamageTaken,
+    /// The just-guard grant site (v2.0.3 `0x1f36f70`).
+    PerfectGuard,
+    /// An effect-record grant (`0x26f9640` / `0xbcaa90`). The payload is the
+    /// record's key where the hook could read one, else 0.
+    Effect(u32),
+    /// A four-slot broadcast award — every party member gains at once
+    /// (`0x1b07ae0` / `0x31ec9e0`, distinguished by argument 9).
+    PartyAward,
+    /// The summon/director flat award (`0x6506b0`, argument 11).
+    DirectorAward,
+    /// Gauge granted at quest start (`0x6c50f0` / `0x6c4910`).
+    QuestStart,
+    /// A grant site we have located but cannot name in gameplay terms yet. The
+    /// payload is a stable per-site tag (see `sba.rs`'s `SITE_*` constants), so
+    /// the UI can distinguish them and a future capture can name them.
+    Site(u32),
+    /// A rise with nothing parked and no flag set — an unlocated site. Its
+    /// amount is logged under `hookdiag` so the next site can be found.
+    Unknown,
+    /// A rise inside the just-dodge reward handler (v2.0.3 `0x26f9640`, the
+    /// same frame the `Effect(0xD2C8E10A)` record grant runs in — briefly
+    /// emitted under that key before the frame's semantic was live-confirmed,
+    /// ~42.15 gauge per perfect dodge, log 1694 2026-08-04). Appended last per
+    /// the append-only rule.
+    PerfectDodge,
+}
+
+/// Emitted for EVERY measured gauge rise whose owner resolves, with a `cause`
+/// naming how it was granted. The old Normal-only filter is gone: the parser
+/// keys breakdown rows by the classified `ActionType`, so a link-attack or SBA
+/// hit's gain lands on that hit's own row rather than being flattened into a
+/// `Normal` row it does not belong to.
+///
+/// Separate from [`OnUpdateSBAEvent`], which is a slot POLL: that path diffs
+/// each party member's gauge against the last poll and cannot say what raised
+/// it. This one is emitted from the gauge-UPDATE path: the game's gauge update
+/// runs as a synchronous callee of its register-hit gate, so the hook's gate
+/// detour parks the hit's damage instance on a thread-local for the duration
+/// of the call and the gauge hook reads it back — the parked hit IS the cause,
+/// no timing heuristic involved.
+///
+/// LOCAL PLAYER ONLY in practice: only locally-processed hits pass through
+/// the gate — a remote member's gauge is synced rather than computed here, so
+/// no hit we can see produced it; the poll path remains the only source for
+/// them.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct SbaGainEvent {
+    /// The generating player's slot key (`PLAYER_SLOT_INDEX_BASE | slot`).
+    pub actor_index: u32,
+    /// Raw action id off the causing `DamageInstance` (+0x16C). Kept because
+    /// logs stored before `cause` existed carry their attribution here; the
+    /// parser reads a causeless event as `ActionType::Normal(action_id)`.
+    /// New events carry it only for `Skill(Normal(id))` causes, else 0.
+    pub action_id: u32,
+    /// Gauge added, measured across the game's own gauge-update call.
+    pub amount: f32,
+    /// Why the gauge rose. `None` only in logs stored before causes existed;
+    /// the parser reads that as `Skill(Normal(action_id))`, the old meaning.
+    #[serde(default)]
+    pub cause: Option<SbaGainCause>,
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct OnDeathEvent {
     pub actor_index: u32,
@@ -595,6 +676,22 @@ pub struct StatusApplyEvent {
     pub ability_id: Option<u32>,
     /// Stack count after this application. 1 for unstacking effects.
     pub stacks: u32,
+    /// The status object's RTTI class, as a hash of its class NAME (never its
+    /// vtable address — that moves on a game patch, and a stored address would
+    /// silently resolve to a different class afterwards).
+    ///
+    /// `None` when the hook could not vouch for one. Names the row's source
+    /// where `ability_id` cannot: a passive has no action id, which is what the
+    /// 9998 sentinel means.
+    pub status_class: Option<u32>,
+    /// The action the caster was performing when it applied this. Names the
+    /// rows `ability_id` cannot, because a passive has no action id to record.
+    ///
+    /// Deliberately SEPARATE from `ability_id`, never substituted into it:
+    /// "the game recorded this cause" and "we inferred it from what the caster
+    /// was doing" are different claims, and collapsing them would make the
+    /// stored log lie about its own provenance.
+    pub caster_action_id: Option<u32>,
 }
 
 /// A status effect ending on an actor. Pairs with [`StatusApplyEvent`] by
@@ -613,6 +710,31 @@ pub struct StatusRemoveEvent {
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct QuestElapsedTimeEvent {
     pub elapsed_time_in_secs: u32,
+}
+
+/// Link Time began (`active`) or ended (`!active`) for the party. Captured as
+/// a TRANSITION of the game's own link-time state — the emitter latches and
+/// only sends changes, so consumers can pair start/end into windows.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LinkTimeEvent {
+    pub active: bool,
+}
+
+/// An enemy's battle mode changed (Normal / Overdrive / Break). `mode` is the
+/// game's OWN mode value, forwarded raw so a future game patch adding a mode
+/// cannot silently misfile it; [`EnemyModeEvent::MODE_BREAK`] and friends name
+/// the values live captures have confirmed. `actor_index` matches the index
+/// damage events carry for the same enemy.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EnemyModeEvent {
+    pub actor_index: u32,
+    pub mode: u32,
+}
+
+impl EnemyModeEvent {
+    pub const MODE_NORMAL: u32 = 0;
+    pub const MODE_OVERDRIVE: u32 = 1;
+    pub const MODE_BREAK: u32 = 2;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -683,6 +805,15 @@ pub enum Message {
     StatusApply(StatusApplyEvent),
     /// A status effect ending. Appended last per the append-only rule.
     StatusRemove(StatusRemoveEvent),
+    /// Gauge generated by one hit, with the action that caused it. Appended
+    /// last per the append-only rule.
+    SbaGain(SbaGainEvent),
+    /// Link Time began or ended for the party. Appended last per the
+    /// append-only rule.
+    LinkTime(LinkTimeEvent),
+    /// An enemy's battle mode changed (Normal / Overdrive / Break). Appended
+    /// last per the append-only rule.
+    EnemyMode(EnemyModeEvent),
 }
 
 #[cfg(test)]
@@ -721,6 +852,67 @@ mod record_stats_tests {
         assert_eq!(decoded.stun_power, 12.5);
         assert_eq!(decoded.critical_rate, 21.5);
         assert_eq!(decoded.power, 9999);
+    }
+}
+
+#[cfg(test)]
+mod sba_gain_tests {
+    use super::{ActionType, SbaGainCause, SbaGainEvent};
+
+    /// A stored log written before causes existed decodes with `cause: None`,
+    /// which the parser reads as the old meaning (the hit's own action).
+    #[test]
+    fn old_event_without_a_cause_still_decodes() {
+        #[derive(serde::Serialize)]
+        struct OldSbaGainEvent {
+            actor_index: u32,
+            action_id: u32,
+            amount: f32,
+        }
+
+        let old = OldSbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 1100,
+            amount: 12.5,
+        };
+        let blob = cbor4ii::serde::to_vec(Vec::new(), &old).expect("encode");
+        let new: SbaGainEvent = cbor4ii::serde::from_slice(&blob).expect("decode");
+
+        assert_eq!(new.action_id, 1100);
+        assert_eq!(new.cause, None);
+    }
+
+    /// The cause round-trips, carrying the CLASSIFIED action rather than a raw
+    /// id — the parser keys breakdown rows by the classified `ActionType`.
+    #[test]
+    fn cause_round_trips_through_cbor() {
+        let event = SbaGainEvent {
+            actor_index: 0xF000_0001,
+            action_id: 0,
+            amount: 35.0,
+            cause: Some(SbaGainCause::Skill(ActionType::LinkAttack)),
+        };
+        let blob = cbor4ii::serde::to_vec(Vec::new(), &event).expect("encode");
+        let back: SbaGainEvent = cbor4ii::serde::from_slice(&blob).expect("decode");
+        assert_eq!(
+            back.cause,
+            Some(SbaGainCause::Skill(ActionType::LinkAttack))
+        );
+    }
+
+    /// New variants append; an old event without one still decodes (the
+    /// backward-compat contract every cause addition must re-prove).
+    #[test]
+    fn perfect_dodge_round_trips() {
+        let event = SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 0,
+            amount: 8.43,
+            cause: Some(SbaGainCause::PerfectDodge),
+        };
+        let blob = cbor4ii::serde::to_vec(Vec::new(), &event).expect("encode");
+        let back: SbaGainEvent = cbor4ii::serde::from_slice(&blob).expect("decode");
+        assert_eq!(back.cause, Some(SbaGainCause::PerfectDodge));
     }
 }
 

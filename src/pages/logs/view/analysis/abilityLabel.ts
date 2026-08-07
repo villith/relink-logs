@@ -7,6 +7,25 @@ import { abilityRowKey, abilityRowName, groupOfPin } from "../abilitySkills";
  * this only names the parts that are read. */
 export type AbilityLabelPlayer = Pick<ComputedPlayerState, "characterType" | "skillBreakdown">;
 
+/** Whether one breakdown entry belongs to the row `key` names — a group pin
+ * matches on the ROW key, a raw pin on the action alone, deliberately: a key
+ * from a backend that sent no child character is raw even where that player's
+ * own skill groups, and it must still find its owner. */
+const ownsKey = (key: string): ((entry: SkillRow) => boolean) => {
+  const group = groupOfPin(key);
+  return (entry) => (group === null ? abilityKey(entry.actionType) === key : abilityRowKey(entry) === key);
+};
+
+/** The player whose table `key` would be named against — the same scan (and
+ * the same preferred-player override) `abilityLabelFor` names with, exported
+ * so the label QUALIFIER can name the owner the label itself was named for. */
+export const abilityOwnerFor = (
+  key: string,
+  players: AbilityLabelPlayer[],
+  preferred?: AbilityLabelPlayer
+): AbilityLabelPlayer | undefined =>
+  (preferred ? [preferred, ...players] : players).find((candidate) => candidate.skillBreakdown.some(ownsKey(key)));
+
 /** Display name for one `abilityKey`.
  *
  * Skill names are per character, so an ability is named against the first player
@@ -44,11 +63,7 @@ export const abilityLabelFor = (
   const action = group === null ? parseAbilityKey(key) : { Group: group };
   if (action === null) return key;
 
-  // A group pin matches on the ROW key; a raw pin matches on the action alone,
-  // deliberately — a key from a backend that sent no child character is raw even
-  // where that player's own skill groups, and it must still find its owner.
-  const owns = (entry: SkillRow) =>
-    group === null ? abilityKey(entry.actionType) === key : abilityRowKey(entry) === key;
+  const owns = ownsKey(key);
 
   // Named as the row the key names: through `{ Group }` for a group pin (shared
   // with the drill-down legend, so a band and this label cannot disagree), and

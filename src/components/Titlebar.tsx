@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 
 import { HOOK_LABEL_KEY, HOOK_TONE_CLASS } from "@/hookState";
-import getVersion from "@/hooks/getVersion";
+import { useAppVersion } from "@/hooks/useAppVersion";
 import type { TemplateTokens } from "@/labelTemplate";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { EncounterState, PlayerData, SortDirection, SortType } from "@/types";
@@ -112,7 +112,7 @@ export const Titlebar = ({
   sortDirection: SortDirection;
 }) => {
   const { t } = useTranslation();
-  const { version } = getVersion();
+  const version = useAppVersion();
   const header_segments = useMeterSettingsStore((state) => state.header_segments);
   const header_buttons = useMeterSettingsStore((state) => state.header_buttons);
   const { tokens, toneClass } = useHeaderTokens(encounterState, elapsedTime, version);

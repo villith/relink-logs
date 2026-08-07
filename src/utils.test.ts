@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import i18next from "i18next";
+import { beforeAll, describe, expect, it } from "vitest";
 import { gameXxhash32 } from "../scripts/gbfr-hash.mjs";
 import skillNameSources from "../src-tauri/assets/skill-name-sources.json";
 import enAbilities from "../src-tauri/lang/en/abilities.json";
@@ -44,6 +45,7 @@ import {
   hasQuestElapsedTime,
   humanizeNumbers,
   mergeTargetBreakdowns,
+  millisecondsToPreciseElapsedFormat,
   moveItem,
   orderedChecklistEntries,
   overmasteryAmountFromId,
@@ -57,7 +59,14 @@ import {
   toHash,
   toHashString,
   traitMaxLevel,
+  translateAbilityId,
+  translateItemId,
+  translateOvermasteryId,
+  translateSigilId,
+  translateSummonBonusId,
+  translateSummonId,
   translateTraitId,
+  translateWeaponId,
   type BonusSource,
 } from "./utils";
 
@@ -1210,6 +1219,64 @@ describe("master-trait branch names in en/skillboard-branches.json", () => {
   });
 });
 
+describe("hashed-id translators", () => {
+  // The eight id spaces share one implementation, so these assert the contract
+  // that implementation owes all of them: each wrapper must reach its OWN
+  // bundle, and all of them must guard, pad and spell an id the same way.
+  //
+  // Synthetic resources rather than the shipped bundles, so a wrapper pointed
+  // at the wrong namespace fails here loudly instead of quietly returning a
+  // plausible name from a neighbouring id space. `langBundles.test.ts` is what
+  // holds these against the real bundles' contents.
+  const translators: [string, (id: number | null) => string][] = [
+    ["traits", translateTraitId],
+    ["abilities", translateAbilityId],
+    ["sigils", translateSigilId],
+    ["items", translateItemId],
+    ["overmasteries", translateOvermasteryId],
+    ["weapons", translateWeaponId],
+    ["summons", translateSummonId],
+    ["summon-bonuses", translateSummonBonusId],
+  ];
+
+  const NAMED = 0x00abcdef;
+  const NAMED_HASH = "00abcdef";
+
+  beforeAll(async () => {
+    // Global, and deliberately started here rather than in the suite's setup:
+    // the describes above this one assert the un-loaded fallback behaviour and
+    // would change meaning if i18next were live for them. The describes below
+    // (`barWidth`, `millisecondsToPreciseElapsedFormat`) do not translate.
+    //
+    // Every namespace names the SAME id differently, so a wrapper reaching the
+    // wrong bundle returns another namespace's string rather than passing.
+    const namespaces = Object.fromEntries(
+      translators.map(([namespace]) => [namespace, { [NAMED_HASH]: { text: `${namespace}/${NAMED_HASH}` } }])
+    );
+
+    await i18next.init({
+      lng: "en",
+      defaultNS: "ui",
+      resources: { en: { ui: { "unknown-id": "Unknown ({{id}})" }, ...namespaces } },
+      interpolation: { escapeValue: false },
+    });
+  });
+
+  it.each(translators)("%s: answers empty for an unrecorded id", (_namespace, translate) => {
+    expect(translate(null)).toBe("");
+  });
+
+  it.each(translators)("%s: answers empty for an empty slot", (_namespace, translate) => {
+    // EMPTY_ID is the game's own "nothing equipped here" — naming it would
+    // render "Unknown (887b8bb0)" for a slot the player deliberately left bare.
+    expect(translate(EMPTY_ID)).toBe("");
+  });
+
+  it.each(translators)("%s: reads its own bundle, padded to eight digits", (namespace, translate) => {
+    expect(translate(NAMED)).toBe(`${namespace}/${NAMED_HASH}`);
+  });
+});
+
 describe("barWidth", () => {
   it("returns the raw percentage in total mode", () => {
     expect(barWidth(42, 80, "total")).toBe(42);
@@ -1228,5 +1295,21 @@ describe("barWidth", () => {
     // Nothing has dealt damage yet: divide-by-zero would render NaN%.
     expect(barWidth(0, 0, "relative")).toBe(0);
     expect(barWidth(12, 0, "relative")).toBe(12);
+  });
+});
+
+describe("millisecondsToPreciseElapsedFormat", () => {
+  it("keeps the milliseconds the elapsed format drops", () => {
+    expect(millisecondsToPreciseElapsedFormat(1_500)).toBe("00:01.500");
+    expect(millisecondsToPreciseElapsedFormat(0)).toBe("00:00.000");
+  });
+
+  it("pads every field to a fixed width so a column stays aligned", () => {
+    expect(millisecondsToPreciseElapsedFormat(61_007)).toBe("01:01.007");
+  });
+
+  it("carries past an hour into the minutes field rather than wrapping", () => {
+    // A 90-minute Conflux run must not read as 30:00.000.
+    expect(millisecondsToPreciseElapsedFormat(90 * 60_000)).toBe("90:00.000");
   });
 });

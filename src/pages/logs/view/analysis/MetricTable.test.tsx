@@ -162,21 +162,31 @@ describe("MetricTable", () => {
     expect(screen.getByText("ui.logs.rows-by-player")).toBeTruthy();
   });
 
+  const SECTIONS = () => [
+    {
+      headingKey: "ui.logs.hover-by-target",
+      color: "rgb(1,2,3)",
+      entries: [{ key: "t", label: "Boss", value: 5 }],
+    },
+  ];
+  const CARD_AMOUNT = { amountKey: "ui.meter-columns.damage", format: (value: number) => String(value) };
+
   it("wraps a row in a hover card when the caller supplies sections", () => {
-    const { container } = renderTable({
-      rowSections: () => [
-        {
-          headingKey: "ui.logs.hover-by-target",
-          color: "rgb(1,2,3)",
-          entries: [{ key: "t", label: "Boss", value: 5 }],
-        },
-      ],
-    });
+    const { container } = renderTable({ rowSections: SECTIONS, cardAmount: CARD_AMOUNT });
     const row = container.querySelector<HTMLElement>(".analysis-row");
     expect(row).toBeTruthy();
     fireEvent.mouseOver(row!);
     expect(screen.getByTestId("metric-hover-card")).toBeTruthy();
     expect(screen.getByText("Boss")).toBeTruthy();
+  });
+
+  it("renders no card for sections with no stated meaning", () => {
+    // `cardAmount` says what the figures ARE. Defaulting it is how every tab's
+    // tooltip came to head its column "DMG" and report damage; without one
+    // there is nothing honest to draw.
+    const { container } = renderTable({ rowSections: SECTIONS });
+    fireEvent.mouseOver(container.querySelector<HTMLElement>(".analysis-row")!);
+    expect(screen.queryByTestId("metric-hover-card")).toBeNull();
   });
 
   it("renders rows unwrapped when no sections are supplied", () => {
@@ -236,6 +246,95 @@ describe("MetricTable", () => {
     const toggle = container.querySelector(".analysis-row-toggle");
     expect(toggle?.tagName).toBe("BUTTON");
     expect(toggle?.getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+describe("subrows", () => {
+  const child = (key: string, value: number): MetricRow => ({
+    key,
+    label: key,
+    value,
+    columns: [String(value), ""],
+    pinOnClick: { ability: key },
+    colorSlot: 0,
+  });
+
+  const parentRows = (): MetricRow[] => [
+    {
+      key: "skill:group",
+      label: "skill:group",
+      value: 400,
+      columns: ["400", "4"],
+      pinOnClick: { ability: "group" },
+      colorSlot: 0,
+      children: [child("skill:Normal:100", 300), child("skill:Normal:110", 100)],
+    },
+    {
+      key: "skill:Normal:999",
+      label: "skill:Normal:999",
+      value: 50,
+      columns: ["50", "1"],
+      pinOnClick: null,
+      colorSlot: 0,
+    },
+  ];
+
+  it("renders an expand control only on rows with children", () => {
+    const { container } = renderTable({ rows: parentRows() });
+    const chevrons = container.querySelectorAll(".analysis-row-expand");
+    expect(chevrons).toHaveLength(1);
+    expect(chevrons[0].getAttribute("aria-label")).toBe("ui.logs.expand-row");
+    expect(chevrons[0].tagName).toBe("BUTTON");
+  });
+
+  it("reveals the children as indented rows on expand, without pinning the parent", () => {
+    const onPin = vi.fn();
+    const { container } = renderTable({ rows: parentRows(), onPin });
+
+    expect(screen.queryByText("skill:Normal:100")).toBeNull();
+
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(onPin).not.toHaveBeenCalled();
+
+    expect(screen.getByText("skill:Normal:100")).toBeTruthy();
+    expect(screen.getByText("skill:Normal:110")).toBeTruthy();
+    expect(container.querySelectorAll(".analysis-subrow")).toHaveLength(2);
+  });
+
+  it("pins a clicked child by the child's own payload", () => {
+    const onPin = vi.fn();
+    const { container } = renderTable({ rows: parentRows(), onPin });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+
+    screen.getByText("skill:Normal:110").click();
+    expect(onPin).toHaveBeenCalledWith({ ability: "skill:Normal:110" });
+  });
+
+  it("collapses again on a second click", () => {
+    const { container } = renderTable({ rows: parentRows() });
+    const chevron = container.querySelector(".analysis-row-expand")!;
+    fireEvent.click(chevron);
+    fireEvent.click(chevron);
+    expect(screen.queryByText("skill:Normal:100")).toBeNull();
+  });
+
+  it("resets expansion when the rows change identity", () => {
+    const { container, rerender } = renderTable({ rows: parentRows() });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(screen.getByText("skill:Normal:100")).toBeTruthy();
+
+    // A regroup or refetch hands the table a NEW rows array; stale expansion
+    // keyed to the old rows must not leak onto it.
+    rerender(
+      <MantineProvider>
+        <MetricTable
+          rows={parentRows()}
+          columnKeys={["ui.logs.total-damage", "ui.meter-columns.dps"]}
+          onPin={() => {}}
+        />
+      </MantineProvider>
+    );
+    expect(screen.queryByText("skill:Normal:100")).toBeNull();
   });
 });
 
@@ -328,5 +427,114 @@ describe("timeline rows", () => {
 
     expect(container.querySelector(".analysis-name")?.className).not.toContain("analysis-name-fixed");
     expect(container.querySelector(".analysis-track")).toBeNull();
+  });
+});
+
+describe("children accessor", () => {
+  const child = (key: string, value: number): MetricRow => ({
+    key,
+    label: key,
+    value,
+    columns: [String(value), ""],
+    pinOnClick: null,
+    colorSlot: 0,
+  });
+
+  const parent = (children?: MetricRow[]): MetricRow => ({
+    key: "skill:parent",
+    label: "skill:parent",
+    value: 100,
+    columns: ["100", "1"],
+    pinOnClick: null,
+    colorSlot: 0,
+    ...(children ? { children } : {}),
+  });
+
+  it("prefers the accessor's children over the row's own", () => {
+    // Party-wide, the per-source split REPLACES the member variants the
+    // groups fetch attached — the spec's two reading modes.
+    const { container } = renderTable({
+      rows: [parent([child("skill:member", 40), child("skill:member2", 60)])],
+      rowChildren: () => [child("player:0", 70), child("player:1", 30)],
+    });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(screen.getByText("player:0")).toBeTruthy();
+    expect(screen.queryByText("skill:member")).toBeNull();
+  });
+
+  it("falls back to the row's own children when the accessor answers null", () => {
+    // The drilled case: a pinned source's parent carries its member variants.
+    const { container } = renderTable({
+      rows: [parent([child("skill:member", 40), child("skill:member2", 60)])],
+      rowChildren: () => null,
+    });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(screen.getByText("skill:member")).toBeTruthy();
+  });
+
+  it("hides the chevron below two children — one child only restates its parent", () => {
+    const { container } = renderTable({
+      rows: [parent()],
+      rowChildren: () => [child("player:0", 100)],
+    });
+    expect(container.querySelectorAll(".analysis-row-expand")).toHaveLength(0);
+  });
+
+  it("falls back to the row's own children when the accessor's split restates the parent", () => {
+    // A character-unique ability has ONE user, so the per-source split is a
+    // single row — which the ≥2 rule then refuses to draw a chevron for. Left
+    // to shadow the member variants it would hide an expansion that did have
+    // something to say, on every ability row of a solo log.
+    const { container } = renderTable({
+      rows: [parent([child("skill:member", 40), child("skill:member2", 60)])],
+      rowChildren: () => [child("player:0", 100)],
+    });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(screen.getByText("skill:member")).toBeTruthy();
+    expect(screen.queryByText("player:0")).toBeNull();
+  });
+
+  it("reports its open state to assistive tech", () => {
+    const { container } = renderTable({
+      rows: [parent()],
+      rowChildren: () => [child("player:0", 70), child("player:1", 30)],
+    });
+    const chevron = container.querySelector(".analysis-row-expand")!;
+    expect(chevron.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(chevron);
+    expect(chevron.getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("gives accessor children the subrow anatomy", () => {
+    const { container } = renderTable({
+      rows: [parent()],
+      rowChildren: () => [child("player:0", 70), child("player:1", 30)],
+    });
+    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    expect(container.querySelectorAll(".analysis-subrow")).toHaveLength(2);
+  });
+});
+
+describe("section subheaders", () => {
+  const sectioned: MetricRow[] = [
+    { key: "a", label: "a", value: 3, columns: ["3"], pinOnClick: null, colorSlot: -1 },
+    { key: "b", label: "b", value: 2, columns: ["2"], pinOnClick: null, colorSlot: -1 },
+    { key: "c", label: "c", value: 1, columns: ["1"], pinOnClick: null, colorSlot: -1 },
+  ];
+
+  it("draws one muted header per section change, not per row", () => {
+    renderTable({
+      rows: sectioned,
+      columnKeys: ["ui.logs.buff-uptime"],
+      sectionLabel: (row) => (row.key === "c" ? "Unknown" : "Skill"),
+    });
+    // Two runs → two headers: Skill above a, Unknown above c — none above b.
+    expect(screen.getAllByText("Skill")).toHaveLength(1);
+    expect(screen.getAllByText("Unknown")).toHaveLength(1);
+  });
+
+  it("draws no headers without the prop — every other table is untouched", () => {
+    renderTable({ rows: sectioned, columnKeys: ["ui.logs.buff-uptime"] });
+    expect(screen.queryByText("Skill")).toBeNull();
   });
 });

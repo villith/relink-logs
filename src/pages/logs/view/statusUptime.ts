@@ -1,10 +1,24 @@
 import type { StatusInterval } from "@/types";
 
-/** Identity of a buff row: the effect AND the ability that caused it.
- * Unresolved causes collapse to one "unknown" bucket per effect rather than
- * scattering — the documented fallback when the hook cannot attribute. */
-export const statusKey = (interval: Pick<StatusInterval, "statusId" | "abilityId">): string =>
-  `${interval.statusId}:${interval.abilityId ?? "unknown"}`;
+import { clipSpans, mergeSpans } from "./spans";
+
+/** Identity of a buff row: the effect, the ability that caused it, AND the
+ * status class that applied it. Unresolved causes and classes collapse to one
+ * "unknown" bucket per effect rather than scattering — the documented fallback
+ * when the hook cannot attribute.
+ *
+ * The class segment is ALWAYS written; absence is spelled, not omitted, so the
+ * grammar keeps exactly one shape for its four readers. That is safe because
+ * this key is DERIVED at every use site and never stored — the only
+ * two-segment key that can outlive the change is a bookmarked pin, which
+ * already renders verbatim against an empty table.
+ *
+ * The class splits rows ACROSS holders, not within one: within a single
+ * `(actor, spawn, effect, cause)` the parser still merges, so the first class
+ * wins. `casterActionId` is deliberately NOT here — it is inferred rather than
+ * recorded, and keying on it would split rows by a guess. */
+export const statusKey = (interval: Pick<StatusInterval, "statusId" | "abilityId" | "statusClass">): string =>
+  `${interval.statusId}:${interval.abilityId ?? "unknown"}:${interval.statusClass ?? "unknown"}`;
 
 /** The prefix that keeps a status pin tellable apart from a damage-ability pin
  * in the Ability selector they share. Spelled once, here, beside the key it
@@ -13,7 +27,7 @@ export const statusKey = (interval: Pick<StatusInterval, "statusId" | "abilityId
 export const STATUS_PIN_PREFIX = "status:";
 
 /** `statusKey` prefixed, i.e. the value a status row pins. */
-export const statusPinKey = (interval: Pick<StatusInterval, "statusId" | "abilityId">): string =>
+export const statusPinKey = (interval: Pick<StatusInterval, "statusId" | "abilityId" | "statusClass">): string =>
   `${STATUS_PIN_PREFIX}${statusKey(interval)}`;
 
 /** Whether an Ability pin selects a status effect rather than a damage ability.
@@ -33,37 +47,13 @@ export const isStatusPin = (pin: string | null): pin is string => pin !== null &
  * table while the Buffs table beside them kept reporting the whole pull.
  *
  * Intervals only touching an edge are dropped: at zero width they contribute
- * nothing to uptime but would still draw a row. */
+ * nothing to uptime but would still draw a row — `overlapsWindow`'s rule. */
 export const clipToWindow = (intervals: StatusInterval[], startMs: number, endMs: number): StatusInterval[] =>
-  intervals
-    .filter((interval) => interval.startMs < endMs && interval.endMs > startMs)
-    .map((interval) => ({
-      ...interval,
-      startMs: Math.max(startMs, interval.startMs),
-      endMs: Math.min(endMs, interval.endMs),
-    }));
+  clipSpans(intervals, { startMs, endMs });
 
 /** Total milliseconds covered, merging overlaps.
  *
  * Two sources of one effect on one actor is 100% uptime, not 200% — summing
  * durations naively would report the latter. */
-export const uptimeMs = (intervals: StatusInterval[]): number => {
-  if (intervals.length === 0) return 0;
-
-  const sorted = [...intervals].sort((a, b) => a.startMs - b.startMs);
-  let total = 0;
-  let start = sorted[0].startMs;
-  let end = sorted[0].endMs;
-
-  for (const interval of sorted.slice(1)) {
-    if (interval.startMs <= end) {
-      end = Math.max(end, interval.endMs);
-      continue;
-    }
-    total += end - start;
-    start = interval.startMs;
-    end = interval.endMs;
-  }
-
-  return total + (end - start);
-};
+export const uptimeMs = (intervals: StatusInterval[]): number =>
+  mergeSpans(intervals).reduce((total, interval) => total + (interval.endMs - interval.startMs), 0);

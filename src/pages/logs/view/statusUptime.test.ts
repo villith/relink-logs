@@ -9,6 +9,8 @@ const interval = (actor: number, start: number, end: number, ability: number | n
   casterIndex: 0,
   statusId: 10,
   abilityId: ability,
+  statusClass: null,
+  casterActionId: null,
   startMs: start,
   endMs: end,
   maxStacks: 1,
@@ -42,6 +44,21 @@ describe("statusKey", () => {
 
   it("gives unresolved causes their own stable key", () => {
     // The documented fallback: no causing ability still groups coherently.
-    expect(statusKey(interval(1, 0, 1, null))).toBe("10:unknown");
+    expect(statusKey(interval(1, 0, 1, null))).toBe("10:unknown:unknown");
+  });
+
+  it("separates the same effect and cause applied by different classes", () => {
+    // What the third segment buys: a passive whose cause is a sentinel is told
+    // apart by the object that applied it, so Guardpoint and Ares no longer
+    // share one "(9998)" row.
+    const guardpoint = { ...interval(1, 0, 1, 9998), statusClass: 43981 };
+    const ares = { ...interval(1, 0, 1, 9998), statusClass: 1234 };
+    expect(statusKey(guardpoint)).not.toBe(statusKey(ares));
+  });
+
+  it("spells an absent class rather than omitting the segment", () => {
+    // One grammar shape for all four readers: a class-less log still writes
+    // three segments, so it groups exactly as it did before this change.
+    expect(statusKey(interval(1, 0, 1, 500))).toBe("10:500:unknown");
   });
 });

@@ -1,14 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import type { ComputedPlayerState } from "@/types";
+import type { ComputedPlayerState, EnemyType, SkillTargetState } from "@/types";
 
 import type { SelectorPins } from "../selectorOptions";
-import { damageDone } from "./damageDone";
+import { damageDone, parseEnemyRow } from "./damageDone";
+import type { MetricRow } from "./types";
+
+/** A per-enemy entry of a skill's breakdown, as the parser ships it. */
+const hit = (enemyType: EnemyType, totalDamage: number, hits: number): SkillTargetState => ({
+  enemyType,
+  totalDamage,
+  hits,
+});
 
 const player = (
   index: number,
   total: number,
-  skills: { action: number; damage: number; child?: string; hits?: number; min?: number | null; max?: number | null }[]
+  skills: {
+    action: number;
+    damage: number;
+    child?: string;
+    hits?: number;
+    min?: number | null;
+    max?: number | null;
+    targets?: SkillTargetState[];
+  }[]
 ) =>
   ({
     index,
@@ -38,6 +54,10 @@ const player = (
       cappableHits: 0,
       overcapBaseSum: 0,
       overcapCapSum: 0,
+      // Left absent unless a case asks for it: `targets` is optional on
+      // SkillState because cached payloads predate it, and the fallback for a
+      // payload without one is a behaviour worth keeping covered.
+      ...(s.targets ? { targets: s.targets } : {}),
     })),
   }) as unknown as ComputedPlayerState;
 
@@ -294,5 +314,274 @@ describe("damageDone descriptor", () => {
     const rows = damageDone.rows(input("players"));
     expect(rows[0].columns.at(-1)).toBe("75.0%");
     expect(rows[1].columns.at(-1)).toBe("25.0%");
+  });
+});
+
+describe("drilling a pinned ability with a friendly pinned", () => {
+  // The pinned row's own enemies, as the scoped fetch leaves them: one action,
+  // hit on two enemy types.
+  const soloAction = (targets = [hit("Em1000", 90, 3), hit("Em2000", 30, 1)]) => [
+    player(0, 120, [{ action: 100, damage: 120, hits: 4, min: 10, max: 60, targets }]),
+  ];
+
+  const drill = (players: ComputedPlayerState[]) =>
+    damageDone.rows(input("skills", { source: 0, targets: [], ability: "Normal:100" }, players));
+
+  it("lists the group's members when the pinned row was a group", () => {
+    // Two actions behind the row means it condensed several — those ARE the
+    // decomposition, so the enemies stay one level further down.
+    const grouped = [
+      player(0, 120, [
+        { action: 100, damage: 90, hits: 3, targets: [hit("Em1000", 90, 3)] },
+        { action: 101, damage: 30, hits: 1, targets: [hit("Em1000", 30, 1)] },
+      ]),
+    ];
+    const rows = damageDone.rows(
+      input("skills", { source: 0, targets: [], ability: 'Group:normal-attack@"Pl0000"' }, grouped)
+    );
+
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:100", "skill:Normal:101"]);
+    expect(rows.every((row) => row.kind === undefined)).toBe(true);
+  });
+
+  it("lists the enemies hit when the pinned row was a single ability", () => {
+    // Restating one action as one row says nothing the row above it did not.
+    const rows = drill(soloAction());
+
+    expect(rows.map((row) => row.kind)).toEqual(["enemy", "enemy"]);
+    expect(rows.map((row) => parseEnemyRow(row.label))).toEqual(["Em1000", "Em2000"]);
+  });
+
+  it("reports each enemy's damage, hits, average and share", () => {
+    const [top, second] = drill(soloAction());
+
+    // Total, hits, min, max, average, share — the same six the member rows
+    // fill, so both shapes line up under one header.
+    expect(top.columns).toEqual(["90", "3", "—", "—", "30", "75.0%"]);
+    expect(second.columns).toEqual(["30", "1", "—", "—", "30", "25.0%"]);
+  });
+
+  it("leaves the per-enemy extremes blank rather than borrowing the ability's", () => {
+    // The skill's own min/max (10/60) describe hits across every enemy; printing
+    // them on one enemy's row would claim a spread that was never measured.
+    const [top] = drill(soloAction());
+    expect(top.columns[2]).toBe("—");
+    expect(top.columns[3]).toBe("—");
+  });
+
+  it("sums same-type spawns into one row and adds their hits", () => {
+    const rows = drill(soloAction([hit("Em1000", 50, 2), hit("Em1000", 40, 1), hit("Em2000", 30, 1)]));
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0].columns.slice(0, 2)).toEqual(["90", "3"]);
+  });
+
+  it("keeps every Unknown enemy on its own row", () => {
+    // JSON, not String(): every Unknown variant stringifies to "[object
+    // Object]" and would collapse into a single unnamed row.
+    const rows = drill(soloAction([hit({ Unknown: 1 }, 60, 1), hit({ Unknown: 2 }, 60, 1)]));
+
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row) => parseEnemyRow(row.label))).toEqual([{ Unknown: 1 }, { Unknown: 2 }]);
+  });
+
+  it("pins nothing, because a type cannot choose between two spawns", () => {
+    expect(drill(soloAction()).every((row) => row.pinOnClick === null)).toBe(true);
+  });
+
+  it("falls back to the single ability row when the payload has no enemies", () => {
+    // A log saved before SkillState.targets existed. An empty table would claim
+    // the ability hit nothing.
+    const rows = drill([player(0, 120, [{ action: 100, damage: 120, hits: 4 }])]);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].key).toBe("skill:Normal:100");
+    expect(rows[0].kind).toBeUndefined();
+  });
+
+  it("keeps summing across the party when no friendly is pinned", () => {
+    // Without an owner the row answers a different question, and the per-enemy
+    // breakdown cannot say who dealt which part of it.
+    const party = [
+      player(0, 30, [{ action: 100, damage: 30, targets: [hit("Em1000", 30, 1)] }]),
+      player(1, 20, [{ action: 100, damage: 20, targets: [hit("Em1000", 20, 1)] }]),
+    ];
+    const rows = damageDone.rows(input("skills", { source: null, targets: [], ability: "Normal:100" }, party));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].key).toBe("skill:Normal:100");
+  });
+});
+
+const victimPlayer = (index: number, breakdown: { enemy: number; total: number }[]) =>
+  ({
+    index,
+    partyIndex: index,
+    characterType: "Pl0000",
+    totalDamage: 0,
+    dps: 0,
+    percentage: 0,
+    sba: 0,
+    totalStunValue: 0,
+    stunPerSecond: 0,
+    lastDamageTime: 0,
+    cappedHits: 0,
+    cappableHits: 0,
+    overcapBaseSum: 0,
+    overcapCapSum: 0,
+    skillBreakdown: [],
+    damageTakenBreakdown: breakdown.map((row) => ({
+      enemyType: { Unknown: row.enemy },
+      actionId: { Normal: 1 },
+      hits: 1,
+      totalDamage: row.total,
+      maxDamage: row.total,
+    })),
+  }) as unknown as ComputedPlayerState;
+
+describe("damageDone enemy side", () => {
+  it("ranks enemy types by damage dealt to the party", () => {
+    const players = [
+      victimPlayer(0, [{ enemy: 0xaa, total: 500 }]),
+      victimPlayer(1, [
+        { enemy: 0xaa, total: 300 },
+        { enemy: 0xbb, total: 100 },
+      ]),
+    ];
+
+    const rows = damageDone.rows({
+      encounter: { totalDamage: 0 } as never,
+      partyData: [null, null],
+      players,
+      level: "players",
+      pins: { source: null, targets: [], ability: null },
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    } as never);
+
+    expect(rows.map((row) => row.key)).toEqual([
+      `enemy:${JSON.stringify({ Unknown: 0xaa })}`,
+      `enemy:${JSON.stringify({ Unknown: 0xbb })}`,
+    ]);
+    expect(rows[0].kind).toBe("enemy");
+    expect(rows[0].value).toBe(800);
+    // Amount, DPS-to-party over the 100s window, share.
+    expect(rows[0].columns).toEqual(["800", "8", "88.9%"]);
+    expect(rows[0].pinOnClick).toBeNull();
+  });
+
+  it("shows nothing on the enemy side of a log with no incoming events recorded", () => {
+    const rows = damageDone.rows({
+      encounter: { totalDamage: 0 } as never,
+      partyData: [null, null],
+      players: [victimPlayer(0, [])],
+      level: "players",
+      pins: { source: null, targets: [], ability: null },
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    } as never);
+
+    expect(rows).toEqual([]);
+  });
+
+  it("fills the full six-column drill-down shape below the players level", () => {
+    const players = [
+      victimPlayer(0, [{ enemy: 0xaa, total: 500 }]),
+      victimPlayer(1, [
+        { enemy: 0xaa, total: 300 },
+        { enemy: 0xbb, total: 100 },
+      ]),
+    ];
+
+    const rows = damageDone.rows({
+      encounter: { totalDamage: 0 } as never,
+      partyData: [null, null],
+      players,
+      level: "abilities",
+      pins: { source: null, targets: [], ability: null },
+      fightDurationMs: 100_000,
+      hostility: "enemy",
+    } as never);
+
+    expect(rows[0].columns).toHaveLength(6);
+    // min is blank: DamageTakenState carries no minimum.
+    expect(rows[0].columns[2]).toBe("—");
+    // max folds across both victims' rows for 0xaa (500, 300) to the larger.
+    expect(rows[0].columns[3]).toBe("500");
+  });
+});
+
+describe("damageDone.children — party-wide per-source split", () => {
+  const abilityRow = (key: string): MetricRow => ({
+    key,
+    label: key.replace(/^skill:/, ""),
+    kind: "ability",
+    value: 0,
+    columns: [],
+    pinOnClick: null,
+    colorSlot: -1,
+  });
+
+  const childrenOf = (
+    key: string,
+    players: ComputedPlayerState[],
+    pins: SelectorPins = NO_PINS,
+    hostility?: "friendly" | "enemy",
+    level: "players" | "abilities" | "skills" = "abilities"
+  ) => damageDone.children!({ row: abilityRow(key), players, level, pins, hostility, fightDurationMs: 100_000 });
+
+  const party = [
+    player(0, 300, [
+      { action: 9001, damage: 200, hits: 2, min: 50, max: 150 },
+      { action: 9002, damage: 100 },
+    ]),
+    player(1, 100, [{ action: 9001, damage: 100, hits: 1, min: 100, max: 100 }]),
+  ];
+
+  it("splits a party-wide ability row into one child per player who used it", () => {
+    const children = childrenOf("skill:Normal:9001", party)!;
+
+    expect(children.map((child) => child.key)).toEqual(["player:0", "player:1"]);
+    expect(children.map((child) => child.kind)).toEqual(["player", "player"]);
+    expect(children[0].pinOnClick).toEqual({ source: 0 });
+    expect(children.map((child) => child.colorSlot)).toEqual([0, 1]);
+    // The six damage drill-down cells, shared against the party total (400).
+    expect(children[0].columns).toEqual(["200", "2", "50", "150", "100", "50.0%"]);
+    expect(children[1].columns).toEqual(["100", "1", "100", "100", "100", "25.0%"]);
+  });
+
+  it("sums a group parent's members per player", () => {
+    // Against the REAL table: Gran's 100/110/120 are all "normal-attack".
+    const grouped = [
+      player(0, 50, [
+        { action: 100, damage: 30 },
+        { action: 110, damage: 20 },
+      ]),
+      player(1, 10, [{ action: 120, damage: 10 }]),
+    ];
+    const children = childrenOf('skill:Group:normal-attack@"Pl0000"', grouped)!;
+
+    expect(children.map((child) => child.key)).toEqual(["player:0", "player:1"]);
+    expect(children.map((child) => child.value)).toEqual([50, 10]);
+  });
+
+  it("answers null with a source pinned — the parent already carries its variants", () => {
+    expect(childrenOf("skill:Normal:9001", party, { source: 0, targets: [], ability: null })).toBeNull();
+  });
+
+  it("answers null on the enemy side — incoming rows carry no spawn identity", () => {
+    expect(childrenOf("skill:Normal:9001", party, NO_PINS, "enemy")).toBeNull();
+  });
+
+  it("answers null off the abilities level", () => {
+    expect(childrenOf("skill:Normal:9001", party, NO_PINS, undefined, "players")).toBeNull();
+  });
+
+  it("answers null for a row whose key names no ability", () => {
+    expect(childrenOf("other", party)).toBeNull();
+  });
+
+  it("returns a lone user as a single child — the table hides the chevron below two", () => {
+    expect(childrenOf("skill:Normal:9002", party)).toHaveLength(1);
   });
 });

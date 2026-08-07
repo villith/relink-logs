@@ -1,15 +1,17 @@
-import { ActionIcon, Box, MultiSelect, Select, Text } from "@mantine/core";
+import { ActionIcon, Box, Text } from "@mantine/core";
 import { X } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
 import type { SelectorPins } from "../selectorOptions";
 
+import { PinSelect, type LabelledOption } from "./PinSelect";
+
 import "./analysis.css";
 
-export type LabelledOption = { value: string; label: string };
+export type { LabelledOption };
 
 export type PinBarProps = {
-  options: { sources: LabelledOption[]; targets: LabelledOption[]; abilities: LabelledOption[] };
+  options: { targets: LabelledOption[]; abilities: LabelledOption[] };
   pins: SelectorPins;
   onChange: (pins: SelectorPins) => void;
   /** Formatted window, or null for the full fight. */
@@ -19,10 +21,15 @@ export type PinBarProps = {
   onClearWindow: () => void;
 };
 
-/** The three pins and the window readout.
+/** The target and ability pins, and the window readout.
+ *
+ * The ACTOR pin is not here — it sits in the topmost row with the view switch
+ * (see ActorBar), because it is the one pin that outranks the side and the
+ * metric. These two narrow whatever the metric below is showing, so they stay
+ * with it.
  *
  * No label in front of each selector: the placeholder already names the
- * dimension — "All enemies" cannot be mistaken for a source — so a label
+ * dimension — "All enemies" cannot be mistaken for an ability — so a label
  * repeats it. Left-to-right order carries the rest.
  *
  * The window is deliberately not a selector. It is set by dragging the chart
@@ -41,40 +48,26 @@ export const PinBar = ({ options, pins, onChange, windowLabel, fullLabel, onClea
         flexWrap: "wrap",
       }}
     >
-      <Select
-        w={190}
-        size="xs"
-        data={options.sources}
-        value={pins.source === null ? null : String(pins.source)}
-        placeholder={t("ui.logs.selector-all-friendlies")}
-        aria-label={t("ui.logs.selector-source")}
-        clearable
-        searchable
-        onChange={(value) => onChange({ ...pins, source: value === null ? null : Number(value) })}
-      />
-      <MultiSelect
-        w={210}
-        size="xs"
-        // Mantine's xs MultiSelect wraps its value in a pill container, which
-        // makes it 33px against the Selects' 30px and misaligns the row.
-        styles={{ input: { minHeight: 30, height: 30 } }}
+      {/* Single like the machine's target axis (WCL's): one spawn or All —
+          `targets` still travels as a list only because the legacy pin shape
+          does. */}
+      <PinSelect
+        minWidth={240}
         data={options.targets}
-        value={pins.targets.map(String)}
+        value={pins.targets.length === 0 ? null : String(pins.targets[0])}
         placeholder={t("ui.logs.selector-all-enemies")}
-        aria-label={t("ui.logs.selector-target")}
-        clearable
-        searchable
-        onChange={(values) => onChange({ ...pins, targets: values.map(Number) })}
+        ariaLabel={t("ui.logs.selector-target")}
+        onChange={(value) => onChange({ ...pins, targets: value === null ? [] : [Number(value)] })}
       />
-      <Select
-        w={220}
-        size="xs"
+      {/* The widest basis of the three: an ability is named through its cause
+          ("Guardpoint (Sigil)"), which makes it the longest thing any of these
+          rows has to hold. */}
+      <PinSelect
+        minWidth={300}
         data={options.abilities}
         value={pins.ability}
         placeholder={t("ui.logs.selector-all-abilities")}
-        aria-label={t("ui.logs.selector-ability")}
-        clearable
-        searchable
+        ariaLabel={t("ui.logs.selector-ability")}
         onChange={(value) => onChange({ ...pins, ability: value })}
       />
       {windowLabel !== null && (

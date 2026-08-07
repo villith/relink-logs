@@ -2,7 +2,7 @@ import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { HoverCard, HoverCardBody, type CardSection } from "./HoverCard";
+import { HoverCard, HoverCardBody, SECTION_ENTRY_CAP, type CardSection } from "./HoverCard";
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
@@ -16,10 +16,14 @@ const section = (headingKey: string, count: number): CardSection => ({
   })),
 });
 
-const renderBody = (sections: CardSection[]) =>
+/** What the card measures. Damage's own, since these cases are about layout
+ * rather than about which metric is on screen — see the amount-column case. */
+const DAMAGE_AMOUNT = { amountKey: "ui.meter-columns.damage", format: (value: number) => String(value) };
+
+const renderBody = (sections: CardSection[], amount = DAMAGE_AMOUNT) =>
   render(
     <MantineProvider>
-      <HoverCardBody sections={sections} />
+      <HoverCardBody sections={sections} {...amount} />
     </MantineProvider>
   );
 
@@ -30,10 +34,41 @@ describe("HoverCardBody", () => {
     expect(screen.getByText("ui.logs.hover-by-target")).toBeTruthy();
   });
 
-  it("renders every entry — long lists are never truncated", () => {
-    renderBody([section("ui.logs.hover-by-ability", 24)]);
-    expect(screen.getByText("entry 0")).toBeTruthy();
-    expect(screen.getByText("entry 23")).toBeTruthy();
+  it("heads the amount column with what the card is measuring", () => {
+    // Hard-coded to "DMG", this heading sat over the Stun tab's figures too.
+    renderBody([section("ui.logs.hover-by-ability", 1)], {
+      amountKey: "ui.skill-columns.stun",
+      format: (value: number) => value.toFixed(1),
+    });
+
+    expect(screen.getByText("ui.skill-columns.stun")).toBeTruthy();
+    expect(screen.queryByText("ui.meter-columns.damage")).toBeNull();
+  });
+
+  it("writes each amount in the metric's own format", () => {
+    renderBody([section("ui.logs.hover-by-ability", 1)], {
+      amountKey: "ui.skill-columns.stun",
+      format: (value: number) => value.toFixed(1),
+    });
+
+    expect(screen.getByText("1.0")).toBeTruthy();
+  });
+
+  it("caps a section at its top entries, silently — WCL's behavior", () => {
+    // No "+N more" row: the entry past the cap and everything below it
+    // simply do not render.
+    renderBody([section("ui.logs.hover-by-ability", SECTION_ENTRY_CAP + 1)]);
+    expect(screen.getByText(`entry ${SECTION_ENTRY_CAP - 1}`)).toBeTruthy();
+    expect(screen.queryByText(`entry ${SECTION_ENTRY_CAP}`)).toBeNull();
+  });
+
+  it("keeps shares computed over the FULL total, never the shown five", () => {
+    // values 6..1 sum to 21. The largest entry's share is 6/21 = 28.6%;
+    // re-normalizing over the visible five (6/20 = 30.0%) would silently
+    // claim the section sums to 100%.
+    renderBody([section("ui.logs.hover-by-target", 6)]);
+    expect(screen.getByText("28.6%")).toBeTruthy();
+    expect(screen.queryByText("30.0%")).toBeNull();
   });
 
   it("scales bars against the section's largest entry", () => {
@@ -82,7 +117,7 @@ describe("HoverCard", () => {
     // var(--an-line-strong) border render as no panel at all.
     render(
       <MantineProvider>
-        <HoverCard sections={[section("ui.logs.hover-by-target", 1)]}>
+        <HoverCard sections={[section("ui.logs.hover-by-target", 1)]} {...DAMAGE_AMOUNT}>
           <button>row</button>
         </HoverCard>
       </MantineProvider>

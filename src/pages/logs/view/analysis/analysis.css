@@ -122,6 +122,25 @@
   cursor: pointer;
 }
 
+/* A child behind an expanded parent (a member variant or one source's share):
+ * the same row anatomy, indented and on a muted panel so the hierarchy reads
+ * at a glance without stealing the parents' contrast. */
+.analysis-subrow {
+  padding-left: 28px;
+  background-color: var(--an-panel);
+}
+
+/* The skill-group expand control. Same anatomy as the band toggle: on the
+ * bar, so it takes `position: relative` or the fill paints over it. */
+.analysis-row-expand {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: 6px;
+  cursor: pointer;
+}
+
 .analysis-name {
   flex: 1;
   min-width: 0;
@@ -329,8 +348,9 @@
   opacity: 0.75;
 }
 
-/* The status tabs' Friendlies|Enemies switch. A small pill pair, not tabs:
- * it re-pivots the current table rather than navigating. */
+/* The Friendlies|Enemies switch. A small pill pair, not tabs: it re-pivots the
+ * current table rather than navigating. Sits above the metric tabs, so it holds
+ * its place on every tab and only the status ones can operate it. */
 .analysis-hostility {
   display: inline-flex;
   gap: 2px;
@@ -351,4 +371,182 @@
 .analysis-hostility-active {
   color: var(--an-ink);
   background-color: var(--an-raised);
+}
+
+/* Dimmed where the tab has no enemy-side figures to pivot to. The pointer
+ * cursor goes too — the switch keeps its place, but it must not invite a click
+ * that does nothing. */
+.analysis-hostility-disabled {
+  opacity: 0.4;
+}
+
+.analysis-hostility-disabled .analysis-hostility-option {
+  cursor: default;
+}
+
+/* The aura chip strips (WCL's Source/Target Auras Filter), between the chart
+ * and the table. Chips wrap; the selected one takes the accent outline the
+ * window chip already uses, and carries the ✕ that clears it. */
+.analysis-aura-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--an-line);
+}
+
+.analysis-aura-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  border: 1px solid var(--an-line-strong);
+  border-radius: 4px;
+  background-color: var(--an-panel);
+}
+
+.analysis-aura-chip-selected {
+  border-color: var(--an-accent);
+  background-color: rgba(0, 184, 217, 0.09);
+  padding-right: 2px;
+}
+
+.analysis-aura-chip-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--an-ink-2);
+  cursor: pointer;
+}
+
+.analysis-aura-chip-selected .analysis-aura-chip-button {
+  color: var(--an-ink);
+  padding-right: 2px;
+}
+
+.analysis-aura-chip-uptime {
+  font-size: 11px;
+  color: var(--an-ink-3);
+}
+
+.analysis-window-chip-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* A provenance section's subheader inside the effects table — the same
+ * small-caps voice as the column heads, spaced off the run above it. Visual
+ * grouping only; it is not a row and takes no interaction. */
+.analysis-section-head {
+  padding: 8px 8px 2px;
+}
+
+/* The pin selectors (PinSelect), in the view's own palette rather than
+ * Mantine's stock dark input. The rows they sit in are built entirely from the
+ * --an-* tokens — the window chip beside them, the chips below — and a default
+ * input among those reads as two designs sharing one row.
+ *
+ * Every rule here is a COMPOUND selector, and deliberately so: Mantine's own
+ * `.mantine-Select-input` has the same one-class specificity, so a single-class
+ * rule would win or lose on stylesheet order — which is the bundler's business,
+ * not ours. Two classes always win. The `.analysis` ancestor does that for the
+ * control; the dropdown portals out of the view, so it pairs with the
+ * `analysis-tokens` class it carries for the same reason. */
+.analysis .analysis-select-input {
+  height: 28px;
+  min-height: 28px;
+  background-color: var(--an-panel);
+  border: 1px solid var(--an-line);
+  border-radius: 4px;
+  color: var(--an-ink);
+  font-size: 12.5px;
+  /* The controls grow to fit their names (see PinSelect), but nothing bounds a
+   * name — so the one that still overruns truncates rather than turning the
+   * input into a horizontal scroller you have to drag a caret through. */
+  text-overflow: ellipsis;
+}
+
+.analysis .analysis-select-input::placeholder {
+  color: var(--an-ink-3);
+}
+
+.analysis .analysis-select-input:hover {
+  border-color: var(--an-line-strong);
+}
+
+/* The accent ring the window chip and the selected aura chip already wear, so
+ * "this control is live" looks the same everywhere in the view. */
+.analysis .analysis-select-input:focus,
+.analysis .analysis-select-input:focus-within {
+  border-color: var(--an-accent);
+}
+
+/* The chevron and the clear ✕. Mantine sizes the section from the font, and
+ * the stock colour is a step brighter than anything else in the row. */
+.analysis .analysis-select-section {
+  color: var(--an-ink-3);
+}
+
+.analysis-tokens.analysis-select-dropdown {
+  background-color: var(--an-panel);
+  border: 1px solid var(--an-line-strong);
+  border-radius: 4px;
+}
+
+.analysis-select-dropdown .analysis-select-option {
+  font-size: 12.5px;
+  color: var(--an-ink-2);
+  border-radius: 3px;
+}
+
+/* Hover and keyboard-active read the same, as they do on a table row: the
+ * dropdown is a list of things to land on, not two kinds of highlight. */
+.analysis-select-dropdown .analysis-select-option:hover,
+.analysis-select-dropdown .analysis-select-option[data-combobox-active] {
+  background-color: var(--an-raised);
+  color: var(--an-ink);
+}
+
+.analysis-select-dropdown .analysis-select-option[data-combobox-selected] {
+  background-color: var(--an-raised);
+  color: var(--an-ink);
+}
+
+/* One row inside an option: art, then name. The name takes the slack and
+ * ellipsises — a long boss name must not widen the dropdown past its input. */
+.analysis-select-option-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.analysis-select-option-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Smaller than the table's `.analysis-row-icon` (22px): these sit in a 28px
+ * control, where that size would leave no air above or below. */
+.analysis-select-icon {
+  height: 18px;
+  width: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+/* The events stream's own art, smaller again: its rows are 22px, which the
+ * table's 22px icon would fill edge to edge. */
+.events-row-icon {
+  height: 16px;
+  width: 16px;
+  object-fit: contain;
+  flex-shrink: 0;
 }

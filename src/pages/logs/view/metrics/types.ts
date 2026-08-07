@@ -1,7 +1,15 @@
-import type { ComputedPlayerState, EncounterState, PlayerData, StatusInterval } from "@/types";
+import type { ComputedPlayerState, EncounterState, PlayerData, SkillState, StatusInterval } from "@/types";
 
-import type { RowLevel } from "../deriveRows";
 import type { SelectorPins } from "../selectorOptions";
+
+/** What a row represents at the current pin state — the legacy descriptors'
+ * level vocabulary, a projection of the machine's grouping dimension
+ * (source→players, ability→abilities, target→skills; see `levelFor`).
+ *
+ * `"skills"` and not `"hits"`: the parser cannot produce per-hit rows, and this
+ * level lists the pinned ability's MEMBER SKILLS — what a condensed group is
+ * made of — so a name promising hits misleads. */
+export type RowLevel = "players" | "abilities" | "skills";
 
 /** One row of the generic metric table, already reduced to what it renders. */
 export type MetricRow = {
@@ -21,6 +29,28 @@ export type MetricRow = {
    * enemy). The table resolves the slot to a colour, so descriptors stay pure
    * functions with no reach into the settings store. */
   colorSlot: number;
+  /** i18next key naming this row directly, for a row that names no ability,
+   * player or effect at all — today only the SBA table's unattributed
+   * remainder. Where it is set the table draws `t(labelKey)` and no icon,
+   * bypassing the `kind` resolution entirely: there is nothing to resolve, and
+   * putting a sentinel through the ability join would print whatever that join
+   * makes of a name it has never seen. */
+  labelKey?: string;
+  /** Interpolation values for `labelKey`, for a self-naming row whose text
+   * carries a discriminator ("Effect 4242"). Ignored without `labelKey`. */
+  labelParams?: Record<string, string | number>;
+  /** What this row is, where the level alone cannot say.
+   *
+   * `MetricDescriptor.labelKind` answers per LEVEL, which holds until one level
+   * can produce more than one shape of row: the deepest damage level decomposes
+   * a pinned ability into its group's member skills, the enemies it hit, or the
+   * players who used it, depending on which of those the pins have left free.
+   * Absent, the level's own kind stands. */
+  kind?: LabelKind;
+  /** Member rows behind a skill-group parent on the groups path, each
+   * pinnable by its raw action. The table renders them indented behind an
+   * expand control; a row without them has nothing to expand. */
+  children?: MetricRow[];
   /** Contiguous windows this row's effect was up, in MILLISECONDS FROM THE
    * START OF THE MEASURED WINDOW, overlaps merged.
    *
@@ -39,18 +69,53 @@ export type MetricRow = {
  * are two rows.
  *
  * `"target"` is the debuff holder row: a `target:<segment>` or `actor:<id>` key
- * naming the enemy SPAWN that held the effect. */
-export type LabelKind = "player" | "ability" | "status" | "target";
+ * naming the enemy SPAWN that held the effect.
+ *
+ * `"enemy"` is an enemy TYPE, as the JSON of an `EnemyType`. Distinct from
+ * `"target"` because it names something coarser: the per-skill damage breakdown
+ * (`SkillState.targets`) records a type and merges same-type spawns, so a row
+ * built from it cannot point at one spawn and must not pretend to.
+ *
+ * `"takenAttack"` is one enemy ATTACK on the damage-taken tab: a JSON
+ * `{enemyType, actionId}` pair (see `takenAttackRowParts`), named as the enemy
+ * plus its attack id — the game data carries no names for enemy actions. */
+export type LabelKind = "player" | "ability" | "status" | "target" | "enemy" | "takenAttack";
 
 /** Which side's holders the status tables are about — WCL's
  * Friendlies/Enemies switch. Polarity (buff vs debuff) is fixed per tab; this
  * picks the holders, so all four quadrants are reachable. */
 export type Hostility = "friendly" | "enemy";
 
+/** What the row hover card measures, for the metrics that have a breakdown
+ * behind their rows.
+ *
+ * The card used to read `SkillState.totalDamage` unconditionally and head its
+ * amount column "DMG", so every tab's tooltip reported damage — the Stun tab
+ * explained a stun bar with damage figures, and the SBA tab explained a gauge
+ * with them. What a card measures follows the metric, so the metric says. */
+export type MetricCard = {
+  /** i18next key for the card's amount column — what the figures ARE. */
+  amountKey: string;
+  /** This metric's figure on one breakdown row. */
+  valueOf: (skill: SkillState) => number;
+  /** How that figure is written. Damage humanizes to "1.5m"; stun is a small
+   * number where a suffix would only lose precision. */
+  format: (value: number) => string;
+  /** Whether the parser records this metric PER ENEMY. Damage does
+   * (`SkillTargetState.totalDamage`); stun does not, and a by-target section
+   * built from what is there would print damage under a stun heading — the
+   * original defect, one level down. */
+  perTarget: boolean;
+};
+
 /** Everything a metric needs to turn encounter state into rows. */
 export type MetricDescriptor = {
   /** i18next key for the switcher label. */
   labelKey: string;
+  /** Whether the Friendlies/Enemies toggle operates on this tab. Absent =
+   * disabled (SBA is a per-player gauge and stun has no honest enemy-side
+   * decomposition — its two capture paths reconcile with max()). */
+  supportsHostility?: boolean;
   /** i18next keys for the numeric column headers at a given level.
    *
    * A function of the level, not a fixed list: descending from players to
@@ -59,6 +124,11 @@ export type MetricDescriptor = {
   columnKeys: (level: RowLevel) => string[];
   /** How the table should resolve each row's `label` at this level. */
   labelKind: (level: RowLevel) => LabelKind;
+  /** What a row's hover card decomposes, or absent where the metric has
+   * nothing to decompose: SBA is a gauge reading, and the status tables' rows
+   * are effects and their holders rather than sums over skills. Absent, rows
+   * carry no card at all — which is what "no breakdown" should look like. */
+  card?: MetricCard;
   /** Rows for the current pin state. */
   rows: (input: {
     encounter: EncounterState;
@@ -88,4 +158,20 @@ export type MetricDescriptor = {
      * uses its natural side: Buffs → friendly, Debuffs → enemy. */
     hostility?: Hostility;
   }) => MetricRow[];
+  /** Child rows behind ONE row at the current level, or null where it has
+   * none — the table's in-place nesting. Party-wide ability rows split per
+   * SOURCE out of the derived state, synchronously (the same data the hover
+   * cards decompose — no fetch); with a source pinned the groups-path parent
+   * already carries its member variants on `MetricRow.children`, so the
+   * accessor answers null and the table falls back to those. Optional
+   * because only the damage tabs have nesting semantics — stun/SBA and the
+   * aura tables have nothing honest to nest. */
+  children?: (input: {
+    row: MetricRow;
+    players: ComputedPlayerState[];
+    level: RowLevel;
+    pins: SelectorPins;
+    hostility?: Hostility;
+    fightDurationMs?: number;
+  }) => MetricRow[] | null;
 };

@@ -1,14 +1,15 @@
 import {
-  AbilityChartSeries,
+  AbilitySeries,
+  ChartWindow,
   DeathEvent,
   EncounterState,
+  GroupAggregate,
   HpChartSeries,
   LegalityFinding,
   PlayerData,
   SBAEvent,
   SelectionFact,
   StatusInterval,
-  TargetChartSeries,
   TargetEntry,
   TargetSpan,
 } from "@/types";
@@ -20,12 +21,23 @@ interface EncounterStore {
   /** Stun applied per second, keyed by actor index. Empty on a backend that
    * predates the field. */
   stunChart: Record<number, number[]>;
+  /** Damage TAKEN per second, keyed by the victim's slot key. Empty on a
+   * backend that predates the field; all zeroes on logs recorded before
+   * damage-taken capture. */
+  takenChart: Record<number, number[]>;
   /** Enemy HP% per second, one series per charted HP pool (largest first). Empty on old logs. */
   hpChart: HpChartSeries[];
   /** Every window an actor held a status effect for, spanning the whole fight.
    * Empty on logs recorded before status capture. */
   statusIntervals: StatusInterval[];
+  /** Spans a battle state held (an SBA performance, Link Time, an enemy's
+   * Break), for the chart's shaded windows. Empty on logs recorded before
+   * the transition events existed. */
+  chartWindows: ChartWindow[];
   sbaChart: Record<number, number[]>;
+  /** Per-ability bands for the DRILLED Stun/SBA chart, keyed by player index.
+   * Empty unless the last fetch asked for them — an undrilled tab never does. */
+  abilitySeries: Record<number, AbilitySeries[]>;
   sbaEvents: SBAEvent[];
   deathEvents: DeathEvent[];
   chartLen: number;
@@ -35,6 +47,9 @@ interface EncounterStore {
   /** Every (source, target, ability) combination in the current window, with
    * the selector pins NOT applied — the analysis view cascades from this. */
   selectionFacts: SelectionFact[];
+  /** The (filters × groupBy) aggregates for the last `groupQuery` sent — table
+   * rows and chart bands from ONE grouping. Empty when no query was sent. */
+  groups: GroupAggregate[];
   /** Selected target spawn spans; empty = all. */
   selectedTargetSpans: TargetSpan[];
   selectedPlayers: string[];
@@ -66,11 +81,19 @@ export interface EncounterStateResponse {
   dpsChart: Record<number, number[]>;
   /** Optional so a backend older than the field reads as "no stun series". */
   stunChart?: Record<number, number[]>;
+  /** Optional so a backend older than the field reads as "no taken series". */
+  takenChart?: Record<number, number[]>;
   hpChart: HpChartSeries[];
   /** Optional so a backend older than the field reads as "no status capture" —
    * which is also what every log recorded before the hook emitted these has. */
   statusIntervals?: StatusInterval[];
+  /** Optional so a backend older than the field reads as "no windows". */
+  chartWindows?: ChartWindow[];
   sbaChart: Record<number, number[]>;
+  /** The drilled Stun/SBA chart's bands, sent only when the request carried an
+   * `abilitySeries` query. Optional so a frontend ahead of its backend degrades
+   * to no bands — and therefore to the per-player lines — rather than throwing. */
+  abilitySeries?: Record<number, AbilitySeries[]>;
   sbaEvents: SBAEvent[];
   deathEvents: DeathEvent[];
   chartLen: number;
@@ -78,13 +101,10 @@ export interface EncounterStateResponse {
   targetEntries: TargetEntry[];
   /** Optional so a backend older than the field reads as "nothing to cascade". */
   selectionFacts?: SelectionFact[];
-  /** The analysis view's drill-down chart, sent only on a scoped fetch that
-   * pinned a source. Not stored: it belongs to one set of pins, and the store
-   * holds the base load. Optional so a frontend ahead of its backend — the Rust
-   * binary does not hot-reload — degrades to the per-player chart. */
-  abilityChart?: AbilityChartSeries[];
-  /** The level below: what the pinned ability hit, one band per enemy spawn. */
-  targetChart?: TargetChartSeries[];
+  /** The analysis view's generic aggregation, sent only when the request
+   * carried a `groupQuery`. Optional so a frontend ahead of its backend
+   * degrades to no groups rather than an error. */
+  groups?: GroupAggregate[];
   players: PlayerData[];
   /** One vector per PARTY SLOT (0-3), parallel to the unfiltered `players`. */
   legality: LegalityFinding[][];
@@ -100,15 +120,19 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   encounterState: null,
   dpsChart: {},
   stunChart: {},
+  takenChart: {},
   hpChart: [],
   statusIntervals: [],
+  chartWindows: [],
   sbaChart: {},
+  abilitySeries: {},
   sbaEvents: [],
   deathEvents: [],
   chartLen: 0,
   sbaChartLen: 0,
   targetEntries: [],
   selectionFacts: [],
+  groups: [],
   selectedTargetSpans: [],
   selectedPlayers: [],
   players: [],
@@ -132,15 +156,19 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       encounterState: response.encounterState,
       dpsChart: response.dpsChart,
       stunChart: response.stunChart ?? {},
+      takenChart: response.takenChart ?? {},
       hpChart: response.hpChart ?? [],
       statusIntervals: response.statusIntervals ?? [],
+      chartWindows: response.chartWindows ?? [],
       sbaChart: response.sbaChart,
+      abilitySeries: response.abilitySeries ?? {},
       sbaEvents: response.sbaEvents,
       deathEvents: response.deathEvents,
       chartLen: response.chartLen,
       sbaChartLen: response.sbaChartLen,
       targetEntries: response.targetEntries ?? [],
       selectionFacts: response.selectionFacts ?? [],
+      groups: response.groups ?? [],
       players: filteredPlayers,
       legality: filteredLegality,
       questId: response.questId,

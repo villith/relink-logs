@@ -53,6 +53,7 @@ export const statusRows = ({
   pinnedKey,
   slotOf,
   holderOf = (interval) => ({ key: `player:${interval.actorIndex}`, label: String(interval.actorIndex) }),
+  pinOf,
   window,
 }: {
   intervals: StatusInterval[];
@@ -60,6 +61,13 @@ export const statusRows = ({
   pinnedKey: string | null;
   slotOf: (actorIndex: number) => number;
   holderOf?: (interval: StatusInterval) => { key: string; label: string };
+  /** What clicking a holder row pins, or absent/null to keep it a leaf.
+   * The holder×effect drill: with an effect pinned, pinning the holder too
+   * reaches the machine's one-row terminal. Friendly holders pin their player
+   * into Source; enemy holders stay leaves — on the enemy side Source means
+   * the CASTER (see `narrowedByPins`), so pinning the holder there would
+   * filter by the wrong actor. */
+  pinOf?: (interval: StatusInterval) => Partial<SelectorPins> | null;
   /** The measured window, for the rows' timelines. Absent leaves them off and
    * the table falls back to its magnitude bar. */
   window?: { startMs: number; endMs: number };
@@ -101,7 +109,7 @@ export const statusRows = ({
         label: holderLevel ? holderOf(group[0]).label : key,
         value: uptime,
         columns: [percent(uptime, fightDurationMs), String(applications(group))],
-        pinOnClick: holderLevel ? null : { ability: key },
+        pinOnClick: holderLevel ? pinOf?.(group[0]) ?? null : { ability: key },
         // An effect row spans the party, so no one slot's colour is right.
         colorSlot: holderLevel ? slotOf(group[0].actorIndex) : -1,
         timeline: timelineOf(group),
@@ -122,9 +130,9 @@ export const slotsOf = (players: ComputedPlayerState[]): Map<number, number> =>
   new Map(players.map((player) => [player.index, player.partyIndex]));
 
 /** The intervals a roster's players hold, or the ones nobody in it does — the
- * hostility split (`statusTabRows` picks the boolean per tab, defaulted by
- * `hostility`). Takes the prebuilt roster so a descriptor does not construct
- * it twice per render. */
+ * hostility split (`statusTabRows` turns the chosen side into this boolean).
+ * Takes the prebuilt roster so a descriptor does not construct it twice per
+ * render. */
 export const heldByRoster = (
   intervals: StatusInterval[],
   roster: Map<number, number>,
@@ -185,40 +193,81 @@ export const narrowedByPins = (
     return true;
   });
 
+/** The intervals one status tab shows: held by the chosen SIDE, of the tab's
+ * POLARITY, and admitted by the Source and Enemy pins — `heldByRoster`, then
+ * `isHarmful`, then `narrowedByPins`, in that order.
+ *
+ * It exists so the aura CHART and the aura TABLE cannot drift. Both used to
+ * spell the three steps out for themselves, which meant a change to
+ * `narrowedByPins`' semantics, or to which roster a call site built its slots
+ * from, would silently make the plot draw a different set of effects from the
+ * rows underneath it — with no type error and no failing test to say so. One
+ * composition, two callers, no way to change one without the other.
+ *
+ * Takes the prebuilt slots rather than the players, for the same reason
+ * `heldByRoster` does: `statusTabRows` needs the same map afterwards to colour
+ * its holder rows, and building it twice per render buys nothing.
+ *
+ * Not every status reader wants all three steps — `statusSeries` (the Stacks
+ * plot) composes the roster split with `narrowedByPins` itself and skips the
+ * POLARITY filter, because a pinned effect key already implies it. Routing it
+ * through here would change what it draws; it is not a call site this function
+ * is missing. */
+export const narrowedStatusIntervals = ({
+  intervals,
+  slots,
+  hostility,
+  harmful,
+  pins,
+}: {
+  intervals: StatusInterval[];
+  /** The roster map from `slotsOf`, built from the IDENTITY party. */
+  slots: Map<number, number>;
+  hostility: Hostility;
+  /** Which polarity the tab shows: Buffs false, Debuffs true. */
+  harmful: boolean;
+  pins: SelectorPins;
+}): StatusInterval[] =>
+  narrowedByPins(
+    heldByRoster(intervals, slots, hostility === "friendly").filter(
+      (interval) => isHarmful(interval.statusId) === harmful
+    ),
+    pins,
+    hostility
+  );
+
 /** Rows for one status tab: the tab fixes the POLARITY (Buffs shows
  * beneficial effects, Debuffs harmful ones — the game's own
  * `PositiveStatusOrNegativeStatus` flag via `isHarmful`), the hostility
  * switch picks the HOLDERS. Split by holder alone, the Debuffs tab filed an
- * enemy's own Bloodthirst as a "debuff", which is not what a debuff is. */
-export const statusTabRows = (
-  input: Parameters<MetricDescriptor["rows"]>[0],
-  harmful: boolean,
-  fallbackHostility: Hostility
-): MetricRow[] => {
+ * enemy's own Bloodthirst as a "debuff", which is not what a debuff is.
+ *
+ * The two axes are INDEPENDENT, so there is no per-tab fallback side: a tab
+ * that defaulted itself to one side made the switch read as a consequence of
+ * the polarity, which it is not. Absent an explicit side both tabs answer for
+ * the friendly holders, the same way Warcraft Logs opens both of its. */
+export const statusTabRows = (input: Parameters<MetricDescriptor["rows"]>[0], harmful: boolean): MetricRow[] => {
   const { statusIntervals, fightDurationMs, players, roster, pins, statusWindow } = input;
-  const hostility = input.hostility ?? fallbackHostility;
+  const hostility: Hostility = input.hostility ?? "friendly";
   const slots = slotsOf(roster ?? players);
-  const held = heldByRoster(statusIntervals ?? [], slots, hostility === "friendly");
   return statusRows({
-    intervals: narrowedByPins(
-      held.filter((interval) => isHarmful(interval.statusId) === harmful),
-      pins,
-      hostility
-    ),
+    intervals: narrowedStatusIntervals({ intervals: statusIntervals ?? [], slots, hostility, harmful, pins }),
     fightDurationMs: fightDurationMs ?? 0,
     pinnedKey: pins.ability,
     // Enemies have no party slot, so their holder rows take the neutral slot.
     slotOf: hostility === "friendly" ? (actorIndex) => slots.get(actorIndex) ?? -1 : () => -1,
     holderOf: hostility === "friendly" ? undefined : enemyHolderOf,
+    pinOf: hostility === "friendly" ? (interval) => ({ source: interval.actorIndex }) : undefined,
     window: statusWindow,
   });
 };
 
 export const buffs: MetricDescriptor = {
   labelKey: "ui.logs.metric-buffs",
+  supportsHostility: true,
   columnKeys: () => ["ui.logs.buff-uptime", "ui.logs.buff-count"],
   // Holder-row kinds are decided by the HOSTILITY at render time
   // (`statusRowKindFor`); this only marks the tab as a status table.
   labelKind: (level) => (level === "players" ? "status" : "player"),
-  rows: (input) => statusTabRows(input, false, "friendly"),
+  rows: (input) => statusTabRows(input, false),
 };

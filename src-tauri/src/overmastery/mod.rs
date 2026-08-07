@@ -241,10 +241,22 @@ pub struct OvermasteryStatus {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OvermasteryQuery {
-    pub char_id: u32,
+    /// Roster character id hashes to simulate, in the order to report them.
+    pub char_ids: Vec<u32>,
     /// Meditation size 0/1/2 (small/medium/large).
     pub tier: usize,
     pub rolls: u32,
+}
+
+/// One character's slice of a batch prediction. Exactly one of
+/// `prediction`/`error` is set: a character the live roster doesn't hold has
+/// no stream to simulate, but the rest of the batch is still good.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OvermasteryCharacterPrediction {
+    pub char_id: u32,
+    pub prediction: Option<OvermasteryPrediction>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

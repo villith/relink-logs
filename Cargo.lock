@@ -3273,6 +3273,7 @@ name = "protocol"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "cbor4ii",
  "serde",
 ]
 

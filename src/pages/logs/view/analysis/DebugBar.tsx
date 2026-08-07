@@ -6,7 +6,8 @@ import "./analysis.css";
 export type DebugBarProps = {
   /** The URL query string exactly as it stands, leading "?" and all. */
   search: string;
-  /** The chart's own derivation, already formatted by `formatChartDebug`. */
+  /** The resolved machine state as one JSON line — what the spec made of the
+   * URL, beside the URL itself. */
   chart: string;
 };
 

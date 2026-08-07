@@ -34,6 +34,7 @@ const renderIt = (props: Partial<React.ComponentProps<typeof QuestSummary>> = {}
         questCompleted
         questTimer={null}
         imported={false}
+        logId={1786}
         {...props}
       />
     </MantineProvider>
@@ -43,6 +44,16 @@ describe("QuestSummary", () => {
   it("names the quest", () => {
     renderIt();
     expect(screen.getByText("quest-123")).toBeTruthy();
+  });
+
+  it("shows the log id so a specific log can be referred to", () => {
+    renderIt();
+    expect(screen.getByText(/· #1786$/)).toBeTruthy();
+  });
+
+  it("shows no id fragment without one", () => {
+    renderIt({ logId: null });
+    expect(screen.queryByText(/#\d+$/)).toBeNull();
   });
 
   it("states the duration between the first and last hit", () => {

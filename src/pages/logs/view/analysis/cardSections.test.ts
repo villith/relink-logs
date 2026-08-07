@@ -1,10 +1,28 @@
 import { describe, expect, it } from "vitest";
 
-import type { ComputedPlayerState, EnemyType } from "@/types";
+import type { ComputedPlayerState, EnemyType, TargetEntry } from "@/types";
 
-import type { MetricRow } from "../metrics/types";
+import type { MetricCard, MetricRow } from "../metrics/types";
 
-import { cardSectionsFor } from "./cardSections";
+import { cardSectionsFor, targetCardSectionsFor } from "./cardSections";
+
+/** What the damage tab measures. Spelled here rather than imported from the
+ * descriptor so a change of heart there shows up as a failing expectation
+ * instead of silently redefining what these cases assert. */
+const DAMAGE_CARD: MetricCard = {
+  amountKey: "ui.meter-columns.damage",
+  valueOf: (s) => s.totalDamage,
+  format: String,
+  perTarget: true,
+};
+
+/** The stun tab: a different figure, and no per-enemy record to break down. */
+const STUN_CARD: MetricCard = {
+  amountKey: "ui.skill-columns.stun",
+  valueOf: (s) => s.totalStunValue,
+  format: String,
+  perTarget: false,
+};
 
 const skill = (action: number, damage: number, hits: number) => ({
   actionType: { Normal: action },
@@ -13,7 +31,9 @@ const skill = (action: number, damage: number, hits: number) => ({
   minDamage: 10,
   maxDamage: 90,
   totalDamage: damage,
-  totalStunValue: 0,
+  // Deliberately NOT proportional to damage: a card reading the wrong field
+  // would otherwise still produce plausible-looking ordering.
+  totalStunValue: damage / 10,
   maxStunValue: 0,
   cappedHits: 0,
   cappableHits: 0,
@@ -80,6 +100,7 @@ const call = (level: "players" | "abilities" | "skills", key: string) =>
     pins: { source: 0, targets: [], ability: null },
     color: "rgb(1,2,3)",
     labels: LABELS,
+    card: DAMAGE_CARD,
   });
 
 const callWith = (
@@ -95,6 +116,7 @@ const callWith = (
     pins,
     color: "rgb(1,2,3)",
     labels: LABELS,
+    card: DAMAGE_CARD,
   });
 
 describe("cardSectionsFor", () => {
@@ -130,6 +152,7 @@ describe("cardSectionsFor", () => {
       pins: { source: 0, targets: [], ability: null },
       color: "rgb(1,2,3)",
       labels: LABELS,
+      card: DAMAGE_CARD,
     });
 
     const abilities = sections?.[0].entries ?? [];
@@ -156,6 +179,7 @@ describe("cardSectionsFor", () => {
           return `ability:${key}`;
         },
       },
+      card: DAMAGE_CARD,
     });
 
     expect(sections?.[0].entries.length).toBeGreaterThan(0);
@@ -200,16 +224,17 @@ describe("cardSectionsFor", () => {
       pins: { source: 0, targets: [], ability: null },
       color: "rgb(1,2,3)",
       labels: LABELS,
+      card: DAMAGE_CARD,
     });
 
     expect(sections?.[1].entries.map((e) => e.value)).toEqual([20, 10]);
   });
 
   it("gives an ability row its targets, and nothing else", () => {
-    // No Source section: the abilities level is only reached with a source
-    // already pinned, so it would always be one row at 100%. No hit-statistics
-    // section either — every section here renders as a share and a bar, which
-    // is meaningless over min/max/avg, so those live in the table's columns.
+    // No Source section — a source IS pinned here, so it would always be one
+    // row at 100%. No hit-statistics section either — every section here
+    // renders as a share and a bar, which is meaningless over min/max/avg, so
+    // those live in the table's columns.
     const sections = call("abilities", "skill:Normal:9001");
     expect(sections?.map((s) => s.headingKey)).toEqual(["ui.logs.hover-by-target"]);
   });
@@ -234,6 +259,7 @@ describe("cardSectionsFor", () => {
       pins: { source: 0, targets: [], ability: null },
       color: "rgb(1,2,3)",
       labels: LABELS,
+      card: DAMAGE_CARD,
     });
 
     // Targets merge across both, so the section totals the ability's damage.
@@ -246,6 +272,63 @@ describe("cardSectionsFor", () => {
 
   it("gives an unknown row no card", () => {
     expect(call("players", "player:99")).toBeNull();
+  });
+
+  it("numbers a player's targets per spawn when the entries carry segments", () => {
+    // Two spawns of ONE type must be two rows named like the table's target
+    // rows — not merged into a type row the table would contradict.
+    const players = [
+      {
+        index: 0,
+        partyIndex: 0,
+        characterType: "Pl1400",
+        totalDamage: 100,
+        skillBreakdown: [
+          {
+            ...skill(9001, 100, 10),
+            targets: [
+              { enemyType: "Em0003", segment: 0, hits: 5, totalDamage: 60 },
+              { enemyType: "Em0003", segment: 1, hits: 5, totalDamage: 40 },
+            ],
+          },
+        ],
+      },
+    ] as unknown as ComputedPlayerState[];
+
+    const sections = cardSectionsFor({
+      row: row("player:0"),
+      level: "players",
+      players,
+      pins: { source: 0, targets: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: {
+        ...LABELS,
+        target: (segment: number) => `spawn:${segment}`,
+        targetIcon: (segment: number) => `icon:${segment}`,
+      },
+      card: DAMAGE_CARD,
+    });
+
+    expect(sections?.[1].entries).toEqual([
+      { key: "target:0", label: "spawn:0", value: 60, icon: "icon:0" },
+      { key: "target:1", label: "spawn:1", value: 40, icon: "icon:1" },
+    ]);
+  });
+
+  it("falls back to the un-numbered type for entries that predate the segment field", () => {
+    // The fixture's targets carry no segment — an old cached payload. The
+    // spawn labeler being INJECTED must not change how those render.
+    const sections = cardSectionsFor({
+      row: row("player:0"),
+      level: "players",
+      players: PLAYERS,
+      pins: { source: 0, targets: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: { ...LABELS, target: (segment: number) => `spawn:${segment}` },
+      card: DAMAGE_CARD,
+    });
+
+    expect(sections?.[1].entries.map((entry) => entry.label)).toEqual(["enemy:Em0003", "enemy:unknown-7"]);
   });
 });
 
@@ -304,5 +387,204 @@ describe("cardSectionsFor at the skills level", () => {
 
   it("returns null for a row no player's breakdown holds", () => {
     expect(callWith("skills", "skill:Normal:404", ABILITY_ONLY)).toBeNull();
+  });
+});
+
+describe("the card follows the metric", () => {
+  // The card read `SkillState.totalDamage` whatever the tab, so a stun bar's
+  // tooltip explained it with damage figures under a "DMG" heading.
+  const stun = (level: "players" | "abilities" | "skills", key: string, players = PLAYERS) =>
+    cardSectionsFor({
+      row: row(key),
+      level,
+      players,
+      pins: { source: 0, targets: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: LABELS,
+      card: STUN_CARD,
+    });
+
+  it("reads the metric's own figure off each breakdown row", () => {
+    // The fixture's stun is damage/10, so reading the wrong field is a factor
+    // of ten out rather than a plausible-looking reordering.
+    const sections = stun("players", "player:0");
+    expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([20, 10]);
+  });
+
+  it("omits the by-target section where the metric has no per-enemy record", () => {
+    // SkillTargetState carries damage and hits only. A "Target" section here
+    // could only be filled from the damage figures — the original defect, one
+    // level down — and an empty one would suggest the ability hit nothing.
+    expect(stun("players", "player:0")?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-ability"]);
+  });
+
+  it("gives an ability row no card at all when by-target is its only section", () => {
+    // The abilities level offers targets and nothing else, so a metric with no
+    // per-enemy record has nothing to say there.
+    expect(stun("abilities", "skill:Normal:9001")).toBeNull();
+  });
+
+  it("keeps the source section on a member skill, measured in the metric", () => {
+    const sections = cardSectionsFor({
+      row: row("skill:Normal:9001"),
+      level: "skills",
+      players: PARTY,
+      pins: { source: null, targets: [], ability: "Normal:9001" },
+      color: "rgb(1,2,3)",
+      labels: LABELS,
+      card: STUN_CARD,
+    });
+
+    expect(sections?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-source"]);
+    expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([20, 5]);
+  });
+
+  it("gives a party-wide stun ability row its by-source section even with no per-enemy record", () => {
+    const sections = cardSectionsFor({
+      row: row("skill:Normal:9001"),
+      level: "abilities",
+      players: PARTY,
+      pins: { source: null, targets: [], ability: null },
+      color: "rgb(1,2,3)",
+      labels: LABELS,
+      card: STUN_CARD,
+    });
+
+    expect(sections?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-source"]);
+    expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([20, 5]);
+  });
+});
+
+describe("targetCardSectionsFor", () => {
+  // Two spawns of ONE enemy type: the row's card must count its own spawn
+  // and nothing of its same-type sibling.
+  const SPAWN_PARTY = [
+    {
+      index: 0,
+      partyIndex: 0,
+      characterType: "Pl1400",
+      totalDamage: 160,
+      skillBreakdown: [
+        {
+          ...skill(9001, 100, 10),
+          targets: [
+            { enemyType: "Em0003", segment: 0, hits: 6, totalDamage: 60 },
+            { enemyType: "Em0003", segment: 1, hits: 4, totalDamage: 40 },
+          ],
+        },
+        {
+          ...skill(9002, 60, 6),
+          targets: [{ enemyType: "Em0003", segment: 1, hits: 6, totalDamage: 60 }],
+        },
+      ],
+    },
+    {
+      index: 1,
+      partyIndex: 1,
+      characterType: "Pl1400",
+      totalDamage: 50,
+      skillBreakdown: [
+        {
+          ...skill(9001, 50, 5),
+          targets: [{ enemyType: "Em0003", segment: 1, hits: 5, totalDamage: 50 }],
+        },
+      ],
+    },
+  ] as unknown as ComputedPlayerState[];
+
+  const ENTRIES = [
+    { id: 9, actorIndex: 9, enemyType: "Em0003", instance: 1, maxHp: null, startMs: 0, endMs: 1_000 },
+    { id: 10, actorIndex: 10, enemyType: "Em0003", instance: 2, maxHp: null, startMs: 0, endMs: 1_000 },
+  ] as TargetEntry[];
+
+  const callTarget = (key: string, players = SPAWN_PARTY, targetEntries = ENTRIES) =>
+    targetCardSectionsFor({ row: row(key), players, targetEntries, color: "rgb(1,2,3)", labels: LABELS });
+
+  it("explains a spawn row by ability and by source", () => {
+    expect(callTarget("target:1")?.map((section) => section.headingKey)).toEqual([
+      "ui.logs.hover-by-ability",
+      "ui.logs.hover-by-source",
+    ]);
+  });
+
+  it("counts only the row's own spawn, never its same-type sibling", () => {
+    const sections = callTarget("target:1");
+
+    // Spawn 1 took 40+50 of 9001 and 60 of 9002; spawn 0's 60 stays out.
+    expect(sections?.[0].entries.map((entry) => [entry.key, entry.value])).toEqual([
+      ["Normal:9001", 90],
+      ["Normal:9002", 60],
+    ]);
+    expect(sections?.[1].entries.map((entry) => [entry.label, entry.value])).toEqual([
+      ["player:0", 100],
+      ["player:1", 50],
+    ]);
+  });
+
+  it("colours each source with the player's own colour", () => {
+    expect(callTarget("target:1")?.[1].entries.map((entry) => entry.color)).toEqual(["#000", "#001"]);
+  });
+
+  it("matches segment-less entries by the spawn's type — the old-payload fallback", () => {
+    const legacy = [
+      {
+        index: 0,
+        partyIndex: 0,
+        characterType: "Pl1400",
+        totalDamage: 100,
+        skillBreakdown: [{ ...skill(9001, 100, 10), targets: [{ enemyType: "Em0003", hits: 10, totalDamage: 100 }] }],
+      },
+    ] as unknown as ComputedPlayerState[];
+
+    const sections = callTarget("target:0", legacy);
+    expect(sections?.[1].entries.map((entry) => entry.value)).toEqual([100]);
+  });
+
+  it("answers null for anything that names no live spawn", () => {
+    expect(callTarget("enemy:whatever")).toBeNull();
+    expect(callTarget("player:0")).toBeNull();
+    // A stale URL's segment indexes no entry — no card, never a guess.
+    expect(callTarget("target:99")).toBeNull();
+  });
+});
+
+describe("cardSectionsFor at the abilities level, party-wide", () => {
+  // The RegroupStrip's "Done by ability" reaches this level with NO source
+  // pinned — the state the machine refactor regressed (WCL comparison §2):
+  // the card silently vanished because the branch resolved its owner from
+  // pins.source alone.
+  const UNPINNED = { source: null, targets: [] as number[], ability: null };
+
+  it("gives a party-wide ability row a card with by-source and by-target sections", () => {
+    const sections = callWith("abilities", "skill:Normal:9001", UNPINNED);
+
+    expect(sections?.map((section) => section.headingKey)).toEqual([
+      "ui.logs.hover-by-source",
+      "ui.logs.hover-by-target",
+    ]);
+  });
+
+  it("splits the ability across the players who dealt it, in their own colours", () => {
+    const sections = callWith("abilities", "skill:Normal:9001", UNPINNED);
+
+    expect(sections?.[0].entries.map((entry) => entry.value)).toEqual([200, 50]);
+    expect(sections?.[0].entries.map((entry) => entry.color)).toEqual(["#000", "#001"]);
+  });
+
+  it("totals the targets across every player's copy of the ability", () => {
+    const sections = callWith("abilities", "skill:Normal:9001", UNPINNED);
+
+    // 250 damage total across both players, whatever the per-target split.
+    expect(sections?.[1].entries.reduce((sum, entry) => sum + entry.value, 0)).toBe(250);
+  });
+
+  it("keeps the pinned shape unchanged — by target alone", () => {
+    const sections = callWith("abilities", "skill:Normal:9001", { source: 0, targets: [], ability: null });
+
+    expect(sections?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-target"]);
+  });
+
+  it("still answers null for a pinned source missing from the scoped party", () => {
+    expect(callWith("abilities", "skill:Normal:9001", { source: 42, targets: [], ability: null })).toBeNull();
   });
 });

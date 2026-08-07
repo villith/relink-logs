@@ -14,6 +14,7 @@ import {
 import { PlayerLabel } from "./PlayerLabel";
 import { SkillBreakdown } from "./SkillBreakdown";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
+import { UnitValue, ValueCell } from "./ValueCell";
 import { usePlayerRow } from "./usePlayerRow";
 
 /** Steps a bust is allowed to walk right — one short of a full party, so the
@@ -94,27 +95,20 @@ export const PlayerRow = ({
           {/* `color` is an inline style rather than a class: the meter's rows
               are plain divs outside Mantine, so the severity name maps to a
               CSS variable the same way Mantine would resolve it. */}
-          <div
-            role="cell"
-            className="text-left row-data player-name"
+          <ValueCell
+            align="left"
+            className="player-name"
             style={legalityColor ? { color: `var(--mantine-color-${legalityColor}-5)` } : undefined}
           >
             <PlayerLabel template={playerLabelTemplate} tokens={labelTokens} />
-          </div>
+          </ValueCell>
           {columns.map((column) => {
             const columnValue = matchColumnTypeToValue(showFullValues, column);
 
             return (
-              <div key={column} role="cell" className="text-center row-data">
-                {showFullValues ? (
-                  columnValue.value
-                ) : (
-                  <>
-                    {columnValue.value}
-                    <span className="unit font-sm">{columnValue.unit}</span>
-                  </>
-                )}
-              </div>
+              <ValueCell key={column}>
+                {showFullValues ? columnValue.value : <UnitValue value={columnValue.value} unit={columnValue.unit} />}
+              </ValueCell>
             );
           })}
         </div>

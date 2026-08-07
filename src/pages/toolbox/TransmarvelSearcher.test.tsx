@@ -502,7 +502,11 @@ describe("TransmarvelSearcher", () => {
     expect(await screen.findByText(`#${MAX_SHOWN_ROWS}`)).toBeTruthy();
     expect(screen.queryByText(`#${MAX_SHOWN_ROWS + 1}`)).toBeNull();
     expect(screen.getByText(`Showing the first ${MAX_SHOWN_ROWS} of ${total} rolls.`)).toBeTruthy();
-  });
+    // Rendering MAX_SHOWN_ROWS (1000) rows in jsdom is inherently slow — the
+    // cost IS what this test verifies — and it sat close enough to vitest's
+    // 5s default that a growing suite tipped it over under parallel load.
+    // Explicit budget rather than a global bump, so only this test pays it.
+  }, 20_000);
 
   it("renders results synthesis-style: name line plus dimmed trait/level line", async () => {
     const sigilPrediction: TransmarvelPrediction = {

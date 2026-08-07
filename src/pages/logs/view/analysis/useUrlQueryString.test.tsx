@@ -3,20 +3,20 @@ import { NuqsAdapter } from "nuqs/adapters/react-router/v6";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { useSelectorParams } from "../useSelectorParams";
-
+import { DEFAULT_STATE } from "./machine/state";
+import { useAnalysisState } from "./machine/useAnalysisState";
 import { useUrlQueryString } from "./useUrlQueryString";
 
-/** The real pins, the real adapter, the real jsdom URL — the point of this test
- * is the wiring between them, so nothing here is stubbed. */
+/** The real machine state, the real adapter, the real jsdom URL — the point of
+ * this test is the wiring between them, so nothing here is stubbed. */
 const Harness = () => {
-  const [, setPins] = useSelectorParams();
+  const [, setState] = useAnalysisState();
   const query = useUrlQueryString();
 
   return (
     <>
       <output data-testid="query">{query}</output>
-      <button onClick={() => setPins({ source: 2, targets: [3, 4], ability: null })}>pin</button>
+      <button onClick={() => setState({ ...DEFAULT_STATE, source: 2, target: 3 })}>pin</button>
     </>
   );
 };

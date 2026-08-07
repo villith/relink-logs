@@ -131,31 +131,6 @@ export type ActionType =
   | { Group: string };
 
 /**
- * One band of the analysis view's ability drill-down chart (mirrors the Rust
- * `AbilityChartSeries`): what one breakdown row of the pinned player dealt per
- * second. Keyed exactly as a `skillBreakdown` row is — same action, same child
- * character — so a band always corresponds to a row of the table beneath it and
- * both fold into skill groups by the same rule.
- *
- * Present only on a scoped fetch that pinned a source; empty otherwise.
- */
-export type AbilityChartSeries = SkillRow & {
-  values: number[];
-};
-
-/**
- * One band of the target drill-down chart (mirrors the Rust
- * `TargetChartSeries`): what the pinned ability dealt to one enemy spawn per
- * second. Carries the spawn's `instance`, so a band names the same enemy the
- * target dropdown and the HP chart do.
- */
-export type TargetChartSeries = {
-  enemyType: EnemyType;
-  instance: number;
-  values: number[];
-};
-
-/**
  * One window during which one actor held one status effect (mirrors the Rust
  * `StatusInterval`).
  *
@@ -171,6 +146,18 @@ export type StatusInterval = {
   /** Null when the hook could not resolve the causing ability. The row then
    * falls back to the bare effect name rather than disappearing. */
   abilityId: number | null;
+  /** The applying status object's RTTI class, as a hash of its class NAME.
+   * Names the row's source where `abilityId` cannot — a passive has no action
+   * id, which is what a sentinel cause such as 9998 means. Null when the hook
+   * could not vouch for one, and on every log written before it existed. */
+  statusClass: number | null;
+  /** The action the caster was performing when it applied the effect. Names
+   * the same rows one rung more specifically than `statusClass` does: the
+   * class names the mechanism, this names the ability.
+   *
+   * Deliberately separate from `abilityId` — "the game recorded this cause"
+   * and "we inferred it from what the caster was doing" are different claims. */
+  casterActionId: number | null;
   startMs: number;
   endMs: number;
   /** Peak stacks within the window. Carried for the chart, which is where a
@@ -192,6 +179,19 @@ export type StatusInterval = {
   applications: number;
 };
 
+/** A span of fight time a battle state held — mirrors the Rust `ChartWindow`
+ * (parser/v1/windows.rs). `sba` is a Skybound Art performance (chains merged),
+ * `link` is Link Time, `break` is one enemy sitting in Break. Milliseconds
+ * from the fight's start, the same clock `StatusInterval` reports on. */
+export type ChartWindow = {
+  kind: "sba" | "link" | "break";
+  startMs: number;
+  endMs: number;
+  /** The breaking enemy's actor index for `break` windows; null for the
+   * party-wide kinds. */
+  actorIndex: number | null;
+};
+
 /** Everything grouping and naming read of a hit: the action and the body it came
  * from.
  *
@@ -200,11 +200,39 @@ export type StatusInterval = {
  * needing a cast that would hide a real drift between a band and a row. */
 export type SkillRow = Pick<SkillState, "actionType" | "childCharacterType">;
 
-/** Per-enemy-type share of one skill's damage (mirrors the Rust
- * `SkillTargetState`); same-type spawns merge into one entry. Computed under
- * the active target/time filters, like the rest of the derived state. */
+/** One per-ability chart band for the drilled Stun/SBA charts (mirrors the Rust
+ * `AbilitySeries`), in the two shapes a band can take.
+ *
+ * A `skill` band names the breakdown ROW it decomposes, not a display group: the
+ * grouping lives here in the frontend (`skillGroupFor`) and the parser is
+ * deliberately free of it, so the fold happens on this side — see `abilityBands`.
+ * It satisfies `SkillRow` structurally, which is what lets it feed
+ * `abilityRowKey` with no cast.
+ *
+ * A `cause` band has no action at all — SBA gauge from a party award, or the
+ * unattributed remainder — so it carries the row key directly, in the same
+ * `source:{kind}[:{id}]` / `skill:unattributed` grammar the SBA table builds its
+ * rows with.
+ *
+ * Values are stun applied per bucket on the Stun tab, gauge GENERATED per bucket
+ * on the SBA tab (drilled in, that chart plots generation rather than the gauge
+ * level — a level cannot be decomposed by contributor). */
+export type AbilitySeries =
+  | ({ kind: "skill"; values: number[] } & SkillRow)
+  | { kind: "cause"; key: string; values: number[] };
+
+/** Per-enemy share of one skill's damage (mirrors the Rust
+ * `SkillTargetState`). Computed under the active target/time filters, like
+ * the rest of the derived state. */
 export type SkillTargetState = {
   enemyType: EnemyType;
+  /** The enemy SPAWN this share landed on, as an index into `targetEntries` —
+   * the same segment the groups path keys by, so a card and the table can
+   * never number spawns differently. Absent on payloads from before the
+   * field existed (and from the live meter path), or where the segmenter
+   * declined to place the event; those entries aggregate at the type level
+   * and render un-numbered. */
+  segment?: number;
   hits: number;
   totalDamage: number;
 };
@@ -222,6 +250,11 @@ export type SkillState = {
   maxDamage: number | null;
   /** Total damage of the skill */
   totalDamage: number;
+  /** Skybound Arts gauge this skill generated. Local player only — a remote
+   * member's gauge is synced rather than granted by a hit the hook can see, so
+   * their rows are 0 and the table must say so rather than ranking them.
+   * Optional: a backend older than the field sends nothing (dev HMR skew). */
+  sbaGenerated?: number;
   /** Total stun value of the skill hits */
   totalStunValue: number;
   /** Maximum recorded stun value of the skill */
@@ -293,6 +326,12 @@ export type PlayerState = {
   dps: number;
   /** Amount of SBA Gauge (0.0 - 1000.0) */
   sba: number;
+  /** Total gauge generated over the fight — the sum of every recorded gauge
+   * increase. Ranks contribution; `sba` above is the LEVEL, which reads 0 right
+   * after a burst. Optional: a backend older than the field sends nothing (dev
+   * HMR skew) — never a stored-log concern, since logs are always reparsed by
+   * the running backend. */
+  sbaGenerated?: number;
   /** Total stun value */
   totalStunValue: number;
   /** Stun per second over the encounter time */
@@ -305,6 +344,9 @@ export type PlayerState = {
   lastDamageTime: number;
   /** Stats for individual skills logged */
   skillBreakdown: SkillState[];
+  /** SBA generated by causes that are not the player's own damaging hits, one
+   * entry per (kind, id). Optional: a payload from an older backend has none. */
+  sbaSources?: SbaSourceState[];
   /** Number of hits by this player that reached the game's damage cap */
   cappedHits: number;
   /** Number of hits by this player that were subject to a damage cap at all */
@@ -313,6 +355,97 @@ export type PlayerState = {
   overcapBaseSum: number;
   /** Sum of damage caps over cappable hits */
   overcapCapSum: number;
+  /** Damage this player RECEIVED from enemies. Optional: a payload from an
+   * older backend has none, and a log recorded before damage-taken capture
+   * (2026-08-04) reads 0 — the tab shows "—" for the former case. */
+  totalDamageTaken?: number;
+  /** How many enemy hits landed on this player. Optional like the total. */
+  hitsTaken?: number;
+  /** Incoming damage per (attacker class, attack). Optional like the total. */
+  damageTakenBreakdown?: DamageTakenState[];
+};
+
+/** One (attacker class, attack) row of a player's incoming damage — mirrors
+ * the Rust `DamageTakenState`. */
+export type DamageTakenState = {
+  enemyType: EnemyType;
+  actionId: ActionType;
+  hits: number;
+  totalDamage: number;
+  maxDamage: number;
+};
+
+/** Which universe an index names — mirrors the Rust `ActorRef`. A `source`/
+ * `target` filter on a `GroupQuery` is one of these; which universe is valid
+ * depends on the query's (metric, hostility) role-mapping. */
+export type GroupActorRef = { kind: "player"; index: number } | { kind: "enemySpawn"; segment: number };
+
+/** What one `GroupAggregate` row/band is (mirrors the Rust `GroupKey`).
+ * Universe-typed like `GroupActorRef`; `other` is the top-N rollup so a
+ * capped chart still sums to the table. */
+export type GroupKey =
+  | { kind: "player"; index: number }
+  | { kind: "enemySpawn"; segment: number; enemyType: EnemyType; instance: number }
+  | { kind: "enemyType"; enemyType: EnemyType }
+  | { kind: "friendlyAbility"; actionType: ActionType; childCharacterType: CharacterType }
+  | { kind: "enemyAttack"; enemyType: EnemyType; actionId: ActionType }
+  | { kind: "other" };
+
+/** The ability filter of a wire `GroupQuery` (mirrors the Rust
+ * `AbilityFilter`): a friendly pin ships pre-expanded into its member actions
+ * (`actionsForPin` owns skill-group knowledge); an enemy attack is one
+ * (type, action) pair. */
+export type GroupAbilityFilter =
+  | { kind: "friendly"; actions: ActionType[] }
+  | { kind: "enemyAttack"; enemyType: EnemyType; actionId: ActionType };
+
+/** The wire aggregation request (mirrors the Rust `GroupQuery`). The
+ * resolver's own `GroupQuery` (machine/resolve.ts) carries the RAW ability
+ * pin; the view expands it into this shape at fetch time, and stamps the
+ * committed scrub window on so the measures follow the scrub. */
+export type WireGroupQuery = {
+  metric: "damage" | "taken";
+  hostility: "friendly" | "enemy";
+  groupBy: "source" | "ability" | "target";
+  source: GroupActorRef | null;
+  target: GroupActorRef | null;
+  ability: GroupAbilityFilter | null;
+  topN: number;
+  fromMs?: number;
+  upToMs?: number;
+  /** The aura filter's admitted spans, ms relative to the fight's start,
+   * start-inclusive end-exclusive (mirrors the Rust `TimeWindow`). Absent =
+   * no mask; present-but-EMPTY matches nothing — the effect was never up
+   * inside the chart window. */
+  windows?: { fromMs: number; upToMs: number }[];
+};
+
+/** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`). */
+export type GroupMeasure = { amount: number; hits: number; min: number | null; max: number | null };
+
+/** One (filters × groupBy) row/band pair from `aggregate_groups` (mirrors the
+ * Rust `GroupAggregate`): the table (`key` + `measure`) and the chart
+ * (`key` + `series`) come from the same grouping, so the two can never
+ * disagree. `series` is a whole-fight per-bucket band, same buckets as
+ * `dpsChart` — the view slices it client-side. */
+export type GroupAggregate = { key: GroupKey; measure: GroupMeasure; series: number[] };
+
+/** A cause of SBA generation that no skill row can hold — mirrors the Rust
+ * `SbaSourceState`. `kind` is a stable machine key; the table maps it to an
+ * i18n key rather than displaying it. */
+export type SbaSourceState = {
+  kind:
+    | "damageTaken"
+    | "perfectGuard"
+    | "effect"
+    | "partyAward"
+    | "directorAward"
+    | "questStart"
+    | "perfectDodge"
+    | "site"
+    | "unknown";
+  id: number | null;
+  generated: number;
 };
 
 export type ComputedPlayerState = PlayerState & {
@@ -740,6 +873,78 @@ export type SBAEvent = [
 
 export type DeathEvent = [number, { OnDeathEvent: { actor_index: number; death_counter: number } }];
 
+/** One actor as a damage event reports it. `parent_index` is what an attribution
+ * reads — a summon's hit belongs to the player who called it. */
+type LogEventActor = {
+  index: number;
+  actor_type: number;
+  parent_index: number;
+  parent_actor_type: number;
+};
+
+/**
+ * The payload half of one raw-log event: an externally-tagged
+ * `protocol::Message`. Inner fields stay snake_case because `Message` variants
+ * serialise with serde's DEFAULTS, not camelCase — `SBAEvent` above is the same
+ * mirror, narrower.
+ *
+ * Names only the variants the events table READS. `Message` has 27 and grows by
+ * the append-only rule (see protocol/src/lib.rs), so the projection must cope
+ * with a variant this union does not name — `eventKind` classifies anything
+ * unrecognised as `other` and `toEventRow` reads no field off it that it has not
+ * checked for at runtime. Widen this union when a variant earns its own column
+ * treatment, not merely because it exists.
+ */
+export type LogEventPayload =
+  | {
+      DamageEvent: {
+        source: LogEventActor;
+        target: LogEventActor;
+        damage: number;
+        flags: number;
+        action_id: ActionType;
+      };
+    }
+  | { OnDeathEvent: { actor_index: number; death_counter: number } }
+  | { OnPlayerStun: { actor_index: number; stun_amount: number } }
+  | { OnPerfectGuardStun: { actor_index: number; stun_amount: number } }
+  | { OnPerfectGuardQuickening: { actor_index: number; stun_amount: number } }
+  | { OnStunEffect: { actor_index: number; stun_amount: number } }
+  | { OnAttemptSBA: { actor_index: number } }
+  | { OnPerformSBA: { actor_index: number } }
+  | { OnContinueSBAChain: { actor_index: number } }
+  | { OnUpdateSBA: { actor_index: number; sba_value: number; sba_added: number } }
+  | { SbaGain: { actor_index: number; action_id: number; amount: number } }
+  // The apply side carries everything a `status:` row key is spelled from
+  // (effect, cause, class) plus who cast it; the remove side has only the
+  // effect and the cause, because the shared destructor cannot vouch for a
+  // class by the time it fires. Mirrors `StatusApplyEvent`/`StatusRemoveEvent`
+  // — every optional here is `Option<u32>` in the protocol, and the events
+  // table must not turn a missing cause into a fabricated one.
+  | {
+      StatusApply: {
+        actor_index: number;
+        caster_index: number | null;
+        status_id: number;
+        ability_id: number | null;
+        stacks: number;
+        status_class: number | null;
+        caster_action_id: number | null;
+      };
+    }
+  | { StatusRemove: { actor_index: number; status_id: number; ability_id: number | null } }
+  | { LinkTime: { active: boolean } }
+  | { EnemyMode: { actor_index: number; mode: number } };
+
+/** One entry of a log's raw event stream. Mirrors `(i64, protocol::Message)`,
+ * with the timestamp already rebased to the fight start by `event_page`. */
+export type LogEvent = [number, LogEventPayload];
+
+/** Mirrors the Rust `EventPage`. `total` can exceed `events.length` — the
+ * frontend asks for a capped page, and a log past the cap is truncated VISIBLY
+ * (see EventsTab), never silently. */
+export type EventPage = { events: LogEvent[]; total: number };
+
 /** Toolbox / Synthesis Helper — mirrors src-tauri/src/synthesis/mod.rs. */
 export type SynthesisSigil = {
   uid: number;
@@ -769,6 +974,10 @@ export type SynthesisStatus = {
   gameRunning: boolean;
   sigilCount: number;
   rngUnpredictable: boolean;
+  /** False until the game latches its synthesis seed — see `seed_latched` in
+   * src-tauri/src/synthesis/mod.rs. Predictions made now are computed from a
+   * seed the game replaces when the player opens the synthesis screen. */
+  seedLatched: boolean;
 };
 
 export type SynthesisSearchResponse = {
@@ -776,15 +985,22 @@ export type SynthesisSearchResponse = {
   pairsTested: number;
   sigilCount: number;
   rngUnpredictable: boolean;
-  /** Seed identity the search was computed from (staleness detection). */
+  /** Seed identity the search was computed from (staleness detection). All
+   * three move independently: a synthesis moves only `synthCount`. */
   rngState: number;
-  seedCounter: number;
+  savedSeed: number;
+  synthCount: number;
+  seedLatched: boolean;
 };
 
 /** Live synthesis seed identity (fetch_synthesis_seed; null = game not running). */
 export type SynthesisSeed = {
   rngState: number;
-  seedCounter: number;
+  savedSeed: number;
+  synthCount: number;
+  /** True when the game has latched its synthesis seed — see `seed_latched`
+   * in src-tauri/src/synthesis/mod.rs. */
+  latched: boolean;
 };
 
 /** Toolbox / Overmastery Predictor — mirrors src-tauri/src/overmastery/mod.rs. */
@@ -810,6 +1026,16 @@ export type OvermasteryPrediction = {
   slotState: number;
   unpredictable: boolean;
   mspCost: number;
+};
+
+/** One character's slice of a batch prediction. Exactly one of
+ * `prediction`/`error` is set: a character the live roster doesn't hold has
+ * no stream to simulate, but the rest of the batch is still good. */
+export type OvermasteryCharacterPrediction = {
+  /** Character id hash, as the number the query asked for. */
+  charId: number;
+  prediction: OvermasteryPrediction | null;
+  error: string | null;
 };
 
 /** Toolbox / Transmarvel Wishlist — mirrors src-tauri/src/transmarvel/mod.rs. */

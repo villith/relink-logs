@@ -193,11 +193,13 @@ async fn fetch_synthesis_status(
             game_running: false,
             sigil_count: 0,
             rng_unpredictable: false,
+            seed_latched: false,
         }),
         Some(snap) => Ok(synthesis::SynthesisStatus {
             game_running: true,
             sigil_count: snap.sigils.len() as u32,
             rng_unpredictable: snap.rng_state == 0,
+            seed_latched: synthesis::seed_latched(&snap),
         }),
     }
 }
@@ -224,7 +226,9 @@ async fn search_synthesis(
             sigil_count: snap.sigils.len() as u32,
             rng_unpredictable: snap.rng_state == 0,
             rng_state: snap.rng_state,
-            seed_counter: snap.seed_counter,
+            saved_seed: snap.saved_seed,
+            synth_count: synthesis::synth_count(&snap),
+            seed_latched: synthesis::seed_latched(&snap),
         })
     })
     .await
@@ -345,13 +349,25 @@ async fn fetch_overmastery_status(
     }
 }
 
+/// Most characters one batch prediction will simulate. The roster is far
+/// smaller than this; the cap is only so a malformed query can't ask for an
+/// unbounded pile of simulation.
+const MAX_PREDICTED_CHARACTERS: usize = 64;
+
 /// Toolbox / Overmastery Predictor: fresh RNG snapshot + simulate the next N
-/// meditation rolls for one character and size.
+/// meditation rolls at one size, for each requested character.
+///
+/// The whole batch is simulated from a *single* snapshot: the per-character
+/// results are shown side by side, so they must agree about the RNG state
+/// they were computed from — and the staleness watch must be able to speak
+/// for all of them at once. A per-character failure (someone the live roster
+/// doesn't hold) is reported in that character's entry rather than failing
+/// the batch; only the whole-read failures below are errors.
 #[tauri::command(async)]
 async fn predict_overmastery(
     query: overmastery::OvermasteryQuery,
     hook: State<'_, HookStatus>,
-) -> Result<overmastery::OvermasteryPrediction, String> {
+) -> Result<Vec<overmastery::OvermasteryCharacterPrediction>, String> {
     let tables = overmastery::stock_tables();
     if query.tier >= tables.tiers.len() {
         return Err("invalid-tier".to_string());
@@ -363,20 +379,38 @@ async fn predict_overmastery(
     if snap.slot_override != u32::MAX {
         return Err("rng-override-active".to_string());
     }
-    let char_idx = overmastery::char_slot_index(&snap.roster, query.char_id)
-        .ok_or_else(|| "character-not-found".to_string())?;
-    let slot = overmastery::rng_slot(query.tier as u32, char_idx);
-    let slot_state = *snap
-        .slots
-        .get(slot as usize)
-        .ok_or_else(|| "slot-out-of-range".to_string())?;
-    Ok(overmastery::OvermasteryPrediction {
-        rolls: overmastery::simulate(slot_state, query.tier, tables, rolls),
-        slot,
-        slot_state,
-        unpredictable: slot_state == 0,
-        msp_cost: tables.tiers[query.tier].msp_cost,
-    })
+    Ok(query
+        .char_ids
+        .iter()
+        .take(MAX_PREDICTED_CHARACTERS)
+        .map(|&char_id| {
+            let predicted = overmastery::char_slot_index(&snap.roster, char_id)
+                .ok_or("character-not-found")
+                .and_then(|char_idx| {
+                    let slot = overmastery::rng_slot(query.tier as u32, char_idx);
+                    let slot_state = *snap.slots.get(slot as usize).ok_or("slot-out-of-range")?;
+                    Ok(overmastery::OvermasteryPrediction {
+                        rolls: overmastery::simulate(slot_state, query.tier, tables, rolls),
+                        slot,
+                        slot_state,
+                        unpredictable: slot_state == 0,
+                        msp_cost: tables.tiers[query.tier].msp_cost,
+                    })
+                });
+            match predicted {
+                Ok(prediction) => overmastery::OvermasteryCharacterPrediction {
+                    char_id,
+                    prediction: Some(prediction),
+                    error: None,
+                },
+                Err(e) => overmastery::OvermasteryCharacterPrediction {
+                    char_id,
+                    prediction: None,
+                    error: Some(e.to_string()),
+                },
+            }
+        })
+        .collect())
 }
 
 /// Toolbox: current RNG state of one slot, for staleness polling against a
@@ -963,7 +997,15 @@ fn export_damage_log_to_file(id: u32, options: ParseOptions) -> Result<(), Strin
             // reparsing, so the filter has to be applied here by hand — an
             // export is meant to be what the view shows, and a CSV that still
             // contained rows the table excluded would not add up to it.
+            //
+            // The damage-TAKEN stream is excluded for the same reason every
+            // other dealt-damage path excludes it: this file has one `damage`
+            // column and no side, so an enemy→party hit would land beside the
+            // party's own with a `source_type` of `Unknown(...)`, and summing
+            // the column — which is the whole point of the export — would
+            // overstate party damage by the entire incoming stream.
             if inside_window
+                && !v1::is_damage_taken_event(damage_event)
                 && !v1::is_excluded(damage_event, &options.filters)
                 && v1::target_selected(timestamp, damage_event, &options.target_spans)
             {
@@ -1269,28 +1311,34 @@ struct EncounterStateResponse {
     /// window, with the selector pins NOT applied — the analysis view cascades
     /// its three selectors from this without a round trip per keystroke.
     selection_facts: Vec<v1::SelectionFact>,
-    /// The analysis view's drill-down chart, present only on a scoped fetch that
-    /// pinned a source: what that player's damage was made of, one band per
-    /// breakdown row. Empty at every other level — with nothing pinned the
-    /// per-player `dps_chart` already answers.
-    ability_chart: Vec<v1::AbilityChartSeries>,
-    /// The drill-down chart one level further in: with a source AND an ability
-    /// pinned, what that ability hit, one band per enemy spawn.
-    target_chart: Vec<v1::TargetChartSeries>,
     /// Every window an actor held a status effect for, per actor and never
     /// merged, spanning the FULL fight. The Buffs and Debuffs tables compute
     /// their own uptime from these, so a scrub window narrows the view without
     /// another round trip. Empty on logs recorded before status capture.
     status_intervals: Vec<v1::StatusInterval>,
+    /// Spans of fight time a battle state held (SBA performance, Link Time, an
+    /// enemy's Break), for the analysis chart's shaded windows. Empty on logs
+    /// recorded before the transition events existed.
+    chart_windows: Vec<v1::ChartWindow>,
     dps_chart: HashMap<u32, Vec<i32>>,
     /// Stun applied per DPS-chart bucket. Separate from `dps_chart` because
     /// stun reconciles two capture paths with max(), not a sum — see
     /// `build_player_stun_chart`.
     stun_chart: HashMap<u32, Vec<f64>>,
+    /// Damage TAKEN per DPS-chart bucket, keyed by the victim's slot key. All
+    /// zeroes on logs recorded before damage-taken capture (2026-08-04).
+    taken_chart: HashMap<u32, Vec<i64>>,
     /// Enemy HP% per DPS-chart bucket, one series per HP pool passing the target
     /// filter (largest pools first, capped). Empty on logs recorded before HP capture.
     hp_chart: Vec<v1::HpChartSeries>,
+    /// The (filters × groupBy) aggregates for `group_query` — table rows and
+    /// chart bands from ONE grouping. Empty when no query was sent.
+    groups: Vec<v1::GroupAggregate>,
     sba_chart: HashMap<u32, Vec<f32>>,
+    /// Per-ability bands for the DRILLED Stun/SBA charts, keyed by player slot.
+    /// Empty unless the view sent an `ability_series` query — an undrilled log
+    /// pays nothing for this.
+    ability_series: HashMap<u32, Vec<v1::AbilitySeries>>,
     sba_events: Vec<(i64, protocol::Message)>,
     death_events: Vec<(i64, protocol::Message)>,
     chart_len: usize,
@@ -1330,6 +1378,47 @@ struct ParseOptions {
     /// empty means "All" on every dimension — the shipped default.
     #[serde(default)]
     selection: v1::SelectionFilter,
+    /// The analysis view's generic aggregation request; None = no groups in
+    /// the response. Replaces the pin-shaped drill-chart triggers.
+    #[serde(default)]
+    group_query: Option<v1::GroupQuery>,
+    /// The analysis view's window-filter mask for the DERIVED state — the
+    /// same shape and semantics as [`v1::GroupQuery::windows`] (which masks
+    /// the groups aggregation independently; the frontend sends the same
+    /// combined mask to both so a table and its hover cards agree).
+    #[serde(default)]
+    windows: Option<Vec<v1::TimeWindow>>,
+    /// The analysis view's per-ability chart request; None = no bands in the
+    /// response.
+    ///
+    /// Rides this fetch rather than a command of its own: the walk is one extra
+    /// linear pass over a `raw_event_log` this call has already decompressed and
+    /// reparsed, and a drill changes the pins — which refetches anyway.
+    #[serde(default)]
+    ability_series: Option<AbilitySeriesQuery>,
+}
+
+/// Which derived-path metric the per-ability bands are built for.
+///
+/// Only the two the group aggregation cannot serve: damage and taken already
+/// have bands through `group_query`.
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone, Copy)]
+#[serde(rename_all = "camelCase")]
+enum AbilitySeriesMetric {
+    Stun,
+    Sba,
+}
+
+/// The analysis view's per-ability chart request, sent only when a derived-path
+/// tab is drilled in (`groupBy === "ability"`).
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AbilitySeriesQuery {
+    metric: AbilitySeriesMetric,
+    /// The pinned player, or None for the whole party — stun's ability level
+    /// widens to the party when no source is pinned (see `metrics/stun.ts`).
+    #[serde(default)]
+    player: Option<u32>,
 }
 
 // Per-second buckets: the quest-details charts and the window scrubber both
@@ -1337,119 +1426,145 @@ struct ParseOptions {
 const DPS_INTERVAL: i64 = 1_000;
 const SBA_INTERVAL: i64 = 1_000;
 
-/// The analysis view's drill-down chart series for the current pins.
+/// The analysis view's generic (filters × groupBy) aggregation, present only
+/// when the view sent a `group_query` — absent, this is a query-free fetch
+/// (e.g. a scrub commit) and the response carries no groups at all.
 ///
-/// The chart follows the row level, so what it decomposes is decided entirely by
-/// what is pinned: a source alone means "what was this player's damage made
-/// of", a source and an ability means "what did this ability hit". Nothing
-/// pinned needs no series at all — that level is the per-player `dps_chart` the
-/// base load already carries — so both come back empty and the caller pays
-/// nothing for a fetch that only moved the window.
+/// `segments`/`assignment` are the caller's segmentation of the UNWINDOWED
+/// log, passed in rather than recomputed (the caller already needs it for
+/// `selection_facts`): sharing it is what makes an aggregate's spawn key and
+/// a target-dropdown entry mean the same enemy.
+/// The group aggregation for this request, or NO bands.
 ///
-/// Only the FIRST pinned source and ability are read: the selector bar pins one
-/// of each, and a chart that stacked two players' abilities together would have
-/// no meaningful total.
-///
-/// `segments`/`assignment` are the caller's segmentation of the UNWINDOWED log,
-/// passed in rather than recomputed: the caller already needs it for
-/// `selection_facts`, and segmenting twice per fetch is two more full passes
-/// over a log that can hold hundreds of thousands of events. Sharing it is also
-/// what makes a band and a target-dropdown entry mean the same spawn.
-fn build_drill_charts(
+/// A rejected query is never fatal to the fetch. Every other stale-reference
+/// case in this path narrows to nothing — an out-of-range spawn segment
+/// aggregates to `Ok(vec![])`, an ability pin that expands to no action ids
+/// matches nothing — and a `GroupQueryError` is the same kind of thing: a pin
+/// left over from a hostility flip or a hand-edited URL. Propagating it would
+/// fail the whole command, so the log page would lose its party table, its
+/// charts, its status intervals and its legality verdicts over one bad
+/// selector. Logged rather than swallowed, because a query the frontend should
+/// never have built is still a bug worth seeing.
+fn build_groups(
     parser: &v1::Parser,
     options: &ParseOptions,
     segments: &[v1::TargetSegment],
     assignment: &[Option<usize>],
-) -> (Vec<v1::AbilityChartSeries>, Vec<v1::TargetChartSeries>) {
-    let Some(&source_index) = options.selection.source_indices.first() else {
-        return (Vec::new(), Vec::new());
+) -> Vec<v1::GroupAggregate> {
+    let built = match &options.group_query {
+        Some(query) => v1::aggregate_groups(
+            &parser.encounter.raw_event_log,
+            &parser.encounter.player_data,
+            segments,
+            assignment,
+            query,
+            parser.start_time(),
+            DPS_INTERVAL,
+            (parser.full_log_duration() / DPS_INTERVAL) as usize + 1,
+            options.filters,
+        )
+        .map_err(|e| format!("group query rejected: {e}")),
+        None => Ok(Vec::new()),
     };
 
-    let start_time = parser.start_time();
-    // Whole-fight geometry, so a bucket index is still the elapsed second no
-    // matter what window the same fetch applied to the derived state.
-    let chart_len = (parser.full_log_duration() / DPS_INTERVAL) as usize + 1;
-
-    match options.selection.abilities.first() {
-        Some(&ability) => {
-            let target_chart = v1::build_target_damage_chart(
-                &parser.encounter.raw_event_log,
-                &parser.encounter.player_data,
-                segments,
-                assignment,
-                source_index,
-                ability,
-                start_time,
-                DPS_INTERVAL,
-                chart_len,
-                &options.target_spans,
-                options.filters,
-            );
-            (Vec::new(), target_chart)
-        }
-        None => {
-            let ability_chart = v1::build_ability_damage_chart(
-                &parser.encounter.raw_event_log,
-                &parser.encounter.player_data,
-                source_index,
-                start_time,
-                DPS_INTERVAL,
-                chart_len,
-                &options.target_spans,
-                options.filters,
-            );
-            (ability_chart, Vec::new())
-        }
-    }
+    built.unwrap_or_else(|error| {
+        log::warn!("{error} — the response carries no group aggregates");
+        Vec::new()
+    })
 }
 
-/// The per-player damage chart for a scope with NO source pinned.
+/// The per-ability chart bands for this request, or none.
 ///
-/// The base-load `dps_chart` is built with no pins at all, so an enemy or
-/// ability pin left the plot showing the whole fight while the table beside it
-/// had narrowed — measured on log 1566, where pinning one enemy halved the
-/// table's totals and did not move a single line.
-///
-/// Empty with a source pinned: [`build_drill_charts`] already answers there, and
-/// its bands are target-filtered. Empty with nothing narrowing, so a fetch that
-/// only moved the window pays nothing.
-///
-/// Damage only, by construction — this is the damage tab's series. Stun's two
-/// capture paths reconcile with `max()` and its network messages carry no target
-/// at all, so a target-filtered stun chart would be a fiction; the SBA gauge has
-/// no decomposition.
-fn build_scoped_player_chart(
+/// Like [`build_groups`], a request that resolves to nothing is never fatal to
+/// the fetch: a pin left over from a metric switch narrows to an empty map, and
+/// losing the whole log page over one stale selector would be far worse than a
+/// chart falling back to its per-player lines.
+fn build_ability_series(
     parser: &v1::Parser,
     options: &ParseOptions,
-) -> HashMap<u32, Vec<i32>> {
-    if !options.selection.source_indices.is_empty()
-        || (options.target_spans.is_empty() && options.selection.abilities.is_empty())
-    {
+    player_indices: &[u32],
+) -> HashMap<u32, Vec<v1::AbilitySeries>> {
+    let Some(query) = &options.ability_series else {
+        return HashMap::new();
+    };
+
+    // Sized from the FULL log like every other chart, not from the scrub
+    // window: these walk the whole event log, and the view slices client-side.
+    let chart_len = (parser.full_log_duration() / DPS_INTERVAL) as usize + 1;
+
+    let wanted: Vec<u32> = match query.player {
+        Some(player) => player_indices
+            .iter()
+            .copied()
+            .filter(|index| *index == player)
+            .collect(),
+        None => player_indices.to_vec(),
+    };
+    if wanted.is_empty() {
         return HashMap::new();
     }
 
-    let player_indices: Vec<u32> = parser
-        .derived_state
-        .party
-        .values()
-        .map(|player| player.index)
-        .collect();
+    // ONE scope for both, built from the request — see `v1::ChartScope`. A
+    // builder cannot quietly honour a different subset of these than its
+    // neighbour, which is how the ability charts once ignored the ability pin.
+    let scope = v1::ChartScope {
+        player_data: &parser.encounter.player_data,
+        target_spans: &options.target_spans,
+        abilities: &options.selection.abilities,
+        filters: options.filters,
+    };
 
-    // Whole-fight geometry, exactly as `build_drill_charts` uses: the view slices
-    // its chart client-side, so a bucket index must stay the elapsed second.
-    let chart_len = (parser.full_log_duration() / DPS_INTERVAL) as usize + 1;
+    match query.metric {
+        AbilitySeriesMetric::Stun => v1::build_ability_stun_chart(
+            &parser.encounter.raw_event_log,
+            &wanted,
+            parser.start_time(),
+            DPS_INTERVAL,
+            chart_len,
+            &scope,
+        ),
+        AbilitySeriesMetric::Sba => v1::build_ability_sba_chart(
+            &parser.encounter.raw_event_log,
+            &wanted,
+            parser.start_time(),
+            DPS_INTERVAL,
+            chart_len,
+            &scope,
+        ),
+    }
+}
 
-    v1::build_player_dps_chart(
-        &parser.encounter.raw_event_log,
-        &parser.encounter.player_data,
-        &player_indices,
-        parser.start_time(),
-        DPS_INTERVAL,
-        chart_len,
-        &options.target_spans,
-        &options.selection.abilities,
-        options.filters,
-    )
+/// `(async)` for the same reason as [`fetch_encounter_state`]: this decompresses
+/// and deserialises the stored blob, which must not run on the main thread.
+///
+/// `deserialize_encounter`, NOT `deserialize_version`: the events table reads the
+/// RAW log, so replaying it through the derived-state machinery would be pure
+/// waste. It repopulates a legacy log's event vector itself.
+#[tauri::command(async)]
+fn fetch_encounter_events(id: u64, offset: usize, count: usize) -> Result<v1::EventPage, String> {
+    let conn = db::connect_to_db().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT data, version FROM logs WHERE id = ?")
+        .map_err(|e| e.to_string())?;
+    let (blob, version): (Vec<u8>, u8) = stmt
+        .query_row([id], |row| Ok((row.get(0)?, row.get(1)?)))
+        .map_err(|e| e.to_string())?;
+
+    let encounter = parser::deserialize_encounter(&blob, version).map_err(|e| e.to_string())?;
+    // The same rebasing origin `Parser::start_time` uses — the first event in the
+    // log — so a row's timestamp lines up with the chart's own axis.
+    let start_time = encounter
+        .raw_event_log
+        .first()
+        .map(|(ts, _)| *ts)
+        .unwrap_or_default();
+
+    Ok(v1::event_page(
+        &encounter.raw_event_log,
+        start_time,
+        offset,
+        count,
+    ))
 }
 
 // `(async)` so the decompress + full reparse runs off the main thread — this is
@@ -1489,7 +1604,12 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
 
     parser.filters = options.filters;
     parser.selection = options.selection.clone();
-    parser.reparse_with_options_window(&options.target_spans, options.from_ms, options.up_to_ms);
+    parser.reparse_with_options(
+        &options.target_spans,
+        options.from_ms,
+        options.up_to_ms,
+        options.windows.as_deref(),
+    );
 
     if options.state_only {
         // Included even here, unlike the charts: it is one pass over the events
@@ -1509,21 +1629,25 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             &assignment,
         );
 
-        // The drill-down chart. Built here rather than on the base load because
-        // it is the pins that decide what it decomposes, and only a pinned
-        // source narrows it enough to be worth sending: the unpinned case is
-        // the per-player `dps_chart` the base load already carries.
-        //
-        // Deliberately spans the FULL fight, ignoring `from_ms`/`up_to_ms`: the
-        // view slices its chart client-side from whole-fight buckets, so a
-        // pre-sliced series would be windowed twice and a bucket index would
-        // stop being the elapsed second.
-        let (ability_chart, target_chart) =
-            build_drill_charts(&parser, &options, &segments, &assignment);
-        // The level above those: no source pinned, but an enemy or an ability
-        // still narrowing the fight. Without it the plot kept drawing the whole
-        // party's whole fight beside a table that had already narrowed.
-        let dps_chart = build_scoped_player_chart(&parser, &options);
+        // The group aggregation: the analysis view's table rows and chart
+        // bands under the current pins, window and grouping. Its series span
+        // the FULL fight (the view slices client-side), while its measures
+        // honor the query's own scrub window.
+        let groups = build_groups(&parser, &options, &segments, &assignment);
+
+        // The drilled Stun/SBA bands, built here too: unlike the other charts
+        // these are NOT carried over from the base load. A drill is a pin
+        // change, and pins are exactly what the scoped fetch answers — and that
+        // fetch sets `state_only`, so building them only below would mean the
+        // drill never received them. Costs nothing undrilled: the query is
+        // absent, and `build_ability_series` returns empty without walking.
+        let player_indices: Vec<u32> = parser
+            .derived_state
+            .party
+            .values()
+            .map(|player| player.index)
+            .collect();
+        let ability_series = build_ability_series(&parser, &options, &player_indices);
 
         // Only the fields the scrub commit actually consumes; everything else stays at its
         // Default so a new response field doesn't have to be mirrored as a hand-written
@@ -1538,9 +1662,8 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             imported,
             legality: findings,
             selection_facts,
-            ability_chart,
-            target_chart,
-            dps_chart,
+            groups,
+            ability_series,
             ..Default::default()
         });
     }
@@ -1574,26 +1697,37 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         .values()
         .map(|player| player.index)
         .collect();
+    // ONE scope for every chart this response builds — see `v1::ChartScope`.
+    let chart_scope = v1::ChartScope {
+        player_data: &parser.encounter.player_data,
+        target_spans: &options.target_spans,
+        abilities: &options.selection.abilities,
+        filters: options.filters,
+    };
+
     let player_dps = v1::build_player_dps_chart(
         &parser.encounter.raw_event_log,
-        &parser.encounter.player_data,
         &player_indices,
         start_time,
         DPS_INTERVAL,
         (duration / DPS_INTERVAL) as usize + 1,
-        &options.target_spans,
-        &options.selection.abilities,
-        options.filters,
+        &chart_scope,
     );
     let player_stun = v1::build_player_stun_chart(
         &parser.encounter.raw_event_log,
-        &parser.encounter.player_data,
         &player_indices,
         start_time,
         DPS_INTERVAL,
         (duration / DPS_INTERVAL) as usize + 1,
-        &options.target_spans,
-        options.filters,
+        &chart_scope,
+    );
+
+    let player_taken = v1::build_player_taken_chart(
+        &parser.encounter.raw_event_log,
+        &player_indices,
+        start_time,
+        DPS_INTERVAL,
+        (duration / DPS_INTERVAL) as usize + 1,
     );
 
     let hp_chart = v1::build_target_hp_charts(
@@ -1602,7 +1736,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         start_time,
         DPS_INTERVAL,
         (duration / DPS_INTERVAL) as usize + 1,
-        &options.target_spans,
+        &chart_scope,
     );
 
     // Closed against the end of the full log, not the scrub window: an interval
@@ -1618,20 +1752,37 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         &target_entries,
     );
 
+    // Same closing rule as the status intervals: a state still active at the
+    // last event ran to the end of what was recorded.
+    let chart_windows =
+        v1::assemble_chart_windows(&parser.encounter.raw_event_log, start_time, duration);
+
+    let groups = build_groups(&parser, &options, &target_entries, &assignment);
+
+    // The drilled Stun/SBA tabs' bands.
+    let ability_series = build_ability_series(&parser, &options, &player_indices);
+
     let sba_chart = parser.generate_sba_chart(SBA_INTERVAL);
 
+    // Activations pass only when same-actor SBA damage corroborates them: the
+    // per-frame perform capture can re-fire the previous fight's leftover
+    // casting state once at a Repeat Quest boundary, and that phantom drew an
+    // "X used their art" marker at the first millisecond of the next log. The
+    // SBA chart windows drop the same events by the same rule, so a marker and
+    // its window can never disagree about whether an art was real.
+    let corroborated = v1::corroborated_sba_activations(&parser.encounter.raw_event_log);
     let sba_events = parser
         .encounter
         .event_log()
-        .filter(|(_, e)| {
-            matches!(
-                e,
-                Message::OnContinueSBAChain(_)
-                    | Message::OnAttemptSBA(_)
-                    | Message::OnPerformSBA(_)
-            )
+        .enumerate()
+        .filter(|(index, (_, e))| match e {
+            Message::OnAttemptSBA(_) => true,
+            Message::OnPerformSBA(_) | Message::OnContinueSBAChain(_) => {
+                corroborated.contains(index)
+            }
+            _ => false,
         })
-        .map(|(ts, e)| (*ts - start_time, e.clone()))
+        .map(|(_, (ts, e))| (*ts - start_time, e.clone()))
         .collect();
 
     let death_events = parser
@@ -1650,17 +1801,17 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         room_index,
         imported,
         legality: findings,
-        // Nothing to decompose on the base load: it is the unpinned fight, which
-        // is exactly the level `dps_chart` already draws.
-        ability_chart: Vec::new(),
-        target_chart: Vec::new(),
         status_intervals,
+        chart_windows,
         dps_chart: player_dps,
         stun_chart: player_stun,
+        taken_chart: player_taken,
         hp_chart,
+        groups,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
         sba_chart_len: (duration / SBA_INTERVAL) as usize + 1,
         sba_chart,
+        ability_series,
         sba_events,
         death_events,
         target_entries,
@@ -2453,6 +2604,9 @@ fn connect_and_run_parser(app: AppHandle) {
                                 protocol::Message::OnContinueSBAChain(event) => {
                                     state.on_continue_sba_chain(event);
                                 }
+                                protocol::Message::SbaGain(event) => {
+                                    state.on_sba_gain(event);
+                                }
                                 protocol::Message::OnDeathEvent(event) => {
                                     state.on_death_event(event);
                                 }
@@ -2494,6 +2648,12 @@ fn connect_and_run_parser(app: AppHandle) {
                                 }
                                 protocol::Message::StatusRemove(event) => {
                                     state.on_status_remove(event);
+                                }
+                                protocol::Message::LinkTime(event) => {
+                                    state.on_link_time(event);
+                                }
+                                protocol::Message::EnemyMode(event) => {
+                                    state.on_enemy_mode(event);
                                 }
                             }
                         }
@@ -2807,6 +2967,7 @@ fn main() {
         })
         .invoke_handler(tauri::generate_handler![
             fetch_encounter_state,
+            fetch_encounter_events,
             fetch_logs,
             fetch_conflux_runs,
             fetch_legality_players,
@@ -2879,4 +3040,35 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod ability_series_query_tests {
+    use super::{AbilitySeriesMetric, AbilitySeriesQuery};
+    use serde_json::json;
+
+    /// The wire contract with `AnalysisView`'s `abilityQuery` memo. Locked by a
+    /// test for the same reason `groups.rs` locks `GroupQuery`'s: the frontend
+    /// builds this by hand, and a silent rename would degrade to "no bands"
+    /// rather than to an error anyone would notice.
+    #[test]
+    fn deserializes_a_pinned_request() {
+        let query: AbilitySeriesQuery =
+            serde_json::from_value(json!({ "metric": "stun", "player": 3 }))
+                .expect("valid AbilitySeriesQuery JSON");
+
+        assert_eq!(query.metric, AbilitySeriesMetric::Stun);
+        assert_eq!(query.player, Some(3));
+    }
+
+    /// Stun's ability level widens to the whole party when no source is pinned
+    /// (see `metrics/stun.ts`), so `player` is optional rather than required.
+    #[test]
+    fn defaults_to_every_player() {
+        let query: AbilitySeriesQuery =
+            serde_json::from_value(json!({ "metric": "sba" })).expect("valid JSON");
+
+        assert_eq!(query.metric, AbilitySeriesMetric::Sba);
+        assert_eq!(query.player, None);
+    }
 }

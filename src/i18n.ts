@@ -79,6 +79,7 @@ i18n
       "skillboard",
       "skillboard-branches",
       "statuses",
+      "enemy-attacks",
     ],
     defaultNS: "ui",
     fallbackLng: {

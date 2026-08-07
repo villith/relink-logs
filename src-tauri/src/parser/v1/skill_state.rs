@@ -5,13 +5,24 @@ use crate::parser::constants::{CharacterType, EnemyType};
 
 use super::AdjustedDamageInstance;
 
-/// Damage attribution of one enemy type within a skill's stats — the
-/// quest-details per-enemy tooltip breakdown. Accumulated during the same
-/// reparse as everything else, so it reflects the active target/time filters.
+/// Damage attribution of one enemy spawn (or, for entries derived without a
+/// segmentation in hand, one enemy TYPE) within a skill's stats. Accumulated
+/// during the same reparse as everything else, so it reflects the active
+/// target/time filters.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillTargetState {
     pub enemy_type: EnemyType,
+    /// The enemy SPAWN this share landed on — an index into the same
+    /// `TargetSegment` vector the response ships as `targetEntries`, assigned
+    /// by `segment_targets_indexed` exactly like the groups path's
+    /// `GroupKey::EnemySpawn`, so the card's "#2" and the table's "#2" can
+    /// never name different spawns. `None` on the live path (no full log to
+    /// segment yet) and in payloads from before the field existed; those
+    /// entries aggregate at the type level. Omitted from the wire when
+    /// `None` so the TS mirror can stay `segment?: number`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub segment: Option<usize>,
     pub hits: u32,
     pub total_damage: u64,
 }
@@ -84,6 +95,13 @@ pub struct SkillState {
     /// Per-enemy-type share of this skill's damage (same-type spawns merge).
     #[serde(default)]
     pub targets: Vec<SkillTargetState>,
+    /// Gauge this skill generated, summed over the hits attributed to it.
+    ///
+    /// LOCAL PLAYER ONLY: a remote member's gauge is synced rather than granted
+    /// by a hit we can see, so their rows carry 0 and the UI must say so rather
+    /// than presenting a zero as a measurement.
+    #[serde(default)]
+    pub sba_generated: f64,
 }
 
 impl SkillState {
@@ -107,6 +125,7 @@ impl SkillState {
             overcap_base_sum: 0.0,
             overcap_cap_sum: 0.0,
             targets: Vec::new(),
+            sba_generated: 0.0,
         }
     }
 
@@ -126,17 +145,16 @@ impl SkillState {
         self.total_damage += damage_instance.event.damage as u64;
 
         let enemy_type = EnemyType::from_hash(damage_instance.event.target.parent_actor_type);
-        match self
-            .targets
-            .iter_mut()
-            .find(|target| target.enemy_type == enemy_type)
-        {
+        match self.targets.iter_mut().find(|target| {
+            target.enemy_type == enemy_type && target.segment == damage_instance.target_segment
+        }) {
             Some(target) => {
                 target.hits += 1;
                 target.total_damage += damage_instance.event.damage as u64;
             }
             None => self.targets.push(SkillTargetState {
                 enemy_type,
+                segment: damage_instance.target_segment,
                 hits: 1,
                 total_damage: damage_instance.event.damage as u64,
             }),
@@ -444,5 +462,79 @@ mod tests {
         assert_eq!(skill_state.hits, 1);
         assert_eq!(skill_state.capped_hits, 0);
         assert_eq!(skill_state.cappable_hits, 0);
+    }
+
+    #[test]
+    fn splits_target_entries_per_spawn_segment() {
+        // Two hits of the SAME enemy type on different spawn segments must be
+        // two entries — the card's "#1"/"#2" identity — while segment-less
+        // hits (the live path, old payloads) keep merging by type.
+        let mut skill_state = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+
+        let mut e1 = make_event(100, None, None);
+        e1.target.parent_actor_type = 0xAAAA;
+        let mut e2 = make_event(50, None, None);
+        e2.target.parent_actor_type = 0xAAAA;
+
+        skill_state.update_from_damage_event(
+            &AdjustedDamageInstance::from_damage_event(&e1, None).with_target_segment(Some(0)),
+        );
+        skill_state.update_from_damage_event(
+            &AdjustedDamageInstance::from_damage_event(&e2, None).with_target_segment(Some(1)),
+        );
+
+        assert_eq!(
+            skill_state.targets.len(),
+            2,
+            "same type, two spawns, two entries"
+        );
+        let first = &skill_state.targets[0];
+        let second = &skill_state.targets[1];
+        assert_eq!((first.segment, first.total_damage), (Some(0), 100));
+        assert_eq!((second.segment, second.total_damage), (Some(1), 50));
+    }
+
+    #[test]
+    fn segment_less_hits_keep_merging_by_type() {
+        // `from_damage_event` alone (no `.with_target_segment`) is the live
+        // path's shape — behavior there is unchanged.
+        let mut skill_state = SkillState::new(ActionType::Normal(1), CharacterType::Pl0000);
+
+        let mut e1 = make_event(100, None, None);
+        e1.target.parent_actor_type = 0xAAAA;
+        let mut e2 = make_event(50, None, None);
+        e2.target.parent_actor_type = 0xAAAA;
+
+        for event in [&e1, &e2] {
+            skill_state
+                .update_from_damage_event(&AdjustedDamageInstance::from_damage_event(event, None));
+        }
+
+        assert_eq!(skill_state.targets.len(), 1);
+        assert_eq!(skill_state.targets[0].segment, None);
+        assert_eq!(skill_state.targets[0].total_damage, 150);
+    }
+
+    #[test]
+    fn segment_serializes_only_when_assigned() {
+        // Absent, not null: the TS mirror declares `segment?: number` and the
+        // frontend keys on `!== undefined`.
+        let unassigned = SkillTargetState {
+            enemy_type: EnemyType::Unknown(1),
+            segment: None,
+            hits: 1,
+            total_damage: 5,
+        };
+        let value = serde_json::to_value(&unassigned).expect("serializes");
+        assert!(value.get("segment").is_none(), "None must be omitted");
+
+        let assigned = SkillTargetState {
+            enemy_type: EnemyType::Unknown(1),
+            segment: Some(2),
+            hits: 1,
+            total_damage: 5,
+        };
+        let value = serde_json::to_value(&assigned).expect("serializes");
+        assert_eq!(value["segment"], 2);
     }
 }

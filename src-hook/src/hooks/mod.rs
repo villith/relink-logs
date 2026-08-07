@@ -5,7 +5,7 @@ use crate::{event, process::Process};
 
 use self::{
     area::OnAreaEnterHook,
-    damage::{OnProcessDamageHook, OnProcessDotHook},
+    damage::{OnPlayerHitApplyHook, OnProcessDamageHook, OnProcessDotHook},
     endless::{OnEndlessBuffInstallHook, OnEndlessMgrDtorHook, OnReceptionFlowDispatchHook},
     player::{OnLoadPlayerHook, OnLoadPlayerIdentityHook},
     quest::{OnLoadQuestHook, OnQuestCompleteHook},
@@ -16,6 +16,7 @@ use self::{
 };
 
 mod area;
+mod battle;
 // Compiled under `cfg(test)` too, so a plain `cargo test` type-checks and exercises the
 // quest-classification logic. The hook itself is still only INSTALLED behind the feature
 // (see `setup_hooks`), so a release `hook.dll` contains none of this.
@@ -36,6 +37,10 @@ mod sba;
 // Buff/debuff lifecycle (see hooks/status.rs): emits StatusApply/StatusRemove,
 // and logs a field dump on top of that under `hookdiag`.
 mod status;
+// Resolves a status object's own vtable to a patch-stable class-name hash.
+// See status_class.rs for why this is a name hash, not the raw RVA.
+mod status_class;
+mod status_class_table;
 // Generated from status.tbl's HasLevels column — which ids the +0xb0 stack
 // count is real for. Regenerate with scripts/gen-stackable-statuses.py.
 mod status_levels;
@@ -101,6 +106,13 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     try_step(
         "process_dot",
         OnProcessDotHook::new(tx.clone()).setup(&process),
+    );
+    // The damage-TAKEN stream: hits applied to party-slot actors, emitted by
+    // the player-family hit-apply notifier. Non-fatal: without it the dealt
+    // meter still works, damage taken just records nothing.
+    try_step(
+        "player_hit_apply",
+        OnPlayerHitApplyHook::new(tx.clone()).setup(&process),
     );
     try_step("death", OnDeathHook::new(tx.clone()).setup(&process));
 
@@ -185,9 +197,10 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         OnEndlessMgrDtorHook::new(tx.clone()).setup(&process),
     );
 
-    /* Status (buff/debuff) lifecycle. Detours the shared StatusBase::init (apply
-    AND refresh — the game re-inits the same instance; 165/168 classes inherit
-    it) and the shared scalar-deleting dtor (removal). */
+    /* Status (buff/debuff) lifecycle. Detours the shared StatusBase::init
+    (REFRESH only — the apply worker inlines the same arming when it creates a
+    status, so a first application never enters it; 165/168 classes inherit it)
+    and the shared scalar-deleting dtor (removal). */
     try_step(
         "status_init",
         status::OnStatusInitHook::new(tx.clone()).setup(&process),
@@ -202,6 +215,15 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     try_step(
         "status_dtor_variants",
         status::OnStatusDtorVariantsHook::new(tx.clone()).setup(&process),
+    );
+    /* The APPLY coverage init cannot give: ExStatus::update ticks one holder
+    per frame, so diffing its status list reports a first application whichever
+    of the ~350 call sites made it — and reports the buffs a fight starts under,
+    which are applied before any encounter exists. Additive: it publishes an
+    object only the first time it is seen. */
+    try_step(
+        "status_update",
+        status::OnStatusUpdateHook::new(tx.clone()).setup(&process),
     );
 
     /* SBA */
@@ -224,6 +246,58 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     try_step(
         "sba_continue_chain",
         OnContinueSBAChainHook::new(tx.clone()).setup(&process),
+    );
+    // PRODUCTION: the register-hit gate (v2.0.3 entry 0x9adaa0) whose
+    // synchronous callee chain performs the gauge update. Parks the causing
+    // hit's damage instance on a thread-local so sba_update can attribute the
+    // gain — without it every SbaGain stays unemitted (the gauge-level poll
+    // still works).
+    try_step(
+        "sba_register_hit",
+        sba::OnSBARegisterHitHook::new().setup(&process),
+    );
+    // Cause-parking grant sites (see the grant-site block in sba.rs): each
+    // parks a named SbaGainCause while the game's own grant routine runs, so
+    // the gauge hook can caption rises no damaging hit explains.
+    try_step(
+        "sba_just_guard_grant",
+        sba::OnJustGuardGrantHook::new().setup(&process),
+    );
+    try_step(
+        "sba_effect_grant",
+        sba::OnEffectGrantHook::new().setup(&process),
+    );
+    try_step(
+        "sba_percent_grant",
+        sba::OnGaugePercentGrantHook::new().setup(&process),
+    );
+    try_step(
+        "sba_quest_start_gauge",
+        sba::OnQuestStartGaugeHook::new().setup(&process),
+    );
+    try_step(
+        "sba_quest_start_gauge_solo",
+        sba::OnQuestStartGaugeSoloHook::new().setup(&process),
+    );
+    try_step(
+        "sba_vtable_grant_191be40",
+        sba::OnVtableGrant191be40Hook::new().setup(&process),
+    );
+    try_step(
+        "sba_vtable_grant_33bbc20",
+        sba::OnVtableGrant33bbc20Hook::new().setup(&process),
+    );
+    try_step(
+        "sba_vtable_grant_33bc050",
+        sba::OnVtableGrant33bc050Hook::new().setup(&process),
+    );
+    // The per-hit gauge-grant virtual (0x9b41b0): the taken-side grant path —
+    // hits players RECEIVE grant a flat award through it with nothing parked
+    // on the thread, which is what the Unknown rises were (see
+    // sba::OnSBAGrantHook). Parks DamageTaken for the duration of each call.
+    try_step(
+        "sba_taken_grant",
+        sba::OnSBAGrantHook::new().setup(&process),
     );
 
     // DEV BUILDS ONLY. The one hook that changes game behavior rather than observing it;

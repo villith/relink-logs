@@ -1,0 +1,662 @@
+{
+  "208567": {
+    "class": "StatusPl0900UniqueBuffCount",
+    "name": "Count"
+  },
+  "34466165": {
+    "class": "StatusPl1200UniqueBuffNoble",
+    "name": "Noble"
+  },
+  "69788560": {
+    "class": "StatusPl2200UpgradeBBuff",
+    "name": "Upgrade B Buff"
+  },
+  "96424886": {
+    "class": "StatusPl2800UniqueReversePlusBuff",
+    "name": "Reverse Plus Buff"
+  },
+  "139717900": {
+    "class": "StatusIllusionBuff",
+    "name": "Illusion Buff"
+  },
+  "186279698": {
+    "class": "StatusStackableAttackDebuff",
+    "name": "Stackable Attack Debuff"
+  },
+  "217617910": {
+    "class": "StatusAilmentBanAbility",
+    "name": "Ailment Ban Ability"
+  },
+  "336827244": {
+    "class": "StatusPl0500UniqueDebuffGrenade",
+    "name": "Debuff Grenade"
+  },
+  "361342343": {
+    "class": "StatusPl2600UniqueClockHealPlusBuff",
+    "name": "Clock Heal Plus Buff"
+  },
+  "372267043": {
+    "class": "StatusPl1200AttackBuff",
+    "name": "Attack Buff"
+  },
+  "399040482": {
+    "class": "StatusPl1600ArvessBuff",
+    "name": "Arvess Buff"
+  },
+  "411742688": {
+    "class": "StatusPl2900LowballBuff",
+    "name": "Lowball Buff"
+  },
+  "416452336": {
+    "class": "StatusPl2400UniqueBuffGSwingJust",
+    "name": "G Swing Just"
+  },
+  "450479154": {
+    "class": "StatusHyperArmorBuff",
+    "name": "Hyper Armor Buff"
+  },
+  "524137158": {
+    "class": "StatusManigansBuff",
+    "name": "Manigans Buff"
+  },
+  "620143561": {
+    "class": "StatusEm1700AttackBuff",
+    "name": "Attack Buff"
+  },
+  "632601431": {
+    "class": "StatusAilmentBanSpecialArts",
+    "name": "Ailment Ban Special Arts"
+  },
+  "633302470": {
+    "class": "StatusPl1100UniqueBuffDragon",
+    "name": "Dragon"
+  },
+  "641527069": {
+    "class": "StatusAttackBuff",
+    "name": "Attack Buff"
+  },
+  "706628826": {
+    "class": "StatusDamageCutBuff",
+    "name": "Damage Cut Buff"
+  },
+  "798236543": {
+    "class": "StatusIronMaidenBuff",
+    "name": "Iron Maiden Buff"
+  },
+  "799504527": {
+    "class": "StatusAilmentSlow",
+    "name": "Ailment Slow"
+  },
+  "805037566": {
+    "class": "StatusStackableDeffenceDebuff",
+    "name": "Stackable Deffence Debuff"
+  },
+  "805812046": {
+    "class": "StatusPl2800UniqueUprightBuff",
+    "name": "Upright Buff"
+  },
+  "818385240": {
+    "class": "StatusPl2500SuperiorBuff",
+    "name": "Superior Buff"
+  },
+  "862209576": {
+    "class": "StatusPl0900UniqueBuffBeatCombo",
+    "name": "Beat Combo"
+  },
+  "864356490": {
+    "class": "StatusPl0000UniqueBuffCover",
+    "name": "Cover"
+  },
+  "897005693": {
+    "class": "StatusPl2800UniqueReverseBuff",
+    "name": "Reverse Buff"
+  },
+  "960225271": {
+    "class": "StatusPl2600UniqueClockHealBuff",
+    "name": "Clock Heal Buff"
+  },
+  "968096346": {
+    "class": "StatusAutoReviveBuff",
+    "name": "Auto Revive Buff"
+  },
+  "987425699": {
+    "class": "StatusPl2300UniqueGaugeUp",
+    "name": "Gauge Up"
+  },
+  "1004792313": {
+    "class": "StatusPl1900UniqueBuffSealDebuff",
+    "name": "Seal Debuff"
+  },
+  "1014076783": {
+    "class": "StatusPl0600UniqueBuffSpiralRose",
+    "name": "Spiral Rose"
+  },
+  "1033600927": {
+    "class": "StatusPl2600UniqueClockAttackPlusBuff",
+    "name": "Clock Attack Plus Buff"
+  },
+  "1049525673": {
+    "class": "StatusPhantasmaGoria",
+    "name": "Phantasma Goria"
+  },
+  "1065517153": {
+    "class": "StatusGutsBuff",
+    "name": "Guts Buff"
+  },
+  "1129719443": {
+    "class": "StatusCovered",
+    "name": "Covered"
+  },
+  "1131927280": {
+    "class": "StatusAilmentParalyze",
+    "name": "Ailment Paralyze"
+  },
+  "1151000662": {
+    "class": "StatusPl2300UniqueBuffTwoCrowns",
+    "name": "Two Crowns"
+  },
+  "1259181953": {
+    "class": "StatusEm8300DevilBuff",
+    "name": "Devil Buff"
+  },
+  "1353744714": {
+    "class": "StatusPl0400UniqueBuffConcentrationEx",
+    "name": "Concentration Ex"
+  },
+  "1354926850": {
+    "class": "StatusPl0800UniqueBuffStillerGlanz",
+    "name": "Stiller Glanz"
+  },
+  "1366539842": {
+    "class": "StatusStackableAttackBuff",
+    "name": "Stackable Attack Buff"
+  },
+  "1371684106": {
+    "class": "StatusPl0200UniqueBuffAresKeep",
+    "name": "Ares Keep"
+  },
+  "1445353470": {
+    "class": "StatusPl1000UniqueBuffFlameEmpire",
+    "name": "Flame Empire"
+  },
+  "1449921194": {
+    "class": "StatusUniqueGutsBuff",
+    "name": "Guts Buff"
+  },
+  "1483555513": {
+    "class": "StatusEm2510PushDebuff",
+    "name": "Push Debuff"
+  },
+  "1510343344": {
+    "class": "StatusAilmentDarkFlame",
+    "name": "Ailment Dark Flame"
+  },
+  "1518442696": {
+    "class": "StatusPl0300UniqueBuffBullBlast",
+    "name": "Bull Blast"
+  },
+  "1524831728": {
+    "class": "StatusPl1500UniqueBuffPunch",
+    "name": "Punch"
+  },
+  "1525216914": {
+    "class": "StatusPl1800UniqueBuffChargeAttack",
+    "name": "Charge Attack"
+  },
+  "1576935878": {
+    "class": "StatusAttackDebuff",
+    "name": "Attack Debuff"
+  },
+  "1581308019": {
+    "class": "StatusEm8300JudgementBuff",
+    "name": "Judgement Buff"
+  },
+  "1584346057": {
+    "class": "StatusPl0800UniqueBuffFinishAbility",
+    "name": "Finish Ability"
+  },
+  "1596293065": {
+    "class": "StatusAilmentWeakElement",
+    "name": "Ailment Weak Element"
+  },
+  "1597141620": {
+    "class": "StatusAilmentPoison",
+    "name": "Ailment Poison"
+  },
+  "1617430066": {
+    "class": "StatusPl1700UniqueBuffChargeAttack",
+    "name": "Charge Attack"
+  },
+  "1656897975": {
+    "class": "StatusPl0900UniqueBuffProvocation",
+    "name": "Provocation"
+  },
+  "1665945531": {
+    "class": "StatusRebuildWeaponStunBuff",
+    "name": "Rebuild Weapon Stun Buff"
+  },
+  "1673779383": {
+    "class": "StatusVeil",
+    "name": "Veil"
+  },
+  "1677255532": {
+    "class": "StatusDimensionDamageInvalidBuff",
+    "name": "Dimension Damage Invalid Buff"
+  },
+  "1702990162": {
+    "class": "StatusBarrier",
+    "name": "Barrier"
+  },
+  "1722773459": {
+    "class": "StatusDamageLimitBuff",
+    "name": "Damage Limit Buff"
+  },
+  "1727994097": {
+    "class": "StatusPl1600ArialBuff",
+    "name": "Arial Buff"
+  },
+  "1735581285": {
+    "class": "StatusPl1100UniqueBuffCover",
+    "name": "Cover"
+  },
+  "1735678842": {
+    "class": "StatusMagicVortex",
+    "name": "Magic Vortex"
+  },
+  "1770327264": {
+    "class": "StatusBurnInvalidBuff",
+    "name": "Burn Invalid Buff"
+  },
+  "1788507119": {
+    "class": "StatusAilmentFrostbite",
+    "name": "Ailment Frostbite"
+  },
+  "1813353265": {
+    "class": "StatusEm8300SpDamageDebuff",
+    "name": "Sp Damage Debuff"
+  },
+  "1907735909": {
+    "class": "StatusAilmentBurn",
+    "name": "Ailment Burn"
+  },
+  "1914134557": {
+    "class": "StatusPl0800UniqueBuffEnhanceFinish",
+    "name": "Enhance Finish"
+  },
+  "1938558614": {
+    "class": "StatusAilmentArvessFermare",
+    "name": "Ailment Arvess Fermare"
+  },
+  "1941541321": {
+    "class": "StatusPl2600UniqueClockDeffenceBuff",
+    "name": "Clock Deffence Buff"
+  },
+  "1948093032": {
+    "class": "StatusPl2400SuperModeBuff",
+    "name": "Super Mode Buff"
+  },
+  "1968461316": {
+    "class": "StatusRegeneBuff",
+    "name": "Regene Buff"
+  },
+  "1976835603": {
+    "class": "StatusPl0700PrivateBuff",
+    "name": "Private Buff"
+  },
+  "1997971915": {
+    "class": "StatusPl1000UniqueBuffChargeAttack",
+    "name": "Charge Attack"
+  },
+  "2019804602": {
+    "class": "StatusPl1600CounterBuff",
+    "name": "Counter Buff"
+  },
+  "2088057384": {
+    "class": "StatusCoverBuff",
+    "name": "Cover Buff"
+  },
+  "2089330042": {
+    "class": "StatusPl1900UniqueBuffKamui",
+    "name": "Kamui"
+  },
+  "2170377092": {
+    "class": "StatusPl2600UniqueClockEnhancement",
+    "name": "Clock Enhancement"
+  },
+  "2213967179": {
+    "class": "StatusBossArtsAura",
+    "name": "Boss Arts Aura"
+  },
+  "2232744613": {
+    "class": "StatusEm8300AttackBuff",
+    "name": "Attack Buff"
+  },
+  "2234697943": {
+    "class": "StatusWindInvalidBuff",
+    "name": "Wind Invalid Buff"
+  },
+  "2236309972": {
+    "class": "StatusPl2100WeakElementZoharStrikeDebuff",
+    "name": "Weak Element Zohar Strike Debuff"
+  },
+  "2299723486": {
+    "class": "StatusPl1700UniqueBuffChargeSpeed",
+    "name": "Charge Speed"
+  },
+  "2302930476": {
+    "class": "StatusPl2100SuperModeBuffPlusBuff",
+    "name": "Super Mode Buff Plus Buff"
+  },
+  "2306417869": {
+    "class": "StatusPl2200KenshinUpBuff",
+    "name": "Kenshin Up Buff"
+  },
+  "2356348779": {
+    "class": "StatusPl2100SuperModeAtkBuff",
+    "name": "Super Mode Atk Buff"
+  },
+  "2366816130": {
+    "class": "StatusAilmentStone",
+    "name": "Ailment Stone"
+  },
+  "2397844126": {
+    "class": "StatusInvinsible",
+    "name": "Invinsible"
+  },
+  "2412709628": {
+    "class": "StatusPl1300AbilityCoolTime",
+    "name": "Ability Cool Time"
+  },
+  "2417504094": {
+    "class": "StatusPl2700UniqueGaugeBuff",
+    "name": "Gauge Buff"
+  },
+  "2418034112": {
+    "class": "StatusRebuildWeaponWeakBuff",
+    "name": "Rebuild Weapon Weak Buff"
+  },
+  "2418695076": {
+    "class": "StatusAilmentFear",
+    "name": "Ailment Fear"
+  },
+  "2432047135": {
+    "class": "StatusPl1200UniqueBuffGuardpoint",
+    "name": "Guardpoint"
+  },
+  "2453573921": {
+    "class": "StatusPl0600UniqueBuffLostLove",
+    "name": "Lost Love"
+  },
+  "2522841538": {
+    "class": "StatusPl1000UniqueBuffChargeParry",
+    "name": "Charge Parry"
+  },
+  "2528099293": {
+    "class": "StatusPl2200UpgradeABuff",
+    "name": "Upgrade A Buff"
+  },
+  "2574461637": {
+    "class": "StatusAilmentProvocation",
+    "name": "Ailment Provocation"
+  },
+  "2692359613": {
+    "class": "StatusStrengthBuff",
+    "name": "Strength Buff"
+  },
+  "2697949828": {
+    "class": "StatusAmplifyDamageBuff",
+    "name": "Amplify Damage Buff"
+  },
+  "2706820728": {
+    "class": "StatusDeffenceDebuff",
+    "name": "Deffence Debuff"
+  },
+  "2730096112": {
+    "class": "StatusPl1200UniqueBuffInvincible",
+    "name": "Invincible"
+  },
+  "2746680195": {
+    "class": "StatusPl0200UniqueBuffPride",
+    "name": "Pride"
+  },
+  "2750070646": {
+    "class": "StatusPl2400UniqueSpmDamageUpBuff",
+    "name": "Spm Damage Up Buff"
+  },
+  "2761807628": {
+    "class": "StatusPl1400UniqueBuffKagura",
+    "name": "Kagura"
+  },
+  "2768093491": {
+    "class": "StatusPl2700UniqueBuffFinish",
+    "name": "Finish"
+  },
+  "2814297206": {
+    "class": "StatusClearAilment",
+    "name": "Clear Ailment"
+  },
+  "2893773673": {
+    "class": "StatusPl1700UndeadBuff",
+    "name": "Undead Buff"
+  },
+  "2926930758": {
+    "class": "StatusStunResistDebuff",
+    "name": "Stun Resist Debuff"
+  },
+  "2952924837": {
+    "class": "StatusAmplifyDamageDebuff",
+    "name": "Amplify Damage Debuff"
+  },
+  "2960117192": {
+    "class": "StatusAilmentDimensionDamage",
+    "name": "Ailment Dimension Damage"
+  },
+  "2969804603": {
+    "class": "StatusProvocationBuff",
+    "name": "Provocation Buff"
+  },
+  "2984123980": {
+    "class": "StatusPl1700UniqueBuffAbility",
+    "name": "Ability"
+  },
+  "2985308184": {
+    "class": "StatusMaxHpDebuff",
+    "name": "Max Hp Debuff"
+  },
+  "2995699228": {
+    "class": "StatusPl2600UniqueClockPlusBaseBuff",
+    "name": "Clock Plus Base Buff"
+  },
+  "2998985417": {
+    "class": "StatusEm8300JusticeBuff",
+    "name": "Justice Buff"
+  },
+  "3024487491": {
+    "class": "StatusPl2300UniqueBuffClincher",
+    "name": "Clincher"
+  },
+  "3067113357": {
+    "class": "StatusSuperIdModeBuff",
+    "name": "Super Id Mode Buff"
+  },
+  "3127411509": {
+    "class": "StatusCriticalRateBuff",
+    "name": "Critical Rate Buff"
+  },
+  "3133008830": {
+    "class": "StatusEm8300TowerBuff",
+    "name": "Tower Buff"
+  },
+  "3150227669": {
+    "class": "StatusEm1806AuraBuff",
+    "name": "Aura Buff"
+  },
+  "3206938392": {
+    "class": "StatusPl2600UniqueClockDeffencePlusBuff",
+    "name": "Clock Deffence Plus Buff"
+  },
+  "3212522574": {
+    "class": "StatusPl2400UniqueAbDmgBuff",
+    "name": "Ab Dmg Buff"
+  },
+  "3255715714": {
+    "class": "StatusPl2800UniqueUprightPlusBuff",
+    "name": "Upright Plus Buff"
+  },
+  "3291427361": {
+    "class": "StatusEm8300DeffenceDebuff",
+    "name": "Deffence Debuff"
+  },
+  "3351873947": {
+    "class": "StatusPl0700PartyBuff",
+    "name": "Party Buff"
+  },
+  "3384734518": {
+    "class": "StatusPl2300ParalysisArrow",
+    "name": "Paralysis Arrow"
+  },
+  "3387245304": {
+    "class": "StatusPl2400UniqueDebuffBanGSwing",
+    "name": "Debuff Ban G Swing"
+  },
+  "3453714571": {
+    "class": "StatusPl1800UniqueBuffDebuffCount",
+    "name": "Debuff Count"
+  },
+  "3508005972": {
+    "class": "StatusDoubleTapBuff",
+    "name": "Double Tap Buff"
+  },
+  "3549490574": {
+    "class": "StatusPl1100UniqueBuffJust",
+    "name": "Just"
+  },
+  "3561199000": {
+    "class": "StatusPl1300CounterBuff",
+    "name": "Counter Buff"
+  },
+  "3582810479": {
+    "class": "StatusDoubleAttackBuff",
+    "name": "Double Attack Buff"
+  },
+  "3592040059": {
+    "class": "StatusPl1300AttackBuff",
+    "name": "Attack Buff"
+  },
+  "3658963385": {
+    "class": "StatusEm1700DefenceBuff",
+    "name": "Defence Buff"
+  },
+  "3676227397": {
+    "class": "StatusAilmentFrozen",
+    "name": "Ailment Frozen"
+  },
+  "3688860419": {
+    "class": "StatusPl2600UniqueClockAttackBuff",
+    "name": "Clock Attack Buff"
+  },
+  "3690296927": {
+    "class": "StatusPl2600UniqueOverClockBuff",
+    "name": "Over Clock Buff"
+  },
+  "3698295449": {
+    "class": "StatusAilmentWaterBall",
+    "name": "Ailment Water Ball"
+  },
+  "3738746311": {
+    "class": "StatusAbilityAttackBuff",
+    "name": "Ability Attack Buff"
+  },
+  "3756541899": {
+    "class": "StatusPl2900CascadeBuff",
+    "name": "Cascade Buff"
+  },
+  "3765888535": {
+    "class": "StatusEm8200AttackBuff",
+    "name": "Attack Buff"
+  },
+  "3790236701": {
+    "class": "StatusSkill301Buff",
+    "name": "Skill301 Buff"
+  },
+  "3814078141": {
+    "class": "StatusAilmentCapture",
+    "name": "Ailment Capture"
+  },
+  "3845230707": {
+    "class": "StatusPl2300UniqueDebuffTwoCrowns",
+    "name": "Debuff Two Crowns"
+  },
+  "3853551208": {
+    "class": "StatusPl0400UniqueDebuffChainReaction",
+    "name": "Debuff Chain Reaction"
+  },
+  "3884831012": {
+    "class": "StatusPl2300UniqueBuffSniper",
+    "name": "Sniper"
+  },
+  "3902606718": {
+    "class": "StatusPl1400UniqueBuffButterfly",
+    "name": "Butterfly"
+  },
+  "3912368598": {
+    "class": "StatusEm8300DeathBuff",
+    "name": "Death Buff"
+  },
+  "3940532029": {
+    "class": "StatusDrainAttackBuff",
+    "name": "Drain Attack Buff"
+  },
+  "3941469158": {
+    "class": "StatusPl2500UniqueGaugeBuff",
+    "name": "Gauge Buff"
+  },
+  "3953791310": {
+    "class": "StatusStackableDeffenceBuff",
+    "name": "Stackable Deffence Buff"
+  },
+  "3962683380": {
+    "class": "StatusAdversityBuff",
+    "name": "Adversity Buff"
+  },
+  "3966318193": {
+    "class": "StatusFrozenInvalidBuff",
+    "name": "Frozen Invalid Buff"
+  },
+  "3983034647": {
+    "class": "StatusPl0200UniqueBuffAres",
+    "name": "Ares"
+  },
+  "3985010314": {
+    "class": "StatusPl0000UniqueBuffHeal",
+    "name": "Heal"
+  },
+  "3986817439": {
+    "class": "StatusDragonModeBuff",
+    "name": "Dragon Mode Buff"
+  },
+  "4124047263": {
+    "class": "StatusConcentrationBuff",
+    "name": "Concentration Buff"
+  },
+  "4154526485": {
+    "class": "StatusAilmentDebuffTimeExtend",
+    "name": "Ailment Debuff Time Extend"
+  },
+  "4202572017": {
+    "class": "StatusAilmentStun",
+    "name": "Ailment Stun"
+  },
+  "4247728747": {
+    "class": "StatusPl1400UniqueBuffGenzi",
+    "name": "Genzi"
+  },
+  "4253591202": {
+    "class": "StatusDeffenceBuff",
+    "name": "Deffence Buff"
+  },
+  "4258842441": {
+    "class": "StatusPl0500UniqueBuffAim",
+    "name": "Aim"
+  }
+}

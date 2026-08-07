@@ -1,0 +1,340 @@
+{
+  "EM0005": {
+    "1": "Shield Slam"
+  },
+  "EM0015": {
+    "1": "Tatami Gaeshi"
+  },
+  "EM0102": {
+    "1": "Hell's Gate"
+  },
+  "EM0103": {
+    "1": "Bones of Damnation"
+  },
+  "EM0500": {
+    "1": "Razing Roll",
+    "2": "Razing Roll Ruination"
+  },
+  "EM0501": {
+    "1": "Icy Roll"
+  },
+  "EM0502": {
+    "1": "Burning Roll",
+    "2": "Burning Roll Bombination"
+  },
+  "EM0706": {
+    "1": "Freeze Ray",
+    "2": "Glacial Tomb",
+    "3": "Nystagmus"
+  },
+  "EM1500": {
+    "1": "Earth Shaker"
+  },
+  "EM1600": {
+    "1": "Whirlwind"
+  },
+  "EM1700": {
+    "1": "Chaotic Massacre",
+    "2": "Deathclaw"
+  },
+  "EM1800": {
+    "1": "Draconic Hex"
+  },
+  "EM1801": {
+    "1": "Meteor Shower"
+  },
+  "EM1802": {
+    "1": "Hailstorm"
+  },
+  "EM1803": {
+    "1": "Upheaval"
+  },
+  "EM1804": {
+    "1": "Maelstrom"
+  },
+  "EM1805": {
+    "1": "Cataclysmic Thunder"
+  },
+  "EM1806": {
+    "1": "Shadow Vortex",
+    "2": "Ravenous Abyss",
+    "3": "Despair"
+  },
+  "EM1900": {
+    "1": "Turbo Boost",
+    "2": "Stasis Field",
+    "3": "Carnage Blast"
+  },
+  "EM2000": {
+    "1": "Martial Spear",
+    "2": "Storming Death",
+    "3": "Silver Veil Storm",
+    "4": "Grand Impalings"
+  },
+  "EM2100": {
+    "1": "Sword Opera",
+    "2": "Symphony Superiór",
+    "3": "Sandrilla's Waltz"
+  },
+  "EM2200": {
+    "1": "Sentenced"
+  },
+  "EM2300": {
+    "1": "Sentenced: Terminus",
+    "2": "Final Mortality",
+    "3": "Soul Link",
+    "4": "Scourge",
+    "5": "Soul Transmutation",
+    "6": "Ruinous Smash"
+  },
+  "EM2400": {
+    "1": "Nox Atra"
+  },
+  "EM2510": {
+    "1": "Running with Scissors"
+  },
+  "EM3100": {
+    "1": "Apocalypse Blade",
+    "2": "Anomaly Initiation",
+    "3": "Elemental Shift",
+    "4": "Sea of Silence",
+    "5": "Sea of Opulence",
+    "6": "Sea of Tides",
+    "7": "Homeward Prayer",
+    "8": "Resonant Voice",
+    "9": "Termination Protocol",
+    "10": "Axis Ray",
+    "11": "Chromatic Arc",
+    "12": "Red Signal",
+    "13": "Red Signal +",
+    "14": "Blue Signal",
+    "15": "Blue Signal +",
+    "16": "Yellow Signal",
+    "17": "Yellow Signal +"
+  },
+  "EM7000": {
+    "1": "Skyfall",
+    "2": "Catastrophe",
+    "3": "Reginleiv",
+    "4": "Arcadia: Erythros",
+    "5": "Scarlet Rain",
+    "6": "Arcadia: Kyanos",
+    "7": "Silver Wave",
+    "8": "Arcadia: Xanthos",
+    "9": "Tectonic Collapse",
+    "10": "Arcadia: Khloros",
+    "11": "Withering Wind",
+    "12": "Skylink Primacy",
+    "13": "Supernova",
+    "14": "Fatal Crest",
+    "15": "Catastrophe: Zero",
+    "16": "Settle the Score",
+    "17": "Eclipse Ray"
+  },
+  "EM7100": {
+    "1": "Odium",
+    "2": "Auxilium",
+    "3": "Link Charge",
+    "4": "Ire",
+    "5": "Massa Flammae"
+  },
+  "EM7110": {
+    "1": "Void Eruption",
+    "2": "Dark Rising",
+    "3": "Furious Onslaught"
+  },
+  "EM7200": {
+    "1": "Savage Cyclone",
+    "2": "Sweeping Flourish"
+  },
+  "EM7201": {
+    "1": "Wrath of the Goddess",
+    "2": "Fluttersword",
+    "3": "Transfiguration",
+    "4": "Shrieking Squall",
+    "5": "Ring of Death",
+    "6": "Xibalba"
+  },
+  "EM7210": {
+    "1": "Hollow Storm"
+  },
+  "EM7211": {
+    "1": "Last Tempest",
+    "2": "Void Ripper",
+    "3": "Transfiguration",
+    "4": "Arrow Gale",
+    "5": "Soulless Storm"
+  },
+  "EM7300": {
+    "1": "Silver Wolf Surge",
+    "2": "Death's Threshold",
+    "3": "Whiteout",
+    "4": "Final Sweep",
+    "5": "Avalanche",
+    "6": "Glacial Desolation",
+    "7": "Crystallize",
+    "8": "Glacial Sequestration"
+  },
+  "EM7310": {
+    "1": "Nihil Sequestration",
+    "2": "Nox Aeterna",
+    "3": "Inimical Icestorm",
+    "4": "Void Ray",
+    "5": "Nihil Wolfstorm",
+    "6": "Cryogenic Sphere"
+  },
+  "EM7400": {
+    "1": "Desert Flare",
+    "2": "Defense Overdrive"
+  },
+  "EM7500": {
+    "1": "Last Judgment",
+    "2": "Salvation",
+    "3": "Damnation",
+    "4": "Gate of Salvation: Ananda",
+    "5": "Gate of Silence: Mauna",
+    "6": "Gate of Penance: Kala",
+    "7": "Gate of Eternity: Amartya",
+    "8": "Gate of Truth: Satya",
+    "9": "Gate of Clarity: Krsna",
+    "10": "Perdition's Light",
+    "11": "Prelude",
+    "12": "Dimension Warp"
+  },
+  "EM7600": {
+    "1": "Hell's Flare",
+    "2": "Alter Ego: Insanis",
+    "3": "Reason's Transcendence",
+    "4": "Obliteration",
+    "5": "Fractured Id",
+    "6": "The Rage",
+    "7": "Despotic Deity",
+    "8": "Light of the Apocalypse",
+    "9": "Cosmic Cycle: Destruction",
+    "10": "Light of the Deliverance",
+    "11": "Creation",
+    "12": "Primal Rage",
+    "13": "Daedalus Wing",
+    "14": "Synchrotron",
+    "15": "Omega Blitz"
+  },
+  "EM7700": {
+    "1": "Celestial Fusion",
+    "2": "Final Rebellion",
+    "3": "Paradise Lost",
+    "4": "Seven Trumpets",
+    "5": "The End",
+    "6": "Gopherwood Ark",
+    "7": "Stigma",
+    "8": "Punishment",
+    "9": "Holy Wings",
+    "10": "Ruin",
+    "11": "Trinity of Terror",
+    "12": "Halphas",
+    "13": "Requiem",
+    "14": "Xaphan",
+    "15": "Wings of Sin",
+    "16": "Mastema",
+    "17": "Absolute Nothing",
+    "18": "Dark Gospel",
+    "19": "Agaliarept",
+    "20": "Nemesis",
+    "21": "Symphonic Cross"
+  },
+  "EM8000": {
+    "1": "Cien Mil Espadas",
+    "2": "Seven-Star's Brilliance",
+    "3": "Carro Magnifico",
+    "4": "Lapide",
+    "5": "Emblema",
+    "6": "Fonte di Energia",
+    "7": "Guaina Perduta"
+  },
+  "EM8100": {
+    "1": "Asteroid Jäger",
+    "2": "Wrath of Star and Crown",
+    "3": "Depravity",
+    "4": "Clincher",
+    "5": "Two-Crown's Strife",
+    "6": "Sting the Thunder",
+    "7": "Echo-String Rites",
+    "8": "Inner Monster",
+    "9": "Syzygy of Star and Crown",
+    "10": "Wrath of Star and Crown+",
+    "11": "Wrath of Star and Crown++",
+    "12": "Celestial Font"
+  },
+  "EM8200": {
+    "1": "Chaoscalibur: Ignition",
+    "2": "Hail to the King",
+    "3": "Chaos Legion",
+    "4": "Raging Chain",
+    "5": "Smothered Mate",
+    "6": "Los Endos",
+    "7": "Archenemy",
+    "8": "Unisonic"
+  },
+  "EM8300": {
+    "1": "New World Order",
+    "2": "Celestial Sphere",
+    "3": "New World Disorder",
+    "4": "Arcarum: The World Beyond",
+    "5": "Rise of Justice",
+    "6": "Binds of The Hanged Man",
+    "7": "Pain of Death",
+    "8": "Theater of Temperance",
+    "9": "Kiss of The Devil",
+    "10": "Collapse of The Tower",
+    "11": "Shooting of The Star",
+    "12": "Reflection of The Moon",
+    "13": "Heat of The Sun",
+    "14": "Melody of Judgement",
+    "15": "Wheel of Fortune",
+    "19": "Invoke Idean",
+    "20": "Sephira Sandbox",
+    "21": "Rise of Justice+",
+    "22": "Rise of Justice++",
+    "23": "Pain of Death+",
+    "24": "Pain of Death++",
+    "25": "Kiss of The Devil+",
+    "26": "Kiss of The Devil++",
+    "27": "Collapse of The Tower+",
+    "28": "Collapse of The Tower++",
+    "29": "Melody of Judgement+",
+    "30": "Melody of Judgement++",
+    "31": "Quickening"
+  },
+  "EM8400": {
+    "1": "Sors Tua",
+    "2": "Dum Vita Est",
+    "3": "Sky Dragons' Trial",
+    "4": "Rationale Exitium",
+    "8": "Virtus Halos",
+    "9": "Venator",
+    "10": "Antinomy Excision",
+    "11": "Devoratio",
+    "12": "Vermillion Claw",
+    "13": "Azure Eddy",
+    "14": "Gold Rockfall",
+    "15": "Emerald Beak",
+    "16": "White Flare",
+    "17": "Black Hex",
+    "18": "Vivid Fire",
+    "19": "Fatal Attractor",
+    "20": "Universal Paroxysm",
+    "21": "Exhaustive Collapse",
+    "22": "Myribolt Refraction",
+    "23": "Necrotic Storm",
+    "24": "Vermillion's Trial",
+    "25": "Azure's Trial",
+    "26": "Gold's Trial",
+    "27": "Emerald's Trial",
+    "28": "White's Trial",
+    "29": "Black's Trial",
+    "33": "Causal Degradation",
+    "34": "Para Bellum",
+    "35": "Final Trial",
+    "36": "Pillars of the World",
+    "38": "Causal Amplification"
+  }
+}

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  casterActionOf,
   causeCandidatesFor,
   causeLabel,
   causeNameFor,
   statusIdOfKey,
+  statusKeyParts,
   statusLabelFor,
   statusRowKindFor,
   targetRowLabel,
@@ -23,21 +25,23 @@ const t = (key: string, vars?: Record<string, unknown>): string =>
 
 describe("statusLabelFor", () => {
   it("reads as the effect with its cause in parentheses", () => {
-    expect(statusLabelFor("status:10:500", t, { effect: () => "Attack Up", cause: () => "Signo Drive" })).toBe(
+    expect(statusLabelFor("status:10:500:unknown", t, { effect: () => "Attack Up", cause: () => "Signo Drive" })).toBe(
       "Attack Up (Signo Drive)"
     );
   });
 
   it("names an unresolved cause rather than dropping the row", () => {
     // The documented fallback for an ability_id the hook could not attribute.
-    expect(statusLabelFor("status:10:unknown", t, { effect: () => "Attack Up", cause: () => "" })).toBe(
+    expect(statusLabelFor("status:10:unknown:unknown", t, { effect: () => "Attack Up", cause: () => "" })).toBe(
       "Attack Up (unknown source)"
     );
   });
 
   it("falls back to the raw effect id when no name exists for it", () => {
     // status.tbl is not extracted yet, so this is the shipping path.
-    expect(statusLabelFor("status:10:500", t, { effect: () => "", cause: () => "500" })).toBe("Effect 10 (500)");
+    expect(statusLabelFor("status:10:500:unknown", t, { effect: () => "", cause: () => "500" })).toBe(
+      "Effect 10 (500)"
+    );
   });
 
   it("hands back anything that is not a status key", () => {
@@ -55,8 +59,8 @@ describe("statusRowKindFor", () => {
   it("answers the holder kind for a status pin from the hostility", () => {
     // The kind used to come from which TAB was open; with the hostility
     // switch, a Debuffs table over friendly holders shows PLAYER rows.
-    expect(statusRowKindFor("status:10:500", "friendly")).toBe("player");
-    expect(statusRowKindFor("status:10:500", "enemy")).toBe("target");
+    expect(statusRowKindFor("status:10:500:unknown", "friendly")).toBe("player");
+    expect(statusRowKindFor("status:10:500:unknown", "enemy")).toBe("target");
   });
 });
 
@@ -104,6 +108,89 @@ describe("causeNameFor", () => {
   });
 });
 
+describe("causeNameFor with the caster-action and class rungs", () => {
+  it("prefers a named cause over both fallbacks", () => {
+    // What the game RECORDED beats anything inferred from it.
+    expect(
+      causeNameFor(
+        1200,
+        () => "Signo Drive",
+        () => "Dread Scythe",
+        () => "Guardpoint"
+      )
+    ).toBe("Signo Drive");
+  });
+
+  it("uses the caster's action when nothing names the cause", () => {
+    // 9998 means no activated action produced the effect, so `nameForCause`
+    // has nothing to look up — but the caster was still mid-action, and the
+    // ability is what a user actually wants to read.
+    expect(
+      causeNameFor(
+        9998,
+        () => "",
+        () => "Dread Scythe",
+        () => "Guardpoint"
+      )
+    ).toBe("Dread Scythe");
+  });
+
+  it("falls back to the class when the caster's action names nothing either", () => {
+    // The class names the MECHANISM rather than the ability — less specific,
+    // still far better than a number.
+    expect(
+      causeNameFor(
+        9998,
+        () => "",
+        () => "",
+        () => "Guardpoint"
+      )
+    ).toBe("Guardpoint");
+  });
+
+  it("falls back to the bare number when neither resolves", () => {
+    // A real but uncurated action id is honest, and the number is the only
+    // thing telling two such rows apart.
+    expect(
+      causeNameFor(
+        1500,
+        () => "",
+        () => "",
+        () => ""
+      )
+    ).toBe("1500");
+  });
+
+  it("still answers empty for the unattributed sentinels", () => {
+    // `causeLabel` owns that test, and a class must not resurrect a row it
+    // already called unattributed.
+    const guardpoint = () => "Guardpoint";
+    expect(causeNameFor(null, () => "", guardpoint, guardpoint)).toBe("");
+    expect(causeNameFor(0, () => "", guardpoint, guardpoint)).toBe("");
+    expect(causeNameFor(0xffffffff, () => "", guardpoint, guardpoint)).toBe("");
+  });
+});
+
+describe("statusLabelFor with a class-named row", () => {
+  it("names the row from its class when the cause resolves to nothing", () => {
+    expect(
+      statusLabelFor("status:7:9998:43981", t, {
+        effect: () => "Molten Edge",
+        cause: () => "Guardpoint",
+      })
+    ).toBe("Molten Edge (Guardpoint)");
+  });
+
+  it("falls back to today's unknown text when nothing resolves", () => {
+    expect(
+      statusLabelFor("status:7:unknown:unknown", t, {
+        effect: () => "Molten Edge",
+        cause: () => "",
+      })
+    ).toBe("Molten Edge (unknown source)");
+  });
+});
+
 describe("causeCandidatesFor", () => {
   // A cause is the CASTER's action id, so only the caster's own tables may
   // name it. A party-wide scan provably misattributed: Eustace's supp-DMG
@@ -119,13 +206,13 @@ describe("causeCandidatesFor", () => {
 
   it("scopes candidates to the casters of the key's own intervals", () => {
     const intervals = [interval(7, 1500, 0), interval(0, 1200, 2)];
-    expect(causeCandidatesFor("status:7:1500", intervals, playerOf)).toEqual(["Pl2700"]);
+    expect(causeCandidatesFor("status:7:1500:unknown", intervals, playerOf)).toEqual(["Pl2700"]);
   });
 
   it("includes the caster's own sub-actor child types", () => {
     // Id's Dragonform Burn arrives from the Pl2000 sub-actor, and only
     // Pl2000's table names its actions — the parent Pl1900 cannot.
-    expect(causeCandidatesFor("status:0:1200", [interval(0, 1200, 2)], playerOf)).toEqual(["Pl1900", "Pl2000"]);
+    expect(causeCandidatesFor("status:0:1200:unknown", [interval(0, 1200, 2)], playerOf)).toEqual(["Pl1900", "Pl2000"]);
   });
 
   it("answers no candidates when no caster resolves to a player", () => {
@@ -133,11 +220,34 @@ describe("causeCandidatesFor", () => {
     // answer is the shared bands and then the number — a name borrowed from
     // whoever happens to be in the party is a fabrication.
     const intervals = [interval(7, 1500, null), interval(7, 1500, 999)];
-    expect(causeCandidatesFor("status:7:1500", intervals, playerOf)).toEqual([]);
+    expect(causeCandidatesFor("status:7:1500:unknown", intervals, playerOf)).toEqual([]);
   });
 
   it("matches the unknown-cause spelling of the key", () => {
-    expect(causeCandidatesFor("status:7:unknown", [interval(7, null, 0)], playerOf)).toEqual(["Pl2700"]);
+    expect(causeCandidatesFor("status:7:unknown:unknown", [interval(7, null, 0)], playerOf)).toEqual(["Pl2700"]);
+  });
+});
+
+describe("casterActionOf", () => {
+  const held = (casterActionId: number | null) => ({ casterActionId });
+
+  it("answers the action every apply on the row agrees on", () => {
+    expect(casterActionOf([held(1200), held(1200)])).toBe(1200);
+  });
+
+  it("answers null where the row's applies disagree", () => {
+    // The caster action is not part of the row key, so one row can span
+    // several. Naming it after whichever sorted first would fabricate — the
+    // class rung is the honest answer instead.
+    expect(casterActionOf([held(1200), held(1300)])).toBeNull();
+  });
+
+  it("lets an apply with no action abstain rather than veto", () => {
+    // Every log written before the field existed carries none at all, and one
+    // unreadable apply must not silence the rest of the row.
+    expect(casterActionOf([held(null), held(1200)])).toBe(1200);
+    expect(casterActionOf([held(null), held(null)])).toBeNull();
+    expect(casterActionOf([])).toBeNull();
   });
 });
 
@@ -161,13 +271,40 @@ describe("targetRowLabel", () => {
 
 describe("statusIdOfKey", () => {
   it("reads the effect id out of a status key", () => {
-    expect(statusIdOfKey("status:1001:1100")).toBe(1001);
-    expect(statusIdOfKey("status:10:unknown")).toBe(10);
+    expect(statusIdOfKey("status:1001:1100:unknown")).toBe(1001);
+    expect(statusIdOfKey("status:10:unknown:unknown")).toBe(10);
   });
 
   it("answers null for anything that is not a status key", () => {
     expect(statusIdOfKey("player:0")).toBeNull();
     expect(statusIdOfKey("Normal:1000")).toBeNull();
+  });
+});
+
+describe("statusKeyParts", () => {
+  it("reads all three ids out of a status key", () => {
+    expect(statusKeyParts("status:7:9998:43981")).toEqual({
+      statusId: 7,
+      causeId: 9998,
+      classHash: 43981,
+    });
+  });
+
+  it("reads an absent cause and an absent class as null", () => {
+    expect(statusKeyParts("status:7:unknown:unknown")).toEqual({
+      statusId: 7,
+      causeId: null,
+      classHash: null,
+    });
+  });
+
+  it("refuses anything that is not a status key", () => {
+    expect(statusKeyParts("ability:1200")).toBeNull();
+    // Two segments is the OLD grammar. Keys are derived at every use site and
+    // never stored, so the only way to see one is a stale bookmarked pin —
+    // which must read as "not a status key" and render verbatim, exactly as
+    // any other stale pin does.
+    expect(statusKeyParts("status:7:9998")).toBeNull();
   });
 });
 

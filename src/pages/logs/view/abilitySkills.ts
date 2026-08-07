@@ -94,6 +94,24 @@ export const groupOfPin = (key: string): string | null => {
   return group;
 };
 
+/** The child character a group pin carries, or null for a raw action key, a
+ * body-spanning group (`ANY_CHILD`), or anything malformed.
+ *
+ * The reading half of `abilityRowKey`'s child suffix, exactly as `groupOfPin`
+ * is of its name — the label qualifier reads it to tell "Normal Attack (Id)"
+ * from "Normal Attack (Eustace)", which the group NAME alone cannot. */
+export const childOfPin = (key: string): CharacterType | null => {
+  const action = parseAbilityKey(key);
+  if (action === null || typeof action !== "object" || !("Group" in action)) return null;
+  const [, child] = action.Group.split(CHILD_SEPARATOR);
+  if (child === undefined || child === ANY_CHILD) return null;
+  try {
+    return JSON.parse(child) as CharacterType;
+  } catch {
+    return null;
+  }
+};
+
 const foldBy = (skills: SkillState[], keyOf: (skill: SkillState) => string): AbilitySkills[] =>
   [...groupBy(skills, keyOf)].map(([key, grouped]) => ({ key, skills: grouped }));
 

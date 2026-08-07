@@ -16,9 +16,14 @@ fn main() -> anyhow::Result<()> {
         }
     };
     println!(
-        "rng_state={:#010x} seed_counter={} sigils={} pair_counters={} weights={} trait_to_item={}",
+        "rng_state={:#010x} saved_seed={:#010x} latched={} synths={} sigils={} pair_counters={} weights={} trait_to_item={}",
         snap.rng_state,
-        snap.seed_counter,
+        snap.saved_seed,
+        // Equal <=> the game has latched its seed. Run this before opening the
+        // Sigil Synthesis screen and again after: the saved seed should jump to
+        // the slot value, and the two should agree from then on.
+        synthesis::seed_latched(&snap),
+        synthesis::synth_count(&snap),
         snap.sigils.len(),
         snap.pair_counters.len(),
         snap.level_weights.len(),

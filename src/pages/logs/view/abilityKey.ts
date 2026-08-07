@@ -10,6 +10,25 @@ export const abilityKey = (action: ActionType): string => {
   return `${name}:${payload}`;
 };
 
+/** The namespace every ability ROW and chart BAND key carries.
+ *
+ * Row and band keys share one flat namespace (`player:`, `target:`, `enemy:`,
+ * `taken:`, `skill:`, `source:`, `other`), and consumers dispatch on the prefix
+ * — `bandLabelFor` resolves `skill:` through the skill namer and falls through
+ * to the RAW KEY for anything it does not recognise. A producer that forgets the
+ * prefix therefore does not throw: it silently prints "Normal:1" at the user.
+ * That is exactly what the stun/SBA drill bands did before this was hoisted out
+ * of the six places that spelled it by hand. */
+const SKILL_PREFIX = "skill:";
+
+/** A skill row/band key from its ability payload. Pair with [`skillKeyPayload`];
+ * between them the `skill:` grammar has ONE author. */
+export const skillKey = (payload: string): string => `${SKILL_PREFIX}${payload}`;
+
+/** The ability payload inside a skill key, or null when the key is not one. */
+export const skillKeyPayload = (key: string): string | null =>
+  key.startsWith(SKILL_PREFIX) ? key.slice(SKILL_PREFIX.length) : null;
+
 /** Inverse of `abilityKey`. Returns null for anything unrecognised, so a stale
  * or hand-edited URL degrades to "All" instead of throwing. */
 export const parseAbilityKey = (key: string): ActionType | null => {

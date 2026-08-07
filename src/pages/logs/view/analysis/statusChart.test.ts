@@ -2,13 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import type { StatusInterval } from "@/types";
 
-import { buildStatusSeries } from "./statusChart";
+import { buildEffectSeries, buildStatusSeries } from "./statusChart";
 
 const interval = (over: Partial<StatusInterval>): StatusInterval => ({
   actorIndex: 0,
   casterIndex: null,
   statusId: 10,
   abilityId: 500,
+  statusClass: null,
+  casterActionId: null,
   startMs: 0,
   endMs: 1_000,
   maxStacks: 1,
@@ -32,7 +34,7 @@ describe("buildStatusSeries", () => {
         interval({ actorIndex: 0, startMs: 0, endMs: 2_000 }),
         interval({ actorIndex: 1, startMs: 1_000, endMs: 3_000 }),
       ],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 3,
       holderOf,
@@ -47,7 +49,7 @@ describe("buildStatusSeries", () => {
   it("reports the stack count, not merely presence", () => {
     const series = buildStatusSeries({
       intervals: [interval({ startMs: 0, endMs: 2_000, maxStacks: 4 })],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 3,
       holderOf,
@@ -62,7 +64,7 @@ describe("buildStatusSeries", () => {
         interval({ startMs: 0, endMs: 2_000, maxStacks: 2 }),
         interval({ startMs: 1_000, endMs: 2_000, maxStacks: 5 }),
       ],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 3,
       holderOf,
@@ -74,7 +76,7 @@ describe("buildStatusSeries", () => {
   it("ignores intervals of a different effect", () => {
     const series = buildStatusSeries({
       intervals: [interval({ statusId: 99, startMs: 0, endMs: 3_000 }), interval({ startMs: 0, endMs: 1_000 })],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 3,
       holderOf,
@@ -90,7 +92,7 @@ describe("buildStatusSeries", () => {
         interval({ actorIndex: 7, startMs: 0, endMs: 1_000 }),
         interval({ actorIndex: 3, startMs: 0, endMs: 3_000 }),
       ],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 3,
       holderOf,
@@ -102,12 +104,118 @@ describe("buildStatusSeries", () => {
   it("treats a missing stack count as one stack, never none", () => {
     const series = buildStatusSeries({
       intervals: [interval({ startMs: 0, endMs: 1_000, maxStacks: 0 })],
-      pinnedKey: "status:10:500",
+      pinnedKey: "status:10:500:unknown",
       bucketMs: 1_000,
       len: 2,
       holderOf,
     });
 
     expect(series[0].values).toEqual([1, 0]);
+  });
+});
+
+const holderKeyOf = (i: StatusInterval) => `player:${i.actorIndex}`;
+const labelOf = (key: string) => `L(${key})`;
+
+describe("buildEffectSeries", () => {
+  it("gives one series per effect, counting holders per bucket", () => {
+    const series = buildEffectSeries({
+      intervals: [
+        interval({ actorIndex: 0, startMs: 0, endMs: 2_000 }),
+        interval({ actorIndex: 1, startMs: 1_000, endMs: 3_000 }),
+      ],
+      bucketMs: 1_000,
+      len: 3,
+      topN: 8,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series).toEqual([{ key: "status:10:500:unknown", label: "L(status:10:500:unknown)", values: [1, 2, 1] }]);
+  });
+
+  it("counts a holder once however many of their windows overlap a bucket", () => {
+    const series = buildEffectSeries({
+      intervals: [
+        interval({ actorIndex: 0, startMs: 0, endMs: 2_000 }),
+        interval({ actorIndex: 0, startMs: 500, endMs: 1_500 }),
+      ],
+      bucketMs: 1_000,
+      len: 2,
+      topN: 8,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series[0].values).toEqual([1, 1]);
+  });
+
+  it("keeps separate causes of one status as separate series, like the table rows", () => {
+    const series = buildEffectSeries({
+      intervals: [interval({ abilityId: 500 }), interval({ abilityId: 900 })],
+      bucketMs: 1_000,
+      len: 1,
+      topN: 8,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series.map((entry) => entry.key).sort()).toEqual(["status:10:500:unknown", "status:10:900:unknown"]);
+  });
+
+  it("ranks by merged uptime and caps at topN", () => {
+    const series = buildEffectSeries({
+      intervals: [
+        interval({ statusId: 1, startMs: 0, endMs: 1_000 }),
+        interval({ statusId: 2, startMs: 0, endMs: 3_000 }),
+        interval({ statusId: 3, startMs: 0, endMs: 2_000 }),
+      ],
+      bucketMs: 1_000,
+      len: 3,
+      topN: 2,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series.map((entry) => entry.key)).toEqual(["status:2:500:unknown", "status:3:500:unknown"]);
+  });
+
+  it("returns nothing when the chart has no buckets", () => {
+    expect(
+      buildEffectSeries({ intervals: [interval({})], bucketMs: 1_000, len: 0, topN: 8, labelOf, holderKeyOf })
+    ).toEqual([]);
+  });
+
+  it("discards the portion of an interval that starts before the chart", () => {
+    // Window is bucket 0 [0,1000) and bucket 1 [1000,2000). The interval
+    // starts 500ms before the chart; that early sliver must not be written to
+    // a negative index, and the holder must still be counted in the buckets
+    // its window genuinely covers.
+    const series = buildEffectSeries({
+      intervals: [interval({ actorIndex: 0, startMs: -500, endMs: 1_500 })],
+      bucketMs: 1_000,
+      len: 2,
+      topN: 8,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series[0].values).toEqual([1, 1]);
+  });
+
+  it("fills to the last bucket for an interval that ends past the chart", () => {
+    // The window is only 2 buckets (2000ms) long; the interval runs to
+    // 5000ms. It must fill bucket 1 and stop — not run past values.length.
+    const series = buildEffectSeries({
+      intervals: [interval({ actorIndex: 0, startMs: 0, endMs: 5_000 })],
+      bucketMs: 1_000,
+      len: 2,
+      topN: 8,
+      labelOf,
+      holderKeyOf,
+    });
+
+    expect(series[0].values).toEqual([1, 1]);
+    expect(series[0].values).toHaveLength(2);
   });
 });

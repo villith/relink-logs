@@ -15,7 +15,6 @@ vi.mock("react-i18next", () => ({
 }));
 
 const OPTIONS = {
-  sources: [{ value: "0", label: "Narmaya" }],
   targets: [{ value: "1", label: "Vulkan Bolla Nihilla" }],
   abilities: [{ value: "Normal:100", label: "Dawnfly Stance" }],
 };
@@ -40,14 +39,19 @@ const renderIt = (props: Partial<React.ComponentProps<typeof PinBar>> = {}) =>
 describe("PinBar", () => {
   it("shows each dimension's placeholder when nothing is pinned", () => {
     renderIt();
-    expect(screen.getByPlaceholderText("ui.logs.selector-all-friendlies")).toBeTruthy();
     expect(screen.getByPlaceholderText("ui.logs.selector-all-enemies")).toBeTruthy();
     expect(screen.getByPlaceholderText("ui.logs.selector-all-abilities")).toBeTruthy();
   });
 
+  // It moved to the topmost row, with the view switch — see ActorBar. Asserted
+  // here so the two bars cannot both grow one.
+  it("does not carry the actor pin", () => {
+    renderIt();
+    expect(screen.queryByPlaceholderText("ui.logs.selector-all-friendlies")).toBeNull();
+  });
+
   it("does not label the selectors — the placeholder already names them", () => {
     renderIt();
-    expect(screen.queryByText("ui.logs.selector-source")).toBeNull();
     expect(screen.queryByText("ui.logs.selector-target")).toBeNull();
     expect(screen.queryByText("ui.logs.selector-ability")).toBeNull();
   });
@@ -68,5 +72,16 @@ describe("PinBar", () => {
     renderIt({ windowLabel: "01:12 – 01:48", onClearWindow });
     fireEvent.click(screen.getByLabelText("ui.logs.window-reset"));
     expect(onClearWindow).toHaveBeenCalled();
+  });
+
+  it("pins ONE target — the machine's target axis is single, like WCL's", () => {
+    const onChange = vi.fn();
+    renderIt({ onChange });
+
+    const target = screen.getByPlaceholderText("ui.logs.selector-all-enemies");
+    fireEvent.click(target);
+    fireEvent.click(screen.getByText("Vulkan Bolla Nihilla"));
+
+    expect(onChange).toHaveBeenCalledWith({ source: null, targets: [1], ability: null });
   });
 });

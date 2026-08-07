@@ -23,6 +23,10 @@ export type QuestSummaryProps = {
   questTimer: number | null;
   /** Copied in from another installation's logs.db. */
   imported: boolean;
+  /** The log's database id, shown so a specific log can be referred to (bug
+   * reports, the diag examples' `--id`). Null when the route id is not a
+   * number, which never happens off a real logs link. */
+  logId: number | null;
 };
 
 /** What a log is, on one line: which quest, cleared or not, how long, when, how
@@ -37,6 +41,7 @@ export const QuestSummary = ({
   questCompleted,
   questTimer,
   imported,
+  logId,
 }: QuestSummaryProps) => {
   const { t } = useTranslation();
   const [total, totalSuffix] = humanizeNumbers(encounter.totalDamage);
@@ -90,6 +95,9 @@ export const QuestSummary = ({
       <Text className="analysis-num" style={{ fontSize: 12, color: "var(--an-ink-3)", whiteSpace: "nowrap" }}>
         {duration}
         {timer} · {epochToLocalTime(encounter.startTime)}
+        {/* eslint-disable-next-line i18next/no-literal-string -- a "#" plus a
+            database id is notation, not prose */}
+        {logId !== null && ` · #${logId}`}
       </Text>
       {imported && (
         <Tooltip label={t("ui.logs.imported-tooltip")} multiline w={280}>

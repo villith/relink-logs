@@ -126,3 +126,108 @@ describe("stun descriptor", () => {
     expect(rows[0].columns).toEqual(["80.0", "30.0"]);
   });
 });
+
+describe("stun — rows that applied no stun", () => {
+  const PINNED: SelectorPins = { source: 0, targets: [], ability: null };
+
+  it("drops ability rows whose skills applied no stun", () => {
+    // Most of a rotation is stun-incapable, or lands while the enemy is already
+    // stunned. Listing those is a wall of honest zeros — the same rule
+    // metrics/sba.ts applies to its attributed rows.
+    const roster = [
+      player(0, 20, 2, [
+        { action: 1, stun: 20 },
+        { action: 2, stun: 0 },
+      ]),
+    ];
+    const rows = stun.rows(input("abilities", PINNED, roster));
+
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:1"]);
+  });
+
+  it("drops them one level down too, where rows are a group's members", () => {
+    const roster = [
+      player(0, 5, 1, [
+        { action: 1, stun: 5 },
+        { action: 2, stun: 0 },
+      ]),
+    ];
+    const rows = stun.rows(input("skills", PINNED, roster));
+
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:1"]);
+  });
+
+  it("keeps a row whose stun is real but rounds to 0.0 in the column", () => {
+    // The filter is on the VALUE, not the rendered string: a genuinely tiny
+    // accrual is data, and hiding it would under-report the total above it.
+    const roster = [player(0, 0.04, 0, [{ action: 1, stun: 0.04 }])];
+    const rows = stun.rows(input("abilities", PINNED, roster));
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].columns[0]).toBe("0.0");
+  });
+
+  it("still lists players who applied no stun, so the roster stays intact", () => {
+    const roster = [player(0, 20, 2, [{ action: 1, stun: 20 }]), player(1, 0, 0, [])];
+    const rows = stun.rows(input("players", NO_PINS, roster));
+
+    expect(rows).toHaveLength(2);
+  });
+});
+
+describe("stun — decomposing a pinned ability", () => {
+  // Two member actions of one skill group, plus an unrelated ability.
+  const GROUPED = [
+    player(0, 100, 10, [
+      { action: 100, stun: 40 },
+      { action: 110, stun: 25 },
+      { action: 7, stun: 35 },
+    ]),
+  ];
+  const GROUP_KEY = 'Group:normal-attack@"Pl0000"';
+
+  it("folds into skill GROUPS with no ability pinned", () => {
+    const rows = stun.rows(input("abilities", { source: 0, targets: [], ability: null }, GROUPED));
+
+    expect(rows.map((row) => row.key)).toEqual([`skill:${GROUP_KEY}`, "skill:Normal:7"]);
+    expect(rows[0].value).toBe(65);
+  });
+
+  it("decomposes a pinned group into its member ACTIONS", () => {
+    // Damage reaches this view through its target dimension; stun has none, so
+    // the ability pin is what descends. Without this the pin only re-folded the
+    // group into the single row that had just been clicked.
+    //
+    // The breakdown arrives ALREADY narrowed to the pinned group — the scoped
+    // fetch rebuilds the derived state under `selection.abilities` — so this
+    // fold only decides group-versus-member, never which ability.
+    const narrowed = [
+      player(0, 65, 6, [
+        { action: 100, stun: 40 },
+        { action: 110, stun: 25 },
+      ]),
+    ];
+    const rows = stun.rows(input("abilities", { source: 0, targets: [], ability: GROUP_KEY }, narrowed));
+
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:100", "skill:Normal:110"]);
+    expect(rows.map((row) => row.value)).toEqual([40, 25]);
+  });
+
+  it("offers no further pin once the rows ARE the members", () => {
+    const narrowed = [
+      player(0, 65, 6, [
+        { action: 100, stun: 40 },
+        { action: 110, stun: 25 },
+      ]),
+    ];
+    const rows = stun.rows(input("abilities", { source: 0, targets: [], ability: GROUP_KEY }, narrowed));
+
+    expect(rows.every((row) => row.pinOnClick === null)).toBe(true);
+  });
+
+  it("pins the group from an unpinned ability row", () => {
+    const rows = stun.rows(input("abilities", { source: 0, targets: [], ability: null }, GROUPED));
+
+    expect(rows[0].pinOnClick).toEqual({ ability: GROUP_KEY });
+  });
+});

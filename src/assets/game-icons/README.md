@@ -102,6 +102,16 @@ for pl in pl0000 pl0100 ... pl2900; do   # every playable id incl. pl2000
   GBFRDataTools.exe extract -i "$GAME" -o $RAW -f "system/player/Data/$pl/${pl}_action.msg"
 done
 
+# 3c. boss cast-bar callout names -> lang/<lang>/enemy-attacks.json
+for code in bp cs ct en es fr ge it jp ko; do
+  GBFRDataTools.exe extract -i "$GAME" -o $RAW -f "system/table/text/$code/text_battle.msg"
+done
+node scripts/gen-enemy-attack-names.mjs
+# Only the NAMES regenerate. src-tauri/assets/enemy-attack-map.json (action id
+# -> callout ordinal) is hand-verified live capture and is never generated —
+# see the enemy-attack-names plan's discovery log for why the game ships no
+# such edge.
+
 # 4. slice the families this app uses (add more as needed)
 node scripts/slice-atlas.mjs --atlas $RAW/ui/atlas/common_icon_status.PNG  --out icon-export/sliced/status
 node scripts/slice-atlas.mjs --atlas $RAW/ui/atlas/common_icon_ability.PNG --out icon-export/sliced/ability

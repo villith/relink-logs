@@ -223,10 +223,6 @@ pub fn read_ptr_guarded(base: usize, offset: usize) -> Option<usize> {
 /// committed/readable. VirtualQuery-guarded — can NEVER fault the game. Distinct from
 /// [`read_ptr_guarded`] only in intent: this is for values that happen to be 64-bit (scene-map
 /// uuids, hash-table masks) rather than for pointers to follow.
-///
-/// Part of the reader family rather than the diag probes, but every caller today is
-/// hookdiag-gated — so it reads as dead in a plain build.
-#[allow(dead_code)]
 pub fn read_u64_guarded(base: usize, offset: usize) -> Option<u64> {
     if base == 0 {
         return None;

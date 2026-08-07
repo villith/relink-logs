@@ -14,7 +14,7 @@
 //! Protocol for reversing the RNG (record results in the scratchpad notes):
 //!   1. From title, load your save. Run `synth_probe` to list sigils.
 //!   2. Pick a pair; run `synth_probe <uidA> <uidB>` and record the trace
-//!      (pairKey, count, seed_counter, rng_state, the 4 cross combos).
+//!      (pairKey, count, saved_seed, rng_state, the 4 cross combos).
 //!   3. Synthesize that exact pair in-game (mod OFF). Record the actual result
 //!      traits (in slot order) + whether it was the high-level (15) roll.
 //!   4. Repeat step 2-3 for the SAME pair several times (count increments) and
@@ -91,9 +91,9 @@ fn main() -> anyhow::Result<()> {
     if is_list {
         let elig: Vec<&SynthesisSigil> = snap.sigils.iter().filter(|s| eligible(s)).collect();
         println!(
-            "rng_state={:#010x} seed_counter={} sigils={} eligible(2-trait,lvl>=11)={} pair_counters={}",
+            "rng_state={:#010x} saved_seed={} sigils={} eligible(2-trait,lvl>=11)={} pair_counters={}",
             snap.rng_state,
-            snap.seed_counter,
+            snap.saved_seed,
             snap.sigils.len(),
             elig.len(),
             snap.pair_counters.len(),
@@ -165,7 +165,7 @@ fn main() -> anyhow::Result<()> {
             sb.trait2_level,
             sb.record_level
         );
-        println!("pair_key={pair_key}  count(this pair so far)={count}  seed_counter={}  rng_state={:#010x}", snap.seed_counter, snap.rng_state);
+        println!("pair_key={pair_key}  count(this pair so far)={count}  saved_seed={}  rng_state={:#010x}", snap.saved_seed, snap.rng_state);
         println!("uidA={ua:#010x} uidB={ub:#010x}  (instance-dependence check: does swapping which copy changes result?)");
 
         // The FOUR possible results under rule #3 (one trait from each sigil):

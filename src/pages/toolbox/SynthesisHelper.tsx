@@ -49,7 +49,7 @@ const LevelCell = ({ lucky }: { lucky: boolean }) => {
 
 const SynthesisHelper = () => {
   const { t } = useTranslation();
-  const { form, setForm, status, response, error, searching, stale, loading, traitOptions, search } =
+  const { form, setForm, status, response, error, searching, stale, seedLatched, loading, traitOptions, search } =
     useSynthesisHelper();
 
   // The form drives reads of live game memory: hold it while the initial
@@ -62,11 +62,33 @@ const SynthesisHelper = () => {
 
   const errorMessage = backendErrorMessage(t, "synthesis", error);
 
+  // The game copies its live RNG stream into the saved synthesis seed when the
+  // Sigil Synthesis screen opens, so a list computed before that is predicting
+  // from a seed the game is about to replace — the classic "first result was
+  // wrong, the rest were right". Nag from the live state AND from the shown
+  // results: the game can latch a moment after a search that already missed.
+  // `seedLatched` is null when there is no game to read, where the
+  // game-not-running banner is the actionable one.
+  const notLatched = seedLatched !== null && (seedLatched === false || response?.seedLatched === false);
+
+  // Searching unlatched can only produce a list that has to be found again, so
+  // the button waits. Gated on the LIVE state alone: once the game has latched,
+  // re-searching is precisely the fix for an unlatched result list.
+  const unlatchedNow = seedLatched === false;
+
   return (
     <ToolPage
       title={t("ui.toolbox.synthesis-helper", "Synthesis Helper")}
       gameNotRunning={status && !status.gameRunning ? t("ui.toolbox.game-not-running") : null}
       unpredictable={status?.rngUnpredictable || response?.rngUnpredictable ? t("ui.toolbox.rng-unpredictable") : null}
+      notice={
+        notLatched
+          ? t(
+              "ui.toolbox.seed-not-latched",
+              "Open the Sigil Synthesis screen in game before searching — it locks in the prediction seed as it opens, so a list found beforehand will not match your first synthesis."
+            )
+          : null
+      }
       error={error ? errorMessage : null}
       stale={stale}
     >
@@ -107,7 +129,7 @@ const SynthesisHelper = () => {
             disabled={busy}
           />
           <Group>
-            <Button onClick={search} loading={searching} disabled={busy || !form.trait1}>
+            <Button onClick={search} loading={searching} disabled={busy || !form.trait1 || unlatchedNow}>
               {t("ui.toolbox.search", "Search")}
             </Button>
           </Group>

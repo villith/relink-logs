@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use anyhow::Result;
 use chrono::Utc;
@@ -19,19 +19,32 @@ use super::{
     v0,
 };
 
+mod ability_charts;
 #[cfg(any(test, feature = "diag"))]
 pub mod audit;
 mod cap_detection;
+mod chart_scope;
 mod filters;
+mod groups;
 pub mod phantom_targets;
 mod player_state;
 mod skill_state;
 mod status;
+mod windows;
 
+pub use ability_charts::{build_ability_sba_chart, build_ability_stun_chart, AbilitySeries};
+pub use chart_scope::ChartScope;
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
+pub use groups::{
+    aggregate_groups, AbilityFilter, ActorRef, Dimension, GroupAggregate, GroupHostility, GroupKey,
+    GroupMeasure, GroupMetric, GroupQuery, GroupQueryError, TimeWindow,
+};
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
-use player_state::PlayerState;
+use player_state::{PlayerState, SbaSourceKind};
 pub use status::{assemble_intervals, StatusInterval};
+pub use windows::{
+    assemble_chart_windows, corroborated_sba_activations, ChartWindow, ChartWindowKind,
+};
 
 pub struct AdjustedDamageInstance<'a> {
     pub event: &'a DamageEvent,
@@ -42,6 +55,12 @@ pub struct AdjustedDamageInstance<'a> {
     /// (supplementary damage, DoT, hits with no cap info) must count toward
     /// neither the capped-hit tallies nor their denominators.
     pub is_cappable: bool,
+    /// The enemy SPAWN the hit landed on, as an index into the shared
+    /// `segment_targets_indexed` segmentation — set only by the reparse walk,
+    /// which has the full log to segment. The live path leaves it `None`
+    /// (the overlay never reads per-spawn shares; the saved log is reparsed
+    /// and comes out segmented).
+    pub target_segment: Option<usize>,
 }
 
 impl<'a> AdjustedDamageInstance<'a> {
@@ -68,6 +87,7 @@ impl<'a> AdjustedDamageInstance<'a> {
             stun_damage,
             is_capped,
             is_cappable,
+            target_segment: None,
         }
     }
 
@@ -78,6 +98,13 @@ impl<'a> AdjustedDamageInstance<'a> {
             return None;
         }
         cap_detection::overcap_contribution(self.event.base_damage, self.event.damage_cap)
+    }
+
+    /// The reparse walk's way of stamping the shared spawn segmentation onto
+    /// a hit without touching every other `from_damage_event` call site.
+    pub fn with_target_segment(mut self, target_segment: Option<usize>) -> Self {
+        self.target_segment = target_segment;
+        self
     }
 }
 
@@ -761,8 +788,12 @@ impl Encounter {
         for (_, message) in self.event_log() {
             match message {
                 Message::DamageEvent(event) => {
-                    coverage.enemy_hp |= event.target_current_hp.is_some();
-                    coverage.overcap |= event.base_damage.is_some();
+                    // An incoming hit's HP pair is the PLAYER's pool, not
+                    // enemy-HP coverage.
+                    if !is_damage_taken_event(event) {
+                        coverage.enemy_hp |= event.target_current_hp.is_some();
+                        coverage.overcap |= event.base_damage.is_some();
+                    }
                 }
                 Message::OnDeathEvent(_) => coverage.deaths = true,
                 Message::OnPlayerStun(_)
@@ -1050,6 +1081,25 @@ pub struct DerivedEncounterState {
     /// survive.
     #[serde(skip)]
     pending_player_stun_effect: HashMap<u32, Vec<f64>>,
+    /// Non-skill gauge causes seen before their player's row existed, held by
+    /// slot key. Quest-start gauge genuinely arrives before anyone has dealt
+    /// damage, so dropping it would lose a real, nameable chunk of the bar.
+    #[serde(skip)]
+    pending_player_sba_sources: HashMap<u32, Vec<(SbaSourceKind, Option<u32>, f64)>>,
+    /// Gauge polls and forced levels seen before their player's row existed:
+    /// the last known level, plus every poll's positive `added` summed. Held
+    /// because SBA is a property of the player, not of any hit — and under a
+    /// source pin the damage events that would create the OTHER players' rows
+    /// are filtered out entirely, so dropping these made pinning one player
+    /// change everyone else's gauge figures.
+    #[serde(skip)]
+    pending_player_sba: HashMap<u32, (f64, f64)>,
+    /// Skill-cause gauge gains seen before their player's row existed. Folded
+    /// through [`PlayerState::add_sba_gain`] on row creation, so they land on
+    /// (or keep waiting for) the causing skill's own row — never inventing a
+    /// player from a gain alone.
+    #[serde(skip)]
+    pending_player_sba_gains: HashMap<u32, Vec<(ActionType, f64)>>,
     /// Players whose most recent stun-capable hit was filtered out of the meters
     /// (see [`is_excluded`]).
     ///
@@ -1085,6 +1135,9 @@ impl Default for DerivedEncounterState {
             pending_player_pg_stun: HashMap::new(),
             pending_player_pg_quickening: HashMap::new(),
             pending_player_stun_effect: HashMap::new(),
+            pending_player_sba_sources: HashMap::new(),
+            pending_player_sba: HashMap::new(),
+            pending_player_sba_gains: HashMap::new(),
             stun_suppressed_players: HashSet::new(),
             status: ParserStatus::Stopped,
             party: HashMap::new(),
@@ -1137,6 +1190,23 @@ impl DerivedEncounterState {
             self.start_time = now;
         }
         self.end_time = now;
+    }
+
+    /// Accumulates an incoming (enemy→party) hit onto the victim's row. Never
+    /// touches the DPS window: taken damage opens an encounter (the live
+    /// path's `ensure_encounter_started` has already run) but the window is
+    /// anchored and stretched only by dealt hits — same posture as guards and
+    /// stun procs.
+    fn process_damage_taken_event(&mut self, event: &DamageEvent) {
+        self.ensure_player_row(
+            event.target.parent_index,
+            CharacterType::from_hash(event.target.parent_actor_type),
+        );
+        let victim = self
+            .party
+            .get_mut(&event.target.parent_index)
+            .expect("ensure_player_row created the row above");
+        victim.add_damage_taken(event);
     }
 
     /// `total_stun_value` = whichever capture path saw the accrual (the two
@@ -1254,6 +1324,94 @@ impl DerivedEncounterState {
         }
     }
 
+    /// Folds one gauge reading into a player's row during a reparse.
+    ///
+    /// Silently skipped when the player has no row yet: unlike stun there is
+    /// nothing to hold pending, because the gauge is a LEVEL — a later event
+    /// carries the running total again, so an early reading lost before the
+    /// player's first damage event costs at most its own `added`.
+    fn process_sba_update(&mut self, actor_index: u32, value: f64, added: f64) {
+        match self.party.get_mut(&actor_index) {
+            Some(player) => player.apply_sba(value, added),
+            // No row yet: hold the level and the rise until one is created
+            // (see `pending_player_sba`).
+            None => {
+                let pending = self.pending_player_sba.entry(actor_index).or_default();
+                pending.0 = value;
+                pending.1 += added.max(0.0);
+            }
+        }
+    }
+
+    /// Files one attributed gauge gain against whatever its cause names.
+    ///
+    /// `Skill` goes to the breakdown row the causing hit opened, through the
+    /// raw-action memo (see [`PlayerState::add_sba_gain`]). Every other cause is
+    /// gauge no hit produced and goes to the player's source list — a cause must
+    /// never be able to open a breakdown row, because a row with no hits is a
+    /// row the damage and stun tables would have to show.
+    ///
+    /// NOTE the wire ordering — or rather, the absence of one. The hook emits a
+    /// gain from the game's gauge-update path, which is entered through a
+    /// separate register-hit gate and not necessarily on the thread the damage
+    /// path runs on, so a `SbaGain` and the `DamageEvent` for the same hit can
+    /// interleave arbitrarily at the shared `Tx`. A SKILL gain whose player has
+    /// no party row yet is therefore dropped (fail-closed: inventing a player
+    /// from a gain alone would put a damage-less row in the meter), while one
+    /// whose skill merely has no row yet is held — see
+    /// [`PlayerState::add_sba_gain`].
+    fn process_sba_gain(&mut self, actor_index: u32, cause: protocol::SbaGainCause, amount: f64) {
+        use protocol::SbaGainCause;
+
+        let (kind, id) = match cause {
+            SbaGainCause::Skill(action) => {
+                match self.party.get_mut(&actor_index) {
+                    Some(player) => player.add_sba_gain(action, amount),
+                    // Held rather than dropped (see `pending_player_sba_gains`):
+                    // the fold routes through `add_sba_gain`, so it still cannot
+                    // invent a player or a damage-less row.
+                    None => self
+                        .pending_player_sba_gains
+                        .entry(actor_index)
+                        .or_default()
+                        .push((action, amount)),
+                }
+                return;
+            }
+            SbaGainCause::DamageTaken => (SbaSourceKind::DamageTaken, None),
+            SbaGainCause::PerfectGuard => (SbaSourceKind::PerfectGuard, None),
+            SbaGainCause::Effect(id) => (SbaSourceKind::Effect, Some(id)),
+            SbaGainCause::PartyAward => (SbaSourceKind::PartyAward, None),
+            SbaGainCause::DirectorAward => (SbaSourceKind::DirectorAward, None),
+            SbaGainCause::QuestStart => (SbaSourceKind::QuestStart, None),
+            SbaGainCause::PerfectDodge => (SbaSourceKind::PerfectDodge, None),
+            SbaGainCause::Site(tag) => (SbaSourceKind::Site, Some(tag)),
+            SbaGainCause::Unknown => (SbaSourceKind::Unknown, None),
+        };
+
+        match self.party.get_mut(&actor_index) {
+            Some(player) => player.add_sba_source(kind, id, amount),
+            // Held rather than dropped: unlike a skill gain, a source has no row
+            // to wait for and quest-start gauge legitimately precedes every hit.
+            None => self
+                .pending_player_sba_sources
+                .entry(actor_index)
+                .or_default()
+                .push((kind, id, amount)),
+        }
+    }
+
+    /// A gauge forced to a known level (attempt / perform / chain), which
+    /// generates nothing.
+    fn process_sba_level(&mut self, actor_index: u32, value: f64) {
+        match self.party.get_mut(&actor_index) {
+            Some(player) => player.set_sba(value),
+            // A forced level replaces the held level but generates nothing,
+            // so the held rise stays as it is.
+            None => self.pending_player_sba.entry(actor_index).or_default().0 = value,
+        }
+    }
+
     /// Creates a player's party row before their first damage event, from the
     /// character type the identity snapshot carries — a player who only guards
     /// must still show their Perfect Guard rows. Folds in any guard/stun state
@@ -1264,6 +1422,9 @@ impl DerivedEncounterState {
         let pending_pg_stun = self.pending_player_pg_stun.remove(&actor_index);
         let pending_pg_quickening = self.pending_player_pg_quickening.remove(&actor_index);
         let pending_stun_effect = self.pending_player_stun_effect.remove(&actor_index);
+        let pending_sources = self.pending_player_sba_sources.remove(&actor_index);
+        let pending_sba = self.pending_player_sba.remove(&actor_index);
+        let pending_sba_gains = self.pending_player_sba_gains.remove(&actor_index);
 
         let player = self
             .party
@@ -1288,6 +1449,21 @@ impl DerivedEncounterState {
         if let Some(pending) = pending_stun_effect {
             for amount in pending {
                 player.add_stun_effect(amount);
+            }
+        }
+        if let Some(sources) = pending_sources {
+            for (kind, id, amount) in sources {
+                player.add_sba_source(kind, id, amount);
+            }
+        }
+        if let Some((value, generated)) = pending_sba {
+            // The same shape a poll applies: the last held level, plus the sum
+            // of every positive rise seen while the row didn't exist.
+            player.apply_sba(value, generated);
+        }
+        if let Some(gains) = pending_sba_gains {
+            for (action, amount) in gains {
+                player.add_sba_gain(action, amount);
             }
         }
     }
@@ -1590,6 +1766,22 @@ pub struct SelectionFact {
 /// and filtering by the pins first would collapse every list to what is already
 /// selected. The window IS applied, so the selectors only ever offer a pin that
 /// has something behind it.
+/// True for a hit some enemy dealt TO a party member — the damage-taken
+/// stream, which has its own accumulation and must stay out of every
+/// dealt-damage path (DPS totals, target segments, selection facts, coverage).
+///
+/// Identity-only, both sides: the target carries a party slot key (the hook
+/// slot-keys player victims the same way it keys player sources) and the
+/// source's parent is no known player character. A player-sourced hit on a
+/// player keeps flowing through the dealt pipeline unchanged.
+pub fn is_damage_taken_event(event: &DamageEvent) -> bool {
+    protocol::is_player_slot_key(event.target.parent_index)
+        && matches!(
+            CharacterType::from_hash(event.source.parent_actor_type),
+            CharacterType::Unknown(_)
+        )
+}
+
 pub fn selection_facts(
     events: &[(i64, Message)],
     start_time: i64,
@@ -1640,6 +1832,47 @@ pub fn selection_facts(
     }
 
     facts
+}
+
+/// One page of the raw event stream, with timestamps rebased to the fight start.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventPage {
+    /// `(ms since fight start, event)`. The inner [`Message`] serialises with
+    /// serde's DEFAULTS — externally tagged, snake_case fields — so the
+    /// frontend's `LogEvent` mirror is snake_case inside the variant.
+    pub events: Vec<(i64, Message)>,
+    /// How many events exist in total, so the frontend can tell a full answer
+    /// from a truncated one.
+    pub total: usize,
+}
+
+/// `count` events starting at `offset`, rebased to `start_time`.
+///
+/// An offset past the end yields an empty page rather than panicking: the
+/// frontend's scroll position and the backend's event count can disagree for a
+/// frame after a filter change.
+pub fn event_page(
+    events: &[(i64, Message)],
+    start_time: i64,
+    offset: usize,
+    count: usize,
+) -> EventPage {
+    let total = events.len();
+    let end = offset.saturating_add(count).min(total);
+    let slice = if offset >= total {
+        &events[0..0]
+    } else {
+        &events[offset..end]
+    };
+
+    EventPage {
+        events: slice
+            .iter()
+            .map(|(ts, event)| (ts - start_time, event.clone()))
+            .collect(),
+        total,
+    }
 }
 
 /// Split every damage-event target into [`TargetSegment`]s, in first-hit
@@ -1696,6 +1929,13 @@ fn segment_targets_inner(
         let Message::DamageEvent(event) = message else {
             continue;
         };
+        // Party victims are not targets: an incoming hit would otherwise put
+        // the PLAYER in the target dropdown and their HP pool in the enemy-HP
+        // charts. Left unassigned, exactly like a non-damage event, which also
+        // keeps enemy attacks out of `selection_facts`.
+        if is_damage_taken_event(event) {
+            continue;
+        }
         if phantoms.is_phantom(event) {
             continue;
         }
@@ -1813,21 +2053,15 @@ pub fn target_selected(
 // Eight independent inputs with no natural grouping — the event log, who to
 // build rows for, the bucket geometry, and the two filters. Bundling them into
 // a struct would only move the same list somewhere less readable.
-#[allow(clippy::too_many_arguments)]
 pub fn build_player_dps_chart(
     events: &[(i64, Message)],
-    player_data: &[Option<PlayerData>; 4],
     player_indices: &[u32],
     start_time: i64,
     interval: i64,
     chart_len: usize,
-    target_spans: &[TargetSpan],
-    // Actions to keep (empty = all), the same rule `matches_selection` applies
-    // to the derived state — so a chart drawn under an ability pin cannot
-    // disagree with the table beneath it.
-    abilities: &[ActionType],
-    filters: MeterFilters,
+    scope: &ChartScope,
 ) -> HashMap<u32, Vec<i32>> {
+    let player_data = scope.player_data;
     let mut player_dps: HashMap<u32, Vec<i32>> = player_indices
         .iter()
         .map(|index| (*index, vec![0; chart_len]))
@@ -1842,13 +2076,13 @@ pub fn build_player_dps_chart(
             continue;
         };
 
-        if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
+        if phantoms.is_phantom(damage_event) || !scope.counted(damage_event) {
             continue;
         }
 
         // The RAW action, read before the dragon-form remap below — that remap
         // rewrites the source, never the action, so the two are independent.
-        if !abilities.is_empty() && !abilities.contains(&damage_event.action_id) {
+        if !scope.selects_ability(damage_event.action_id) {
             continue;
         }
 
@@ -1862,12 +2096,67 @@ pub fn build_player_dps_chart(
         };
 
         // Check to see if the target is in the list of targets to filter by.
-        if target_selected(timestamp - start_time, &damage_event, target_spans) {
+        if scope.selects_target(timestamp - start_time, &damage_event) {
             chart[((timestamp - start_time) / interval) as usize] += damage_event.damage;
         }
     }
 
     player_dps
+}
+
+/// Per-player, per-second damage TAKEN buckets for the analysis view's Taken
+/// chart, keyed by the victim's slot key.
+///
+/// Only incoming events (see [`is_damage_taken_event`]) count, and only onto
+/// the party keys given — same posture as [`build_player_dps_chart`]. None of
+/// that function's gates apply here: phantom targets and the exclusion filters
+/// are about hits ON enemies, an enemy attack is not a pinnable ability, and
+/// the victim is a player rather than a target span.
+/// Damage TAKEN per bucket, keyed by the victim's slot key.
+///
+/// The one chart builder that takes NO [`ChartScope`], stated here so its
+/// absence reads as a decision rather than the omission that produced the
+/// ability-pin bug. None of the gates apply: the contested-source filters and
+/// the ability pin both speak the grammar of a PLAYER's outgoing hits, and this
+/// walks the incoming stream, where the actor is an enemy and the action is an
+/// enemy attack. Narrowing it by either would silently answer a question about
+/// the wrong side of the fight.
+pub fn build_player_taken_chart(
+    events: &[(i64, Message)],
+    player_indices: &[u32],
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+) -> HashMap<u32, Vec<i64>> {
+    let mut player_taken: HashMap<u32, Vec<i64>> = player_indices
+        .iter()
+        .map(|index| (*index, vec![0; chart_len]))
+        .collect();
+
+    for (timestamp, event) in events {
+        let Message::DamageEvent(damage_event) = event else {
+            continue;
+        };
+        if !is_damage_taken_event(damage_event) {
+            continue;
+        }
+        let Some(chart) = player_taken.get_mut(&damage_event.target.parent_index) else {
+            continue;
+        };
+        // Bounds-checked like every other bucketing walk (`bucket_for`, and
+        // `aggregate_groups`'s taken branch): `chart_len` is sized from the
+        // LAST raw event's wall-clock stamp, not the maximum one, so a clock
+        // step during a fight can put an event outside it. Indexing an
+        // unchecked bucket would panic inside `fetch_encounter_state` and the
+        // log would simply refuse to open.
+        let bucket = ((timestamp - start_time) / interval) as usize;
+        if bucket >= chart_len {
+            continue;
+        }
+        chart[bucket] += damage_event.damage.max(0) as i64;
+    }
+
+    player_taken
 }
 
 /// Build the per-player stun chart: stun applied per bucket, keyed by actor
@@ -1891,17 +2180,15 @@ pub fn build_player_dps_chart(
 /// credited to the skill before it, the dragon-form remap, and Perfect Guard's
 /// local-versus-remote zero rule. Stun messages carry no target, so target
 /// spans do not gate them (enemy stun is effectively boss-wide).
-#[allow(clippy::too_many_arguments)]
 pub fn build_player_stun_chart(
     events: &[(i64, Message)],
-    player_data: &[Option<PlayerData>; 4],
     player_indices: &[u32],
     start_time: i64,
     interval: i64,
     chart_len: usize,
-    target_spans: &[TargetSpan],
-    filters: MeterFilters,
+    scope: &ChartScope,
 ) -> HashMap<u32, Vec<f64>> {
+    let player_data = scope.player_data;
     let empty = || -> HashMap<u32, Vec<f64>> {
         player_indices
             .iter()
@@ -1928,7 +2215,7 @@ pub fn build_player_stun_chart(
                 if phantoms.is_phantom(damage_event) {
                     continue;
                 }
-                if is_excluded(damage_event, &filters) {
+                if !scope.counted(damage_event) {
                     // `note_excluded_damage`: supplementary and DoT hits never
                     // own a stun message, so they cannot suppress one.
                     if !matches!(
@@ -1952,7 +2239,12 @@ pub fn build_player_stun_chart(
                 let Some(chart) = delta.get_mut(&damage_event.source.parent_index) else {
                     continue;
                 };
-                if target_selected(timestamp - start_time, &damage_event, target_spans) {
+                // The ability pin, which this walk did not apply before the
+                // gates moved onto `ChartScope` — the per-player stun chart
+                // spanned every ability while the table beneath it narrowed.
+                if scope.selects_ability(damage_event.action_id)
+                    && scope.selects_target(timestamp - start_time, &damage_event)
+                {
                     chart[bucket] += damage_event.stun_value.unwrap_or(0.0) as f64;
                 }
             }
@@ -2019,7 +2311,7 @@ pub fn build_target_hp_charts(
     start_time: i64,
     interval: i64,
     chart_len: usize,
-    target_spans: &[TargetSpan],
+    scope: &ChartScope,
 ) -> Vec<HpChartSeries> {
     let mut series_by_segment: Vec<Option<HpChartSeries>> = vec![None; segments.len()];
 
@@ -2041,7 +2333,10 @@ pub fn build_target_hp_charts(
             continue;
         };
         let rel_ts = timestamp - start_time;
-        if !target_selected(rel_ts, event, target_spans) {
+        // The only gate an HP series takes: which SPAWNS are charted. The
+        // ability and contested-source filters are about a hit's attribution,
+        // and an enemy's health is not attributed to anyone.
+        if !scope.selects_target(rel_ts, event) {
             continue;
         }
         // Newest matching segment wins. A respawn boundary gives the closing segment an
@@ -2080,227 +2375,35 @@ pub fn build_target_hp_charts(
     charts
 }
 
-/// One band of the analysis view's ability drill-down chart: what one breakdown
-/// row of one player dealt per bucket.
-///
-/// Keyed exactly as `skill_breakdown` keys its rows — same action, same child
-/// character — so a band always corresponds to a row of the table beneath it,
-/// and the frontend can fold bands into skill groups with the same rule it
-/// folds rows by. The raw key, not the group: grouping is a display concern the
-/// parser has never known about, and folding a sum is lossless while splitting
-/// one is not.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AbilityChartSeries {
-    pub action_type: ActionType,
-    pub child_character_type: CharacterType,
-    pub values: Vec<i32>,
-}
-
-/// One band of the target drill-down chart: what one pinned ability dealt to one
-/// spawn segment per bucket.
-///
-/// Carries the segment's `instance` rather than merging same-type spawns, so a
-/// band lines up with the target dropdown, the enemy-HP chart above it and the
-/// target pin. Merging down to the type is something the frontend can still do;
-/// splitting a merged series is not.
-#[derive(Debug, Clone, PartialEq, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TargetChartSeries {
-    pub enemy_type: EnemyType,
-    pub instance: u32,
-    pub values: Vec<i32>,
-}
-
-/// The hits from one source that a drill-down chart counts, in log order, as
-/// `(position in the log, bucket, remapped event)`.
-///
-/// The gate chain the drill charts share, written once: phantom targets, the
-/// contested-source filter, the optional ability pin, the dragon-form remap,
-/// the target spans and the bucket bounds. Each chart's own docs promise that
-/// its area equals the total the table reports — a promise only as good as
-/// these gates agreeing, which hand-kept copies of them cannot guarantee.
-///
-/// `ability` is applied BEFORE the remap, which is safe because the remap
-/// rewrites only the event's source, never its `action_id` — and it keeps the
-/// clone off the hits the pin rejects.
-#[allow(clippy::too_many_arguments)]
-fn counted_hits<'a>(
-    events: &'a [(i64, Message)],
-    player_data: &'a [Option<PlayerData>; 4],
-    source_index: u32,
-    ability: Option<ActionType>,
-    start_time: i64,
-    interval: i64,
-    chart_len: usize,
-    target_spans: &'a [TargetSpan],
+/// The pre-remap half of the gate chain the analysis view's
+/// [`groups::aggregate_groups`] applies: phantom targets and the
+/// contested-source exclusion filter. Split from [`bucket_for`] because a
+/// caller's own ability narrowing belongs BETWEEN these two halves — it must
+/// see the raw event (the remap never touches `action_id`, but it does
+/// rewrite `source`, which a source narrowing downstream must see remapped).
+fn survives_shared_gates(
+    event: &DamageEvent,
+    phantoms: &PhantomTargets,
     filters: MeterFilters,
-) -> impl Iterator<Item = (usize, usize, DamageEvent)> + 'a {
-    let phantoms = PhantomTargets::learned_from(events.iter());
-
-    events
-        .iter()
-        .enumerate()
-        .filter_map(move |(position, (timestamp, event))| {
-            let Message::DamageEvent(damage_event) = event else {
-                return None;
-            };
-
-            if phantoms.is_phantom(damage_event) || is_excluded(damage_event, &filters) {
-                return None;
-            }
-            if ability.is_some_and(|pinned| damage_event.action_id != pinned) {
-                return None;
-            }
-
-            let damage_event = remap_dragon_form(player_data, damage_event);
-            if damage_event.source.parent_index != source_index {
-                return None;
-            }
-
-            let rel_ts = timestamp - start_time;
-            if !target_selected(rel_ts, &damage_event, target_spans) {
-                return None;
-            }
-
-            let bucket = (rel_ts / interval) as usize;
-            if bucket >= chart_len {
-                return None;
-            }
-
-            Some((position, bucket, damage_event))
-        })
+) -> bool {
+    !phantoms.is_phantom(event) && !is_excluded(event, &filters)
 }
 
-/// Damage buckets for one player, split by breakdown row.
-///
-/// Every gate the meter applies is applied here too — see [`counted_hits`] — so
-/// the chart's area equals the total the table reports. Bands come back largest
-/// first, which is also the table's order.
-///
-/// `chart_len` must be sized from the FULL log duration, exactly as
-/// [`build_player_dps_chart`] requires: a bucket index IS the elapsed second.
-#[allow(clippy::too_many_arguments)]
-pub fn build_ability_damage_chart(
-    events: &[(i64, Message)],
-    player_data: &[Option<PlayerData>; 4],
-    source_index: u32,
-    start_time: i64,
-    interval: i64,
-    chart_len: usize,
+/// The post-remap half of the gate chain: the target-span window and the
+/// bucket bounds, applied to an already-remapped event. `None` means the hit
+/// is out of the selected window or lands past the chart entirely.
+fn bucket_for(
+    rel_ts: i64,
+    event: &DamageEvent,
     target_spans: &[TargetSpan],
-    filters: MeterFilters,
-) -> Vec<AbilityChartSeries> {
-    // One keying per call: it is stateful and must see this player's hits in log
-    // order, which is exactly what walking the log once gives it.
-    let mut keying = player_state::BreakdownKeying::default();
-    let mut series: Vec<AbilityChartSeries> = Vec::new();
-
-    for (_, bucket, damage_event) in counted_hits(
-        events,
-        player_data,
-        source_index,
-        None,
-        start_time,
-        interval,
-        chart_len,
-        target_spans,
-        filters,
-    ) {
-        let (action_type, child_character_type) = keying.key_for(&damage_event);
-        let found = series.iter_mut().find(|s| {
-            s.action_type == action_type && s.child_character_type == child_character_type
-        });
-        let band = match found {
-            Some(band) => band,
-            None => {
-                series.push(AbilityChartSeries {
-                    action_type,
-                    child_character_type,
-                    values: vec![0; chart_len],
-                });
-                series.last_mut().expect("band pushed just above")
-            }
-        };
-        band.values[bucket] += damage_event.damage;
-    }
-
-    // Stable, so bands with equal totals keep the order they first landed in.
-    series
-        .sort_by_key(|band| std::cmp::Reverse(band.values.iter().map(|v| *v as i64).sum::<i64>()));
-    series
-}
-
-/// Damage buckets for one player's one ability, split by the enemy spawn it hit.
-///
-/// `segments`/`assignment` MUST come from [`segment_targets_indexed`] over the
-/// same events: sharing the segmentation is what guarantees a band and a
-/// dropdown entry mean the same enemy. Time cannot substitute for it — a phase
-/// change opens a segment at the same millisecond the outgoing one ends.
-///
-/// The ability is matched on the RAW `action_id`, the same rule
-/// [`matches_selection`] applies to the derived state, so this chart and the
-/// table beneath it always agree about what is pinned.
-///
-/// Capped at [`HP_CHART_MAX_SERIES`] like the HP chart, for the same reason:
-/// one summon wave can spawn a dozen pools. What the cap drops is logged rather
-/// than silently truncated.
-#[allow(clippy::too_many_arguments)]
-pub fn build_target_damage_chart(
-    events: &[(i64, Message)],
-    player_data: &[Option<PlayerData>; 4],
-    segments: &[TargetSegment],
-    assignment: &[Option<usize>],
-    source_index: u32,
-    ability: ActionType,
-    start_time: i64,
     interval: i64,
     chart_len: usize,
-    target_spans: &[TargetSpan],
-    filters: MeterFilters,
-) -> Vec<TargetChartSeries> {
-    let mut values_by_segment: Vec<Option<Vec<i32>>> = vec![None; segments.len()];
-
-    for (position, bucket, damage_event) in counted_hits(
-        events,
-        player_data,
-        source_index,
-        Some(ability),
-        start_time,
-        interval,
-        chart_len,
-        target_spans,
-        filters,
-    ) {
-        let Some(Some(segment)) = assignment.get(position) else {
-            continue;
-        };
-        let band = values_by_segment[*segment].get_or_insert_with(|| vec![0; chart_len]);
-        band[bucket] += damage_event.damage;
+) -> Option<usize> {
+    if !target_selected(rel_ts, event, target_spans) {
+        return None;
     }
-
-    let mut charts: Vec<TargetChartSeries> = values_by_segment
-        .into_iter()
-        .enumerate()
-        .filter_map(|(index, values)| {
-            values.map(|values| TargetChartSeries {
-                enemy_type: segments[index].enemy_type,
-                instance: segments[index].instance,
-                values,
-            })
-        })
-        .collect();
-
-    charts
-        .sort_by_key(|band| std::cmp::Reverse(band.values.iter().map(|v| *v as i64).sum::<i64>()));
-    if charts.len() > HP_CHART_MAX_SERIES {
-        log::info!(
-            "target drill chart: showing the {HP_CHART_MAX_SERIES} biggest of {} spawns hit",
-            charts.len()
-        );
-        charts.truncate(HP_CHART_MAX_SERIES);
-    }
-    charts
+    let bucket = (rel_ts / interval) as usize;
+    (bucket < chart_len).then_some(bucket)
 }
 
 /// The parser for the encounter.
@@ -2376,6 +2479,20 @@ pub struct Parser {
     #[serde(skip)]
     repeat_chain_anchor: Option<i64>,
 
+    /// Every status currently ACTIVE in the game, keyed the way removes pair
+    /// with applies (holder, effect, causing action) and holding the latest
+    /// apply. Maintained across encounter boundaries, because the statuses a
+    /// fight starts under are applied OUTSIDE it: quest-start buffs (Guts,
+    /// Autorevive, the sigil passives) land seconds before the first damage
+    /// event, and on a Repeat Quest chain they are never re-applied at all.
+    /// [`Self::ensure_encounter_started`] seeds these into each new
+    /// encounter's raw log; a quest load ([`Self::on_area_enter_event`])
+    /// clears the map, so a stale town buff cannot haunt later fights.
+    /// BTreeMap so the seeding order — and with it the stored log — is
+    /// deterministic.
+    #[serde(skip)]
+    standing_statuses: BTreeMap<(u32, u32, Option<u32>), protocol::StatusApplyEvent>,
+
     /// The party's verdicts as last computed, so the per-hit identity path can
     /// re-broadcast them without re-auditing four builds. Recomputed only when
     /// the party actually changes — see [`Parser::insert_player_data`].
@@ -2450,6 +2567,27 @@ impl Parser {
         from_ms: Option<i64>,
         up_to_ms: Option<i64>,
     ) {
+        self.reparse_with_options(target_spans, from_ms, up_to_ms, None);
+    }
+
+    /// [`Self::reparse_with_options_window`] plus the analysis view's window
+    /// filter: `windows` is a mask of fight-relative spans with the groups
+    /// path's exact semantics (`GroupQuery::windows`) — an event is admitted
+    /// when its timestamp lies inside ANY span (`from_ms <= t < up_to_ms`),
+    /// `Some(&[])` admits nothing, `None` is no mask. The mask never pins the
+    /// derived start itself: with no scrub `from`, the window still anchors
+    /// on the first ADMITTED hit and ends on the last, so backend rates
+    /// measure the hull of admitted damage — for a single masked span that is
+    /// the span itself, which is the useful reading; multi-span masks include
+    /// the gaps. A caller wanting scrub-window rates pins `from_ms`/`up_to_ms`
+    /// as the analysis view's scrub does.
+    pub fn reparse_with_options(
+        &mut self,
+        target_spans: &[TargetSpan],
+        from_ms: Option<i64>,
+        up_to_ms: Option<i64>,
+        windows: Option<&[TimeWindow]>,
+    ) {
         let filters = self.filters;
         // Cloned rather than borrowed: the loop below takes `&mut self`.
         let selection = self.selection.clone();
@@ -2458,6 +2596,14 @@ impl Parser {
         // HP read, so judging it as events stream past would drop only the few
         // that happen to reveal the pool.
         self.phantom_targets = PhantomTargets::learned_from(self.encounter.event_log());
+        // The shared spawn segmentation — the SAME `segment_targets_indexed`
+        // over the SAME unwindowed raw log that `fetch_encounter_state` uses
+        // for `target_entries` and the groups path's assignment, so a
+        // SkillTargetState's `segment` indexes the very vector the frontend
+        // holds. Computed here (not passed in) because identical inputs give
+        // identical output, and the reparse has many callers.
+        let (_, target_assignment) =
+            segment_targets_indexed(&self.encounter.raw_event_log, log_start);
         self.derived_state = Default::default();
         // `Default` means Stopped, but a reparse says nothing about whether the
         // fight is over — the live path reparses on a filter toggle mid-fight.
@@ -2475,12 +2621,22 @@ impl Parser {
         }
         let cutoff = up_to_ms.map(|up_to| log_start + up_to);
 
-        for (timestamp, event) in self.encounter.event_log() {
+        for (event_index, (timestamp, event)) in self.encounter.event_log().enumerate() {
             if cutoff.is_some_and(|cutoff| *timestamp > cutoff) {
                 break;
             }
             if from.is_some_and(|from| *timestamp < from) {
                 continue;
+            }
+            // The window-filter mask: outside every admitted span, the event
+            // does not exist for this derived state — the same `continue` the
+            // scrub bounds use, so every accumulation path downstream (damage,
+            // taken, stun, SBA gauge/gains, statuses) narrows identically.
+            if let Some(windows) = windows {
+                let rel_ts = *timestamp - log_start;
+                if !windows.iter().any(|window| window.admits(rel_ts)) {
+                    continue;
+                }
             }
             // Ahead of the window extension in the DamageEvent arm below: an
             // excluded hit must not stretch the encounter window either, or a
@@ -2489,6 +2645,14 @@ impl Parser {
             // never reaches `process_damage_event` for an excluded hit and so
             // never moves the window from one.
             if let Message::DamageEvent(event) = event {
+                // Incoming (enemy→party) hits have their own accumulation: no
+                // window extension (they never anchor or stretch the DPS
+                // denominator), no phantom/exclusion filters and no target or
+                // ability pins — the victim is a player, not a dropdown target.
+                if is_damage_taken_event(event) {
+                    self.derived_state.process_damage_taken_event(event);
+                    continue;
+                }
                 // Ahead of the excluded-damage note as well: a marker's damage
                 // was never real, so it belongs in no total, not even the
                 // "excluded" one the user can toggle back on.
@@ -2523,7 +2687,15 @@ impl Parser {
                             .find(|player| player.actor_index == event.source.parent_index);
 
                         let damage_instance =
-                            AdjustedDamageInstance::from_damage_event(&event, player_data);
+                            AdjustedDamageInstance::from_damage_event(&event, player_data)
+                                // The event's own position in the raw log —
+                                // the dragon-form remap rewrites the SOURCE,
+                                // never the target, so the assignment made
+                                // over the unremapped log still names this
+                                // hit's spawn.
+                                .with_target_segment(
+                                    target_assignment.get(event_index).copied().flatten(),
+                                );
 
                         self.derived_state
                             .process_damage_event(*timestamp, &damage_instance);
@@ -2558,6 +2730,40 @@ impl Parser {
                         event.actor_index,
                         event.stun_amount as f64,
                     );
+                }
+                // The reparse is what the log viewer reads, so an SBA event
+                // dropped here is an SBA tab of zeroes however well the hook
+                // captured it. No target/selection gating: the gauge is a
+                // property of the player, not of a hit on some enemy.
+                Message::OnUpdateSBA(event) => {
+                    self.derived_state.process_sba_update(
+                        event.actor_index,
+                        event.sba_value as f64,
+                        event.sba_added as f64,
+                    );
+                }
+                Message::SbaGain(event) => {
+                    let cause =
+                        event
+                            .cause
+                            .unwrap_or(protocol::SbaGainCause::Skill(ActionType::Normal(
+                                event.action_id,
+                            )));
+                    self.derived_state.process_sba_gain(
+                        event.actor_index,
+                        cause,
+                        event.amount as f64,
+                    );
+                }
+                Message::OnAttemptSBA(event) => {
+                    self.derived_state
+                        .process_sba_level(event.actor_index, 800.0);
+                }
+                Message::OnPerformSBA(event) => {
+                    self.derived_state.process_sba_level(event.actor_index, 0.0);
+                }
+                Message::OnContinueSBAChain(event) => {
+                    self.derived_state.process_sba_level(event.actor_index, 0.0);
                 }
                 _ => {}
             }
@@ -2672,6 +2878,12 @@ impl Parser {
         // exactly the ones that load WITHOUT passing here). Cleared after the
         // save above so a chained run cut by this load still joins its chain.
         self.repeat_chain_anchor = None;
+        // Same boundary for the standing statuses: the incoming area's own
+        // applies fire after this event, and anything still standing from the
+        // previous area (a town buff with no observed remove) must not be
+        // seeded into the next fight. Repeat Quest chains skip this handler,
+        // which is exactly why their persistent buffs survive from run to run.
+        self.standing_statuses.clear();
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("on-area-enter", &self.derived_state);
@@ -2867,6 +3079,16 @@ impl Parser {
             self.reset();
             self.derived_state.start(now);
             self.update_status(ParserStatus::InProgress);
+            // Seed the fight with every status standing at its opening event —
+            // quest-start buffs land before anyone deals damage, and on a
+            // Repeat Quest chain the sigil passives are never re-applied at
+            // all, so without this they exist in no encounter's log. Stamped
+            // `now`: "active when the fight began" is the honest timestamp the
+            // interval assembly can anchor an uptime on.
+            for event in self.standing_statuses.values() {
+                self.encounter
+                    .push_event(now, Message::StatusApply(event.clone()));
+            }
         }
     }
 
@@ -2883,6 +3105,18 @@ impl Parser {
 
         self.encounter
             .push_event(now, Message::DamageEvent(event.clone()));
+
+        // An incoming (enemy→party) hit: recorded above like any other event,
+        // then routed to the taken accumulation. The dealt pipeline below —
+        // phantom learning, exclusion filters, DPS windowing — is about hits
+        // ON enemies and must never see it.
+        if is_damage_taken_event(&event) {
+            self.derived_state.process_damage_taken_event(&event);
+            if let Some(window) = &self.window_handle {
+                let _ = window.emit("encounter-update", &self.derived_state);
+            }
+            return;
+        }
 
         // Recorded above, counted nowhere — same contract as the filters below.
         // Live can only recognise a marker from its first HP-bearing hit
@@ -3224,11 +3458,18 @@ impl Parser {
     /// Recorded ONLY inside a running encounter, and deliberately never opens
     /// one. Statuses fire constantly outside combat — party buffs on load,
     /// food, regen in town — so starting a fight on one would fill the log with
-    /// empty quests. The cost is a buff pre-cast before the first hit of a
-    /// pull: it is dropped rather than back-dated, because `ensure_encounter_started`
-    /// is what makes an event survive the first damage event's `reset()` and
-    /// nothing may call it that cannot legitimately begin a fight.
+    /// empty quests. An apply that lands OUTSIDE an encounter is not lost,
+    /// though: it goes into [`Self::standing_statuses`], and the next
+    /// `ensure_encounter_started` seeds it into that encounter's log — which is
+    /// how quest-start buffs (Guts, Autorevive, the sigil passives), applied
+    /// seconds before anyone deals damage, make it into the fight at all.
     pub fn on_status_apply(&mut self, event: protocol::StatusApplyEvent) {
+        // Standing state is maintained unconditionally — it is the record of
+        // what is active NOW, encounter or no encounter.
+        self.standing_statuses.insert(
+            (event.actor_index, event.status_id, event.ability_id),
+            event.clone(),
+        );
         if self.status != ParserStatus::InProgress {
             return;
         }
@@ -3238,13 +3479,40 @@ impl Parser {
 
     /// Records one status effect ending. Same in-fight rule as
     /// [`Self::on_status_apply`]: a buff expiring in town belongs to no
-    /// encounter, and recording it would attach it to the NEXT one.
+    /// encounter, and recording it would attach it to the NEXT one — but it
+    /// always leaves the standing map, so a lapsed buff is never seeded into
+    /// the next fight.
     pub fn on_status_remove(&mut self, event: protocol::StatusRemoveEvent) {
+        self.standing_statuses
+            .remove(&(event.actor_index, event.status_id, event.ability_id));
         if self.status != ParserStatus::InProgress {
             return;
         }
         let now = Utc::now().timestamp_millis();
         self.encounter.push_event(now, Message::StatusRemove(event));
+    }
+
+    /// Records a Link Time transition. Raw log only (the chart windows are
+    /// assembled on read, see `assemble_chart_windows`), and only inside a
+    /// running encounter — link time cannot exist outside a fight, and the
+    /// transition latch in the hook means a stray pre-fight `false` carries
+    /// no information.
+    pub fn on_link_time(&mut self, event: protocol::LinkTimeEvent) {
+        if self.status != ParserStatus::InProgress {
+            return;
+        }
+        let now = Utc::now().timestamp_millis();
+        self.encounter.push_event(now, Message::LinkTime(event));
+    }
+
+    /// Records an enemy mode transition (Normal / Overdrive / Break). Same
+    /// in-fight rule as [`Self::on_link_time`].
+    pub fn on_enemy_mode(&mut self, event: protocol::EnemyModeEvent) {
+        if self.status != ParserStatus::InProgress {
+            return;
+        }
+        let now = Utc::now().timestamp_millis();
+        self.encounter.push_event(now, Message::EnemyMode(event));
     }
 
     /// Handles one guarded-Quickening marker (The World): counts the guard for
@@ -3271,10 +3539,40 @@ impl Parser {
             Message::OnUpdateSBA(event.clone()),
         );
 
-        let player_index = event.actor_index;
-        if let Some(player) = self.derived_state.party.get_mut(&player_index) {
-            player.set_sba(event.sba_value as f64);
+        self.derived_state.process_sba_update(
+            event.actor_index,
+            event.sba_value as f64,
+            event.sba_added as f64,
+        );
+
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
         }
+    }
+
+    /// Handles one attributed SBA gain (local player only — see `SbaGainEvent`).
+    pub fn on_sba_gain(&mut self, event: protocol::SbaGainEvent) {
+        let now = Utc::now().timestamp_millis();
+        // A gain can be the encounter's opening event: the `QuestStart` grant
+        // fires at quest load, before anyone has dealt damage, and without
+        // this the first damage event's `reset()` erased it from the raw log
+        // (unrecoverable on reparse). Gains only fire in-quest — unlike the
+        // gauge POLL, which ticks in town and must never open an encounter.
+        self.ensure_encounter_started(now);
+        self.encounter
+            .push_event(now, Message::SbaGain(event.clone()));
+
+        // The cause is resolved in the HOOK, where the gauge rise, the parked
+        // hit and the update's own flag arguments are all in scope. `None` only
+        // appears in logs stored before causes existed, and means what it used
+        // to: the hit's own Normal action.
+        let cause = event
+            .cause
+            .unwrap_or(protocol::SbaGainCause::Skill(ActionType::Normal(
+                event.action_id,
+            )));
+        self.derived_state
+            .process_sba_gain(event.actor_index, cause, event.amount as f64);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -3287,10 +3585,8 @@ impl Parser {
             Message::OnAttemptSBA(event.clone()),
         );
 
-        let player_index = event.actor_index;
-        if let Some(player) = self.derived_state.party.get_mut(&player_index) {
-            player.set_sba(800.0);
-        }
+        self.derived_state
+            .process_sba_level(event.actor_index, 800.0);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -3303,10 +3599,7 @@ impl Parser {
             Message::OnPerformSBA(event.clone()),
         );
 
-        let player_index = event.actor_index;
-        if let Some(player) = self.derived_state.party.get_mut(&player_index) {
-            player.set_sba(0.0);
-        }
+        self.derived_state.process_sba_level(event.actor_index, 0.0);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -3320,10 +3613,7 @@ impl Parser {
             Message::OnContinueSBAChain(event.clone()),
         );
 
-        let player_index = event.actor_index;
-        if let Some(player) = self.derived_state.party.get_mut(&player_index) {
-            player.set_sba(0.0);
-        }
+        self.derived_state.process_sba_level(event.actor_index, 0.0);
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-update", &self.derived_state);
@@ -3397,6 +3687,12 @@ impl Parser {
 
         if event.damage <= 0 {
             return true;
+        }
+
+        // Enemy→party hits are the damage-taken stream: recorded and derived,
+        // never dropped for their unknown source.
+        if is_damage_taken_event(event) {
+            return false;
         }
 
         // Hand-listed non-enemy actors (Eugen's Grenade, skill-spawned markers).
@@ -3904,6 +4200,8 @@ mod tests {
             caster_index: Some(0),
             status_id,
             ability_id: None,
+            status_class: None,
+            caster_action_id: None,
             stacks: 1,
         }
     }
@@ -3978,6 +4276,250 @@ mod tests {
         }
     }
 
+    /// An enemy hit ON party slot 0, shaped the way the hook publishes it now
+    /// that player targets are slot-keyed: pointer-like enemy source, target
+    /// keyed by the party slot with the character hash alongside.
+    fn damage_taken_by_slot0(action: u32, damage: i32) -> DamageEvent {
+        DamageEvent {
+            source: Actor {
+                index: 0xF1EB_1234,
+                actor_type: 0xDEAD_BEEF,
+                parent_index: 0xF1EB_1234,
+                parent_actor_type: 0xDEAD_BEEF,
+            },
+            target: Actor {
+                index: 77,
+                actor_type: PLAYER_HASH,
+                parent_index: protocol::player_slot_key(0),
+                parent_actor_type: PLAYER_HASH,
+            },
+            damage,
+            flags: 0,
+            action_id: ActionType::Normal(action),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+            base_damage: None,
+            target_current_hp: Some(9_500),
+            target_max_hp: Some(10_000),
+        }
+    }
+
+    #[test]
+    fn an_enemy_hit_on_a_player_is_recorded_and_derived_as_damage_taken() {
+        let mut parser = Parser::default();
+
+        parser.on_damage_event(damage_taken_by_slot0(9001, 750));
+
+        assert_eq!(
+            parser.encounter.raw_event_log.len(),
+            1,
+            "the hit belongs in the raw log"
+        );
+        let victim = parser
+            .derived_state
+            .party
+            .get(&protocol::player_slot_key(0))
+            .expect("the victim gets a party row");
+        assert_eq!(victim.total_damage_taken, 750);
+        assert_eq!(victim.hits_taken, 1);
+        assert_eq!(victim.total_damage, 0, "taken damage is not dealt damage");
+        assert_eq!(
+            parser.derived_state.total_damage, 0,
+            "taken damage must stay out of the encounter DPS totals"
+        );
+        assert_eq!(victim.damage_taken_breakdown.len(), 1);
+        let row = &victim.damage_taken_breakdown[0];
+        assert_eq!(row.enemy_type, EnemyType::from_hash(0xDEAD_BEEF));
+        assert_eq!(row.action_id, ActionType::Normal(9001));
+        assert_eq!(row.hits, 1);
+        assert_eq!(row.total_damage, 750);
+        assert_eq!(row.max_damage, 750);
+    }
+
+    #[test]
+    fn damage_taken_opens_an_encounter_but_never_anchors_the_dps_window() {
+        let mut parser = Parser::default();
+
+        parser.on_damage_event(damage_taken_by_slot0(9001, 750));
+
+        assert_eq!(
+            parser.status,
+            ParserStatus::InProgress,
+            "an ambush is a fight"
+        );
+        assert!(
+            !parser.derived_state.window_anchored,
+            "the DPS denominator starts at the first dealt hit, same as guards"
+        );
+    }
+
+    #[test]
+    fn reparse_rebuilds_damage_taken_and_keeps_it_out_of_dps() {
+        let mut parser = Parser::default();
+        parser.encounter.raw_event_log.push((
+            1_000,
+            Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+        ));
+        parser.encounter.raw_event_log.push((
+            2_000,
+            Message::DamageEvent(damage_taken_by_slot0(9001, 750)),
+        ));
+
+        parser.reparse();
+
+        assert_eq!(parser.derived_state.total_damage, 1_000);
+        let victim = parser
+            .derived_state
+            .party
+            .get(&protocol::player_slot_key(0))
+            .expect("the victim row is rebuilt from the raw log");
+        assert_eq!(victim.total_damage_taken, 750);
+        assert_eq!(victim.hits_taken, 1);
+    }
+
+    /// Per-player damage taken per second, bucketed for the analysis chart:
+    /// only taken events count, keyed by the victim's slot key, and dealt
+    /// damage never leaks in.
+    #[test]
+    fn taken_chart_buckets_incoming_damage_by_victim() {
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (
+                1_500,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 300)),
+            ),
+            (
+                3_000,
+                Message::DamageEvent(damage_taken_by_slot0(9002, 200)),
+            ),
+        ];
+
+        let chart =
+            build_player_taken_chart(&events, &[protocol::player_slot_key(0)], 1_000, 1_000, 3);
+
+        assert_eq!(
+            chart.get(&protocol::player_slot_key(0)).unwrap(),
+            &vec![300, 0, 200]
+        );
+        assert_eq!(chart.len(), 1, "no series for anyone who took nothing");
+    }
+
+    /// An event outside the chart's own span is dropped, not indexed.
+    ///
+    /// `chart_len` is sized from the LAST raw event's stamp rather than the
+    /// maximum one, and `push_event` stamps wall clock — so a clock step during
+    /// a fight can put an event past the end (or, going backwards, before the
+    /// start, where `as usize` wraps to about 2^64). Either one used to index
+    /// straight off the end and panic inside `fetch_encounter_state`, which the
+    /// user sees as a log that will not open. Same guard the dealt walk's
+    /// `bucket_for` and `aggregate_groups`' taken branch already carry.
+    #[test]
+    fn taken_chart_drops_events_outside_the_chart_span() {
+        let events = vec![
+            (
+                1_500,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 300)),
+            ),
+            // Past the end (chart_len = 2 covers buckets 0..1).
+            (
+                9_000,
+                Message::DamageEvent(damage_taken_by_slot0(9002, 400)),
+            ),
+            // Before the start: the subtraction goes negative.
+            (0, Message::DamageEvent(damage_taken_by_slot0(9003, 500))),
+        ];
+
+        let chart =
+            build_player_taken_chart(&events, &[protocol::player_slot_key(0)], 1_000, 1_000, 2);
+
+        assert_eq!(
+            chart.get(&protocol::player_slot_key(0)).unwrap(),
+            &vec![300, 0]
+        );
+    }
+
+    /// Two hits from the same enemy action fold into one breakdown row; a
+    /// different attacker opens its own.
+    #[test]
+    fn damage_taken_breakdown_groups_by_attacker_and_action() {
+        let mut parser = Parser::default();
+
+        parser.on_damage_event(damage_taken_by_slot0(9001, 750));
+        parser.on_damage_event(damage_taken_by_slot0(9001, 250));
+        let mut other_attacker = damage_taken_by_slot0(9001, 100);
+        other_attacker.source.actor_type = 0xBEEF_CAFE;
+        other_attacker.source.parent_actor_type = 0xBEEF_CAFE;
+        parser.on_damage_event(other_attacker);
+
+        let victim = parser
+            .derived_state
+            .party
+            .get(&protocol::player_slot_key(0))
+            .expect("victim row");
+        assert_eq!(victim.total_damage_taken, 1_100);
+        assert_eq!(victim.hits_taken, 3);
+        assert_eq!(victim.damage_taken_breakdown.len(), 2);
+        let same_attack = &victim.damage_taken_breakdown[0];
+        assert_eq!(same_attack.hits, 2);
+        assert_eq!(same_attack.total_damage, 1_000);
+        assert_eq!(same_attack.max_damage, 750);
+    }
+
+    #[test]
+    fn player_victims_never_become_target_segments() {
+        let events = vec![
+            (
+                1_000,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (
+                2_000,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 750)),
+            ),
+        ];
+
+        let segments = segment_targets(&events, 1_000);
+
+        assert_eq!(
+            segments.len(),
+            1,
+            "only the enemy the player hit belongs in the target dropdown"
+        );
+    }
+
+    #[test]
+    fn player_hp_on_a_taken_event_is_not_enemy_hp_coverage() {
+        let encounter = Encounter {
+            raw_event_log: vec![(
+                1_000,
+                Message::DamageEvent(damage_taken_by_slot0(9001, 750)),
+            )],
+            ..Default::default()
+        };
+
+        assert!(!encounter.data_coverage().enemy_hp);
+    }
+
+    #[test]
+    fn enemy_to_enemy_damage_is_still_ignored() {
+        // The same enemy-sourced hit aimed at another enemy (raw index, no
+        // slot key) must keep being dropped — only party victims are recorded.
+        let mut event = damage_taken_by_slot0(9001, 750);
+        event.target.index = 9;
+        event.target.actor_type = 0x1234;
+        event.target.parent_index = 9;
+        event.target.parent_actor_type = 0x1234;
+
+        assert!(Parser::should_ignore_damage_event(&event));
+        assert!(!Parser::should_ignore_damage_event(&damage_taken_by_slot0(
+            9001, 750
+        )));
+    }
+
     /// A parser holding one ordinary hit at t=1000 and one Primal Burst at
     /// t=2000, both credited to player slot 0.
     fn parser_with_a_burst() -> Parser {
@@ -3995,6 +4537,39 @@ mod tests {
             )),
         ));
         parser
+    }
+
+    #[test]
+    fn event_page_returns_a_bounded_slice_in_order() {
+        let mut parser = Parser::default();
+        let base = 1_000;
+        for offset in 0..10 {
+            parser
+                .encounter
+                .push_event(base + offset, Message::DamageEvent(a_damage_event()));
+        }
+
+        let page = event_page(&parser.encounter.raw_event_log, base, 2, 3);
+
+        assert_eq!(
+            page.total, 10,
+            "total counts every event, not just the page"
+        );
+        assert_eq!(page.events.len(), 3);
+        assert_eq!(page.events[0].0, 2, "timestamps are relative to start_time");
+    }
+
+    #[test]
+    fn event_page_clamps_an_offset_past_the_end() {
+        let mut parser = Parser::default();
+        parser
+            .encounter
+            .push_event(1_000, Message::DamageEvent(a_damage_event()));
+
+        let page = event_page(&parser.encounter.raw_event_log, 1_000, 500, 10);
+
+        assert_eq!(page.events.len(), 0, "past the end is empty, not a panic");
+        assert_eq!(page.total, 1);
     }
 
     #[test]
@@ -4337,14 +4912,16 @@ mod tests {
 
         let chart = build_player_dps_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         // Buckets are elapsed seconds from the start: hit 1 at 0s, the burst at
@@ -4371,15 +4948,17 @@ mod tests {
 
         let chart = build_player_dps_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             2,
-            &[],
-            &[],
-            MeterFilters {
-                include_primal_burst: true,
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters {
+                    include_primal_burst: true,
+                },
             },
         );
 
@@ -4403,14 +4982,16 @@ mod tests {
 
         let chart = build_player_dps_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            &[ActionType::Normal(100)],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[ActionType::Normal(100)],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(
@@ -4435,14 +5016,16 @@ mod tests {
 
         let chart = build_player_dps_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             2,
-            &[],
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(
@@ -4459,119 +5042,6 @@ mod tests {
         event.target.index = target_index;
         event.target.parent_index = target_index;
         event
-    }
-
-    #[test]
-    fn ability_chart_splits_one_player_by_breakdown_row() {
-        let events = vec![
-            (
-                1_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
-            ),
-            (
-                2_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 200, 300)),
-            ),
-            (
-                3_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 500)),
-            ),
-        ];
-
-        let series = build_ability_damage_chart(
-            &events,
-            &Default::default(),
-            0,
-            1_000,
-            1_000,
-            3,
-            &[],
-            MeterFilters::default(),
-        );
-
-        assert_eq!(series.len(), 2, "one band per ability");
-        // Largest first: action 100 totals 1500 against action 200's 300.
-        assert_eq!(series[0].action_type, ActionType::Normal(100));
-        assert_eq!(series[0].values, vec![1_000, 0, 500]);
-        assert_eq!(series[1].action_type, ActionType::Normal(200));
-        assert_eq!(series[1].values, vec![0, 300, 0]);
-    }
-
-    #[test]
-    fn ability_chart_area_equals_the_players_total() {
-        // The invariant that makes the chart trustworthy: a band's area is part
-        // of the row total beneath it, so the whole stack is the player total.
-        let mut parser = Parser::default();
-        for (timestamp, action, damage) in
-            [(1_000, 100, 1_000), (2_000, 200, 300), (2_500, 100, 500)]
-        {
-            parser.encounter.raw_event_log.push((
-                timestamp,
-                Message::DamageEvent(damage_from(PLAYER_HASH, action, damage)),
-            ));
-        }
-        parser.reparse();
-
-        let series = build_ability_damage_chart(
-            &parser.encounter.raw_event_log,
-            &parser.encounter.player_data,
-            0,
-            parser.start_time(),
-            1_000,
-            3,
-            &[],
-            MeterFilters::default(),
-        );
-
-        let charted: i64 = series
-            .iter()
-            .flat_map(|band| band.values.iter())
-            .map(|value| *value as i64)
-            .sum();
-        let table_total = parser
-            .derived_state
-            .party
-            .values()
-            .next()
-            .unwrap()
-            .total_damage;
-        assert_eq!(charted, table_total as i64);
-    }
-
-    #[test]
-    fn ability_chart_drops_other_players_and_filtered_hits() {
-        let mut other = damage_from(PLAYER_HASH, 100, 9_999);
-        other.source.parent_index = 3;
-
-        let events = vec![
-            (
-                1_000,
-                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
-            ),
-            (1_500, Message::DamageEvent(other)),
-            (
-                2_000,
-                Message::DamageEvent(damage_from(
-                    PRIMAL_BURST_BODY,
-                    SUMMON_ATTACK_ACTION_ID,
-                    3_000,
-                )),
-            ),
-        ];
-
-        let series = build_ability_damage_chart(
-            &events,
-            &Default::default(),
-            0,
-            1_000,
-            1_000,
-            2,
-            &[],
-            MeterFilters::default(),
-        );
-
-        assert_eq!(series.len(), 1);
-        assert_eq!(series[0].values, vec![1_000, 0]);
     }
 
     #[test]
@@ -4599,62 +5069,103 @@ mod tests {
         );
     }
 
+    /// The spec's shared-segment guarantee: the card path (SkillState.targets)
+    /// and the groups path (aggregate_groups grouped by Target) must assign
+    /// identical segments, because both must come from
+    /// `segment_targets_indexed` over the same raw log — never re-derived.
     #[test]
-    fn target_chart_splits_one_ability_by_spawn() {
-        let events = vec![
-            (1_000, Message::DamageEvent(damage_onto(9, 100, 1_000))),
-            (2_000, Message::DamageEvent(damage_onto(11, 100, 400))),
-            // A different ability: pinning action 100 must exclude it.
-            (2_000, Message::DamageEvent(damage_onto(9, 200, 7_777))),
-            (3_000, Message::DamageEvent(damage_onto(9, 100, 250))),
-        ];
-        let (segments, assignment) = segment_targets_indexed(&events, 1_000);
+    fn skill_target_entries_carry_the_groups_path_spawn_segments() {
+        let mut parser = Parser::default();
+        // Two spawns of the SAME enemy type (damage_onto keeps actor_type
+        // 0x1234 for any target index): segments 0 and 1, instances #1 and #2.
+        //
+        // Non-damage events are interleaved (before both, and between them) so
+        // the raw-log index diverges from the damage-event ordinal: the first
+        // damage event sits at raw index 1 (ordinal 0) and the second at raw
+        // index 3 (ordinal 1). This pins `segment_targets_indexed`'s
+        // `event_index` to the raw log's position, not a filtered count — a
+        // refactor that enumerated only damage events would still line up
+        // ordinals 0/1 with segments 0/1 and pass regardless.
+        parser.encounter.raw_event_log.push((
+            900,
+            Message::OnPlayerStun(OnPlayerStunEvent {
+                actor_index: 0,
+                stun_amount: 0.0,
+            }),
+        ));
+        parser
+            .encounter
+            .raw_event_log
+            .push((1_000, Message::DamageEvent(damage_onto(9, 100, 400))));
+        parser.encounter.raw_event_log.push((
+            1_500,
+            Message::OnPlayerStun(OnPlayerStunEvent {
+                actor_index: 0,
+                stun_amount: 0.0,
+            }),
+        ));
+        parser
+            .encounter
+            .raw_event_log
+            .push((2_000, Message::DamageEvent(damage_onto(10, 100, 600))));
 
-        let series = build_target_damage_chart(
-            &events,
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0)
+            .expect("the dealing player's row");
+        assert_eq!(player.skill_breakdown.len(), 1, "one action, one skill row");
+        let mut card_path: Vec<(Option<usize>, u64)> = player.skill_breakdown[0]
+            .targets
+            .iter()
+            .map(|target| (target.segment, target.total_damage))
+            .collect();
+        card_path.sort();
+
+        let (segments, assignment) =
+            segment_targets_indexed(&parser.encounter.raw_event_log, parser.start_time());
+        let query = GroupQuery {
+            metric: GroupMetric::Damage,
+            hostility: GroupHostility::Friendly,
+            group_by: Dimension::Target,
+            source: None,
+            target: None,
+            ability: None,
+            top_n: None,
+            from_ms: None,
+            up_to_ms: None,
+            windows: None,
+        };
+        let aggregates = aggregate_groups(
+            &parser.encounter.raw_event_log,
             &Default::default(),
             &segments,
             &assignment,
-            0,
-            ActionType::Normal(100),
+            &query,
+            parser.start_time(),
             1_000,
-            1_000,
-            3,
-            &[],
+            2,
             MeterFilters::default(),
-        );
+        )
+        .expect("friendly damage grouped by target is supported");
+        let mut groups_path: Vec<(Option<usize>, u64)> = aggregates
+            .iter()
+            .map(|aggregate| match aggregate.key {
+                GroupKey::EnemySpawn { segment, .. } => {
+                    (Some(segment), aggregate.measure.amount as u64)
+                }
+                ref other => panic!("expected spawn keys, got {other:?}"),
+            })
+            .collect();
+        groups_path.sort();
 
-        assert_eq!(series.len(), 2, "one band per spawn hit");
-        assert_eq!(series[0].values, vec![1_000, 0, 250]);
-        assert_eq!(series[1].values, vec![0, 400, 0]);
-        // Instances come from the shared segmentation, so a band names the same
-        // enemy the target dropdown does.
         assert_eq!(
-            series.iter().map(|s| s.instance).collect::<Vec<_>>(),
-            vec![segments[0].instance, segments[1].instance]
+            card_path, groups_path,
+            "the card path and the groups path must name the same spawns"
         );
-    }
-
-    #[test]
-    fn target_chart_is_empty_when_the_ability_never_landed() {
-        let events = vec![(1_000, Message::DamageEvent(damage_onto(9, 100, 1_000)))];
-        let (segments, assignment) = segment_targets_indexed(&events, 1_000);
-
-        let series = build_target_damage_chart(
-            &events,
-            &Default::default(),
-            &segments,
-            &assignment,
-            0,
-            ActionType::Normal(999),
-            1_000,
-            1_000,
-            1,
-            &[],
-            MeterFilters::default(),
-        );
-
-        assert!(series.is_empty(), "no band for an ability with no hits");
+        assert_eq!(card_path, vec![(Some(0), 400), (Some(1), 600)]);
     }
 
     #[test]
@@ -4666,14 +5177,16 @@ mod tests {
 
         let chart = build_player_dps_chart(
             &events,
-            &Default::default(),
             &[7],
             1_000,
             1_000,
             1,
-            &[],
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         // Player 0 dealt the damage but has no row requested, so it is dropped
@@ -4710,13 +5223,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(chart.get(&0).unwrap(), &vec![50.0, 0.0, 50.0]);
@@ -4736,13 +5252,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(chart.get(&0).unwrap(), &vec![30.0, 0.0, 20.0]);
@@ -4763,13 +5282,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             2,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         let series = chart.get(&0).unwrap();
@@ -4810,13 +5332,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         let charted: f64 = chart.get(&0).unwrap().iter().sum();
@@ -4841,13 +5366,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             3,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(chart.get(&0).unwrap().iter().sum::<f64>(), 0.0);
@@ -4872,13 +5400,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[0],
             1_000,
             1_000,
             2,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(chart.get(&0).unwrap(), &vec![50.0, 25.0]);
@@ -4893,13 +5424,16 @@ mod tests {
 
         let chart = build_player_stun_chart(
             &events,
-            &Default::default(),
             &[7],
             1_000,
             1_000,
             1,
-            &[],
-            MeterFilters::default(),
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
         );
 
         assert_eq!(chart.len(), 1);
@@ -5782,7 +6316,19 @@ mod tests {
         ];
 
         let segments = segment_targets(&events, 0);
-        let charts = build_target_hp_charts(&events, &segments, 0, 3_000, 3, &[]);
+        let charts = build_target_hp_charts(
+            &events,
+            &segments,
+            0,
+            3_000,
+            3,
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
+        );
         assert_eq!(charts.len(), 3);
 
         // Largest pool first; smaller pools never pollute its line.
@@ -5804,14 +6350,39 @@ mod tests {
             start_ms: 0,
             end_ms: 10_000,
         };
-        let charts = build_target_hp_charts(&events, &segments, 0, 3_000, 3, &[span]);
+        let charts = build_target_hp_charts(
+            &events,
+            &segments,
+            0,
+            3_000,
+            3,
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[span],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
+        );
         assert_eq!(charts.len(), 1);
         assert_eq!(charts[0].values, vec![None, Some(75.0), None]);
 
         // Events without HP data can never produce a chart.
         let bare = vec![(0, Message::DamageEvent(a_damage_event()))];
         let bare_segments = segment_targets(&bare, 0);
-        assert!(build_target_hp_charts(&bare, &bare_segments, 0, 3_000, 1, &[]).is_empty());
+        assert!(build_target_hp_charts(
+            &bare,
+            &bare_segments,
+            0,
+            3_000,
+            1,
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
+        )
+        .is_empty());
     }
 
     /// Lucilius' summon waves: every wave's swords report the SAME collapsed
@@ -5844,7 +6415,19 @@ mod tests {
         ];
 
         let segments = segment_targets(&events, 0);
-        let charts = build_target_hp_charts(&events, &segments, 0, 3_000, 16, &[]);
+        let charts = build_target_hp_charts(
+            &events,
+            &segments,
+            0,
+            3_000,
+            16,
+            &ChartScope {
+                player_data: &Default::default(),
+                target_spans: &[],
+                abilities: &[],
+                filters: MeterFilters::default(),
+            },
+        );
         assert_eq!(charts.len(), 5);
 
         // Largest first: the (healed, unsplit) 200-max pool. Instance numbers
@@ -6139,6 +6722,576 @@ mod tests {
         // An empty window stays at zero rather than picking up stale state.
         parser.reparse_with_options_window(&[], Some(1_000), Some(3_000));
         assert_eq!(parser.derived_state.total_damage, 0);
+    }
+
+    /// The analysis view's window filter: a multi-window mask with the groups
+    /// path's exact semantics — an event is admitted when its fight-relative
+    /// timestamp lies inside ANY window (`from_ms <= t < up_to_ms`); `Some`
+    /// of an empty vec matches nothing; `None` is no mask at all.
+    #[test]
+    fn reparse_windows_mask_admits_only_events_inside_a_window() {
+        let mut parser = Parser::default();
+        let base = 10_000;
+
+        for (offset, damage) in [(0, 100), (4_000, 200), (8_000, 400)] {
+            let mut event = a_damage_event();
+            event.damage = damage;
+            parser
+                .encounter
+                .push_event(base + offset, Message::DamageEvent(event));
+        }
+
+        let mask = [
+            TimeWindow {
+                from_ms: 0,
+                up_to_ms: 1_000,
+            },
+            TimeWindow {
+                from_ms: 3_000,
+                up_to_ms: 5_000,
+            },
+        ];
+        parser.reparse_with_options(&[], None, None, Some(&mask));
+        // 0 is inside [0,1000); 4_000 inside [3000,5000); 8_000 in neither.
+        assert_eq!(parser.derived_state.total_damage, 300);
+
+        // The upper edge is EXCLUSIVE, matching the wire windows' convention.
+        let edge = [TimeWindow {
+            from_ms: 0,
+            up_to_ms: 4_000,
+        }];
+        parser.reparse_with_options(&[], None, None, Some(&edge));
+        assert_eq!(parser.derived_state.total_damage, 100);
+
+        // An empty mask matches nothing — a stale filter narrows, never widens.
+        parser.reparse_with_options(&[], None, None, Some(&[]));
+        assert_eq!(parser.derived_state.total_damage, 0);
+
+        // The mask composes with the scrub range.
+        let wide = [TimeWindow {
+            from_ms: 0,
+            up_to_ms: 100_000,
+        }];
+        parser.reparse_with_options(&[], Some(2_000), Some(5_000), Some(&wide));
+        assert_eq!(parser.derived_state.total_damage, 200);
+    }
+
+    /// The mask gates every accumulation path, not just damage: a stun
+    /// message outside every admitted span must not count either.
+    #[test]
+    fn reparse_windows_mask_drops_non_damage_events_outside_the_mask() {
+        let mut parser = Parser::default();
+        let base = 10_000;
+
+        // Push in chronological order: the reparse loop's `cutoff` break
+        // assumes the raw log is time-ordered.
+        let mut damage_event = a_damage_event();
+        damage_event.damage = 100;
+        parser
+            .encounter
+            .push_event(base, Message::DamageEvent(damage_event));
+        parser.encounter.push_event(
+            base + 500,
+            Message::OnPlayerStun(OnPlayerStunEvent {
+                actor_index: 0xF000_0000,
+                stun_amount: 30.0,
+            }),
+        );
+        parser.encounter.push_event(
+            base + 2_000,
+            Message::OnPlayerStun(OnPlayerStunEvent {
+                actor_index: 0xF000_0000,
+                stun_amount: 50.0,
+            }),
+        );
+
+        let mask = [TimeWindow {
+            from_ms: 0,
+            up_to_ms: 1_000,
+        }];
+        parser.reparse_with_options(&[], None, None, Some(&mask));
+
+        // The +500 stun message is inside [0,1000) and counts; the +2000 one
+        // is outside every admitted span and is dropped, same as a hit.
+        assert_eq!(parser.derived_state.total_stun_value, 30.0);
+    }
+
+    /// Pins the start-anchoring contract the mask's doc comment describes:
+    /// with no scrub `from`, the derived window still anchors on the first
+    /// MASK-ADMITTED hit (not the fight's first hit), so backend rates
+    /// measure the hull of admitted damage.
+    #[test]
+    fn reparse_windows_mask_anchors_start_on_first_admitted_hit() {
+        let mut parser = Parser::default();
+        let base = 10_000;
+
+        for (offset, damage) in [(0, 100), (4_000, 200), (8_000, 400)] {
+            let mut event = a_damage_event();
+            event.damage = damage;
+            parser
+                .encounter
+                .push_event(base + offset, Message::DamageEvent(event));
+        }
+
+        let mask = [TimeWindow {
+            from_ms: 3_000,
+            up_to_ms: 5_000,
+        }];
+        parser.reparse_with_options(&[], None, None, Some(&mask));
+        assert_eq!(parser.derived_state.start_time, base + 4_000);
+    }
+
+    /// Regression: `reparse_with_options_window` swallowed `OnUpdateSBA` in its
+    /// `_ => {}` arm, so every STORED log reported `sba = 0.0` for every player
+    /// and the analysis view's SBA tab was a list of zeroes. The live path set it;
+    /// the reparse the log viewer actually uses never did.
+    #[test]
+    fn reparse_replays_sba_events() {
+        let mut parser = Parser::default();
+        // A damage event first: the party row is created from damage, and an SBA
+        // event for a player with no row must not be silently dropped.
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.on_sba_update(protocol::OnUpdateSBAEvent {
+            actor_index: 0xF000_0000,
+            sba_value: 300.0,
+            sba_added: 300.0,
+        });
+        parser.on_sba_update(protocol::OnUpdateSBAEvent {
+            actor_index: 0xF000_0000,
+            sba_value: 500.0,
+            sba_added: 200.0,
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        assert_eq!(player.sba, 500.0, "last gauge value survives a reparse");
+        assert_eq!(
+            player.sba_generated, 500.0,
+            "total generated is the sum of every sba_added"
+        );
+    }
+
+    /// An attributed gain lands in the same breakdown row the causing hit did, so
+    /// the SBA drill-down and the damage drill-down name the same skills.
+    #[test]
+    fn sba_gain_attributes_to_the_causing_skill_row() {
+        let mut parser = Parser::default();
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 1,
+            amount: 12.5,
+            cause: None,
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(1))
+            .expect("the causing skill's row");
+        assert_eq!(row.sba_generated, 12.5);
+        // The PLAYER total is NOT touched by a gain — it comes from the gauge poll,
+        // which covers all four members; attribution covers only the local player,
+        // and adding both would double-count them.
+        assert_eq!(
+            player.sba_generated, 0.0,
+            "a gain splits the total, it does not add to it"
+        );
+    }
+
+    /// A gain that beats the player's FIRST damage event is held (like the
+    /// non-skill sources) and folded through `add_sba_gain` when the row is
+    /// created, so it still lands on the causing skill's row. (Distinct from a
+    /// gain that beats its own SKILL's first hit, which `PlayerState` holds;
+    /// that one only needs the player to exist.)
+    #[test]
+    fn sba_gain_before_the_players_first_damage_event_is_held() {
+        let mut parser = Parser::default();
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 1,
+            amount: 7.0,
+            cause: None,
+        });
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 1,
+            amount: 12.5,
+            cause: None,
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(1))
+            .expect("row for the causing skill");
+        assert_eq!(
+            row.sba_generated,
+            7.0 + 12.5,
+            "the opener is held for the row, not dropped"
+        );
+    }
+
+    /// A poll that beats the player's first row-creating event — but lands
+    /// inside a running encounter — is held, not dropped: another player's hit
+    /// opens the fight, and every member's gauge is polled from that moment
+    /// even though their own rows appear one by one.
+    #[test]
+    fn sba_poll_before_the_players_first_row_is_held() {
+        let mut parser = Parser::default();
+        let mut opener = a_damage_event();
+        opener.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(opener);
+
+        parser.on_sba_update(protocol::OnUpdateSBAEvent {
+            actor_index: 0xF000_0001,
+            sba_value: 150.0,
+            sba_added: 150.0,
+        });
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0001;
+        parser.on_damage_event(event);
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0001)
+            .expect("party row");
+        assert_eq!(player.sba, 150.0, "the early poll's level survives");
+        assert_eq!(
+            player.sba_generated, 150.0,
+            "the early poll's rise survives"
+        );
+    }
+
+    /// SBA is a property of the player, not of any hit (see the reparse's SBA
+    /// arms) — a source pin must not change anyone's gauge figures. Regression:
+    /// polls for a player with no row yet were dropped, and under a source pin
+    /// the other players' rows are only created by their first damage-TAKEN
+    /// event, so pinning one player visibly changed everyone else's totals.
+    #[test]
+    fn sba_totals_survive_a_source_pin() {
+        let mut parser = Parser::default();
+
+        let mut pinned = a_damage_event();
+        pinned.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(pinned);
+
+        // The other player's own hit — filtered out by the pin below.
+        let mut other = a_damage_event();
+        other.source.parent_index = 0xF000_0001;
+        parser.on_damage_event(other);
+
+        parser.on_sba_update(protocol::OnUpdateSBAEvent {
+            actor_index: 0xF000_0001,
+            sba_value: 300.0,
+            sba_added: 300.0,
+        });
+
+        // The event that finally creates their row under the pin: an enemy hit
+        // ON them (taken events are deliberately not selection-filtered).
+        let mut taken = a_damage_event();
+        taken.source.parent_actor_type = 0;
+        taken.target.parent_index = 0xF000_0001;
+        taken.target.parent_actor_type = 0x2AF6_78E8;
+        parser.on_damage_event(taken);
+
+        parser.selection = SelectionFilter {
+            source_indices: vec![0xF000_0000],
+            ..Default::default()
+        };
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0001)
+            .expect("row created by the taken hit");
+        assert_eq!(player.sba, 300.0, "the poll's level survives the pin");
+        assert_eq!(
+            player.sba_generated, 300.0,
+            "the poll's rise survives the pin"
+        );
+    }
+
+    fn a_status_apply(status_id: u32) -> protocol::StatusApplyEvent {
+        protocol::StatusApplyEvent {
+            actor_index: 0xF000_0000,
+            caster_index: Some(0xF000_0000),
+            status_id,
+            ability_id: None,
+            stacks: 1,
+            status_class: None,
+            caster_action_id: None,
+        }
+    }
+
+    fn recorded_applies(parser: &Parser, status_id: u32) -> usize {
+        parser
+            .encounter
+            .event_log()
+            .filter(|(_, m)| matches!(m, Message::StatusApply(e) if e.status_id == status_id))
+            .count()
+    }
+
+    /// Quest-start buffs (Guts, Autorevive, the sigil passives) land while no
+    /// encounter is running, seconds before the first hit. They must survive
+    /// the first damage event's `reset()`: the standing map seeds them into
+    /// the new encounter's log at its opening event.
+    #[test]
+    fn statuses_standing_at_encounter_start_are_seeded_into_the_log() {
+        let mut parser = Parser::default();
+        parser.on_status_apply(a_status_apply(42));
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        assert_eq!(
+            recorded_applies(&parser, 42),
+            1,
+            "the standing buff is seeded at encounter start"
+        );
+    }
+
+    /// A buff that lapsed before the fight began was not active when it
+    /// started, so it is not seeded.
+    #[test]
+    fn a_status_removed_before_the_encounter_is_not_seeded() {
+        let mut parser = Parser::default();
+        parser.on_status_apply(a_status_apply(42));
+        parser.on_status_remove(protocol::StatusRemoveEvent {
+            actor_index: 0xF000_0000,
+            status_id: 42,
+            ability_id: None,
+        });
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        assert_eq!(recorded_applies(&parser, 42), 0);
+    }
+
+    /// Repeat Quest chains skip the quest-load boundary and never re-apply the
+    /// sigil passives, so the statuses standing when run 1 ended must seed run
+    /// 2's encounter as well.
+    #[test]
+    fn standing_statuses_seed_the_next_chained_encounter() {
+        let mut parser = Parser::default();
+        parser.on_status_apply(a_status_apply(42));
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event.clone());
+
+        // Run 1 ends at the result screen; a chained run starts WITHOUT a
+        // quest load in between.
+        parser.on_quest_complete_event(protocol::QuestCompleteEvent {
+            quest_id: 1,
+            elapsed_time_in_secs: 60,
+        });
+        parser.on_damage_event(event);
+
+        assert_eq!(
+            recorded_applies(&parser, 42),
+            1,
+            "run 2's fresh log carries the seeded buff"
+        );
+    }
+
+    /// A quest load is the standing map's boundary: the incoming area's own
+    /// applies fire after it, and anything left from the previous area (a town
+    /// buff with no observed remove) must not haunt the next fight.
+    #[test]
+    fn a_quest_load_clears_the_standing_statuses() {
+        let mut parser = Parser::default();
+        parser.on_status_apply(a_status_apply(42));
+
+        parser.on_area_enter_event(protocol::AreaEnterEvent {
+            last_known_quest_id: 0,
+            last_known_elapsed_time_in_secs: 0,
+        });
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        assert_eq!(recorded_applies(&parser, 42), 0);
+    }
+
+    /// A party award is the whole party's, not the swinging player's: it must
+    /// land as a SOURCE even when a hit is on the books.
+    #[test]
+    fn party_award_lands_as_a_source_not_on_a_skill_row() {
+        let mut parser = Parser::default();
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 0,
+            amount: 35.0,
+            cause: Some(protocol::SbaGainCause::PartyAward),
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        assert_eq!(player.sba_sources.len(), 1);
+        assert_eq!(player.sba_sources[0].generated, 35.0);
+        assert!(
+            player
+                .skill_breakdown
+                .iter()
+                .all(|skill| skill.sba_generated == 0.0),
+            "no skill row absorbs a party award"
+        );
+    }
+
+    /// A gain stored before causes existed keeps its old meaning exactly.
+    #[test]
+    fn a_causeless_gain_is_read_as_the_hits_own_action() {
+        let mut parser = Parser::default();
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 1,
+            amount: 12.5,
+            cause: None,
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(1))
+            .expect("the causing skill's row");
+        assert_eq!(row.sba_generated, 12.5);
+        assert!(player.sba_sources.is_empty());
+    }
+
+    /// A link attack's gain lands on the link-attack row — the Normal-only
+    /// filter that used to drop it is gone, and the row memo is keyed by the
+    /// classified action, so nothing has to be flattened.
+    #[test]
+    fn a_link_attack_gain_lands_on_the_link_attack_row() {
+        let mut parser = Parser::default();
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        event.action_id = ActionType::LinkAttack;
+        parser.on_damage_event(event);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 0,
+            amount: 9.0,
+            cause: Some(protocol::SbaGainCause::Skill(ActionType::LinkAttack)),
+        });
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        let row = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::LinkAttack)
+            .expect("link attack row");
+        assert_eq!(row.sba_generated, 9.0);
+    }
+
+    /// A source arriving before ITS OWN player's row exists — the fight already
+    /// started off someone else's hit, say an ally bursting before this player
+    /// has swung — is HELD against the slot and folded in when the row appears,
+    /// rather than dropped.
+    ///
+    /// A source before the fight's FIRST hit is a different case and stays
+    /// dropped: the encounter reset on that hit wipes every pre-fight event,
+    /// including the gauge-poll rises the player TOTAL is built from, so
+    /// holding the source would explain gauge the total never counted and push
+    /// "% explained" past 100.
+    #[test]
+    fn a_source_arriving_before_the_player_row_is_held() {
+        let mut parser = Parser::default();
+
+        // An ally's hit starts the encounter; the gaining player hasn't swung.
+        let mut opener = a_damage_event();
+        opener.source.parent_index = 0xF000_0001;
+        parser.on_damage_event(opener);
+
+        parser.on_sba_gain(protocol::SbaGainEvent {
+            actor_index: 0xF000_0000,
+            action_id: 0,
+            amount: 100.0,
+            cause: Some(protocol::SbaGainCause::PartyAward),
+        });
+
+        let mut event = a_damage_event();
+        event.source.parent_index = 0xF000_0000;
+        parser.on_damage_event(event);
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0xF000_0000)
+            .expect("party row");
+        assert_eq!(
+            player.sba_sources.iter().map(|s| s.generated).sum::<f64>(),
+            100.0
+        );
     }
 
     /// Regression: the SBA chart walks the FULL event log, so it must size its
