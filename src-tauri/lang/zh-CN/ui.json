@@ -150,7 +150,7 @@
       "sba": "奥义",
       "sba-description": "实时奥义槽数值",
       "sba-generated": "增长",
-      "sba-generated-description": "累计生成的奥义槽",
+      "sba-generated-description": "累计获得的奥义槽数值",
       "total-stun-value": "昏厥",
       "total-stun-value-description": "总昏厥值",
       "stun-per-second": "昏厥/秒",
