@@ -1,0 +1,20 @@
+/* Deliberately invisible: no fill, no border, no hover state, and the default
+ * arrow cursor, so sweeping the mouse over it gives nothing away. It is meant to
+ * be used by people who already know it is there.
+ *
+ * `:focus-visible` is the one exception. It fires only for keyboard focus, never
+ * on click, so a Tab user is not stranded on a control they cannot see while a
+ * mouse user still sees nothing. */
+.view-mode-toggle {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  opacity: 0;
+  cursor: default;
+}
+
+.view-mode-toggle:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--mantine-color-blue-5);
+  outline-offset: 2px;
+}

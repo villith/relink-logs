@@ -427,7 +427,8 @@
         "label": "View mode",
         "analysis": "Analysis",
         "classic": "Classic",
-        "analysis-under-construction": "The analysis view is still being built on this branch."
+        "analysis-under-construction": "The analysis view is still being built on this branch.",
+        "toggle": "Toggle view mode"
       },
       "analysis-tab": "Analysis",
       "view-tablist-label": "View",

@@ -10,6 +10,7 @@ import { useShallow } from "zustand/react/shallow";
 import { characterIconUrl } from "@/characterIcon";
 import { emKeyOf, enemyAttackOrdinal } from "@/enemyAttackNames";
 import { enemyIconUrl } from "@/enemyIcon";
+import { ViewModeToggle } from "@/pages/logs/view/ViewModeToggle";
 import { statusClassName } from "@/statusClassName";
 import { statusIconUrl } from "@/statusIcon";
 import { EncounterStateResponse, useEncounterStore } from "@/stores/useEncounterStore";
@@ -1912,19 +1913,22 @@ export const AnalysisView = () => {
         value={pins.source}
         onChange={(source) => handlePinsChange({ ...pins, source })}
         trailing={
-          <MetricTabs
-            variant="inline"
-            ariaLabelKey="ui.logs.view-tablist-label"
-            tabs={VIEW_TABS}
-            value={onEvents ? EVENTS_TAB : TABLE_TAB}
-            onChange={(value) =>
-              // Leaving Events clears the param rather than storing "table":
-              // the table body is the default, and a default in the URL is
-              // noise. The metric the table was last on is untouched either
-              // way — it lives in the machine, not here.
-              setTab(value === EVENTS_TAB ? EVENTS_TAB : null)
-            }
-          />
+          <>
+            <ViewModeToggle />
+            <MetricTabs
+              variant="inline"
+              ariaLabelKey="ui.logs.view-tablist-label"
+              tabs={VIEW_TABS}
+              value={onEvents ? EVENTS_TAB : TABLE_TAB}
+              onChange={(value) =>
+                // Leaving Events clears the param rather than storing "table":
+                // the table body is the default, and a default in the URL is
+                // noise. The metric the table was last on is untouched either
+                // way — it lives in the machine, not here.
+                setTab(value === EVENTS_TAB ? EVENTS_TAB : null)
+              }
+            />
+          </>
         }
       />
 

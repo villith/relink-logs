@@ -34,6 +34,8 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { useParams } from "react-router-dom";
 
+import { ViewModeToggle } from "./ViewModeToggle";
+
 import { ColumnsPopover } from "@/components/ColumnsPopover";
 import { FlaggedGear, traitLine } from "@/components/FlaggedGear";
 import { LegalityMark, LegalityPlayerName } from "@/components/LegalityMark";
@@ -951,7 +953,8 @@ export const ClassicView = () => {
               {t("ui.back-btn")}
             </Button>
           </Box>
-          <Flex display="flex" flex={1} justify={"flex-end"}>
+          <Flex display="flex" flex={1} justify={"flex-end"} align="center" gap="xs">
+            <ViewModeToggle />
             <Menu shadow="md" trigger="hover" openDelay={100} closeDelay={400}>
               <Menu.Target>
                 <ActionIcon aria-label="Clipboard" variant="filled" color="light">

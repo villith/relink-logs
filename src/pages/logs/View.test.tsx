@@ -1,5 +1,5 @@
 import { MantineProvider } from "@mantine/core";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `t` returns the key, so assertions read against keys rather than English.
@@ -39,23 +39,22 @@ describe("ViewPage", () => {
     expect(screen.queryByText("analysis-body")).toBeNull();
   });
 
-  it("writes the choice back to the settings store", () => {
-    renderIt();
-
-    // Mantine's SegmentedControl is a radio group; the visible label is the
-    // radio's accessible name.
-    fireEvent.click(screen.getByRole("radio", { name: "ui.logs.view-mode.classic" }));
-
-    expect(useMeterSettingsStore.getState().logs_view_mode).toBe("classic");
-  });
-
-  /** The switch is the only writer. Rendering reads `logs_view_mode` and must
-   * never normalise or rewrite it, or a stored choice would be lost simply by
-   * opening a quest. */
+  /** `ViewModeToggle` is the only writer. Rendering reads `logs_view_mode` and
+   * must never normalise or rewrite it, or a stored choice would be lost simply
+   * by opening a quest. */
   it("does not overwrite the stored setting just by rendering", () => {
     useMeterSettingsStore.setState({ logs_view_mode: "analysis" });
     renderIt();
 
     expect(useMeterSettingsStore.getState().logs_view_mode).toBe("analysis");
+  });
+
+  /** The shell must not reserve a row for the switch any more — the toggle
+   * rides inside each body, beside that body's own top-right control. */
+  it("renders nothing but the chosen body", () => {
+    const { container } = renderIt();
+
+    expect(container.querySelector(".view-mode-toggle")).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 });
