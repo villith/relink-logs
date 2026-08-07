@@ -1,7 +1,7 @@
 import type { ChartWindow } from "@/types";
 
-import type { WireWindow } from "./auraWindows";
 import { winFilterParts } from "./machine/state";
+import type { WireWindow } from "./wireWindows";
 
 /** The battle windows a `win` filter value names, in start order. A stale
  * individual index (the log reparsed into fewer windows) selects NOTHING —
@@ -12,26 +12,6 @@ export const selectedChartWindows = (windows: ChartWindow[], win: string): Chart
   if (index === null) return ofKind;
   const one = ofKind[index];
   return one === undefined ? [] : [one];
-};
-
-/** The wire mask for the selected windows: clipped to the scrub window,
- * merged, `[fromMs, upToMs)`. Empty is a REAL mask (matches nothing) — the
- * same convention `auraWireWindows` follows. */
-export const windowFilterWireWindows = (
-  selected: ChartWindow[],
-  window: { startMs: number; endMs: number }
-): WireWindow[] => {
-  const clipped = selected
-    .filter((span) => span.startMs < window.endMs && span.endMs > window.startMs)
-    .map((span) => ({ fromMs: Math.max(span.startMs, window.startMs), upToMs: Math.min(span.endMs, window.endMs) }))
-    .sort((a, b) => a.fromMs - b.fromMs);
-  const merged: WireWindow[] = [];
-  for (const span of clipped) {
-    const last = merged[merged.length - 1];
-    if (last && span.fromMs <= last.upToMs) last.upToMs = Math.max(last.upToMs, span.upToMs);
-    else merged.push({ ...span });
-  }
-  return merged;
 };
 
 /** The scrub range (inclusive bucket indexes) covering the selected windows'
