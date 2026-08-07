@@ -1,3 +1,5 @@
+import i18n from "i18next";
+import { useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
@@ -81,37 +83,50 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
     }))
   );
 
-  const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
-  const computedSkills = player.skillBreakdown.map<ComputedSkillState>((skill) => {
-    return {
-      // Guard the denominator: a stun-only breakdown (e.g. Perfect Guard before
-      // any damage) would otherwise divide 0 by 0 and render "NaN%".
-      percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
-      groupName: getSkillName(player.characterType, skill),
-      ...skill,
-    };
-  });
+  // Keyed, not recomputed per render: the overlay re-renders on its own 500ms
+  // clock as well as on every encounter update, and this runs once per open
+  // row. The grouping fold scans the rows built so far for each skill, so
+  // repeating it is quadratic work for a result that did not change.
+  //
+  // `i18n.language` is a key because `getSkillName` resolves through i18next:
+  // without it a language switch would leave the old names on screen until the
+  // player's damage next changed.
+  const skills = useMemo<Array<ComputedSkillGroup | ComputedSkillState>>(() => {
+    const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
+    const computedSkills = player.skillBreakdown.map<ComputedSkillState>((skill) => {
+      return {
+        // Guard the denominator: a stun-only breakdown (e.g. Perfect Guard before
+        // any damage) would otherwise divide 0 by 0 and render "NaN%".
+        percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
+        groupName: getSkillName(player.characterType, skill),
+        ...skill,
+      };
+    });
 
-  let skillsToShow: Array<ComputedSkillGroup | ComputedSkillState> = computedSkills;
+    let skillsToShow: Array<ComputedSkillGroup | ComputedSkillState> = computedSkills;
 
-  if (useCondensedSkills && typeof player.characterType == "string") {
-    const skills: Array<ComputedSkillGroup | ComputedSkillGroup> = [];
+    if (useCondensedSkills && typeof player.characterType == "string") {
+      const grouped: Array<ComputedSkillGroup | ComputedSkillGroup> = [];
 
-    for (const skill of computedSkills) {
-      // The rule itself lives in skillGrouping.ts, shared with the analysis
-      // view's stacked chart so a band and a row group the same way.
-      const key = skillGroupFor(skill);
+      for (const skill of computedSkills) {
+        // The rule itself lives in skillGrouping.ts, shared with the analysis
+        // view's stacked chart so a band and a row group the same way.
+        const key = skillGroupFor(skill);
 
-      if (key === null) skills.push(skill);
-      else upsertGroup(skills, key.group, skill, key.childCharacterType);
+        if (key === null) grouped.push(skill);
+        else upsertGroup(grouped, key.group, skill, key.childCharacterType);
+      }
+
+      skillsToShow = grouped;
     }
 
-    skillsToShow = skills;
-  }
+    // Safe to sort in place: both branches above produced a fresh array.
+    skillsToShow.sort((a, b) => b.totalDamage - a.totalDamage);
 
-  skillsToShow.sort((a, b) => b.totalDamage - a.totalDamage);
+    return skillsToShow;
+  }, [player, useCondensedSkills, i18n.language]);
 
   return {
-    skills: skillsToShow,
+    skills,
   };
 };

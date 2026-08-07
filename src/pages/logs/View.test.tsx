@@ -1,6 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // `t` returns the key, so assertions read against keys rather than English.
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -26,48 +26,6 @@ describe("ViewPage", () => {
     useMeterSettingsStore.setState({ logs_view_mode: "analysis" });
   });
 
-  /**
-   * THE SHIPPING GATE. The Analysis view is unfinished, so a release build must
-   * not offer it at all.
-   *
-   * Hiding the switch is not enough on its own: `logs_view_mode` defaults to
-   * "analysis" and is PERSISTED, so anyone who has already opened a quest on a
-   * dev build carries that setting into the release and would be stranded on
-   * the half-built view with no control left to escape it. The release ignores
-   * the setting outright rather than defaulting it.
-   *
-   * Vitest runs with `DEV` true, so every other test in this file is the
-   * dev-mode behaviour and this block is the only one that has to say so.
-   */
-  describe("in a release build", () => {
-    beforeEach(() => {
-      vi.stubEnv("DEV", false);
-    });
-    afterEach(() => {
-      vi.unstubAllEnvs();
-    });
-
-    it("shows the classic view even when the stored setting says analysis", () => {
-      useMeterSettingsStore.setState({ logs_view_mode: "analysis" });
-      renderIt();
-
-      expect(screen.getByText("classic-body")).toBeTruthy();
-      expect(screen.queryByText("analysis-body")).toBeNull();
-    });
-
-    it("offers no way to switch views", () => {
-      renderIt();
-      expect(screen.queryByRole("radio")).toBeNull();
-    });
-
-    /** The setting is left ALONE rather than rewritten to "classic": a dev who
-     * flips back to a dev build should find their own choice still there. */
-    it("does not overwrite the stored setting", () => {
-      renderIt();
-      expect(useMeterSettingsStore.getState().logs_view_mode).toBe("analysis");
-    });
-  });
-
   it("renders the analysis view by default", () => {
     renderIt();
     expect(screen.getByText("analysis-body")).toBeTruthy();
@@ -89,5 +47,15 @@ describe("ViewPage", () => {
     fireEvent.click(screen.getByRole("radio", { name: "ui.logs.view-mode.classic" }));
 
     expect(useMeterSettingsStore.getState().logs_view_mode).toBe("classic");
+  });
+
+  /** The switch is the only writer. Rendering reads `logs_view_mode` and must
+   * never normalise or rewrite it, or a stored choice would be lost simply by
+   * opening a quest. */
+  it("does not overwrite the stored setting just by rendering", () => {
+    useMeterSettingsStore.setState({ logs_view_mode: "analysis" });
+    renderIt();
+
+    expect(useMeterSettingsStore.getState().logs_view_mode).toBe("analysis");
   });
 });

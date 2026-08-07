@@ -11,17 +11,13 @@ import { ClassicView } from "./view/ClassicView";
  * fetching, because their filter shapes differ (see the plan's "classic view
  * stays" rules).
  *
- * THE ANALYSIS VIEW IS DEV-ONLY for now: it is unfinished, so a release build
- * shows Classic and offers no switch. Everything below the guard is what the
- * page will be again once Analysis ships — deleting the guard is the whole
- * change.
- *
- * The guard IGNORES `logs_view_mode` rather than defaulting it. The setting is
- * persisted and already defaults to "analysis", so anyone who has opened a
- * quest on a dev build carries that value into the release; merely hiding the
- * switch would strand them on the half-built view with no control left to
- * escape it. The stored value is left untouched, so a dev build still finds the
- * choice its owner made. */
+ * Analysis is still unfinished but is offered in every build (cd06c00f removed
+ * the `import.meta.env.DEV` guard that used to force Classic outside dev). What
+ * makes that safe is the switch below rendering unconditionally: `logs_view_mode`
+ * is persisted and defaults to "analysis", so the guard's real job was to stop
+ * someone being stranded on the half-built view with no control to escape it.
+ * A visible switch answers that on its own — so if this ever goes back behind a
+ * guard, the switch must not be hidden without also ignoring the stored value. */
 export const ViewPage = () => {
   const { t } = useTranslation();
   const mode = useMeterSettingsStore((state) => state.logs_view_mode);

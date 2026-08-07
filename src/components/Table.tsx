@@ -51,28 +51,36 @@ export const Table = ({
       }))
     );
 
-  const partyOrderPlayers = formatInPartyOrder(encounterState.party);
-  let players: Array<ComputedPlayerState> = partyOrderPlayers.map((playerData) => {
-    return {
+  // Ordering, sorting and filtering the party is one derivation, so it is
+  // memoized as one. It used to run on every render, and the overlay re-renders
+  // on its own 500ms clock as well as on each encounter update. Holding the row
+  // objects stable between updates is also what lets `useSkillBreakdown` keep
+  // its own memo for an expanded row, instead of being handed a new player
+  // object every time the clock ticked.
+  const { players, maxPercentage } = useMemo(() => {
+    const ordered: Array<ComputedPlayerState> = formatInPartyOrder(encounterState.party).map((playerData) => ({
       ...playerData,
       percentage: (playerData.totalDamage / encounterState.totalDamage) * 100,
+    }));
+
+    // Sort players by the selected sort type and direction
+    sortPlayers(ordered, sortType, sortDirection);
+
+    const visible = ordered.filter((player) => {
+      const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
+
+      // If streamer mode is ON, then only show the first party slot (the streamer's character)
+      // Otherwise, show all players.
+      return streamerMode ? partySlotIndex === 0 : true;
+    });
+
+    return {
+      players: visible,
+      // Taken AFTER the streamer-mode filter: with only the streamer's own row
+      // on screen, a relative bar that always reads 100% is the intended result.
+      maxPercentage: visible.reduce((max, player) => Math.max(max, player.percentage || 0), 0),
     };
-  });
-
-  // Sort players by the selected sort type and direction
-  sortPlayers(players, sortType, sortDirection);
-
-  players = players.filter((player) => {
-    const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-
-    // If streamer mode is ON, then only show the first party slot (the streamer's character)
-    // Otherwise, show all players.
-    return streamerMode ? partySlotIndex === 0 : true;
-  });
-
-  // Taken AFTER the streamer-mode filter: with only the streamer's own row on
-  // screen, a relative bar that always reads 100% is the intended result.
-  const maxPercentage = players.reduce((max, player) => Math.max(max, player.percentage || 0), 0);
+  }, [encounterState.party, encounterState.totalDamage, partyData, sortType, sortDirection, streamerMode]);
 
   // Encounter duration in seconds — the same span (last damage − first damage)
   // the parser divides by for player.stunPerSecond, so per-skill SPS stays

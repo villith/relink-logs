@@ -65,6 +65,36 @@ const breakdown = (skills: SkillState[], condensed = true) => {
   return renderHook(() => useSkillBreakdown(player(skills))).result.current.skills;
 };
 
+describe("useSkillBreakdown recomputation", () => {
+  // The overlay re-renders on a 500ms clock as well as on encounter events, so
+  // this hook runs for every open row on renders where nothing it reads has
+  // changed. The grouping fold is a linear scan per skill (O(skills^2)), which
+  // is why it must be keyed rather than repeated.
+  it("returns the same rows when re-rendered with an unchanged player", () => {
+    useMeterSettingsStore.setState({ use_condensed_skills: true });
+    const subject = player([skill({ totalDamage: 100 })]);
+
+    const { result, rerender } = renderHook(() => useSkillBreakdown(subject));
+    const first = result.current.skills;
+    rerender();
+
+    expect(result.current.skills).toBe(first);
+  });
+
+  it("recomputes when the player's breakdown changes", () => {
+    useMeterSettingsStore.setState({ use_condensed_skills: true });
+    let subject = player([skill({ totalDamage: 100 })]);
+
+    const { result, rerender } = renderHook(() => useSkillBreakdown(subject));
+    const first = result.current.skills;
+    subject = player([skill({ totalDamage: 250 })]);
+    rerender();
+
+    expect(result.current.skills).not.toBe(first);
+    expect(result.current.skills[0].totalDamage).toBe(250);
+  });
+});
+
 describe("useSkillBreakdown Primal Burst grouping", () => {
   const primalBurst = (bodyHash: number, totalDamage: number) =>
     skill({ childCharacterType: { Unknown: bodyHash }, totalDamage, hits: 2 });
