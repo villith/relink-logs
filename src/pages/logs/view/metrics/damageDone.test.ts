@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import type { ComputedPlayerState, EnemyType, SkillTargetState } from "@/types";
+import type { ComputedPlayerState, EnemyType, SkillState, SkillTargetState } from "@/types";
 
+import { groupSkillsForRows, rowKeyingFor } from "../abilitySkills";
 import type { SelectorPins } from "../selectorOptions";
-import { damageDone, parseEnemyRow } from "./damageDone";
+import { abilityRows, damageDone, parseEnemyRow } from "./damageDone";
 import type { MetricRow } from "./types";
 
 /** A per-enemy entry of a skill's breakdown, as the parser ships it. */
@@ -583,5 +584,49 @@ describe("damageDone.children — party-wide per-source split", () => {
 
   it("returns a lone user as a single child — the table hides the chevron below two", () => {
     expect(childrenOf("skill:Normal:9002", party)).toHaveLength(1);
+  });
+});
+
+describe("abilityRows — supplementary collapse", () => {
+  const breakdown = [
+    {
+      actionType: { Normal: 100 },
+      childCharacterType: "Pl1900",
+      totalDamage: 1000,
+      hits: 4,
+      minDamage: 200,
+      maxDamage: 300,
+    },
+    {
+      actionType: { SupplementaryDamage: 100 },
+      childCharacterType: "Pl1900",
+      totalDamage: 300,
+      hits: 3,
+      minDamage: 90,
+      maxDamage: 110,
+    },
+  ] as unknown as SkillState[];
+
+  it("adds the echo's damage and hits to its cause, and reports the split", () => {
+    const rows = abilityRows(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, true)), 1300, 0, true);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].value).toBe(1300);
+    expect(rows[0].subValue).toBe(300);
+    // hits column is index 1 — direct 4 plus echo 3.
+    expect(rows[0].columns[1]).toBe("7");
+  });
+
+  it("leaves min and max reporting direct hits only", () => {
+    const rows = abilityRows(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, true)), 1300, 0, true);
+    // An echo is a different damage source; folding it in would make the
+    // skill's "min hit" read as a 90-damage echo tick.
+    expect(rows[0].columns[2]).toBe("200");
+    expect(rows[0].columns[3]).toBe("300");
+  });
+
+  it("keeps the echo as its own row without collapsing", () => {
+    const rows = abilityRows(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, false)), 1300, 0, true);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.subValue === undefined)).toBe(true);
   });
 });

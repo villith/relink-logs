@@ -1,5 +1,6 @@
 import type { ComputedPlayerState, EncounterState, PlayerData, SkillState, StatusInterval } from "@/types";
 
+import type { RowKeying } from "../abilitySkills";
 import type { SelectorPins } from "../selectorOptions";
 
 /** What a row represents at the current pin state — the legacy descriptors'
@@ -161,6 +162,11 @@ export type MetricDescriptor = {
     /** Which side's holders the status descriptors select. Absent, each tab
      * uses its natural side: Buffs → friendly, Debuffs → enemy. */
     hostility?: Hostility;
+    /** How the view keys its rows — today, whether echo damage rides the skill
+     * that caused it. Passed in rather than rebuilt per descriptor: the table,
+     * the chart and the timeline must agree about which row an echo is on, and
+     * deriving it three times is how they would come to differ. */
+    keying?: RowKeying;
   }) => MetricRow[];
   /** Child rows behind ONE row at the current level, or null where it has
    * none — the table's in-place nesting. Party-wide ability rows split per

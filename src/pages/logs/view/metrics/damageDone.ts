@@ -1,5 +1,5 @@
 import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
-import { humanizeNumber, ratePerSecond, share } from "@/utils";
+import { humanizeNumber, isSupplementaryAction, ratePerSecond, share } from "@/utils";
 
 import { groupSkillsForRows, mergeSkillsByAction, skillsForAbilityKey, type AbilitySkills } from "../abilitySkills";
 import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
@@ -48,25 +48,51 @@ export const playersColumns = (amount: number, total: number, fightDurationMs?: 
   share(amount, total),
 ];
 
-/** Rows for a set of ability (or member-skill) groups. */
-const abilityRows = (groups: AbilitySkills[], total: number, colorSlot: number, pinnable: boolean): MetricRow[] =>
+/** Rows for a set of ability (or member-skill) groups.
+ *
+ * With the collapse on, a group holds its cause's breakdown rows AND the echo
+ * rows attributed to it, so damage and hits sum without a special case. Min and
+ * max stay over the DIRECT rows only: they are per-hit extremes of the named
+ * skill, and an echo is a different damage source — folding it in would make a
+ * skill's smallest hit read as an echo tick.
+ *
+ * Exported for its own tests; the descriptor below is its only other caller. */
+export const abilityRows = (
+  groups: AbilitySkills[],
+  total: number,
+  colorSlot: number,
+  pinnable: boolean
+): MetricRow[] =>
   groups
     .map(({ key, skills }) => {
       const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
       const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
+      const echoes = skills.filter((skill) => isSupplementaryAction(skill.actionType));
+      // Only a MIXED group has a split to report. A group that is entirely
+      // echoes — the echo row with the toggle off, or the residue row a collapse
+      // leaves behind — is echo all the way across, and painting the whole bar
+      // in the fainter shade says nothing its label does not already say.
+      const mixed = echoes.length > 0 && echoes.length < skills.length;
+      const supplementary = mixed ? echoes.reduce((sum, skill) => sum + skill.totalDamage, 0) : 0;
+      // Only the direct rows describe the skill's own per-hit extremes. An
+      // all-echo group has none, so it falls back to its own — which is what it
+      // is measuring.
+      const direct = mixed ? skills.filter((skill) => !echoes.includes(skill)) : skills;
       return {
         key: `skill:${key}`,
         label: key,
         value: damage,
+        // Absent rather than 0, so a row with no echoes mounts one segment.
+        ...(supplementary > 0 ? { subValue: supplementary } : {}),
         columns: damageColumns(
           damage,
           hits,
           extreme(
-            skills.map((skill) => skill.minDamage),
+            direct.map((skill) => skill.minDamage),
             (values) => Math.min(...values)
           ),
           extreme(
-            skills.map((skill) => skill.maxDamage),
+            direct.map((skill) => skill.maxDamage),
             (values) => Math.max(...values)
           ),
           total
@@ -228,7 +254,7 @@ export const damageDone: MetricDescriptor = {
     perTarget: true,
   },
 
-  rows: ({ players, level, pins, fightDurationMs, hostility }): MetricRow[] => {
+  rows: ({ players, level, pins, fightDurationMs, hostility, keying }): MetricRow[] => {
     // The enemy side answers one question at every level — what each enemy
     // dealt to the (scoped) party — so it ignores the drill level entirely
     // except for which column shape that answer takes.
@@ -265,7 +291,7 @@ export const damageDone: MetricDescriptor = {
     // One row is what the user pins, so a row must be one thing: a group where
     // the app groups, and otherwise one ability however many breakdown rows fed
     // it.
-    if (level === "abilities") return abilityRows(groupSkillsForRows(breakdown), total, colorSlot, true);
+    if (level === "abilities") return abilityRows(groupSkillsForRows(breakdown, keying), total, colorSlot, true);
 
     // The skills level is the same breakdown NOT condensed: the scoped fetch has
     // already narrowed the party to the pinned row's member actions, so folding
