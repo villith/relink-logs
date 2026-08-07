@@ -17,10 +17,10 @@ const ANY_CHILD = "*";
 
 /** The one key every supplementary-damage hit folds onto.
  *
- * The parser folds ALL echoes onto a single breakdown row whatever their payload
- * or body (`BreakdownKeying::first_supplementary`), so the row key must fold the
- * same way or the two disagree — a selector listing 24 entries that all read
- * "Supplementary Damage", each pinning a quarter of the row it names.
+ * The parser emits one breakdown row per echo PAYLOAD, so this is the only fold
+ * keeping the family together — without it the selector lists 24 entries that
+ * all read "Supplementary Damage", each pinning a slice of the row it appears to
+ * name.
  *
  * The payload is normalised to 0 rather than dropped so the key still parses:
  * `getSkillName` names every echo from the variant alone, so a canonical payload
@@ -30,6 +30,38 @@ const SUPPLEMENTARY_ROW: ActionType = { SupplementaryDamage: 0 };
 /** Whether an action is a supplementary-damage (echo) hit. */
 const isSupplementary = (actionType: ActionType): boolean =>
   typeof actionType === "object" && Object.hasOwn(actionType, "SupplementaryDamage");
+
+/** How rows are keyed for one view.
+ *
+ * Built once and passed down, so the table, the chart, the selector and the
+ * timeline cannot disagree about which row an echo belongs to. Absent means
+ * today's behaviour, which is what keeps every caller that does not care
+ * (`selectorOptions`, `abilityLabel`, `rowIcon`) unchanged. */
+export type RowKeying = {
+  collapseSupplementary: boolean;
+  /** The row key a cause id resolves to, or null when the party used no such
+   * action — which is what keeps an unattributable echo on the echo row. */
+  causeRow: (causeId: number) => string | null;
+};
+
+/** The keying for one view, from what the party actually used.
+ *
+ * Derived from the observed actions rather than a lookup table, for the same
+ * reason `actionsForPin` is: it cannot claim a cause nobody landed. */
+export const rowKeyingFor = (skills: SkillRow[], collapse: boolean): RowKeying => {
+  const byCause = new Map<number, string>();
+  if (collapse) {
+    for (const skill of skills) {
+      const action = skill.actionType;
+      if (typeof action !== "object" || !("Normal" in action)) continue;
+      byCause.set(action.Normal, abilityRowKey(skill));
+    }
+  }
+  return {
+    collapseSupplementary: collapse,
+    causeRow: (causeId) => byCause.get(causeId) ?? null,
+  };
+};
 
 /** The key identifying the ability row a skill belongs to.
  *
@@ -48,10 +80,16 @@ const isSupplementary = (actionType: ActionType): boolean =>
  *   damage split (the defect 68e148c fixed in the hover card).
  *
  * The result doubles as the `ability` pin, so it must stay URL-safe. */
-export const abilityRowKey = (skill: SkillRow): string => {
-  // Echoes fold first: they are never grouped, and every one of them is the
-  // same row (see `SUPPLEMENTARY_ROW`).
-  if (isSupplementary(skill.actionType)) return abilityKey(SUPPLEMENTARY_ROW);
+export const abilityRowKey = (skill: SkillRow, keying?: RowKeying): string => {
+  // Echoes fold first: ungrouped by nature, and without collapse keying every
+  // one of them is the same row (see `SUPPLEMENTARY_ROW`). With it, an echo
+  // rides the row of the skill that caused it — and falls back to the echo row
+  // when that cause names nothing the party used.
+  if (isSupplementary(skill.actionType)) {
+    if (keying?.collapseSupplementary !== true) return abilityKey(SUPPLEMENTARY_ROW);
+    const causeId = (skill.actionType as { SupplementaryDamage: number }).SupplementaryDamage;
+    return keying.causeRow(causeId) ?? abilityKey(SUPPLEMENTARY_ROW);
+  }
 
   const group = skillGroupFor(skill);
   if (group === null) return abilityKey(skill.actionType);

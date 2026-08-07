@@ -11,7 +11,7 @@ vi.mock("@/assets/skill-groups", () => ({
   },
 }));
 
-import type { SkillState } from "@/types";
+import type { SkillRow, SkillState } from "@/types";
 
 import { parseAbilityKey } from "./abilityKey";
 import {
@@ -20,6 +20,7 @@ import {
   childOfPin,
   groupSkillsForRows,
   mergeSkillsByAction,
+  rowKeyingFor,
   skillsForAbilityKey,
 } from "./abilitySkills";
 
@@ -161,11 +162,12 @@ describe("actionsForPin", () => {
 });
 
 describe("abilityRowKey — supplementary damage", () => {
-  /** The parser folds ALL echoes onto one row whatever their payload or body
-   * (`BreakdownKeying::first_supplementary`). The row key must fold the same
-   * way, or the ability selector lists one entry per payload — all of them
-   * reading "Supplementary Damage" and each pinning a slice of the single row
-   * they appear to name. */
+  /** The parser emits one breakdown row per echo payload, so this fold is the
+   * only thing keeping the whole family on one display row. Without it the
+   * ability selector lists one entry per payload — all of them reading
+   * "Supplementary Damage" and each pinning a slice of the row they appear to
+   * name. This block is also the toggle-OFF parity proof: adding collapse
+   * keying must leave every assertion here green. */
   it("folds every payload onto one row key", () => {
     const keys = [
       abilityRowKey(skill({ SupplementaryDamage: 0 })),
@@ -176,7 +178,7 @@ describe("abilityRowKey — supplementary damage", () => {
     expect(new Set(keys).size).toBe(1);
   });
 
-  it("folds across bodies too, since the parser's fold ignores the child", () => {
+  it("folds across bodies too, since an echo belongs to no body class", () => {
     expect(abilityRowKey(skill({ SupplementaryDamage: 1 }, "Pl1900"))).toBe(
       abilityRowKey(skill({ SupplementaryDamage: 7 }, "Pl2000"))
     );
@@ -190,6 +192,35 @@ describe("abilityRowKey — supplementary damage", () => {
 
   it("does not fold anything else onto the echo row", () => {
     expect(abilityRowKey(skill({ DamageOverTime: 0 }))).not.toBe(abilityRowKey(skill({ SupplementaryDamage: 0 })));
+  });
+});
+
+describe("abilityRowKey — collapse keying", () => {
+  const skills: SkillRow[] = [
+    { actionType: { Normal: 100 }, childCharacterType: "Pl1900" },
+    { actionType: { SupplementaryDamage: 100 }, childCharacterType: "Pl1900" },
+    { actionType: { SupplementaryDamage: 999 }, childCharacterType: "Pl1900" },
+  ];
+
+  it("keeps every echo on the echo row without keying", () => {
+    const keying = rowKeyingFor(skills, false);
+    expect(abilityRowKey(skills[1], keying)).toBe(abilityRowKey(skills[2], keying));
+    expect(abilityRowKey(skills[1], keying)).not.toBe(abilityRowKey(skills[0], keying));
+  });
+
+  it("puts an echo on its causing skill's row when collapsing", () => {
+    const keying = rowKeyingFor(skills, true);
+    expect(abilityRowKey(skills[1], keying)).toBe(abilityRowKey(skills[0], keying));
+  });
+
+  it("keeps an echo whose cause the party never used on the echo row", () => {
+    const keying = rowKeyingFor(skills, true);
+    // 999 names no action in `skills`, so there is no row to move it to.
+    expect(abilityRowKey(skills[2], keying)).toBe(abilityRowKey(skills[2], rowKeyingFor(skills, false)));
+  });
+
+  it("is unchanged from the no-keying behaviour when keying is absent", () => {
+    expect(abilityRowKey(skills[1])).toBe(abilityRowKey(skills[1], rowKeyingFor(skills, false)));
   });
 });
 
