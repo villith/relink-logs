@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { EventRow } from "../events/eventRows";
 import type { MetricRow } from "../metrics/types";
 
+import type { SkillRow } from "@/types";
+
+import { abilityRowKey, rowKeyingFor } from "../abilitySkills";
+
 import { laneMatcherFor, type LaneMatchContext } from "./laneMatch";
 
 const event = (over: Partial<EventRow>): EventRow => ({
@@ -48,6 +52,30 @@ describe("laneMatcherFor", () => {
       const rows = [metricRow({ key: "skill:Normal:100", label: "Normal:100", kind: "ability" })];
       const matcher = laneMatcherFor(rows, CTX);
       expect(matcher.laneOf(event({ abilityKey: "Normal:100" }))).toBe("skill:Normal:100");
+    });
+
+    // 9001 is deliberately an id no shipped skill group claims, so the row key
+    // is the raw action and these cases turn only on the collapse keying.
+    const ECHO_AND_CAUSE: SkillRow[] = [
+      { actionType: { Normal: 9001 }, childCharacterType: "Pl1900" },
+      { actionType: { SupplementaryDamage: 9001 }, childCharacterType: "Pl1900" },
+    ];
+
+    /** The cause's lane, keyed exactly as the table would key it. */
+    const causeLane = (keying: ReturnType<typeof rowKeyingFor>) => {
+      const rowKey = abilityRowKey(ECHO_AND_CAUSE[0], keying);
+      const rows = [metricRow({ key: `skill:${rowKey}`, label: rowKey, kind: "ability" })];
+      return { rows, matcher: laneMatcherFor(rows, { ...CTX, everySkill: ECHO_AND_CAUSE, keying }) };
+    };
+
+    it("puts an echo on its cause's lane when collapsing", () => {
+      const { rows, matcher } = causeLane(rowKeyingFor(ECHO_AND_CAUSE, true));
+      expect(matcher.laneOf(event({ abilityKey: "SupplementaryDamage:9001" }))).toBe(rows[0].key);
+    });
+
+    it("leaves an echo off the cause's lane without collapsing", () => {
+      const { matcher } = causeLane(rowKeyingFor(ECHO_AND_CAUSE, false));
+      expect(matcher.laneOf(event({ abilityKey: "SupplementaryDamage:9001" }))).toBeNull();
     });
 
     it("answers null for an action no lane expands to", () => {

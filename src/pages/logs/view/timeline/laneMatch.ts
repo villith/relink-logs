@@ -1,7 +1,7 @@
 import type { EnemyType, SkillRow } from "@/types";
 
 import { abilityKey } from "../abilityKey";
-import { actionsForPin } from "../abilitySkills";
+import { actionsForPin, type RowKeying } from "../abilitySkills";
 import { playerRowIndex, spawnRowSegment } from "../actorRowKey";
 import type { ActorSpace, EventRow } from "../events/eventRows";
 import { takenAttackRowParts } from "../metrics/damageTaken";
@@ -23,6 +23,10 @@ export type LaneMatchContext = {
   segmentAt: (index: number, atMs: number, space: ActorSpace) => number;
   /** The enemy TYPE at that index and moment, or null when it names no spawn. */
   enemyTypeAt: (index: number, atMs: number) => EnemyType | null;
+  /** The view's row keying. Passed rather than rebuilt: the lane join and the
+   * table must agree about which row an echo is on, and deriving it twice is
+   * how they would come to differ. */
+  keying?: RowKeying;
 };
 
 /** How a lane claims an event. */
@@ -58,9 +62,13 @@ export const laneMatcherFor = (rows: MetricRow[], ctx: LaneMatchContext): LaneMa
       // The pin expansion, reused verbatim: a folded group row claims every
       // raw action behind it. Spelling this join a second way is how a lane
       // and the pin made by clicking it would come to disagree.
+      //
+      // No echo logic of its own is needed here: `actionsForPin` selects
+      // through the collapse-aware `abilityRowKey`, so with the toggle on a
+      // cause row's expansion already carries its echoes' raw actions.
       const byAction = new Map<string, string>();
       for (const row of rows) {
-        for (const action of actionsForPin(row.label, ctx.everySkill)) {
+        for (const action of actionsForPin(row.label, ctx.everySkill, ctx.keying)) {
           byAction.set(abilityKey(action), row.key);
         }
       }

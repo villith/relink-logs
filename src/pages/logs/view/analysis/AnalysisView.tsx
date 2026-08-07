@@ -2123,6 +2123,7 @@ export const AnalysisView = () => {
           hostility={hostility}
           rows={shownRows}
           everySkill={everySkill}
+          keying={rowKeying}
           pins={eventPins}
           probes={eventProbes}
           window={statusWindow}

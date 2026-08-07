@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import type { EnemyType, SkillRow } from "@/types";
 
+import type { RowKeying } from "../abilitySkills";
 import type { CardAmount, CardSection } from "../analysis/HoverCard";
 import type { MetricKey } from "../analysis/machine/state";
 import type { ActorSpace, EventPins } from "../events/eventRows";
@@ -50,6 +51,10 @@ export type TimelineTabProps = {
   rows: MetricRow[];
   /** The view's `everySkill`, for expanding a folded ability row. */
   everySkill: SkillRow[];
+  /** The view's row keying — passed rather than rebuilt, so a lane and the
+   * table row above it cannot disagree about which row an echo is on. It also
+   * carries the collapse flag the cast fold clusters echoes by. */
+  keying?: RowKeying;
   pins: EventPins;
   probes: ScopeProbes;
   /** The committed window, in absolute fight milliseconds. */
@@ -86,6 +91,7 @@ export const TimelineTab = ({
   hostility,
   rows,
   everySkill,
+  keying,
   pins,
   probes,
   window,
@@ -122,11 +128,11 @@ export const TimelineTab = ({
   const domainMs = Math.max(0, window.endMs - window.startMs);
 
   const lanes = useMemo(() => {
-    const matcher = laneMatcherFor(rows, { everySkill, end: laneEndFor(metric), segmentAt, enemyTypeAt });
-    const byLane = marksByLane(shown, matcher, window);
+    const matcher = laneMatcherFor(rows, { everySkill, end: laneEndFor(metric), segmentAt, enemyTypeAt, keying });
+    const byLane = marksByLane(shown, matcher, window, keying?.collapseSupplementary ?? false);
     const gapMs = markGapMs({ widthPx: width, viewportMs: TIMELINE_VIEWPORT_MS, gapPx: MARK_GAP_PX });
     return lanesFor(rows, byLane, gapMs);
-  }, [rows, everySkill, metric, segmentAt, enemyTypeAt, shown, window, width]);
+  }, [rows, everySkill, keying, metric, segmentAt, enemyTypeAt, shown, window, width]);
 
   // The cap is the frontend's, not the log's. Said out loud for the same
   // reason the Events tab says it: a fight cut off at 50,000 events would
