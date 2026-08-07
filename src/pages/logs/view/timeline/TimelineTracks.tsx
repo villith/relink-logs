@@ -22,6 +22,13 @@ import { markCardSections } from "./markCard";
  * the labels do not collide. */
 const TICK_STEP_MS = 5000;
 
+/** Above this many hits a cast draws solid.
+ *
+ * Bounds the DOM as much as the eye: a busy lane in a six-minute fight would
+ * otherwise mount thousands of tick nodes, and ticks that close read as noise
+ * rather than as rhythm. */
+const MAX_CAST_TICKS = 40;
+
 /** A percentage, at the precision a sub-pixel position needs and no more —
  * `toFixed` keeps the DOM stable across renders where a raw float would not. */
 const percent = (value: number, of: number): string => (of === 0 ? "0%" : `${((value / of) * 100).toFixed(4)}%`);
@@ -110,7 +117,15 @@ export const TimelineTracks = ({
             start: millisecondsToPreciseElapsedFormat(startMs + mark.startMs),
             end: millisecondsToPreciseElapsedFormat(startMs + mark.endMs),
           });
-    const parts = [t("ui.logs.timeline-mark-hits", { count: mark.count }), when];
+    // A mark the DENSITY fold merged holds several casts, and calling that "N
+    // hits" would describe the wrong grouping — the bar the user is pointing at
+    // is several casts, not one long one.
+    const parts = [
+      mark.casts > 1
+        ? t("ui.logs.timeline-mark-casts", { count: mark.casts })
+        : t("ui.logs.timeline-mark-hits", { count: mark.count }),
+      when,
+    ];
     if (mark.amount !== null) parts.push(t("ui.logs.timeline-mark-amount", { amount: humanizeNumber(mark.amount) }));
     return parts.join(" · ");
   };
@@ -147,15 +162,34 @@ export const TimelineTracks = ({
     return lane.marks.map((mark) => {
       const key = `${mark.startMs}:${mark.endMs}`;
       const sections = cardAmount && markEntry ? markCardSections(mark, { color, entry: markEntry }) : [];
+      // A cast is a fold that MEANS something — several hits of one skill — so
+      // it draws as a bar with its hits ticked inside. A lone instant and a
+      // status row's real span both stay as they were.
+      const isCast = !lane.spans && mark.count > 1;
+      const spanMs = mark.endMs - mark.startMs;
       const markNode = (
         <Box
-          className={`timeline-mark ${lane.spans ? "timeline-mark-span" : "timeline-mark-instant"}`}
+          className={`timeline-mark ${lane.spans ? "timeline-mark-span" : "timeline-mark-instant"}${
+            isCast ? " timeline-mark-cast" : ""
+          }`}
           style={{
             left: percent(mark.startMs, domainMs),
-            width: percent(mark.endMs - mark.startMs, domainMs),
+            width: percent(spanMs, domainMs),
             backgroundColor: color,
           }}
-        />
+        >
+          {isCast &&
+            mark.count <= MAX_CAST_TICKS &&
+            spanMs > 0 &&
+            mark.hits.map((hit, index) => (
+              <Box
+                key={index}
+                data-testid="timeline-tick"
+                className={`timeline-tick${hit.echo ? " timeline-tick-echo" : ""}`}
+                style={{ left: percent(hit.atMs - mark.startMs, spanMs) }}
+              />
+            ))}
+        </Box>
       );
       return sections.length > 0 && cardAmount ? (
         <HoverCard key={key} sections={sections} {...cardAmount}>

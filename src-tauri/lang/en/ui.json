@@ -476,6 +476,8 @@
       "timeline-lane-pin": "Filter to {{name}}",
       "timeline-mark-hits": "{{count}} hit",
       "timeline-mark-hits_other": "{{count}} hits",
+      "timeline-mark-casts": "{{count}} cast",
+      "timeline-mark-casts_other": "{{count}} casts",
       "timeline-mark-at": "at {{time}}",
       "timeline-mark-span": "{{start}} – {{end}}",
       "timeline-mark-amount": "Total {{amount}}",

@@ -694,6 +694,29 @@
   opacity: 1;
 }
 
+/* A cast reads a touch softer than a lone hit, so the bar is legible as a
+ * CONTAINER for the ticks inside it rather than competing with them. */
+.timeline-mark-cast {
+  opacity: 0.9;
+}
+
+/* A cast's individual hits, drawn inside its bar so the group and its rhythm
+ * read at once. */
+.timeline-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--mantine-color-white);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* Echo hits, matching the fainter segment MetricBar draws in the table. */
+.timeline-tick-echo {
+  opacity: 0.25;
+}
+
 /* The axis, at the top of the tracks column and inside its horizontal scroller
  * so it pans with the marks. 22px INCLUDING its border — `.timeline-ruler-gap`
  * is the same 22px, which is what puts lane one at the same y in both columns. */

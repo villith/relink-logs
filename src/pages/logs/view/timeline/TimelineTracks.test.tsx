@@ -166,3 +166,41 @@ describe("TimelineTracks", () => {
     expect(screen.getByText("ui.logs.timeline-empty")).toBeTruthy();
   });
 });
+
+describe("cast ticks", () => {
+  /** One cast holding `hits` hits, every third of them an echo. */
+  const castLane = (hits: number): Lane => ({
+    row: metricRow({ key: "a", label: "A", value: 1, colorSlot: 0 }),
+    spans: false,
+    marks: [
+      {
+        startMs: 0,
+        endMs: 2_000,
+        count: hits,
+        amount: 100 * hits,
+        by: [{ key: "Normal:100", count: hits, amount: 100 * hits }],
+        hits: Array.from({ length: hits }, (_, index) => ({ atMs: index * 100, echo: index % 3 === 0 })),
+        casts: 1,
+        castKey: "damage|Normal:100",
+      },
+    ],
+  });
+
+  it("draws a tick per hit inside a cast", () => {
+    renderTracks([castLane(5)]);
+    expect(screen.getAllByTestId("timeline-tick")).toHaveLength(5);
+  });
+
+  it("marks an echo tick so it can read fainter", () => {
+    renderTracks([castLane(5)]);
+    const echoes = screen
+      .getAllByTestId("timeline-tick")
+      .filter((tick) => tick.className.includes("timeline-tick-echo"));
+    expect(echoes).toHaveLength(2);
+  });
+
+  it("draws a dense cast solid rather than as mush", () => {
+    renderTracks([castLane(60)]);
+    expect(screen.queryAllByTestId("timeline-tick")).toHaveLength(0);
+  });
+});
