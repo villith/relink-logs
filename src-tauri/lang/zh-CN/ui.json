@@ -740,7 +740,7 @@
         "summonBonusSource": "加成 ID 错误 — 仅限 {{allowed}}",
         "summonBonusSource-unnamed": "加成 ID 不合法",
         "summonBonusMagnitude": "最大值 {{allowed}}",
-        "summonPerfectCount": "{{observed}} 项完美召唤石",
+        "summonPerfectCount": "{{observed}} 颗完美召唤石",
         "masterTraitCount": "最多 {{allowed}} 个"
       },
       "violation": {
