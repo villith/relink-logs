@@ -224,6 +224,42 @@ describe("abilityRowKey — collapse keying", () => {
   });
 });
 
+describe("groupSkillsForRows — collapse keying", () => {
+  const breakdown = [
+    { actionType: { Normal: 100 }, childCharacterType: "Pl1900", totalDamage: 1000, hits: 4 },
+    { actionType: { SupplementaryDamage: 100 }, childCharacterType: "Pl1900", totalDamage: 300, hits: 3 },
+  ] as unknown as SkillState[];
+
+  it("keeps the echo as its own row without collapsing", () => {
+    expect(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, false))).toHaveLength(2);
+  });
+
+  it("folds the echo into its cause's row when collapsing", () => {
+    const rows = groupSkillsForRows(breakdown, rowKeyingFor(breakdown, true));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].skills).toHaveLength(2);
+  });
+});
+
+describe("actionsForPin — collapse keying", () => {
+  const breakdown: SkillRow[] = [
+    { actionType: { Normal: 100 }, childCharacterType: "Pl1900" },
+    { actionType: { SupplementaryDamage: 100 }, childCharacterType: "Pl1900" },
+  ];
+
+  it("expands a cause row to its echo's raw actions when collapsing", () => {
+    const keying = rowKeyingFor(breakdown, true);
+    const key = abilityRowKey(breakdown[0], keying);
+    expect(actionsForPin(key, breakdown, keying)).toEqual([{ Normal: 100 }, { SupplementaryDamage: 100 }]);
+  });
+
+  it("leaves the cause row naming only itself without collapsing", () => {
+    const keying = rowKeyingFor(breakdown, false);
+    const key = abilityRowKey(breakdown[0], keying);
+    expect(actionsForPin(key, breakdown, keying)).toEqual([{ Normal: 100 }]);
+  });
+});
+
 describe("childOfPin", () => {
   it("reads the child character out of a group pin", () => {
     expect(childOfPin('Group:normal-attack@"Pl0900"')).toBe("Pl0900");

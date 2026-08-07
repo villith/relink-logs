@@ -154,7 +154,8 @@ const foldBy = (skills: SkillState[], keyOf: (skill: SkillState) => string): Abi
   [...groupBy(skills, keyOf)].map(([key, grouped]) => ({ key, skills: grouped }));
 
 /** A player's `skillBreakdown` as ability rows, in first-seen order. */
-export const groupSkillsForRows = (skills: SkillState[]): AbilitySkills[] => foldBy(skills, abilityRowKey);
+export const groupSkillsForRows = (skills: SkillState[], keying?: RowKeying): AbilitySkills[] =>
+  foldBy(skills, (skill) => abilityRowKey(skill, keying));
 
 /** A breakdown as one row per ACTION, in first-seen order.
  *
@@ -173,8 +174,8 @@ export const mergeSkillsByAction = (skills: SkillState[]): AbilitySkills[] =>
  *
  * Prefer this over `find`: a single row is one contributor's share, so
  * explaining a row with it describes a fraction of what the row reports. */
-export const skillsForAbilityKey = <T extends SkillRow>(skills: T[], key: string): T[] =>
-  skills.filter((skill) => abilityRowKey(skill) === key);
+export const skillsForAbilityKey = <T extends SkillRow>(skills: T[], key: string, keying?: RowKeying): T[] =>
+  skills.filter((skill) => abilityRowKey(skill, keying) === key);
 
 /** The raw actions a pinned ability row stands for, for the backend's filter.
  *
@@ -184,17 +185,17 @@ export const skillsForAbilityKey = <T extends SkillRow>(skills: T[], key: string
  * the cases no table lookup could (Primal Burst's shared id, Ferry's remapped
  * pet actions).
  *
- * **Pass the breakdown rows AND the selection facts.** A breakdown row carries
- * only the payload the parser folded that row onto, so the echo row alone names
- * one `SupplementaryDamage(n)` out of the dozens behind it — filtering on that
- * reported a quarter of the row's damage as its whole. The facts carry every
- * distinct action, which is what makes the expansion complete.
+ * **Pass the breakdown rows AND the selection facts.** The echo ROW is a display
+ * fold over dozens of `SupplementaryDamage(n)` payloads and its key carries only
+ * the canonical one, so expanding the pin from the key alone filtered to that
+ * single payload and reported a quarter of the row's damage as its whole. The
+ * facts carry every distinct action, which is what makes the expansion complete.
  *
  * Falls back to the key's own action when nothing matches, because an empty list
  * reads as "every ability" at the backend and would silently drop the filter. */
-export const actionsForPin = (key: string, skills: SkillRow[]): ActionType[] => {
+export const actionsForPin = (key: string, skills: SkillRow[], keying?: RowKeying): ActionType[] => {
   const actions = new Map<string, ActionType>();
-  for (const skill of skillsForAbilityKey(skills, key)) {
+  for (const skill of skillsForAbilityKey(skills, key, keying)) {
     actions.set(abilityKey(skill.actionType), skill.actionType);
   }
   if (actions.size > 0) return [...actions.values()];
