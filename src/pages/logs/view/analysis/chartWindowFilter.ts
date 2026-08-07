@@ -1,5 +1,7 @@
 import type { ChartWindow } from "@/types";
 
+import { clampToWindow, overlapsWindow } from "../spans";
+
 import { winFilterParts } from "./machine/state";
 import type { WireWindow } from "./wireWindows";
 
@@ -46,16 +48,19 @@ export const maskStatusIntervals = <T extends { startMs: number; endMs: number; 
   intervals: T[],
   mask: WireWindow[]
 ): T[] =>
-  mask.flatMap((span) =>
-    intervals
-      .filter((interval) => interval.startMs < span.upToMs && interval.endMs > span.fromMs)
+  mask.flatMap((span) => {
+    // Clipped one span at a time rather than through `clipSpans`, because the
+    // applications test needs the interval's ORIGINAL start: an interval
+    // starting exactly on the span's edge was applied inside it, and after
+    // clamping that is indistinguishable from one clipped down to the edge.
+    const window = { startMs: span.fromMs, endMs: span.upToMs };
+    return intervals
+      .filter((interval) => overlapsWindow(interval, window))
       .map((interval) => ({
-        ...interval,
-        startMs: Math.max(span.fromMs, interval.startMs),
-        endMs: Math.min(span.upToMs, interval.endMs),
-        applications: interval.startMs >= span.fromMs ? interval.applications : 0,
-      }))
-  );
+        ...clampToWindow(interval, window),
+        applications: interval.startMs >= window.startMs ? interval.applications : 0,
+      }));
+  });
 
 /** Time inside BOTH masks — the aura filter and the window filter compose by
  * intersection. Both inputs sorted and merged (what the two builders return). */

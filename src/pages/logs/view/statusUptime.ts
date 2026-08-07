@@ -1,5 +1,7 @@
 import type { StatusInterval } from "@/types";
 
+import { clipSpans, mergeSpans } from "./spans";
+
 /** Identity of a buff row: the effect, the ability that caused it, AND the
  * status class that applied it. Unresolved causes and classes collapse to one
  * "unknown" bucket per effect rather than scattering — the documented fallback
@@ -45,37 +47,13 @@ export const isStatusPin = (pin: string | null): pin is string => pin !== null &
  * table while the Buffs table beside them kept reporting the whole pull.
  *
  * Intervals only touching an edge are dropped: at zero width they contribute
- * nothing to uptime but would still draw a row. */
+ * nothing to uptime but would still draw a row — `overlapsWindow`'s rule. */
 export const clipToWindow = (intervals: StatusInterval[], startMs: number, endMs: number): StatusInterval[] =>
-  intervals
-    .filter((interval) => interval.startMs < endMs && interval.endMs > startMs)
-    .map((interval) => ({
-      ...interval,
-      startMs: Math.max(startMs, interval.startMs),
-      endMs: Math.min(endMs, interval.endMs),
-    }));
+  clipSpans(intervals, { startMs, endMs });
 
 /** Total milliseconds covered, merging overlaps.
  *
  * Two sources of one effect on one actor is 100% uptime, not 200% — summing
  * durations naively would report the latter. */
-export const uptimeMs = (intervals: StatusInterval[]): number => {
-  if (intervals.length === 0) return 0;
-
-  const sorted = [...intervals].sort((a, b) => a.startMs - b.startMs);
-  let total = 0;
-  let start = sorted[0].startMs;
-  let end = sorted[0].endMs;
-
-  for (const interval of sorted.slice(1)) {
-    if (interval.startMs <= end) {
-      end = Math.max(end, interval.endMs);
-      continue;
-    }
-    total += end - start;
-    start = interval.startMs;
-    end = interval.endMs;
-  }
-
-  return total + (end - start);
-};
+export const uptimeMs = (intervals: StatusInterval[]): number =>
+  mergeSpans(intervals).reduce((total, interval) => total + (interval.endMs - interval.startMs), 0);
