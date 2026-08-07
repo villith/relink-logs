@@ -735,7 +735,7 @@
         "sigilQuestLockedTrait": "仅限任务获取的特性",
         "sigilSingleTraitOnly": "第二特性",
         "overmasteryValue": "数值不合法",
-        "overmasteryAllMaxed": "3 条满值“昏厥值”上限突破",
+        "overmasteryAllMaxed": "上限突破中有 3 项最高数值的“昏厥值”",
         "summonTrait": "该召唤石无法获得此特性",
         "summonBonusSource": "加成 ID 错误 — 仅限 {{allowed}}",
         "summonBonusSource-unnamed": "加成 ID 不合法",
