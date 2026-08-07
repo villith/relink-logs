@@ -4651,6 +4651,57 @@ mod tests {
     }
 
     #[test]
+    fn echoes_keep_one_breakdown_row_per_causing_skill() {
+        // The frontend folds every echo onto one DISPLAY row (`abilityRowKey`),
+        // so the parser folding them too only destroyed the payload naming the
+        // cause — which is what the collapse toggle attributes by.
+        let mut parser = Parser::default();
+
+        let mut first = damage_from(PLAYER_HASH, 0, 500);
+        first.action_id = ActionType::SupplementaryDamage(100);
+        let mut second = damage_from(PLAYER_HASH, 0, 300);
+        second.action_id = ActionType::SupplementaryDamage(200);
+
+        parser
+            .encounter
+            .raw_event_log
+            .push((1_000, Message::DamageEvent(first)));
+        parser
+            .encounter
+            .raw_event_log
+            .push((2_000, Message::DamageEvent(second)));
+
+        parser.reparse();
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0)
+            .expect("the dealing player's row");
+
+        assert_eq!(
+            player.skill_breakdown.len(),
+            2,
+            "one row per distinct echo payload"
+        );
+
+        let mut rows: Vec<(ActionType, u64)> = player
+            .skill_breakdown
+            .iter()
+            .map(|skill| (skill.action_type, skill.total_damage))
+            .collect();
+        rows.sort();
+
+        assert_eq!(
+            rows,
+            vec![
+                (ActionType::SupplementaryDamage(100), 500),
+                (ActionType::SupplementaryDamage(200), 300),
+            ]
+        );
+    }
+
+    #[test]
     fn excluded_damage_stays_in_the_raw_event_log() {
         // The raw log is the source of truth, so flipping the setting and
         // reparsing must bring the excluded damage straight back.
