@@ -78,6 +78,24 @@ fn reset_encounter(state: State<ResetChannel>) {
     }
 }
 
+/// Sender half of the live parser's republish channel. Same shape and lifetime
+/// as [`ResetChannel`] — the parser is owned by the pipe-reading task, so a
+/// command reaches it through a channel rather than a lock.
+struct RepublishChannel(std::sync::Mutex<Option<tokio::sync::mpsc::UnboundedSender<()>>>);
+
+/// Asks the live parser to re-send the encounter, the party and its verdicts.
+///
+/// The party and legality events are only emitted when they actually change, so
+/// a meter that mounts mid-fight has already missed them. It calls this once on
+/// mount to catch up; a meter that mounts outside a fight simply gets the empty
+/// state it would have drawn anyway.
+#[tauri::command]
+fn request_live_republish(state: State<RepublishChannel>) {
+    if let Some(tx) = state.0.lock().unwrap().as_ref() {
+        let _ = tx.send(());
+    }
+}
+
 /// The meter's damage-source filters, shared between the settings UI and the
 /// live parser.
 ///
@@ -2489,6 +2507,9 @@ fn connect_and_run_parser(app: AppHandle) {
     let (filters_tx, mut filters_rx) = tokio::sync::mpsc::unbounded_channel::<v1::MeterFilters>();
     *app.state::<MeterFilterState>().tx.lock().unwrap() = Some(filters_tx);
 
+    let (republish_tx, mut republish_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+    *app.state::<RepublishChannel>().0.lock().unwrap() = Some(republish_tx);
+
     tauri::async_runtime::spawn(async move {
         #[cfg(windows)]
         let mut connect_failures: u32 = 0;
@@ -2524,6 +2545,14 @@ fn connect_and_run_parser(app: AppHandle) {
                     let decoder = tokio_util::codec::LengthDelimitedCodec::new();
                     let mut reader = FramedRead::new(stream, decoder);
 
+                    // Drives the trailing half of the `encounter-update`
+                    // throttle. Without it the update produced by the last hit
+                    // of a fight would be suppressed and never replaced, since
+                    // nothing else is coming to carry it.
+                    let mut flush_tick =
+                        tokio::time::interval(std::time::Duration::from_millis(50));
+                    flush_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
                     loop {
                         let msg = tokio::select! {
                             next = reader.next() => match next {
@@ -2531,6 +2560,14 @@ fn connect_and_run_parser(app: AppHandle) {
                                 // Pipe closed or read error: the game is gone.
                                 _ => break,
                             },
+                            _ = flush_tick.tick() => {
+                                state.flush_encounter_update();
+                                continue;
+                            }
+                            Some(()) = republish_rx.recv() => {
+                                state.republish_live_state();
+                                continue;
+                            }
                             Some(()) = reset_rx.recv() => {
                                 state.on_manual_reset();
                                 continue;
@@ -2954,6 +2991,7 @@ fn main() {
         .manage(ClickThrough(AtomicBool::new(false)))
         .manage(DebugMode(AtomicBool::new(false)))
         .manage(ResetChannel(std::sync::Mutex::new(None)))
+        .manage(RepublishChannel(std::sync::Mutex::new(None)))
         .manage(MeterFilterState::default())
         .manage(HookStatus::default())
         .manage(TrayLabels::default())
@@ -2985,6 +3023,7 @@ fn main() {
             export_damage_log_to_file,
             set_debug_mode,
             reset_encounter,
+            request_live_republish,
             set_meter_filters,
             fetch_synthesis_status,
             fetch_synthesis_seed,

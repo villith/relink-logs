@@ -26,6 +26,7 @@ mod cap_detection;
 mod chart_scope;
 mod filters;
 mod groups;
+mod live_emit;
 pub mod phantom_targets;
 mod player_state;
 mod skill_state;
@@ -2498,6 +2499,13 @@ pub struct Parser {
     /// the party actually changes — see [`Parser::insert_player_data`].
     #[serde(skip)]
     last_party_legality: [Vec<crate::legality::Finding>; 4],
+
+    /// Rate limiter for `encounter-update`. Fresh derived state is produced by
+    /// every hit, stun and SBA message; the overlay is told about it at 10Hz.
+    /// See [`live_emit`] for why, and for the trailing-flush contract that
+    /// keeps the last state of a fight from being the one that got suppressed.
+    #[serde(skip)]
+    encounter_update_throttle: live_emit::EmitThrottle,
 }
 
 impl Parser {
@@ -2507,6 +2515,63 @@ impl Parser {
             db: Some(db),
             window_handle: Some(window),
             ..Default::default()
+        }
+    }
+
+    /// Tells the overlay the encounter changed, at most 10× a second.
+    ///
+    /// Called from the message handlers, which run at the game's event rate.
+    /// A suppressed update is not lost: it is released by
+    /// [`flush_encounter_update`](Self::flush_encounter_update).
+    fn emit_encounter_update(&mut self) {
+        if self
+            .encounter_update_throttle
+            .admit(Utc::now().timestamp_millis())
+        {
+            self.write_encounter_update();
+        }
+    }
+
+    /// Releases an update the throttle held back. Driven by a timer on the pipe
+    /// loop rather than by game events, because the update worth showing most —
+    /// the one produced by the killing blow — is precisely the one that arrives
+    /// while the window is shut and is followed by no further events.
+    pub fn flush_encounter_update(&mut self) {
+        if self
+            .encounter_update_throttle
+            .flush_due(Utc::now().timestamp_millis())
+        {
+            self.write_encounter_update();
+        }
+    }
+
+    /// An encounter boundary (save, fail, manual reset). Emits immediately and
+    /// re-opens the throttle, so the first update of the next fight is not held
+    /// behind the last one of the previous.
+    fn publish_encounter_update_now(&mut self) {
+        self.encounter_update_throttle.reset();
+        self.encounter_update_throttle
+            .admit(Utc::now().timestamp_millis());
+        self.write_encounter_update();
+    }
+
+    /// Everything the overlay needs to draw itself from cold.
+    ///
+    /// The per-hit paths publish the party only when it changes, so a meter that
+    /// mounts or reloads mid-fight has missed those emits and would otherwise
+    /// draw four unnamed, uncoloured rows until the party next changed — which,
+    /// for a settled party, is never. The meter asks for this once on mount.
+    pub fn republish_live_state(&self) {
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
+            let _ = window.emit("encounter-party-update", &self.encounter.player_data);
+            let _ = window.emit("encounter-legality-update", &self.last_party_legality);
+        }
+    }
+
+    fn write_encounter_update(&self) {
+        if let Some(window) = &self.window_handle {
+            let _ = window.emit("encounter-update", &self.derived_state);
         }
     }
 
@@ -2970,9 +3035,7 @@ impl Parser {
                 }
             }
 
-            if let Some(window) = &self.window_handle {
-                let _ = window.emit("encounter-update", &self.derived_state);
-            }
+            self.publish_encounter_update_now();
         }
 
         // v2.0.2: the area-enter hook (the old between-quest wipe point) no longer
@@ -3019,9 +3082,7 @@ impl Parser {
         self.update_status(ParserStatus::Stopped);
         self.save_and_emit_encounter();
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.publish_encounter_update_now();
 
         // Same rationale as the quest boundaries: actor indices are reused across
         // sessions, so stale identities must die here (after the save above).
@@ -3050,9 +3111,7 @@ impl Parser {
             self.update_status(ParserStatus::Stopped);
             self.save_and_emit_encounter();
 
-            if let Some(window) = &self.window_handle {
-                let _ = window.emit("encounter-update", &self.derived_state);
-            }
+            self.publish_encounter_update_now();
         }
 
         // Same rationale as the quest-complete boundary: actor indices are reused
@@ -3112,9 +3171,7 @@ impl Parser {
         // ON enemies and must never see it.
         if is_damage_taken_event(&event) {
             self.derived_state.process_damage_taken_event(&event);
-            if let Some(window) = &self.window_handle {
-                let _ = window.emit("encounter-update", &self.derived_state);
-            }
+            self.emit_encounter_update();
             return;
         }
 
@@ -3151,9 +3208,7 @@ impl Parser {
         self.derived_state
             .process_damage_event(now, &damage_instance);
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.emit_encounter_update();
     }
 
     pub fn on_player_load_event(&mut self, event: PlayerLoadEvent) {
@@ -3354,25 +3409,28 @@ impl Parser {
         };
         // The identity path publishes on EVERY damage hit (`hooks/damage.rs`
         // sends a `PlayerIdentityEvent` for each hit's source actor), so this
-        // runs at combat rate, not once per equipment snapshot.
+        // runs at combat rate, not once per equipment snapshot. A settled party
+        // is identical on all of them, so both the audit and the two emits are
+        // gated on a real change.
         //
-        // What that made expensive was the AUDIT, not the emit: `party_legality`
-        // rebuilds four `LegalityInputs` (each cloning a whole equipment set)
-        // and runs every rule over them. That is gated on a real change here.
+        // The emits used to be ungated, to guarantee that a meter mounting
+        // mid-fight learned the party at all — `useMeter` had no fetch for it.
+        // That guarantee now comes from [`Parser::republish_live_state`], which
+        // the meter asks for once on mount, instead of from re-serialising four
+        // whole equipment sets on every hit for the life of the quest.
         //
-        // The two emits are NOT gated. They are the frontend's only source for
-        // the party — `useMeter` holds no fetch for it — so a meter that mounts
-        // or reloads mid-fight would otherwise draw four unnamed, uncoloured
-        // rows for the rest of the quest, a settled party never changing again.
-        // Note the guard is a derived `PartialEq` over structs holding `f32`
-        // read from game memory: one NaN makes it compare unequal forever, so
-        // it must only ever cost work, never correctness.
-        if slot.as_ref() != Some(&player_data) {
-            *slot = Some(player_data);
-            // A live fight has no stored row to read verdicts from, so the
-            // meter's colouring is derived here.
-            self.last_party_legality = self.party_legality();
+        // [`live_emit::snapshot_changed`] rather than `!=` because the payload
+        // holds `f32`s read from game memory: NaN is never equal to itself, so
+        // a derived comparison would report a change on every hit forever and
+        // quietly restore the cost this gate exists to remove.
+        if !live_emit::snapshot_changed(slot.as_ref(), &player_data) {
+            return;
         }
+
+        *slot = Some(player_data);
+        // A live fight has no stored row to read verdicts from, so the meter's
+        // colouring is derived here.
+        self.last_party_legality = self.party_legality();
 
         if let Some(window) = &self.window_handle {
             let _ = window.emit("encounter-party-update", &self.encounter.player_data);
@@ -3402,9 +3460,7 @@ impl Parser {
         self.derived_state
             .process_stun_message(now, event.actor_index, event.stun_amount as f64);
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.emit_encounter_update();
     }
 
     /// Handles one Perfect Guard stun capture (source-side accumulator delta on
@@ -3423,9 +3479,7 @@ impl Parser {
             event.stun_amount as f64,
         );
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.emit_encounter_update();
     }
 
     /// Handles one non-guard stun-effect proc (Eugen's sticky grenade): a
@@ -3444,9 +3498,7 @@ impl Parser {
             event.stun_amount as f64,
         );
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.emit_encounter_update();
     }
 
     /// Records one status effect landing on an actor.
@@ -3527,9 +3579,7 @@ impl Parser {
         self.derived_state
             .process_perfect_guard_quickening(&self.encounter.player_data, event.actor_index);
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.emit_encounter_update();
     }
 
     /// Handles setting the SBA gauge value for a player
@@ -3545,9 +3595,7 @@ impl Parser {
             event.sba_added as f64,
         );
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.emit_encounter_update();
     }
 
     /// Handles one attributed SBA gain (local player only — see `SbaGainEvent`).
@@ -3574,9 +3622,7 @@ impl Parser {
         self.derived_state
             .process_sba_gain(event.actor_index, cause, event.amount as f64);
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.emit_encounter_update();
     }
 
     pub fn on_sba_attempt(&mut self, event: OnAttemptSBAEvent) {
@@ -3588,9 +3634,7 @@ impl Parser {
         self.derived_state
             .process_sba_level(event.actor_index, 800.0);
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.emit_encounter_update();
     }
 
     pub fn on_sba_perform(&mut self, event: OnPerformSBAEvent) {
@@ -3601,9 +3645,7 @@ impl Parser {
 
         self.derived_state.process_sba_level(event.actor_index, 0.0);
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.emit_encounter_update();
     }
 
     /// @TODO(false): Note that this event only fires for the local player.
@@ -3615,9 +3657,7 @@ impl Parser {
 
         self.derived_state.process_sba_level(event.actor_index, 0.0);
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.emit_encounter_update();
     }
 
     pub fn on_death_event(&mut self, event: OnDeathEvent) {
@@ -3633,9 +3673,7 @@ impl Parser {
         self.reset();
         self.update_status(ParserStatus::Stopped);
 
-        if let Some(window) = &self.window_handle {
-            let _ = window.emit("encounter-update", &self.derived_state);
-        }
+        self.publish_encounter_update_now();
     }
 
     fn reset(&mut self) {

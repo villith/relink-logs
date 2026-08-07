@@ -10,6 +10,7 @@ import {
   SortType,
 } from "@/types";
 import { usePrevious } from "@mantine/hooks";
+import { invoke } from "@tauri-apps/api";
 import { listen } from "@tauri-apps/api/event";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -111,17 +112,35 @@ export default function useMeter() {
         : toast.success(tRef.current("ui.on-clickthrough-disabled"));
     });
 
+    const registrations = [
+      encounterUpdateListener,
+      encounterSavedListener,
+      encounterSavedErrorListener,
+      onAreaEnterListener,
+      onPartyUpdate,
+      onLegalityUpdate,
+      onSuccessAlert,
+      onErrorAlert,
+      onPinned,
+      onClickthrough,
+    ];
+
+    // The backend publishes the party and its verdicts only when they change,
+    // so mounting mid-fight means having missed them — and a settled party
+    // never changes again, so nothing would arrive for the rest of the quest.
+    // Asking once here is what replaces the old per-hit broadcast.
+    //
+    // Awaited, not fired alongside: `listen` registers the handler when its
+    // promise resolves, so asking any sooner races the reply against our own
+    // registration, and losing that race is the blank meter this prevents.
+    void Promise.all(registrations)
+      .then(() => invoke("request_live_republish"))
+      .catch(() => {
+        // No backend to answer (no game yet) — the next real change still lands.
+      });
+
     return () => {
-      encounterUpdateListener.then((f) => f());
-      encounterSavedListener.then((f) => f());
-      encounterSavedErrorListener.then((f) => f());
-      onAreaEnterListener.then((f) => f());
-      onPartyUpdate.then((f) => f());
-      onLegalityUpdate.then((f) => f());
-      onSuccessAlert.then((f) => f());
-      onErrorAlert.then((f) => f());
-      onPinned.then((f) => f());
-      onClickthrough.then((f) => f());
+      registrations.forEach((registration) => registration.then((unlisten) => unlisten()));
     };
     // Deliberately NOT keyed on partyData: none of these handlers read it, the
     // backend re-emits `encounter-party-update` on every damage hit (it is this
