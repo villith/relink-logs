@@ -6,15 +6,15 @@ import "./Logs.css";
 import HookStatusBadge from "@/components/HookStatusBadge";
 import NewChip from "@/components/NewChip";
 import UpdateAvailableButton from "@/components/UpdateAvailableButton";
+import { useAppVersion } from "@/hooks/useAppVersion";
 import { sectionNewIds } from "@/newFeatures";
 import { useIsLinux } from "@/platform";
 import { deriveNavState } from "@/utils";
 import { ActionIcon, AppShell, Button, Group, Text } from "@mantine/core";
 import { Bug, Flag, Gear, House, ListDashes, Translate, Wrench } from "@phosphor-icons/react";
-import { getVersion } from "@tauri-apps/api/app";
 import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/api/shell";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Toaster } from "react-hot-toast";
 import { useTranslation } from "react-i18next";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
@@ -69,7 +69,7 @@ const Layout = () => {
   useMeterFilterSync();
   const { t } = useTranslation();
   const isLinux = useIsLinux();
-  const [version, setVersion] = useState("");
+  const version = useAppVersion();
   useUpdateCheck(auto_check_updates);
   const updateStatus = useUpdateStatusStore((state) => state.status);
   const versionSuffix = !updateStatus
@@ -101,10 +101,6 @@ const Layout = () => {
   // otherwise hold the pathname from when the listener was attached).
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
-
-  useEffect(() => {
-    getVersion().then(setVersion);
-  }, []);
 
   useEffect(() => {
     const debugListener = listen("debug-event", (event: { payload: unknown }) => {

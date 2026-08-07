@@ -1,10 +1,10 @@
 import type { ActionType, ComputedPlayerState, EnemyType } from "@/types";
 
-import { abilityKey } from "../abilityKey";
 import { parseEnemyRow } from "../metrics/damageDone";
 import type { MetricRow } from "../metrics/types";
 
 import type { CardSection } from "./HoverCard";
+import { foldPartyDealt, sortedEntries } from "./cardFold";
 
 /** Name/colour lookups the view injects, so these stay pure functions — the
  * same posture as `SectionLabels` in cardSections.ts.
@@ -35,9 +35,6 @@ export type HostilityCardLabels = {
  * target section uses, so a section about the OPPOSING side is the same colour
  * whichever tab it is on. */
 const TARGET_COLOR = "var(--mantine-color-red-6)";
-
-const sortedEntries = <T extends { value: number }>(entries: T[]): T[] =>
-  [...entries].sort((a, b) => b.value - a.value);
 
 /** The enemy type an `enemy:`-keyed row names, or null for anything that is not
  * one. The label IS the type's JSON — the same grammar `damageDone`'s and
@@ -137,52 +134,18 @@ export const enemyReceivedCardSectionsFor = ({
   if (enemy === null) return null;
   const enemyKey = JSON.stringify(enemy);
 
-  const bySource: { key: string; label: string; value: number; color: string; icon?: string }[] = [];
-  const byAbility = new Map<string, { label: string; value: number; icon?: string }>();
-  for (const player of players) {
-    let dealt = 0;
-    for (const skill of player.skillBreakdown) {
-      let skillDealt = 0;
-      // `targets` is optional because cached payloads predate it; an absent
-      // list means the breakdown is unavailable, not that nothing was hit.
-      for (const target of skill.targets ?? []) {
-        if (JSON.stringify(target.enemyType) !== enemyKey) continue;
-        skillDealt += target.totalDamage;
-      }
-      if (skillDealt === 0) continue;
-      dealt += skillDealt;
-      // Keyed by the raw action, and named against its OWN player: the parser
-      // emits one `SkillState` per (action, child character), so this also
-      // merges a player and their summon back into the one ability.
-      const key = abilityKey(skill.actionType);
-      const ability = byAbility.get(key);
-      if (ability) ability.value += skillDealt;
-      else
-        byAbility.set(key, {
-          label: labels.ability(key, player),
-          value: skillDealt,
-          icon: labels.abilityIcon?.(key, player),
-        });
-    }
-    if (dealt > 0) {
-      bySource.push({
-        key: `source:${player.index}`,
-        label: labels.source(player.index),
-        value: dealt,
-        color: labels.sourceColor(player.index),
-        icon: labels.sourceIcon?.(player.index),
-      });
-    }
-  }
+  // Every spawn of the type, by design: an enemy ROW merges its spawns, so its
+  // card must account for all of them.
+  const { bySource, byAbility } = foldPartyDealt(
+    players,
+    (target) => JSON.stringify(target.enemyType) === enemyKey,
+    labels
+  );
   // Nobody dealt to this enemy — no card, rather than an empty one.
   if (bySource.length === 0) return null;
 
   return [
     { headingKey: "ui.logs.hover-by-source", color, entries: sortedEntries(bySource) },
-    {
-      headingKey: "ui.logs.hover-by-ability",
-      color,
-      entries: sortedEntries([...byAbility.entries()].map(([key, entry]) => ({ key, ...entry }))),
-    },
+    { headingKey: "ui.logs.hover-by-ability", color, entries: sortedEntries(byAbility) },
   ];
 };

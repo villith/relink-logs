@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { StatusInterval } from "@/types";
 
-import { auraExcludedBands, auraHolderIntervals, auraWireWindows } from "./auraWindows";
+import { auraExcludedBands, auraHolderIntervals } from "./auraWindows";
 
 const interval = (
   actor: number,
@@ -43,31 +43,6 @@ describe("auraHolderIntervals", () => {
   it("selects an enemy holder by SPAWN segment, never actor index", () => {
     const held = auraHolderIntervals(INTERVALS, "status:10:500:unknown", { kind: "enemySpawn", segment: 2 });
     expect(held).toEqual([INTERVALS[3]]);
-  });
-});
-
-describe("auraWireWindows", () => {
-  const WINDOW = { startMs: 1_000, endMs: 10_000 };
-
-  it("clips to the chart window and merges overlaps, in fight-relative ms", () => {
-    const windows = auraWireWindows(
-      [interval(0, 0, 3_000), interval(0, 2_000, 5_000), interval(0, 8_000, 12_000)],
-      WINDOW
-    );
-    expect(windows).toEqual([
-      { fromMs: 1_000, upToMs: 5_000 },
-      { fromMs: 8_000, upToMs: 10_000 },
-    ]);
-  });
-
-  it("answers empty when the effect was never up inside the window", () => {
-    expect(auraWireWindows([interval(0, 20_000, 30_000)], WINDOW)).toEqual([]);
-    expect(auraWireWindows([], WINDOW)).toEqual([]);
-  });
-
-  it("drops a zero-width edge touch — the [start, end) convention", () => {
-    // Ends exactly AT the window's start: contributes nothing.
-    expect(auraWireWindows([interval(0, 0, 1_000)], WINDOW)).toEqual([]);
   });
 });
 

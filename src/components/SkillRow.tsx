@@ -10,6 +10,7 @@ import {
 } from "@/utils";
 import { useMemo } from "react";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
+import { ValueCell } from "./ValueCell";
 import { renderSkillCell } from "./renderSkillCell";
 import { useSkillRow } from "./useSkillRow";
 
@@ -59,13 +60,11 @@ export const SkillRow = ({
   if (skill.actionType === "PerfectGuardQuickening") {
     return (
       <div role="row" className={`meter-row skill-row ${nested ? "nested" : ""}`}>
-        <div role="cell" className={`text-left row-data ${nested ? "nested" : ""}`}>
+        <ValueCell align="left" className={nested ? "nested" : undefined}>
           {getSkillName(characterType, skill)}
-        </div>
+        </ValueCell>
         {columns.map((column) => (
-          <div key={column} role="cell" className="text-center row-data">
-            {column === SkillColumns.Hits ? skill.hits : "-"}
-          </div>
+          <ValueCell key={column}>{column === SkillColumns.Hits ? skill.hits : "-"}</ValueCell>
         ))}
       </div>
     );
@@ -83,9 +82,9 @@ export const SkillRow = ({
         className={`meter-row skill-row ${nested ? "nested" : ""}`}
         style={damageBarStyle(color, barWidth(skill.percentage, maxPercentage, fillMode))}
       >
-        <div role="cell" className={`text-left row-data ${nested ? "nested" : ""}`}>
+        <ValueCell align="left" className={nested ? "nested" : undefined}>
           {getSkillName(characterType, skill)}
-        </div>
+        </ValueCell>
         {columns.map(renderCell)}
       </div>
     </SkillTargetTooltip>

@@ -1834,6 +1834,47 @@ pub fn selection_facts(
     facts
 }
 
+/// One page of the raw event stream, with timestamps rebased to the fight start.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventPage {
+    /// `(ms since fight start, event)`. The inner [`Message`] serialises with
+    /// serde's DEFAULTS — externally tagged, snake_case fields — so the
+    /// frontend's `LogEvent` mirror is snake_case inside the variant.
+    pub events: Vec<(i64, Message)>,
+    /// How many events exist in total, so the frontend can tell a full answer
+    /// from a truncated one.
+    pub total: usize,
+}
+
+/// `count` events starting at `offset`, rebased to `start_time`.
+///
+/// An offset past the end yields an empty page rather than panicking: the
+/// frontend's scroll position and the backend's event count can disagree for a
+/// frame after a filter change.
+pub fn event_page(
+    events: &[(i64, Message)],
+    start_time: i64,
+    offset: usize,
+    count: usize,
+) -> EventPage {
+    let total = events.len();
+    let end = offset.saturating_add(count).min(total);
+    let slice = if offset >= total {
+        &events[0..0]
+    } else {
+        &events[offset..end]
+    };
+
+    EventPage {
+        events: slice
+            .iter()
+            .map(|(ts, event)| (ts - start_time, event.clone()))
+            .collect(),
+        total,
+    }
+}
+
 /// Split every damage-event target into [`TargetSegment`]s, in first-hit
 /// order. Events without HP data still open/extend segments (DoT-only spans,
 /// old logs) — they just can't trigger respawn boundaries.
@@ -4496,6 +4537,39 @@ mod tests {
             )),
         ));
         parser
+    }
+
+    #[test]
+    fn event_page_returns_a_bounded_slice_in_order() {
+        let mut parser = Parser::default();
+        let base = 1_000;
+        for offset in 0..10 {
+            parser
+                .encounter
+                .push_event(base + offset, Message::DamageEvent(a_damage_event()));
+        }
+
+        let page = event_page(&parser.encounter.raw_event_log, base, 2, 3);
+
+        assert_eq!(
+            page.total, 10,
+            "total counts every event, not just the page"
+        );
+        assert_eq!(page.events.len(), 3);
+        assert_eq!(page.events[0].0, 2, "timestamps are relative to start_time");
+    }
+
+    #[test]
+    fn event_page_clamps_an_offset_past_the_end() {
+        let mut parser = Parser::default();
+        parser
+            .encounter
+            .push_event(1_000, Message::DamageEvent(a_damage_event()));
+
+        let page = event_page(&parser.encounter.raw_event_log, 1_000, 500, 10);
+
+        assert_eq!(page.events.len(), 0, "past the end is empty, not a panic");
+        assert_eq!(page.total, 1);
     }
 
     #[test]

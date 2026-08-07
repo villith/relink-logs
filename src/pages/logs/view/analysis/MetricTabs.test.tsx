@@ -38,4 +38,25 @@ describe("MetricTabs", () => {
     fireEvent.click(screen.getByRole("tab", { name: "ui.logs.metric-stun" }));
     expect(onChange).toHaveBeenCalledWith("stun");
   });
+
+  it("announces itself as the metric switcher by default", () => {
+    renderIt();
+    expect(screen.getByRole("tablist", { name: "ui.logs.metric-tablist-label" })).toBeTruthy();
+  });
+
+  // The top-level view switch shares this control but asks a different
+  // question, and a screen reader announcing it as "Metric" would be a lie.
+  it("takes another label when it is not the metric switcher", () => {
+    renderIt({ ariaLabelKey: "ui.logs.view-tablist-label" });
+    expect(screen.getByRole("tablist", { name: "ui.logs.view-tablist-label" })).toBeTruthy();
+    expect(screen.queryByRole("tablist", { name: "ui.logs.metric-tablist-label" })).toBeNull();
+  });
+
+  // Inline, the tabs sit inside the selector bar, which draws its own rule —
+  // a second one under the tablist would double it.
+  it("drops the strip's own rule when inline", () => {
+    const { container } = renderIt({ variant: "inline" });
+    const tablist = container.querySelector('[role="tablist"]') as HTMLElement;
+    expect(tablist.style.borderBottom).toBe("");
+  });
 });

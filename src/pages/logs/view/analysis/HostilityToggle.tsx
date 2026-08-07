@@ -5,6 +5,8 @@ import type { Hostility } from "../metrics/types";
 
 import "./analysis.css";
 
+import { onArrowKeys } from "./rovingKeys";
+
 const SIDES: { value: Hostility; labelKey: string }[] = [
   { value: "friendly", labelKey: "ui.logs.hostility-friendlies" },
   { value: "enemy", labelKey: "ui.logs.hostility-enemies" },
@@ -51,12 +53,7 @@ export const HostilityToggle = ({
       aria-disabled={disabled || undefined}
       className={`analysis-hostility${disabled ? " analysis-hostility-disabled" : ""}`}
       title={disabled ? t("ui.logs.hostility-disabled-hint") : undefined}
-      onKeyDown={(event) => {
-        if (disabled) return;
-        if (event.key === "ArrowRight" || event.key === "ArrowLeft") onChange(other);
-        else return;
-        event.preventDefault();
-      }}
+      onKeyDown={disabled ? undefined : onArrowKeys(() => onChange(other))}
     >
       {SIDES.map((side) => (
         <UnstyledButton
