@@ -14,13 +14,13 @@ import type {
   TargetEntry,
 } from "@/types";
 import {
-  PLAYER_COLORS,
   getSkillName,
+  PLAYER_COLORS,
   resolvePlayerColor,
   targetLabelKey,
   translateCharacterType,
-  translateEnemyType,
   translatedPlayerName,
+  translateEnemyType,
 } from "@/utils";
 
 import { actorColor, type ActorColorContext } from "../../actorColor";
