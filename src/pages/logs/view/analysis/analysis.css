@@ -23,11 +23,20 @@
   --an-plot: #1a1c21;
 }
 
+/* Full-bleed, not a card. The view is dense enough that the window edge is the
+ * only frame it needs, and a bordered panel inset from the shell's padding just
+ * wasted the margin the charts and tables want.
+ *
+ * Cancelling `--app-shell-padding` with a matching negative margin keeps the
+ * change scoped to this route — AppShell.Main pads every page in the logs
+ * window, and Classic still wants that padding. The top rule cancels only the
+ * padding half of Main's `header-offset + padding`, so the header keeps its
+ * space, and min-height then fills whatever is left below it. */
 .analysis {
   background-color: var(--an-bg);
   color: var(--an-ink);
-  border: 1px solid var(--an-line);
-  border-radius: 5px;
+  margin: calc(var(--app-shell-padding, 0px) * -1);
+  min-height: calc(100dvh - var(--app-shell-header-offset, 0px));
 }
 
 /* Small tracked capitals for column heads and section labels. */

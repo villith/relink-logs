@@ -1894,6 +1894,15 @@ export const AnalysisView = () => {
 
   return (
     <Box className="analysis analysis-tokens">
+      {/* Above everything, on its own row: the way back to Classic. It is not
+          part of the selector bar below because it does not select anything —
+          it replaces the whole body, so it sits outside what it would replace.
+          Padded like ActorBar, since the view is full-bleed and nothing else
+          holds its children off the window edge. */}
+      <Box style={{ display: "flex", justifyContent: "flex-end", padding: "10px 16px" }}>
+        <ViewModeToggle />
+      </Box>
+
       <QuestSummary
         encounter={shownEncounter}
         questId={questId}
@@ -1904,31 +1913,27 @@ export const AnalysisView = () => {
         logId={Number.isFinite(Number(id)) ? Number(id) : null}
       />
 
-      {/* The topmost row: WHO the page is about, and which view is showing it.
-          Both outrank everything below — the actor pin is the one selection the
-          two views read the same way, and the view switch changes the whole
-          body under this row. */}
+      {/* WHO the page is about. It outranks everything below: the actor pin is
+          the one selection the Events view and the table view read the same
+          way, so it sits above the metric tabs rather than beside them. */}
       <ActorBar
         options={labelledOptions.sources}
         value={pins.source}
         onChange={(source) => handlePinsChange({ ...pins, source })}
         trailing={
-          <>
-            <ViewModeToggle />
-            <MetricTabs
-              variant="inline"
-              ariaLabelKey="ui.logs.view-tablist-label"
-              tabs={VIEW_TABS}
-              value={onEvents ? EVENTS_TAB : TABLE_TAB}
-              onChange={(value) =>
-                // Leaving Events clears the param rather than storing "table":
-                // the table body is the default, and a default in the URL is
-                // noise. The metric the table was last on is untouched either
-                // way — it lives in the machine, not here.
-                setTab(value === EVENTS_TAB ? EVENTS_TAB : null)
-              }
-            />
-          </>
+          <MetricTabs
+            variant="inline"
+            ariaLabelKey="ui.logs.view-tablist-label"
+            tabs={VIEW_TABS}
+            value={onEvents ? EVENTS_TAB : TABLE_TAB}
+            onChange={(value) =>
+              // Leaving Events clears the param rather than storing "table":
+              // the table body is the default, and a default in the URL is
+              // noise. The metric the table was last on is untouched either
+              // way — it lives in the machine, not here.
+              setTab(value === EVENTS_TAB ? EVENTS_TAB : null)
+            }
+          />
         }
       />
 

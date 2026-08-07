@@ -95,11 +95,13 @@ export const DEFAULT_HEADER_SEGMENTS: HeaderSegment[] = [
  * the redesign changes how a number is reached, not just how it looks. Both are
  * maintained; only `analysis` gains new metrics.
  *
- * DEV BUILDS ONLY at present. `analysis` is unfinished, so `ViewPage` ignores
- * this setting entirely outside dev and renders Classic — see the guard there
- * for why it ignores rather than defaults. The stored value therefore governs
- * nothing in a release build; leave it as it is rather than "fixing" the
- * default below to match what users see. */
+ * `classic` is the default, and `analysis` is unfinished. There is no longer a
+ * build guard — cd06c00f removed the `import.meta.env.DEV` check that used to
+ * make `ViewPage` ignore this setting outside dev — so the stored value governs
+ * what a release build draws, and this default is the only thing keeping users
+ * off the unfinished view. `ViewModeToggle` is the sole writer and is invisible
+ * by design, so a user who does not already know it exists never leaves
+ * `classic`. Do not flip this default until `analysis` is finished. */
 export type LogsViewMode = "analysis" | "classic";
 
 interface MeterSettings {
@@ -212,7 +214,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   header_buttons: { ...DEFAULT_HEADER_BUTTONS },
   ...DEFAULT_OVERLAY_SIZE,
   ...DEFAULT_BAR_APPEARANCE,
-  logs_view_mode: "analysis",
+  logs_view_mode: "classic",
   skill_name_resolution: "label-first",
 };
 

@@ -43,7 +43,7 @@ export const ActorBar = ({ options, value, onChange, trailing }: ActorBarProps) 
       <PinSelect
         minWidth={240}
         // Capped: this row is otherwise empty, so an uncapped selector would
-        // stretch the whole way to the view switch — a 700px control holding
+        // stretch the whole way to the metric tabs — a 700px control holding
         // one player's name.
         maxWidth={420}
         data={options}

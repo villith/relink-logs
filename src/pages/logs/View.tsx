@@ -12,12 +12,14 @@ import { ClassicView } from "./view/ClassicView";
  *
  * The switch itself is NOT here any more. It is `ViewModeToggle`, rendered
  * inside each body beside that body's own top-right control, so it costs no row
- * of its own. It is also invisible by design, which changes an old guarantee:
- * this page used to rely on a visible switch as the escape hatch off the
- * unfinished Analysis view (cd06c00f removed the `import.meta.env.DEV` guard
- * that used to force Classic outside dev). There is no longer a discoverable
- * way off Analysis, so if this ever goes back behind a guard, the guard must
- * ignore the stored value rather than assume someone can find the toggle. */
+ * of its own. It is invisible by design, and cd06c00f removed the
+ * `import.meta.env.DEV` guard that used to force Classic outside dev — so
+ * nothing here keeps users off the unfinished Analysis view except the stored
+ * default, which is `classic` (see `LogsViewMode`). Those two facts are load
+ * bearing together: an invisible toggle is only acceptable while the default is
+ * the finished view, because a user who lands on Analysis by accident cannot
+ * find their way back. Flip the default only when Analysis is done, or give the
+ * toggle a visible affordance first. */
 export const ViewPage = () => {
   const mode = useMeterSettingsStore((state) => state.logs_view_mode);
 
