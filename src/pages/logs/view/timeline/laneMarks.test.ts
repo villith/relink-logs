@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { EventRow } from "../events/eventRows";
 import type { MetricRow } from "../metrics/types";
 
-import { lanesFor, markGapMs, marksByLane, mergeMarks } from "./laneMarks";
+import { CAST_MAX_MS, lanesFor, markGapMs, marksByLane, mergeCasts, mergeMarks, type LaneMark } from "./laneMarks";
 import type { LaneMatcher } from "./laneMatch";
 
 const event = (over: Partial<EventRow>): EventRow => ({
@@ -33,13 +33,37 @@ const metricRow = (over: Partial<MetricRow>): MetricRow => ({
 /** Every event lands on lane "a". */
 const ALL_TO_A: LaneMatcher = { laneOf: () => "a" };
 
+/** A mark with the fields a case is not about already filled in. Written once
+ * so adding a field to `LaneMark` does not mean editing twenty literals — and
+ * so a case that IS about `hits`/`casts`/`castKey` states them visibly. */
+const mark = (over: Partial<LaneMark>): LaneMark => ({
+  startMs: 0,
+  endMs: 0,
+  count: 1,
+  amount: null,
+  by: [],
+  hits: [],
+  casts: 1,
+  castKey: "",
+  ...over,
+});
+
 describe("marksByLane", () => {
   // Rebased onto the window's own start, exactly as `MetricRow.timeline` is —
   // so a bar and a tick on the same chart measure from one origin.
   it("rebases each mark onto the window start", () => {
     const marks = marksByLane([event({ timeMs: 7000, amount: 100 })], ALL_TO_A, { startMs: 5000, endMs: 15000 });
     expect(marks.get("a")).toEqual([
-      { startMs: 2000, endMs: 2000, count: 1, amount: 100, by: [{ key: "", count: 1, amount: 100 }] },
+      mark({
+        startMs: 2000,
+        endMs: 2000,
+        amount: 100,
+        by: [{ key: "", count: 1, amount: 100 }],
+        hits: [{ atMs: 2000, echo: false }],
+        // The kind is always part of a cast identity, even for an event that
+        // names no ability at all — see `castKeyOf`.
+        castKey: "damage|",
+      }),
     ]);
   });
 
@@ -69,36 +93,24 @@ describe("mergeMarks", () => {
   // The whole point: at a scale where two hits are a pixel apart, drawing two
   // marks draws one smear. Merging says so honestly and keeps the count.
   it("folds marks closer together than the gap", () => {
-    const marks = [
-      { startMs: 0, endMs: 0, count: 1, amount: 10, by: [] },
-      { startMs: 50, endMs: 50, count: 1, amount: 20, by: [] },
-    ];
-    expect(mergeMarks(marks, 100)).toEqual([{ startMs: 0, endMs: 50, count: 2, amount: 30, by: [] }]);
+    const marks = [mark({ startMs: 0, endMs: 0, amount: 10 }), mark({ startMs: 50, endMs: 50, amount: 20 })];
+    expect(mergeMarks(marks, 100)).toEqual([mark({ startMs: 0, endMs: 50, count: 2, amount: 30, casts: 2 })]);
   });
 
   it("keeps marks further apart than the gap separate", () => {
-    const marks = [
-      { startMs: 0, endMs: 0, count: 1, amount: 10, by: [] },
-      { startMs: 500, endMs: 500, count: 1, amount: 20, by: [] },
-    ];
+    const marks = [mark({ startMs: 0, endMs: 0, amount: 10 }), mark({ startMs: 500, endMs: 500, amount: 20 })];
     expect(mergeMarks(marks, 100)).toHaveLength(2);
   });
 
   it("sorts before merging, so event order cannot change the result", () => {
-    const marks = [
-      { startMs: 50, endMs: 50, count: 1, amount: 20, by: [] },
-      { startMs: 0, endMs: 0, count: 1, amount: 10, by: [] },
-    ];
-    expect(mergeMarks(marks, 100)).toEqual([{ startMs: 0, endMs: 50, count: 2, amount: 30, by: [] }]);
+    const marks = [mark({ startMs: 50, endMs: 50, amount: 20 }), mark({ startMs: 0, endMs: 0, amount: 10 })];
+    expect(mergeMarks(marks, 100)).toEqual([mark({ startMs: 0, endMs: 50, count: 2, amount: 30, casts: 2 })]);
   });
 
   // A lane where nothing carried an amount must not report 0 — that reads as a
   // measured zero rather than as "this kind has no amount".
   it("keeps a null amount null when no mark carried one", () => {
-    const marks = [
-      { startMs: 0, endMs: 0, count: 1, amount: null, by: [] },
-      { startMs: 50, endMs: 50, count: 1, amount: null, by: [] },
-    ];
+    const marks = [mark({ startMs: 0, endMs: 0, amount: null }), mark({ startMs: 50, endMs: 50, amount: null })];
     expect(mergeMarks(marks, 100)[0]?.amount).toBeNull();
   });
 
@@ -127,23 +139,19 @@ describe("lanesFor", () => {
     const rows = [metricRow({ key: "status:77:210", kind: "status", timeline: [{ startMs: 0, endMs: 4000 }] })];
     const lanes = lanesFor(rows, new Map(), 100);
     expect(lanes[0]?.spans).toBe(true);
-    expect(lanes[0]?.marks).toEqual([{ startMs: 0, endMs: 4000, count: 1, amount: null, by: [] }]);
+    expect(lanes[0]?.marks).toEqual([mark({ startMs: 0, endMs: 4000 })]);
   });
 
   it("draws merged event marks for a row with no timeline", () => {
     const rows = [metricRow({ key: "skill:Normal:100", kind: "ability" })];
     const byLane = new Map([
-      [
-        "skill:Normal:100",
-        [
-          { startMs: 0, endMs: 0, count: 1, amount: 10, by: [] },
-          { startMs: 50, endMs: 50, count: 1, amount: 20, by: [] },
-        ],
-      ],
+      ["skill:Normal:100", [mark({ startMs: 0, endMs: 0, amount: 10 }), mark({ startMs: 50, endMs: 50, amount: 20 })]],
     ]);
     const lanes = lanesFor(rows, byLane, 100);
     expect(lanes[0]?.spans).toBe(false);
-    expect(lanes[0]?.marks).toEqual([{ startMs: 0, endMs: 50, count: 2, amount: 30, by: [] }]);
+    // ONE cast, not two: the cast fold runs first and two same-identity hits
+    // 50ms apart are one cast, so the density fold has nothing left to merge.
+    expect(lanes[0]?.marks).toEqual([mark({ startMs: 0, endMs: 50, count: 2, amount: 30, casts: 1 })]);
   });
 
   // A row the join could not place still gets a lane. Dropping it would make
@@ -174,8 +182,8 @@ describe("mark contributions", () => {
 
   it("folds contributions of the same action together when marks merge", () => {
     const marks = [
-      { startMs: 0, endMs: 0, count: 1, amount: 10, by: [{ key: "A", count: 1, amount: 10 }] },
-      { startMs: 50, endMs: 50, count: 1, amount: 20, by: [{ key: "A", count: 1, amount: 20 }] },
+      mark({ startMs: 0, endMs: 0, amount: 10, by: [{ key: "A", count: 1, amount: 10 }] }),
+      mark({ startMs: 50, endMs: 50, amount: 20, by: [{ key: "A", count: 1, amount: 20 }] }),
     ];
     expect(mergeMarks(marks, 100)[0]?.by).toEqual([{ key: "A", count: 2, amount: 30 }]);
   });
@@ -184,8 +192,8 @@ describe("mark contributions", () => {
   // and order them.
   it("keeps distinct actions apart and sorts them by amount", () => {
     const marks = [
-      { startMs: 0, endMs: 0, count: 1, amount: 10, by: [{ key: "A", count: 1, amount: 10 }] },
-      { startMs: 50, endMs: 50, count: 1, amount: 90, by: [{ key: "B", count: 1, amount: 90 }] },
+      mark({ startMs: 0, endMs: 0, amount: 10, by: [{ key: "A", count: 1, amount: 10 }] }),
+      mark({ startMs: 50, endMs: 50, amount: 90, by: [{ key: "B", count: 1, amount: 90 }] }),
     ];
     expect(mergeMarks(marks, 100)[0]?.by).toEqual([
       { key: "B", count: 1, amount: 90 },
@@ -208,5 +216,66 @@ describe("mark contributions", () => {
   it("gives a span mark no contributions", () => {
     const rows = [metricRow({ key: "s", kind: "status", timeline: [{ startMs: 0, endMs: 4000 }] })];
     expect(lanesFor(rows, new Map(), 100)[0]?.marks[0]?.by).toEqual([]);
+  });
+});
+
+describe("mergeCasts", () => {
+  const hit = (startMs: number, castKey = "damage|Normal:100"): LaneMark => ({
+    startMs,
+    endMs: startMs,
+    count: 1,
+    amount: 100,
+    by: [{ key: "Normal:100", count: 1, amount: 100 }],
+    hits: [{ atMs: startMs, echo: false }],
+    casts: 1,
+    castKey,
+  });
+
+  it("folds hits of one skill inside the idle gap into one cast", () => {
+    const merged = mergeCasts([hit(0), hit(400), hit(900)]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].count).toBe(3);
+    expect(merged[0].endMs).toBe(900);
+    expect(merged[0].hits.map((h) => h.atMs)).toEqual([0, 400, 900]);
+  });
+
+  it("starts a new cast once the idle gap is exceeded", () => {
+    expect(mergeCasts([hit(0), hit(1_500)])).toHaveLength(2);
+  });
+
+  it("never folds two different skills together", () => {
+    expect(mergeCasts([hit(0), hit(100, "damage|Normal:200")])).toHaveLength(2);
+  });
+
+  it("splits a chain that outgrows the cast ceiling", () => {
+    // Without a ceiling a continuously attacking player's auto-attack lane
+    // chains every hit in the fight into one enormous "cast".
+    const chain = Array.from({ length: 20 }, (_, index) => hit(index * 500));
+    const merged = mergeCasts(chain);
+    expect(merged.length).toBeGreaterThan(1);
+    expect(Math.max(...merged.map((mark) => mark.endMs - mark.startMs))).toBeLessThanOrEqual(CAST_MAX_MS);
+  });
+
+  it("is independent of the zoom-derived gap", () => {
+    // The whole point: a cast must not split when you zoom in.
+    expect(mergeMarks(mergeCasts([hit(0), hit(400)]), 0)).toHaveLength(1);
+  });
+});
+
+describe("mergeMarks — casts", () => {
+  it("counts the casts it folds together", () => {
+    const cast = (startMs: number): LaneMark => ({
+      startMs,
+      endMs: startMs + 100,
+      count: 2,
+      amount: 200,
+      by: [],
+      hits: [],
+      casts: 1,
+      castKey: "damage|Normal:100",
+    });
+    const merged = mergeMarks([cast(0), cast(150)], 100);
+    expect(merged).toHaveLength(1);
+    expect(merged[0].casts).toBe(2);
   });
 });
