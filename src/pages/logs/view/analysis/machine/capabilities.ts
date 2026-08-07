@@ -69,6 +69,18 @@ export type MetricCapabilities = {
    * rather than branched on `metricKey` in the view, which is what made adding
    * a metric with its own series a view edit rather than a declaration. */
   chart: ChartDecl;
+  /** Whether this metric records supplementary (echo) damage.
+   *
+   * Only Damage Done does, so the collapse toggle is inert everywhere else —
+   * including on a shared link that arrives with it already switched on. The
+   * toggle is disabled rather than hidden for the same reason the side switch
+   * is: a control that came and went with the tab would shift everything under
+   * it. */
+  recordsSupplementary: boolean;
+  /** Which polarity of status the interval tables select — Buffs the helpful
+   * ones, Debuffs the harmful. Fixed per tab, and meaningless off the interval
+   * path, where it is false. */
+  harmfulStatuses: boolean;
 };
 
 /** The three rate metrics share one shape: their own series, smoothed like DPS
@@ -123,6 +135,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // The same trailing moving average the classic view smooths with, so the
     // same fight draws the same line in both.
     chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
+    recordsSupplementary: true,
+    harmfulStatuses: false,
   },
 
   taken: {
@@ -145,6 +159,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     chartFromGroups: true,
     // Incoming damage per second, off the same buckets as DPS.
     chart: RATE_CHART("ui.logs.chart-taken-label", "taken"),
+    recordsSupplementary: false,
+    harmfulStatuses: false,
   },
 
   stun: {
@@ -161,6 +177,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     cardKind: (dim) => (dim === "target" ? "none" : "skill"),
     chartFromGroups: false,
     chart: RATE_CHART("ui.logs.chart-stun-label", "stun"),
+    recordsSupplementary: false,
+    harmfulStatuses: false,
   },
 
   sba: {
@@ -186,6 +204,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // A gauge LEVEL, not a rate: smoothing would round off the discharge that
     // IS the reading. Stored in tenths of a percent.
     chart: { labelKey: "ui.logs.chart-sba-label", series: "sba", smoothing: "none", scale: 0.1, format: "percent" },
+    recordsSupplementary: false,
+    harmfulStatuses: false,
   },
 
   buffs: {
@@ -206,6 +226,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // — but it must still name a real series, so the fallback has a length to
     // plot on a log whose intervals produced no series at all.
     chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
+    recordsSupplementary: false,
+    harmfulStatuses: false,
   },
 
   debuffs: {
@@ -223,5 +245,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     chartFromGroups: false,
     // As buffs: overlaid by the stack counts, but a real series underneath.
     chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
+    recordsSupplementary: false,
+    // The one metric that selects the harmful side of the polarity split.
+    harmfulStatuses: true,
   },
 };

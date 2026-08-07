@@ -165,3 +165,17 @@ describe("chart declarations", () => {
     expect(CAPABILITIES.debuffs.chart.series).toBe("dps");
   });
 });
+
+describe("metric flags", () => {
+  it("records supplementary damage on Damage Done alone", () => {
+    expect(CAPABILITIES.damage.recordsSupplementary).toBe(true);
+    for (const key of ["taken", "stun", "sba", "buffs", "debuffs"] as const) {
+      expect(CAPABILITIES[key].recordsSupplementary, key).toBe(false);
+    }
+  });
+
+  it("selects harmful statuses on Debuffs alone", () => {
+    expect(CAPABILITIES.debuffs.harmfulStatuses).toBe(true);
+    expect(CAPABILITIES.buffs.harmfulStatuses).toBe(false);
+  });
+});
