@@ -10,6 +10,7 @@ import { DPS_BUCKET_MS, type ChartDatapoint, type Label } from "../DetailCharts"
 import { bandOpacity, type Band } from "../statusBands";
 
 import { ChartLegend } from "./ChartLegend";
+import { HoverCardBody } from "./HoverCard";
 import "./analysis.css";
 import type { ChartMarker, MarkerKind } from "./chartMarkers";
 import {
@@ -198,18 +199,29 @@ export const ChartTooltip = ({
       <Text fw={500} mb={5}>
         {label}
       </Text>
-      {landed.map((item) => {
-        return (
-          // Keyed by dataKey (the actor index), not name: two players can
-          // share a display label, and React drops the duplicate row.
-          <Text key={String(item.dataKey)} fz="sm">
-            <Text component="span" c={item.color as string}>
-              {labelByKey.get(String(item.name)) ?? String(item.name)}
-            </Text>
-            : {formatChartValue(format, item.value as number)}
-          </Text>
-        );
-      })}
+      <HoverCardBody
+        sections={[
+          {
+            headingKey: "ui.logs.chart-tooltip-section",
+            // Per-entry colour overrides this; the section colour is only the
+            // fallback for an entry recharts gave no colour.
+            color: "var(--an-ink-3)",
+            entries: landed.map((item) => ({
+              // Keyed by dataKey, not name: two players can share a display
+              // label, and React drops the duplicate row.
+              key: String(item.dataKey),
+              label: labelByKey.get(String(item.name)) ?? String(item.name),
+              value: item.value as number,
+              color: item.color as string,
+            })),
+          },
+        ]}
+        amountKey="ui.logs.column-amount"
+        format={(value) => formatChartValue(format, value)}
+      />
+      {/* Markers and window lines carry no value, and a BreakdownEntry
+          requires one — inventing a number for a death marker to fit it into a
+          section would be worse than keeping these as their own rows. */}
       {(markers ?? []).map((marker, index) => (
         <Text key={`marker-${index}`} fz="sm" c={marker.color}>
           {marker.label}

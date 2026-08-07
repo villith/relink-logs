@@ -566,6 +566,8 @@
       "stun-no-target-dimension": "Stun is not recorded per enemy",
       "status-no-target-dimension": "Effects have no enemy-target dimension; switch sides to see enemy-held effects",
       "column-share": "%",
+      "column-amount": "Amount",
+      "chart-tooltip-section": "At this moment",
       "column-damage-taken": "Amount",
       "column-dtps": "DTPS",
       "taken-attack": "Attack {{id}}",

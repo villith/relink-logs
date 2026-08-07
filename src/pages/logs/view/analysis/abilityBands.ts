@@ -1,7 +1,7 @@
 import type { AbilitySeries } from "@/types";
 
 import { abilityKey, skillKey } from "../abilityKey";
-import { abilityRowKey } from "../abilitySkills";
+import { abilityRowKey, type RowKeying } from "../abilitySkills";
 import type { DrillSeries } from "./statusChart";
 
 /** The backend's per-breakdown-row bands folded into the table's ability ROWS.
@@ -31,7 +31,8 @@ export const abilityBands = (
   series: AbilitySeries[],
   topN: number,
   labelOf: (key: string) => string,
-  foldBy: "group" | "action" = "group"
+  foldBy: "group" | "action" = "group",
+  keying?: RowKeying
 ): DrillSeries[] => {
   if (series.length === 0) return [];
 
@@ -47,7 +48,7 @@ export const abilityBands = (
     const key =
       band.kind === "cause"
         ? band.key
-        : skillKey(foldBy === "action" ? abilityKey(band.actionType) : abilityRowKey(band));
+        : skillKey(foldBy === "action" ? abilityKey(band.actionType) : abilityRowKey(band, keying));
     const values = byRow.get(key) ?? new Array<number>(len).fill(0);
     for (let bucket = 0; bucket < len; bucket++) values[bucket] += band.values[bucket] ?? 0;
     byRow.set(key, values);

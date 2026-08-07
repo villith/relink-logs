@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { AbilitySeries } from "@/types";
+import type { AbilitySeries, SkillRow } from "@/types";
 
+import { skillKey } from "../abilityKey";
+import { abilityRowKey, rowKeyingFor } from "../abilitySkills";
 import { abilityBands } from "./abilityBands";
 import { groupBandsFor } from "./machine/groupRows";
 
@@ -158,5 +160,32 @@ describe("abilityBands — fold mode", () => {
 
     expect(bands).toHaveLength(1);
     expect(bands[0].values).toEqual([15]);
+  });
+});
+
+describe("abilityBands — supplementary collapse", () => {
+  // Narrowed to the SKILL variant, which is the half of `AbilitySeries` that
+  // structurally IS a `SkillRow` — the keying and the row key both take one, and
+  // a cause band (no action at all) can never reach either.
+  const series: (AbilitySeries & SkillRow)[] = [
+    { kind: "skill", actionType: { Normal: 100 }, childCharacterType: "Pl1900", values: [10, 0] },
+    { kind: "skill", actionType: { SupplementaryDamage: 100 }, childCharacterType: "Pl1900", values: [4, 0] },
+  ];
+
+  it("merges an echo band into its cause's band when collapsing", () => {
+    const bands = abilityBands(series, 8, asKey, "group", rowKeyingFor(series, true));
+    expect(bands).toHaveLength(1);
+    expect(bands[0].values[0]).toBe(14);
+  });
+
+  it("keeps the echo band separate without collapsing", () => {
+    expect(abilityBands(series, 8, asKey, "group", rowKeyingFor(series, false))).toHaveLength(2);
+  });
+
+  it("keys a band exactly as the table keys the same row", () => {
+    // The agree-by-construction claim, made testable: a band and the row it
+    // decomposes must never be keyed two different ways.
+    const keying = rowKeyingFor(series, true);
+    expect(abilityBands(series, 8, asKey, "group", keying)[0].key).toBe(skillKey(abilityRowKey(series[1], keying)));
   });
 });

@@ -83,15 +83,28 @@ describe("ChartTooltip", () => {
     expect(screen.getByText("03:03")).toBeTruthy();
   });
 
+  it("renders tooltip entries as card sections with bars", () => {
+    // The chart's tooltip and the table's hover card are ONE body, so a reading
+    // taken off the chart looks like the same reading taken off the table.
+    renderTooltip([
+      { dataKey: "0", name: "0", value: 100, color: "#f00" },
+      { dataKey: "1", name: "1", value: 40, color: "#0f0" },
+    ]);
+
+    expect(screen.getByText("Rain")).toBeTruthy();
+    // Bars arrive with the card body — the whole point of sharing it.
+    expect(screen.getAllByTestId("metric-bar-segment").length).toBeGreaterThan(0);
+  });
+
   it("orders entries by value, largest first", () => {
     // The payload arrives in series order, which is the stack's order over the
     // WHOLE fight — at any one second the biggest contributor is rarely first.
-    renderTooltip([
+    const { container } = renderTooltip([
       { dataKey: "0", name: "0", value: 100, color: "#f00" },
       { dataKey: "1", name: "1", value: 900, color: "#0f0" },
     ]);
 
-    const names = [...document.querySelectorAll("span")].map((s) => s.textContent);
+    const names = [...container.querySelectorAll(".analysis-card-name")].map((cell) => cell.textContent);
     expect(names.indexOf("Manmoth")).toBeLessThan(names.indexOf("Rain"));
   });
 
@@ -120,10 +133,14 @@ describe("ChartTooltip", () => {
 
     // Existence alone doesn't pin the ordering constraint this task exists to
     // enforce — check DOM position too, the same way "orders entries by
-    // value" above does.
-    const rows = [...document.querySelectorAll('[data-testid="chart-tooltip"] > p')].map((row) => row.textContent);
-    const seriesRowIndex = rows.findIndex((text) => text?.includes("Rain"));
-    const markerRowIndex = rows.findIndex((text) => text === "☠ Rain died");
+    // value" above does. The series rows live inside the shared card body now,
+    // so the comparison is between the tooltip's top-level blocks rather than
+    // between sibling paragraphs.
+    const blocks = [...document.querySelectorAll('[data-testid="chart-tooltip"] > *')].map(
+      (block) => block.textContent
+    );
+    const seriesRowIndex = blocks.findIndex((text) => text?.includes("Rain"));
+    const markerRowIndex = blocks.findIndex((text) => text === "☠ Rain died");
     expect(seriesRowIndex).toBeGreaterThanOrEqual(0);
     expect(markerRowIndex).toBeGreaterThan(seriesRowIndex);
   });
