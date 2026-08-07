@@ -1,15 +1,14 @@
 import { Text } from "@mantine/core";
 import { useElementSize } from "@mantine/hooks";
-import type React from "react";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { EnemyType, SkillRow } from "@/types";
 
 import type { RowKeying } from "../abilitySkills";
-import type { CardAmount, CardSection } from "../analysis/HoverCard";
 import type { MetricKey } from "../analysis/machine/state";
-import type { ActorSpace, EventPins } from "../events/eventRows";
+import type { RowPresentation, StreamContext } from "../analysis/model/bodyContext";
+import type { ActorSpace } from "../events/eventRows";
 import { filterByKind, filterByPins, toEventRow } from "../events/eventRows";
 import {
   defaultScopeKinds,
@@ -17,11 +16,8 @@ import {
   filterByScope,
   scopeFor,
   scopeUsesHostility,
-  type ScopeProbes,
 } from "../events/eventScope";
 import { useEvents } from "../events/useEvents";
-import type { Hostility, MetricRow } from "../metrics/types";
-import type { SelectorPins } from "../selectorOptions";
 import type { Span } from "../spans";
 
 import { TimelineTracks } from "./TimelineTracks";
@@ -44,37 +40,26 @@ const MARK_GAP_PX = 3;
 const laneEndFor = (metric: MetricKey): "source" | "target" => (metric === "taken" ? "target" : "source");
 
 export type TimelineTabProps = {
-  id: string | undefined;
-  metric: MetricKey;
-  hostility: Hostility;
-  /** The SAME rows the table body renders. */
-  rows: MetricRow[];
+  /** Which log, metric and side to read the event stream for, and how to narrow
+   * it — shared verbatim with the Events body (see `StreamContext`). */
+  stream: StreamContext;
+  /** The rows to draw and everything drawn about them — shared verbatim with
+   * the table body (see `RowPresentation`), which is what stops a lane and its
+   * table row being named, coloured or explained two different ways. */
+  presentation: RowPresentation;
   /** The view's `everySkill`, for expanding a folded ability row. */
   everySkill: SkillRow[];
   /** The view's row keying — passed rather than rebuilt, so a lane and the
    * table row above it cannot disagree about which row an echo is on. It also
    * carries the collapse flag the cast fold clusters echoes by. */
   keying?: RowKeying;
-  pins: EventPins;
-  probes: ScopeProbes;
   /** The committed window, in absolute fight milliseconds. */
   window: Span;
   segmentAt: (index: number, atMs: number, space: ActorSpace) => number;
   enemyTypeAt: (index: number, atMs: number) => EnemyType | null;
-  renderLabel: (row: MetricRow) => React.ReactNode;
-  rowColor: (row: MetricRow) => string;
-  onPin: (pins: Partial<SelectorPins>) => void;
-  sectionLabel?: (row: MetricRow) => string | null;
-  emptyKey?: string;
-  /** The hover card's sections for one lane's row — the SAME accessor the
-   * table uses, so a lane and its row explain themselves identically. */
-  rowSections?: (row: MetricRow) => CardSection[] | null;
-  /** What those sections measure. Without it no card is drawn at all, which is
-   * the same rule the table follows. */
-  cardAmount?: CardAmount;
   /** Names and art for one mark's contribution. A mark's parts are keyed by
    * whatever the event named — an action for a hit, a `status:` key for an
-   * effect — so it dispatches on the same `status:` prefix `abilityOptionIconUrl`
+   * effect — so it dispatches on the same `status:` prefix the selector's art
    * already uses. A single resolver would name an effect through the ability
    * join and print whatever that join's fallback picked. */
   markEntry?: (key: string) => { name: string; iconUrl?: string };
@@ -86,26 +71,17 @@ export type TimelineTabProps = {
  * rows it draws are the table's. It adds a join between them and nothing else
  * — which is what keeps three bodies answering for one fight. */
 export const TimelineTab = ({
-  id,
-  metric,
-  hostility,
-  rows,
+  stream,
+  presentation,
   everySkill,
   keying,
-  pins,
-  probes,
   window,
   segmentAt,
   enemyTypeAt,
-  renderLabel,
-  rowColor,
-  onPin,
-  sectionLabel,
-  emptyKey,
-  rowSections,
-  cardAmount,
   markEntry,
 }: TimelineTabProps) => {
+  const { id, metric, hostility, pins, probes } = stream;
+  const { rows, renderLabel, rowColor, onPin, sectionLabel, emptyKey, rowSections, cardAmount } = presentation;
   const { t } = useTranslation();
   const { events, total } = useEvents(id);
   // Measured so the merge threshold tracks the real scale. `useElementSize`

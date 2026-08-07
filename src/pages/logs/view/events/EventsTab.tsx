@@ -6,18 +6,8 @@ import { millisecondsToPreciseElapsedFormat } from "@/utils";
 
 import "../analysis/analysis.css";
 
-import type { MetricKey } from "../analysis/machine/state";
-import type { Hostility } from "../metrics/types";
-
-import {
-  filterByKind,
-  filterByPins,
-  toEventRow,
-  type ActorSpace,
-  type EventKind,
-  type EventPins,
-  type EventRow,
-} from "./eventRows";
+import type { StreamContext } from "../analysis/model/bodyContext";
+import { filterByKind, filterByPins, toEventRow, type ActorSpace, type EventKind, type EventRow } from "./eventRows";
 import {
   defaultScopeKinds,
   filterByHolderSide,
@@ -25,7 +15,6 @@ import {
   scopeFor,
   scopeKinds,
   scopeUsesHostility,
-  type ScopeProbes,
 } from "./eventScope";
 import { useEvents } from "./useEvents";
 import { visibleSlice } from "./windowSlice";
@@ -265,12 +254,10 @@ export const EventRowsTable = ({
 };
 
 export type EventsTabProps = {
-  id: string | undefined;
-  /** The metric tab, which is what says WHICH events this is a stream of. */
-  metric: MetricKey;
-  hostility: Hostility;
-  pins: EventPins;
-  probes: ScopeProbes;
+  /** Which log, metric and side to read, and how to narrow and classify what
+   * comes back — shared verbatim with the Timeline body (see `StreamContext`),
+   * which reads the same stream through the same filters. */
+  stream: StreamContext;
   labels: EventLabels;
 };
 
@@ -282,7 +269,8 @@ export type EventsTabProps = {
  * table would. So it answers to all of them: the metric picks the kinds (see
  * `eventScope`), the side picks the holders where that means anything, and the
  * pins narrow what is left. */
-export const EventsTab = ({ id, metric, hostility, pins, probes, labels }: EventsTabProps) => {
+export const EventsTab = ({ stream, labels }: EventsTabProps) => {
+  const { id, metric, hostility, pins, probes } = stream;
   const { t } = useTranslation();
   const { events, total } = useEvents(id);
 

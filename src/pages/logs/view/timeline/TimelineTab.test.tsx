@@ -44,24 +44,35 @@ const ROWS: MetricRow[] = [
   },
 ];
 
-const renderTab = (over = {}) =>
+/** The stream half of what a body is given — which log, metric and side, and
+ * how to narrow it. Shared with the Events body in production. */
+const STREAM = {
+  id: "1",
+  metric: "damage" as const,
+  hostility: "friendly" as const,
+  pins: { source: null, targetSpans: [], abilityKeys: null },
+  probes: { isPartyMember: (index: number) => index < 4, isHarmful: () => false },
+};
+
+/** The presentation half — shared with the table body in production, which is
+ * what stops a lane and its table row being drawn two different ways. */
+const PRESENTATION = {
+  rows: ROWS,
+  renderLabel: (row: MetricRow) => `label(${row.key})`,
+  rowColor: () => "#36B37E",
+  onPin: () => {},
+};
+
+const renderTab = (over: Record<string, unknown> = {}) =>
   render(
     <MantineProvider>
       <TimelineTab
-        id="1"
-        metric="damage"
-        hostility="friendly"
-        rows={ROWS}
+        stream={STREAM}
+        presentation={{ ...PRESENTATION, ...over }}
         everySkill={[]}
-        pins={{ source: null, targetSpans: [], abilityKeys: null }}
-        probes={{ isPartyMember: (index: number) => index < 4, isHarmful: () => false }}
         window={{ startMs: 0, endMs: 30_000 }}
         segmentAt={() => -1}
         enemyTypeAt={() => null}
-        renderLabel={(row: MetricRow) => `label(${row.key})`}
-        rowColor={() => "#36B37E"}
-        onPin={() => {}}
-        {...over}
       />
     </MantineProvider>
   );
