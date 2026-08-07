@@ -277,7 +277,7 @@
       "hostility-disabled-hint": "奥义与昏厥仅按玩家记录，无法切换至敌方视角。",
       "buffs-empty": "此日志中未记录任何状态",
       "enemy-dealt-empty": "未记录任何受到的伤害 — 引入承伤记录之前的日志不含此类数据",
-      "sba-no-breakdown": "分能力奥义仅记录您自己的角色",
+      "sba-no-breakdown": "按能力拆分的奥义槽增长仅记录您自己的角色",
       "sba-unattributed": "未归因（闪避、队友奥义、连锁）",
       "sba-cause-damage-taken": "受到伤害",
       "sba-cause-perfect-guard": "精准格挡",
