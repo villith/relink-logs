@@ -76,6 +76,7 @@ import type { Hostility, MetricDescriptor, MetricRow } from "../metrics/types";
 import { deriveSelectorOptions, type SelectorPins } from "../selectorOptions";
 import { clipToWindow, isStatusPin, statusPinKey, uptimeMs } from "../statusUptime";
 import { buildTargetLabels } from "../targetLabels";
+import { TimelineTab } from "../timeline/TimelineTab";
 
 import { ActorBar } from "./ActorBar";
 import { AuraStrip, type AuraChip } from "./AuraStrip";
@@ -167,20 +168,22 @@ const METRIC_TABS: MetricTab[] = Object.entries(METRICS).map(([value, descriptor
 /** The raw-event-stream view's value in the top-level switch, and in the `tab`
  * URL param. Its absence means the default view, the table. */
 const EVENTS_TAB = "events";
+/** The positional view: the metric's own rows drawn against fight time. */
+const TIMELINE_TAB = "timeline";
 /** The default view: the chart-and-table body, everything the metric tabs
  * switch between. Never written to the URL — a default in the URL is noise. */
 const TABLE_TAB = "table";
 
 /** The top-level switch, which changes the WHOLE body below the selector bar.
  *
- * Events is here rather than alongside the metrics because it is not a metric —
- * it has no chart, no groupings, no numeric columns and no side, so there is
- * nothing for `CAPABILITIES`/`resolveViewSpec` to answer for it, and nothing for
- * the hostility toggle or the metric tabs to mean while it is showing. It rides
- * its own `tab` param instead of `state.metric`, so the pins survive switching
- * between the two views — which is the point of sharing the selector bar. */
+ * Neither Events nor Timeline is a metric — they have no chart of their own, no
+ * groupings and no numeric columns, so there is nothing for
+ * `CAPABILITIES`/`resolveViewSpec` to answer for them. Both ride the `tab`
+ * param instead of `state.metric`, so the pins survive switching between the
+ * three bodies — which is the point of sharing the selector bar. */
 const VIEW_TABS: MetricTab[] = [
   { value: TABLE_TAB, labelKey: "ui.logs.view-table-tab" },
+  { value: TIMELINE_TAB, labelKey: "ui.logs.timeline-tab" },
   { value: EVENTS_TAB, labelKey: "ui.logs.events-tab" },
 ];
 
@@ -278,7 +281,10 @@ export const AnalysisView = () => {
   // clobbering the other — and the pins therefore survive switching between the
   // two bodies, which is the whole point of sharing the selector bar.
   const [tab, setTab] = useQueryState("tab", { history: "replace" });
-  const onEvents = tab === EVENTS_TAB;
+  // Which BODY the frame shows. A three-way selector rather than a boolean per
+  // body: two booleans can both be true, and the one that wins would then
+  // depend on the order the JSX tested them in.
+  const body = tab === EVENTS_TAB ? EVENTS_TAB : tab === TIMELINE_TAB ? TIMELINE_TAB : TABLE_TAB;
   const caps = CAPABILITIES[state.metric];
   const spec = useMemo(() => resolveViewSpec(state, caps), [state, caps]);
 
@@ -755,6 +761,20 @@ export const AnalysisView = () => {
       return segment === -1 ? null : labelForTarget(segment);
     },
     [targetEntries, labelForTarget]
+  );
+
+  // The enemy TYPE at an actor index and a moment, for the taken tab's lanes.
+  // Matched on index AND time overlap for the same reason `breakEnemyOf` is:
+  // the game reissues a dead boss's actor index to a later spawn, and an
+  // index-only lookup files the second boss's attacks under the first's lane.
+  const enemyTypeAt = useCallback(
+    (actorIndex: number, atMs: number): EnemyType | null => {
+      const entry = targetEntries.find(
+        (candidate) => candidate.actorIndex === actorIndex && candidate.startMs <= atMs && candidate.endMs >= atMs
+      );
+      return entry?.enemyType ?? null;
+    },
+    [targetEntries]
   );
 
   // The Events body's pins, resolved out of the machine's index spaces into the
@@ -1925,13 +1945,14 @@ export const AnalysisView = () => {
             variant="inline"
             ariaLabelKey="ui.logs.view-tablist-label"
             tabs={VIEW_TABS}
-            value={onEvents ? EVENTS_TAB : TABLE_TAB}
+            value={body}
             onChange={(value) =>
-              // Leaving Events clears the param rather than storing "table":
-              // the table body is the default, and a default in the URL is
-              // noise. The metric the table was last on is untouched either
-              // way — it lives in the machine, not here.
-              setTab(value === EVENTS_TAB ? EVENTS_TAB : null)
+              // Selecting the DEFAULT body clears the param rather than storing
+              // "table": the table is the default, and a default in the URL is
+              // noise. Anything else is written as-is. The metric the table was
+              // last on is untouched either way — it lives in the machine, not
+              // here.
+              setTab(value === TABLE_TAB ? null : value)
             }
           />
         }
@@ -2043,9 +2064,10 @@ export const AnalysisView = () => {
         </>
       )}
 
-      {/* The ONE block the view switch swaps: the metric's figures, or the raw
-          events behind them. Everything above is the same in both. */}
-      {onEvents ? (
+      {/* The ONE block the view switch swaps: the metric's figures, the same
+          rows drawn against time, or the raw events behind them. Everything
+          above is the same in all three. */}
+      {body === EVENTS_TAB ? (
         <EventsTab
           id={id}
           metric={metricKey}
@@ -2053,6 +2075,24 @@ export const AnalysisView = () => {
           pins={eventPins}
           probes={eventProbes}
           labels={eventLabels}
+        />
+      ) : body === TIMELINE_TAB ? (
+        <TimelineTab
+          id={id}
+          metric={metricKey}
+          hostility={hostility}
+          rows={shownRows}
+          everySkill={everySkill}
+          pins={eventPins}
+          probes={eventProbes}
+          window={statusWindow}
+          segmentAt={(index, atMs, space) => spawnSegmentAt(targetEntries, index, atMs, space)}
+          enemyTypeAt={enemyTypeAt}
+          renderLabel={renderLabel}
+          rowColor={rowColor}
+          onPin={handlePin}
+          sectionLabel={effectLevel ? sectionLabelOf : undefined}
+          emptyKey={isStatusMetric && statusIntervals.length > 0 ? undefined : spec.table.emptyKey}
         />
       ) : (
         <Box style={{ padding: "4px 16px 14px" }}>
