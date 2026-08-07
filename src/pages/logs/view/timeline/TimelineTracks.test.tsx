@@ -59,8 +59,47 @@ const renderTracks = (lanes = LANES, over: Partial<React.ComponentProps<typeof T
 describe("TimelineTracks", () => {
   it("renders one lane per row, in order", () => {
     const { container } = renderTracks();
-    const names = [...container.querySelectorAll(".timeline-lane-name")].map((el) => el.textContent);
+    const names = [...container.querySelectorAll(".timeline-names .analysis-row")].map((el) => el.textContent);
     expect(names).toEqual(["label(skill:Normal:100)", "label(status:77:210)"]);
+  });
+
+  it("puts the horizontal scrollbar on the track column only", () => {
+    const { container } = renderTracks();
+    expect(container.querySelector(".timeline-names")).toBeTruthy();
+    // The names column must not sit inside the horizontal scroller.
+    expect(container.querySelector(".timeline-tracks-scroll .timeline-names")).toBeNull();
+  });
+
+  it("draws lanes as the table's own row", () => {
+    const { container } = renderTracks();
+    expect(container.querySelectorAll(".timeline-names .analysis-row").length).toBe(2);
+  });
+
+  // The two columns are rendered from one sequence; if they ever disagree the
+  // names sit against the wrong marks.
+  it("renders the same number of lane rows in both columns", () => {
+    const { container } = renderTracks(LANES, { sectionLabel: () => "S" });
+    expect(container.querySelectorAll(".timeline-names .analysis-row").length).toBe(
+      container.querySelectorAll(".timeline-content .timeline-row").length
+    );
+  });
+
+  it("renders the same number of section headings in both columns", () => {
+    const { container } = renderTracks(LANES, {
+      sectionLabel: (row: MetricRow) => (row.kind === "status" ? "Effects" : "Abilities"),
+    });
+    expect(container.querySelectorAll(".timeline-section").length).toBe(
+      container.querySelectorAll(".timeline-row-gap").length
+    );
+  });
+
+  it("opens the table's card on a mark that has contributions", () => {
+    const { container } = renderTracks(LANES, {
+      cardAmount: { amountKey: "ui.logs.column-dmg", format: (value: number) => String(value) },
+      markEntry: (key: string) => ({ name: `named(${key})` }),
+    });
+    // Both marks still draw; the instant one now carries a card.
+    expect(container.querySelectorAll(".timeline-mark").length).toBe(2);
   });
 
   // A lane and its table row must not be resolved two ways, so the caller's

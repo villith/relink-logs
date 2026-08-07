@@ -560,17 +560,55 @@
   flex-shrink: 0;
 }
 
-/* The Timeline body. One horizontal scroll container holds BOTH the ruler and
- * the lanes, so the axis and the marks under it cannot drift apart — two
- * scrollers kept in sync by hand is how a timeline comes to lie about when
- * something happened. */
-.timeline-scroll {
-  overflow-x: auto;
+/* The Timeline body.
+ *
+ * ONE vertical scroller — `.timeline-frame` — holding two columns side by side:
+ * the lane names, which never move sideways, and the tracks, which own the only
+ * horizontal scrollbar in the block. The scrollbar used to span the whole
+ * container, which read as if the names scrolled too.
+ *
+ * The columns are two lists rendered from ONE `laneRows` sequence, so they stay
+ * in step only while their row heights match EXACTLY. Every height below is
+ * border-box (Mantine's reset), so a border sits INSIDE the stated height and
+ * adds nothing to it:
+ *
+ *   ruler    22px  .timeline-ruler      ↔  .timeline-ruler-gap
+ *   heading  22px  .timeline-section    ↔  .timeline-row-gap
+ *   lane     30px  .analysis-row        ↔  .timeline-row
+ *
+ * The lane height is `.analysis-row`'s, restated here rather than shared: a
+ * lane IS an `.analysis-row`, and the track beside it has to be told the same
+ * number. Change one and change the other. */
+.timeline-frame {
+  display: flex;
   overflow-y: auto;
   max-height: 460px;
   border: 1px solid var(--an-line);
   border-radius: 4px;
-  position: relative;
+}
+
+/* Outside the horizontal scroller, so the names cannot pan away and no longer
+ * need to be sticky. Opaque, and separated by its own right border. */
+.timeline-names {
+  flex: 0 0 220px;
+  min-width: 0;
+  background: var(--mantine-color-body);
+  border-right: 1px solid var(--an-line);
+}
+
+/* Exactly `.timeline-ruler`'s height, so lane one starts level in both columns.
+ * Carries the ruler's underline across the names column. */
+.timeline-ruler-gap {
+  height: 22px;
+  border-bottom: 1px solid var(--an-line);
+}
+
+/* The ONLY horizontal scrollbar. `min-width: 0` so the flex item may shrink
+ * below its (very wide) content instead of stretching the frame. */
+.timeline-tracks-scroll {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
 }
 
 /* Wider than its container by exactly domain/viewport, set inline. Percentage
@@ -581,35 +619,21 @@
   min-width: 100%;
 }
 
-.timeline-lane {
+/* One lane's track. 30px — `.analysis-row`'s height in the other column. */
+.timeline-row {
   display: flex;
   align-items: stretch;
-  height: 22px;
+  height: 30px;
 }
 
-.timeline-lane:hover {
+.timeline-row:hover {
   background: var(--an-row-hover, rgba(255, 255, 255, 0.04));
 }
 
-/* Sticky against the HORIZONTAL scroll, so a lane keeps its name while its
- * marks pan out of view. Opaque, because the marks slide underneath it. */
-.timeline-lane-name {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  flex: 0 0 220px;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  background: var(--mantine-color-body);
-  border-right: 1px solid var(--an-line);
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  font-size: var(--mantine-font-size-xs);
-  cursor: pointer;
+/* A section heading's height with none of its words: the names column carries
+ * the text, this column only has to stay level with it. */
+.timeline-row-gap {
+  height: 22px;
 }
 
 .timeline-lane-track {
@@ -646,25 +670,14 @@
   opacity: 1;
 }
 
-/* Sticky against the VERTICAL scroll so the axis stays put while lanes scroll,
- * and inside the same horizontal scroller so it pans with them. */
+/* The axis, at the top of the tracks column and inside its horizontal scroller
+ * so it pans with the marks. 22px INCLUDING its border — `.timeline-ruler-gap`
+ * is the same 22px, which is what puts lane one at the same y in both columns. */
 .timeline-ruler {
-  position: sticky;
-  top: 0;
-  z-index: 3;
   height: 22px;
   background: var(--mantine-color-body);
   border-bottom: 1px solid var(--an-line);
   display: flex;
-}
-
-.timeline-ruler-spacer {
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  flex: 0 0 220px;
-  background: var(--mantine-color-body);
-  border-right: 1px solid var(--an-line);
 }
 
 .timeline-ruler-track {
@@ -685,16 +698,20 @@
   white-space: nowrap;
 }
 
-/* A section subheader, the timeline's copy of the table's provenance runs. */
+/* A section subheader, the timeline's copy of the table's provenance runs. It
+ * lives in the names column, outside the horizontal scroller, so it needs no
+ * stickiness of its own. Fixed at 22px, matching `.timeline-row-gap` in the
+ * other column — a heading that grew with its text would push the names out of
+ * step with their marks. */
 .timeline-section {
-  position: sticky;
-  left: 0;
-  z-index: 2;
-  padding: 6px 8px 2px;
+  display: flex;
+  align-items: flex-end;
+  height: 22px;
+  padding: 0 8px 3px;
   font-size: 10px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--mantine-color-dimmed);
-  background: var(--mantine-color-body);
-  width: max-content;
+  overflow: hidden;
+  white-space: nowrap;
 }

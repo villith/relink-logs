@@ -21,13 +21,14 @@ export type TimelineRulerProps = {
   stepMs: number;
 };
 
-/** The time axis. Shares its scroll container with the lanes, so the two
- * cannot disagree about where a moment sits. */
+/** The time axis. Shares its HORIZONTAL scroll container with the lanes' tracks,
+ * so the two cannot disagree about where a moment sits.
+ *
+ * No name-column spacer of its own any more: the names are a separate column
+ * outside this scroller, and it opens with `.timeline-ruler-gap` at exactly this
+ * ruler's height. */
 export const TimelineRuler = ({ domainMs, startMs, stepMs }: TimelineRulerProps) => (
   <div className="timeline-ruler">
-    {/* Matches the lanes' sticky name column, so tick zero lines up with the
-        left edge of the tracks rather than with the left edge of the view. */}
-    <div className="timeline-ruler-spacer" />
     <div className="timeline-ruler-track">
       {tickTimes(domainMs, stepMs).map((at) => (
         <span
