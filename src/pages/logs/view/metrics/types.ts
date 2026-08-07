@@ -183,5 +183,9 @@ export type MetricDescriptor = {
     pins: SelectorPins;
     hostility?: Hostility;
     fightDurationMs?: number;
+    /** The same keying `rows` was built with — the children decompose one of
+     * its rows, so a child selected by a different fold would not sum to the
+     * parent it sits under. */
+    keying?: RowKeying;
   }) => MetricRow[] | null;
 };

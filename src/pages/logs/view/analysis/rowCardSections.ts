@@ -1,5 +1,6 @@
 import type { ComputedPlayerState, TargetEntry } from "@/types";
 
+import type { RowKeying } from "../abilitySkills";
 import type { MetricCard, MetricRow, RowLevel } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
 
@@ -36,6 +37,7 @@ export const rowCardSectionsFor = ({
   color,
   labels,
   card,
+  keying,
 }: {
   cardKind: CardKind;
   groupBy: Dimension;
@@ -49,6 +51,10 @@ export const rowCardSectionsFor = ({
   /** The metric's card (amount heading, figure, per-target flag) — consumed
    * by the skill-walk builders only. */
   card: MetricCard | undefined;
+  /** The view's row keying, so a card folds exactly as the row it explains.
+   * Only the skill-walk builder needs it; the enemy and taken cards decompose
+   * dimensions the collapse does not touch. */
+  keying?: RowKeying;
 }): CardSection[] | null => {
   switch (cardKind) {
     case "enemyDealt":
@@ -75,7 +81,7 @@ export const rowCardSectionsFor = ({
       if (row.key.startsWith("target:")) {
         return targetCardSectionsFor({ row, players, targetEntries, color, labels });
       }
-      return card ? cardSectionsFor({ row, level, players, pins, color, labels, card }) : null;
+      return card ? cardSectionsFor({ row, level, players, pins, color, labels, card, keying }) : null;
     default:
       return null;
   }

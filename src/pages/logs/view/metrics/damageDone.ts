@@ -327,13 +327,13 @@ export const damageDone: MetricDescriptor = {
   // rows are enemy ATTACKS, and their honest per-source split is per SPAWN —
   // which `DamageTakenState` does not record — so they stay leaves rather
   // than pretending victims are sources.
-  children: ({ row, players, level, pins, hostility }): MetricRow[] | null => {
+  children: ({ row, players, level, pins, hostility, keying }): MetricRow[] | null => {
     if (level !== "abilities" || hostility === "enemy" || pins.source !== null) return null;
     if (!row.key.startsWith("skill:")) return null;
     const key = row.key.slice("skill:".length);
     const total = players.reduce((sum, player) => sum + player.totalDamage, 0);
     return players
-      .map((player) => ({ player, skills: skillsForAbilityKey(player.skillBreakdown, key) }))
+      .map((player) => ({ player, skills: skillsForAbilityKey(player.skillBreakdown, key, keying) }))
       .filter(({ skills }) => skills.length > 0)
       .map(({ player, skills }): MetricRow => {
         const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);

@@ -1,7 +1,7 @@
 import type { CharacterType, ComputedPlayerState, EnemyType, SkillState, SkillTargetState, TargetEntry } from "@/types";
 
 import { abilityKey } from "../abilityKey";
-import { childOfPin, groupSkillsForRows, skillsForAbilityKey } from "../abilitySkills";
+import { childOfPin, groupSkillsForRows, skillsForAbilityKey, type RowKeying } from "../abilitySkills";
 import type { MetricCard, MetricRow, RowLevel } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
 
@@ -102,11 +102,14 @@ export const aggregateAbilities = (
   abilityLabel: (key: string) => string,
   valueOf: (skill: SkillState) => number,
   abilityIcon?: (key: string) => string | undefined,
-  characterName?: (type: CharacterType) => string
+  characterName?: (type: CharacterType) => string,
+  keying?: RowKeying
 ) => {
   // `groupSkillsForRows` owns the condensing rule; re-deriving it here is what
-  // produced the double-draw above in the first place.
-  const entries = groupSkillsForRows(skills).map(({ key, skills: grouped }) => ({
+  // produced the double-draw above in the first place. The view's keying rides
+  // along for the same reason: a card that folded echoes differently from the
+  // table beneath it would explain a row that is not the one being hovered.
+  const entries = groupSkillsForRows(skills, keying).map(({ key, skills: grouped }) => ({
     key,
     label: abilityLabel(key),
     value: grouped.reduce((sum, skill) => sum + valueOf(skill), 0),
@@ -172,6 +175,7 @@ export const cardSectionsFor = ({
   color,
   labels,
   card,
+  keying,
 }: {
   row: MetricRow;
   level: RowLevel;
@@ -180,6 +184,8 @@ export const cardSectionsFor = ({
   /** The row's own colour, so the card matches the bar it came from. */
   color: string;
   labels: SectionLabels;
+  /** The view's row keying, so the card folds exactly as the row it explains. */
+  keying?: RowKeying;
   /** What the card measures. Every figure below is read through
    * `card.valueOf`, and the by-target section is omitted outright where the
    * metric has no per-enemy record — see `aggregateTargets`. */
@@ -213,7 +219,8 @@ export const cardSectionsFor = ({
           (key) => labels.ability(key, player),
           card.valueOf,
           labels.abilityIcon && ((key) => labels.abilityIcon?.(key, player)),
-          labels.character
+          labels.character,
+          keying
         ),
       },
       ...targetSection(player.skillBreakdown),
@@ -229,7 +236,7 @@ export const cardSectionsFor = ({
     if (pins.source !== null && !owner) return null;
     const scoped = owner ? [owner] : players;
     const rowKey = row.key.replace(/^skill:/, "");
-    const skillsOf = (player: ComputedPlayerState) => skillsForAbilityKey(player.skillBreakdown, rowKey);
+    const skillsOf = (player: ComputedPlayerState) => skillsForAbilityKey(player.skillBreakdown, rowKey, keying);
     // EVERY skill under the ability, not the first: the row above sums them, so
     // explaining it with one contributor describes a fraction of what it says.
     const skills = scoped.flatMap(skillsOf);

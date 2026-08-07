@@ -53,7 +53,7 @@ import {
   type Label,
 } from "../DetailCharts";
 import { abilityKey, skillKeyPayload } from "../abilityKey";
-import { actionsForPin, childOfPin } from "../abilitySkills";
+import { actionsForPin, childOfPin, rowKeyingFor } from "../abilitySkills";
 import { actorColor, keyColor, type ActorColorContext } from "../actorColor";
 import { EventsTab, type EventLabels } from "../events/EventsTab";
 import type { ScopeProbes } from "../events/eventScope";
@@ -80,6 +80,7 @@ import { TimelineTab } from "../timeline/TimelineTab";
 
 import { ActorBar } from "./ActorBar";
 import { AuraStrip, type AuraChip } from "./AuraStrip";
+import { CollapseSupplementaryToggle } from "./CollapseSupplementaryToggle";
 import { DebugBar } from "./DebugBar";
 import { DpsChart, type StackMode } from "./DpsChart";
 import { HostilityToggle } from "./HostilityToggle";
@@ -282,6 +283,12 @@ export const AnalysisView = () => {
   // switching between the three bodies, which is the whole point of sharing the
   // selector bar.
   const [tab, setTab] = useQueryState("tab", { history: "replace" });
+  // Whether echo damage rides the skill that caused it. Its own nuqs key beside
+  // the pins, so a shared link reproduces the reading rather than the recipient
+  // seeing a differently-folded table. "1" for on, absent for off — the same
+  // shape every other flag in this query takes.
+  const [collapseParam, setCollapseParam] = useQueryState("supp", { history: "replace" });
+  const collapseSupplementary = collapseParam === "1";
   // That param resolved to one of the three bodies, with anything unrecognised
   // falling back to the default. One selector rather than a boolean per body:
   // two booleans can both be true, and which one won would then depend on the
@@ -415,6 +422,19 @@ export const AnalysisView = () => {
     [encounter, baseFacts]
   );
 
+  // THE view's row keying, built once from the same actions the table, the
+  // chart and the timeline all draw from. Passed down rather than re-derived per
+  // surface: a band and the row it decomposes have to agree about which row an
+  // echo is on, and deriving it three times is how they would come to differ.
+  //
+  // Gated on the metric as well as the toggle, because only Damage Done records
+  // supplementary damage — the toggle disables itself on the other tabs, and
+  // this makes it inert there even if it were left on from a shared link.
+  const rowKeying = useMemo(
+    () => rowKeyingFor(everySkill, collapseSupplementary && metricKey === "damage"),
+    [everySkill, collapseSupplementary, metricKey]
+  );
+
   // A pinned row can be a condensed GROUP, which the backend knows nothing
   // about — it filters on raw action ids. Expanded here, from what the party
   // actually used, so the parser stays free of a display concern and the filter
@@ -423,8 +443,9 @@ export const AnalysisView = () => {
   // action ids and would narrow the fight to nothing at all. Left empty, the
   // damage tables stay whole while a buff is pinned on its own tab.
   const pinnedActions = useMemo(
-    () => (pins.ability === null || isStatusPin(pins.ability) ? [] : actionsForPin(pins.ability, everySkill)),
-    [pins.ability, everySkill]
+    () =>
+      pins.ability === null || isStatusPin(pins.ability) ? [] : actionsForPin(pins.ability, everySkill, rowKeying),
+    [pins.ability, everySkill, rowKeying]
   );
 
   // The active aura's admitted windows — the pinned holder's intervals of the
@@ -489,7 +510,10 @@ export const AnalysisView = () => {
     if (spec.fetch.ability !== null) {
       const attack = takenAttackRowParts(spec.fetch.ability);
       if (dealtStream && attack === null) {
-        ability = { kind: "friendly", actions: actionsForPin(spec.fetch.ability, everySkill) };
+        // Through the same keying the table pins by: with the collapse on, a
+        // cause row stands for its echoes' actions as well, and a filter that
+        // left them out would fetch less than the row it was clicked on reports.
+        ability = { kind: "friendly", actions: actionsForPin(spec.fetch.ability, everySkill, rowKeying) };
       } else if (!dealtStream && attack !== null) {
         ability = { kind: "enemyAttack", enemyType: attack.enemyType, actionId: attack.actionId };
       }
@@ -511,7 +535,7 @@ export const AnalysisView = () => {
       // rows and the chart bands all answer for the same filtered fight.
       ...(maskWindows === undefined ? {} : { windows: maskWindows }),
     };
-  }, [spec.fetch, everySkill, state.window, maskWindows]);
+  }, [spec.fetch, everySkill, rowKeying, state.window, maskWindows]);
   wireQueryRef.current = wireQuery;
   // The query's JSON identity, for "is a refetch needed at all" below — the
   // object is rebuilt every render, so identity comparison would always refetch.
@@ -1140,6 +1164,7 @@ export const AnalysisView = () => {
           fightDurationMs,
           statusWindow,
           hostility,
+          keying: rowKeying,
         })
       : [];
   }, [
@@ -1160,6 +1185,7 @@ export const AnalysisView = () => {
     fightDurationMs,
     statusWindow,
     hostility,
+    rowKeying,
   ]);
 
   // Child rows behind one table row — the descriptor's split bound to the
@@ -1169,8 +1195,10 @@ export const AnalysisView = () => {
   // semantics declare no accessor and their rows keep only what they carry.
   const rowChildren = useCallback(
     (row: MetricRow) =>
-      metric.children ? metric.children({ row, players, level, pins, hostility, fightDurationMs }) : null,
-    [metric, players, level, pins, hostility, fightDurationMs]
+      metric.children
+        ? metric.children({ row, players, level, pins, hostility, fightDurationMs, keying: rowKeying })
+        : null,
+    [metric, players, level, pins, hostility, fightDurationMs, rowKeying]
   );
 
   // The character that tells two same-labelled ability rows apart: the child
@@ -1501,8 +1529,9 @@ export const AnalysisView = () => {
         color: rowColor(row),
         labels: hostilityLabels,
         card: metric.card,
+        keying: rowKeying,
       }),
-    [caps, spec.groupBy, hostility, level, players, pins, targetEntries, rowColor, hostilityLabels, metric]
+    [caps, spec.groupBy, hostility, level, players, pins, targetEntries, rowColor, hostilityLabels, metric, rowKeying]
   );
   // What the plot shows follows the metric tabs. Each metric brings its own
   // bucketed series from the base load, so switching tabs never refetches.
@@ -1685,8 +1714,8 @@ export const AnalysisView = () => {
     // Same cap as the group bands — both feed the eight-colour palette. The
     // fold follows the table's: a PINNED group's rows are its members, so the
     // bands must be too, or the chart redraws the band that was just clicked.
-    return abilityBands(bands, GROUP_TOP_N, bandLabelFor, pins.ability === null ? "group" : "action");
-  }, [caps.dataPath, spec.groupBy, pins.source, pins.ability, scopedAbilitySeries, bandLabelFor]);
+    return abilityBands(bands, GROUP_TOP_N, bandLabelFor, pins.ability === null ? "group" : "action", rowKeying);
+  }, [caps.dataPath, spec.groupBy, pins.source, pins.ability, scopedAbilitySeries, bandLabelFor, rowKeying]);
 
   // Which series the per-player chart draws. identityPlayers, not players: these
   // charts hold the whole party, so a pin must not drop curves from the plot.
@@ -1964,11 +1993,20 @@ export const AnalysisView = () => {
           the switcher shifted every control under it each time the metric
           changed. Only metrics that declare `supportsHostility` can operate it
           — see HostilityToggle's `disabled`. */}
-      <Box style={{ padding: "8px 16px 0" }}>
+      <Box style={{ padding: "8px 16px 0", display: "flex", alignItems: "center", gap: 16 }}>
         <HostilityToggle
           value={hostility}
           onChange={(side) => setState(hostilityTransition(state, side))}
           disabled={!caps.supportsHostility}
+        />
+        {/* Beside the side switch, and disabled rather than hidden for the same
+            reason it is: only Damage Done records supplementary damage, and a
+            control that comes and went with the tab would shift everything
+            under it. */}
+        <CollapseSupplementaryToggle
+          value={collapseSupplementary}
+          onChange={(next) => setCollapseParam(next ? "1" : null)}
+          disabled={metricKey !== "damage"}
         />
       </Box>
 
