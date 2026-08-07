@@ -30,12 +30,13 @@ const LANES: Lane[] = [
       pinOnClick: { ability: "Normal:100" },
     }),
     spans: false,
-    marks: [{ startMs: 0, endMs: 0, count: 1, amount: 500 }],
+    marks: [{ startMs: 0, endMs: 0, count: 1, amount: 500, by: [{ key: "Normal:100", count: 1, amount: 500 }] }],
   },
   {
     row: metricRow({ key: "status:77:210", label: "status:77:210", kind: "status" }),
     spans: true,
-    marks: [{ startMs: 5000, endMs: 15_000, count: 1, amount: null }],
+    // A real span is not an event fold, so it has no parts to decompose.
+    marks: [{ startMs: 5000, endMs: 15_000, count: 1, amount: null, by: [] }],
   },
 ];
 
