@@ -94,9 +94,18 @@ describe("MetricTable", () => {
 
   it("scales bars against the largest row, not the total", () => {
     const { container } = renderTable();
-    const bars = container.querySelectorAll<HTMLElement>("[data-metric-bar]");
+    const bars = container.querySelectorAll<HTMLElement>("[data-testid='metric-bar-segment']");
     expect(bars[0].style.width).toBe("100%");
     expect(parseFloat(bars[1].style.width)).toBeCloseTo(100 / 3, 6);
+  });
+
+  it("draws a row's supplementary split", () => {
+    renderTable({
+      rows: [{ key: "a", label: "A", value: 50, subValue: 20, columns: [], pinOnClick: null, colorSlot: 0 }],
+    });
+    const segments = screen.getAllByTestId("metric-bar-segment") as HTMLElement[];
+    expect(segments).toHaveLength(2);
+    expect(segments[1].style.left).toBe("60%");
   });
 
   it("draws no rank number", () => {
@@ -115,7 +124,7 @@ describe("MetricTable", () => {
       rows: [ROWS[1]],
       rowColor: (row: MetricRow) => (row.colorSlot === 1 ? "rgb(1, 2, 3)" : "rgb(9, 9, 9)"),
     });
-    const bar = container.querySelector<HTMLElement>("[data-metric-bar]");
+    const bar = container.querySelector<HTMLElement>("[data-testid='metric-bar-segment']");
     expect(bar?.style.backgroundColor).toBe("rgb(1, 2, 3)");
   });
 
@@ -147,7 +156,7 @@ describe("MetricTable", () => {
       { key: "b", label: "Eugen", value: 0, columns: ["0", "0"], pinOnClick: null, colorSlot: 1 },
     ];
     const { container } = renderTable({ rows: zeros });
-    const bars = container.querySelectorAll<HTMLElement>("[data-metric-bar]");
+    const bars = container.querySelectorAll<HTMLElement>("[data-testid='metric-bar-segment']");
     expect(bars).toHaveLength(2);
     expect(bars[0].style.width).toBe("0%");
   });
@@ -379,7 +388,7 @@ describe("timeline rows", () => {
     });
 
     expect(container.querySelectorAll(".analysis-timeline-piece")).toHaveLength(0);
-    expect(container.querySelectorAll("[data-metric-bar]")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-testid='metric-bar-segment']")).toHaveLength(1);
   });
 
   it("gives a zero-width window a visible minimum rather than nothing", () => {
@@ -401,7 +410,7 @@ describe("timeline rows", () => {
     });
 
     expect(container.querySelectorAll(".analysis-timeline-piece")).toHaveLength(0);
-    expect(container.querySelectorAll("[data-metric-bar]")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-testid='metric-bar-segment']")).toHaveLength(1);
   });
 
   it("draws the pieces inside a dedicated track cell, not across the row", () => {

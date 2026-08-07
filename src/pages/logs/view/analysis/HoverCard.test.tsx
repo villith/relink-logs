@@ -75,9 +75,26 @@ describe("HoverCardBody", () => {
     // Scaling to the section total would draw a three-row target list as three
     // slivers.
     const { container } = renderBody([section("ui.logs.hover-by-target", 4)]);
-    const bars = container.querySelectorAll<HTMLElement>("[data-card-bar]");
+    const bars = container.querySelectorAll<HTMLElement>("[data-testid='metric-bar-segment']");
     expect(bars[0].style.width).toBe("100%");
     expect(bars[3].style.width).toBe("25%");
+  });
+
+  it("draws a card entry's supplementary split the way a table row does", () => {
+    renderBody([
+      {
+        headingKey: "heading",
+        color: "red",
+        entries: [{ key: "a", label: "Ability", value: 50, subValue: 20 }],
+      },
+    ]);
+    const segments = screen.getAllByTestId("metric-bar-segment") as HTMLElement[];
+    // The lone entry IS the section's largest, so the pair fills the track:
+    // direct 30/50, supplementary 20/50 picking up exactly where it ends.
+    expect(segments).toHaveLength(2);
+    expect(segments[0].style.width).toBe("60%");
+    expect(segments[1].style.width).toBe("40%");
+    expect(segments[1].style.left).toBe("60%");
   });
 
   it("states each entry's share of the hovered row", () => {

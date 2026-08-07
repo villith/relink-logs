@@ -8,6 +8,7 @@ import type { SelectorPins } from "../selectorOptions";
 
 import { AnalysisRow } from "./AnalysisRow";
 import { HoverCard, type CardAmount, type CardSection } from "./HoverCard";
+import { MetricBar } from "./MetricBar";
 import "./analysis.css";
 
 export type MetricTableProps = {
@@ -184,16 +185,12 @@ export const MetricTable = ({
               name={renderLabel ? renderLabel(rowData) : rowData.label}
               background={
                 !positional && (
-                  <Box
-                    data-metric-bar
-                    className="analysis-bar"
-                    style={{
-                      // largest === 0 when every row is zero (a fight with no
-                      // stun, say). Guarding here keeps those rows visible at
-                      // zero width instead of rendering NaN.
-                      width: largest === 0 ? "0%" : `${(rowData.value / largest) * 100}%`,
-                      backgroundColor: rowColor ? rowColor(rowData) : FALLBACK_COLOR,
-                    }}
+                  <MetricBar
+                    value={rowData.value}
+                    subValue={rowData.subValue}
+                    largest={largest}
+                    color={rowColor ? rowColor(rowData) : FALLBACK_COLOR}
+                    variant="row"
                   />
                 )
               }

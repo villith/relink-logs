@@ -21,6 +21,10 @@ export type MetricRow = {
   label: string;
   /** Drives the bar width, as a percentage of the largest row. */
   value: number;
+  /** The part of `value` that is supplementary (echo) damage, drawn as a
+   * fainter segment at the bar's right end. Absent when the row has none or
+   * the collapse toggle is off — never 0, which would mount an empty segment. */
+  subValue?: number;
   /** Right-hand numeric columns, already formatted. */
   columns: string[];
   /** What clicking this row pins, or null if the row is a leaf. */

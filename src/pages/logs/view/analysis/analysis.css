@@ -112,6 +112,12 @@
  * three of four row names below 4.5:1 — the row got harder to read at the exact
  * moment the user was reading it. The outline above carries the hover state. */
 
+/* ONE opacity for the row and the card. The card used to override this to 0.38,
+ * which was never a reasoned difference, only an unshared literal. Checked
+ * before unifying: over --an-panel the worst palette entry (#9BCF53) composites
+ * to L=0.122, which is 6.1:1 against the card's white label — the row's 4.5:1
+ * floor holds on the panel too, so there is nothing for a second figure to buy. */
+
 /* The fill's segments. Absolute siblings rather than nested, so the
  * supplementary part can be fainter than the direct one — nested inside an
  * element that already carries opacity, a same-coloured child is invisible. */
@@ -246,10 +252,6 @@
   padding: 0 8px;
   margin: 2px 4px;
   border-radius: 2px;
-}
-
-.analysis-card-row .analysis-bar {
-  opacity: 0.38;
 }
 
 .analysis-card-name {

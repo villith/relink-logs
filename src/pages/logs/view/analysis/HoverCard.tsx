@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 import { CursorCard } from "@/components/CursorCard";
 import { share } from "@/utils";
 
+import { MetricBar } from "./MetricBar";
+
 import "./analysis.css";
 
 /** One row of a card section. `color` overrides the section's colour for this
@@ -12,7 +14,15 @@ import "./analysis.css";
  * row of it would say nothing about who dealt what. `icon` is the entity's
  * art, where it has any; rows without stay text-only rather than reserving a
  * blank box. */
-export type BreakdownEntry = { key: string; label: string; value: number; color?: string; icon?: string };
+export type BreakdownEntry = {
+  key: string;
+  label: string;
+  value: number;
+  /** The supplementary part of `value` — see `MetricRow.subValue`. */
+  subValue?: number;
+  color?: string;
+  icon?: string;
+};
 
 /** One stacked section of the card: a heading naming the dimension, then its
  * rows. `color` is the entity's colour — ability rows take their owner's, target
@@ -74,13 +84,12 @@ const Section = ({ headingKey, color, entries, amountKey, format }: CardSection 
       {shown.map((entry) => {
         return (
           <Box key={entry.key} className="analysis-card-row">
-            <Box
-              data-card-bar
-              className="analysis-bar"
-              style={{
-                width: largest === 0 ? "0%" : `${(entry.value / largest) * 100}%`,
-                backgroundColor: entry.color ?? color,
-              }}
+            <MetricBar
+              value={entry.value}
+              subValue={entry.subValue}
+              largest={largest}
+              color={entry.color ?? color}
+              variant="card"
             />
             <Text className="analysis-card-name">
               {entry.icon && <img className="analysis-card-icon" src={entry.icon} alt="" />}
