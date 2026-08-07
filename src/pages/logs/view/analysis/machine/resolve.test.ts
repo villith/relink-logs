@@ -75,14 +75,11 @@ describe("resolveViewSpec", () => {
   });
 
   it("picks the chart shape from what is drawn", () => {
-    expect(resolveViewSpec(state({ metric: "sba" }), CAPABILITIES.sba).chart).toMatchObject({
-      source: "base",
-      format: "percent",
-    });
-    expect(resolveViewSpec(state({ metric: "buffs" }), CAPABILITIES.buffs).chart).toMatchObject({
-      source: "stacks",
-      format: "count",
-    });
+    // Source only. The chart's title and format live on `chartPresentation`,
+    // which decides them from the series that won — a second answer here would
+    // be one the view never reads.
+    expect(resolveViewSpec(state({ metric: "sba" }), CAPABILITIES.sba).chart).toMatchObject({ source: "base" });
+    expect(resolveViewSpec(state({ metric: "buffs" }), CAPABILITIES.buffs).chart).toMatchObject({ source: "stacks" });
   });
 
   it("inverts the row label and regroup-tab vocabulary on the enemy side", () => {

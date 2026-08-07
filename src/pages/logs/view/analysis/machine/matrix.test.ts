@@ -46,7 +46,7 @@ describe("the full state matrix", () => {
     }
   });
 
-  // Row: metric hostility pins by → groupBy chart.source chart.titleKey fetch|local
+  // Row: metric hostility pins by → groupBy chart.source fetch|local
   // pins: S/A/T = source/ability/target pinned (fixed order), - = unpinned;
   // · = no by override.
   it("matches the reviewed snapshot — a diff here is a behavior change", () => {
@@ -65,7 +65,6 @@ describe("the full state matrix", () => {
         "→",
         spec.groupBy,
         spec.chart.source,
-        spec.chart.titleKey,
         spec.fetch ? "fetch" : "local",
       ].join(" ");
     });

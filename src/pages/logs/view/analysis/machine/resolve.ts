@@ -43,7 +43,15 @@ export type ViewSpec = {
   groupBy: Dimension;
   regroupTabs: RegroupTab[];
   table: { columnKeys: string[]; rowsLabelKey: string; emptyKey?: string };
-  chart: { source: "groups" | "base" | "stacks"; titleKey: string; format: "amount" | "percent" | "count" };
+  /** Which machinery feeds the plot — the dev readout's only field.
+   *
+   * The chart's TITLE and FORMAT are deliberately NOT here. Both are
+   * `chartPresentation`'s, decided from the series that actually won rather
+   * than from the state that requested them, which is the only way the heading
+   * can be kept from disagreeing with what is on screen. A second answer here
+   * was computed and snapshotted for a while but never rendered, and it had
+   * drifted: it knew nothing of the drilled-SBA title. */
+  chart: { source: "groups" | "base" | "stacks" };
   selectors: { dim: Dimension; enabled: boolean }[];
   fetch: GroupQuery | null;
 };
@@ -121,8 +129,6 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
           : caps.dataPath === "intervals"
             ? "stacks"
             : "base",
-      titleKey: chartTitleKeyFor(state, groupBy, caps),
-      format: state.metric === "sba" ? "percent" : caps.dataPath === "intervals" ? "count" : "amount",
     },
     selectors: DIMENSIONS.map((dim) => ({ dim, enabled: caps.dimensions[dim].supported })),
     fetch,
@@ -165,16 +171,4 @@ const emptyKeyFor = (state: AnalysisState, caps: MetricCapabilities): string | u
     return "ui.logs.enemy-dealt-empty";
   }
   return undefined;
-};
-
-/** Existing chart-title keys, chosen by what is DRAWN. */
-const chartTitleKeyFor = (state: AnalysisState, groupBy: Dimension, caps: MetricCapabilities): string => {
-  if (caps.dataPath === "intervals") return "ui.logs.chart-stacks-label";
-  if (state.metric === "stun") return "ui.logs.chart-stun-label";
-  if (state.metric === "sba") return "ui.logs.chart-sba-label";
-  if (state.metric === "taken")
-    return groupBy === "source" ? "ui.logs.chart-taken-label" : "ui.logs.chart-taken-drill-label";
-  if (groupBy === "ability") return "ui.logs.chart-drill-ability-label";
-  if (groupBy === "target") return "ui.logs.chart-drill-target-label";
-  return "ui.logs.chart-dps-label";
 };
