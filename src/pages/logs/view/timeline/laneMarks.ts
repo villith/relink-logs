@@ -4,6 +4,12 @@ import type { Span } from "../spans";
 
 import type { LaneMatcher } from "./laneMatch";
 
+/** One action's share of a mark. `amount` is 0 rather than null for a kind
+ * that carries none (a stun, a death, an effect landing): these are summed and
+ * sorted, and a null in that arithmetic would poison the fold. The mark's own
+ * `amount` still says null when nothing carried one. */
+export type MarkPart = { key: string; count: number; amount: number };
+
 /** One drawn mark. Times are milliseconds FROM THE START OF THE WINDOW, the
  * same base `MetricRow.timeline` uses — so a status bar and a damage tick on
  * one screen measure from one origin.
@@ -19,6 +25,12 @@ export type LaneMark = {
   /** Their summed amount, or null when none of them carried one — a stun or a
    * death has no amount, and reporting 0 would read as a measured zero. */
   amount: number | null;
+  /** What produced this mark, folded by action (or effect) and sorted by
+   * amount descending — the order the breakdown card lists them in.
+   *
+   * Empty for a real span: a status row's `timeline` is not an event fold and
+   * has no parts to name. */
+  by: MarkPart[];
 };
 
 /** One table row plus what it draws. */
@@ -67,13 +79,34 @@ export const marksByLane = (events: EventRow[], matcher: LaneMatcher, window: Sp
     if (lane === null) continue;
 
     const at = event.timeMs - window.startMs;
-    const mark: LaneMark = { startMs: at, endMs: at, count: 1, amount: event.amount };
+    const partKey = event.abilityKey ?? event.statusKey ?? "";
+    const mark: LaneMark = {
+      startMs: at,
+      endMs: at,
+      count: 1,
+      amount: event.amount,
+      by: [{ key: partKey, count: 1, amount: event.amount ?? 0 }],
+    };
     const found = byLane.get(lane);
     if (found) found.push(mark);
     else byLane.set(lane, [mark]);
   }
 
   return byLane;
+};
+
+/** Two part lists summed by key, largest first. Sorted here rather than at the
+ * card, so the card stays a renderer and the ordering rule has one home. */
+const foldParts = (into: MarkPart[], parts: MarkPart[]): MarkPart[] => {
+  const byKey = new Map<string, MarkPart>();
+  for (const part of [...into, ...parts]) {
+    const found = byKey.get(part.key);
+    if (found) {
+      found.count += part.count;
+      found.amount += part.amount;
+    } else byKey.set(part.key, { ...part });
+  }
+  return [...byKey.values()].sort((a, b) => b.amount - a.amount);
 };
 
 /** Marks folded so that none of them would overlap on screen.
@@ -90,8 +123,9 @@ export const mergeMarks = (marks: LaneMark[], gapMs: number): LaneMark[] => {
       last.endMs = Math.max(last.endMs, mark.endMs);
       last.count += mark.count;
       last.amount = last.amount === null ? mark.amount : last.amount + (mark.amount ?? 0);
+      last.by = foldParts(last.by, mark.by);
     } else {
-      merged.push({ ...mark });
+      merged.push({ ...mark, by: [...mark.by] });
     }
   }
 
@@ -110,7 +144,13 @@ export const lanesFor = (rows: MetricRow[], byLane: Map<string, LaneMark[]>, gap
       return {
         row,
         spans: true,
-        marks: row.timeline.map((span) => ({ startMs: span.startMs, endMs: span.endMs, count: 1, amount: null })),
+        marks: row.timeline.map((span) => ({
+          startMs: span.startMs,
+          endMs: span.endMs,
+          count: 1,
+          amount: null,
+          by: [],
+        })),
       };
     }
     return { row, spans: false, marks: mergeMarks(byLane.get(row.key) ?? [], gapMs) };

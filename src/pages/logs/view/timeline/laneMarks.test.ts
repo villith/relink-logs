@@ -38,7 +38,9 @@ describe("marksByLane", () => {
   // so a bar and a tick on the same chart measure from one origin.
   it("rebases each mark onto the window start", () => {
     const marks = marksByLane([event({ timeMs: 7000, amount: 100 })], ALL_TO_A, { startMs: 5000, endMs: 15000 });
-    expect(marks.get("a")).toEqual([{ startMs: 2000, endMs: 2000, count: 1, amount: 100 }]);
+    expect(marks.get("a")).toEqual([
+      { startMs: 2000, endMs: 2000, count: 1, amount: 100, by: [{ key: "", count: 1, amount: 100 }] },
+    ]);
   });
 
   it("drops events outside the window", () => {
@@ -68,34 +70,34 @@ describe("mergeMarks", () => {
   // marks draws one smear. Merging says so honestly and keeps the count.
   it("folds marks closer together than the gap", () => {
     const marks = [
-      { startMs: 0, endMs: 0, count: 1, amount: 10 },
-      { startMs: 50, endMs: 50, count: 1, amount: 20 },
+      { startMs: 0, endMs: 0, count: 1, amount: 10, by: [] },
+      { startMs: 50, endMs: 50, count: 1, amount: 20, by: [] },
     ];
-    expect(mergeMarks(marks, 100)).toEqual([{ startMs: 0, endMs: 50, count: 2, amount: 30 }]);
+    expect(mergeMarks(marks, 100)).toEqual([{ startMs: 0, endMs: 50, count: 2, amount: 30, by: [] }]);
   });
 
   it("keeps marks further apart than the gap separate", () => {
     const marks = [
-      { startMs: 0, endMs: 0, count: 1, amount: 10 },
-      { startMs: 500, endMs: 500, count: 1, amount: 20 },
+      { startMs: 0, endMs: 0, count: 1, amount: 10, by: [] },
+      { startMs: 500, endMs: 500, count: 1, amount: 20, by: [] },
     ];
     expect(mergeMarks(marks, 100)).toHaveLength(2);
   });
 
   it("sorts before merging, so event order cannot change the result", () => {
     const marks = [
-      { startMs: 50, endMs: 50, count: 1, amount: 20 },
-      { startMs: 0, endMs: 0, count: 1, amount: 10 },
+      { startMs: 50, endMs: 50, count: 1, amount: 20, by: [] },
+      { startMs: 0, endMs: 0, count: 1, amount: 10, by: [] },
     ];
-    expect(mergeMarks(marks, 100)).toEqual([{ startMs: 0, endMs: 50, count: 2, amount: 30 }]);
+    expect(mergeMarks(marks, 100)).toEqual([{ startMs: 0, endMs: 50, count: 2, amount: 30, by: [] }]);
   });
 
   // A lane where nothing carried an amount must not report 0 — that reads as a
   // measured zero rather than as "this kind has no amount".
   it("keeps a null amount null when no mark carried one", () => {
     const marks = [
-      { startMs: 0, endMs: 0, count: 1, amount: null },
-      { startMs: 50, endMs: 50, count: 1, amount: null },
+      { startMs: 0, endMs: 0, count: 1, amount: null, by: [] },
+      { startMs: 50, endMs: 50, count: 1, amount: null, by: [] },
     ];
     expect(mergeMarks(marks, 100)[0]?.amount).toBeNull();
   });
@@ -125,7 +127,7 @@ describe("lanesFor", () => {
     const rows = [metricRow({ key: "status:77:210", kind: "status", timeline: [{ startMs: 0, endMs: 4000 }] })];
     const lanes = lanesFor(rows, new Map(), 100);
     expect(lanes[0]?.spans).toBe(true);
-    expect(lanes[0]?.marks).toEqual([{ startMs: 0, endMs: 4000, count: 1, amount: null }]);
+    expect(lanes[0]?.marks).toEqual([{ startMs: 0, endMs: 4000, count: 1, amount: null, by: [] }]);
   });
 
   it("draws merged event marks for a row with no timeline", () => {
@@ -134,14 +136,14 @@ describe("lanesFor", () => {
       [
         "skill:Normal:100",
         [
-          { startMs: 0, endMs: 0, count: 1, amount: 10 },
-          { startMs: 50, endMs: 50, count: 1, amount: 20 },
+          { startMs: 0, endMs: 0, count: 1, amount: 10, by: [] },
+          { startMs: 50, endMs: 50, count: 1, amount: 20, by: [] },
         ],
       ],
     ]);
     const lanes = lanesFor(rows, byLane, 100);
     expect(lanes[0]?.spans).toBe(false);
-    expect(lanes[0]?.marks).toEqual([{ startMs: 0, endMs: 50, count: 2, amount: 30 }]);
+    expect(lanes[0]?.marks).toEqual([{ startMs: 0, endMs: 50, count: 2, amount: 30, by: [] }]);
   });
 
   // A row the join could not place still gets a lane. Dropping it would make
@@ -156,5 +158,55 @@ describe("lanesFor", () => {
   it("keeps the rows in the order it was given them", () => {
     const rows = [metricRow({ key: "a", kind: "ability" }), metricRow({ key: "b", kind: "ability" })];
     expect(lanesFor(rows, new Map(), 100).map((lane) => lane.row.key)).toEqual(["a", "b"]);
+  });
+});
+
+describe("mark contributions", () => {
+  // A mark folds several hits; the card behind it lists what they were, so
+  // each mark has to remember its parts rather than only their sum.
+  it("records the action behind a single event", () => {
+    const marks = marksByLane([event({ timeMs: 1000, abilityKey: "Normal:100", amount: 500 })], ALL_TO_A, {
+      startMs: 0,
+      endMs: 10_000,
+    });
+    expect(marks.get("a")?.[0]?.by).toEqual([{ key: "Normal:100", count: 1, amount: 500 }]);
+  });
+
+  it("folds contributions of the same action together when marks merge", () => {
+    const marks = [
+      { startMs: 0, endMs: 0, count: 1, amount: 10, by: [{ key: "A", count: 1, amount: 10 }] },
+      { startMs: 50, endMs: 50, count: 1, amount: 20, by: [{ key: "A", count: 1, amount: 20 }] },
+    ];
+    expect(mergeMarks(marks, 100)[0]?.by).toEqual([{ key: "A", count: 2, amount: 30 }]);
+  });
+
+  // The card lists largest first, so a merge must keep distinct actions apart
+  // and order them.
+  it("keeps distinct actions apart and sorts them by amount", () => {
+    const marks = [
+      { startMs: 0, endMs: 0, count: 1, amount: 10, by: [{ key: "A", count: 1, amount: 10 }] },
+      { startMs: 50, endMs: 50, count: 1, amount: 90, by: [{ key: "B", count: 1, amount: 90 }] },
+    ];
+    expect(mergeMarks(marks, 100)[0]?.by).toEqual([
+      { key: "B", count: 1, amount: 90 },
+      { key: "A", count: 1, amount: 10 },
+    ]);
+  });
+
+  // An effect names no action; its key is the status key so the card can name
+  // it through the same `status:` grammar the tables use.
+  it("uses the status key for an effect event", () => {
+    const marks = marksByLane(
+      [event({ timeMs: 1000, kind: "status", statusKey: "status:77:210", amount: null })],
+      ALL_TO_A,
+      { startMs: 0, endMs: 10_000 }
+    );
+    expect(marks.get("a")?.[0]?.by).toEqual([{ key: "status:77:210", count: 1, amount: 0 }]);
+  });
+
+  // A row's own timeline spans are not an event fold and have nothing to list.
+  it("gives a span mark no contributions", () => {
+    const rows = [metricRow({ key: "s", kind: "status", timeline: [{ startMs: 0, endMs: 4000 }] })];
+    expect(lanesFor(rows, new Map(), 100)[0]?.marks[0]?.by).toEqual([]);
   });
 });
