@@ -17,6 +17,25 @@ export type DataPath = "groups" | "derived" | "intervals";
  * null at runtime. */
 export type CardKind = "skill" | "taken" | "enemyDealt" | "enemyReceived" | "none";
 
+/** Which bucketed series a metric plots when nothing overlays it, and how that
+ * series is read.
+ *
+ * `series` NAMES the store field rather than carrying values, so the
+ * declaration stays a constant: the view resolves it against the encounter
+ * store, which is where the buckets live.
+ *
+ * `smoothing` is "rate" or "none" rather than a number, because the number is
+ * the user's chosen window (DpsChart's control) and only a RATE may use it — a
+ * level averaged over a trailing window reads as something it never was. */
+export type ChartDecl = {
+  labelKey: string;
+  series: "dps" | "stun" | "taken" | "sba";
+  smoothing: "rate" | "none";
+  /** Multiplier onto the stored values. SBA is stored in tenths of a percent. */
+  scale: number;
+  format: "amount" | "percent";
+};
+
 export type DimensionDecl = {
   supported: boolean;
   /** i18next key stating WHY, where supported is false. */
@@ -46,7 +65,22 @@ export type MetricCapabilities = {
   /** Whether the chart stacks the fetched groups' series. False = the metric's
    * base chart keeps drawing (stun/SBA gauges, aura stacks/bands). */
   chartFromGroups: boolean;
+  /** The metric's OWN plot — what is drawn when nothing overlays it. Declared
+   * rather than branched on `metricKey` in the view, which is what made adding
+   * a metric with its own series a view edit rather than a declaration. */
+  chart: ChartDecl;
 };
+
+/** The three rate metrics share one shape: their own series, smoothed like DPS
+ * because all three are per-second rates off the same buckets. Spelled once
+ * rather than three times, so a change to the shared reading is one edit. */
+const RATE_CHART = (labelKey: string, series: ChartDecl["series"]): ChartDecl => ({
+  labelKey,
+  series,
+  smoothing: "rate",
+  scale: 1,
+  format: "amount",
+});
 
 // `groupLabelKey` here is a placeholder (empty strings, no ui.json entry) —
 // consumers MUST check `supported` before reading it.
@@ -86,6 +120,9 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // has a builder only for its attacker rows.
     cardKind: (dim, hostility) => (hostility === "enemy" ? (dim === "source" ? "enemyDealt" : "none") : "skill"),
     chartFromGroups: true,
+    // The same trailing moving average the classic view smooths with, so the
+    // same fight draws the same line in both.
+    chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
   },
 
   taken: {
@@ -106,6 +143,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     cardKind: (dim, hostility) =>
       hostility === "enemy" ? (dim === "source" ? "enemyReceived" : "none") : dim === "target" ? "none" : "taken",
     chartFromGroups: true,
+    // Incoming damage per second, off the same buckets as DPS.
+    chart: RATE_CHART("ui.logs.chart-taken-label", "taken"),
   },
 
   stun: {
@@ -121,6 +160,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     columnKeys: (dim) => stun.columnKeys(levelFor(dim)),
     cardKind: (dim) => (dim === "target" ? "none" : "skill"),
     chartFromGroups: false,
+    chart: RATE_CHART("ui.logs.chart-stun-label", "stun"),
   },
 
   sba: {
@@ -143,6 +183,9 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // rows are already the finest grain the capture has.
     cardKind: () => "none",
     chartFromGroups: false,
+    // A gauge LEVEL, not a rate: smoothing would round off the discharge that
+    // IS the reading. Stored in tenths of a percent.
+    chart: { labelKey: "ui.logs.chart-sba-label", series: "sba", smoothing: "none", scale: 0.1, format: "percent" },
   },
 
   buffs: {
@@ -159,6 +202,10 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // Effect and holder rows are windows, not sums over skills.
     cardKind: () => "none",
     chartFromGroups: false,
+    // Never actually drawn — the stack-count overlay always wins on this path
+    // — but it must still name a real series, so the fallback has a length to
+    // plot on a log whose intervals produced no series at all.
+    chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
   },
 
   debuffs: {
@@ -174,5 +221,7 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     columnKeys: (dim) => debuffs.columnKeys(levelFor(dim)),
     cardKind: () => "none",
     chartFromGroups: false,
+    // As buffs: overlaid by the stack counts, but a real series underneath.
+    chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
   },
 };

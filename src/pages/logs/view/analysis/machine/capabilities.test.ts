@@ -135,3 +135,33 @@ describe("CAPABILITIES against the real ui.json", () => {
     }
   });
 });
+
+describe("chart declarations", () => {
+  it("names each metric's own series, scale and format", () => {
+    expect(CAPABILITIES.damage.chart).toEqual({
+      labelKey: "ui.logs.chart-dps-label",
+      series: "dps",
+      smoothing: "rate",
+      scale: 1,
+      format: "amount",
+    });
+    expect(CAPABILITIES.sba.chart).toEqual({
+      labelKey: "ui.logs.chart-sba-label",
+      series: "sba",
+      // A gauge LEVEL: smoothing would round off the discharge that IS the
+      // reading, and the values are stored in tenths of a percent.
+      smoothing: "none",
+      scale: 0.1,
+      format: "percent",
+    });
+    expect(CAPABILITIES.taken.chart.series).toBe("taken");
+    expect(CAPABILITIES.stun.chart.series).toBe("stun");
+  });
+
+  it("gives the interval metrics the dps buckets and no chart of their own", () => {
+    // Buffs/debuffs overlay stack counts; the base source is never drawn, but
+    // it must still be a real series so the fallback has a length to plot.
+    expect(CAPABILITIES.buffs.chart.series).toBe("dps");
+    expect(CAPABILITIES.debuffs.chart.series).toBe("dps");
+  });
+});
