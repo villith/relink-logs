@@ -1585,41 +1585,42 @@ export const getLangBundle = (namespace: string): Record<string, { text?: string
 /** The loaded `traits` resource bundle. */
 export const getTraitsBundle = (): Record<string, { text?: string }> => getLangBundle("traits");
 
-/// Translates the trait ID to a human-readable string.
-export const translateTraitId = (id: number | null): string => {
+/** One hashed table-key id, named through its bundle.
+ *
+ * Eight id spaces — traits, abilities, sigils, items, overmasteries, weapons,
+ * summons and summon equip-bonuses — are keyed identically: the game's 32-bit
+ * table-key hash, written as eight lowercase hex digits, naming a
+ * `<namespace>:<hash>.text` bundle entry. The namespace is the only thing that
+ * varies between them, so it is the only thing the wrappers below pass.
+ *
+ * The padding is load-bearing, not cosmetic: the generated bundles spell every
+ * key as eight digits, so a hash with a leading zero misses its own entry
+ * without it.
+ *
+ * Both guards answer "" rather than the unknown label. `null` means the log
+ * never recorded one and EMPTY_ID is the game's own "this slot is empty" —
+ * neither is an id we tried and failed to name, and rendering
+ * "Unknown (887b8bb0)" for an empty slot reads as a parser bug.
+ */
+const translateHashedId = (namespace: string, id: number | null): string => {
   if (id === null) return "";
   if (id === EMPTY_ID) return "";
 
   const hash = id.toString(16).padStart(8, "0");
-  return t([`traits:${hash}.text`, "ui.unknown-id"], { id: hash });
+  return t([`${namespace}:${hash}.text`, "ui.unknown-id"], { id: hash });
 };
+
+/// Translates the trait ID to a human-readable string.
+export const translateTraitId = (id: number | null): string => translateHashedId("traits", id);
 
 /// Translates the ability (equipped skill) ID to a human-readable string.
-export const translateAbilityId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`abilities:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateAbilityId = (id: number | null): string => translateHashedId("abilities", id);
 
 /// Translates the sigil ID to a human-readable string.
-export const translateSigilId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`sigils:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateSigilId = (id: number | null): string => translateHashedId("sigils", id);
 
 /// Translates the item ID to a human-readable string.
-export const translateItemId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`items:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateItemId = (id: number | null): string => translateHashedId("items", id);
 
 /** The wrightstone's display name. The stone's ITEM id never syncs for remote
  * players (only its trait pairs do), so 0 means "a stone we can't name", not
@@ -1628,41 +1629,16 @@ export const translateWrightstoneId = (id: number | null): string =>
   id && id !== EMPTY_ID ? translateItemId(id) : t("ui.wrightstone");
 
 /// Translates the overmastery ID to a human-readable string.
-export const translateOvermasteryId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-
-  return t([`overmasteries:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateOvermasteryId = (id: number | null): string => translateHashedId("overmasteries", id);
 
 /// Translates a numeric weapon ID (weapon table key hash) to a human-readable string.
-export const translateWeaponId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`weapons:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateWeaponId = (id: number | null): string => translateHashedId("weapons", id);
 
 /// Translates the summon ID (summon table key) to a human-readable string.
-export const translateSummonId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`summons:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateSummonId = (id: number | null): string => translateHashedId("summons", id);
 
 /// Translates the summon equip-bonus ID (summon base-param key) to a human-readable string.
-export const translateSummonBonusId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`summon-bonuses:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateSummonBonusId = (id: number | null): string => translateHashedId("summon-bonuses", id);
 
 /// The skillboard bundle key for one master-trait node. Node ids are only unique
 /// per character (the game's effect/ui id), so the key composes both:
