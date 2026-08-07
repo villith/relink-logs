@@ -90,13 +90,19 @@
   outline-offset: -3px;
 }
 
-/* background-color, never the `background` shorthand: the shorthand resets
+/* The fill's TRACK: the full width a bar could reach, which its segments are
+ * then a percentage of. `right: 0` is what makes that width real — the segments
+ * are absolute and contribute nothing, so without it the track collapses and
+ * every bar renders at zero pixels.
+ *
+ * background-color, never the `background` shorthand: the shorthand resets
  * background-size and has broken full-width bars in this app before. */
 .analysis-bar {
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
+  right: 0;
   border-radius: 2px;
   opacity: 0.42;
   pointer-events: none;
@@ -105,6 +111,22 @@
 /* Hover deliberately does NOT raise the fill's opacity. Taking it to 0.62 put
  * three of four row names below 4.5:1 — the row got harder to read at the exact
  * moment the user was reading it. The outline above carries the hover state. */
+
+/* The fill's segments. Absolute siblings rather than nested, so the
+ * supplementary part can be fainter than the direct one — nested inside an
+ * element that already carries opacity, a same-coloured child is invisible. */
+.analysis-bar-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* Echo damage reads as part of the bar but plainly not the skill's own. */
+.analysis-bar-supplementary {
+  opacity: 0.45;
+}
 
 /* Every cell sits above the bar. */
 .analysis-name,
