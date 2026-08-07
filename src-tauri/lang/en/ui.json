@@ -480,6 +480,7 @@
       "timeline-mark-span": "{{start}} – {{end}}",
       "timeline-mark-amount": "Total {{amount}}",
       "timeline-mark-uptime": "Up for {{seconds}}s",
+      "timeline-mark-section": "By ability",
       "timeline-truncated": "Showing the first {{shown}} of {{total}} events",
       "selector-source": "Source",
       "selector-target": "Target",
