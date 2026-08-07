@@ -47,6 +47,16 @@ describe("marksByLane", () => {
     expect(marks.get("a")).toHaveLength(1);
   });
 
+  // Half-open, `[startMs, endMs)` — the rule the rest of the pipeline follows.
+  // `statusWindow.endMs` is the first millisecond of the bucket AFTER the
+  // window, and the group query stops at `endMs - 1`, so admitting `endMs`
+  // here would put a mark on the timeline for a hit the table did not count.
+  it("admits the window's first millisecond and excludes its last", () => {
+    const events = [event({ timeMs: 5000 }), event({ timeMs: 14999 }), event({ timeMs: 15000 })];
+    const marks = marksByLane(events, ALL_TO_A, { startMs: 5000, endMs: 15000 });
+    expect(marks.get("a")?.map((mark) => mark.startMs)).toEqual([0, 9999]);
+  });
+
   it("drops events no lane claims", () => {
     const marks = marksByLane([event({ timeMs: 1000 })], { laneOf: () => null }, { startMs: 0, endMs: 10000 });
     expect(marks.size).toBe(0);

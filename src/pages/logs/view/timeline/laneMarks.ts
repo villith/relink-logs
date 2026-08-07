@@ -50,12 +50,19 @@ export const markGapMs = ({
 /** Every event filed under the lane that claims it, in ONE pass.
  *
  * Events outside the window are dropped rather than clamped: an instant
- * clamped to the edge would draw a mark at a time it did not happen. */
+ * clamped to the edge would draw a mark at a time it did not happen.
+ *
+ * The window is HALF-OPEN, `[startMs, endMs)`, which is the rule the whole
+ * pipeline already follows: `statusWindow.endMs` is `(lastBucket + 1) * 1000`
+ * — the first millisecond of the bucket AFTER the window — and the group query
+ * admits only up to `endMs - 1` (see `wireQuery`'s `upToMs`). An inclusive end
+ * here would draw a mark for a hit the table's own numbers exclude, which is
+ * the one thing a timeline drawn beside that table must never do. */
 export const marksByLane = (events: EventRow[], matcher: LaneMatcher, window: Span): Map<string, LaneMark[]> => {
   const byLane = new Map<string, LaneMark[]>();
 
   for (const event of events) {
-    if (event.timeMs < window.startMs || event.timeMs > window.endMs) continue;
+    if (event.timeMs < window.startMs || event.timeMs >= window.endMs) continue;
     const lane = matcher.laneOf(event);
     if (lane === null) continue;
 
