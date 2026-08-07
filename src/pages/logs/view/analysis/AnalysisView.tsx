@@ -275,15 +275,17 @@ export const AnalysisView = () => {
   // grouping override), the resolver turns it into everything the view shows.
   const [state, setState] = useAnalysisState();
   // Which BODY the frame shows — the top-level view switch. Its own nuqs key
-  // rather than a machine field: Events is not a metric, so putting it in
-  // `AnalysisState` would mean a `MetricKey` the resolver has no spec for. nuqs
-  // writes per key, so this and `useAnalysisState` share the URL without either
-  // clobbering the other — and the pins therefore survive switching between the
-  // two bodies, which is the whole point of sharing the selector bar.
+  // rather than a machine field: neither Events nor Timeline is a metric, so
+  // putting either in `AnalysisState` would mean a `MetricKey` the resolver has
+  // no spec for. nuqs writes per key, so this and `useAnalysisState` share the
+  // URL without either clobbering the other — and the pins therefore survive
+  // switching between the three bodies, which is the whole point of sharing the
+  // selector bar.
   const [tab, setTab] = useQueryState("tab", { history: "replace" });
-  // Which BODY the frame shows. A three-way selector rather than a boolean per
-  // body: two booleans can both be true, and the one that wins would then
-  // depend on the order the JSX tested them in.
+  // That param resolved to one of the three bodies, with anything unrecognised
+  // falling back to the default. One selector rather than a boolean per body:
+  // two booleans can both be true, and which one won would then depend on the
+  // order the JSX happened to test them in.
   const body = tab === EVENTS_TAB ? EVENTS_TAB : tab === TIMELINE_TAB ? TIMELINE_TAB : TABLE_TAB;
   const caps = CAPABILITIES[state.metric];
   const spec = useMemo(() => resolveViewSpec(state, caps), [state, caps]);
