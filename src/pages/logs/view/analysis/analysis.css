@@ -559,3 +559,142 @@
   object-fit: contain;
   flex-shrink: 0;
 }
+
+/* The Timeline body. One horizontal scroll container holds BOTH the ruler and
+ * the lanes, so the axis and the marks under it cannot drift apart — two
+ * scrollers kept in sync by hand is how a timeline comes to lie about when
+ * something happened. */
+.timeline-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 460px;
+  border: 1px solid var(--an-line);
+  border-radius: 4px;
+  position: relative;
+}
+
+/* Wider than its container by exactly domain/viewport, set inline. Percentage
+ * widths inside it therefore address the whole domain, which is what lets the
+ * marks be positioned without measuring anything. */
+.timeline-content {
+  position: relative;
+  min-width: 100%;
+}
+
+.timeline-lane {
+  display: flex;
+  align-items: stretch;
+  height: 22px;
+}
+
+.timeline-lane:hover {
+  background: var(--an-row-hover, rgba(255, 255, 255, 0.04));
+}
+
+/* Sticky against the HORIZONTAL scroll, so a lane keeps its name while its
+ * marks pan out of view. Opaque, because the marks slide underneath it. */
+.timeline-lane-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex: 0 0 220px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 8px;
+  background: var(--mantine-color-body);
+  border-right: 1px solid var(--an-line);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--mantine-font-size-xs);
+  cursor: pointer;
+}
+
+.timeline-lane-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Faintly filled, so an empty lane reads as "nothing here" rather than as a
+ * missing cell — the same reasoning as `.analysis-track`. */
+.timeline-lane-track::before {
+  content: "";
+  position: absolute;
+  inset: 4px 0;
+  background: var(--an-line);
+  opacity: 0.25;
+}
+
+.timeline-mark {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  min-width: 2px;
+  border-radius: 1px;
+}
+
+/* A real span reads as a filled bar; a folded instant reads as a tick. Same
+ * colour, different weight, so the two are never mistaken for each other. */
+.timeline-mark-span {
+  opacity: 0.85;
+}
+
+.timeline-mark-instant {
+  opacity: 1;
+}
+
+/* Sticky against the VERTICAL scroll so the axis stays put while lanes scroll,
+ * and inside the same horizontal scroller so it pans with them. */
+.timeline-ruler {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 22px;
+  background: var(--mantine-color-body);
+  border-bottom: 1px solid var(--an-line);
+  display: flex;
+}
+
+.timeline-ruler-spacer {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex: 0 0 220px;
+  background: var(--mantine-color-body);
+  border-right: 1px solid var(--an-line);
+}
+
+.timeline-ruler-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.timeline-ruler-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--an-line);
+  padding-left: 3px;
+  font-size: 10px;
+  line-height: 22px;
+  color: var(--mantine-color-dimmed);
+  white-space: nowrap;
+}
+
+/* A section subheader, the timeline's copy of the table's provenance runs. */
+.timeline-section {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  padding: 6px 8px 2px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--mantine-color-dimmed);
+  background: var(--mantine-color-body);
+  width: max-content;
+}
