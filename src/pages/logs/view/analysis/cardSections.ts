@@ -6,6 +6,7 @@ import type { MetricCard, MetricRow, RowLevel } from "../metrics/types";
 import type { SelectorPins } from "../selectorOptions";
 
 import type { CardSection } from "./HoverCard";
+import { foldPartyDealt, sortedEntries } from "./cardFold";
 import { qualifyDuplicateLabels } from "./labelCollision";
 import { targetRowSegment } from "./statusLabel";
 
@@ -283,9 +284,6 @@ export const cardSectionsFor = ({
   return null;
 };
 
-const sortedEntries = <T extends { value: number }>(entries: T[]): T[] =>
-  [...entries].sort((a, b) => b.value - a.value);
-
 /** Damage, friendly side: one enemy SPAWN row ("Done to enemy", and the
  * source+ability drill's rows) explained by what hit it and who dealt that —
  * the two dimensions a target pin leaves free, which is why declaring these
@@ -325,57 +323,17 @@ export const targetCardSectionsFor = ({
   if (!entry) return null;
   const typeKey = JSON.stringify(entry.enemyType);
 
+  // An entry without a segment matches by the spawn's TYPE instead — the
+  // approximation the doc comment above describes.
   const matches = (target: SkillTargetState): boolean =>
     target.segment !== undefined ? target.segment === segment : JSON.stringify(target.enemyType) === typeKey;
 
-  const bySource: { key: string; label: string; value: number; color: string; icon?: string }[] = [];
-  const byAbility = new Map<string, { label: string; value: number; icon?: string }>();
-  for (const player of players) {
-    let dealt = 0;
-    for (const skill of player.skillBreakdown) {
-      let skillDealt = 0;
-      // `targets` is optional because cached payloads predate it; an absent
-      // list means the breakdown is unavailable, not that nothing was hit.
-      for (const target of skill.targets ?? []) {
-        if (matches(target)) skillDealt += target.totalDamage;
-      }
-      if (skillDealt === 0) continue;
-      dealt += skillDealt;
-      // Keyed by the raw action, and named against its OWN player: the parser
-      // emits one `SkillState` per (action, child character), so this also
-      // merges a player and their summon back into the one ability — the
-      // same fold `enemyReceivedCardSectionsFor` uses.
-      const key = abilityKey(skill.actionType);
-      const ability = byAbility.get(key);
-      if (ability) ability.value += skillDealt;
-      else
-        byAbility.set(key, {
-          label: labels.ability(key, player),
-          value: skillDealt,
-          icon: labels.abilityIcon?.(key, player),
-        });
-    }
-    if (dealt > 0) {
-      bySource.push({
-        key: `source:${player.index}`,
-        label: labels.source(player.index),
-        value: dealt,
-        // Each player in their OWN party colour: one colour across the
-        // section would lose the only thing it is for.
-        color: labels.sourceColor(player.index),
-        icon: labels.sourceIcon?.(player.index),
-      });
-    }
-  }
+  const { bySource, byAbility } = foldPartyDealt(players, matches, labels);
   // Nothing recorded against this spawn — no card, rather than an empty one.
   if (bySource.length === 0) return null;
 
   return [
-    {
-      headingKey: "ui.logs.hover-by-ability",
-      color,
-      entries: sortedEntries([...byAbility.entries()].map(([key, ability]) => ({ key, ...ability }))),
-    },
+    { headingKey: "ui.logs.hover-by-ability", color, entries: sortedEntries(byAbility) },
     { headingKey: "ui.logs.hover-by-source", color, entries: sortedEntries(bySource) },
   ];
 };
