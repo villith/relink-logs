@@ -12,6 +12,7 @@ import { CaretDown, CaretUp } from "@phosphor-icons/react";
 import { useMemo } from "react";
 import { SkillRow } from "./SkillRow";
 import { SkillTargetTooltip } from "./SkillTargetTooltip";
+import { ValueCell } from "./ValueCell";
 import { renderSkillCell } from "./renderSkillCell";
 import { useSkillGroupRow } from "./useSkillGroupRow";
 
@@ -67,10 +68,10 @@ export const SkillGroupRow = ({
           style={damageBarStyle(color, barWidth(group.percentage, maxPercentage, fillMode))}
           onClick={() => setExpanded(!expanded)}
         >
-          <div role="cell" className="text-left row-data">
+          <ValueCell align="left">
             <span>{getSkillName(group.childCharacterType, group)}</span>
             <span className="p4">{expanded ? <CaretUp size={12} /> : <CaretDown size={12} />}</span>
-          </div>
+          </ValueCell>
           {columns.map(renderCell)}
         </div>
       </SkillTargetTooltip>
