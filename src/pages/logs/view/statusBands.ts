@@ -1,3 +1,5 @@
+import { clipSpans, mergeSpans } from "./spans";
+
 /** One shaded span on the chart, in milliseconds from the START OF THE WINDOW —
  * which is what the chart's own first bucket is.
  *
@@ -57,24 +59,13 @@ export const toBands = (
 ): Band[] => {
   if (endMs <= startMs) return [];
 
-  const clipped = intervals
-    .filter((interval) => interval.startMs < endMs && interval.endMs > startMs)
-    .map((interval) => ({
-      startMs: Math.max(startMs, interval.startMs) - startMs,
-      endMs: Math.min(endMs, interval.endMs) - startMs,
-      // The hook reports 1 for every status status.tbl does not mark
-      // HasLevels, so a missing count is one stack rather than none.
-      stacks: interval.maxStacks ?? 1,
-    }))
-    .sort((a, b) => a.startMs - b.startMs);
+  const clipped: Band[] = clipSpans(intervals, { startMs, endMs }).map((interval) => ({
+    startMs: interval.startMs - startMs,
+    endMs: interval.endMs - startMs,
+    // The hook reports 1 for every status status.tbl does not mark
+    // HasLevels, so a missing count is one stack rather than none.
+    stacks: interval.maxStacks ?? 1,
+  }));
 
-  const merged: Band[] = [];
-  for (const span of clipped) {
-    const last = merged[merged.length - 1];
-    if (last && span.startMs <= last.endMs) {
-      last.endMs = Math.max(last.endMs, span.endMs);
-      last.stacks = Math.max(last.stacks, span.stacks);
-    } else merged.push({ ...span });
-  }
-  return merged;
+  return mergeSpans(clipped, (into, span) => ({ ...into, stacks: Math.max(into.stacks, span.stacks) }));
 };

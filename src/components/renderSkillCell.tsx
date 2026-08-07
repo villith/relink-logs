@@ -1,6 +1,7 @@
 import { ComputedSkillGroup, ComputedSkillState, SkillColumns } from "@/types";
 import { OvercapCell } from "./OvercapCell";
 import { StunCell } from "./StunCell";
+import { UnitValue, ValueCell } from "./ValueCell";
 import { useSkillRow } from "./useSkillRow";
 
 /** The humanized/derived values a value cell needs, on top of the raw skill data.
@@ -37,27 +38,20 @@ export const renderSkillCell = (
 
   switch (column) {
     case SkillColumns.Hits:
-      return (
-        <div key={column} role="cell" className="text-center row-data">
-          {data.hits}
-        </div>
-      );
+      return <ValueCell key={column}>{data.hits}</ValueCell>;
     case SkillColumns.TotalDamage:
       return (
-        <div key={column} role="cell" className="text-center row-data">
+        <ValueCell key={column}>
           {showFullValues ? (
             data.totalDamage.toLocaleString()
           ) : (
-            <>
-              {totalDamage}
-              <span className="unit font-sm">{totalDamageUnit}</span>
-            </>
+            <UnitValue value={totalDamage} unit={totalDamageUnit} />
           )}
-        </div>
+        </ValueCell>
       );
     case SkillColumns.MinDamage:
       return (
-        <div key={column} role="cell" className="text-center row-data">
+        <ValueCell key={column}>
           {showFullValues ? (
             data.minDamage ? (
               data.minDamage.toLocaleString()
@@ -65,16 +59,13 @@ export const renderSkillCell = (
               ""
             )
           ) : (
-            <>
-              {data.minDamage && minDmg}
-              <span className="unit font-sm">{minDmgUnit}</span>
-            </>
+            <UnitValue value={data.minDamage && minDmg} unit={minDmgUnit} />
           )}
-        </div>
+        </ValueCell>
       );
     case SkillColumns.MaxDamage:
       return (
-        <div key={column} role="cell" className="text-center row-data">
+        <ValueCell key={column}>
           {showFullValues ? (
             data.maxDamage ? (
               data.maxDamage.toLocaleString()
@@ -82,34 +73,20 @@ export const renderSkillCell = (
               ""
             )
           ) : (
-            <>
-              {data.maxDamage && maxDmg}
-              <span className="unit font-sm">{maxDmgUnit}</span>
-            </>
+            <UnitValue value={data.maxDamage && maxDmg} unit={maxDmgUnit} />
           )}
-        </div>
+        </ValueCell>
       );
     case SkillColumns.AverageDamage:
       return (
-        <div key={column} role="cell" className="text-center row-data">
-          {showFullValues ? (
-            rawAverageDmg.toLocaleString()
-          ) : (
-            <>
-              {averageDmg}
-              <span className="unit font-sm">{averageDmgUnit}</span>
-            </>
-          )}
-        </div>
+        <ValueCell key={column}>
+          {showFullValues ? rawAverageDmg.toLocaleString() : <UnitValue value={averageDmg} unit={averageDmgUnit} />}
+        </ValueCell>
       );
     case SkillColumns.TotalStunValue:
       return <StunCell key={column} value={data.totalStunValue ?? 0} showFullValues={showFullValues} />;
     case SkillColumns.StunEligibleHits:
-      return (
-        <div key={column} role="cell" className="text-center row-data">
-          {(data.stunEligibleHits ?? 0) > 0 ? data.stunEligibleHits : ""}
-        </div>
-      );
+      return <ValueCell key={column}>{(data.stunEligibleHits ?? 0) > 0 ? data.stunEligibleHits : ""}</ValueCell>;
     case SkillColumns.StunPerEligibleHit: {
       const eligible = data.stunEligibleHits ?? 0;
       const perHit = eligible > 0 ? (data.totalStunValue ?? 0) / eligible : 0;
@@ -117,25 +94,20 @@ export const renderSkillCell = (
     }
     case SkillColumns.StunPerSecond: {
       const sps = durationSeconds > 0 ? (data.totalStunValue ?? 0) / durationSeconds : 0;
-      return (
-        <div key={column} role="cell" className="text-center row-data">
-          {sps > 0 ? sps.toFixed(2) : ""}
-        </div>
-      );
+      return <ValueCell key={column}>{sps > 0 ? sps.toFixed(2) : ""}</ValueCell>;
     }
     case SkillColumns.Overcap:
       return <OvercapCell key={column} percentage={overcapPercentage} />;
     case SkillColumns.DamagePercentage:
       return (
-        <div key={column} role="cell" className="text-center row-data">
-          {data.percentage.toFixed(0)}
-          <span className="unit font-sm">%</span>
-        </div>
+        <ValueCell key={column}>
+          <UnitValue value={data.percentage.toFixed(0)} unit="%" />
+        </ValueCell>
       );
     default:
       // An id outside the current SkillColumns (e.g. a stale/corrupted persisted
       // list): still emit a cell so the body stays aligned with the header, which
       // renders one <th> per column unconditionally.
-      return <div key={column} role="cell" className="text-center row-data" />;
+      return <ValueCell key={column} />;
   }
 };

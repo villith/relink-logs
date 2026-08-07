@@ -90,7 +90,7 @@ import { WindowStrip } from "./WindowStrip";
 import { abilityBands } from "./abilityBands";
 import { abilityLabelFor, abilityOwnerFor } from "./abilityLabel";
 import "./analysis.css";
-import { auraExcludedBands, auraHolderIntervals, auraWireWindows, type AuraHolder } from "./auraWindows";
+import { auraExcludedBands, auraHolderIntervals, type AuraHolder } from "./auraWindows";
 import { CAUSE_CLASS_LABEL_KEY, causeClassOfKey, withProvenance } from "./causeClass";
 import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "./chartMarkers";
 import { chartPresentation } from "./chartPresentation";
@@ -102,7 +102,6 @@ import {
   maskStatusIntervals,
   selectedChartWindows,
   windowFilterScrubRange,
-  windowFilterWireWindows,
 } from "./chartWindowFilter";
 import { windowMetricAmount, windowTooltipEntries } from "./chartWindowTooltip";
 import { qualifiedAbilityLabels } from "./labelCollision";
@@ -141,6 +140,7 @@ import { withStatusOption } from "./statusOption";
 import { statusRowColors } from "./statusRowColors";
 import { useUrlQueryString } from "./useUrlQueryString";
 import { windowChips } from "./windowChips";
+import { wireWindowsFrom } from "./wireWindows";
 
 /** The metric switcher's contents, in display order. Adding a metric that only
  * has a friendly side is adding a descriptor here — the frame itself does not
@@ -431,16 +431,14 @@ export const AnalysisView = () => {
     if (anchor === null || index === null) return undefined;
     const holder: AuraHolder =
       universeOf(anchor, hostility) === "player" ? { kind: "player", index } : { kind: "enemySpawn", segment: index };
-    return auraWireWindows(auraHolderIntervals(statusIntervals, auraPinKey(aura), holder), statusWindow);
+    return wireWindowsFrom(auraHolderIntervals(statusIntervals, auraPinKey(aura), holder), statusWindow);
   }, [spec.fetch, state.source, state.target, hostility, statusIntervals, statusWindow]);
 
   // The window filter's admitted spans. Undefined = no filter; an EMPTY array
   // is a real mask (a stale individual index) and narrows to nothing.
   const windowFilterWindows = useMemo(
     () =>
-      state.win === null
-        ? undefined
-        : windowFilterWireWindows(selectedChartWindows(chartWindows, state.win), statusWindow),
+      state.win === null ? undefined : wireWindowsFrom(selectedChartWindows(chartWindows, state.win), statusWindow),
     [state.win, chartWindows, statusWindow]
   );
 

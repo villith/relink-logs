@@ -1,7 +1,9 @@
 import type { ChartWindow } from "@/types";
 
-import type { WireWindow } from "./auraWindows";
+import { clampToWindow, overlapsWindow } from "../spans";
+
 import { winFilterParts } from "./machine/state";
+import type { WireWindow } from "./wireWindows";
 
 /** The battle windows a `win` filter value names, in start order. A stale
  * individual index (the log reparsed into fewer windows) selects NOTHING —
@@ -12,26 +14,6 @@ export const selectedChartWindows = (windows: ChartWindow[], win: string): Chart
   if (index === null) return ofKind;
   const one = ofKind[index];
   return one === undefined ? [] : [one];
-};
-
-/** The wire mask for the selected windows: clipped to the scrub window,
- * merged, `[fromMs, upToMs)`. Empty is a REAL mask (matches nothing) — the
- * same convention `auraWireWindows` follows. */
-export const windowFilterWireWindows = (
-  selected: ChartWindow[],
-  window: { startMs: number; endMs: number }
-): WireWindow[] => {
-  const clipped = selected
-    .filter((span) => span.startMs < window.endMs && span.endMs > window.startMs)
-    .map((span) => ({ fromMs: Math.max(span.startMs, window.startMs), upToMs: Math.min(span.endMs, window.endMs) }))
-    .sort((a, b) => a.fromMs - b.fromMs);
-  const merged: WireWindow[] = [];
-  for (const span of clipped) {
-    const last = merged[merged.length - 1];
-    if (last && span.fromMs <= last.upToMs) last.upToMs = Math.max(last.upToMs, span.upToMs);
-    else merged.push({ ...span });
-  }
-  return merged;
 };
 
 /** The scrub range (inclusive bucket indexes) covering the selected windows'
@@ -66,16 +48,19 @@ export const maskStatusIntervals = <T extends { startMs: number; endMs: number; 
   intervals: T[],
   mask: WireWindow[]
 ): T[] =>
-  mask.flatMap((span) =>
-    intervals
-      .filter((interval) => interval.startMs < span.upToMs && interval.endMs > span.fromMs)
+  mask.flatMap((span) => {
+    // Clipped one span at a time rather than through `clipSpans`, because the
+    // applications test needs the interval's ORIGINAL start: an interval
+    // starting exactly on the span's edge was applied inside it, and after
+    // clamping that is indistinguishable from one clipped down to the edge.
+    const window = { startMs: span.fromMs, endMs: span.upToMs };
+    return intervals
+      .filter((interval) => overlapsWindow(interval, window))
       .map((interval) => ({
-        ...interval,
-        startMs: Math.max(span.fromMs, interval.startMs),
-        endMs: Math.min(span.upToMs, interval.endMs),
-        applications: interval.startMs >= span.fromMs ? interval.applications : 0,
-      }))
-  );
+        ...clampToWindow(interval, window),
+        applications: interval.startMs >= window.startMs ? interval.applications : 0,
+      }));
+  });
 
 /** Time inside BOTH masks — the aura filter and the window filter compose by
  * intersection. Both inputs sorted and merged (what the two builders return). */

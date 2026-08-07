@@ -91,7 +91,6 @@ import {
   skillboardNodeMeta,
   summonBonusValue,
   targetLabelKey,
-  toHashString,
   traitMaxLevel,
   translateAbilityId,
   translateEnemyType,
@@ -1327,10 +1326,7 @@ export const ClassicView = () => {
                                 {createWeaponStars(player.weaponState.starLevel)}
                               </Text>
                               <Text size="xs" fs="italic" fw={300}>
-                                {t([`weapons:${toHashString(player.weaponState.weaponId)}.text`, "ui.unknown-id"], {
-                                  id: toHashString(player.weaponState.weaponId),
-                                })}{" "}
-                                +{player.weaponState.plusMarks}
+                                {translateWeaponId(player.weaponState.weaponId)} +{player.weaponState.plusMarks}
                               </Text>
                               {(() => {
                                 /* Derived from the innate skill levels vs the per-stage
@@ -1408,10 +1404,7 @@ export const ClassicView = () => {
                                 {createWeaponStars(player.weaponInfo?.starLevel || 0)}
                               </Text>
                               <Text size="xs" fs="italic" fw={300}>
-                                {t([`weapons:${toHashString(player.weaponInfo?.weaponId)}.text`, "ui.unknown-id"], {
-                                  id: toHashString(player.weaponInfo?.weaponId),
-                                })}{" "}
-                                +{player.weaponInfo?.plusMarks}
+                                {translateWeaponId(player.weaponInfo?.weaponId ?? null)} +{player.weaponInfo?.plusMarks}
                               </Text>
                               <Text size="xs" fs="italic" fw={300}>
                                 {t("ui.awakening-level", { level: player.weaponInfo?.awakeningLevel || 0 })}

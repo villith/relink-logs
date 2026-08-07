@@ -6,6 +6,7 @@ import "./analysis.css";
 
 import type { RegroupTab } from "./machine/resolve";
 import type { Dimension } from "./machine/state";
+import { onArrowKeys } from "./rovingKeys";
 
 export type RegroupStripProps = {
   tabs: RegroupTab[];
@@ -49,14 +50,12 @@ export const RegroupStrip = ({ tabs, onRegroup }: RegroupStripProps) => {
       role="tablist"
       aria-label={t("ui.logs.regroup-tablist-label")}
       style={{ display: "flex", padding: "0 16px 6px" }}
-      onKeyDown={(event) => {
+      onKeyDown={onArrowKeys((delta, event) => {
+        // Roves from the button the key was pressed on, so a keydown that
+        // reached the tablist from anything else is not a step.
         const from = buttonRefs.current.indexOf(event.target as HTMLButtonElement);
-        if (from === -1) return;
-        if (event.key === "ArrowRight") move(from, 1);
-        else if (event.key === "ArrowLeft") move(from, -1);
-        else return;
-        event.preventDefault();
-      }}
+        if (from !== -1) move(from, delta);
+      })}
     >
       {tabs.map((tab, index) => {
         const disabled = tab.disabledReason !== undefined;

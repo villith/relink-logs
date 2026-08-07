@@ -1286,6 +1286,73 @@ const encounterSummaryCsv = (encounterState: EncounterState): string => {
   return [header, values].join("\n");
 };
 
+/// The header both exports print above a player line.
+const PLAYER_CSV_HEADER = "Name, DMG, DPS, %";
+
+/// The party as both exports rank it: party order, each row carrying its share
+/// of the encounter's damage, then sorted the way the meter is sorted.
+const encounterCsvPlayers = (
+  encounterState: EncounterState,
+  sortType: SortType,
+  sortDirection: SortDirection
+): ComputedPlayerState[] => {
+  const players: ComputedPlayerState[] = formatInPartyOrder(encounterState.party).map((player) => ({
+    ...player,
+    percentage: (player.totalDamage / encounterState.totalDamage) * 100,
+  }));
+
+  sortPlayers(players, sortType, sortDirection);
+
+  return players;
+};
+
+/// One player's row: name, damage, DPS, share of the encounter.
+const playerCsvRow = (player: ComputedPlayerState, partyData: Array<PlayerData | null>): string => {
+  const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
+
+  return [
+    translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player),
+    player.totalDamage,
+    Math.round(player.dps),
+    `${player.percentage?.toFixed(2)}%`,
+  ].join(", ");
+};
+
+/// A player's skill table for the detailed export: biggest hitter first, each
+/// row carrying its share of that player's own damage.
+const skillCsvRows = (player: ComputedPlayerState): string => {
+  const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
+
+  return player.skillBreakdown
+    .map((skill) => ({
+      // Guard the denominator: a guard-only player (all zero-damage Perfect
+      // Guard rows) has totalDamage 0, which would export "NaN%" for every
+      // row — same guard as useSkillBreakdown.
+      percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
+      ...skill,
+    }))
+    .sort((a, b) => b.totalDamage - a.totalDamage)
+    .map((skill) =>
+      [
+        getSkillName(player.characterType, skill),
+        skill.hits,
+        skill.totalDamage,
+        skill.minDamage,
+        skill.maxDamage,
+        Math.round(skill.hits === 0 ? 0 : skill.totalDamage / skill.hits),
+        `${skill.percentage.toFixed(2)}%`,
+      ].join(", ")
+    )
+    .join("\n");
+};
+
+/// Puts an assembled export on the clipboard and says so.
+const copyEncounterCsv = (sections: string[]) => {
+  navigator.clipboard.writeText(sections.join("\n")).then(() => {
+    toast.success(t("ui.copied-to-clipboard"));
+  });
+};
+
 /// Exports the encounter data to the clipboard in a simple format (CSV)
 export const exportSimpleEncounterToClipboard = (
   sortType: SortType,
@@ -1295,52 +1362,20 @@ export const exportSimpleEncounterToClipboard = (
 ) => {
   if (encounterState.totalDamage === 0) return toast.error("Nothing to copy!");
 
-  const encounterData = encounterSummaryCsv(encounterState);
+  const players = encounterCsvPlayers(encounterState, sortType, sortDirection);
 
-  const orderedPlayers = formatInPartyOrder(encounterState.party);
-
-  const players: Array<ComputedPlayerState> = orderedPlayers.map((playerData) => {
-    return {
-      ...playerData,
-      percentage: (playerData.totalDamage / encounterState.totalDamage) * 100,
-    };
-  });
-
-  sortPlayers(players, sortType, sortDirection);
-
-  const playerHeader = "Name, DMG, DPS, %";
-  const playerData = players
-    .map((player) => {
-      const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
-      const computedSkills = player.skillBreakdown.map((skill) => {
-        return {
-          // Guard the denominator: a guard-only player (all zero-damage Perfect
-          // Guard rows) has totalDamage 0, which would export "NaN%" for every
-          // row — same guard as useSkillBreakdown.
-          percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
-          ...skill,
-        };
-      });
-
-      computedSkills.sort((a, b) => b.totalDamage - a.totalDamage);
-
-      const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-
-      return [
-        translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player),
-        player.totalDamage,
-        Math.round(player.dps),
-        `${player.percentage?.toFixed(2)}%`,
-      ].join(", ");
-    })
-    .join("\n");
-
-  navigator.clipboard.writeText([encounterData, playerHeader, playerData].join("\n")).then(() => {
-    toast.success(t("ui.copied-to-clipboard"));
-  });
+  copyEncounterCsv([
+    encounterSummaryCsv(encounterState),
+    PLAYER_CSV_HEADER,
+    players.map((player) => playerCsvRow(player, partyData)).join("\n"),
+  ]);
 };
 
 /// Exports the encounter data to the clipboard in a detailed format (CSV)
+///
+/// The simple export's rows, each followed by that player's own skill table —
+/// so the two share everything above the skill block rather than keeping a
+/// second copy of it.
 export const exportFullEncounterToClipboard = (
   sortType: SortType,
   sortDirection: SortDirection,
@@ -1349,70 +1384,17 @@ export const exportFullEncounterToClipboard = (
 ) => {
   if (encounterState.totalDamage === 0) return toast.error("Nothing to copy!");
 
-  const encounterData = encounterSummaryCsv(encounterState);
+  const skillHeader = ["Skill", "Hits", "Total", "Min", "Max", "Avg", "%"].join(", ");
+  const players = encounterCsvPlayers(encounterState, sortType, sortDirection);
 
-  const playerHeader = "Name, DMG, DPS, %";
-  const orderedPlayers = formatInPartyOrder(encounterState.party);
-
-  const players: Array<ComputedPlayerState> = orderedPlayers.map((playerData) => {
-    return {
-      ...playerData,
-      percentage: (playerData.totalDamage / encounterState.totalDamage) * 100,
-    };
-  });
-
-  sortPlayers(players, sortType, sortDirection);
-
-  const playerData = players
-    .map((player) => {
-      const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
-      const computedSkills = player.skillBreakdown.map((skill) => {
-        return {
-          // Guard the denominator: a guard-only player (all zero-damage Perfect
-          // Guard rows) has totalDamage 0, which would export "NaN%" for every
-          // row — same guard as useSkillBreakdown.
-          percentage: totalDamage > 0 ? (skill.totalDamage / totalDamage) * 100 : 0,
-          ...skill,
-        };
-      });
-
-      const partySlotIndex = partyData.findIndex((partyMember) => partyMember?.actorIndex === player.index);
-
-      computedSkills.sort((a, b) => b.totalDamage - a.totalDamage);
-
-      const playerLine = [
-        translatedPlayerName(partySlotIndex, partyData[partySlotIndex], player),
-        player.totalDamage,
-        Math.round(player.dps),
-        `${player.percentage?.toFixed(2)}%`,
-      ].join(", ");
-
-      const skillHeader = ["Skill", "Hits", "Total", "Min", "Max", "Avg", "%"].join(", ");
-
-      const skillLine = computedSkills
-        .map((skill) => {
-          const skillName = getSkillName(player.characterType, skill);
-          const averageHit = skill.hits === 0 ? 0 : skill.totalDamage / skill.hits;
-
-          return [
-            skillName,
-            skill.hits,
-            skill.totalDamage,
-            skill.minDamage,
-            skill.maxDamage,
-            Math.round(averageHit),
-            `${skill.percentage.toFixed(2)}%`,
-          ].join(", ");
-        })
-        .join("\n");
-
-      return [playerHeader, playerLine, skillHeader, skillLine].join("\n");
-    })
-    .join("\n");
-
-  navigator.clipboard.writeText([encounterData, playerData].join("\n")).then(() => {
-    toast.success(t("ui.copied-to-clipboard"));
-  });
+  copyEncounterCsv([
+    encounterSummaryCsv(encounterState),
+    players
+      .map((player) =>
+        [PLAYER_CSV_HEADER, playerCsvRow(player, partyData), skillHeader, skillCsvRows(player)].join("\n")
+      )
+      .join("\n"),
+  ]);
 };
 
 export const PLAYER_COLORS = ["#FF5630", "#FFAB00", "#36B37E", "#00B8D9", "#9BCF53", "#380E7F", "#416D19", "#2C568D"];
@@ -1585,41 +1567,42 @@ export const getLangBundle = (namespace: string): Record<string, { text?: string
 /** The loaded `traits` resource bundle. */
 export const getTraitsBundle = (): Record<string, { text?: string }> => getLangBundle("traits");
 
-/// Translates the trait ID to a human-readable string.
-export const translateTraitId = (id: number | null): string => {
+/** One hashed table-key id, named through its bundle.
+ *
+ * Eight id spaces — traits, abilities, sigils, items, overmasteries, weapons,
+ * summons and summon equip-bonuses — are keyed identically: the game's 32-bit
+ * table-key hash, written as eight lowercase hex digits, naming a
+ * `<namespace>:<hash>.text` bundle entry. The namespace is the only thing that
+ * varies between them, so it is the only thing the wrappers below pass.
+ *
+ * The padding is load-bearing, not cosmetic: the generated bundles spell every
+ * key as eight digits, so a hash with a leading zero misses its own entry
+ * without it.
+ *
+ * Both guards answer "" rather than the unknown label. `null` means the log
+ * never recorded one and EMPTY_ID is the game's own "this slot is empty" —
+ * neither is an id we tried and failed to name, and rendering
+ * "Unknown (887b8bb0)" for an empty slot reads as a parser bug.
+ */
+const translateHashedId = (namespace: string, id: number | null): string => {
   if (id === null) return "";
   if (id === EMPTY_ID) return "";
 
   const hash = id.toString(16).padStart(8, "0");
-  return t([`traits:${hash}.text`, "ui.unknown-id"], { id: hash });
+  return t([`${namespace}:${hash}.text`, "ui.unknown-id"], { id: hash });
 };
+
+/// Translates the trait ID to a human-readable string.
+export const translateTraitId = (id: number | null): string => translateHashedId("traits", id);
 
 /// Translates the ability (equipped skill) ID to a human-readable string.
-export const translateAbilityId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`abilities:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateAbilityId = (id: number | null): string => translateHashedId("abilities", id);
 
 /// Translates the sigil ID to a human-readable string.
-export const translateSigilId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`sigils:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateSigilId = (id: number | null): string => translateHashedId("sigils", id);
 
 /// Translates the item ID to a human-readable string.
-export const translateItemId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`items:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateItemId = (id: number | null): string => translateHashedId("items", id);
 
 /** The wrightstone's display name. The stone's ITEM id never syncs for remote
  * players (only its trait pairs do), so 0 means "a stone we can't name", not
@@ -1628,41 +1611,16 @@ export const translateWrightstoneId = (id: number | null): string =>
   id && id !== EMPTY_ID ? translateItemId(id) : t("ui.wrightstone");
 
 /// Translates the overmastery ID to a human-readable string.
-export const translateOvermasteryId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-
-  return t([`overmasteries:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateOvermasteryId = (id: number | null): string => translateHashedId("overmasteries", id);
 
 /// Translates a numeric weapon ID (weapon table key hash) to a human-readable string.
-export const translateWeaponId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`weapons:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateWeaponId = (id: number | null): string => translateHashedId("weapons", id);
 
 /// Translates the summon ID (summon table key) to a human-readable string.
-export const translateSummonId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`summons:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateSummonId = (id: number | null): string => translateHashedId("summons", id);
 
 /// Translates the summon equip-bonus ID (summon base-param key) to a human-readable string.
-export const translateSummonBonusId = (id: number | null): string => {
-  if (id === null) return "";
-  if (id === EMPTY_ID) return "";
-
-  const hash = id.toString(16).padStart(8, "0");
-  return t([`summon-bonuses:${hash}.text`, "ui.unknown-id"], { id: hash });
-};
+export const translateSummonBonusId = (id: number | null): string => translateHashedId("summon-bonuses", id);
 
 /// The skillboard bundle key for one master-trait node. Node ids are only unique
 /// per character (the game's effect/ui id), so the key composes both:

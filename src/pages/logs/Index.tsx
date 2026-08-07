@@ -6,6 +6,7 @@ import {
   epochToLocalTime,
   hasQuestElapsedTime,
   millisecondsToElapsedFormat,
+  translateCharacterType,
   translateEnemyType,
   translateEnemyTypeId,
   translateQuestId,
@@ -180,8 +181,20 @@ export const IndexPage = () => {
     <Box>
       <Box py={"xs"}>
         <Group>
-          <SelectableEnemy targetIds={searchResult.enemyIds} setFilters={setFilters} filters={filters} />
-          <SelectableQuest questIds={searchResult.questIds} setFilters={setFilters} filters={filters} />
+          <FilterSelect
+            ids={searchResult.enemyIds}
+            labelOf={translateEnemyTypeId}
+            value={filters.filterByEnemyId}
+            onPick={(filterByEnemyId) => setFilters({ filterByEnemyId })}
+            placeholder={t("ui.select-enemy")}
+          />
+          <FilterSelect
+            ids={searchResult.questIds}
+            labelOf={translateQuestId}
+            value={filters.filterByQuestId}
+            onPick={(filterByQuestId) => setFilters({ filterByQuestId })}
+            placeholder={t("ui.select-quest")}
+          />
           <SelectableQuestCompletion setFilters={setFilters} filters={filters} />
           <Button size="s" variant="default" onClick={toggleAdvancedFilters}>
             {filters.showAdvancedFilters ? t("ui.logs.hide-advanced-filters") : t("ui.logs.show-advanced-filters")}
@@ -199,10 +212,22 @@ export const IndexPage = () => {
       <Box pb={filters.showAdvancedFilters ? "xs" : undefined}>
         <Group>
           {filters.showAdvancedFilters && (
-            <SelectablePlayer playerIds={searchResult.playerIds} setFilters={setFilters} filters={filters} />
+            <FilterSelect
+              ids={searchResult.playerIds}
+              labelOf={String}
+              value={filters.filterByPlayerId}
+              onPick={(filterByPlayerId) => setFilters({ filterByPlayerId })}
+              placeholder={t("ui.select-player")}
+            />
           )}
           {filters.showAdvancedFilters && (
-            <SelectablePlayerType playerTypes={searchResult.playerTypes} setFilters={setFilters} filters={filters} />
+            <FilterSelect
+              ids={searchResult.playerTypes}
+              labelOf={translateCharacterType}
+              value={filters.filterByPlayerCharacter}
+              onPick={(filterByPlayerCharacter) => setFilters({ filterByPlayerCharacter })}
+              placeholder={t("ui.select-character")}
+            />
           )}
           {/* Hidden with the verdicts themselves: filtering by something the
               user has asked not to see would narrow the list for a reason
@@ -614,54 +639,42 @@ function BlankTable() {
   );
 }
 
-function SelectableEnemy({
-  targetIds,
-  filters,
-  setFilters,
+/** One clearable, searchable filter over a list of ids.
+ *
+ * The enemy, quest, player and character filters were four copies of this: map
+ * ids to translated options, hold the chosen one in a `FilterState` field, and
+ * write null back on clear. Only the id space and the field ever differed.
+ *
+ * Mantine's Select speaks strings, so the chosen option is matched back out of
+ * `ids` rather than parsed — a numeric id space gets its NUMBER back without
+ * the call site casting, which is what the four copies each did by hand and
+ * what made the number and string ones look like different components.
+ *
+ * `labelOf` belongs to the memo's deps, so pass a stable function (the
+ * module-level `translate*` ones are) — an inline arrow recomputes the options
+ * every render.
+ */
+function FilterSelect<T extends string | number>({
+  ids,
+  labelOf,
+  value,
+  onPick,
+  placeholder,
 }: {
-  targetIds: number[];
-  filters: FilterState;
-  setFilters: (filters: Partial<FilterState>) => void;
+  ids: T[];
+  labelOf: (id: T) => string;
+  value: T | null;
+  onPick: (id: T | null) => void;
+  placeholder: string;
 }) {
-  const { t } = useTranslation();
-  const targetOptions = useMemo(
-    () => targetIds.map((id) => ({ value: id.toString(), label: translateEnemyTypeId(id) })),
-    [targetIds]
-  );
+  const options = useMemo(() => ids.map((id) => ({ value: String(id), label: labelOf(id) })), [ids, labelOf]);
 
   return (
     <Select
-      data={targetOptions}
-      value={filters.filterByEnemyId?.toString() ?? null}
-      onChange={(value) => setFilters({ filterByEnemyId: value ? Number(value) : null })}
-      placeholder={t("ui.select-enemy")}
-      searchable
-      clearable
-    />
-  );
-}
-
-function SelectableQuest({
-  questIds,
-  filters,
-  setFilters,
-}: {
-  questIds: number[];
-  filters: FilterState;
-  setFilters: (filters: Partial<FilterState>) => void;
-}) {
-  const { t } = useTranslation();
-  const questOptions = useMemo(
-    () => questIds.map((id) => ({ value: id.toString(), label: translateQuestId(id) })),
-    [questIds]
-  );
-
-  return (
-    <Select
-      data={questOptions}
-      value={filters.filterByQuestId?.toString() ?? null}
-      onChange={(value) => setFilters({ filterByQuestId: value ? Number(value) : null })}
-      placeholder={t("ui.select-quest")}
+      data={options}
+      value={value === null ? null : String(value)}
+      onChange={(picked) => onPick(picked === null ? null : ids.find((id) => String(id) === picked) ?? null)}
+      placeholder={placeholder}
       searchable
       clearable
     />
@@ -715,60 +728,6 @@ function SelectableFlagged({
       placeholder={t("ui.logs.filter-flagged")}
       value={filters.flaggedOnly ? "flagged" : "all"}
       onClear={() => setFilters({ flaggedOnly: false })}
-      clearable
-    />
-  );
-}
-
-function SelectablePlayer({
-  playerIds,
-  filters,
-  setFilters,
-}: {
-  playerIds: string[];
-  filters: FilterState;
-  setFilters: (filters: Partial<FilterState>) => void;
-}) {
-  const { t } = useTranslation();
-  const targetOptions = useMemo(
-    () => playerIds.map((id) => ({ value: id.toString(), label: id.toString() })),
-    [playerIds]
-  );
-
-  return (
-    <Select
-      data={targetOptions}
-      onChange={(value) => setFilters({ filterByPlayerId: value ? String(value) : null })}
-      placeholder={t("ui.select-player")}
-      value={filters.filterByPlayerId ?? null}
-      searchable
-      clearable
-    />
-  );
-}
-
-function SelectablePlayerType({
-  playerTypes,
-  filters,
-  setFilters,
-}: {
-  playerTypes: string[];
-  filters: FilterState;
-  setFilters: (filters: Partial<FilterState>) => void;
-}) {
-  const { t } = useTranslation();
-  const targetOptions = useMemo(
-    () => playerTypes.map((id) => ({ value: id.toString(), label: t(`characters:${id}`, `ui:characters.${id}`) })),
-    [playerTypes]
-  );
-
-  return (
-    <Select
-      data={targetOptions}
-      onChange={(value) => setFilters({ filterByPlayerCharacter: value ? String(value) : null })}
-      value={filters.filterByPlayerCharacter ?? null}
-      placeholder={t("ui.select-character")}
-      searchable
       clearable
     />
   );
