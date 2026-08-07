@@ -73,9 +73,13 @@ const STUN_MAX_OFFSET: usize = 0xB94;
 /// wrong bucket array and made every online stun unattributable. Reading a
 /// plausible-looking pointer out of the wrong global fails silently, and a
 /// "does it land in BSS" sanity check cannot catch it — the whole region is BSS.
-const NET_ENTITY_MAP_BUCKETS_RVA: usize = 0x7bc3d98; // 2.0.2: 0x7bc6dd8
-const NET_ENTITY_MAP_SENTINEL_RVA: usize = 0x7bc3d88; // 2.0.2: 0x7bc6dc8
-const NET_ENTITY_MAP_MASK_RVA: usize = 0x7bc3db0; // 2.0.2: 0x7bc6df0
+///
+/// v2.0.4: +0x1280 (same shift as SAVE_ROOT / CHARA_POWER). Confirmed by a
+/// resolver window (~0x26ca00) that rip-loads all three with gaps 0x10 / 0x18
+/// unchanged. NETWORK_STUN_SIG and actor+0xB90 still match.
+const NET_ENTITY_MAP_BUCKETS_RVA: usize = 0x7bc5018; // 2.0.3: 0x7bc3d98; 2.0.2: 0x7bc6dd8
+const NET_ENTITY_MAP_SENTINEL_RVA: usize = 0x7bc5008; // 2.0.3: 0x7bc3d88; 2.0.2: 0x7bc6dc8
+const NET_ENTITY_MAP_MASK_RVA: usize = 0x7bc5030; // 2.0.3: 0x7bc3db0; 2.0.2: 0x7bc6df0
 
 type NetworkStunFunc = unsafe extern "system" fn(*const usize, *const usize) -> usize;
 
