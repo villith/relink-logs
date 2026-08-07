@@ -1,9 +1,28 @@
+import { statusPinKey } from "@/pages/logs/view/statusUptime";
 import type { LogEvent } from "@/types";
 
 import { abilityKey } from "../abilityKey";
 
 /** What the colour coding and the kind toggles key on. */
 export type EventKind = "damage" | "stun" | "perfectGuard" | "sba" | "sbaTick" | "death" | "status" | "other";
+
+/** Which index space a row's `targetIndex` is in.
+ *
+ * The two capture paths do NOT share one, and nothing about the number says
+ * which it is. A damage event's `target.index` is the spawn's INSTANCE POINTER
+ * folded to 32 bits — `TargetEntry.id`. Every other event reports the game's
+ * own actor index — `TargetEntry.actorIndex`, the coarser one, because the
+ * status hook sees the actor and not the damage instance.
+ *
+ * The parser learned this the expensive way: see `segment_at` in
+ * `parser/v1/status.rs`, where comparing the two compared different namespaces,
+ * never matched, and left every enemy-held status without its spawn. A row that
+ * did not say which space it carries would repeat that here — which is exactly
+ * what it did, and why a damage row's target rendered as a bare number.
+ *
+ * Players are not affected: BOTH paths report `PLAYER_SLOT_INDEX_BASE | slot`
+ * for a party member, so a player resolves the same way in either space. */
+export type ActorSpace = "spawn" | "actor";
 
 /** A projected event row. Null means "this kind has no such field" — never zero,
  * which would render as real data. */
@@ -13,11 +32,25 @@ export type EventRow = {
   /** The acting actor, or null for a party-wide event that names none. */
   sourceIndex: number | null;
   targetIndex: number | null;
+  /** Which spawn table column `targetIndex` must be matched against. Carried on
+   * every row, including those with no target, so a consumer never has to infer
+   * it from the kind. */
+  targetSpace: ActorSpace;
   /** The ability the row names, for rows that have one. */
   abilityKey: string | null;
-  /** A translated descriptor for a row with no ability — the
-   * `labelKey`/`labelParams` idiom `MetricRow` already uses. Rendered in the
-   * Ability column, so the two are mutually exclusive. */
+  /** The `status:<effect>:<cause>:<class>` key for a row that names an EFFECT
+   * rather than an ability — the same grammar the buffs tables and the ability
+   * selector pin, so one effect is named and pictured identically wherever it
+   * appears. Mutually exclusive with `abilityKey`. */
+  statusKey: string | null;
+  /** The effect id on its own, for the polarity split the Buffs and Debuffs
+   * tabs make (`isHarmful`). Carried rather than parsed back out of
+   * `statusKey`: it is the number the event already gave us, and re-reading it
+   * through the key's grammar is a second chance to get it wrong. */
+  statusId: number | null;
+  /** A translated descriptor for a row with neither — the
+   * `labelKey`/`labelParams` idiom `MetricRow` already uses. All three render in
+   * the Ability column, so they are mutually exclusive. */
   detailKey: string | null;
   detailParams?: Record<string, number | string>;
   amount: number | null;
@@ -93,10 +126,88 @@ export const toEventRow = (event: LogEvent): EventRow => {
       // belongs to the player who called it, and the source pin is in that same
       // index space, so a pin can only filter against the parent.
       sourceIndex: hit.source.parent_index,
+      // The damage path's own key: the folded instance pointer, NOT
+      // `target.parent_index` (see `ActorSpace`).
       targetIndex: hit.target.index,
+      targetSpace: "spawn",
       abilityKey: abilityKey(hit.action_id),
+      statusKey: null,
+      statusId: null,
       detailKey: null,
       amount: hit.damage,
+    };
+  }
+
+  // An effect landing. The CASTER is the source and the HOLDER is the target —
+  // the same direction a damage row reads, so the two scan as one table. Filed
+  // the other way round (holder as source, which is how every other variant's
+  // `actor_index` is read below) a buff would read as the target buffing
+  // itself.
+  if ("StatusApply" in payload) {
+    const status = payload.StatusApply;
+    return {
+      timeMs,
+      kind,
+      sourceIndex: status.caster_index,
+      targetIndex: status.actor_index,
+      targetSpace: "actor",
+      abilityKey: null,
+      statusKey: statusPinKey({
+        statusId: status.status_id,
+        abilityId: status.ability_id,
+        statusClass: status.status_class,
+      }),
+      statusId: status.status_id,
+      // Kept ALONGSIDE the effect, not instead of it: the effect says what, this
+      // says whether it landed or ended, and the two render together (see
+      // `CellText`'s suffix). Without it an apply and its matching remove are
+      // the same effect on the same holder in the same colour.
+      detailKey: "ui.logs.events-status-applied",
+      amount: status.stacks,
+    };
+  }
+
+  // The remove side carries no caster and no class — the shared destructor
+  // cannot vouch for either. Spelled `unknown` in the key rather than guessed,
+  // which is what makes the row name the effect and stay silent about a cause
+  // it does not have.
+  if ("StatusRemove" in payload) {
+    const status = payload.StatusRemove;
+    return {
+      timeMs,
+      kind,
+      sourceIndex: null,
+      targetIndex: status.actor_index,
+      targetSpace: "actor",
+      abilityKey: null,
+      statusKey: statusPinKey({
+        statusId: status.status_id,
+        abilityId: status.ability_id,
+        statusClass: null,
+      }),
+      statusId: status.status_id,
+      detailKey: "ui.logs.events-status-removed",
+      amount: null,
+    };
+  }
+
+  // The gauge grant names the skill that produced it. `action_id` is 0 where
+  // the cause was not a `Skill(Normal(id))` (see `SbaGainEvent`), and 0 is not
+  // an action — naming it would print an unknown skill over every link attack
+  // and echo that fed the gauge.
+  if ("SbaGain" in payload) {
+    const gain = payload.SbaGain;
+    return {
+      timeMs,
+      kind,
+      sourceIndex: gain.actor_index,
+      targetIndex: null,
+      targetSpace: "actor",
+      abilityKey: gain.action_id === 0 ? null : abilityKey({ Normal: gain.action_id }),
+      statusKey: null,
+      statusId: null,
+      detailKey: gain.action_id === 0 ? "ui.logs.events-sba-gain" : null,
+      amount: Math.round(gain.amount),
     };
   }
 
@@ -107,7 +218,10 @@ export const toEventRow = (event: LogEvent): EventRow => {
       kind,
       sourceIndex: null,
       targetIndex: null,
+      targetSpace: "actor",
       abilityKey: null,
+      statusKey: null,
+      statusId: null,
       detailKey: payload.LinkTime.active ? "ui.logs.events-link-start" : "ui.logs.events-link-end",
       amount: null,
     };
@@ -119,7 +233,10 @@ export const toEventRow = (event: LogEvent): EventRow => {
       kind,
       sourceIndex: payload.EnemyMode.actor_index,
       targetIndex: null,
+      targetSpace: "actor",
       abilityKey: null,
+      statusKey: null,
+      statusId: null,
       detailKey: "ui.logs.events-enemy-mode",
       detailParams: { mode: payload.EnemyMode.mode },
       amount: null,
@@ -133,7 +250,10 @@ export const toEventRow = (event: LogEvent): EventRow => {
     kind,
     sourceIndex: numberAt(body, "actor_index"),
     targetIndex: null,
+    targetSpace: "actor",
     abilityKey: null,
+    statusKey: null,
+    statusId: null,
     detailKey,
     // An unrecognised variant names itself, so a stored log never renders a
     // blank row the reader cannot account for.
@@ -149,9 +269,12 @@ export const toEventRow = (event: LogEvent): EventRow => {
   };
 };
 
-/** Every kind, in the order the toggles show them. The one list the toggle strip
- * and the colour map are both built from, so a kind cannot exist without a way
- * to turn it off. */
+/** Every kind, in the order the toggles show them. The one list the colour map
+ * is built from, so a kind cannot exist without a colour.
+ *
+ * Which of these a given tab OFFERS — and which start on — is `eventScope`'s
+ * business now, because the metric tab is what says which events its stream is
+ * made of. This is the universe, not a default. */
 export const EVENT_KINDS: EventKind[] = [
   "damage",
   "stun",
@@ -163,16 +286,18 @@ export const EVENT_KINDS: EventKind[] = [
   "sbaTick",
 ];
 
-/** Every kind except the gauge ticks, which are 29%-plus of a log and carry
- * nothing readable. One toggle brings them back. */
-export const DEFAULT_KINDS: ReadonlySet<EventKind> = new Set(EVENT_KINDS.filter((kind) => kind !== "sbaTick"));
-
 export const filterByKind = (rows: EventRow[], kinds: ReadonlySet<EventKind>): EventRow[] =>
   rows.filter((row) => kinds.has(row.kind));
 
-/** One pinned enemy SPAWN: its actor index plus the span it was alive for. A
- * span, not an id, because the game reissues a dead boss's actor index. */
-export type EventTargetSpan = { actorIndex: number; startMs: number; endMs: number };
+/** One pinned enemy SPAWN, in BOTH index spaces, plus the span it was alive
+ * for.
+ *
+ * Both, because the rows it filters are not all in one space (see
+ * `ActorSpace`): a damage row carries the folded instance pointer and a status
+ * row carries the game's actor index, and a span holding only one of them
+ * silently dropped every row of the other kind. A span rather than an id alone
+ * because the game reissues a dead boss's actor index to a later spawn. */
+export type EventTargetSpan = { spawnId: number; actorIndex: number; startMs: number; endMs: number };
 
 /** The pins, already resolved out of their own index spaces by the view.
  *
@@ -193,7 +318,10 @@ export const filterByPins = (rows: EventRow[], pins: EventPins): EventRow[] =>
     if (pins.source !== null && row.sourceIndex !== pins.source) return false;
     if (pins.targetSpans.length > 0) {
       const hit = pins.targetSpans.some(
-        (span) => row.targetIndex === span.actorIndex && row.timeMs >= span.startMs && row.timeMs <= span.endMs
+        (span) =>
+          row.targetIndex === (row.targetSpace === "spawn" ? span.spawnId : span.actorIndex) &&
+          row.timeMs >= span.startMs &&
+          row.timeMs <= span.endMs
       );
       if (!hit) return false;
     }

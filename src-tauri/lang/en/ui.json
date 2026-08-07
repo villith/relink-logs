@@ -430,6 +430,8 @@
         "analysis-under-construction": "The analysis view is still being built on this branch."
       },
       "analysis-tab": "Analysis",
+      "view-tablist-label": "View",
+      "view-table-tab": "Table",
       "events-tab": "Events",
       "events-time": "Time",
       "events-source": "Source",
@@ -471,6 +473,7 @@
       "selector-all-friendlies": "All friendlies",
       "selector-all-enemies": "All enemies",
       "selector-all-abilities": "All abilities",
+      "selector-clear": "Clear the {{dimension}} filter",
       "metric-damage-done": "Damage Done",
       "metric-stun": "Stun",
       "metric-sba": "SBA",

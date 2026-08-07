@@ -53,7 +53,10 @@ import {
 } from "../DetailCharts";
 import { abilityKey, skillKeyPayload } from "../abilityKey";
 import { actionsForPin, childOfPin } from "../abilitySkills";
+import { actorColor, keyColor, type ActorColorContext } from "../actorColor";
 import { EventsTab, type EventLabels } from "../events/EventsTab";
+import type { ScopeProbes } from "../events/eventScope";
+import { spawnSegmentAt } from "../events/eventTargets";
 import {
   buffs,
   enemyHolderKey,
@@ -66,12 +69,14 @@ import { damageDone, parseEnemyRow } from "../metrics/damageDone";
 import { damageTaken, takenAttackNameKey, takenAttackRowParts } from "../metrics/damageTaken";
 import { debuffs } from "../metrics/debuffs";
 import { sba, sbaCauseLabel } from "../metrics/sba";
+import { isHarmful } from "../metrics/statusPolarity";
 import { stun } from "../metrics/stun";
 import type { Hostility, MetricDescriptor, MetricRow } from "../metrics/types";
 import { deriveSelectorOptions, type SelectorPins } from "../selectorOptions";
 import { clipToWindow, isStatusPin, statusPinKey, uptimeMs } from "../statusUptime";
 import { buildTargetLabels } from "../targetLabels";
 
+import { ActorBar } from "./ActorBar";
 import { AuraStrip, type AuraChip } from "./AuraStrip";
 import { DebugBar } from "./DebugBar";
 import { DpsChart, type StackMode } from "./DpsChart";
@@ -158,17 +163,25 @@ const METRIC_TABS: MetricTab[] = Object.entries(METRICS).map(([value, descriptor
   labelKey: descriptor.labelKey,
 }));
 
-/** The raw-event-stream tab's value in the strip, and in the `tab` URL param. */
+/** The raw-event-stream view's value in the top-level switch, and in the `tab`
+ * URL param. Its absence means the default view, the table. */
 const EVENTS_TAB = "events";
+/** The default view: the chart-and-table body, everything the metric tabs
+ * switch between. Never written to the URL — a default in the URL is noise. */
+const TABLE_TAB = "table";
 
-/** The whole strip: the metrics, then Events.
+/** The top-level switch, which changes the WHOLE body below the selector bar.
  *
- * Events is appended HERE rather than added to `METRICS` because it is not a
- * metric — it has no chart, no groupings and no numeric columns, so there is
- * nothing for `CAPABILITIES`/`resolveViewSpec` to answer for it. It rides its own
- * `tab` param instead of `state.metric`, and the frame swaps its body for the
- * chart-and-table block below. */
-const VIEW_TABS: MetricTab[] = [...METRIC_TABS, { value: EVENTS_TAB, labelKey: "ui.logs.events-tab" }];
+ * Events is here rather than alongside the metrics because it is not a metric —
+ * it has no chart, no groupings, no numeric columns and no side, so there is
+ * nothing for `CAPABILITIES`/`resolveViewSpec` to answer for it, and nothing for
+ * the hostility toggle or the metric tabs to mean while it is showing. It rides
+ * its own `tab` param instead of `state.metric`, so the pins survive switching
+ * between the two views — which is the point of sharing the selector bar. */
+const VIEW_TABS: MetricTab[] = [
+  { value: TABLE_TAB, labelKey: "ui.logs.view-table-tab" },
+  { value: EVENTS_TAB, labelKey: "ui.logs.events-tab" },
+];
 
 /** Tooltip line per marker kind. Sibling of `DpsChart`'s `MARKER_LABEL_KEY`, but
  * a separate key set: those name the control-row checkboxes, these are the
@@ -257,12 +270,12 @@ export const AnalysisView = () => {
   // The machine: the URL holds the WHOLE state (metric, side, pins, window,
   // grouping override), the resolver turns it into everything the view shows.
   const [state, setState] = useAnalysisState();
-  // Which BODY the frame shows. Its own nuqs key rather than a machine field:
-  // Events is not a metric, so putting it in `AnalysisState` would mean a
-  // `MetricKey` the resolver has no spec for. nuqs writes per key, so this and
-  // `useAnalysisState` share the URL without either clobbering the other — and
-  // the pins therefore survive switching between the two bodies, which is the
-  // whole point of sharing the selector bar.
+  // Which BODY the frame shows — the top-level view switch. Its own nuqs key
+  // rather than a machine field: Events is not a metric, so putting it in
+  // `AnalysisState` would mean a `MetricKey` the resolver has no spec for. nuqs
+  // writes per key, so this and `useAnalysisState` share the URL without either
+  // clobbering the other — and the pins therefore survive switching between the
+  // two bodies, which is the whole point of sharing the selector bar.
   const [tab, setTab] = useQueryState("tab", { history: "replace" });
   const onEvents = tab === EVENTS_TAB;
   const caps = CAPABILITIES[state.metric];
@@ -636,6 +649,16 @@ export const AnalysisView = () => {
   const facts = scoped?.facts ?? baseFacts;
   const options = useMemo(() => deriveSelectorOptions(facts, pins), [facts, pins]);
 
+  // The party palette. Declared HERE, well above the chart it was written for,
+  // because the events stream colours its rows by the acting player and needs
+  // it long before the plot does — one palette, so a player is the same colour
+  // in the plot, the table and the raw stream.
+  const colors = useMemo(() => [color_1, color_2, color_3, color_4], [color_1, color_2, color_3, color_4]);
+
+  // The eight-entry palette the chart already draws with, so a player is the
+  // same colour in the table as in the plot above it.
+  const palette = useMemo(() => [...colors, ...PLAYER_COLORS.slice(4)], [colors]);
+
   // Player labels are looked up by actor index, which is what a pin carries.
   const playerByIndex = useMemo(() => {
     const byIndex = new Map<number, { player: ComputedPlayerState; slot: number }>();
@@ -742,13 +765,20 @@ export const AnalysisView = () => {
     () => ({
       // Already the same space as a damage event's `source.parent_index`.
       source: pins.source,
-      // A pinned target is a SPAWN, so it travels as that spawn's actor index
-      // plus its span — the game reissues a dead boss's actor index, and the
-      // index alone would file a later spawn's hits under the earlier one.
+      // A pinned target is a SPAWN, so it travels as BOTH of that spawn's ids
+      // plus its span. Both because the rows it filters are not all in one
+      // index space (see `ActorSpace`): a damage row carries the folded
+      // instance pointer, a status row the game's actor index. The span is what
+      // separates a reissued actor index's two spawns.
       targetSpans: pins.targets
         .map((segment) => targetEntries[segment])
         .filter((entry) => entry !== undefined)
-        .map((entry) => ({ actorIndex: entry.actorIndex, startMs: entry.startMs, endMs: entry.endMs })),
+        .map((entry) => ({
+          spawnId: entry.id,
+          actorIndex: entry.actorIndex,
+          startMs: entry.startMs,
+          endMs: entry.endMs,
+        })),
       // `pinnedActions` is the expansion the view already computes for its own
       // fetch, so a condensed `Group:` pin matches the raw ids behind it. An
       // EMPTY set with an ability pinned narrows to nothing, which is the honest
@@ -756,24 +786,6 @@ export const AnalysisView = () => {
       abilityKeys: pins.ability === null ? null : new Set(pinnedActions.map(abilityKey)),
     }),
     [pins.source, pins.targets, pins.ability, pinnedActions, targetEntries]
-  );
-
-  // An event's target is a bare actor index, so it is named through the spawn
-  // table by index AND time — the same rule `breakEnemyOf` uses, for the same
-  // reason. A hit the PARTY received names a player, not a spawn.
-  const eventLabels: EventLabels = useMemo(
-    () => ({
-      source: labelForSource,
-      target: (actorIndex, atMs) => {
-        const segment = targetEntries.findIndex(
-          (entry) => entry.actorIndex === actorIndex && entry.startMs <= atMs && entry.endMs >= atMs
-        );
-        if (segment !== -1) return labelForTarget(segment);
-        return playerByIndex.has(actorIndex) ? labelForSource(actorIndex) : String(actorIndex);
-      },
-      ability: labelForAbility,
-    }),
-    [labelForSource, labelForTarget, labelForAbility, targetEntries, playerByIndex]
   );
 
   // The Windows strip's chips: the filter UI for the battle windows. Declared
@@ -915,15 +927,142 @@ export const AnalysisView = () => {
     [caps.supportsAuraFilter, auraChipsFor]
   );
 
+  // The art an OPTION wears. Each resolves through the same join `rowIconUrl`
+  // sends the matching table row through, so pinning a row cannot change the
+  // picture beside its name — the selector and the row it came from are the
+  // same thing said twice, and they must look it. `undefined` is the common
+  // answer, not a failure: trash mobs have no portrait and bare kinds (link
+  // attacks, echoes, DoT) are not ability casts.
+  const sourceIconUrl = useCallback(
+    (index: number) => {
+      const character = playerByIndex.get(index)?.player.characterType;
+      return typeof character === "string" ? characterIconUrl(character) : undefined;
+    },
+    [playerByIndex]
+  );
+
+  // What every actor colour in the view is resolved against — the chart's
+  // bands, the table's rows, the pin selectors' options and the events stream
+  // all go through `actorColor` with this. One context so a boss cannot be pink
+  // in the plot, grey in the table and uncoloured in the dropdown.
+  //
+  // `slotOf` reads the IDENTITY party, so a scoped fetch's renumbered slots
+  // cannot recolour a player mid-drill, and answers `undefined` for a non-member
+  // rather than falling back to slot 0 — which would paint every enemy in the
+  // first player's colour.
+  const colorContext: ActorColorContext = useMemo(
+    () => ({ palette, partyData: playerData, slotOf: (index) => playerByIndex.get(index)?.slot }),
+    [palette, playerData, playerByIndex]
+  );
+
+  const abilityOptionIconUrl = useCallback(
+    (key: string) => {
+      // A status pin names an EFFECT, not an action, so it takes the effects
+      // table's art rather than the ability map's — which has no entry for it
+      // and would answer with whichever action its fallback landed on.
+      if (isStatusPin(key)) {
+        const statusId = statusIdOfKey(key);
+        return statusId === null ? undefined : statusIconUrl(statusId);
+      }
+      return abilityRowIconUrl(key, identityPlayers, playerByIndex.get(pins.source ?? -1)?.player);
+    },
+    [identityPlayers, playerByIndex, pins.source]
+  );
+
+  // The Events body's cells, named and pictured through the SAME resolvers the
+  // metric table and the selectors use — a second spelling of either here would
+  // let the two name one actor two ways, or pair one kind's name with another
+  // kind's art. Declared HERE, below those resolvers rather than beside
+  // `eventPins` above, because it closes over all three of them.
+  //
+  // ONE actor resolver for both ends of a row. The party is tried first, then
+  // the spawn table in the index space the row declares (see `ActorSpace`), at
+  // the moment of the event — the parser's own `segment_at` rule. A party
+  // member resolves the same way in either space, because both capture paths
+  // report one as a slot key.
+  //
+  // Colour is the point of the split: a player takes their own party colour,
+  // an enemy takes its SPAWN's colour from the enemy palette. Neither answers
+  // for the other, so a boss can never be drawn in a party member's colour.
+  const eventLabels: EventLabels = useMemo(
+    () => ({
+      actor: (index, atMs, space) => {
+        if (playerByIndex.has(index)) {
+          return {
+            name: labelForSource(index),
+            iconUrl: sourceIconUrl(index),
+            color: actorColor({ kind: "player", index }, colorContext),
+          };
+        }
+        const segment = spawnSegmentAt(targetEntries, index, atMs, space);
+        if (segment !== -1) {
+          return {
+            name: labelForTarget(segment),
+            iconUrl: enemyIconUrl(targetEntries[segment]?.enemyType ?? null),
+            color: actorColor({ kind: "spawn", segment }, colorContext),
+          };
+        }
+        // Neither a party member nor a known spawn. The raw index is the honest
+        // answer — it is what tells the reader the log holds an actor the
+        // segmenter skipped, rather than quietly showing an empty cell. No
+        // colour either: an actor we cannot name is not one we can categorise.
+        return { name: String(index) };
+      },
+      // One resolver for the art of both, because `abilityOptionIconUrl` already
+      // dispatches on the `status:` prefix — the selector needs the same split.
+      ability: (key) => ({ name: labelForAbility(key), iconUrl: abilityOptionIconUrl(key) }),
+      status: (key) => ({ name: statusDisplayLabel(key), iconUrl: abilityOptionIconUrl(key) }),
+    }),
+    [
+      labelForSource,
+      labelForTarget,
+      labelForAbility,
+      statusDisplayLabel,
+      sourceIconUrl,
+      colorContext,
+      abilityOptionIconUrl,
+      targetEntries,
+      playerByIndex,
+    ]
+  );
+
+  // How the event stream classifies an actor and an effect. Both come straight
+  // from what the tables already use — the identity party for membership, the
+  // game's own polarity flag for buff-vs-debuff — so the stream and the table
+  // above it cannot disagree about who is in the party or what a debuff is.
+  const eventProbes: ScopeProbes = useMemo(
+    () => ({ isPartyMember: (index) => playerByIndex.has(index), isHarmful }),
+    [playerByIndex]
+  );
+
   const labelledOptions = useMemo(
     () => ({
-      sources: labelSourceOptions(options.sources, labelForSource, characterForSource, player_label_template),
-      targets: options.targets.map((option) => ({ ...option, label: labelForTarget(Number(option.value)) })),
+      // Options wear their actor's own colour, the same one the chart band and
+      // the table row take — a dropdown is where you pick the thing you are
+      // about to look at, so it is the one place the colours must already
+      // match. An ability has no actor and stays plain.
+      sources: labelSourceOptions(options.sources, labelForSource, characterForSource, player_label_template).map(
+        (option) => ({
+          ...option,
+          iconUrl: sourceIconUrl(Number(option.value)),
+          color: actorColor({ kind: "player", index: Number(option.value) }, colorContext),
+        })
+      ),
+      targets: options.targets.map((option) => ({
+        ...option,
+        label: labelForTarget(Number(option.value)),
+        iconUrl: enemyIconUrl(targetEntries[Number(option.value)]?.enemyType ?? null),
+        color: actorColor({ kind: "spawn", segment: Number(option.value) }, colorContext),
+      })),
+      // Icons AFTER `withStatusOption`, not before: the option it injects for a
+      // pinned effect is not in the list it was given, and an icon pass on the
+      // input would leave the one option that is definitely selected as the
+      // only one with no art.
       abilities: withStatusOption(
         options.abilities.map((option) => ({ ...option, label: labelForAbility(option.value) })),
         pins.ability,
         statusDisplayLabel
-      ),
+      ).map((option) => ({ ...option, iconUrl: abilityOptionIconUrl(option.value) })),
     }),
     [
       options,
@@ -934,6 +1073,10 @@ export const AnalysisView = () => {
       labelForAbility,
       pins.ability,
       statusDisplayLabel,
+      sourceIconUrl,
+      abilityOptionIconUrl,
+      targetEntries,
+      colorContext,
     ]
   );
 
@@ -1219,14 +1362,6 @@ export const AnalysisView = () => {
   const [rateSmoothing, setRateSmoothing] = useState<number>(DPS_SMOOTHING_WINDOW);
   useEffect(() => setStackMode("normal"), [metricKey, id]);
 
-  // Chart series, mirroring the classic view's shaping so the same fight draws
-  // the same picture in both.
-  const colors = useMemo(() => [color_1, color_2, color_3, color_4], [color_1, color_2, color_3, color_4]);
-
-  // The eight-entry palette the chart already draws with, so a player is the
-  // same colour in the table as in the plot above it.
-  const palette = useMemo(() => [...colors, ...PLAYER_COLORS.slice(4)], [colors]);
-
   // Death and SBA markers, rebased onto the same window the chart shows and
   // resolved to display form here — the extractor stays pure of names and
   // colours. Deaths wear the dead player's party colour; SBA lines wear
@@ -1256,14 +1391,26 @@ export const AnalysisView = () => {
 
   const rowColor = useCallback(
     (row: MetricRow) => {
-      if (row.colorSlot < 0) return rowColors?.get(row.key) ?? "var(--an-ink-3)";
+      if (row.colorSlot < 0) {
+        // An ENEMY row — a spawn or a type — takes its own actor colour, the
+        // same one the chart band above it and the dropdown beside it take.
+        // Before this every enemy row was the neutral ink, which said nothing
+        // about which enemy it was and made the table the one place in the
+        // view where a boss had no identity.
+        //
+        // Ahead of the status colours, and it cannot steal from them: an
+        // effect row's key is `status:`, which names no actor at all.
+        const actor = keyColor(row.key, colorContext);
+        if (actor !== undefined) return actor;
+        return rowColors?.get(row.key) ?? "var(--an-ink-3)";
+      }
       // Re-resolve through the identity party: a scoped fetch renumbers slots,
       // so the descriptor's colorSlot can point at the wrong player.
       const key = row.key.startsWith("player:") ? Number(row.key.slice("player:".length)) : pins.source;
       const slot = playerByIndex.get(key ?? -1)?.slot ?? row.colorSlot;
       return resolvePlayerColor(palette, playerData, slot, 0);
     },
-    [palette, playerData, playerByIndex, pins.source, rowColors]
+    [palette, playerData, playerByIndex, pins.source, rowColors, colorContext]
   );
 
   // The rule itself lives in cardSections.ts; the view only supplies the name
@@ -1654,7 +1801,15 @@ export const AnalysisView = () => {
             name: series.key,
             label: series.label,
             partySlotIndex: position,
-            color: mantineColorVar(HP_SERIES_COLORS[position % HP_SERIES_COLORS.length]),
+            // An ACTOR band takes its actor's own colour — the same one its row
+            // in the table and its entry in the dropdown take, so one enemy is
+            // one colour wherever it appears. The positional palette stays for
+            // the bands that name no actor: an ability drill, a taken-attack
+            // row, the `other` remainder. Those have no identity to be
+            // consistent about, and position is the honest ordering for them.
+            color:
+              keyColor(series.key, colorContext) ??
+              mantineColorVar(HP_SERIES_COLORS[position % HP_SERIES_COLORS.length]),
           }))
         : [
             // First in the array so recharts draws it FIRST — the player lines
@@ -1686,7 +1841,7 @@ export const AnalysisView = () => {
                 color: colors[player.partyIndex % colors.length] ?? PLAYER_COLORS[0],
               })),
           ],
-    [overlay, identityPlayers, chartIndexes, labelForSource, colors, player_label_template, withTotal, t]
+    [overlay, identityPlayers, chartIndexes, labelForSource, colors, player_label_template, withTotal, t, colorContext]
   );
 
   // The combined filter's EXCLUDED regions, shaded onto the plot in the
@@ -1750,41 +1905,57 @@ export const AnalysisView = () => {
         logId={Number.isFinite(Number(id)) ? Number(id) : null}
       />
 
-      {/* Above the tabs, where Warcraft Logs puts it: the side is a property of
-          the whole view, not of one tab, and rendering it below the switcher
-          shifted every control under it each time the tab changed. Only tabs
-          that declare `supportsHostility` can operate it — see
-          HostilityToggle's `disabled`. Tested `!== true` rather than falsily,
-          matching `enemySide` above: one spelling of "this tab has an enemy
-          side" keeps the control offering it and the code rendering it from
-          disagreeing. */}
-      {/* Not on Events: a side is a property of a METRIC's two event streams,
-          and the raw stream has both in it by definition. */}
-      {!onEvents && (
-        <Box style={{ padding: "8px 16px 0" }}>
-          <HostilityToggle
-            value={hostility}
-            onChange={(side) => setState(hostilityTransition(state, side))}
-            disabled={!caps.supportsHostility}
+      {/* The topmost row: WHO the page is about, and which view is showing it.
+          Both outrank everything below — the actor pin is the one selection the
+          two views read the same way, and the view switch changes the whole
+          body under this row. */}
+      <ActorBar
+        options={labelledOptions.sources}
+        value={pins.source}
+        onChange={(source) => handlePinsChange({ ...pins, source })}
+        trailing={
+          <MetricTabs
+            variant="inline"
+            ariaLabelKey="ui.logs.view-tablist-label"
+            tabs={VIEW_TABS}
+            value={onEvents ? EVENTS_TAB : TABLE_TAB}
+            onChange={(value) =>
+              // Leaving Events clears the param rather than storing "table":
+              // the table body is the default, and a default in the URL is
+              // noise. The metric the table was last on is untouched either
+              // way — it lives in the machine, not here.
+              setTab(value === EVENTS_TAB ? EVENTS_TAB : null)
+            }
           />
-        </Box>
-      )}
-
-      <MetricTabs
-        tabs={VIEW_TABS}
-        value={onEvents ? EVENTS_TAB : metricKey}
-        onChange={(value) => {
-          if (value === EVENTS_TAB) {
-            setTab(EVENTS_TAB);
-            return;
-          }
-          // Leaving Events clears the param rather than storing "metrics": the
-          // metric body is the default, and a default in the URL is noise.
-          setTab(null);
-          setState(metricTransition(state, value as MetricKey));
-        }}
+        }
       />
 
+      {/* Above the metric tabs, where Warcraft Logs puts it: rendering it below
+          the switcher shifted every control under it each time the metric
+          changed. Only metrics that declare `supportsHostility` can operate it
+          — see HostilityToggle's `disabled`. */}
+      <Box style={{ padding: "8px 16px 0" }}>
+        <HostilityToggle
+          value={hostility}
+          onChange={(side) => setState(hostilityTransition(state, side))}
+          disabled={!caps.supportsHostility}
+        />
+      </Box>
+
+      {/* Live in BOTH views, because Events is a display MODE and not a view of
+          its own: the metric tab is what says which events the stream lists —
+          Buffs → applies and removes, Damage Taken → incoming hits (see
+          `eventScope`). Warcraft Logs' model, and the reason this frame is
+          shared rather than swapped. */}
+      <MetricTabs
+        tabs={METRIC_TABS}
+        value={metricKey}
+        onChange={(value) => setState(metricTransition(state, value as MetricKey))}
+      />
+
+      {/* The other two pins narrow whatever is below them. Below the metric tabs
+          rather than above: the enemies and abilities they offer are the ones
+          the CURRENT metric's facts turned up. */}
       <PinBar
         options={labelledOptions}
         pins={pins}
@@ -1794,108 +1965,115 @@ export const AnalysisView = () => {
         onClearWindow={() => setState(windowTransition(state, null))}
       />
 
-      {/* Everything below the selector bar describes a METRIC — a grouping, a
-          plot, a filter over one of its event streams, a table of its figures.
-          The raw stream has none of those, so Events swaps the whole block
-          rather than sitting alongside it. */}
-      {onEvents ? (
-        <EventsTab id={id} pins={eventPins} labels={eventLabels} />
-      ) : (
-        <>
-          {/* WCL's "Done By …" strip: the resolved grouping is only a default,
-              and this is the override (`by` in the URL). */}
-          <RegroupStrip tabs={spec.regroupTabs} onRegroup={(dim) => setState(regroup(state, dim, caps))} />
+      {/* Everything from here down to the body is the metric's own frame, and
+          it is the SAME frame in both views — a plot of the metric, the filters
+          over it, and then either its figures or its events. Only that last
+          block swaps. */}
+      {/* WCL's "Done By …" strip: the resolved grouping is only a default,
+          and this is the override (`by` in the URL). */}
+      <RegroupStrip tabs={spec.regroupTabs} onRegroup={(dim) => setState(regroup(state, dim, caps))} />
 
-          <DpsChart
-            data={shownChartData}
-            labels={labels}
-            labelKey={labelKey}
-            format={format}
-            stacked={stacked}
-            onScope={handleScope}
-            fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
-            toLabel={range === null ? fullLabel : bucketLabel(range[1])}
-            markers={chartMarkers}
-            bands={maskBands}
-            windowBands={stateWindowBands}
-            windowTooltips={chartWindowTooltips}
-            smoothing={smoothing}
-            // Offered on RATE charts only. On a level (the undrilled SBA gauge, the
-            // aura stacks) `chartPresentation` pins smoothing to 1 whatever is
-            // chosen, so a control there would be a knob that does nothing.
-            onSmoothingChange={format === "amount" ? setRateSmoothing : undefined}
-            stackMode={chartSource === "stacks" ? stackMode : undefined}
-            onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
-          />
+      <DpsChart
+        data={shownChartData}
+        labels={labels}
+        labelKey={labelKey}
+        format={format}
+        stacked={stacked}
+        onScope={handleScope}
+        fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
+        toLabel={range === null ? fullLabel : bucketLabel(range[1])}
+        markers={chartMarkers}
+        bands={maskBands}
+        windowBands={stateWindowBands}
+        windowTooltips={chartWindowTooltips}
+        smoothing={smoothing}
+        // Offered on RATE charts only. On a level (the undrilled SBA gauge, the
+        // aura stacks) `chartPresentation` pins smoothing to 1 whatever is
+        // chosen, so a control there would be a knob that does nothing.
+        onSmoothingChange={format === "amount" ? setRateSmoothing : undefined}
+        stackMode={chartSource === "stacks" ? stackMode : undefined}
+        onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
+      />
 
-          {/* Dev builds only, the same guard the Debug tab uses. */}
-          {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
+      {/* Dev builds only, the same guard the Debug tab uses. */}
+      {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
 
-          {/* The Windows strip: the battle-window filter's UI, on every tab —
+      {/* The Windows strip: the battle-window filter's UI, on every tab —
           unlike the aura strips it needs no pin to anchor it. Selecting a
           chip also COMMITS the scrub window to the selection's bucket hull —
           the chart zooms to the window through the same mechanism a drag
           uses, so the readout, the uptime denominators and the fetches all
           follow. Clearing the chip clears that zoom with it; a stale index
           resolves to no hull and leaves the scrub alone. */}
-          <WindowStrip
-            chips={windowFilterChips}
-            onSelect={(win) => {
-              const scrub = windowFilterScrubRange(selectedChartWindows(chartWindows, win), DPS_BUCKET_MS);
-              const next = windowFilterTransition(state, win);
-              setState(scrub === null ? next : windowTransition(next, scrub));
-            }}
-            onClear={() => setState(windowTransition(windowFilterTransition(state, null), null))}
-          />
+      <WindowStrip
+        chips={windowFilterChips}
+        onSelect={(win) => {
+          const scrub = windowFilterScrubRange(selectedChartWindows(chartWindows, win), DPS_BUCKET_MS);
+          const next = windowFilterTransition(state, win);
+          setState(scrub === null ? next : windowTransition(next, scrub));
+        }}
+        onClear={() => setState(windowTransition(windowFilterTransition(state, null), null))}
+      />
 
-          {/* The Auras Filter (spec: between chart and table). Each strip exists
+      {/* The Auras Filter (spec: between chart and table). Each strip exists
           only while its actor pin does — AuraStrip renders nothing for an
           empty chip list — and one aura is active at a time: selecting on
           either strip replaces the other's selection. */}
-          {caps.supportsAuraFilter && (
-            <>
-              <AuraStrip
-                titleKey="ui.logs.aura-source-title"
-                chips={sourceAuraChips}
-                onSelect={(aura) => setState(auraTransition(state, aura))}
-                onClear={() => setState(auraTransition(state, null))}
-              />
-              <AuraStrip
-                titleKey="ui.logs.aura-target-title"
-                chips={targetAuraChips}
-                onSelect={(aura) => setState(auraTransition(state, aura))}
-                onClear={() => setState(auraTransition(state, null))}
-              />
-            </>
-          )}
-
-          <Box style={{ padding: "4px 16px 14px" }}>
-            <MetricTable
-              rows={shownRows}
-              // The SOURCE header rides the same `effectLevel` condition that
-              // prepends the cells, so the two can never disagree — deliberately
-              // NOT declared on the descriptor's columnKeys: a `by` regroup can
-              // move groupBy without moving the rows off the effect level, and
-              // the PIN (not the grouping) is what statusRows keys the level on.
-              columnKeys={effectLevel ? ["ui.logs.buff-source", ...spec.table.columnKeys] : spec.table.columnKeys}
-              onPin={handlePin}
-              renderLabel={renderLabel}
-              rowColor={rowColor}
-              rowSections={rowSections}
-              rowChildren={rowChildren}
-              cardAmount={metric.card}
-              timelineMs={fightDurationMs}
-              sectionLabel={effectLevel ? sectionLabelOf : undefined}
-              // The resolver names the honest empty states (see `emptyKeyFor`).
-              // The aura tabs' key means "this log never recorded status events",
-              // so it applies only when the fight truly has no intervals — with
-              // intervals in hand an empty status table IS about the pins, and
-              // the table's own default says so.
-              emptyKey={isStatusMetric && statusIntervals.length > 0 ? undefined : spec.table.emptyKey}
-              rowsLabelKey={spec.table.rowsLabelKey}
-            />
-          </Box>
+      {caps.supportsAuraFilter && (
+        <>
+          <AuraStrip
+            titleKey="ui.logs.aura-source-title"
+            chips={sourceAuraChips}
+            onSelect={(aura) => setState(auraTransition(state, aura))}
+            onClear={() => setState(auraTransition(state, null))}
+          />
+          <AuraStrip
+            titleKey="ui.logs.aura-target-title"
+            chips={targetAuraChips}
+            onSelect={(aura) => setState(auraTransition(state, aura))}
+            onClear={() => setState(auraTransition(state, null))}
+          />
         </>
+      )}
+
+      {/* The ONE block the view switch swaps: the metric's figures, or the raw
+          events behind them. Everything above is the same in both. */}
+      {onEvents ? (
+        <EventsTab
+          id={id}
+          metric={metricKey}
+          hostility={hostility}
+          pins={eventPins}
+          probes={eventProbes}
+          labels={eventLabels}
+        />
+      ) : (
+        <Box style={{ padding: "4px 16px 14px" }}>
+          <MetricTable
+            rows={shownRows}
+            // The SOURCE header rides the same `effectLevel` condition that
+            // prepends the cells, so the two can never disagree — deliberately
+            // NOT declared on the descriptor's columnKeys: a `by` regroup can
+            // move groupBy without moving the rows off the effect level, and
+            // the PIN (not the grouping) is what statusRows keys the level on.
+            columnKeys={effectLevel ? ["ui.logs.buff-source", ...spec.table.columnKeys] : spec.table.columnKeys}
+            onPin={handlePin}
+            renderLabel={renderLabel}
+            rowColor={rowColor}
+            rowSections={rowSections}
+            rowChildren={rowChildren}
+            cardAmount={metric.card}
+            timelineMs={fightDurationMs}
+            sectionLabel={effectLevel ? sectionLabelOf : undefined}
+            // The resolver names the honest empty states (see `emptyKeyFor`).
+            // The aura tabs' key means "this log never recorded status events",
+            // so it applies only when the fight truly has no intervals — with
+            // intervals in hand an empty status table IS about the pins, and
+            // the table's own default says so.
+            emptyKey={isStatusMetric && statusIntervals.length > 0 ? undefined : spec.table.emptyKey}
+            rowsLabelKey={spec.table.rowsLabelKey}
+          />
+        </Box>
       )}
     </Box>
   );

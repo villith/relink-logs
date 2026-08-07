@@ -9,14 +9,29 @@ export type MetricTabsProps = {
   tabs: MetricTab[];
   value: string;
   onChange: (value: string) => void;
+  /** What the tablist is a list OF, for screen readers. Defaults to the metric
+   * switcher's own label — the other caller is the top-level view switch, which
+   * is a different question and must not announce itself as "Metric". */
+  ariaLabelKey?: string;
+  /** `strip` is the full-width row under the selector bar; `inline` drops the
+   * row's own rule and padding so the tabs can sit INSIDE another row (the
+   * selector bar's right edge). Only the frame differs — the tabs themselves,
+   * and the keyboard behaviour, are the same control either way. */
+  variant?: "strip" | "inline";
 };
 
-/** The metric switcher.
+/** A tablist: the metric switcher, and the top-level Table | Events switch.
  *
- * A tablist rather than Mantine's SegmentedControl: choosing a metric changes
- * what the whole page is about, which is navigation, and a row of pills reads
- * as a form control. */
-export const MetricTabs = ({ tabs, value, onChange }: MetricTabsProps) => {
+ * A tablist rather than Mantine's SegmentedControl: choosing a metric — or a
+ * view — changes what the whole page is about, which is navigation, and a row of
+ * pills reads as a form control. */
+export const MetricTabs = ({
+  tabs,
+  value,
+  onChange,
+  ariaLabelKey = "ui.logs.metric-tablist-label",
+  variant = "strip",
+}: MetricTabsProps) => {
   const { t } = useTranslation();
 
   // Arrow keys move between tabs and only the active tab is tabbable — the
@@ -31,14 +46,18 @@ export const MetricTabs = ({ tabs, value, onChange }: MetricTabsProps) => {
   return (
     <Box
       role="tablist"
-      aria-label={t("ui.logs.metric-tablist-label")}
+      aria-label={t(ariaLabelKey)}
       onKeyDown={(event) => {
         if (event.key === "ArrowRight") move(1);
         else if (event.key === "ArrowLeft") move(-1);
         else return;
         event.preventDefault();
       }}
-      style={{ display: "flex", padding: "0 16px", borderBottom: "1px solid var(--an-line)" }}
+      style={
+        variant === "inline"
+          ? { display: "flex", gap: 20 }
+          : { display: "flex", padding: "0 16px", borderBottom: "1px solid var(--an-line)" }
+      }
     >
       {tabs.map((tab) => {
         const active = tab.value === value;
@@ -50,8 +69,11 @@ export const MetricTabs = ({ tabs, value, onChange }: MetricTabsProps) => {
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(tab.value)}
             style={{
-              padding: "7px 0",
-              marginRight: 20,
+              // Inline, the row above supplies the vertical padding and `gap`
+              // supplies the spacing — repeating either here would push the
+              // underline off the text and double the gutter.
+              padding: variant === "inline" ? "3px 0" : "7px 0",
+              marginRight: variant === "inline" ? 0 : 20,
               fontSize: 13,
               fontWeight: 600,
               letterSpacing: "-0.01em",

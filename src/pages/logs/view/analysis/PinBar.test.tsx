@@ -15,7 +15,6 @@ vi.mock("react-i18next", () => ({
 }));
 
 const OPTIONS = {
-  sources: [{ value: "0", label: "Narmaya" }],
   targets: [{ value: "1", label: "Vulkan Bolla Nihilla" }],
   abilities: [{ value: "Normal:100", label: "Dawnfly Stance" }],
 };
@@ -40,14 +39,19 @@ const renderIt = (props: Partial<React.ComponentProps<typeof PinBar>> = {}) =>
 describe("PinBar", () => {
   it("shows each dimension's placeholder when nothing is pinned", () => {
     renderIt();
-    expect(screen.getByPlaceholderText("ui.logs.selector-all-friendlies")).toBeTruthy();
     expect(screen.getByPlaceholderText("ui.logs.selector-all-enemies")).toBeTruthy();
     expect(screen.getByPlaceholderText("ui.logs.selector-all-abilities")).toBeTruthy();
   });
 
+  // It moved to the topmost row, with the view switch — see ActorBar. Asserted
+  // here so the two bars cannot both grow one.
+  it("does not carry the actor pin", () => {
+    renderIt();
+    expect(screen.queryByPlaceholderText("ui.logs.selector-all-friendlies")).toBeNull();
+  });
+
   it("does not label the selectors — the placeholder already names them", () => {
     renderIt();
-    expect(screen.queryByText("ui.logs.selector-source")).toBeNull();
     expect(screen.queryByText("ui.logs.selector-target")).toBeNull();
     expect(screen.queryByText("ui.logs.selector-ability")).toBeNull();
   });

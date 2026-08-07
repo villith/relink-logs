@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { LogEvent } from "@/types";
 
-import { DEFAULT_KINDS, EVENT_KINDS, eventKind, filterByKind, filterByPins, toEventRow } from "./eventRows";
+import { EVENT_KINDS, eventKind, filterByKind, filterByPins, toEventRow } from "./eventRows";
 
 const actor = (index: number) => ({
   index,
@@ -29,7 +29,21 @@ const gaugeTick: LogEvent = [900, { OnUpdateSBA: { actor_index: 0, sba_value: 42
 const stun: LogEvent = [2_000, { OnPlayerStun: { actor_index: 2, stun_amount: 12.75 } }];
 const guard: LogEvent = [2_100, { OnPerfectGuardStun: { actor_index: 2, stun_amount: 4 } }];
 const perform: LogEvent = [3_000, { OnPerformSBA: { actor_index: 3 } }];
-const applied: LogEvent = [4_000, { StatusApply: { actor_index: 1, status_id: 77, stacks: 2 } }];
+const applied: LogEvent = [
+  4_000,
+  {
+    StatusApply: {
+      actor_index: 1,
+      caster_index: 3,
+      status_id: 77,
+      ability_id: 210,
+      stacks: 2,
+      status_class: 4242,
+      caster_action_id: null,
+    },
+  },
+];
+const removed: LogEvent = [6_000, { StatusRemove: { actor_index: 1, status_id: 77, ability_id: 210 } }];
 const linked: LogEvent = [5_000, { LinkTime: { active: true } }];
 
 /** A variant appended to `Message` after this file was written. */
@@ -72,6 +86,14 @@ describe("toEventRow", () => {
     expect(row.detailKey).toBeNull();
   });
 
+  // The damage path keys a spawn by the folded INSTANCE POINTER; every other
+  // path reports the game's actor index. Nothing about the number says which,
+  // so the row has to — see `ActorSpace`.
+  it("declares which index space its target is in", () => {
+    expect(toEventRow(damage).targetSpace).toBe("spawn");
+    expect(toEventRow(applied).targetSpace).toBe("actor");
+  });
+
   it("credits a hit to the PARENT actor, so a summon's damage is its caller's", () => {
     const summoned: LogEvent = [
       1_000,
@@ -106,10 +128,52 @@ describe("toEventRow", () => {
   });
 
   it("carries a status effect's stacks as its amount", () => {
+    expect(toEventRow(applied).amount).toBe(2);
+  });
+
+  // The caster acts on the holder, exactly as an attacker acts on a target, so
+  // the two kinds of row scan as one table. Filed the other way round — the way
+  // every other variant's bare `actor_index` is read — a buff read as the
+  // target buffing itself.
+  it("reads a status apply as caster ACTING ON holder", () => {
     const row = toEventRow(applied);
-    expect(row.sourceIndex).toBe(1);
-    expect(row.amount).toBe(2);
-    expect(row.detailKey).toBe("ui.logs.events-status-applied");
+    expect(row.sourceIndex).toBe(3);
+    expect(row.targetIndex).toBe(1);
+    expect(row.targetSpace).toBe("actor");
+  });
+
+  // The same grammar the buffs tables and the ability selector pin, so one
+  // effect is named and pictured identically wherever it appears.
+  it("names the effect with the pin key the buffs tables use", () => {
+    expect(toEventRow(applied).statusKey).toBe("status:77:210:4242");
+    expect(toEventRow(applied).abilityKey).toBeNull();
+  });
+
+  // The shared destructor cannot vouch for a class, so the remove side spells
+  // one it does not have rather than inventing it.
+  it("spells a removal's missing class rather than guessing one", () => {
+    const row = toEventRow(removed);
+    expect(row.statusKey).toBe("status:77:210:unknown");
+    expect(row.sourceIndex).toBeNull();
+    expect(row.targetIndex).toBe(1);
+  });
+
+  it("names the skill behind a gauge grant", () => {
+    const gain: LogEvent = [1_000, { SbaGain: { actor_index: 0, action_id: 100, amount: 3.25 } }];
+    const row = toEventRow(gain);
+    expect(row.abilityKey).toBe("Normal:100");
+    expect(row.amount).toBe(3);
+    expect(row.detailKey).toBeNull();
+  });
+
+  // `action_id` is 0 wherever the cause was not a `Skill(Normal(id))` — every
+  // link attack and echo that fed the gauge. Naming 0 would print an unknown
+  // skill over all of them.
+  it("does not name action 0 as a skill", () => {
+    const gain: LogEvent = [1_000, { SbaGain: { actor_index: 0, action_id: 0, amount: 1 } }];
+    const row = toEventRow(gain);
+    expect(row.abilityKey).toBeNull();
+    expect(row.detailKey).toBe("ui.logs.events-sba-gain");
   });
 
   it("leaves the source absent on a party-wide event with no actor", () => {
@@ -130,16 +194,9 @@ describe("toEventRow", () => {
 });
 
 describe("kind filtering", () => {
-  it("excludes the gauge ticks by default and nothing else", () => {
-    // OnUpdateSBA alone is 29% of every stored log, and SbaGain is one per hit —
-    // unfiltered they bury everything.
-    expect(DEFAULT_KINDS.has("sbaTick")).toBe(false);
-    expect(EVENT_KINDS.filter((kind) => !DEFAULT_KINDS.has(kind))).toEqual(["sbaTick"]);
-  });
-
-  it("offers a toggle for every kind the projection can produce", () => {
-    // A kind with no toggle is a row the reader cannot turn off — or, worse, one
-    // that vanishes because no toggle ever enables it.
+  it("gives every kind the projection can produce a place in the universe", () => {
+    // A kind missing from EVENT_KINDS has no colour and no toggle — a row that
+    // cannot be turned off, or one that no scope can ever enable.
     const produced = [damage, death, gaugeTick, stun, guard, perform, applied, linked, future].map(
       (event) => toEventRow(event).kind
     );
@@ -161,7 +218,9 @@ describe("filterByPins", () => {
   // damage: source 0, target 9, Normal:100 at 1500ms | death: source 1 |
   // stun: source 2 | linked: no source at all
   const rows = [damage, death, stun, linked].map(toEventRow);
-  const spans = [{ actorIndex: 9, startMs: 0, endMs: 10_000 }];
+  // One spawn in both spaces: the damage path's folded pointer is 9, the actor
+  // index the status path reports is 4.
+  const spans = [{ spawnId: 9, actorIndex: 4, startMs: 0, endMs: 10_000 }];
   const NO_PINS = { source: null, targetSpans: [], abilityKeys: null };
 
   it("keeps everything with nothing pinned", () => {
@@ -178,14 +237,44 @@ describe("filterByPins", () => {
     expect(filterByPins(rows, { ...NO_PINS, source: 0 }).map((row) => row.kind)).toEqual(["damage"]);
   });
 
-  it("narrows to a target SPAWN, matching its actor index and its span", () => {
+  it("narrows to a target SPAWN, matching its id and its span", () => {
     expect(filterByPins(rows, { ...NO_PINS, targetSpans: spans })).toHaveLength(1);
   });
 
-  it("excludes a hit on the same actor index outside the spawn's span", () => {
+  // The span carries both ids and the ROW says which one applies. Matching a
+  // damage row against the actor index compares different namespaces — the
+  // defect the parser already documents in `segment_at` — and drops every
+  // damage row the pin was supposed to keep.
+  it("matches each row in the space that row declares", () => {
+    const damageRow = toEventRow(damage);
+    expect(filterByPins([damageRow], { ...NO_PINS, targetSpans: spans })).toHaveLength(1);
+    // The actor index of the SAME spawn must not match a damage row.
+    expect(
+      filterByPins([damageRow], { ...NO_PINS, targetSpans: [{ ...spans[0], spawnId: 4, actorIndex: 9 }] })
+    ).toEqual([]);
+
+    // ...and an actor-space row matches on the other id, not the pointer.
+    const statusRow = toEventRow(applied);
+    expect(
+      filterByPins([statusRow], {
+        ...NO_PINS,
+        targetSpans: [{ spawnId: 99, actorIndex: 1, startMs: 0, endMs: 10_000 }],
+      })
+    ).toHaveLength(1);
+    expect(
+      filterByPins([statusRow], {
+        ...NO_PINS,
+        targetSpans: [{ spawnId: 1, actorIndex: 99, startMs: 0, endMs: 10_000 }],
+      })
+    ).toEqual([]);
+  });
+
+  it("excludes a hit on the same spawn id outside the spawn's span", () => {
     // The game reissues a dead boss's actor index to a later spawn — matching the
     // index alone put a second dragon's damage under the first one.
-    expect(filterByPins(rows, { ...NO_PINS, targetSpans: [{ actorIndex: 9, startMs: 0, endMs: 1_000 }] })).toEqual([]);
+    expect(
+      filterByPins(rows, { ...NO_PINS, targetSpans: [{ spawnId: 9, actorIndex: 4, startMs: 0, endMs: 1_000 }] })
+    ).toEqual([]);
   });
 
   it("narrows to the expanded ability keys", () => {
