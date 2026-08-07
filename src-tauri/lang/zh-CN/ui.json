@@ -274,7 +274,7 @@
       "hostility-label": "仇恨",
       "hostility-friendlies": "友方",
       "hostility-enemies": "敌方",
-      "hostility-disabled-hint": "奥义与昏厥仅按玩家记录 — 不区分敌我侧。",
+      "hostility-disabled-hint": "奥义与昏厥仅按玩家记录，无法切换至敌方视角。",
       "buffs-empty": "此日志中未记录任何状态",
       "enemy-dealt-empty": "未记录任何受到的伤害 — 引入承伤记录之前的日志不含此类数据",
       "sba-no-breakdown": "分能力奥义仅记录您自己的角色",
