@@ -27,14 +27,6 @@ export const ViewPage = () => {
   const mode = useMeterSettingsStore((state) => state.logs_view_mode);
   const setSettings = useMeterSettingsStore((state) => state.set);
 
-  if (!import.meta.env.DEV) {
-    return (
-      <Box>
-        <ClassicView />
-      </Box>
-    );
-  }
-
   return (
     <Box>
       <Box display="flex" style={{ justifyContent: "flex-end" }} mb="xs">
