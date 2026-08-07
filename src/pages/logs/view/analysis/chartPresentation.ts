@@ -40,6 +40,22 @@ export type ChartPresentation = {
   smoothing: number;
 };
 
+/** Which of the four builders draws INSTEAD of the per-player lines.
+ *
+ * Named and exported so this module and `useChartModel` cannot disagree about
+ * the precedence — the chain used to be spelled out in both.
+ *
+ * Returns the winner BY REFERENCE, which is load-bearing: the classification
+ * below recognises which plot it is by comparing `overlay === statusSeries` and
+ * friends, so rebuilding the array would silently reclassify the chart, and
+ * with it the title, the axis format and whether a Total series is drawn. */
+export const overlayOf = (
+  statusSeries: DrillSeries[] | null,
+  effectSeries: DrillSeries[] | null,
+  groupOverlay: DrillSeries[] | null,
+  abilitySeries: DrillSeries[] | null
+): DrillSeries[] | null => statusSeries ?? effectSeries ?? groupOverlay ?? abilitySeries;
+
 export const chartPresentation = ({
   statusSeries,
   effectSeries,
@@ -87,7 +103,7 @@ export const chartPresentation = ({
   // Whichever series is drawn INSTEAD of the per-player ones. Stack counts and
   // group bands are the same shape and are consumed identically, so they are
   // one branch here rather than the same ternary spelled out per field.
-  const overlay = statusSeries ?? effectSeries ?? groupOverlay ?? abilitySeries;
+  const overlay = overlayOf(statusSeries, effectSeries, groupOverlay, abilitySeries);
 
   // WHICH of those the plot ended up drawing, recognised from the value itself
   // rather than re-derived from the pins, so the title cannot disagree with
