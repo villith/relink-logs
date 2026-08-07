@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next";
 
 import type { EnemyType, SkillRow } from "@/types";
 
+import type { CardAmount, CardSection } from "../analysis/HoverCard";
 import type { MetricKey } from "../analysis/machine/state";
 import type { ActorSpace, EventPins } from "../events/eventRows";
 import { filterByKind, filterByPins, toEventRow } from "../events/eventRows";
@@ -60,6 +61,18 @@ export type TimelineTabProps = {
   onPin: (pins: Partial<SelectorPins>) => void;
   sectionLabel?: (row: MetricRow) => string | null;
   emptyKey?: string;
+  /** The hover card's sections for one lane's row — the SAME accessor the
+   * table uses, so a lane and its row explain themselves identically. */
+  rowSections?: (row: MetricRow) => CardSection[] | null;
+  /** What those sections measure. Without it no card is drawn at all, which is
+   * the same rule the table follows. */
+  cardAmount?: CardAmount;
+  /** Names and art for one mark's contribution. A mark's parts are keyed by
+   * whatever the event named — an action for a hit, a `status:` key for an
+   * effect — so it dispatches on the same `status:` prefix `abilityOptionIconUrl`
+   * already uses. A single resolver would name an effect through the ability
+   * join and print whatever that join's fallback picked. */
+  markEntry?: (key: string) => { name: string; iconUrl?: string };
 };
 
 /** The metric's rows drawn against fight time.
@@ -83,6 +96,9 @@ export const TimelineTab = ({
   onPin,
   sectionLabel,
   emptyKey,
+  rowSections,
+  cardAmount,
+  markEntry,
 }: TimelineTabProps) => {
   const { t } = useTranslation();
   const { events, total } = useEvents(id);
@@ -134,6 +150,9 @@ export const TimelineTab = ({
         onPin={onPin}
         {...(sectionLabel === undefined ? {} : { sectionLabel })}
         {...(emptyKey === undefined ? {} : { emptyKey })}
+        {...(rowSections === undefined ? {} : { rowSections })}
+        {...(cardAmount === undefined ? {} : { cardAmount })}
+        {...(markEntry === undefined ? {} : { markEntry })}
       />
     </div>
   );

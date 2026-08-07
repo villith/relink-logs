@@ -2095,6 +2095,14 @@ export const AnalysisView = () => {
           onPin={handlePin}
           sectionLabel={effectLevel ? sectionLabelOf : undefined}
           emptyKey={isStatusMetric && statusIntervals.length > 0 ? undefined : spec.table.emptyKey}
+          rowSections={rowSections}
+          cardAmount={metric.card}
+          // A mark's parts are keyed by whatever the event named — an action
+          // for a hit, a `status:` key for an effect — so it dispatches on the
+          // same `status:` prefix `abilityOptionIconUrl` already uses. A single
+          // resolver would name an effect through the ability join and print
+          // whatever that join's fallback picked.
+          markEntry={(key) => (isStatusPin(key) ? eventLabels.status(key) : eventLabels.ability(key))}
         />
       ) : (
         <Box style={{ padding: "4px 16px 14px" }}>
