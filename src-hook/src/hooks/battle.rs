@@ -7,8 +7,8 @@
 //! Where the reads come from (v2.0.3, `gbfr203fast` decompiles, 2026-08-06):
 //!
 //! * **Link Time** — `BT::EmLinkTimeCondition`'s evaluate virtual
-//!   (`FUN_140d43f10`) is one read: `*(byte*)(DAT_14702fd50 + 0x10) & 1`,
-//!   i.e. a singleton pointer at RVA `0x702fd50` whose byte `+0x10` carries
+//!   (`FUN_140d43f10`) is one read: `*(byte*)(DAT_147030fe0 + 0x10) & 1`,
+//!   i.e. a singleton pointer at RVA `0x7030fe0` whose byte `+0x10` carries
 //!   the link-time-active bit. The enemy AI itself branches on this, so it is
 //!   authoritative for "the party is inside Link Time".
 //! * **Enemy mode** — `BT::EmBossOverDriveCondition`'s evaluate
@@ -39,14 +39,14 @@ use crate::hooks::diag::{read_ptr_guarded, read_u32_guarded, MODULE_BASE};
 
 /// The battle singleton `EmLinkTimeCondition` reads (v2.0.3). Byte `+0x10`
 /// bit 0 = link time active.
-const LINK_TIME_SINGLETON_RVA: usize = 0x702fd50;
+const LINK_TIME_SINGLETON_RVA: usize = 0x7030fe0; // 2.0.3: 0x702fd50
 /// Byte offset of the link-time flag inside the singleton.
 const LINK_TIME_FLAG_OFFSET: usize = 0x10;
 
 /// The enemy mode component's static-init type id (v2.0.3); guard dword at
 /// `+4`, same `_Init_thread` protocol as `SBA_COMPONENT_TYPE_RVA` (see
 /// `poll_context` in sba.rs for the guard semantics).
-const EM_MODE_COMPONENT_TYPE_RVA: usize = 0x7bb6b4c;
+const EM_MODE_COMPONENT_TYPE_RVA: usize = 0x7bb7dcc; // 2.0.3: 0x7bb6b4c
 /// Mode field inside the resolved component.
 const EM_MODE_OFFSET: usize = 0x10;
 /// The game's raw mode enum has six values (the BT mapping table

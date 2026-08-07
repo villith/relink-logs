@@ -376,7 +376,7 @@ const RECORD_MASTER_LEVEL_OFFSET: usize = 0x5B60;
 /// v2.0.3: re-derived 2026-07-31 from the `mov r14,[rip+..]` in the weapon-state
 /// fill `FUN_140a2d8d0` (now at rva 0xa27000-ish), which loads the save root and
 /// the weapon table back to back.
-const SAVE_ROOT_RVA: usize = 0x7c21940; // 2.0.2: 0x7c24980
+const SAVE_ROOT_RVA: usize = 0x7c22bc0; // 2.0.3: 0x7c21940
 const EQ_MAP_END: usize = 0x40;
 const EQ_MAP_BUCKETS: usize = 0x50;
 const EQ_MAP_MASK: usize = 0x68;
@@ -446,7 +446,7 @@ const WEAPON_SOURCE_KEY_OFFSET: usize = 0x44;
 /// at +0x00, then the 18-u32 weapon struct (so +0x04 = weapon.tbl Key hash),
 /// validity count at +0x40, the 5 active innate skill-id slots at +0x44.
 /// `FUN_140321e30` copies a column verbatim into record+0x50 / blob+0x50.
-const WEAPON_TABLE_RVA: usize = 0x7c21ab8; // 2.0.2: 0x7c24af8
+const WEAPON_TABLE_RVA: usize = 0x7c22d38; // 2.0.3: 0x7c21ab8
 const WS_TABLE_BASE: usize = 0x370;
 const WS_TABLE_ROWS: usize = 32;
 const WS_TABLE_ROW_STRIDE: usize = 0x680;
@@ -472,7 +472,7 @@ const WS_TABLE_SKILL_SLOTS: usize = 5;
 /// skillboard query's own `mov rbx,[rip+..]` prologue load and the record
 /// dispatcher's `mov rax,[rip+..]`. This is the global whose staleness silently
 /// emptied master traits after the patch.
-const CHARA_POWER_RVA: usize = 0x7c21a38; // 2.0.2: 0x7c24a78
+const CHARA_POWER_RVA: usize = 0x7c22cb8; // 2.0.3: 0x7c21a38
 const SB_CHAR_MAP_END: usize = 0x728;
 const SB_CHAR_MAP_BUCKETS: usize = 0x738;
 const SB_CHAR_MAP_MASK: usize = 0x750;
@@ -1942,11 +1942,14 @@ fn log_progress_probe(record: *const usize) {
         return;
     }
     // CORRECTED 07-17 (dispatcher re-decompile): the master-exp ints live in
-    // DAT_147c24980 (+0x12A244 + +0x12A248, -1 = unloaded), NOT DAT_147c24a78
-    // as previously recorded — the earlier all-zero reads were the wrong
-    // global. The dispatcher sums them and walks the chara_master_exp row
-    // vector @ +0x430/0x438 (threshold @ row+0x54).
-    let Some(mgr) = read_ptr_guarded(module, 0x7c24980) else {
+    // the save-root global (+0x12A244 + +0x12A248, -1 = unloaded), NOT the
+    // chara-power global as previously recorded — the earlier all-zero reads
+    // were the wrong global. The dispatcher sums them and walks the
+    // chara_master_exp row vector @ +0x430/0x438 (threshold @ row+0x54).
+    //
+    // Use the named consts: these were left as raw 2.0.2 literals through the
+    // 2.0.3 pass, so this probe read a stale global for a whole game version.
+    let Some(mgr) = read_ptr_guarded(module, SAVE_ROOT_RVA) else {
         return;
     };
     if mgr == 0 {
@@ -2115,7 +2118,11 @@ fn log_progress_probe(record: *const usize) {
     static SCAN_TICK: AtomicU32 = AtomicU32::new(0);
     if read_u32_guarded(base, 0x5AC0) != 0 && SCAN_TICK.fetch_add(1, Ordering::Relaxed) % 1024 == 0
     {
-        for global in [0x7c23f48_usize, 0x7c24980, 0x7c24a78] {
+        // `0x7c23f48` is a 2.0.2-era literal no pass has ever re-derived, so it is
+        // stale on 2.0.4 and this probe reads nothing through it. Left un-guessed
+        // rather than shifted by an assumed section delta; hookdiag-only, so no
+        // production path depends on it. Re-derive before trusting its output.
+        for global in [0x7c23f48_usize, SAVE_ROOT_RVA, CHARA_POWER_RVA] {
             let Some(agg) = read_ptr_guarded(module, global) else {
                 continue;
             };
@@ -2153,7 +2160,7 @@ fn log_progress_probe(record: *const usize) {
         // levels (40/38/47) are not within ±0x200, so per-character blocks
         // sit at some larger stride. Scan for the distinctive triple
         // {1..=60, 0..=5, 15} at 8-byte alignment to find them all.
-        if let Some(cp) = read_ptr_guarded(module, 0x7c24a78) {
+        if let Some(cp) = read_ptr_guarded(module, CHARA_POWER_RVA) {
             if cp != 0 {
                 let mut hits: Vec<String> = Vec::new();
                 for off in (0..0x130000_usize).step_by(8) {
@@ -2416,6 +2423,7 @@ fn log_weapon_probe(record: *const usize) {
     // per-character equipped weapon. One dump per periodic fire.
     static PART3: AtomicU32 = AtomicU32::new(0);
     if PART3.fetch_add(1, Ordering::Relaxed) % 4 == 0 {
+        // Stale 2.0.2-era literal — see the note on the same global above.
         if let Some(agg) = read_ptr_guarded(module, 0x7c23f48) {
             if agg != 0 {
                 let mut lines = 0usize;
@@ -2438,7 +2446,7 @@ fn log_weapon_probe(record: *const usize) {
             }
         }
     }
-    let Some(mgr) = read_ptr_guarded(module, 0x7c24980) else {
+    let Some(mgr) = read_ptr_guarded(module, SAVE_ROOT_RVA) else {
         return;
     };
     if mgr == 0 {

@@ -61,21 +61,30 @@ const STUN_MAX_OFFSET: usize = 0xB94;
 /// every read is SEH-guarded and the found node is validated by key, so a
 /// racing mutation can only cost us one attribution, never a fault.
 ///
-/// v2.0.3 (re-derived 2026-07-31): the resolver moved to rva 0x269520 and is
-/// byte-identical to its 2.0.2 self apart from six displacement bytes. That diff
-/// pins the displacement positions exactly — mask at fn+0xDD (`and rcx,[rip]`),
-/// buckets at fn+0xE4 (`mov r14,[rip]`), sentinel at fn+0xF7 (`mov r11,[rip]`) —
-/// and the same arithmetic reproduces the known-good 2.0.2 values from the 2.0.2
-/// function, which is what makes these trustworthy. Node layout unchanged.
+/// v2.0.4 (re-derived 2026-08-07): the resolver stayed at rva 0x269520 and is
+/// byte-identical to its 2.0.3 self apart from twelve displacement bytes. That
+/// diff pins the displacement positions exactly — mask at fn+0xDD (`and
+/// rcx,[rip]`), buckets at fn+0xE4 (`mov r14,[rip]`), sentinel at fn+0xF7 (`mov
+/// r11,[rip]`) — and the same arithmetic reproduces the known-good 2.0.3 values
+/// from the 2.0.3 function, which is what makes these trustworthy. Node layout
+/// unchanged. Cross-checked a second way: the xref-site relocation of each
+/// global (several independent call sites per global) lands on the same three
+/// values.
+///
+/// These going stale is exactly what breaks ONLINE stun/SPS while solo keeps
+/// working: the mask reads out of the wrong global, `resolve_source_entity`
+/// bails, `source_slot_key` is None and no `OnPlayerStun` is ever emitted. The
+/// solo path measures the accumulator delta in the damage hook and is unaffected,
+/// so the symptom is "stun works solo, is dead online".
 ///
 /// Derive these by DIFFING the function, not by counting bytes in a hex dump: a
 /// first pass mis-sited all three displacements by 8, which silently walked the
 /// wrong bucket array and made every online stun unattributable. Reading a
 /// plausible-looking pointer out of the wrong global fails silently, and a
 /// "does it land in BSS" sanity check cannot catch it — the whole region is BSS.
-const NET_ENTITY_MAP_BUCKETS_RVA: usize = 0x7bc3d98; // 2.0.2: 0x7bc6dd8
-const NET_ENTITY_MAP_SENTINEL_RVA: usize = 0x7bc3d88; // 2.0.2: 0x7bc6dc8
-const NET_ENTITY_MAP_MASK_RVA: usize = 0x7bc3db0; // 2.0.2: 0x7bc6df0
+const NET_ENTITY_MAP_BUCKETS_RVA: usize = 0x7bc5018; // 2.0.3: 0x7bc3d98
+const NET_ENTITY_MAP_SENTINEL_RVA: usize = 0x7bc5008; // 2.0.3: 0x7bc3d88
+const NET_ENTITY_MAP_MASK_RVA: usize = 0x7bc5030; // 2.0.3: 0x7bc3db0
 
 type NetworkStunFunc = unsafe extern "system" fn(*const usize, *const usize) -> usize;
 

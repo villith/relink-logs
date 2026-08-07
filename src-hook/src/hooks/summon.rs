@@ -18,7 +18,7 @@ use crate::hooks::GetEntityHashID0x58;
 /// `*(summon) - MODULE_BASE` — a plain read and compare, never a vfunc call on
 /// a swept pointer. Goes stale on every game patch by design; a miss fails
 /// closed and warns once.
-/// v2.0.3 values, re-derived 2026-07-31. Each was recovered by walking MSVC RTTI
+/// v2.0.4 values, re-derived 2026-08-07. Each was recovered by walking MSVC RTTI
 /// forward from the class name, which survives recompiles: the `.?AV<Class>@@`
 /// string locates the TypeDescriptor, the Complete Object Locator carrying that
 /// TD's RVA *at subobject offset 0* is the primary one (these classes each have
@@ -26,26 +26,33 @@ use crate::hooks::GetEntityHashID0x58;
 /// offset-0 subobject's vtable is what `*(summon)` yields), and the qword
 /// pointing at that COL sits at vtable-8. Every entry was then round-tripped back
 /// through the same walk to confirm the RVA yields the class it came from, so
-/// these are read facts, not the -0x4040 section shift applied arithmetically.
+/// these are read facts, not the +0x12A0 section shift applied arithmetically.
+///
+/// NOT in this list, deliberately: `So6300` (2.0.4 vtable 0x5C595A0) and `So1a01`
+/// (0x5E7ED30). The RTTI walk finds them alongside the others and they are NOT new
+/// 2.0.4 classes — they were already absent here. Whether they belong is a
+/// question of whether they store their summoner at +0xFE8, which has not been
+/// checked; adding them unverified would mis-attribute damage, so they stay out
+/// until someone decompiles them.
 const SUMMON_BASE_VTABLE_RVAS: &[usize] = &[
-    0x59C2190, // BehaviorSummonObjectBase (generic/data-driven body)
-    0x5C54D90, // So0000  Lucilius
-    0x5C55FB0, // So4e00  Albacore
-    0x5C58A20, // So6400  Wheel of Fate
-    0x5C59BD0, // So0200  Rolan
-    0x5C5AD60, // So2001  Silverslime var.
-    0x5C5CFE0, // So4502  Lilith var.
-    0x5E715C0, // So4500  Lilith
-    0x5E74200, // So4c00  Managarmr Nihilla
-    0x5E75390, // So1d00  Quakadile
-    0x5E76480, // So9200  Beelzebub
-    0x5E77610, // So0d00  Goblin Soldier
-    0x5E787A0, // So4f00  Hope-Filled Skydwellers
-    0x5E79950, // So5600  Mellose Clan
-    0x5E7AB00, // So5700  Crew Alliance Rafale
-    0x5E7BCB0, // So5f01  Cat var.
-    0x617B980, // So1100  Goblin Warrior
-    0x617BD20, // So1100Base (generic body)
+    0x59C3430, // BehaviorSummonObjectBase (generic/data-driven body)
+    0x5C56030, // So0000  Lucilius
+    0x5C57250, // So4e00  Albacore
+    0x5C59CC0, // So6400  Wheel of Fate
+    0x5C5AE70, // So0200  Rolan
+    0x5C5C000, // So2001  Silverslime var.
+    0x5C5E280, // So4502  Lilith var.
+    0x5E72860, // So4500  Lilith
+    0x5E754A0, // So4c00  Managarmr Nihilla
+    0x5E76630, // So1d00  Quakadile
+    0x5E77720, // So9200  Beelzebub
+    0x5E788B0, // So0d00  Goblin Soldier
+    0x5E79A40, // So4f00  Hope-Filled Skydwellers
+    0x5E7ABF0, // So5600  Mellose Clan
+    0x5E7BDA0, // So5700  Crew Alliance Rafale
+    0x5E7CF50, // So5f01  Cat var.
+    0x617CC20, // So1100  Goblin Warrior
+    0x617CFC0, // So1100Base (generic body)
 ];
 
 /// One-shot latch so a patch that moves these vtables logs once per session
