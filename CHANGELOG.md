@@ -5,6 +5,26 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.10
+
+### Notes
+
+- **Supports game patch 2.0.4.**. The patch broke a number of things so it is highly suggested you update.
+
+### Features
+
+- **Overmastery Predictor** can now predict rolls for several characters at once
+
+### Bug Fixes
+
+- The Sigil Synthesis tool now prevents searching when your seed is out of date, to prevent the issue where the first sigil synthesis does match match the listed results
+
+### Language
+
+- Added missing action names and corrected the Fediel labels. [contributed by imnotsueryi-sys](https://github.com/imnotsureyi-sys)
+- Clarified the zh-CN Sup column wording. [contributed by imnotsueryi-sys](https://github.com/imnotsureyi-sys)
+- Updated the zh-TW translation. [contributed by o403chila](https://github.com/o403chila)
+
 ## 1.12.9
 
 ### Notes
