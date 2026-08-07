@@ -1,7 +1,7 @@
 {
   "name": "relink-logs",
   "private": true,
-  "version": "1.12.10-4",
+  "version": "1.12.10-5",
   "type": "module",
   "scripts": {
     "dev": "node scripts/clean-target.mjs --quiet && node scripts/build-hook-dev.mjs && vite",
