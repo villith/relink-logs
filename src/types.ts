@@ -915,8 +915,24 @@ export type LogEventPayload =
   | { OnContinueSBAChain: { actor_index: number } }
   | { OnUpdateSBA: { actor_index: number; sba_value: number; sba_added: number } }
   | { SbaGain: { actor_index: number; action_id: number; amount: number } }
-  | { StatusApply: { actor_index: number; status_id: number; stacks: number } }
-  | { StatusRemove: { actor_index: number; status_id: number } }
+  // The apply side carries everything a `status:` row key is spelled from
+  // (effect, cause, class) plus who cast it; the remove side has only the
+  // effect and the cause, because the shared destructor cannot vouch for a
+  // class by the time it fires. Mirrors `StatusApplyEvent`/`StatusRemoveEvent`
+  // — every optional here is `Option<u32>` in the protocol, and the events
+  // table must not turn a missing cause into a fabricated one.
+  | {
+      StatusApply: {
+        actor_index: number;
+        caster_index: number | null;
+        status_id: number;
+        ability_id: number | null;
+        stacks: number;
+        status_class: number | null;
+        caster_action_id: number | null;
+      };
+    }
+  | { StatusRemove: { actor_index: number; status_id: number; ability_id: number | null } }
   | { LinkTime: { active: boolean } }
   | { EnemyMode: { actor_index: number; mode: number } };
 
