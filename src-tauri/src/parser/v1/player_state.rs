@@ -147,6 +147,11 @@ pub enum SbaSourceKind {
     PerfectDodge,
     Site,
     Unknown,
+    /// Deduced, not read (see `sba_inference`): a flat SBA-chain contribution
+    /// recognised by its exact value.
+    InferredChainGrant,
+    /// Deduced, not read: gauge correlated with a hit the player received.
+    InferredDamageTaken,
 }
 
 /// One cause's share of a player's generated gauge.
@@ -421,6 +426,25 @@ impl PlayerState {
                     .sba_generated += amount;
             }
             None => *self.pending_sba_gain.entry(action).or_default() += amount,
+        }
+    }
+
+    /// Files one gauge gain the parser DEDUCED against the breakdown row of the
+    /// action it was correlated with (see the `sba_inference` module).
+    ///
+    /// Same row lookup as [`Self::add_sba_gain`] — an inferred gain is keyed off
+    /// a hit that exists, so it can no more open a row than a read one can — but
+    /// it accrues to `sba_inferred` instead of `sba_generated`, so a row always
+    /// reports how much of its gauge was measured and how much was concluded.
+    /// Merging the two would make a correlation indistinguishable from a
+    /// reading, which is the one thing inference is not allowed to do.
+    ///
+    /// A gain whose row has not opened is DROPPED, not held: this runs after
+    /// the whole log is folded, so nothing will open one later.
+    pub fn add_inferred_sba_gain(&mut self, action: ActionType, amount: f64) {
+        if let Some((row_action, child_character_type)) = self.keying.row_for_raw_action(action) {
+            self.breakdown_row_mut(row_action, child_character_type)
+                .sba_inferred += amount;
         }
     }
 

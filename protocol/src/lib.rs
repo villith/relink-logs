@@ -592,6 +592,42 @@ pub enum SbaGainCause {
     /// ~42.15 gauge per perfect dodge, log 1694 2026-08-04). Appended last per
     /// the append-only rule.
     PerfectDodge,
+    // -- Deduced, not read. ---------------------------------------------------
+    //
+    // Everything above is something the hook OBSERVED: a cause parked on the
+    // thread the gauge moved on, or a flag the gauge update itself carried.
+    // The three below are the parser's conclusions about gauge no hook could
+    // see — a remote party member's, which arrives as a bare level from the
+    // four-slot poll (see `parser::v1::sba_inference`).
+    //
+    // They are separate variants rather than a flag on the existing ones on
+    // purpose: a deduction must never be indistinguishable from a measurement,
+    // in the stored log or in the UI. Nothing in the hook ever emits these.
+    /// The action a remote player's gauge rise was correlated with, carrying
+    /// the same CLASSIFIED action a hook-read `Skill` cause would, so it routes
+    /// to the identical breakdown row. Appended last per the append-only rule.
+    Inferred(ActionType),
+    /// A rise matching the flat SBA-chain contribution exactly. Appended last
+    /// per the append-only rule.
+    InferredChainGrant,
+    /// A rise correlated with a hit the player RECEIVED. Appended last per the
+    /// append-only rule.
+    InferredDamageTaken,
+}
+
+impl SbaGainCause {
+    /// Did the parser deduce this cause, rather than the hook read it?
+    ///
+    /// The one place the distinction is expressed in code, so a future variant
+    /// has exactly one list to be added to.
+    pub fn is_inferred(&self) -> bool {
+        matches!(
+            self,
+            SbaGainCause::Inferred(_)
+                | SbaGainCause::InferredChainGrant
+                | SbaGainCause::InferredDamageTaken
+        )
+    }
 }
 
 /// Emitted for EVERY measured gauge rise whose owner resolves, with a `cause`

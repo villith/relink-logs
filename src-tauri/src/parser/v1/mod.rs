@@ -29,6 +29,7 @@ mod groups;
 mod live_emit;
 pub mod phantom_targets;
 mod player_state;
+mod sba_inference;
 mod skill_state;
 mod status;
 mod windows;
@@ -1422,6 +1423,24 @@ impl DerivedEncounterState {
             SbaGainCause::PerfectDodge => (SbaSourceKind::PerfectDodge, None),
             SbaGainCause::Site(tag) => (SbaSourceKind::Site, Some(tag)),
             SbaGainCause::Unknown => (SbaSourceKind::Unknown, None),
+            // Deduced causes (see `sba_inference`). A move verdict routes to
+            // the same breakdown row a read `Skill` would — it is keyed off a
+            // hit that exists — but through `add_inferred_sba_gain`, which
+            // tallies it separately so the UI can always say how much of a row
+            // is measured and how much is concluded.
+            SbaGainCause::Inferred(action) => {
+                // Dropped rather than held when the player has no row: unlike a
+                // read gain, this arrives after the whole log has been folded,
+                // so a missing row means no hit of theirs was ever counted and
+                // nothing will open one later. The held path also folds through
+                // `add_sba_gain`, which would quietly re-file it as measured.
+                if let Some(player) = self.party.get_mut(&actor_index) {
+                    player.add_inferred_sba_gain(action, amount);
+                }
+                return;
+            }
+            SbaGainCause::InferredChainGrant => (SbaSourceKind::InferredChainGrant, None),
+            SbaGainCause::InferredDamageTaken => (SbaSourceKind::InferredDamageTaken, None),
         };
 
         match self.party.get_mut(&actor_index) {
@@ -1815,6 +1834,35 @@ pub struct SelectionFact {
 /// slot-keys player victims the same way it keys player sources) and the
 /// source's parent is no known player character. A player-sourced hit on a
 /// player keeps flowing through the dealt pipeline unchanged.
+/// Does this event exist for a reparse run with these bounds?
+///
+/// The scrub range and the window-filter mask, in one place. `reparse_with_options`'s
+/// main loop and the SBA inference pass that follows it both decide through
+/// this, because inference joins against the very events the derived state was
+/// built from — if it saw an event the loop excluded, it could name gauge that
+/// is not in the polled total it is meant to be splitting.
+fn admits_event(
+    timestamp: i64,
+    from: Option<i64>,
+    cutoff: Option<i64>,
+    windows: Option<&[TimeWindow]>,
+    log_start: i64,
+) -> bool {
+    if cutoff.is_some_and(|cutoff| timestamp > cutoff) {
+        return false;
+    }
+    if from.is_some_and(|from| timestamp < from) {
+        return false;
+    }
+    match windows {
+        Some(windows) => {
+            let rel_ts = timestamp - log_start;
+            windows.iter().any(|window| window.admits(rel_ts))
+        }
+        None => true,
+    }
+}
+
 pub fn is_damage_taken_event(event: &DamageEvent) -> bool {
     protocol::is_player_slot_key(event.target.parent_index)
         && matches!(
@@ -2730,18 +2778,14 @@ impl Parser {
             if cutoff.is_some_and(|cutoff| *timestamp > cutoff) {
                 break;
             }
-            if from.is_some_and(|from| *timestamp < from) {
+            // The scrub bounds and the window-filter mask: outside them the
+            // event does not exist for this derived state, so every
+            // accumulation path downstream (damage, taken, stun, SBA
+            // gauge/gains, statuses) narrows identically. Shared with the SBA
+            // inference pass below through `admits_event`, so the two can never
+            // disagree about which events are real.
+            if !admits_event(*timestamp, from, cutoff, windows, log_start) {
                 continue;
-            }
-            // The window-filter mask: outside every admitted span, the event
-            // does not exist for this derived state — the same `continue` the
-            // scrub bounds use, so every accumulation path downstream (damage,
-            // taken, stun, SBA gauge/gains, statuses) narrows identically.
-            if let Some(windows) = windows {
-                let rel_ts = *timestamp - log_start;
-                if !windows.iter().any(|window| window.admits(rel_ts)) {
-                    continue;
-                }
             }
             // Ahead of the window extension in the DamageEvent arm below: an
             // excluded hit must not stretch the encounter window either, or a
@@ -2873,6 +2917,20 @@ impl Parser {
                 }
                 _ => {}
             }
+        }
+
+        // Gauge the hook could not caption — a remote party member's, which
+        // arrives as a bare level from the four-slot poll — gets whatever name
+        // the log itself can support. AFTER the loop, for two reasons: the
+        // rules join rises against hits on BOTH sides of them in time, and
+        // every breakdown row is open by now, so an inferred move gain lands in
+        // the row its hit opened instead of waiting on the pending list.
+        let inferred = sba_inference::infer(&self.encounter.raw_event_log, &|timestamp| {
+            admits_event(timestamp, from, cutoff, windows, log_start)
+        });
+        for gain in inferred {
+            self.derived_state
+                .process_sba_gain(gain.actor_index, gain.cause, gain.amount);
         }
     }
 

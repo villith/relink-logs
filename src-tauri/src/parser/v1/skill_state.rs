@@ -95,13 +95,23 @@ pub struct SkillState {
     /// Per-enemy-type share of this skill's damage (same-type spawns merge).
     #[serde(default)]
     pub targets: Vec<SkillTargetState>,
-    /// Gauge this skill generated, summed over the hits attributed to it.
+    /// Gauge this skill generated, summed over the hits attributed to it —
+    /// gauge the hook MEASURED, in a grant frame it could read a cause from.
     ///
-    /// LOCAL PLAYER ONLY: a remote member's gauge is synced rather than granted
-    /// by a hit we can see, so their rows carry 0 and the UI must say so rather
-    /// than presenting a zero as a measurement.
+    /// LOCALLY SIMULATED PLAYERS ONLY: a remote member's gauge is synced rather
+    /// than granted by a hit we can see, so no grant frame runs here and this
+    /// stays 0 for them. What their rows carry instead is `sba_inferred`.
     #[serde(default)]
     pub sba_generated: f64,
+    /// Gauge CORRELATED with this skill rather than measured on it — the
+    /// deduced half, for players whose grant frames never run locally (see the
+    /// `sba_inference` module).
+    ///
+    /// Kept apart from `sba_generated` on purpose: summed together the two are
+    /// this row's best estimate, but only one of them is evidence, and the UI
+    /// must be able to tell a reader which is which.
+    #[serde(default)]
+    pub sba_inferred: f64,
 }
 
 impl SkillState {
@@ -126,6 +136,7 @@ impl SkillState {
             overcap_cap_sum: 0.0,
             targets: Vec::new(),
             sba_generated: 0.0,
+            sba_inferred: 0.0,
         }
     }
 

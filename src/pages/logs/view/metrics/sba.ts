@@ -13,6 +13,18 @@ const NOT_RECORDED = "—";
  * magnitudes a fight produces, and a suffix would only lose precision. */
 const whole = (value: number): string => String(Math.round(value));
 
+/** Marks a figure the parser DEDUCED rather than the hook measured. A remote
+ * member's rows are inferred in full, so without this their gauge would read
+ * exactly like a local player's measured gauge. */
+const APPROXIMATE = "≈";
+
+/** A breakdown row's gauge: what was measured on it plus what was correlated
+ * with it. Summed because they answer the same question — this row's share of
+ * the player's bar — and a remote member has only the second kind, so ranking
+ * on the first alone leaves their whole table at zero. */
+const rowGauge = (skill: { sbaGenerated?: number; sbaInferred?: number }): number =>
+  (skill.sbaGenerated ?? 0) + (skill.sbaInferred ?? 0);
+
 /** Cause → i18n key. Exhaustive by construction: a kind with no entry here is a
  * backend that shipped a cause the UI has not been taught, which reads as
  * "Unidentified" rather than as a missing row. */
@@ -26,6 +38,10 @@ const CAUSE_LABEL_KEYS: Record<SbaSourceState["kind"], string> = {
   perfectDodge: "ui.logs.sba-cause-perfect-dodge",
   site: "ui.logs.sba-cause-site",
   unknown: "ui.logs.sba-cause-unknown",
+  // Deduced by the parser, not read by the hook — the labels say so, because a
+  // reader has to be able to tell a correlation from a measurement.
+  inferredChainGrant: "ui.logs.sba-cause-inferred-chain-grant",
+  inferredDamageTaken: "ui.logs.sba-cause-inferred-damage-taken",
 };
 
 /** Effect-record keys we have SEEN live and identified. Everything else renders
@@ -124,7 +140,7 @@ export const sba: MetricDescriptor = {
   // `skillBreakdown` for a skill walk to reach. A gain carries no target.
   card: {
     amountKey: "ui.meter-columns.sba-generated",
-    valueOf: (skill) => skill.sbaGenerated ?? 0,
+    valueOf: rowGauge,
     format: whole,
     perTarget: false,
   },
@@ -170,17 +186,21 @@ export const sba: MetricDescriptor = {
 
     const attributed = fold(owner.skillBreakdown)
       .map(({ key, skills }) => {
-        const generated = skills.reduce((sum, skill) => sum + (skill.sbaGenerated ?? 0), 0);
-        return { key, generated };
+        const generated = skills.reduce((sum, skill) => sum + rowGauge(skill), 0);
+        const inferred = skills.reduce((sum, skill) => sum + (skill.sbaInferred ?? 0), 0);
+        return { key, generated, inferred };
       })
       // A player with no attribution at all carries no attribution — filtered
       // here rather than shown as a wall of honest zeros.
       .filter(({ generated }) => generated !== 0)
-      .map(({ key, generated }) => ({
+      .map(({ key, generated, inferred }) => ({
         key: skillKey(key),
         label: key,
         value: generated,
-        columns: [whole(generated), share(generated, total)],
+        // Marked where any of the figure was deduced: a remote member's rows
+        // are correlations, and presenting them identically to the local
+        // player's measured rows would be the one dishonesty here.
+        columns: [inferred > 0 ? `${APPROXIMATE}${whole(generated)}` : whole(generated), share(generated, total)],
         // Pinnable into the group's members, like `stun`. A gain carries no
         // target, so once the rows ARE those members there is nothing further
         // to descend into.

@@ -250,11 +250,18 @@ export type SkillState = {
   maxDamage: number | null;
   /** Total damage of the skill */
   totalDamage: number;
-  /** Skybound Arts gauge this skill generated. Local player only — a remote
-   * member's gauge is synced rather than granted by a hit the hook can see, so
-   * their rows are 0 and the table must say so rather than ranking them.
+  /** Skybound Arts gauge MEASURED on this skill, in a grant frame the hook
+   * could read a cause from. Locally simulated players only — a remote member's
+   * gauge is synced rather than granted by a hit the hook can see, so this is 0
+   * for them and `sbaInferred` carries what could be deduced instead.
    * Optional: a backend older than the field sends nothing (dev HMR skew). */
   sbaGenerated?: number;
+  /** Skybound Arts gauge CORRELATED with this skill by the parser rather than
+   * measured on it — how a remote member's rows get filled at all. Kept apart
+   * from `sbaGenerated` so the table can always distinguish a deduction from a
+   * reading; summed, the two are the row's best estimate.
+   * Optional: a backend older than the field sends nothing. */
+  sbaInferred?: number;
   /** Total stun value of the skill hits */
   totalStunValue: number;
   /** Maximum recorded stun value of the skill */
@@ -453,7 +460,12 @@ export type SbaSourceState = {
     | "questStart"
     | "perfectDodge"
     | "site"
-    | "unknown";
+    | "unknown"
+    // Deduced by the parser from the log rather than read by the hook — the
+    // only causes available for a remote member, whose grant frames never run
+    // on this machine.
+    | "inferredChainGrant"
+    | "inferredDamageTaken";
   id: number | null;
   generated: number;
 };

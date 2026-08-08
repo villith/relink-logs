@@ -551,6 +551,8 @@
       "sba-cause-perfect-dodge": "Perfect Dodge",
       "sba-cause-generic-grant": "Unidentified (generic gauge grant)",
       "sba-cause-unknown": "Unidentified",
+      "sba-cause-inferred-chain-grant": "SBA chain bonus (estimated)",
+      "sba-cause-inferred-damage-taken": "Damage taken (estimated)",
       "sba-effect-test-entry": "Test effect (never shown)",
       "rows-by-effect": "Effect",
       "rows-by-enemy": "Enemy",
