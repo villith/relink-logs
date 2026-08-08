@@ -1,6 +1,6 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
-export type StripProps = {
+export type StripProps = Omit<ComponentPropsWithoutRef<"div">, "className" | "children"> & {
   children: ReactNode;
   /** Which edge carries the hairline. The aura and window strips rule their TOP
    * because they sit under the chart; every header strip rules its bottom. */
@@ -26,8 +26,19 @@ const RULE_CLASS = {
  * strips, the events toolbar. Every one of them was previously a `Box` with the
  * same six declarations written out by hand, which is how three of them came to
  * disagree about their padding. */
-export const Strip = ({ children, rule = "bottom", wrap = false, align = "center", className }: StripProps) => (
+export const Strip = ({
+  children,
+  rule = "bottom",
+  wrap = false,
+  align = "center",
+  className,
+  ...rest
+}: StripProps) => (
+  // Anything else the caller passed rides through — the events stream's kind
+  // filters are a `role="group"` with a name, and a band that could not say so
+  // would be a list of controls announced as loose buttons.
   <div
+    {...rest}
     className={[
       "flex gap-2 px-4 py-1.5",
       align === "baseline" ? "items-baseline" : "items-center",

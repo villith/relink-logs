@@ -34,10 +34,11 @@ const renderIt = (props: Partial<React.ComponentProps<typeof AuraStrip>> = {}) =
 
 describe("AuraStrip", () => {
   it("renders nothing with no chips", () => {
-    // Not `container.innerHTML === ""`: MantineProvider injects its own
-    // <style> tag, so the assertion is about the strip's own markup.
+    // Not `container.innerHTML === ""`, and not `firstElementChild`:
+    // MantineProvider injects its own <style> tag, so the assertion is about
+    // the strip's own markup — its title and its tiles.
     const { container } = renderIt({ chips: [] });
-    expect(container.querySelector(".analysis-aura-strip")).toBeNull();
+    expect(container.querySelector("button")).toBeNull();
     expect(screen.queryByText("ui.logs.aura-source-title")).toBeNull();
   });
 
@@ -56,7 +57,7 @@ describe("AuraStrip", () => {
     // The same art the effects table shows beside the same name — a chip is
     // that row's filter form.
     const { container } = renderIt();
-    const icon = container.querySelector("img.analysis-aura-tile-icon");
+    const icon = container.querySelector("button img");
 
     expect(icon?.getAttribute("src")).toBe("/status/1010.png");
     expect(icon?.getAttribute("alt")).toBe("");
@@ -67,9 +68,9 @@ describe("AuraStrip", () => {
     // to filter by them; letting them collapse would break the strip's rhythm.
     const { container } = renderIt();
 
-    expect(container.querySelectorAll(".analysis-aura-tile")).toHaveLength(2);
-    expect(container.querySelectorAll("img.analysis-aura-tile-icon")).toHaveLength(1);
-    expect(container.querySelectorAll(".analysis-aura-tile-blank")).toHaveLength(1);
+    expect(screen.getAllByRole("button")).toHaveLength(2);
+    expect(container.querySelectorAll("button img")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-tile-blank]")).toHaveLength(1);
   });
 
   it("names each chip for assistive tech, since nothing is written on it", () => {
@@ -124,7 +125,7 @@ describe("AuraStrip", () => {
   it("marks the selected chip, and only it", () => {
     const { container } = renderIt({ chips: [{ ...CHIPS[0], selected: true }, CHIPS[1]] });
 
-    expect(container.querySelectorAll(".analysis-aura-tile-selected")).toHaveLength(1);
+    expect(container.querySelectorAll('[aria-pressed="true"]')).toHaveLength(1);
     expect(screen.getByLabelText("Attack Up (Signo Drive)").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByLabelText("Veil (Panacea)").getAttribute("aria-pressed")).toBe("false");
   });

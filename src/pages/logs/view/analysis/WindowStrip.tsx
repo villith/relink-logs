@@ -1,6 +1,5 @@
-import { ChipStrip, type StripChip } from "./ChipStrip";
+import { CHIP_SWATCH_CLASS, ChipStrip, type StripChip } from "./ChipStrip";
 
-import "./analysis.css";
 import { WINDOW_BAND_COLOR } from "./chartWindowBands";
 import type { WindowChip } from "./windowChips";
 
@@ -24,11 +23,7 @@ export const WindowStrip = ({ chips, onSelect, onClear }: WindowStripProps) => (
         label: chip.label,
         selected: chip.selected,
         leading: (
-          <span
-            className="analysis-window-chip-swatch"
-            style={{ backgroundColor: WINDOW_BAND_COLOR[chip.kind] }}
-            aria-hidden
-          />
+          <span className={CHIP_SWATCH_CLASS} style={{ backgroundColor: WINDOW_BAND_COLOR[chip.kind] }} aria-hidden />
         ),
         figure: chip.durationLabel,
         // A per-window chip's visible label is a bare range ("10-20"), naming

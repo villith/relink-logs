@@ -1,9 +1,20 @@
-import { ActionIcon, Box, Text, UnstyledButton } from "@mantine/core";
+import { ActionIcon, Box, UnstyledButton } from "@mantine/core";
 import { X } from "@phosphor-icons/react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import "./analysis.css";
+import { Figure } from "@/components/ui/Figure";
+import { Label } from "@/components/ui/Label";
+import { Strip } from "@/components/ui/Strip";
+
+/** The chip anatomy, shared with the events stream's kind filters — the same
+ * control in a different strip, and two spellings of it would drift. */
+export const CHIP_CLASS = "inline-flex h-chip items-center rounded-sm border border-line-strong bg-panel";
+export const CHIP_SELECTED_CLASS = "border-accent bg-accent-soft pr-0.5";
+export const CHIP_BUTTON_CLASS = "inline-flex h-full cursor-pointer items-center gap-1.5 px-2 text-sm text-ink-2";
+export const CHIP_BUTTON_SELECTED_CLASS = "pr-0.5 text-ink";
+/** A window kind's colour block, before the label. */
+export const CHIP_SWATCH_CLASS = "inline-block size-swatch shrink-0 rounded-xs";
 
 export type StripChip = {
   /** Identity, and the value the strip reports back on select. */
@@ -50,20 +61,22 @@ export const ChipStrip = ({ titleKey, chips, onSelect, onClear }: ChipStripProps
   if (chips.length === 0) return null;
 
   return (
-    <Box className="analysis-aura-strip">
-      <Text className="analysis-label">{t(titleKey)}</Text>
+    <Strip rule="top" wrap>
+      <Label>{t(titleKey)}</Label>
       {chips.map((chip) => (
-        <Box key={chip.value} className={`analysis-aura-chip${chip.selected ? " analysis-aura-chip-selected" : ""}`}>
+        <Box key={chip.value} className={[CHIP_CLASS, chip.selected ? CHIP_SELECTED_CLASS : ""].join(" ")}>
           <UnstyledButton
-            className="analysis-aura-chip-button"
+            className={[CHIP_BUTTON_CLASS, chip.selected ? CHIP_BUTTON_SELECTED_CLASS : ""].join(" ")}
             aria-pressed={chip.selected}
             {...(chip.ariaLabel === undefined ? {} : { "aria-label": chip.ariaLabel })}
             onClick={() => (chip.selected ? onClear() : onSelect(chip.value))}
           >
             {chip.leading}
-            <span className="analysis-aura-chip-name">{chip.label}</span>
+            <span>{chip.label}</span>
             {chip.figure !== null && chip.figure !== undefined && (
-              <span className="analysis-num analysis-aura-chip-uptime">{chip.figure}</span>
+              <Figure data-chip-figure size="xs" tone="dim">
+                {chip.figure}
+              </Figure>
             )}
           </UnstyledButton>
           {chip.selected && (
@@ -80,6 +93,6 @@ export const ChipStrip = ({ titleKey, chips, onSelect, onClear }: ChipStripProps
           )}
         </Box>
       ))}
-    </Box>
+    </Strip>
   );
 };

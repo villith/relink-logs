@@ -2,10 +2,18 @@ import { Box, Text, UnstyledButton } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
 import { CursorCard } from "@/components/CursorCard";
+import { Label } from "@/components/ui/Label";
+import { Strip } from "@/components/ui/Strip";
 
 import { HOVER_PANEL_CLASS } from "./HoverCard";
 
 import "./analysis.css";
+
+/** A tile: art alone, in a square the size of a chip's height. The border does
+ * the whole job the removed text and ✕ used to share — it marks which effect
+ * the view is filtered by. */
+const TILE_CLASS =
+  "inline-flex size-[calc(26px*var(--density))] cursor-pointer items-center justify-center rounded-sm border border-line-strong bg-panel p-px";
 
 export type AuraChip = {
   /** The full aura value this chip selects (`src:status:…`/`tgt:status:…`). */
@@ -44,9 +52,9 @@ const AuraTooltip = ({ label, uptimePercent, children }: AuraChip & { children: 
       className={`analysis-tokens ${HOVER_PANEL_CLASS}`}
       style={{ maxWidth: 280 }}
       content={
-        <Box className="analysis-aura-card">
-          <Text className="analysis-aura-card-name">{label}</Text>
-          <Text className="analysis-label">{t("ui.logs.aura-uptime", { percent: uptimePercent })}</Text>
+        <Box className="px-[9px] py-1.5">
+          <Text className="text-md text-white">{label}</Text>
+          <Label>{t("ui.logs.aura-uptime", { percent: uptimePercent })}</Label>
         </Box>
       }
     >
@@ -78,12 +86,21 @@ export const AuraStrip = ({ titleKey, chips, onSelect, onClear }: AuraStripProps
   if (chips.length === 0) return null;
 
   return (
-    <Box className="analysis-aura-strip">
-      <Text className="analysis-label">{t(titleKey)}</Text>
+    <Strip rule="top" wrap>
+      <Label>{t(titleKey)}</Label>
       {chips.map((chip) => (
         <AuraTooltip key={chip.aura} {...chip}>
           <UnstyledButton
-            className={`analysis-aura-tile${chip.selected ? " analysis-aura-tile-selected" : ""}`}
+            className={[
+              TILE_CLASS,
+              // Hover has to read on a tile with no text to brighten, so the
+              // border lifts toward the accent before the click that would
+              // commit it — and a selected tile is past that, so it keeps its
+              // ring rather than dropping back to the hover colour.
+              chip.selected
+                ? "border-accent bg-accent-soft shadow-[0_0_0_1px_var(--color-accent)]"
+                : "hover:border-ink-3",
+            ].join(" ")}
             aria-pressed={chip.selected}
             // The tile writes nothing, so this is the only name it has.
             aria-label={chip.label}
@@ -92,14 +109,21 @@ export const AuraStrip = ({ titleKey, chips, onSelect, onClear }: AuraStripProps
             {chip.iconUrl === undefined ? (
               // An effect with no art still gets its square: dropping the tile
               // would drop the filter with it, and collapsing it would break
-              // the strip's rhythm and move every tile after it.
-              <Box className="analysis-aura-tile-blank" />
+              // the strip's rhythm and move every tile after it. Deliberately
+              // not a glyph or a "?" — it stands for "this effect has no
+              // picture", not for "unknown effect".
+              <Box data-tile-blank className="size-full rounded-xs bg-ink-3 opacity-[0.28]" />
             ) : (
-              <img className="analysis-aura-tile-icon" src={chip.iconUrl} alt="" />
+              // Unselected art sits back a little so the selected tile reads first.
+              <img
+                className={["size-full object-contain", chip.selected ? "opacity-100" : "opacity-85"].join(" ")}
+                src={chip.iconUrl}
+                alt=""
+              />
             )}
           </UnstyledButton>
         </AuraTooltip>
       ))}
-    </Box>
+    </Strip>
   );
 };

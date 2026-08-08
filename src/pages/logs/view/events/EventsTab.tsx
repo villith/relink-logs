@@ -2,10 +2,18 @@ import { Box, Group, Text, UnstyledButton } from "@mantine/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Strip } from "@/components/ui/Strip";
 import { millisecondsToPreciseElapsedFormat } from "@/utils";
 
 import "../analysis/analysis.css";
 
+import {
+  CHIP_BUTTON_CLASS,
+  CHIP_BUTTON_SELECTED_CLASS,
+  CHIP_CLASS,
+  CHIP_SELECTED_CLASS,
+  CHIP_SWATCH_CLASS,
+} from "../analysis/ChipStrip";
 import type { StreamContext } from "../analysis/model/bodyContext";
 import { toEventRow, type ActorSpace, type EventKind, type EventRow } from "./eventRows";
 import { defaultScopeKinds, narrowStream, scopeFor, scopeKinds } from "./eventScope";
@@ -324,23 +332,23 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
           and only when there is more than one — a strip of one offers no choice
           the metric tab above has not already made. */}
       {offered.length > 1 && (
-        <Box className="analysis-aura-strip" role="group" aria-label={t("ui.logs.events-kinds-label")}>
+        <Strip rule="top" wrap role="group" aria-label={t("ui.logs.events-kinds-label")}>
           {offered.map((kind) => {
             const on = kinds.has(kind);
             return (
-              <Box key={kind} className={`analysis-aura-chip${on ? " analysis-aura-chip-selected" : ""}`}>
-                <UnstyledButton className="analysis-aura-chip-button" aria-pressed={on} onClick={() => toggle(kind)}>
-                  <span
-                    className="analysis-window-chip-swatch"
-                    style={{ backgroundColor: KIND_COLORS[kind] }}
-                    aria-hidden
-                  />
-                  <span className="analysis-aura-chip-name">{t(KIND_LABEL_KEY[kind])}</span>
+              <Box key={kind} className={[CHIP_CLASS, on ? CHIP_SELECTED_CLASS : ""].join(" ")}>
+                <UnstyledButton
+                  className={[CHIP_BUTTON_CLASS, on ? CHIP_BUTTON_SELECTED_CLASS : ""].join(" ")}
+                  aria-pressed={on}
+                  onClick={() => toggle(kind)}
+                >
+                  <span className={CHIP_SWATCH_CLASS} style={{ backgroundColor: KIND_COLORS[kind] }} aria-hidden />
+                  <span>{t(KIND_LABEL_KEY[kind])}</span>
                 </UnstyledButton>
               </Box>
             );
           })}
-        </Box>
+        </Strip>
       )}
 
       <Text size="xs" c="dimmed" mb={4}>
