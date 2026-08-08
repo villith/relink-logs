@@ -3,7 +3,9 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CursorCard } from "@/components/CursorCard";
+import { Label } from "@/components/ui/Label";
 
+import { HOVER_PANEL_CLASS } from "../analysis/HoverCard";
 import { capCardRows, type CapHit, type CapRow } from "./capBreakdown";
 
 const format = (row: CapRow, locale: string): string => {
@@ -22,10 +24,10 @@ const format = (row: CapRow, locale: string): string => {
 /** The Amount cell. A damage row's amount is the END of a calculation the log
  * already records the inputs to, so hovering it explains itself.
  *
- * Rows with nothing to explain render the bare number with no card at all: a
- * non-damage row has no cap, and a damage row from a log predating the capture
- * yields only the `damage` row, which would restate the cell. An empty or
- * one-row card would imply the data is missing rather than inapplicable. */
+ * Rows with nothing to explain render the bare number and open no card at all:
+ * a non-damage row has no cap, and a damage row from a log predating the
+ * capture yields only the `damage` row, which would restate the cell. An empty
+ * or one-row card would imply the data is missing rather than inapplicable. */
 export const AmountCell = ({
   amount,
   capHit,
@@ -42,12 +44,18 @@ export const AmountCell = ({
   // Memoized because `CursorCard` re-renders on every committed cursor frame
   // and only its own position should change; see its `content` prop.
   const content = useMemo(
-    () =>
-      rows.map((row) => (
-        <Text key={row.key} size="xs" data-cap-row={row.key}>
-          {t(row.labelKey)} {format(row, i18n.language)}
-        </Text>
-      )),
+    () => (
+      <Box className="px-[9px] py-1.5">
+        {rows.map((row) => (
+          <Box key={row.key} className="flex items-baseline justify-between gap-4" data-cap-row={row.key}>
+            <Label>{t(row.labelKey)}</Label>
+            <Text className="text-sm text-white" style={{ fontVariantNumeric: "tabular-nums" }}>
+              {format(row, i18n.language)}
+            </Text>
+          </Box>
+        ))}
+      </Box>
+    ),
     [rows, t, i18n.language]
   );
 
@@ -60,7 +68,21 @@ export const AmountCell = ({
   return (
     <Box w={width}>
       {shows ? (
-        <CursorCard content={content} testId="cap-card" style={{ padding: 8 }}>
+        // The same surface as the metric and aura cards (`HOVER_PANEL_CLASS`):
+        // one view must not teach two kinds of tooltip. Sized to its content
+        // rather than to the metric card's width floor — six label/value pairs
+        // do not need it.
+        //
+        // Grows LEFT: Amount is the rightmost column, so there is no room to
+        // its right and the default placement would only park the card against
+        // the window edge.
+        <CursorCard
+          content={content}
+          testId="cap-card"
+          className={HOVER_PANEL_CLASS}
+          placement="top-left"
+          style={{ maxWidth: 280 }}
+        >
           {cell}
         </CursorCard>
       ) : (

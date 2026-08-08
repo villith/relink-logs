@@ -39,12 +39,22 @@ const VIEWPORT_PADDING = 5;
  * directly instead of this when there is not, rather than opening an empty
  * panel.
  */
+/** Which way the panel grows out of the cursor. It always grows UP; this is the
+ * horizontal half.
+ *
+ * `top-right` suits a cell with room to its right. `top-left` is for one that
+ * has none — the rightmost column of a table, where growing right only feeds
+ * the viewport clamp and parks the panel at the window edge instead of beside
+ * the thing it explains. */
+export type CursorCardPlacement = "top-right" | "top-left";
+
 export const CursorCard = ({
   content,
   children,
   testId,
   className,
   style,
+  placement = "top-right",
 }: {
   /** Memoize this. The component re-renders on every committed cursor frame,
    * and only the outer box's position should change — a referentially stable
@@ -57,6 +67,8 @@ export const CursorCard = ({
   /** The panel's own chrome — background, border, sizing. Positioning,
    * stacking and visibility are owned here and cannot be overridden. */
   style?: CSSProperties;
+  /** See [`CursorCardPlacement`]. Defaults to growing right. */
+  placement?: CursorCardPlacement;
 }) => {
   const [opened, setOpened] = useState(false);
   const [cursor, setCursor] = useState({ x: 0, y: 0 });
@@ -108,10 +120,11 @@ export const CursorCard = ({
   // Position from the committed cursor, clamped to the viewport. Held invisible
   // until measured so the first frame (size unknown) cannot flash in the wrong
   // spot before the grow-up offset is known.
-  const left = Math.max(
-    VIEWPORT_PADDING,
-    Math.min(cursor.x + CURSOR_OFFSET, window.innerWidth - size.width - VIEWPORT_PADDING)
-  );
+  // The anchored edge: the panel's left edge sits right of the cursor, or its
+  // right edge sits left of it. The clamp then applies equally to both, so a
+  // `top-left` card near the LEFT edge still slides back into view.
+  const anchoredLeft = placement === "top-left" ? cursor.x - CURSOR_OFFSET - size.width : cursor.x + CURSOR_OFFSET;
+  const left = Math.max(VIEWPORT_PADDING, Math.min(anchoredLeft, window.innerWidth - size.width - VIEWPORT_PADDING));
   const top = Math.max(
     VIEWPORT_PADDING,
     Math.min(cursor.y - CURSOR_OFFSET - size.height, window.innerHeight - size.height - VIEWPORT_PADDING)
