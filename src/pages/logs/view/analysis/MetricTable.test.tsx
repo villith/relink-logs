@@ -182,7 +182,9 @@ describe("MetricTable", () => {
 
   it("wraps a row in a hover card when the caller supplies sections", () => {
     const { container } = renderTable({ rowSections: SECTIONS, cardAmount: CARD_AMOUNT });
-    const row = container.querySelector<HTMLElement>(".analysis-row");
+    // The column head also carries role="row" (a grid's header row is a row),
+    // so a data row is one that is not the head.
+    const row = container.querySelector<HTMLElement>("[role='row']:not(.analysis-head)");
     expect(row).toBeTruthy();
     fireEvent.mouseOver(row!);
     expect(screen.getByTestId("metric-hover-card")).toBeTruthy();
@@ -194,7 +196,7 @@ describe("MetricTable", () => {
     // tooltip came to head its column "DMG" and report damage; without one
     // there is nothing honest to draw.
     const { container } = renderTable({ rowSections: SECTIONS });
-    fireEvent.mouseOver(container.querySelector<HTMLElement>(".analysis-row")!);
+    fireEvent.mouseOver(container.querySelector<HTMLElement>("[role='row']:not(.analysis-head)")!);
     expect(screen.queryByTestId("metric-hover-card")).toBeNull();
   });
 
@@ -424,7 +426,8 @@ describe("timeline rows", () => {
     expect(track).not.toBeNull();
     expect(track.querySelectorAll(".analysis-timeline-piece")).toHaveLength(1);
     // The name cell is bounded so the track never sits under the text.
-    expect(container.querySelector(".analysis-name")?.className).toContain("analysis-name-fixed");
+    const nameClasses = container.querySelector("[role='gridcell']")?.className.split(" ") ?? [];
+    expect(nameClasses).toContain("basis-name");
   });
 
   it("keeps the magnitude rows' name cell fluid", () => {
@@ -434,7 +437,8 @@ describe("timeline rows", () => {
       timelineMs: 10_000,
     });
 
-    expect(container.querySelector(".analysis-name")?.className).not.toContain("analysis-name-fixed");
+    const nameClasses = container.querySelector("[role='gridcell']")?.className.split(" ") ?? [];
+    expect(nameClasses).not.toContain("basis-name");
     expect(container.querySelector(".analysis-track")).toBeNull();
   });
 });

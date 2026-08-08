@@ -1,7 +1,5 @@
 import { Box, Text } from "@mantine/core";
 
-import "./analysis.css";
-
 export type AnalysisRowProps = {
   /** The row's name cell, already resolved to a node — this component never
    * looks a label up. Both bodies pass the view's own `renderLabel` output,
@@ -59,7 +57,25 @@ export const AnalysisRow = ({
   // keyboard pinning to fix the nesting would be a poor trade.
   <Box
     role="row"
-    className={["analysis-row", className, onClick ? "analysis-row-pinnable" : ""].filter(Boolean).join(" ")}
+    className={[
+      // 30px tall with NO margin, the bar inset 1px top and bottom, rather than
+      // 28px with a 2px margin. It draws identically — a 28px bar every 30px —
+      // but the separation now belongs to the row instead of sitting between
+      // rows. That gap was dead space owned by no hover target: measured at the
+      // exact midpoint between two rows, elementFromPoint returned a bare DIV
+      // inside neither row, so a cursor crossing it fired mouseleave and tore
+      // the hover card down before the next row built it again.
+      "relative flex h-row w-full items-center rounded-sm px-2 text-left",
+      // Rows touch, so an outline drawn OUTSIDE the box would overlap its
+      // neighbour's. Both states draw their ring inside instead, offset by the
+      // row's own 1px inset so the ring lands on the bar's edge.
+      "hover:outline hover:outline-1 hover:-outline-offset-2 hover:outline-line-strong",
+      "focus-visible:-outline-offset-[3px]",
+      onClick ? "cursor-pointer" : "",
+      className,
+    ]
+      .filter(Boolean)
+      .join(" ")}
     tabIndex={onClick ? 0 : undefined}
     onClick={onClick}
     onKeyDown={
@@ -76,7 +92,14 @@ export const AnalysisRow = ({
   >
     {background}
     {leading}
-    <Text role="gridcell" className={`analysis-name${nameFixed ? " analysis-name-fixed" : ""}`}>
+    <Text
+      role="gridcell"
+      className={[
+        "relative min-w-0 truncate text-lg font-semibold tracking-[-0.01em]",
+        // Timeline rows bound the name so the track gets the rest of the row.
+        nameFixed ? "flex-none basis-name" : "flex-1",
+      ].join(" ")}
+    >
       {name}
     </Text>
     {trailing}

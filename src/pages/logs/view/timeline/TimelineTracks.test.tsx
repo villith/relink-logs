@@ -70,7 +70,7 @@ const renderTracks = (lanes = LANES, over: Partial<React.ComponentProps<typeof T
 describe("TimelineTracks", () => {
   it("renders one lane per row, in order", () => {
     const { container } = renderTracks();
-    const names = [...container.querySelectorAll(".timeline-names .analysis-row")].map((el) => el.textContent);
+    const names = [...container.querySelectorAll(".timeline-names [role='row']")].map((el) => el.textContent);
     expect(names).toEqual(["label(skill:Normal:100)", "label(status:77:210)"]);
   });
 
@@ -83,14 +83,14 @@ describe("TimelineTracks", () => {
 
   it("draws lanes as the table's own row", () => {
     const { container } = renderTracks();
-    expect(container.querySelectorAll(".timeline-names .analysis-row").length).toBe(2);
+    expect(container.querySelectorAll(".timeline-names [role='row']").length).toBe(2);
   });
 
   // The two columns are rendered from one sequence; if they ever disagree the
   // names sit against the wrong marks.
   it("renders the same number of lane rows in both columns", () => {
     const { container } = renderTracks(LANES, { sectionLabel: () => "S" });
-    expect(container.querySelectorAll(".timeline-names .analysis-row").length).toBe(
+    expect(container.querySelectorAll(".timeline-names [role='row']").length).toBe(
       container.querySelectorAll(".timeline-content .timeline-row").length
     );
   });
