@@ -4,7 +4,7 @@
   "version": "1.12.11",
   "type": "module",
   "scripts": {
-    "dev": "node scripts/clean-target.mjs --quiet && node scripts/build-hook-dev.mjs && vite",
+    "dev": "node scripts/kill-orphans.mjs --quiet && node scripts/clean-target.mjs --quiet && node scripts/build-hook-dev.mjs && vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint ./src",
