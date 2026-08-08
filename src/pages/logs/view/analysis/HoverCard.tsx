@@ -192,8 +192,14 @@ const Section = ({
 
 /** One row of a note section: an event or span the card reports but does not
  * measure. `color` is the entity's own — the marker line's stroke, the window
- * band's shade — so the row and the mark it stands for on the plot agree. */
-export type CardNote = { key: string; color: string; text: string };
+ * band's shade — so the row and the mark it stands for on the plot agree.
+ *
+ * `icon` is that entity's art where it has any, drawn exactly as a measured
+ * entry's is. A death or a Skybound Art is an actor doing something, and a note
+ * row naming a player next to a card row naming the same player looked like two
+ * different kinds of thing for want of the picture. Absent on the window notes,
+ * which name a span rather than an actor. */
+export type CardNote = { key: string; color: string; text: string; icon?: string };
 
 /** A section of notes rather than of figures.
  *
@@ -222,6 +228,9 @@ export const CardNotes = ({ headingKey, notes }: { headingKey: string; notes: Ca
             style={{ backgroundColor: note.color }}
           />
           <Text data-card-name className="relative min-w-0 flex-1 truncate text-md">
+            {/* The same size and inline offset a measured entry's art takes, so
+                a notes section and a breakdown section above it line up. */}
+            {note.icon && <EntityIcon size="card" src={note.icon} alt="" className="mr-[5px] align-[-3px]" />}
             {note.text}
           </Text>
         </Box>

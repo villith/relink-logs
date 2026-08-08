@@ -176,10 +176,30 @@ describe("ChartTooltip", () => {
     // unordered — two players SBA-ing together, or two deaths at once.
     renderTooltip([{ dataKey: "0", name: "0", value: 1000, color: "#f00" }], LABELS, [
       { kind: "death", atMs: 183_000, color: "#f00", label: "☠ Rain died" },
-      { kind: "sba", atMs: 183_000, color: "#0ff", label: "✦ Manmoth — Skybound Art" },
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "Manmoth — Skybound Art" },
     ]);
     expect(screen.getByText("☠ Rain died")).toBeTruthy();
-    expect(screen.getByText("✦ Manmoth — Skybound Art")).toBeTruthy();
+    expect(screen.getByText("Manmoth — Skybound Art")).toBeTruthy();
+  });
+
+  it("draws the actor's art beside a marker that has any", () => {
+    // Load-bearing on the SBA rows: every SBA line wears ONE colour, so the
+    // swatch says only that an SBA happened — the art is what says by whom.
+    const { container } = renderTooltip([{ dataKey: "0", name: "0", value: 1000, color: "#f00" }], LABELS, [
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "Manmoth — Skybound Art", icon: "/char/manmoth.png" },
+    ]);
+    const art = container.querySelector("[data-card-name] img");
+    expect(art?.getAttribute("src")).toBe("/char/manmoth.png");
+    expect(art?.getAttribute("alt")).toBe("");
+  });
+
+  it("draws no art for a marker whose actor resolves none, rather than a blank box", () => {
+    const { container } = renderTooltip([{ dataKey: "0", name: "0", value: 1000, color: "#f00" }], LABELS, [
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "Manmoth — Skybound Art" },
+    ]);
+    expect(container.querySelector("[data-card-name] img")).toBeNull();
+    // The row is still there — the swatch and the words carry it.
+    expect(screen.getByText("Manmoth — Skybound Art")).toBeTruthy();
   });
 
   it("stays visible for a bucket where nothing landed but a marker did", () => {
@@ -187,11 +207,11 @@ describe("ChartTooltip", () => {
     // marker is exactly the content that must still show there — a death is
     // usually WHY the bucket is all zeroes.
     const { container } = renderTooltip([{ dataKey: "0", name: "0", value: 0, color: "#f00" }], LABELS, [
-      { kind: "sba", atMs: 183_000, color: "#0ff", label: "✦ Manmoth — Skybound Art" },
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "Manmoth — Skybound Art" },
     ]);
     const card = container.querySelector<HTMLElement>('[data-testid="chart-tooltip"]');
     expect(card!.style.visibility).not.toBe("hidden");
-    expect(screen.getByText("✦ Manmoth — Skybound Art")).toBeTruthy();
+    expect(screen.getByText("Manmoth — Skybound Art")).toBeTruthy();
   });
 
   it("still hides the card when an explicit empty markers array accompanies all-zero series", () => {
@@ -349,7 +369,7 @@ describe("ChartTooltip — markers and battle windows as card sections", () => {
   it("heads the markers by their kind too", () => {
     renderWith([
       { kind: "death", atMs: 183_000, color: "#f00", label: "☠ Rain died" },
-      { kind: "sba", atMs: 183_000, color: "#0ff", label: "✦ Manmoth — Skybound Art" },
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "Manmoth — Skybound Art" },
     ]);
     expect(screen.getByText("ui.logs.chart-marker-deaths")).toBeTruthy();
     expect(screen.getByText("ui.logs.chart-marker-sba")).toBeTruthy();

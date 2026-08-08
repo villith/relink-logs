@@ -11,8 +11,14 @@ export type MarkerKind = "death" | "sba";
 export type MarkerEvent = { kind: MarkerKind; atMs: number; actorIndex: number };
 
 /** A marker as the chart draws it: a vertical line at `atMs` (milliseconds
- * from the chart window's start) plus the tooltip line for its bucket. */
-export type ChartMarker = { kind: MarkerKind; atMs: number; color: string; label: string };
+ * from the chart window's start) plus the tooltip line for its bucket.
+ *
+ * `icon` is the ACTOR's art — whose death this was, who cast the Skybound Art.
+ * Optional because it comes from the same resolver every other card row's does,
+ * and that resolver has no picture for a character it cannot identify. It
+ * matters most on the SBA markers: those all draw in one colour, so the swatch
+ * says "an SBA happened" and only the name and the art say whose. */
+export type ChartMarker = { kind: MarkerKind; atMs: number; color: string; label: string; icon?: string };
 
 /** The SBA markers' colour. Deaths take the dead player's colour, so this one
  * has to stay distinct from three sets at once, all of which share the plot:
