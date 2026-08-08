@@ -3,6 +3,8 @@ import { useTranslation } from "react-i18next";
 
 import { CursorCard } from "@/components/CursorCard";
 
+import { HOVER_PANEL_CLASS } from "./HoverCard";
+
 import "./analysis.css";
 
 export type AuraChip = {
@@ -28,7 +30,7 @@ export type AuraStripProps = {
 
 /** One chip's hover card: what the tile itself no longer says.
  *
- * The same panel as the metric hover card (`analysis-hover-panel`, and
+ * The same panel as the metric hover card (`HOVER_PANEL_CLASS`, and
  * `CursorCard` under it), because a reader should not have to learn two kinds
  * of tooltip in one view. Sized to its content rather than to that card's
  * 300px floor — an effect name and a percentage do not need the width, and a
@@ -39,7 +41,7 @@ const AuraTooltip = ({ label, uptimePercent, children }: AuraChip & { children: 
   return (
     <CursorCard
       testId="aura-hover-card"
-      className="analysis-tokens analysis-hover-panel"
+      className={`analysis-tokens ${HOVER_PANEL_CLASS}`}
       style={{ maxWidth: 280 }}
       content={
         <Box className="analysis-aura-card">

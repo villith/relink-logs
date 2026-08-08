@@ -43,7 +43,12 @@ export const MetricBar = ({ value, subValue, largest, color, variant }: MetricBa
         // `inset-x-0` is what makes the track's width real — the segments are
         // absolute and contribute nothing, so without it every bar renders at
         // zero pixels.
-        "pointer-events-none absolute inset-x-0 rounded-sm opacity-[0.42]",
+        //
+        // ONE opacity for the row and the card. The card used to override it to
+        // 0.38, which was never a reasoned difference, only an unshared literal.
+        // Over --color-panel the worst palette entry (#9BCF53) composites to
+        // L=0.122, which is 6.1:1 against the card's white label.
+        "pointer-events-none absolute inset-x-0 rounded-xs opacity-[0.42]",
         // The row's own separation, so the pixels between two bars still belong
         // to a row and the hover card survives the crossing. The card draws
         // edge to edge; only the row insets.
@@ -52,13 +57,13 @@ export const MetricBar = ({ value, subValue, largest, color, variant }: MetricBa
     >
       <Box
         data-testid="metric-bar-segment"
-        className="pointer-events-none absolute inset-y-0 rounded-sm"
+        className="pointer-events-none absolute inset-y-0 rounded-xs"
         style={{ left: "0%", width: `${pct(direct)}%`, backgroundColor: color }}
       />
       {supplementary > 0 && (
         <Box
           data-testid="metric-bar-segment"
-          className="pointer-events-none absolute inset-y-0 rounded-sm opacity-45"
+          className="pointer-events-none absolute inset-y-0 rounded-xs opacity-45"
           style={{ left: `${pct(direct)}%`, width: `${pct(supplementary)}%`, backgroundColor: color }}
         />
       )}

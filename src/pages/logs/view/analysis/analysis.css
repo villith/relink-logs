@@ -155,15 +155,6 @@
   vertical-align: -6px;
 }
 
-/* The hover card's smaller copy of the same. */
-.analysis-card-icon {
-  height: var(--an-icon-xs);
-  width: var(--an-icon-xs);
-  object-fit: contain;
-  margin-right: 5px;
-  vertical-align: -3px;
-}
-
 .analysis-cell-muted {
   color: var(--an-ink-2);
   font-size: var(--an-fs-sm);
@@ -176,81 +167,6 @@
   padding: 0 8px;
   border-bottom: 1px solid var(--an-line);
   margin-bottom: 6px;
-}
-
-/* The chrome every cursor-following panel in the view wears: the metric hover
- * card and the aura tiles' own. Size is the caller's — a breakdown card needs
- * a width floor an effect name does not — but the surface must not differ, or
- * one view teaches two kinds of tooltip. */
-.analysis-hover-panel {
-  color: var(--mantine-color-white);
-  background-color: var(--an-panel);
-  border: 1px solid var(--an-line-strong);
-  border-radius: var(--mantine-radius-sm);
-  box-shadow: var(--mantine-shadow-md);
-  overflow: hidden;
-}
-
-/* The hover card: the same row anatomy at a smaller scale. */
-.analysis-card-section + .analysis-card-section {
-  border-top: 1px solid var(--an-line-strong);
-}
-
-.analysis-card-head {
-  display: flex;
-  align-items: center;
-  height: var(--an-head-h);
-  padding: 0 8px;
-  background-color: var(--an-raised);
-}
-
-.analysis-card-row {
-  position: relative;
-  display: flex;
-  align-items: center;
-  height: calc(23px * var(--an-scale));
-  padding: 0 8px;
-  margin: 2px 4px;
-  border-radius: 2px;
-}
-
-.analysis-card-name {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-  font-size: var(--an-fs-md);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* A note row's colour block, standing in for the bar a measured row draws:
-   it marks which line or band on the plot the row is about, so identity never
-   rides the text colour alone. Sized to the card's own row rhythm. */
-.analysis-card-note-swatch {
-  position: relative;
-  flex: none;
-  width: var(--an-swatch);
-  height: var(--an-swatch);
-  margin-right: 7px;
-  border-radius: 2px;
-}
-
-.analysis-card-share {
-  position: relative;
-  width: calc(52px * var(--an-scale));
-  text-align: right;
-  font-size: var(--an-fs-sm);
-  color: var(--an-ink-2);
-  font-variant-numeric: tabular-nums;
-}
-
-.analysis-card-amount {
-  position: relative;
-  width: calc(64px * var(--an-scale));
-  text-align: right;
-  font-size: var(--an-fs-sm);
-  font-variant-numeric: tabular-nums;
 }
 
 /* .analysis-label and .analysis-cell have equal specificity, so the later one

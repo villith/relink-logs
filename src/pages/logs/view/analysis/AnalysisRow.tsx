@@ -65,7 +65,7 @@ export const AnalysisRow = ({
       // exact midpoint between two rows, elementFromPoint returned a bare DIV
       // inside neither row, so a cursor crossing it fired mouseleave and tore
       // the hover card down before the next row built it again.
-      "relative flex h-row w-full items-center rounded-sm px-2 text-left",
+      "relative flex h-row w-full items-center rounded-xs px-2 text-left",
       // Rows touch, so an outline drawn OUTSIDE the box would overlap its
       // neighbour's. Both states draw their ring inside instead, offset by the
       // row's own 1px inset so the ring lands on the bar's edge.

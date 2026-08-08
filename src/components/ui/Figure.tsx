@@ -29,8 +29,11 @@ export type FigureProps = {
  * Tabular ALWAYS — that is the whole point of the component. Every figure in
  * the view is tabular so columns align down the page, and the eight sites that
  * previously set `fontVariantNumeric` inline are eight chances to forget. */
-export const Figure = ({ children, size = "lg", tone = "default", className }: FigureProps) => (
-  <span className={["tabular-nums", SIZE_CLASS[size], TONE_CLASS[tone], className].filter(Boolean).join(" ")}>
+export const Figure = ({ children, size = "lg", tone = "default", className, ...rest }: FigureProps) => (
+  // Anything else the caller passed rides through to the span — a `data-*` hook,
+  // a title. Without it a figure could not be told apart from its neighbours
+  // once the class names became utilities shared by half the view.
+  <span {...rest} className={["tabular-nums", SIZE_CLASS[size], TONE_CLASS[tone], className].filter(Boolean).join(" ")}>
     {children}
   </span>
 );

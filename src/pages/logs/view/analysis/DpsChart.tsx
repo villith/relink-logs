@@ -141,8 +141,8 @@ const MIXED_MARKER_COLOR = "var(--mantine-color-gray-5)";
  * label in whichever bucket the cursor was over, so it changed width — and,
  * being right-anchored by recharts near the plot's right edge, jumped
  * sideways — as the pointer crossed the plot. Wide enough for the four-column
- * row at the labels the view produces; longer names ellipsize, which
- * `.analysis-card-name` already does in the table.
+ * row at the labels the view produces; longer names ellipsize, which the card's
+ * own name cell already does in the table.
  *
  * Its own constant rather than `HoverCard`'s min/max pair: those bound a card
  * whose content is fixed by the row it explains, and are free to fit it. */

@@ -110,13 +110,13 @@ describe("HoverCardBody", () => {
     // where share is the last column.
     const { container } = renderBody([section("ui.logs.hover-by-target", 2)]);
 
-    const head = container.querySelector(".analysis-card-head")!.textContent;
+    const head = container.querySelector("[data-card-head]")!.textContent;
     expect(head!.indexOf("ui.meter-columns.damage")).toBeLessThan(head!.indexOf("ui.logs.column-share"));
 
-    const row = container.querySelector(".analysis-card-row")!;
-    const cells = [...row.querySelectorAll(".analysis-card-amount, .analysis-card-share")].map((c) => c.className);
-    expect(cells[0]).toContain("analysis-card-amount");
-    expect(cells[1]).toContain("analysis-card-share");
+    const row = container.querySelector("[data-card-row]")!;
+    const cells = [...row.querySelectorAll("[data-card-amount], [data-card-share]")];
+    expect(cells[0].hasAttribute("data-card-amount")).toBe(true);
+    expect(cells[1].hasAttribute("data-card-share")).toBe(true);
   });
 
   it("skips a section with no entries rather than drawing an empty heading", () => {
@@ -138,14 +138,14 @@ describe("HoverCardBody — a section that states no shares", () => {
 
   it("drops the share column from the rows", () => {
     const { container } = renderBody([total()]);
-    expect(container.querySelector(".analysis-card-share")).toBeNull();
+    expect(container.querySelector("[data-card-share]")).toBeNull();
     // The amount is the whole point of the row and must survive.
     expect(screen.getByText("2900")).toBeTruthy();
   });
 
   it("drops the share column from the heading too, so the columns still line up", () => {
     const { container } = renderBody([total()]);
-    const head = container.querySelector(".analysis-card-head")!.textContent;
+    const head = container.querySelector("[data-card-head]")!.textContent;
     expect(head).not.toContain("ui.logs.column-share");
     expect(head).toContain("ui.meter-columns.damage");
   });
@@ -156,25 +156,30 @@ describe("HoverCardBody — a section that states no shares", () => {
     // under the share column of every row it sums. The width is reserved
     // instead, so the two amounts still read down one column.
     const { container } = renderBody([section("ui.logs.hover-by-target", 2), total()]);
-    const rows = [...container.querySelectorAll(".analysis-card-row")];
-    const cellClasses = (row: Element) =>
-      [...row.children].map((cell) => (cell.className.match(/analysis-card-[\w-]+/) ?? [""])[0]);
+    const rows = [...container.querySelectorAll("[data-card-row]")];
+    /** Which cell each of a row's children is, by the hook it carries. */
+    const cellKinds = (row: Element) =>
+      [...row.children].map(
+        (cell) => [...cell.attributes].map((attr) => attr.name).find((name) => name.startsWith("data-card-")) ?? ""
+      );
 
     // The amount sits at the same offset from the end of both rows, with a
     // cell of the share column's own width trailing it either way.
-    expect(cellClasses(rows[0]).at(-2)).toBe("analysis-card-amount");
-    expect(cellClasses(rows[2]).at(-2)).toBe("analysis-card-amount");
-    expect(cellClasses(rows[2]).at(-1)).toBe("analysis-card-share-spacer");
-    // .analysis-card-share is 52px in analysis.css; jsdom loads no stylesheet,
-    // so the spacer states the matching width inline where the test can see it.
-    expect(([...rows[2].children].at(-1) as HTMLElement).style.width).toBe("52px");
+    expect(cellKinds(rows[0]).at(-2)).toBe("data-card-amount");
+    expect(cellKinds(rows[2]).at(-2)).toBe("data-card-amount");
+    expect(cellKinds(rows[2]).at(-1)).toBe("data-card-share-spacer");
+    // The reserved width has to be the share column's OWN rather than a second
+    // literal free to drift from it. jsdom loads no stylesheet, so compare the
+    // width utility the two cells carry.
+    const widthOf = (cell: Element) => [...cell.classList].find((name) => name.startsWith("w-["));
+    expect(widthOf([...rows[2].children].at(-1)!)).toBe(widthOf(container.querySelector("[data-card-share]")!));
   });
 
   it("leaves a section that says nothing about shares untouched elsewhere", () => {
     // The flag is per SECTION: a card can carry both, and the breakdown beside
     // a Total must keep its own percentages.
     const { container } = renderBody([section("ui.logs.hover-by-target", 2), total()]);
-    expect(container.querySelectorAll(".analysis-card-share")).toHaveLength(2);
+    expect(container.querySelectorAll("[data-card-share]")).toHaveLength(2);
   });
 });
 
@@ -193,17 +198,18 @@ describe("HoverCardBody — a section that states no heading", () => {
     expect(screen.queryByText("ui.logs.chart-total-label")).toBeNull();
     expect(screen.getByText("Total")).toBeTruthy();
     // Still its own section, so the separator between the two survives.
-    expect(container.querySelectorAll(".analysis-card-section")).toHaveLength(2);
-    expect(container.querySelectorAll(".analysis-card-head")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-card-section]")).toHaveLength(2);
+    expect(container.querySelectorAll("[data-card-head]")).toHaveLength(1);
   });
 });
 
 describe("HoverCard", () => {
   it("carries the design tokens on the card itself, not on an ancestor", () => {
     // The card portals to document.body, outside .analysis. Custom properties
-    // inherit down the tree, so tokens declared only on .analysis resolve to
-    // nothing here and the card's own panel background and border (declared
-    // on `.analysis-tokens` in analysis.css) render as no panel at all.
+    // inherit down the tree, so the view's --an-* aliases (declared on
+    // `.analysis-tokens` in analysis.css) resolve to nothing here unless the
+    // card carries the class itself — and a rule reading an undefined property
+    // is dropped without a word.
     render(
       <MantineProvider>
         <HoverCard sections={[section("ui.logs.hover-by-target", 1)]} {...DAMAGE_AMOUNT}>
@@ -257,7 +263,7 @@ describe("HoverCardBody — the detail flag", () => {
 describe("HoverCardBody — reserved row slots", () => {
   /** Rows drawn inside the FIRST section, placeholders included. */
   const rowsOfFirstSection = (container: HTMLElement) =>
-    container.querySelector(".analysis-card-section")!.querySelectorAll(".analysis-card-row");
+    container.querySelector("[data-card-section]")!.querySelectorAll("[data-card-row]");
 
   it("holds a section at its reserved row count when fewer entries landed", () => {
     // The chart tooltip's section is one BUCKET of a plot: at any one second
