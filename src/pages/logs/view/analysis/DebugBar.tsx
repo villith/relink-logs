@@ -2,7 +2,11 @@ import { Box, UnstyledButton } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import "./analysis.css";
+/** Monospace, wrapping and selectable: the whole purpose of a readout line is to
+ * be read exactly and pasted into a bug report. Both lines are single unbroken
+ * tokens, so `anywhere` is the only break that keeps a long pin set inside the
+ * panel. */
+const LINE_CLASS = "min-w-0 flex-1 select-text font-mono text-xs leading-[1.6] text-ink-3 [overflow-wrap:anywhere]";
 
 export type DebugBarProps = {
   /** The URL query string exactly as it stands, leading "?" and all. */
@@ -34,13 +38,20 @@ const DebugLine = ({ label, value, copy }: { label: string; value: string; copy:
   }, [copied]);
 
   return (
-    <div className="analysis-debug-row">
-      <div className="analysis-debug-line">
-        <span className="analysis-debug-key">{label}</span>
+    // The copy button is pinned at the right, where a long query cannot push it
+    // off the row.
+    <div className="flex items-start gap-2">
+      <div className={LINE_CLASS}>
+        <span className="mr-1.5 text-accent">{label}</span>
         <span>{value}</span>
       </div>
       <UnstyledButton
-        className={`analysis-debug-copy${copied ? " analysis-debug-copied" : ""}`}
+        className={[
+          "flex-none cursor-pointer rounded-[3px] border bg-panel px-1.5 text-label uppercase leading-[1.7] tracking-[0.06em]",
+          // Confirmation lives on the button itself — a toast for a dev readout
+          // would be louder than the thing it reports.
+          copied ? "border-accent text-accent" : "border-line text-ink-3 hover:border-line-strong hover:text-ink-2",
+        ].join(" ")}
         aria-label={t("ui.debug.copy-line", { line: label })}
         // The COPY is the raw value, never the displayed one: an empty query
         // shows "(none)", and a report pasting that back would be pasting a
@@ -73,7 +84,7 @@ export const DebugBar = ({ search, chart }: DebugBarProps) => {
   const { t } = useTranslation();
 
   return (
-    <Box className="analysis-debug">
+    <Box className="border-t border-line bg-plot px-4 pb-2 pt-1.5">
       <DebugLine
         label={t("ui.debug.analysis-query")}
         value={search === "" ? t("ui.debug.analysis-query-empty") : search}

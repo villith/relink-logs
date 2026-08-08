@@ -11,12 +11,27 @@ export type StripProps = Omit<ComponentPropsWithoutRef<"div">, "className" | "ch
   /** `baseline` for a row of mixed type sizes that must sit on one line — the
    * quest header, where a 17px figure and a 10px label share a row. */
   align?: "center" | "baseline";
+  /** How much room the band keeps around its contents. `frame` holds the
+   * gutter but drops the vertical padding and the gap, for a band whose
+   * children state their own — the metric tab row, whose underline has to reach
+   * the band's bottom edge. `none` frames nothing and only carries the rule.
+   *
+   * A PROP rather than a `py-0 gap-0` in `className`: Tailwind orders utilities
+   * by scale value, so a smaller override sorts BEFORE the default it means to
+   * replace and silently loses the cascade. */
+  pad?: "default" | "frame" | "none";
   className?: string;
 };
 
 const RULE_CLASS = {
   bottom: "border-b border-line",
   top: "border-t border-line",
+  none: "",
+} as const;
+
+const PAD_CLASS = {
+  default: "gap-2 px-4 py-1.5",
+  frame: "px-4",
   none: "",
 } as const;
 
@@ -31,6 +46,7 @@ export const Strip = ({
   rule = "bottom",
   wrap = false,
   align = "center",
+  pad = "default",
   className,
   ...rest
 }: StripProps) => (
@@ -40,7 +56,8 @@ export const Strip = ({
   <div
     {...rest}
     className={[
-      "flex gap-2 px-4 py-1.5",
+      "flex",
+      PAD_CLASS[pad],
       align === "baseline" ? "items-baseline" : "items-center",
       wrap ? "flex-wrap" : "",
       RULE_CLASS[rule],

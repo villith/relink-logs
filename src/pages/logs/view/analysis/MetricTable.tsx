@@ -3,6 +3,8 @@ import { CaretDown, CaretUp, Eye, EyeSlash } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Label } from "@/components/ui/Label";
+
 import type { MetricRow } from "../metrics/types";
 import { sectionHeadings } from "../sectionRuns";
 import type { SelectorPins } from "../selectorOptions";
@@ -153,14 +155,21 @@ export const MetricTable = ({
       {/* `data-head` rather than a styling class: the column heads and the data
           rows share role="row", so tests need something to tell them apart that
           survives this table being restyled. */}
-      <Box className="analysis-head" role="row" data-head>
-        <Text className="analysis-label" role="columnheader" style={{ flex: 1 }}>
+      <Box
+        className="mb-1.5 flex h-[calc(20px*var(--density))] items-center border-b border-line px-2"
+        role="row"
+        data-head
+      >
+        <Label className="flex-1" role="columnheader">
           {rowsLabelKey ? t(rowsLabelKey) : ""}
-        </Text>
+        </Label>
+        {/* The head cell states the column's width itself rather than wearing
+            the data cells' class, which carries the row FONT SIZE with it — the
+            heads rendered at row size for as long as they shared it. */}
         {columnKeys.map((key) => (
-          <Text key={key} role="columnheader" className="analysis-label analysis-cell">
+          <Label key={key} role="columnheader" className="w-cell text-right">
             {t(key)}
-          </Text>
+          </Label>
         ))}
       </Box>
 
@@ -314,7 +323,8 @@ export const MetricTable = ({
 
         return (
           <Fragment key={row.key}>
-            {heading !== null && <Text className="analysis-label analysis-section-head">{heading}</Text>}
+            {/* Visual grouping only: it is not a row and takes no interaction. */}
+            {heading !== null && <Label className="px-2 pb-0.5 pt-2">{heading}</Label>}
             {parent}
             {expanded.has(row.key) &&
               childRows.map((child) => <Fragment key={child.key}>{rowElement(child, true)}</Fragment>)}

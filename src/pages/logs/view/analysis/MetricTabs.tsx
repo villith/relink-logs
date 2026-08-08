@@ -1,9 +1,8 @@
-import { Box, UnstyledButton } from "@mantine/core";
+import { UnstyledButton } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
 import { onArrowKeys } from "@/components/ui/rovingKeys";
-
-import "./analysis.css";
+import { Strip } from "@/components/ui/Strip";
 
 export type MetricTab = { value: string; labelKey: string };
 
@@ -46,15 +45,15 @@ export const MetricTabs = ({
   };
 
   return (
-    <Box
+    // Inline, the tabs sit inside a row that already supplies the band: no rule,
+    // no padding of its own, and `gap` rather than the buttons' margin.
+    <Strip
       role="tablist"
       aria-label={t(ariaLabelKey)}
       onKeyDown={onArrowKeys(move)}
-      style={
-        variant === "inline"
-          ? { display: "flex", gap: 20 }
-          : { display: "flex", padding: "0 16px", borderBottom: "1px solid var(--color-line)" }
-      }
+      rule={variant === "inline" ? "none" : "bottom"}
+      pad={variant === "inline" ? "none" : "frame"}
+      className={variant === "inline" ? "gap-5" : undefined}
     >
       {tabs.map((tab) => {
         const active = tab.value === value;
@@ -65,23 +64,19 @@ export const MetricTabs = ({
             aria-selected={active}
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(tab.value)}
-            style={{
-              // Inline, the row above supplies the vertical padding and `gap`
-              // supplies the spacing — repeating either here would push the
-              // underline off the text and double the gutter.
-              padding: variant === "inline" ? "3px 0" : "7px 0",
-              marginRight: variant === "inline" ? 0 : 20,
-              fontSize: "var(--text-lg)",
-              fontWeight: 600,
-              letterSpacing: "-0.01em",
-              color: active ? "var(--color-ink)" : "var(--color-ink-3)",
-              borderBottom: `2px solid ${active ? "var(--color-accent)" : "transparent"}`,
-            }}
+            className={[
+              "border-b-2 text-lg font-semibold tracking-[-0.01em]",
+              // Inline, the row above supplies the vertical padding and the
+              // strip's `gap` supplies the spacing — repeating either here would
+              // push the underline off the text and double the gutter.
+              variant === "inline" ? "py-[3px]" : "mr-5 py-[7px]",
+              active ? "border-accent text-ink" : "border-transparent text-ink-3",
+            ].join(" ")}
           >
             {t(tab.labelKey)}
           </UnstyledButton>
         );
       })}
-    </Box>
+    </Strip>
   );
 };

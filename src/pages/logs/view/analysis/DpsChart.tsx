@@ -5,6 +5,8 @@ import { useTranslation } from "react-i18next";
 import { ReferenceArea, ReferenceLine } from "recharts";
 
 import { AnimatedHeight } from "@/components/AnimatedHeight";
+// Aliased: `Label` in this file is the chart's own series-label type.
+import { Label as UiLabel } from "@/components/ui/Label";
 import { PillGroup } from "@/components/ui/PillGroup";
 import { useCtrlHeld } from "@/components/useCtrlHeld";
 import { humanizeNumber } from "@/utils";
@@ -721,7 +723,7 @@ export const DpsChart = ({
   return (
     <Box style={{ padding: "10px 16px 8px" }}>
       <Box style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-        <Text className="analysis-label">{t(labelKey)}</Text>
+        <UiLabel>{t(labelKey)}</UiLabel>
         <Group gap="sm">
           {onSmoothingChange !== undefined && smoothing !== undefined && (
             <PillGroup

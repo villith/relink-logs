@@ -1,7 +1,10 @@
-import { Box, Text, Tooltip } from "@mantine/core";
+import { Text, Tooltip } from "@mantine/core";
 import { WarningCircle } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
+import { Figure } from "@/components/ui/Figure";
+import { Label } from "@/components/ui/Label";
+import { Strip } from "@/components/ui/Strip";
 import type { EncounterState } from "@/types";
 import {
   epochToLocalTime,
@@ -62,58 +65,33 @@ export const QuestSummary = ({
         : "";
 
   return (
-    <Box
-      style={{
-        display: "flex",
-        alignItems: "baseline",
-        gap: 11,
-        padding: "11px 16px 10px",
-        borderBottom: "1px solid var(--color-line)",
-      }}
-    >
+    <Strip align="baseline" className="gap-[11px] pb-2.5 pt-[11px]">
       {/* The quest name truncates so the metadata beside it never has to wrap:
           at a 620px viewport the block grew 48px -> 71px and "Total Damage"
           broke onto two lines. */}
-      <Text
-        style={{
-          fontWeight: 700,
-          fontSize: "var(--text-xl)",
-          letterSpacing: "-0.015em",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          minWidth: 0,
-        }}
-      >
-        {name}
-      </Text>
+      <Text className="min-w-0 truncate text-xl font-bold tracking-[-0.015em]">{name}</Text>
       {roomIndex === null && !!questId && (
-        <Text style={{ fontSize: "var(--text-xs)" }} c={questCompleted ? "teal.4" : "red.5"}>
+        <Text className="text-xs" c={questCompleted ? "teal.4" : "red.5"}>
           {questCompleted ? t("ui.logs.quest-cleared") : t("ui.logs.quest-failed")}
         </Text>
       )}
-      <Text
-        className="analysis-num"
-        style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-3)", whiteSpace: "nowrap" }}
-      >
+      <Figure size="sm" tone="dim" className="whitespace-nowrap">
         {duration}
         {timer} · {epochToLocalTime(encounter.startTime)}
         {/* eslint-disable-next-line i18next/no-literal-string -- a "#" plus a
             database id is notation, not prose */}
         {logId !== null && ` · #${logId}`}
-      </Text>
+      </Figure>
       {imported && (
         <Tooltip label={t("ui.logs.imported-tooltip")} multiline w={280}>
           <WarningCircle size={18} color="var(--mantine-color-yellow-6)" aria-label={t("ui.imported-badge")} />
         </Tooltip>
       )}
-      <Text className="analysis-label" style={{ marginLeft: "auto", whiteSpace: "nowrap" }}>
-        {t("ui.logs.total-damage")}
-      </Text>
-      <Text className="analysis-num" style={{ fontWeight: 700, fontSize: "var(--text-2xl)" }}>
+      <Label className="ml-auto whitespace-nowrap">{t("ui.logs.total-damage")}</Label>
+      <Figure size="2xl" className="font-bold">
         {total}
         {totalSuffix}
-      </Text>
-    </Box>
+      </Figure>
+    </Strip>
   );
 };

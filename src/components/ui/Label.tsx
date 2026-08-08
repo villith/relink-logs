@@ -1,6 +1,6 @@
-import type { ElementType, ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ElementType, ReactNode } from "react";
 
-export type LabelProps = {
+export type LabelProps = Omit<ComponentPropsWithoutRef<"span">, "className" | "children"> & {
   children: ReactNode;
   /** The element to render. A column head is a `span`; a run of rows under a
    * heading is a real heading, and saying so is what puts it in the document

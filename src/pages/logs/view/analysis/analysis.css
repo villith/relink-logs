@@ -86,20 +86,6 @@
   min-height: calc(100dvh - var(--app-shell-header-offset, 0px));
 }
 
-/* Small tracked capitals for column heads and section labels. */
-.analysis-label {
-  font-size: var(--an-fs-label);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--an-ink-3);
-  font-weight: 600;
-}
-
-/* Every figure in the view is tabular so columns align down the page. */
-.analysis-num {
-  font-variant-numeric: tabular-nums;
-}
-
 /* Every cell sits above the bar. */
 .analysis-cell {
   position: relative;
@@ -160,71 +146,6 @@
   font-size: var(--an-fs-sm);
 }
 
-.analysis-head {
-  display: flex;
-  align-items: center;
-  height: calc(20px * var(--an-scale));
-  padding: 0 8px;
-  border-bottom: 1px solid var(--an-line);
-  margin-bottom: 6px;
-}
-
-/* .analysis-label and .analysis-cell have equal specificity, so the later one
- * (.analysis-cell, at --an-fs-lg) wins and column heads render at row size.
- * Scoping to the header row restores the intended label size without touching
- * either class. */
-.analysis-head .analysis-label {
-  font-size: var(--an-fs-label);
-  letter-spacing: 0.08em;
-}
-
-/* The chart legend, in ordinary flow below the plot: a recharts <Legend> is
-   laid out INSIDE the chart against a hardcoded 44px reservation, so a legend
-   that wraps to a second row overlaps the plot. This one wraps as far as it
-   needs to. */
-.analysis-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 12px;
-  padding: 4px 0 2px;
-}
-
-/* The show-more control sits IN the legend's flow rather than beside it, so it
-   wraps with the entries it expands. It carries no swatch — it names no series
-   — and reads as the quieter thing it is. */
-.analysis-legend-more .analysis-legend-name {
-  color: var(--an-ink-3);
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
-}
-
-.analysis-legend-entry {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 1px 2px;
-  border-radius: 3px;
-}
-
-/* An outline, not a fill — the same hover language `.analysis-row` uses. */
-.analysis-legend-entry:hover {
-  outline: 1px solid var(--an-line-strong);
-  outline-offset: -1px;
-}
-
-.analysis-legend-swatch {
-  width: calc(9px * var(--an-scale));
-  height: calc(9px * var(--an-scale));
-  border-radius: 2px;
-  flex: none;
-}
-
-.analysis-legend-name {
-  font-size: var(--an-fs-xs);
-  color: var(--an-ink-2);
-  line-height: 1.4;
-}
-
 /* The plot's own axis text. recharts renders its ticks as SVG <text>, which no
    token in this file would otherwise reach — so the axis stayed at the library
    default while every label around it grew. Scoped to the view, and to the tick
@@ -232,68 +153,6 @@
    recharts wants a number. */
 .analysis .recharts-cartesian-axis-tick-value {
   font-size: var(--an-fs-sm);
-}
-
-/* Dev-only state readout under the plot. Monospace, wrapping and selectable:
-   its whole purpose is to be read exactly and pasted into a bug report — which
-   is also why each line carries a copy button, since selecting a wrapped line
-   by hand is how half of one ends up in the report. */
-.analysis-debug {
-  padding: 6px 16px 8px;
-  border-top: 1px solid var(--an-line);
-  background-color: var(--an-plot);
-}
-
-/* The line's own row: the key, the value, and the copy button pinned at the
-   right where it cannot be pushed off by a long query. */
-.analysis-debug-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.analysis-debug-copy {
-  flex: none;
-  padding: 0 6px;
-  border: 1px solid var(--an-line);
-  border-radius: 3px;
-  background-color: var(--an-panel);
-  color: var(--an-ink-3);
-  font-size: var(--an-fs-label);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  line-height: 1.7;
-  cursor: pointer;
-}
-
-.analysis-debug-copy:hover {
-  border-color: var(--an-line-strong);
-  color: var(--an-ink-2);
-}
-
-/* Confirmation lives on the button itself — a toast for a dev readout would be
-   louder than the thing it reports. */
-.analysis-debug-copied {
-  border-color: var(--an-accent);
-  color: var(--an-accent);
-}
-
-.analysis-debug-line {
-  flex: 1;
-  min-width: 0;
-  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: var(--an-fs-xs);
-  line-height: 1.6;
-  color: var(--an-ink-3);
-  user-select: text;
-  /* Both lines are single unbroken tokens, so anywhere is the only break that
-     keeps a long pin set inside the panel. */
-  overflow-wrap: anywhere;
-}
-
-.analysis-debug-key {
-  color: var(--an-accent);
-  margin-right: 6px;
 }
 
 /* The status tables' uptime track: the timeline's own cell between the name
@@ -325,13 +184,6 @@
  * mode are all the shared `PillGroup` now (`src/components/ui/ui.css`), and the
  * collapse toggle is the shared `ToggleSwitch` — so the pill and switch rules
  * that used to live here belong to the app rather than to this view. */
-
-/* A provenance section's subheader inside the effects table — the same
- * small-caps voice as the column heads, spaced off the run above it. Visual
- * grouping only; it is not a row and takes no interaction. */
-.analysis-section-head {
-  padding: 8px 8px 2px;
-}
 
 /* The pin selectors (PinSelect), in the view's own palette rather than
  * Mantine's stock dark input. The rows they sit in are built entirely from the

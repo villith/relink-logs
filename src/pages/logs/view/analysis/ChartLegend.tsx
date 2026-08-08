@@ -2,7 +2,14 @@ import { Box, Text, UnstyledButton } from "@mantine/core";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import "./analysis.css";
+/** One entry's shell. An outline on hover, not a fill — the same hover language
+ * a metric row uses. */
+const ENTRY_CLASS =
+  "flex items-center gap-[5px] rounded-[3px] px-0.5 py-px hover:outline hover:outline-1 hover:-outline-offset-1 hover:outline-line-strong";
+/** Carries no colour: each site states its own, because two colour utilities on
+ * one element are decided by stylesheet order rather than by which was written
+ * last. */
+const NAME_CLASS = "text-xs leading-[1.4]";
 
 export type LegendEntry = {
   key: string;
@@ -52,35 +59,38 @@ export const ChartLegend = ({ entries, hidden, onToggle }: ChartLegendProps) => 
   const listed = entries.filter((entry) => !entry.tail || tailShown || !hidden.has(entry.key));
 
   return (
-    <Box className="analysis-legend" aria-label={t("ui.logs.chart-legend-label")}>
+    <Box className="flex flex-wrap gap-x-3 gap-y-0.5 pb-0.5 pt-1" aria-label={t("ui.logs.chart-legend-label")}>
       {listed.map((entry) => {
         const shown = !hidden.has(entry.key);
         return (
           <UnstyledButton
             key={entry.key}
             data-legend-key={entry.key}
-            className="analysis-legend-entry"
+            className={ENTRY_CLASS}
             aria-pressed={shown}
             onClick={() => onToggle(entry.key)}
           >
             <Box
               data-legend-swatch
-              className="analysis-legend-swatch"
+              className="size-[calc(9px*var(--density))] flex-none rounded-xs"
               style={{ backgroundColor: entry.color, opacity: shown ? 1 : 0.25 }}
             />
-            <Text className="analysis-legend-name" style={{ opacity: shown ? 1 : 0.45 }}>
+            <Text className={`${NAME_CLASS} text-ink-2`} style={{ opacity: shown ? 1 : 0.45 }}>
               {entry.label}
             </Text>
           </UnstyledButton>
         );
       })}
       {tailCount > 0 && (
+        // In the legend's own flow rather than beside it, so it wraps with the
+        // entries it expands. It carries no swatch — it names no series — and
+        // reads as the quieter thing it is.
         <UnstyledButton
-          className="analysis-legend-entry analysis-legend-more"
+          className={ENTRY_CLASS}
           aria-expanded={tailShown}
           onClick={() => setTailShown((previous) => !previous)}
         >
-          <Text className="analysis-legend-name">
+          <Text className={`${NAME_CLASS} text-ink-3 underline decoration-dotted underline-offset-2`}>
             {tailShown
               ? t("ui.logs.chart-legend-show-fewer")
               : t("ui.logs.chart-legend-show-more", { count: tailCount })}
