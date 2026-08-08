@@ -67,9 +67,18 @@ export type TimelineTracksProps = {
  * the chart above it are all still live, and this block simply stands where the
  * table would — the same contract `EventsTab` has.
  *
- * Two columns inside ONE vertical scroller: the lane names, fixed, and the
- * tracks, which own the only horizontal scrollbar. Both columns map the single
- * `laneRows` sequence, so neither can invent a row the other does not have.
+ * Two columns: the lane names, fixed, and the tracks, which own the only
+ * scrollbar in the block. Both columns map the single `laneRows` sequence, so
+ * neither can invent a row the other does not have.
+ *
+ * NO vertical scroller of its own — the block grows to its full height and the
+ * page scrolls it. A `max-height` here is what broke the two columns before: a
+ * single-line flex container clamps its line to its own max cross size, so
+ * BOTH columns were stretched to the frame's height rather than their
+ * content's. The names spilled (`overflow: visible`) and scrolled with the
+ * frame, while the tracks — forced to `overflow-y: auto` by their own
+ * `overflow-x` — clipped instead, so they kept a second vertical scrollbar and
+ * ran out part-way down while the names kept going.
  *
  * They stay in step only while their row heights match EXACTLY, so each pair
  * reads the SAME token rather than restating a number:
@@ -257,13 +266,9 @@ export const TimelineTracks = ({
     <Box style={{ padding: "4px 16px 14px" }}>
       {/* The vertical scroller. Both columns live in it, so they scroll down
           together; only the right one scrolls sideways. */}
-      <Box
-        className="flex max-h-[calc(460px*var(--density))] overflow-y-auto rounded-sm border border-line"
-        role="group"
-        aria-label={t("ui.logs.timeline-label")}
-      >
-        {/* Outside the horizontal scroller, so the names cannot pan away and no
-            longer need to be sticky. Opaque, and separated by its own border. */}
+      <Box className="flex rounded-sm border border-line" role="group" aria-label={t("ui.logs.timeline-label")}>
+        {/* Outside the horizontal scroller, so the names cannot pan away and
+            need no stickiness. Opaque, and separated by its own border. */}
         <Box
           data-lane-names
           className="min-w-0 flex-none basis-name border-r border-line bg-[var(--mantine-color-body)]"
@@ -291,8 +296,10 @@ export const TimelineTracks = ({
           )}
         </Box>
 
-        {/* The ONLY horizontal scrollbar. `min-w-0` so the flex item may shrink
-            below its (very wide) content instead of stretching the frame. */}
+        {/* The ONLY scrollbar in the block, and it spans this column alone —
+            across the whole frame it sits under the names too and reads as if
+            they scrolled with it. `min-w-0` so the flex item may shrink below
+            its (very wide) content instead of stretching the frame. */}
         <Box data-tracks-scroll className="min-w-0 flex-1 overflow-x-auto">
           {/* Widened by exactly domain/viewport, so percentages inside address
               the whole window and the scale needs no measurement. */}

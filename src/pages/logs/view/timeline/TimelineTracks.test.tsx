@@ -74,11 +74,29 @@ describe("TimelineTracks", () => {
     expect(names).toEqual(["label(skill:Normal:100)", "label(status:77:210)"]);
   });
 
+  // The block grows to its full height and the PAGE scrolls it. A `max-height`
+  // here is what broke the two columns before: a single-line flex container
+  // clamps its line to its own max cross size, so BOTH columns were stretched
+  // to the frame's height instead of their content's. The names spilled (they
+  // are `overflow: visible`) and scrolled with the frame, while the tracks --
+  // forced to `overflow-y: auto` by their own `overflow-x` -- clipped instead,
+  // so they kept a second vertical scrollbar and ran out part-way down.
+  it("keeps no vertical scroller of its own", () => {
+    const { container } = renderTracks();
+    const frame = container.querySelector("[role='group']") as HTMLElement;
+    expect(frame.className).not.toMatch(/max-h-|overflow-y-auto|overflow-auto/);
+  });
+
+  // Only the tracks scroll sideways. Spanning the whole frame, the scrollbar
+  // sits under the name column too and reads as if the names scrolled with it.
   it("puts the horizontal scrollbar on the track column only", () => {
     const { container } = renderTracks();
-    expect(container.querySelector("[data-lane-names]")).toBeTruthy();
-    // The names column must not sit inside the horizontal scroller.
+    const scroll = container.querySelector("[data-tracks-scroll]") as HTMLElement;
+    expect(scroll.className).toContain("overflow-x-auto");
+    // The names column must not sit inside the horizontal scroller...
     expect(container.querySelector("[data-tracks-scroll] [data-lane-names]")).toBeNull();
+    // ...and must not scroll on any axis of its own.
+    expect((container.querySelector("[data-lane-names]") as HTMLElement).className).not.toContain("overflow");
   });
 
   it("draws lanes as the table's own row", () => {
@@ -135,6 +153,8 @@ describe("TimelineTracks", () => {
     expect(container.querySelectorAll('[data-mark-kind="span"]')).toHaveLength(1);
   });
 
+  // A percentage of the track scroller, which IS the visible track width now
+  // that the names sit outside it -- so the scale needs no measurement.
   it("widens the content by domain over viewport", () => {
     const { container } = renderTracks(LANES, { domainMs: 90_000, viewportMs: 30_000 });
     expect((container.querySelector("[data-timeline-content]") as HTMLElement).style.width).toBe("300%");
