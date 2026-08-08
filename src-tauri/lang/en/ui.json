@@ -586,6 +586,7 @@
       "hover-by-source": "Source",
       "hover-by-ability": "Ability",
       "hover-by-target": "Target",
+      "hover-by-sba-cause": "Cause",
       "hover-by-hits": "Hits",
       "hover-count": "Count",
       "hover-capped": "Capped",

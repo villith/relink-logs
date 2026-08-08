@@ -355,8 +355,12 @@ export const useRowModel = ({
       // through, so a card's "#2" can never name a different spawn.
       target: (segment: number) => resolvers.target(segment).name,
       targetIcon: (segment: number) => resolvers.target(segment).iconUrl,
+      // An SBA cause is already a key/params pair by the time it reaches a
+      // card (`sbaCauseLabel` owns that mapping, for the table and the chart
+      // bands too); all that is left is to translate it.
+      cause: (labelKey: string, params?: Record<string, string | number>) => t(labelKey, params ?? {}),
     }),
-    [resolvers, playerColor]
+    [resolvers, playerColor, t]
   );
 
   // The enemy-side cards' lookups: the same ones the friendly card already

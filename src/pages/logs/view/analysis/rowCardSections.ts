@@ -14,12 +14,13 @@ import {
 } from "./hostilityCardSections";
 import type { CardKind } from "./machine/capabilities";
 import type { Dimension } from "./machine/state";
+import { sbaCardSectionsFor, type SbaCardLabels } from "./sbaCardSections";
 import { takenAbilityCardSectionsFor, takenCardSectionsFor } from "./takenCardSections";
 
 /** The union of every builder's lookups — one labels object for all of them,
  * so an ability, a player or an enemy cannot be named one way by one card and
  * another way by the next. */
-export type RowCardLabels = SectionLabels & HostilityCardLabels;
+export type RowCardLabels = SectionLabels & HostilityCardLabels & Pick<SbaCardLabels, "cause">;
 
 /** One row's hover-card sections, routed by the DECLARED card kind — the
  * machine's `cardKind(groupBy, hostility)` — to the builder that delivers it.
@@ -77,6 +78,10 @@ export const rowCardSectionsFor = ({
       return groupBy === "ability"
         ? takenAbilityCardSectionsFor({ row, players, source: pins.source, color, labels })
         : takenCardSectionsFor({ row, players, color, labels });
+    case "sbaGenerated":
+      // Its own builder: a player's generated gauge is not a sum over their
+      // skills, so the skill walk below would explain a fraction of the row.
+      return sbaCardSectionsFor({ row, players, color, labels, keying });
     case "skill":
       // A target-grouped row is a spawn, decomposed by its own builder; every
       // other skill-walk row goes through the level-based sections.

@@ -117,6 +117,18 @@ const sourceRows = (owner: ComputedPlayerState, total: number): MetricRow[] =>
 export const sba: MetricDescriptor = {
   labelKey: "ui.logs.metric-sba",
 
+  // What the player rows' hover card measures. `valueOf` and `perTarget` are
+  // stated for completeness but go unread: the SBA card has its own builder
+  // (`sbaCardSectionsFor`), because a player's generated total also holds the
+  // non-hit causes and the unattributed remainder, neither of which is in
+  // `skillBreakdown` for a skill walk to reach. A gain carries no target.
+  card: {
+    amountKey: "ui.meter-columns.sba-generated",
+    valueOf: (skill) => skill.sbaGenerated ?? 0,
+    format: whole,
+    perTarget: false,
+  },
+
   columnKeys: (level) =>
     level === "players"
       ? ["ui.meter-columns.sba-generated", "ui.meter-columns.sba"]

@@ -15,7 +15,7 @@ export type DataPath = "groups" | "derived" | "intervals";
  * has nothing a skill walk can decompose, and the enemy side has builders
  * for its source grouping's rows only), declared rather than discovered as a
  * null at runtime. */
-export type CardKind = "skill" | "taken" | "enemyDealt" | "enemyReceived" | "none";
+export type CardKind = "skill" | "taken" | "enemyDealt" | "enemyReceived" | "sbaGenerated" | "none";
 
 /** Which bucketed series a metric plots when nothing overlays it, and how that
  * series is read.
@@ -190,9 +190,13 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
       target: UNSUPPORTED("ui.logs.sba-no-target-dimension"),
     },
     columnKeys: (dim) => sba.columnKeys(levelFor(dim)),
-    // A gauge reading has nothing a skill walk can decompose — the ability
-    // rows are already the finest grain the capture has.
-    cardKind: () => "none",
+    // A PLAYER row decomposes into what generated their gauge — the same
+    // abilities, named causes and unattributed remainder the drilled table
+    // shows — through the SBA card's own builder, because that total is not a
+    // sum over skills and the generic skill walk would explain a fraction of
+    // it. The ability and cause rows below are already the finest grain the
+    // capture has, so they carry no card.
+    cardKind: (dim) => (dim === "source" ? "sbaGenerated" : "none"),
     chartFromGroups: false,
     // A gauge LEVEL, not a rate: smoothing would round off the discharge that
     // IS the reading. Stored in tenths of a percent.
