@@ -1,19 +1,3 @@
-/* The app's shared design tokens and the controls built from them.
- *
- * This layer is deliberately NOT owned by any one page. It began inside the
- * Analysis view (`analysis.css`), which is why the palette is that view's — but
- * the pills, the switch and the scale below are the design the rest of the app
- * is meant to move onto, so they live here and the view aliases them rather
- * than the other way round.
- *
- * Tokens sit on `:root`, not on a class: a Mantine dropdown, tooltip or modal
- * PORTALS to document.body, outside whatever page mounted it, and custom
- * properties only inherit down the tree — declared on a wrapper, they resolve
- * to nothing in the portal and the control paints itself blank.
- *
- * Font sizes are written as CSS lengths, never as var(--mantine-font-size-*):
- * this app's theme sets those tokens to unitless strings ("12", "14"), so the
- * var resolves to invalid CSS and the declaration is silently dropped. */
 :root {
   /* Surfaces and ink. */
   --ui-bg: #17181c;
@@ -25,23 +9,11 @@
   --ui-ink-2: #b9bfc9;
   --ui-ink-3: #8b929e;
   --ui-accent: #00b8d9;
-  /* The accent as a FILL — the wash a selected chip, a live window and an "on"
-   * switch all take, so "this control is engaged" is one colour everywhere. */
   --ui-accent-soft: rgba(0, 184, 217, 0.09);
   --ui-plot: #1a1c21;
 
-  /* ONE density knob. Every length below is a multiple of it, so text, art,
-   * row heights and the controls between them grow together — bumping a font
-   * on its own is what leaves a row at the old height and makes a page read as
-   * two scales sharing a screen.
-   *
-   * The base numbers are the sizes this design was first drawn at, so the
-   * ratios between them survive any scale; only the multiplier moves. Set
-   * `--ui-scale` on any subtree to rescale just that part of the app. */
-  --ui-scale: 1.2;
+  --ui-scale: 1;
 
-  /* Type, named by ROLE rather than by size: a call site should say what it is,
-   * not how big it happens to be at the current scale. */
   --ui-fs-label: calc(10px * var(--ui-scale)); /* small-caps captions and heads */
   --ui-fs-xs: calc(11px * var(--ui-scale)); /* legend names, uptimes */
   --ui-fs-sm: calc(12px * var(--ui-scale)); /* muted cells, card figures */
@@ -63,8 +35,6 @@
   --ui-name-w: calc(220px * var(--ui-scale)); /* a fixed name column */
 }
 
-/* Small tracked capitals: a column head, or the word in front of a control
- * saying what it sets. */
 .ui-label {
   font-size: var(--ui-fs-label);
   letter-spacing: 0.08em;
@@ -73,10 +43,6 @@
   font-weight: 600;
 }
 
-/* THE segmented control (see PillGroup): a small pill pair or triple, one
- * chosen. Used for anything that re-reads what is already on screen — a side
- * switch, a smoothing window, a display mode — as opposed to tabs, which
- * navigate. */
 .ui-pills {
   display: inline-flex;
   gap: 2px;
@@ -100,9 +66,6 @@
   background-color: var(--ui-raised);
 }
 
-/* Dimmed where there is nothing to choose between. The pointer cursor goes
- * too — the control keeps its place, but it must not invite a click that does
- * nothing. */
 .ui-pills-disabled {
   opacity: 0.4;
 }
@@ -111,16 +74,12 @@
   cursor: default;
 }
 
-/* A group and the caption naming it. Bare values ("Off 5s 10s 30s") name the
- * options and not the subject, which is exactly the control nobody can
- * identify. */
 .ui-pills-field {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
 
-/* The on/off control (see ToggleSwitch), in the same palette as the pills. */
 .ui-switch {
   display: inline-flex;
   align-items: center;
@@ -150,10 +109,6 @@
   cursor: default;
 }
 
-/* The track carries the state as POSITION as well as colour — a switch that
- * said "on" in hue alone is unreadable to the same eyes the rest of these
- * colour choices are made for. Sized off the type scale, so it grows with the
- * label beside it. */
 .ui-switch-track {
   position: relative;
   flex: none;
