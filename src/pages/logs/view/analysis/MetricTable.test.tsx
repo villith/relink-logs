@@ -184,7 +184,7 @@ describe("MetricTable", () => {
     const { container } = renderTable({ rowSections: SECTIONS, cardAmount: CARD_AMOUNT });
     // The column head also carries role="row" (a grid's header row is a row),
     // so a data row is one that is not the head.
-    const row = container.querySelector<HTMLElement>("[role='row']:not(.analysis-head)");
+    const row = container.querySelector<HTMLElement>("[role='row']:not([data-head])");
     expect(row).toBeTruthy();
     fireEvent.mouseOver(row!);
     expect(screen.getByTestId("metric-hover-card")).toBeTruthy();
@@ -196,7 +196,7 @@ describe("MetricTable", () => {
     // tooltip came to head its column "DMG" and report damage; without one
     // there is nothing honest to draw.
     const { container } = renderTable({ rowSections: SECTIONS });
-    fireEvent.mouseOver(container.querySelector<HTMLElement>("[role='row']:not(.analysis-head)")!);
+    fireEvent.mouseOver(container.querySelector<HTMLElement>("[role='row']:not([data-head])")!);
     expect(screen.queryByTestId("metric-hover-card")).toBeNull();
   });
 

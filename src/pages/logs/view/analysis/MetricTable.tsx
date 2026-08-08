@@ -150,7 +150,10 @@ export const MetricTable = ({
 
   return (
     <Box role="grid">
-      <Box className="analysis-head" role="row">
+      {/* `data-head` rather than a styling class: the column heads and the data
+          rows share role="row", so tests need something to tell them apart that
+          survives this table being restyled. */}
+      <Box className="analysis-head" role="row" data-head>
         <Text className="analysis-label" role="columnheader" style={{ flex: 1 }}>
           {rowsLabelKey ? t(rowsLabelKey) : ""}
         </Text>

@@ -22,8 +22,9 @@ export type MetricBarProps = {
  *
  * The supplementary split is two SIBLING segments rather than a nested one:
  * the track already carries an opacity, so a child of the same colour inside
- * it paints identically to its parent and no split would appear. */
-/* Hover deliberately does NOT raise the fill's opacity. Taking it to 0.62 put
+ * it paints identically to its parent and no split would appear.
+ *
+ * Hover deliberately does NOT raise the fill's opacity. Taking it to 0.62 put
  * three of four row names below 4.5:1 — the row got harder to read at the exact
  * moment the user was reading it. The outline on the row carries hover instead. */
 export const MetricBar = ({ value, subValue, largest, color, variant }: MetricBarProps) => {
