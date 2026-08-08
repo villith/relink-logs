@@ -11,6 +11,17 @@ const actor = (index: number) => ({
   parent_actor_type: 1,
 });
 
+/** The cap half of a damage payload, absent. Old logs carry every one of these
+ * as null, so it is the shape a fixture must default to. */
+const noCap = {
+  damage_cap: null,
+  base_damage: null,
+  attack_rate: null,
+  stun_value: null,
+  target_current_hp: null,
+  target_max_hp: null,
+};
+
 const damage: LogEvent = [
   1_500,
   {
@@ -20,6 +31,10 @@ const damage: LogEvent = [
       damage: 18204,
       flags: 0,
       action_id: { Normal: 100 },
+      ...noCap,
+      damage_cap: 1_000_000,
+      base_damage: 4_000_000,
+      attack_rate: 2.5,
     },
   },
 ];
@@ -104,6 +119,7 @@ describe("toEventRow", () => {
           damage: 5,
           flags: 0,
           action_id: "LinkAttack",
+          ...noCap,
         },
       },
     ];

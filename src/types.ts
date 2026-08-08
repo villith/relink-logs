@@ -925,6 +925,15 @@ export type LogEventPayload =
         damage: number;
         flags: number;
         action_id: ActionType;
+        /** The game's own cap for this hit. `null` on old logs. */
+        damage_cap: number | null;
+        /** Pre-cap base damage, before `min(base, cap)` clamps it. */
+        base_damage: number | null;
+        /** The move's attack rate — what community sheets call MV. */
+        attack_rate: number | null;
+        stun_value: number | null;
+        target_current_hp: number | null;
+        target_max_hp: number | null;
       };
     }
   | { OnDeathEvent: { actor_index: number; death_counter: number } }
