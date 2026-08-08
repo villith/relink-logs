@@ -32,10 +32,6 @@ body {
   background-color: transparent;
 }
 
-td {
-  padding: 0;
-}
-
 *::-webkit-scrollbar {
   height: 10px;
   width: 10px;
