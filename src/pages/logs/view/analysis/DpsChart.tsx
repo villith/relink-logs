@@ -309,7 +309,7 @@ export const ChartTooltip = ({
               reserve,
               // Per-entry colour overrides this; the section colour is only
               // the fallback for an entry recharts gave no colour.
-              color: "var(--an-ink-3)",
+              color: "var(--color-ink-3)",
               entries: landed.map((item) => {
                 const icon = iconByKey.get(String(item.name));
                 return {
@@ -333,7 +333,7 @@ export const ChartTooltip = ({
               : [
                   {
                     headingKey: TOTAL_SERIES_KEY,
-                    color: "var(--an-ink-3)",
+                    color: "var(--color-ink-3)",
                     showHeading: false,
                     showShare: false,
                     entries: [
@@ -712,8 +712,8 @@ export const DpsChart = ({
       x1={data[Math.min(band[0], band[1])]?.timestamp}
       x2={data[Math.max(band[0], band[1])]?.timestamp}
       strokeOpacity={0.9}
-      stroke="var(--an-accent)"
-      fill="var(--an-accent)"
+      stroke="var(--color-accent)"
+      fill="var(--color-accent)"
       fillOpacity={0.13}
     />
   );

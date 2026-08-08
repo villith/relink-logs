@@ -40,9 +40,10 @@ export type PinSelectProps = {
  * from the others.
  *
  * The dropdown carries `analysis-tokens` because it PORTALS to document.body,
- * outside `.analysis` — the `--an-*` custom properties inherit down the tree,
- * so a dropdown styled with them and rendered outside the view resolves them to
- * nothing and paints itself blank. The same reason the hover card carries it. */
+ * outside `.analysis` — its custom properties, declared on `.analysis-tokens`,
+ * inherit down the tree, so a dropdown styled with them and rendered outside
+ * the view resolves them to nothing and paints itself blank. The same reason
+ * the hover card carries it. */
 export const PinSelect = ({ minWidth, maxWidth, data, value, placeholder, ariaLabel, onChange }: PinSelectProps) => {
   const { t } = useTranslation();
   // Art and colour by value, because the two places that need them are given

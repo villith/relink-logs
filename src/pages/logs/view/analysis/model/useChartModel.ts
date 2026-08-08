@@ -580,7 +580,7 @@ export const useChartModel = ({
   const maskBands = useMemo(() => {
     if (maskWindows === undefined) return undefined;
     const excluded = auraExcludedBands(maskWindows, statusWindow);
-    return excluded.length === 0 ? undefined : excluded.map((band) => ({ color: "var(--an-ink-3)", band }));
+    return excluded.length === 0 ? undefined : excluded.map((band) => ({ color: "var(--color-ink-3)", band }));
   }, [maskWindows, statusWindow]);
 
   // The chart IS the window: committing does not shade the rest of the fight,

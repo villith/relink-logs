@@ -16,10 +16,10 @@
  */
 
 .logs-table {
-  /* The analysis view's accent (`--an-accent` in analysis.css, and
+  /* The analysis view's accent (`--color-accent` in theme.css, and
      PLAYER_COLORS[3]), declared once here rather than written as a literal at
-     each use. That token is scoped to `.analysis-tokens`, which does not wrap
-     this table, so it cannot simply be referenced — but a single declaration
+     each use. Duplicated rather than referenced via `var()`, so this file
+     stays independent of the app-wide token layer — but a single declaration
      keeps the two places this table needs it in step with each other. */
   --logs-accent: #00b8d9;
 }

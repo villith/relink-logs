@@ -168,7 +168,7 @@ export const EventRowsTable = ({
           top: 0,
           zIndex: 1,
           background: "var(--mantine-color-body)",
-          borderBottom: "1px solid var(--an-line)",
+          borderBottom: "1px solid var(--color-line)",
         }}
       >
         <Group gap="xs" px="xs" wrap="nowrap" style={{ height: rowHeight }}>
@@ -357,7 +357,7 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
           height: VIEWPORT_HEIGHT,
           overflowY: "auto",
           position: "relative",
-          border: "1px solid var(--an-line)",
+          border: "1px solid var(--color-line)",
           borderRadius: 4,
         }}
       >

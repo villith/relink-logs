@@ -68,7 +68,7 @@ export const QuestSummary = ({
         alignItems: "baseline",
         gap: 11,
         padding: "11px 16px 10px",
-        borderBottom: "1px solid var(--an-line)",
+        borderBottom: "1px solid var(--color-line)",
       }}
     >
       {/* The quest name truncates so the metadata beside it never has to wrap:
@@ -77,7 +77,7 @@ export const QuestSummary = ({
       <Text
         style={{
           fontWeight: 700,
-          fontSize: "var(--an-fs-xl)",
+          fontSize: "var(--text-xl)",
           letterSpacing: "-0.015em",
           overflow: "hidden",
           textOverflow: "ellipsis",
@@ -88,13 +88,13 @@ export const QuestSummary = ({
         {name}
       </Text>
       {roomIndex === null && !!questId && (
-        <Text style={{ fontSize: "var(--an-fs-xs)" }} c={questCompleted ? "teal.4" : "red.5"}>
+        <Text style={{ fontSize: "var(--text-xs)" }} c={questCompleted ? "teal.4" : "red.5"}>
           {questCompleted ? t("ui.logs.quest-cleared") : t("ui.logs.quest-failed")}
         </Text>
       )}
       <Text
         className="analysis-num"
-        style={{ fontSize: "var(--an-fs-sm)", color: "var(--an-ink-3)", whiteSpace: "nowrap" }}
+        style={{ fontSize: "var(--text-sm)", color: "var(--color-ink-3)", whiteSpace: "nowrap" }}
       >
         {duration}
         {timer} · {epochToLocalTime(encounter.startTime)}
@@ -110,7 +110,7 @@ export const QuestSummary = ({
       <Text className="analysis-label" style={{ marginLeft: "auto", whiteSpace: "nowrap" }}>
         {t("ui.logs.total-damage")}
       </Text>
-      <Text className="analysis-num" style={{ fontWeight: 700, fontSize: "var(--an-fs-2xl)" }}>
+      <Text className="analysis-num" style={{ fontWeight: 700, fontSize: "var(--text-2xl)" }}>
         {total}
         {totalSuffix}
       </Text>

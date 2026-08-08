@@ -202,8 +202,8 @@ describe("HoverCard", () => {
   it("carries the design tokens on the card itself, not on an ancestor", () => {
     // The card portals to document.body, outside .analysis. Custom properties
     // inherit down the tree, so tokens declared only on .analysis resolve to
-    // nothing here and the card's own var(--an-panel) background and
-    // var(--an-line-strong) border render as no panel at all.
+    // nothing here and the card's own panel background and border (declared
+    // on `.analysis-tokens` in analysis.css) render as no panel at all.
     render(
       <MantineProvider>
         <HoverCard sections={[section("ui.logs.hover-by-target", 1)]} {...DAMAGE_AMOUNT}>

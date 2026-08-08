@@ -53,7 +53,7 @@ export const MetricTabs = ({
       style={
         variant === "inline"
           ? { display: "flex", gap: 20 }
-          : { display: "flex", padding: "0 16px", borderBottom: "1px solid var(--an-line)" }
+          : { display: "flex", padding: "0 16px", borderBottom: "1px solid var(--color-line)" }
       }
     >
       {tabs.map((tab) => {
@@ -71,11 +71,11 @@ export const MetricTabs = ({
               // underline off the text and double the gutter.
               padding: variant === "inline" ? "3px 0" : "7px 0",
               marginRight: variant === "inline" ? 0 : 20,
-              fontSize: "var(--an-fs-lg)",
+              fontSize: "var(--text-lg)",
               fontWeight: 600,
               letterSpacing: "-0.01em",
-              color: active ? "var(--an-ink)" : "var(--an-ink-3)",
-              borderBottom: `2px solid ${active ? "var(--an-accent)" : "transparent"}`,
+              color: active ? "var(--color-ink)" : "var(--color-ink-3)",
+              borderBottom: `2px solid ${active ? "var(--color-accent)" : "transparent"}`,
             }}
           >
             {t(tab.labelKey)}

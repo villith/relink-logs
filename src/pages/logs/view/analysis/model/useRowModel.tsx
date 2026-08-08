@@ -316,7 +316,7 @@ export const useRowModel = ({
         // effect row's key is `status:`, which names no actor at all.
         const actor = keyColor(row.key, colorContext);
         if (actor !== undefined) return actor;
-        return rowColors?.get(row.key) ?? "var(--an-ink-3)";
+        return rowColors?.get(row.key) ?? "var(--color-ink-3)";
       }
       // Re-resolve through the identity party: a scoped fetch renumbers slots,
       // so the descriptor's colorSlot can point at the wrong player.

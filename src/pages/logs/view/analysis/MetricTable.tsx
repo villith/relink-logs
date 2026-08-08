@@ -65,7 +65,7 @@ export type MetricTableProps = {
   sectionLabel?: (row: MetricRow) => string | null;
 };
 
-const FALLBACK_COLOR = "var(--an-ink-3)";
+const FALLBACK_COLOR = "var(--color-ink-3)";
 
 /** The one table every metric renders through.
  *
