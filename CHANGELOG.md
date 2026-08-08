@@ -5,6 +5,14 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.11
+
+### Features
+
+- An opt-in **BETA** version of the new logs UI is available to try out
+  - Some of the functionality is incomplete
+  - The viewer is not optimized. When viewing longer fights ( ex. infinity zegalith ), it will be a bit slow
+
 ## 1.12.10
 
 ### Notes
