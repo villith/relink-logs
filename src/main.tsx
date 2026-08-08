@@ -5,11 +5,10 @@ import "@mantine/core/styles.layer.css";
 import ReactDOM from "react-dom/client";
 import "./styles.css";
 
-// The shared design tokens (`--ui-*`) and the controls built from them. Imported
-// at the entry rather than only from the components that use them, so a page
-// styling itself with a token can rely on it existing whether or not one of
-// those components happens to be mounted.
-import "@/components/ui/ui.css";
+// The shared design tokens. Imported at the entry rather than only from the
+// components that use them, so a page styling itself with a token can rely on
+// it existing whether or not one of those components happens to be mounted.
+import "@/components/ui/theme.css";
 
 // Populates the skill-name bridge map before the first render. The module's
 // top-level await blocks until the asset is read.

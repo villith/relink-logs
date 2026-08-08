@@ -1,0 +1,42 @@
+/* static: forces emission — recharts reads these from JS strings.
+   inline: utility emits the calc(), so --density re-resolves per subtree. */
+
+:root {
+  --density: 1;
+}
+
+@theme static {
+  --color-bg: #17181c;
+  --color-panel: #1d1f24;
+  --color-raised: #22252b;
+  --color-line: #2c2f36;
+  --color-line-strong: #3b4048;
+  --color-ink: #e8eaed;
+  --color-ink-2: #b9bfc9;
+  --color-ink-3: #8b929e;
+  --color-accent: #00b8d9;
+  --color-accent-soft: rgba(0, 184, 217, 0.09);
+  --color-plot: #1a1c21;
+  --font-mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+@theme inline {
+  --text-label: calc(10px * var(--density));
+  --text-xs: calc(11px * var(--density));
+  --text-sm: calc(12px * var(--density));
+  --text-md: calc(12.5px * var(--density));
+  --text-lg: calc(13px * var(--density));
+  --text-xl: calc(15px * var(--density));
+  --text-2xl: calc(17px * var(--density));
+
+  --spacing-row: calc(30px * var(--density));
+  --spacing-head: calc(22px * var(--density));
+  --spacing-control: calc(28px * var(--density));
+  --spacing-chip: calc(24px * var(--density));
+  --spacing-icon: calc(22px * var(--density));
+  --spacing-icon-sm: calc(18px * var(--density));
+  --spacing-icon-xs: calc(15px * var(--density));
+  --spacing-swatch: calc(8px * var(--density));
+  --spacing-cell: calc(84px * var(--density));
+  --spacing-name: calc(220px * var(--density));
+}
