@@ -2,6 +2,7 @@ import { Box, Group, Text, UnstyledButton } from "@mantine/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { EntityIcon } from "@/components/ui/EntityIcon";
 import { Strip } from "@/components/ui/Strip";
 import { millisecondsToPreciseElapsedFormat } from "@/utils";
 
@@ -80,10 +81,10 @@ const KIND_LABEL_KEY: Record<EventKind, string> = {
 };
 
 /** Row height in px. Fixed, which is what makes `visibleSlice` pure arithmetic
- * — so it is a NUMBER here and not `--ui-row-h`, which the virtualiser could
+ * — so it is a NUMBER here and not `--spacing-row`, which the virtualiser could
  * not do division with. Kept a step under a table row, as it always was, but
  * moved with the rest of the view's scale: the stream's art is now
- * `--ui-icon-xs`, which at 22px left no air above or below it. */
+ * `--spacing-icon-xs`, which at 22px left no air above or below it. */
 const ROW_HEIGHT = 26;
 /** Rows rendered beyond each edge of the viewport, so a fast scroll does not
  * outrun the render. */
@@ -131,7 +132,9 @@ const CellText = ({
     data-cell={name}
     style={flex ? { flex: 1, minWidth: 0 } : { minWidth: 0, flexShrink: 0 }}
   >
-    {cell.iconUrl !== undefined && <img className="events-row-icon" src={cell.iconUrl} alt="" />}
+    {/* Smaller than the table's: the events rows are shorter, and the table's
+        own icon would fill one edge to edge. */}
+    {cell.iconUrl !== undefined && <EntityIcon size="card" src={cell.iconUrl} alt="" />}
     {/* Only a cell that HAS a colour takes one — an actor. Everything else
         (the time, the ability, the amount) inherits the row's kind colour,
         which is what still says at a glance what sort of event this is. */}

@@ -26,6 +26,10 @@ export type AnalysisRowProps = {
   onMouseEnter?: (event: React.MouseEvent) => void;
   onMouseMove?: (event: React.MouseEvent) => void;
   onMouseLeave?: (event: React.MouseEvent) => void;
+  /** Marks a child row behind an expanded parent. An attribute rather than a
+   * styling class, so a test can tell a subrow from its parent without reading
+   * how either is painted. */
+  "data-subrow"?: boolean;
 };
 
 /** The one row shell the analysis view draws, in the table and on the timeline.
@@ -46,6 +50,7 @@ export const AnalysisRow = ({
   onMouseEnter,
   onMouseMove,
   onMouseLeave,
+  ...rest
 }: AnalysisRowProps) => (
   // A div, not a button. The controls inside it are real <button>s, and a
   // button may not contain interactive content — the row used to be an
@@ -56,6 +61,7 @@ export const AnalysisRow = ({
   // was giving for free: a row in a grid is allowed to take focus, and losing
   // keyboard pinning to fix the nesting would be a poor trade.
   <Box
+    {...rest}
     role="row"
     className={[
       // 30px tall with NO margin, the bar inset 1px top and bottom, rather than

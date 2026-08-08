@@ -2,6 +2,7 @@ import type React from "react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { EntityIcon } from "@/components/ui/EntityIcon";
 import type {
   ActionType,
   ComputedPlayerState,
@@ -295,7 +296,7 @@ export const useRowModel = ({
       if (!cell.iconUrl) return name;
       return (
         <>
-          <img className="analysis-row-icon" src={cell.iconUrl} alt="" />
+          <EntityIcon src={cell.iconUrl} alt="" className="mr-[7px] align-[-6px]" />
           {name}
         </>
       );

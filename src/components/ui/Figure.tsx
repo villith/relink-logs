@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
 export type FigureSize = "xs" | "sm" | "md" | "lg" | "2xl";
 export type FigureTone = "default" | "muted" | "dim";
@@ -17,7 +17,7 @@ const TONE_CLASS: Record<FigureTone, string> = {
   dim: "text-ink-3",
 };
 
-export type FigureProps = {
+export type FigureProps = Omit<ComponentPropsWithoutRef<"span">, "className" | "children"> & {
   children: ReactNode;
   size?: FigureSize;
   tone?: FigureTone;

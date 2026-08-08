@@ -1,7 +1,5 @@
 import { millisecondsToElapsedFormat } from "@/utils";
 
-import "../analysis/analysis.css";
-
 /** Tick offsets across the domain, in milliseconds from its start.
  *
  * Never past the end: a tick beyond the track renders outside it and widens
@@ -25,15 +23,19 @@ export type TimelineRulerProps = {
  * so the two cannot disagree about where a moment sits.
  *
  * No name-column spacer of its own any more: the names are a separate column
- * outside this scroller, and it opens with `.timeline-ruler-gap` at exactly this
- * ruler's height. */
+ * outside this scroller, which opens with a gap of exactly this ruler's height.
+ *
+ * `h-head` INCLUDING its border — every height here is border-box, so the rule
+ * sits inside the stated height and adds nothing. That is what puts lane one at
+ * the same y in both columns. */
 export const TimelineRuler = ({ domainMs, startMs, stepMs }: TimelineRulerProps) => (
-  <div className="timeline-ruler">
-    <div className="timeline-ruler-track">
+  <div className="flex h-head border-b border-line bg-[var(--mantine-color-body)]">
+    <div className="relative min-w-0 flex-1">
       {tickTimes(domainMs, stepMs).map((at) => (
         <span
           key={at}
-          className="timeline-ruler-tick"
+          data-ruler-tick
+          className="absolute inset-y-0 whitespace-nowrap border-l border-line pl-[3px] text-label leading-[var(--spacing-head)] text-[var(--mantine-color-dimmed)]"
           style={{ left: domainMs === 0 ? "0%" : `${((at / domainMs) * 100).toFixed(4)}%` }}
         >
           {millisecondsToElapsedFormat(startMs + at)}

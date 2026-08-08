@@ -10,7 +10,6 @@ import type { SelectorPins } from "../selectorOptions";
 
 import { AnalysisRow } from "../analysis/AnalysisRow";
 import { HoverCard, type CardAmount, type CardSection } from "../analysis/HoverCard";
-import "../analysis/analysis.css";
 
 import { TimelineRuler } from "./TimelineRuler";
 import type { Lane, LaneMark } from "./laneMarks";
@@ -70,8 +69,18 @@ export type TimelineTracksProps = {
  *
  * Two columns inside ONE vertical scroller: the lane names, fixed, and the
  * tracks, which own the only horizontal scrollbar. Both columns map the single
- * `laneRows` sequence, so neither can invent a row the other does not have; the
- * heights that keep them level are in `analysis.css`. */
+ * `laneRows` sequence, so neither can invent a row the other does not have.
+ *
+ * They stay in step only while their row heights match EXACTLY, so each pair
+ * reads the SAME token rather than restating a number:
+ *
+ *   ruler    `h-head`  TimelineRuler   ↔  the names column's opening gap
+ *   heading  `h-head`  the heading     ↔  the tracks column's gap row
+ *   lane     `h-row`   `AnalysisRow`   ↔  the lane row
+ *
+ * A lane IS an `AnalysisRow`, and the track beside it has to be exactly as
+ * tall. Stated twice, the two columns drift apart the first time one is
+ * nudged. */
 export const TimelineTracks = ({
   lanes,
   domainMs,
@@ -197,9 +206,17 @@ export const TimelineTracks = ({
       const spanMs = mark.endMs - mark.startMs;
       const markNode = (
         <Box
-          className={`timeline-mark ${lane.spans ? "timeline-mark-span" : "timeline-mark-instant"}${
-            isCast ? " timeline-mark-cast" : ""
-          }`}
+          data-mark
+          data-mark-kind={lane.spans ? "span" : isCast ? "cast" : "instant"}
+          className={[
+            "absolute inset-y-1 min-w-0.5 rounded-[1px]",
+            // ONE opacity per mark rather than a base and two modifiers: a real
+            // span reads as a filled bar, a folded instant as a tick, and a cast
+            // a touch softer so its bar reads as a CONTAINER for the ticks
+            // inside it. Layered as separate utilities the strongest would win
+            // on stylesheet order, not on which applies.
+            lane.spans ? "opacity-85" : isCast ? "opacity-90" : "opacity-100",
+          ].join(" ")}
           style={{
             left: percent(mark.startMs, domainMs),
             width: percent(spanMs, domainMs),
@@ -213,7 +230,12 @@ export const TimelineTracks = ({
               <Box
                 key={index}
                 data-testid="timeline-tick"
-                className={`timeline-tick${hit.echo ? " timeline-tick-echo" : ""}`}
+                data-echo={hit.echo || undefined}
+                // Echo hits match the fainter segment MetricBar draws in the table.
+                className={[
+                  "pointer-events-none absolute inset-y-0 w-px bg-white",
+                  hit.echo ? "opacity-25" : "opacity-55",
+                ].join(" ")}
                 style={{ left: percent(hit.atMs - mark.startMs, spanMs) }}
               />
             ))}
@@ -235,13 +257,32 @@ export const TimelineTracks = ({
     <Box style={{ padding: "4px 16px 14px" }}>
       {/* The vertical scroller. Both columns live in it, so they scroll down
           together; only the right one scrolls sideways. */}
-      <Box className="timeline-frame" role="group" aria-label={t("ui.logs.timeline-label")}>
-        <Box className="timeline-names" role="grid" aria-label={t("ui.logs.timeline-lanes-label")}>
-          {/* Stands in for the ruler, so lane one is level in both columns. */}
-          <Box className="timeline-ruler-gap" aria-hidden />
+      <Box
+        className="flex max-h-[calc(460px*var(--density))] overflow-y-auto rounded-sm border border-line"
+        role="group"
+        aria-label={t("ui.logs.timeline-label")}
+      >
+        {/* Outside the horizontal scroller, so the names cannot pan away and no
+            longer need to be sticky. Opaque, and separated by its own border. */}
+        <Box
+          data-lane-names
+          className="min-w-0 flex-none basis-name border-r border-line bg-[var(--mantine-color-body)]"
+          role="grid"
+          aria-label={t("ui.logs.timeline-lanes-label")}
+        >
+          {/* Stands in for the ruler, so lane one is level in both columns, and
+              carries the ruler's underline across the names column. */}
+          <Box className="h-head border-b border-line" aria-hidden />
           {rows.map((row) =>
             row.kind === "heading" ? (
-              <Box key={row.key} className="timeline-section">
+              // Fixed at the gap row's own height in the other column — a
+              // heading that grew with its text would push the names out of
+              // step with their marks.
+              <Box
+                key={row.key}
+                data-lane-heading
+                className="flex h-head items-end overflow-hidden whitespace-nowrap px-2 pb-[3px] text-label uppercase tracking-[0.04em] text-[var(--mantine-color-dimmed)]"
+              >
                 {row.label}
               </Box>
             ) : (
@@ -250,20 +291,30 @@ export const TimelineTracks = ({
           )}
         </Box>
 
-        <Box className="timeline-tracks-scroll">
+        {/* The ONLY horizontal scrollbar. `min-w-0` so the flex item may shrink
+            below its (very wide) content instead of stretching the frame. */}
+        <Box data-tracks-scroll className="min-w-0 flex-1 overflow-x-auto">
           {/* Widened by exactly domain/viewport, so percentages inside address
               the whole window and the scale needs no measurement. */}
-          <Box className="timeline-content" style={{ width: `${(domainMs / viewportMs) * 100}%` }}>
+          <Box
+            data-timeline-content
+            className="relative min-w-full"
+            style={{ width: `${(domainMs / viewportMs) * 100}%` }}
+          >
             <TimelineRuler domainMs={domainMs} startMs={startMs} stepMs={TICK_STEP_MS} />
 
             {rows.map((row) =>
               row.kind === "heading" ? (
                 // The heading's height with none of its text: the names column
                 // carries the words, this column only has to stay level.
-                <Box key={row.key} className="timeline-row-gap" aria-hidden />
+                <Box key={row.key} data-lane-gap className="h-head" aria-hidden />
               ) : (
-                <Box key={row.key} className="timeline-row">
-                  <Box className="timeline-lane-track">{laneMarks(row.lane)}</Box>
+                <Box key={row.key} data-lane-row className="flex h-row items-stretch hover:bg-white/5">
+                  {/* Faintly filled, so an empty lane reads as "nothing here"
+                      rather than as a missing cell. */}
+                  <Box className="relative min-w-0 flex-1 before:absolute before:inset-x-0 before:inset-y-1 before:bg-line before:opacity-25 before:content-['']">
+                    {laneMarks(row.lane)}
+                  </Box>
                 </Box>
               )
             )}
