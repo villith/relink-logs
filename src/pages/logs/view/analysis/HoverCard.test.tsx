@@ -2,7 +2,7 @@ import { MantineProvider } from "@mantine/core";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { HoverCard, HoverCardBody, SECTION_ENTRY_CAP, type CardSection } from "./HoverCard";
+import { HOVER_PANEL_CLASS, HoverCard, HoverCardBody, SECTION_ENTRY_CAP, type CardSection } from "./HoverCard";
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
@@ -204,12 +204,12 @@ describe("HoverCardBody — a section that states no heading", () => {
 });
 
 describe("HoverCard", () => {
-  it("carries the design tokens on the card itself, not on an ancestor", () => {
-    // The card portals to document.body, outside .analysis. Custom properties
-    // inherit down the tree, so the view's --an-* aliases (declared on
-    // `.analysis-tokens` in analysis.css) resolve to nothing here unless the
-    // card carries the class itself — and a rule reading an undefined property
-    // is dropped without a word.
+  it("paints its own surface, since it portals out of the view", () => {
+    // The card renders under document.body, outside .analysis, so anything it
+    // took from an ancestor would not reach it. Its tokens come from :root and
+    // its surface rides the card itself — an earlier version carried a token
+    // class instead, and a rule reading an undefined property is dropped
+    // without a word.
     render(
       <MantineProvider>
         <HoverCard sections={[section("ui.logs.hover-by-target", 1)]} {...DAMAGE_AMOUNT}>
@@ -219,7 +219,8 @@ describe("HoverCard", () => {
     );
     fireEvent.mouseEnter(screen.getByText("row"));
     const card = document.querySelector('[data-testid="metric-hover-card"]');
-    expect(card?.classList.contains("analysis-tokens")).toBe(true);
+    expect(card?.closest(".analysis")).toBeNull();
+    for (const name of HOVER_PANEL_CLASS.split(" ")) expect([...card!.classList]).toContain(name);
   });
 });
 

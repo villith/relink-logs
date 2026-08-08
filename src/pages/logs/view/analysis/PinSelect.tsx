@@ -2,7 +2,36 @@ import { Select } from "@mantine/core";
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import "./analysis.css";
+import { EntityIcon } from "@/components/ui/EntityIcon";
+
+/** The control, the dropdown and one option, in the view's own palette rather
+ * than Mantine's stock dark input. The rows these sit in are built from the same
+ * tokens — the window chip beside them, the chips below — and a default input
+ * among those reads as two designs sharing one row.
+ *
+ * Plain utilities, no compound selectors: Mantine's stylesheet is a cascade
+ * LAYER now, so every utility outranks it whatever the source order. This used
+ * to need `.analysis .analysis-select-input` because `.mantine-Select-input` has
+ * the same one-class specificity and the winner was the bundler's choice. */
+const INPUT_CLASS = [
+  "h-control min-h-control rounded-sm border border-line bg-panel text-md text-ink",
+  // The controls grow to fit their names (see below), but nothing bounds a
+  // name — so the one that still overruns truncates rather than turning the
+  // input into a horizontal scroller you have to drag a caret through.
+  "text-ellipsis placeholder:text-ink-3 hover:border-line-strong",
+  // The accent ring the window chip and the selected aura chip already wear, so
+  // "this control is live" looks the same everywhere in the view.
+  "focus:border-accent focus-within:border-accent",
+].join(" ");
+
+const OPTION_CLASS = [
+  "rounded-xs text-md text-ink-2",
+  // Hover and keyboard-active read the same, as they do on a table row: the
+  // dropdown is a list of things to land on, not two kinds of highlight.
+  "hover:bg-raised hover:text-ink",
+  "data-[combobox-active]:bg-raised data-[combobox-active]:text-ink",
+  "data-[combobox-selected]:bg-raised data-[combobox-selected]:text-ink",
+].join(" ");
 
 /** One entry in a pin selector. `iconUrl` is optional because most of what the
  * lists carry has no art at all — trash mobs have no portrait, and bare kinds
@@ -34,16 +63,9 @@ export type PinSelectProps = {
 
 /** One pin selector, wearing the Analysis view's own design and its art.
  *
- * A component rather than three configured `Select`s: the styling, the icon
- * resolution and the dropdown's token class are the same three answers every
- * time, and three copies of them is three chances for one selector to drift
- * from the others.
- *
- * The dropdown carries `analysis-tokens` because it PORTALS to document.body,
- * outside `.analysis` — its custom properties, declared on `.analysis-tokens`,
- * inherit down the tree, so a dropdown styled with them and rendered outside
- * the view resolves them to nothing and paints itself blank. The same reason
- * the hover card carries it. */
+ * A component rather than three configured `Select`s: the styling and the icon
+ * resolution are the same two answers every time, and three copies of them is
+ * three chances for one selector to drift from the others. */
 export const PinSelect = ({ minWidth, maxWidth, data, value, placeholder, ariaLabel, onChange }: PinSelectProps) => {
   const { t } = useTranslation();
   // Art and colour by value, because the two places that need them are given
@@ -88,16 +110,23 @@ export const PinSelect = ({ minWidth, maxWidth, data, value, placeholder, ariaLa
       // dimension the control already carries — one string, not a third prop
       // every call site has to remember.
       clearButtonProps={{ "aria-label": t("ui.logs.selector-clear", { dimension: ariaLabel }) }}
-      classNames={{ input: "analysis-select-input", section: "analysis-select-section" }}
+      classNames={{
+        input: INPUT_CLASS,
+        // The chevron and the clear ✕. Mantine sizes the section from the font,
+        // and the stock colour is a step brighter than anything else in the row.
+        section: "text-ink-3",
+      }}
+      // The dropdown portals to document.body, outside `.analysis`. It needs no
+      // token class of its own for that: the theme puts every token on :root,
+      // and custom properties inherit down from there to a portal as readily as
+      // to anything else.
       comboboxProps={{
-        classNames: { dropdown: "analysis-tokens analysis-select-dropdown", option: "analysis-select-option" },
+        classNames: { dropdown: "rounded-sm border border-line-strong bg-panel", option: OPTION_CLASS },
       }}
       // Only where the selected option HAS art: an empty left section still
       // reserves its width, which would indent the placeholder of every
       // selector whose list happens to be artless.
-      leftSection={
-        selectedIcon === undefined ? undefined : <img className="analysis-select-icon" src={selectedIcon} alt="" />
-      }
+      leftSection={selectedIcon === undefined ? undefined : <EntityIcon size="control" src={selectedIcon} alt="" />}
       // Mantine's default section is 36px, which around an 18px icon reads as a
       // gap rather than as art attached to a name. Left undefined without one so
       // no padding is reserved at all.
@@ -110,13 +139,15 @@ export const PinSelect = ({ minWidth, maxWidth, data, value, placeholder, ariaLa
       renderOption={({ option }) => {
         const entry = byValue.get(option.value);
         return (
-          <div className="analysis-select-option-row">
-            {entry?.iconUrl !== undefined && <img className="analysis-select-icon" src={entry.iconUrl} alt="" />}
+          // The name takes the slack and ellipsises — a long boss name must not
+          // widen the dropdown past its input.
+          <div data-option-row className="flex min-w-0 items-center gap-[7px]">
+            {entry?.iconUrl !== undefined && <EntityIcon size="control" src={entry.iconUrl} alt="" />}
             {/* `title` because the dropdown is only as wide as its control: a
                 name past that ellipsises, and hovering is then the only way
                 left to read the rest of it. */}
             <span
-              className="analysis-select-option-label"
+              className="truncate"
               title={option.label}
               style={entry?.color === undefined ? undefined : { color: entry.color }}
             >

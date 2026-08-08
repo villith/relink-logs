@@ -49,7 +49,7 @@ const AuraTooltip = ({ label, uptimePercent, children }: AuraChip & { children: 
   return (
     <CursorCard
       testId="aura-hover-card"
-      className={`analysis-tokens ${HOVER_PANEL_CLASS}`}
+      className={HOVER_PANEL_CLASS}
       style={{ maxWidth: 280 }}
       content={
         <Box className="px-[9px] py-1.5">

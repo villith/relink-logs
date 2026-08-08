@@ -279,10 +279,10 @@ export const HoverCard = ({
       // aura tiles' card also wears; only the SIZE is this card's own — a
       // breakdown needs a width floor an effect name does not.
       //
-      // `analysis-tokens` because the card portals to document.body, outside
-      // .analysis: custom properties only inherit down the tree, so the view's
-      // remaining --an-* aliases would resolve to nothing without it.
-      className={`analysis-tokens ${HOVER_PANEL_CLASS}`}
+      // No token class, though the card portals to document.body: every token
+      // is on :root, and custom properties inherit down from there to a portal
+      // as readily as to anything else.
+      className={HOVER_PANEL_CLASS}
       style={{ minWidth: 300, maxWidth: 420, maxHeight: "70vh" }}
     >
       {children}
