@@ -44,6 +44,7 @@ import {
   groupBonuses,
   hasQuestElapsedTime,
   humanizeNumbers,
+  mergeSupplementaryRows,
   mergeTargetBreakdowns,
   millisecondsToPreciseElapsedFormat,
   moveItem,
@@ -959,6 +960,80 @@ describe("mergeTargetBreakdowns", () => {
     expect(mergeTargetBreakdowns([undefined, [{ enemyType: { Unknown: 1 }, hits: 1, totalDamage: 5 }]])).toEqual([
       { enemyType: { Unknown: 1 }, hits: 1, totalDamage: 5 },
     ]);
+  });
+});
+
+describe("mergeSupplementaryRows", () => {
+  const row = (overrides: Partial<SkillState>): SkillState =>
+    ({
+      actionType: { Normal: 100 },
+      childCharacterType: "Pl1900",
+      hits: 1,
+      minDamage: 100,
+      maxDamage: 100,
+      totalDamage: 100,
+      totalStunValue: 0,
+      maxStunValue: 0,
+      cappedHits: 0,
+      cappableHits: 0,
+      overcapBaseSum: 0,
+      overcapCapSum: 0,
+      ...overrides,
+    }) as SkillState;
+
+  const echo = (cause: number, overrides: Partial<SkillState> = {}) =>
+    row({ actionType: { SupplementaryDamage: cause }, ...overrides });
+
+  it("folds the payloads into one row, in the first echo's place", () => {
+    const merged = mergeSupplementaryRows([
+      row({ totalDamage: 900 }),
+      echo(100, { totalDamage: 300, hits: 3 }),
+      row({ actionType: { Normal: 110 }, totalDamage: 50 }),
+      echo(200, { totalDamage: 200, hits: 2 }),
+    ]);
+
+    expect(merged.map((skill) => skill.actionType)).toEqual([
+      { Normal: 100 },
+      { SupplementaryDamage: 100 },
+      { Normal: 110 },
+    ]);
+    expect(merged[1].totalDamage).toBe(500);
+    expect(merged[1].hits).toBe(5);
+  });
+
+  it("takes the extremes across every echo", () => {
+    const merged = mergeSupplementaryRows([
+      echo(100, { minDamage: 80, maxDamage: 400 }),
+      echo(200, { minDamage: 30, maxDamage: 120 }),
+    ]);
+
+    expect(merged[0].minDamage).toBe(30);
+    expect(merged[0].maxDamage).toBe(400);
+  });
+
+  it("keeps an unrecorded extreme unrecorded rather than calling it zero", () => {
+    // Logs saved before minDamage/maxDamage existed carry null on every row.
+    const merged = mergeSupplementaryRows([
+      echo(100, { minDamage: null, maxDamage: null }),
+      echo(200, { minDamage: null, maxDamage: null }),
+    ]);
+
+    expect(merged[0].minDamage).toBeNull();
+    expect(merged[0].maxDamage).toBeNull();
+  });
+
+  it("merges the per-enemy breakdowns behind the folded row", () => {
+    const merged = mergeSupplementaryRows([
+      echo(100, { targets: [{ enemyType: { Unknown: 1 }, hits: 1, totalDamage: 100 }] }),
+      echo(200, { targets: [{ enemyType: { Unknown: 1 }, hits: 2, totalDamage: 250 }] }),
+    ]);
+
+    expect(merged[0].targets).toEqual([{ enemyType: { Unknown: 1 }, hits: 3, totalDamage: 350 }]);
+  });
+
+  it("leaves a breakdown with fewer than two echoes exactly as it was", () => {
+    const rows = [row({}), echo(100)];
+    expect(mergeSupplementaryRows(rows)).toBe(rows);
   });
 });
 

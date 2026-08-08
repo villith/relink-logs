@@ -4,7 +4,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, ComputedSkillGroup, ComputedSkillState } from "@/types";
-import { getSkillName, isSkillGroup } from "@/utils";
+import { getSkillName, isSkillGroup, mergeSupplementaryRows } from "@/utils";
 
 import { skillGroupFor } from "./skillGrouping";
 
@@ -92,8 +92,12 @@ export const useSkillBreakdown = (player: ComputedPlayerState) => {
   // without it a language switch would leave the old names on screen until the
   // player's damage next changed.
   const skills = useMemo<Array<ComputedSkillGroup | ComputedSkillState>>(() => {
-    const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
-    const computedSkills = player.skillBreakdown.map<ComputedSkillState>((skill) => {
+    // Echoes fold FIRST, so the one row they become takes one share of the
+    // total rather than a share each — and so the condense below, which has
+    // nothing to say about echoes, sees one of them.
+    const breakdown = mergeSupplementaryRows(player.skillBreakdown);
+    const totalDamage = breakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
+    const computedSkills = breakdown.map<ComputedSkillState>((skill) => {
       return {
         // Guard the denominator: a stun-only breakdown (e.g. Perfect Guard before
         // any damage) would otherwise divide 0 by 0 and render "NaN%".

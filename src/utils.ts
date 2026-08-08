@@ -1326,9 +1326,13 @@ const playerCsvRow = (player: ComputedPlayerState, partyData: Array<PlayerData |
 /// A player's skill table for the detailed export: biggest hitter first, each
 /// row carrying its share of that player's own damage.
 const skillCsvRows = (player: ComputedPlayerState): string => {
-  const totalDamage = player.skillBreakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
+  // Folded for the same reason the table folds: every echo payload exports the
+  // one name "Supplementary Damage", so unfolded the export repeats that line
+  // once per causing skill with the damage split between the copies.
+  const breakdown = mergeSupplementaryRows(player.skillBreakdown);
+  const totalDamage = breakdown.reduce((acc, skill) => acc + skill.totalDamage, 0);
 
-  return player.skillBreakdown
+  return breakdown
     .map((skill) => ({
       // Guard the denominator: a guard-only player (all zero-damage Perfect
       // Guard rows) has totalDamage 0, which would export "NaN%" for every
@@ -1553,6 +1557,77 @@ export const mergeTargetBreakdowns = (breakdowns: (SkillTargetState[] | undefine
     }
   }
   return [...merged.values()].sort((a, b) => b.totalDamage - a.totalDamage);
+};
+
+/** A summed optional field, ABSENT when no row carried it — a legacy payload's
+ * missing field must not become a 0 the table reads as a real measurement. */
+const sumOptional = <T>(rows: T[], value: (row: T) => number | undefined): number | undefined =>
+  rows.some((row) => value(row) !== undefined) ? rows.reduce((total, row) => total + (value(row) ?? 0), 0) : undefined;
+
+/** The smallest (or largest) figure any row recorded, or null when none did —
+ * logs saved before `minDamage`/`maxDamage` existed carry null, and folding that
+ * in as a 0 would claim a hit landed for nothing. */
+const recordedExtreme = (values: (number | null)[], pick: (a: number, b: number) => number): number | null => {
+  const known = values.filter((value): value is number => value !== null);
+  // `reduce(Math.min)` would hand the index and the array to Math.min as extra
+  // arguments and answer NaN, so the fold is spelled out.
+  return known.length === 0 ? null : known.reduce((chosen, value) => pick(chosen, value));
+};
+
+/** Every supplementary-damage (echo) row folded into ONE, in the first echo's
+ * place; anything else passes through untouched.
+ *
+ * The parser emits one breakdown row per `SupplementaryDamage(n)` payload
+ * because `n` names the skill that CAUSED the echo — the attribution the
+ * analysis view's collapse toggle reads (`rowKeyingFor`). Nothing else can use
+ * it: `getSkillName` names every payload "Supplementary Damage" and
+ * `skillGroupFor` leaves echoes ungrouped, so a surface with no cause
+ * attribution of its own repeats that one name once per cause unless it folds
+ * here. This is the fold the parser used to do for everyone.
+ *
+ * NOT the skill-group condense, and deliberately not gated on it: an echo
+ * belongs to no group, and its row was single whatever that setting said.
+ *
+ * Folded onto the first echo so the row keeps a real payload and its position in
+ * the breakdown, exactly as the parser's own fold did. */
+export const mergeSupplementaryRows = <T extends SkillState>(rows: T[]): T[] => {
+  const echoes = rows.filter((row) => isSupplementaryAction(row.actionType));
+  if (echoes.length < 2) return rows;
+
+  const folded: T = {
+    ...echoes[0],
+    hits: echoes.reduce((total, row) => total + row.hits, 0),
+    totalDamage: echoes.reduce((total, row) => total + row.totalDamage, 0),
+    minDamage: recordedExtreme(
+      echoes.map((row) => row.minDamage),
+      Math.min
+    ),
+    maxDamage: recordedExtreme(
+      echoes.map((row) => row.maxDamage),
+      Math.max
+    ),
+    totalStunValue: echoes.reduce((total, row) => total + row.totalStunValue, 0),
+    maxStunValue: echoes.reduce((max, row) => Math.max(max, row.maxStunValue), 0),
+    cappedHits: echoes.reduce((total, row) => total + row.cappedHits, 0),
+    cappableHits: echoes.reduce((total, row) => total + row.cappableHits, 0),
+    overcapBaseSum: echoes.reduce((total, row) => total + row.overcapBaseSum, 0),
+    overcapCapSum: echoes.reduce((total, row) => total + row.overcapCapSum, 0),
+    sbaGenerated: sumOptional(echoes, (row) => row.sbaGenerated),
+    stunDeltaSum: sumOptional(echoes, (row) => row.stunDeltaSum),
+    stunMessageSum: sumOptional(echoes, (row) => row.stunMessageSum),
+    stunEligibleHits: sumOptional(echoes, (row) => row.stunEligibleHits),
+    targets: echoes.some((row) => row.targets !== undefined)
+      ? mergeTargetBreakdowns(echoes.map((row) => row.targets))
+      : undefined,
+  };
+
+  let placed = false;
+  return rows.flatMap((row) => {
+    if (!isSupplementaryAction(row.actionType)) return [row];
+    if (placed) return [];
+    placed = true;
+    return [folded];
+  });
 };
 
 /// Translates the quest ID to a human-readable string.

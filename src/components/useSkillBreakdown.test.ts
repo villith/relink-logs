@@ -95,6 +95,42 @@ describe("useSkillBreakdown recomputation", () => {
   });
 });
 
+describe("useSkillBreakdown supplementary damage", () => {
+  // The parser emits one breakdown row per `SupplementaryDamage(n)` payload — n
+  // names the skill that caused the echo, which only the analysis view's
+  // collapse reads. Every one of them is called "Supplementary Damage", so this
+  // table has to fold them or it repeats that one name once per cause.
+  const echo = (cause: number, totalDamage: number, hits: number, min: number, max: number) =>
+    skill({ actionType: { SupplementaryDamage: cause }, totalDamage, hits, minDamage: min, maxDamage: max });
+
+  it("folds every echo payload onto one row", () => {
+    const rows = breakdown([echo(100, 300, 3, 50, 150), skill({ totalDamage: 1000 }), echo(200, 200, 2, 40, 120)]);
+
+    const echoes = rows.filter((row) => typeof row.actionType === "object" && "SupplementaryDamage" in row.actionType);
+    expect(echoes).toHaveLength(1);
+    expect(echoes[0].totalDamage).toBe(500);
+    expect(echoes[0].hits).toBe(5);
+    expect(echoes[0].minDamage).toBe(40);
+    expect(echoes[0].maxDamage).toBe(150);
+  });
+
+  it("folds them with condensed skills off too", () => {
+    // The fold is not the skill-group condense: an echo belongs to no group,
+    // and the row was single whatever that setting said before the parser
+    // stopped folding.
+    const rows = breakdown([echo(100, 300, 3, 50, 150), echo(200, 200, 2, 40, 120)], false);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].totalDamage).toBe(500);
+  });
+
+  it("shares out the folded row's percentage over the whole of it", () => {
+    const rows = breakdown([echo(100, 300, 3, 50, 150), echo(200, 200, 2, 40, 120), skill({ totalDamage: 500 })]);
+
+    expect(rows.map((row) => row.percentage)).toEqual([50, 50]);
+  });
+});
+
 describe("useSkillBreakdown Primal Burst grouping", () => {
   const primalBurst = (bodyHash: number, totalDamage: number) =>
     skill({ childCharacterType: { Unknown: bodyHash }, totalDamage, hits: 2 });
