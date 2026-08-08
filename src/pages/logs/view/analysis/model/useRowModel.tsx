@@ -2,9 +2,8 @@ import type React from "react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
-import { enemyIconUrl } from "@/enemyIcon";
-import { statusIconUrl } from "@/statusIcon";
 import type {
+  ActionType,
   ComputedPlayerState,
   EncounterState,
   EnemyType,
@@ -13,20 +12,20 @@ import type {
   StatusInterval,
   TargetEntry,
 } from "@/types";
-import { getSkillName, translateCharacterType, translateEnemyType } from "@/utils";
+import { translateCharacterType } from "@/utils";
 
 import { childOfPin, type RowKeying } from "../../abilitySkills";
 import { keyColor } from "../../actorColor";
 import { buffs } from "../../metrics/buffs";
-import { damageDone, parseEnemyRow } from "../../metrics/damageDone";
-import { damageTaken, takenAttackRowParts } from "../../metrics/damageTaken";
+import { damageDone } from "../../metrics/damageDone";
+import { damageTaken } from "../../metrics/damageTaken";
 import { debuffs } from "../../metrics/debuffs";
 import { sba } from "../../metrics/sba";
 import { stun } from "../../metrics/stun";
-import type { Hostility, LabelKind, MetricDescriptor, MetricRow, RowLevel } from "../../metrics/types";
+import type { Hostility, MetricDescriptor, MetricRow, RowLevel } from "../../metrics/types";
 import type { SelectorPins } from "../../selectorOptions";
 import { isStatusPin } from "../../statusUptime";
-import { abilityLabelFor, abilityOwnerFor } from "../abilityLabel";
+import { abilityOwnerFor } from "../abilityLabel";
 import { CAUSE_CLASS_LABEL_KEY, withProvenance, type CauseClass } from "../causeClass";
 import type { CardSection } from "../HoverCard";
 import { qualifiedAbilityLabels } from "../labelCollision";
@@ -35,11 +34,11 @@ import { groupRowsFor } from "../machine/groupRows";
 import type { ViewSpec } from "../machine/resolve";
 import type { MetricKey } from "../machine/state";
 import { rowCardSectionsFor } from "../rowCardSections";
-import { abilityRowIconUrl } from "../rowIcon";
-import { statusIdOfKey, statusRowKindFor, targetRowLabel, targetRowSegment } from "../statusLabel";
+import { statusRowKindFor } from "../statusLabel";
 import { statusRowColors } from "../statusRowColors";
 
 import type { ActorIdentity } from "./useActorIdentity";
+import type { EntityCells } from "./useEntityCells";
 
 /** The metric switcher's contents, in display order. Adding a metric that only
  * has a friendly side is adding a descriptor here — the frame itself does not
@@ -52,15 +51,6 @@ export const METRICS: Record<string, MetricDescriptor> = {
   buffs,
   debuffs,
 };
-
-/** What a row's label and its icon are BOTH resolved against.
- *
- * One function rather than the same expression in `renderLabel` and
- * `rowIconUrl`: the two must never disagree, or a row pairs one kind's name
- * with another kind's art. The row's OWN kind wins where it declares one — the
- * groups path declares one per row — and the table-level discriminator stands
- * in otherwise. */
-export const rowKindOf = (row: MetricRow, tableKind: LabelKind): LabelKind => row.kind ?? tableKind;
 
 export type RowModel = {
   metric: MetricDescriptor;
@@ -100,7 +90,9 @@ export type RowModelInput = {
   shownEncounter: EncounterState | null;
   sourcePin: number | null;
   identity: ActorIdentity;
-  statusDisplayLabel: (key: string) => string;
+  /** The view's one set of entity lookups — the same bundle the chart and the
+   * selectors resolve through, so a row and its band cannot disagree. */
+  cells: EntityCells;
   classOfRowKey: (rowKey: string) => CauseClass;
 };
 
@@ -123,22 +115,15 @@ export const useRowModel = ({
   shownEncounter,
   sourcePin,
   identity,
-  statusDisplayLabel,
+  cells,
   classOfRowKey,
 }: RowModelInput): RowModel => {
   const { t, i18n } = useTranslation();
-  const {
-    playerByIndex,
-    colorContext,
-    labelForSource,
-    labelForAbility,
-    labelForTarget,
-    labelForTakenAttack,
-    takenAttackLabel,
-    sourceIconUrl,
-    targetIconUrl,
-    playerColor,
-  } = identity;
+  // Only the four the ROWS themselves need: everything the table draws is
+  // named and illustrated through `cells` now, so the label and icon lookups
+  // this used to hold one by one are gone with the switches that used them.
+  const { playerByIndex, colorContext, labelForAbility, playerColor } = identity;
+  const { rowCell, resolvers } = cells;
   const metric = METRICS[metricKey] ?? damageDone;
 
   // Party slot per player index, for the group fold's row colours.
@@ -279,87 +264,34 @@ export const useRowModel = ({
 
   const sectionLabelOf = useCallback((row: MetricRow) => t(CAUSE_CLASS_LABEL_KEY[classOfRow(row)]), [classOfRow, t]);
 
-  // The art beside a row's name, by the same discriminator the name uses, so
-  // a row can never pair one kind's name with another kind's icon. Undefined
-  // is the honest answer for most of what has none: combo actions are not
-  // ability casts, `actor:` holder rows index no spawn, and only the boss
-  // roster has portraits at all (see enemyIcon.ts).
-  const rowIconUrl = useCallback(
-    (row: MetricRow): string | undefined => {
-      // A self-naming row depicts nothing (see `MetricRow.labelKey`); the
-      // ability join below would answer with whichever art its fallback picks.
-      if (row.labelKey) return undefined;
-      // The row's own kind wins, exactly as in `renderLabel` — the two share
-      // one discriminator so a row can never pair one kind's name with
-      // another kind's art.
-      const kind = rowKindOf(row, tableKind);
-      if (kind === "status") {
-        const statusId = statusIdOfKey(row.label);
-        return statusId === null ? undefined : statusIconUrl(statusId);
-      }
-      if (kind === "player") return sourceIconUrl(Number(row.label));
-      if (kind === "target") {
-        const segment = targetRowSegment(row.label);
-        return segment === null ? undefined : targetIconUrl(segment);
-      }
-      // An enemy TYPE row carries the type itself, so it needs no spawn to look
-      // one up through.
-      if (kind === "enemy") return enemyIconUrl(parseEnemyRow(row.label));
-      // A taken row is an enemy's attack, so it wears the attacker's portrait.
-      if (kind === "takenAttack") {
-        const parts = takenAttackRowParts(row.label);
-        return parts ? enemyIconUrl(parts.enemyType) : undefined;
-      }
-      return abilityRowIconUrl(row.label, identityPlayers, playerByIndex.get(sourcePin ?? -1)?.player);
-    },
-    [tableKind, playerByIndex, targetEntries, identityPlayers, sourceIconUrl, targetIconUrl, sourcePin]
-  );
+  // What a row is called and what it looks like, off the ONE entity ladder the
+  // chart's bands and the selectors' options resolve through (see
+  // `useEntityCells`). A row can never pair one kind's name with another kind's
+  // art, because both come out of a single branch — and it can never be named
+  // one way in the table and another way in the band above it.
+  //
+  // Effect names come from status.tbl via the generated `statuses` bundle; the
+  // ~90 internal statuses the game never names answer empty and fall back to
+  // "Effect <id>". The cause resolves through `causeSkillName`, which bridges
+  // the effect-entry id at `+0x4c` to the acting skill.
+  const rowCellOf = useCallback((row: MetricRow) => rowCell(row, tableKind), [rowCell, tableKind]);
 
   const renderLabel = useCallback(
     (row: MetricRow) => {
-      // A row that names itself (see `MetricRow.labelKey`) resolves against
-      // nothing: it is not an ability, a player or an effect, and sending its
-      // sentinel through one of those joins would print that join's guess.
-      if (row.labelKey) return t(row.labelKey, row.labelParams);
-      // The row's own kind wins — the groups path declares one per row — and
-      // the table-level discriminator stands in for the legacy descriptors.
-      const kind = rowKindOf(row, tableKind);
-      // Effect names come from status.tbl via the generated `statuses` bundle;
-      // the ~90 internal statuses the game never names answer empty and fall
-      // back to "Effect <id>". The cause resolves through `causeSkillName`,
-      // which bridges the effect-entry id at `+0x4c` to the acting skill.
-      const name =
-        kind === "status"
-          ? statusDisplayLabel(row.label)
-          : kind === "player"
-            ? labelForSource(Number(row.label))
-            : kind === "target"
-              ? targetRowLabel(row.label, labelForTarget)
-              : kind === "enemy"
-                ? translateEnemyType(parseEnemyRow(row.label))
-                : kind === "takenAttack"
-                  ? takenAttackLabel(row.label)
-                  : abilityRowLabels.get(row.key) ?? labelForAbility(row.label);
-      const icon = rowIconUrl(row);
-      if (!icon) return name;
+      const cell = rowCellOf(row);
+      // The qualified label wins where the table computed one: two same-named
+      // parent rows carry their owner's character, which the entity ladder —
+      // naming one row at a time — cannot know about.
+      const name = abilityRowLabels.get(row.key) ?? cell.name;
+      if (!cell.iconUrl) return name;
       return (
         <>
-          <img className="analysis-row-icon" src={icon} alt="" />
+          <img className="analysis-row-icon" src={cell.iconUrl} alt="" />
           {name}
         </>
       );
     },
-    [
-      t,
-      tableKind,
-      labelForSource,
-      labelForTarget,
-      labelForAbility,
-      takenAttackLabel,
-      statusDisplayLabel,
-      rowIconUrl,
-      abilityRowLabels,
-    ]
+    [rowCellOf, abilityRowLabels]
   );
 
   const rowColor = useCallback(
@@ -387,31 +319,34 @@ export const useRowModel = ({
 
   // The rule itself lives in cardSections.ts; the view only supplies the name
   // and colour lookups that keep it a pure function.
+  // The card's lookups are PROJECTIONS of the one entity bundle, not a second
+  // set of them. Every pair here used to be wired by hand — a namer beside an
+  // icon resolver beside a colour — which is how a card came to explain a row
+  // with the same entities under different names and different pictures. Name
+  // and art now come out of one call, so they cannot be wired apart.
+  //
+  // `owner` matters where the card decomposes one player's own breakdown:
+  // action ids collide across characters, and the party-order scan named Id's
+  // own 120 with Eustace's "Grade 1 Shot" on the hover card.
   const sectionLabels = useMemo(
     () => ({
-      // With an owner (a player card decomposing that player's own breakdown),
-      // the key is named against THEIR table first — action ids collide across
-      // characters, and the party-order scan named Id's own 120 with Eustace's
-      // "Grade 1 Shot" on the hover card.
-      ability: (key: string, owner?: ComputedPlayerState) =>
-        owner ? abilityLabelFor(key, identityPlayers, getSkillName, owner) : labelForAbility(key),
-      enemy: (type: EnemyType) => translateEnemyType(type),
-      source: labelForSource,
-      // The player's OWN party colour, resolved through the identity party so a
-      // scoped fetch's renumbered slots cannot recolour them mid-drill.
+      ability: (key: string, owner?: ComputedPlayerState) => resolvers.ability(key, owner).name,
+      abilityIcon: (key: string, owner?: ComputedPlayerState) => resolvers.ability(key, owner).iconUrl,
+      enemy: (type: EnemyType) => resolvers.enemy(type).name,
+      enemyIcon: (type: EnemyType) => resolvers.enemy(type).iconUrl,
+      source: (index: number) => resolvers.player(index).name,
+      sourceIcon: (index: number) => resolvers.player(index).iconUrl,
+      // The player's OWN party colour, not the band palette's: resolved through
+      // the identity party so a scoped fetch's renumbered slots cannot recolour
+      // them mid-drill.
       sourceColor: (index: number) => playerColor(index, 0),
       character: translateCharacterType,
-      // The same art the rows above the card show, resolved the same way, so
-      // hovering a row cannot show its members under different pictures.
-      abilityIcon: (key: string, owner?: ComputedPlayerState) => abilityRowIconUrl(key, identityPlayers, owner),
-      enemyIcon: enemyIconUrl,
-      sourceIcon: sourceIconUrl,
       // The SAME spawn naming (and art) the table's target rows resolve
       // through, so a card's "#2" can never name a different spawn.
-      target: labelForTarget,
-      targetIcon: targetIconUrl,
+      target: (segment: number) => resolvers.target(segment).name,
+      targetIcon: (segment: number) => resolvers.target(segment).iconUrl,
     }),
-    [labelForAbility, identityPlayers, labelForSource, playerColor, sourceIconUrl, targetIconUrl]
+    [resolvers, playerColor]
   );
 
   // The enemy-side cards' lookups: the same ones the friendly card already
@@ -419,8 +354,11 @@ export const useRowModel = ({
   // than restated so an ability, a player and their colour cannot be named one
   // way on the friendly side and another on the enemy side.
   const hostilityLabels = useMemo(
-    () => ({ ...sectionLabels, attack: labelForTakenAttack }),
-    [sectionLabels, labelForTakenAttack]
+    () => ({
+      ...sectionLabels,
+      attack: (enemyType: EnemyType, actionId: ActionType) => resolvers.takenAttack(enemyType, actionId).name,
+    }),
+    [sectionLabels, resolvers]
   );
 
   // Which card explains a row is DECLARED per (grouping, side) — see

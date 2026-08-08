@@ -24,7 +24,7 @@ import {
 } from "@/utils";
 
 import { actorColor, type ActorColorContext } from "../../actorColor";
-import { takenAttackNameKey, takenAttackRowParts } from "../../metrics/damageTaken";
+import { takenAttackNameKey } from "../../metrics/damageTaken";
 import { buildTargetLabels } from "../../targetLabels";
 import { abilityLabelFor } from "../abilityLabel";
 import { identityPartyOf } from "../partyIdentity";
@@ -94,9 +94,6 @@ export type ActorIdentity = {
   labelForAbility: (key: string) => string;
   labelForTarget: (segment: number) => string;
   labelForTakenAttack: (enemyType: EnemyType, actionId: ActionType) => string;
-  /** The row-label form of `labelForTakenAttack`, off the JSON label the taken
-   * rows carry (see `takenAttackRowParts` — the grammar has one author). */
-  takenAttackLabel: (label: string) => string;
   characterForSource: (index: number) => string;
   sourceIconUrl: (index: number) => string | undefined;
   targetIconUrl: (segment: number) => string | undefined;
@@ -218,14 +215,6 @@ export const useActorIdentity = ({
     [t, i18n.language]
   );
 
-  const takenAttackLabel = useCallback(
-    (label: string) => {
-      const parts = takenAttackRowParts(label);
-      return parts ? labelForTakenAttack(parts.enemyType, parts.actionId) : label;
-    },
-    [labelForTakenAttack]
-  );
-
   // The same rule the quest view's HP-chart legend and target filter label with,
   // so one enemy reads the same way everywhere: "#n" only once a name repeats.
   const targetLabels = useMemo(
@@ -318,7 +307,6 @@ export const useActorIdentity = ({
     labelForAbility,
     labelForTarget,
     labelForTakenAttack,
-    takenAttackLabel,
     characterForSource,
     sourceIconUrl,
     targetIconUrl,

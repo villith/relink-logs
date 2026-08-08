@@ -4,6 +4,8 @@ import type { ComputedPlayerState, EnemyType, TargetEntry } from "@/types";
 
 import type { MetricCard, MetricRow } from "../metrics/types";
 
+import { rowKeyingFor } from "../abilitySkills";
+
 import { cardSectionsFor, targetCardSectionsFor } from "./cardSections";
 
 /** What the damage tab measures. Spelled here rather than imported from the
@@ -586,5 +588,60 @@ describe("cardSectionsFor at the abilities level, party-wide", () => {
 
   it("still answers null for a pinned source missing from the scoped party", () => {
     expect(callWith("abilities", "skill:Normal:9001", { source: 42, targets: [], ability: null })).toBeNull();
+  });
+});
+
+describe("targetCardSectionsFor — the collapse", () => {
+  // One player, one skill, and the echo that skill caused — all on spawn 0.
+  const ECHO_PARTY = [
+    {
+      index: 0,
+      partyIndex: 0,
+      characterType: "Pl1400",
+      totalDamage: 400,
+      skillBreakdown: [
+        { ...skill(9001, 300, 3), targets: [{ enemyType: "Em0003", segment: 0, hits: 3, totalDamage: 300 }] },
+        {
+          ...skill(9001, 100, 4),
+          actionType: { SupplementaryDamage: 9001 },
+          targets: [{ enemyType: "Em0003", segment: 0, hits: 4, totalDamage: 100 }],
+        },
+      ],
+    },
+  ] as unknown as ComputedPlayerState[];
+  const ENTRIES = [
+    { id: 9, actorIndex: 9, enemyType: "Em0003", instance: 1, maxHp: null, startMs: 0, endMs: 1_000 },
+  ] as TargetEntry[];
+  const everySkill = ECHO_PARTY[0].skillBreakdown;
+  const call = (collapse: boolean) =>
+    targetCardSectionsFor({
+      row: row("target:0"),
+      players: ECHO_PARTY,
+      targetEntries: ENTRIES,
+      color: "rgb(1,2,3)",
+      labels: LABELS,
+      keying: rowKeyingFor(everySkill, collapse),
+    });
+
+  it("folds the echo onto its cause and splits that entry's bar", () => {
+    // The card explains a table row where echoes already ride their cause; an
+    // entry the table has no row for would be explaining a different fight.
+    const byAbility = call(true)?.[0];
+    expect(byAbility?.entries.map((entry) => entry.key)).toEqual(["Normal:9001"]);
+    expect(byAbility?.entries[0].value).toBe(400);
+    expect(byAbility?.entries[0].subValue).toBe(100);
+  });
+
+  it("splits the by-source entry too, so both sections read as the row does", () => {
+    const bySource = call(true)?.[1];
+    expect(bySource?.entries[0].value).toBe(400);
+    expect(bySource?.entries[0].subValue).toBe(100);
+  });
+
+  it("keeps the echo a separate entry, unsplit, with the collapse off", () => {
+    const byAbility = call(false)?.[0];
+    expect(byAbility?.entries.map((entry) => entry.key)).toEqual(["Normal:9001", "SupplementaryDamage:9001"]);
+    expect(byAbility?.entries.every((entry) => entry.subValue === undefined)).toBe(true);
+    expect(call(false)?.[1].entries[0].subValue).toBeUndefined();
   });
 });

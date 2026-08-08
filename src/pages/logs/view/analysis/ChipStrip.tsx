@@ -29,14 +29,17 @@ export type ChipStripProps = {
   onClear: () => void;
 };
 
-/** One row of selectable filter chips.
+/** One row of selectable filter chips — the battle-window strip.
  *
- * Both filter strips in the analysis view are this: the aura strip (WCL's
- * Source/Target Auras Filter) and the battle-window strip. They share more than
- * a look — the selected chip carries the ✕ that clears it (the §1.2 visibility
- * rule: a live filter must be visible and dismissible where it was set), and
- * clicking the selected chip again also clears, so a filter never needs a trip
- * elsewhere to undo. That interaction is the thing worth having in one place.
+ * The selected chip carries the ✕ that clears it (the §1.2 visibility rule: a
+ * live filter must be visible and dismissible where it was set), and clicking
+ * the selected chip again also clears, so a filter never needs a trip
+ * elsewhere to undo.
+ *
+ * The aura strip was the second caller and no longer is: its chips became art
+ * alone (see `AuraStrip`), which leaves nothing for the label, the figure or
+ * the ✕ to sit beside. The interaction is the same, so this and that strip
+ * must keep answering a click the same way; the LAYOUT is what diverged.
  *
  * Renders nothing with no chips: a strip exists only while what anchors it
  * does, and an empty row of chrome would say nothing.

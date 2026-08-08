@@ -126,6 +126,78 @@ describe("HoverCardBody", () => {
   });
 });
 
+describe("HoverCardBody — a section that states no shares", () => {
+  // A one-row Total section is the case: its share of itself is 100% by
+  // construction, and a column that can only ever read 100% is noise.
+  const total = (): CardSection => ({
+    headingKey: "ui.logs.chart-total-label",
+    color: "rgb(9, 9, 9)",
+    entries: [{ key: "total", label: "Total", value: 2900 }],
+    showShare: false,
+  });
+
+  it("drops the share column from the rows", () => {
+    const { container } = renderBody([total()]);
+    expect(container.querySelector(".analysis-card-share")).toBeNull();
+    // The amount is the whole point of the row and must survive.
+    expect(screen.getByText("2900")).toBeTruthy();
+  });
+
+  it("drops the share column from the heading too, so the columns still line up", () => {
+    const { container } = renderBody([total()]);
+    const head = container.querySelector(".analysis-card-head")!.textContent;
+    expect(head).not.toContain("ui.logs.column-share");
+    expect(head).toContain("ui.meter-columns.damage");
+  });
+
+  it("keeps its amount in the same column as the breakdown's amounts", () => {
+    // The share cell is a fixed 52px at the END of a flex row, so simply
+    // dropping it slides the amount 52px right — the Total would then sit
+    // under the share column of every row it sums. The width is reserved
+    // instead, so the two amounts still read down one column.
+    const { container } = renderBody([section("ui.logs.hover-by-target", 2), total()]);
+    const rows = [...container.querySelectorAll(".analysis-card-row")];
+    const cellClasses = (row: Element) =>
+      [...row.children].map((cell) => (cell.className.match(/analysis-card-[\w-]+/) ?? [""])[0]);
+
+    // The amount sits at the same offset from the end of both rows, with a
+    // cell of the share column's own width trailing it either way.
+    expect(cellClasses(rows[0]).at(-2)).toBe("analysis-card-amount");
+    expect(cellClasses(rows[2]).at(-2)).toBe("analysis-card-amount");
+    expect(cellClasses(rows[2]).at(-1)).toBe("analysis-card-share-spacer");
+    // .analysis-card-share is 52px in analysis.css; jsdom loads no stylesheet,
+    // so the spacer states the matching width inline where the test can see it.
+    expect(([...rows[2].children].at(-1) as HTMLElement).style.width).toBe("52px");
+  });
+
+  it("leaves a section that says nothing about shares untouched elsewhere", () => {
+    // The flag is per SECTION: a card can carry both, and the breakdown beside
+    // a Total must keep its own percentages.
+    const { container } = renderBody([section("ui.logs.hover-by-target", 2), total()]);
+    expect(container.querySelectorAll(".analysis-card-share")).toHaveLength(2);
+  });
+});
+
+describe("HoverCardBody — a section that states no heading", () => {
+  const headless = (): CardSection => ({
+    headingKey: "ui.logs.chart-total-label",
+    color: "rgb(9, 9, 9)",
+    entries: [{ key: "total", label: "Total", value: 5 }],
+    showHeading: false,
+  });
+
+  it("renders the rows with no heading row above them", () => {
+    // The section separator already divides it from the breakdown, and a
+    // heading reading "Total" over a single row labelled "Total" says it twice.
+    const { container } = renderBody([section("ui.logs.hover-by-target", 1), headless()]);
+    expect(screen.queryByText("ui.logs.chart-total-label")).toBeNull();
+    expect(screen.getByText("Total")).toBeTruthy();
+    // Still its own section, so the separator between the two survives.
+    expect(container.querySelectorAll(".analysis-card-section")).toHaveLength(2);
+    expect(container.querySelectorAll(".analysis-card-head")).toHaveLength(1);
+  });
+});
+
 describe("HoverCard", () => {
   it("carries the design tokens on the card itself, not on an ancestor", () => {
     // The card portals to document.body, outside .analysis. Custom properties
@@ -142,5 +214,156 @@ describe("HoverCard", () => {
     fireEvent.mouseEnter(screen.getByText("row"));
     const card = document.querySelector('[data-testid="metric-hover-card"]');
     expect(card?.classList.contains("analysis-tokens")).toBe(true);
+  });
+});
+
+describe("HoverCardBody — the detail flag", () => {
+  const capped = (over: number) => [section("ui.logs.hover-by-ability", SECTION_ENTRY_CAP + over)];
+  const renderDetailed = (sections: CardSection[]) =>
+    render(
+      <MantineProvider>
+        <HoverCardBody sections={sections} {...DAMAGE_AMOUNT} detailed />
+      </MantineProvider>
+    );
+
+  it("shows the capped tail when the flag is set", () => {
+    renderDetailed(capped(2));
+    expect(screen.getByText(`entry ${SECTION_ENTRY_CAP}`)).toBeTruthy();
+    expect(screen.getByText(`entry ${SECTION_ENTRY_CAP + 1}`)).toBeTruthy();
+  });
+
+  it("leaves shares alone when the tail appears", () => {
+    // Shares are already computed over the full total, so revealing the rest
+    // of the list must not move a single figure — the tail was always counted.
+    renderDetailed([section("ui.logs.hover-by-target", 6)]);
+    expect(screen.getByText("28.6%")).toBeTruthy();
+    expect(screen.queryByText("30.0%")).toBeNull();
+  });
+
+  it("leaves the bar scale alone when the tail appears", () => {
+    // Entries are sorted descending, so the largest is always already shown —
+    // setting the flag must not rescale the bars the reader was just looking at.
+    const widthOfFirst = (container: HTMLElement) =>
+      container.querySelectorAll<HTMLElement>("[data-testid='metric-bar-segment']")[0].style.width;
+
+    const plain = renderBody(capped(1));
+    const before = widthOfFirst(plain.container);
+    plain.unmount();
+
+    expect(widthOfFirst(renderDetailed(capped(1)).container)).toBe(before);
+  });
+});
+
+describe("HoverCardBody — reserved row slots", () => {
+  /** Rows drawn inside the FIRST section, placeholders included. */
+  const rowsOfFirstSection = (container: HTMLElement) =>
+    container.querySelector(".analysis-card-section")!.querySelectorAll(".analysis-card-row");
+
+  it("holds a section at its reserved row count when fewer entries landed", () => {
+    // The chart tooltip's section is one BUCKET of a plot: at any one second
+    // most bands are zero and drop out, so an unreserved card resized under
+    // the cursor on every move.
+    const { container } = renderBody([{ ...section("ui.logs.hover-by-ability", 1), reserve: 4 }]);
+
+    expect(rowsOfFirstSection(container)).toHaveLength(4);
+    expect(screen.getByText("entry 0")).toBeTruthy();
+  });
+
+  it("adds nothing when the entries already fill the reserve", () => {
+    const { container } = renderBody([{ ...section("ui.logs.hover-by-ability", 4), reserve: 4 }]);
+
+    expect(rowsOfFirstSection(container)).toHaveLength(4);
+  });
+
+  it("still caps a section that overflows its reserve", () => {
+    // The reserve sets a FLOOR on the rows drawn; the cap is still the ceiling.
+    const { container } = renderBody([{ ...section("ui.logs.hover-by-ability", SECTION_ENTRY_CAP + 3), reserve: 2 }]);
+
+    expect(rowsOfFirstSection(container)).toHaveLength(SECTION_ENTRY_CAP);
+  });
+
+  it("draws no placeholder in a section that was given no reserve", () => {
+    // Every other card in the view has a fixed row set already — padding one
+    // of those would open a gap under its last row for nothing.
+    const { container } = renderBody([section("ui.logs.hover-by-ability", 1)]);
+
+    expect(rowsOfFirstSection(container)).toHaveLength(1);
+  });
+
+  it("drops the reserve while the detail modifier is held", () => {
+    // Detailed, the card is deliberately as long as its data; padding it to a
+    // floor it has already passed would only add blank rows at the bottom.
+    const { container } = render(
+      <MantineProvider>
+        <HoverCardBody
+          sections={[{ ...section("ui.logs.hover-by-ability", 1), reserve: 4 }]}
+          detailed
+          {...DAMAGE_AMOUNT}
+        />
+      </MantineProvider>
+    );
+
+    expect(rowsOfFirstSection(container)).toHaveLength(1);
+  });
+
+  it("keeps a reserved section out of the empty-card check", () => {
+    // `HoverCard` renders the row alone when every section is empty. A reserve
+    // must not make an empty section look occupied and open a card of blanks.
+    render(
+      <MantineProvider>
+        <HoverCard sections={[{ headingKey: "h", color: "red", entries: [], reserve: 4 }]} {...DAMAGE_AMOUNT}>
+          <button>row</button>
+        </HoverCard>
+      </MantineProvider>
+    );
+    fireEvent.mouseEnter(screen.getByText("row"));
+
+    expect(document.querySelector('[data-testid="metric-hover-card"]')).toBeNull();
+  });
+});
+
+describe("HoverCard — the Ctrl detail modifier", () => {
+  /** Ctrl down and up on the window, the way the browser delivers them. */
+  const ctrl = (down: boolean) =>
+    fireEvent(window, new KeyboardEvent(down ? "keydown" : "keyup", { key: "Control", ctrlKey: down }));
+
+  /** The card open over its row, which is the only state it renders in. */
+  const openCard = (over: number) => {
+    render(
+      <MantineProvider>
+        <HoverCard sections={[section("ui.logs.hover-by-ability", SECTION_ENTRY_CAP + over)]} {...DAMAGE_AMOUNT}>
+          <button>row</button>
+        </HoverCard>
+      </MantineProvider>
+    );
+    fireEvent.mouseEnter(screen.getByText("row"));
+  };
+
+  it("reveals the capped tail while Ctrl is held, and hides it again on release", () => {
+    // The shell reads the key, not the body: `CursorCard` re-measures only when
+    // its `content` prop changes identity, and a flag read inside the body
+    // would grow the card while its cached size — and so its grow-up offset
+    // and viewport clamps — stayed stale.
+    openCard(2);
+    expect(screen.queryByText(`entry ${SECTION_ENTRY_CAP}`)).toBeNull();
+
+    ctrl(true);
+    expect(screen.getByText(`entry ${SECTION_ENTRY_CAP}`)).toBeTruthy();
+    expect(screen.getByText(`entry ${SECTION_ENTRY_CAP + 1}`)).toBeTruthy();
+
+    ctrl(false);
+    expect(screen.queryByText(`entry ${SECTION_ENTRY_CAP}`)).toBeNull();
+  });
+
+  it("hands the body a fresh element on the flip, so the shell re-measures", () => {
+    // The regression this guards: `HoverCard` memoizes its body on the props
+    // object. A flag that did not ride those props would leave the memo
+    // holding the summary card for the whole hover.
+    openCard(1);
+    const card = document.querySelector('[data-testid="metric-hover-card"]');
+    const before = card?.innerHTML;
+
+    ctrl(true);
+    expect(document.querySelector('[data-testid="metric-hover-card"]')?.innerHTML).not.toBe(before);
   });
 });

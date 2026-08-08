@@ -231,6 +231,19 @@
   margin-bottom: 6px;
 }
 
+/* The chrome every cursor-following panel in the view wears: the metric hover
+ * card and the aura tiles' own. Size is the caller's — a breakdown card needs
+ * a width floor an effect name does not — but the surface must not differ, or
+ * one view teaches two kinds of tooltip. */
+.analysis-hover-panel {
+  color: var(--mantine-color-white);
+  background-color: var(--an-panel);
+  border: 1px solid var(--an-line-strong);
+  border-radius: var(--mantine-radius-sm);
+  box-shadow: var(--mantine-shadow-md);
+  overflow: hidden;
+}
+
 /* The hover card: the same row anatomy at a smaller scale. */
 .analysis-card-section + .analysis-card-section {
   border-top: 1px solid var(--an-line-strong);
@@ -262,6 +275,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A note row's colour block, standing in for the bar a measured row draws:
+   it marks which line or band on the plot the row is about, so identity never
+   rides the text colour alone. Sized to the card's own row rhythm. */
+.analysis-card-note-swatch {
+  position: relative;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 2px;
 }
 
 .analysis-card-share {
@@ -298,6 +323,15 @@
   flex-wrap: wrap;
   gap: 2px 12px;
   padding: 4px 0 2px;
+}
+
+/* The show-more control sits IN the legend's flow rather than beside it, so it
+   wraps with the entries it expands. It carries no swatch — it names no series
+   — and reads as the quieter thing it is. */
+.analysis-legend-more .analysis-legend-name {
+  color: var(--an-ink-3);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
 }
 
 .analysis-legend-entry {
@@ -417,9 +451,9 @@
   cursor: default;
 }
 
-/* The aura chip strips (WCL's Source/Target Auras Filter), between the chart
- * and the table. Chips wrap; the selected one takes the accent outline the
- * window chip already uses, and carries the ✕ that clears it. */
+/* The aura tile strips (WCL's Source/Target Auras Filter), between the chart
+ * and the table, and the battle-window chip strip that shares their row shell.
+ * Both wrap; a selected one takes the accent outline. */
 .analysis-aura-strip {
   display: flex;
   align-items: center;
@@ -463,6 +497,70 @@
 .analysis-aura-chip-uptime {
   font-size: 11px;
   color: var(--an-ink-3);
+}
+
+/* An aura tile: art alone, in a square the size of a chip's height. The
+ * border does the whole job the removed text and ✕ used to share — it marks
+ * which effect the view is filtered by. */
+.analysis-aura-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 1px;
+  border: 1px solid var(--an-line-strong);
+  border-radius: 4px;
+  background-color: var(--an-panel);
+  cursor: pointer;
+}
+
+/* Hover has to read on a tile with no text to brighten, so the border lifts
+   toward the accent before the click that would commit it. */
+.analysis-aura-tile:hover {
+  border-color: var(--an-ink-3);
+}
+
+.analysis-aura-tile-selected,
+.analysis-aura-tile-selected:hover {
+  border-color: var(--an-accent);
+  box-shadow: 0 0 0 1px var(--an-accent);
+  background-color: rgba(0, 184, 217, 0.09);
+}
+
+.analysis-aura-tile-icon {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  /* Unselected art sits back a little so the selected tile reads first. */
+  opacity: 0.85;
+}
+
+.analysis-aura-tile-selected .analysis-aura-tile-icon {
+  opacity: 1;
+}
+
+/* The placeholder for the ~90 internal effects the game ships no art for:
+   the tile's own square in the neutral ink, so the strip keeps its rhythm and
+   the effect stays filterable. Deliberately not a glyph or a "?" — it stands
+   for "this effect has no picture", not for "unknown effect". */
+.analysis-aura-tile-blank {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background-color: var(--an-ink-3);
+  opacity: 0.28;
+}
+
+/* An aura tile's hover card: the name the tile no longer writes, over its
+   uptime in the card's own small-caps voice. */
+.analysis-aura-card {
+  padding: 6px 9px;
+}
+
+.analysis-aura-card-name {
+  font-size: 12.5px;
+  color: var(--mantine-color-white);
 }
 
 .analysis-window-chip-swatch {

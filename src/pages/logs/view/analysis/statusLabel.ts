@@ -39,35 +39,12 @@ export const statusKeyParts = (
 export const statusRowKindFor = (pin: string | null, hostility: Hostility): LabelKind =>
   isStatusPin(pin) ? (hostility === "friendly" ? "player" : "target") : "status";
 
-/** How a debuff holder row names the enemy that held the effect: the SPAWN it
- * belonged to, or the bare actor id when the segmenter never placed it. */
-const TARGET_ROW = /^(target|actor):(\d+)$/;
-
-/** The spawn segment inside a `target:<n>` row label, or null — including for
- * `actor:<id>` rows, whose bare id indexes nothing a portrait could hang on. */
-export const targetRowSegment = (label: string): number | null => {
-  const parsed = TARGET_ROW.exec(label);
-  return parsed !== null && parsed[1] === "target" ? Number(parsed[2]) : null;
-};
-
-/** Display name for a debuff holder row.
- *
- * Two spellings because there are two things to say. `target:<n>` indexes the
- * response's `targetEntries`, which is what carries an enemy's name and its
- * "#n" — the actor index cannot, because the game reissues a dead boss's index
- * to the next one. `actor:<id>` is the fallback for an enemy with no segment at
- * all (a phantom marker actor the segmenter skips): its window is real capture,
- * so the row stays, showing the only identity there is.
- *
- * `labelForTarget` is injected for the same reason `statusLabelFor` injects its
- * names — it needs i18n and the entries vector, and this stays pure. */
-export const targetRowLabel = (label: string, labelForTarget: (segment: number) => string): string => {
-  const parsed = TARGET_ROW.exec(label);
-  if (!parsed) return label;
-
-  const [, kind, id] = parsed;
-  return kind === "target" ? labelForTarget(Number(id)) : id;
-};
+/* A debuff holder row names either the SPAWN that held the effect or, where
+ * the segmenter never placed it, the bare actor id. Both live in the row-key
+ * grammar (`rowKey.ts`): `spawnRowSegment` reads the first and answers null for
+ * the second, whose id indexes nothing a portrait could hang on, and the entity
+ * ladder names each through its own branch. This module used to spell that
+ * grammar a third time, in a regex of its own. */
 
 /** The hook's `+0x4c` cause discriminator, as a bare number.
  *

@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { ComputedPlayerState, EnemyType, SkillState, SkillTargetState } from "@/types";
 
 import { groupSkillsForRows, rowKeyingFor } from "../abilitySkills";
+import { parseEnemyRow } from "../rowKey";
 import type { SelectorPins } from "../selectorOptions";
-import { abilityRows, damageDone, parseEnemyRow } from "./damageDone";
+import { abilityRows, damageDone } from "./damageDone";
 import type { MetricRow } from "./types";
 
 /** A per-enemy entry of a skill's breakdown, as the parser ships it. */
@@ -549,6 +550,46 @@ describe("damageDone.children — party-wide per-source split", () => {
     // The six damage drill-down cells, shared against the party total (400).
     expect(children[0].columns).toEqual(["200", "2", "50", "150", "100", "50.0%"]);
     expect(children[1].columns).toEqual(["100", "1", "100", "100", "100", "25.0%"]);
+  });
+
+  it("carries each player's own echo share, so a child bar splits like its parent", () => {
+    // The nested rows are table bars too — a child that folded an echo must
+    // draw the same two-segment fill the parent above it does.
+    const withEcho = [
+      {
+        ...party[0],
+        skillBreakdown: [
+          ...party[0].skillBreakdown,
+          {
+            ...party[0].skillBreakdown[0],
+            actionType: { SupplementaryDamage: 9001 },
+            totalDamage: 60,
+            hits: 3,
+          },
+        ],
+      } as ComputedPlayerState,
+      party[1],
+    ];
+    const keying = rowKeyingFor(
+      withEcho.flatMap((entry) => entry.skillBreakdown),
+      true
+    );
+    const children = damageDone.children!({
+      row: abilityRow("skill:Normal:9001"),
+      players: withEcho,
+      level: "abilities",
+      pins: NO_PINS,
+      fightDurationMs: 100_000,
+      keying,
+    })!;
+
+    // Player 0 dealt the echo, player 1 did not.
+    expect(children[0].value).toBe(260);
+    expect(children[0].subValue).toBe(60);
+    expect(children[1].subValue).toBeUndefined();
+    // Its extremes still describe the named skill's own hits.
+    expect(children[0].columns[2]).toBe("50");
+    expect(children[0].columns[3]).toBe("150");
   });
 
   it("sums a group parent's members per player", () => {

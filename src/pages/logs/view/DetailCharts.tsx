@@ -12,6 +12,14 @@ export type Label = {
   label?: string;
   color: string;
   strokeDasharray?: string;
+  /** The entity's art, where it has any — the same picture its row in the
+   * table wears, so a band and its row depict one thing. Read by the chart
+   * TOOLTIP's breakdown rows; the plotted line itself draws no icon. */
+  icon?: string;
+  /** Ranked past the analysis chart's band cap — plotted only once switched on
+   * in the legend, and represented by the `other` rollup until then. See
+   * `analysis/chartRollup`. */
+  tail?: boolean;
 }[];
 
 interface ChartTooltipProps {

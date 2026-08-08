@@ -9,6 +9,7 @@ import type {
   EncounterState,
   GroupAbilityFilter,
   GroupAggregate,
+  GroupReference,
   SelectionFact,
   SkillRow,
   TargetEntry,
@@ -67,6 +68,10 @@ export type EncounterData = {
   rowKeying: RowKeying;
   /** A condensed group pin expanded into the raw action ids behind it. */
   pinnedActions: ActionType[];
+  /** The whole-fight ranking behind the chart's band colours, from whichever
+   * response supplied the aggregates. Empty when the request narrowed no time
+   * — then the aggregates ARE that ranking. */
+  groupReference: GroupReference[];
 };
 
 export type EncounterDataInput = {
@@ -76,6 +81,7 @@ export type EncounterDataInput = {
   encounter: EncounterState | null;
   baseFacts: SelectionFact[];
   baseGroups: GroupAggregate[];
+  baseGroupReference: GroupReference[];
   targetEntries: TargetEntry[];
   pins: SelectorPins;
   spec: ViewSpec;
@@ -102,6 +108,7 @@ export const useEncounterData = ({
   encounter,
   baseFacts,
   baseGroups,
+  baseGroupReference,
   targetEntries,
   pins,
   spec,
@@ -127,6 +134,10 @@ export const useEncounterData = ({
     /** The drilled Stun/SBA bands, keyed by player. Only this fetch carries
      * them — the base load ignores pins, and a drill IS a pin. */
     abilitySeries: Record<number, AbilitySeries[]>;
+    /** The whole-fight ranking for `groups`, carried with them so a colour
+     * reference can never describe a different response than the bands it
+     * colours. */
+    groupReference: GroupReference[];
   } | null>(null);
 
   // Responses are not ordered with respect to their requests (the command is
@@ -378,6 +389,9 @@ export const useEncounterData = ({
           // hot-reload, so a frontend ahead of its backend degrades to no bands
           // — and therefore to the per-player lines — rather than throwing.
           abilitySeries: response.abilitySeries ?? {},
+          // Normalised at the boundary like `groups`: a frontend ahead of its
+          // backend degrades to ranking bands by the aggregates it was sent.
+          groupReference: response.groupReference ?? [],
         });
       })
       .catch((e) => {
@@ -402,6 +416,11 @@ export const useEncounterData = ({
   // is the honest answer whenever no scoped response has supplied them.
   const scopedAbilitySeries = scoped?.abilitySeries ?? EMPTY_ABILITY_SERIES;
 
+  // Taken from whichever response supplied the aggregates, never mixed: a
+  // reference describing a different request than the bands it colours would
+  // rank keys those bands do not have.
+  const groupReference = scoped?.groupReference ?? baseGroupReference;
+
   const shownEncounter = scoped?.state ?? encounter;
 
   // Cascading options come from the facts for the CURRENT window but with no
@@ -417,5 +436,6 @@ export const useEncounterData = ({
     everySkill,
     rowKeying,
     pinnedActions,
+    groupReference,
   };
 };

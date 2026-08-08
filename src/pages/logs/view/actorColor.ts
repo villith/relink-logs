@@ -1,38 +1,7 @@
 import type { EnemyType, PlayerData } from "@/types";
 import { ENEMY_COLORS, resolvePlayerColor } from "@/utils";
 
-import { parseEnemyRow } from "./metrics/damageDone";
-
-/** One actor, in whichever shape the caller has it.
- *
- * Three shapes because the view groups actors three ways and every one of them
- * has to end up the same colour as the others: a player by actor index, one
- * enemy SPAWN by its index into `targetEntries`, and an enemy TYPE, which
- * merges every spawn of that type into one row. */
-export type ActorKey =
-  | { kind: "player"; index: number }
-  | { kind: "spawn"; segment: number }
-  | { kind: "enemyType"; type: EnemyType | null };
-
-/** The actor a row or chart-band key names, or null when it names none.
- *
- * The table and the chart both work in key space, and the three grammars here
- * are the ones their producers already write (`groupRows`, `enemyRowKey`,
- * `enemyHolderKey`). `actor:<id>` — an enemy the segmenter skipped — answers
- * null on purpose: it has no spawn to be coloured by, and colouring it by its
- * raw actor index would give a reissued index two spawns' colours. */
-export const actorOfKey = (key: string): ActorKey | null => {
-  if (key.startsWith("player:")) {
-    const index = Number(key.slice("player:".length));
-    return Number.isFinite(index) ? { kind: "player", index } : null;
-  }
-  if (key.startsWith("target:")) {
-    const segment = Number(key.slice("target:".length));
-    return Number.isFinite(segment) ? { kind: "spawn", segment } : null;
-  }
-  if (key.startsWith("enemy:")) return { kind: "enemyType", type: parseEnemyRow(key.slice("enemy:".length)) };
-  return null;
-};
+import { rowRefOf, type RowRef } from "./rowKey";
 
 /** A stable number for one enemy type, so a type takes the same colour in every
  * fight and in every grouping.
@@ -71,27 +40,39 @@ export type ActorColorContext = {
  * The one answer to "what colour is this actor", shared by the chart, the
  * table, the pin selectors and the events stream.
  *
- * One function because the four of them show the SAME actors and a reader
- * moves between them constantly — a boss that is pink in the plot, grey in the
- * table and uncoloured in the dropdown is three enemies as far as the eye is
+ * One function because the four of them show the SAME actors and a reader moves
+ * between them constantly — a boss that is pink in the plot, grey in the table
+ * and uncoloured in the dropdown is three enemies as far as the eye is
  * concerned. Before this they each answered for themselves, and only the
  * players agreed.
  *
- * `undefined` means "this actor has no colour", not "use grey": a player the
- * identity party does not know has no slot to resolve, and inventing one would
- * paint a stranger in a party member's colour. Callers supply their own
- * fallback — the table's neutral ink, the chart's positional palette.
+ * Takes a `RowRef` rather than a colour-only taxonomy of its own. This used to
+ * parse keys into a three-variant `ActorKey` that said "spawn" and "enemyType"
+ * where every other module says "target" and "enemy" — one thing with two names
+ * depending on which module was asking, and a fourth hand-written pass over the
+ * key grammar to produce it. The three variants that carry a colour answer; the
+ * rest answer `undefined`, which is the honest reading of "this names no
+ * actor": an ability belongs to whoever used it, and an `actor:` holder indexes
+ * no spawn (colouring it by its raw index would give a reissued index two
+ * spawns' colours).
+ *
+ * `undefined` means "no colour", not "use grey": a player the identity party
+ * does not know has no slot to resolve, and inventing one would paint a
+ * stranger in a party member's colour. Callers supply their own fallback — the
+ * table's neutral ink, the chart's positional palette.
  */
-export const actorColor = (actor: ActorKey, ctx: ActorColorContext): string | undefined => {
-  if (actor.kind === "player") {
-    const slot = ctx.slotOf(actor.index);
+export const actorColor = (ref: RowRef, ctx: ActorColorContext): string | undefined => {
+  if (ref.kind === "player") {
+    const slot = ctx.slotOf(ref.index);
     return slot === undefined ? undefined : resolvePlayerColor(ctx.palette, ctx.partyData, slot, 0);
   }
-  return actor.kind === "spawn" ? enemyColor(actor.segment) : enemyColor(enemyTypeIndex(actor.type));
+  if (ref.kind === "target") return enemyColor(ref.segment);
+  if (ref.kind === "enemy") return enemyColor(enemyTypeIndex(ref.enemyType));
+  return undefined;
 };
 
 /** `actorColor` against a row or band KEY, for the callers that have one. */
 export const keyColor = (key: string, ctx: ActorColorContext): string | undefined => {
-  const actor = actorOfKey(key);
-  return actor === null ? undefined : actorColor(actor, ctx);
+  const ref = rowRefOf(key);
+  return ref === null ? undefined : actorColor(ref, ctx);
 };

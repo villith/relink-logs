@@ -222,9 +222,10 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // Effect and holder rows are windows, not sums over skills.
     cardKind: () => "none",
     chartFromGroups: false,
-    // Never actually drawn — the stack-count overlay always wins on this path
-    // — but it must still name a real series, so the fallback has a length to
-    // plot on a log whose intervals produced no series at all.
+    // Actually drawn, and the tab's resting plot: the party's damage, as the
+    // context the effects are read against — Warcraft Logs keeps its own
+    // damage chart above the Buffs timeline for the same reason. Only a
+    // PINNED effect overlays it, with that effect's per-holder stack depths.
     chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
     recordsSupplementary: false,
     harmfulStatuses: false,
@@ -243,7 +244,8 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     columnKeys: (dim) => debuffs.columnKeys(levelFor(dim)),
     cardKind: () => "none",
     chartFromGroups: false,
-    // As buffs: overlaid by the stack counts, but a real series underneath.
+    // As buffs: the damage plot at rest, overlaid by stack depths once an
+    // effect is pinned.
     chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
     recordsSupplementary: false,
     // The one metric that selects the harmful side of the polarity split.

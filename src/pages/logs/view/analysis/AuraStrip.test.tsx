@@ -4,8 +4,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { AuraStrip } from "./AuraStrip";
 
+// The usual key-echoing mock, plus the interpolated values appended: the
+// uptime the card states only exists as a parameter, so a `t` that dropped
+// params would make the figure untestable.
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params === undefined ? key : `${key} ${Object.values(params).join(" ")}`,
+  }),
 }));
 
 const CHIPS = [
@@ -35,47 +41,91 @@ describe("AuraStrip", () => {
     expect(screen.queryByText("ui.logs.aura-source-title")).toBeNull();
   });
 
-  it("titles the strip and names every chip with its uptime", () => {
+  it("titles the strip but writes nothing on the chips themselves", () => {
+    // A fight holds dozens of effects, and named in full they wrapped the
+    // strip several rows deep between the chart and the table. The art is the
+    // identity, exactly as Warcraft Logs' own Auras Filter draws it.
     renderIt();
+
     expect(screen.getByText("ui.logs.aura-source-title")).toBeTruthy();
-    expect(screen.getByText("Attack Up (Signo Drive)")).toBeTruthy();
-    expect(screen.getByText("80%")).toBeTruthy();
-    expect(screen.getByText("12%")).toBeTruthy();
+    expect(screen.queryByText("Attack Up (Signo Drive)")).toBeNull();
+    expect(screen.queryByText("80%")).toBeNull();
   });
 
-  it("wears the effect's icon where one resolves, and only there", () => {
+  it("wears the effect's icon where one resolves", () => {
     // The same art the effects table shows beside the same name — a chip is
-    // that row's filter form. No icon is the honest state for the ~90
-    // internal effects with no art (the second chip).
+    // that row's filter form.
     const { container } = renderIt();
-    const icons = container.querySelectorAll("img.analysis-row-icon");
-    expect(icons).toHaveLength(1);
-    expect(icons[0].getAttribute("src")).toBe("/status/1010.png");
-    expect(icons[0].getAttribute("alt")).toBe("");
+    const icon = container.querySelector("img.analysis-aura-tile-icon");
+
+    expect(icon?.getAttribute("src")).toBe("/status/1010.png");
+    expect(icon?.getAttribute("alt")).toBe("");
+  });
+
+  it("gives an art-less effect a placeholder tile of the same size", () => {
+    // ~90 internal effects ship no art. Dropping them would drop the ability
+    // to filter by them; letting them collapse would break the strip's rhythm.
+    const { container } = renderIt();
+
+    expect(container.querySelectorAll(".analysis-aura-tile")).toHaveLength(2);
+    expect(container.querySelectorAll("img.analysis-aura-tile-icon")).toHaveLength(1);
+    expect(container.querySelectorAll(".analysis-aura-tile-blank")).toHaveLength(1);
+  });
+
+  it("names each chip for assistive tech, since nothing is written on it", () => {
+    renderIt();
+
+    expect(screen.getByLabelText("Attack Up (Signo Drive)")).toBeTruthy();
+    expect(screen.getByLabelText("Veil (Panacea)")).toBeTruthy();
+  });
+
+  it("names the effect and its uptime in a hover card", () => {
+    renderIt();
+    fireEvent.mouseEnter(screen.getByLabelText("Attack Up (Signo Drive)"));
+
+    const card = document.querySelector('[data-testid="aura-hover-card"]');
+    expect(card?.textContent).toContain("Attack Up (Signo Drive)");
+    expect(card?.textContent).toContain("ui.logs.aura-uptime 80");
+  });
+
+  it("opens no card until a chip is hovered, and closes it again on leave", () => {
+    renderIt();
+    expect(document.querySelector('[data-testid="aura-hover-card"]')).toBeNull();
+
+    const chip = screen.getByLabelText("Veil (Panacea)");
+    fireEvent.mouseEnter(chip);
+    expect(document.querySelector('[data-testid="aura-hover-card"]')).toBeTruthy();
+
+    fireEvent.mouseLeave(chip);
+    expect(document.querySelector('[data-testid="aura-hover-card"]')).toBeNull();
   });
 
   it("selects a chip on click", () => {
     const onSelect = vi.fn();
     renderIt({ onSelect });
-    fireEvent.click(screen.getByText("Attack Up (Signo Drive)"));
+    fireEvent.click(screen.getByLabelText("Attack Up (Signo Drive)"));
+
     expect(onSelect).toHaveBeenCalledWith("src:status:10:500");
   });
 
-  it("shows the ✕ only on the selected chip, and it clears", () => {
-    const onClear = vi.fn();
-    renderIt({ chips: [{ ...CHIPS[0], selected: true }, CHIPS[1]], onClear });
-    const clear = screen.getByLabelText("ui.logs.aura-clear");
-    fireEvent.click(clear);
-    expect(onClear).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByLabelText("ui.logs.aura-clear")).toHaveLength(1);
-  });
-
   it("clicking an already-selected chip clears it (toggle)", () => {
+    // The chip IS the clear affordance now that it carries no ✕: a live
+    // filter stays dismissible where it was set, without a second control
+    // that would make the selected tile wider than its neighbours.
     const onClear = vi.fn();
     const onSelect = vi.fn();
     renderIt({ chips: [{ ...CHIPS[0], selected: true }], onClear, onSelect });
-    fireEvent.click(screen.getByText("Attack Up (Signo Drive)"));
+    fireEvent.click(screen.getByLabelText("Attack Up (Signo Drive)"));
+
     expect(onClear).toHaveBeenCalledTimes(1);
     expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("marks the selected chip, and only it", () => {
+    const { container } = renderIt({ chips: [{ ...CHIPS[0], selected: true }, CHIPS[1]] });
+
+    expect(container.querySelectorAll(".analysis-aura-tile-selected")).toHaveLength(1);
+    expect(screen.getByLabelText("Attack Up (Signo Drive)").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByLabelText("Veil (Panacea)").getAttribute("aria-pressed")).toBe("false");
   });
 });

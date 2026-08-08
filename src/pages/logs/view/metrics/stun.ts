@@ -1,4 +1,5 @@
 import { groupSkillsForRows, mergeSkillsByAction } from "../abilitySkills";
+import { playerRowKey, skillKey } from "../rowKey";
 import type { MetricDescriptor, MetricRow } from "./types";
 
 const oneDecimal = (value: number): string => value.toFixed(1);
@@ -31,7 +32,7 @@ export const stun: MetricDescriptor = {
       return [...players]
         .sort((a, b) => b.totalStunValue - a.totalStunValue)
         .map((p) => ({
-          key: `player:${p.index}`,
+          key: playerRowKey(p.index),
           label: String(p.index),
           value: p.totalStunValue,
           columns: [oneDecimal(p.totalStunValue), oneDecimal(p.stunPerSecond)],
@@ -68,7 +69,7 @@ export const stun: MetricDescriptor = {
         .map(({ key, skills }) => {
           const total = skills.reduce((sum, skill) => sum + skill.totalStunValue, 0);
           return {
-            key: `skill:${key}`,
+            key: skillKey(key),
             label: key,
             value: total,
             columns: [oneDecimal(total), oneDecimal(Math.max(...skills.map((skill) => skill.maxStunValue)))],

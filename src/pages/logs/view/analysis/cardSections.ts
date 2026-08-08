@@ -1,48 +1,39 @@
-import type { CharacterType, ComputedPlayerState, EnemyType, SkillState, SkillTargetState, TargetEntry } from "@/types";
+import type { CharacterType, ComputedPlayerState, SkillState, SkillTargetState, TargetEntry } from "@/types";
 
 import { abilityKey } from "../abilityKey";
-import { childOfPin, groupSkillsForRows, skillsForAbilityKey, type RowKeying } from "../abilitySkills";
+import {
+  childOfPin,
+  groupSkillsForRows,
+  skillsForAbilityKey,
+  splitSupplementary,
+  type RowKeying,
+} from "../abilitySkills";
 import type { MetricCard, MetricRow, RowLevel } from "../metrics/types";
+import { playerRowKey, spawnRowKey, spawnRowSegment } from "../rowKey";
 import type { SelectorPins } from "../selectorOptions";
 
 import type { CardSection } from "./HoverCard";
 import { foldPartyDealt, sortedEntries } from "./cardFold";
+import type { CardLabels } from "./cardLabels";
 import { qualifyDuplicateLabels } from "./labelCollision";
-import { targetRowSegment } from "./statusLabel";
 
-/** Name lookups the view injects, so this stays a pure function: skill and
- * enemy names need i18n, and player names and colours need the settings store. */
-export type SectionLabels = {
-  /** `owner` is the player whose breakdown the key is being named for, where
-   * the card knows one — action ids collide across characters (120 is
-   * Eustace's "Grade 1 Shot" AND Id's "Combo Finisher (Dragonform)"), so a
-   * player card's abilities must be named against that player's own table,
-   * not the first party member to share the id. */
-  ability: (key: string, owner?: ComputedPlayerState) => string;
-  enemy: (type: EnemyType) => string;
-  /** A player's display name, honouring streamer mode and the label template. */
-  source: (index: number) => string;
-  /** That player's own party colour, so a source row matches their bar. */
-  sourceColor: (index: number) => string;
-  /** A character's display name, for qualifying two same-named ability entries
-   * from different bodies (Id vs his dragonform) — applied only on collision,
-   * by the same helper the table's parent rows use. Optional so tests and
-   * older callers stay unqualified rather than broken. */
-  character?: (type: CharacterType) => string;
-  /** The entities' art, all optional so tests and older callers stay
-   * text-only. The ability icon takes the owner for the same collision reason
-   * the ability NAME does. */
-  abilityIcon?: (key: string, owner?: ComputedPlayerState) => string | undefined;
-  enemyIcon?: (type: EnemyType) => string | undefined;
-  sourceIcon?: (index: number) => string | undefined;
-  /** One enemy SPAWN's display name (name + "#N" once a name repeats) — the
-   * SAME labelling the table's target rows resolve through, injected so the
-   * card's "#2" and the table's "#2" can never name different spawns.
-   * Optional so tests and older callers fall back to the type name. */
-  target?: (segment: number) => string;
-  /** That spawn's portrait, resolved through `targetEntries` by the view. */
-  targetIcon?: (segment: number) => string | undefined;
-};
+/** What the damage cards name and draw with — the view injects them so this
+ * stays a pure function: skill and enemy names need i18n, and player names and
+ * colours need the settings store. Declared in `cardLabels.ts` with the other
+ * cards' lookups, so one field cannot mean two things across two cards. */
+export type SectionLabels = Pick<
+  CardLabels,
+  | "ability"
+  | "enemy"
+  | "source"
+  | "sourceColor"
+  | "character"
+  | "abilityIcon"
+  | "enemyIcon"
+  | "sourceIcon"
+  | "target"
+  | "targetIcon"
+>;
 
 /** Per-enemy totals summed across a set of skills.
  *
@@ -71,7 +62,7 @@ export const aggregateTargets = (
       // `string | { Unknown: number }`, and String() renders every Unknown
       // variant as "[object Object]", merging every unidentified spawn into
       // a single row.
-      const key = target.segment !== undefined ? `target:${target.segment}` : JSON.stringify(target.enemyType);
+      const key = target.segment !== undefined ? spawnRowKey(target.segment) : JSON.stringify(target.enemyType);
       const found = folded.get(key);
       if (found) {
         found.value += target.totalDamage;
@@ -87,6 +78,20 @@ export const aggregateTargets = (
     }
   }
   return [...folded.values()].sort((a, b) => b.value - a.value);
+};
+
+/** The echo share of a set of skills, as a `BreakdownEntry` fragment.
+ *
+ * A card explains the row it is hovering, so an entry that folded an echo has
+ * to draw the same two-segment bar that row does. Through `splitSupplementary`,
+ * the one author of the rule — a card that split differently would be
+ * explaining a row other than the one under the cursor. */
+const entrySplit = (skills: SkillState[], valueOf: (skill: SkillState) => number): { subValue?: number } => {
+  const { echoes, mixed } = splitSupplementary(skills);
+  if (!mixed) return {};
+  const supplementary = echoes.reduce((sum, skill) => sum + valueOf(skill), 0);
+  // Absent rather than 0, so an entry with no echoes mounts one bar segment.
+  return supplementary > 0 ? { subValue: supplementary } : {};
 };
 
 /** Per-ability totals, summed across every skill the table would draw as ONE
@@ -113,6 +118,7 @@ export const aggregateAbilities = (
     key,
     label: abilityLabel(key),
     value: grouped.reduce((sum, skill) => sum + valueOf(skill), 0),
+    ...entrySplit(grouped, valueOf),
     icon: abilityIcon?.(key),
   }));
   // Two same-named groups from different bodies (Id vs his dragonform) read
@@ -146,13 +152,21 @@ export const aggregateSources = (
   sourceIcon?: (index: number) => string | undefined
 ) =>
   players
-    .map((player) => ({
-      key: `source:${player.index}`,
-      label: sourceLabel(player.index),
-      color: sourceColor(player.index),
-      icon: sourceIcon?.(player.index),
-      value: skillsOf(player).reduce((sum, skill) => sum + valueOf(skill), 0),
-    }))
+    .map((player) => {
+      // Once, not twice: the value and its echo share come from the same list,
+      // and `skillsOf` filters a whole breakdown per call.
+      const skills = skillsOf(player);
+      return {
+        key: playerRowKey(player.index),
+        label: sourceLabel(player.index),
+        color: sourceColor(player.index),
+        icon: sourceIcon?.(player.index),
+        value: skills.reduce((sum, skill) => sum + valueOf(skill), 0),
+        // This player's OWN echo share — the section splits one row across the
+        // party, so each entry answers for the echoes it actually dealt.
+        ...entrySplit(skills, valueOf),
+      };
+    })
     .filter((entry) => entry.value > 0)
     .sort((a, b) => b.value - a.value);
 
@@ -207,7 +221,7 @@ export const cardSectionsFor = ({
       : [];
 
   if (level === "players") {
-    const player = players.find((candidate) => `player:${candidate.index}` === row.key);
+    const player = players.find((candidate) => playerRowKey(candidate.index) === row.key);
     if (!player) return null;
 
     return [
@@ -313,6 +327,7 @@ export const targetCardSectionsFor = ({
   targetEntries,
   color,
   labels,
+  keying,
 }: {
   row: MetricRow;
   players: ComputedPlayerState[];
@@ -321,8 +336,11 @@ export const targetCardSectionsFor = ({
   /** The row's own colour, so the by-ability section matches its bar. */
   color: string;
   labels: SectionLabels;
+  /** The view's row keying, so an echo rides its cause here exactly as it does
+   * in the table this card explains. */
+  keying?: RowKeying;
 }): CardSection[] | null => {
-  const segment = targetRowSegment(row.key);
+  const segment = spawnRowSegment(row.key);
   if (segment === null) return null;
   const entry = targetEntries[segment];
   // A stale segment indexes nothing — no card rather than a guess, the same
@@ -335,7 +353,7 @@ export const targetCardSectionsFor = ({
   const matches = (target: SkillTargetState): boolean =>
     target.segment !== undefined ? target.segment === segment : JSON.stringify(target.enemyType) === typeKey;
 
-  const { bySource, byAbility } = foldPartyDealt(players, matches, labels);
+  const { bySource, byAbility } = foldPartyDealt(players, matches, labels, keying);
   // Nothing recorded against this spawn — no card, rather than an empty one.
   if (bySource.length === 0) return null;
 

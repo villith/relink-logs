@@ -1,35 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import type { AbilitySeries, ChartWindow, DeathEvent, GroupAggregate, SBAEvent, StatusInterval } from "@/types";
-import {
-  PLAYER_COLORS,
-  humanizeNumber,
-  millisecondsToElapsedFormat,
-  translateCharacterType,
-  translateEnemyType,
-} from "@/utils";
+import type {
+  AbilitySeries,
+  ChartWindow,
+  DeathEvent,
+  GroupAggregate,
+  GroupReference,
+  SBAEvent,
+  StatusInterval,
+} from "@/types";
+import { PLAYER_COLORS, humanizeNumber, millisecondsToElapsedFormat, translateCharacterType } from "@/utils";
 
-import {
-  DPS_SMOOTHING_WINDOW,
-  HP_SERIES_COLORS,
-  mantineColorVar,
-  type ChartDatapoint,
-  type Label,
-} from "../../DetailCharts";
-import { skillKeyPayload } from "../../abilityKey";
+import { DPS_SMOOTHING_WINDOW, type ChartDatapoint, type Label } from "../../DetailCharts";
 import type { RowKeying } from "../../abilitySkills";
 import { keyColor } from "../../actorColor";
-import { enemyHolderKey, heldByRoster, narrowedByPins, narrowedStatusIntervals, slotsOf } from "../../metrics/buffs";
-import { parseEnemyRow } from "../../metrics/damageDone";
-import { sbaCauseLabel } from "../../metrics/sba";
+import { enemyHolderKey, heldByRoster, narrowedByPins, slotsOf } from "../../metrics/buffs";
 import type { Hostility } from "../../metrics/types";
+import { playerRowKey } from "../../rowKey";
 import type { SelectorPins } from "../../selectorOptions";
 import type { Band } from "../../statusBands";
-import { isStatusPin } from "../../statusUptime";
 import type { StackMode } from "../DpsChart";
 import { abilityBands } from "../abilityBands";
 import { auraExcludedBands } from "../auraWindows";
+import { bandColorAt, paletteOrderOf, referenceBandOrder } from "../bandPalette";
+import { chartPlayerIndexes } from "../chartIndexes";
 import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "../chartMarkers";
 import { chartPresentation, overlayOf } from "../chartPresentation";
 import { ROLLUP_SERIES_KEY } from "../chartRollup";
@@ -42,10 +37,11 @@ import { levelFor, type MetricCapabilities } from "../machine/capabilities";
 import { groupBandsFor } from "../machine/groupRows";
 import { GROUP_TOP_N, type ViewSpec } from "../machine/resolve";
 import type { MetricKey } from "../machine/state";
-import { buildEffectSeries, buildStatusSeries } from "../statusChart";
+import { buildStatusSeries } from "../statusChart";
 import type { WireWindow } from "../wireWindows";
 
 import type { ActorIdentity } from "./useActorIdentity";
+import type { EntityCells } from "./useEntityCells";
 
 /** Tooltip line per marker kind. Sibling of `DpsChart`'s `MARKER_LABEL_KEY`, but
  * a separate key set: those name the control-row checkboxes, these are the
@@ -58,6 +54,11 @@ const MARKER_LINE_KEY: Record<MarkerKind, string> = {
 /** Re-exported from `chartPresentation`, which owns the precedence — the
  * hook and the fold must not each carry their own copy of the chain. */
 export { overlayOf };
+
+/** A `Label`'s optional `icon` field, present only where there is art. The
+ * type is `icon?: string` under `exactOptionalPropertyTypes`, so writing
+ * `icon: undefined` is a type error rather than an omission. */
+const iconField = (icon: string | undefined) => (icon === undefined ? {} : { icon });
 
 export type ChartModel = {
   shownChartData: ChartDatapoint[];
@@ -100,6 +101,10 @@ export type ChartModelInput = {
   statusIntervals: StatusInterval[];
   maskWindows: WireWindow[] | undefined;
   groups: GroupAggregate[];
+  /** The whole-fight ranking the bands take their COLOURS from. Empty for the
+   * derived tabs and whenever nothing narrows time — both cases already rank by
+   * the whole fight, so the drawn order is its own reference. */
+  groupReference: GroupReference[];
   chartGroupBy: ViewSpec["groupBy"];
   scopedAbilitySeries: Record<number, AbilitySeries[]>;
   rowKeying: RowKeying;
@@ -107,7 +112,9 @@ export type ChartModelInput = {
    * re-derived, so the chart and the table agree about which tab this is. */
   isStatusMetric: boolean;
   identity: ActorIdentity;
-  statusDisplayLabel: (key: string) => string;
+  /** The view's one set of entity lookups — the same bundle the table and the
+   * selectors resolve through, so a band and its row cannot disagree. */
+  cells: EntityCells;
   playerLabelTemplate: string;
 };
 
@@ -133,12 +140,13 @@ export const useChartModel = ({
   statusIntervals,
   maskWindows,
   groups,
+  groupReference,
   chartGroupBy,
   scopedAbilitySeries,
   rowKeying,
   isStatusMetric,
   identity,
-  statusDisplayLabel,
+  cells,
   playerLabelTemplate,
 }: ChartModelInput): ChartModel => {
   const { t, i18n } = useTranslation();
@@ -148,12 +156,11 @@ export const useChartModel = ({
     colors,
     colorContext,
     labelForSource,
-    labelForAbility,
     labelForTarget,
-    takenAttackLabel,
     playerColor,
     breakEnemyOf,
   } = identity;
+  const { cellOf } = cells;
   const groupsPath = caps.dataPath === "groups";
   const level = levelFor(chartGroupBy);
   /** Bucket index → "M:SS", for the plotted points' timestamps. */
@@ -222,28 +229,13 @@ export const useChartModel = ({
     };
   }, [caps.chart, dpsChart, stunChart, takenChart, chartLen, sbaChart, sbaChartLen]);
 
-  // Display name for one chart band, off the same row-key grammar the table's
-  // rows carry — a band and the row it decomposes must read identically.
-  const bandLabelFor = useCallback(
-    (key: string): string => {
-      if (key === "other") return t("ui.logs.chart-other-label");
-      // The drilled SBA chart's non-skill bands: named through the SAME namer
-      // the SBA table names its `source:` rows with, so a band and the row it
-      // sits above cannot read differently. Checked before `skill:` because the
-      // unattributed remainder wears a `skill:` key it has no ability for.
-      const cause = sbaCauseLabel(key);
-      if (cause !== null) return t(cause.labelKey, cause.labelParams);
-      if (key.startsWith("player:")) return labelForSource(Number(key.slice("player:".length)));
-      if (key.startsWith("target:")) return labelForTarget(Number(key.slice("target:".length)));
-      if (key.startsWith("enemy:")) return translateEnemyType(parseEnemyRow(key.slice("enemy:".length)));
-      if (key.startsWith("taken:")) return takenAttackLabel(key.slice("taken:".length));
-      const ability = skillKeyPayload(key);
-      if (ability !== null) return labelForAbility(ability);
-      return key;
-    },
-    // i18n.language: every branch produces a translated name.
-    [t, labelForSource, labelForTarget, takenAttackLabel, labelForAbility, i18n.language]
-  );
+  // A band's name and its art, off the ONE entity ladder the table's rows and
+  // the selectors' options resolve through (see `useEntityCells`). A band and
+  // the row it decomposes are the same thing seen twice, so they cannot read
+  // differently — and a band can never wear one entity's name over another's
+  // picture, because both come out of a single branch.
+  const bandLabelFor = useCallback((key: string): string => cellOf(key).name, [cellOf]);
+  const bandIcon = useCallback((key: string): string | undefined => cellOf(key).iconUrl, [cellOf]);
 
   // The groups path's source grouping on the friendly side is the per-player
   // chart the base load used to own — one LINE per player in party colours,
@@ -308,49 +300,10 @@ export const useChartModel = ({
               label:
                 interval.targetSegment === null ? String(interval.actorIndex) : labelForTarget(interval.targetSegment),
             }
-          : { key: `player:${interval.actorIndex}`, label: labelForSource(interval.actorIndex) },
+          : { key: playerRowKey(interval.actorIndex), label: labelForSource(interval.actorIndex) },
     });
     return series.length > 0 ? series : null;
   }, [isStatusMetric, statusIntervals, pins, chartLen, hostility, labelForTarget, labelForSource, identityPlayers]);
-
-  // The top-level aura chart: no effect pinned, so the effects THEMSELVES are
-  // the series — the top 8 by uptime (the table's own ranking), Y = holders
-  // with the effect active. Same polarity, side and pin narrowing as the
-  // table rows (`statusTabRows`), so the chart draws the rows above it.
-  //
-  // `statusIntervals`, not `windowedIntervals`, for the same reason as
-  // `statusSeries`: the parent crops the chart, and cropping twice would
-  // shorten the series against a chart that is already the window.
-  const effectSeries = useMemo(() => {
-    if (!isStatusMetric || isStatusPin(pins.ability)) return null;
-    const series = buildEffectSeries({
-      // The one composition the table rows use (`statusTabRows`), so the plot
-      // cannot draw a different set of effects from the rows underneath it.
-      intervals: narrowedStatusIntervals({
-        intervals: statusIntervals,
-        slots: slotsOf(identityPlayers),
-        hostility,
-        harmful: caps.harmfulStatuses,
-        pins,
-      }),
-      bucketMs: bucketMs,
-      len: chartLen,
-      // The same cap as the group bands — both feed the eight-colour palette.
-      topN: GROUP_TOP_N,
-      labelOf: statusDisplayLabel,
-      holderKeyOf: (interval) => (hostility === "enemy" ? enemyHolderKey(interval) : `player:${interval.actorIndex}`),
-    });
-    return series.length > 0 ? series : null;
-  }, [
-    isStatusMetric,
-    pins,
-    identityPlayers,
-    statusIntervals,
-    hostility,
-    caps.harmfulStatuses,
-    chartLen,
-    statusDisplayLabel,
-  ]);
 
   // The drilled Stun/SBA plot: the backend's per-breakdown-row bands folded into
   // the table's ability rows (see `abilityBands` — the parser cannot produce
@@ -374,18 +327,24 @@ export const useChartModel = ({
     return abilityBands(bands, GROUP_TOP_N, bandLabelFor, pins.ability === null ? "group" : "action", rowKeying);
   }, [caps.dataPath, spec.groupBy, pins.source, pins.ability, scopedAbilitySeries, bandLabelFor, rowKeying]);
 
-  // Which series the per-player chart draws. identityPlayers, not players: these
-  // charts hold the whole party, so a pin must not drop curves from the plot.
+  // Which series the per-player chart draws — identityPlayers, not players,
+  // so a pin cannot drop the curves the pinned one is compared against. See
+  // `chartPlayerIndexes`, which owns the rule and the two cases where a pin
+  // must NOT narrow.
   //
-  // The exception is a pinned source on a metric with no decomposition to
-  // draw (stun, SBA): showing the whole party there answers a question nobody
-  // asked, and narrowing to the pinned player is the most the data supports.
-  const chartIndexes = useMemo(() => {
-    const everyone = identityPlayers.map((player) => player.index);
-    if (statusSeries || effectSeries || groupOverlay || abilitySeries || groupPlayerSeries || pins.source === null)
-      return everyone;
-    return everyone.filter((index) => index === pins.source);
-  }, [identityPlayers, statusSeries, effectSeries, groupOverlay, abilitySeries, groupPlayerSeries, pins.source]);
+  // The aura tabs reach the narrowing branch now that nothing overlays them
+  // until an effect is pinned: a pinned holder draws that holder's own damage
+  // line, beside the table of what they held.
+  const chartIndexes = useMemo(
+    () =>
+      chartPlayerIndexes({
+        party: identityPlayers.map((player) => player.index),
+        sourcePin: pins.source,
+        hostility,
+        overlaid: Boolean(statusSeries || groupOverlay || abilitySeries || groupPlayerSeries),
+      }),
+    [identityPlayers, statusSeries, groupOverlay, abilitySeries, groupPlayerSeries, pins.source, hostility]
+  );
 
   // With no source pinned, an enemy or ability pin still narrows the fight, and
   // the backend rebuilds the per-player series under it — otherwise the plot
@@ -397,7 +356,6 @@ export const useChartModel = ({
   // so the heading can never disagree with what is on screen.
   const { overlay, chartSource, withTotal, labelKey, format, stacked, smoothing } = chartPresentation({
     statusSeries,
-    effectSeries,
     groupOverlay,
     abilitySeries,
     groupPlayerSeries,
@@ -509,6 +467,15 @@ export const useChartModel = ({
     [chartWindows, statusWindow, format, chartInputs, breakEnemyOf, t, i18n.language]
   );
 
+  // The colour ordering: the backend's whole-fight totals folded onto the same
+  // bands the plot draws, ranked, and used as the palette index. Empty
+  // reference — the derived tabs, and any request that narrows no time — falls
+  // through to the drawn order, which in both those cases IS the whole fight.
+  const paletteOrder = useMemo(
+    () => paletteOrderOf(referenceBandOrder(groupReference, rowKeying), overlay ? overlay.map((s) => s.key) : []),
+    [groupReference, rowKeying, overlay]
+  );
+
   const labels: Label = useMemo(
     () =>
       // Drilled in, the bands are one player's own output split up, so the
@@ -533,13 +500,18 @@ export const useChartModel = ({
               ...(series.tail === true ? { tail: true } : {}),
               // An ACTOR band takes its actor's own colour — the same one its row
               // in the table and its entry in the dropdown take, so one enemy is
-              // one colour wherever it appears. The positional palette stays for
-              // the bands that name no actor: an ability drill, a taken-attack
-              // row, the `other` remainder. Those have no identity to be
-              // consistent about, and position is the honest ordering for them.
-              color:
-                keyColor(series.key, colorContext) ??
-                mantineColorVar(HP_SERIES_COLORS[position % HP_SERIES_COLORS.length]),
+              // one colour wherever it appears. Everything else — an ability
+              // drill, a taken-attack row, the `other` remainder — takes the
+              // categorical palette at its WHOLE-FIGHT rank, not its rank here:
+              // ranking by the filtered order repainted the chart every time a
+              // filter reordered it, which is the same fault `actorColor`
+              // already refuses for enemies. `position` is the fallback for a
+              // band no reference names, which is every band before one arrives.
+              color: keyColor(series.key, colorContext) ?? bandColorAt(paletteOrder.get(series.key) ?? position),
+              // Omitted rather than written undefined: most bands have art,
+              // and the ones that do not stay text-only in the tooltip rather
+              // than reserving a blank box (see `BreakdownEntry.icon`).
+              ...iconField(bandIcon(series.key)),
             })),
             // LAST, so recharts stacks the remainder on top of the bands that
             // outrank it. Declared whenever a tail exists; the chart drops it
@@ -584,6 +556,7 @@ export const useChartModel = ({
                 ),
                 partySlotIndex: player.partyIndex,
                 color: colors[player.partyIndex % colors.length] ?? PLAYER_COLORS[0],
+                ...iconField(bandIcon(playerRowKey(player.index))),
               })),
           ],
     [
@@ -597,6 +570,8 @@ export const useChartModel = ({
       t,
       colorContext,
       bandLabelFor,
+      bandIcon,
+      paletteOrder,
     ]
   );
 

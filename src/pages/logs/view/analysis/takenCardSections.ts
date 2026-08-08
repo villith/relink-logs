@@ -1,19 +1,15 @@
-import type { ActionType, ComputedPlayerState, EnemyType } from "@/types";
+import type { ComputedPlayerState } from "@/types";
 
-import { takenAttackRowParts } from "../metrics/damageTaken";
 import type { MetricRow } from "../metrics/types";
+import { playerRowKey, takenAttackRowParts } from "../rowKey";
 
+import type { CardLabels } from "./cardLabels";
 import type { CardSection } from "./HoverCard";
 
-/** Name and art lookups the view injects, so this stays a pure function —
- * the same posture as `SectionLabels` in cardSections.ts. */
-export type TakenSectionLabels = {
-  /** One enemy attack, named with its attacker for context — enemy action ids
-   * carry no names of their own. */
-  attack: (enemyType: EnemyType, actionId: ActionType) => string;
-  enemy: (type: EnemyType) => string;
-  enemyIcon?: (type: EnemyType) => string | undefined;
-};
+/** What the taken tab's cards name and draw with. Declared in `cardLabels.ts`
+ * with the other cards' lookups, so the attack namer here and the one the enemy
+ * side uses are one field rather than two spellings of it. */
+export type TakenSectionLabels = Pick<CardLabels, "attack" | "enemy" | "enemyIcon">;
 
 /** The attacker section's colour: enemies are the same red the damage card's
  * target section paints them. */
@@ -35,7 +31,7 @@ export const takenCardSectionsFor = ({
   labels: TakenSectionLabels;
 }): CardSection[] | null => {
   if (!row.key.startsWith("player:")) return null;
-  const player = players.find((candidate) => `player:${candidate.index}` === row.key);
+  const player = players.find((candidate) => playerRowKey(candidate.index) === row.key);
   const breakdown = player?.damageTakenBreakdown ?? [];
   if (breakdown.length === 0) return null;
 

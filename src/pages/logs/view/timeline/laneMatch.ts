@@ -2,10 +2,10 @@ import type { EnemyType, SkillRow } from "@/types";
 
 import { abilityKey } from "../abilityKey";
 import { actionsForPin, type RowKeying } from "../abilitySkills";
-import { playerRowIndex, spawnRowSegment } from "../actorRowKey";
 import type { ActorSpace, EventRow } from "../events/eventRows";
 import { takenAttackRowParts } from "../metrics/damageTaken";
 import type { MetricRow } from "../metrics/types";
+import { playerRowIndex, spawnRowSegment } from "../rowKey";
 
 /** What the matcher needs from the view to place an event on a lane. */
 export type LaneMatchContext = {

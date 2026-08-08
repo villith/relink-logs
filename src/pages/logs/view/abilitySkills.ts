@@ -31,6 +31,23 @@ const SUPPLEMENTARY_ROW: ActionType = { SupplementaryDamage: 0 };
 const isSupplementary = (actionType: ActionType): boolean =>
   typeof actionType === "object" && Object.hasOwn(actionType, "SupplementaryDamage");
 
+/** A set of breakdown rows split into its direct and echo halves.
+ *
+ * `mixed` is the whole point: only a set holding BOTH has a split to report.
+ * One that is echo all the way across — the echo row with the toggle off, or
+ * the residue a collapse leaves behind — is already described by its own
+ * label, and painting the whole bar in the fainter shade would say nothing.
+ *
+ * The one author of that rule. Four surfaces draw the same split (the table's
+ * ability rows, their per-player children, the groups path's rows and members,
+ * and the hover card's sections), and a bar that split where the row beside it
+ * did not is exactly what a second spelling buys. */
+export const splitSupplementary = <T extends SkillRow>(rows: T[]): { direct: T[]; echoes: T[]; mixed: boolean } => {
+  const echoes = rows.filter((row) => isSupplementary(row.actionType));
+  const mixed = echoes.length > 0 && echoes.length < rows.length;
+  return { direct: mixed ? rows.filter((row) => !isSupplementary(row.actionType)) : rows, echoes, mixed };
+};
+
 /** How rows are keyed for one view.
  *
  * Built once and passed down, so the table, the chart, the selector and the
@@ -42,6 +59,14 @@ export type RowKeying = {
   /** The row key a cause id resolves to, or null when the party used no such
    * action — which is what keeps an unattributable echo on the echo row. */
   causeRow: (causeId: number) => string | null;
+  /** The ACTION that cause id names, one level below `causeRow`.
+   *
+   * A row is where an echo belongs; this is which of that row's member skills
+   * it belongs to. Only a skill-GROUP row has members, and listing an echo
+   * beside them as a member of its own says the group contains a skill it does
+   * not — while dropping it would stop the children summing to the parent they
+   * expand. Folded onto its cause, both hold. */
+  causeAction: (causeId: number) => ActionType | null;
 };
 
 /** The keying for one view, from what the party actually used.
@@ -49,17 +74,20 @@ export type RowKeying = {
  * Derived from the observed actions rather than a lookup table, for the same
  * reason `actionsForPin` is: it cannot claim a cause nobody landed. */
 export const rowKeyingFor = (skills: SkillRow[], collapse: boolean): RowKeying => {
-  const byCause = new Map<number, string>();
+  // Row and action together, from ONE scan: they answer the same question at
+  // two levels, and two scans is how they would come to name different causes.
+  const byCause = new Map<number, { row: string; action: ActionType }>();
   if (collapse) {
     for (const skill of skills) {
       const action = skill.actionType;
       if (typeof action !== "object" || !("Normal" in action)) continue;
-      byCause.set(action.Normal, abilityRowKey(skill));
+      byCause.set(action.Normal, { row: abilityRowKey(skill), action });
     }
   }
   return {
     collapseSupplementary: collapse,
-    causeRow: (causeId) => byCause.get(causeId) ?? null,
+    causeRow: (causeId) => byCause.get(causeId)?.row ?? null,
+    causeAction: (causeId) => byCause.get(causeId)?.action ?? null,
   };
 };
 

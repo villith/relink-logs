@@ -9,8 +9,6 @@ import {
   statusKeyParts,
   statusLabelFor,
   statusRowKindFor,
-  targetRowLabel,
-  targetRowSegment,
 } from "./statusLabel";
 
 // Stands in for i18next: the real thing interpolates the same way.
@@ -251,24 +249,6 @@ describe("casterActionOf", () => {
   });
 });
 
-describe("targetRowLabel", () => {
-  it("names a segmented enemy through the target labels", () => {
-    // The whole point: a spawn has a name and a "#n", the recycled actor id
-    // behind it has neither.
-    expect(targetRowLabel("target:2", (segment) => `Enemy #${segment}`)).toBe("Enemy #2");
-  });
-
-  it("shows the raw id for an enemy the segmenter never placed", () => {
-    // A phantom marker actor has no segment, so there is nothing to name it
-    // with — but its row must still say which actor it was.
-    expect(targetRowLabel("actor:4058884280", () => "unused")).toBe("4058884280");
-  });
-
-  it("hands back anything else untouched", () => {
-    expect(targetRowLabel("player:0", () => "unused")).toBe("player:0");
-  });
-});
-
 describe("statusIdOfKey", () => {
   it("reads the effect id out of a status key", () => {
     expect(statusIdOfKey("status:1001:1100:unknown")).toBe(1001);
@@ -305,17 +285,5 @@ describe("statusKeyParts", () => {
     // which must read as "not a status key" and render verbatim, exactly as
     // any other stale pin does.
     expect(statusKeyParts("status:7:9998")).toBeNull();
-  });
-});
-
-describe("targetRowSegment", () => {
-  it("reads the spawn segment out of a target row", () => {
-    expect(targetRowSegment("target:3")).toBe(3);
-  });
-
-  it("answers null for actor rows and anything else", () => {
-    // A bare actor id indexes nothing a portrait could hang on.
-    expect(targetRowSegment("actor:4058884280")).toBeNull();
-    expect(targetRowSegment("player:0")).toBeNull();
   });
 });

@@ -1,7 +1,14 @@
 import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
-import { humanizeNumber, isSupplementaryAction, ratePerSecond, share } from "@/utils";
+import { humanizeNumber, ratePerSecond, share } from "@/utils";
 
-import { groupSkillsForRows, mergeSkillsByAction, skillsForAbilityKey, type AbilitySkills } from "../abilitySkills";
+import {
+  groupSkillsForRows,
+  mergeSkillsByAction,
+  skillsForAbilityKey,
+  splitSupplementary,
+  type AbilitySkills,
+} from "../abilitySkills";
+import { enemyRowKey, playerRowKey, skillKey, skillKeyPayload } from "../rowKey";
 import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
 
 const format = humanizeNumber;
@@ -67,19 +74,13 @@ export const abilityRows = (
     .map(({ key, skills }) => {
       const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
       const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
-      const echoes = skills.filter((skill) => isSupplementaryAction(skill.actionType));
-      // Only a MIXED group has a split to report. A group that is entirely
-      // echoes — the echo row with the toggle off, or the residue row a collapse
-      // leaves behind — is echo all the way across, and painting the whole bar
-      // in the fainter shade says nothing its label does not already say.
-      const mixed = echoes.length > 0 && echoes.length < skills.length;
+      // Only a MIXED group has a split to report, and only the DIRECT rows
+      // describe the skill's own per-hit extremes — `splitSupplementary` owns
+      // both rules, so every bar in the view splits the same way.
+      const { direct, echoes, mixed } = splitSupplementary(skills);
       const supplementary = mixed ? echoes.reduce((sum, skill) => sum + skill.totalDamage, 0) : 0;
-      // Only the direct rows describe the skill's own per-hit extremes. An
-      // all-echo group has none, so it falls back to its own — which is what it
-      // is measuring.
-      const direct = mixed ? skills.filter((skill) => !echoes.includes(skill)) : skills;
       return {
-        key: `skill:${key}`,
+        key: skillKey(key),
         label: key,
         value: damage,
         // Absent rather than 0, so a row with no echoes mounts one segment.
@@ -102,32 +103,6 @@ export const abilityRows = (
       };
     })
     .sort((a, b) => b.value - a.value);
-
-/** The table row key naming one enemy TYPE, and the label that goes with it:
- * the label IS the type's JSON, and the key is that JSON under an `enemy:`
- * prefix the view matches on.
- *
- * Four folds across three files emit these rows — `enemyRows` and
- * `enemyDealtRows` below, `enemyReceivedRows` on the taken tab, and
- * `hostilitySeriesFor`'s chart bands — and a band only lines up with the row it
- * decomposes if all four spell the key identically, so they all spell it here.
- * `parseEnemyRow` is the matching reader. */
-export const enemyRowKey = (type: EnemyType): string => `enemy:${JSON.stringify(type)}`;
-
-/** The `EnemyType` an `enemy` row's label spells, or null for anything that is
- * not one.
- *
- * The reading half of `enemyRowKey` above. Tolerant of a malformed label for
- * the same reason `statusLabelFor` is of a stale pin: `translateEnemyType` and
- * `enemyIconUrl` both answer null with "unknown", which beats throwing inside
- * a row renderer. */
-export const parseEnemyRow = (label: string): EnemyType | null => {
-  try {
-    return JSON.parse(label) as EnemyType;
-  } catch {
-    return null;
-  }
-};
 
 /** What the pinned ability dealt to each enemy TYPE — the opposite direction
  * from `enemyDealtRows` below, which asks what enemies dealt to the party.
@@ -265,7 +240,7 @@ export const damageDone: MetricDescriptor = {
       return [...players]
         .sort((a, b) => b.totalDamage - a.totalDamage)
         .map((p) => ({
-          key: `player:${p.index}`,
+          key: playerRowKey(p.index),
           label: String(p.index),
           value: p.totalDamage,
           columns: [format(p.totalDamage), format(p.dps), share(p.totalDamage, total)],
@@ -329,8 +304,8 @@ export const damageDone: MetricDescriptor = {
   // than pretending victims are sources.
   children: ({ row, players, level, pins, hostility, keying }): MetricRow[] | null => {
     if (level !== "abilities" || hostility === "enemy" || pins.source !== null) return null;
-    if (!row.key.startsWith("skill:")) return null;
-    const key = row.key.slice("skill:".length);
+    const key = skillKeyPayload(row.key);
+    if (key === null) return null;
     const total = players.reduce((sum, player) => sum + player.totalDamage, 0);
     return players
       .map((player) => ({ player, skills: skillsForAbilityKey(player.skillBreakdown, key, keying) }))
@@ -338,20 +313,27 @@ export const damageDone: MetricDescriptor = {
       .map(({ player, skills }): MetricRow => {
         const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
         const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
+        // A child is a table bar too, so it splits by the same rule its parent
+        // does — over THIS player's echoes, which is what makes the section a
+        // split of the row rather than a restatement of it.
+        const { direct, echoes, mixed } = splitSupplementary(skills);
+        const supplementary = mixed ? echoes.reduce((sum, skill) => sum + skill.totalDamage, 0) : 0;
         return {
-          key: `player:${player.index}`,
+          key: playerRowKey(player.index),
           label: String(player.index),
           kind: "player",
           value: damage,
+          // Absent rather than 0, so a child with no echoes mounts one segment.
+          ...(supplementary > 0 ? { subValue: supplementary } : {}),
           columns: damageColumns(
             damage,
             hits,
             extreme(
-              skills.map((skill) => skill.minDamage),
+              direct.map((skill) => skill.minDamage),
               (values) => Math.min(...values)
             ),
             extreme(
-              skills.map((skill) => skill.maxDamage),
+              direct.map((skill) => skill.maxDamage),
               (values) => Math.max(...values)
             ),
             total

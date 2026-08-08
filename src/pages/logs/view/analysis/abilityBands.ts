@@ -18,8 +18,11 @@ import type { DrillSeries } from "./statusChart";
  * Cause bands (SBA's non-hit causes and its unattributed remainder) carry their
  * row key already — they have no action to group by — so they pass through.
  *
- * Ranked and capped like the group bands, with the tail summed into one `other`
- * band rather than dropped, because both feed the same eight-colour palette.
+ * Ranked like the group bands, and capped the same way: `topN` MARKS the bands
+ * past the cap as `tail` rather than removing them. The chart draws the tail
+ * hidden and rolls it up itself, from whichever tail bands are still hidden
+ * (see `chartRollup`) — summed into one `other` band here, the tail had no
+ * series of its own left and could never be switched back on.
  *
  * `foldBy` mirrors the table's own two folds. "group" is `groupSkillsForRows`,
  * the default. "action" is `mergeSkillsByAction` — used once a group is PINNED,
@@ -58,14 +61,10 @@ export const abilityBands = (
     .map(([key, values]) => ({ key, values, total: values.reduce((sum, value) => sum + value, 0) }))
     .sort((a, b) => b.total - a.total);
 
-  const kept = ranked.slice(0, topN).map(({ key, values }) => ({ key, label: labelOf(key), values }));
-
-  const tail = ranked.slice(topN);
-  if (tail.length === 0) return kept;
-
-  const other = new Array<number>(len).fill(0);
-  for (const { values } of tail) {
-    for (let bucket = 0; bucket < len; bucket++) other[bucket] += values[bucket];
-  }
-  return [...kept, { key: "other", label: labelOf("other"), values: other }];
+  return ranked.map(({ key, values }, rank) => ({
+    key,
+    label: labelOf(key),
+    values,
+    ...(rank >= topN ? { tail: true } : {}),
+  }));
 };

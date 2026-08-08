@@ -1,23 +1,22 @@
 import { useCallback, useMemo } from "react";
 
-import { statusIconUrl } from "@/statusIcon";
 import type { ActionType, SelectionFact, TargetEntry } from "@/types";
 
 import { abilityKey } from "../../abilityKey";
-import { actorColor } from "../../actorColor";
-import type { EventLabels } from "../../events/EventsTab";
+import { optionOfCell } from "../../entity";
 import type { EventPins } from "../../events/eventRows";
 import type { ScopeProbes } from "../../events/eventScope";
+import type { EventLabels } from "../../events/EventsTab";
 import { spawnSegmentAt } from "../../events/eventTargets";
 import { isHarmful } from "../../metrics/statusPolarity";
+import { playerRowKey, spawnRowKey } from "../../rowKey";
 import { deriveSelectorOptions, type SelectorPins } from "../../selectorOptions";
 import { isStatusPin } from "../../statusUptime";
 import { labelSourceOptions } from "../legendLabel";
-import { abilityRowIconUrl } from "../rowIcon";
-import { statusIdOfKey } from "../statusLabel";
 import { withStatusOption } from "../statusOption";
 
 import type { ActorIdentity } from "./useActorIdentity";
+import type { EntityCells } from "./useEntityCells";
 
 /** The pick lists and the raw event stream's cells.
  *
@@ -50,7 +49,10 @@ export type SelectorModelInput = {
   pinnedActions: ActionType[];
   targetEntries: TargetEntry[];
   identity: ActorIdentity;
-  statusDisplayLabel: (key: string) => string;
+  /** The view's one set of entity lookups — the same bundle the table and the
+   * chart resolve through, so a dropdown entry and the row it pins cannot be
+   * named, illustrated or coloured differently. */
+  cells: EntityCells;
   playerLabelTemplate: string;
 };
 
@@ -60,20 +62,13 @@ export const useSelectorModel = ({
   pinnedActions,
   targetEntries,
   identity,
-  statusDisplayLabel,
+  cells,
   playerLabelTemplate,
 }: SelectorModelInput): SelectorModel => {
-  const {
-    identityPlayers,
-    playerByIndex,
-    colorContext,
-    labelForSource,
-    labelForAbility,
-    labelForTarget,
-    characterForSource,
-    sourceIconUrl,
-    targetIconUrl,
-  } = identity;
+  // Only what the OPTIONS themselves need beyond the bundle: the party for
+  // membership, and the character namer the legend rule qualifies with.
+  const { playerByIndex, labelForSource, characterForSource } = identity;
+  const { cellOf, resolvers } = cells;
   // Cascading options come from the facts for the CURRENT window but with no
   // pin applied — a selector must keep offering what the other pins allow.
   const options = useMemo(() => deriveSelectorOptions(facts, pins), [facts, pins]);
@@ -108,18 +103,14 @@ export const useSelectorModel = ({
     [pins.source, pins.targets, pins.ability, pinnedActions, targetEntries]
   );
 
-  const abilityOptionIconUrl = useCallback(
-    (key: string) => {
-      // A status pin names an EFFECT, not an action, so it takes the effects
-      // table's art rather than the ability map's — which has no entry for it
-      // and would answer with whichever action its fallback landed on.
-      if (isStatusPin(key)) {
-        const statusId = statusIdOfKey(key);
-        return statusId === null ? undefined : statusIconUrl(statusId);
-      }
-      return abilityRowIconUrl(key, identityPlayers, playerByIndex.get(pins.source ?? -1)?.player);
-    },
-    [identityPlayers, playerByIndex, pins.source]
+  // An Ability option is either an effect or an action, and the two take
+  // different art — a status pin resolved through the ability map has no entry
+  // there and would answer with whichever action the fallback landed on. The
+  // grammar already tells them apart, so the option asks the one ladder rather
+  // than re-testing the prefix here.
+  const abilityOptionCell = useCallback(
+    (key: string) => (isStatusPin(key) ? resolvers.status(key) : resolvers.ability(key)),
+    [resolvers]
   );
 
   // The Events body's cells, named and pictured through the SAME resolvers the
@@ -140,43 +131,21 @@ export const useSelectorModel = ({
   const eventLabels: EventLabels = useMemo(
     () => ({
       actor: (index, atMs, space) => {
-        if (playerByIndex.has(index)) {
-          return {
-            name: labelForSource(index),
-            iconUrl: sourceIconUrl(index),
-            color: actorColor({ kind: "player", index }, colorContext),
-          };
-        }
+        if (playerByIndex.has(index)) return resolvers.player(index);
         const segment = spawnSegmentAt(targetEntries, index, atMs, space);
-        if (segment !== -1) {
-          return {
-            name: labelForTarget(segment),
-            iconUrl: targetIconUrl(segment),
-            color: actorColor({ kind: "spawn", segment }, colorContext),
-          };
-        }
+        if (segment !== -1) return resolvers.target(segment);
         // Neither a party member nor a known spawn. The raw index is the honest
         // answer — it is what tells the reader the log holds an actor the
         // segmenter skipped, rather than quietly showing an empty cell. No
         // colour either: an actor we cannot name is not one we can categorise.
         return { name: String(index) };
       },
-      // One resolver for the art of both, because `abilityOptionIconUrl` already
-      // dispatches on the `status:` prefix — the selector needs the same split.
-      ability: (key) => ({ name: labelForAbility(key), iconUrl: abilityOptionIconUrl(key) }),
-      status: (key) => ({ name: statusDisplayLabel(key), iconUrl: abilityOptionIconUrl(key) }),
+      // One resolver for both, because the grammar already tells an effect from
+      // an action — the stream needs exactly the split the selector needs.
+      ability: abilityOptionCell,
+      status: abilityOptionCell,
     }),
-    [
-      labelForSource,
-      labelForTarget,
-      labelForAbility,
-      statusDisplayLabel,
-      sourceIconUrl,
-      colorContext,
-      abilityOptionIconUrl,
-      targetEntries,
-      playerByIndex,
-    ]
+    [resolvers, abilityOptionCell, targetEntries, playerByIndex]
   );
 
   // How the event stream classifies an actor and an effect. Both come straight
@@ -195,42 +164,26 @@ export const useSelectorModel = ({
       // about to look at, so it is the one place the colours must already
       // match. An ability has no actor and stays plain.
       sources: labelSourceOptions(options.sources, labelForSource, characterForSource, playerLabelTemplate).map(
-        (option) => ({
-          ...option,
-          iconUrl: sourceIconUrl(Number(option.value)),
-          color: actorColor({ kind: "player", index: Number(option.value) }, colorContext),
-        })
+        (option) =>
+          // The LABEL keeps the legend's qualifier — two players a template
+          // renders identically are told apart by character, which the entity
+          // ladder (naming one actor at a time) cannot know about. The art and
+          // the colour come from the ladder, so they cannot drift from the row
+          // this option pins.
+          optionOfCell(option.value, { ...cellOf(playerRowKey(Number(option.value))), name: option.label })
       ),
-      targets: options.targets.map((option) => ({
-        ...option,
-        label: labelForTarget(Number(option.value)),
-        iconUrl: targetIconUrl(Number(option.value)),
-        color: actorColor({ kind: "spawn", segment: Number(option.value) }, colorContext),
-      })),
+      targets: options.targets.map((option) => optionOfCell(option.value, cellOf(spawnRowKey(Number(option.value))))),
       // Icons AFTER `withStatusOption`, not before: the option it injects for a
       // pinned effect is not in the list it was given, and an icon pass on the
       // input would leave the one option that is definitely selected as the
       // only one with no art.
       abilities: withStatusOption(
-        options.abilities.map((option) => ({ ...option, label: labelForAbility(option.value) })),
+        options.abilities.map((option) => ({ ...option, label: abilityOptionCell(option.value).name })),
         pins.ability,
-        statusDisplayLabel
-      ).map((option) => ({ ...option, iconUrl: abilityOptionIconUrl(option.value) })),
+        (key) => resolvers.status(key).name
+      ).map((option) => ({ ...option, iconUrl: abilityOptionCell(option.value).iconUrl })),
     }),
-    [
-      options,
-      labelForSource,
-      characterForSource,
-      playerLabelTemplate,
-      labelForTarget,
-      labelForAbility,
-      pins.ability,
-      statusDisplayLabel,
-      sourceIconUrl,
-      abilityOptionIconUrl,
-      targetEntries,
-      colorContext,
-    ]
+    [options, labelForSource, characterForSource, playerLabelTemplate, pins.ability, abilityOptionCell, resolvers]
   );
 
   return { eventPins, eventLabels, eventProbes, labelledOptions };
