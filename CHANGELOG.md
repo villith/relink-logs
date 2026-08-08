@@ -14,6 +14,7 @@ markdown in the app.
 ### Features
 
 - **Overmastery Predictor** can now predict rolls for several characters at once
+- Perfect Summon no longer appears as a Cheat Audit violation
 
 ### Bug Fixes
 
