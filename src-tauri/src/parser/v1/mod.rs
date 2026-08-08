@@ -8162,6 +8162,9 @@ mod tests {
             skillboard: Vec::new(),
             stats: None,
             weapon_state: None,
+            cap_up_normal: None,
+            cap_up_skill: None,
+            cap_up_sba: None,
         }
     }
 

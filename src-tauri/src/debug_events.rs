@@ -65,6 +65,9 @@ pub fn identity_event(slot: u8, character_type: u32, name: &str) -> PlayerIdenti
         skillboard: Vec::new(),
         stats: None,
         weapon_state: None,
+        cap_up_normal: None,
+        cap_up_skill: None,
+        cap_up_sba: None,
     }
 }
 

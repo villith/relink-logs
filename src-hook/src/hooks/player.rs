@@ -500,6 +500,9 @@ struct StoredPlayerIdentity {
     skillboard: Vec<u32>,
     stats: Option<protocol::RecordStats>,
     weapon_state: Option<protocol::WeaponState>,
+    /// The record's three damage-cap-up fields, already in builder units. See
+    /// [`read_record_cap_ups`].
+    cap_ups: (Option<f32>, Option<f32>, Option<f32>),
 }
 
 /// One player's cached identity, paired with the id its record most recently
@@ -735,13 +738,17 @@ impl OnLoadPlayerIdentityHook {
         identity.skillboard = read_record_skillboard(record);
         identity.stats = read_record_stats(record);
         identity.weapon_state = read_weapon_state(record);
+        identity.cap_ups = read_record_cap_ups(record as usize);
 
         // One line per claim summarizing what the NEW production readers
         // resolved, so a single live run verifies overmasteries/abilities/
         // weapon/master-level/skillboard against the in-game equip screens.
         #[cfg(feature = "hookdiag")]
         log::info!(
-            "EQDIAG key={player_key:#010x} party={} om={} ab={:x?} weapon={:?} mlvl={} sb={} lvl={}",
+            // capup is printed in the SAME units and order as the oracle's
+            // `om=[...,n:,s:,b:]`, so the live gate is one diff of two log lines
+            // rather than a walk through a stored log.
+            "EQDIAG key={player_key:#010x} party={} om={} ab={:x?} weapon={:?} mlvl={} sb={} lvl={} capup=[n:{:?},s:{:?},b:{:?}]",
             identity.party_index,
             identity
                 .overmasteries
@@ -754,6 +761,9 @@ impl OnLoadPlayerIdentityHook {
             identity.master_level,
             identity.skillboard.len(),
             identity.player_level,
+            identity.cap_ups.0,
+            identity.cap_ups.1,
+            identity.cap_ups.2,
         );
 
         // Companion lines for the stat/weapon-state labeling run: STDIAG dumps
@@ -995,6 +1005,9 @@ pub fn identity_event_for_actor(
         skillboard: identity.skillboard,
         stats: identity.stats,
         weapon_state: identity.weapon_state,
+        cap_up_normal: identity.cap_ups.0,
+        cap_up_skill: identity.cap_ups.1,
+        cap_up_sba: identity.cap_ups.2,
     })
 }
 
@@ -1037,6 +1050,12 @@ fn embedded_identity_event(
         skillboard: equip.skillboard,
         stats: equip.stats,
         weapon_state: equip.weapon_state,
+        // From the equipment donor, like every other record-sourced field: the
+        // cap-ups belong to whichever record the loadout came off, not to the
+        // actor's own half-filled snapshot.
+        cap_up_normal: equip.cap_ups.0,
+        cap_up_skill: equip.cap_ups.1,
+        cap_up_sba: equip.cap_ups.2,
     }
 }
 
@@ -1049,6 +1068,27 @@ fn sanity_u32(value: u32, max: u32) -> u32 {
     } else {
         value
     }
+}
+
+/// The record's three damage-cap-up fields, in the builder's own units.
+///
+/// The builder reads these at `record+0x28/+0x30/+0x34` and scales by 0.01
+/// (`FUN_1409c1cf0`), so the scaling is applied HERE and the parser stores what
+/// the formula actually adds. A non-finite value reads `None`: it would
+/// serialize to JSON null and poison every downstream sum.
+///
+/// The record reached here is the one the identity path already holds. Whether
+/// it is the SAME object the builder reaches through `holder->vfn+0x9f0` is a
+/// hypothesis, not a fact — `cap_oracle.rs` prints the builder's own values for
+/// the same three fields, and the two agreeing on a live run is what settles it.
+/// v2.0.4 offsets; a patch that moves them cannot be caught by any test here.
+fn read_record_cap_ups(record: usize) -> (Option<f32>, Option<f32>, Option<f32>) {
+    let read = |offset: usize| {
+        crate::hooks::diag::read_f32_guarded(record, offset)
+            .filter(|v| v.is_finite())
+            .map(|v| v * 0.01)
+    };
+    (read(0x28), read(0x30), read(0x34))
 }
 
 /// Reads the 4 equipped overmasteries inline in the player record (see
@@ -1664,6 +1704,7 @@ unsafe fn read_player_identity(snapshot: *const u8) -> Option<StoredPlayerIdenti
         skillboard: Vec::new(),
         stats: None,
         weapon_state: None,
+        cap_ups: (None, None, None),
     })
 }
 
@@ -2738,6 +2779,7 @@ mod tests {
             skillboard: Vec::new(),
             stats: None,
             weapon_state: None,
+            cap_ups: (None, None, None),
         }
     }
 

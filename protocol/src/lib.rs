@@ -401,6 +401,24 @@ pub struct PlayerIdentityEvent {
     /// `#[serde(default)]` keeps stored logs readable.
     #[serde(default)]
     pub weapon_state: Option<WeaponState>,
+    /// Damage-cap-up for NORMAL attacks, as the builder uses it (the raw
+    /// record field already scaled by 0.01). Read from `record+0x28`.
+    ///
+    /// This is the dominant cap term — 13.1 to 19.0 in the 2026-08-08 capture,
+    /// against ~3.6 for every other itemized contribution combined. It is
+    /// CAPTURED rather than reproduced because its provenance in the stored
+    /// loadout is unknown; see the design's "What Plan A changed".
+    /// `None` on old logs and when the record is unreadable.
+    #[serde(default)]
+    pub cap_up_normal: Option<f32>,
+    /// The same for SKILL attacks (`record+0x30`), selected when the hit's
+    /// class flags have `0x10000` and not `0x40000`.
+    #[serde(default)]
+    pub cap_up_skill: Option<f32>,
+    /// The same for Skybound Arts (`record+0x34`), selected when the hit's
+    /// class flags have `0x40000` (which wins over `0x10000`).
+    #[serde(default)]
+    pub cap_up_sba: Option<f32>,
 }
 
 /// Training-room ("Trial") lifecycle. The training room has no flow object and
