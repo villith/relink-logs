@@ -4,11 +4,21 @@ import { createPortal } from "react-dom";
 
 import { rafThrottle } from "./rafThrottle";
 
-// The card grows up and to the right of the cursor, sitting this many pixels
-// clear of it, and is kept this far in from the viewport edges (matching the
-// shift behaviour the old Mantine `Tooltip.Floating` had).
+// The card grows up out of the cursor — and to the right or the left of it, per
+// `placement` — sitting this many pixels clear of it, and is kept this far in
+// from the viewport edges (matching the shift behaviour the old Mantine
+// `Tooltip.Floating` had).
 const CURSOR_OFFSET = 6;
 const VIEWPORT_PADDING = 5;
+
+/** Which way the panel grows out of the cursor. It always grows UP; this is the
+ * horizontal half.
+ *
+ * `top-right` suits a cell with room to its right. `top-left` is for one that
+ * has none — the rightmost column of a table, where growing right only feeds
+ * the viewport clamp and parks the panel at the window edge instead of beside
+ * the thing it explains. */
+export type CursorCardPlacement = "top-right" | "top-left";
 
 /** A panel that follows the cursor while its child is hovered.
  *
@@ -39,15 +49,6 @@ const VIEWPORT_PADDING = 5;
  * directly instead of this when there is not, rather than opening an empty
  * panel.
  */
-/** Which way the panel grows out of the cursor. It always grows UP; this is the
- * horizontal half.
- *
- * `top-right` suits a cell with room to its right. `top-left` is for one that
- * has none — the rightmost column of a table, where growing right only feeds
- * the viewport clamp and parks the panel at the window edge instead of beside
- * the thing it explains. */
-export type CursorCardPlacement = "top-right" | "top-left";
-
 export const CursorCard = ({
   content,
   children,
@@ -120,9 +121,11 @@ export const CursorCard = ({
   // Position from the committed cursor, clamped to the viewport. Held invisible
   // until measured so the first frame (size unknown) cannot flash in the wrong
   // spot before the grow-up offset is known.
-  // The anchored edge: the panel's left edge sits right of the cursor, or its
-  // right edge sits left of it. The clamp then applies equally to both, so a
-  // `top-left` card near the LEFT edge still slides back into view.
+  //
+  // The anchored edge is whichever one faces the cursor: the panel's left edge
+  // sits right of it, or its right edge sits left of it. The clamp then applies
+  // equally to both, so a `top-left` card near the LEFT viewport edge still
+  // slides back into view.
   const anchoredLeft = placement === "top-left" ? cursor.x - CURSOR_OFFSET - size.width : cursor.x + CURSOR_OFFSET;
   const left = Math.max(VIEWPORT_PADDING, Math.min(anchoredLeft, window.innerWidth - size.width - VIEWPORT_PADDING));
   const top = Math.max(
