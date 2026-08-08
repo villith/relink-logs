@@ -38,18 +38,37 @@ to relicense. (Same treatment as `src/assets/character-icons/`.)
   from `ability.tbl` (character id + equip-slot number), and
   `ability-map.json` (generated, do not hand-edit) bridges the meter's
   per-character **action ids** to them: `characterType → actionId → icon file
-name`. The bridge comes from two independent streams of game data —
-  `system/player/data/pl####/pl####_action.msg`, whose `ActionInfo` rows tag
-  ability actions with their `abilityTag_`, plus an English-name join
-  (`text.msg` `TXT_AB_*` names against ui.json `skills.<Char>` action names)
-  for the variant actions the tags skip. Both resolve slot → icon through
-  `ability.tbl`'s `IconFileName`, which is not the identity map (Seofon's
-  upgraded slots reuse base art; Id's dragonform slots scatter, e.g.
-  `AB_PL2000_02` → `2000_05`). Every disagreement between the streams is
-  adjudicated by ability name and printed by the generator — the known one is
-  Io's empowered Gravity Well rows carrying Gran's Decimate tag, dev
-  copy-paste junk. An action with no entry is genuinely not an ability cast
-  (combos, link attacks, procs). Lookups: `abilityIconUrl(char, slot)` and
+name`. Which ability an action belongs to is read from
+  `system/player/data/pl####/pl####_action.msg` by `scripts/ability-actions.mjs`
+  (unit-tested), off three `ActionInfo` fields in this precedence:
+
+  1. `relatedAbilityType_` — the ability's **ordinal** (slot − 1), or `16` for
+     an action that is no ability at all. Checked against every tagged row at
+     game 2.0.3: 333 agree with their tag and the 22 that do not are exactly
+     the junk tags, so this field wins outright.
+  2. `abilityTag_` (`AB_PL####_NN`) — only base actions carry one, and a few
+     carry the wrong one (Io's empowered Gravity Well rows are tagged with
+     Gran's Decimate; Gran's Miserable Mist levels likewise). Used only where
+     no ordinal is claimed, e.g. Cagliostro's Mimic Doll (`10000`).
+  3. `derivedId_` — the base action a variant follows from. This is what
+     reaches the untagged, unnamed variants: Vane's successful Acidrage Howl
+     counter (`1310`), arts levels, follow-up hits.
+
+  Two joins fill what the action rows cannot: an action whose ordinal names a
+  slot the character has no `ability.tbl` row for is looked up by its own
+  (Japanese) `actionName_` across every character — Id's dragonform claims a
+  sixth ability against five `AB_PL2000_*` rows, because Ragnarok Form's art
+  lives under his human form — and actions absent from `<char>_action.msg`
+  entirely but named in ui.json `skills.<Char>` (Io's Concentration, `11000`)
+  keep the English-name join against `text.msg`'s `TXT_AB_*` names.
+
+  Every stream resolves slot → icon through `ability.tbl`'s `IconFileName`,
+  which is not the identity map (Seofon's upgraded slots reuse base art; Id's
+  dragonform slots scatter, e.g. `AB_PL2000_02` → `2000_05`), so skipping the
+  tbl hop attaches wrong art silently. An action with no entry is genuinely
+  not an ability cast — combos, link attacks, procs, and the charged normal
+  attacks that carry their own names (Percival's Schlacht) have no ability art
+  anywhere in the game. Lookups: `abilityIconUrl(char, slot)` and
   `abilityIconForAction(char, actionId)`.
 
 - **enemy** — the em-numbered portraits packed into the SUMMON atlas: Relink's
@@ -121,6 +140,12 @@ node scripts/slice-atlas.mjs --atlas $RAW/ui/atlas/common_icon_summon.PNG  --out
 # 5. select + rename + regenerate the maps into src/assets/game-icons
 node scripts/gen-game-icons.mjs
 ```
+
+To fix a **map** rather than the sprites — a new edge in the ability
+derivation, a table that moved — `node scripts/gen-game-icons.mjs --maps-only`
+rebuilds `status-map.json` and `ability-map.json` against the sprites already
+shipped. It needs only `tables.sqlite` and the msg files, and it does not
+re-quantize 500 unchanged PNGs through whatever `sharp` is installed today.
 
 Then `npx vitest run src/statusIcon.test.ts src/abilityIcon.test.ts
 src/sigilIcon.test.ts` — the tests are the coverage check: a patch that adds a
