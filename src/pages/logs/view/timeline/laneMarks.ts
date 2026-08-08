@@ -1,3 +1,4 @@
+import { SUPPLEMENTARY_KEY, supplementaryCause } from "../abilityKey";
 import type { EventRow } from "../events/eventRows";
 import type { MetricRow } from "../metrics/types";
 import type { Span } from "../spans";
@@ -99,12 +100,13 @@ export const marksByLane = (
     if (lane === null) continue;
 
     const at = event.timeMs - window.startMs;
-    const echo = event.abilityKey?.startsWith("SupplementaryDamage:") ?? false;
-    // The echo's part key normalises to the FOLDED payload. Keyed raw, each
-    // distinct SupplementaryDamage(n) is its own part, and the breakdown card
-    // lists nine rows all reading "Supplementary Damage" — the defect
-    // `SUPPLEMENTARY_ROW` fixed at the table level, reappearing here.
-    const partKey = echo ? "SupplementaryDamage:0" : event.abilityKey ?? event.statusKey ?? "";
+    const echo = event.abilityKey !== null && supplementaryCause(event.abilityKey) !== null;
+    // The echo's part key normalises to the FOLDED key, the same one the table
+    // folds its echo row onto. Keyed raw, each distinct SupplementaryDamage(n)
+    // is its own part and the breakdown card lists nine rows all reading
+    // "Supplementary Damage" — the defect the fold fixed at the table level,
+    // reappearing here.
+    const partKey = echo ? SUPPLEMENTARY_KEY : event.abilityKey ?? event.statusKey ?? "";
     const mark: LaneMark = {
       startMs: at,
       endMs: at,
@@ -150,64 +152,67 @@ export const CAST_GAP_MS = 1000;
  * second for thirty — chains the whole fight into a single "cast". */
 export const CAST_MAX_MS = 6000;
 
+/** Adjacent marks folded into runs, by whatever `joins` says a run is.
+ *
+ * The two folds below differ ONLY in that predicate and in what the cast count
+ * does — the accumulation (extend the end, sum the count and the amount, fold
+ * the parts, concatenate the hits) is one rule at both grains, and it was worth
+ * writing once: an amount summed one way by the cast fold and another by the
+ * density fold is a mark whose tooltip does not add up to its own bar.
+ *
+ * Sorted first, so neither fold can depend on the order events arrived in.
+ * `null + null` stays null while `null + n` becomes n: a lane where nothing
+ * carried an amount must keep saying so. */
+const foldRuns = (
+  marks: LaneMark[],
+  joins: (last: LaneMark, next: LaneMark) => boolean,
+  onJoin?: (last: LaneMark, next: LaneMark) => void
+): LaneMark[] => {
+  const merged: LaneMark[] = [];
+
+  for (const mark of [...marks].sort((a, b) => a.startMs - b.startMs)) {
+    const last = merged[merged.length - 1];
+    if (last === undefined || !joins(last, mark)) {
+      merged.push({ ...mark, by: [...mark.by], hits: [...mark.hits] });
+      continue;
+    }
+    last.endMs = Math.max(last.endMs, mark.endMs);
+    last.count += mark.count;
+    last.amount = last.amount === null ? mark.amount : last.amount + (mark.amount ?? 0);
+    last.by = foldParts(last.by, mark.by);
+    last.hits = [...last.hits, ...mark.hits];
+    onJoin?.(last, mark);
+  }
+
+  return merged;
+};
+
 /** Marks folded into casts: same identity, inside the idle gap, bounded by the
  * ceiling.
  *
  * Runs BEFORE `mergeMarks`, so what counts as one cast is settled before the
- * screen has any say in it. Sorted first, so the fold cannot depend on the
- * order events arrived in. */
-export const mergeCasts = (marks: LaneMark[]): LaneMark[] => {
-  const merged: LaneMark[] = [];
+ * screen has any say in it. */
+export const mergeCasts = (marks: LaneMark[]): LaneMark[] =>
+  foldRuns(
+    marks,
+    (last, next) =>
+      last.castKey === next.castKey &&
+      next.startMs - last.endMs <= CAST_GAP_MS &&
+      next.endMs - last.startMs <= CAST_MAX_MS
+  );
 
-  for (const mark of [...marks].sort((a, b) => a.startMs - b.startMs)) {
-    const last = merged[merged.length - 1];
-    const joins =
-      last !== undefined &&
-      last.castKey === mark.castKey &&
-      mark.startMs - last.endMs <= CAST_GAP_MS &&
-      mark.endMs - last.startMs <= CAST_MAX_MS;
-
-    if (joins) {
-      last.endMs = Math.max(last.endMs, mark.endMs);
-      last.count += mark.count;
-      last.amount = last.amount === null ? mark.amount : last.amount + (mark.amount ?? 0);
-      last.by = foldParts(last.by, mark.by);
-      last.hits = [...last.hits, ...mark.hits];
-    } else {
-      merged.push({ ...mark, by: [...mark.by], hits: [...mark.hits] });
-    }
-  }
-
-  return merged;
-};
-
-/** Marks folded so that none of them would overlap on screen.
- *
- * Sorted first, so the fold cannot depend on the order events arrived in.
- * `null + null` stays null while `null + n` becomes n: a lane where nothing
- * carried an amount must keep saying so. */
-export const mergeMarks = (marks: LaneMark[], gapMs: number): LaneMark[] => {
-  const merged: LaneMark[] = [];
-
-  for (const mark of [...marks].sort((a, b) => a.startMs - b.startMs)) {
-    const last = merged[merged.length - 1];
-    if (last && mark.startMs - last.endMs <= gapMs) {
-      last.endMs = Math.max(last.endMs, mark.endMs);
-      last.count += mark.count;
-      last.amount = last.amount === null ? mark.amount : last.amount + (mark.amount ?? 0);
-      last.by = foldParts(last.by, mark.by);
-      last.hits = [...last.hits, ...mark.hits];
-      last.casts += mark.casts;
+/** Marks folded so that none of them would overlap on screen. */
+export const mergeMarks = (marks: LaneMark[], gapMs: number): LaneMark[] =>
+  foldRuns(
+    marks,
+    (last, next) => next.startMs - last.endMs <= gapMs,
+    (last, next) => {
+      last.casts += next.casts;
       // Two folded marks no longer share one identity, and claiming either
       // one's would name the mark after half of what it holds.
-      if (last.castKey !== mark.castKey) last.castKey = "";
-    } else {
-      merged.push({ ...mark, by: [...mark.by], hits: [...mark.hits] });
+      if (last.castKey !== next.castKey) last.castKey = "";
     }
-  }
-
-  return merged;
-};
+  );
 
 /** The lanes, in the rows' own order.
  *

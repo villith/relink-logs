@@ -6,17 +6,10 @@ import { useTranslation } from "react-i18next";
 import type { EnemyType, SkillRow } from "@/types";
 
 import type { RowKeying } from "../abilitySkills";
-import type { MetricKey } from "../analysis/machine/state";
 import type { RowPresentation, StreamContext } from "../analysis/model/bodyContext";
 import type { ActorSpace } from "../events/eventRows";
-import { filterByKind, filterByPins, toEventRow } from "../events/eventRows";
-import {
-  defaultScopeKinds,
-  filterByHolderSide,
-  filterByScope,
-  scopeFor,
-  scopeUsesHostility,
-} from "../events/eventScope";
+import { toEventRow } from "../events/eventRows";
+import { defaultScopeKinds, narrowStream, scopeFor, type EventScope } from "../events/eventScope";
 import { useEvents } from "../events/useEvents";
 import type { Span } from "../spans";
 
@@ -34,10 +27,10 @@ export const TIMELINE_VIEWPORT_MS = 30_000;
  * separately just makes a smear that pretends to be two readable marks. */
 const MARK_GAP_PX = 3;
 
-/** Which end of a damage event a metric's lanes are keyed by. `taken` reads
- * the same hits from the victim's end, exactly as `filterByScope`'s direction
- * test does — so its player lanes are victims, not attackers. */
-const laneEndFor = (metric: MetricKey): "source" | "target" => (metric === "taken" ? "target" : "source");
+/** Which end of a damage event a metric's lanes are keyed by — read off the
+ * scope's own `direction` rather than re-tested against the metric name, so a
+ * lane keys by the end `filterByScope` already selected the hits from. */
+const laneEndFor = (scope: EventScope): "source" | "target" => (scope.direction === "taken" ? "target" : "source");
 
 export type TimelineTabProps = {
   /** Which log, metric and side to read the event stream for, and how to narrow
@@ -94,21 +87,19 @@ export const TimelineTab = ({
   // tab's rows are the same events. The kind toggles are deliberately NOT
   // here: they are that tab's sub-filter, and a lane's marks must match the
   // row the lane is, not a separate selection made elsewhere.
-  const shown = useMemo(() => {
-    const all = events.map(toEventRow);
-    const inScope = filterByScope(all, scope, probes);
-    const sided = scopeUsesHostility(scope) ? filterByHolderSide(inScope, hostility, probes) : inScope;
-    return filterByPins(filterByKind(sided, defaultScopeKinds(scope)), pins);
-  }, [events, scope, probes, hostility, pins]);
+  const shown = useMemo(
+    () => narrowStream(events.map(toEventRow), { scope, hostility, probes, kinds: defaultScopeKinds(scope), pins }),
+    [events, scope, probes, hostility, pins]
+  );
 
   const domainMs = Math.max(0, window.endMs - window.startMs);
 
   const lanes = useMemo(() => {
-    const matcher = laneMatcherFor(rows, { everySkill, end: laneEndFor(metric), segmentAt, enemyTypeAt, keying });
+    const matcher = laneMatcherFor(rows, { everySkill, end: laneEndFor(scope), segmentAt, enemyTypeAt, keying });
     const byLane = marksByLane(shown, matcher, window, keying?.collapseSupplementary ?? false);
     const gapMs = markGapMs({ widthPx: width, viewportMs: TIMELINE_VIEWPORT_MS, gapPx: MARK_GAP_PX });
     return lanesFor(rows, byLane, gapMs);
-  }, [rows, everySkill, keying, metric, segmentAt, enemyTypeAt, shown, window, width]);
+  }, [rows, everySkill, keying, scope, segmentAt, enemyTypeAt, shown, window, width]);
 
   // The cap is the frontend's, not the log's. Said out loud for the same
   // reason the Events tab says it: a fight cut off at 50,000 events would

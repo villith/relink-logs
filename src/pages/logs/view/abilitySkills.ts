@@ -1,7 +1,7 @@
 import { skillGroupFor } from "@/components/skillGrouping";
 import type { ActionType, CharacterType, SkillRow, SkillState } from "@/types";
 
-import { abilityKey, parseAbilityKey } from "./abilityKey";
+import { abilityKey, parseAbilityKey, SUPPLEMENTARY_KEY } from "./abilityKey";
 import { groupBy } from "./groupBy";
 
 /** One ability row and every breakdown row behind it. */
@@ -14,18 +14,6 @@ const CHILD_SEPARATOR = "@";
 /** The sentinel child for a group that deliberately spans body classes — only
  * Primal Burst, whose three classes share one action id. */
 const ANY_CHILD = "*";
-
-/** The one key every supplementary-damage hit folds onto.
- *
- * The parser emits one breakdown row per echo PAYLOAD, so this is the only fold
- * keeping the family together — without it the selector lists 24 entries that
- * all read "Supplementary Damage", each pinning a slice of the row it appears to
- * name.
- *
- * The payload is normalised to 0 rather than dropped so the key still parses:
- * `getSkillName` names every echo from the variant alone, so a canonical payload
- * reads exactly as the row does. */
-const SUPPLEMENTARY_ROW: ActionType = { SupplementaryDamage: 0 };
 
 /** Whether an action is a supplementary-damage (echo) hit. */
 const isSupplementary = (actionType: ActionType): boolean =>
@@ -110,13 +98,13 @@ export const rowKeyingFor = (skills: SkillRow[], collapse: boolean): RowKeying =
  * The result doubles as the `ability` pin, so it must stay URL-safe. */
 export const abilityRowKey = (skill: SkillRow, keying?: RowKeying): string => {
   // Echoes fold first: ungrouped by nature, and without collapse keying every
-  // one of them is the same row (see `SUPPLEMENTARY_ROW`). With it, an echo
+  // one of them is the same row (see `SUPPLEMENTARY_KEY`). With it, an echo
   // rides the row of the skill that caused it — and falls back to the echo row
   // when that cause names nothing the party used.
   if (isSupplementary(skill.actionType)) {
-    if (keying?.collapseSupplementary !== true) return abilityKey(SUPPLEMENTARY_ROW);
+    if (keying?.collapseSupplementary !== true) return SUPPLEMENTARY_KEY;
     const causeId = (skill.actionType as { SupplementaryDamage: number }).SupplementaryDamage;
-    return keying.causeRow(causeId) ?? abilityKey(SUPPLEMENTARY_ROW);
+    return keying.causeRow(causeId) ?? SUPPLEMENTARY_KEY;
   }
 
   const group = skillGroupFor(skill);
@@ -226,10 +214,42 @@ export const actionsForPin = (key: string, skills: SkillRow[], keying?: RowKeyin
   for (const skill of skillsForAbilityKey(skills, key, keying)) {
     actions.set(abilityKey(skill.actionType), skill.actionType);
   }
-  if (actions.size > 0) return [...actions.values()];
+  return actions.size > 0 ? [...actions.values()] : pinFallback(key);
+};
 
+/** What a pin stands for when NO observed hit keys to it. Shared by the two
+ * expansions below so a row the timeline resolves and the same row the backend
+ * filter resolves cannot fall back differently. */
+const pinFallback = (key: string): ActionType[] => {
   const parsed = parseAbilityKey(key);
   // A group that matched nothing has no raw action to fall back to; the caller
   // sees an empty filter, which is the same thing the empty table shows.
   return parsed === null || groupOfPin(key) !== null ? [] : [parsed];
+};
+
+/** `actionsForPin` for a whole table's worth of rows, in ONE pass.
+ *
+ * The same expansion and the same fallback — but keyed forward off the skills
+ * instead of filtered backward per row. `actionsForPin` rescans every skill for
+ * every key, computing a row key per entry; the timeline's lane index asks for
+ * every ability row at once, so that is rows × skills row-key computations each
+ * time the index is built. This is rows + skills. */
+export const actionsForPins = (keys: string[], skills: SkillRow[], keying?: RowKeying): Map<string, ActionType[]> => {
+  const byRow = new Map<string, Map<string, ActionType>>();
+  for (const skill of skills) {
+    const rowKey = abilityRowKey(skill, keying);
+    let actions = byRow.get(rowKey);
+    if (actions === undefined) {
+      actions = new Map<string, ActionType>();
+      byRow.set(rowKey, actions);
+    }
+    actions.set(abilityKey(skill.actionType), skill.actionType);
+  }
+
+  const expanded = new Map<string, ActionType[]>();
+  for (const key of keys) {
+    const actions = byRow.get(key);
+    expanded.set(key, actions === undefined ? pinFallback(key) : [...actions.values()]);
+  }
+  return expanded;
 };

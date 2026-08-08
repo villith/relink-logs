@@ -1,6 +1,6 @@
 import { Box, Text, Tooltip } from "@mantine/core";
 import type React from "react";
-import { Fragment } from "react";
+import { Fragment, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { humanizeNumber, millisecondsToPreciseElapsedFormat } from "@/utils";
@@ -88,6 +88,38 @@ export const TimelineTracks = ({
 }: TimelineTracksProps) => {
   const { t } = useTranslation();
 
+  // Derived once and rendered twice — see `laneRows`. Two columns each applying
+  // the heading rule for themselves is how they would come to differ by a row.
+  const rows = useMemo(() => laneRows(lanes, sectionLabel), [lanes, sectionLabel]);
+
+  // Built once per lane set rather than once per render, the same reason
+  // `MetricTable` memoises its own: one call folds a whole skill breakdown,
+  // and the card that consumes it only ever opens under the pointer. The
+  // timeline multiplies that by mark count, so recomputing on every render was
+  // the most expensive thing this body did.
+  const sectionsByLane = useMemo(
+    () => (rowSections ? new Map(lanes.map((lane) => [lane.row.key, rowSections(lane.row)])) : null),
+    [lanes, rowSections]
+  );
+
+  const sectionsByMark = useMemo(() => {
+    if (!cardAmount || !markEntry) return null;
+    const byMark = new Map<string, CardSection[]>();
+    for (const lane of lanes) {
+      const color = rowColor(lane.row);
+      for (const mark of lane.marks) {
+        byMark.set(
+          `${lane.row.key}:${mark.startMs}:${mark.endMs}`,
+          markCardSections(mark, { color, entry: markEntry })
+        );
+      }
+    }
+    return byMark;
+  }, [lanes, rowColor, cardAmount, markEntry]);
+
+  // AFTER the memos: an early return above them would make this component call
+  // a different number of hooks on an empty lane set than on a full one, which
+  // React rejects the moment a filter empties the timeline and then refills it.
   if (lanes.length === 0) {
     return (
       <Text size="sm" c="dimmed" ta="center" py="lg">
@@ -130,10 +162,6 @@ export const TimelineTracks = ({
     return parts.join(" · ");
   };
 
-  // Derived once and rendered twice — see `laneRows`. Two columns each applying
-  // the heading rule for themselves is how they would come to differ by a row.
-  const rows = laneRows(lanes, sectionLabel);
-
   // A lane's name cell IS the table's row, so it carries the table's height and
   // the table's art — the 22px icon `renderLabel` emits used to be squeezed to
   // nothing by a 22px lane.
@@ -142,7 +170,7 @@ export const TimelineTracks = ({
     const rowNode = (
       <AnalysisRow name={renderLabel(lane.row)} onClick={pinOnClick ? () => onPin(pinOnClick) : undefined} />
     );
-    const sections = rowSections?.(lane.row) ?? null;
+    const sections = sectionsByLane?.get(lane.row.key) ?? null;
     // No second emptiness guard: `HoverCard` already renders the child alone
     // when every section is empty.
     return sections && cardAmount ? (
@@ -161,7 +189,7 @@ export const TimelineTracks = ({
     const color = rowColor(lane.row);
     return lane.marks.map((mark) => {
       const key = `${mark.startMs}:${mark.endMs}`;
-      const sections = cardAmount && markEntry ? markCardSections(mark, { color, entry: markEntry }) : [];
+      const sections = sectionsByMark?.get(`${lane.row.key}:${key}`) ?? [];
       // A cast is a fold that MEANS something — several hits of one skill — so
       // it draws as a bar with its hits ticked inside. A lone instant and a
       // status row's real span both stay as they were.

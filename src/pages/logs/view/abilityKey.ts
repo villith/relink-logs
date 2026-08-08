@@ -10,6 +10,29 @@ export const abilityKey = (action: ActionType): string => {
   return `${name}:${payload}`;
 };
 
+const SUPPLEMENTARY = "SupplementaryDamage";
+
+/** The FOLDED echo key — the one key every supplementary hit reduces to.
+ *
+ * `SupplementaryDamage(n)` carries the id of the skill that caused the echo, so
+ * keyed raw each distinct cause is its own key: a table row, a chart band and a
+ * hover-card entry repeated once per cause, every one of them reading
+ * "Supplementary Damage". Folding onto payload 0 is what makes them one row,
+ * and it is spelled HERE so the table's fold, the timeline's part keys and the
+ * cast fold cannot fold to three different keys. */
+export const SUPPLEMENTARY_ACTION = { [SUPPLEMENTARY]: 0 } as ActionType;
+export const SUPPLEMENTARY_KEY = abilityKey(SUPPLEMENTARY_ACTION);
+
+/** The CAUSE id inside an echo key, or null when the key names no echo — the
+ * reading half of `abilityKey({ SupplementaryDamage: n })`, so the echo grammar
+ * is not spelled by hand wherever an echo has to be recognised. */
+export const supplementaryCause = (key: string): number | null => {
+  const parsed = parseAbilityKey(key);
+  return parsed !== null && typeof parsed === "object" && SUPPLEMENTARY in parsed
+    ? (parsed as { SupplementaryDamage: number })[SUPPLEMENTARY]
+    : null;
+};
+
 /** The namespace every ability ROW and chart BAND key carries.
  *
  * Row and band keys share one flat namespace (`player:`, `target:`, `enemy:`,

@@ -7,15 +7,8 @@ import { millisecondsToPreciseElapsedFormat } from "@/utils";
 import "../analysis/analysis.css";
 
 import type { StreamContext } from "../analysis/model/bodyContext";
-import { filterByKind, filterByPins, toEventRow, type ActorSpace, type EventKind, type EventRow } from "./eventRows";
-import {
-  defaultScopeKinds,
-  filterByHolderSide,
-  filterByScope,
-  scopeFor,
-  scopeKinds,
-  scopeUsesHostility,
-} from "./eventScope";
+import { toEventRow, type ActorSpace, type EventKind, type EventRow } from "./eventRows";
+import { defaultScopeKinds, narrowStream, scopeFor, scopeKinds } from "./eventScope";
 import { useEvents } from "./useEvents";
 import { visibleSlice } from "./windowSlice";
 
@@ -288,14 +281,10 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
   useEffect(() => setKinds(defaultScopeKinds(scopeFor(metric))), [metric]);
 
   const allRows = useMemo(() => events.map(toEventRow), [events]);
-  const shown = useMemo(() => {
-    const inScope = filterByScope(allRows, scope, probes);
-    // The side is only meaningful where it names a HOLDER: on the damage tabs
-    // both sides read the same hits from opposite ends, so filtering by it
-    // there would empty the table on a control that does not apply.
-    const sided = scopeUsesHostility(scope) ? filterByHolderSide(inScope, hostility, probes) : inScope;
-    return filterByPins(filterByKind(sided, kinds), pins);
-  }, [allRows, scope, probes, hostility, kinds, pins]);
+  const shown = useMemo(
+    () => narrowStream(allRows, { scope, hostility, probes, kinds, pins }),
+    [allRows, scope, probes, hostility, kinds, pins]
+  );
 
   // A shorter list can leave the container scrolled past its own end, where it
   // renders nothing at all — so a filter change that shrinks the list has to

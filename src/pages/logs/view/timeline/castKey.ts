@@ -1,12 +1,5 @@
+import { abilityKey, supplementaryCause } from "../abilityKey";
 import type { EventRow } from "../events/eventRows";
-
-/** The `SupplementaryDamage:<n>` payload, or null for anything else. */
-const echoCause = (abilityKey: string): number | null => {
-  const prefix = "SupplementaryDamage:";
-  if (!abilityKey.startsWith(prefix)) return null;
-  const id = Number(abilityKey.slice(prefix.length));
-  return Number.isInteger(id) ? id : null;
-};
 
 /** The identity two events must share to belong to one cast.
  *
@@ -20,8 +13,8 @@ const echoCause = (abilityKey: string): number | null => {
 export const castKeyOf = (event: EventRow, collapseEchoes: boolean): string => {
   const named = event.abilityKey ?? event.statusKey ?? "";
   if (collapseEchoes && event.abilityKey !== null) {
-    const cause = echoCause(event.abilityKey);
-    if (cause !== null) return `${event.kind}|Normal:${cause}`;
+    const cause = supplementaryCause(event.abilityKey);
+    if (cause !== null) return `${event.kind}|${abilityKey({ Normal: cause })}`;
   }
   return `${event.kind}|${named}`;
 };

@@ -1,7 +1,7 @@
 import type { EnemyType, SkillRow } from "@/types";
 
 import { abilityKey } from "../abilityKey";
-import { actionsForPin, type RowKeying } from "../abilitySkills";
+import { actionsForPins, type RowKeying } from "../abilitySkills";
 import type { ActorSpace, EventRow } from "../events/eventRows";
 import { takenAttackRowParts } from "../metrics/damageTaken";
 import type { MetricRow } from "../metrics/types";
@@ -67,8 +67,13 @@ export const laneMatcherFor = (rows: MetricRow[], ctx: LaneMatchContext): LaneMa
       // through the collapse-aware `abilityRowKey`, so with the toggle on a
       // cause row's expansion already carries its echoes' raw actions.
       const byAction = new Map<string, string>();
+      const expansions = actionsForPins(
+        rows.map((row) => row.label),
+        ctx.everySkill,
+        ctx.keying
+      );
       for (const row of rows) {
-        for (const action of actionsForPin(row.label, ctx.everySkill, ctx.keying)) {
+        for (const action of expansions.get(row.label) ?? []) {
           byAction.set(abilityKey(action), row.key);
         }
       }

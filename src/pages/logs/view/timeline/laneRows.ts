@@ -1,4 +1,5 @@
 import type { MetricRow } from "../metrics/types";
+import { sectionHeadings } from "../sectionRuns";
 
 import type { Lane } from "./laneMarks";
 
@@ -12,18 +13,16 @@ export type LaneRow = { kind: "heading"; key: string; label: string } | { kind: 
  * for themselves is how they would come to differ by a row, and a timeline
  * whose names are one row out of step with its marks is worse than none.
  *
- * The heading rule is `MetricTable`'s: emit one only where the section CHANGES
- * between consecutive rows, so a run of rows in one section is titled once. */
+ * The heading rule is `sectionHeadings`, the same one `MetricTable` applies —
+ * shared rather than re-spelled, because the table and the timeline are drawing
+ * one row set and must title it identically. */
 export const laneRows = (lanes: Lane[], sectionLabel?: (row: MetricRow) => string | null): LaneRow[] => {
+  const headings = sectionHeadings(lanes, (lane) => sectionLabel?.(lane.row) ?? null);
   const rows: LaneRow[] = [];
-  let previous: string | null = null;
 
   lanes.forEach((lane, index) => {
-    const section = sectionLabel?.(lane.row) ?? null;
-    if (section !== null && section !== previous) {
-      rows.push({ kind: "heading", key: `heading:${index}:${section}`, label: section });
-    }
-    previous = section;
+    const heading = headings[index];
+    if (heading !== null) rows.push({ kind: "heading", key: `heading:${index}:${heading}`, label: heading });
     rows.push({ kind: "lane", key: `lane:${lane.row.key}`, lane });
   });
 

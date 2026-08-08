@@ -1,7 +1,8 @@
 import type { MetricKey } from "../analysis/machine/state";
 import type { Hostility } from "../metrics/types";
 
-import type { EventKind, EventRow } from "./eventRows";
+import type { EventKind, EventPins, EventRow } from "./eventRows";
+import { filterByKind, filterByPins } from "./eventRows";
 
 /** Which raw events one metric's stream is made of.
  *
@@ -108,3 +109,39 @@ export const filterByHolderSide = (rows: EventRow[], hostility: Hostility, probe
     if (row.kind !== "status" || row.targetIndex === null) return true;
     return probes.isPartyMember(row.targetIndex) === (hostility === "friendly");
   });
+
+/** The whole narrowing, in order: scope, then side, then kinds, then pins.
+ *
+ * ONE pipeline for the two bodies that read the stream. The Events list and the
+ * timeline's lanes are showing the same fight from the same events, and the
+ * ORDER as much as the set is what makes them agree — so it is written here,
+ * beside the rules it applies, rather than re-typed in each body and held in
+ * step by a comment.
+ *
+ * `kinds` is the only parameter that genuinely differs between them: the Events
+ * tab passes its toggle strip's selection, the timeline passes the scope's
+ * defaults, because a lane's marks must match the row the lane IS rather than a
+ * separate selection made elsewhere. */
+export const narrowStream = (
+  rows: EventRow[],
+  {
+    scope,
+    hostility,
+    probes,
+    kinds,
+    pins,
+  }: {
+    scope: EventScope;
+    hostility: Hostility;
+    probes: ScopeProbes;
+    kinds: ReadonlySet<EventKind>;
+    pins: EventPins;
+  }
+): EventRow[] => {
+  const inScope = filterByScope(rows, scope, probes);
+  // The side is only meaningful where it names a HOLDER: on the damage tabs
+  // both sides read the same hits from opposite ends, so filtering by it there
+  // would empty the body on a control that does not apply.
+  const sided = scopeUsesHostility(scope) ? filterByHolderSide(inScope, hostility, probes) : inScope;
+  return filterByPins(filterByKind(sided, kinds), pins);
+};
