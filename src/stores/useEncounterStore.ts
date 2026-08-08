@@ -4,6 +4,7 @@ import {
   DeathEvent,
   EncounterState,
   GroupAggregate,
+  GroupReference,
   HpChartSeries,
   LegalityFinding,
   PlayerData,
@@ -50,6 +51,10 @@ interface EncounterStore {
   /** The (filters × groupBy) aggregates for the last `groupQuery` sent — table
    * rows and chart bands from ONE grouping. Empty when no query was sent. */
   groups: GroupAggregate[];
+  /** The same grouping over the WHOLE fight, for the chart's band colours.
+   * Empty when the query narrowed no time — then the aggregates above already
+   * ARE that ranking. */
+  groupReference: GroupReference[];
   /** Selected target spawn spans; empty = all. */
   selectedTargetSpans: TargetSpan[];
   selectedPlayers: string[];
@@ -105,6 +110,9 @@ export interface EncounterStateResponse {
    * carried a `groupQuery`. Optional so a frontend ahead of its backend
    * degrades to no groups rather than an error. */
   groups?: GroupAggregate[];
+  /** Optional for the same reason as `groups`: a frontend ahead of its backend
+   * degrades to ranking bands by the aggregates it was sent. */
+  groupReference?: GroupReference[];
   players: PlayerData[];
   /** One vector per PARTY SLOT (0-3), parallel to the unfiltered `players`. */
   legality: LegalityFinding[][];
@@ -133,6 +141,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
   targetEntries: [],
   selectionFacts: [],
   groups: [],
+  groupReference: [],
   selectedTargetSpans: [],
   selectedPlayers: [],
   players: [],
@@ -169,6 +178,7 @@ export const useEncounterStore = create<EncounterStore>((set) => ({
       targetEntries: response.targetEntries ?? [],
       selectionFacts: response.selectionFacts ?? [],
       groups: response.groups ?? [],
+      groupReference: response.groupReference ?? [],
       players: filteredPlayers,
       legality: filteredLegality,
       questId: response.questId,

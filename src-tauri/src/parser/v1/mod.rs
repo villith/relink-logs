@@ -37,8 +37,9 @@ pub use ability_charts::{build_ability_sba_chart, build_ability_stun_chart, Abil
 pub use chart_scope::ChartScope;
 pub use filters::{is_excluded, matches_selection, MeterFilters, SelectionFilter};
 pub use groups::{
-    aggregate_groups, AbilityFilter, ActorRef, Dimension, GroupAggregate, GroupHostility, GroupKey,
-    GroupMeasure, GroupMetric, GroupQuery, GroupQueryError, TimeWindow,
+    aggregate_group_reference, aggregate_groups, AbilityFilter, ActorRef, Dimension,
+    GroupAggregate, GroupHostility, GroupKey, GroupMeasure, GroupMetric, GroupQuery,
+    GroupQueryError, GroupReference, TimeWindow,
 };
 use phantom_targets::{is_excluded_target_type, PhantomTargets};
 use player_state::{PlayerState, SbaSourceKind};
