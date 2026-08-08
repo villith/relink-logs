@@ -1,7 +1,5 @@
 import { UnstyledButton } from "@mantine/core";
 
-import "./ui.css";
-
 export type ToggleSwitchProps = {
   checked: boolean;
   onChange: (next: boolean) => void;
@@ -37,15 +35,32 @@ export const ToggleSwitch = ({ checked, onChange, label, disabled = false, title
     aria-disabled={disabled || undefined}
     tabIndex={disabled ? -1 : 0}
     title={title}
-    className={`ui-switch${checked ? " ui-switch-on" : ""}${disabled ? " ui-switch-disabled" : ""}`}
+    className={[
+      "inline-flex items-center gap-[7px] rounded border py-0.5 pl-[3px] pr-2 text-sm font-semibold",
+      checked ? "border-accent bg-accent-soft text-ink" : "border-line bg-panel text-ink-3",
+      disabled ? "cursor-default opacity-40" : "cursor-pointer hover:border-line-strong",
+    ].join(" ")}
     // Guarded here as well as by `aria-disabled`, which is an announcement and
     // not a lock: a dimmed control that still reports a change is the same
     // defect as an undimmed one.
     onClick={() => !disabled && onChange(!checked)}
   >
-    <span className="ui-switch-track" aria-hidden>
-      <span className="ui-switch-knob" />
+    <span
+      aria-hidden
+      className={[
+        "relative h-[calc(var(--text-sm)*1.05)] w-[calc(var(--text-sm)*1.9)] flex-none rounded-full",
+        "transition-colors duration-100",
+        checked ? "bg-accent" : "bg-line-strong",
+      ].join(" ")}
+    >
+      <span
+        className={[
+          "absolute left-0.5 top-1/2 size-[calc(var(--text-sm)*0.75)] rounded-full",
+          "transition-transform duration-100",
+          checked ? "translate-x-[calc(var(--text-sm)*0.85)] -translate-y-1/2 bg-bg" : "-translate-y-1/2 bg-ink",
+        ].join(" ")}
+      />
     </span>
-    <span className="ui-switch-label">{label}</span>
+    <span>{label}</span>
   </UnstyledButton>
 );

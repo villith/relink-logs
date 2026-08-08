@@ -1,8 +1,8 @@
 import { Box, UnstyledButton } from "@mantine/core";
 import type { ReactNode } from "react";
 
+import { Label } from "./Label";
 import { onArrowKeys } from "./rovingKeys";
-import "./ui.css";
 
 export type PillOption<T extends string> = { value: T; label: string };
 
@@ -60,7 +60,9 @@ export const PillGroup = <T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       aria-disabled={disabled || undefined}
-      className={`ui-pills${disabled ? " ui-pills-disabled" : ""}`}
+      className={["inline-flex gap-0.5 rounded border border-line bg-panel p-0.5", disabled ? "opacity-40" : ""]
+        .filter(Boolean)
+        .join(" ")}
       // With a caption the whole field carries the tooltip instead, so hovering
       // the word in front of the pills explains them too.
       title={caption === undefined ? title : undefined}
@@ -77,7 +79,13 @@ export const PillGroup = <T extends string>({
             // Out of the tab order entirely while disabled: a roving tabindex
             // would still hand focus to a control that cannot be operated.
             tabIndex={disabled ? -1 : active ? 0 : -1}
-            className={`ui-pill${active ? " ui-pill-active" : ""}`}
+            className={[
+              "whitespace-nowrap rounded-sm px-2.5 py-0.5 text-sm font-semibold",
+              active ? "bg-raised text-ink" : "text-ink-3",
+              disabled ? "cursor-default" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
             // Guarded here as well as by the dimming: a class is a look, not a
             // lock, and a dimmed control that still reports a change is the
             // same defect as an undimmed one.
@@ -93,13 +101,11 @@ export const PillGroup = <T extends string>({
   if (caption === undefined) return group;
 
   return (
-    <Box className="ui-pills-field" title={title}>
+    <Box className="inline-flex items-center gap-1.5" title={title}>
       {/* Not a <label>: the thing it names is a radiogroup, which `for` cannot
           address — the accessible name rides `ariaLabel`, and this is the
           sighted reader's copy of it. */}
-      <span className="ui-label" aria-hidden>
-        {caption}
-      </span>
+      <Label aria-hidden>{caption}</Label>
       {group}
     </Box>
   );
