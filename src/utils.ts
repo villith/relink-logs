@@ -1132,8 +1132,13 @@ export const exportScreenshotToClipboard = (selector = ".app") => {
 };
 
 /// Translates a character type hash to its localized class name (e.g. "Cagliostro").
+///
+/// An ARRAY of keys, not a key and a default: `t(key, "ui:characters.X")` makes
+/// that string i18next's default VALUE, so a body the generated bundle does not
+/// name — Id's dragon form (Pl2000), which is not a playable character —
+/// rendered the key itself at the user rather than the name ui.json holds for it.
 export const translateCharacterType = (characterType: CharacterType): string =>
-  t(`characters:${characterType}`, `ui:characters.${characterType}`);
+  t([`characters:${characterType}`, `ui:characters.${characterType}`]);
 
 /// Builds the `Name (CharacterType)` label shared by the meter and the equipment tab.
 ///

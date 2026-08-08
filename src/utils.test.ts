@@ -60,6 +60,7 @@ import {
   toHashString,
   traitMaxLevel,
   translateAbilityId,
+  translateCharacterType,
   translateItemId,
   translateOvermasteryId,
   translateSigilId,
@@ -1257,7 +1258,13 @@ describe("hashed-id translators", () => {
     await i18next.init({
       lng: "en",
       defaultNS: "ui",
-      resources: { en: { ui: { "unknown-id": "Unknown ({{id}})" }, ...namespaces } },
+      resources: {
+        en: {
+          ui: { "unknown-id": "Unknown ({{id}})", characters: { Pl2000: "Id (Transformation)" } },
+          characters: { Pl1900: "Id" },
+          ...namespaces,
+        },
+      },
       interpolation: { escapeValue: false },
     });
   });
@@ -1274,6 +1281,21 @@ describe("hashed-id translators", () => {
 
   it.each(translators)("%s: reads its own bundle, padded to eight digits", (namespace, translate) => {
     expect(translate(NAMED)).toBe(`${namespace}/${NAMED_HASH}`);
+  });
+
+  describe("translateCharacterType", () => {
+    it("names a character from the generated bundle", () => {
+      expect(translateCharacterType("Pl1900")).toBe("Id");
+    });
+
+    it("falls back to the hand-written ui bundle for a body with no generated name", () => {
+      // Pl2000 is Id's dragon FORM — a body, not a playable character — so
+      // gen-langfiles never emits it and only ui.json names it. The fallback
+      // has to be a KEY: given as i18next's default VALUE it rendered the
+      // string "ui:characters.Pl2000" at the user, which is what the analysis
+      // view's ability-label qualifier was printing beside "Normal Attack".
+      expect(translateCharacterType("Pl2000")).toBe("Id (Transformation)");
+    });
   });
 });
 

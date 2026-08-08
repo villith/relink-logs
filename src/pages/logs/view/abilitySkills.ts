@@ -44,9 +44,10 @@ export const splitSupplementary = <T extends SkillRow>(rows: T[]): { direct: T[]
  * (`selectorOptions`, `abilityLabel`, `rowIcon`) unchanged. */
 export type RowKeying = {
   collapseSupplementary: boolean;
-  /** The row key a cause id resolves to, or null when the party used no such
-   * action — which is what keeps an unattributable echo on the echo row. */
-  causeRow: (causeId: number) => string | null;
+  /** The row key a cause id resolves to FOR ONE BODY, or null when that body
+   * used no such action — which is what keeps an unattributable echo on the
+   * echo row. Pass the echo's own `childCharacterType`; see `rowKeyingFor`. */
+  causeRow: (causeId: number, body: CharacterType) => string | null;
   /** The ACTION that cause id names, one level below `causeRow`.
    *
    * A row is where an echo belongs; this is which of that row's member skills
@@ -54,8 +55,24 @@ export type RowKeying = {
    * beside them as a member of its own says the group contains a skill it does
    * not — while dropping it would stop the children summing to the parent they
    * expand. Folded onto its cause, both hold. */
-  causeAction: (causeId: number) => ActionType | null;
+  causeAction: (causeId: number, body: CharacterType) => ActionType | null;
 };
+
+/** One entry in the cause index: a body and the action id it used.
+ *
+ * **A cause id means nothing on its own.** Skill ids are numbered per character:
+ * `Normal(100)` is Id's first normal attack, Percival's, and Id's dragon form's,
+ * and `Normal(130)` is a member of Eustace's normal-attack group while every
+ * other character leaves it ungrouped. Keyed by the bare id across the party,
+ * the last body to use it named the row for all of them — which put one player's
+ * echoes on another player's row ("Normal Attack (Percival)" under Id), and put
+ * the rest on raw-action rows standing beside the very group they belong to (a
+ * second "Grade 4 Shot" under Eustace).
+ *
+ * The echo's own body is the right scope: an echo is dealt by the same actor as
+ * the hit that triggered it, so the parser files both under one
+ * `childCharacterType` (`child_character_type_for`). */
+const causeIndexKey = (body: CharacterType, causeId: number): string => `${JSON.stringify(body)}:${causeId}`;
 
 /** The keying for one view, from what the party actually used.
  *
@@ -64,18 +81,21 @@ export type RowKeying = {
 export const rowKeyingFor = (skills: SkillRow[], collapse: boolean): RowKeying => {
   // Row and action together, from ONE scan: they answer the same question at
   // two levels, and two scans is how they would come to name different causes.
-  const byCause = new Map<number, { row: string; action: ActionType }>();
+  //
+  // Last writer wins and cannot matter: `abilityRowKey` is a function of
+  // (action, body) alone, so every entry under one index key agrees.
+  const byCause = new Map<string, { row: string; action: ActionType }>();
   if (collapse) {
     for (const skill of skills) {
       const action = skill.actionType;
       if (typeof action !== "object" || !("Normal" in action)) continue;
-      byCause.set(action.Normal, { row: abilityRowKey(skill), action });
+      byCause.set(causeIndexKey(skill.childCharacterType, action.Normal), { row: abilityRowKey(skill), action });
     }
   }
   return {
     collapseSupplementary: collapse,
-    causeRow: (causeId) => byCause.get(causeId)?.row ?? null,
-    causeAction: (causeId) => byCause.get(causeId)?.action ?? null,
+    causeRow: (causeId, body) => byCause.get(causeIndexKey(body, causeId))?.row ?? null,
+    causeAction: (causeId, body) => byCause.get(causeIndexKey(body, causeId))?.action ?? null,
   };
 };
 
@@ -104,7 +124,7 @@ export const abilityRowKey = (skill: SkillRow, keying?: RowKeying): string => {
   if (isSupplementary(skill.actionType)) {
     if (keying?.collapseSupplementary !== true) return SUPPLEMENTARY_KEY;
     const causeId = (skill.actionType as { SupplementaryDamage: number }).SupplementaryDamage;
-    return keying.causeRow(causeId) ?? SUPPLEMENTARY_KEY;
+    return keying.causeRow(causeId, skill.childCharacterType) ?? SUPPLEMENTARY_KEY;
   }
 
   const group = skillGroupFor(skill);

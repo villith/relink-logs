@@ -97,7 +97,10 @@ export const foldPartyDealt = (
       // Unresolvable (or uncollapsed), the echo stays its own entry — which is
       // also its own row in the table, so nothing lands where it does not go.
       const cause = echo
-        ? keying?.causeAction((skill.actionType as { SupplementaryDamage: number }).SupplementaryDamage) ?? null
+        ? keying?.causeAction(
+            (skill.actionType as { SupplementaryDamage: number }).SupplementaryDamage,
+            skill.childCharacterType
+          ) ?? null
         : null;
       const key = abilityKey(cause ?? skill.actionType);
       const ability = byAbility.get(key);
