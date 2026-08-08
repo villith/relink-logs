@@ -142,6 +142,15 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     // the game actually reads (see filediag.rs). No-op without the feature.
     try_step("filediag", filediag::setup());
 
+    // hookdiag-only: the damage-cap ORACLE (see cap_oracle.rs). Emits the game's
+    // own per-term cap contributions so the pure reproduction can be diffed
+    // against ground truth. No-op without the feature.
+    #[cfg(feature = "hookdiag")]
+    try_step(
+        "cap_oracle",
+        cap_oracle::CapOracleHook::new().setup(&process),
+    );
+
     try_step(
         "loadprobe",
         loadprobe::OnComponentLookupProbe::new().setup(&process),
@@ -340,6 +349,8 @@ pub fn teardown_hooks() {
     sba::disable();
     #[cfg(feature = "hookdiag")]
     loadprobe::disable();
+    #[cfg(feature = "hookdiag")]
+    cap_oracle::disable();
     status::disable();
     #[cfg(any(feature = "fullassist", test))]
     assist::disable();
