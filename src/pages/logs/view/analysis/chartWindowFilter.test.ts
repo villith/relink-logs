@@ -26,20 +26,40 @@ const WINDOWS: ChartWindow[] = [
 
 describe("selectedChartWindows", () => {
   it("selects a whole kind in start order", () => {
-    expect(selectedChartWindows(WINDOWS, "sba")).toEqual([WINDOWS[0], WINDOWS[2]]);
+    expect(selectedChartWindows(WINDOWS, ["sba"])).toEqual([WINDOWS[0], WINDOWS[2]]);
   });
 
   it("selects one window by 0-based per-kind index", () => {
-    expect(selectedChartWindows(WINDOWS, "sba:1")).toEqual([WINDOWS[2]]);
+    expect(selectedChartWindows(WINDOWS, ["sba:1"])).toEqual([WINDOWS[2]]);
   });
 
   it("a stale index selects nothing — narrows, never widens", () => {
-    expect(selectedChartWindows(WINDOWS, "sba:9")).toEqual([]);
+    expect(selectedChartWindows(WINDOWS, ["sba:9"])).toEqual([]);
   });
 
   it("resolves the index by start order even when the input array isn't sorted", () => {
     const outOfOrder = [win("sba", 50_000, 60_000), win("sba", 10_000, 20_000)];
-    expect(selectedChartWindows(outOfOrder, "sba:1")).toEqual([outOfOrder[0]]);
+    expect(selectedChartWindows(outOfOrder, ["sba:1"])).toEqual([outOfOrder[0]]);
+  });
+
+  it("unions several values, across kinds, in start order", () => {
+    // sba:1 starts at 50s and break:0 at 40s — sorted by start, not by the
+    // order the selection was made in.
+    expect(selectedChartWindows(WINDOWS, ["sba:1", "break:0"])).toEqual([WINDOWS[3], WINDOWS[2]]);
+  });
+
+  it("counts a window once when its kind and its own index are both selected", () => {
+    // The kind already admits it; listing it twice would double it in every
+    // count built off this list.
+    expect(selectedChartWindows(WINDOWS, ["sba", "sba:0"])).toEqual([WINDOWS[0], WINDOWS[2]]);
+  });
+
+  it("an empty selection selects nothing — the caller tests length for 'no filter'", () => {
+    expect(selectedChartWindows(WINDOWS, [])).toEqual([]);
+  });
+
+  it("a stale index does not discard the live values beside it", () => {
+    expect(selectedChartWindows(WINDOWS, ["sba:9", "sba:0"])).toEqual([WINDOWS[0]]);
   });
 });
 

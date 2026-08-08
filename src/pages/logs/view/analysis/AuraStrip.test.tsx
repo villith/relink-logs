@@ -28,7 +28,14 @@ const CHIPS = [
 const renderIt = (props: Partial<React.ComponentProps<typeof AuraStrip>> = {}) =>
   render(
     <MantineProvider>
-      <AuraStrip titleKey="ui.logs.aura-source-title" chips={CHIPS} onSelect={() => {}} onClear={() => {}} {...props} />
+      <AuraStrip
+        titleKey="ui.logs.aura-source-title"
+        chips={CHIPS}
+        onToggle={() => {}}
+        stacked={false}
+        stackPercent={null}
+        {...props}
+      />
     </MantineProvider>
   );
 
@@ -102,31 +109,68 @@ describe("AuraStrip", () => {
   });
 
   it("selects a chip on click", () => {
-    const onSelect = vi.fn();
-    renderIt({ onSelect });
+    const onToggle = vi.fn();
+    renderIt({ onToggle });
     fireEvent.click(screen.getByLabelText("Attack Up (Signo Drive)"));
 
-    expect(onSelect).toHaveBeenCalledWith("src:status:10:500");
+    expect(onToggle).toHaveBeenCalledWith("src:status:10:500");
   });
 
-  it("clicking an already-selected chip clears it (toggle)", () => {
-    // The chip IS the clear affordance now that it carries no ✕: a live
-    // filter stays dismissible where it was set, without a second control
-    // that would make the selected tile wider than its neighbours.
-    const onClear = vi.fn();
-    const onSelect = vi.fn();
-    renderIt({ chips: [{ ...CHIPS[0], selected: true }], onClear, onSelect });
+  it("clicking an already-selected chip reports ITSELF, not a clear-all", () => {
+    // The chip IS the clear affordance for its own effect: with several
+    // selected, deselecting one has to leave the rest standing, so the strip
+    // reports the tile and the state machine decides it was a deselect.
+    const onToggle = vi.fn();
+    renderIt({ chips: [{ ...CHIPS[0], selected: true }, CHIPS[1]], onToggle });
     fireEvent.click(screen.getByLabelText("Attack Up (Signo Drive)"));
 
-    expect(onClear).toHaveBeenCalledTimes(1);
-    expect(onSelect).not.toHaveBeenCalled();
+    expect(onToggle).toHaveBeenCalledWith("src:status:10:500");
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
-  it("marks the selected chip, and only it", () => {
-    const { container } = renderIt({ chips: [{ ...CHIPS[0], selected: true }, CHIPS[1]] });
+  it("marks every selected chip", () => {
+    const { container } = renderIt({
+      chips: [
+        { ...CHIPS[0], selected: true },
+        { ...CHIPS[1], selected: true },
+      ],
+    });
 
-    expect(container.querySelectorAll('[aria-pressed="true"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[aria-pressed="true"]')).toHaveLength(2);
+  });
+
+  it("marks only the selected ones", () => {
+    renderIt({ chips: [{ ...CHIPS[0], selected: true }, CHIPS[1]] });
+
     expect(screen.getByLabelText("Attack Up (Signo Drive)").getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByLabelText("Veil (Panacea)").getAttribute("aria-pressed")).toBe("false");
+  });
+
+  it("says '(all)' in the title once a stack is selected", () => {
+    // A row of ticked tiles otherwise reads as "any of these", which is the
+    // opposite of what the intersection shows.
+    renderIt({ stacked: true, stackPercent: 34 });
+    expect(screen.getByText("ui.logs.aura-title-all ui.logs.aura-source-title")).toBeTruthy();
+  });
+
+  it("states the stack's own uptime on a SELECTED chip's card", () => {
+    // The tile's own uptime is no longer what the view is showing once several
+    // are picked — the intersection is, and it appears nowhere else.
+    renderIt({ chips: [{ ...CHIPS[0], selected: true }], stacked: true, stackPercent: 34 });
+    fireEvent.mouseEnter(screen.getByLabelText("Attack Up (Signo Drive)"));
+
+    const card = document.querySelector('[data-testid="aura-hover-card"]');
+    expect(card?.textContent).toContain("ui.logs.aura-uptime 80");
+    expect(card?.textContent).toContain("ui.logs.aura-stack-uptime 34");
+  });
+
+  it("states no stack uptime on an UNSELECTED chip, or with no stack at all", () => {
+    renderIt({ chips: [CHIPS[0]], stacked: true, stackPercent: 34 });
+    fireEvent.mouseEnter(screen.getByLabelText("Attack Up (Signo Drive)"));
+    expect(document.querySelector("[data-aura-stack]")).toBeNull();
+
+    renderIt({ chips: [{ ...CHIPS[1], selected: true }], stacked: false, stackPercent: null });
+    fireEvent.mouseEnter(screen.getByLabelText("Veil (Panacea)"));
+    expect(document.querySelector("[data-aura-stack]")).toBeNull();
   });
 });

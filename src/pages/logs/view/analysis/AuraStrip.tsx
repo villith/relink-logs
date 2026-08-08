@@ -32,8 +32,17 @@ export type AuraStripProps = {
   /** "Source auras:" or "Target auras:" — which pinned actor the chips hold. */
   titleKey: string;
   chips: AuraChip[];
-  onSelect: (aura: string) => void;
-  onClear: () => void;
+  /** Toggles one effect in the shared filter. There is deliberately no strip
+   * ✕: each tile is its own clear, and the two strips select into ONE list, so
+   * a "clear all" on either would be a control on one strip that empties the
+   * other — which is the surprise this rework exists to remove. */
+  onToggle: (aura: string) => void;
+  /** True once MORE THAN ONE effect is selected across both strips, which is
+   * when the title has to say the selections intersect. */
+  stacked: boolean;
+  /** How much of the window the whole stack admits, or null when there is no
+   * stack — see `ChartWindowModel.auraStackPercent`. */
+  stackPercent: number | null;
 };
 
 /** One chip's hover card: what the tile itself no longer says.
@@ -42,8 +51,18 @@ export type AuraStripProps = {
  * `CursorCard` under it), because a reader should not have to learn two kinds
  * of tooltip in one view. Sized to its content rather than to that card's
  * 300px floor — an effect name and a percentage do not need the width, and a
- * panel three times wider than its text reads as a mis-render. */
-const AuraTooltip = ({ label, uptimePercent, children }: AuraChip & { children: React.ReactElement }) => {
+ * panel three times wider than its text reads as a mis-render.
+ *
+ * A SELECTED tile inside a stack also states what the stack admits, because its
+ * own uptime is no longer what the view is showing — the intersection is, and
+ * that figure appears nowhere else. */
+const AuraTooltip = ({
+  label,
+  uptimePercent,
+  selected,
+  stackPercent,
+  children,
+}: AuraChip & { stackPercent: number | null; children: React.ReactElement }) => {
   const { t } = useTranslation();
 
   return (
@@ -55,6 +74,9 @@ const AuraTooltip = ({ label, uptimePercent, children }: AuraChip & { children: 
         <Box className="px-[9px] py-1.5">
           <Text className="text-md text-white">{label}</Text>
           <Label>{t("ui.logs.aura-uptime", { percent: uptimePercent })}</Label>
+          {selected && stackPercent !== null && (
+            <Label data-aura-stack>{t("ui.logs.aura-stack-uptime", { percent: stackPercent })}</Label>
+          )}
         </Box>
       }
     >
@@ -72,24 +94,32 @@ const AuraTooltip = ({ label, uptimePercent, children }: AuraChip & { children: 
  * the hover card; the accessible name carries the same thing for a reader who
  * cannot see the art.
  *
- * The tile is also its own clear: clicking the selected one deselects it. It
+ * SEVERAL tiles select at once, and they compose by INTERSECTION: the view
+ * narrows to the time every selected effect was up together. The source and
+ * target strips select into ONE list and apply together — they used to replace
+ * each other, so picking a target effect silently dropped the source one the
+ * strip above was still drawing as selected. While more than one is picked the
+ * title says "(all)", because a row of ticked tiles otherwise reads as "any of
+ * these".
+ *
+ * The tile is also its own clear: clicking a selected one deselects it. It
  * carries no ✕ — beside a 24px square that control would make the selected
  * tile visibly wider than its neighbours and shuffle the whole strip on every
  * click — but the §1.2 rule it served still holds, since the live filter stays
- * visible as the selected tile and dismissible by clicking it.
+ * visible as the selected tiles and dismissible by clicking them.
  *
  * Renders nothing with no chips: a strip exists only while what anchors it
  * does, and an empty row of chrome would say nothing. */
-export const AuraStrip = ({ titleKey, chips, onSelect, onClear }: AuraStripProps) => {
+export const AuraStrip = ({ titleKey, chips, onToggle, stacked, stackPercent }: AuraStripProps) => {
   const { t } = useTranslation();
 
   if (chips.length === 0) return null;
 
   return (
     <Strip rule="top" wrap>
-      <Label>{t(titleKey)}</Label>
+      <Label>{stacked ? t("ui.logs.aura-title-all", { title: t(titleKey) }) : t(titleKey)}</Label>
       {chips.map((chip) => (
-        <AuraTooltip key={chip.aura} {...chip}>
+        <AuraTooltip key={chip.aura} {...chip} stackPercent={stackPercent}>
           <UnstyledButton
             className={[
               TILE_CLASS,
@@ -104,7 +134,9 @@ export const AuraStrip = ({ titleKey, chips, onSelect, onClear }: AuraStripProps
             aria-pressed={chip.selected}
             // The tile writes nothing, so this is the only name it has.
             aria-label={chip.label}
-            onClick={() => (chip.selected ? onClear() : onSelect(chip.aura))}
+            // Toggles ITSELF rather than clearing the whole filter: with several
+            // selected, deselecting one must leave the rest standing.
+            onClick={() => onToggle(chip.aura)}
           >
             {chip.iconUrl === undefined ? (
               // An effect with no art still gets its square: dropping the tile

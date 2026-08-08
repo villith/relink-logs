@@ -18,12 +18,12 @@ export type GroupQuery = {
    * `actionsForPin` at fetch time (it needs the fight's skill list); the
    * resolver only decides whether the pin belongs in the query at all. */
   ability: string | null;
-  /** The raw aura filter (`src:status:…`/`tgt:status:…`), or null. Like
-   * `ability`, the view expands it at fetch time — into the effect's active
+  /** The raw aura filters (`src:status:…`/`tgt:status:…`), possibly empty. Like
+   * `ability`, the view expands them at fetch time — into each effect's active
    * windows, which need the fight's status intervals — the resolver only
-   * decides whether it belongs in the query at all: declared support AND its
+   * decides which belong in the query at all: declared support AND the
    * anchoring pin present (a hand-edited URL can carry one without). */
-  aura: string | null;
+  aura: string[];
   topN: number;
 };
 
@@ -135,16 +135,21 @@ export const resolveViewSpec = (state: AnalysisState, caps: MetricCapabilities):
   };
 };
 
-/** Whether the state's aura filter belongs in the group query: the tab
- * declares support and the pin the aura is anchored to is actually present.
- * Anything else (hand-edited URL, anchor cleared by an older app) is null —
- * the mask must never outlive the chips that explain it. */
-const auraInQuery = (state: AnalysisState, caps: MetricCapabilities): string | null => {
-  if (state.aura === null || !caps.supportsAuraFilter) return null;
-  const anchor = auraAnchorOf(state.aura);
-  if (anchor === "source") return state.source !== null ? state.aura : null;
-  if (anchor === "target") return state.target !== null ? state.aura : null;
-  return null;
+/** Which of the state's aura filters belong in the group query: the tab
+ * declares support and the pin each aura is anchored to is actually present.
+ * Anything else (hand-edited URL, anchor cleared by an older app) drops — a
+ * mask must never outlive the chips that explain it.
+ *
+ * Filtered per ENTRY rather than all-or-nothing, so a source aura kept alive by
+ * its own pin is not discarded because a target aura beside it lost its. */
+const auraInQuery = (state: AnalysisState, caps: MetricCapabilities): string[] => {
+  if (!caps.supportsAuraFilter) return [];
+  return state.aura.filter((aura) => {
+    const anchor = auraAnchorOf(aura);
+    if (anchor === "source") return state.source !== null;
+    if (anchor === "target") return state.target !== null;
+    return false;
+  });
 };
 
 /** i18next key naming what a row IS under this grouping. Reuses the existing

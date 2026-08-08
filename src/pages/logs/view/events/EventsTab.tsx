@@ -14,7 +14,7 @@ import {
   CHIP_CLASS,
   CHIP_SELECTED_CLASS,
   CHIP_SWATCH_CLASS,
-} from "../analysis/ChipStrip";
+} from "../analysis/chipAnatomy";
 import type { StreamContext } from "../analysis/model/bodyContext";
 import { toEventRow, type ActorSpace, type EventKind, type EventRow } from "./eventRows";
 import { defaultScopeKinds, narrowStream, scopeFor, scopeKinds } from "./eventScope";

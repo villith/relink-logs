@@ -14,8 +14,8 @@ const FULL_STATE: AnalysisState = {
   ability: "skill:42",
   window: [10, 95],
   by: "target",
-  aura: "src:status:4:1:unknown",
-  win: "break:2",
+  aura: ["src:status:4:1:unknown", "tgt:status:9:1:1"],
+  win: ["break:2", "sba"],
 };
 
 /** The real state, the real adapter, the real jsdom URL — the point of this
@@ -61,8 +61,8 @@ describe("useAnalysisState", () => {
       ability: null,
       window: null,
       by: null,
-      aura: null,
-      win: null,
+      aura: [],
+      win: [],
     });
   });
 
@@ -82,8 +82,10 @@ describe("useAnalysisState", () => {
     expect(search).toContain("from=10");
     expect(search).toContain("to=95");
     // `:` is legal in a query value, so nuqs leaves it bare — same as `abil`.
-    expect(search).toContain("aura=src:status:4:1:unknown");
-    expect(search).toContain("win=break:2");
+    // Several filters ride ONE param, comma-separated; nuqs percent-encodes the
+    // comma, which is why this reads the decoded form rather than the raw one.
+    expect(decodeURIComponent(search)).toContain("aura=src:status:4:1:unknown,tgt:status:9:1:1");
+    expect(decodeURIComponent(search)).toContain("win=break:2,sba");
   });
 
   it("clears the URL when reset to DEFAULT_STATE", async () => {
@@ -109,8 +111,8 @@ describe("useAnalysisState", () => {
         ability: null,
         window: [10, 95],
         by: null,
-        aura: null,
-        win: null,
+        aura: [],
+        win: [],
       })
     );
   });
@@ -121,7 +123,17 @@ describe("useAnalysisState", () => {
     await waitFor(() => {
       const decoded = JSON.parse(screen.getByTestId("state").textContent ?? "");
       expect(decoded.source).toBe(1);
-      expect(decoded.aura).toBe("src:status:4:1:unknown");
+      expect(decoded.aura).toEqual(["src:status:4:1:unknown"]);
+    });
+  });
+
+  it("decodes a pre-seeded MULTI-value filter param on mount", async () => {
+    renderHarness(["/?src=1&tgt=0&aura=src%3Astatus%3A4%3A1%3Aunknown%2Ctgt%3Astatus%3A9%3A1%3A1&win=sba%2Cbreak%3A1"]);
+
+    await waitFor(() => {
+      const decoded = JSON.parse(screen.getByTestId("state").textContent ?? "");
+      expect(decoded.aura).toEqual(["src:status:4:1:unknown", "tgt:status:9:1:1"]);
+      expect(decoded.win).toEqual(["sba", "break:1"]);
     });
   });
 });

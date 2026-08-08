@@ -13,7 +13,7 @@ import { WINDOW_LABEL_KEY } from "../chartWindowBands";
 import { intersectWireWindows, maskStatusIntervals, selectedChartWindows } from "../chartWindowFilter";
 import { auraAnchorOf, auraPinKey, type AnalysisState } from "../machine/state";
 import { statusIdOfKey } from "../statusLabel";
-import { windowChips, type WindowChip } from "../windowChips";
+import { windowChips, type WindowChipGroup } from "../windowChips";
 import { wireWindowsFrom, type WireWindow } from "../wireWindows";
 
 import { groupByPinKey } from "./useStatusNaming";
@@ -41,6 +41,21 @@ export const combineMasks = (
   return intersectWireWindows(aura, windows);
 };
 
+/** Several auras' masks, folded into the time they were ALL up.
+ *
+ * Intersection is what the multi-select is for: three effects ticked asks "what
+ * did we do under all three", and a union would answer "under any of them",
+ * which the tiles can already say one at a time. An empty result is a real
+ * answer — the stack never lined up — and narrows the view to nothing, which is
+ * the honest reading rather than a reason to fall back to a wider mask.
+ *
+ * No masks at all is `undefined` ("no aura filter"), and exactly one passes
+ * through BY REFERENCE for the same memoisation reason `combineMasks` does. */
+export const intersectMasks = (masks: WireWindow[][]): WireWindow[] | undefined => {
+  if (masks.length === 0) return undefined;
+  return masks.reduce((left, right) => intersectWireWindows(left, right));
+};
+
 /** The WINDOW half: everything the fetches need, and nothing that needs a
  * name.
  *
@@ -64,13 +79,21 @@ export type ChartWindowModel = {
   maskWindows: WireWindow[] | undefined;
   /** The masked intervals the buffs/debuffs tables measure. */
   maskedIntervals: StatusInterval[];
+  /** How much of the chart window the AURAS alone admit, 0–100 (rounded) —
+   * null with fewer than two selected, where each tile's own uptime already
+   * says it and a second figure repeating one tile would only confuse.
+   *
+   * Auras only, not the combined mask: this answers "how much of the fight had
+   * the whole stack up", and folding the battle-window filter in would make one
+   * number move when an unrelated control changed. */
+  auraStackPercent: number | null;
 };
 
 /** The CHIP half: the filter UI, which needs the naming the fetch enables. */
 export type FilterChips = {
   sourceAuraChips: AuraChip[];
   targetAuraChips: AuraChip[];
-  windowFilterChips: WindowChip[];
+  windowFilterGroups: WindowChipGroup[];
 };
 
 export type ChartWindowInput = {
@@ -83,9 +106,9 @@ export type ChartWindowInput = {
   chartWindows: ChartWindow[];
   /** The EFFECTIVE side — a metric with no enemy side reads friendly. */
   hostility: Hostility;
-  /** The resolved fetch's aura, or null — the resolver has already decided
-   * whether a hand-edited URL's aura belongs in the query at all. */
-  fetchAura: string | null;
+  /** The resolved fetch's auras, possibly empty — the resolver has already
+   * decided which of a hand-edited URL's auras belong in the query at all. */
+  fetchAuras: string[];
 };
 
 export const useChartWindow = ({
@@ -96,7 +119,7 @@ export const useChartWindow = ({
   statusIntervals,
   chartWindows,
   hostility,
-  fetchAura,
+  fetchAuras,
 }: ChartWindowInput): ChartWindowModel => {
   // The window the status tables measure, in milliseconds from the fight's
   // start. Buckets are inclusive at both ends, so the last one runs to the
@@ -122,23 +145,33 @@ export const useChartWindow = ({
     [statusIntervals, statusWindow]
   );
 
-  // The active aura's admitted windows — the pinned holder's intervals of the
-  // chosen effect, clipped to the chart window. Undefined = no aura in the
-  // query; an EMPTY array is a real mask and narrows to nothing.
+  // The active auras' admitted windows — for each, the pinned holder's
+  // intervals of that effect clipped to the chart window, then INTERSECTED into
+  // the time they were all up together. Undefined = no aura in the query; an
+  // EMPTY array is a real mask and narrows to nothing.
+  //
+  // An aura whose anchor resolves to no pin contributes NOTHING rather than an
+  // empty mask: the resolver has already dropped those, so reaching one here
+  // means a pin cleared mid-render, and masking the fight to nothing over it
+  // would blank the view for a filter no chip is showing.
   const auraWindows = useMemo(() => {
-    if (fetchAura === null) return undefined;
-    const anchor = auraAnchorOf(fetchAura);
-    const index = anchor === "source" ? state.source : state.target;
-    if (anchor === null || index === null) return undefined;
-    const holder = auraHolderFor(anchor, hostility, index);
-    return wireWindowsFrom(auraHolderIntervals(statusIntervals, auraPinKey(fetchAura), holder), statusWindow);
-  }, [fetchAura, state.source, state.target, hostility, statusIntervals, statusWindow]);
+    const masks = fetchAuras.flatMap((aura) => {
+      const anchor = auraAnchorOf(aura);
+      const index = anchor === "source" ? state.source : state.target;
+      if (anchor === null || index === null) return [];
+      const holder = auraHolderFor(anchor, hostility, index);
+      return [wireWindowsFrom(auraHolderIntervals(statusIntervals, auraPinKey(aura), holder), statusWindow)];
+    });
+    return intersectMasks(masks);
+  }, [fetchAuras, state.source, state.target, hostility, statusIntervals, statusWindow]);
 
-  // The window filter's admitted spans. Undefined = no filter; an EMPTY array
-  // is a real mask (a stale individual index) and narrows to nothing.
+  // The window filter's admitted spans — the UNION of every selected window
+  // (`selectedChartWindows`), merged by `wireWindowsFrom`. Undefined = no
+  // filter; an EMPTY array is a real mask (every selected index went stale) and
+  // narrows to nothing.
   const windowFilterWindows = useMemo(
     () =>
-      state.win === null ? undefined : wireWindowsFrom(selectedChartWindows(chartWindows, state.win), statusWindow),
+      state.win.length === 0 ? undefined : wireWindowsFrom(selectedChartWindows(chartWindows, state.win), statusWindow),
     [state.win, chartWindows, statusWindow]
   );
 
@@ -155,7 +188,16 @@ export const useChartWindow = ({
     [windowedIntervals, maskWindows]
   );
 
-  return { statusWindow, fightDurationMs, windowedIntervals, maskWindows, maskedIntervals };
+  // Measured off the folded mask rather than by summing the tiles': two effects
+  // each up 60% of the fight overlap somewhere between 20% and 60% of it, and
+  // only the intersection knows where.
+  const auraStackPercent = useMemo(() => {
+    if (fetchAuras.length < 2 || auraWindows === undefined || fightDurationMs === 0) return null;
+    const held = auraWindows.reduce((sum, span) => sum + (span.upToMs - span.fromMs), 0);
+    return Math.min(100, Math.round((held / fightDurationMs) * 100));
+  }, [fetchAuras.length, auraWindows, fightDurationMs]);
+
+  return { statusWindow, fightDurationMs, windowedIntervals, maskWindows, maskedIntervals, auraStackPercent };
 };
 
 export type FilterChipsInput = {
@@ -210,7 +252,7 @@ export const useFilterChips = ({
             label: statusDisplayLabel(key),
             uptimePercent:
               fightDurationMs === 0 ? 0 : Math.min(100, Math.round((uptimeMs(group) / fightDurationMs) * 100)),
-            selected: state.aura === `${anchor}:${key}`,
+            selected: state.aura.includes(`${anchor}:${key}`),
             ...(iconUrl === undefined ? {} : { iconUrl }),
           };
         })
@@ -228,12 +270,14 @@ export const useFilterChips = ({
     [supportsAuraFilter, auraChipsFor]
   );
 
-  // The Windows strip's chips: the filter UI for the battle windows.
-  const windowFilterChips = useMemo(
+  // The Windows strip's chips: the filter UI for the battle windows, one group
+  // per kind present.
+  const windowFilterGroups = useMemo(
     () =>
       windowChips(chartWindows, state.win, {
         kindLabel: (kind) => t(WINDOW_LABEL_KEY[kind]),
-        kindChipLabel: (label, count) => t("ui.logs.window-chip-kind", { label, count }),
+        totalLabel: (count) => t("ui.logs.window-chip-total", { count }),
+        selectedLabel: (selected, total) => t("ui.logs.window-chip-selected", { selected, total }),
         rangeLabel: (startMs, endMs) => `${millisecondsToElapsedFormat(startMs)}–${millisecondsToElapsedFormat(endMs)}`,
         durationLabel: (ms) => t("ui.logs.window-chip-duration", { seconds: Math.round(ms / 1000) }),
         breakEnemyLabel: (actorIndex, span) => breakEnemyOf(actorIndex, span),
@@ -242,5 +286,5 @@ export const useFilterChips = ({
     [chartWindows, state.win, t, breakEnemyOf, i18n.language]
   );
 
-  return { sourceAuraChips, targetAuraChips, windowFilterChips };
+  return { sourceAuraChips, targetAuraChips, windowFilterGroups };
 };

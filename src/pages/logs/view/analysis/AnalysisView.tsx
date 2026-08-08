@@ -34,15 +34,17 @@ import "./analysis.css";
 import { selectedChartWindows, windowFilterScrubRange } from "./chartWindowFilter";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { resolveViewSpec } from "./machine/resolve";
-import type { MetricKey } from "./machine/state";
+import type { AnalysisState, MetricKey } from "./machine/state";
 import {
-  setAura as auraTransition,
+  toggleAura as auraTransition,
   clearPin,
+  clearWindowFilters,
   setHostility as hostilityTransition,
   setMetric as metricTransition,
   pinRow,
   regroup,
-  setWindowFilter as windowFilterTransition,
+  toggleWindowFilter as windowFilterTransition,
+  toggleWindowKind as windowKindTransition,
   setWindow as windowTransition,
 } from "./machine/transitions";
 import { useAnalysisState } from "./machine/useAnalysisState";
@@ -209,16 +211,17 @@ export const AnalysisView = () => {
   // (see `useFilterWindows`). Declared HERE, above the fetch memos, because the
   // masks ride the queries: `wireQuery` and the scoped fetch both read
   // `maskWindows`, and the uptime denominators read `fightDurationMs`.
-  const { statusWindow, fightDurationMs, windowedIntervals, maskWindows, maskedIntervals } = useChartWindow({
-    state,
-    range,
-    chartLen,
-    bucketMs: DPS_BUCKET_MS,
-    statusIntervals,
-    chartWindows,
-    hostility,
-    fetchAura: spec.fetch?.aura ?? null,
-  });
+  const { statusWindow, fightDurationMs, windowedIntervals, maskWindows, maskedIntervals, auraStackPercent } =
+    useChartWindow({
+      state,
+      range,
+      chartLen,
+      bucketMs: DPS_BUCKET_MS,
+      statusIntervals,
+      chartWindows,
+      hostility,
+      fetchAuras: spec.fetch?.aura ?? [],
+    });
 
   // Both fetches, their generation guards and every request-identity key (see
   // `useEncounterData`). Extracted whole: the response-ordering rules and the
@@ -306,7 +309,7 @@ export const AnalysisView = () => {
   // because a chip is LABELLED — `statusDisplayLabel` and `breakEnemyOf` both
   // need the party the fetch returns, while the masks have to be resolved
   // before that fetch is sent.
-  const { sourceAuraChips, targetAuraChips, windowFilterChips } = useFilterChips({
+  const { sourceAuraChips, targetAuraChips, windowFilterGroups } = useFilterChips({
     state,
     hostility,
     supportsAuraFilter: caps.supportsAuraFilter,
@@ -454,6 +457,22 @@ export const AnalysisView = () => {
   const debugChart = useMemo(
     () => JSON.stringify({ state, groupBy: spec.groupBy, chart: spec.chart.source, fetch: spec.fetch !== null }),
     [state, spec]
+  );
+
+  // A window-filter change, with the chart's zoom brought along: the scrub
+  // commits to the bucket hull of everything the NEW selection admits.
+  //
+  // An emptied selection returns the whole fight, which is what clearing the
+  // last chip should do. A selection that still holds values but resolves to no
+  // windows (every index went stale against a reparsed log) leaves the scrub
+  // alone rather than zooming to nothing.
+  const withWindowScrub = useCallback(
+    (next: AnalysisState): AnalysisState => {
+      if (next.win.length === 0) return windowTransition(next, null);
+      const scrub = windowFilterScrubRange(selectedChartWindows(chartWindows, next.win), DPS_BUCKET_MS);
+      return scrub === null ? next : windowTransition(next, scrub);
+    },
+    [chartWindows]
   );
 
   // Indexes arrive relative to the data the chart was given, so a drag while
@@ -622,39 +641,42 @@ export const AnalysisView = () => {
       {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
 
       {/* The Windows strip: the battle-window filter's UI, on every tab —
-          unlike the aura strips it needs no pin to anchor it. Selecting a
-          chip also COMMITS the scrub window to the selection's bucket hull —
-          the chart zooms to the window through the same mechanism a drag
-          uses, so the readout, the uptime denominators and the fetches all
-          follow. Clearing the chip clears that zoom with it; a stale index
-          resolves to no hull and leaves the scrub alone. */}
+          unlike the aura strips it needs no pin to anchor it. Changing the
+          selection also COMMITS the scrub window to the SELECTION'S bucket
+          hull — the chart zooms to it through the same mechanism a drag uses,
+          so the readout, the uptime denominators and the fetches all follow.
+          Emptying the selection clears that zoom with it; a selection that
+          resolves to no windows (every index stale) leaves the scrub alone.
+
+          Computed off the state the transition RETURNS rather than off the
+          value the strip reported: with several windows selectable the hull
+          spans all of them, and the clicked one is only the newest. */}
       <WindowStrip
-        chips={windowFilterChips}
-        onSelect={(win) => {
-          const scrub = windowFilterScrubRange(selectedChartWindows(chartWindows, win), DPS_BUCKET_MS);
-          const next = windowFilterTransition(state, win);
-          setState(scrub === null ? next : windowTransition(next, scrub));
-        }}
-        onClear={() => setState(windowTransition(windowFilterTransition(state, null), null))}
+        groups={windowFilterGroups}
+        onToggleWindow={(win) => setState(withWindowScrub(windowFilterTransition(state, win)))}
+        onToggleKind={(kind) => setState(withWindowScrub(windowKindTransition(state, kind)))}
+        onClear={() => setState(windowTransition(clearWindowFilters(state), null))}
       />
 
       {/* The Auras Filter (spec: between chart and table). Each strip exists
           only while its actor pin does — AuraStrip renders nothing for an
-          empty chip list — and one aura is active at a time: selecting on
-          either strip replaces the other's selection. */}
+          empty chip list — and both select into ONE list whose entries all
+          apply at once, by intersection. */}
       {caps.supportsAuraFilter && (
         <>
           <AuraStrip
             titleKey="ui.logs.aura-source-title"
             chips={sourceAuraChips}
-            onSelect={(aura) => setState(auraTransition(state, aura))}
-            onClear={() => setState(auraTransition(state, null))}
+            onToggle={(aura) => setState(auraTransition(state, aura))}
+            stacked={auraStackPercent !== null}
+            stackPercent={auraStackPercent}
           />
           <AuraStrip
             titleKey="ui.logs.aura-target-title"
             chips={targetAuraChips}
-            onSelect={(aura) => setState(auraTransition(state, aura))}
-            onClear={() => setState(auraTransition(state, null))}
+            onToggle={(aura) => setState(auraTransition(state, aura))}
+            stacked={auraStackPercent !== null}
+            stackPercent={auraStackPercent}
           />
         </>
       )}

@@ -3,7 +3,19 @@ import { describe, expect, it } from "vitest";
 import { CAPABILITIES } from "./capabilities";
 import { resolveGroupBy } from "./resolve";
 import { DEFAULT_STATE, type AnalysisState } from "./state";
-import { clearPin, pinRow, regroup, setAura, setHostility, setMetric, setWindow, setWindowFilter } from "./transitions";
+import {
+  clearAuras,
+  clearPin,
+  clearWindowFilters,
+  pinRow,
+  regroup,
+  setHostility,
+  setMetric,
+  setWindow,
+  toggleAura,
+  toggleWindowFilter,
+  toggleWindowKind,
+} from "./transitions";
 
 const state = (over: Partial<AnalysisState>): AnalysisState => ({ ...DEFAULT_STATE, ...over });
 
@@ -91,59 +103,120 @@ describe("axis housekeeping", () => {
   });
 });
 
+const SRC_AURA = "src:status:4:1:unknown";
+const TGT_AURA = "tgt:status:4:1:unknown";
+const SRC_AURA_2 = "src:status:9:1:unknown";
+
 describe("aura filter housekeeping", () => {
-  it("setAura sets and clears the filter without touching pins or by", () => {
+  it("toggleAura selects and deselects without touching pins or by", () => {
     const pinned = state({ source: 1, by: "source" });
-    const withAura = setAura(pinned, "src:status:4:1:unknown");
-    expect(withAura.aura).toBe("src:status:4:1:unknown");
+    const withAura = toggleAura(pinned, SRC_AURA);
+    expect(withAura.aura).toEqual([SRC_AURA]);
     expect(withAura.source).toBe(1);
     expect(withAura.by).toBe("source");
-    expect(setAura(withAura, null).aura).toBeNull();
+    expect(toggleAura(withAura, SRC_AURA).aura).toEqual([]);
   });
 
-  it("clearing the anchoring pin clears the aura", () => {
-    expect(clearPin(state({ source: 1, aura: "src:status:4:1:unknown" }), "source").aura).toBeNull();
-    expect(clearPin(state({ target: 0, aura: "tgt:status:4:1:unknown" }), "target").aura).toBeNull();
+  it("selects several at once, in selection order", () => {
+    let next = toggleAura(state({ source: 1, target: 0 }), SRC_AURA);
+    next = toggleAura(next, TGT_AURA);
+    next = toggleAura(next, SRC_AURA_2);
+    expect(next.aura).toEqual([SRC_AURA, TGT_AURA, SRC_AURA_2]);
   });
 
-  it("clearing an UNRELATED pin keeps the aura", () => {
-    const s = state({ source: 1, target: 0, aura: "src:status:4:1:unknown" });
-    expect(clearPin(s, "target").aura).toBe("src:status:4:1:unknown");
-    expect(clearPin(s, "ability").aura).toBe("src:status:4:1:unknown");
+  it("a target aura no longer replaces a source one — the strips share one list", () => {
+    const next = toggleAura(toggleAura(state({ source: 1, target: 0 }), SRC_AURA), TGT_AURA);
+    expect(next.aura).toEqual([SRC_AURA, TGT_AURA]);
   });
 
-  it("re-pinning the anchor to a DIFFERENT actor clears the aura; same actor keeps it", () => {
-    const s = state({ source: 1, aura: "src:status:4:1:unknown" });
-    expect(pinRow(s, { dim: "source", value: 2 }).aura).toBeNull();
-    expect(pinRow(s, { dim: "source", value: 1 }).aura).toBe("src:status:4:1:unknown");
-    expect(pinRow(s, { dim: "ability", value: "skill:9" }).aura).toBe("src:status:4:1:unknown");
+  it("deselecting one leaves the rest standing", () => {
+    const s = state({ source: 1, target: 0, aura: [SRC_AURA, TGT_AURA, SRC_AURA_2] });
+    expect(toggleAura(s, TGT_AURA).aura).toEqual([SRC_AURA, SRC_AURA_2]);
   });
 
-  it("setHostility clears the aura with the actor pins it depends on", () => {
-    expect(setHostility(state({ source: 1, aura: "src:status:4:1:unknown" }), "enemy").aura).toBeNull();
+  it("clearing the anchoring pin drops ONLY the auras anchored to it", () => {
+    const s = state({ source: 1, target: 0, aura: [SRC_AURA, TGT_AURA] });
+    expect(clearPin(s, "source").aura).toEqual([TGT_AURA]);
+    expect(clearPin(s, "target").aura).toEqual([SRC_AURA]);
   });
 
-  it("setMetric keeps the aura, like the window", () => {
+  it("clearing an UNRELATED pin keeps every aura", () => {
+    const s = state({ source: 1, target: 0, aura: [SRC_AURA] });
+    expect(clearPin(s, "target").aura).toEqual([SRC_AURA]);
+    expect(clearPin(s, "ability").aura).toEqual([SRC_AURA]);
+  });
+
+  it("a pin change that drops nothing returns the same state object", () => {
+    // Consumers memoise off this; rebuilding it would hand them a fresh
+    // identity on every unrelated pin.
+    const s = state({ source: 1, target: 0, aura: [SRC_AURA] });
+    expect(clearPin(s, "ability").aura).toBe(s.aura);
+  });
+
+  it("re-pinning the anchor to a DIFFERENT actor drops its auras; same actor keeps them", () => {
+    const s = state({ source: 1, aura: [SRC_AURA, SRC_AURA_2] });
+    expect(pinRow(s, { dim: "source", value: 2 }).aura).toEqual([]);
+    expect(pinRow(s, { dim: "source", value: 1 }).aura).toEqual([SRC_AURA, SRC_AURA_2]);
+    expect(pinRow(s, { dim: "ability", value: "skill:9" }).aura).toEqual([SRC_AURA, SRC_AURA_2]);
+  });
+
+  it("setHostility clears every aura with the actor pins they depend on", () => {
+    expect(setHostility(state({ source: 1, aura: [SRC_AURA] }), "enemy").aura).toEqual([]);
+  });
+
+  it("setMetric keeps the auras, like the window", () => {
     // damage → taken keeps the source pin, so the anchor survives; the
     // resolver decides whether the destination tab honors the filter.
-    expect(setMetric(state({ source: 1, aura: "src:status:4:1:unknown" }), "taken").aura).toBe(
-      "src:status:4:1:unknown"
-    );
+    expect(setMetric(state({ source: 1, aura: [SRC_AURA] }), "taken").aura).toEqual([SRC_AURA]);
+  });
+
+  it("clearAuras empties the list, and is identity-stable when already empty", () => {
+    expect(clearAuras(state({ aura: [SRC_AURA, TGT_AURA] })).aura).toEqual([]);
+    expect(clearAuras(DEFAULT_STATE)).toBe(DEFAULT_STATE);
   });
 });
 
-describe("setWindowFilter", () => {
-  it("selects and clears", () => {
-    const selected = setWindowFilter(DEFAULT_STATE, "sba:0");
-    expect(selected.win).toBe("sba:0");
-    expect(setWindowFilter(selected, null).win).toBeNull();
+describe("window filter", () => {
+  it("toggleWindowFilter selects and deselects one window", () => {
+    const selected = toggleWindowFilter(DEFAULT_STATE, "sba:0");
+    expect(selected.win).toEqual(["sba:0"]);
+    expect(toggleWindowFilter(selected, "sba:0").win).toEqual([]);
+  });
+
+  it("selects several windows, across kinds", () => {
+    let next = toggleWindowFilter(DEFAULT_STATE, "sba:0");
+    next = toggleWindowFilter(next, "sba:2");
+    next = toggleWindowFilter(next, "break:1");
+    expect(next.win).toEqual(["sba:0", "sba:2", "break:1"]);
+  });
+
+  it("selecting a KIND drops that kind's individual entries — it already admits them", () => {
+    const s = state({ win: ["sba:0", "sba:2", "break:1"] });
+    expect(toggleWindowKind(s, "sba").win).toEqual(["break:1", "sba"]);
+  });
+
+  it("deselecting a kind leaves nothing of it behind", () => {
+    // Not a fallback to whichever windows happened to be ticked before the
+    // kind row was: those were dropped when it went on.
+    const s = toggleWindowKind(state({ win: ["sba:0"] }), "sba");
+    expect(toggleWindowKind(s, "sba").win).toEqual([]);
+  });
+
+  it("a kind toggle leaves OTHER kinds' entries alone", () => {
+    const s = state({ win: ["break:1", "link"] });
+    expect(toggleWindowKind(s, "sba").win).toEqual(["break:1", "link", "sba"]);
+  });
+
+  it("clearWindowFilters empties the list, and is identity-stable when already empty", () => {
+    expect(clearWindowFilters(state({ win: ["sba", "break:0"] })).win).toEqual([]);
+    expect(clearWindowFilters(DEFAULT_STATE)).toBe(DEFAULT_STATE);
   });
 
   it("survives pins, metric switches and hostility flips", () => {
-    let next = setWindowFilter(DEFAULT_STATE, "link");
+    let next = toggleWindowFilter(DEFAULT_STATE, "link");
     next = pinRow(next, { dim: "source", value: 2 });
     next = setMetric(next, "sba");
     next = setHostility(next, "enemy");
-    expect(next.win).toBe("link");
+    expect(next.win).toEqual(["link"]);
   });
 });
