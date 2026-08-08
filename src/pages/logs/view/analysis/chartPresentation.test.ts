@@ -9,7 +9,6 @@ const series = (key: string): DrillSeries[] => [{ key, label: key, values: [1, 2
  * per-player LINES, which is the only place a Total series belongs. */
 const base = {
   statusSeries: null,
-  effectSeries: null,
   groupOverlay: null,
   abilitySeries: null,
   groupPlayerSeries: null,
@@ -36,22 +35,23 @@ describe("chartPresentation — chartSource", () => {
     expect(chartPresentation({ ...base, statusSeries: series("player:0") }).chartSource).toBe("stacks");
   });
 
-  it("reads 'stacks' for the unpinned effect series too", () => {
-    // BOTH aura plots are stacks: the pinned effect's holder depths and the
-    // top-level effects-as-holder-counts chart. Only the group bands drill.
-    expect(chartPresentation({ ...base, effectSeries: series("status:12") }).chartSource).toBe("stacks");
+  it("reads 'base' on a status tab with no effect pinned", () => {
+    // The aura tabs used to overlay the effects THEMSELVES as holder counts
+    // here. They no longer do: with nothing pinned the tab keeps the metric's
+    // own damage plot as the context for reading the table beneath it, and
+    // only a pinned effect switches the chart to stack depths.
+    expect(chartPresentation({ ...base, groupsPath: false, metricKey: "buffs" }).chartSource).toBe("base");
   });
 
   it("reads 'drill' for the fetched aggregates' bands", () => {
     expect(chartPresentation({ ...base, groupOverlay: series("skill:1") }).chartSource).toBe("drill");
   });
 
-  it("prefers the status series over the effect and group series", () => {
+  it("prefers the status series over the group series", () => {
     const statusSeries = series("player:0");
     const result = chartPresentation({
       ...base,
       statusSeries,
-      effectSeries: series("status:12"),
       groupOverlay: series("skill:1"),
     });
     expect(result.overlay).toBe(statusSeries);
@@ -60,15 +60,15 @@ describe("chartPresentation — chartSource", () => {
 
   it("classifies by REFERENCE, so a rebuilt array is not mistaken for another series", () => {
     // `overlay` is whichever input won, and the "stacks" test is
-    // `overlay === statusSeries || overlay === effectSeries`. A tidy-up that
-    // copied the arrays on the way in — or on the way out — would leave the
-    // group bands matching nothing and every stacks chart reading as a drill.
-    const effectSeries = series("status:12");
+    // `overlay === statusSeries`. A tidy-up that copied the arrays on the way
+    // in — or on the way out — would leave the group bands matching nothing
+    // and every stacks chart reading as a drill.
+    const statusSeries = series("player:0");
     const groupOverlay = [...series("skill:1")];
-    const stacks = chartPresentation({ ...base, effectSeries });
+    const stacks = chartPresentation({ ...base, statusSeries });
     const drill = chartPresentation({ ...base, groupOverlay });
 
-    expect(stacks.overlay).toBe(effectSeries);
+    expect(stacks.overlay).toBe(statusSeries);
     expect(drill.overlay).toBe(groupOverlay);
     // Structurally identical bands still classify by which input they came
     // from, never by their shape.
@@ -103,7 +103,6 @@ describe("chartPresentation — withTotal", () => {
 
   it("withholds the Total from the aura stacks", () => {
     expect(chartPresentation({ ...base, statusSeries: series("player:0") }).withTotal).toBe(false);
-    expect(chartPresentation({ ...base, effectSeries: series("status:12") }).withTotal).toBe(false);
   });
 
   it("withholds the Total from any grouping other than source", () => {
@@ -133,12 +132,13 @@ describe("chartPresentation — labelKey", () => {
     );
   });
 
-  it("names the unpinned aura plot as the effects themselves", () => {
-    // The split is `statusSeries !== null`: with no effect pinned the series
-    // ARE the effects, counted by holder.
-    expect(chartPresentation({ ...base, effectSeries: series("status:12") }).labelKey).toBe(
-      "ui.logs.chart-effects-label"
-    );
+  it("titles an unpinned aura tab after its own base chart", () => {
+    // Nothing overlays it, so the heading is the metric's — which on the aura
+    // tabs is the damage plot they now use as context.
+    expect(
+      chartPresentation({ ...base, groupsPath: false, metricKey: "buffs", metricLabelKey: "ui.logs.chart-dps-label" })
+        .labelKey
+    ).toBe("ui.logs.chart-dps-label");
   });
 
   it("names a friendly drill after the level it decomposed to", () => {
@@ -192,7 +192,6 @@ describe("chartPresentation — format and stacked", () => {
     expect(chartPresentation({ ...base, statusSeries: series("player:0"), metricFormat: "percent" }).format).toBe(
       "count"
     );
-    expect(chartPresentation({ ...base, effectSeries: series("status:12") }).format).toBe("count");
   });
 
   it("reads a drill's bands as an amount", () => {
@@ -205,7 +204,6 @@ describe("chartPresentation — format and stacked", () => {
     expect(chartPresentation(base).stacked).toBe(false);
     expect(chartPresentation({ ...base, groupPlayerSeries: { 0: [1, 2] } }).stacked).toBe(false);
     expect(chartPresentation({ ...base, statusSeries: series("player:0") }).stacked).toBe(true);
-    expect(chartPresentation({ ...base, effectSeries: series("status:12") }).stacked).toBe(true);
     expect(chartPresentation({ ...base, groupOverlay: series("skill:1") }).stacked).toBe(true);
   });
 });

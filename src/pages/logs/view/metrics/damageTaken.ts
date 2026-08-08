@@ -2,7 +2,16 @@ import type { ActionType, ComputedPlayerState, DamageTakenState, EnemyType } fro
 import { humanizeNumber, ratePerSecond } from "@/utils";
 
 import { skillsForAbilityKey } from "../abilitySkills";
-import { enemyRowKey, playersColumns } from "./damageDone";
+import {
+  enemyRowKey,
+  playerRowKey,
+  skillKeyPayload,
+  takenAttackRowLabel,
+  takenAttackRowParts,
+  takenRowKey,
+  takenRowLabel,
+} from "../rowKey";
+import { playersColumns } from "./damageDone";
 import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
 
 const format = humanizeNumber;
@@ -11,18 +20,9 @@ const format = humanizeNumber;
  * binary older than the field. A zero would claim the player was never hit. */
 const NOT_RECORDED = "—";
 
-/** What a `takenAttack` row's label spells: the attacker and the attack, both
- * halves as their raw wire shapes so the view (which owns i18n) can name and
- * illustrate each. The label IS this JSON — `attackRows` writes it and the
- * view reads it through this parser, so the grammar has one author. */
-export const takenAttackRowParts = (label: string): { enemyType: EnemyType; actionId: ActionType } | null => {
-  try {
-    const parts = JSON.parse(label) as { enemyType: EnemyType; actionId: ActionType };
-    return parts && typeof parts === "object" && "enemyType" in parts && "actionId" in parts ? parts : null;
-  } catch {
-    return null;
-  }
-};
+/** Re-exported from the grammar's own module, where the writing half lives
+ * beside it — the view has always imported this from here. */
+export { takenAttackRowParts };
 
 /** The i18n key (and params) naming one enemy attack. Enemy actions carry no
  * names in the game data, so a Normal attack is its raw id; a DoT tick has a
@@ -57,7 +57,7 @@ export const drilldownColumns = (damage: number, hits: number, fightDurationMs?:
 const attackRows = (breakdown: DamageTakenState[], fightDurationMs?: number): MetricRow[] => {
   const byAttack = new Map<string, { damage: number; hits: number }>();
   for (const row of breakdown) {
-    const key = JSON.stringify({ enemyType: row.enemyType, actionId: row.actionId });
+    const key = takenAttackRowLabel(row.enemyType, row.actionId);
     const found = byAttack.get(key);
     if (found) {
       found.damage += row.totalDamage;
@@ -67,7 +67,7 @@ const attackRows = (breakdown: DamageTakenState[], fightDurationMs?: number): Me
 
   return [...byAttack.entries()]
     .map(([key, { damage, hits }]) => ({
-      key: `taken:${key}`,
+      key: takenRowKey(key),
       label: key,
       kind: "takenAttack" as const,
       value: damage,
@@ -168,7 +168,7 @@ export const damageTaken: MetricDescriptor = {
       return [...players]
         .sort((a, b) => (b.totalDamageTaken ?? 0) - (a.totalDamageTaken ?? 0))
         .map((p) => ({
-          key: `player:${p.index}`,
+          key: playerRowKey(p.index),
           label: String(p.index),
           value: p.totalDamageTaken ?? 0,
           columns:
@@ -202,8 +202,8 @@ export const damageTaken: MetricDescriptor = {
     if (level !== "abilities" || pins.source !== null) return null;
 
     if (hostility === "enemy") {
-      if (!row.key.startsWith("skill:")) return null;
-      const key = row.key.slice("skill:".length);
+      const key = skillKeyPayload(row.key);
+      if (key === null) return null;
       return players
         .map((player) => ({ player, skills: skillsForAbilityKey(player.skillBreakdown, key) }))
         .filter(({ skills }) => skills.length > 0)
@@ -211,7 +211,7 @@ export const damageTaken: MetricDescriptor = {
           const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
           const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
           return {
-            key: `player:${player.index}`,
+            key: playerRowKey(player.index),
             label: String(player.index),
             kind: "player",
             value: damage,
@@ -225,13 +225,13 @@ export const damageTaken: MetricDescriptor = {
         .sort((a, b) => b.value - a.value);
     }
 
-    if (!row.key.startsWith("taken:")) return null;
-    const label = row.key.slice("taken:".length);
+    const label = takenRowLabel(row.key);
+    if (label === null) return null;
     return players
       .map((player) => ({
         player,
         entries: (player.damageTakenBreakdown ?? []).filter(
-          (entry) => JSON.stringify({ enemyType: entry.enemyType, actionId: entry.actionId }) === label
+          (entry) => takenAttackRowLabel(entry.enemyType, entry.actionId) === label
         ),
       }))
       .filter(({ entries }) => entries.length > 0)
@@ -239,7 +239,7 @@ export const damageTaken: MetricDescriptor = {
         const damage = entries.reduce((sum, entry) => sum + entry.totalDamage, 0);
         const hits = entries.reduce((sum, entry) => sum + entry.hits, 0);
         return {
-          key: `player:${player.index}`,
+          key: playerRowKey(player.index),
           label: String(player.index),
           kind: "player",
           value: damage,

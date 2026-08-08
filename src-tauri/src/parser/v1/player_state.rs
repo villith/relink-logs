@@ -17,10 +17,14 @@ const GUARD_STUN_WINDOW_MS: i64 = 150;
 /// The breakdown row a damage event belongs to: `(action, child character)`,
 /// exactly the key [`PlayerState::breakdown_row_mut`] uses.
 ///
-/// Stateful, and therefore order-dependent, for two reasons: Ferry's pet actions
-/// are corrected from the last pet skill seen, and every supplementary-damage
-/// hit folds into the FIRST supplementary row this player opened, whatever its
-/// payload or body. Feed it one player's damage events in log order.
+/// Stateful, and therefore order-dependent: Ferry's pet actions are corrected
+/// from the last pet skill seen. Feed it one player's damage events in log
+/// order.
+///
+/// Echoes are deliberately NOT folded here. Each `SupplementaryDamage(n)` keeps
+/// its own row, because `n` names the skill that caused it — the frontend folds
+/// the whole family onto one display row anyway (`abilityRowKey`), so folding
+/// here as well only destroyed the attribution the collapse toggle needs.
 ///
 /// THE one place the row key is decided. [`PlayerState`] owns one of these and
 /// routes every damage event through it, so the drill-down chart keying its
@@ -30,7 +34,6 @@ const GUARD_STUN_WINDOW_MS: i64 = 150;
 #[derive(Debug, Default)]
 pub struct BreakdownKeying {
     last_known_pet_skill: Option<ActionType>,
-    first_supplementary: Option<(ActionType, CharacterType)>,
     /// The row each RAW action id most recently resolved to, for events that
     /// carry an id but no row of their own — today only attributed SBA gains
     /// (see [`Self::row_for_raw_action`]).
@@ -69,15 +72,6 @@ impl BreakdownKeying {
         } else {
             event.action_id
         };
-
-        // Every echo shares one row regardless of payload or body, so the first
-        // one seen names it — which is what collapses the whole family onto a
-        // single breakdown row.
-        if matches!(action, ActionType::SupplementaryDamage(_)) {
-            return *self
-                .first_supplementary
-                .get_or_insert((action, child_character_type));
-        }
 
         (action, child_character_type)
     }
@@ -1267,10 +1261,10 @@ mod tests {
     }
 
     #[test]
-    fn keying_folds_every_echo_onto_the_first_supplementary_row() {
-        // The payload differs per trigger and every echo shares one row, so
-        // three distinct payloads must still collapse to a single key — or the
-        // chart draws one band per trigger against a single table row.
+    fn keying_keeps_one_echo_row_per_payload() {
+        // The parser no longer folds echoes: the payload names the skill that
+        // caused the echo, and the frontend's own fold (`abilityRowKey`) is what
+        // draws them as one row. Three distinct payloads are three rows here.
         let events = [
             plain_event(ActionType::SupplementaryDamage(1), 10),
             plain_event(ActionType::SupplementaryDamage(2), 20),
@@ -1279,13 +1273,17 @@ mod tests {
 
         let (keys, rows) = keys_and_rows(&events);
 
-        assert_eq!(rows.len(), 1, "one row for every echo");
+        assert_eq!(rows.len(), 3, "one row per distinct echo payload");
         assert_eq!(
             keys.iter().copied().collect::<HashSet<_>>().len(),
-            1,
-            "one key for every echo"
+            3,
+            "one key per distinct echo payload"
         );
-        assert_eq!(keys[0], rows[0]);
+        assert_eq!(
+            keys.iter().copied().collect::<HashSet<_>>(),
+            rows.iter().copied().collect::<HashSet<_>>(),
+            "every key must name a row, and every row must have a key"
+        );
     }
 
     #[test]
@@ -1305,10 +1303,11 @@ mod tests {
     }
 
     #[test]
-    fn supplementary_events_merge_into_single_row() {
+    fn supplementary_events_get_a_row_each_and_still_count_toward_the_total() {
         let mut player = empty_player();
         apply(&mut player, &plain_event(ActionType::Normal(1), 1000));
-        // Different trigger action ids, same merged row.
+        // Different trigger action ids, and the parser no longer merges them —
+        // each payload names the skill that caused that echo.
         apply(
             &mut player,
             &plain_event(ActionType::SupplementaryDamage(1), 200),
@@ -1318,14 +1317,18 @@ mod tests {
             &plain_event(ActionType::SupplementaryDamage(99), 800),
         );
 
-        assert_eq!(player.skill_breakdown.len(), 2);
-        let merged = player
+        assert_eq!(player.skill_breakdown.len(), 3);
+        let echoes: Vec<&SkillState> = player
             .skill_breakdown
             .iter()
-            .find(|s| matches!(s.action_type, ActionType::SupplementaryDamage(_)))
-            .unwrap();
-        assert_eq!(merged.hits, 2);
-        assert_eq!(merged.total_damage, 1000);
+            .filter(|s| matches!(s.action_type, ActionType::SupplementaryDamage(_)))
+            .collect();
+        assert_eq!(echoes.len(), 2);
+        assert!(echoes.iter().all(|echo| echo.hits == 1));
+        assert_eq!(
+            echoes.iter().map(|echo| echo.total_damage).sum::<u64>(),
+            1000
+        );
         assert_eq!(player.total_damage, 2000);
     }
 

@@ -1,46 +1,27 @@
-import type { ActionType, ComputedPlayerState, EnemyType } from "@/types";
+import type { ComputedPlayerState, EnemyType } from "@/types";
 
-import { parseEnemyRow } from "../metrics/damageDone";
+import type { RowKeying } from "../abilitySkills";
 import type { MetricRow } from "../metrics/types";
+import { parseEnemyRow, rowRefOf } from "../rowKey";
 
 import type { CardSection } from "./HoverCard";
-import { foldPartyDealt, sortedEntries } from "./cardFold";
+import { TARGET_COLOR, foldPartyDealt, sortedEntries } from "./cardFold";
+import type { CardLabels } from "./cardLabels";
 
-/** Name/colour lookups the view injects, so these stay pure functions — the
- * same posture as `SectionLabels` in cardSections.ts.
- *
- * Deliberately the UNION of what both enemy-side cards need rather than one
- * type each: the view holds a single labels object for both tabs, and two
- * near-identical shapes would let one tab's names drift from the other's. */
-export type HostilityCardLabels = {
-  /** One enemy attack, named with its attacker for context — enemy action ids
-   * carry no names of their own. Same lookup the taken card uses. */
-  attack: (enemyType: EnemyType, actionId: ActionType) => string;
-  /** `owner` is the player whose breakdown the key is being named for. Action
-   * ids collide across characters (120 is Eustace's "Grade 1 Shot" AND Id's
-   * "Combo Finisher (Dragonform)"), so an ability folded out of one player's
-   * table must be named against THAT player — the by-ability section below
-   * spans the whole party, so it passes an owner for every entry. */
-  ability: (key: string, owner?: ComputedPlayerState) => string;
-  /** A player's display name, honouring streamer mode and the label template. */
-  source: (index: number) => string;
-  /** That player's own party colour, so a player row matches their bar. */
-  sourceColor: (index: number) => string;
-  /** The entities' art, optional so tests stay text-only. */
-  sourceIcon?: (index: number) => string | undefined;
-  abilityIcon?: (key: string, owner?: ComputedPlayerState) => string | undefined;
-};
+/** What the enemy-side cards need. Deliberately the UNION of what BOTH of them
+ * need rather than one type each: the view holds a single labels object for the
+ * two tabs, and two near-identical shapes would let one tab's names drift from
+ * the other's. */
+export type HostilityCardLabels = Pick<
+  CardLabels,
+  "attack" | "ability" | "source" | "sourceColor" | "sourceIcon" | "abilityIcon"
+>;
 
-/** Players painted as the card's "other side": the same red the damage card's
- * target section uses, so a section about the OPPOSING side is the same colour
- * whichever tab it is on. */
-const TARGET_COLOR = "var(--mantine-color-red-6)";
-
-/** The enemy type an `enemy:`-keyed row names, or null for anything that is not
- * one. The label IS the type's JSON — the same grammar `damageDone`'s and
- * `damageTaken`'s enemy rows write, parsed by its one author. */
+/** The enemy type an enemy-keyed row names, or null for anything that is not
+ * one — read through the row-key grammar's one author (`rowKey.ts`), so this
+ * cannot come to disagree with the folds that write those rows. */
 const enemyOfRow = (row: MetricRow): EnemyType | null =>
-  row.key.startsWith("enemy:") ? parseEnemyRow(row.label) : null;
+  rowRefOf(row.key)?.kind === "enemy" ? parseEnemyRow(row.label) : null;
 
 /** Damage Done, enemy side: one ATTACKER explained by the attacks it landed and
  * by the party members it landed them on — both folded out of the party's own
@@ -123,12 +104,16 @@ export const enemyReceivedCardSectionsFor = ({
   players,
   color,
   labels,
+  keying,
 }: {
   row: MetricRow;
   players: ComputedPlayerState[];
   /** The row's own colour, so the card matches the bar it came from. */
   color: string;
   labels: HostilityCardLabels;
+  /** The view's row keying — this card's by-ability section lists what the
+   * party used, so an echo has to ride its cause here as it does in the table. */
+  keying?: RowKeying;
 }): CardSection[] | null => {
   const enemy = enemyOfRow(row);
   if (enemy === null) return null;
@@ -139,7 +124,8 @@ export const enemyReceivedCardSectionsFor = ({
   const { bySource, byAbility } = foldPartyDealt(
     players,
     (target) => JSON.stringify(target.enemyType) === enemyKey,
-    labels
+    labels,
+    keying
   );
   // Nobody dealt to this enemy — no card, rather than an empty one.
   if (bySource.length === 0) return null;

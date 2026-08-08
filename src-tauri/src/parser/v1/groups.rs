@@ -195,6 +195,84 @@ pub struct GroupAggregate {
     pub series: Vec<i64>,
 }
 
+/// One key's WHOLE-FIGHT total, ignoring everything the query narrows in time.
+///
+/// The chart colours a band by its rank here rather than by its rank in the
+/// filtered aggregation. Ranking by the filtered one repainted the plot
+/// whenever a filter reordered it — the same fault `actorColor` already refuses
+/// for enemies, whose colour is deliberately "NOT the row's position".
+///
+/// An AMOUNT rather than a rank, because the band fold is a display concern
+/// this crate does not have: `groupBandsFor` folds several `FriendlyAbility`
+/// keys into one band through the skill-group table, so a rank over raw keys is
+/// not a rank over drawn bands. The view folds these the same way it folds the
+/// aggregates, then ranks.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupReference {
+    pub key: GroupKey,
+    pub amount: i64,
+}
+
+/// The whole-fight ranking behind the chart's band colours.
+///
+/// EMPTY when the query narrows no time: the response's own aggregates already
+/// are that ranking, and walking twice for one answer is waste. The view reads
+/// an empty list as "rank by what you were sent".
+///
+/// Otherwise the same query with its three time-narrowing fields removed, run
+/// through [`aggregate_groups`] itself rather than through a second walk of its
+/// own — a reference that counted hits by a different rule than the aggregates
+/// it colours would be worse than no reference at all. The cost is one more
+/// linear pass over an event slice this request has already decompressed and
+/// reparsed, and only when a filter is actually active.
+///
+/// Keys the mask excludes ENTIRELY are the point of this: they never appear as
+/// aggregates, and without them the surviving bands' ranks compact and the
+/// colours shift anyway — which is the bug.
+pub fn aggregate_group_reference(
+    events: &[(i64, Message)],
+    player_data: &[Option<PlayerData>; 4],
+    segments: &[TargetSegment],
+    assignment: &[Option<usize>],
+    query: &GroupQuery,
+    start_time: i64,
+    interval: i64,
+    chart_len: usize,
+    filters: MeterFilters,
+) -> Result<Vec<GroupReference>, GroupQueryError> {
+    if query.windows.is_none() && query.from_ms.is_none() && query.up_to_ms.is_none() {
+        return Ok(Vec::new());
+    }
+
+    let mut whole = query.clone();
+    whole.windows = None;
+    whole.from_ms = None;
+    whole.up_to_ms = None;
+    // No cap: `Other` is a chart rollup rather than a band anyone draws, and a
+    // rank it occupied would be a colour no band could claim.
+    whole.top_n = None;
+
+    Ok(aggregate_groups(
+        events,
+        player_data,
+        segments,
+        assignment,
+        &whole,
+        start_time,
+        interval,
+        chart_len,
+        filters,
+    )?
+    .into_iter()
+    .filter(|aggregate| aggregate.key != GroupKey::Other)
+    .map(|aggregate| GroupReference {
+        key: aggregate.key,
+        amount: aggregate.measure.amount,
+    })
+    .collect())
+}
+
 /// Errors a `GroupQuery` can fail validation with before [`aggregate_groups`]
 /// ever walks the event log.
 ///
@@ -2193,5 +2271,121 @@ mod tests {
 
         assert_eq!(aggregates.len(), 1);
         assert_eq!(aggregates[0].measure.amount, 100);
+    }
+
+    // --- the colour reference ------------------------------------------------
+
+    #[test]
+    fn reference_is_empty_when_the_query_narrows_no_time() {
+        // The response's own aggregates already ARE the whole-fight ranking, so
+        // walking a second time would buy nothing. Empty is how the view is
+        // told to rank by what it was sent.
+        let events = vec![(1_000, Message::DamageEvent(player_hit(0, 9, 100, 5)))];
+        let query = friendly_damage_query(Dimension::Ability);
+
+        let reference = aggregate_group_reference(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            2,
+            MeterFilters::default(),
+        )
+        .expect("no filter is not a validation error");
+
+        assert!(reference.is_empty());
+    }
+
+    #[test]
+    fn reference_ranks_by_the_whole_fight_while_the_mask_narrows_the_rows() {
+        // Action 1 lands one huge hit OUTSIDE the mask; action 2 lands a small
+        // one inside it. The aggregates see only action 2 — but the reference
+        // must still rank action 1 first, which is exactly what stops a band
+        // changing colour when the mask is applied.
+        let events = vec![
+            (1_000, Message::DamageEvent(player_hit(0, 9, 1, 1_000))), // rel 0 - outside
+            (2_000, Message::DamageEvent(player_hit(0, 9, 2, 10))),    // rel 1000 - inside
+        ];
+        let mut query = friendly_damage_query(Dimension::Ability);
+        query.windows = Some(vec![TimeWindow {
+            from_ms: 1_000,
+            up_to_ms: 2_000,
+        }]);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            2,
+            MeterFilters::default(),
+        )
+        .expect("a windows mask is not a validation error");
+        assert_eq!(aggregates.len(), 1, "the mask admits one action");
+
+        let reference = aggregate_group_reference(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            2,
+            MeterFilters::default(),
+        )
+        .expect("a windows mask is not a validation error");
+
+        // BOTH actions, largest first — including the one the mask excluded
+        // entirely. Without it the surviving band's rank would compact from 1
+        // to 0 and it would take the first colour instead of the second.
+        assert_eq!(reference.len(), 2);
+        assert_eq!(reference[0].amount, 1_000);
+        assert_eq!(reference[1].amount, 10);
+        assert_eq!(
+            reference[1].key,
+            GroupKey::FriendlyAbility {
+                action_type: ActionType::Normal(2),
+                child_character_type: CharacterType::Pl1000,
+            },
+            "the admitted band is ranked SECOND by the whole fight"
+        );
+    }
+
+    #[test]
+    fn reference_keeps_the_scrub_out_too_and_never_carries_the_rollup() {
+        // The scrub narrows time exactly as the mask does, so it is stripped by
+        // the same rule. `Other` is a chart rollup rather than a band anyone
+        // draws, and a rank it occupied would be a colour no band could claim.
+        let events = vec![
+            (1_000, Message::DamageEvent(player_hit(0, 9, 1, 1_000))),
+            (2_000, Message::DamageEvent(player_hit(0, 9, 2, 10))),
+            (3_000, Message::DamageEvent(player_hit(0, 9, 3, 5))),
+        ];
+        let mut query = friendly_damage_query(Dimension::Ability);
+        query.from_ms = Some(2_000);
+        query.top_n = Some(1);
+
+        let reference = aggregate_group_reference(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            1_000,
+            1_000,
+            4,
+            MeterFilters::default(),
+        )
+        .expect("a scrub is not a validation error");
+
+        assert_eq!(reference.len(), 3, "every action in the whole fight");
+        assert!(reference.iter().all(|row| row.key != GroupKey::Other));
     }
 }

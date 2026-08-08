@@ -1,7 +1,14 @@
 import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
 import { humanizeNumber, ratePerSecond, share } from "@/utils";
 
-import { groupSkillsForRows, mergeSkillsByAction, skillsForAbilityKey, type AbilitySkills } from "../abilitySkills";
+import {
+  groupSkillsForRows,
+  mergeSkillsByAction,
+  skillsForAbilityKey,
+  splitSupplementary,
+  type AbilitySkills,
+} from "../abilitySkills";
+import { enemyRowKey, playerRowKey, skillKey, skillKeyPayload } from "../rowKey";
 import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
 
 const format = humanizeNumber;
@@ -33,6 +40,48 @@ export const damageColumns = (damage: number, hits: number, min: string, max: st
   share(damage, total),
 ];
 
+/** Everything a damage BAR reads off one set of breakdown rows: its length,
+ * its supplementary split, and the numeric columns beside it.
+ *
+ * The ability rows and their per-player children are the same bar drawn at two
+ * grains — same sum, same split rule, same columns — and only the key, label
+ * and pin differ. Written once so the echo split (which decides whether a bar
+ * mounts one segment or two) cannot be changed for the parent and missed for
+ * the children, which is the exact way a row and its expansion come to disagree
+ * about their own total.
+ *
+ * `subValue` is ABSENT rather than 0 where there is no split, so a row with no
+ * echoes mounts a single segment. Min and max stay over the DIRECT rows only:
+ * they are per-hit extremes of the named skill, and an echo is a different
+ * damage source — folding it in would make a skill's smallest hit read as an
+ * echo tick. */
+const damageCells = (skills: SkillState[], total: number): { value: number; subValue?: number; columns: string[] } => {
+  const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
+  const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
+  // Only a MIXED set has a split to report — `splitSupplementary` owns both
+  // that rule and the direct/echo partition, so every bar in the view splits
+  // the same way.
+  const { direct, echoes, mixed } = splitSupplementary(skills);
+  const supplementary = mixed ? echoes.reduce((sum, skill) => sum + skill.totalDamage, 0) : 0;
+  return {
+    value: damage,
+    ...(supplementary > 0 ? { subValue: supplementary } : {}),
+    columns: damageColumns(
+      damage,
+      hits,
+      extreme(
+        direct.map((skill) => skill.minDamage),
+        (values) => Math.min(...values)
+      ),
+      extreme(
+        direct.map((skill) => skill.maxDamage),
+        (values) => Math.max(...values)
+      ),
+      total
+    ),
+  };
+};
+
 /** The numeric columns a players-level row fills, in header order: amount, its
  * per-second rate, and its share of that level's own total. Written once
  * because BOTH metrics' `columnKeys("players")` promise this same shape and
@@ -48,60 +97,28 @@ export const playersColumns = (amount: number, total: number, fightDurationMs?: 
   share(amount, total),
 ];
 
-/** Rows for a set of ability (or member-skill) groups. */
-const abilityRows = (groups: AbilitySkills[], total: number, colorSlot: number, pinnable: boolean): MetricRow[] =>
+/** Rows for a set of ability (or member-skill) groups.
+ *
+ * With the collapse on, a group holds its cause's breakdown rows AND the echo
+ * rows attributed to it, so damage and hits sum without a special case — see
+ * `damageCells`, which the per-player children below share.
+ *
+ * Exported for its own tests; the descriptor below is its only other caller. */
+export const abilityRows = (
+  groups: AbilitySkills[],
+  total: number,
+  colorSlot: number,
+  pinnable: boolean
+): MetricRow[] =>
   groups
-    .map(({ key, skills }) => {
-      const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
-      const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
-      return {
-        key: `skill:${key}`,
-        label: key,
-        value: damage,
-        columns: damageColumns(
-          damage,
-          hits,
-          extreme(
-            skills.map((skill) => skill.minDamage),
-            (values) => Math.min(...values)
-          ),
-          extreme(
-            skills.map((skill) => skill.maxDamage),
-            (values) => Math.max(...values)
-          ),
-          total
-        ),
-        pinOnClick: pinnable ? { ability: key } : null,
-        colorSlot,
-      };
-    })
+    .map(({ key, skills }) => ({
+      key: skillKey(key),
+      label: key,
+      ...damageCells(skills, total),
+      pinOnClick: pinnable ? { ability: key } : null,
+      colorSlot,
+    }))
     .sort((a, b) => b.value - a.value);
-
-/** The table row key naming one enemy TYPE, and the label that goes with it:
- * the label IS the type's JSON, and the key is that JSON under an `enemy:`
- * prefix the view matches on.
- *
- * Four folds across three files emit these rows — `enemyRows` and
- * `enemyDealtRows` below, `enemyReceivedRows` on the taken tab, and
- * `hostilitySeriesFor`'s chart bands — and a band only lines up with the row it
- * decomposes if all four spell the key identically, so they all spell it here.
- * `parseEnemyRow` is the matching reader. */
-export const enemyRowKey = (type: EnemyType): string => `enemy:${JSON.stringify(type)}`;
-
-/** The `EnemyType` an `enemy` row's label spells, or null for anything that is
- * not one.
- *
- * The reading half of `enemyRowKey` above. Tolerant of a malformed label for
- * the same reason `statusLabelFor` is of a stale pin: `translateEnemyType` and
- * `enemyIconUrl` both answer null with "unknown", which beats throwing inside
- * a row renderer. */
-export const parseEnemyRow = (label: string): EnemyType | null => {
-  try {
-    return JSON.parse(label) as EnemyType;
-  } catch {
-    return null;
-  }
-};
 
 /** What the pinned ability dealt to each enemy TYPE — the opposite direction
  * from `enemyDealtRows` below, which asks what enemies dealt to the party.
@@ -228,7 +245,7 @@ export const damageDone: MetricDescriptor = {
     perTarget: true,
   },
 
-  rows: ({ players, level, pins, fightDurationMs, hostility }): MetricRow[] => {
+  rows: ({ players, level, pins, fightDurationMs, hostility, keying }): MetricRow[] => {
     // The enemy side answers one question at every level — what each enemy
     // dealt to the (scoped) party — so it ignores the drill level entirely
     // except for which column shape that answer takes.
@@ -239,7 +256,7 @@ export const damageDone: MetricDescriptor = {
       return [...players]
         .sort((a, b) => b.totalDamage - a.totalDamage)
         .map((p) => ({
-          key: `player:${p.index}`,
+          key: playerRowKey(p.index),
           label: String(p.index),
           value: p.totalDamage,
           columns: [format(p.totalDamage), format(p.dps), share(p.totalDamage, total)],
@@ -265,7 +282,7 @@ export const damageDone: MetricDescriptor = {
     // One row is what the user pins, so a row must be one thing: a group where
     // the app groups, and otherwise one ability however many breakdown rows fed
     // it.
-    if (level === "abilities") return abilityRows(groupSkillsForRows(breakdown), total, colorSlot, true);
+    if (level === "abilities") return abilityRows(groupSkillsForRows(breakdown, keying), total, colorSlot, true);
 
     // The skills level is the same breakdown NOT condensed: the scoped fetch has
     // already narrowed the party to the pinned row's member actions, so folding
@@ -301,41 +318,29 @@ export const damageDone: MetricDescriptor = {
   // rows are enemy ATTACKS, and their honest per-source split is per SPAWN —
   // which `DamageTakenState` does not record — so they stay leaves rather
   // than pretending victims are sources.
-  children: ({ row, players, level, pins, hostility }): MetricRow[] | null => {
+  children: ({ row, players, level, pins, hostility, keying }): MetricRow[] | null => {
     if (level !== "abilities" || hostility === "enemy" || pins.source !== null) return null;
-    if (!row.key.startsWith("skill:")) return null;
-    const key = row.key.slice("skill:".length);
+    const key = skillKeyPayload(row.key);
+    if (key === null) return null;
     const total = players.reduce((sum, player) => sum + player.totalDamage, 0);
     return players
-      .map((player) => ({ player, skills: skillsForAbilityKey(player.skillBreakdown, key) }))
+      .map((player) => ({ player, skills: skillsForAbilityKey(player.skillBreakdown, key, keying) }))
       .filter(({ skills }) => skills.length > 0)
-      .map(({ player, skills }): MetricRow => {
-        const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
-        const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
-        return {
-          key: `player:${player.index}`,
+      .map(
+        ({ player, skills }): MetricRow => ({
+          key: playerRowKey(player.index),
           label: String(player.index),
           kind: "player",
-          value: damage,
-          columns: damageColumns(
-            damage,
-            hits,
-            extreme(
-              skills.map((skill) => skill.minDamage),
-              (values) => Math.min(...values)
-            ),
-            extreme(
-              skills.map((skill) => skill.maxDamage),
-              (values) => Math.max(...values)
-            ),
-            total
-          ),
+          // A child is a table bar too, so it reads the same cells its parent
+          // does — over THIS player's skills, which is what makes the section a
+          // split of the row rather than a restatement of it.
+          ...damageCells(skills, total),
           // Clicking a player child pins that player — the machine keeps the
           // ability free, so the next state is that player's drill.
           pinOnClick: { source: player.index },
           colorSlot: player.partyIndex,
-        };
-      })
+        })
+      )
       .sort((a, b) => b.value - a.value);
   },
 };

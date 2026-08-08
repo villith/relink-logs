@@ -52,6 +52,7 @@ const LABELS: RowCardLabels = {
   sourceColor: () => "#000",
   target: (segment: number) => `spawn:${segment}`,
   attack: (type, action) => `${JSON.stringify(type)}:${JSON.stringify(action)}`,
+  cause: (labelKey: string) => `cause:${labelKey}`,
 };
 
 const DAMAGE_CARD: MetricCard = {

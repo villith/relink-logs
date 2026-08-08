@@ -22,7 +22,7 @@ npm run tauri dev      # full app: builds hook.dll (release), runs Tauri backend
 - `npm run format` / `npm run format-check` — Prettier.
 - Rust: `cargo build` / `cargo test` / `cargo clippy` at the workspace root, or `-p gbfr-logs` / `-p hook` / `-p protocol` for a single crate.
 
-There is no Rust-side automated test suite of note; verify backend changes by running the app against the game.
+The Rust side is well covered — ~750 `#[test]`s, most of them in `src-tauri` (the parser, the group aggregation, the chart builders) and `src-hook`. Prefer a unit test against fake events over a manual run: `cargo test -p gbfr-logs parser::v1::groups` and friends are fast. What the tests CANNOT cover is anything that reads live game memory — the RE'd signatures and offsets — so hook changes still need a run against the game.
 
 ## Architecture: five subprojects, two languages
 

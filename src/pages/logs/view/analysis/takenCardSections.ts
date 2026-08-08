@@ -1,19 +1,15 @@
-import type { ActionType, ComputedPlayerState, EnemyType } from "@/types";
+import type { ComputedPlayerState } from "@/types";
 
-import { takenAttackRowParts } from "../metrics/damageTaken";
 import type { MetricRow } from "../metrics/types";
+import { playerRowIndex, takenAttackRowLabel, takenAttackRowParts, takenRowLabel } from "../rowKey";
 
+import type { CardLabels } from "./cardLabels";
 import type { CardSection } from "./HoverCard";
 
-/** Name and art lookups the view injects, so this stays a pure function —
- * the same posture as `SectionLabels` in cardSections.ts. */
-export type TakenSectionLabels = {
-  /** One enemy attack, named with its attacker for context — enemy action ids
-   * carry no names of their own. */
-  attack: (enemyType: EnemyType, actionId: ActionType) => string;
-  enemy: (type: EnemyType) => string;
-  enemyIcon?: (type: EnemyType) => string | undefined;
-};
+/** What the taken tab's cards name and draw with. Declared in `cardLabels.ts`
+ * with the other cards' lookups, so the attack namer here and the one the enemy
+ * side uses are one field rather than two spellings of it. */
+export type TakenSectionLabels = Pick<CardLabels, "attack" | "enemy" | "enemyIcon">;
 
 /** The attacker section's colour: enemies are the same red the damage card's
  * target section paints them. */
@@ -34,8 +30,9 @@ export const takenCardSectionsFor = ({
   color: string;
   labels: TakenSectionLabels;
 }): CardSection[] | null => {
-  if (!row.key.startsWith("player:")) return null;
-  const player = players.find((candidate) => `player:${candidate.index}` === row.key);
+  const index = playerRowIndex(row.key);
+  if (index === null) return null;
+  const player = players.find((candidate) => candidate.index === index);
   const breakdown = player?.damageTakenBreakdown ?? [];
   if (breakdown.length === 0) return null;
 
@@ -44,7 +41,7 @@ export const takenCardSectionsFor = ({
   for (const entry of breakdown) {
     // JSON keys, not String(): both halves are tagged unions and String()
     // would merge every one of them into "[object Object]".
-    const attackKey = JSON.stringify({ enemyType: entry.enemyType, actionId: entry.actionId });
+    const attackKey = takenAttackRowLabel(entry.enemyType, entry.actionId);
     const enemyKey = JSON.stringify(entry.enemyType);
     const attack = byAttack.get(attackKey);
     if (attack) attack.value += entry.totalDamage;
@@ -116,7 +113,7 @@ export const takenAbilityCardSectionsFor = ({
   color: string;
   labels: TakenVictimLabels;
 }): CardSection[] | null => {
-  if (!row.key.startsWith("taken:")) return null;
+  if (takenRowLabel(row.key) === null) return null;
   // The label IS the JSON `takenAttackRowParts` reads — the grammar has one
   // author (`attackRows` / `groupRowsFor`'s enemyAttack case).
   const parts = takenAttackRowParts(row.label);

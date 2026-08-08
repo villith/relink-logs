@@ -75,14 +75,11 @@ describe("resolveViewSpec", () => {
   });
 
   it("picks the chart shape from what is drawn", () => {
-    expect(resolveViewSpec(state({ metric: "sba" }), CAPABILITIES.sba).chart).toMatchObject({
-      source: "base",
-      format: "percent",
-    });
-    expect(resolveViewSpec(state({ metric: "buffs" }), CAPABILITIES.buffs).chart).toMatchObject({
-      source: "stacks",
-      format: "count",
-    });
+    // Source only. The chart's title and format live on `chartPresentation`,
+    // which decides them from the series that won — a second answer here would
+    // be one the view never reads.
+    expect(resolveViewSpec(state({ metric: "sba" }), CAPABILITIES.sba).chart).toMatchObject({ source: "base" });
+    expect(resolveViewSpec(state({ metric: "buffs" }), CAPABILITIES.buffs).chart).toMatchObject({ source: "stacks" });
   });
 
   it("inverts the row label and regroup-tab vocabulary on the enemy side", () => {
@@ -123,7 +120,7 @@ describe("resolveViewSpec", () => {
 describe("the aura filter", () => {
   it("never affects the grouping", () => {
     const base = state({ source: 1 });
-    const withAura = state({ source: 1, aura: "src:status:4:1:unknown" });
+    const withAura = state({ source: 1, aura: ["src:status:4:1:unknown"] });
     expect(resolveGroupBy(withAura, CAPABILITIES.damage)).toBe(resolveGroupBy(base, CAPABILITIES.damage));
     expect(resolveViewSpec(withAura, CAPABILITIES.damage).groupBy).toBe(
       resolveViewSpec(base, CAPABILITIES.damage).groupBy
@@ -131,17 +128,35 @@ describe("the aura filter", () => {
   });
 
   it("rides the fetch only when its anchoring pin is present", () => {
-    expect(resolveViewSpec(state({ source: 1, aura: "src:status:4:1:unknown" }), CAPABILITIES.damage).fetch?.aura).toBe(
-      "src:status:4:1:unknown"
-    );
     expect(
-      resolveViewSpec(state({ metric: "taken", target: 0, aura: "tgt:status:4:1:unknown" }), CAPABILITIES.taken).fetch
+      resolveViewSpec(state({ source: 1, aura: ["src:status:4:1:unknown"] }), CAPABILITIES.damage).fetch?.aura
+    ).toEqual(["src:status:4:1:unknown"]);
+    expect(
+      resolveViewSpec(state({ metric: "taken", target: 0, aura: ["tgt:status:4:1:unknown"] }), CAPABILITIES.taken).fetch
         ?.aura
-    ).toBe("tgt:status:4:1:unknown");
+    ).toEqual(["tgt:status:4:1:unknown"]);
     // Hand-edited URL: an aura whose anchor pin is absent filters nothing.
-    expect(resolveViewSpec(state({ aura: "src:status:4:1:unknown" }), CAPABILITIES.damage).fetch?.aura).toBeNull();
+    expect(resolveViewSpec(state({ aura: ["src:status:4:1:unknown"] }), CAPABILITIES.damage).fetch?.aura).toEqual([]);
     expect(
-      resolveViewSpec(state({ source: 1, aura: "tgt:status:4:1:unknown" }), CAPABILITIES.damage).fetch?.aura
-    ).toBeNull();
+      resolveViewSpec(state({ source: 1, aura: ["tgt:status:4:1:unknown"] }), CAPABILITIES.damage).fetch?.aura
+    ).toEqual([]);
+  });
+
+  it("drops an unanchored aura WITHOUT dropping the anchored ones beside it", () => {
+    // Per-entry, not all-or-nothing: a source aura kept alive by its own pin
+    // must survive a target aura that lost its.
+    expect(
+      resolveViewSpec(state({ source: 1, aura: ["src:status:4:1:unknown", "tgt:status:9:1:1"] }), CAPABILITIES.damage)
+        .fetch?.aura
+    ).toEqual(["src:status:4:1:unknown"]);
+  });
+
+  it("carries every aura once BOTH anchors are pinned", () => {
+    expect(
+      resolveViewSpec(
+        state({ source: 1, target: 0, aura: ["src:status:4:1:unknown", "tgt:status:9:1:1"] }),
+        CAPABILITIES.damage
+      ).fetch?.aura
+    ).toEqual(["src:status:4:1:unknown", "tgt:status:9:1:1"]);
   });
 });

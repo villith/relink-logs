@@ -1,8 +1,12 @@
 import "@fontsource-variable/noto-sans";
-import "@mantine/charts/styles.css";
+import "@mantine/charts/styles.layer.css";
 import { createTheme, MantineProvider, rem } from "@mantine/core";
-import "@mantine/core/styles.css";
+import "@mantine/core/styles.layer.css";
 import ReactDOM from "react-dom/client";
+// Pulls in Tailwind's theme and utilities layers and, through them, the app's
+// design tokens in `components/ui/theme.css`. Imported ONLY here: importing
+// theme.css directly as well bypasses Tailwind's processing, which lands a
+// second, inert copy of its `@theme` blocks in every bundle.
 import "./styles.css";
 
 // Populates the skill-name bridge map before the first render. The module's

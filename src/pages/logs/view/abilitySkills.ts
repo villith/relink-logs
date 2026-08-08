@@ -1,7 +1,7 @@
 import { skillGroupFor } from "@/components/skillGrouping";
 import type { ActionType, CharacterType, SkillRow, SkillState } from "@/types";
 
-import { abilityKey, parseAbilityKey } from "./abilityKey";
+import { abilityKey, parseAbilityKey, SUPPLEMENTARY_KEY } from "./abilityKey";
 import { groupBy } from "./groupBy";
 
 /** One ability row and every breakdown row behind it. */
@@ -15,21 +15,89 @@ const CHILD_SEPARATOR = "@";
  * Primal Burst, whose three classes share one action id. */
 const ANY_CHILD = "*";
 
-/** The one key every supplementary-damage hit folds onto.
- *
- * The parser folds ALL echoes onto a single breakdown row whatever their payload
- * or body (`BreakdownKeying::first_supplementary`), so the row key must fold the
- * same way or the two disagree — a selector listing 24 entries that all read
- * "Supplementary Damage", each pinning a quarter of the row it names.
- *
- * The payload is normalised to 0 rather than dropped so the key still parses:
- * `getSkillName` names every echo from the variant alone, so a canonical payload
- * reads exactly as the row does. */
-const SUPPLEMENTARY_ROW: ActionType = { SupplementaryDamage: 0 };
-
 /** Whether an action is a supplementary-damage (echo) hit. */
 const isSupplementary = (actionType: ActionType): boolean =>
   typeof actionType === "object" && Object.hasOwn(actionType, "SupplementaryDamage");
+
+/** A set of breakdown rows split into its direct and echo halves.
+ *
+ * `mixed` is the whole point: only a set holding BOTH has a split to report.
+ * One that is echo all the way across — the echo row with the toggle off, or
+ * the residue a collapse leaves behind — is already described by its own
+ * label, and painting the whole bar in the fainter shade would say nothing.
+ *
+ * The one author of that rule. Four surfaces draw the same split (the table's
+ * ability rows, their per-player children, the groups path's rows and members,
+ * and the hover card's sections), and a bar that split where the row beside it
+ * did not is exactly what a second spelling buys. */
+export const splitSupplementary = <T extends SkillRow>(rows: T[]): { direct: T[]; echoes: T[]; mixed: boolean } => {
+  const echoes = rows.filter((row) => isSupplementary(row.actionType));
+  const mixed = echoes.length > 0 && echoes.length < rows.length;
+  return { direct: mixed ? rows.filter((row) => !isSupplementary(row.actionType)) : rows, echoes, mixed };
+};
+
+/** How rows are keyed for one view.
+ *
+ * Built once and passed down, so the table, the chart, the selector and the
+ * timeline cannot disagree about which row an echo belongs to. Absent means
+ * today's behaviour, which is what keeps every caller that does not care
+ * (`selectorOptions`, `abilityLabel`, `rowIcon`) unchanged. */
+export type RowKeying = {
+  collapseSupplementary: boolean;
+  /** The row key a cause id resolves to FOR ONE BODY, or null when that body
+   * used no such action — which is what keeps an unattributable echo on the
+   * echo row. Pass the echo's own `childCharacterType`; see `rowKeyingFor`. */
+  causeRow: (causeId: number, body: CharacterType) => string | null;
+  /** The ACTION that cause id names, one level below `causeRow`.
+   *
+   * A row is where an echo belongs; this is which of that row's member skills
+   * it belongs to. Only a skill-GROUP row has members, and listing an echo
+   * beside them as a member of its own says the group contains a skill it does
+   * not — while dropping it would stop the children summing to the parent they
+   * expand. Folded onto its cause, both hold. */
+  causeAction: (causeId: number, body: CharacterType) => ActionType | null;
+};
+
+/** One entry in the cause index: a body and the action id it used.
+ *
+ * **A cause id means nothing on its own.** Skill ids are numbered per character:
+ * `Normal(100)` is Id's first normal attack, Percival's, and Id's dragon form's,
+ * and `Normal(130)` is a member of Eustace's normal-attack group while every
+ * other character leaves it ungrouped. Keyed by the bare id across the party,
+ * the last body to use it named the row for all of them — which put one player's
+ * echoes on another player's row ("Normal Attack (Percival)" under Id), and put
+ * the rest on raw-action rows standing beside the very group they belong to (a
+ * second "Grade 4 Shot" under Eustace).
+ *
+ * The echo's own body is the right scope: an echo is dealt by the same actor as
+ * the hit that triggered it, so the parser files both under one
+ * `childCharacterType` (`child_character_type_for`). */
+const causeIndexKey = (body: CharacterType, causeId: number): string => `${JSON.stringify(body)}:${causeId}`;
+
+/** The keying for one view, from what the party actually used.
+ *
+ * Derived from the observed actions rather than a lookup table, for the same
+ * reason `actionsForPin` is: it cannot claim a cause nobody landed. */
+export const rowKeyingFor = (skills: SkillRow[], collapse: boolean): RowKeying => {
+  // Row and action together, from ONE scan: they answer the same question at
+  // two levels, and two scans is how they would come to name different causes.
+  //
+  // Last writer wins and cannot matter: `abilityRowKey` is a function of
+  // (action, body) alone, so every entry under one index key agrees.
+  const byCause = new Map<string, { row: string; action: ActionType }>();
+  if (collapse) {
+    for (const skill of skills) {
+      const action = skill.actionType;
+      if (typeof action !== "object" || !("Normal" in action)) continue;
+      byCause.set(causeIndexKey(skill.childCharacterType, action.Normal), { row: abilityRowKey(skill), action });
+    }
+  }
+  return {
+    collapseSupplementary: collapse,
+    causeRow: (causeId, body) => byCause.get(causeIndexKey(body, causeId))?.row ?? null,
+    causeAction: (causeId, body) => byCause.get(causeIndexKey(body, causeId))?.action ?? null,
+  };
+};
 
 /** The key identifying the ability row a skill belongs to.
  *
@@ -48,10 +116,16 @@ const isSupplementary = (actionType: ActionType): boolean =>
  *   damage split (the defect 68e148c fixed in the hover card).
  *
  * The result doubles as the `ability` pin, so it must stay URL-safe. */
-export const abilityRowKey = (skill: SkillRow): string => {
-  // Echoes fold first: they are never grouped, and every one of them is the
-  // same row (see `SUPPLEMENTARY_ROW`).
-  if (isSupplementary(skill.actionType)) return abilityKey(SUPPLEMENTARY_ROW);
+export const abilityRowKey = (skill: SkillRow, keying?: RowKeying): string => {
+  // Echoes fold first: ungrouped by nature, and without collapse keying every
+  // one of them is the same row (see `SUPPLEMENTARY_KEY`). With it, an echo
+  // rides the row of the skill that caused it — and falls back to the echo row
+  // when that cause names nothing the party used.
+  if (isSupplementary(skill.actionType)) {
+    if (keying?.collapseSupplementary !== true) return SUPPLEMENTARY_KEY;
+    const causeId = (skill.actionType as { SupplementaryDamage: number }).SupplementaryDamage;
+    return keying.causeRow(causeId, skill.childCharacterType) ?? SUPPLEMENTARY_KEY;
+  }
 
   const group = skillGroupFor(skill);
   if (group === null) return abilityKey(skill.actionType);
@@ -116,7 +190,8 @@ const foldBy = (skills: SkillState[], keyOf: (skill: SkillState) => string): Abi
   [...groupBy(skills, keyOf)].map(([key, grouped]) => ({ key, skills: grouped }));
 
 /** A player's `skillBreakdown` as ability rows, in first-seen order. */
-export const groupSkillsForRows = (skills: SkillState[]): AbilitySkills[] => foldBy(skills, abilityRowKey);
+export const groupSkillsForRows = (skills: SkillState[], keying?: RowKeying): AbilitySkills[] =>
+  foldBy(skills, (skill) => abilityRowKey(skill, keying));
 
 /** A breakdown as one row per ACTION, in first-seen order.
  *
@@ -135,8 +210,8 @@ export const mergeSkillsByAction = (skills: SkillState[]): AbilitySkills[] =>
  *
  * Prefer this over `find`: a single row is one contributor's share, so
  * explaining a row with it describes a fraction of what the row reports. */
-export const skillsForAbilityKey = <T extends SkillRow>(skills: T[], key: string): T[] =>
-  skills.filter((skill) => abilityRowKey(skill) === key);
+export const skillsForAbilityKey = <T extends SkillRow>(skills: T[], key: string, keying?: RowKeying): T[] =>
+  skills.filter((skill) => abilityRowKey(skill, keying) === key);
 
 /** The raw actions a pinned ability row stands for, for the backend's filter.
  *
@@ -146,23 +221,55 @@ export const skillsForAbilityKey = <T extends SkillRow>(skills: T[], key: string
  * the cases no table lookup could (Primal Burst's shared id, Ferry's remapped
  * pet actions).
  *
- * **Pass the breakdown rows AND the selection facts.** A breakdown row carries
- * only the payload the parser folded that row onto, so the echo row alone names
- * one `SupplementaryDamage(n)` out of the dozens behind it — filtering on that
- * reported a quarter of the row's damage as its whole. The facts carry every
- * distinct action, which is what makes the expansion complete.
+ * **Pass the breakdown rows AND the selection facts.** The echo ROW is a display
+ * fold over dozens of `SupplementaryDamage(n)` payloads and its key carries only
+ * the canonical one, so expanding the pin from the key alone filtered to that
+ * single payload and reported a quarter of the row's damage as its whole. The
+ * facts carry every distinct action, which is what makes the expansion complete.
  *
  * Falls back to the key's own action when nothing matches, because an empty list
  * reads as "every ability" at the backend and would silently drop the filter. */
-export const actionsForPin = (key: string, skills: SkillRow[]): ActionType[] => {
+export const actionsForPin = (key: string, skills: SkillRow[], keying?: RowKeying): ActionType[] => {
   const actions = new Map<string, ActionType>();
-  for (const skill of skillsForAbilityKey(skills, key)) {
+  for (const skill of skillsForAbilityKey(skills, key, keying)) {
     actions.set(abilityKey(skill.actionType), skill.actionType);
   }
-  if (actions.size > 0) return [...actions.values()];
+  return actions.size > 0 ? [...actions.values()] : pinFallback(key);
+};
 
+/** What a pin stands for when NO observed hit keys to it. Shared by the two
+ * expansions below so a row the timeline resolves and the same row the backend
+ * filter resolves cannot fall back differently. */
+const pinFallback = (key: string): ActionType[] => {
   const parsed = parseAbilityKey(key);
   // A group that matched nothing has no raw action to fall back to; the caller
   // sees an empty filter, which is the same thing the empty table shows.
   return parsed === null || groupOfPin(key) !== null ? [] : [parsed];
+};
+
+/** `actionsForPin` for a whole table's worth of rows, in ONE pass.
+ *
+ * The same expansion and the same fallback — but keyed forward off the skills
+ * instead of filtered backward per row. `actionsForPin` rescans every skill for
+ * every key, computing a row key per entry; the timeline's lane index asks for
+ * every ability row at once, so that is rows × skills row-key computations each
+ * time the index is built. This is rows + skills. */
+export const actionsForPins = (keys: string[], skills: SkillRow[], keying?: RowKeying): Map<string, ActionType[]> => {
+  const byRow = new Map<string, Map<string, ActionType>>();
+  for (const skill of skills) {
+    const rowKey = abilityRowKey(skill, keying);
+    let actions = byRow.get(rowKey);
+    if (actions === undefined) {
+      actions = new Map<string, ActionType>();
+      byRow.set(rowKey, actions);
+    }
+    actions.set(abilityKey(skill.actionType), skill.actionType);
+  }
+
+  const expanded = new Map<string, ActionType[]>();
+  for (const key of keys) {
+    const actions = byRow.get(key);
+    expanded.set(key, actions === undefined ? pinFallback(key) : [...actions.values()]);
+  }
+  return expanded;
 };

@@ -37,6 +37,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import sharp from "sharp";
 
+import { abilitySlotsOf, actionNameKey } from "./ability-actions.mjs";
 import { msgDecode } from "./msg-decode.mjs";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
@@ -44,12 +45,24 @@ const SLICED = path.join(ROOT, "icon-export", "sliced");
 const TABLES = path.join(ROOT, "icon-export", "raw", "tables.sqlite");
 const OUT = path.join(ROOT, "src", "assets", "game-icons");
 
+/** Rebuild the maps against the sprites already shipped, leaving the PNGs
+ * alone. For fixing a MAP — a new edge in `buildAbilityMap`, a table that
+ * moved — where re-quantizing 500 unchanged sprites only risks churning them
+ * through whatever `sharp` is installed today. A full run still needs the
+ * atlas extraction; this one needs only `tables.sqlite` and the msg files. */
+const MAPS_ONLY = process.argv.includes("--maps-only");
+
 const db = new DatabaseSync(TABLES, { readOnly: true });
 
 /** Emits the sliced sprites whose name matches, renamed by the capture
  * group and palette-quantized, replacing whatever the family directory held
  * before. */
 const emitFamily = async (family, sliceDir, pattern) => {
+  if (MAPS_ONLY) {
+    const kept = (await readdir(path.join(OUT, family))).length;
+    console.log(`${family}: ${kept} icons (kept, --maps-only)`);
+    return kept;
+  }
   const outDir = path.join(OUT, family);
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
@@ -95,20 +108,25 @@ await emitFamily("ability", "ability", /^cmn_icablt_(pl\d{4}_\d{2})\.png$/);
 //
 // The meter's currency is per-character ACTION ids (the damage/cause id
 // space); ability art is keyed by ability SLOT. The game ships the edge in
-// `system/player/data/pl####/pl####_action.msg`: each ActionInfo row carries
-// its action `id_` and, for ability actions, an `abilityTag_` (`AB_PL####_NN`).
-// Two things make a second, independent stream necessary:
+// `system/player/data/pl####/pl####_action.msg`, whose ActionInfo rows carry
+// an action `id_` plus three fields that between them say which ability it
+// belongs to — see `ability-actions.mjs`, which owns that reading and its
+// precedence (`relatedAbilityType_` over `abilityTag_`, plus a `derivedId_`
+// walk for the untagged variants).
 //
-//   1. Only base actions are tagged — variant actions (arts levels,
-//      follow-ups) often carry no tag. Those are recovered by joining the
-//      action's curated English name (ui.json `skills.<Char>`) to the ability
-//      names in `system/table/text/en/text.msg` (`TXT_AB_PL####_NN`).
-//   2. A few tags are dev copy-paste junk — Io's empowered Gravity Well rows
-//      (7200-7203) are tagged with GRAN's Decimate (`AB_PL0000_01`). When the
-//      tag's own ability name contradicts the action's name and the name-join
-//      resolves, the name-join wins; every such override is printed.
+// Two more streams fill what the action rows cannot answer:
 //
-// Both streams then resolve slot -> icon through ability.tbl's IconFileName,
+//   1. An action whose ordinal names a slot the character has no ability.tbl
+//      row for. Id's dragonform claims a sixth (Ragnarok Form) against five
+//      PL2000 rows, because that art lives under his human form. Joined by
+//      the action's own name across every character's rows, ambiguity
+//      resolved toward the character's own art and skipped when it cannot be.
+//   2. Actions that are not in `<char>_action.msg` AT ALL, yet are named in
+//      ui.json `skills.<Char>` (Io's Concentration, 11000). Those are joined
+//      by curated English name to the ability names in
+//      `system/table/text/en/text.msg` (`TXT_AB_PL####_NN`).
+//
+// Every stream then resolves slot -> icon through ability.tbl's IconFileName,
 // which is NOT the identity map: upgraded ability entries reuse base icons
 // (AB_PL2100_13 -> 2100_02) and Id's dragonform slots scatter (AB_PL2000_02
 // -> 2000_05, AB_PL2000_05 -> 1900_06), so skipping the tbl hop attaches
@@ -155,68 +173,86 @@ const buildAbilityMap = async () => {
     if (!slotOfName.has(nk)) slotOfName.set(nk, slot);
   }
 
-  // Shared movesets tag the twin (Gran's arts rows carry AB_PL0100_08), so
-  // prefer the same slot on the character's own ability row.
-  const resolveIcon = (plUpper, tagChar, slot) =>
-    iconOfTag.get(`AB_${plUpper}_${slot}`) ?? iconOfTag.get(`AB_${tagChar}_${slot}`);
+  const iconOfSlot = (plUpper, slot) => iconOfTag.get(`AB_${plUpper}_${slot}`);
 
   const ui = JSON.parse(await readFile(path.join(ROOT, "src-tauri", "lang", "en", "ui.json"), "utf8"));
   const abilityFiles = new Set(await readdir(path.join(OUT, "ability")));
-  const result = {};
-  let total = 0;
-  for (const char of Object.keys(ui.skills)) {
-    if (!/^Pl\d{4}$/.test(char)) continue;
-    const plLower = char.toLowerCase();
-    const plUpper = char.replace(/^Pl/, "PL");
+  const chars = Object.keys(ui.skills).filter((char) => /^Pl\d{4}$/.test(char));
 
-    const tagStream = new Map();
+  // Pass 1: decode each character's action rows and read the slot each action
+  // belongs to. Held rather than emitted, because the name index below has to
+  // see EVERY character before any one of them can fall back to it.
+  const perChar = new Map();
+  for (const char of chars) {
+    const plLower = char.toLowerCase();
+    let rows = null;
     for (const caseDir of ["data", "Data"]) {
       const p = path.join(ROOT, "icon-export", "raw", "system", "player", caseDir, plLower, `${plLower}_action.msg`);
-      let root;
       try {
-        root = msgDecode(await readFile(p));
+        rows = [...msgDecode(await readFile(p))]
+          .filter(([key]) => key === "ActionInfo")
+          .map(([, value]) => Object.fromEntries(value));
+        break;
       } catch {
         continue;
       }
-      for (const [key, value] of root) {
-        if (key !== "ActionInfo") continue;
-        const a = Object.fromEntries(value);
-        const tm = /^AB_((?:PL|NP)\d{4})_(\d{2})$/.exec(a.abilityTag_ ?? "");
-        if (!tm) continue;
-        const icon = resolveIcon(plUpper, tm[1], tm[2]);
-        if (icon) tagStream.set(Number(a.id_), { icon, slot: tm[2], tagChar: tm[1] });
-      }
-      break;
+    }
+    if (rows === null) continue;
+    perChar.set(char, { rows, slots: abilitySlotsOf(rows) });
+  }
+
+  // The cross-character name index (stream 1 above), built only from actions
+  // whose slot DOES resolve — an unresolved action cannot vouch for a name.
+  // A name that reaches two different icons is kept with both, and the pick
+  // below prefers the looking character's own art; where neither matches and
+  // the name is ambiguous it resolves to nothing rather than to a coin flip.
+  const iconsOfActionName = new Map();
+  for (const [char, { rows, slots }] of perChar) {
+    const plUpper = char.replace(/^Pl/, "PL");
+    for (const row of rows) {
+      const slot = slots.get(Number(row.id_));
+      const icon = slot === undefined ? undefined : iconOfSlot(plUpper, slot);
+      const key = actionNameKey(row.actionName_);
+      if (icon === undefined || key === "") continue;
+      if (!iconsOfActionName.has(key)) iconsOfActionName.set(key, new Set());
+      iconsOfActionName.get(key).add(icon);
+    }
+  }
+  const iconByActionName = (char, name) => {
+    const icons = [...(iconsOfActionName.get(actionNameKey(name)) ?? [])];
+    const own = icons.find((icon) => icon.startsWith(`${char.replace(/^Pl/, "")}_`));
+    return own ?? (icons.length === 1 ? icons[0] : undefined);
+  };
+
+  const result = {};
+  let total = 0;
+  for (const char of chars) {
+    const plUpper = char.replace(/^Pl/, "PL");
+    const map = {};
+
+    // The action rows themselves, and the name fallback for the slots this
+    // character has no ability row for.
+    const { rows = [], slots = new Map() } = perChar.get(char) ?? {};
+    const nameOf = new Map(rows.map((row) => [Number(row.id_), row.actionName_]));
+    for (const [action, slot] of slots) {
+      const icon = iconOfSlot(plUpper, slot) ?? iconByActionName(char, nameOf.get(action));
+      if (icon) map[action] = icon;
     }
 
-    const nameStream = new Map();
+    // The curated-English join, for the actions the action rows never mention.
+    // It does not override what the game data already answered — that ordering
+    // is what retires the junk-tag adjudication this join used to carry, since
+    // `relatedAbilityType_` now names the right ability outright.
     for (const [id, name] of Object.entries(ui.skills[char])) {
-      if (!/^\d+$/.test(id)) continue;
+      if (!/^\d+$/.test(id) || map[id] !== undefined) continue;
       const full = norm(String(name));
       const base = norm(String(name).replace(/\s*\([^)]*\)\s*$/, ""));
       const slot = slotOfName.get(`${plUpper}|${full}`) ?? slotOfName.get(`${plUpper}|${base}`);
       if (!slot) continue;
-      const icon = resolveIcon(plUpper, plUpper, slot);
-      if (icon) nameStream.set(Number(id), { icon, base });
+      const icon = iconOfSlot(plUpper, slot);
+      if (icon) map[id] = icon;
     }
 
-    const map = {};
-    for (const [action, tag] of tagStream) {
-      const byName = nameStream.get(action);
-      if (byName && byName.icon !== tag.icon) {
-        const tagName = norm(nameOfSlot.get(`${tag.tagChar}|${tag.slot}`) ?? "");
-        if (tagName && tagName !== byName.base) {
-          console.warn(
-            `  ${char} ${action}: junk tag AB_${tag.tagChar}_${tag.slot} ` +
-              `("${nameOfSlot.get(`${tag.tagChar}|${tag.slot}`)}") on "${ui.skills[char][action]}" — using ${byName.icon}`
-          );
-          map[action] = byName.icon;
-          continue;
-        }
-      }
-      map[action] = tag.icon;
-    }
-    for (const [action, v] of nameStream) if (map[action] === undefined) map[action] = v.icon;
     for (const [action, icon] of Object.entries(map))
       if (!abilityFiles.has(`pl${icon}.png`)) {
         console.warn(`  ${char} ${action}: icon pl${icon}.png missing from the sliced set, omitting`);

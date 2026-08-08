@@ -49,4 +49,47 @@ describe("abilityRowIconUrl", () => {
   it("returns undefined for a key nobody used", () => {
     expect(abilityRowIconUrl("Normal:1200", [])).toBeUndefined();
   });
+
+  it("resolves a GROUPED action addressed by its raw action key", () => {
+    // Percival's Zerreissen (Empowered), action 40, folds into the `zerreissen`
+    // group — so its ROW key is the group's. The hover card's ability fold
+    // keys by the raw action deliberately (`foldPartyDealt`), and matching row
+    // keys alone left every grouped action in that card text-only beside a
+    // table showing its art.
+    const skill = { actionType: { Normal: 40 }, childCharacterType: "Pl1000" };
+    const percival = player("Pl1000", [skill]);
+
+    expect(abilityRowKey(skill)).not.toBe("Normal:40");
+    expect(abilityRowIconUrl("Normal:40", [percival])).toMatch(/pl1000_04\.png/);
+  });
+
+  it("inherits the group's art for a member action that has none of its own", () => {
+    // Id's dragonform Reginleiv Recidive Combo (1010) is a follow-up the game
+    // gives no ability art; it continues 1000, which has it, and the two are
+    // one row. The group is the parent to inherit from.
+    const id = player("Pl1900", [{ actionType: { Normal: 1010 }, childCharacterType: "Pl2000" }]);
+
+    expect(abilityRowIconUrl("Normal:1010", [id])).toMatch(/pl2000_01\.png/);
+  });
+
+  it("inherits from the group TABLE, not just the actions the player used", () => {
+    // The sibling that carries the art may not appear in this breakdown at all
+    // — a fight where only the follow-up landed. The group's membership is a
+    // static fact, so the inheritance must not depend on what was used.
+    const id = player("Pl1900", [
+      { actionType: { Normal: 1010 }, childCharacterType: "Pl2000" },
+      { actionType: { Normal: 1100 }, childCharacterType: "Pl2000" },
+    ]);
+
+    expect(abilityRowIconUrl("Normal:1010", [id])).toMatch(/pl2000_01\.png/);
+  });
+
+  it("stays undefined for a group whose members have no art at all", () => {
+    // Percival's Schlacht is a charged attack, not an ability — neither member
+    // of the group has a diamond, so there is nothing to inherit and a blank
+    // box would be worse than no box.
+    const percival = player("Pl1000", [{ actionType: { Normal: 200 }, childCharacterType: "Pl1000" }]);
+
+    expect(abilityRowIconUrl("Normal:200", [percival])).toBeUndefined();
+  });
 });

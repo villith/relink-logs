@@ -2,6 +2,7 @@ import type { ComputedPlayerState, SbaSourceState } from "@/types";
 import { share } from "@/utils";
 
 import { groupSkillsForRows, mergeSkillsByAction } from "../abilitySkills";
+import { SBA_UNATTRIBUTED_KEY, playerRowKey, sbaCausePayload, sbaCauseRowKey, skillKey } from "../rowKey";
 import type { MetricDescriptor, MetricRow } from "./types";
 
 /** Shown where the backend served no generated total — a log served by a
@@ -40,7 +41,9 @@ const KNOWN_EFFECT_KEYS: Record<number, string> = {
 
 /** The row key the unattributed remainder carries, shared with the backend's
  * band of the same name so the two are one identity. */
-export const SBA_UNATTRIBUTED_KEY = "skill:unattributed";
+// Re-exported from the grammar's own module: `rowRefOf` has to know it too,
+// and a second spelling is how the two would come to disagree.
+export { SBA_UNATTRIBUTED_KEY };
 
 /** How to name a `source:` row key, or null when the key is not one.
  *
@@ -52,9 +55,10 @@ export const sbaCauseLabel = (
   rowKey: string
 ): { labelKey: string; labelParams?: Record<string, string | number> } | null => {
   if (rowKey === SBA_UNATTRIBUTED_KEY) return { labelKey: "ui.logs.sba-unattributed" };
-  if (!rowKey.startsWith("source:")) return null;
+  const payload = sbaCausePayload(rowKey);
+  if (payload === null) return null;
 
-  const [kind, rawId] = rowKey.slice("source:".length).split(":");
+  const [kind, rawId] = payload.split(":");
   const id = rawId === undefined ? null : Number(rawId);
 
   // `Effect(0)` is not an effect record: it is the residual bucket the hook
@@ -84,7 +88,7 @@ const sourceRows = (owner: ComputedPlayerState, total: number): MetricRow[] =>
   (owner.sbaSources ?? [])
     .filter((source) => source.generated !== 0)
     .map((source) => {
-      const key = source.id === null ? `source:${source.kind}` : `source:${source.kind}:${source.id}`;
+      const key = sbaCauseRowKey(source.kind, source.id);
       // Named through the shared namer rather than inline, so the row and the
       // chart band above it cannot be labelled differently. Never null here:
       // the key was just built in the `source:` grammar it parses.
@@ -113,6 +117,18 @@ const sourceRows = (owner: ComputedPlayerState, total: number): MetricRow[] =>
 export const sba: MetricDescriptor = {
   labelKey: "ui.logs.metric-sba",
 
+  // What the player rows' hover card measures. `valueOf` and `perTarget` are
+  // stated for completeness but go unread: the SBA card has its own builder
+  // (`sbaCardSectionsFor`), because a player's generated total also holds the
+  // non-hit causes and the unattributed remainder, neither of which is in
+  // `skillBreakdown` for a skill walk to reach. A gain carries no target.
+  card: {
+    amountKey: "ui.meter-columns.sba-generated",
+    valueOf: (skill) => skill.sbaGenerated ?? 0,
+    format: whole,
+    perTarget: false,
+  },
+
   columnKeys: (level) =>
     level === "players"
       ? ["ui.meter-columns.sba-generated", "ui.meter-columns.sba"]
@@ -126,7 +142,7 @@ export const sba: MetricDescriptor = {
         .map((player) => ({ player, generated: player.sbaGenerated }))
         .sort((a, b) => (b.generated ?? b.player.sba) - (a.generated ?? a.player.sba))
         .map(({ player, generated }) => ({
-          key: `player:${player.index}`,
+          key: playerRowKey(player.index),
           label: String(player.index),
           // The bar ranks by contribution where it is known, and by the level
           // where it is not — the honest fallback for an older payload.
@@ -161,7 +177,7 @@ export const sba: MetricDescriptor = {
       // here rather than shown as a wall of honest zeros.
       .filter(({ generated }) => generated !== 0)
       .map(({ key, generated }) => ({
-        key: `skill:${key}`,
+        key: skillKey(key),
         label: key,
         value: generated,
         columns: [whole(generated), share(generated, total)],

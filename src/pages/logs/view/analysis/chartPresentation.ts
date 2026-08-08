@@ -40,9 +40,23 @@ export type ChartPresentation = {
   smoothing: number;
 };
 
+/** Which of the four builders draws INSTEAD of the per-player lines.
+ *
+ * Named and exported so this module and `useChartModel` cannot disagree about
+ * the precedence — the chain used to be spelled out in both.
+ *
+ * Returns the winner BY REFERENCE, which is load-bearing: the classification
+ * below recognises which plot it is by comparing `overlay === statusSeries` and
+ * friends, so rebuilding the array would silently reclassify the chart, and
+ * with it the title, the axis format and whether a Total series is drawn. */
+export const overlayOf = (
+  statusSeries: DrillSeries[] | null,
+  groupOverlay: DrillSeries[] | null,
+  abilitySeries: DrillSeries[] | null
+): DrillSeries[] | null => statusSeries ?? groupOverlay ?? abilitySeries;
+
 export const chartPresentation = ({
   statusSeries,
-  effectSeries,
   groupOverlay,
   abilitySeries,
   groupPlayerSeries,
@@ -55,10 +69,14 @@ export const chartPresentation = ({
   metricFormat,
   rateSmoothing,
 }: {
-  /** One series per holder of the pinned effect, or null. */
+  /** One series per holder of the pinned effect, or null.
+   *
+   * The ONLY thing the aura tabs overlay their chart with. Unpinned, they used
+   * to plot the effects themselves as holder counts — a plot that answered a
+   * question the table beside it already answers better, while hiding the
+   * damage the effects are being read against. Now nothing overlays them until
+   * an effect is pinned, and the tab keeps the metric's own damage plot. */
   statusSeries: DrillSeries[] | null;
-  /** The effects themselves as holder counts, or null. */
-  effectSeries: DrillSeries[] | null;
   /** The fetched aggregates' stacked bands, or null. */
   groupOverlay: DrillSeries[] | null;
   /** The derived tabs' per-ability bands (Stun/SBA drilled in), or null.
@@ -87,7 +105,7 @@ export const chartPresentation = ({
   // Whichever series is drawn INSTEAD of the per-player ones. Stack counts and
   // group bands are the same shape and are consumed identically, so they are
   // one branch here rather than the same ternary spelled out per field.
-  const overlay = statusSeries ?? effectSeries ?? groupOverlay ?? abilitySeries;
+  const overlay = overlayOf(statusSeries, groupOverlay, abilitySeries);
 
   // WHICH of those the plot ended up drawing, recognised from the value itself
   // rather than re-derived from the pins, so the title cannot disagree with
@@ -98,7 +116,7 @@ export const chartPresentation = ({
       ? groupPlayerSeries
         ? "scoped"
         : "base"
-      : overlay === statusSeries || overlay === effectSeries
+      : overlay === statusSeries
         ? "stacks"
         : overlay === abilitySeries
           ? "ability"
@@ -140,11 +158,8 @@ export const chartPresentation = ({
           ? "ui.logs.chart-sba-drill-label"
           : "ui.logs.chart-stun-drill-label"
         : chartSource === "stacks"
-          ? // Pinned, the plot is one effect's stack depths; unpinned it is
-            // the effects themselves as holder counts.
-            statusSeries !== null
-            ? "ui.logs.chart-stacks-label"
-            : "ui.logs.chart-effects-label"
+          ? // The one aura plot: the pinned effect's per-holder stack depths.
+            "ui.logs.chart-stacks-label"
           : groupOverlay !== null
             ? // The enemy side inverts which way the damage flows, so both
               // of these name both ends. Reusing the friendly titles would

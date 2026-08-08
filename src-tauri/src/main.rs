@@ -1352,6 +1352,10 @@ struct EncounterStateResponse {
     /// The (filters × groupBy) aggregates for `group_query` — table rows and
     /// chart bands from ONE grouping. Empty when no query was sent.
     groups: Vec<v1::GroupAggregate>,
+    /// The same grouping over the WHOLE fight, for the chart's band colours
+    /// (see [`v1::aggregate_group_reference`]). Empty when the query narrows no
+    /// time, which the view reads as "rank by the aggregates you were sent".
+    group_reference: Vec<v1::GroupReference>,
     sba_chart: HashMap<u32, Vec<f32>>,
     /// Per-ability bands for the DRILLED Stun/SBA charts, keyed by player slot.
     /// Empty unless the view sent an `ability_series` query — an undrilled log
@@ -1487,6 +1491,38 @@ fn build_groups(
 
     built.unwrap_or_else(|error| {
         log::warn!("{error} — the response carries no group aggregates");
+        Vec::new()
+    })
+}
+
+/// The whole-fight ranking behind the chart's band colours, or none.
+///
+/// Degrades exactly like [`build_groups`], and for a smaller stake: without a
+/// reference the chart falls back to ranking by the aggregates it was sent,
+/// which is what it drew before this existed. Never worth failing a fetch over.
+fn build_group_reference(
+    parser: &v1::Parser,
+    options: &ParseOptions,
+    segments: &[v1::TargetSegment],
+    assignment: &[Option<usize>],
+) -> Vec<v1::GroupReference> {
+    let Some(query) = &options.group_query else {
+        return Vec::new();
+    };
+
+    v1::aggregate_group_reference(
+        &parser.encounter.raw_event_log,
+        &parser.encounter.player_data,
+        segments,
+        assignment,
+        query,
+        parser.start_time(),
+        DPS_INTERVAL,
+        (parser.full_log_duration() / DPS_INTERVAL) as usize + 1,
+        options.filters,
+    )
+    .unwrap_or_else(|e| {
+        log::warn!("group reference rejected: {e} — the chart ranks its own bands");
         Vec::new()
     })
 }
@@ -1652,6 +1688,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         // the FULL fight (the view slices client-side), while its measures
         // honor the query's own scrub window.
         let groups = build_groups(&parser, &options, &segments, &assignment);
+        let group_reference = build_group_reference(&parser, &options, &segments, &assignment);
 
         // The drilled Stun/SBA bands, built here too: unlike the other charts
         // these are NOT carried over from the base load. A drill is a pin
@@ -1681,6 +1718,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
             legality: findings,
             selection_facts,
             groups,
+            group_reference,
             ability_series,
             ..Default::default()
         });
@@ -1776,6 +1814,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         v1::assemble_chart_windows(&parser.encounter.raw_event_log, start_time, duration);
 
     let groups = build_groups(&parser, &options, &target_entries, &assignment);
+    let group_reference = build_group_reference(&parser, &options, &target_entries, &assignment);
 
     // The drilled Stun/SBA tabs' bands.
     let ability_series = build_ability_series(&parser, &options, &player_indices);
@@ -1826,6 +1865,7 @@ fn fetch_encounter_state(id: u64, options: ParseOptions) -> Result<EncounterStat
         taken_chart: player_taken,
         hp_chart,
         groups,
+        group_reference,
         chart_len: (duration / DPS_INTERVAL) as usize + 1,
         sba_chart_len: (duration / SBA_INTERVAL) as usize + 1,
         sba_chart,

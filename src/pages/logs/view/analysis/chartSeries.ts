@@ -1,3 +1,5 @@
+import { TOTAL_KEY } from "../rowKey";
+
 /** Turns a metric's bucketed per-player series into chart datapoints.
  *
  * Extracted from the view because the three metrics differ in more than their
@@ -28,9 +30,21 @@ export const buildSeriesPoints = ({
   scale: number;
   /** Which buckets a filter mask admits; absent = all. A trailing average
    * over a masked series would otherwise smear its spikes past the mask's
-   * edge (the decay tail reads as damage after a window filter's end) and
-   * dilute the first buckets inside it with the excluded zeros — so masked
-   * buckets plot as zero and the average divides by admitted buckets only. */
+   * edge — the decay tail reads as damage after a window filter's end — so a
+   * masked bucket plots as zero outright.
+   *
+   * The excluded buckets keep their PLACE in the trailing window even though
+   * their values are dropped. The Y axis is a rate per bucket of wall clock,
+   * and dividing by the admitted count instead would rescale it to a rate per
+   * admitted bucket: at the leading edge of an admitted region, where only one
+   * of `smoothing` buckets is admitted, the same damage would plot up to
+   * `smoothing`× higher. A filter that removes TIME but no damage would then
+   * raise the line above its unfiltered self (log #1880: an aura excluding
+   * 0.13% of the damage doubled the plotted peak and moved the fight's
+   * maximum), and the area under the chart would stop matching the table it
+   * sits above. The cost is the honest one: the line ramps in over the
+   * smoothing period at each admitted region's start, because that is how much
+   * wall clock the average has actually seen. */
   admitted?: boolean[];
 }): Record<string, number>[] => {
   const points: Record<string, number>[] = [];
@@ -47,13 +61,15 @@ export const buildSeriesPoints = ({
       const series = source[key] ?? [];
       const from = Math.max(0, bucket - smoothing + 1);
       let sum = 0;
-      let count = 0;
       for (let i = from; i <= bucket; i++) {
+        // Excluded buckets contribute nothing to the sum but still count in the
+        // denominator below — see `admitted`.
         if (admitted !== undefined && !admitted[i]) continue;
         sum += series[i] ?? 0;
-        count += 1;
       }
-      point[String(key)] = masked || count === 0 ? 0 : Math.round((sum / count) * scale);
+      // The window's own length, which at the fight's start is short of
+      // `smoothing`: there are no buckets behind bucket 0 to average over.
+      point[String(key)] = masked ? 0 : Math.round((sum / (bucket - from + 1)) * scale);
     }
 
     points.push(point);
@@ -62,9 +78,9 @@ export const buildSeriesPoints = ({
   return points;
 };
 
-/** The Total series' key. A reserved word rather than a player index or a
- * row-key grammar, so it can never collide with a real series. */
-export const TOTAL_SERIES_KEY = "total";
+/** The Total series' key: the row-key grammar's reserved word for the total,
+ * so the series and the ref `rowRefOf` resolves are one identity. */
+export const TOTAL_SERIES_KEY = TOTAL_KEY;
 
 /** Adds a Total value to every point: the sum of ALL listed series, whatever
  * the legend later hides — Warcraft Logs' Total likewise ignores legend state.

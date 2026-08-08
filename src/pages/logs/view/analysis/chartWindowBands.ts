@@ -18,7 +18,7 @@ export type WindowBand = { kind: WindowKind; color: string; band: Band };
  *
  * - `sba` wears the SBA markers' grape ON PURPOSE: the marker is the window's
  *   opening edge, and one entity wears one hue.
- * - `link` takes indigo — cooler than the drag accent's cyan (`--an-accent`),
+ * - `link` takes indigo — cooler than the drag accent's cyan (`--color-accent`),
  *   which only ever appears mid-drag anyway.
  * - `break` takes orange: the "enemy is down, burn it" reading, and the only
  *   warm hue on the plot. */

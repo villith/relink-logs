@@ -1,6 +1,7 @@
 import type { ComputedPlayerState, StatusInterval } from "@/types";
 
 import { groupBy } from "../groupBy";
+import { actorFallbackKey, playerRowKey, spawnRowKey } from "../rowKey";
 import type { SelectorPins } from "../selectorOptions";
 import { toBands } from "../statusBands";
 import { isStatusPin, statusPinKey, uptimeMs } from "../statusUptime";
@@ -52,7 +53,7 @@ export const statusRows = ({
   fightDurationMs,
   pinnedKey,
   slotOf,
-  holderOf = (interval) => ({ key: `player:${interval.actorIndex}`, label: String(interval.actorIndex) }),
+  holderOf = (interval) => ({ key: playerRowKey(interval.actorIndex), label: String(interval.actorIndex) }),
   pinOf,
   window,
 }: {
@@ -144,10 +145,10 @@ export const heldByRoster = (
  * merged two dragons into one row. An enemy the segmenter skipped (a phantom
  * marker) has no spawn to name it by and keeps the raw id. */
 export const enemyHolderKey = (interval: StatusInterval): string =>
-  interval.targetSegment === null ? `actor:${interval.actorIndex}` : `target:${interval.targetSegment}`;
+  interval.targetSegment === null ? actorFallbackKey(interval.actorIndex) : spawnRowKey(interval.targetSegment);
 
 /** The holder row itself, keyed by `enemyHolderKey` and labelled with the raw
- * key — the table resolves it to a name (see `targetRowLabel`), which is also
+ * key — the table resolves it to a name through the entity ladder, which is also
  * what `TARGET_ROW` parses back out. Callers that CAN name the spawn (the
  * chart, which holds `labelForTarget`) pass their own label and reuse the key
  * function, so the grammar has exactly one author. */

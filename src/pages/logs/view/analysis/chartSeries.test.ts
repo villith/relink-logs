@@ -49,9 +49,9 @@ describe("buildSeriesPoints", () => {
   });
 
   it("zeroes buckets outside the admitted mask instead of smearing the average past its edge", () => {
-    // Without the mask, the trailing average would decay over buckets 4-5
-    // (the bleed past a window filter's end) and dilute bucket 2 with the
-    // pre-window zeros (the ramp-in at its start).
+    // Buckets 4-5 are the bleed past a window filter's end: without the mask
+    // the trailing average would decay across them, drawing damage after the
+    // filter stopped admitting any.
     const points = buildSeriesPoints({
       source: { 1: [0, 0, 10, 10, 0, 0] },
       len: 6,
@@ -60,20 +60,39 @@ describe("buildSeriesPoints", () => {
       scale: 1,
       admitted: [false, false, true, true, false, false],
     });
-    expect(points.map((p) => p["1"])).toEqual([0, 0, 10, 10, 0, 0]);
+    // 10/3 and 20/3: the mask drops the excluded buckets' VALUES but not their
+    // place in the window, so the line ramps in over the smoothing period.
+    expect(points.map((p) => p["1"])).toEqual([0, 0, 3, 7, 0, 0]);
   });
 
-  it("averages only over the admitted buckets inside the trailing window", () => {
-    // Bucket 3's window is 1..3, but only 2..3 are admitted: (6+12)/2 = 9.
-    const points = buildSeriesPoints({
-      source: { 1: [99, 99, 6, 12] },
+  it("keeps the excluded buckets in the denominator, so a mask can never raise the rate", () => {
+    // The plotted Y is a rate per WALL-CLOCK bucket. Dividing by the admitted
+    // count instead would rescale it to a rate per admitted bucket and multiply
+    // the leading edge of every admitted region by up to `smoothing` — a filter
+    // that removes time but no damage would make DPS go UP (log #1880: an aura
+    // that excluded 0.13% of the damage doubled the plotted peak).
+    const source = { 1: [99, 99, 6, 12] };
+    const masked = buildSeriesPoints({
+      source,
       len: 4,
       keys: [1],
       smoothing: 3,
       scale: 1,
       admitted: [false, false, true, true],
     });
-    expect(points.map((p) => p["1"])).toEqual([0, 0, 6, 9]);
+    // Bucket 3's window is 1..3 and holds 6+12 of admitted damage: 18/3 = 6.
+    expect(masked.map((p) => p["1"])).toEqual([0, 0, 2, 6]);
+
+    // The invariant that failure violated: masking narrows a series, never
+    // widens it, at every bucket.
+    const whole = buildSeriesPoints({ source, len: 4, keys: [1], smoothing: 3, scale: 1 });
+    masked.forEach((point, bucket) => expect(point["1"]).toBeLessThanOrEqual(whole[bucket]["1"]));
+  });
+
+  it("leaves an unmasked series byte-identical, so only filtered charts move", () => {
+    const source = { 1: [3, 6, 9, 12] };
+    const args = { source, len: 4, keys: [1], smoothing: 3, scale: 1 };
+    expect(buildSeriesPoints({ ...args, admitted: [true, true, true, true] })).toEqual(buildSeriesPoints(args));
   });
 
   it("scales stored values, so an SBA gauge stored in tenths reads as a percent", () => {

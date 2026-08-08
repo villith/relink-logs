@@ -55,3 +55,6 @@ docs/superpowers/
 # Local scratch: full-res UI atlas dumps extracted from the game archive.
 # Large (~400MB) and not ours to redistribute - never commit.
 /icon-export/
+
+# Local machine config (logs.db path for scripts/log-size-report.mjs)
+.env

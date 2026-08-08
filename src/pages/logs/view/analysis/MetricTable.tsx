@@ -3,10 +3,16 @@ import { CaretDown, CaretUp, Eye, EyeSlash } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Figure } from "@/components/ui/Figure";
+import { Label } from "@/components/ui/Label";
+
 import type { MetricRow } from "../metrics/types";
+import { sectionHeadings } from "../sectionRuns";
 import type { SelectorPins } from "../selectorOptions";
 
+import { AnalysisRow } from "./AnalysisRow";
 import { HoverCard, type CardAmount, type CardSection } from "./HoverCard";
+import { MetricBar } from "./MetricBar";
 import "./analysis.css";
 
 export type MetricTableProps = {
@@ -62,7 +68,7 @@ export type MetricTableProps = {
   sectionLabel?: (row: MetricRow) => string | null;
 };
 
-const FALLBACK_COLOR = "var(--an-ink-3)";
+const FALLBACK_COLOR = "var(--color-ink-3)";
 
 /** The one table every metric renders through.
  *
@@ -73,6 +79,10 @@ const FALLBACK_COLOR = "var(--an-ink-3)";
  * Bars scale against the LARGEST row rather than the total: at the abilities
  * level the rows are a subset of one player's damage, so a share-of-total bar
  * would render every row as a sliver. */
+/** A control before the name — the band toggle, the expand caret. Sits ON the
+ * bar like the row's text, so without `relative` the fill paints over it. */
+const CONTROL_CLASS = "relative mr-1.5 inline-flex shrink-0 cursor-pointer items-center";
+
 export const MetricTable = ({
   rows,
   columnKeys,
@@ -99,6 +109,12 @@ export const MetricTable = ({
     () => (rowSections ? new Map(rows.map((row) => [row.key, rowSections(row)])) : null),
     [rows, rowSections]
   );
+
+  // Resolved once per row, not once per comparison: `sectionLabel` walks the
+  // cause ladder, and asking it for each row AND for its predecessor doubled
+  // that walk on every render. The timeline draws the same headings from the
+  // same helper (see `sectionRuns`).
+  const headings = useMemo(() => sectionHeadings(rows, sectionLabel), [rows, sectionLabel]);
 
   // Resolved once per row set, same as `sectionsByRow`: the accessor scans the
   // whole party's breakdown per row, and its answer only changes when the rows
@@ -141,14 +157,24 @@ export const MetricTable = ({
 
   return (
     <Box role="grid">
-      <Box className="analysis-head" role="row">
-        <Text className="analysis-label" role="columnheader" style={{ flex: 1 }}>
+      {/* `data-head` rather than a styling class: the column heads and the data
+          rows share role="row", so tests need something to tell them apart that
+          survives this table being restyled. */}
+      <Box
+        className="mb-1.5 flex h-[calc(20px*var(--density))] items-center border-b border-line px-2"
+        role="row"
+        data-head
+      >
+        <Label className="flex-1" role="columnheader">
           {rowsLabelKey ? t(rowsLabelKey) : ""}
-        </Text>
+        </Label>
+        {/* The head cell states the column's width itself rather than wearing
+            the data cells' class, which carries the row FONT SIZE with it — the
+            heads rendered at row size for as long as they shared it. */}
         {columnKeys.map((key) => (
-          <Text key={key} role="columnheader" className="analysis-label analysis-cell">
+          <Label key={key} role="columnheader" className="w-cell text-right">
             {t(key)}
-          </Text>
+          </Label>
         ))}
       </Box>
 
@@ -170,123 +196,135 @@ export const MetricTable = ({
           // is the outer row's — only the outer call can pass nested=false.
           const hasChildren = !nested && childRows.length >= 2;
           const isExpanded = expanded.has(rowData.key);
+          const pinOnClick = rowData.pinOnClick;
           return (
-            // A div, not a button. The controls inside it are real <button>s,
-            // and a button may not contain interactive content — the row used
-            // to be an UnstyledButton with a focusable role="button" span in
-            // it, which is invalid and made the two fight over focus and
-            // clicks.
-            //
-            // Focusable and Enter/Space-activated by hand, which is what the
-            // <button> was giving for free: a row in a grid is allowed to take
-            // focus, and losing keyboard pinning to fix the nesting would be a
-            // poor trade.
-            <Box
-              role="row"
-              className={`analysis-row${nested ? " analysis-subrow" : ""}${rowData.pinOnClick ? " analysis-row-pinnable" : ""}`}
-              tabIndex={rowData.pinOnClick ? 0 : undefined}
-              onClick={() => rowData.pinOnClick && onPin(rowData.pinOnClick)}
-              onKeyDown={(event: React.KeyboardEvent) => {
-                if (!rowData.pinOnClick || (event.key !== "Enter" && event.key !== " ")) return;
-                event.preventDefault();
-                onPin(rowData.pinOnClick);
-              }}
-            >
-              {!positional && (
-                <Box
-                  data-metric-bar
-                  className="analysis-bar"
-                  style={{
-                    // largest === 0 when every row is zero (a fight with no
-                    // stun, say). Guarding here keeps those rows visible at
-                    // zero width instead of rendering NaN.
-                    width: largest === 0 ? "0%" : `${(rowData.value / largest) * 100}%`,
-                    backgroundColor: rowColor ? rowColor(rowData) : FALLBACK_COLOR,
-                  }}
-                />
-              )}
-              {/* A real button now that the row is not one. Still stops
-                  propagation, so banding a row does not also pin it — including
-                  on the keyboard, where the row above listens for the same keys. */}
-              {toggle && (
-                <UnstyledButton
-                  aria-pressed={toggle.shown}
-                  aria-label={t("ui.logs.buff-band-toggle")}
-                  className="analysis-row-toggle"
-                  style={{ opacity: toggle.shown ? 1 : 0.35 }}
-                  onClick={(event: React.MouseEvent) => {
-                    event.stopPropagation();
-                    toggle.onToggle();
-                  }}
-                  onKeyDown={(event: React.KeyboardEvent) => {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.stopPropagation();
-                  }}
-                >
-                  {toggle.shown ? <Eye size={14} weight="fill" /> : <EyeSlash size={14} />}
-                </UnstyledButton>
-              )}
-              {/* The skill-group expand control — its own button for the same
-                  nesting reason as the band toggle, and stopping propagation
-                  because opening a group must not also pin it. */}
-              {hasChildren && (
-                <UnstyledButton
-                  aria-expanded={isExpanded}
-                  aria-label={t("ui.logs.expand-row")}
-                  className="analysis-row-expand"
-                  onClick={(event: React.MouseEvent) => {
-                    event.stopPropagation();
-                    setExpanded((previous) => {
-                      const next = new Set(previous);
-                      if (!next.delete(rowData.key)) next.add(rowData.key);
-                      return next;
-                    });
-                  }}
-                  onKeyDown={(event: React.KeyboardEvent) => {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    event.stopPropagation();
-                  }}
-                >
-                  {isExpanded ? <CaretUp size={12} /> : <CaretDown size={12} />}
-                </UnstyledButton>
-              )}
-              <Text role="gridcell" className={`analysis-name${positional ? " analysis-name-fixed" : ""}`}>
-                {renderLabel ? renderLabel(rowData) : rowData.label}
-              </Text>
-              {positional && rowData.timeline && (
-                // Positional, not proportional: Warcraft Logs' uptime bar marks
-                // WHEN the effect was up, and the % column beside it already
-                // says how much. Its own cell between the name and the numbers,
-                // so the pieces never sit under text. One piece per contiguous
-                // window — `toBands` merged the overlaps.
-                <Box className="analysis-track" aria-hidden>
-                  {rowData.timeline.map((span, spanIndex) => (
-                    <Box
-                      key={spanIndex}
-                      className="analysis-timeline-piece"
-                      style={{
-                        left: `${(span.startMs / timelineMs) * 100}%`,
-                        width: `${((span.endMs - span.startMs) / timelineMs) * 100}%`,
-                        // A window shorter than a pixel is still a real window;
-                        // at zero width it would vanish from a row that reports
-                        // it.
-                        minWidth: "2px",
-                        backgroundColor: rowColor ? rowColor(rowData) : FALLBACK_COLOR,
+            // The row shell — a focusable div, its geometry and its name cell —
+            // is `AnalysisRow`, shared with the timeline's lanes so the two can
+            // never draw a row two different heights. Everything below is this
+            // table's own: the bar, the controls, the uptime track, the figures.
+            <AnalysisRow
+              // A child behind an expanded parent: the same row anatomy,
+              // indented and on a muted panel so the hierarchy reads at a glance
+              // without stealing the parents' contrast.
+              data-subrow={nested || undefined}
+              className={nested ? "bg-panel pl-[calc(28px*var(--density))]" : undefined}
+              onClick={pinOnClick ? () => onPin(pinOnClick) : undefined}
+              nameFixed={positional}
+              name={renderLabel ? renderLabel(rowData) : rowData.label}
+              background={
+                !positional && (
+                  <MetricBar
+                    value={rowData.value}
+                    subValue={rowData.subValue}
+                    largest={largest}
+                    color={rowColor ? rowColor(rowData) : FALLBACK_COLOR}
+                    variant="row"
+                  />
+                )
+              }
+              leading={
+                <>
+                  {/* A real button now that the row is not one. Still stops
+                      propagation, so banding a row does not also pin it — including
+                      on the keyboard, where the row above listens for the same keys. */}
+                  {toggle && (
+                    <UnstyledButton
+                      aria-pressed={toggle.shown}
+                      aria-label={t("ui.logs.buff-band-toggle")}
+                      data-band-toggle
+                      // On the bar like the rest of the row's text, so it takes
+                      // `relative` or the fill paints over it.
+                      className={CONTROL_CLASS}
+                      style={{ opacity: toggle.shown ? 1 : 0.35 }}
+                      onClick={(event: React.MouseEvent) => {
+                        event.stopPropagation();
+                        toggle.onToggle();
                       }}
-                    />
-                  ))}
-                </Box>
-              )}
-              {rowData.columns.map((value, columnIndex) => (
-                <Text
+                      onKeyDown={(event: React.KeyboardEvent) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.stopPropagation();
+                      }}
+                    >
+                      {toggle.shown ? <Eye size={14} weight="fill" /> : <EyeSlash size={14} />}
+                    </UnstyledButton>
+                  )}
+                  {/* The skill-group expand control — its own button for the same
+                      nesting reason as the band toggle, and stopping propagation
+                      because opening a group must not also pin it. */}
+                  {hasChildren && (
+                    <UnstyledButton
+                      aria-expanded={isExpanded}
+                      aria-label={t("ui.logs.expand-row")}
+                      data-expand
+                      className={CONTROL_CLASS}
+                      onClick={(event: React.MouseEvent) => {
+                        event.stopPropagation();
+                        setExpanded((previous) => {
+                          const next = new Set(previous);
+                          if (!next.delete(rowData.key)) next.add(rowData.key);
+                          return next;
+                        });
+                      }}
+                      onKeyDown={(event: React.KeyboardEvent) => {
+                        if (event.key !== "Enter" && event.key !== " ") return;
+                        event.stopPropagation();
+                      }}
+                    >
+                      {isExpanded ? <CaretUp size={12} /> : <CaretDown size={12} />}
+                    </UnstyledButton>
+                  )}
+                </>
+              }
+              trailing={
+                positional &&
+                rowData.timeline && (
+                  // Positional, not proportional: Warcraft Logs' uptime bar marks
+                  // WHEN the effect was up, and the % column beside it already
+                  // says how much. Its own cell between the name and the numbers,
+                  // so the pieces never sit under text. One piece per contiguous
+                  // window — `toBands` merged the overlaps.
+                  // Faintly filled, so "no pieces here" reads as an empty track
+                  // rather than as a missing cell.
+                  <Box
+                    data-uptime-track
+                    className="relative mx-2.5 my-1 min-w-0 flex-1 self-stretch rounded-xs bg-white/[0.03]"
+                    aria-hidden
+                  >
+                    {rowData.timeline.map((span, spanIndex) => (
+                      <Box
+                        key={spanIndex}
+                        data-uptime-piece
+                        // In its own cell the pieces are the only ink, so they
+                        // can afford to be more solid than they were sharing
+                        // space with the row's text.
+                        className="absolute inset-y-0 rounded-xs opacity-75"
+                        style={{
+                          left: `${(span.startMs / timelineMs) * 100}%`,
+                          width: `${((span.endMs - span.startMs) / timelineMs) * 100}%`,
+                          // A window shorter than a pixel is still a real window;
+                          // at zero width it would vanish from a row that reports
+                          // it.
+                          minWidth: "2px",
+                          backgroundColor: rowColor ? rowColor(rowData) : FALLBACK_COLOR,
+                        }}
+                      />
+                    ))}
+                  </Box>
+                )
+              }
+              // Every cell sits above the bar, so each takes `relative`.
+              columns={rowData.columns.map((value, columnIndex) => (
+                <Figure
                   key={columnIndex}
                   role="gridcell"
-                  className={`analysis-cell${columnIndex === 0 ? "" : " analysis-cell-muted"}`}
+                  size={columnIndex === 0 ? "lg" : "sm"}
+                  tone={columnIndex === 0 ? "default" : "muted"}
+                  className="relative w-cell text-right"
                 >
                   {value}
-                </Text>
+                </Figure>
               ))}
-            </Box>
+            />
           );
         };
 
@@ -307,14 +345,12 @@ export const MetricTable = ({
         // A subheader is drawn only where the section CHANGES, so a run of
         // rows sharing one is titled once. Purely visual: not a row, takes no
         // interaction, and absent the prop nothing is drawn at all.
-        const section = sectionLabel?.(row) ?? null;
-        const previousSection = rowIndex === 0 ? null : sectionLabel?.(rows[rowIndex - 1]) ?? null;
+        const heading = headings[rowIndex];
 
         return (
           <Fragment key={row.key}>
-            {section !== null && section !== previousSection && (
-              <Text className="analysis-label analysis-section-head">{section}</Text>
-            )}
+            {/* Visual grouping only: it is not a row and takes no interaction. */}
+            {heading !== null && <Label className="px-2 pb-0.5 pt-2">{heading}</Label>}
             {parent}
             {expanded.has(row.key) &&
               childRows.map((child) => <Fragment key={child.key}>{rowElement(child, true)}</Fragment>)}

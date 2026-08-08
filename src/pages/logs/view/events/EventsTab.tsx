@@ -2,31 +2,22 @@ import { Box, Group, Text, UnstyledButton } from "@mantine/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { EntityIcon } from "@/components/ui/EntityIcon";
+import { Strip } from "@/components/ui/Strip";
 import { millisecondsToPreciseElapsedFormat } from "@/utils";
 
 import "../analysis/analysis.css";
 
-import type { MetricKey } from "../analysis/machine/state";
-import type { Hostility } from "../metrics/types";
-
 import {
-  filterByKind,
-  filterByPins,
-  toEventRow,
-  type ActorSpace,
-  type EventKind,
-  type EventPins,
-  type EventRow,
-} from "./eventRows";
-import {
-  defaultScopeKinds,
-  filterByHolderSide,
-  filterByScope,
-  scopeFor,
-  scopeKinds,
-  scopeUsesHostility,
-  type ScopeProbes,
-} from "./eventScope";
+  CHIP_BUTTON_CLASS,
+  CHIP_BUTTON_SELECTED_CLASS,
+  CHIP_CLASS,
+  CHIP_SELECTED_CLASS,
+  CHIP_SWATCH_CLASS,
+} from "../analysis/chipAnatomy";
+import type { StreamContext } from "../analysis/model/bodyContext";
+import { toEventRow, type ActorSpace, type EventKind, type EventRow } from "./eventRows";
+import { defaultScopeKinds, narrowStream, scopeFor, scopeKinds } from "./eventScope";
 import { useEvents } from "./useEvents";
 import { visibleSlice } from "./windowSlice";
 
@@ -89,8 +80,12 @@ const KIND_LABEL_KEY: Record<EventKind, string> = {
   other: "ui.logs.events-kind-other",
 };
 
-/** Row height in px. Fixed, which is what makes `visibleSlice` pure arithmetic. */
-const ROW_HEIGHT = 22;
+/** Row height in px. Fixed, which is what makes `visibleSlice` pure arithmetic
+ * — so it is a NUMBER here and not `--spacing-row`, which the virtualiser could
+ * not do division with. Kept a step under a table row, as it always was, but
+ * moved with the rest of the view's scale: the stream's art is now
+ * `--spacing-icon-xs`, which at 22px left no air above or below it. */
+const ROW_HEIGHT = 26;
 /** Rows rendered beyond each edge of the viewport, so a fast scroll does not
  * outrun the render. */
 const OVERSCAN = 10;
@@ -137,7 +132,9 @@ const CellText = ({
     data-cell={name}
     style={flex ? { flex: 1, minWidth: 0 } : { minWidth: 0, flexShrink: 0 }}
   >
-    {cell.iconUrl !== undefined && <img className="events-row-icon" src={cell.iconUrl} alt="" />}
+    {/* Smaller than the table's: the events rows are shorter, and the table's
+        own icon would fill one edge to edge. */}
+    {cell.iconUrl !== undefined && <EntityIcon size="card" src={cell.iconUrl} alt="" />}
     {/* Only a cell that HAS a colour takes one — an actor. Everything else
         (the time, the ability, the amount) inherits the row's kind colour,
         which is what still says at a glance what sort of event this is. */}
@@ -182,7 +179,7 @@ export const EventRowsTable = ({
           top: 0,
           zIndex: 1,
           background: "var(--mantine-color-body)",
-          borderBottom: "1px solid var(--an-line)",
+          borderBottom: "1px solid var(--color-line)",
         }}
       >
         <Group gap="xs" px="xs" wrap="nowrap" style={{ height: rowHeight }}>
@@ -265,12 +262,10 @@ export const EventRowsTable = ({
 };
 
 export type EventsTabProps = {
-  id: string | undefined;
-  /** The metric tab, which is what says WHICH events this is a stream of. */
-  metric: MetricKey;
-  hostility: Hostility;
-  pins: EventPins;
-  probes: ScopeProbes;
+  /** Which log, metric and side to read, and how to narrow and classify what
+   * comes back — shared verbatim with the Timeline body (see `StreamContext`),
+   * which reads the same stream through the same filters. */
+  stream: StreamContext;
   labels: EventLabels;
 };
 
@@ -282,7 +277,8 @@ export type EventsTabProps = {
  * table would. So it answers to all of them: the metric picks the kinds (see
  * `eventScope`), the side picks the holders where that means anything, and the
  * pins narrow what is left. */
-export const EventsTab = ({ id, metric, hostility, pins, probes, labels }: EventsTabProps) => {
+export const EventsTab = ({ stream, labels }: EventsTabProps) => {
+  const { id, metric, hostility, pins, probes } = stream;
   const { t } = useTranslation();
   const { events, total } = useEvents(id);
 
@@ -300,14 +296,10 @@ export const EventsTab = ({ id, metric, hostility, pins, probes, labels }: Event
   useEffect(() => setKinds(defaultScopeKinds(scopeFor(metric))), [metric]);
 
   const allRows = useMemo(() => events.map(toEventRow), [events]);
-  const shown = useMemo(() => {
-    const inScope = filterByScope(allRows, scope, probes);
-    // The side is only meaningful where it names a HOLDER: on the damage tabs
-    // both sides read the same hits from opposite ends, so filtering by it
-    // there would empty the table on a control that does not apply.
-    const sided = scopeUsesHostility(scope) ? filterByHolderSide(inScope, hostility, probes) : inScope;
-    return filterByPins(filterByKind(sided, kinds), pins);
-  }, [allRows, scope, probes, hostility, kinds, pins]);
+  const shown = useMemo(
+    () => narrowStream(allRows, { scope, hostility, probes, kinds, pins }),
+    [allRows, scope, probes, hostility, kinds, pins]
+  );
 
   // A shorter list can leave the container scrolled past its own end, where it
   // renders nothing at all — so a filter change that shrinks the list has to
@@ -343,23 +335,23 @@ export const EventsTab = ({ id, metric, hostility, pins, probes, labels }: Event
           and only when there is more than one — a strip of one offers no choice
           the metric tab above has not already made. */}
       {offered.length > 1 && (
-        <Box className="analysis-aura-strip" role="group" aria-label={t("ui.logs.events-kinds-label")}>
+        <Strip rule="top" wrap role="group" aria-label={t("ui.logs.events-kinds-label")}>
           {offered.map((kind) => {
             const on = kinds.has(kind);
             return (
-              <Box key={kind} className={`analysis-aura-chip${on ? " analysis-aura-chip-selected" : ""}`}>
-                <UnstyledButton className="analysis-aura-chip-button" aria-pressed={on} onClick={() => toggle(kind)}>
-                  <span
-                    className="analysis-window-chip-swatch"
-                    style={{ backgroundColor: KIND_COLORS[kind] }}
-                    aria-hidden
-                  />
-                  <span className="analysis-aura-chip-name">{t(KIND_LABEL_KEY[kind])}</span>
+              <Box key={kind} className={[CHIP_CLASS, on ? CHIP_SELECTED_CLASS : ""].join(" ")}>
+                <UnstyledButton
+                  className={[CHIP_BUTTON_CLASS, on ? CHIP_BUTTON_SELECTED_CLASS : ""].join(" ")}
+                  aria-pressed={on}
+                  onClick={() => toggle(kind)}
+                >
+                  <span className={CHIP_SWATCH_CLASS} style={{ backgroundColor: KIND_COLORS[kind] }} aria-hidden />
+                  <span>{t(KIND_LABEL_KEY[kind])}</span>
                 </UnstyledButton>
               </Box>
             );
           })}
-        </Box>
+        </Strip>
       )}
 
       <Text size="xs" c="dimmed" mb={4}>
@@ -376,7 +368,7 @@ export const EventsTab = ({ id, metric, hostility, pins, probes, labels }: Event
           height: VIEWPORT_HEIGHT,
           overflowY: "auto",
           position: "relative",
-          border: "1px solid var(--an-line)",
+          border: "1px solid var(--color-line)",
           borderRadius: 4,
         }}
       >

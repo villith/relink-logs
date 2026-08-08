@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { AbilitySeries } from "@/types";
+import type { AbilitySeries, SkillRow } from "@/types";
 
+import { skillKey } from "../abilityKey";
+import { abilityRowKey, rowKeyingFor } from "../abilitySkills";
 import { abilityBands } from "./abilityBands";
 import { groupBandsFor } from "./machine/groupRows";
 
@@ -34,18 +36,21 @@ describe("abilityBands", () => {
     expect(bands.map((band) => band.key)).toEqual(["source:partyAward"]);
   });
 
-  it("ranks by total and folds the tail into exactly one other band", () => {
+  it("ranks by total and marks everything past the cap as the tail", () => {
     const input = Array.from({ length: 10 }, (_, index) => skill(index, [10 - index]));
     const bands = abilityBands(input, 3, asKey);
 
-    expect(bands).toHaveLength(4);
+    // Every band survives — the cap decides what is SHOWN, not what exists.
+    expect(bands).toHaveLength(10);
     expect(bands.slice(0, 3).map((band) => band.values[0])).toEqual([10, 9, 8]);
-    expect(bands[3].key).toBe("other");
-    // 7+6+5+4+3+2+1 = 28 — the tail is summed, never dropped.
-    expect(bands[3].values[0]).toBe(28);
+    expect(bands.slice(0, 3).every((band) => !band.tail)).toBe(true);
+    expect(bands.slice(3).every((band) => band.tail)).toBe(true);
+    // 7+6+5+4+3+2+1 = 28 — the tail is still all there, one band each, and the
+    // chart sums whichever of them stay hidden into its own `other`.
+    expect(bands.slice(3).reduce((sum, band) => sum + band.values[0], 0)).toBe(28);
   });
 
-  it("omits the other band when nothing is left over", () => {
+  it("never invents an other band of its own", () => {
     const bands = abilityBands([skill(1, [5]), skill(2, [3])], 8, asKey);
 
     expect(bands.map((band) => band.key)).not.toContain("other");
@@ -85,6 +90,29 @@ describe("abilityBands — key grammar", () => {
     const bands = abilityBands([cause("source:partyAward", [1])], 8, asKey);
 
     expect(bands[0].key).toBe("source:partyAward");
+  });
+});
+
+describe("abilityBands — the capped tail", () => {
+  const ranked = [skill(1, [100]), skill(2, [60]), skill(3, [30]), skill(4, [10])];
+
+  it("keeps every band and marks the ones past topN, rather than lumping them away", () => {
+    // Summed into one `other` band, the tail had no series of its own left and
+    // could never be switched back on. The chart rolls it up itself now, from
+    // whichever tail bands are hidden (see `chartRollup`).
+    const bands = abilityBands(ranked, 2, (key) => key);
+    expect(bands).toHaveLength(4);
+    expect(bands.map((band) => band.tail ?? false)).toEqual([false, false, true, true]);
+    expect(bands.some((band) => band.key === "other")).toBe(false);
+  });
+
+  it("still sums to the drill's own total exactly once", () => {
+    const bands = abilityBands(ranked, 2, (key) => key);
+    expect(bands.reduce((sum, band) => sum + band.values[0], 0)).toBe(200);
+  });
+
+  it("marks nothing as tail when the cap admits every band", () => {
+    expect(abilityBands(ranked, 8, (key) => key).every((band) => !band.tail)).toBe(true);
   });
 });
 
@@ -158,5 +186,32 @@ describe("abilityBands — fold mode", () => {
 
     expect(bands).toHaveLength(1);
     expect(bands[0].values).toEqual([15]);
+  });
+});
+
+describe("abilityBands — supplementary collapse", () => {
+  // Narrowed to the SKILL variant, which is the half of `AbilitySeries` that
+  // structurally IS a `SkillRow` — the keying and the row key both take one, and
+  // a cause band (no action at all) can never reach either.
+  const series: (AbilitySeries & SkillRow)[] = [
+    { kind: "skill", actionType: { Normal: 100 }, childCharacterType: "Pl1900", values: [10, 0] },
+    { kind: "skill", actionType: { SupplementaryDamage: 100 }, childCharacterType: "Pl1900", values: [4, 0] },
+  ];
+
+  it("merges an echo band into its cause's band when collapsing", () => {
+    const bands = abilityBands(series, 8, asKey, "group", rowKeyingFor(series, true));
+    expect(bands).toHaveLength(1);
+    expect(bands[0].values[0]).toBe(14);
+  });
+
+  it("keeps the echo band separate without collapsing", () => {
+    expect(abilityBands(series, 8, asKey, "group", rowKeyingFor(series, false))).toHaveLength(2);
+  });
+
+  it("keys a band exactly as the table keys the same row", () => {
+    // The agree-by-construction claim, made testable: a band and the row it
+    // decomposes must never be keyed two different ways.
+    const keying = rowKeyingFor(series, true);
+    expect(abilityBands(series, 8, asKey, "group", keying)[0].key).toBe(skillKey(abilityRowKey(series[1], keying)));
   });
 });

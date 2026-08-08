@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import type { ComputedPlayerState, EnemyType, SkillTargetState } from "@/types";
+import type { ComputedPlayerState, EnemyType, SkillState, SkillTargetState } from "@/types";
 
+import { groupSkillsForRows, rowKeyingFor } from "../abilitySkills";
+import { parseEnemyRow } from "../rowKey";
 import type { SelectorPins } from "../selectorOptions";
-import { damageDone, parseEnemyRow } from "./damageDone";
+import { abilityRows, damageDone } from "./damageDone";
 import type { MetricRow } from "./types";
 
 /** A per-enemy entry of a skill's breakdown, as the parser ships it. */
@@ -550,6 +552,46 @@ describe("damageDone.children — party-wide per-source split", () => {
     expect(children[1].columns).toEqual(["100", "1", "100", "100", "100", "25.0%"]);
   });
 
+  it("carries each player's own echo share, so a child bar splits like its parent", () => {
+    // The nested rows are table bars too — a child that folded an echo must
+    // draw the same two-segment fill the parent above it does.
+    const withEcho = [
+      {
+        ...party[0],
+        skillBreakdown: [
+          ...party[0].skillBreakdown,
+          {
+            ...party[0].skillBreakdown[0],
+            actionType: { SupplementaryDamage: 9001 },
+            totalDamage: 60,
+            hits: 3,
+          },
+        ],
+      } as ComputedPlayerState,
+      party[1],
+    ];
+    const keying = rowKeyingFor(
+      withEcho.flatMap((entry) => entry.skillBreakdown),
+      true
+    );
+    const children = damageDone.children!({
+      row: abilityRow("skill:Normal:9001"),
+      players: withEcho,
+      level: "abilities",
+      pins: NO_PINS,
+      fightDurationMs: 100_000,
+      keying,
+    })!;
+
+    // Player 0 dealt the echo, player 1 did not.
+    expect(children[0].value).toBe(260);
+    expect(children[0].subValue).toBe(60);
+    expect(children[1].subValue).toBeUndefined();
+    // Its extremes still describe the named skill's own hits.
+    expect(children[0].columns[2]).toBe("50");
+    expect(children[0].columns[3]).toBe("150");
+  });
+
   it("sums a group parent's members per player", () => {
     // Against the REAL table: Gran's 100/110/120 are all "normal-attack".
     const grouped = [
@@ -583,5 +625,49 @@ describe("damageDone.children — party-wide per-source split", () => {
 
   it("returns a lone user as a single child — the table hides the chevron below two", () => {
     expect(childrenOf("skill:Normal:9002", party)).toHaveLength(1);
+  });
+});
+
+describe("abilityRows — supplementary collapse", () => {
+  const breakdown = [
+    {
+      actionType: { Normal: 100 },
+      childCharacterType: "Pl1900",
+      totalDamage: 1000,
+      hits: 4,
+      minDamage: 200,
+      maxDamage: 300,
+    },
+    {
+      actionType: { SupplementaryDamage: 100 },
+      childCharacterType: "Pl1900",
+      totalDamage: 300,
+      hits: 3,
+      minDamage: 90,
+      maxDamage: 110,
+    },
+  ] as unknown as SkillState[];
+
+  it("adds the echo's damage and hits to its cause, and reports the split", () => {
+    const rows = abilityRows(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, true)), 1300, 0, true);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].value).toBe(1300);
+    expect(rows[0].subValue).toBe(300);
+    // hits column is index 1 — direct 4 plus echo 3.
+    expect(rows[0].columns[1]).toBe("7");
+  });
+
+  it("leaves min and max reporting direct hits only", () => {
+    const rows = abilityRows(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, true)), 1300, 0, true);
+    // An echo is a different damage source; folding it in would make the
+    // skill's "min hit" read as a 90-damage echo tick.
+    expect(rows[0].columns[2]).toBe("200");
+    expect(rows[0].columns[3]).toBe("300");
+  });
+
+  it("keeps the echo as its own row without collapsing", () => {
+    const rows = abilityRows(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, false)), 1300, 0, true);
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.subValue === undefined)).toBe(true);
   });
 });

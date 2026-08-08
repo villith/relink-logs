@@ -63,7 +63,10 @@ describe("CAPABILITIES", () => {
     expect(CAPABILITIES.taken.cardKind("ability", "enemy")).toBe("none");
     expect(CAPABILITIES.taken.cardKind("target", "enemy")).toBe("none");
     expect(CAPABILITIES.stun.cardKind("source", "friendly")).toBe("skill");
-    expect(CAPABILITIES.sba.cardKind("source", "friendly")).toBe("none");
+    // A PLAYER row decomposes into what generated their gauge; the ability and
+    // cause rows below it are already the finest grain the capture has.
+    expect(CAPABILITIES.sba.cardKind("source", "friendly")).toBe("sbaGenerated");
+    expect(CAPABILITIES.sba.cardKind("ability", "friendly")).toBe("none");
     expect(CAPABILITIES.buffs.cardKind("ability", "friendly")).toBe("none");
   });
 
@@ -132,6 +135,45 @@ describe("CAPABILITIES against the real ui.json", () => {
         if (reasonKey === undefined) continue;
         expect(typeof resolve(reasonKey)).toBe("string");
       }
+    }
+  });
+});
+
+describe("chart declarations", () => {
+  it("names each metric's own series, scale and format", () => {
+    expect(CAPABILITIES.damage.chart).toEqual({
+      labelKey: "ui.logs.chart-dps-label",
+      series: "dps",
+      smoothing: "rate",
+      scale: 1,
+      format: "amount",
+    });
+    expect(CAPABILITIES.sba.chart).toEqual({
+      labelKey: "ui.logs.chart-sba-label",
+      series: "sba",
+      // A gauge LEVEL: smoothing would round off the discharge that IS the
+      // reading, and the values are stored in tenths of a percent.
+      smoothing: "none",
+      scale: 0.1,
+      format: "percent",
+    });
+    expect(CAPABILITIES.taken.chart.series).toBe("taken");
+    expect(CAPABILITIES.stun.chart.series).toBe("stun");
+  });
+
+  it("gives the interval metrics the dps buckets and no chart of their own", () => {
+    // Buffs/debuffs overlay stack counts; the base source is never drawn, but
+    // it must still be a real series so the fallback has a length to plot.
+    expect(CAPABILITIES.buffs.chart.series).toBe("dps");
+    expect(CAPABILITIES.debuffs.chart.series).toBe("dps");
+  });
+});
+
+describe("metric flags", () => {
+  it("records supplementary damage on Damage Done alone", () => {
+    expect(CAPABILITIES.damage.recordsSupplementary).toBe(true);
+    for (const key of ["taken", "stun", "sba", "buffs", "debuffs"] as const) {
+      expect(CAPABILITIES[key].recordsSupplementary, key).toBe(false);
     }
   });
 });

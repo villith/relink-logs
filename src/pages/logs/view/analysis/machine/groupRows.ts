@@ -1,11 +1,12 @@
 import type { ActionType, CharacterType, GroupAggregate, GroupKey, GroupMeasure } from "@/types";
-import { humanizeNumber } from "@/utils";
+import { humanizeNumber, isSupplementaryAction } from "@/utils";
 
 import { abilityKey, skillKey } from "../../abilityKey";
-import { abilityRowKey, groupOfPin } from "../../abilitySkills";
-import { damageColumns, enemyRowKey, playersColumns } from "../../metrics/damageDone";
+import { abilityRowKey, groupOfPin, type RowKeying } from "../../abilitySkills";
+import { damageColumns, playersColumns } from "../../metrics/damageDone";
 import { drilldownColumns } from "../../metrics/damageTaken";
 import type { Hostility, MetricRow } from "../../metrics/types";
+import { enemyRowKey, playerRowKey, spawnRowKey, takenAttackRowLabel, takenRowKey } from "../../rowKey";
 import type { Dimension } from "./state";
 
 /** What the fold needs to know beyond the aggregates themselves — which
@@ -21,6 +22,12 @@ export type GroupRowsContext = {
    * damageDone always has; null (or an enemy-side pin) colours none. */
   source: number | null;
   fightDurationMs?: number;
+  /** The view's row keying — today, whether echo damage rides the skill that
+   * caused it. Passed rather than rebuilt for the same reason the descriptors
+   * take one: the table, the chart bands and the timeline's lane join must
+   * agree about which row an echo is on, and deriving it three times is how
+   * they would come to differ. Absent = the uncollapsed fold. */
+  keying?: RowKeying;
 };
 
 /** Shown where a measure never recorded an extreme (a walk with no per-hit
@@ -74,12 +81,66 @@ const emptyMeasure = (): GroupMeasure => ({ amount: 0, hits: 0, min: null, max: 
 
 type FriendlyAbilityKey = Extract<GroupKey, { kind: "friendlyAbility" }>;
 
-/** One ability row in the making: the summed measure plus the member
- * aggregates behind it, kept so a skill-group parent can list them. */
-type AbilityBucket = { measure: GroupMeasure; members: Map<string, { actionType: ActionType; measure: GroupMeasure }> };
+/** One row's totals kept as the whole AND its direct half.
+ *
+ * The two answer different questions. Damage and hits are the ROW's — with the
+ * collapse on it reports both sources — while min and max are the named
+ * skill's own per-hit extremes: folding an echo tick in would make a skill's
+ * smallest hit read as an echo (`abilityRows`'s rule, kept identical here so
+ * the two paths cannot disagree).
+ *
+ * `hasDirect`/`hasEcho` are `splitSupplementary`'s `mixed` test at aggregate
+ * grain: a bucket that is echo ALL THE WAY ACROSS — the echo row itself, or
+ * the residue a collapse leaves behind — has no split to report, and painting
+ * the whole bar in the fainter shade would say nothing its label does not. */
+type SplitMeasure = {
+  measure: GroupMeasure;
+  direct: GroupMeasure;
+  supplementary: number;
+  hasDirect: boolean;
+  hasEcho: boolean;
+};
 
-const abilityRowOf = (key: FriendlyAbilityKey): string =>
-  abilityRowKey({ actionType: key.actionType, childCharacterType: key.childCharacterType as CharacterType });
+const emptySplit = (): SplitMeasure => ({
+  measure: emptyMeasure(),
+  direct: emptyMeasure(),
+  supplementary: 0,
+  hasDirect: false,
+  hasEcho: false,
+});
+
+const addSplit = (into: SplitMeasure, measure: GroupMeasure, echo: boolean): void => {
+  addMeasure(into.measure, measure);
+  if (echo) {
+    into.hasEcho = true;
+    into.supplementary += measure.amount;
+  } else {
+    into.hasDirect = true;
+    addMeasure(into.direct, measure);
+  }
+};
+
+const isMixed = (split: SplitMeasure): boolean => split.hasDirect && split.hasEcho;
+
+/** What the columns are filled from: the whole amount and hits, with the
+ * extremes narrowed to the direct half only where there IS a direct half to
+ * narrow to. */
+const reportedMeasure = (split: SplitMeasure): GroupMeasure =>
+  isMixed(split) ? { ...split.measure, min: split.direct.min, max: split.direct.max } : split.measure;
+
+/** The echo share to draw as the fainter bar segment, or undefined where there
+ * is no split — absent rather than 0, which would mount an empty segment. */
+const subValueOf = (split: SplitMeasure): { subValue?: number } =>
+  isMixed(split) && split.supplementary > 0 ? { subValue: split.supplementary } : {};
+
+/** One ability row in the making: the row's own split plus the member
+ * aggregates behind it, kept so a skill-group parent can list them. */
+type AbilityBucket = SplitMeasure & {
+  members: Map<string, { actionType: ActionType; split: SplitMeasure }>;
+};
+
+const abilityRowOf = (key: FriendlyAbilityKey, keying?: RowKeying): string =>
+  abilityRowKey({ actionType: key.actionType, childCharacterType: key.childCharacterType as CharacterType }, keying);
 
 /** Flat backend aggregates → `MetricRow`s, spelled in the SAME key grammars
  * clicking has always pinned (`player:<i>`, `skill:<key>`, `target:<seg>`,
@@ -112,7 +173,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
     switch (key.kind) {
       case "player":
         rows.push({
-          key: `player:${key.index}`,
+          key: playerRowKey(key.index),
           label: String(key.index),
           kind: "player",
           value: measure.amount,
@@ -124,8 +185,8 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
 
       case "enemySpawn":
         rows.push({
-          key: `target:${key.segment}`,
-          label: `target:${key.segment}`,
+          key: spawnRowKey(key.segment),
+          label: spawnRowKey(key.segment),
           kind: "target",
           value: measure.amount,
           columns: columnsFor(ctx, measure, total),
@@ -152,9 +213,9 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
       case "enemyAttack": {
         // The takenAttack grammar: the label IS the JSON `takenAttackRowParts`
         // reads, and the pin carries it on the ability axis.
-        const label = JSON.stringify({ enemyType: key.enemyType, actionId: key.actionId });
+        const label = takenAttackRowLabel(key.enemyType, key.actionId);
         rows.push({
-          key: `taken:${label}`,
+          key: takenRowKey(label),
           label,
           kind: "takenAttack",
           value: measure.amount,
@@ -166,15 +227,33 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
       }
 
       case "friendlyAbility": {
-        const rowKey = abilityRowOf(key);
-        const bucket = abilityBuckets.get(rowKey) ?? { measure: emptyMeasure(), members: new Map() };
-        addMeasure(bucket.measure, measure);
+        const rowKey = abilityRowOf(key, ctx.keying);
+        const bucket = abilityBuckets.get(rowKey) ?? { ...emptySplit(), members: new Map() };
+        // Which half this aggregate is. With the collapse off a bucket is never
+        // mixed — every echo keys to the echo row — so this costs nothing there
+        // and the row comes out exactly as it always has.
+        const echo = isSupplementaryAction(key.actionType);
+        addSplit(bucket, measure, echo);
+
+        // An echo joins the member that CAUSED it rather than standing as a
+        // member of its own: a skill group holds skills, and "Supplementary
+        // Damage" is not one of them — while dropping the echo outright would
+        // stop the children summing to the parent they expand. Unresolvable
+        // (or uncollapsed), the echo is its own member, which is also its own
+        // row, so nothing is folded anywhere it does not belong.
+        const cause = echo
+          ? ctx.keying?.causeAction(
+              (key.actionType as { SupplementaryDamage: number }).SupplementaryDamage,
+              key.childCharacterType
+            ) ?? null
+          : null;
         // Members merge by action ALONE (`mergeSkillsByAction`'s rule): a
         // player and their summon on one action id are one member skill, and
         // Primal Burst's three bodies share one id on purpose.
-        const memberKey = abilityKey(key.actionType);
-        const member = bucket.members.get(memberKey) ?? { actionType: key.actionType, measure: emptyMeasure() };
-        addMeasure(member.measure, measure);
+        const memberAction = cause ?? key.actionType;
+        const memberKey = abilityKey(memberAction);
+        const member = bucket.members.get(memberKey) ?? { actionType: memberAction, split: emptySplit() };
+        addSplit(member.split, measure, echo);
         bucket.members.set(memberKey, member);
         abilityBuckets.set(rowKey, bucket);
         break;
@@ -192,6 +271,9 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
   for (const [rowKey, bucket] of abilityBuckets) {
     // Only a GROUP row decomposes: an ungrouped row (or the echo fold) is one
     // ability already, and a child restating it would say nothing new.
+    //
+    // A member draws its own split for the same reason its parent does — the
+    // echo it carries is its own, folded there by cause.
     const children =
       groupOfPin(rowKey) === null
         ? undefined
@@ -201,8 +283,9 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
                 key: skillKey(memberKey),
                 label: memberKey,
                 kind: "ability",
-                value: member.measure.amount,
-                columns: columnsFor(ctx, member.measure, total),
+                value: member.split.measure.amount,
+                ...subValueOf(member.split),
+                columns: columnsFor(ctx, reportedMeasure(member.split), total),
                 pinOnClick: { ability: memberKey },
                 colorSlot: abilitySlot,
               })
@@ -214,7 +297,8 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
       label: rowKey,
       kind: "ability",
       value: bucket.measure.amount,
-      columns: columnsFor(ctx, bucket.measure, total),
+      ...subValueOf(bucket),
+      columns: columnsFor(ctx, reportedMeasure(bucket), total),
       pinOnClick: { ability: rowKey },
       colorSlot: abilitySlot,
       ...(children === undefined ? {} : { children }),
@@ -230,39 +314,49 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
  * decomposes are one thing, which is the whole point of the shared
  * aggregation. Sorted largest-first with `other` last, like the rows.
  *
- * `topN` is the CHART's half of the backend's cap, and it is not optional in
- * practice: `aggregate_groups` sorts largest-first and then APPENDS an `other`
- * band summing ranks `topN..`, keeping every individual row for the table. A
- * chart that stacks all of them plus `other` therefore draws the tail twice
- * and stands roughly `other` too tall. Slicing here to the first `topN`
- * aggregates plus `other` is exactly the composition the Rust doc describes,
- * and it sums to the same total the (unsliced) table reports. Omitted, every
- * band is drawn — correct only for a response with no `other` in it. */
-export const groupBandsFor = (aggregates: GroupAggregate[], topN?: number): { key: string; values: number[] }[] => {
-  // Sliced BEFORE the skill-group fold, on the backend's own ranking: `other`
-  // sums the aggregates past the cap, so those are the ones that must go.
-  const capped =
-    topN === undefined || !aggregates.some((aggregate) => aggregate.key.kind === "other")
-      ? aggregates
-      : [
-          ...aggregates.filter((aggregate) => aggregate.key.kind !== "other").slice(0, topN),
-          ...aggregates.filter((aggregate) => aggregate.key.kind === "other"),
-        ];
+ * The backend's own `other` band is DROPPED. `aggregate_groups` sorts
+ * largest-first and then APPENDS `other` summing ranks `topN..` while keeping
+ * every individual row for the table — so the real rows already carry the whole
+ * fight, and stacking `other` beside them draws the tail twice. Every real band
+ * is returned instead, and `topN` only MARKS the ones past the cap as `tail`.
+ *
+ * The chart plots the tail hidden and rolls it up itself, from whichever tail
+ * bands are still hidden (see `chartRollup`): that is what lets one be switched
+ * on without the stack standing that band too tall, which slicing here could
+ * never allow — a sliced band has no series left to draw.
+ *
+ * The cap is applied AFTER the skill-group fold, on the folded ranking. Applied
+ * before it, a group split across several backend rows spent several of the
+ * cap's places and the plot drew fewer bands than it was asked for — which is
+ * how a top-8 cap came to show six abilities and one lump. */
+/** The band key one aggregate key folds onto — the view's own row-key grammar,
+ * in ONE place.
+ *
+ * Shared with the colour reference (`referenceBandOrder`), which ranks the same
+ * bands by their whole-fight totals. A second spelling of this grammar would
+ * rank keys no band ever asks about, and every band would silently fall back to
+ * its drawn position — the fault the reference exists to fix. */
+export const bandKeyOf = (key: Exclude<GroupKey, { kind: "other" }>, keying?: RowKeying): string =>
+  key.kind === "player"
+    ? playerRowKey(key.index)
+    : key.kind === "enemySpawn"
+      ? spawnRowKey(key.segment)
+      : key.kind === "enemyType"
+        ? enemyRowKey(key.enemyType)
+        : key.kind === "enemyAttack"
+          ? takenRowKey(takenAttackRowLabel(key.enemyType, key.actionId))
+          : skillKey(abilityRowOf(key, keying));
 
+export const groupBandsFor = (
+  aggregates: GroupAggregate[],
+  topN?: number,
+  keying?: RowKeying
+): { key: string; values: number[]; tail?: boolean }[] => {
   const bands = new Map<string, number[]>();
-  for (const { key, series } of capped) {
-    const bandKey =
-      key.kind === "player"
-        ? `player:${key.index}`
-        : key.kind === "enemySpawn"
-          ? `target:${key.segment}`
-          : key.kind === "enemyType"
-            ? enemyRowKey(key.enemyType)
-            : key.kind === "enemyAttack"
-              ? `taken:${JSON.stringify({ enemyType: key.enemyType, actionId: key.actionId })}`
-              : key.kind === "friendlyAbility"
-                ? skillKey(abilityRowOf(key))
-                : "other";
+  for (const { key, series } of aggregates) {
+    // The backend's rollup duplicates rows in this same list.
+    if (key.kind === "other") continue;
+    const bandKey = bandKeyOf(key, keying);
     const found = bands.get(bandKey);
     if (found) {
       for (let bucket = 0; bucket < series.length; bucket++) found[bucket] = (found[bucket] ?? 0) + series[bucket];
@@ -272,10 +366,6 @@ export const groupBandsFor = (aggregates: GroupAggregate[], topN?: number): { ke
   }
   return [...bands.entries()]
     .map(([key, values]) => ({ key, values, total: values.reduce((sum, value) => sum + value, 0) }))
-    .sort((a, b) => {
-      if (a.key === "other") return 1;
-      if (b.key === "other") return -1;
-      return b.total - a.total;
-    })
-    .map(({ key, values }) => ({ key, values }));
+    .sort((a, b) => b.total - a.total)
+    .map(({ key, values }, rank) => ({ key, values, ...(topN !== undefined && rank >= topN ? { tail: true } : {}) }));
 };

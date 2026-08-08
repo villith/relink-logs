@@ -430,6 +430,16 @@ export type GroupMeasure = { amount: number; hits: number; min: number | null; m
  * `dpsChart` — the view slices it client-side. */
 export type GroupAggregate = { key: GroupKey; measure: GroupMeasure; series: number[] };
 
+/** One key's WHOLE-FIGHT total, ignoring everything the query narrows in time
+ * (mirrors the Rust `GroupReference`).
+ *
+ * What the chart colours its bands by. Ranking by the FILTERED aggregation
+ * repainted the plot whenever a filter reordered it — the same fault
+ * `actorColor` already refuses for enemies. An amount rather than a rank
+ * because the band fold (`groupBandsFor`) is a display concern the parser does
+ * not have, so the view folds these the same way and ranks the result. */
+export type GroupReference = { key: GroupKey; amount: number };
+
 /** A cause of SBA generation that no skill row can hold — mirrors the Rust
  * `SbaSourceState`. `kind` is a stable machine key; the table maps it to an
  * i18n key rather than displaying it. */

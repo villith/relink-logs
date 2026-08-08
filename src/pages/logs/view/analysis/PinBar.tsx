@@ -2,6 +2,9 @@ import { ActionIcon, Box, Text } from "@mantine/core";
 import { X } from "@phosphor-icons/react";
 import { useTranslation } from "react-i18next";
 
+import { Figure } from "@/components/ui/Figure";
+import { Strip } from "@/components/ui/Strip";
+
 import type { SelectorPins } from "../selectorOptions";
 
 import { PinSelect, type LabelledOption } from "./PinSelect";
@@ -38,16 +41,7 @@ export const PinBar = ({ options, pins, onChange, windowLabel, fullLabel, onClea
   const { t } = useTranslation();
 
   return (
-    <Box
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "10px 16px",
-        borderBottom: "1px solid var(--an-line)",
-        flexWrap: "wrap",
-      }}
-    >
+    <Strip wrap className="py-2.5">
       {/* Single like the machine's target axis (WCL's): one spawn or All —
           `targets` still travels as a list only because the legacy pin shape
           does. */}
@@ -71,28 +65,14 @@ export const PinBar = ({ options, pins, onChange, windowLabel, fullLabel, onClea
         onChange={(value) => onChange({ ...pins, ability: value })}
       />
       {windowLabel !== null && (
-        <Box
-          style={{
-            marginLeft: "auto",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            height: 28,
-            padding: "0 6px 0 11px",
-            borderRadius: 4,
-            border: "1px solid var(--an-accent)",
-            backgroundColor: "rgba(0, 184, 217, 0.09)",
-          }}
-        >
-          <Text className="analysis-num" style={{ fontSize: 12.5, color: "var(--an-accent)" }}>
+        <Box className="ml-auto inline-flex h-control items-center gap-1.5 rounded-sm border border-accent bg-accent-soft pl-[11px] pr-1.5">
+          <Figure size="md" className="text-accent">
             {windowLabel}
-          </Text>
+          </Figure>
           {/* `window-of` next door is Classic's full sentence and interpolates
               both ends; this chip already states the window beside it, so it
               needs the shorter "of {{total}}". */}
-          <Text style={{ fontSize: 11, color: "var(--an-ink-3)" }}>
-            {t("ui.logs.window-within", { total: fullLabel })}
-          </Text>
+          <Text className="text-xs text-ink-3">{t("ui.logs.window-within", { total: fullLabel })}</Text>
           {/* sm, not xs: this is the only control that clears a window, and xs
               measured 18x18 against WCAG 2.2 SC 2.5.8's 24x24. */}
           <ActionIcon
@@ -107,6 +87,6 @@ export const PinBar = ({ options, pins, onChange, windowLabel, fullLabel, onClea
           </ActionIcon>
         </Box>
       )}
-    </Box>
+    </Strip>
   );
 };

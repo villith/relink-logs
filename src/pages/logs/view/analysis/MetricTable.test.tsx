@@ -35,7 +35,7 @@ describe("MetricTable", () => {
 
   it("grows no row control when no toggle is given", () => {
     const { container } = renderTable();
-    expect(container.querySelectorAll(".analysis-row-toggle")).toHaveLength(0);
+    expect(container.querySelectorAll("[data-band-toggle]")).toHaveLength(0);
   });
 
   it("toggles a row without pinning it", () => {
@@ -48,7 +48,7 @@ describe("MetricTable", () => {
       rowToggle: (row) => (row.key === "a" ? { shown: false, onToggle } : null),
     });
 
-    const toggles = container.querySelectorAll(".analysis-row-toggle");
+    const toggles = container.querySelectorAll("[data-band-toggle]");
     expect(toggles).toHaveLength(1);
 
     fireEvent.click(toggles[0]);
@@ -65,7 +65,7 @@ describe("MetricTable", () => {
 
   it("grows no row control when no toggle is given", () => {
     const { container } = renderTable();
-    expect(container.querySelectorAll(".analysis-row-toggle")).toHaveLength(0);
+    expect(container.querySelectorAll("[data-band-toggle]")).toHaveLength(0);
   });
 
   it("toggles a row without pinning it", () => {
@@ -78,7 +78,7 @@ describe("MetricTable", () => {
       rowToggle: (row) => (row.key === "a" ? { shown: false, onToggle } : null),
     });
 
-    const toggles = container.querySelectorAll(".analysis-row-toggle");
+    const toggles = container.querySelectorAll("[data-band-toggle]");
     expect(toggles).toHaveLength(1);
 
     fireEvent.click(toggles[0]);
@@ -94,9 +94,18 @@ describe("MetricTable", () => {
 
   it("scales bars against the largest row, not the total", () => {
     const { container } = renderTable();
-    const bars = container.querySelectorAll<HTMLElement>("[data-metric-bar]");
+    const bars = container.querySelectorAll<HTMLElement>("[data-testid='metric-bar-segment']");
     expect(bars[0].style.width).toBe("100%");
     expect(parseFloat(bars[1].style.width)).toBeCloseTo(100 / 3, 6);
+  });
+
+  it("draws a row's supplementary split", () => {
+    renderTable({
+      rows: [{ key: "a", label: "A", value: 50, subValue: 20, columns: [], pinOnClick: null, colorSlot: 0 }],
+    });
+    const segments = screen.getAllByTestId("metric-bar-segment") as HTMLElement[];
+    expect(segments).toHaveLength(2);
+    expect(segments[1].style.left).toBe("60%");
   });
 
   it("draws no rank number", () => {
@@ -115,7 +124,7 @@ describe("MetricTable", () => {
       rows: [ROWS[1]],
       rowColor: (row: MetricRow) => (row.colorSlot === 1 ? "rgb(1, 2, 3)" : "rgb(9, 9, 9)"),
     });
-    const bar = container.querySelector<HTMLElement>("[data-metric-bar]");
+    const bar = container.querySelector<HTMLElement>("[data-testid='metric-bar-segment']");
     expect(bar?.style.backgroundColor).toBe("rgb(1, 2, 3)");
   });
 
@@ -147,7 +156,7 @@ describe("MetricTable", () => {
       { key: "b", label: "Eugen", value: 0, columns: ["0", "0"], pinOnClick: null, colorSlot: 1 },
     ];
     const { container } = renderTable({ rows: zeros });
-    const bars = container.querySelectorAll<HTMLElement>("[data-metric-bar]");
+    const bars = container.querySelectorAll<HTMLElement>("[data-testid='metric-bar-segment']");
     expect(bars).toHaveLength(2);
     expect(bars[0].style.width).toBe("0%");
   });
@@ -173,7 +182,9 @@ describe("MetricTable", () => {
 
   it("wraps a row in a hover card when the caller supplies sections", () => {
     const { container } = renderTable({ rowSections: SECTIONS, cardAmount: CARD_AMOUNT });
-    const row = container.querySelector<HTMLElement>(".analysis-row");
+    // The column head also carries role="row" (a grid's header row is a row),
+    // so a data row is one that is not the head.
+    const row = container.querySelector<HTMLElement>("[role='row']:not([data-head])");
     expect(row).toBeTruthy();
     fireEvent.mouseOver(row!);
     expect(screen.getByTestId("metric-hover-card")).toBeTruthy();
@@ -185,7 +196,7 @@ describe("MetricTable", () => {
     // tooltip came to head its column "DMG" and report damage; without one
     // there is nothing honest to draw.
     const { container } = renderTable({ rowSections: SECTIONS });
-    fireEvent.mouseOver(container.querySelector<HTMLElement>(".analysis-row")!);
+    fireEvent.mouseOver(container.querySelector<HTMLElement>("[role='row']:not([data-head])")!);
     expect(screen.queryByTestId("metric-hover-card")).toBeNull();
   });
 
@@ -216,7 +227,7 @@ describe("MetricTable", () => {
       rowToggle: () => ({ shown: true, onToggle: () => {} }),
     });
 
-    const toggle = container.querySelector(".analysis-row-toggle");
+    const toggle = container.querySelector("[data-band-toggle]");
     expect(toggle?.tagName).toBe("BUTTON");
     expect(toggle?.getAttribute("aria-pressed")).toBe("true");
   });
@@ -243,7 +254,7 @@ describe("MetricTable", () => {
       rowToggle: () => ({ shown: true, onToggle: () => {} }),
     });
 
-    const toggle = container.querySelector(".analysis-row-toggle");
+    const toggle = container.querySelector("[data-band-toggle]");
     expect(toggle?.tagName).toBe("BUTTON");
     expect(toggle?.getAttribute("aria-pressed")).toBe("true");
   });
@@ -281,7 +292,7 @@ describe("subrows", () => {
 
   it("renders an expand control only on rows with children", () => {
     const { container } = renderTable({ rows: parentRows() });
-    const chevrons = container.querySelectorAll(".analysis-row-expand");
+    const chevrons = container.querySelectorAll("[data-expand]");
     expect(chevrons).toHaveLength(1);
     expect(chevrons[0].getAttribute("aria-label")).toBe("ui.logs.expand-row");
     expect(chevrons[0].tagName).toBe("BUTTON");
@@ -293,18 +304,18 @@ describe("subrows", () => {
 
     expect(screen.queryByText("skill:Normal:100")).toBeNull();
 
-    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    fireEvent.click(container.querySelector("[data-expand]")!);
     expect(onPin).not.toHaveBeenCalled();
 
     expect(screen.getByText("skill:Normal:100")).toBeTruthy();
     expect(screen.getByText("skill:Normal:110")).toBeTruthy();
-    expect(container.querySelectorAll(".analysis-subrow")).toHaveLength(2);
+    expect(container.querySelectorAll("[data-subrow]")).toHaveLength(2);
   });
 
   it("pins a clicked child by the child's own payload", () => {
     const onPin = vi.fn();
     const { container } = renderTable({ rows: parentRows(), onPin });
-    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    fireEvent.click(container.querySelector("[data-expand]")!);
 
     screen.getByText("skill:Normal:110").click();
     expect(onPin).toHaveBeenCalledWith({ ability: "skill:Normal:110" });
@@ -312,7 +323,7 @@ describe("subrows", () => {
 
   it("collapses again on a second click", () => {
     const { container } = renderTable({ rows: parentRows() });
-    const chevron = container.querySelector(".analysis-row-expand")!;
+    const chevron = container.querySelector("[data-expand]")!;
     fireEvent.click(chevron);
     fireEvent.click(chevron);
     expect(screen.queryByText("skill:Normal:100")).toBeNull();
@@ -320,7 +331,7 @@ describe("subrows", () => {
 
   it("resets expansion when the rows change identity", () => {
     const { container, rerender } = renderTable({ rows: parentRows() });
-    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    fireEvent.click(container.querySelector("[data-expand]")!);
     expect(screen.getByText("skill:Normal:100")).toBeTruthy();
 
     // A regroup or refetch hands the table a NEW rows array; stale expansion
@@ -363,7 +374,7 @@ describe("timeline rows", () => {
       timelineMs: 10_000,
     });
 
-    const pieces = container.querySelectorAll<HTMLElement>(".analysis-timeline-piece");
+    const pieces = container.querySelectorAll<HTMLElement>("[data-uptime-piece]");
     expect(pieces).toHaveLength(2);
     expect(pieces[0].style.left).toBe("0%");
     expect(pieces[0].style.width).toBe("20%");
@@ -378,8 +389,8 @@ describe("timeline rows", () => {
       timelineMs: 10_000,
     });
 
-    expect(container.querySelectorAll(".analysis-timeline-piece")).toHaveLength(0);
-    expect(container.querySelectorAll("[data-metric-bar]")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-uptime-piece]")).toHaveLength(0);
+    expect(container.querySelectorAll("[data-testid='metric-bar-segment']")).toHaveLength(1);
   });
 
   it("gives a zero-width window a visible minimum rather than nothing", () => {
@@ -389,7 +400,7 @@ describe("timeline rows", () => {
       timelineMs: 10_000,
     });
 
-    const piece = container.querySelector<HTMLElement>(".analysis-timeline-piece");
+    const piece = container.querySelector<HTMLElement>("[data-uptime-piece]");
     expect(piece?.style.minWidth).toBe("2px");
   });
 
@@ -400,8 +411,8 @@ describe("timeline rows", () => {
       timelineMs: 0,
     });
 
-    expect(container.querySelectorAll(".analysis-timeline-piece")).toHaveLength(0);
-    expect(container.querySelectorAll("[data-metric-bar]")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-uptime-piece]")).toHaveLength(0);
+    expect(container.querySelectorAll("[data-testid='metric-bar-segment']")).toHaveLength(1);
   });
 
   it("draws the pieces inside a dedicated track cell, not across the row", () => {
@@ -411,11 +422,12 @@ describe("timeline rows", () => {
       timelineMs: 10_000,
     });
 
-    const track = container.querySelector(".analysis-track") as HTMLElement;
+    const track = container.querySelector("[data-uptime-track]") as HTMLElement;
     expect(track).not.toBeNull();
-    expect(track.querySelectorAll(".analysis-timeline-piece")).toHaveLength(1);
+    expect(track.querySelectorAll("[data-uptime-piece]")).toHaveLength(1);
     // The name cell is bounded so the track never sits under the text.
-    expect(container.querySelector(".analysis-name")?.className).toContain("analysis-name-fixed");
+    const nameClasses = container.querySelector("[role='gridcell']")?.className.split(" ") ?? [];
+    expect(nameClasses).toContain("basis-name");
   });
 
   it("keeps the magnitude rows' name cell fluid", () => {
@@ -425,8 +437,9 @@ describe("timeline rows", () => {
       timelineMs: 10_000,
     });
 
-    expect(container.querySelector(".analysis-name")?.className).not.toContain("analysis-name-fixed");
-    expect(container.querySelector(".analysis-track")).toBeNull();
+    const nameClasses = container.querySelector("[role='gridcell']")?.className.split(" ") ?? [];
+    expect(nameClasses).not.toContain("basis-name");
+    expect(container.querySelector("[data-uptime-track]")).toBeNull();
   });
 });
 
@@ -457,7 +470,7 @@ describe("children accessor", () => {
       rows: [parent([child("skill:member", 40), child("skill:member2", 60)])],
       rowChildren: () => [child("player:0", 70), child("player:1", 30)],
     });
-    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    fireEvent.click(container.querySelector("[data-expand]")!);
     expect(screen.getByText("player:0")).toBeTruthy();
     expect(screen.queryByText("skill:member")).toBeNull();
   });
@@ -468,7 +481,7 @@ describe("children accessor", () => {
       rows: [parent([child("skill:member", 40), child("skill:member2", 60)])],
       rowChildren: () => null,
     });
-    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    fireEvent.click(container.querySelector("[data-expand]")!);
     expect(screen.getByText("skill:member")).toBeTruthy();
   });
 
@@ -477,7 +490,7 @@ describe("children accessor", () => {
       rows: [parent()],
       rowChildren: () => [child("player:0", 100)],
     });
-    expect(container.querySelectorAll(".analysis-row-expand")).toHaveLength(0);
+    expect(container.querySelectorAll("[data-expand]")).toHaveLength(0);
   });
 
   it("falls back to the row's own children when the accessor's split restates the parent", () => {
@@ -489,7 +502,7 @@ describe("children accessor", () => {
       rows: [parent([child("skill:member", 40), child("skill:member2", 60)])],
       rowChildren: () => [child("player:0", 100)],
     });
-    fireEvent.click(container.querySelector(".analysis-row-expand")!);
+    fireEvent.click(container.querySelector("[data-expand]")!);
     expect(screen.getByText("skill:member")).toBeTruthy();
     expect(screen.queryByText("player:0")).toBeNull();
   });
@@ -499,7 +512,7 @@ describe("children accessor", () => {
       rows: [parent()],
       rowChildren: () => [child("player:0", 70), child("player:1", 30)],
     });
-    const chevron = container.querySelector(".analysis-row-expand")!;
+    const chevron = container.querySelector("[data-expand]")!;
     expect(chevron.getAttribute("aria-expanded")).toBe("false");
     fireEvent.click(chevron);
     expect(chevron.getAttribute("aria-expanded")).toBe("true");
@@ -510,8 +523,8 @@ describe("children accessor", () => {
       rows: [parent()],
       rowChildren: () => [child("player:0", 70), child("player:1", 30)],
     });
-    fireEvent.click(container.querySelector(".analysis-row-expand")!);
-    expect(container.querySelectorAll(".analysis-subrow")).toHaveLength(2);
+    fireEvent.click(container.querySelector("[data-expand]")!);
+    expect(container.querySelectorAll("[data-subrow]")).toHaveLength(2);
   });
 });
 
