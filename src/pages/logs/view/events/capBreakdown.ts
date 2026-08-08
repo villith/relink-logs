@@ -19,17 +19,46 @@ export type CapHit = {
   attack_rate: number | null;
 };
 
+/** One cap-up contribution reconstructed from the stored loadout, as the
+ * fraction the formula adds (0.5 renders as +50%). */
+export type CapSource = {
+  key: string;
+  labelKey: string;
+  value: number;
+};
+
+/** The cap-up side of a hit: the game's own fused total, and whatever share of
+ * it we have managed to attribute.
+ *
+ * The game hands over ONE number per attack class — it has already summed every
+ * sigil, trait, node and bonus before the hook sees it. So `terms` is not a
+ * decomposition handed to us; it is an independent reconstruction from the
+ * loadout, and `totalCapUp` is what it must be checked against. The difference
+ * is reported rather than hidden, which is what makes the model falsifiable. */
+export type CapUp = {
+  totalCapUp: number;
+  terms: CapSource[];
+};
+
 const round = (value: number, places: number): number => {
   const scale = 10 ** places;
   return Math.round(value * scale) / scale;
 };
+
+/** A fraction as a percentage row, e.g. 13.13 -> 1313. */
+const asPercent = (key: string, labelKey: string, fraction: number): CapRow => ({
+  key,
+  labelKey,
+  value: round(fraction * 100, 2),
+  kind: "percent",
+});
 
 /** The rows for one hit.
  *
  * Everything past `damage` is derived from the cap fields, which are absent on
  * old logs. A hit without them reports the one number it does have rather than
  * rendering zeroes, which would read as "the cap was zero". */
-export const capCardRows = (hit: CapHit): CapRow[] => {
+export const capCardRows = (hit: CapHit, capUp?: CapUp): CapRow[] => {
   const rows: CapRow[] = [{ key: "damage", labelKey: "ui.logs.cap-damage-dealt", value: hit.damage, kind: "count" }];
 
   const cap = hit.damage_cap;
@@ -42,6 +71,28 @@ export const capCardRows = (hit: CapHit): CapRow[] => {
   if (hit.attack_rate !== null) {
     rows.push({ key: "mv", labelKey: "ui.logs.cap-mv", value: hit.attack_rate, kind: "rate" });
   }
+
+  // The cap-up block, when the log carries a cap-up for this hit's player and
+  // attack class. The base is divided out of the GAME's multiplier and never
+  // the reconstructed one: the terms are a partial reconstruction, so dividing
+  // by them would overstate the base by exactly the part not yet attributed.
+  if (capUp !== undefined && Number.isFinite(capUp.totalCapUp) && 1 + capUp.totalCapUp > 0) {
+    rows.push({
+      key: "basecap",
+      labelKey: "ui.logs.cap-base",
+      value: round(cap / (1 + capUp.totalCapUp), 2),
+      kind: "count",
+    });
+    rows.push(asPercent("capup", "ui.logs.cap-term-record", capUp.totalCapUp));
+    for (const term of capUp.terms) {
+      rows.push(asPercent(term.key, term.labelKey, term.value));
+    }
+    // Always rendered, however large — hiding it exactly when the model is
+    // doing badly is when the reader most needs it.
+    const attributed = capUp.terms.reduce((sum, term) => sum + term.value, 0);
+    rows.push(asPercent("unaccounted", "ui.logs.cap-unaccounted", capUp.totalCapUp - attributed));
+  }
+
   rows.push({ key: "base", labelKey: "ui.logs.cap-precap-base", value: base, kind: "count" });
   rows.push({
     key: "overcap",
