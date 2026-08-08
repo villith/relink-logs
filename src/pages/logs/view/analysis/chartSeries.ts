@@ -28,9 +28,21 @@ export const buildSeriesPoints = ({
   scale: number;
   /** Which buckets a filter mask admits; absent = all. A trailing average
    * over a masked series would otherwise smear its spikes past the mask's
-   * edge (the decay tail reads as damage after a window filter's end) and
-   * dilute the first buckets inside it with the excluded zeros — so masked
-   * buckets plot as zero and the average divides by admitted buckets only. */
+   * edge — the decay tail reads as damage after a window filter's end — so a
+   * masked bucket plots as zero outright.
+   *
+   * The excluded buckets keep their PLACE in the trailing window even though
+   * their values are dropped. The Y axis is a rate per bucket of wall clock,
+   * and dividing by the admitted count instead would rescale it to a rate per
+   * admitted bucket: at the leading edge of an admitted region, where only one
+   * of `smoothing` buckets is admitted, the same damage would plot up to
+   * `smoothing`× higher. A filter that removes TIME but no damage would then
+   * raise the line above its unfiltered self (log #1880: an aura excluding
+   * 0.13% of the damage doubled the plotted peak and moved the fight's
+   * maximum), and the area under the chart would stop matching the table it
+   * sits above. The cost is the honest one: the line ramps in over the
+   * smoothing period at each admitted region's start, because that is how much
+   * wall clock the average has actually seen. */
   admitted?: boolean[];
 }): Record<string, number>[] => {
   const points: Record<string, number>[] = [];
@@ -47,13 +59,15 @@ export const buildSeriesPoints = ({
       const series = source[key] ?? [];
       const from = Math.max(0, bucket - smoothing + 1);
       let sum = 0;
-      let count = 0;
       for (let i = from; i <= bucket; i++) {
+        // Excluded buckets contribute nothing to the sum but still count in the
+        // denominator below — see `admitted`.
         if (admitted !== undefined && !admitted[i]) continue;
         sum += series[i] ?? 0;
-        count += 1;
       }
-      point[String(key)] = masked || count === 0 ? 0 : Math.round((sum / count) * scale);
+      // The window's own length, which at the fight's start is short of
+      // `smoothing`: there are no buckets behind bucket 0 to average over.
+      point[String(key)] = masked ? 0 : Math.round((sum / (bucket - from + 1)) * scale);
     }
 
     points.push(point);
