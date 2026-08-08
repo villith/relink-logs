@@ -154,6 +154,7 @@ export const useChartModel = ({
     labelForSource,
     labelForTarget,
     playerColor,
+    sourceIconUrl,
     breakEnemyOf,
   } = identity;
   const { cellOf } = cells;
@@ -195,8 +196,15 @@ export const useChartModel = ({
             playerColor(event.actorIndex, 0)
           : SBA_MARKER_COLOR,
       label: t(MARKER_LINE_KEY[event.kind], { name: labelForSource(event.actorIndex) }),
+      // The actor's own art, through the SAME resolver the table's rows and the
+      // hover cards' entries use — a marker naming a player beside a card row
+      // naming the same player must not illustrate them differently. Spread
+      // rather than assigned, because the field is optional under
+      // `exactOptionalPropertyTypes` and an explicit `undefined` is a type
+      // error rather than an omission.
+      ...(sourceIconUrl(event.actorIndex) === undefined ? {} : { icon: sourceIconUrl(event.actorIndex) }),
     }));
-  }, [deathEvents, sbaEvents, playerColor, statusWindow, playerByIndex, labelForSource, t]);
+  }, [deathEvents, sbaEvents, playerColor, statusWindow, playerByIndex, labelForSource, sourceIconUrl, t]);
 
   // What the plot shows follows the metric's OWN declaration (see `ChartDecl`).
   // Each metric brings its own bucketed series from the base load, so switching
@@ -580,7 +588,7 @@ export const useChartModel = ({
   const maskBands = useMemo(() => {
     if (maskWindows === undefined) return undefined;
     const excluded = auraExcludedBands(maskWindows, statusWindow);
-    return excluded.length === 0 ? undefined : excluded.map((band) => ({ color: "var(--an-ink-3)", band }));
+    return excluded.length === 0 ? undefined : excluded.map((band) => ({ color: "var(--color-ink-3)", band }));
   }, [maskWindows, statusWindow]);
 
   // The chart IS the window: committing does not shade the rest of the fight,

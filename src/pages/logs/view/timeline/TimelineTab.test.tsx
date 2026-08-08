@@ -87,7 +87,7 @@ describe("TimelineTab", () => {
   // skeleton that still looks correct.
   it("places the metric's events onto their lane", () => {
     const { container } = renderTab();
-    expect(container.querySelectorAll(".timeline-mark").length).toBeGreaterThan(0);
+    expect(container.querySelectorAll("[data-mark]").length).toBeGreaterThan(0);
   });
 
   it("shows the empty state when the metric has no rows", () => {

@@ -1,10 +1,12 @@
 import { AreaChart, LineChart } from "@mantine/charts";
-import { Box, Checkbox, Group, Paper, Text } from "@mantine/core";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Box, Group, Paper, Text } from "@mantine/core";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ReferenceArea, ReferenceLine } from "recharts";
 
 import { AnimatedHeight } from "@/components/AnimatedHeight";
+// Aliased: `Label` in this file is the chart's own series-label type.
+import { Label as UiLabel } from "@/components/ui/Label";
 import { PillGroup } from "@/components/ui/PillGroup";
 import { useCtrlHeld } from "@/components/useCtrlHeld";
 import { humanizeNumber } from "@/utils";
@@ -13,9 +15,10 @@ import { DPS_BUCKET_MS, type ChartDatapoint, type Label } from "../DetailCharts"
 import { bandOpacity, type Band } from "../statusBands";
 
 import { ChartLegend } from "./ChartLegend";
+import { ChartToggle } from "./ChartToggle";
 import { CardNotes, HoverCardBody } from "./HoverCard";
 import "./analysis.css";
-import type { ChartMarker, MarkerKind } from "./chartMarkers";
+import { SBA_MARKER_COLOR, type ChartMarker, type MarkerKind } from "./chartMarkers";
 import { ROLLUP_SERIES_KEY, rollupIsDrawn, withRollupSeries } from "./chartRollup";
 import { TOTAL_SERIES_KEY } from "./chartSeries";
 import {
@@ -120,12 +123,17 @@ export type DpsChartProps = {
   /** Providing this renders the Normal | Stacked SegmentedControl in the
    * chart header. */
   onStackModeChange?: (mode: StackMode) => void;
+  /** Extra controls for the header strip, drawn ahead of the chart's own.
+   *
+   * A slot rather than a prop per control: what belongs here is anything that
+   * changes how the plot READS but is not the chart's to own — the Merge Sup
+   * DMG switch folds echo damage into its causing skill, which is a property of
+   * the whole view (the table folds with it) and not of the plot. Threading it
+   * as `collapseSupplementary`/`onCollapseChange` would put a damage-model
+   * concept inside a component that otherwise knows only about series and
+   * buckets. */
+  controls?: ReactNode;
 };
-
-/** The glyph a marker's reference line wears at the top of the plot. Kept out
- * of JSX text (recharts label props) so the i18next literal rule stays clean;
- * the tooltip lines carry their own translated text instead. */
-const MARKER_GLYPH: Record<MarkerKind, string> = { death: "☠", sba: "✦" };
 
 /** The stroke a deduped marker line takes when the markers it stands for do NOT
  * agree on a colour — two players dying in one bucket, each in their own party
@@ -141,8 +149,8 @@ const MIXED_MARKER_COLOR = "var(--mantine-color-gray-5)";
  * label in whichever bucket the cursor was over, so it changed width — and,
  * being right-anchored by recharts near the plot's right edge, jumped
  * sideways — as the pointer crossed the plot. Wide enough for the four-column
- * row at the labels the view produces; longer names ellipsize, which
- * `.analysis-card-name` already does in the table.
+ * row at the labels the view produces; longer names ellipsize, which the card's
+ * own name cell already does in the table.
  *
  * Its own constant rather than `HoverCard`'s min/max pair: those bound a card
  * whose content is fixed by the row it explains, and are free to fit it. */
@@ -152,6 +160,17 @@ const TOOLTIP_WIDTH = 320;
 const MARKER_LABEL_KEY: Record<MarkerKind, string> = {
   death: "ui.logs.chart-marker-deaths",
   sba: "ui.logs.chart-marker-sba",
+};
+
+/** The control row's swatch colour per marker kind.
+ *
+ * SBA lines all draw in one colour, so its switch can wear it. DEATH lines take
+ * the dying player's own colour (see `chartMarkers`), so there is no single hue
+ * to show — the switch takes a neutral one rather than picking a party colour
+ * and claiming deaths are that player's. */
+const MARKER_TOGGLE_COLOR: Record<MarkerKind, string> = {
+  death: "var(--color-ink-2)",
+  sba: SBA_MARKER_COLOR,
 };
 
 // recharts types a tooltip entry as Payload<any, any>, which has no index
@@ -253,7 +272,15 @@ export const ChartTooltip = ({
       kind,
       notes: (markers ?? [])
         .filter((marker) => marker.kind === kind)
-        .map((marker, index) => ({ key: `${kind}-${index}`, color: marker.color, text: marker.label })),
+        .map((marker, index) => ({
+          key: `${kind}-${index}`,
+          color: marker.color,
+          text: marker.label,
+          // Whose death, whose Skybound Art. Load-bearing on the SBA rows in
+          // particular: every SBA line wears one colour, so the swatch says
+          // only that an SBA happened and the art is what says by whom.
+          ...(marker.icon === undefined ? {} : { icon: marker.icon }),
+        })),
     }))
     .filter((section) => section.notes.length > 0);
 
@@ -309,7 +336,7 @@ export const ChartTooltip = ({
               reserve,
               // Per-entry colour overrides this; the section colour is only
               // the fallback for an entry recharts gave no colour.
-              color: "var(--an-ink-3)",
+              color: "var(--color-ink-3)",
               entries: landed.map((item) => {
                 const icon = iconByKey.get(String(item.name));
                 return {
@@ -333,7 +360,7 @@ export const ChartTooltip = ({
               : [
                   {
                     headingKey: TOTAL_SERIES_KEY,
-                    color: "var(--an-ink-3)",
+                    color: "var(--color-ink-3)",
                     showHeading: false,
                     showShare: false,
                     entries: [
@@ -395,6 +422,7 @@ export const DpsChart = ({
   onSmoothingChange,
   stackMode = "stacked",
   onStackModeChange,
+  controls,
 }: DpsChartProps) => {
   const { t } = useTranslation();
   const anchor = useRef<number | null>(null);
@@ -555,7 +583,7 @@ export const DpsChart = ({
     // Grows with the view's density knob, like everything around it: at the
     // larger type the old ceiling left the plot shorter than the table's first
     // few rows.
-    h: "clamp(calc(190px * var(--ui-scale)), 28vh, calc(380px * var(--ui-scale)))",
+    h: "clamp(calc(190px * var(--density)), 28vh, calc(380px * var(--density)))",
     // The rolled-up form, so the `other` band the legend offers has a series
     // to draw. Identical to `data` on a chart with no capped tail.
     data: plotData,
@@ -648,27 +676,29 @@ export const DpsChart = ({
   // ONE line per kind per bucket. Co-located markers are the norm, not the edge
   // case: an SBA chain is `OnPerformSBA` plus up to three `OnContinueSBAChain`
   // within a second or two, so a full-party SBA drew four identical lines and
-  // four ✦ glyphs on the same x, and two deaths in a bucket drew one line over
-  // the other. The dedup is deliberately NOT applied to `markersByLabel` below
+  // four identical lines on the same x, and two deaths in a bucket drew one
+  // line over the other. The dedup is deliberately NOT applied to
+  // `markersByLabel` below
   // — the tooltip must still list every marker individually.
   const markerLines = useMemo(() => {
-    const lines = new Map<string, { kind: MarkerKind; timestamp: string | undefined; color: string }>();
+    // The kind survives in the map KEY (one line per kind per bucket) but not
+    // in the value: it used to pick the line's glyph, and nothing drawn now
+    // reads it.
+    const lines = new Map<string, { timestamp: string | undefined; color: string }>();
     for (const { marker, timestamp } of bucketedMarkers) {
       const key = `${marker.kind}@${timestamp}`;
       const drawn = lines.get(key);
-      if (!drawn) lines.set(key, { kind: marker.kind, timestamp, color: marker.color });
+      if (!drawn) lines.set(key, { timestamp, color: marker.color });
       else if (drawn.color !== marker.color) drawn.color = MIXED_MARKER_COLOR;
     }
-    return [...lines.values()].map(({ kind, timestamp, color }, index) => (
-      <ReferenceLine
-        key={`marker-${index}`}
-        x={timestamp}
-        stroke={color}
-        strokeDasharray="3 3"
-        // A number, not a token: recharts writes this into an SVG attribute and
-        // a CSS var would not resolve there.
-        label={{ value: MARKER_GLYPH[kind], position: "top", fill: color, fontSize: 12 }}
-      />
+    return [...lines.values()].map(({ timestamp, color }, index) => (
+      // No label. Each line used to wear a ☠/✦ at the top of the plot naming
+      // its kind; the line's own colour, the control-row switch that turns the
+      // kind on and off, and the tooltip — which names every marker in the
+      // bucket, with the actor's art — all say the same thing without hanging
+      // glyphs over the plot's top edge, where a full-party SBA put several of
+      // them in a row.
+      <ReferenceLine key={`marker-${index}`} x={timestamp} stroke={color} strokeDasharray="3 3" />
     ));
   }, [bucketedMarkers]);
 
@@ -712,8 +742,8 @@ export const DpsChart = ({
       x1={data[Math.min(band[0], band[1])]?.timestamp}
       x2={data[Math.max(band[0], band[1])]?.timestamp}
       strokeOpacity={0.9}
-      stroke="var(--an-accent)"
-      fill="var(--an-accent)"
+      stroke="var(--color-accent)"
+      fill="var(--color-accent)"
       fillOpacity={0.13}
     />
   );
@@ -721,8 +751,9 @@ export const DpsChart = ({
   return (
     <Box style={{ padding: "10px 16px 8px" }}>
       <Box style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-        <Text className="analysis-label">{t(labelKey)}</Text>
-        <Group gap="sm">
+        <UiLabel>{t(labelKey)}</UiLabel>
+        <Group gap="sm" data-testid="chart-controls">
+          {controls}
           {onSmoothingChange !== undefined && smoothing !== undefined && (
             <PillGroup
               // The options are bare durations, so both the caption and the
@@ -760,25 +791,30 @@ export const DpsChart = ({
               ]}
             />
           )}
+          {/* The same control the legend under the plot is made of (see
+              `ChartToggle`). These were Mantine `Checkbox`es, which put the
+              stock theme's box and label sizing directly above a legend drawing
+              the same five things in the app's own voice. The band's colour
+              rides its switch, so the label names the hue the plot shades with
+              — identity never rides colour alone. */}
           {windowKinds.map((kind) => (
-            <Checkbox
+            <ChartToggle
               key={`window-${kind}`}
-              size="xs"
-              // The band's own colour on the box, so the label names the hue
-              // the plot shades with — identity never rides colour alone.
-              color={WINDOW_BAND_COLOR[kind]}
               label={t(WINDOW_LABEL_KEY[kind])}
-              checked={!hiddenWindowKinds.has(kind)}
-              onChange={() => toggleWindowKind(kind)}
+              color={WINDOW_BAND_COLOR[kind]}
+              shown={!hiddenWindowKinds.has(kind)}
+              onToggle={() => toggleWindowKind(kind)}
             />
           ))}
           {markerKinds.map((kind) => (
-            <Checkbox
+            <ChartToggle
               key={kind}
-              size="xs"
               label={t(MARKER_LABEL_KEY[kind])}
-              checked={!hiddenMarkerKinds.has(kind)}
-              onChange={() => toggleMarkerKind(kind)}
+              color={MARKER_TOGGLE_COLOR[kind]}
+              // A line on the plot, not a shaded stretch of it.
+              glyph="marker"
+              shown={!hiddenMarkerKinds.has(kind)}
+              onToggle={() => toggleMarkerKind(kind)}
             />
           ))}
         </Group>

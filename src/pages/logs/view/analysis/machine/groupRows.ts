@@ -242,7 +242,10 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
         // (or uncollapsed), the echo is its own member, which is also its own
         // row, so nothing is folded anywhere it does not belong.
         const cause = echo
-          ? ctx.keying?.causeAction((key.actionType as { SupplementaryDamage: number }).SupplementaryDamage) ?? null
+          ? ctx.keying?.causeAction(
+              (key.actionType as { SupplementaryDamage: number }).SupplementaryDamage,
+              key.childCharacterType
+            ) ?? null
           : null;
         // Members merge by action ALONE (`mergeSkillsByAction`'s rule): a
         // player and their summon on one action id are one member skill, and

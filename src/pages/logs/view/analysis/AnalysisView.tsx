@@ -4,7 +4,6 @@ import { useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
-import { ViewModeToggle } from "@/pages/logs/view/ViewModeToggle";
 import { useEncounterStore } from "@/stores/useEncounterStore";
 import { useMeterFilters } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
@@ -19,6 +18,7 @@ import { type SelectorPins } from "../selectorOptions";
 import { TimelineTab } from "../timeline/TimelineTab";
 
 import { ActorBar } from "./ActorBar";
+import { AnalysisTopBar } from "./AnalysisTopBar";
 import { AuraStrip } from "./AuraStrip";
 import { CollapseSupplementaryToggle } from "./CollapseSupplementaryToggle";
 import { DebugBar } from "./DebugBar";
@@ -34,15 +34,17 @@ import "./analysis.css";
 import { selectedChartWindows, windowFilterScrubRange } from "./chartWindowFilter";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { resolveViewSpec } from "./machine/resolve";
-import type { MetricKey } from "./machine/state";
+import type { AnalysisState, MetricKey } from "./machine/state";
 import {
-  setAura as auraTransition,
+  toggleAura as auraTransition,
   clearPin,
+  clearWindowFilters,
   setHostility as hostilityTransition,
   setMetric as metricTransition,
   pinRow,
   regroup,
-  setWindowFilter as windowFilterTransition,
+  toggleWindowFilter as windowFilterTransition,
+  toggleWindowKind as windowKindTransition,
   setWindow as windowTransition,
 } from "./machine/transitions";
 import { useAnalysisState } from "./machine/useAnalysisState";
@@ -147,18 +149,32 @@ export const AnalysisView = () => {
     }))
   );
 
-  const { show_display_names, streamer_mode, player_label_template, color_1, color_2, color_3, color_4 } =
-    useMeterSettingsStore(
-      useShallow((state) => ({
-        show_display_names: state.show_display_names,
-        streamer_mode: state.streamer_mode,
-        player_label_template: state.player_label_template,
-        color_1: state.color_1,
-        color_2: state.color_2,
-        color_3: state.color_3,
-        color_4: state.color_4,
-      }))
-    );
+  const {
+    show_display_names,
+    streamer_mode,
+    player_label_template,
+    color_1,
+    color_2,
+    color_3,
+    color_4,
+    // Whether echo damage rides the skill that caused it. A stored setting
+    // rather than the `supp` URL param it used to be: how someone reads damage
+    // is a preference that should outlive the log they set it on, and the param
+    // put it back to off on every log they opened.
+    collapseSupplementary,
+  } = useMeterSettingsStore(
+    useShallow((state) => ({
+      show_display_names: state.show_display_names,
+      streamer_mode: state.streamer_mode,
+      player_label_template: state.player_label_template,
+      color_1: state.color_1,
+      color_2: state.color_2,
+      color_3: state.color_3,
+      color_4: state.color_4,
+      collapseSupplementary: state.merge_supplementary,
+    }))
+  );
+  const setSettings = useMeterSettingsStore((state) => state.set);
 
   // The machine: the URL holds the WHOLE state (metric, side, pins, window,
   // grouping override), the resolver turns it into everything the view shows.
@@ -171,12 +187,6 @@ export const AnalysisView = () => {
   // switching between the three bodies, which is the whole point of sharing the
   // selector bar.
   const [tab, setTab] = useQueryState("tab", { history: "replace" });
-  // Whether echo damage rides the skill that caused it. Its own nuqs key beside
-  // the pins, so a shared link reproduces the reading rather than the recipient
-  // seeing a differently-folded table. "1" for on, absent for off — the same
-  // shape every other flag in this query takes.
-  const [collapseParam, setCollapseParam] = useQueryState("supp", { history: "replace" });
-  const collapseSupplementary = collapseParam === "1";
   // That param resolved to one of the three bodies, with anything unrecognised
   // falling back to the default. One selector rather than a boolean per body:
   // two booleans can both be true, and which one won would then depend on the
@@ -209,16 +219,17 @@ export const AnalysisView = () => {
   // (see `useFilterWindows`). Declared HERE, above the fetch memos, because the
   // masks ride the queries: `wireQuery` and the scoped fetch both read
   // `maskWindows`, and the uptime denominators read `fightDurationMs`.
-  const { statusWindow, fightDurationMs, windowedIntervals, maskWindows, maskedIntervals } = useChartWindow({
-    state,
-    range,
-    chartLen,
-    bucketMs: DPS_BUCKET_MS,
-    statusIntervals,
-    chartWindows,
-    hostility,
-    fetchAura: spec.fetch?.aura ?? null,
-  });
+  const { statusWindow, fightDurationMs, windowedIntervals, maskWindows, maskedIntervals, auraStackPercent } =
+    useChartWindow({
+      state,
+      range,
+      chartLen,
+      bucketMs: DPS_BUCKET_MS,
+      statusIntervals,
+      chartWindows,
+      hostility,
+      fetchAuras: spec.fetch?.aura ?? [],
+    });
 
   // Both fetches, their generation guards and every request-identity key (see
   // `useEncounterData`). Extracted whole: the response-ordering rules and the
@@ -306,7 +317,7 @@ export const AnalysisView = () => {
   // because a chip is LABELLED — `statusDisplayLabel` and `breakEnemyOf` both
   // need the party the fetch returns, while the masks have to be resolved
   // before that fetch is sent.
-  const { sourceAuraChips, targetAuraChips, windowFilterChips } = useFilterChips({
+  const { sourceAuraChips, targetAuraChips, windowFilterGroups } = useFilterChips({
     state,
     hostility,
     supportsAuraFilter: caps.supportsAuraFilter,
@@ -456,6 +467,22 @@ export const AnalysisView = () => {
     [state, spec]
   );
 
+  // A window-filter change, with the chart's zoom brought along: the scrub
+  // commits to the bucket hull of everything the NEW selection admits.
+  //
+  // An emptied selection returns the whole fight, which is what clearing the
+  // last chip should do. A selection that still holds values but resolves to no
+  // windows (every index went stale against a reparsed log) leaves the scrub
+  // alone rather than zooming to nothing.
+  const withWindowScrub = useCallback(
+    (next: AnalysisState): AnalysisState => {
+      if (next.win.length === 0) return windowTransition(next, null);
+      const scrub = windowFilterScrubRange(selectedChartWindows(chartWindows, next.win), DPS_BUCKET_MS);
+      return scrub === null ? next : windowTransition(next, scrub);
+    },
+    [chartWindows]
+  );
+
   // Indexes arrive relative to the data the chart was given, so a drag while
   // already scoped is relative to the current window — offset it back into
   // whole-fight indexes before committing.
@@ -497,15 +524,8 @@ export const AnalysisView = () => {
   const fullLabel = bucketLabel(Math.max(0, chartLen - 1));
 
   return (
-    <Box className="analysis analysis-tokens">
-      {/* Above everything, on its own row: the way back to Classic. It is not
-          part of the selector bar below because it does not select anything —
-          it replaces the whole body, so it sits outside what it would replace.
-          Padded like ActorBar, since the view is full-bleed and nothing else
-          holds its children off the window edge. */}
-      <Box style={{ display: "flex", justifyContent: "flex-end", padding: "10px 16px" }}>
-        <ViewModeToggle />
-      </Box>
+    <Box className="analysis">
+      <AnalysisTopBar />
 
       <QuestSummary
         encounter={shownEncounter}
@@ -551,15 +571,6 @@ export const AnalysisView = () => {
           value={hostility}
           onChange={(side) => setState(hostilityTransition(state, side))}
           disabled={!caps.supportsHostility}
-        />
-        {/* Beside the side switch, and disabled rather than hidden for the same
-            reason it is: only Damage Done records supplementary damage, and a
-            control that comes and went with the tab would shift everything
-            under it. */}
-        <CollapseSupplementaryToggle
-          value={collapseSupplementary}
-          onChange={(next) => setCollapseParam(next ? "1" : null)}
-          disabled={!caps.recordsSupplementary}
         />
       </Box>
 
@@ -616,45 +627,64 @@ export const AnalysisView = () => {
         onSmoothingChange={format === "amount" ? setRateSmoothing : undefined}
         stackMode={chartSource === "stacks" ? stackMode : undefined}
         onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
+        // In the chart's own control strip, beside the smoothing window: it
+        // belongs with the other knobs that change how the fight READS, not
+        // with the side switch, which changes WHOSE fight is being read. It
+        // folds the table as well as the plot, so it rides the strip as a
+        // caller-supplied control rather than as something the chart owns.
+        //
+        // Disabled rather than hidden, for the same reason HostilityToggle is:
+        // only Damage Done records supplementary damage, and a control that
+        // came and went with the tab would shift the whole strip each time.
+        controls={
+          <CollapseSupplementaryToggle
+            value={collapseSupplementary}
+            onChange={(next) => setSettings({ merge_supplementary: next })}
+            disabled={!caps.recordsSupplementary}
+          />
+        }
       />
 
       {/* Dev builds only, the same guard the Debug tab uses. */}
       {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
 
       {/* The Windows strip: the battle-window filter's UI, on every tab —
-          unlike the aura strips it needs no pin to anchor it. Selecting a
-          chip also COMMITS the scrub window to the selection's bucket hull —
-          the chart zooms to the window through the same mechanism a drag
-          uses, so the readout, the uptime denominators and the fetches all
-          follow. Clearing the chip clears that zoom with it; a stale index
-          resolves to no hull and leaves the scrub alone. */}
+          unlike the aura strips it needs no pin to anchor it. Changing the
+          selection also COMMITS the scrub window to the SELECTION'S bucket
+          hull — the chart zooms to it through the same mechanism a drag uses,
+          so the readout, the uptime denominators and the fetches all follow.
+          Emptying the selection clears that zoom with it; a selection that
+          resolves to no windows (every index stale) leaves the scrub alone.
+
+          Computed off the state the transition RETURNS rather than off the
+          value the strip reported: with several windows selectable the hull
+          spans all of them, and the clicked one is only the newest. */}
       <WindowStrip
-        chips={windowFilterChips}
-        onSelect={(win) => {
-          const scrub = windowFilterScrubRange(selectedChartWindows(chartWindows, win), DPS_BUCKET_MS);
-          const next = windowFilterTransition(state, win);
-          setState(scrub === null ? next : windowTransition(next, scrub));
-        }}
-        onClear={() => setState(windowTransition(windowFilterTransition(state, null), null))}
+        groups={windowFilterGroups}
+        onToggleWindow={(win) => setState(withWindowScrub(windowFilterTransition(state, win)))}
+        onToggleKind={(kind) => setState(withWindowScrub(windowKindTransition(state, kind)))}
+        onClear={() => setState(windowTransition(clearWindowFilters(state), null))}
       />
 
       {/* The Auras Filter (spec: between chart and table). Each strip exists
           only while its actor pin does — AuraStrip renders nothing for an
-          empty chip list — and one aura is active at a time: selecting on
-          either strip replaces the other's selection. */}
+          empty chip list — and both select into ONE list whose entries all
+          apply at once, by intersection. */}
       {caps.supportsAuraFilter && (
         <>
           <AuraStrip
             titleKey="ui.logs.aura-source-title"
             chips={sourceAuraChips}
-            onSelect={(aura) => setState(auraTransition(state, aura))}
-            onClear={() => setState(auraTransition(state, null))}
+            onToggle={(aura) => setState(auraTransition(state, aura))}
+            stacked={auraStackPercent !== null}
+            stackPercent={auraStackPercent}
           />
           <AuraStrip
             titleKey="ui.logs.aura-target-title"
             chips={targetAuraChips}
-            onSelect={(aura) => setState(auraTransition(state, aura))}
-            onClear={() => setState(auraTransition(state, null))}
+            onToggle={(aura) => setState(auraTransition(state, aura))}
+            stacked={auraStackPercent !== null}
+            stackPercent={auraStackPercent}
           />
         </>
       )}

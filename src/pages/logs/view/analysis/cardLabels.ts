@@ -40,6 +40,12 @@ export type CardLabels = {
    * from different bodies (Id vs his dragonform) — applied only on collision,
    * by the same helper the table's parent rows use. */
   character?: (type: CharacterType) => string;
+  /** An SBA gauge CAUSE, from the key/params pair `sbaCauseLabel` resolves a
+   * row key to. Takes the pair rather than the row key so the naming rule stays
+   * in one place: the table's rows go through the same function, and a card
+   * that re-derived it would eventually name a cause differently from the row
+   * it explains. */
+  cause: (labelKey: string, params?: Record<string, string | number>) => string;
   /** The entities' art. Optional only so a builder's own tests can stay
    * text-only where art is not their subject: the view fills all of them, from
    * one projection, so no production card can be missing one. */

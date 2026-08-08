@@ -63,7 +63,10 @@ describe("CAPABILITIES", () => {
     expect(CAPABILITIES.taken.cardKind("ability", "enemy")).toBe("none");
     expect(CAPABILITIES.taken.cardKind("target", "enemy")).toBe("none");
     expect(CAPABILITIES.stun.cardKind("source", "friendly")).toBe("skill");
-    expect(CAPABILITIES.sba.cardKind("source", "friendly")).toBe("none");
+    // A PLAYER row decomposes into what generated their gauge; the ability and
+    // cause rows below it are already the finest grain the capture has.
+    expect(CAPABILITIES.sba.cardKind("source", "friendly")).toBe("sbaGenerated");
+    expect(CAPABILITIES.sba.cardKind("ability", "friendly")).toBe("none");
     expect(CAPABILITIES.buffs.cardKind("ability", "friendly")).toBe("none");
   });
 

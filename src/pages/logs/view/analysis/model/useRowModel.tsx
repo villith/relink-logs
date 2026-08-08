@@ -2,6 +2,7 @@ import type React from "react";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
+import { EntityIcon } from "@/components/ui/EntityIcon";
 import type {
   ActionType,
   ComputedPlayerState,
@@ -295,7 +296,7 @@ export const useRowModel = ({
       if (!cell.iconUrl) return name;
       return (
         <>
-          <img className="analysis-row-icon" src={cell.iconUrl} alt="" />
+          <EntityIcon src={cell.iconUrl} alt="" className="mr-[7px] align-[-6px]" />
           {name}
         </>
       );
@@ -316,7 +317,7 @@ export const useRowModel = ({
         // effect row's key is `status:`, which names no actor at all.
         const actor = keyColor(row.key, colorContext);
         if (actor !== undefined) return actor;
-        return rowColors?.get(row.key) ?? "var(--an-ink-3)";
+        return rowColors?.get(row.key) ?? "var(--color-ink-3)";
       }
       // Re-resolve through the identity party: a scoped fetch renumbers slots,
       // so the descriptor's colorSlot can point at the wrong player.
@@ -354,8 +355,12 @@ export const useRowModel = ({
       // through, so a card's "#2" can never name a different spawn.
       target: (segment: number) => resolvers.target(segment).name,
       targetIcon: (segment: number) => resolvers.target(segment).iconUrl,
+      // An SBA cause is already a key/params pair by the time it reaches a
+      // card (`sbaCauseLabel` owns that mapping, for the table and the chart
+      // bands too); all that is left is to translate it.
+      cause: (labelKey: string, params?: Record<string, string | number>) => t(labelKey, params ?? {}),
     }),
-    [resolvers, playerColor]
+    [resolvers, playerColor, t]
   );
 
   // The enemy-side cards' lookups: the same ones the friendly card already

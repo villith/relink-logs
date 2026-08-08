@@ -2,7 +2,12 @@ import { Box, Text, UnstyledButton } from "@mantine/core";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import "./analysis.css";
+import { ChartToggle, TOGGLE_CLASS } from "./ChartToggle";
+
+/** Carries no colour: each site states its own, because two colour utilities on
+ * one element are decided by stylesheet order rather than by which was written
+ * last. */
+const NAME_CLASS = "text-xs leading-[1.4]";
 
 export type LegendEntry = {
   key: string;
@@ -52,35 +57,27 @@ export const ChartLegend = ({ entries, hidden, onToggle }: ChartLegendProps) => 
   const listed = entries.filter((entry) => !entry.tail || tailShown || !hidden.has(entry.key));
 
   return (
-    <Box className="analysis-legend" aria-label={t("ui.logs.chart-legend-label")}>
-      {listed.map((entry) => {
-        const shown = !hidden.has(entry.key);
-        return (
-          <UnstyledButton
-            key={entry.key}
-            data-legend-key={entry.key}
-            className="analysis-legend-entry"
-            aria-pressed={shown}
-            onClick={() => onToggle(entry.key)}
-          >
-            <Box
-              data-legend-swatch
-              className="analysis-legend-swatch"
-              style={{ backgroundColor: entry.color, opacity: shown ? 1 : 0.25 }}
-            />
-            <Text className="analysis-legend-name" style={{ opacity: shown ? 1 : 0.45 }}>
-              {entry.label}
-            </Text>
-          </UnstyledButton>
-        );
-      })}
+    <Box className="flex flex-wrap gap-x-3 gap-y-0.5 pb-0.5 pt-1" aria-label={t("ui.logs.chart-legend-label")}>
+      {listed.map((entry) => (
+        <ChartToggle
+          key={entry.key}
+          dataKey={entry.key}
+          label={entry.label}
+          color={entry.color}
+          shown={!hidden.has(entry.key)}
+          onToggle={() => onToggle(entry.key)}
+        />
+      ))}
       {tailCount > 0 && (
+        // In the legend's own flow rather than beside it, so it wraps with the
+        // entries it expands. It carries no swatch — it names no series — and
+        // reads as the quieter thing it is.
         <UnstyledButton
-          className="analysis-legend-entry analysis-legend-more"
+          className={TOGGLE_CLASS}
           aria-expanded={tailShown}
           onClick={() => setTailShown((previous) => !previous)}
         >
-          <Text className="analysis-legend-name">
+          <Text className={`${NAME_CLASS} text-ink-3 underline decoration-dotted underline-offset-2`}>
             {tailShown
               ? t("ui.logs.chart-legend-show-fewer")
               : t("ui.logs.chart-legend-show-more", { count: tailCount })}

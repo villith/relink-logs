@@ -16,68 +16,72 @@ const renderIt = () =>
     </MantineProvider>
   );
 
-/** The way OUT of Analysis: a labelled button anyone can see. */
-const exit = () => screen.getByRole("button", { name: "ui.logs.view-mode.to-classic" });
-
-/** The way IN to Analysis: the unlabelled control that paints nothing. */
-const entry = () => screen.getByRole("button", { name: "ui.logs.view-mode.toggle" });
+/** The options are radios inside Mantine's SegmentedControl. Found by VALUE
+ * rather than by accessible name: the Beta option's name also carries its WIP
+ * badge, so a name match would be asserting the badge's copy by accident. */
+const option = (container: HTMLElement, value: string) =>
+  container.querySelector<HTMLInputElement>(`input[value="${value}"]`)!;
 
 describe("ViewModeToggle", () => {
   beforeEach(() => {
-    useMeterSettingsStore.setState({ logs_view_mode: "analysis" });
+    useMeterSettingsStore.setState({ logs_view: "analysis" });
+  });
+
+  /** Both directions are ordinary, visible options now. The way in used to
+   * paint nothing at all, which hid the redesigned view from everyone who did
+   * not already know where to click. */
+  it("offers both views as visible, labelled options", () => {
+    const { container } = renderIt();
+
+    expect(screen.getByText("ui.logs.view-mode.classic")).toBeTruthy();
+    expect(screen.getByText("ui.logs.view-mode.beta")).toBeTruthy();
+    expect(option(container, "classic")).toBeTruthy();
+    expect(option(container, "analysis")).toBeTruthy();
+  });
+
+  /** The Beta option carries its own warning. The view is unfinished, and a
+   * plain second tab beside Classic would present the two as equals. */
+  it("marks the beta option as work-in-progress", () => {
+    renderIt();
+
+    expect(screen.getByText("ui.logs.view-mode.wip")).toBeTruthy();
+  });
+
+  it("shows which view is current", () => {
+    const { container } = renderIt();
+
+    expect(option(container, "analysis").checked).toBe(true);
+    expect(option(container, "classic").checked).toBe(false);
   });
 
   it("switches from analysis to classic", () => {
-    renderIt();
-    fireEvent.click(exit());
+    const { container } = renderIt();
+    fireEvent.click(option(container, "classic"));
 
-    expect(useMeterSettingsStore.getState().logs_view_mode).toBe("classic");
+    expect(useMeterSettingsStore.getState().logs_view).toBe("classic");
   });
 
   it("switches back from classic to analysis", () => {
-    useMeterSettingsStore.setState({ logs_view_mode: "classic" });
-    renderIt();
-    fireEvent.click(entry());
+    useMeterSettingsStore.setState({ logs_view: "classic" });
+    const { container } = renderIt();
+    fireEvent.click(option(container, "analysis"));
 
-    expect(useMeterSettingsStore.getState().logs_view_mode).toBe("analysis");
+    expect(useMeterSettingsStore.getState().logs_view).toBe("analysis");
   });
 
   /** Two clicks must land where they started — a plain toggle, not a control
-   * that can drift into a third state. The control it renders differs per mode,
-   * so the second click has to find whichever one Analysis' exit left behind. */
+   * that can drift into a third state. */
   it("returns to the starting mode after two clicks", () => {
-    renderIt();
-    fireEvent.click(exit());
-    fireEvent.click(entry());
+    const { container } = renderIt();
+    fireEvent.click(option(container, "classic"));
+    fireEvent.click(option(container, "analysis"));
 
-    expect(useMeterSettingsStore.getState().logs_view_mode).toBe("analysis");
-  });
-
-  /** Analysis is unfinished and is NOT the default, so the only people on it
-   * are people who switched deliberately — but the escape hatch still has to be
-   * findable by eye, not just by knowing where to click. Carrying visible text
-   * is what separates it from the entry control. */
-  it("shows a visible, labelled way out of analysis", () => {
-    renderIt();
-
-    expect(exit().textContent).toBe("ui.logs.view-mode.to-classic");
-    expect(exit().className).not.toContain("view-mode-toggle");
-  });
-
-  /** The way in stays hidden. Classic is what every user opens, and an Analysis
-   * button sitting on it would advertise an unfinished view. */
-  it("keeps the way in to analysis invisible and unlabelled", () => {
-    useMeterSettingsStore.setState({ logs_view_mode: "classic" });
-    renderIt();
-
-    expect(entry().textContent).toBe("");
-    expect(entry().className).toContain("view-mode-toggle");
-    expect(screen.queryByRole("button", { name: "ui.logs.view-mode.to-classic" })).toBeNull();
+    expect(useMeterSettingsStore.getState().logs_view).toBe("analysis");
   });
 
   it("writes nothing on render", () => {
     renderIt();
 
-    expect(useMeterSettingsStore.getState().logs_view_mode).toBe("analysis");
+    expect(useMeterSettingsStore.getState().logs_view).toBe("analysis");
   });
 });

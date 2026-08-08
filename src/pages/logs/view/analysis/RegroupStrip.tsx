@@ -75,10 +75,10 @@ export const RegroupStrip = ({ tabs, onRegroup }: RegroupStripProps) => {
             style={{
               padding: "4px 0",
               marginRight: 14,
-              fontSize: "var(--an-fs-xs)",
+              fontSize: "var(--text-xs)",
               fontWeight: 600,
               letterSpacing: "-0.01em",
-              color: disabled ? "var(--an-ink-3)" : tab.active ? "var(--an-ink)" : "var(--an-ink-3)",
+              color: disabled ? "var(--color-ink-3)" : tab.active ? "var(--color-ink)" : "var(--color-ink-3)",
               opacity: disabled ? 0.45 : 1,
               cursor: disabled ? "default" : "pointer",
             }}

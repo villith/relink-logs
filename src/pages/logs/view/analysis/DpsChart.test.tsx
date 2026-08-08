@@ -129,7 +129,7 @@ describe("ChartTooltip", () => {
       { dataKey: "1", name: "1", value: 900, color: "#0f0" },
     ]);
 
-    const names = [...container.querySelectorAll(".analysis-card-name")].map((cell) => cell.textContent);
+    const names = [...container.querySelectorAll("[data-card-name]")].map((cell) => cell.textContent);
     expect(names.indexOf("Manmoth")).toBeLessThan(names.indexOf("Rain"));
   });
 
@@ -162,7 +162,7 @@ describe("ChartTooltip", () => {
     // the markers in a card section of their own, so the comparison is between
     // the tooltip's SECTIONS rather than between sibling paragraphs (and not
     // between its direct children, which the animated-height wrapper owns).
-    const blocks = [...document.querySelectorAll('[data-testid="chart-tooltip"] .analysis-card-section')].map(
+    const blocks = [...document.querySelectorAll('[data-testid="chart-tooltip"] [data-card-section]')].map(
       (block) => block.textContent
     );
     const seriesRowIndex = blocks.findIndex((text) => text?.includes("Rain"));
@@ -176,10 +176,30 @@ describe("ChartTooltip", () => {
     // unordered — two players SBA-ing together, or two deaths at once.
     renderTooltip([{ dataKey: "0", name: "0", value: 1000, color: "#f00" }], LABELS, [
       { kind: "death", atMs: 183_000, color: "#f00", label: "☠ Rain died" },
-      { kind: "sba", atMs: 183_000, color: "#0ff", label: "✦ Manmoth — Skybound Art" },
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "Manmoth — Skybound Art" },
     ]);
     expect(screen.getByText("☠ Rain died")).toBeTruthy();
-    expect(screen.getByText("✦ Manmoth — Skybound Art")).toBeTruthy();
+    expect(screen.getByText("Manmoth — Skybound Art")).toBeTruthy();
+  });
+
+  it("draws the actor's art beside a marker that has any", () => {
+    // Load-bearing on the SBA rows: every SBA line wears ONE colour, so the
+    // swatch says only that an SBA happened — the art is what says by whom.
+    const { container } = renderTooltip([{ dataKey: "0", name: "0", value: 1000, color: "#f00" }], LABELS, [
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "Manmoth — Skybound Art", icon: "/char/manmoth.png" },
+    ]);
+    const art = container.querySelector("[data-card-name] img");
+    expect(art?.getAttribute("src")).toBe("/char/manmoth.png");
+    expect(art?.getAttribute("alt")).toBe("");
+  });
+
+  it("draws no art for a marker whose actor resolves none, rather than a blank box", () => {
+    const { container } = renderTooltip([{ dataKey: "0", name: "0", value: 1000, color: "#f00" }], LABELS, [
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "Manmoth — Skybound Art" },
+    ]);
+    expect(container.querySelector("[data-card-name] img")).toBeNull();
+    // The row is still there — the swatch and the words carry it.
+    expect(screen.getByText("Manmoth — Skybound Art")).toBeTruthy();
   });
 
   it("stays visible for a bucket where nothing landed but a marker did", () => {
@@ -187,11 +207,11 @@ describe("ChartTooltip", () => {
     // marker is exactly the content that must still show there — a death is
     // usually WHY the bucket is all zeroes.
     const { container } = renderTooltip([{ dataKey: "0", name: "0", value: 0, color: "#f00" }], LABELS, [
-      { kind: "sba", atMs: 183_000, color: "#0ff", label: "✦ Manmoth — Skybound Art" },
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "Manmoth — Skybound Art" },
     ]);
     const card = container.querySelector<HTMLElement>('[data-testid="chart-tooltip"]');
     expect(card!.style.visibility).not.toBe("hidden");
-    expect(screen.getByText("✦ Manmoth — Skybound Art")).toBeTruthy();
+    expect(screen.getByText("Manmoth — Skybound Art")).toBeTruthy();
   });
 
   it("still hides the card when an explicit empty markers array accompanies all-zero series", () => {
@@ -214,7 +234,7 @@ describe("ChartTooltip", () => {
 describe("ChartTooltip — art and a card that holds still", () => {
   /** Rows of the breakdown section, placeholders included. */
   const breakdownRows = (container: HTMLElement) =>
-    container.querySelector(".analysis-card-section")!.querySelectorAll(".analysis-card-row");
+    container.querySelector("[data-card-section]")!.querySelectorAll("[data-card-row]");
 
   const WITH_ART: Label = [
     { name: "0", label: "Rain", partySlotIndex: 0, color: "#f00", icon: "rain.png" },
@@ -226,7 +246,7 @@ describe("ChartTooltip — art and a card that holds still", () => {
     // shown this art all along — the breakdown listed bare text beside it.
     const { container } = renderTooltip([{ dataKey: "0", name: "0", value: 1000, color: "#f00" }], WITH_ART);
 
-    expect(container.querySelector<HTMLImageElement>(".analysis-card-icon")?.src).toContain("rain.png");
+    expect(container.querySelector<HTMLImageElement>("[data-card-name] img")?.src).toContain("rain.png");
   });
 
   it("leaves a series with no art text-only", () => {
@@ -234,7 +254,7 @@ describe("ChartTooltip — art and a card that holds still", () => {
     // depict nothing, and a blank box says less than no box.
     const { container } = renderTooltip([{ dataKey: "1", name: "1", value: 1000, color: "#0f0" }], WITH_ART);
 
-    expect(container.querySelector(".analysis-card-icon")).toBeNull();
+    expect(container.querySelector("[data-card-name] img")).toBeNull();
     expect(screen.getByText("Manmoth")).toBeTruthy();
   });
 
@@ -331,7 +351,7 @@ describe("ChartTooltip — markers and battle windows as card sections", () => {
     expect(screen.getByText("ui.logs.chart-window-link")).toBeTruthy();
     // Card sections, the same shell the breakdown above them uses — one for
     // the series, one per window kind.
-    expect(container.querySelectorAll(".analysis-card-section")).toHaveLength(3);
+    expect(container.querySelectorAll("[data-card-section]")).toHaveLength(3);
   });
 
   it("gathers two windows of one kind under a single heading", () => {
@@ -349,7 +369,7 @@ describe("ChartTooltip — markers and battle windows as card sections", () => {
   it("heads the markers by their kind too", () => {
     renderWith([
       { kind: "death", atMs: 183_000, color: "#f00", label: "☠ Rain died" },
-      { kind: "sba", atMs: 183_000, color: "#0ff", label: "✦ Manmoth — Skybound Art" },
+      { kind: "sba", atMs: 183_000, color: "#0ff", label: "Manmoth — Skybound Art" },
     ]);
     expect(screen.getByText("ui.logs.chart-marker-deaths")).toBeTruthy();
     expect(screen.getByText("ui.logs.chart-marker-sba")).toBeTruthy();
@@ -360,7 +380,7 @@ describe("ChartTooltip — markers and battle windows as card sections", () => {
     // The card's rows identify by a colour block beside a readable name; bare
     // coloured text is the thing that stopped matching the design.
     const { container } = renderWith(undefined, [{ kind: "break", color: "rgb(1, 2, 3)", text: "Vrazarek · 12s" }]);
-    const swatch = container.querySelector<HTMLElement>(".analysis-card-note-swatch");
+    const swatch = container.querySelector<HTMLElement>("[data-card-swatch]");
     expect(swatch).toBeTruthy();
     expect(swatch!.style.backgroundColor).toBe("rgb(1, 2, 3)");
   });
@@ -370,7 +390,7 @@ describe("ChartTooltip — markers and battle windows as card sections", () => {
       [{ kind: "death", atMs: 1, color: "#f00", label: "☠ Rain died" }],
       [{ kind: "sba", color: "#0ff", text: "01:02–01:10 · 8s" }]
     );
-    const text = [...container.querySelectorAll(".analysis-card-section")].map((s) => s.textContent ?? "");
+    const text = [...container.querySelectorAll("[data-card-section]")].map((s) => s.textContent ?? "");
     expect(text.findIndex((t) => t.includes("Rain") && !t.includes("died"))).toBe(0);
     expect(text.findIndex((t) => t.includes("☠ Rain died"))).toBe(1);
     expect(text.findIndex((t) => t.includes("01:02–01:10 · 8s"))).toBe(2);
@@ -390,8 +410,8 @@ describe("ChartTooltip — the Total series", () => {
 
   it("keeps the Total out of the breakdown section", () => {
     const { container } = renderTooltip(payload, WITH_TOTAL);
-    const breakdown = container.querySelectorAll(".analysis-card-section")[0];
-    const names = [...breakdown.querySelectorAll(".analysis-card-name")].map((cell) => cell.textContent);
+    const breakdown = container.querySelectorAll("[data-card-section]")[0];
+    const names = [...breakdown.querySelectorAll("[data-card-name]")].map((cell) => cell.textContent);
     expect(names).toEqual(["Rain", "Manmoth"]);
   });
 
@@ -408,17 +428,17 @@ describe("ChartTooltip — the Total series", () => {
 
   it("gives the Total its own section, below the breakdown and with no share", () => {
     const { container } = renderTooltip(payload, WITH_TOTAL);
-    const sections = [...container.querySelectorAll(".analysis-card-section")];
+    const sections = [...container.querySelectorAll("[data-card-section]")];
     expect(sections).toHaveLength(2);
     expect(sections[1].textContent).toContain("Total");
     // Its share of itself is 100% by construction — a column that can only
     // read 100% says nothing.
-    expect(sections[1].querySelector(".analysis-card-share")).toBeNull();
+    expect(sections[1].querySelector("[data-card-share]")).toBeNull();
   });
 
   it("draws no Total section on a chart that neither plots nor sums one", () => {
     const { container } = renderTooltip([{ dataKey: "0", name: "0", value: 200, color: "#f00" }]);
-    expect(container.querySelectorAll(".analysis-card-section")).toHaveLength(1);
+    expect(container.querySelectorAll("[data-card-section]")).toHaveLength(1);
   });
 
   it("sums the bands into a Total on a stacked chart, which plots no Total series", () => {
@@ -429,10 +449,10 @@ describe("ChartTooltip — the Total series", () => {
       { dataKey: "a", name: "a", value: 300, color: "#f00" },
       { dataKey: "b", name: "b", value: 120, color: "#0f0" },
     ]);
-    const sections = [...container.querySelectorAll(".analysis-card-section")];
+    const sections = [...container.querySelectorAll("[data-card-section]")];
     expect(sections).toHaveLength(2);
     expect(sections[1].textContent).toContain("420");
-    expect(sections[1].querySelector(".analysis-card-share")).toBeNull();
+    expect(sections[1].querySelector("[data-card-share]")).toBeNull();
   });
 
   it("sums over every band, not just the five the section shows", () => {
@@ -445,7 +465,7 @@ describe("ChartTooltip — the Total series", () => {
       color: "#f00",
     }));
     const { container } = renderStacked(bands);
-    const sections = [...container.querySelectorAll(".analysis-card-section")];
+    const sections = [...container.querySelectorAll("[data-card-section]")];
     expect(sections[1].textContent).toContain(String(10 * (SECTION_ENTRY_CAP + 3)));
   });
 
@@ -456,7 +476,7 @@ describe("ChartTooltip — the Total series", () => {
       { dataKey: TOTAL_SERIES_KEY, name: TOTAL_SERIES_KEY, value: 999, color: "#888" },
       { dataKey: "0", name: "0", value: 300, color: "#f00" },
     ]);
-    const sections = [...container.querySelectorAll(".analysis-card-section")];
+    const sections = [...container.querySelectorAll("[data-card-section]")];
     expect(sections[1].textContent).toContain("999");
     // 999 + 300 humanizes to "1.3k" — the figure a card that summed anyway
     // would print.
@@ -637,5 +657,53 @@ describe("ChartTooltip — the Ctrl detail modifier", () => {
 
     ctrl(false);
     expect(screen.queryByText(`band ${SECTION_ENTRY_CAP}`)).toBeNull();
+  });
+});
+
+/** The strip above the plot, which holds every control that changes how the
+ * chart READS — the smoothing window, the stack mode, the band and marker
+ * switches — plus whatever the caller adds to it. */
+describe("DpsChart — the header control strip", () => {
+  const DATA = [
+    { timestamp: "00:01", s1: 100 },
+    { timestamp: "00:02", s1: 200 },
+  ] as unknown as ChartDatapoint[];
+
+  const SERIES: Label = [{ name: "s1", label: "Reginleiv", partySlotIndex: 0, color: "#f00" }];
+
+  const renderChart = (props: Partial<React.ComponentProps<typeof DpsChart>> = {}) =>
+    render(
+      <MantineProvider>
+        <DpsChart
+          data={DATA}
+          labels={SERIES}
+          labelKey="ui.logs.chart-dps-label"
+          sectionKey="ui.logs.rows-by-ability"
+          format="amount"
+          onScope={() => {}}
+          smoothing={1}
+          onSmoothingChange={() => {}}
+          {...props}
+        />
+      </MantineProvider>
+    );
+
+  /** The caller's own controls belong in the SAME strip as the chart's, not on
+   * a row of their own: they are the same kind of thing — a knob that changes
+   * the reading — and a second row would push the plot down and split one set
+   * of controls across two places. */
+  it("puts caller-supplied controls in the same strip as the smoothing window", () => {
+    renderChart({ controls: <span>merge-switch</span> });
+
+    const strip = screen.getByTestId("chart-controls");
+    expect(strip.contains(screen.getByText("merge-switch"))).toBe(true);
+    expect(strip.contains(screen.getByText("ui.logs.chart-smoothing-caption"))).toBe(true);
+  });
+
+  it("draws the strip without them when the caller supplies none", () => {
+    renderChart();
+
+    expect(screen.queryByText("merge-switch")).toBeNull();
+    expect(screen.getByTestId("chart-controls")).toBeTruthy();
   });
 });

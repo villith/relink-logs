@@ -1,3 +1,9 @@
+@layer mantine, theme, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@import "./components/ui/theme.css";
+
 :root {
   color: #fff;
   background: rgba(0, 0, 0, 0) !important;
@@ -24,10 +30,6 @@ html {
 body {
   margin: 0;
   background-color: transparent;
-}
-
-td {
-  padding: 0;
 }
 
 *::-webkit-scrollbar {

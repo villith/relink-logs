@@ -23,7 +23,7 @@ const renderIt = () =>
 
 describe("ViewPage", () => {
   beforeEach(() => {
-    useMeterSettingsStore.setState({ logs_view_mode: "analysis" });
+    useMeterSettingsStore.setState({ logs_view: "analysis" });
   });
 
   it("renders the analysis view by default", () => {
@@ -33,28 +33,28 @@ describe("ViewPage", () => {
   });
 
   it("renders the classic view when the setting says so", () => {
-    useMeterSettingsStore.setState({ logs_view_mode: "classic" });
+    useMeterSettingsStore.setState({ logs_view: "classic" });
     renderIt();
     expect(screen.getByText("classic-body")).toBeTruthy();
     expect(screen.queryByText("analysis-body")).toBeNull();
   });
 
-  /** `ViewModeToggle` is the only writer. Rendering reads `logs_view_mode` and
+  /** `ViewModeToggle` is the only writer. Rendering reads `logs_view` and
    * must never normalise or rewrite it, or a stored choice would be lost simply
    * by opening a quest. */
   it("does not overwrite the stored setting just by rendering", () => {
-    useMeterSettingsStore.setState({ logs_view_mode: "analysis" });
+    useMeterSettingsStore.setState({ logs_view: "analysis" });
     renderIt();
 
-    expect(useMeterSettingsStore.getState().logs_view_mode).toBe("analysis");
+    expect(useMeterSettingsStore.getState().logs_view).toBe("analysis");
   });
 
   /** The shell must not reserve a row for the switch any more — the toggle
    * rides inside each body, beside that body's own top-right control. */
   it("renders nothing but the chosen body", () => {
-    const { container } = renderIt();
+    renderIt();
 
-    expect(container.querySelector(".view-mode-toggle")).toBeNull();
     expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
   });
 });

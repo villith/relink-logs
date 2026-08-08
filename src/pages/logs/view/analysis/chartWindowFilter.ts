@@ -5,15 +5,34 @@ import { clampToWindow, overlapsWindow } from "../spans";
 import { winFilterParts } from "./machine/state";
 import type { WireWindow } from "./wireWindows";
 
-/** The battle windows a `win` filter value names, in start order. A stale
+/** The battle windows ONE `win` filter value names, in start order. A stale
  * individual index (the log reparsed into fewer windows) selects NOTHING —
  * the same "narrows, never widens" rule stale target pins follow. */
-export const selectedChartWindows = (windows: ChartWindow[], win: string): ChartWindow[] => {
+const windowsForValue = (windows: ChartWindow[], win: string): ChartWindow[] => {
   const { kind, index } = winFilterParts(win);
   const ofKind = windows.filter((span) => span.kind === kind).sort((a, b) => a.startMs - b.startMs);
   if (index === null) return ofKind;
   const one = ofKind[index];
   return one === undefined ? [] : [one];
+};
+
+/** The battle windows a whole `win` selection names — the UNION of its values,
+ * deduplicated and in start order.
+ *
+ * Union, not intersection: battle windows of one kind never overlap, and two
+ * kinds' windows rarely do, so intersecting a selection would resolve to
+ * nothing almost every time. Deduplicated because a kind chip and one of its
+ * own windows can both be selected ("all SBA windows" plus SBA #2), and a span
+ * counted twice would be masked twice — harmless for the mask itself, but it
+ * would double the window in every count built off this list.
+ *
+ * An EMPTY selection returns no windows, which callers must not confuse with
+ * "no filter": the caller tests `win.length` for that, exactly as the mask
+ * builders test `undefined` rather than truthiness. */
+export const selectedChartWindows = (windows: ChartWindow[], win: string[]): ChartWindow[] => {
+  const seen = new Set<ChartWindow>();
+  for (const value of win) for (const span of windowsForValue(windows, value)) seen.add(span);
+  return [...seen].sort((a, b) => a.startMs - b.startMs);
 };
 
 /** The scrub range (inclusive bucket indexes) covering the selected windows'

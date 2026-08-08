@@ -16,7 +16,8 @@
     "test": "vitest run",
     "bump": "node scripts/bump-version.mjs",
     "clean:target": "node scripts/clean-target.mjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "log-size": "node scripts/log-size-report.mjs"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans": "^5.0.1",
@@ -50,6 +51,7 @@
     "zustand": "^4.5.2"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
     "@tauri-apps/cli": "^1.6.3",
     "@testing-library/react": "^15.0.6",
     "@types/node": "^24.13.3",
@@ -71,6 +73,7 @@
     "prettier": "3.2.5",
     "prettier-plugin-organize-imports": "^3.2.4",
     "sharp": "^0.35.3",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.0.2",
     "vite": "^5.0.0",
     "vitest": "^1.6.0"

@@ -89,4 +89,13 @@ describe("QuestSummary", () => {
     renderIt({ imported: true });
     expect(screen.getByLabelText("ui.imported-badge")).toBeTruthy();
   });
+
+  /** The beta caveat is NOT here. It belongs to the view rather than to the
+   * log, so it is spoken outright in `AnalysisTopBar` — beside the switch that
+   * answers it — and a second yellow glyph in this strip would only compete
+   * with the imported badge, which does report something about the log. */
+  it("leaves the view's own caveat to the top bar", () => {
+    renderIt();
+    expect(screen.queryByLabelText("ui.logs.view-mode.beta-warning")).toBeNull();
+  });
 });

@@ -3,12 +3,34 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CursorCard } from "@/components/CursorCard";
+import { EntityIcon } from "@/components/ui/EntityIcon";
+import { Figure } from "@/components/ui/Figure";
+import { Label } from "@/components/ui/Label";
 import { useCtrlHeld } from "@/components/useCtrlHeld";
 import { share } from "@/utils";
 
 import { MetricBar } from "./MetricBar";
 
 import "./analysis.css";
+
+/** The chrome every cursor-following panel in the view wears: this card and the
+ * aura tiles' own. Size is the caller's — a breakdown card needs a width floor
+ * an effect name does not — but the surface must not differ, or one view teaches
+ * two kinds of tooltip. Shared as a constant rather than as a class, so the two
+ * cannot drift apart while both are written out in TSX. */
+export const HOVER_PANEL_CLASS = "overflow-hidden rounded-sm border border-line-strong bg-panel text-white shadow-md";
+
+/** A stacked section of a card, ruled off from the one above it. `&+&` rather
+ * than an index: a card's sections come from two components (`Section` and
+ * `CardNotes`), so neither knows whether it is the first. */
+const SECTION_CLASS = "[&+&]:border-t [&+&]:border-line-strong";
+
+const CARD_ROW_CLASS = "relative mx-1 my-0.5 flex h-[calc(23px*var(--density))] items-center rounded-xs px-2";
+
+/** The two fixed cells at the end of a row, scaled like everything else — the
+ * heads read the same widths, which is what keeps the columns stacked. */
+const AMOUNT_W = "w-[calc(64px*var(--density))]";
+const SHARE_W = "w-[calc(52px*var(--density))]";
 
 /** One row of a card section. `color` overrides the section's colour for this
  * row alone — a "by source" section is per player, and one colour across every
@@ -112,29 +134,23 @@ const Section = ({
   const total = entries.reduce((sum, entry) => sum + entry.value, 0);
 
   return (
-    <Box className="analysis-card-section">
+    <Box data-card-section className={SECTION_CLASS}>
       {showHeading && (
-        <Box className="analysis-card-head">
-          <Text className="analysis-label" style={{ flex: 1 }}>
-            {t(headingKey)}
-          </Text>
+        <Box data-card-head className="flex h-head items-center bg-raised px-2">
+          <Label className="flex-1">{t(headingKey)}</Label>
           {/* Amount then share, matching the table above it: the amount is what
               the row is about and the share qualifies it. */}
-          <Text className="analysis-label" style={{ width: 64, textAlign: "right" }}>
-            {t(amountKey)}
-          </Text>
+          <Label className={`${AMOUNT_W} text-right`}>{t(amountKey)}</Label>
           {showShare ? (
-            <Text className="analysis-label" style={{ width: 52, textAlign: "right" }}>
-              {t("ui.logs.column-share")}
-            </Text>
+            <Label className={`${SHARE_W} text-right`}>{t("ui.logs.column-share")}</Label>
           ) : (
-            <Box style={{ width: 52 }} />
+            <Box className={SHARE_W} />
           )}
         </Box>
       )}
       {shown.map((entry) => {
         return (
-          <Box key={entry.key} className="analysis-card-row">
+          <Box key={entry.key} data-card-row className={CARD_ROW_CLASS}>
             <MetricBar
               value={entry.value}
               subValue={entry.subValue}
@@ -142,19 +158,23 @@ const Section = ({
               color={entry.color ?? color}
               variant="card"
             />
-            <Text className="analysis-card-name">
-              {entry.icon && <img className="analysis-card-icon" src={entry.icon} alt="" />}
+            <Text data-card-name className="relative min-w-0 flex-1 truncate text-md">
+              {entry.icon && <EntityIcon size="card" src={entry.icon} alt="" className="mr-[5px] align-[-3px]" />}
               {entry.label}
             </Text>
-            <Text className="analysis-card-amount">{format(entry.value)}</Text>
+            <Figure data-card-amount size="sm" className={`relative ${AMOUNT_W} text-right`}>
+              {format(entry.value)}
+            </Figure>
             {/* The share column's width is RESERVED when its figures are not
                 written. It is a fixed cell at the end of a flex row, so simply
                 dropping it slides the amount 52px right and the Total lands
                 under the share column of every row it sums. */}
             {showShare ? (
-              <Text className="analysis-card-share">{share(entry.value, total)}</Text>
+              <Figure data-card-share size="sm" tone="muted" className={`relative ${SHARE_W} text-right`}>
+                {share(entry.value, total)}
+              </Figure>
             ) : (
-              <Box className="analysis-card-share-spacer" style={{ width: 52 }} />
+              <Box data-card-share-spacer className={SHARE_W} />
             )}
           </Box>
         );
@@ -164,7 +184,7 @@ const Section = ({
           does not draw. Hidden from assistive tech, which has no use for a
           layout floor. */}
       {Array.from({ length: padding }, (_, index) => (
-        <Box key={`slot-${index}`} className="analysis-card-row analysis-card-row-empty" aria-hidden />
+        <Box key={`slot-${index}`} data-card-row className={CARD_ROW_CLASS} aria-hidden />
       ))}
     </Box>
   );
@@ -172,8 +192,14 @@ const Section = ({
 
 /** One row of a note section: an event or span the card reports but does not
  * measure. `color` is the entity's own — the marker line's stroke, the window
- * band's shade — so the row and the mark it stands for on the plot agree. */
-export type CardNote = { key: string; color: string; text: string };
+ * band's shade — so the row and the mark it stands for on the plot agree.
+ *
+ * `icon` is that entity's art where it has any, drawn exactly as a measured
+ * entry's is. A death or a Skybound Art is an actor doing something, and a note
+ * row naming a player next to a card row naming the same player looked like two
+ * different kinds of thing for want of the picture. Absent on the window notes,
+ * which name a span rather than an actor. */
+export type CardNote = { key: string; color: string; text: string; icon?: string };
 
 /** A section of notes rather than of figures.
  *
@@ -188,18 +214,25 @@ export const CardNotes = ({ headingKey, notes }: { headingKey: string; notes: Ca
   if (notes.length === 0) return null;
 
   return (
-    <Box className="analysis-card-section">
-      <Box className="analysis-card-head">
-        <Text className="analysis-label" style={{ flex: 1 }}>
-          {t(headingKey)}
-        </Text>
+    <Box data-card-section className={SECTION_CLASS}>
+      <Box data-card-head className="flex h-head items-center bg-raised px-2">
+        <Label className="flex-1">{t(headingKey)}</Label>
       </Box>
       {notes.map((note) => (
-        <Box key={note.key} className="analysis-card-row">
+        <Box key={note.key} data-card-row className={CARD_ROW_CLASS}>
           {/* Identity never rides colour alone — the swatch marks which line on
               the plot this is, and the text says it in words. */}
-          <Box className="analysis-card-note-swatch" style={{ backgroundColor: note.color }} />
-          <Text className="analysis-card-name">{note.text}</Text>
+          <Box
+            data-card-swatch
+            className="relative mr-[7px] size-swatch flex-none rounded-xs"
+            style={{ backgroundColor: note.color }}
+          />
+          <Text data-card-name className="relative min-w-0 flex-1 truncate text-md">
+            {/* The same size and inline offset a measured entry's art takes, so
+                a notes section and a breakdown section above it line up. */}
+            {note.icon && <EntityIcon size="card" src={note.icon} alt="" className="mr-[5px] align-[-3px]" />}
+            {note.text}
+          </Text>
         </Box>
       ))}
     </Box>
@@ -251,10 +284,14 @@ export const HoverCard = ({
     <CursorCard
       content={content}
       testId="metric-hover-card"
-      // Surface (colours, border, shadow, clipping) from the shared panel
-      // class the aura tiles' card also wears; only the SIZE is this card's
-      // own — a breakdown needs a width floor an effect name does not.
-      className="analysis-tokens analysis-hover-panel"
+      // Surface (colours, border, shadow, clipping) from the shared panel the
+      // aura tiles' card also wears; only the SIZE is this card's own — a
+      // breakdown needs a width floor an effect name does not.
+      //
+      // No token class, though the card portals to document.body: every token
+      // is on :root, and custom properties inherit down from there to a portal
+      // as readily as to anything else.
+      className={HOVER_PANEL_CLASS}
       style={{ minWidth: 300, maxWidth: 420, maxHeight: "70vh" }}
     >
       {children}

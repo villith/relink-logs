@@ -21,17 +21,27 @@ export type AnalysisState = {
   window: [number, number] | null;
   /** Explicit grouping override — WCL's `by`. Null = derived default. */
   by: Dimension | null;
-  /** The active Auras Filter: `src:`/`tgt:` (which actor pin anchors it) plus
-   * the status pin key of the chosen effect, or null. A FILTER, not a grouping
-   * dimension — `resolveGroupBy` never reads it (like `window`). Cleared
-   * whenever the anchoring pin clears or changes (see transitions.ts). */
-  aura: string | null;
-  /** The active window filter: a battle-window kind (`sba`) or one individual
-   * window of a kind (`sba:1`, 0-based within that kind's windows sorted by
-   * start — the order `assemble_chart_windows` returns). A FILTER like `aura`
-   * — `resolveGroupBy` never reads it — but with no anchoring pin, so no
-   * transition clears it besides its own. */
-  win: string | null;
+  /** The active Auras Filter: each entry is `src:`/`tgt:` (which actor pin
+   * anchors it) plus the status pin key of the chosen effect. A FILTER, not a
+   * grouping dimension — `resolveGroupBy` never reads it (like `window`).
+   * Entries anchored to a pin are dropped when that pin clears or changes (see
+   * transitions.ts); entries anchored to the OTHER pin survive.
+   *
+   * Several at once compose by INTERSECTION: the view shows time when every
+   * selected effect was up together. Union would answer a different question
+   * ("either buff was running"), and the one the strip is for — "what did we do
+   * under the full stack" — has no other spelling. Empty = no aura filter. */
+  aura: string[];
+  /** The active window filter: each entry is a battle-window kind (`sba`) or
+   * one individual window of a kind (`sba:1`, 0-based within that kind's
+   * windows sorted by start — the order `assemble_chart_windows` returns).
+   *
+   * Several at once compose by UNION, which is the opposite of `aura` and not
+   * an inconsistency: two battle windows never overlap in time, so intersecting
+   * them would resolve to nothing every time. A FILTER like `aura` —
+   * `resolveGroupBy` never reads it — but with no anchoring pin, so no
+   * transition clears it besides its own. Empty = no window filter. */
+  win: string[];
 };
 
 export const METRIC_KEYS: MetricKey[] = ["damage", "taken", "stun", "sba", "buffs", "debuffs"];
@@ -45,8 +55,8 @@ export const DEFAULT_STATE: AnalysisState = {
   ability: null,
   window: null,
   by: null,
-  aura: null,
-  win: null,
+  aura: [],
+  win: [],
 };
 
 export const isPinned = (state: AnalysisState, dim: Dimension): boolean =>
@@ -75,9 +85,26 @@ export const encodeState = (state: AnalysisState): RawState => ({
   from: state.window === null ? null : String(state.window[0]),
   to: state.window === null ? null : String(state.window[1]),
   by: state.by,
-  aura: state.aura,
-  win: state.win,
+  aura: encodeList(state.aura),
+  win: encodeList(state.win),
 });
+
+/** A filter list as ONE query param. Empty encodes as null (the param drops out
+ * of the URL) rather than as an empty string, so a cleared filter leaves the
+ * same address a never-set one does. Comma-separated because neither grammar
+ * admits a comma — `AURA_KEY` and `WIN_KEY` below are the proof. */
+const encodeList = (values: string[]): string | null => (values.length === 0 ? null : values.join(","));
+
+/** The inverse, gating each entry through its own grammar and dropping
+ * duplicates.
+ *
+ * Per ENTRY, not per list: one bad segment in a hand-edited URL discards itself
+ * and leaves the rest standing — the same "every field degrades on its own"
+ * rule `decodeState` applies across fields, one level down. A list that
+ * degrades wholesale would let a single stale index silently drop a filter the
+ * user can see three other chips for. */
+const decodeList = (raw: string | null, grammar: RegExp): string[] =>
+  raw === null ? [] : [...new Set(raw.split(",").filter((value) => grammar.test(value)))];
 
 const nonNegativeInt = (raw: string | null): number | null => {
   if (raw === null || raw.trim() === "") return null;
@@ -132,7 +159,7 @@ export const decodeState = (raw: RawState): AnalysisState => {
     ability: raw.abil === "" ? null : raw.abil,
     window: from !== null && to !== null && from <= to ? [from, to] : null,
     by: DIMENSIONS.includes(raw.by as Dimension) ? (raw.by as Dimension) : null,
-    aura: raw.aura !== null && AURA_KEY.test(raw.aura) ? raw.aura : null,
-    win: raw.win !== null && WIN_KEY.test(raw.win) ? raw.win : null,
+    aura: decodeList(raw.aura, AURA_KEY),
+    win: decodeList(raw.win, WIN_KEY),
   };
 };

@@ -36,7 +36,7 @@ export const ActorBar = ({ options, value, onChange, trailing }: ActorBarProps) 
         alignItems: "center",
         gap: 8,
         padding: "10px 16px",
-        borderBottom: "1px solid var(--an-line)",
+        borderBottom: "1px solid var(--color-line)",
         flexWrap: "wrap",
       }}
     >

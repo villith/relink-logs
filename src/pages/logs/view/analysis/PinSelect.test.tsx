@@ -39,7 +39,7 @@ describe("PinSelect", () => {
   it("shows an option's art beside its name", () => {
     renderIt();
     openIt();
-    const option = screen.getByText("Vulkan Bolla Nihilla").closest(".analysis-select-option-row");
+    const option = screen.getByText("Vulkan Bolla Nihilla").closest("[data-option-row]");
     expect(option?.querySelector("img")?.getAttribute("src")).toBe("/em1000.png");
   });
 
@@ -48,7 +48,7 @@ describe("PinSelect", () => {
   it("renders an artless option as its name alone", () => {
     renderIt();
     openIt();
-    const option = screen.getByText("Goblin").closest(".analysis-select-option-row");
+    const option = screen.getByText("Goblin").closest("[data-option-row]");
     expect(option).toBeTruthy();
     expect(option?.querySelector("img")).toBeNull();
   });
@@ -56,14 +56,14 @@ describe("PinSelect", () => {
   it("puts the selected option's art in the control itself", () => {
     const { container } = renderIt({ value: "1" });
     // The dropdown is closed, so the only icon on screen is the input's.
-    expect(container.querySelector("img.analysis-select-icon")?.getAttribute("src")).toBe("/em1000.png");
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("/em1000.png");
   });
 
   // An empty left section still reserves its width, which would indent the
   // placeholder of every selector whose list happens to be artless.
   it("reserves no left section for a selection with no art", () => {
     const { container } = renderIt({ value: "2" });
-    expect(container.querySelector("img.analysis-select-icon")).toBeNull();
+    expect(container.querySelector("img")).toBeNull();
   });
 
   // An option wears its ACTOR colour — the same one its chart band and its

@@ -1,41 +1,51 @@
-import { Button, UnstyledButton } from "@mantine/core";
+import { Badge, Group, SegmentedControl } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
-import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
+import { LogsViewMode, useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 
-import "./ViewModeToggle.css";
-
-/** Switches the logs page between the Analysis and Classic bodies.
+/** Switches the logs page between the Classic and Beta (Analysis) bodies.
  *
- * Asymmetric on purpose, because the two directions are not the same kind of
- * move. Classic is the default and the finished view, so the way IN to the
- * unfinished Analysis view paints nothing (see the CSS) and reads as empty space
- * beside Classic's clipboard menu — it is for people who already know it is
- * there. The way OUT is an ordinary labelled button on its own row above the
- * Analysis body, because anyone who switched must be able to switch back by eye.
- * An invisible exit would strand them.
+ * One symmetric control, because the two directions are the same kind of move:
+ * both replace the whole body with the other reading of the same log. It used to
+ * be asymmetric — a labelled Button out of Analysis and an invisible hit target
+ * into it — which kept the redesign hidden from anyone who did not already know
+ * where to click.
+ *
+ * Beta wears a WIP badge instead. The view IS unfinished, and two plain tabs
+ * side by side would present it as Classic's equal; the badge says which one is
+ * still being built without hiding it.
+ *
+ * Mantine's `SegmentedControl` and not the app's own `PillGroup`: this renders
+ * in BOTH bodies, and Classic is drawn in the stock theme — the token-built
+ * pills would read as a foreign control there.
  *
  * Lives in both view bodies rather than in the page shell, so each side places
- * it where that side wants it — and so Classic never reserves a row for a
- * control that paints nothing. */
+ * it where that side wants it. */
 export const ViewModeToggle = () => {
   const { t } = useTranslation();
-  const mode = useMeterSettingsStore((state) => state.logs_view_mode);
+  const mode = useMeterSettingsStore((state) => state.logs_view);
   const setSettings = useMeterSettingsStore((state) => state.set);
 
-  if (mode === "analysis") {
-    return (
-      <Button size="xs" variant="default" onClick={() => setSettings({ logs_view_mode: "classic" })}>
-        {t("ui.logs.view-mode.to-classic")}
-      </Button>
-    );
-  }
-
   return (
-    <UnstyledButton
-      className="view-mode-toggle"
-      aria-label={t("ui.logs.view-mode.toggle")}
-      onClick={() => setSettings({ logs_view_mode: "analysis" })}
+    <SegmentedControl
+      size="xs"
+      aria-label={t("ui.logs.view-mode.label")}
+      value={mode}
+      onChange={(value) => setSettings({ logs_view: value as LogsViewMode })}
+      data={[
+        { value: "classic", label: t("ui.logs.view-mode.classic") },
+        {
+          value: "analysis",
+          label: (
+            <Group gap={6} wrap="nowrap">
+              {t("ui.logs.view-mode.beta")}
+              <Badge size="xs" color="yellow" variant="filled">
+                {t("ui.logs.view-mode.wip")}
+              </Badge>
+            </Group>
+          ),
+        },
+      ]}
     />
   );
 };

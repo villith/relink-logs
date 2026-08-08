@@ -1102,6 +1102,12 @@ pub struct DerivedEncounterState {
     /// player from a gain alone.
     #[serde(skip)]
     pending_player_sba_gains: HashMap<u32, Vec<(ActionType, f64)>>,
+    /// Incoming (enemy→party) hits that landed on a slot with no identity yet;
+    /// folded into the victim's row on creation. Whole events rather than the
+    /// three fields the fold reads, so [`PlayerState::add_damage_taken`] stays
+    /// the single authority on how a taken hit is filed.
+    #[serde(skip)]
+    pending_player_taken: HashMap<u32, Vec<DamageEvent>>,
     /// Players whose most recent stun-capable hit was filtered out of the meters
     /// (see [`is_excluded`]).
     ///
@@ -1140,6 +1146,7 @@ impl Default for DerivedEncounterState {
             pending_player_sba_sources: HashMap::new(),
             pending_player_sba: HashMap::new(),
             pending_player_sba_gains: HashMap::new(),
+            pending_player_taken: HashMap::new(),
             stun_suppressed_players: HashSet::new(),
             status: ParserStatus::Stopped,
             party: HashMap::new(),
@@ -1199,16 +1206,42 @@ impl DerivedEncounterState {
     /// path's `ensure_encounter_started` has already run) but the window is
     /// anchored and stretched only by dealt hits — same posture as guards and
     /// stun procs.
-    fn process_damage_taken_event(&mut self, event: &DamageEvent) {
-        self.ensure_player_row(
-            event.target.parent_index,
-            CharacterType::from_hash(event.target.parent_actor_type),
-        );
-        let victim = self
-            .party
-            .get_mut(&event.target.parent_index)
-            .expect("ensure_player_row created the row above");
-        victim.add_damage_taken(event);
+    ///
+    /// It shares their row-creation rule too, and for a reason that is not about
+    /// this metric: the overlay names a row by joining its slot key against
+    /// `player_data`, which is filled only by the identity the hook publishes
+    /// with a DEALT hit. Opening a row from an incoming hit alone therefore drew
+    /// a bar with an icon and no name — the first thing a fight does is hit the
+    /// party, so this was the common case, not the corner one. The hit is held
+    /// against the slot instead and folded in whole when the row appears.
+    ///
+    /// The gate is on the IDENTITY, not on the row: once a row exists it
+    /// accumulates whether or not the slot was ever identified, so a log whose
+    /// party never resolved still reports what its rows took.
+    fn process_damage_taken_event(
+        &mut self,
+        player_data: &[Option<PlayerData>; 4],
+        event: &DamageEvent,
+    ) {
+        let victim_slot = event.target.parent_index;
+
+        if character_type_for_slot_key(player_data, victim_slot).is_some() {
+            // The row keeps the class the EVENT reports, like the dealt path —
+            // the identity is only what says the row can be named.
+            self.ensure_player_row(
+                victim_slot,
+                CharacterType::from_hash(event.target.parent_actor_type),
+            );
+        }
+
+        match self.party.get_mut(&victim_slot) {
+            Some(victim) => victim.add_damage_taken(event),
+            None => self
+                .pending_player_taken
+                .entry(victim_slot)
+                .or_default()
+                .push(event.clone()),
+        }
     }
 
     /// `total_stun_value` = whichever capture path saw the accrual (the two
@@ -1427,6 +1460,7 @@ impl DerivedEncounterState {
         let pending_sources = self.pending_player_sba_sources.remove(&actor_index);
         let pending_sba = self.pending_player_sba.remove(&actor_index);
         let pending_sba_gains = self.pending_player_sba_gains.remove(&actor_index);
+        let pending_taken = self.pending_player_taken.remove(&actor_index);
 
         let player = self
             .party
@@ -1466,6 +1500,11 @@ impl DerivedEncounterState {
         if let Some(gains) = pending_sba_gains {
             for (action, amount) in gains {
                 player.add_sba_gain(action, amount);
+            }
+        }
+        if let Some(taken) = pending_taken {
+            for event in taken {
+                player.add_damage_taken(&event);
             }
         }
     }
@@ -2716,7 +2755,8 @@ impl Parser {
                 // denominator), no phantom/exclusion filters and no target or
                 // ability pins — the victim is a player, not a dropdown target.
                 if is_damage_taken_event(event) {
-                    self.derived_state.process_damage_taken_event(event);
+                    self.derived_state
+                        .process_damage_taken_event(&self.encounter.player_data, event);
                     continue;
                 }
                 // Ahead of the excluded-damage note as well: a marker's damage
@@ -3171,7 +3211,8 @@ impl Parser {
         // phantom learning, exclusion filters, DPS windowing — is about hits
         // ON enemies and must never see it.
         if is_damage_taken_event(&event) {
-            self.derived_state.process_damage_taken_event(&event);
+            self.derived_state
+                .process_damage_taken_event(&self.encounter.player_data, &event);
             self.emit_encounter_update();
             return;
         }
@@ -4344,9 +4385,29 @@ mod tests {
         }
     }
 
+    /// A hit DEALT by party slot 0, keyed the way the hook keys player sources.
+    /// `damage_from`'s parent index is a bare 0, which is a different party row
+    /// from the slot-keyed one an incoming hit lands on.
+    fn dealt_by_slot0(action: u32, damage: i32) -> DamageEvent {
+        let mut event = damage_from(PLAYER_HASH, action, damage);
+        event.source.parent_index = protocol::player_slot_key(0);
+        event
+    }
+
+    /// Seeds party slot 0's identity — what the hook publishes alongside a DEALT
+    /// hit, and the only thing that lets the overlay put a name on a row.
+    fn identify_slot0(parser: &mut Parser) {
+        parser.encounter.player_data[0] = Some(PlayerData {
+            actor_index: protocol::player_slot_key(0),
+            character_type: CharacterType::from_hash(PLAYER_HASH),
+            ..Default::default()
+        });
+    }
+
     #[test]
     fn an_enemy_hit_on_a_player_is_recorded_and_derived_as_damage_taken() {
         let mut parser = Parser::default();
+        identify_slot0(&mut parser);
 
         parser.on_damage_event(damage_taken_by_slot0(9001, 750));
 
@@ -4376,6 +4437,75 @@ mod tests {
         assert_eq!(row.max_damage, 750);
     }
 
+    /// Regression (live, 2026-08-08): an enemy hit is often the first thing that
+    /// happens to a player, and this was the one row-creating path that did not
+    /// need an identity to open a row. The overlay resolves a name by joining a
+    /// row's slot key against `encounter.player_data`, which only a DEALT hit
+    /// fills — so a victim who had not swung yet drew a bar with an icon and no
+    /// name. Held pending instead, exactly as a guard's stun is.
+    #[test]
+    fn an_enemy_hit_on_an_unidentified_player_opens_no_row() {
+        let mut parser = Parser::default();
+
+        parser.on_damage_event(damage_taken_by_slot0(9001, 750));
+
+        assert!(
+            parser.derived_state.party.is_empty(),
+            "a row the overlay cannot name is never created"
+        );
+        assert_eq!(
+            parser.encounter.raw_event_log.len(),
+            1,
+            "the hit is still the source of truth and belongs in the raw log"
+        );
+    }
+
+    /// The other half of the gate: nothing is lost while the row is missing.
+    /// Both hits land in full — totals, hit count and the per-attack breakdown —
+    /// the moment the victim's own first hit opens their row.
+    #[test]
+    fn taken_damage_held_before_the_row_existed_folds_into_it() {
+        let mut parser = Parser::default();
+
+        parser.on_damage_event(damage_taken_by_slot0(9001, 750));
+        parser.on_damage_event(damage_taken_by_slot0(9001, 250));
+        parser.on_damage_event(dealt_by_slot0(100, 1_000));
+
+        let victim = parser
+            .derived_state
+            .party
+            .get(&protocol::player_slot_key(0))
+            .expect("the dealt hit opens the row the held hits were waiting for");
+        assert_eq!(victim.total_damage_taken, 1_000);
+        assert_eq!(victim.hits_taken, 2);
+        assert_eq!(victim.total_damage, 1_000, "the dealt hit still counts");
+        assert_eq!(victim.damage_taken_breakdown.len(), 1);
+        let row = &victim.damage_taken_breakdown[0];
+        assert_eq!(row.hits, 2);
+        assert_eq!(row.total_damage, 1_000);
+        assert_eq!(row.max_damage, 750, "the per-attack max survives the hold");
+    }
+
+    /// An identity arriving later must not double-count what the row already
+    /// took: the hold is drained on the fold, not replayed on every later hit.
+    #[test]
+    fn taken_damage_lands_once_when_the_identity_arrives_after_the_row() {
+        let mut parser = Parser::default();
+
+        parser.on_damage_event(damage_taken_by_slot0(9001, 750));
+        parser.on_damage_event(dealt_by_slot0(100, 1_000));
+        identify_slot0(&mut parser);
+        parser.on_damage_event(damage_taken_by_slot0(9001, 250));
+
+        let victim = parser
+            .derived_state
+            .party
+            .get(&protocol::player_slot_key(0))
+            .expect("the row exists");
+        assert_eq!(victim.total_damage_taken, 1_000);
+        assert_eq!(victim.hits_taken, 2);
+    }
+
     #[test]
     fn damage_taken_opens_an_encounter_but_never_anchors_the_dps_window() {
         let mut parser = Parser::default();
@@ -4396,6 +4526,9 @@ mod tests {
     #[test]
     fn reparse_rebuilds_damage_taken_and_keeps_it_out_of_dps() {
         let mut parser = Parser::default();
+        // A stored log carries the party it was fought with, so the reparse has
+        // the identities the live path had to wait for.
+        identify_slot0(&mut parser);
         parser.encounter.raw_event_log.push((
             1_000,
             Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
@@ -4486,6 +4619,7 @@ mod tests {
     #[test]
     fn damage_taken_breakdown_groups_by_attacker_and_action() {
         let mut parser = Parser::default();
+        identify_slot0(&mut parser);
 
         parser.on_damage_event(damage_taken_by_slot0(9001, 750));
         parser.on_damage_event(damage_taken_by_slot0(9001, 250));
@@ -7095,6 +7229,14 @@ mod tests {
     #[test]
     fn sba_totals_survive_a_source_pin() {
         let mut parser = Parser::default();
+        // The pin filters DEALT events out of the derive; the party the
+        // encounter was fought with is stored on it and survives either way,
+        // which is what lets the taken hit below open a nameable row.
+        parser.encounter.player_data[1] = Some(PlayerData {
+            actor_index: 0xF000_0001,
+            character_type: CharacterType::from_hash(0x2AF6_78E8),
+            ..Default::default()
+        });
 
         let mut pinned = a_damage_event();
         pinned.source.parent_index = 0xF000_0000;

@@ -3,6 +3,9 @@ import { CaretDown, CaretUp, Eye, EyeSlash } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { Figure } from "@/components/ui/Figure";
+import { Label } from "@/components/ui/Label";
+
 import type { MetricRow } from "../metrics/types";
 import { sectionHeadings } from "../sectionRuns";
 import type { SelectorPins } from "../selectorOptions";
@@ -65,7 +68,7 @@ export type MetricTableProps = {
   sectionLabel?: (row: MetricRow) => string | null;
 };
 
-const FALLBACK_COLOR = "var(--an-ink-3)";
+const FALLBACK_COLOR = "var(--color-ink-3)";
 
 /** The one table every metric renders through.
  *
@@ -76,6 +79,10 @@ const FALLBACK_COLOR = "var(--an-ink-3)";
  * Bars scale against the LARGEST row rather than the total: at the abilities
  * level the rows are a subset of one player's damage, so a share-of-total bar
  * would render every row as a sliver. */
+/** A control before the name — the band toggle, the expand caret. Sits ON the
+ * bar like the row's text, so without `relative` the fill paints over it. */
+const CONTROL_CLASS = "relative mr-1.5 inline-flex shrink-0 cursor-pointer items-center";
+
 export const MetricTable = ({
   rows,
   columnKeys,
@@ -150,14 +157,24 @@ export const MetricTable = ({
 
   return (
     <Box role="grid">
-      <Box className="analysis-head" role="row">
-        <Text className="analysis-label" role="columnheader" style={{ flex: 1 }}>
+      {/* `data-head` rather than a styling class: the column heads and the data
+          rows share role="row", so tests need something to tell them apart that
+          survives this table being restyled. */}
+      <Box
+        className="mb-1.5 flex h-[calc(20px*var(--density))] items-center border-b border-line px-2"
+        role="row"
+        data-head
+      >
+        <Label className="flex-1" role="columnheader">
           {rowsLabelKey ? t(rowsLabelKey) : ""}
-        </Text>
+        </Label>
+        {/* The head cell states the column's width itself rather than wearing
+            the data cells' class, which carries the row FONT SIZE with it — the
+            heads rendered at row size for as long as they shared it. */}
         {columnKeys.map((key) => (
-          <Text key={key} role="columnheader" className="analysis-label analysis-cell">
+          <Label key={key} role="columnheader" className="w-cell text-right">
             {t(key)}
-          </Text>
+          </Label>
         ))}
       </Box>
 
@@ -186,7 +203,11 @@ export const MetricTable = ({
             // never draw a row two different heights. Everything below is this
             // table's own: the bar, the controls, the uptime track, the figures.
             <AnalysisRow
-              className={nested ? "analysis-subrow" : undefined}
+              // A child behind an expanded parent: the same row anatomy,
+              // indented and on a muted panel so the hierarchy reads at a glance
+              // without stealing the parents' contrast.
+              data-subrow={nested || undefined}
+              className={nested ? "bg-panel pl-[calc(28px*var(--density))]" : undefined}
               onClick={pinOnClick ? () => onPin(pinOnClick) : undefined}
               nameFixed={positional}
               name={renderLabel ? renderLabel(rowData) : rowData.label}
@@ -210,7 +231,10 @@ export const MetricTable = ({
                     <UnstyledButton
                       aria-pressed={toggle.shown}
                       aria-label={t("ui.logs.buff-band-toggle")}
-                      className="analysis-row-toggle"
+                      data-band-toggle
+                      // On the bar like the rest of the row's text, so it takes
+                      // `relative` or the fill paints over it.
+                      className={CONTROL_CLASS}
                       style={{ opacity: toggle.shown ? 1 : 0.35 }}
                       onClick={(event: React.MouseEvent) => {
                         event.stopPropagation();
@@ -231,7 +255,8 @@ export const MetricTable = ({
                     <UnstyledButton
                       aria-expanded={isExpanded}
                       aria-label={t("ui.logs.expand-row")}
-                      className="analysis-row-expand"
+                      data-expand
+                      className={CONTROL_CLASS}
                       onClick={(event: React.MouseEvent) => {
                         event.stopPropagation();
                         setExpanded((previous) => {
@@ -258,11 +283,21 @@ export const MetricTable = ({
                   // says how much. Its own cell between the name and the numbers,
                   // so the pieces never sit under text. One piece per contiguous
                   // window — `toBands` merged the overlaps.
-                  <Box className="analysis-track" aria-hidden>
+                  // Faintly filled, so "no pieces here" reads as an empty track
+                  // rather than as a missing cell.
+                  <Box
+                    data-uptime-track
+                    className="relative mx-2.5 my-1 min-w-0 flex-1 self-stretch rounded-xs bg-white/[0.03]"
+                    aria-hidden
+                  >
                     {rowData.timeline.map((span, spanIndex) => (
                       <Box
                         key={spanIndex}
-                        className="analysis-timeline-piece"
+                        data-uptime-piece
+                        // In its own cell the pieces are the only ink, so they
+                        // can afford to be more solid than they were sharing
+                        // space with the row's text.
+                        className="absolute inset-y-0 rounded-xs opacity-75"
                         style={{
                           left: `${(span.startMs / timelineMs) * 100}%`,
                           width: `${((span.endMs - span.startMs) / timelineMs) * 100}%`,
@@ -277,14 +312,17 @@ export const MetricTable = ({
                   </Box>
                 )
               }
+              // Every cell sits above the bar, so each takes `relative`.
               columns={rowData.columns.map((value, columnIndex) => (
-                <Text
+                <Figure
                   key={columnIndex}
                   role="gridcell"
-                  className={`analysis-cell${columnIndex === 0 ? "" : " analysis-cell-muted"}`}
+                  size={columnIndex === 0 ? "lg" : "sm"}
+                  tone={columnIndex === 0 ? "default" : "muted"}
+                  className="relative w-cell text-right"
                 >
                   {value}
-                </Text>
+                </Figure>
               ))}
             />
           );
@@ -311,7 +349,8 @@ export const MetricTable = ({
 
         return (
           <Fragment key={row.key}>
-            {heading !== null && <Text className="analysis-label analysis-section-head">{heading}</Text>}
+            {/* Visual grouping only: it is not a row and takes no interaction. */}
+            {heading !== null && <Label className="px-2 pb-0.5 pt-2">{heading}</Label>}
             {parent}
             {expanded.has(row.key) &&
               childRows.map((child) => <Fragment key={child.key}>{rowElement(child, true)}</Fragment>)}

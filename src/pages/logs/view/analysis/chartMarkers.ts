@@ -11,8 +11,14 @@ export type MarkerKind = "death" | "sba";
 export type MarkerEvent = { kind: MarkerKind; atMs: number; actorIndex: number };
 
 /** A marker as the chart draws it: a vertical line at `atMs` (milliseconds
- * from the chart window's start) plus the tooltip line for its bucket. */
-export type ChartMarker = { kind: MarkerKind; atMs: number; color: string; label: string };
+ * from the chart window's start) plus the tooltip line for its bucket.
+ *
+ * `icon` is the ACTOR's art — whose death this was, who cast the Skybound Art.
+ * Optional because it comes from the same resolver every other card row's does,
+ * and that resolver has no picture for a character it cannot identify. It
+ * matters most on the SBA markers: those all draw in one colour, so the swatch
+ * says "an SBA happened" and only the name and the art say whose. */
+export type ChartMarker = { kind: MarkerKind; atMs: number; color: string; label: string; icon?: string };
 
 /** The SBA markers' colour. Deaths take the dead player's colour, so this one
  * has to stay distinct from three sets at once, all of which share the plot:
@@ -20,13 +26,13 @@ export type ChartMarker = { kind: MarkerKind; atMs: number; color: string; label
  * - every party colour (`DEFAULT_METER_COLORS` and `PLAYER_COLORS`' overflow
  *   entries) — an SBA line wearing one would read as that player's death line,
  *   the two differing only by glyph;
- * - `--an-accent` (analysis.css), which is also the drag-scope `ReferenceArea`
+ * - `--color-accent` (theme.css), which is also the drag-scope `ReferenceArea`
  *   in `DpsChart` — mid-drag the selection edge and the SBA lines would merge;
  * - the Total series' neutral grey, `--mantine-color-gray-5`.
  *
  * Mantine's grape-4 (#da77f2) is a hue none of those three use, so it reads as
  * "not a player" at a glance. Re-check it against all three before changing it:
- * the previous value WAS `--an-accent` (#00b8d9), which is byte-identical to
+ * the previous value WAS `--color-accent` (#00b8d9), which is byte-identical to
  * `DEFAULT_METER_COLORS[3]`, so every SBA line drew in slot 4's colour. */
 export const SBA_MARKER_COLOR = "var(--mantine-color-grape-4)";
 

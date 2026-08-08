@@ -70,28 +70,46 @@ const renderTracks = (lanes = LANES, over: Partial<React.ComponentProps<typeof T
 describe("TimelineTracks", () => {
   it("renders one lane per row, in order", () => {
     const { container } = renderTracks();
-    const names = [...container.querySelectorAll(".timeline-names .analysis-row")].map((el) => el.textContent);
+    const names = [...container.querySelectorAll("[data-lane-names] [role='row']")].map((el) => el.textContent);
     expect(names).toEqual(["label(skill:Normal:100)", "label(status:77:210)"]);
   });
 
+  // The block grows to its full height and the PAGE scrolls it. A `max-height`
+  // here is what broke the two columns before: a single-line flex container
+  // clamps its line to its own max cross size, so BOTH columns were stretched
+  // to the frame's height instead of their content's. The names spilled (they
+  // are `overflow: visible`) and scrolled with the frame, while the tracks --
+  // forced to `overflow-y: auto` by their own `overflow-x` -- clipped instead,
+  // so they kept a second vertical scrollbar and ran out part-way down.
+  it("keeps no vertical scroller of its own", () => {
+    const { container } = renderTracks();
+    const frame = container.querySelector("[role='group']") as HTMLElement;
+    expect(frame.className).not.toMatch(/max-h-|overflow-y-auto|overflow-auto/);
+  });
+
+  // Only the tracks scroll sideways. Spanning the whole frame, the scrollbar
+  // sits under the name column too and reads as if the names scrolled with it.
   it("puts the horizontal scrollbar on the track column only", () => {
     const { container } = renderTracks();
-    expect(container.querySelector(".timeline-names")).toBeTruthy();
-    // The names column must not sit inside the horizontal scroller.
-    expect(container.querySelector(".timeline-tracks-scroll .timeline-names")).toBeNull();
+    const scroll = container.querySelector("[data-tracks-scroll]") as HTMLElement;
+    expect(scroll.className).toContain("overflow-x-auto");
+    // The names column must not sit inside the horizontal scroller...
+    expect(container.querySelector("[data-tracks-scroll] [data-lane-names]")).toBeNull();
+    // ...and must not scroll on any axis of its own.
+    expect((container.querySelector("[data-lane-names]") as HTMLElement).className).not.toContain("overflow");
   });
 
   it("draws lanes as the table's own row", () => {
     const { container } = renderTracks();
-    expect(container.querySelectorAll(".timeline-names .analysis-row").length).toBe(2);
+    expect(container.querySelectorAll("[data-lane-names] [role='row']").length).toBe(2);
   });
 
   // The two columns are rendered from one sequence; if they ever disagree the
   // names sit against the wrong marks.
   it("renders the same number of lane rows in both columns", () => {
     const { container } = renderTracks(LANES, { sectionLabel: () => "S" });
-    expect(container.querySelectorAll(".timeline-names .analysis-row").length).toBe(
-      container.querySelectorAll(".timeline-content .timeline-row").length
+    expect(container.querySelectorAll("[data-lane-names] [role='row']").length).toBe(
+      container.querySelectorAll("[data-timeline-content] [data-lane-row]").length
     );
   });
 
@@ -99,8 +117,8 @@ describe("TimelineTracks", () => {
     const { container } = renderTracks(LANES, {
       sectionLabel: (row: MetricRow) => (row.kind === "status" ? "Effects" : "Abilities"),
     });
-    expect(container.querySelectorAll(".timeline-section").length).toBe(
-      container.querySelectorAll(".timeline-row-gap").length
+    expect(container.querySelectorAll("[data-lane-heading]").length).toBe(
+      container.querySelectorAll("[data-lane-gap]").length
     );
   });
 
@@ -110,7 +128,7 @@ describe("TimelineTracks", () => {
       markEntry: (key: string) => ({ name: `named(${key})` }),
     });
     // Both marks still draw; the instant one now carries a card.
-    expect(container.querySelectorAll(".timeline-mark").length).toBe(2);
+    expect(container.querySelectorAll("[data-mark]").length).toBe(2);
   });
 
   // A lane and its table row must not be resolved two ways, so the caller's
@@ -122,7 +140,7 @@ describe("TimelineTracks", () => {
 
   it("positions a mark as a percentage of the domain", () => {
     const { container } = renderTracks();
-    const spanMark = container.querySelectorAll(".timeline-mark")[1] as HTMLElement;
+    const spanMark = container.querySelectorAll("[data-mark]")[1] as HTMLElement;
     expect(spanMark.style.left).toBe("16.6667%");
     expect(spanMark.style.width).toBe("33.3333%");
   });
@@ -131,13 +149,15 @@ describe("TimelineTracks", () => {
   // reads as a buff that was up for that whole time.
   it("marks a real span and a folded instant with different classes", () => {
     const { container } = renderTracks();
-    expect(container.querySelectorAll(".timeline-mark-instant")).toHaveLength(1);
-    expect(container.querySelectorAll(".timeline-mark-span")).toHaveLength(1);
+    expect(container.querySelectorAll('[data-mark-kind="instant"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-mark-kind="span"]')).toHaveLength(1);
   });
 
+  // A percentage of the track scroller, which IS the visible track width now
+  // that the names sit outside it -- so the scale needs no measurement.
   it("widens the content by domain over viewport", () => {
     const { container } = renderTracks(LANES, { domainMs: 90_000, viewportMs: 30_000 });
-    expect((container.querySelector(".timeline-content") as HTMLElement).style.width).toBe("300%");
+    expect((container.querySelector("[data-timeline-content]") as HTMLElement).style.width).toBe("300%");
   });
 
   // Clicking a lane pins exactly what clicking its table row pins.
@@ -193,9 +213,7 @@ describe("cast ticks", () => {
 
   it("marks an echo tick so it can read fainter", () => {
     renderTracks([castLane(5)]);
-    const echoes = screen
-      .getAllByTestId("timeline-tick")
-      .filter((tick) => tick.className.includes("timeline-tick-echo"));
+    const echoes = screen.getAllByTestId("timeline-tick").filter((tick) => tick.hasAttribute("data-echo"));
     expect(echoes).toHaveLength(2);
   });
 

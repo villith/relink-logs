@@ -31,7 +31,7 @@ describe("TimelineRuler", () => {
 
   it("positions each tick as a percentage of the domain", () => {
     const { container } = render(<TimelineRuler domainMs={30_000} startMs={0} stepMs={10_000} />);
-    const ticks = container.querySelectorAll(".timeline-ruler-tick");
+    const ticks = container.querySelectorAll("[data-ruler-tick]");
     expect((ticks[1] as HTMLElement).style.left).toBe("33.3333%");
   });
 });

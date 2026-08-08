@@ -39,6 +39,26 @@ describe("meter settings defaults", () => {
     expect(state.bar_height).toBe(27);
     expect(state.bar_spacing).toBe(0);
     expect(state.header_segments.length).toBeGreaterThan(0);
+    expect(state.merge_supplementary).toBe(false);
+  });
+
+  /** The logs viewer's setting was renamed `logs_view_mode` -> `logs_view` to
+   * put everyone who had already switched back onto Classic while the redesign
+   * is still a beta. The rename only does that if nothing reads the old key —
+   * the stale value is left in settings.db, but it must not feed anything. */
+  it("ignores a stored analysis view mode written under the old key", async () => {
+    localStorage.setItem(
+      "meter-settings",
+      JSON.stringify({ version: 2, state: { logs_view_mode: "analysis", transparency: 0.5 } })
+    );
+
+    const { useMeterSettingsStore } = await import("./useMeterSettingsStore");
+    await useMeterSettingsStore.persist.rehydrate();
+    const state = useMeterSettingsStore.getState();
+
+    expect(state.logs_view).toBe("classic");
+    // The rest of that payload is untouched — this is a rename, not a reset.
+    expect(state.transparency).toBe(0.5);
   });
 
   it("ships defaults that leave the meter looking exactly as it did before", async () => {

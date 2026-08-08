@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { combineMasks } from "./useFilterWindows";
+import { combineMasks, intersectMasks } from "./useFilterWindows";
 
 describe("combineMasks", () => {
   it("is undefined when neither filter is active", () => {
@@ -38,5 +38,49 @@ describe("combineMasks", () => {
 
   it("drops spans that do not overlap at all", () => {
     expect(combineMasks([{ fromMs: 0, upToMs: 5 }], [{ fromMs: 10, upToMs: 20 }])).toEqual([]);
+  });
+});
+
+describe("intersectMasks", () => {
+  it("is undefined with no masks — no aura filter, rather than an empty one", () => {
+    expect(intersectMasks([])).toBeUndefined();
+  });
+
+  it("passes a lone mask through by reference", () => {
+    const only = [{ fromMs: 0, upToMs: 10 }];
+    expect(intersectMasks([only])).toBe(only);
+  });
+
+  it("folds three masks into the time ALL of them were up", () => {
+    // What the multi-select is for: "what did we do under the full stack",
+    // which a union could not answer.
+    expect(
+      intersectMasks([[{ fromMs: 0, upToMs: 100 }], [{ fromMs: 20, upToMs: 80 }], [{ fromMs: 50, upToMs: 200 }]])
+    ).toEqual([{ fromMs: 50, upToMs: 80 }]);
+  });
+
+  it("a stack that never lined up is EMPTY, not absent", () => {
+    // Empty narrows the view to nothing, which is the honest reading — falling
+    // back to a wider mask would show damage the filter excluded.
+    expect(intersectMasks([[{ fromMs: 0, upToMs: 10 }], [{ fromMs: 50, upToMs: 60 }]])).toEqual([]);
+  });
+
+  it("keeps every disjoint stretch where the stack held", () => {
+    expect(
+      intersectMasks([
+        [
+          { fromMs: 0, upToMs: 30 },
+          { fromMs: 60, upToMs: 90 },
+        ],
+        [
+          { fromMs: 10, upToMs: 70 },
+          { fromMs: 80, upToMs: 100 },
+        ],
+      ])
+    ).toEqual([
+      { fromMs: 10, upToMs: 30 },
+      { fromMs: 60, upToMs: 70 },
+      { fromMs: 80, upToMs: 90 },
+    ]);
   });
 });
