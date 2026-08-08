@@ -7,6 +7,8 @@
 //! disagree with the logged cap. What it CAN do is say how much of the
 //! multiplier it explains, which is the residual.
 
+pub mod terms;
+
 /// The per-hit and per-player facts the breakdown needs.
 #[derive(Debug, Clone, PartialEq)]
 pub struct CapInputs {
