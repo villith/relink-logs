@@ -1,3 +1,5 @@
+@layer mantine, theme, components, utilities;
+
 :root {
   color: #fff;
   background: rgba(0, 0, 0, 0) !important;

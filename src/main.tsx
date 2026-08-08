@@ -1,7 +1,7 @@
 import "@fontsource-variable/noto-sans";
-import "@mantine/charts/styles.css";
+import "@mantine/charts/styles.layer.css";
 import { createTheme, MantineProvider, rem } from "@mantine/core";
-import "@mantine/core/styles.css";
+import "@mantine/core/styles.layer.css";
 import ReactDOM from "react-dom/client";
 import "./styles.css";
 
