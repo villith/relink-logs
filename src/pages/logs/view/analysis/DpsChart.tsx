@@ -1,6 +1,6 @@
 import { AreaChart, LineChart } from "@mantine/charts";
 import { Box, Group, Paper, Text } from "@mantine/core";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ReferenceArea, ReferenceLine } from "recharts";
 
@@ -123,6 +123,16 @@ export type DpsChartProps = {
   /** Providing this renders the Normal | Stacked SegmentedControl in the
    * chart header. */
   onStackModeChange?: (mode: StackMode) => void;
+  /** Extra controls for the header strip, drawn ahead of the chart's own.
+   *
+   * A slot rather than a prop per control: what belongs here is anything that
+   * changes how the plot READS but is not the chart's to own — the Merge Sup
+   * DMG switch folds echo damage into its causing skill, which is a property of
+   * the whole view (the table folds with it) and not of the plot. Threading it
+   * as `collapseSupplementary`/`onCollapseChange` would put a damage-model
+   * concept inside a component that otherwise knows only about series and
+   * buckets. */
+  controls?: ReactNode;
 };
 
 /** The stroke a deduped marker line takes when the markers it stands for do NOT
@@ -412,6 +422,7 @@ export const DpsChart = ({
   onSmoothingChange,
   stackMode = "stacked",
   onStackModeChange,
+  controls,
 }: DpsChartProps) => {
   const { t } = useTranslation();
   const anchor = useRef<number | null>(null);
@@ -741,7 +752,8 @@ export const DpsChart = ({
     <Box style={{ padding: "10px 16px 8px" }}>
       <Box style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
         <UiLabel>{t(labelKey)}</UiLabel>
-        <Group gap="sm">
+        <Group gap="sm" data-testid="chart-controls">
+          {controls}
           {onSmoothingChange !== undefined && smoothing !== undefined && (
             <PillGroup
               // The options are bare durations, so both the caption and the

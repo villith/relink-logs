@@ -31,6 +31,24 @@ describe("ToggleSwitch", () => {
     expect(screen.getByRole("switch").getAttribute("aria-checked")).toBe("true");
   });
 
+  /** The border must not move with the state.
+   *
+   * An accent border on the checked switch read as an outline — the same thing
+   * a focus ring and a selected `PillGroup` pill are drawn with — so a switch
+   * that was merely ON looked like the control the keyboard was sitting on, or
+   * like a selected item in the strip beside it. The knob's travel, the track's
+   * colour and the pill's fill already say ON three times over; the frame stays
+   * out of it. */
+  it("keeps the same border in both states", () => {
+    const { container: off } = renderIt({ checked: false });
+    const { container: on } = renderIt({ checked: true });
+
+    const borderOf = (root: HTMLElement) =>
+      [...root.querySelector<HTMLElement>('[role="switch"]')!.classList].filter((name) => name.startsWith("border-"));
+
+    expect(borderOf(on)).toEqual(borderOf(off));
+  });
+
   it("stays on screen but inert when disabled", () => {
     // `aria-disabled` and not the native attribute: a truly disabled control
     // receives no pointer events, hover included, which would silence the

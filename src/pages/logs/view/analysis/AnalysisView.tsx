@@ -149,18 +149,32 @@ export const AnalysisView = () => {
     }))
   );
 
-  const { show_display_names, streamer_mode, player_label_template, color_1, color_2, color_3, color_4 } =
-    useMeterSettingsStore(
-      useShallow((state) => ({
-        show_display_names: state.show_display_names,
-        streamer_mode: state.streamer_mode,
-        player_label_template: state.player_label_template,
-        color_1: state.color_1,
-        color_2: state.color_2,
-        color_3: state.color_3,
-        color_4: state.color_4,
-      }))
-    );
+  const {
+    show_display_names,
+    streamer_mode,
+    player_label_template,
+    color_1,
+    color_2,
+    color_3,
+    color_4,
+    // Whether echo damage rides the skill that caused it. A stored setting
+    // rather than the `supp` URL param it used to be: how someone reads damage
+    // is a preference that should outlive the log they set it on, and the param
+    // put it back to off on every log they opened.
+    collapseSupplementary,
+  } = useMeterSettingsStore(
+    useShallow((state) => ({
+      show_display_names: state.show_display_names,
+      streamer_mode: state.streamer_mode,
+      player_label_template: state.player_label_template,
+      color_1: state.color_1,
+      color_2: state.color_2,
+      color_3: state.color_3,
+      color_4: state.color_4,
+      collapseSupplementary: state.merge_supplementary,
+    }))
+  );
+  const setSettings = useMeterSettingsStore((state) => state.set);
 
   // The machine: the URL holds the WHOLE state (metric, side, pins, window,
   // grouping override), the resolver turns it into everything the view shows.
@@ -173,12 +187,6 @@ export const AnalysisView = () => {
   // switching between the three bodies, which is the whole point of sharing the
   // selector bar.
   const [tab, setTab] = useQueryState("tab", { history: "replace" });
-  // Whether echo damage rides the skill that caused it. Its own nuqs key beside
-  // the pins, so a shared link reproduces the reading rather than the recipient
-  // seeing a differently-folded table. "1" for on, absent for off — the same
-  // shape every other flag in this query takes.
-  const [collapseParam, setCollapseParam] = useQueryState("supp", { history: "replace" });
-  const collapseSupplementary = collapseParam === "1";
   // That param resolved to one of the three bodies, with anything unrecognised
   // falling back to the default. One selector rather than a boolean per body:
   // two booleans can both be true, and which one won would then depend on the
@@ -564,15 +572,6 @@ export const AnalysisView = () => {
           onChange={(side) => setState(hostilityTransition(state, side))}
           disabled={!caps.supportsHostility}
         />
-        {/* Beside the side switch, and disabled rather than hidden for the same
-            reason it is: only Damage Done records supplementary damage, and a
-            control that comes and went with the tab would shift everything
-            under it. */}
-        <CollapseSupplementaryToggle
-          value={collapseSupplementary}
-          onChange={(next) => setCollapseParam(next ? "1" : null)}
-          disabled={!caps.recordsSupplementary}
-        />
       </Box>
 
       {/* Live in BOTH views, because Events is a display MODE and not a view of
@@ -628,6 +627,22 @@ export const AnalysisView = () => {
         onSmoothingChange={format === "amount" ? setRateSmoothing : undefined}
         stackMode={chartSource === "stacks" ? stackMode : undefined}
         onStackModeChange={chartSource === "stacks" ? setStackMode : undefined}
+        // In the chart's own control strip, beside the smoothing window: it
+        // belongs with the other knobs that change how the fight READS, not
+        // with the side switch, which changes WHOSE fight is being read. It
+        // folds the table as well as the plot, so it rides the strip as a
+        // caller-supplied control rather than as something the chart owns.
+        //
+        // Disabled rather than hidden, for the same reason HostilityToggle is:
+        // only Damage Done records supplementary damage, and a control that
+        // came and went with the tab would shift the whole strip each time.
+        controls={
+          <CollapseSupplementaryToggle
+            value={collapseSupplementary}
+            onChange={(next) => setSettings({ merge_supplementary: next })}
+            disabled={!caps.recordsSupplementary}
+          />
+        }
       />
 
       {/* Dev builds only, the same guard the Debug tab uses. */}

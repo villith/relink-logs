@@ -172,6 +172,16 @@ interface MeterSettings {
    * rather than swept: it costs one string, and a rename that also deletes is a
    * rename that cannot be reverted. */
   logs_view: LogsViewMode;
+  /** Whether the Analysis view folds each skill's supplementary ("echo")
+   * damage into the skill that caused it.
+   *
+   * A stored setting rather than a URL param, which is where it used to live.
+   * The param made a shared link reproduce the reading exactly, but it also
+   * meant the switch reset on every log the reader opened — and this is a
+   * preference about how someone reads damage, not a property of one fight.
+   * Only Damage Done records supplementary damage, so it has no effect
+   * elsewhere (see `caps.recordsSupplementary`). */
+  merge_supplementary: boolean;
   /** How skill and cause names resolve across languages — see
    * `SkillNameResolutionMode`. `language-first` prefers the current language's
    * translated game name over a hand label that only exists in English;
@@ -222,6 +232,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   ...DEFAULT_OVERLAY_SIZE,
   ...DEFAULT_BAR_APPEARANCE,
   logs_view: "classic",
+  merge_supplementary: false,
   skill_name_resolution: "label-first",
 };
 

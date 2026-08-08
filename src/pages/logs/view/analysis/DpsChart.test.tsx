@@ -659,3 +659,51 @@ describe("ChartTooltip — the Ctrl detail modifier", () => {
     expect(screen.queryByText(`band ${SECTION_ENTRY_CAP}`)).toBeNull();
   });
 });
+
+/** The strip above the plot, which holds every control that changes how the
+ * chart READS — the smoothing window, the stack mode, the band and marker
+ * switches — plus whatever the caller adds to it. */
+describe("DpsChart — the header control strip", () => {
+  const DATA = [
+    { timestamp: "00:01", s1: 100 },
+    { timestamp: "00:02", s1: 200 },
+  ] as unknown as ChartDatapoint[];
+
+  const SERIES: Label = [{ name: "s1", label: "Reginleiv", partySlotIndex: 0, color: "#f00" }];
+
+  const renderChart = (props: Partial<React.ComponentProps<typeof DpsChart>> = {}) =>
+    render(
+      <MantineProvider>
+        <DpsChart
+          data={DATA}
+          labels={SERIES}
+          labelKey="ui.logs.chart-dps-label"
+          sectionKey="ui.logs.rows-by-ability"
+          format="amount"
+          onScope={() => {}}
+          smoothing={1}
+          onSmoothingChange={() => {}}
+          {...props}
+        />
+      </MantineProvider>
+    );
+
+  /** The caller's own controls belong in the SAME strip as the chart's, not on
+   * a row of their own: they are the same kind of thing — a knob that changes
+   * the reading — and a second row would push the plot down and split one set
+   * of controls across two places. */
+  it("puts caller-supplied controls in the same strip as the smoothing window", () => {
+    renderChart({ controls: <span>merge-switch</span> });
+
+    const strip = screen.getByTestId("chart-controls");
+    expect(strip.contains(screen.getByText("merge-switch"))).toBe(true);
+    expect(strip.contains(screen.getByText("ui.logs.chart-smoothing-caption"))).toBe(true);
+  });
+
+  it("draws the strip without them when the caller supplies none", () => {
+    renderChart();
+
+    expect(screen.queryByText("merge-switch")).toBeNull();
+    expect(screen.getByTestId("chart-controls")).toBeTruthy();
+  });
+});

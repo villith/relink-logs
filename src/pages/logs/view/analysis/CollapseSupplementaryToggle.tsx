@@ -7,6 +7,12 @@ import "./analysis.css";
 
 /** Whether echo damage rides the skill that caused it.
  *
+ * Labelled "Merge Sup DMG", not "Collapse supplementary": it sits in the
+ * chart's header strip beside the smoothing window, where a control's label
+ * competes for width with the plot's own title, and the tooltip is what carries
+ * the sentence. The code keeps the `collapseSupplementary` name, which is what
+ * the fold itself is called everywhere below the UI (see `abilitySkills`).
+ *
  * `disabled` keeps the control on screen where it has nothing to do, for the
  * same reason `HostilityToggle` does: hiding it moved every control below it
  * each time the tab changed, and a live switch that silently does nothing is
@@ -32,12 +38,7 @@ export const CollapseSupplementaryToggle = ({
       withinPortal
       openDelay={200}
     >
-      <ToggleSwitch
-        checked={value}
-        disabled={disabled}
-        label={t("ui.logs.collapse-supplementary")}
-        onChange={onChange}
-      />
+      <ToggleSwitch checked={value} disabled={disabled} label={t("ui.logs.merge-supplementary")} onChange={onChange} />
     </Tooltip>
   );
 };

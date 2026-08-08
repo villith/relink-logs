@@ -23,6 +23,13 @@ export type ToggleSwitchProps = {
  * control that said "on" in hue alone is unreadable to exactly the eyes the
  * rest of these colour choices are made for.
  *
+ * The BORDER is not one of the things that says so, deliberately. An accent
+ * frame on the checked switch read as an outline — which is what a focus ring
+ * and a selected `PillGroup` pill are both drawn with — so a switch that was
+ * merely on looked either focused or selected, right beside a strip of pills
+ * where that same frame means something else. The fill, the track and the knob
+ * say it three times without borrowing another control's vocabulary.
+ *
  * A disabled switch keeps the native `disabled` attribute OFF — `aria-disabled`
  * and an `onClick` no-op instead: browsers drop pointer events, hover included,
  * on a truly disabled control, which would silence the very tooltip that
@@ -36,8 +43,8 @@ export const ToggleSwitch = ({ checked, onChange, label, disabled = false, title
     tabIndex={disabled ? -1 : 0}
     title={title}
     className={[
-      "inline-flex items-center gap-[7px] rounded border py-0.5 pl-[3px] pr-2 text-sm font-semibold",
-      checked ? "border-accent bg-accent-soft text-ink" : "border-line bg-panel text-ink-3",
+      "inline-flex items-center gap-[7px] rounded border border-line py-0.5 pl-[3px] pr-2 text-sm font-semibold",
+      checked ? "bg-accent-soft text-ink" : "bg-panel text-ink-3",
       disabled ? "cursor-default opacity-40" : "cursor-pointer hover:border-line-strong",
     ].join(" ")}
     // Guarded here as well as by `aria-disabled`, which is an announcement and

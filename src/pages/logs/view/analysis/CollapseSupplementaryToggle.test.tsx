@@ -14,6 +14,14 @@ const renderIt = (props: Partial<React.ComponentProps<typeof CollapseSupplementa
   );
 
 describe("CollapseSupplementaryToggle", () => {
+  /** The control sits in the chart's header row beside the smoothing window,
+   * where the space is a strip rather than a line of prose — so the label is
+   * the short form and the tooltip carries the sentence. */
+  it("labels itself in the chart header's short form", () => {
+    renderIt();
+    expect(screen.getByText("ui.logs.merge-supplementary")).toBeTruthy();
+  });
+
   it("reports the flipped value when clicked", () => {
     const onChange = vi.fn();
     renderIt({ onChange });

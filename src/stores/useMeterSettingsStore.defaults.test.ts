@@ -39,6 +39,7 @@ describe("meter settings defaults", () => {
     expect(state.bar_height).toBe(27);
     expect(state.bar_spacing).toBe(0);
     expect(state.header_segments.length).toBeGreaterThan(0);
+    expect(state.merge_supplementary).toBe(false);
   });
 
   /** The logs viewer's setting was renamed `logs_view_mode` -> `logs_view` to
