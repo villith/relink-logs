@@ -69,10 +69,6 @@ const causeResolverFor = (
 };
 
 export type StatusNaming = {
-  /** Every status window in the fight, filed under its row key. */
-  intervalsByPinKey: Map<string, StatusInterval[]>;
-  /** The characters whose skill tables may name a given row's cause. */
-  causeCandidates: Map<string, CharacterType[]>;
   /** The name an effect's row shows — and the one the Ability selector shows
    * for a pinned effect, which is why it is shared rather than spelled twice. */
   statusDisplayLabel: (key: string) => string;
@@ -132,5 +128,5 @@ export const useStatusNaming = ({
     [causeResolver, i18n.language]
   );
 
-  return { intervalsByPinKey, causeCandidates, statusDisplayLabel, classOfRow };
+  return { statusDisplayLabel, classOfRow };
 };

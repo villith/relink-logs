@@ -8,10 +8,9 @@ import { millisecondsToElapsedFormat } from "@/utils";
 import type { Hostility } from "../../metrics/types";
 import { clipToWindow, uptimeMs } from "../../statusUptime";
 import type { AuraChip } from "../AuraStrip";
-import { auraHolderIntervals, type AuraHolder } from "../auraWindows";
+import { auraHolderFor, auraHolderIntervals, heldBy } from "../auraWindows";
 import { WINDOW_LABEL_KEY } from "../chartWindowBands";
 import { intersectWireWindows, maskStatusIntervals, selectedChartWindows } from "../chartWindowFilter";
-import { universeOf } from "../machine/resolve";
 import { auraAnchorOf, auraPinKey, type AnalysisState } from "../machine/state";
 import { statusIdOfKey } from "../statusLabel";
 import { windowChips, type WindowChip } from "../windowChips";
@@ -131,8 +130,7 @@ export const useChartWindow = ({
     const anchor = auraAnchorOf(fetchAura);
     const index = anchor === "source" ? state.source : state.target;
     if (anchor === null || index === null) return undefined;
-    const holder: AuraHolder =
-      universeOf(anchor, hostility) === "player" ? { kind: "player", index } : { kind: "enemySpawn", segment: index };
+    const holder = auraHolderFor(anchor, hostility, index);
     return wireWindowsFrom(auraHolderIntervals(statusIntervals, auraPinKey(fetchAura), holder), statusWindow);
   }, [fetchAura, state.source, state.target, hostility, statusIntervals, statusWindow]);
 
@@ -197,11 +195,8 @@ export const useFilterChips = ({
       const dim = anchor === "src" ? ("source" as const) : ("target" as const);
       const index = anchor === "src" ? state.source : state.target;
       if (index === null) return [];
-      const holder: AuraHolder =
-        universeOf(dim, hostility) === "player" ? { kind: "player", index } : { kind: "enemySpawn", segment: index };
-      const held = windowedIntervals.filter((interval) =>
-        holder.kind === "player" ? interval.actorIndex === holder.index : interval.targetSegment === holder.segment
-      );
+      const holder = auraHolderFor(dim, hostility, index);
+      const held = windowedIntervals.filter((interval) => heldBy(interval, holder));
       // The same one-pass grouping the row labels use (see `groupByPinKey`),
       // over this holder's windowed subset rather than the whole fight.
       return [...groupByPinKey(held).entries()]

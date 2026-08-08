@@ -27,30 +27,6 @@ export const bandColorAt = (index: number): string => {
   return mantineColorVar(`${BAND_HUES[at % BAND_HUES.length]}.${BAND_SHADES[Math.floor(at / BAND_HUES.length)]}`);
 };
 
-/** The fields that narrow a request in TIME: the combined aura∩window mask, and
- * the committed scrub's two ends. Everything else — metric, hostility,
- * grouping, source, target, ability, cap — says WHAT is being measured rather
- * than when, and stays.
- *
- * Stripping exactly these is what turns a live request into its own reference:
- * "the same question, over the whole fight". */
-const TIME_FILTER_FIELDS = ["windows", "fromMs", "upToMs"] as const;
-
-/** The request with its time narrowing removed — the query whose ranking
- * decides the colours. */
-export const stripTimeFilters = <T extends object>(request: T): T => {
-  const rest = { ...request } as Record<string, unknown>;
-  for (const field of TIME_FILTER_FIELDS) delete rest[field];
-  return rest as T;
-};
-
-/** Whether a request narrows time at all. False means the live view IS its own
- * reference, and the bands on screen can be recorded rather than fetched. */
-export const hasTimeFilters = (request: unknown): boolean =>
-  typeof request === "object" &&
-  request !== null &&
-  TIME_FILTER_FIELDS.some((field) => (request as Record<string, unknown>)[field] !== undefined);
-
 /** Palette index per band key: its rank in the reference, or the next index
  * past the reference for a band the reference never produced.
  *

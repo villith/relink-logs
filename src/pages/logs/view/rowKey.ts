@@ -125,6 +125,11 @@ export const takenAttackRowLabel = (enemyType: EnemyType, actionId: ActionType):
 /** The row key for one enemy attack, off the label above. */
 export const takenRowKey = (label: string): string => `${TAKEN_PREFIX}${label}`;
 
+/** The label inside an attack row key, or null when the key is not one — the
+ * reader for `takenRowKey`, so the two halves of the prefix have one author. */
+export const takenRowLabel = (key: string): string | null =>
+  key.startsWith(TAKEN_PREFIX) ? key.slice(TAKEN_PREFIX.length) : null;
+
 /** The reading half of `takenAttackRowLabel`. Tolerant for the same reason
  * `parseEnemyRow` is. */
 export const takenAttackRowParts = (label: string): { enemyType: EnemyType; actionId: ActionType } | null => {

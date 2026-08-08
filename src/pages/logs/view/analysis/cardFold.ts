@@ -7,6 +7,11 @@ import { playerRowKey } from "../rowKey";
 
 import type { CardLabels } from "./cardLabels";
 
+/** The card's "other side" heading colour — the damage card's target section
+ * and the enemy tabs' by-target section. One literal, because a section about
+ * the OPPOSING side must read the same colour whichever card it is on. */
+export const TARGET_COLOR = "var(--mantine-color-red-6)";
+
 /** Section entries rank by size, largest first — a hover card is read top-down
  * and the biggest contributor is the answer most people came for. */
 export const sortedEntries = <T extends { value: number }>(entries: T[]): T[] =>

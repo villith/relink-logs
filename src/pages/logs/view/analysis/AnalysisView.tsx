@@ -12,16 +12,10 @@ import { formatInPartyOrder, millisecondsToElapsedFormat } from "@/utils";
 
 import { DPS_BUCKET_MS } from "../DetailCharts";
 import { EventsTab } from "../events/EventsTab";
+import type { ActorSpace } from "../events/eventRows";
 import { spawnSegmentAt } from "../events/eventTargets";
-import { buffs } from "../metrics/buffs";
-import { damageDone } from "../metrics/damageDone";
-import { damageTaken } from "../metrics/damageTaken";
-import { debuffs } from "../metrics/debuffs";
-import { sba } from "../metrics/sba";
-import { stun } from "../metrics/stun";
-import type { Hostility, MetricDescriptor } from "../metrics/types";
+import type { Hostility } from "../metrics/types";
 import { type SelectorPins } from "../selectorOptions";
-import { isStatusPin } from "../statusUptime";
 import { TimelineTab } from "../timeline/TimelineTab";
 
 import { ActorBar } from "./ActorBar";
@@ -58,25 +52,12 @@ import { useChartModel } from "./model/useChartModel";
 import { useEncounterData } from "./model/useEncounterData";
 import { useEntityCells } from "./model/useEntityCells";
 import { useChartWindow, useFilterChips } from "./model/useFilterWindows";
-import { useRowModel } from "./model/useRowModel";
+import { METRICS, useRowModel } from "./model/useRowModel";
 import { useSelectorModel } from "./model/useSelectorModel";
 import { useStatusNaming } from "./model/useStatusNaming";
 import { useUrlQueryString } from "./useUrlQueryString";
 
-/** The metric switcher's contents, in display order. Adding a metric that only
- * has a friendly side is adding a descriptor here — the frame itself does not
- * change.
- *
- * An ENEMY side still costs more than the descriptor: which hover card
- * decomposes its rows (`rowSections`), which series its bands come from
- * (`hostilitySeriesFor`), what the plot is titled and what an empty table says
- * all branch on `metricKey` rather than reading the descriptor. Folding those
- * four onto `MetricDescriptor` is a deliberate follow-up — worth doing when a
- * third hostility-capable damage tab exists to generalise against, not
- * speculatively against two. */
-const METRICS: Record<string, MetricDescriptor> = { damage: damageDone, taken: damageTaken, stun, sba, buffs, debuffs };
-
-/** The switcher's contents, derived from METRICS — each descriptor already
+/** The switcher's contents, derived from `METRICS` — each descriptor already
  * carries the label the tab shows, and two lists that must agree is one list
  * too many. Insertion order above is the display order. */
 const METRIC_TABS: MetricTab[] = Object.entries(METRICS).map(([value, descriptor]) => ({
@@ -370,6 +351,14 @@ export const AnalysisView = () => {
     cells,
     classOfRowKey,
   });
+
+  // Bound once against the spawn table rather than inline in the timeline's
+  // props: it is in that body's lane memo's dependencies, and a fresh arrow
+  // each render re-folds the whole event stream on every unrelated change.
+  const segmentAt = useCallback(
+    (index: number, atMs: number, space: ActorSpace) => spawnSegmentAt(targetEntries, index, atMs, space),
+    [targetEntries]
+  );
 
   // A row click pins its dimension through the machine's transition, so the
   // `by` override drops and the derived default advances — WCL's behavior.
@@ -684,14 +673,13 @@ export const AnalysisView = () => {
           everySkill={everySkill}
           keying={rowKeying}
           window={statusWindow}
-          segmentAt={(index, atMs, space) => spawnSegmentAt(targetEntries, index, atMs, space)}
+          segmentAt={segmentAt}
           enemyTypeAt={enemyTypeAt}
-          // A mark's parts are keyed by whatever the event named — an action
-          // for a hit, a `status:` key for an effect — so it dispatches on the
-          // same `status:` prefix `abilityOptionIconUrl` already uses. A single
-          // resolver would name an effect through the ability join and print
-          // whatever that join's fallback picked.
-          markEntry={(key) => (isStatusPin(key) ? eventLabels.status(key) : eventLabels.ability(key))}
+          // The stream's own ability resolver, which already dispatches an
+          // effect key away from the ability join (see `abilityOptionCell`) —
+          // re-testing the prefix here would be the same split spelled twice,
+          // with two branches that resolve to one function.
+          markEntry={eventLabels.ability}
         />
       ) : (
         <Box style={{ padding: "4px 16px 14px" }}>

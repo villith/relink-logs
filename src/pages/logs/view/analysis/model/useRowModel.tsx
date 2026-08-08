@@ -23,6 +23,7 @@ import { debuffs } from "../../metrics/debuffs";
 import { sba } from "../../metrics/sba";
 import { stun } from "../../metrics/stun";
 import type { Hostility, MetricDescriptor, MetricRow, RowLevel } from "../../metrics/types";
+import { playerRowIndex } from "../../rowKey";
 import type { SelectorPins } from "../../selectorOptions";
 import { isStatusPin } from "../../statusUptime";
 import { abilityOwnerFor } from "../abilityLabel";
@@ -42,7 +43,15 @@ import type { EntityCells } from "./useEntityCells";
 
 /** The metric switcher's contents, in display order. Adding a metric that only
  * has a friendly side is adding a descriptor here — the frame itself does not
- * change. */
+ * change, and `METRIC_TABS` in the view derives its tabs from this one list.
+ *
+ * An ENEMY side still costs more than the descriptor: which hover card
+ * decomposes its rows (`rowSections`), which series its bands come from
+ * (`hostilitySeriesFor`), what the plot is titled and what an empty table says
+ * all branch on `metricKey` rather than reading the descriptor. Folding those
+ * four onto `MetricDescriptor` is a deliberate follow-up — worth doing when a
+ * third hostility-capable damage tab exists to generalise against, not
+ * speculatively against two. */
 export const METRICS: Record<string, MetricDescriptor> = {
   damage: damageDone,
   taken: damageTaken,
@@ -311,7 +320,7 @@ export const useRowModel = ({
       }
       // Re-resolve through the identity party: a scoped fetch renumbers slots,
       // so the descriptor's colorSlot can point at the wrong player.
-      const key = row.key.startsWith("player:") ? Number(row.key.slice("player:".length)) : pins.source;
+      const key = playerRowIndex(row.key) ?? pins.source;
       return playerColor(key ?? -1, row.colorSlot);
     },
     [playerColor, pins.source, rowColors, colorContext]

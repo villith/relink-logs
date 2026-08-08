@@ -354,11 +354,10 @@ export const useEncounterData = ({
   // cascade re-narrows with the window — and carries the group query for the
   // groups-path table.
   useEffect(() => {
-    const { pinned, isWindowed, hasMask, wantsBands } = earlyOutRef.current;
     // A regroup with nothing pinned still needs ITS grouping's aggregates —
     // unless the base load already fetched this exact query.
     const needsGroups = wireQueryKey !== null && wireQueryKey !== baseQueryKeyRef.current;
-    if (!pinned && !isWindowed && !needsGroups && !hasMask && !wantsBands) {
+    if (!needsScopedFetch({ ...earlyOutRef.current, needsGroups })) {
       setScoped(null);
       return;
     }

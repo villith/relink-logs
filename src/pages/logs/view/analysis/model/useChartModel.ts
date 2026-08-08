@@ -26,7 +26,7 @@ import { auraExcludedBands } from "../auraWindows";
 import { bandColorAt, paletteOrderOf, referenceBandOrder } from "../bandPalette";
 import { chartPlayerIndexes } from "../chartIndexes";
 import { SBA_MARKER_COLOR, extractMarkers, type ChartMarker, type MarkerKind } from "../chartMarkers";
-import { chartPresentation, overlayOf } from "../chartPresentation";
+import { chartPresentation } from "../chartPresentation";
 import { ROLLUP_SERIES_KEY } from "../chartRollup";
 import { TOTAL_SERIES_KEY, buildSeriesPoints, withTotalSeries } from "../chartSeries";
 import { WINDOW_BAND_COLOR, windowBandsFor } from "../chartWindowBands";
@@ -50,10 +50,6 @@ const MARKER_LINE_KEY: Record<MarkerKind, string> = {
   death: "ui.logs.chart-marker-death-line",
   sba: "ui.logs.chart-marker-sba-line",
 };
-
-/** Re-exported from `chartPresentation`, which owns the precedence — the
- * hook and the fold must not each carry their own copy of the chain. */
-export { overlayOf };
 
 /** A `Label`'s optional `icon` field, present only where there is art. The
  * type is `icon?: string` under `exactOptionalPropertyTypes`, so writing

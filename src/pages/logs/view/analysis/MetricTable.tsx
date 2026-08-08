@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { MetricRow } from "../metrics/types";
+import { sectionHeadings } from "../sectionRuns";
 import type { SelectorPins } from "../selectorOptions";
 
 import { AnalysisRow } from "./AnalysisRow";
@@ -101,6 +102,12 @@ export const MetricTable = ({
     () => (rowSections ? new Map(rows.map((row) => [row.key, rowSections(row)])) : null),
     [rows, rowSections]
   );
+
+  // Resolved once per row, not once per comparison: `sectionLabel` walks the
+  // cause ladder, and asking it for each row AND for its predecessor doubled
+  // that walk on every render. The timeline draws the same headings from the
+  // same helper (see `sectionRuns`).
+  const headings = useMemo(() => sectionHeadings(rows, sectionLabel), [rows, sectionLabel]);
 
   // Resolved once per row set, same as `sectionsByRow`: the accessor scans the
   // whole party's breakdown per row, and its answer only changes when the rows
@@ -300,14 +307,11 @@ export const MetricTable = ({
         // A subheader is drawn only where the section CHANGES, so a run of
         // rows sharing one is titled once. Purely visual: not a row, takes no
         // interaction, and absent the prop nothing is drawn at all.
-        const section = sectionLabel?.(row) ?? null;
-        const previousSection = rowIndex === 0 ? null : sectionLabel?.(rows[rowIndex - 1]) ?? null;
+        const heading = headings[rowIndex];
 
         return (
           <Fragment key={row.key}>
-            {section !== null && section !== previousSection && (
-              <Text className="analysis-label analysis-section-head">{section}</Text>
-            )}
+            {heading !== null && <Text className="analysis-label analysis-section-head">{heading}</Text>}
             {parent}
             {expanded.has(row.key) &&
               childRows.map((child) => <Fragment key={child.key}>{rowElement(child, true)}</Fragment>)}

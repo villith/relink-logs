@@ -77,10 +77,6 @@ export type MetricCapabilities = {
    * is: a control that came and went with the tab would shift everything under
    * it. */
   recordsSupplementary: boolean;
-  /** Which polarity of status the interval tables select — Buffs the helpful
-   * ones, Debuffs the harmful. Fixed per tab, and meaningless off the interval
-   * path, where it is false. */
-  harmfulStatuses: boolean;
 };
 
 /** The three rate metrics share one shape: their own series, smoothed like DPS
@@ -136,7 +132,6 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // same fight draws the same line in both.
     chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
     recordsSupplementary: true,
-    harmfulStatuses: false,
   },
 
   taken: {
@@ -160,7 +155,6 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // Incoming damage per second, off the same buckets as DPS.
     chart: RATE_CHART("ui.logs.chart-taken-label", "taken"),
     recordsSupplementary: false,
-    harmfulStatuses: false,
   },
 
   stun: {
@@ -178,7 +172,6 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     chartFromGroups: false,
     chart: RATE_CHART("ui.logs.chart-stun-label", "stun"),
     recordsSupplementary: false,
-    harmfulStatuses: false,
   },
 
   sba: {
@@ -205,7 +198,6 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // IS the reading. Stored in tenths of a percent.
     chart: { labelKey: "ui.logs.chart-sba-label", series: "sba", smoothing: "none", scale: 0.1, format: "percent" },
     recordsSupplementary: false,
-    harmfulStatuses: false,
   },
 
   buffs: {
@@ -228,7 +220,6 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // PINNED effect overlays it, with that effect's per-holder stack depths.
     chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
     recordsSupplementary: false,
-    harmfulStatuses: false,
   },
 
   debuffs: {
@@ -248,7 +239,5 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // effect is pinned.
     chart: RATE_CHART("ui.logs.chart-dps-label", "dps"),
     recordsSupplementary: false,
-    // The one metric that selects the harmful side of the polarity split.
-    harmfulStatuses: true,
   },
 };

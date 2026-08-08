@@ -40,6 +40,48 @@ export const damageColumns = (damage: number, hits: number, min: string, max: st
   share(damage, total),
 ];
 
+/** Everything a damage BAR reads off one set of breakdown rows: its length,
+ * its supplementary split, and the numeric columns beside it.
+ *
+ * The ability rows and their per-player children are the same bar drawn at two
+ * grains — same sum, same split rule, same columns — and only the key, label
+ * and pin differ. Written once so the echo split (which decides whether a bar
+ * mounts one segment or two) cannot be changed for the parent and missed for
+ * the children, which is the exact way a row and its expansion come to disagree
+ * about their own total.
+ *
+ * `subValue` is ABSENT rather than 0 where there is no split, so a row with no
+ * echoes mounts a single segment. Min and max stay over the DIRECT rows only:
+ * they are per-hit extremes of the named skill, and an echo is a different
+ * damage source — folding it in would make a skill's smallest hit read as an
+ * echo tick. */
+const damageCells = (skills: SkillState[], total: number): { value: number; subValue?: number; columns: string[] } => {
+  const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
+  const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
+  // Only a MIXED set has a split to report — `splitSupplementary` owns both
+  // that rule and the direct/echo partition, so every bar in the view splits
+  // the same way.
+  const { direct, echoes, mixed } = splitSupplementary(skills);
+  const supplementary = mixed ? echoes.reduce((sum, skill) => sum + skill.totalDamage, 0) : 0;
+  return {
+    value: damage,
+    ...(supplementary > 0 ? { subValue: supplementary } : {}),
+    columns: damageColumns(
+      damage,
+      hits,
+      extreme(
+        direct.map((skill) => skill.minDamage),
+        (values) => Math.min(...values)
+      ),
+      extreme(
+        direct.map((skill) => skill.maxDamage),
+        (values) => Math.max(...values)
+      ),
+      total
+    ),
+  };
+};
+
 /** The numeric columns a players-level row fills, in header order: amount, its
  * per-second rate, and its share of that level's own total. Written once
  * because BOTH metrics' `columnKeys("players")` promise this same shape and
@@ -58,10 +100,8 @@ export const playersColumns = (amount: number, total: number, fightDurationMs?: 
 /** Rows for a set of ability (or member-skill) groups.
  *
  * With the collapse on, a group holds its cause's breakdown rows AND the echo
- * rows attributed to it, so damage and hits sum without a special case. Min and
- * max stay over the DIRECT rows only: they are per-hit extremes of the named
- * skill, and an echo is a different damage source — folding it in would make a
- * skill's smallest hit read as an echo tick.
+ * rows attributed to it, so damage and hits sum without a special case — see
+ * `damageCells`, which the per-player children below share.
  *
  * Exported for its own tests; the descriptor below is its only other caller. */
 export const abilityRows = (
@@ -71,37 +111,13 @@ export const abilityRows = (
   pinnable: boolean
 ): MetricRow[] =>
   groups
-    .map(({ key, skills }) => {
-      const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
-      const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
-      // Only a MIXED group has a split to report, and only the DIRECT rows
-      // describe the skill's own per-hit extremes — `splitSupplementary` owns
-      // both rules, so every bar in the view splits the same way.
-      const { direct, echoes, mixed } = splitSupplementary(skills);
-      const supplementary = mixed ? echoes.reduce((sum, skill) => sum + skill.totalDamage, 0) : 0;
-      return {
-        key: skillKey(key),
-        label: key,
-        value: damage,
-        // Absent rather than 0, so a row with no echoes mounts one segment.
-        ...(supplementary > 0 ? { subValue: supplementary } : {}),
-        columns: damageColumns(
-          damage,
-          hits,
-          extreme(
-            direct.map((skill) => skill.minDamage),
-            (values) => Math.min(...values)
-          ),
-          extreme(
-            direct.map((skill) => skill.maxDamage),
-            (values) => Math.max(...values)
-          ),
-          total
-        ),
-        pinOnClick: pinnable ? { ability: key } : null,
-        colorSlot,
-      };
-    })
+    .map(({ key, skills }) => ({
+      key: skillKey(key),
+      label: key,
+      ...damageCells(skills, total),
+      pinOnClick: pinnable ? { ability: key } : null,
+      colorSlot,
+    }))
     .sort((a, b) => b.value - a.value);
 
 /** What the pinned ability dealt to each enemy TYPE — the opposite direction
@@ -310,40 +326,21 @@ export const damageDone: MetricDescriptor = {
     return players
       .map((player) => ({ player, skills: skillsForAbilityKey(player.skillBreakdown, key, keying) }))
       .filter(({ skills }) => skills.length > 0)
-      .map(({ player, skills }): MetricRow => {
-        const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
-        const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
-        // A child is a table bar too, so it splits by the same rule its parent
-        // does — over THIS player's echoes, which is what makes the section a
-        // split of the row rather than a restatement of it.
-        const { direct, echoes, mixed } = splitSupplementary(skills);
-        const supplementary = mixed ? echoes.reduce((sum, skill) => sum + skill.totalDamage, 0) : 0;
-        return {
+      .map(
+        ({ player, skills }): MetricRow => ({
           key: playerRowKey(player.index),
           label: String(player.index),
           kind: "player",
-          value: damage,
-          // Absent rather than 0, so a child with no echoes mounts one segment.
-          ...(supplementary > 0 ? { subValue: supplementary } : {}),
-          columns: damageColumns(
-            damage,
-            hits,
-            extreme(
-              direct.map((skill) => skill.minDamage),
-              (values) => Math.min(...values)
-            ),
-            extreme(
-              direct.map((skill) => skill.maxDamage),
-              (values) => Math.max(...values)
-            ),
-            total
-          ),
+          // A child is a table bar too, so it reads the same cells its parent
+          // does — over THIS player's skills, which is what makes the section a
+          // split of the row rather than a restatement of it.
+          ...damageCells(skills, total),
           // Clicking a player child pins that player — the machine keeps the
           // ability free, so the next state is that player's drill.
           pinOnClick: { source: player.index },
           colorSlot: player.partyIndex,
-        };
-      })
+        })
+      )
       .sort((a, b) => b.value - a.value);
   },
 };

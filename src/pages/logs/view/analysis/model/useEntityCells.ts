@@ -72,8 +72,19 @@ export const useEntityCells = ({
 
   const pinnedPlayer = playerByIndex.get(sourcePin ?? -1)?.player;
 
-  const resolvers: EntityResolvers = useMemo(
-    () => ({
+  const resolvers: EntityResolvers = useMemo(() => {
+    // The ability join is the only expensive one: naming and illustrating a
+    // key each walk the WHOLE roster's breakdowns, recomputing a row key per
+    // entry. Every surface asks for the same handful of keys — the table's
+    // rows, the chart's bands (twice, name then art), the selector's options,
+    // every timeline mark — so without this the same scan runs hundreds of
+    // times per render. Cached here rather than at each caller because it is
+    // the resolver, not the surface, that knows the answer cannot change: the
+    // map lives inside this memo and dies with it, so anything that could move
+    // a name or an icon has already thrown it away.
+    const abilityCells = new Map<string, EntityCell>();
+
+    return {
       player: (index) => ({
         name: labelForSource(index),
         iconUrl: sourceIconUrl(index),
@@ -102,10 +113,17 @@ export const useEntityCells = ({
       }),
       // An ability belongs to whoever used it, so it takes no colour of its
       // own — the row it sits on already carries that player's.
-      ability: (rowKey, owner) => ({
-        name: owner ? abilityLabelFor(rowKey, identityPlayers, getSkillName, owner) : labelForAbility(rowKey),
-        iconUrl: abilityRowIconUrl(rowKey, identityPlayers, owner ?? pinnedPlayer),
-      }),
+      ability: (rowKey, owner) => {
+        const cacheKey = `${owner?.index ?? ""}|${rowKey}`;
+        const cached = abilityCells.get(cacheKey);
+        if (cached !== undefined) return cached;
+        const cell = {
+          name: owner ? abilityLabelFor(rowKey, identityPlayers, getSkillName, owner) : labelForAbility(rowKey),
+          iconUrl: abilityRowIconUrl(rowKey, identityPlayers, owner ?? pinnedPlayer),
+        };
+        abilityCells.set(cacheKey, cell);
+        return cell;
+      },
       status: (statusKey) => {
         const statusId = statusIdOfKey(statusKey);
         return {
@@ -122,23 +140,22 @@ export const useEntityCells = ({
         const cause = sbaCauseLabel(ref.key);
         return { name: cause === null ? ref.key : t(cause.labelKey, cause.labelParams) };
       },
-    }),
+    };
     // i18n.language: every branch produces a translated name.
-    [
-      t,
-      i18n.language,
-      labelForSource,
-      labelForTarget,
-      labelForAbility,
-      labelForTakenAttack,
-      statusDisplayLabel,
-      sourceIconUrl,
-      targetIconUrl,
-      colorContext,
-      identityPlayers,
-      pinnedPlayer,
-    ]
-  );
+  }, [
+    t,
+    i18n.language,
+    labelForSource,
+    labelForTarget,
+    labelForAbility,
+    labelForTakenAttack,
+    statusDisplayLabel,
+    sourceIconUrl,
+    targetIconUrl,
+    colorContext,
+    identityPlayers,
+    pinnedPlayer,
+  ]);
 
   const cellOf = useCallback(
     (key: string, owner?: ComputedPlayerState) => cellOfKey(key, resolvers, owner),

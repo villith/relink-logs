@@ -14,16 +14,16 @@ import type {
   TargetEntry,
 } from "@/types";
 import {
-  getSkillName,
   PLAYER_COLORS,
+  getSkillName,
   resolvePlayerColor,
   targetLabelKey,
   translateCharacterType,
-  translatedPlayerName,
   translateEnemyType,
+  translatedPlayerName,
 } from "@/utils";
 
-import { actorColor, type ActorColorContext } from "../../actorColor";
+import { type ActorColorContext } from "../../actorColor";
 import { takenAttackNameKey } from "../../metrics/damageTaken";
 import { buildTargetLabels } from "../../targetLabels";
 import { abilityLabelFor } from "../abilityLabel";
@@ -315,7 +315,3 @@ export const useActorIdentity = ({
     enemyTypeAt,
   };
 };
-
-/** Re-exported so callers that already hold a colour context need not import
- * from two places. */
-export { actorColor };

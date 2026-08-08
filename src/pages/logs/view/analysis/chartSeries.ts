@@ -1,3 +1,5 @@
+import { TOTAL_KEY } from "../rowKey";
+
 /** Turns a metric's bucketed per-player series into chart datapoints.
  *
  * Extracted from the view because the three metrics differ in more than their
@@ -76,9 +78,9 @@ export const buildSeriesPoints = ({
   return points;
 };
 
-/** The Total series' key. A reserved word rather than a player index or a
- * row-key grammar, so it can never collide with a real series. */
-export const TOTAL_SERIES_KEY = "total";
+/** The Total series' key: the row-key grammar's reserved word for the total,
+ * so the series and the ref `rowRefOf` resolves are one identity. */
+export const TOTAL_SERIES_KEY = TOTAL_KEY;
 
 /** Adds a Total value to every point: the sum of ALL listed series, whatever
  * the legend later hides — Warcraft Logs' Total likewise ignores legend state.

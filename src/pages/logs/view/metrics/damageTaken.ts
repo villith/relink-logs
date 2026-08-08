@@ -9,6 +9,7 @@ import {
   takenAttackRowLabel,
   takenAttackRowParts,
   takenRowKey,
+  takenRowLabel,
 } from "../rowKey";
 import { playersColumns } from "./damageDone";
 import type { MetricDescriptor, MetricRow, RowLevel } from "./types";
@@ -224,13 +225,13 @@ export const damageTaken: MetricDescriptor = {
         .sort((a, b) => b.value - a.value);
     }
 
-    if (!row.key.startsWith("taken:")) return null;
-    const label = row.key.slice("taken:".length);
+    const label = takenRowLabel(row.key);
+    if (label === null) return null;
     return players
       .map((player) => ({
         player,
         entries: (player.damageTakenBreakdown ?? []).filter(
-          (entry) => JSON.stringify({ enemyType: entry.enemyType, actionId: entry.actionId }) === label
+          (entry) => takenAttackRowLabel(entry.enemyType, entry.actionId) === label
         ),
       }))
       .filter(({ entries }) => entries.length > 0)

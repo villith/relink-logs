@@ -5,7 +5,7 @@ import type { MetricRow } from "../metrics/types";
 import { parseEnemyRow, rowRefOf } from "../rowKey";
 
 import type { CardSection } from "./HoverCard";
-import { foldPartyDealt, sortedEntries } from "./cardFold";
+import { TARGET_COLOR, foldPartyDealt, sortedEntries } from "./cardFold";
 import type { CardLabels } from "./cardLabels";
 
 /** What the enemy-side cards need. Deliberately the UNION of what BOTH of them
@@ -16,11 +16,6 @@ export type HostilityCardLabels = Pick<
   CardLabels,
   "attack" | "ability" | "source" | "sourceColor" | "sourceIcon" | "abilityIcon"
 >;
-
-/** Players painted as the card's "other side": the same red the damage card's
- * target section uses, so a section about the OPPOSING side is the same colour
- * whichever tab it is on. */
-const TARGET_COLOR = "var(--mantine-color-red-6)";
 
 /** The enemy type an enemy-keyed row names, or null for anything that is not
  * one — read through the row-key grammar's one author (`rowKey.ts`), so this

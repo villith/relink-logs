@@ -4,14 +4,7 @@ import type { GroupReference } from "@/types";
 
 import { HP_SERIES_COLORS, mantineColorVar } from "../DetailCharts";
 
-import {
-  BAND_COLOR_COUNT,
-  bandColorAt,
-  hasTimeFilters,
-  paletteOrderOf,
-  referenceBandOrder,
-  stripTimeFilters,
-} from "./bandPalette";
+import { BAND_COLOR_COUNT, bandColorAt, paletteOrderOf, referenceBandOrder } from "./bandPalette";
 
 describe("bandColorAt", () => {
   it("reproduces the existing palette for the first lap, so no chart changes colour", () => {
@@ -28,38 +21,6 @@ describe("bandColorAt", () => {
 
   it("is wide enough that a busy fight's ranks stay distinct", () => {
     expect(BAND_COLOR_COUNT).toBeGreaterThanOrEqual(36);
-  });
-});
-
-describe("stripTimeFilters", () => {
-  it("drops the three time fields and keeps everything else", () => {
-    expect(
-      stripTimeFilters({ metric: "damage", source: 7, windows: [{ fromMs: 1, upToMs: 2 }], fromMs: 1, upToMs: 9 })
-    ).toEqual({ metric: "damage", source: 7 });
-  });
-
-  it("leaves a request that narrows no time untouched", () => {
-    const request = { metric: "damage", source: 7, target: null };
-    expect(stripTimeFilters(request)).toEqual(request);
-  });
-});
-
-describe("hasTimeFilters", () => {
-  it("is false for a request that narrows no time", () => {
-    expect(hasTimeFilters({ metric: "damage", source: 7 })).toBe(false);
-  });
-
-  it("is true for any one of the three on its own", () => {
-    // An EMPTY windows array is a real mask, not an absent one — the same
-    // convention the aggregator follows.
-    expect(hasTimeFilters({ windows: [] })).toBe(true);
-    expect(hasTimeFilters({ fromMs: 0 })).toBe(true);
-    expect(hasTimeFilters({ upToMs: 10 })).toBe(true);
-  });
-
-  it("is false for no request at all", () => {
-    expect(hasTimeFilters(undefined)).toBe(false);
-    expect(hasTimeFilters(null)).toBe(false);
   });
 });
 

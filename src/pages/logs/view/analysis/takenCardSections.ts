@@ -1,7 +1,7 @@
 import type { ComputedPlayerState } from "@/types";
 
 import type { MetricRow } from "../metrics/types";
-import { playerRowKey, takenAttackRowParts } from "../rowKey";
+import { playerRowIndex, takenAttackRowLabel, takenAttackRowParts, takenRowLabel } from "../rowKey";
 
 import type { CardLabels } from "./cardLabels";
 import type { CardSection } from "./HoverCard";
@@ -30,8 +30,9 @@ export const takenCardSectionsFor = ({
   color: string;
   labels: TakenSectionLabels;
 }): CardSection[] | null => {
-  if (!row.key.startsWith("player:")) return null;
-  const player = players.find((candidate) => playerRowKey(candidate.index) === row.key);
+  const index = playerRowIndex(row.key);
+  if (index === null) return null;
+  const player = players.find((candidate) => candidate.index === index);
   const breakdown = player?.damageTakenBreakdown ?? [];
   if (breakdown.length === 0) return null;
 
@@ -40,7 +41,7 @@ export const takenCardSectionsFor = ({
   for (const entry of breakdown) {
     // JSON keys, not String(): both halves are tagged unions and String()
     // would merge every one of them into "[object Object]".
-    const attackKey = JSON.stringify({ enemyType: entry.enemyType, actionId: entry.actionId });
+    const attackKey = takenAttackRowLabel(entry.enemyType, entry.actionId);
     const enemyKey = JSON.stringify(entry.enemyType);
     const attack = byAttack.get(attackKey);
     if (attack) attack.value += entry.totalDamage;
@@ -112,7 +113,7 @@ export const takenAbilityCardSectionsFor = ({
   color: string;
   labels: TakenVictimLabels;
 }): CardSection[] | null => {
-  if (!row.key.startsWith("taken:")) return null;
+  if (takenRowLabel(row.key) === null) return null;
   // The label IS the JSON `takenAttackRowParts` reads — the grammar has one
   // author (`attackRows` / `groupRowsFor`'s enemyAttack case).
   const parts = takenAttackRowParts(row.label);

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { DrillSeries } from "../statusChart";
 
-import { overlayOf } from "./useChartModel";
+import { overlayOf } from "../chartPresentation";
 
 const series = (key: string): DrillSeries[] => [{ key, label: key, values: [1] }];
 

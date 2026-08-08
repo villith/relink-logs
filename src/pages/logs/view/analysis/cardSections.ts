@@ -1,6 +1,6 @@
 import type { CharacterType, ComputedPlayerState, SkillState, SkillTargetState, TargetEntry } from "@/types";
 
-import { abilityKey } from "../abilityKey";
+import { abilityKey, skillKeyPayload } from "../abilityKey";
 import {
   childOfPin,
   groupSkillsForRows,
@@ -13,7 +13,7 @@ import { playerRowKey, spawnRowKey, spawnRowSegment } from "../rowKey";
 import type { SelectorPins } from "../selectorOptions";
 
 import type { CardSection } from "./HoverCard";
-import { foldPartyDealt, sortedEntries } from "./cardFold";
+import { TARGET_COLOR, foldPartyDealt, sortedEntries } from "./cardFold";
 import type { CardLabels } from "./cardLabels";
 import { qualifyDuplicateLabels } from "./labelCollision";
 
@@ -170,8 +170,6 @@ export const aggregateSources = (
     .filter((entry) => entry.value > 0)
     .sort((a, b) => b.value - a.value);
 
-const TARGET_COLOR = "var(--mantine-color-red-6)";
-
 /** The hover card's sections for one row, or null when the row has nothing to
  * decompose.
  *
@@ -249,7 +247,7 @@ export const cardSectionsFor = ({
     const owner = players.find((candidate) => candidate.index === pins.source);
     if (pins.source !== null && !owner) return null;
     const scoped = owner ? [owner] : players;
-    const rowKey = row.key.replace(/^skill:/, "");
+    const rowKey = skillKeyPayload(row.key) ?? row.key;
     const skillsOf = (player: ComputedPlayerState) => skillsForAbilityKey(player.skillBreakdown, rowKey, keying);
     // EVERY skill under the ability, not the first: the row above sums them, so
     // explaining it with one contributor describes a fraction of what it says.
@@ -279,7 +277,7 @@ export const cardSectionsFor = ({
     //
     // A row the descriptor decomposed some other way (an enemy row, whose key
     // names a type rather than an action) matches no skill and falls out here.
-    const actionKey = row.key.replace(/^skill:/, "");
+    const actionKey = skillKeyPayload(row.key) ?? row.key;
     const skills = players.flatMap((player) =>
       player.skillBreakdown.filter((skill) => abilityKey(skill.actionType) === actionKey)
     );

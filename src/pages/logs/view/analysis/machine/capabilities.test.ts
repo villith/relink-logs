@@ -173,9 +173,4 @@ describe("metric flags", () => {
       expect(CAPABILITIES[key].recordsSupplementary, key).toBe(false);
     }
   });
-
-  it("selects harmful statuses on Debuffs alone", () => {
-    expect(CAPABILITIES.debuffs.harmfulStatuses).toBe(true);
-    expect(CAPABILITIES.buffs.harmfulStatuses).toBe(false);
-  });
 });

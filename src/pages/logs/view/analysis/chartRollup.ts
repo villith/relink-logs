@@ -1,9 +1,10 @@
 import type { ChartDatapoint } from "../DetailCharts";
+import { ROLLUP_KEY } from "../rowKey";
 
-/** The rollup band's series key. A reserved word like `TOTAL_SERIES_KEY`,
- * matching the key the band labellers already name (`bandLabelFor("other")`),
- * so it can never collide with a real band. */
-export const ROLLUP_SERIES_KEY = "other";
+/** The rollup band's series key: the row-key grammar's reserved word for the
+ * same band, so the series a point carries and the ref `rowRefOf` resolves are
+ * one identity rather than two literals that happen to match. */
+export const ROLLUP_SERIES_KEY = ROLLUP_KEY;
 
 /** Whether the rollup band is drawn at all: only while something is inside it. */
 export const rollupIsDrawn = (tailKeys: string[], hidden: Set<string>): boolean =>

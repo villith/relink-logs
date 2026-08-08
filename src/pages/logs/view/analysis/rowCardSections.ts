@@ -2,6 +2,7 @@ import type { ComputedPlayerState, TargetEntry } from "@/types";
 
 import type { RowKeying } from "../abilitySkills";
 import type { MetricCard, MetricRow, RowLevel } from "../metrics/types";
+import { spawnRowSegment } from "../rowKey";
 import type { SelectorPins } from "../selectorOptions";
 
 import type { CardSection } from "./HoverCard";
@@ -65,7 +66,7 @@ export const rowCardSectionsFor = ({
       // (`target:<segment>`), which the spawn builder decomposes — who dealt
       // to the spawn, with what. Type-keyed `enemy:` rows (the legacy
       // grammar) keep the type-level builder.
-      if (row.key.startsWith("target:")) {
+      if (spawnRowSegment(row.key) !== null) {
         return targetCardSectionsFor({ row, players, targetEntries, color, labels, keying });
       }
       return enemyReceivedCardSectionsFor({ row, players, color, labels, keying });
@@ -79,7 +80,7 @@ export const rowCardSectionsFor = ({
     case "skill":
       // A target-grouped row is a spawn, decomposed by its own builder; every
       // other skill-walk row goes through the level-based sections.
-      if (row.key.startsWith("target:")) {
+      if (spawnRowSegment(row.key) !== null) {
         return targetCardSectionsFor({ row, players, targetEntries, color, labels, keying });
       }
       return card ? cardSectionsFor({ row, level, players, pins, color, labels, card, keying }) : null;
