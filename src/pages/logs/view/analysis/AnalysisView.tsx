@@ -605,8 +605,6 @@ export const AnalysisView = () => {
         format={format}
         stacked={stacked}
         onScope={handleScope}
-        fromLabel={range === null ? bucketLabel(0) : bucketLabel(range[0])}
-        toLabel={range === null ? fullLabel : bucketLabel(range[1])}
         markers={chartMarkers}
         bands={maskBands}
         windowBands={stateWindowBands}

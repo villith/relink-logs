@@ -257,7 +257,10 @@
       "sent-nothing": "The hook accepted the batch but nothing was listening — this should not happen.",
       "analysis-query": "Query",
       "analysis-query-empty": "(none)",
-      "analysis-chart": "Chart"
+      "analysis-chart": "Chart",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copy-line": "Copy the {{line}} line"
     },
     "legality": {
       "title": "Cheat Audit",
@@ -600,7 +603,6 @@
       "chart-stacks-label": "Stacks",
       "chart-other-label": "Other",
       "expand-row": "Expand",
-      "chart-drag-hint": "Drag to scope · double-click to reset",
       "chart-legend-label": "Chart series",
       "chart-legend-show-more": "+{{count}} more",
       "chart-legend-show-fewer": "Show fewer",
@@ -613,9 +615,13 @@
       "chart-marker-death-line": "☠ {{name}} died",
       "chart-marker-sba-line": "✦ {{name}} — Skybound Art",
       "chart-smoothing-label": "Chart smoothing",
+      "chart-smoothing-caption": "Smoothing",
+      "chart-smoothing-hint": "Averages each point over the chosen trailing window, so a spiky per-second rate reads as a trend. Off plots the raw seconds.",
       "chart-smoothing-off": "Off",
       "chart-smoothing-seconds": "{{seconds}}s",
       "chart-stack-toggle-label": "Chart stacking mode",
+      "chart-stack-caption": "Areas",
+      "chart-stack-hint": "Normal overlaps the areas so each can be read on its own; Stacked sums them, so the stack's height is the total.",
       "chart-stack-normal": "Normal",
       "chart-stack-stacked": "Stacked",
       "quest-cleared": "Cleared",

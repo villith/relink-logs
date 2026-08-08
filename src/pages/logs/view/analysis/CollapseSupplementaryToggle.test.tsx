@@ -24,10 +24,16 @@ describe("CollapseSupplementaryToggle", () => {
   it("stays on screen but inert when disabled", () => {
     // The same rule `HostilityToggle` follows: the control keeps its place on a
     // tab that cannot use it, so every way in has to be closed.
+    //
+    // `aria-disabled` and not the native attribute, deliberately: a truly
+    // disabled control receives no pointer events, which would silence the
+    // tooltip explaining why it is disabled — the only reason it is still on
+    // screen. So the guard has to be in the handler, and this asserts it is.
     const onChange = vi.fn();
     renderIt({ onChange, disabled: true });
-    const control = screen.getByRole("switch") as HTMLInputElement;
-    expect(control.disabled).toBe(true);
+    const control = screen.getByRole("switch");
+    expect(control.getAttribute("aria-disabled")).toBe("true");
+    expect(control.getAttribute("tabindex")).toBe("-1");
     fireEvent.click(control);
     expect(onChange).not.toHaveBeenCalled();
   });

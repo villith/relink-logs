@@ -1,9 +1,9 @@
 import { Box, UnstyledButton } from "@mantine/core";
 import { useTranslation } from "react-i18next";
 
-import "./analysis.css";
+import { onArrowKeys } from "@/components/ui/rovingKeys";
 
-import { onArrowKeys } from "./rovingKeys";
+import "./analysis.css";
 
 export type MetricTab = { value: string; labelKey: string };
 
@@ -71,7 +71,7 @@ export const MetricTabs = ({
               // underline off the text and double the gutter.
               padding: variant === "inline" ? "3px 0" : "7px 0",
               marginRight: variant === "inline" ? 0 : 20,
-              fontSize: 13,
+              fontSize: "var(--an-fs-lg)",
               fontWeight: 600,
               letterSpacing: "-0.01em",
               color: active ? "var(--an-ink)" : "var(--an-ink-3)",

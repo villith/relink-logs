@@ -1,10 +1,11 @@
 import { AreaChart, LineChart } from "@mantine/charts";
-import { Box, Checkbox, Group, Paper, SegmentedControl, Text } from "@mantine/core";
+import { Box, Checkbox, Group, Paper, Text } from "@mantine/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ReferenceArea, ReferenceLine } from "recharts";
 
 import { AnimatedHeight } from "@/components/AnimatedHeight";
+import { PillGroup } from "@/components/ui/PillGroup";
 import { useCtrlHeld } from "@/components/useCtrlHeld";
 import { humanizeNumber } from "@/utils";
 
@@ -63,9 +64,6 @@ export type DpsChartProps = {
   format: "amount" | "percent" | "count";
   /** Commits a window as bucket indexes RELATIVE TO `data`, or null to clear. */
   onScope: (window: [number, number] | null) => void;
-  /** Drawn under the plot as the axis bounds. */
-  fromLabel: string;
-  toLabel: string;
   /** Stack the series as filled bands instead of drawing them independently.
    *
    * The drill-down levels are a decomposition — a player's damage split by skill
@@ -388,8 +386,6 @@ export const DpsChart = ({
   sectionKey,
   format,
   onScope,
-  fromLabel,
-  toLabel,
   stacked = false,
   bands,
   windowBands,
@@ -556,7 +552,10 @@ export const DpsChart = ({
   };
 
   const shared = {
-    h: "clamp(190px, 26vh, 380px)",
+    // Grows with the view's density knob, like everything around it: at the
+    // larger type the old ceiling left the plot shorter than the table's first
+    // few rows.
+    h: "clamp(calc(190px * var(--ui-scale)), 28vh, calc(380px * var(--ui-scale)))",
     // The rolled-up form, so the `other` band the legend offers has a series
     // to draw. Identical to `data` on a chart with no capped tail.
     data: plotData,
@@ -568,7 +567,10 @@ export const DpsChart = ({
     withLegend: false,
     series: shownSeries,
     valueFormatter: (value: number) => formatChartValue(format, value),
-    yAxisProps: { width: 60 },
+    // Wide enough for the tick text at the scaled-up font (`.analysis
+    // .recharts-cartesian-axis-tick-value`) — recharts reserves this in pixels
+    // and clips whatever overruns it.
+    yAxisProps: { width: 72 },
     xAxisProps: { interval: "preserveStartEnd" as const },
   };
 
@@ -663,7 +665,9 @@ export const DpsChart = ({
         x={timestamp}
         stroke={color}
         strokeDasharray="3 3"
-        label={{ value: MARKER_GLYPH[kind], position: "top", fill: color, fontSize: 10 }}
+        // A number, not a token: recharts writes this into an SVG attribute and
+        // a CSS var would not resolve there.
+        label={{ value: MARKER_GLYPH[kind], position: "top", fill: color, fontSize: 12 }}
       />
     ));
   }, [bucketedMarkers]);
@@ -720,15 +724,18 @@ export const DpsChart = ({
         <Text className="analysis-label">{t(labelKey)}</Text>
         <Group gap="sm">
           {onSmoothingChange !== undefined && smoothing !== undefined && (
-            <SegmentedControl
-              size="xs"
-              // The options are bare durations, so the radiogroup would announce
-              // nothing about WHAT is being set — same reason the stack toggle
-              // labels itself.
-              aria-label={t("ui.logs.chart-smoothing-label")}
+            <PillGroup
+              // The options are bare durations, so both the caption and the
+              // aria-label are load-bearing: "Off 5s 10s 30s" on its own names
+              // four values and no question, which is a control the reader can
+              // operate without ever learning what it does. The title says what
+              // choosing one MEANS.
+              caption={t("ui.logs.chart-smoothing-caption")}
+              ariaLabel={t("ui.logs.chart-smoothing-label")}
+              title={t("ui.logs.chart-smoothing-hint")}
               value={String(smoothing)}
               onChange={(value) => onSmoothingChange(Number(value))}
-              data={SMOOTHING_OPTIONS.map((buckets) => ({
+              options={SMOOTHING_OPTIONS.map((buckets) => ({
                 value: String(buckets),
                 label:
                   buckets === 1
@@ -738,15 +745,16 @@ export const DpsChart = ({
             />
           )}
           {onStackModeChange && (
-            <SegmentedControl
-              size="xs"
+            <PillGroup
               // "Normal" and "Stacked" name the options but not the choice, so
-              // the radiogroup announces nothing about WHAT is being set — the
-              // same reason View.tsx labels its own SegmentedControl.
-              aria-label={t("ui.logs.chart-stack-toggle-label")}
+              // this pair carries a caption for the same reason the smoothing
+              // window does.
+              caption={t("ui.logs.chart-stack-caption")}
+              ariaLabel={t("ui.logs.chart-stack-toggle-label")}
+              title={t("ui.logs.chart-stack-hint")}
               value={stackMode}
               onChange={(value) => onStackModeChange(value as StackMode)}
-              data={[
+              options={[
                 { value: "normal", label: t("ui.logs.chart-stack-normal") },
                 { value: "stacked", label: t("ui.logs.chart-stack-stacked") },
               ]}
@@ -803,12 +811,13 @@ export const DpsChart = ({
           </LineChart>
         )}
       </Box>
+      {/* The legend is the last thing under the plot. There used to be a row
+          below it repeating the window's two ends and captioning the drag —
+          the axis already prints both bounds under the plot, and a permanent
+          instruction line is the kind of chrome that is read once and then
+          costs a strip of the fight forever. The window itself is still stated,
+          once, by the chip in PinBar. */}
       <ChartLegend entries={legendEntries} hidden={hidden} onToggle={toggleSeries} />
-      <Box style={{ display: "flex", justifyContent: "space-between", marginTop: 3 }}>
-        <Text className="analysis-label">{fromLabel}</Text>
-        <Text className="analysis-label">{t("ui.logs.chart-drag-hint")}</Text>
-        <Text className="analysis-label">{toLabel}</Text>
-      </Box>
     </Box>
   );
 };

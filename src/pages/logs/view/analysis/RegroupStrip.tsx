@@ -2,11 +2,12 @@ import { Box, Tooltip, UnstyledButton } from "@mantine/core";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 
+import { onArrowKeys } from "@/components/ui/rovingKeys";
+
 import "./analysis.css";
 
 import type { RegroupTab } from "./machine/resolve";
 import type { Dimension } from "./machine/state";
-import { onArrowKeys } from "./rovingKeys";
 
 export type RegroupStripProps = {
   tabs: RegroupTab[];
@@ -74,7 +75,7 @@ export const RegroupStrip = ({ tabs, onRegroup }: RegroupStripProps) => {
             style={{
               padding: "4px 0",
               marginRight: 14,
-              fontSize: 11,
+              fontSize: "var(--an-fs-xs)",
               fontWeight: 600,
               letterSpacing: "-0.01em",
               color: disabled ? "var(--an-ink-3)" : tab.active ? "var(--an-ink)" : "var(--an-ink-3)",

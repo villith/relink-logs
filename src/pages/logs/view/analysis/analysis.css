@@ -1,4 +1,7 @@
-/* Design tokens and shared rules for the Analysis view.
+/* The Analysis view's own rules, over the app-wide design tokens and controls
+ * in `src/components/ui/ui.css` — that file owns the palette, the density scale
+ * and the shared pills/switch; this one owns the view's tables, chart chrome
+ * and timeline.
  *
  * Scoped under .analysis so nothing here can reach the Classic view, which
  * deliberately keeps the old look.
@@ -6,21 +9,58 @@
  * Font sizes are written as CSS lengths, never as var(--mantine-font-size-*):
  * this app's theme sets those tokens to unitless strings ("12", "14"), so the
  * var resolves to invalid CSS and the declaration is silently dropped. */
-/* Tokens live on their own class so they can be applied anywhere in the DOM.
- * The hover card portals to document.body, outside .analysis — custom
- * properties inherit down the tree, so tokens declared only on .analysis
- * resolve to nothing there and the card renders with no panel at all. */
+/* The view's tokens are ALIASES of the app-wide set in
+ * `src/components/ui/ui.css` — this design started here and now belongs to the
+ * whole app, so there is one place the palette and the density scale are
+ * decided and this file only gives them the names its rules already use.
+ *
+ * Every `--an-*` below is therefore a rename and nothing more. Change a VALUE
+ * in ui.css; change the mapping here only if this view genuinely needs to
+ * differ from the rest of the app (nothing does today). To rescale just this
+ * view, set `--ui-scale` on `.analysis` — the derived lengths all come from it.
+ *
+ * They still live on a CLASS rather than on `.analysis` itself: the hover card
+ * and the pin dropdowns portal to document.body, outside the view, and custom
+ * properties only inherit down the tree — so those carry `analysis-tokens` too.
+ * (The shared tokens are on `:root` for exactly the same reason, which is what
+ * makes these one-line aliases enough.) */
 .analysis-tokens {
-  --an-bg: #17181c;
-  --an-panel: #1d1f24;
-  --an-raised: #22252b;
-  --an-line: #2c2f36;
-  --an-line-strong: #3b4048;
-  --an-ink: #e8eaed;
-  --an-ink-2: #b9bfc9;
-  --an-ink-3: #8b929e;
-  --an-accent: #00b8d9;
-  --an-plot: #1a1c21;
+  --an-bg: var(--ui-bg);
+  --an-panel: var(--ui-panel);
+  --an-raised: var(--ui-raised);
+  --an-line: var(--ui-line);
+  --an-line-strong: var(--ui-line-strong);
+  --an-ink: var(--ui-ink);
+  --an-ink-2: var(--ui-ink-2);
+  --an-ink-3: var(--ui-ink-3);
+  --an-accent: var(--ui-accent);
+  --an-plot: var(--ui-plot);
+
+  /* The density knob, and the type and geometry derived from it. Named by ROLE
+   * rather than by size, so a rule says what it is styling rather than how big
+   * that happens to be at the current scale. */
+  --an-scale: var(--ui-scale);
+  --an-fs-label: var(--ui-fs-label); /* small-caps column heads */
+  --an-fs-xs: var(--ui-fs-xs); /* legend names, uptimes */
+  --an-fs-sm: var(--ui-fs-sm); /* muted cells, card figures */
+  --an-fs-md: var(--ui-fs-md); /* controls, card names */
+  --an-fs-lg: var(--ui-fs-lg); /* row names and row figures */
+  --an-fs-xl: var(--ui-fs-xl); /* the quest name */
+  --an-fs-2xl: var(--ui-fs-2xl); /* the one headline figure */
+
+  /* `--an-row-h` is the metric row AND the timeline lane beside it;
+   * `--an-head-h` is every heading band (card heads, the ruler, section
+   * heads) — the timeline's two columns stay in step only while they agree. */
+  --an-row-h: var(--ui-row-h);
+  --an-head-h: var(--ui-head-h);
+  --an-control-h: var(--ui-control-h);
+  --an-chip-h: var(--ui-chip-h);
+  --an-icon: var(--ui-icon); /* a row's entity art */
+  --an-icon-sm: var(--ui-icon-sm); /* art inside a control */
+  --an-icon-xs: var(--ui-icon-xs); /* art inside a hover card */
+  --an-swatch: var(--ui-swatch);
+  --an-cell-w: var(--ui-cell-w); /* one numeric column */
+  --an-name-w: var(--ui-name-w); /* the timeline's name column */
 }
 
 /* Full-bleed, not a card. The view is dense enough that the window edge is the
@@ -41,7 +81,7 @@
 
 /* Small tracked capitals for column heads and section labels. */
 .analysis-label {
-  font-size: 10px;
+  font-size: var(--an-fs-label);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--an-ink-3);
@@ -67,7 +107,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  height: 30px;
+  height: var(--an-row-h);
   padding: 0 8px;
   width: 100%;
   border-radius: 2px;
@@ -163,7 +203,7 @@
  * the same row anatomy, indented and on a muted panel so the hierarchy reads
  * at a glance without stealing the parents' contrast. */
 .analysis-subrow {
-  padding-left: 28px;
+  padding-left: calc(28px * var(--an-scale));
   background-color: var(--an-panel);
 }
 
@@ -183,16 +223,16 @@
   min-width: 0;
   font-weight: 600;
   letter-spacing: -0.01em;
-  font-size: 13px;
+  font-size: var(--an-fs-lg);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .analysis-cell {
-  width: 84px;
+  width: var(--an-cell-w);
   text-align: right;
-  font-size: 13px;
+  font-size: var(--an-fs-lg);
   font-variant-numeric: tabular-nums;
 }
 
@@ -201,8 +241,8 @@
  * the four families' different aspect ratios (the character busts are tall)
  * line the names up identically; rows with no art render no box at all. */
 .analysis-row-icon {
-  height: 22px;
-  width: 22px;
+  height: var(--an-icon);
+  width: var(--an-icon);
   object-fit: contain;
   margin-right: 7px;
   vertical-align: -6px;
@@ -210,8 +250,8 @@
 
 /* The hover card's smaller copy of the same. */
 .analysis-card-icon {
-  height: 15px;
-  width: 15px;
+  height: var(--an-icon-xs);
+  width: var(--an-icon-xs);
   object-fit: contain;
   margin-right: 5px;
   vertical-align: -3px;
@@ -219,13 +259,13 @@
 
 .analysis-cell-muted {
   color: var(--an-ink-2);
-  font-size: 12px;
+  font-size: var(--an-fs-sm);
 }
 
 .analysis-head {
   display: flex;
   align-items: center;
-  height: 20px;
+  height: calc(20px * var(--an-scale));
   padding: 0 8px;
   border-bottom: 1px solid var(--an-line);
   margin-bottom: 6px;
@@ -252,7 +292,7 @@
 .analysis-card-head {
   display: flex;
   align-items: center;
-  height: 22px;
+  height: var(--an-head-h);
   padding: 0 8px;
   background-color: var(--an-raised);
 }
@@ -261,7 +301,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  height: 23px;
+  height: calc(23px * var(--an-scale));
   padding: 0 8px;
   margin: 2px 4px;
   border-radius: 2px;
@@ -271,7 +311,7 @@
   position: relative;
   flex: 1;
   min-width: 0;
-  font-size: 12.5px;
+  font-size: var(--an-fs-md);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -283,34 +323,35 @@
 .analysis-card-note-swatch {
   position: relative;
   flex: none;
-  width: 8px;
-  height: 8px;
+  width: var(--an-swatch);
+  height: var(--an-swatch);
   margin-right: 7px;
   border-radius: 2px;
 }
 
 .analysis-card-share {
   position: relative;
-  width: 52px;
+  width: calc(52px * var(--an-scale));
   text-align: right;
-  font-size: 12px;
+  font-size: var(--an-fs-sm);
   color: var(--an-ink-2);
   font-variant-numeric: tabular-nums;
 }
 
 .analysis-card-amount {
   position: relative;
-  width: 64px;
+  width: calc(64px * var(--an-scale));
   text-align: right;
-  font-size: 12px;
+  font-size: var(--an-fs-sm);
   font-variant-numeric: tabular-nums;
 }
 
 /* .analysis-label and .analysis-cell have equal specificity, so the later one
- * (.analysis-cell, 13px) wins and column heads render at row size. Scoping to
- * the header row restores the intended 10px without touching either class. */
+ * (.analysis-cell, at --an-fs-lg) wins and column heads render at row size.
+ * Scoping to the header row restores the intended label size without touching
+ * either class. */
 .analysis-head .analysis-label {
-  font-size: 10px;
+  font-size: var(--an-fs-label);
   letter-spacing: 0.08em;
 }
 
@@ -349,29 +390,76 @@
 }
 
 .analysis-legend-swatch {
-  width: 9px;
-  height: 9px;
+  width: calc(9px * var(--an-scale));
+  height: calc(9px * var(--an-scale));
   border-radius: 2px;
   flex: none;
 }
 
 .analysis-legend-name {
-  font-size: 11px;
+  font-size: var(--an-fs-xs);
   color: var(--an-ink-2);
   line-height: 1.4;
 }
 
+/* The plot's own axis text. recharts renders its ticks as SVG <text>, which no
+   token in this file would otherwise reach — so the axis stayed at the library
+   default while every label around it grew. Scoped to the view, and to the tick
+   values only: the reference-line labels carry their own size in JS, where
+   recharts wants a number. */
+.analysis .recharts-cartesian-axis-tick-value {
+  font-size: var(--an-fs-sm);
+}
+
 /* Dev-only state readout under the plot. Monospace, wrapping and selectable:
-   its whole purpose is to be read exactly and pasted into a bug report. */
+   its whole purpose is to be read exactly and pasted into a bug report — which
+   is also why each line carries a copy button, since selecting a wrapped line
+   by hand is how half of one ends up in the report. */
 .analysis-debug {
   padding: 6px 16px 8px;
   border-top: 1px solid var(--an-line);
   background-color: var(--an-plot);
 }
 
+/* The line's own row: the key, the value, and the copy button pinned at the
+   right where it cannot be pushed off by a long query. */
+.analysis-debug-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.analysis-debug-copy {
+  flex: none;
+  padding: 0 6px;
+  border: 1px solid var(--an-line);
+  border-radius: 3px;
+  background-color: var(--an-panel);
+  color: var(--an-ink-3);
+  font-size: var(--an-fs-label);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.7;
+  cursor: pointer;
+}
+
+.analysis-debug-copy:hover {
+  border-color: var(--an-line-strong);
+  color: var(--an-ink-2);
+}
+
+/* Confirmation lives on the button itself — a toast for a dev readout would be
+   louder than the thing it reports. */
+.analysis-debug-copied {
+  border-color: var(--an-accent);
+  color: var(--an-accent);
+}
+
 .analysis-debug-line {
+  flex: 1;
+  min-width: 0;
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
-  font-size: 11px;
+  font-size: var(--an-fs-xs);
   line-height: 1.6;
   color: var(--an-ink-3);
   user-select: text;
@@ -400,7 +488,7 @@
 
 /* Timeline rows bound the name so the track gets the rest of the row. */
 .analysis-name-fixed {
-  flex: 0 0 220px;
+  flex: 0 0 var(--an-name-w);
 }
 
 .analysis-timeline-piece {
@@ -415,41 +503,10 @@
   opacity: 0.75;
 }
 
-/* The Friendlies|Enemies switch. A small pill pair, not tabs: it re-pivots the
- * current table rather than navigating. Sits above the metric tabs, so it holds
- * its place on every tab and only the status ones can operate it. */
-.analysis-hostility {
-  display: inline-flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--an-line);
-  border-radius: 4px;
-  background-color: var(--an-panel);
-}
-
-.analysis-hostility-option {
-  padding: 2px 10px;
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 3px;
-  color: var(--an-ink-3);
-}
-
-.analysis-hostility-active {
-  color: var(--an-ink);
-  background-color: var(--an-raised);
-}
-
-/* Dimmed where the tab has no enemy-side figures to pivot to. The pointer
- * cursor goes too — the switch keeps its place, but it must not invite a click
- * that does nothing. */
-.analysis-hostility-disabled {
-  opacity: 0.4;
-}
-
-.analysis-hostility-disabled .analysis-hostility-option {
-  cursor: default;
-}
+/* The Friendlies|Enemies switch, the chart's smoothing window and its areas
+ * mode are all the shared `PillGroup` now (`src/components/ui/ui.css`), and the
+ * collapse toggle is the shared `ToggleSwitch` — so the pill and switch rules
+ * that used to live here belong to the app rather than to this view. */
 
 /* The aura tile strips (WCL's Source/Target Auras Filter), between the chart
  * and the table, and the battle-window chip strip that shares their row shell.
@@ -466,7 +523,7 @@
 .analysis-aura-chip {
   display: inline-flex;
   align-items: center;
-  height: 24px;
+  height: var(--an-chip-h);
   border: 1px solid var(--an-line-strong);
   border-radius: 4px;
   background-color: var(--an-panel);
@@ -484,7 +541,7 @@
   gap: 6px;
   height: 100%;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: var(--an-fs-sm);
   color: var(--an-ink-2);
   cursor: pointer;
 }
@@ -495,7 +552,7 @@
 }
 
 .analysis-aura-chip-uptime {
-  font-size: 11px;
+  font-size: var(--an-fs-xs);
   color: var(--an-ink-3);
 }
 
@@ -506,8 +563,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: calc(26px * var(--an-scale));
+  height: calc(26px * var(--an-scale));
   padding: 1px;
   border: 1px solid var(--an-line-strong);
   border-radius: 4px;
@@ -559,14 +616,14 @@
 }
 
 .analysis-aura-card-name {
-  font-size: 12.5px;
+  font-size: var(--an-fs-md);
   color: var(--mantine-color-white);
 }
 
 .analysis-window-chip-swatch {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: var(--an-swatch);
+  height: var(--an-swatch);
   border-radius: 2px;
   flex-shrink: 0;
 }
@@ -590,13 +647,13 @@
  * control; the dropdown portals out of the view, so it pairs with the
  * `analysis-tokens` class it carries for the same reason. */
 .analysis .analysis-select-input {
-  height: 28px;
-  min-height: 28px;
+  height: var(--an-control-h);
+  min-height: var(--an-control-h);
   background-color: var(--an-panel);
   border: 1px solid var(--an-line);
   border-radius: 4px;
   color: var(--an-ink);
-  font-size: 12.5px;
+  font-size: var(--an-fs-md);
   /* The controls grow to fit their names (see PinSelect), but nothing bounds a
    * name — so the one that still overruns truncates rather than turning the
    * input into a horizontal scroller you have to drag a caret through. */
@@ -631,7 +688,7 @@
 }
 
 .analysis-select-dropdown .analysis-select-option {
-  font-size: 12.5px;
+  font-size: var(--an-fs-md);
   color: var(--an-ink-2);
   border-radius: 3px;
 }
@@ -664,20 +721,20 @@
   white-space: nowrap;
 }
 
-/* Smaller than the table's `.analysis-row-icon` (22px): these sit in a 28px
- * control, where that size would leave no air above or below. */
+/* Smaller than the table's `.analysis-row-icon`: these sit in a control one
+ * step shorter than a row, where that size would leave no air above or below. */
 .analysis-select-icon {
-  height: 18px;
-  width: 18px;
+  height: var(--an-icon-sm);
+  width: var(--an-icon-sm);
   object-fit: contain;
   flex-shrink: 0;
 }
 
-/* The events stream's own art, smaller again: its rows are 22px, which the
- * table's 22px icon would fill edge to edge. */
+/* The events stream's own art, smaller again: its rows are shorter than the
+ * table's, which the table's own icon would fill edge to edge. */
 .events-row-icon {
-  height: 16px;
-  width: 16px;
+  height: var(--an-icon-xs);
+  width: var(--an-icon-xs);
   object-fit: contain;
   flex-shrink: 0;
 }
@@ -694,17 +751,17 @@
  * border-box (Mantine's reset), so a border sits INSIDE the stated height and
  * adds nothing to it:
  *
- *   ruler    22px  .timeline-ruler      ↔  .timeline-ruler-gap
- *   heading  22px  .timeline-section    ↔  .timeline-row-gap
- *   lane     30px  .analysis-row        ↔  .timeline-row
+ *   ruler    --an-head-h  .timeline-ruler    ↔  .timeline-ruler-gap
+ *   heading  --an-head-h  .timeline-section  ↔  .timeline-row-gap
+ *   lane     --an-row-h   .analysis-row      ↔  .timeline-row
  *
- * The lane height is `.analysis-row`'s, restated here rather than shared: a
- * lane IS an `.analysis-row`, and the track beside it has to be told the same
- * number. Change one and change the other. */
+ * Both pairs read the SAME token rather than restating a number: a lane IS an
+ * `.analysis-row`, and the track beside it has to be exactly as tall. Stated
+ * twice, the two columns drift apart the first time one of them is nudged. */
 .timeline-frame {
   display: flex;
   overflow-y: auto;
-  max-height: 460px;
+  max-height: calc(460px * var(--an-scale));
   border: 1px solid var(--an-line);
   border-radius: 4px;
 }
@@ -712,7 +769,7 @@
 /* Outside the horizontal scroller, so the names cannot pan away and no longer
  * need to be sticky. Opaque, and separated by its own right border. */
 .timeline-names {
-  flex: 0 0 220px;
+  flex: 0 0 var(--an-name-w);
   min-width: 0;
   background: var(--mantine-color-body);
   border-right: 1px solid var(--an-line);
@@ -721,7 +778,7 @@
 /* Exactly `.timeline-ruler`'s height, so lane one starts level in both columns.
  * Carries the ruler's underline across the names column. */
 .timeline-ruler-gap {
-  height: 22px;
+  height: var(--an-head-h);
   border-bottom: 1px solid var(--an-line);
 }
 
@@ -741,11 +798,11 @@
   min-width: 100%;
 }
 
-/* One lane's track. 30px — `.analysis-row`'s height in the other column. */
+/* One lane's track — `.analysis-row`'s own height, from the same token. */
 .timeline-row {
   display: flex;
   align-items: stretch;
-  height: 30px;
+  height: var(--an-row-h);
 }
 
 .timeline-row:hover {
@@ -755,7 +812,7 @@
 /* A section heading's height with none of its words: the names column carries
  * the text, this column only has to stay level with it. */
 .timeline-row-gap {
-  height: 22px;
+  height: var(--an-head-h);
 }
 
 .timeline-lane-track {
@@ -816,10 +873,11 @@
 }
 
 /* The axis, at the top of the tracks column and inside its horizontal scroller
- * so it pans with the marks. 22px INCLUDING its border — `.timeline-ruler-gap`
- * is the same 22px, which is what puts lane one at the same y in both columns. */
+ * so it pans with the marks. `--an-head-h` INCLUDING its border, the same token
+ * `.timeline-ruler-gap` reads — which is what puts lane one at the same y in
+ * both columns. */
 .timeline-ruler {
-  height: 22px;
+  height: var(--an-head-h);
   background: var(--mantine-color-body);
   border-bottom: 1px solid var(--an-line);
   display: flex;
@@ -837,23 +895,23 @@
   bottom: 0;
   border-left: 1px solid var(--an-line);
   padding-left: 3px;
-  font-size: 10px;
-  line-height: 22px;
+  font-size: var(--an-fs-label);
+  line-height: var(--an-head-h);
   color: var(--mantine-color-dimmed);
   white-space: nowrap;
 }
 
 /* A section subheader, the timeline's copy of the table's provenance runs. It
  * lives in the names column, outside the horizontal scroller, so it needs no
- * stickiness of its own. Fixed at 22px, matching `.timeline-row-gap` in the
- * other column — a heading that grew with its text would push the names out of
- * step with their marks. */
+ * stickiness of its own. Fixed at `--an-head-h`, the token `.timeline-row-gap`
+ * reads in the other column — a heading that grew with its text would push the
+ * names out of step with their marks. */
 .timeline-section {
   display: flex;
   align-items: flex-end;
-  height: 22px;
+  height: var(--an-head-h);
   padding: 0 8px 3px;
-  font-size: 10px;
+  font-size: var(--an-fs-label);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--mantine-color-dimmed);

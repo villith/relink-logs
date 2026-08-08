@@ -77,20 +77,20 @@ export const PinBar = ({ options, pins, onChange, windowLabel, fullLabel, onClea
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            height: 28,
+            height: "var(--an-control-h)",
             padding: "0 6px 0 11px",
             borderRadius: 4,
             border: "1px solid var(--an-accent)",
             backgroundColor: "rgba(0, 184, 217, 0.09)",
           }}
         >
-          <Text className="analysis-num" style={{ fontSize: 12.5, color: "var(--an-accent)" }}>
+          <Text className="analysis-num" style={{ fontSize: "var(--an-fs-md)", color: "var(--an-accent)" }}>
             {windowLabel}
           </Text>
           {/* `window-of` next door is Classic's full sentence and interpolates
               both ends; this chip already states the window beside it, so it
               needs the shorter "of {{total}}". */}
-          <Text style={{ fontSize: 11, color: "var(--an-ink-3)" }}>
+          <Text style={{ fontSize: "var(--an-fs-xs)", color: "var(--an-ink-3)" }}>
             {t("ui.logs.window-within", { total: fullLabel })}
           </Text>
           {/* sm, not xs: this is the only control that clears a window, and xs

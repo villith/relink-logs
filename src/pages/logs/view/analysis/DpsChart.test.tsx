@@ -524,8 +524,6 @@ describe("DpsChart — the capped band tail", () => {
           sectionKey="ui.logs.rows-by-ability"
           format="amount"
           onScope={() => {}}
-          fromLabel="00:00"
-          toLabel="00:02"
           stacked
         />
       </MantineProvider>
@@ -597,8 +595,6 @@ describe("DpsChart — the capped band tail", () => {
           sectionKey="ui.logs.rows-by-ability"
           format="amount"
           onScope={() => {}}
-          fromLabel="00:00"
-          toLabel="00:02"
           stacked
         />
       </MantineProvider>

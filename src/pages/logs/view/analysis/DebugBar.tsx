@@ -1,4 +1,5 @@
-import { Box } from "@mantine/core";
+import { Box, UnstyledButton } from "@mantine/core";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import "./analysis.css";
@@ -9,6 +10,53 @@ export type DebugBarProps = {
   /** The resolved machine state as one JSON line — what the spec made of the
    * URL, beside the URL itself. */
   chart: string;
+};
+
+/** How long the button says "copied" before going back to offering the copy. */
+const COPIED_MS = 1200;
+
+/** One readout line: its name, its verbatim value, and a button that puts that
+ * value on the clipboard.
+ *
+ * The button exists because the value is the whole point — both lines wrap at
+ * `overflow-wrap: anywhere`, and hand-selecting a wrapped one is how half a pin
+ * set ends up in a bug report. */
+const DebugLine = ({ label, value, copy }: { label: string; value: string; copy: string }) => {
+  const { t } = useTranslation();
+  const [copied, setCopied] = useState(false);
+
+  // Cleared on unmount as well as on the timer: the bar unmounts the moment the
+  // view switches bodies, and a setState after that is a React warning.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), COPIED_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
+
+  return (
+    <div className="analysis-debug-row">
+      <div className="analysis-debug-line">
+        <span className="analysis-debug-key">{label}</span>
+        <span>{value}</span>
+      </div>
+      <UnstyledButton
+        className={`analysis-debug-copy${copied ? " analysis-debug-copied" : ""}`}
+        aria-label={t("ui.debug.copy-line", { line: label })}
+        // The COPY is the raw value, never the displayed one: an empty query
+        // shows "(none)", and a report pasting that back would be pasting a
+        // word this component invented.
+        onClick={() => {
+          // Fire-and-forget. The clipboard is unavailable in a few contexts
+          // (an insecure origin, a denied permission), and a dev readout must
+          // not throw an unhandled rejection at the app over it — the button
+          // simply never confirms.
+          void navigator.clipboard?.writeText(copy).then(() => setCopied(true));
+        }}
+      >
+        {copied ? t("ui.debug.copied") : t("ui.debug.copy")}
+      </UnstyledButton>
+    </div>
+  );
 };
 
 /** Dev-only readout of what the view is currently asking for.
@@ -26,14 +74,12 @@ export const DebugBar = ({ search, chart }: DebugBarProps) => {
 
   return (
     <Box className="analysis-debug">
-      <div className="analysis-debug-line">
-        <span className="analysis-debug-key">{t("ui.debug.analysis-query")}</span>
-        <span>{search === "" ? t("ui.debug.analysis-query-empty") : search}</span>
-      </div>
-      <div className="analysis-debug-line">
-        <span className="analysis-debug-key">{t("ui.debug.analysis-chart")}</span>
-        <span>{chart}</span>
-      </div>
+      <DebugLine
+        label={t("ui.debug.analysis-query")}
+        value={search === "" ? t("ui.debug.analysis-query-empty") : search}
+        copy={search}
+      />
+      <DebugLine label={t("ui.debug.analysis-chart")} value={chart} copy={chart} />
     </Box>
   );
 };

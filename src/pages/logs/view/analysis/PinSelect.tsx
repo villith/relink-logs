@@ -69,6 +69,15 @@ export const PinSelect = ({ minWidth, maxWidth, data, value, placeholder, ariaLa
       aria-label={ariaLabel}
       clearable
       searchable
+      // A searchable Select is a text input, and the browser spell-checks it:
+      // every player name, boss name and ability in these lists is a proper
+      // noun the dictionary has never seen, so the pinned value sat under a red
+      // squiggle as if it were a typo. Nothing typed here is prose — it is a
+      // filter over names we already know — so all three of the text
+      // assistances are off, not just the underline.
+      spellCheck={false}
+      autoCorrect="off"
+      autoCapitalize="off"
       // Wrapped rather than passed straight through: Mantine calls its
       // `onChange` with `(value, option)`, and a caller whose handler happens to
       // take a second parameter would silently receive a Mantine internal.

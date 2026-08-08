@@ -1,11 +1,10 @@
-import { Box, UnstyledButton } from "@mantine/core";
 import { useTranslation } from "react-i18next";
+
+import { PillGroup } from "@/components/ui/PillGroup";
 
 import type { Hostility } from "../metrics/types";
 
 import "./analysis.css";
-
-import { onArrowKeys } from "./rovingKeys";
 
 const SIDES: { value: Hostility; labelKey: string }[] = [
   { value: "friendly", labelKey: "ui.logs.hostility-friendlies" },
@@ -28,7 +27,10 @@ const SIDES: { value: Hostility; labelKey: string }[] = [
  * player only, so neither has a side to pivot to, and a live switch that
  * silently does nothing is worse than one that says so — which is what the
  * tooltip (`hostility-disabled-hint`) tells the user. Both were last corrected
- * together, when the damage tabs grew an enemy side and falsified them. */
+ * together, when the damage tabs grew an enemy side and falsified them.
+ *
+ * No caption: "Friendlies | Enemies" already names the question its options
+ * answer — unlike the chart's smoothing pills, which carry one. */
 export const HostilityToggle = ({
   value,
   onChange,
@@ -40,36 +42,14 @@ export const HostilityToggle = ({
 }) => {
   const { t } = useTranslation();
 
-  // Arrow keys move the selection and only the checked option is tabbable —
-  // the ARIA radio pattern. Without it both options are separate tab stops and
-  // the arrows do nothing. With only two sides, either arrow key just picks
-  // the other one.
-  const other = value === "friendly" ? "enemy" : "friendly";
-
   return (
-    <Box
-      role="radiogroup"
-      aria-label={t("ui.logs.hostility-label")}
-      aria-disabled={disabled || undefined}
-      className={`analysis-hostility${disabled ? " analysis-hostility-disabled" : ""}`}
-      title={disabled ? t("ui.logs.hostility-disabled-hint") : undefined}
-      onKeyDown={disabled ? undefined : onArrowKeys(() => onChange(other))}
-    >
-      {SIDES.map((side) => (
-        <UnstyledButton
-          key={side.value}
-          role="radio"
-          aria-checked={value === side.value}
-          aria-disabled={disabled || undefined}
-          // Out of the tab order entirely while disabled: a roving tabindex
-          // would still hand focus to a control that cannot be operated.
-          tabIndex={disabled ? -1 : value === side.value ? 0 : -1}
-          className={`analysis-hostility-option${value === side.value ? " analysis-hostility-active" : ""}`}
-          onClick={() => !disabled && onChange(side.value)}
-        >
-          {t(side.labelKey)}
-        </UnstyledButton>
-      ))}
-    </Box>
+    <PillGroup
+      options={SIDES.map((side) => ({ value: side.value, label: t(side.labelKey) }))}
+      value={value}
+      onChange={onChange}
+      ariaLabel={t("ui.logs.hostility-label")}
+      disabled={disabled}
+      {...(disabled ? { title: t("ui.logs.hostility-disabled-hint") } : {})}
+    />
   );
 };

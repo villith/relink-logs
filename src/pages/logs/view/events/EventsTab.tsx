@@ -71,8 +71,12 @@ const KIND_LABEL_KEY: Record<EventKind, string> = {
   other: "ui.logs.events-kind-other",
 };
 
-/** Row height in px. Fixed, which is what makes `visibleSlice` pure arithmetic. */
-const ROW_HEIGHT = 22;
+/** Row height in px. Fixed, which is what makes `visibleSlice` pure arithmetic
+ * — so it is a NUMBER here and not `--ui-row-h`, which the virtualiser could
+ * not do division with. Kept a step under a table row, as it always was, but
+ * moved with the rest of the view's scale: the stream's art is now
+ * `--ui-icon-xs`, which at 22px left no air above or below it. */
+const ROW_HEIGHT = 26;
 /** Rows rendered beyond each edge of the viewport, so a fast scroll does not
  * outrun the render. */
 const OVERSCAN = 10;
