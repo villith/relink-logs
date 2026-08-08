@@ -1,5 +1,7 @@
 /* static: forces emission — recharts reads these from JS strings.
-   inline: utility emits the calc(), so --density re-resolves per subtree. */
+   inline: utility emits the calc(), so --density re-resolves per subtree.
+   --text-*--line-height: inherit — xs/sm/lg/xl/2xl collide with Tailwind's own
+   scale, which would otherwise pair our sizes with its stock line-heights. */
 
 :root {
   --density: 1;
@@ -23,11 +25,16 @@
 @theme inline {
   --text-label: calc(10px * var(--density));
   --text-xs: calc(11px * var(--density));
+  --text-xs--line-height: inherit;
   --text-sm: calc(12px * var(--density));
+  --text-sm--line-height: inherit;
   --text-md: calc(12.5px * var(--density));
   --text-lg: calc(13px * var(--density));
+  --text-lg--line-height: inherit;
   --text-xl: calc(15px * var(--density));
+  --text-xl--line-height: inherit;
   --text-2xl: calc(17px * var(--density));
+  --text-2xl--line-height: inherit;
 
   --spacing-row: calc(30px * var(--density));
   --spacing-head: calc(22px * var(--density));
