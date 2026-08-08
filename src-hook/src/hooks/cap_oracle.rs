@@ -69,6 +69,39 @@ const PARAM_ID_CAP_DOWN: i32 = 0x22;
 /// providers carry a handful of entries; anything past this is garbage.
 const MAX_ENTRIES: usize = 256;
 
+/// Buff-sourced cap terms do NOT pass the chokepoint; the builder sums them
+/// itself over a status list, so the oracle has to walk the same list to see
+/// them. All of this is read off the `FUN_1409c1cf0` decompile.
+///
+/// The holder is reached through the builder's FIRST argument, not the
+/// DamageInstance: `*(arg1 + 0x2300)`.
+const BUILD_STATUS_HOLDER: usize = 0x2300;
+/// The holder's status vector. The decompile indexes a `longlong *` as
+/// `[0x15f]`/`[0x160]`, which are POINTER indices — in bytes, `+0xAF8`/`+0xB00`.
+const HOLDER_STATUS_LIST_BEGIN: usize = 0xAF8;
+/// End of that vector; see [`HOLDER_STATUS_LIST_BEGIN`].
+const HOLDER_STATUS_LIST_END: usize = 0xB00;
+
+/// `__RTDynamicCast(inptr, VfDelta, SrcType, TargetType, isReference)`, entry
+/// confirmed by `SymbolAt 0x496026c` → `FUN_14496026c`.
+///
+/// The cast is load-bearing, not a filter that could be skipped: the game calls
+/// the value virtual on the pointer the cast RETURNS, and under multiple
+/// inheritance that is an adjusted subobject pointer. Calling the slot on the
+/// raw `StatusBase*` would read a different vtable.
+const RT_DYNAMIC_CAST_RVA: usize = 0x496026c;
+/// Source type for that cast — `StatusBase::RTTI_Type_Descriptor` (v2.0.4).
+const STATUS_BASE_TD_RVA: usize = 0x6ebe2d0;
+/// Target type — `IStatusDamageLimitBuff::RTTI_Type_Descriptor` (v2.0.4),
+/// round-tripped through `SymbolAt.java`.
+const DAMAGE_LIMIT_BUFF_TD_RVA: usize = 0x6e613d0;
+/// Virtual slot on the cast-to interface returning the buff's cap contribution.
+const DAMAGE_LIMIT_BUFF_VALUE_SLOT: usize = 8;
+/// u32 `status.tbl` StatusId, the same offset `status.rs` reads.
+const STATUS_ID_OFFSET: usize = 0x50;
+/// Bound on the status walk, for the same reason [`MAX_ENTRIES`] exists.
+const MAX_STATUSES: usize = 256;
+
 /// DamageInstance fields, all from the builder/chokepoint decompiles.
 const INSTANCE_ATTACK_RATE: usize = 0xdc;
 const INSTANCE_CLASS_FLAGS: usize = 0xf0;
@@ -234,6 +267,90 @@ fn matching_descriptor(entry: usize, param_id: i32, module_base: usize) -> Optio
     (id == param_id).then_some(vtable_rva as u32)
 }
 
+/// The cap contribution of each status the attacker carries, as
+/// `(status_id, value)`.
+///
+/// Replicates the builder's own `fVar43` loop: walk the holder's status vector,
+/// dynamic-cast each entry to `IStatusDamageLimitBuff`, and call virtual slot
+/// `+8` on the pointer the cast returns. Statuses that are not damage-limit
+/// buffs cast to null and cost one call each.
+fn buff_terms(context: usize) -> Vec<(u32, f32)> {
+    let mut found = Vec::new();
+    let module_base = crate::hooks::diag::MODULE_BASE.load(std::sync::atomic::Ordering::Relaxed);
+    if module_base == 0 {
+        return found;
+    }
+
+    let Some(holder) = read_ptr_guarded(context, BUILD_STATUS_HOLDER).filter(|h| *h != 0) else {
+        return found;
+    };
+    let (Some(begin), Some(end)) = (
+        read_ptr_guarded(holder, HOLDER_STATUS_LIST_BEGIN),
+        read_ptr_guarded(holder, HOLDER_STATUS_LIST_END),
+    ) else {
+        return found;
+    };
+    let stride = std::mem::size_of::<usize>();
+    if begin == 0 || end < begin || (end - begin) % stride != 0 {
+        return found;
+    }
+    let count = (end - begin) / stride;
+    if count == 0 || count > MAX_STATUSES {
+        return found;
+    }
+    // One probe for the whole array rather than one per slot, for the reason
+    // status.rs documents: IsBadReadPtr takes an exception path on unmapped
+    // memory, and this walk runs on a game thread.
+    if !crate::hooks::diag::readable(begin, count * stride) {
+        return found;
+    }
+
+    let cast: unsafe extern "system" fn(usize, i32, usize, usize, i32) -> usize =
+        unsafe { std::mem::transmute(module_base + RT_DYNAMIC_CAST_RVA) };
+    let source_type = module_base + STATUS_BASE_TD_RVA;
+    let target_type = module_base + DAMAGE_LIMIT_BUFF_TD_RVA;
+
+    for index in 0..count {
+        let status = unsafe { ((begin + index * stride) as *const usize).read() };
+        if status == 0 {
+            continue;
+        }
+        // The cast reads the object's vtable and the COL behind it, so both
+        // must be there before it is called — a freed slot would otherwise
+        // fault (or throw __non_rtti_object) inside the game thread.
+        let Some(vtable) = read_ptr_guarded(status, 0).filter(|v| *v != 0) else {
+            continue;
+        };
+        if read_ptr_guarded(vtable.wrapping_sub(8), 0)
+            .filter(|c| *c != 0)
+            .is_none()
+        {
+            continue;
+        }
+
+        let buff = unsafe { cast(status, 0, source_type, target_type, 0) };
+        if buff == 0 {
+            continue;
+        }
+        let Some(buff_vtable) = read_ptr_guarded(buff, 0).filter(|v| *v != 0) else {
+            continue;
+        };
+        let Some(slot) =
+            read_ptr_guarded(buff_vtable, DAMAGE_LIMIT_BUFF_VALUE_SLOT).filter(|s| *s != 0)
+        else {
+            continue;
+        };
+
+        let value_of: unsafe extern "system" fn(usize) -> f32 =
+            unsafe { std::mem::transmute(slot) };
+        let value = unsafe { value_of(buff) };
+        if value != 0.0 {
+            found.push((read_u32_guarded(status, STATUS_ID_OFFSET), value));
+        }
+    }
+    found
+}
+
 /// Arms recording across one DamageInstance build and emits the oracle line.
 fn run_build(a1: *const usize, a2: *const usize, a3: *const usize) -> usize {
     // Armed for the whole call, restored on drop: the chokepoint runs as a
@@ -241,7 +358,9 @@ fn run_build(a1: *const usize, a2: *const usize, a3: *const usize) -> usize {
     // this hit.
     let _armed = BuildGuard::arm(a2);
     let result = unsafe { DamageInstanceBuild.call(a1, a2, a3) };
-    emit_oracle_line(a2 as usize);
+    // After the call: the builder has finished with the list, and a status the
+    // hit itself applied is not part of the cap it just computed.
+    emit_oracle_line(a2 as usize, &buff_terms(a1 as usize));
     result
 }
 
@@ -294,9 +413,9 @@ fn run_term_site(
 /// One line per built DamageInstance, carrying the cap the builder itself
 /// produced so a capture can be checked against the reproduction without a
 /// second data source.
-fn emit_oracle_line(instance: usize) {
+fn emit_oracle_line(instance: usize, buffs: &[(u32, f32)]) {
     let terms = take_terms();
-    if terms.is_empty() {
+    if terms.is_empty() && buffs.is_empty() {
         return;
     }
     let terms_csv = terms
@@ -304,10 +423,15 @@ fn emit_oracle_line(instance: usize) {
         .map(|(rva, id, value)| format!("{rva:#x}:{id:#x}:{value:.6}"))
         .collect::<Vec<_>>()
         .join(",");
+    let buffs_csv = buffs
+        .iter()
+        .map(|(status_id, value)| format!("{status_id}:{value:.6}"))
+        .collect::<Vec<_>>()
+        .join(",");
 
     log::info!(
         "CAPORACLE t={} inst={:#x} action={} rate={:.3} class_flags={:#x} cap={} floor={} \
-         terms=[{}]",
+         terms=[{}] buffs=[{}]",
         crate::hooks::diag::ms(),
         instance,
         read_u32_guarded(instance, INSTANCE_ACTION_ID),
@@ -316,6 +440,7 @@ fn emit_oracle_line(instance: usize) {
         read_u32_guarded(instance, INSTANCE_DAMAGE_CAP),
         read_u32_guarded(instance, INSTANCE_DAMAGE_FLOOR),
         terms_csv,
+        buffs_csv,
     );
 }
 
