@@ -4,7 +4,6 @@ import { useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useShallow } from "zustand/react/shallow";
 
-import { ViewModeToggle } from "@/pages/logs/view/ViewModeToggle";
 import { useEncounterStore } from "@/stores/useEncounterStore";
 import { useMeterFilters } from "@/stores/useMeterFilterSync";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
@@ -19,6 +18,7 @@ import { type SelectorPins } from "../selectorOptions";
 import { TimelineTab } from "../timeline/TimelineTab";
 
 import { ActorBar } from "./ActorBar";
+import { AnalysisTopBar } from "./AnalysisTopBar";
 import { AuraStrip } from "./AuraStrip";
 import { CollapseSupplementaryToggle } from "./CollapseSupplementaryToggle";
 import { DebugBar } from "./DebugBar";
@@ -517,14 +517,7 @@ export const AnalysisView = () => {
 
   return (
     <Box className="analysis">
-      {/* Above everything, on its own row: the way back to Classic. It is not
-          part of the selector bar below because it does not select anything —
-          it replaces the whole body, so it sits outside what it would replace.
-          Padded like ActorBar, since the view is full-bleed and nothing else
-          holds its children off the window edge. */}
-      <Box style={{ display: "flex", justifyContent: "flex-end", padding: "10px 16px" }}>
-        <ViewModeToggle />
-      </Box>
+      <AnalysisTopBar />
 
       <QuestSummary
         encounter={shownEncounter}

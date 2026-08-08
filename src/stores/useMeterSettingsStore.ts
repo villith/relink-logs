@@ -98,10 +98,10 @@ export const DEFAULT_HEADER_SEGMENTS: HeaderSegment[] = [
  * `classic` is the default, and `analysis` is unfinished. There is no longer a
  * build guard — cd06c00f removed the `import.meta.env.DEV` check that used to
  * make `ViewPage` ignore this setting outside dev — so the stored value governs
- * what a release build draws, and this default is the only thing keeping users
- * off the unfinished view. `ViewModeToggle` is the sole writer and is invisible
- * by design, so a user who does not already know it exists never leaves
- * `classic`. Do not flip this default until `analysis` is finished. */
+ * what a release build draws. Do not flip this default until `analysis` is
+ * finished. `ViewModeToggle` is the sole writer, and it is now an ordinary
+ * visible control (it used to be an invisible hit target), so the default is no
+ * longer load-bearing on its own — the Beta option says what it is instead. */
 export type LogsViewMode = "analysis" | "classic";
 
 interface MeterSettings {
@@ -163,8 +163,15 @@ interface MeterSettings {
   bar_height: number;
   /** Vertical gap between meter rows in px. */
   bar_spacing: number;
-  /** See LogsViewMode. Switched from the control in the quest view itself. */
-  logs_view_mode: LogsViewMode;
+  /** See LogsViewMode. Switched from the control in the quest view itself.
+   *
+   * Renamed from `logs_view_mode`, deliberately: the redesign is still a beta,
+   * and the rename is what puts every user who had already switched back onto
+   * `classic` — nothing reads the old key any more, so its stored `analysis` is
+   * ignored and this default applies. The dead key is left in settings.db
+   * rather than swept: it costs one string, and a rename that also deletes is a
+   * rename that cannot be reverted. */
+  logs_view: LogsViewMode;
   /** How skill and cause names resolve across languages — see
    * `SkillNameResolutionMode`. `language-first` prefers the current language's
    * translated game name over a hand label that only exists in English;
@@ -214,7 +221,7 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   header_buttons: { ...DEFAULT_HEADER_BUTTONS },
   ...DEFAULT_OVERLAY_SIZE,
   ...DEFAULT_BAR_APPEARANCE,
-  logs_view_mode: "classic",
+  logs_view: "classic",
   skill_name_resolution: "label-first",
 };
 
