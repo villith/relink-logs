@@ -1,3 +1,10 @@
+/* The --ui-* tokens the .analysis-tokens block below aliases. Imported HERE,
+   by the file that needs them, rather than relied on from an entry point: no
+   TSX imports ui.css any more, and an alias to an undefined property is an
+   invalid declaration the browser drops without a word. Goes when the last
+   --an-* rule below does. */
+@import "../../../../components/ui/ui.css";
+
 /* The Analysis view's own rules, over the app-wide design tokens and controls
  * in `src/components/ui/ui.css` — that file owns the palette, the density scale
  * and the shared pills/switch; this one owns the view's tables, chart chrome
