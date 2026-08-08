@@ -16,7 +16,8 @@
     "test": "vitest run",
     "bump": "node scripts/bump-version.mjs",
     "clean:target": "node scripts/clean-target.mjs",
-    "prepare": "husky"
+    "prepare": "husky",
+    "log-size": "node scripts/log-size-report.mjs"
   },
   "dependencies": {
     "@fontsource-variable/noto-sans": "^5.0.1",
