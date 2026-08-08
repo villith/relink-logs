@@ -17,6 +17,10 @@ use self::{
 
 mod area;
 mod battle;
+// Damage-cap ORACLE — verification only, never in a release hook. See
+// hooks/cap_oracle.rs for why it is gated rather than always compiled.
+#[cfg(feature = "hookdiag")]
+pub(crate) mod cap_oracle;
 // Compiled under `cfg(test)` too, so a plain `cargo test` type-checks and exercises the
 // quest-classification logic. The hook itself is still only INSTALLED behind the feature
 // (see `setup_hooks`), so a release `hook.dll` contains none of this.
