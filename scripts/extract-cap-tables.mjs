@@ -72,7 +72,23 @@ export const CURVES = {};
  * Note `0` is not a valid key: the oracle reserves it for a provider call whose
  * participant set was not exactly one, i.e. a value it declines to attribute.
  */
-export const TERMS = {};
+export const TERMS = {
+  // Round-tripped: SymbolAt 0x61418d8 -> FreeWorkEnhanceEffectPassive::vftable
+  // (pointer[10], so the param-id slot at +0x38 sits inside it). Observed live
+  // on 2026-08-08 across 2,069 capped hits — the ONLY descriptor class the
+  // chokepoint carried in that capture, always param id 2 (cap-up).
+  //
+  // No coefficient is recorded: this class contributes a per-provider value
+  // that varies per hit (0.15 to 0.45 observed), so it is not a constant to be
+  // tabulated. The entry exists to give the id a name instead of "Other".
+  "061418d8": {
+    labelKey: "ui.logs.cap-term-free-work-enhance-effect-passive",
+    // Observed under class_flags 0x0, 0x1, 0x3, 0x8, 0xa, 0xb, 0x21, 0x2b,
+    // 0x108, 0x10000, 0x10008 — i.e. with and without the 0x10000 bit that
+    // selects between the Normal / Skill / Skybound-Art cap-up fields.
+    appliesTo: ["normal", "skill", "sba"],
+  },
+};
 
 export const buildTables = () => ({
   version: GAME_VERSION,
@@ -90,10 +106,11 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const curves = Object.keys(CURVES).length;
   const terms = Object.keys(TERMS).length;
   console.log(`wrote ${OUTPUT} (${curves} curves, ${terms} terms)`);
-  if (curves === 0 || terms === 0) {
+  const empty = [curves === 0 && "curves", terms === 0 && "terms"].filter(Boolean);
+  if (empty.length > 0) {
     console.log(
-      "curves/terms are empty by design — they come from the live cap-oracle " +
-        "capture, not from the exe. See the header comment.",
+      `${empty.join(" and ")} empty by design — they come from a runtime dump ` +
+        "and the live cap-oracle capture, not from the exe. See the header comment.",
     );
   }
 }
