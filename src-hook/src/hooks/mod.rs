@@ -291,6 +291,14 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         "sba_vtable_grant_33bc050",
         sba::OnVtableGrant33bc050Hook::new().setup(&process),
     );
+    // The NETWORK gauge grant (v2.0.4 entry 0xb957a0): the one route into the
+    // gauge that comes off the wire rather than from local simulation. Parks a
+    // numbered site so those rises stop landing in the generic Effect(0)
+    // bucket — see the block comment in sba.rs for what is still open.
+    try_step(
+        "sba_net_gauge_grant",
+        sba::OnNetGaugeGrantHook::new().setup(&process),
+    );
     // The per-hit gauge-grant virtual (0x9b41b0): the taken-side grant path —
     // hits players RECEIVE grant a flat award through it with nothing parked
     // on the thread, which is what the Unknown rises were (see

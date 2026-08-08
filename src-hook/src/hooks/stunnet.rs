@@ -5,9 +5,17 @@
 //! lobby the target's stun accumulator (`actor+0xB90`) is HOST-AUTHORITATIVE —
 //! it never moves synchronously inside `ProcessDamageEvent`, for ANY player,
 //! local included, so the damage hook's delta-across-the-call method reads 0
-//! online. The accrual instead arrives asynchronously via a dispatch-table
-//! message handler, `FUN_140b43b40` (entry rva 0xb43b40, single DATA xref = its
-//! slot in the handler table at rva 0x7cc2c20):
+//! online. The accrual instead arrives asynchronously via a network
+//! message handler, `FUN_140b43b40` (v2.0.2 entry rva 0xb43b40; v2.0.4
+//! 0xb3e260). It has NO code or vtable xrefs — it is a switch-case target, and
+//! the fast-analysis DB runs with Decompiler Switch Analysis disabled, so its
+//! only reference is its own `.pdata` RUNTIME_FUNCTION entry. (This comment
+//! used to read that entry as "its slot in the handler table at 0x7cc2c20";
+//! there is no such table — that is just where `.pdata` describes it.) To find
+//! its SIBLINGS, enumerate callers of the net entity-handle resolver
+//! `FUN_140269520`: every handler needing a source or target entity calls it.
+//! That is how the network SBA gauge grant was found — see the network-grant
+//! block in `sba.rs`.
 //!
 //!   fn(rcx = target actor, rdx = message) {
 //!       resolve_entity(*(msg+0x20));                 // u64 source entity-handle id

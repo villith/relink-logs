@@ -61,6 +61,7 @@ pub(super) fn disable() {
     super::disable_quiet("OnVtableGrant191be40", &OnVtableGrant191be40);
     super::disable_quiet("OnVtableGrant33bbc20", &OnVtableGrant33bbc20);
     super::disable_quiet("OnVtableGrant33bc050", &OnVtableGrant33bc050);
+    super::disable_quiet("OnNetGaugeGrant", &OnNetGaugeGrant);
     super::disable_quiet("OnSBAGrant", &OnSBAGrant);
 }
 
@@ -473,6 +474,11 @@ pub(crate) mod site {
     pub const VTABLE_GRANT_191BE40: u32 = 1;
     pub const VTABLE_GRANT_33BBC20: u32 = 2;
     pub const VTABLE_GRANT_33BC050: u32 = 3;
+    /// The NETWORK gauge-grant message handler (see [`super::OnNetGaugeGrantHook`]).
+    /// A site rather than a name because what the message means in gameplay
+    /// terms is not established yet — only that the grant arrived over the
+    /// wire instead of being computed locally.
+    pub const NET_GAUGE_GRANT: u32 = 4;
 }
 
 thread_local! {
@@ -975,6 +981,133 @@ impl OnVtableGrant33bc050Hook {
     }
 }
 
+// ---------------------------------------------------------------------------
+// NETWORK gauge grant (v2.0.4, derived 2026-08-08)
+//
+// The one route into the gauge that does NOT start from locally-simulated
+// gameplay. It is a member of the game's network message-handler family — the
+// same family as the network stun-apply handler (see `stunnet.rs`): one arg,
+// the message; resolve `*(u64*)(msg+0x10)` through the net entity-handle map
+// (`FUN_140269520`, rva 0x269520); validate the handle against the entity
+// table (`DAT_14701f728`, +0x48 ids / +0x20 entities); take the specified
+// actor at `entity+0x70`; then call the generic "add gauge %" API:
+//
+//   FUN_140bcba30(actor, *(f32*)(msg+0x18), *(u8*)(msg+0x1e) == 0,
+//                 *(u8*)(msg+0x1c), *(u8*)(msg+0x1d), *(u32*)(msg+0x20),
+//                 *(u8*)(msg+0x24), *(u8*)(msg+0x25))
+//
+// which is the very function `OnGaugePercentGrantHook` detours, so the gauge
+// update runs as a synchronous callee of this frame and the parked cause is
+// read back by `resolve_cause` exactly like every other grant site.
+//
+// HOW IT WAS FOUND, since none of it is reachable by the usual route: the
+// handler has no code xrefs at all (its only reference is its own `.pdata`
+// RUNTIME_FUNCTION), because it is a switch-case target and the fast-analysis
+// DB has Decompiler Switch Analysis disabled. Enumerating callers of the net
+// entity resolver instead yields the whole handler family, and this is the one
+// member that also calls the gauge-percent API.
+//
+// WHAT IS NOT ESTABLISHED, and must come from a live online round before
+// anything is named or built on top:
+//   * whose gauge these messages move — the local player (a host-computed
+//     party award), remote members, or both. The handler grants to whatever
+//     entity the message names, and static code cannot say which are sent.
+//   * what the u32 at `msg+0x20` means. It is forwarded through the percent
+//     API into the gauge update's third argument, which gates that function's
+//     sigil/stat scaling block — so it reads as a grant-KIND enum rather than
+//     an action id. The `SBAGAIN` diagnostic now logs it (`a3`) so live data
+//     can settle it.
+// Until then this parks a numbered SITE, which separates these rises out of
+// the generic `Effect(0)` bucket without asserting a meaning for them.
+//
+// NOTE for the open "Effect(0) tracks ally SBA use" lead: this is a mechanism
+// that would produce exactly that. A host-side award arriving here lands on
+// the percent API with nothing more specific parked, which is precisely the
+// residual bucket. Suggestive, NOT confirmed — the live round decides.
+// ---------------------------------------------------------------------------
+
+/// The network gauge-grant handler (v2.0.4 entry 0xb957a0). Arity 1: the
+/// prologue reads rcx only (`mov rsi,rcx`, then `mov rcx,[rcx+0x10]`), with no
+/// rdx/r8/r9 touched — Ghidra InspectFunc + prologue disasm, 2026-08-08.
+type OnNetGaugeGrantFunc = unsafe extern "system" fn(*const usize) -> usize;
+
+/// Direct-entry signature: the preceding `int3` padding plus the prologue
+/// through the `lea rdx,[rsp+0x40]`, stopping BEFORE the relative call so no
+/// displacement is baked in. sigscan 2026-08-08: exactly 1 match,
+/// cursor_rva=0xb957a0.
+const ON_NET_GAUGE_GRANT_SIG: &str = "cc cc cc cc ' 56 57 48 83 ec 58 48 89 ce c7 44 24 40 00 00 00 00 c5 f8 57 c0 c5 f8 11 44 24 48 48 8b 49 10 48 8d 54 24 40";
+
+/// Message-relative offsets (from the FUN_140b957a0 decompile). Read by the
+/// `SBANET` diagnostic only — production forwards the message untouched.
+#[cfg(feature = "hookdiag")]
+mod net_grant_msg {
+    /// u64 net entity-handle id of the player whose gauge this moves.
+    pub const TARGET_ID: usize = 0x10;
+    /// f32 percent, the amount handed to the gauge-percent API.
+    pub const PERCENT: usize = 0x18;
+    /// u32 forwarded into the gauge update's scaling-gate argument.
+    pub const KIND: usize = 0x20;
+}
+
+static_detour! {
+    static OnNetGaugeGrant: unsafe extern "system" fn(*const usize) -> usize;
+}
+
+/// PRODUCTION detour of the network gauge-grant handler: parks
+/// [`protocol::SbaGainCause::Site`] with [`site::NET_GAUGE_GRANT`] for the
+/// duration of the original call. Forwards its one arg verbatim; no other
+/// side effects. See the block comment above for what this is and what about
+/// it is still open.
+pub struct OnNetGaugeGrantHook;
+
+impl OnNetGaugeGrantHook {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn setup(&self, process: &Process) -> Result<()> {
+        if let Ok(original) = process.search_address(ON_NET_GAUGE_GRANT_SIG) {
+            #[cfg(feature = "console")]
+            println!("found on net gauge grant");
+
+            unsafe {
+                let func: OnNetGaugeGrantFunc = std::mem::transmute(original);
+                OnNetGaugeGrant.initialize(func, |a1| Self::run(a1))?;
+                OnNetGaugeGrant.enable()?;
+            }
+        } else {
+            return Err(anyhow!("Could not find net_gauge_grant"));
+        }
+
+        Ok(())
+    }
+
+    fn run(msg: *const usize) -> usize {
+        // The message's own fields, which the parked cause cannot carry: whose
+        // gauge, how much, and the unidentified kind word. This is the line the
+        // live round reads to decide whether remote members' gauge arrives here
+        // — and therefore whether per-cause attribution is possible for them.
+        #[cfg(feature = "hookdiag")]
+        {
+            use crate::hooks::diag::{read_f32_guarded, read_u32_guarded, read_u64_guarded};
+            static N: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            static DETAIL: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+            log_site_fire("net_gauge_grant", &N);
+            if crate::hooks::diag::first_n(&DETAIL, 32) {
+                log::info!(
+                    "SBANET target_id={:?} percent={:?} kind={:#x}",
+                    read_u64_guarded(msg as usize, net_grant_msg::TARGET_ID),
+                    read_f32_guarded(msg as usize, net_grant_msg::PERCENT),
+                    read_u32_guarded(msg as usize, net_grant_msg::KIND),
+                );
+            }
+        }
+
+        let _guard = CauseGuard::park(protocol::SbaGainCause::Site(site::NET_GAUGE_GRANT));
+        unsafe { OnNetGaugeGrant.call(msg) }
+    }
+}
+
 /// Gets called when your SBA gauge value needs to update with a given value.
 #[derive(Clone)]
 pub struct OnHandleSBAUpdateHook {
@@ -1069,7 +1202,7 @@ impl OnHandleSBAUpdateHook {
             // A burst resetting the bar reads as a large negative; only
             // a real increase is a gain.
             if amount > 0.0 && amount.is_finite() {
-                self.attribute_and_emit_gain(a1, amount, a9, a11);
+                self.attribute_and_emit_gain(a1, amount, a3, a9, a11);
             }
         }
 
@@ -1084,7 +1217,13 @@ impl OnHandleSBAUpdateHook {
     /// `SbaGain` with it, and keeps per-cause counters under `hookdiag`; an
     /// `Err` from the resolver skips the emit (the slot poll remains the
     /// record of the gauge LEVEL either way).
-    fn attribute_and_emit_gain(&self, a1: *const usize, amount: f32, a9: u8, a11: u8) {
+    ///
+    /// `a3` is carried for the diagnostic only: it is the gauge update's
+    /// scaling-gate word, the same value the network gauge grant forwards out
+    /// of its message (`msg+0x20`), and logging it is how that field earns a
+    /// meaning. Nothing branches on it.
+    #[cfg_attr(not(feature = "hookdiag"), allow(unused_variables))]
+    fn attribute_and_emit_gain(&self, a1: *const usize, amount: f32, a3: u32, a9: u8, a11: u8) {
         let outcome = self.resolve_cause(a1, a9, a11);
 
         if let Ok((actor_index, cause)) = outcome {
@@ -1127,7 +1266,8 @@ impl OnHandleSBAUpdateHook {
             if rises <= 8 || rises % 32 == 0 {
                 log::info!(
                     "SBAGAIN rises={rises} skill={} taken={} party={} director={} named={} \
-                     unknown={} failed={} last={outcome:?} amount={amount:.2} a9={a9} a11={a11}",
+                     unknown={} failed={} last={outcome:?} amount={amount:.2} a3={a3:#x} \
+                     a9={a9} a11={a11}",
                     SKILL.load(AtomicOrdering::Relaxed),
                     TAKEN.load(AtomicOrdering::Relaxed),
                     PARTY.load(AtomicOrdering::Relaxed),
