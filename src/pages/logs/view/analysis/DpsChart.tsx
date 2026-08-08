@@ -557,7 +557,7 @@ export const DpsChart = ({
     // Grows with the view's density knob, like everything around it: at the
     // larger type the old ceiling left the plot shorter than the table's first
     // few rows.
-    h: "clamp(calc(190px * var(--ui-scale)), 28vh, calc(380px * var(--ui-scale)))",
+    h: "clamp(calc(190px * var(--density)), 28vh, calc(380px * var(--density)))",
     // The rolled-up form, so the `other` band the legend offers has a series
     // to draw. Identical to `data` on a chart with no capped tail.
     data: plotData,

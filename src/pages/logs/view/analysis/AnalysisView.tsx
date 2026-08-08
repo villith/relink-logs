@@ -497,7 +497,7 @@ export const AnalysisView = () => {
   const fullLabel = bucketLabel(Math.max(0, chartLen - 1));
 
   return (
-    <Box className="analysis analysis-tokens">
+    <Box className="analysis">
       {/* Above everything, on its own row: the way back to Classic. It is not
           part of the selector bar below because it does not select anything —
           it replaces the whole body, so it sits outside what it would replace.
