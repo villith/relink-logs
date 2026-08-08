@@ -958,6 +958,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         }
     }
 
@@ -993,6 +994,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         }
     }
 
@@ -1380,6 +1382,7 @@ mod tests {
             base_damage: None,
             target_current_hp: Some(9_500),
             target_max_hp: Some(10_000),
+            class_flags: None,
         };
 
         // Self-parented Pl2000, matching `dragon_form_damage_attributes_to_the_id_player`.

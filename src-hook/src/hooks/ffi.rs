@@ -14,6 +14,10 @@ use std::ffi::CString;
 //         at 0xDC, its known attack rate). The OLD code read `flags` here, so link/SBA
 //         classification was reading float bit patterns (usually 0 for the tested bits).
 //   0xE8  flags (u64) — the real bitfield; the game tests bits 55, 39, 24 here.
+//   0xF0  attack-class flags (u32) — a DIFFERENT bitfield from 0xE8. The cap
+//         builder reads it to pick which of the record's three cap-up fields
+//         applies: 0x40000 = Skybound Art, 0x10000 = Skill, neither = Normal.
+//         Same offset `cap_oracle.rs` reads as INSTANCE_CLASS_FLAGS.
 //   0x16C action_id (was 0x154; confirmed live: IDs match ui.json)
 //   0x2B8 damage floor (i32, -1 = none)
 //   0x2BC damage cap (i32, was 0x264; -1 is normalized to 99,999,999 = "no cap");
@@ -28,7 +32,8 @@ pub struct DamageInstance {
     pub attack_rate: f32,   // 0xDC
     padding_e0: [u8; 0x08], // 0xE0 - 0xE8
     pub flags: u64,         // 0xE8
-    padding_f0: [u8; 0x7C], // 0xF0 - 0x16C
+    pub class_flags: u32,   // 0xF0 attack class; see the header comment
+    padding_f4: [u8; 0x78], // 0xF4 - 0x16C
     pub action_id: u32,     // 0x16C
     padding_170: [u8; 0x14C], // 0x170 - 0x2BC
     pub damage_cap: i32,    // 0x2BC
@@ -328,5 +333,24 @@ mod tests {
                 .as_bytes(),
             b"Gran"
         );
+    }
+
+    /// The struct reaches its fields by padding arithmetic, so a miscounted
+    /// pad silently shifts every field after it and the hook reads a
+    /// neighbouring value with no error anywhere. This pins the three offsets
+    /// the cap work depends on against the decompile.
+    ///
+    /// It proves the arithmetic, NOT the offsets: those are v2.0.4 facts that
+    /// only a live run can confirm. A failure here means the padding is wrong —
+    /// fix the padding, never the assertion.
+    #[test]
+    fn damage_instance_fields_sit_at_their_documented_offsets() {
+        use std::mem::offset_of;
+        assert_eq!(offset_of!(DamageInstance, class_flags), 0xF0);
+        assert_eq!(offset_of!(DamageInstance, action_id), 0x16C);
+        assert_eq!(offset_of!(DamageInstance, damage_cap), 0x2BC);
+        // The two fields the cap card reads either side of the clamp.
+        assert_eq!(offset_of!(DamageInstance, damage), 0xD4);
+        assert_eq!(offset_of!(DamageInstance, base_damage), 0x2D4);
     }
 }

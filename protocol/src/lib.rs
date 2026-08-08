@@ -207,6 +207,11 @@ pub struct DamageEvent {
     /// The target's maximum HP (`ExHp` +0x168). `None` alongside
     /// `target_current_hp`.
     pub target_max_hp: Option<u64>,
+    /// Attack-class flags (`instance+0xF0`). Bits `0x40000` (Skybound Art) and
+    /// `0x10000` (Skill) select which per-player cap-up applies; neither means
+    /// Normal, and `0x40000` wins over `0x10000`. `None` on old logs.
+    #[serde(default)]
+    pub class_flags: Option<u32>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

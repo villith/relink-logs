@@ -896,6 +896,7 @@ mod data_coverage_tests {
             base_damage,
             target_current_hp: target_hp,
             target_max_hp: target_hp,
+            class_flags: None,
         })
     }
 
@@ -4411,6 +4412,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         }
     }
 
@@ -4440,6 +4442,7 @@ mod tests {
             base_damage: None,
             target_current_hp: Some(9_500),
             target_max_hp: Some(10_000),
+            class_flags: None,
         }
     }
 
@@ -5991,6 +5994,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         }
     }
 
@@ -8887,6 +8891,7 @@ mod tests {
                 base_damage: None,
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
             }),
         ));
 
@@ -8921,6 +8926,7 @@ mod tests {
                 base_damage: None,
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
             }),
         ));
 
@@ -8948,6 +8954,7 @@ mod tests {
                 base_damage: None,
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
             }),
         ));
 
@@ -8987,6 +8994,7 @@ mod tests {
                 base_damage: Some(200_000.0), // base > cap -> capped
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
             }),
         ));
 
@@ -9014,6 +9022,7 @@ mod tests {
                 base_damage: Some(100.0), // base < cap -> not capped
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
             }),
         ));
 
@@ -9055,6 +9064,7 @@ mod tests {
                 base_damage: Some(base),
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
             }
         }
 

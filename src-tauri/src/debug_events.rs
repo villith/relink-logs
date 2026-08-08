@@ -101,6 +101,7 @@ pub fn damage_event(slot: u8, character_type: u32, amount: i32, skill_id: u32) -
         base_damage: None,
         target_current_hp: None,
         target_max_hp: None,
+        class_flags: None,
     }
 }
 

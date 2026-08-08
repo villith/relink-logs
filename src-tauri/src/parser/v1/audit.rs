@@ -489,6 +489,7 @@ mod tests {
                 base_damage: None,
                 target_current_hp: current,
                 target_max_hp: max,
+                class_flags: None,
             }),
         )
     }

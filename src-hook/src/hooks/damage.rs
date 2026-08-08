@@ -1349,6 +1349,9 @@ impl OnProcessDotHook {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            // A DoT tick has no DamageInstance to read a class off, and it is
+            // not one of the three cap classes anyway.
+            class_flags: None,
         });
 
         let _ = self.tx.send(event);
@@ -1653,6 +1656,11 @@ fn build_damage_event(
         base_damage,
         target_current_hp,
         target_max_hp,
+        // Carried for every hit, cappable or not: the class is a fact about the
+        // attack, and gating it on `damage_cap` the way `base_damage` is gated
+        // would make an uncapped hit unable to say which cap-up would have
+        // applied to it.
+        class_flags: Some(damage_instance.class_flags),
     }
 }
 

@@ -666,6 +666,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -704,6 +705,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -750,6 +752,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         };
 
         let skill_two = DamageEvent {
@@ -774,6 +777,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         };
 
         player_state
@@ -815,6 +819,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         };
 
         let child_skill = DamageEvent {
@@ -839,6 +844,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -886,6 +892,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         };
 
         let player_data = PlayerData {
@@ -948,6 +955,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -981,6 +989,7 @@ mod tests {
             base_damage: Some(40_000.0), // base > cap -> capped
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         }
     }
 
@@ -1007,6 +1016,7 @@ mod tests {
             base_damage: Some(100.0), // base < cap -> not capped
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         }
     }
 
@@ -1230,6 +1240,7 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
         }
     }
 
