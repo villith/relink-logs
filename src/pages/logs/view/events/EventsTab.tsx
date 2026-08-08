@@ -16,6 +16,7 @@ import {
   CHIP_SWATCH_CLASS,
 } from "../analysis/chipAnatomy";
 import type { StreamContext } from "../analysis/model/bodyContext";
+import { AmountCell } from "./AmountCell";
 import { toEventRow, type ActorSpace, type EventKind, type EventRow } from "./eventRows";
 import { defaultScopeKinds, narrowStream, scopeFor, scopeKinds } from "./eventScope";
 import { useEvents } from "./useEvents";
@@ -243,15 +244,7 @@ export const EventRowsTable = ({
                     apart. Every other kind has one or the other, never both. */}
                 <CellText name="ability" flex cell={action} suffix={row.statusKey === null ? null : detail} />
                 <CellText name="target" cell={target} width={COLUMNS.target} />
-                <Text
-                  size="xs"
-                  w={COLUMNS.amount}
-                  ta="right"
-                  data-cell="amount"
-                  style={{ fontVariantNumeric: "tabular-nums" }}
-                >
-                  {row.amount === null ? "" : row.amount.toLocaleString()}
-                </Text>
+                <AmountCell amount={row.amount} capHit={row.capHit} width={COLUMNS.amount} />
               </Group>
             </Box>
           );

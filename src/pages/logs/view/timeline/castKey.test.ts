@@ -15,6 +15,7 @@ const event = (over: Partial<EventRow>): EventRow => ({
   statusId: null,
   detailKey: null,
   amount: null,
+  capHit: null,
   ...over,
 });
 

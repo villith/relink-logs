@@ -2,6 +2,7 @@ import { statusPinKey } from "@/pages/logs/view/statusUptime";
 import type { LogEvent } from "@/types";
 
 import { abilityKey } from "../abilityKey";
+import type { CapHit } from "./capBreakdown";
 
 /** What the colour coding and the kind toggles key on. */
 export type EventKind = "damage" | "stun" | "perfectGuard" | "sba" | "sbaTick" | "death" | "status" | "other";
@@ -54,6 +55,11 @@ export type EventRow = {
   detailKey: string | null;
   detailParams?: Record<string, number | string>;
   amount: number | null;
+  /** The cap fields of a damage row, for the Amount hover card. `null` on every
+   * non-damage kind — those rows have no cap to explain. A damage row from a log
+   * predating the capture carries the shape with null members, which
+   * `capCardRows` degrades to the one row it can honestly show. */
+  capHit: CapHit | null;
 };
 
 /** The `Message` variant tag. Externally tagged, so the payload is a one-key
@@ -135,6 +141,12 @@ export const toEventRow = (event: LogEvent): EventRow => {
       statusId: null,
       detailKey: null,
       amount: hit.damage,
+      capHit: {
+        damage: hit.damage,
+        damage_cap: hit.damage_cap,
+        base_damage: hit.base_damage,
+        attack_rate: hit.attack_rate,
+      },
     };
   }
 
@@ -164,6 +176,7 @@ export const toEventRow = (event: LogEvent): EventRow => {
       // the same effect on the same holder in the same colour.
       detailKey: "ui.logs.events-status-applied",
       amount: status.stacks,
+      capHit: null,
     };
   }
 
@@ -188,6 +201,7 @@ export const toEventRow = (event: LogEvent): EventRow => {
       statusId: status.status_id,
       detailKey: "ui.logs.events-status-removed",
       amount: null,
+      capHit: null,
     };
   }
 
@@ -208,6 +222,7 @@ export const toEventRow = (event: LogEvent): EventRow => {
       statusId: null,
       detailKey: gain.action_id === 0 ? "ui.logs.events-sba-gain" : null,
       amount: Math.round(gain.amount),
+      capHit: null,
     };
   }
 
@@ -224,6 +239,7 @@ export const toEventRow = (event: LogEvent): EventRow => {
       statusId: null,
       detailKey: payload.LinkTime.active ? "ui.logs.events-link-start" : "ui.logs.events-link-end",
       amount: null,
+      capHit: null,
     };
   }
 
@@ -240,6 +256,7 @@ export const toEventRow = (event: LogEvent): EventRow => {
       detailKey: "ui.logs.events-enemy-mode",
       detailParams: { mode: payload.EnemyMode.mode },
       amount: null,
+      capHit: null,
     };
   }
 
@@ -266,6 +283,7 @@ export const toEventRow = (event: LogEvent): EventRow => {
       rounded(numberAt(body, "sba_value")) ??
       rounded(numberAt(body, "amount")) ??
       numberAt(body, "stacks"),
+    capHit: null,
   };
 };
 
