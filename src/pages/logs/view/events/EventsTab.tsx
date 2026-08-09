@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { EntityIcon } from "@/components/ui/EntityIcon";
 import { Strip } from "@/components/ui/Strip";
+import type { PlayerData } from "@/types";
 import { millisecondsToPreciseElapsedFormat } from "@/utils";
 
 import "../analysis/analysis.css";
@@ -18,6 +19,7 @@ import {
 import type { StreamContext } from "../analysis/model/bodyContext";
 import { AmountCell } from "./AmountCell";
 import type { PlayerCapUp } from "./capBreakdown";
+import type { CapLoadout } from "./capSources";
 import { toEventRow, type ActorSpace, type EventKind, type EventRow } from "./eventRows";
 import { defaultScopeKinds, narrowStream, scopeFor, scopeKinds } from "./eventScope";
 import { useEvents } from "./useEvents";
@@ -158,6 +160,7 @@ export const EventRowsTable = ({
   totalRows,
   labels,
   capUp,
+  loadout,
 }: {
   /** The visible slice only. */
   rows: EventRow[];
@@ -171,6 +174,9 @@ export const EventRowsTable = ({
   /** The party's cap-up totals, keyed by the slot key a damage row carries as
    * its `sourceIndex`. Absent for a log recorded before the capture. */
   capUp?: Record<string, PlayerCapUp>;
+  /** The party's stored loadouts, on the same key — what the cap card itemizes
+   * the totals against. */
+  loadout?: Map<number, CapLoadout>;
 }) => {
   const { t } = useTranslation();
 
@@ -253,6 +259,7 @@ export const EventRowsTable = ({
                   amount={row.amount}
                   capHit={row.capHit}
                   playerCapUp={row.sourceIndex === null ? undefined : capUp?.[String(row.sourceIndex)]}
+                  loadout={row.sourceIndex === null ? undefined : loadout?.get(row.sourceIndex)}
                   width={COLUMNS.amount}
                 />
               </Group>
@@ -270,6 +277,9 @@ export type EventsTabProps = {
    * which reads the same stream through the same filters. */
   stream: StreamContext;
   labels: EventLabels;
+  /** The party's stored loadouts, which the Amount cell's cap card itemizes a
+   * hit's cap-up total against. Empty for a log with no party data. */
+  playerData: PlayerData[];
 };
 
 /** The metric's raw event stream: the same events its table counts, listed
@@ -280,10 +290,15 @@ export type EventsTabProps = {
  * table would. So it answers to all of them: the metric picks the kinds (see
  * `eventScope`), the side picks the holders where that means anything, and the
  * pins narrow what is left. */
-export const EventsTab = ({ stream, labels }: EventsTabProps) => {
+export const EventsTab = ({ stream, labels, playerData }: EventsTabProps) => {
   const { id, metric, hostility, pins, probes } = stream;
   const { t } = useTranslation();
   const { events, total, capUp } = useEvents(id);
+
+  // Keyed by `actorIndex` — the same key `cap_up_by_source` uses and the same
+  // one a damage row carries as its `sourceIndex`, so a hit's total and the
+  // loadout it is itemized against always describe one player.
+  const loadout = useMemo(() => new Map(playerData.map((player) => [player.actorIndex, player])), [playerData]);
 
   const scope = scopeFor(metric);
   const offered = scopeKinds(scope);
@@ -387,6 +402,7 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
             totalRows={shown.length}
             labels={labels}
             capUp={capUp}
+            loadout={loadout}
           />
         )}
       </Box>

@@ -693,7 +693,7 @@ export const AnalysisView = () => {
           rows drawn against time, or the raw events behind them. Everything
           above is the same in all three. */}
       {body === EVENTS_TAB ? (
-        <EventsTab stream={stream} labels={eventLabels} />
+        <EventsTab stream={stream} labels={eventLabels} playerData={playerData} />
       ) : body === TIMELINE_TAB ? (
         <TimelineTab
           stream={stream}

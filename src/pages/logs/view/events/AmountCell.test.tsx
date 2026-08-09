@@ -51,7 +51,9 @@ describe("AmountCell", () => {
   });
 
   // The whole point of the card: the game's own total, and how much of it the
-  // model can account for. With no source derived yet, that is all of it.
+  // model can account for. With no loadout to reconstruct from, that is all of
+  // it — the alternative, reporting zero unaccounted, would claim a
+  // reconstruction that never ran.
   it("shows the game's cap-up total and the unaccounted remainder", () => {
     renderCell({
       amount: 1_500_000,
@@ -78,6 +80,42 @@ describe("AmountCell", () => {
     });
     hover("1,500,000");
     expect(screen.getByTestId("cap-card").querySelector('[data-cap-row="capup"]')?.textContent).toContain("1,216%");
+  });
+
+  // The reconstruction is what shrinks Unaccounted. A level-65 DMG Cap trait is
+  // +250%, so it must both appear as its own row and come OFF the remainder —
+  // an itemized row that leaves the remainder untouched would double-count.
+  it("itemizes the loadout's cap sources and shrinks the unaccounted row", () => {
+    renderCell({
+      amount: 1_500_000,
+      capHit,
+      playerCapUp: { normal: 13.13, skill: 15.18, sba: 12.16 },
+      loadout: {
+        sigils: [
+          {
+            firstTraitId: 0xdc584f60,
+            firstTraitLevel: 65,
+            secondTraitId: 0,
+            secondTraitLevel: 0,
+            sigilId: 1,
+            equippedCharacter: 0,
+            sigilLevel: 1,
+            acquisitionCount: 0,
+            notificationEnum: 0,
+          },
+        ],
+        summons: [],
+        weaponState: null,
+        weaponInfo: null,
+        overmasteryInfo: null,
+      },
+      width: 78,
+    });
+    hover("1,500,000");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="trait"]')?.textContent).toContain("250%");
+    // 13.13 - 2.50
+    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,063%");
   });
 
   // A damage row from a log recorded before the cap capture carries the shape

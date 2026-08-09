@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/Label";
 
 import { HOVER_PANEL_CLASS } from "../analysis/HoverCard";
 import { capCardRows, selectCapUp, type CapHit, type CapRow, type PlayerCapUp } from "./capBreakdown";
+import { capClassOf, deriveCapSources, type CapLoadout } from "./capSources";
 
 const format = (row: CapRow, locale: string): string => {
   switch (row.kind) {
@@ -32,6 +33,7 @@ export const AmountCell = ({
   amount,
   capHit,
   playerCapUp,
+  loadout,
   width,
 }: {
   amount: number | null;
@@ -40,16 +42,22 @@ export const AmountCell = ({
    * capture — in which case the card falls back to its Stage-1 rows rather than
    * showing a cap-up block it cannot fill. */
   playerCapUp?: PlayerCapUp;
+  /** The acting player's stored loadout, which the itemized rows are
+   * reconstructed from. Undefined leaves the whole total unaccounted rather
+   * than claiming the loadout contributed nothing. */
+  loadout?: CapLoadout;
   width: number;
 }) => {
   const { t, i18n } = useTranslation();
   const rows = useMemo(() => {
     if (capHit === null) return [];
     const total = selectCapUp(playerCapUp, capHit.class_flags);
-    // No derived sources yet, so the whole total reports as unaccounted. That
-    // is the honest starting point, and every source that lands shrinks it.
-    return capCardRows(capHit, total === null ? undefined : { totalCapUp: total, terms: [] });
-  }, [capHit, playerCapUp]);
+    // The terms are reconstructed from the loadout INDEPENDENTLY of `total` —
+    // the game fuses every source before the hook sees it — so whatever they
+    // miss surfaces in the card's unaccounted row instead of being hidden.
+    const terms = deriveCapSources(loadout, capClassOf(capHit.class_flags));
+    return capCardRows(capHit, total === null ? undefined : { totalCapUp: total, terms });
+  }, [capHit, playerCapUp, loadout]);
   const shows = rows.length > 1;
 
   // Memoized because `CursorCard` re-renders on every committed cursor frame
