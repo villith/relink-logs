@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { capCardRows, selectCapUp } from "./capBreakdown";
+import { capCardRows, selectCapUp, type CapContext } from "./capBreakdown";
 
 describe("selectCapUp", () => {
   const capUp = { normal: 13.13, skill: 15.18, sba: 12.16 };
@@ -33,6 +33,16 @@ const hit = {
   class_flags: 0x1,
 };
 
+const context = (over: Partial<CapContext> = {}): CapContext => ({
+  ladderBase: null,
+  consistent: null,
+  record: null,
+  recordComponents: [],
+  dmgCapTrait: 0,
+  conditional: [],
+  ...over,
+});
+
 describe("capCardRows", () => {
   it("reports the logged cap, the MV and the derived multiplier", () => {
     expect(capCardRows(hit)).toEqual([
@@ -50,60 +60,113 @@ describe("capCardRows", () => {
     expect(rows.map((r) => r.key)).toEqual(["damage"]);
   });
 
-  // The game hands us ONE fused cap-up number, not its sources. Deriving the
-  // sources from the stored loadout and subtracting gives the gap — which is
-  // the whole point of the unaccounted row, and is the entire total until a
-  // source lands.
-  describe("itemized cap-up", () => {
-    const capUp = { totalCapUp: 13.13, terms: [] };
-
-    it("reconciles the derived sources against the game's own total", () => {
-      const rows = capCardRows(hit, {
-        totalCapUp: 13.13,
-        terms: [
-          { key: "om-1", labelKey: "ui.logs.cap-source-overmastery", value: 0.5 },
-          { key: "summon-1", labelKey: "ui.logs.cap-source-summon", value: 0.35 },
-        ],
-      });
-      const byKey = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-      expect(byKey["capup"]).toBeCloseTo(1313, 2);
-      expect(byKey["om-1"]).toBeCloseTo(50, 2);
-      expect(byKey["summon-1"]).toBeCloseTo(35, 2);
-      // 13.13 - 0.5 - 0.35 = 12.28
-      expect(byKey["unaccounted"]).toBeCloseTo(1228, 2);
-    });
-
-    it("reports the whole total as unaccounted when no source is derived yet", () => {
-      const rows = capCardRows(hit, capUp);
-      const unaccounted = rows.find((r) => r.key === "unaccounted");
-      expect(unaccounted?.value).toBeCloseTo(1313, 2);
-    });
-
-    it("shows the unaccounted row even when it is the largest number on the card", () => {
-      // Hiding it exactly when the model is doing badly is when the reader most
-      // needs to see it.
-      const rows = capCardRows(hit, capUp);
-      expect(rows.some((r) => r.key === "unaccounted")).toBe(true);
-    });
-
-    it("derives the base cap from the game's total, not from the derived sources", () => {
-      // Sources are a partial reconstruction; dividing by them would overstate
-      // the base. The game's own multiplier is 1 + 13.13.
-      const rows = capCardRows(hit, capUp);
-      const base = rows.find((r) => r.key === "basecap");
-      expect(base?.value).toBeCloseTo(1_000_000 / 14.13, 0);
-    });
-
-    it("keeps the Stage-1 rows when no cap-up is known at all", () => {
-      expect(capCardRows(hit).some((r) => r.key === "unaccounted")).toBe(false);
-    });
-  });
-
   it("divides an UNCAPPED hit by its base, not by the cap", () => {
     // base < cap, so the clamp never bound; dividing by the cap would
     // understate the multiplier (0.7 instead of 1.167).
     const rows = capCardRows({ ...hit, base_damage: 600_000, damage: 700_000 });
     expect(rows.find((r) => r.key === "overcap")?.value).toBeCloseTo(60, 2);
     expect(rows.find((r) => r.key === "postcap")?.value).toBeCloseTo(1.167, 3);
+  });
+
+  // The game's own ladder gives the base INDEPENDENTLY of any cap-up model,
+  // which is what makes every number below it falsifiable: the game's total is
+  // cap / base − 1 per hit, and the attributed terms must reconcile against it.
+  describe("with the ladder base", () => {
+    // A real capped hit from the 2026-08-08 capture: cap 152737 at ladder base
+    // 5399 is the game's own +2729%.
+    const real = { ...hit, damage_cap: 152_737 };
+
+    it("reports the real base and the game's per-hit total", () => {
+      const rows = capCardRows(real, context({ ladderBase: 5399, consistent: true }));
+      const byKey = Object.fromEntries(rows.map((r) => [r.key, r.value]));
+      expect(byKey["basecap"]).toBe(5399);
+      expect(byKey["gamecapup"]).toBeCloseTo(2729, 0);
+    });
+
+    it("carries the formula verdict as its own row", () => {
+      const rows = capCardRows(real, context({ ladderBase: 5399, consistent: true }));
+      expect(rows.find((r) => r.key === "verdict")).toEqual({
+        key: "verdict",
+        labelKey: "ui.logs.cap-formula-check",
+        value: 1,
+        kind: "verdict",
+      });
+      const bad = capCardRows(real, context({ ladderBase: 5399, consistent: false }));
+      expect(bad.find((r) => r.key === "verdict")?.value).toBe(0);
+    });
+
+    it("attributes the captured record and the DMG Cap trait against the game total", () => {
+      const rows = capCardRows(
+        real,
+        context({
+          ladderBase: 5399,
+          consistent: true,
+          record: 18.96,
+          dmgCapTrait: 2.38,
+          recordComponents: [{ key: "overmastery", labelKey: "ui.logs.cap-source-overmastery", value: 0.2 }],
+        })
+      );
+      const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
+      expect(byKey["capup"].value).toBeCloseTo(1896, 0);
+      expect(byKey["dmgcap"].value).toBeCloseTo(238, 0);
+      // 27.29... − 18.96 − 2.38 = 5.95...
+      expect(byKey["unaccounted"].value).toBeCloseTo(595, 0);
+      // The record's components are sub-rows of the captured number, NOT terms:
+      // the record already contains them, so they never join the sum.
+      expect(byKey["overmastery"].variant).toBe("sub");
+    });
+
+    it("renders conditional sources excluded from the attribution", () => {
+      const rows = capCardRows(
+        real,
+        context({
+          ladderBase: 5399,
+          consistent: true,
+          record: 18.96,
+          conditional: [{ key: "conditional-1e1cecce", labelKey: "", traitId: 0x1e1cecce, value: 5.0 }],
+        })
+      );
+      const conditional = rows.find((r) => r.key === "conditional-1e1cecce");
+      expect(conditional?.variant).toBe("conditional");
+      expect(conditional?.value).toBeCloseTo(500, 0);
+      // Unaccounted ignores the conditional's maximum: 27.29… − 18.96.
+      expect(rows.find((r) => r.key === "unaccounted")?.value).toBeCloseTo(833, 0);
+    });
+
+    it("shows the unaccounted row even when nothing is attributed", () => {
+      const rows = capCardRows(real, context({ ladderBase: 5399, consistent: true }));
+      expect(rows.find((r) => r.key === "unaccounted")?.value).toBeCloseTo(2729, 0);
+    });
+  });
+
+  // Old logs carry the captured record but predate the fields the ladder needs
+  // (rate, class flags, character) — the record is the best total available.
+  describe("without the ladder base", () => {
+    it("derives the base cap from the captured record", () => {
+      const rows = capCardRows(hit, context({ record: 13.13 }));
+      expect(rows.find((r) => r.key === "basecap")?.value).toBeCloseTo(1_000_000 / 14.13, 0);
+      expect(rows.find((r) => r.key === "capup")?.value).toBeCloseTo(1313, 0);
+    });
+
+    it("reconciles the components against the record instead", () => {
+      const rows = capCardRows(
+        hit,
+        context({
+          record: 13.13,
+          recordComponents: [{ key: "overmastery", labelKey: "ui.logs.cap-source-overmastery", value: 0.5 }],
+        })
+      );
+      expect(rows.find((r) => r.key === "unaccounted")?.value).toBeCloseTo(1263, 0);
+    });
+
+    it("emits no verdict — there is nothing independent to check against", () => {
+      const rows = capCardRows(hit, context({ record: 13.13 }));
+      expect(rows.some((r) => r.key === "verdict")).toBe(false);
+    });
+
+    it("keeps the Stage-1 rows when nothing at all is known", () => {
+      expect(capCardRows(hit).some((r) => r.key === "unaccounted")).toBe(false);
+      expect(capCardRows(hit, context()).some((r) => r.key === "unaccounted")).toBe(false);
+    });
   });
 });

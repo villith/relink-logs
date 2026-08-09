@@ -4,10 +4,19 @@ import { useTranslation } from "react-i18next";
 
 import { CursorCard } from "@/components/CursorCard";
 import { Label } from "@/components/ui/Label";
+import type { CharacterType } from "@/types";
+import { translateTraitId } from "@/utils";
 
 import { HOVER_PANEL_CLASS } from "../analysis/HoverCard";
-import { capCardRows, selectCapUp, type CapHit, type CapRow, type PlayerCapUp } from "./capBreakdown";
-import { capClassOf, deriveCapSources, type CapLoadout } from "./capSources";
+import { capCardRows, selectCapUp, type CapContext, type CapHit, type CapRow, type PlayerCapUp } from "./capBreakdown";
+import { capConsistent, gameLadderBase, ladderCurveFor } from "./capLadder";
+import {
+  capClassOf,
+  deriveConditionalSources,
+  deriveRecordComponents,
+  dmgCapTraitValue,
+  type CapLoadout,
+} from "./capSources";
 
 const format = (row: CapRow, locale: string): string => {
   switch (row.kind) {
@@ -15,11 +24,33 @@ const format = (row: CapRow, locale: string): string => {
       return row.value.toLocaleString(locale);
     case "rate":
       return row.value.toLocaleString(locale, { maximumFractionDigits: 2 });
-    case "percent":
-      return `${row.value.toLocaleString(locale, { maximumFractionDigits: 2 })}%`;
+    case "percent": {
+      const percent = `${row.value.toLocaleString(locale, { maximumFractionDigits: 2 })}%`;
+      // A conditional's value is a potential, not a measurement.
+      return row.variant === "conditional" ? `≤ ${percent}` : percent;
+    }
     case "multiplier":
       return `x${row.value.toLocaleString(locale, { minimumFractionDigits: 3 })}`;
+    case "verdict":
+      return row.value === 1 ? "✓" : "✗";
   }
+};
+
+/** The cap facts the caller resolved for the acting player, bundled so the
+ * cell's prop list stays readable. All optional: each absent fact degrades the
+ * card by exactly the rows that needed it. */
+export type AmountCellCapFacts = {
+  /** The acting player's cap-up totals, or undefined when the log predates the
+   * capture. */
+  playerCapUp?: PlayerCapUp;
+  /** The acting player's stored loadout, which the itemized rows are
+   * reconstructed from. Undefined leaves the whole total unaccounted rather
+   * than claiming the loadout contributed nothing. */
+  loadout?: CapLoadout;
+  /** The acting player's character — the key the base-cap ladder is looked up
+   * by. Undefined (an old log, an unnamed actor) drops the independent base
+   * and the card falls back to the captured record as its total. */
+  characterType?: CharacterType;
 };
 
 /** The Amount cell. A damage row's amount is the END of a calculation the log
@@ -34,30 +65,33 @@ export const AmountCell = ({
   capHit,
   playerCapUp,
   loadout,
+  characterType,
   width,
 }: {
   amount: number | null;
   capHit: CapHit | null;
-  /** The acting player's cap-up totals, or undefined when the log predates the
-   * capture — in which case the card falls back to its Stage-1 rows rather than
-   * showing a cap-up block it cannot fill. */
-  playerCapUp?: PlayerCapUp;
-  /** The acting player's stored loadout, which the itemized rows are
-   * reconstructed from. Undefined leaves the whole total unaccounted rather
-   * than claiming the loadout contributed nothing. */
-  loadout?: CapLoadout;
   width: number;
-}) => {
+} & AmountCellCapFacts) => {
   const { t, i18n } = useTranslation();
   const rows = useMemo(() => {
     if (capHit === null) return [];
-    const total = selectCapUp(playerCapUp, capHit.class_flags);
-    // The terms are reconstructed from the loadout INDEPENDENTLY of `total` —
-    // the game fuses every source before the hook sees it — so whatever they
-    // miss surfaces in the card's unaccounted row instead of being hidden.
-    const terms = deriveCapSources(loadout, capClassOf(capHit.class_flags));
-    return capCardRows(capHit, total === null ? undefined : { totalCapUp: total, terms });
-  }, [capHit, playerCapUp, loadout]);
+    const capClass = capClassOf(capHit.class_flags);
+    // The independent base, from the game's own shipped ladder. Zero means the
+    // curve had nothing to say (no curve for this character, no rate) — the
+    // card then falls back to the captured record as its total.
+    const curve = ladderCurveFor(characterType, capHit.class_flags);
+    const ladderBase = curve !== null && capHit.attack_rate !== null ? gameLadderBase(curve, capHit.attack_rate) : 0;
+    const hasLadder = ladderBase > 0 && capHit.damage_cap !== null && capHit.damage_cap > 0;
+    const context: CapContext = {
+      ladderBase: hasLadder ? ladderBase : null,
+      consistent: hasLadder ? capConsistent(capHit.damage_cap!, ladderBase) : null,
+      record: selectCapUp(playerCapUp, capHit.class_flags),
+      recordComponents: deriveRecordComponents(loadout, capClass),
+      dmgCapTrait: dmgCapTraitValue(loadout, capClass),
+      conditional: deriveConditionalSources(loadout, capClass),
+    };
+    return capCardRows(capHit, context);
+  }, [capHit, playerCapUp, loadout, characterType]);
   const shows = rows.length > 1;
 
   // Memoized because `CursorCard` re-renders on every committed cursor frame
@@ -66,8 +100,14 @@ export const AmountCell = ({
     () => (
       <Box className="px-[9px] py-1.5">
         {rows.map((row) => (
-          <Box key={row.key} className="flex items-baseline justify-between gap-4" data-cap-row={row.key}>
-            <Label>{t(row.labelKey)}</Label>
+          <Box
+            key={row.key}
+            className="flex items-baseline justify-between gap-4"
+            data-cap-row={row.key}
+            // A sub-row itemizes the row above it; the indent is what says so.
+            style={row.variant === undefined ? undefined : { paddingLeft: 10 }}
+          >
+            <Label>{row.traitId === undefined ? t(row.labelKey) : translateTraitId(row.traitId)}</Label>
             <Text className="text-sm text-white" style={{ fontVariantNumeric: "tabular-nums" }}>
               {format(row, i18n.language)}
             </Text>

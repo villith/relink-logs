@@ -175,8 +175,9 @@ export const EventRowsTable = ({
    * its `sourceIndex`. Absent for a log recorded before the capture. */
   capUp?: Record<string, PlayerCapUp>;
   /** The party's stored loadouts, on the same key — what the cap card itemizes
-   * the totals against. */
-  loadout?: Map<number, CapLoadout>;
+   * the totals against. The character is along for the ride because it keys
+   * the base-cap ladder the card's independent total comes from. */
+  loadout?: Map<number, CapLoadout & Pick<PlayerData, "characterType">>;
 }) => {
   const { t } = useTranslation();
 
@@ -260,6 +261,7 @@ export const EventRowsTable = ({
                   capHit={row.capHit}
                   playerCapUp={row.sourceIndex === null ? undefined : capUp?.[String(row.sourceIndex)]}
                   loadout={row.sourceIndex === null ? undefined : loadout?.get(row.sourceIndex)}
+                  characterType={row.sourceIndex === null ? undefined : loadout?.get(row.sourceIndex)?.characterType}
                   width={COLUMNS.amount}
                 />
               </Group>

@@ -12,6 +12,26 @@ vi.mock("react-i18next", () => ({
 
 const capHit = { damage: 1_500_000, damage_cap: 1_000_000, base_damage: 4_000_000, attack_rate: 2.5, class_flags: 0x1 };
 
+const sigilOf = (traitId: number, level: number) => ({
+  firstTraitId: traitId,
+  firstTraitLevel: level,
+  secondTraitId: 0,
+  secondTraitLevel: 0,
+  sigilId: 1,
+  equippedCharacter: 0,
+  sigilLevel: 1,
+  acquisitionCount: 0,
+  notificationEnum: 0,
+});
+
+const sigilLoadout = (traitId: number, level: number) => ({
+  sigils: [sigilOf(traitId, level)],
+  summons: [],
+  weaponState: null,
+  weaponInfo: null,
+  overmasteryInfo: null,
+});
+
 const renderCell = (props: Parameters<typeof AmountCell>[0]) =>
   render(
     <MantineProvider>
@@ -82,40 +102,65 @@ describe("AmountCell", () => {
     expect(screen.getByTestId("cap-card").querySelector('[data-cap-row="capup"]')?.textContent).toContain("1,216%");
   });
 
-  // The reconstruction is what shrinks Unaccounted. A level-65 DMG Cap trait is
-  // +250%, so it must both appear as its own row and come OFF the remainder —
-  // an itemized row that leaves the remainder untouched would double-count.
-  it("itemizes the loadout's cap sources and shrinks the unaccounted row", () => {
+  // Without the ladder the record IS the total, and its components itemize it:
+  // Fatebreaker L15 (+50%, fused into the record at load) shows as a sub-row
+  // and comes off the record's own remainder.
+  it("itemizes the record's components and shrinks the unaccounted row", () => {
     renderCell({
       amount: 1_500_000,
       capHit,
       playerCapUp: { normal: 13.13, skill: 15.18, sba: 12.16 },
-      loadout: {
-        sigils: [
-          {
-            firstTraitId: 0xdc584f60,
-            firstTraitLevel: 65,
-            secondTraitId: 0,
-            secondTraitLevel: 0,
-            sigilId: 1,
-            equippedCharacter: 0,
-            sigilLevel: 1,
-            acquisitionCount: 0,
-            notificationEnum: 0,
-          },
-        ],
-        summons: [],
-        weaponState: null,
-        weaponInfo: null,
-        overmasteryInfo: null,
-      },
+      loadout: sigilLoadout(0xd029fe08, 15),
       width: 78,
     });
     hover("1,500,000");
     const card = screen.getByTestId("cap-card");
-    expect(card.querySelector('[data-cap-row="trait"]')?.textContent).toContain("250%");
-    // 13.13 - 2.50
-    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,063%");
+    expect(card.querySelector('[data-cap-row="trait"]')?.textContent).toContain("50%");
+    // 13.13 - 0.50
+    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,263%");
+  });
+
+  // With the character known, the base comes from the game's own shipped
+  // ladder, the total becomes per-hit (cap / base − 1), and the plain DMG Cap
+  // trait — the one derived term the record does NOT contain — attributes
+  // against it alongside the record.
+  it("uses the ladder base and the formula verdict when the character is known", () => {
+    renderCell({
+      amount: 152_737,
+      capHit: { ...capHit, damage_cap: 152_737, attack_rate: 0.54 },
+      playerCapUp: { normal: 13.13, skill: 15.18, sba: 12.16 },
+      loadout: sigilLoadout(0xdc584f60, 65),
+      characterType: "Pl0300",
+      width: 78,
+    });
+    hover("152,737");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="basecap"]')?.textContent).toContain("5,399");
+    expect(card.querySelector('[data-cap-row="gamecapup"]')?.textContent).toContain("2,728.99%");
+    expect(card.querySelector('[data-cap-row="verdict"]')?.textContent).toContain("✓");
+    expect(card.querySelector('[data-cap-row="dmgcap"]')?.textContent).toContain("250%");
+    // 27.2899… − 13.13 − 2.50
+    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,165.99%");
+  });
+
+  it("marks a conditional trait's row as a potential, outside the sum", () => {
+    renderCell({
+      amount: 152_737,
+      capHit: { ...capHit, damage_cap: 152_737, attack_rate: 0.54 },
+      playerCapUp: { normal: 13.13, skill: 15.18, sba: 12.16 },
+      // Three Nova sigils: combined level 45, clamped to the table top (+500%).
+      loadout: {
+        ...sigilLoadout(0x1e1cecce, 15),
+        sigils: [sigilOf(0x1e1cecce, 15), sigilOf(0x1e1cecce, 15), sigilOf(0x1e1cecce, 15)],
+      },
+      characterType: "Pl0300",
+      width: 78,
+    });
+    hover("152,737");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="conditional-1e1cecce"]')?.textContent).toContain("≤ 500%");
+    // The potential does NOT shrink the remainder: 27.2899… − 13.13.
+    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,415.99%");
   });
 
   // A damage row from a log recorded before the cap capture carries the shape
