@@ -7,6 +7,9 @@ import {
   deriveConditionalSources,
   deriveRecordComponents,
   dmgCapTraitValue,
+  enumerateOvermasteries,
+  enumerateSummons,
+  enumerateTraits,
   type CapLoadout,
 } from "./capSources";
 
@@ -20,6 +23,11 @@ const OM_SKILL = 0x0b0e4311;
 const OM_SBA = 0x047b7a70;
 /** "Normal Attack Damage Cap Up" as a summon equip bonus; values[0] is 20%. */
 const SUMMON_BONUS_NORMAL = 0x9245dfa4;
+/** Cap traits whose top row raises exactly one class: +30% normal / +30% skill. */
+const NORMAL_ONLY_TRAIT = 0xbbd77c33;
+const SKILL_ONLY_TRAIT = 0x020db733;
+/** A trait with no row in any cap table — a damage/ATK sigil, say. */
+const NOT_A_CAP_TRAIT = 0x0badf00d;
 
 const sigil = (traitId: number, level: number): Sigil => ({
   firstTraitId: traitId,
@@ -142,6 +150,153 @@ describe("deriveRecordComponents", () => {
       overmasteryInfo: { overmasteries: [{ id: OM_NORMAL, flags: 1, value: 20 }] },
     });
     expect(deriveRecordComponents(player, "normal").map((s) => s.key)).toEqual(["trait", "overmastery", "summon"]);
+  });
+});
+
+describe("enumerateTraits", () => {
+  it("lists every combined trait, including the ones that contribute nothing", () => {
+    // The debug panel's premise: a trait considered and rejected must be
+    // visible as considered, or the reader cannot tell it from one we missed.
+    const player = loadout({ sigils: [sigil(NORMAL_ONLY_TRAIT, 15), sigil(NOT_A_CAP_TRAIT, 15)] });
+    const rows = enumerateTraits(player, "normal");
+    expect(rows.map((row) => row.id).sort()).toEqual([NOT_A_CAP_TRAIT, NORMAL_ONLY_TRAIT].sort());
+  });
+
+  it("carries the level it looked up and the whole three-class row it found", () => {
+    const player = loadout({ sigils: [sigil(NORMAL_ONLY_TRAIT, 15)] });
+    const [row] = enumerateTraits(player, "normal");
+    expect(row.level).toBe(15);
+    expect(row.row).toEqual([30, 0, 0]);
+    expect(row.percent).toBe(30);
+    expect(row.excluded).toBeNull();
+  });
+
+  it("says a cap trait raised a DIFFERENT class rather than dropping it", () => {
+    const player = loadout({ sigils: [sigil(SKILL_ONLY_TRAIT, 15)] });
+    const [row] = enumerateTraits(player, "normal");
+    expect(row.excluded).toBe("other-class");
+    expect(row.percent).toBe(0);
+    // The row is still carried: seeing [0, 30, 0] is what says WHICH class.
+    expect(row.row).toEqual([0, 30, 0]);
+  });
+
+  it("says a trait is not a cap source at all", () => {
+    const player = loadout({ sigils: [sigil(NOT_A_CAP_TRAIT, 15)] });
+    const [row] = enumerateTraits(player, "normal");
+    expect(row.excluded).toBe("not-a-cap-source");
+    expect(row.row).toBeNull();
+  });
+
+  it("marks the plain DMG Cap trait as its own term, outside the record", () => {
+    const player = loadout({ sigils: [sigil(DMG_CAP_TRAIT, 63)] });
+    const [row] = enumerateTraits(player, "normal");
+    expect(row.excluded).toBe("dmg-cap-trait");
+    expect(row.percent).toBe(0);
+    // Its magnitude is still shown — it just belongs to a different term.
+    expect(row.row?.[0]).toBeCloseTo(238, 6);
+  });
+
+  it("marks a conditional trait as itemized elsewhere", () => {
+    const player = loadout({ sigils: [sigil(CATASTROPHE_NOVA_TRAIT, 15)] });
+    const [row] = enumerateTraits(player, "normal");
+    expect(row.excluded).toBe("conditional");
+    expect(row.percent).toBe(0);
+  });
+
+  it("says a cap trait's row is empty at the level reached", () => {
+    // Nova's own table is genuinely all zeroes below combined level 26, so a
+    // single L15 sigil of a graded trait contributes nothing YET.
+    const player = loadout({ sigils: [sigil(SKILL_ONLY_TRAIT, 1)] });
+    const [row] = enumerateTraits(player, "skill");
+    expect(row.percent).toBe(0);
+    expect(row.excluded).toBe("zero-at-level");
+  });
+});
+
+describe("enumerateOvermasteries", () => {
+  it("lists every roll with the magnitude the log recorded", () => {
+    const player = loadout({
+      overmasteryInfo: {
+        overmasteries: [
+          { id: OM_NORMAL, flags: 1, value: 20 },
+          { id: OM_SKILL, flags: 1, value: 40 },
+        ],
+      },
+    });
+    const rows = enumerateOvermasteries(player, "normal");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ id: OM_NORMAL, percent: 20, excluded: null });
+    expect(rows[1]).toMatchObject({ id: OM_SKILL, percent: 0, excluded: "other-class" });
+  });
+
+  it("says a roll's magnitude was never recorded", () => {
+    const player = loadout({ overmasteryInfo: { overmasteries: [{ id: OM_NORMAL, flags: 0b100, value: 0 }] } });
+    const [row] = enumerateOvermasteries(player, "normal");
+    expect(row.excluded).toBe("value-unrecorded");
+    expect(row.percent).toBe(0);
+  });
+
+  it("says a roll is not a cap roll", () => {
+    const player = loadout({ overmasteryInfo: { overmasteries: [{ id: NOT_A_CAP_TRAIT, flags: 1, value: 18 }] } });
+    expect(enumerateOvermasteries(player, "normal")[0].excluded).toBe("not-a-cap-source");
+  });
+});
+
+describe("enumerateSummons", () => {
+  it("lists each equipped summon's bonus with the level it was read at", () => {
+    const player = loadout({
+      summons: [
+        { summonId: 1, mainTraitId: 0, mainTraitLevel: 0, bonusId: SUMMON_BONUS_NORMAL, bonusLevel: 0 },
+        { summonId: 2, mainTraitId: 0, mainTraitLevel: 0, bonusId: NOT_A_CAP_TRAIT, bonusLevel: 0 },
+      ],
+    });
+    const rows = enumerateSummons(player, "normal");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ id: SUMMON_BONUS_NORMAL, level: 0, percent: 20, excluded: null });
+    expect(rows[1].excluded).toBe("not-a-cap-source");
+  });
+
+  it("says a summon bonus raises a different class", () => {
+    const player = loadout({
+      summons: [{ summonId: 1, mainTraitId: 0, mainTraitLevel: 0, bonusId: SUMMON_BONUS_NORMAL, bonusLevel: 0 }],
+    });
+    expect(enumerateSummons(player, "sba")[0].excluded).toBe("other-class");
+  });
+});
+
+describe("the enumerations and the family sums", () => {
+  // The whole point of pushing enumeration down here: the tooltip's family
+  // total IS the sum of the debug panel's line items, by construction. Asserted
+  // rather than assumed, because a divergence would be invisible in both views.
+  const player = loadout({
+    sigils: [
+      sigil(FATEBREAKER_TRAIT, 15),
+      sigil(NORMAL_ONLY_TRAIT, 15),
+      sigil(SKILL_ONLY_TRAIT, 15),
+      sigil(DMG_CAP_TRAIT, 63),
+      sigil(CATASTROPHE_NOVA_TRAIT, 15),
+      sigil(NOT_A_CAP_TRAIT, 15),
+    ],
+    summons: [{ summonId: 1, mainTraitId: 0, mainTraitLevel: 0, bonusId: SUMMON_BONUS_NORMAL, bonusLevel: 0 }],
+    overmasteryInfo: {
+      overmasteries: [
+        { id: OM_NORMAL, flags: 1, value: 20 },
+        { id: OM_NORMAL, flags: 1, value: 15 },
+        { id: OM_SKILL, flags: 1, value: 40 },
+        { id: OM_SBA, flags: 0b100, value: 0 },
+      ],
+    },
+  });
+
+  const familyValue = (capClass: "normal" | "skill" | "sba", key: string) =>
+    deriveRecordComponents(player, capClass).find((source) => source.key === key)?.value ?? 0;
+
+  const sum = (rows: { percent: number }[]) => rows.reduce((total, row) => total + row.percent, 0);
+
+  it.each(["normal", "skill", "sba"] as const)("agrees with the record's family rows for %s hits", (capClass) => {
+    expect(sum(enumerateTraits(player, capClass)) / 100).toBe(familyValue(capClass, "trait"));
+    expect(sum(enumerateOvermasteries(player, capClass)) / 100).toBe(familyValue(capClass, "overmastery"));
+    expect(sum(enumerateSummons(player, capClass)) / 100).toBe(familyValue(capClass, "summon"));
   });
 });
 

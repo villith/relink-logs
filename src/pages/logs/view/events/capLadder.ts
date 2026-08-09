@@ -20,10 +20,27 @@ const HASH_BY_CHARACTER: Map<string, string> = new Map(
 
 const f = Math.fround;
 
+/** Which arm of the ladder walk produced the base — what the debug panel prints
+ * instead of a lerp expression it never evaluated.
+ *
+ * `below`/`above` are the flat holds outside the table, `empty` a curve with no
+ * rows at all. There is deliberately no zero-span arm: the walk advances `lo`
+ * only while `rate >= lo.x` and stops at the first `rate < hi.x`, so any
+ * bracket it returns spans a positive width. */
+export type LadderBranch = "empty" | "below" | "lerp" | "above";
+
+/** A row and where it sits in the curve — the index is what lets the panel say
+ * "rows 8→9 of 14" rather than quoting two anonymous coordinate pairs. */
+export type LadderRow = { index: number; point: LadderPoint };
+
 /**
- * The game's own base-cap lookup, arithmetic included: walk to the first row
- * whose x strictly exceeds the rate (f32 compare), lerp against its
- * predecessor in f32, hold flat at both ends, truncate.
+ * The ladder walk with its working shown: which rows bracketed the rate, which
+ * arm ran, and the operands of the lerp it evaluated.
+ *
+ * `rise`/`span`/`offset`/`lerped` are the pieces of the builder's own
+ * expression, each already rounded to f32 exactly as the game holds it, so the
+ * panel can print the arithmetic rather than assert it. They are 0 on every arm
+ * but `lerp`, which ran no arithmetic to show.
  *
  * Single precision is load-bearing, not pedantry. The rows are f32 and the
  * builder lerps in f32; a double-precision mirror of the same expression lands
@@ -32,24 +49,50 @@ const f = Math.fround;
  * shortfall that f32 rounds away. A wrong-by-one base poisons the integer
  * consistency check downstream.
  */
-export const gameLadderBase = (points: LadderPoint[], rate: number): number => {
-  if (points.length === 0) return 0;
+export const gameLadderTrace = (points: LadderPoint[], rate: number): LadderTrace => {
+  const empty: LadderTrace = { branch: "empty", lo: null, hi: null, rise: 0, span: 0, offset: 0, lerped: 0, base: 0 };
+  if (points.length === 0) return empty;
+
   const r = f(rate);
-  let lo: LadderPoint | null = null;
-  for (const p of points) {
-    if (r < f(p.x)) {
+  let lo: LadderRow | null = null;
+  for (const [index, point] of points.entries()) {
+    // Walk to the first row whose x STRICTLY exceeds the rate, in f32 — the
+    // strictness is why a rate sitting exactly on a row takes that row's value
+    // through the lerp below rather than holding its predecessor.
+    if (r < f(point.x)) {
+      const hi: LadderRow = { index, point };
       // No predecessor: the rate sits before the first row, which holds flat.
-      if (lo === null) return Math.trunc(f(p.y));
-      const span = f(f(p.x) - f(lo.x));
-      if (span <= 0) return Math.trunc(f(lo.y));
+      if (lo === null) return { ...empty, branch: "below", hi, base: Math.trunc(f(point.y)) };
+      const span = f(f(point.x) - f(lo.point.x));
+      const rise = f(f(point.y) - f(lo.point.y));
+      const offset = f(r - f(lo.point.x));
       // The builder's own expression shape: ((hi.y - lo.y) * (rate - lo.x)) / span + lo.y.
-      const lerped = f(f(f(f(p.y) - f(lo.y)) * f(r - f(lo.x))) / span);
-      return Math.trunc(f(lerped + f(lo.y)));
+      const lerped = f(f(f(rise * offset) / span) + f(lo.point.y));
+      return { branch: "lerp", lo, hi, rise, span, offset, lerped, base: Math.trunc(lerped) };
     }
-    lo = p;
+    lo = { index, point };
   }
-  return Math.trunc(f(points[points.length - 1].y));
+  return { ...empty, branch: "above", lo, base: Math.trunc(f(points[points.length - 1].y)) };
 };
+
+export type LadderTrace = {
+  branch: LadderBranch;
+  /** The bracketing rows. `lo` is absent below the table, `hi` past its end. */
+  lo: LadderRow | null;
+  hi: LadderRow | null;
+  rise: number;
+  span: number;
+  offset: number;
+  /** The interpolated value BEFORE truncation — the fractional part is what
+   * `base` drops, and seeing it is how a reader tells a near-miss from a hit. */
+  lerped: number;
+  base: number;
+};
+
+/** The game's own base-cap lookup. The walk itself lives in [`gameLadderTrace`]
+ * — one f32 implementation, so the number the tooltip shows and the arithmetic
+ * the debug panel prints cannot disagree. */
+export const gameLadderBase = (points: LadderPoint[], rate: number): number => gameLadderTrace(points, rate).base;
 
 /**
  * The ladder a hit's base cap comes from, or `null` when the log cannot say.

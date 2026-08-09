@@ -8,9 +8,9 @@ import { useTranslation } from "react-i18next";
 import { backendErrorMessage } from "@/backendErrors";
 import { useHookStatus } from "@/useHookStatus";
 
-/** Dev-only tools. Every action here drives the REAL hook over the dev control
- * channel: hook status comes from real handshakes and encounter status from real
- * frames through the real parser. The frontend fakes nothing here. */
+/** Dev-only hook tools. Every action here drives the REAL hook over the dev
+ * control channel: hook status comes from real handshakes and encounter status
+ * from real frames through the real parser. The frontend fakes nothing here. */
 
 type Scenario = "start" | "tick" | "end" | "reset";
 
@@ -99,7 +99,7 @@ const LABEL_KEYS: Record<string, string> = Object.fromEntries(
   [...HOOK_ROWS.flat(), ...SCENARIO_ROW].map((action) => [action.key, action.labelKey])
 );
 
-const DebugPage = () => {
+export const HookTab = () => {
   const { t } = useTranslation();
   const hook = useHookStatus();
   const [fullAssistUnlock, setFullAssistUnlock] = useState(false);
@@ -202,7 +202,7 @@ const DebugPage = () => {
   );
 
   return (
-    <Box p="sm">
+    <Box>
       <Fieldset legend={t("ui.debug.full-assist")}>
         <Tooltip label={t("ui.full-assist-unlock-description")}>
           <Checkbox label={t("ui.full-assist-unlock")} checked={fullAssistUnlock} onChange={toggleFullAssistUnlock} />
@@ -258,5 +258,3 @@ const DebugPage = () => {
     </Box>
   );
 };
-
-export default DebugPage;

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { capConsistent, gameCapUp, gameLadderBase, ladderCurveFor } from "./capLadder";
+import { capConsistent, gameCapUp, gameLadderBase, gameLadderTrace, ladderCurveFor } from "./capLadder";
 
 // The standard normal ladder most characters share, as extracted and
 // runtime-verified (cap_ladder_dump, 2026-08-09). f32 row values on purpose:
@@ -41,6 +41,81 @@ describe("gameLadderBase", () => {
 
   it("is zero for an empty curve", () => {
     expect(gameLadderBase([], 1)).toBe(0);
+  });
+});
+
+describe("gameLadderTrace", () => {
+  it("reports the bracketing rows and the lerp it ran between them", () => {
+    const trace = gameLadderTrace(NORMAL, 0.54);
+    expect(trace.branch).toBe("lerp");
+    expect(trace.lo).toEqual({ index: 5, point: { x: 0.5, y: 4999 } });
+    expect(trace.hi).toEqual({ index: 6, point: { x: 0.6, y: 5999 } });
+    expect(trace.base).toBe(5399);
+  });
+
+  it("carries the lerp operands the expression is written from", () => {
+    const trace = gameLadderTrace(NORMAL, 0.54);
+    // What the panel prints as `4999 + (5999 - 4999) x (0.54 - 0.5) / 0.1`.
+    expect(trace.rise).toBeCloseTo(1000, 3);
+    expect(trace.span).toBeCloseTo(0.1, 5);
+    expect(trace.offset).toBeCloseTo(0.04, 5);
+    // At this rate f32 lands exactly on the integer — which is the property
+    // this whole module exists for, so it is worth pinning.
+    expect(trace.lerped).toBe(5399);
+  });
+
+  it("keeps the fraction the trunc drops", () => {
+    // 0.5555 interpolates to 5553.9995 in f32, so the game's base is 5553 and
+    // not the 5554 the exact arithmetic suggests. Showing the pre-trunc value
+    // is how a reader tells that near-miss from a clean hit.
+    const trace = gameLadderTrace(NORMAL, 0.5555);
+    expect(trace.lerped).toBeCloseTo(5553.9995, 3);
+    expect(trace.base).toBe(5553);
+  });
+
+  it("names the flat hold below the first row", () => {
+    const trace = gameLadderTrace(NORMAL, -1);
+    expect(trace.branch).toBe("below");
+    expect(trace.lo).toBeNull();
+    expect(trace.hi).toEqual({ index: 0, point: { x: 0, y: 0 } });
+    expect(trace.base).toBe(0);
+  });
+
+  it("names the flat hold past the last row", () => {
+    const trace = gameLadderTrace(NORMAL, 50);
+    expect(trace.branch).toBe("above");
+    expect(trace.lo).toEqual({ index: 11, point: { x: 2, y: 21999 } });
+    expect(trace.hi).toBeNull();
+    expect(trace.base).toBe(21999);
+  });
+
+  it("never brackets a rate with two rows sharing a rate", () => {
+    // Why there is no zero-span arm: the walk advances `lo` only while
+    // `rate >= lo.x` and stops at the first `rate < hi.x`, so a bracket it
+    // returns always spans a positive width. Duplicate rows are simply walked
+    // past, and a rate at their shared value holds the last row instead.
+    const flat = [
+      { x: 0, y: 0 },
+      { x: 1, y: 100 },
+      { x: 1, y: 500 },
+    ];
+    expect(gameLadderTrace(flat, 1).branch).toBe("above");
+    expect(gameLadderTrace(flat, 1).base).toBe(500);
+    expect(gameLadderTrace(flat, 0.5).span).toBeGreaterThan(0);
+  });
+
+  it("names an empty curve rather than reporting a zero it walked to", () => {
+    const trace = gameLadderTrace([], 1);
+    expect(trace.branch).toBe("empty");
+    expect(trace.base).toBe(0);
+  });
+
+  it("agrees with gameLadderBase at every row rate and between them", () => {
+    // The whole point of the refactor: one f32 implementation, so the traced
+    // walk cannot drift from the number the tooltip already ships.
+    for (const rate of [-1, 0, 0.05, 0.1, 0.2, 0.54, 0.999, 1, 1.5, 2, 50]) {
+      expect(gameLadderTrace(NORMAL, rate).base).toBe(gameLadderBase(NORMAL, rate));
+    }
   });
 });
 
