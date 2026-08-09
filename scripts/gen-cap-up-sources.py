@@ -60,6 +60,7 @@ Output shape:
   {
     "traits":            { "<hash8>": [[normal, skill, sba], ...] },  # index = level - 1
     "conditionalTraits": { "<hash8>": [[normal, skill, sba], ...] },
+    "conditionalTraitInputs": { "<hash8>": { "<input>": [perLevelValue, ...] } },
     "transcendedTraits": { "<hash8>": [[normal, skill, sba], ...] },
     "overmasteries":     { "<hash8>": "normal" | "skill" | "sba" },
     "summonBonuses":     { "<hash8>": "normal" | "skill" | "sba" }
@@ -120,28 +121,56 @@ UNCONDITIONAL_TRAITS = {
 
 # Conditional cap traits, at the slot holding their MAXIMUM. Kept out of the
 # attributed total by the card; see the module docstring.
+#
+# `inputs` names the OTHER value columns a trait's own EXPLAIN placeholders
+# point at — its gate thresholds and its low end. They are in the same ten f32
+# columns as the magnitudes, per level, which is what makes a conditional trait
+# evaluable at all rather than only showable at its maximum. Names are the
+# frontend's (capFactors/traits.ts reads them by name); slots are validated
+# against the live text exactly as the value slots are.
 CONDITIONAL_TRAITS = {
-    0x40223C28: {"name": "Catastrophe", "slots": {"all": 1}},
-    0x1E1CECCE: {"name": "Catastrophe Nova", "slots": {"all": 1}},
-    0xA7726190: {"name": "Celestial Lumen", "slots": {"all": 1}},
-    0x0DE887A0: {"name": "Celestial Nyx", "slots": {"all": 1}},
-    0xAEFEB1BC: {"name": "DMG Cap Cobalt", "slots": {"all": 3}},
-    0x3B71AF12: {"name": "DMG Cap Ecru", "slots": {"all": 3}},
-    0x0151CF9E: {"name": "DMG Cap Cardinal", "slots": {"all": 6}},
-    0xFFF8CF64: {"name": "DMG Cap Sage", "slots": {"all": 6}},
-    0x30773197: {"name": "Enchantress's Rhythm", "slots": {"all": 0}},
-    0xED8D8AD8: {"name": "The Black's Impulse", "slots": {"all": 1}},
-    0x46EE3116: {"name": "In a Pinch", "slots": {"all": 3}},
-    0x51C115D2: {"name": "Super Ultimate Perfect Dodge", "slots": {"all": 0}},
-    0x461A8E07: {"name": "Ultramarine's Adversity", "slots": {"all": 0}},
+    # "When at {4} max HP or less" — a FLAT HP threshold (45000 at L25), not a
+    # fraction, despite reading like one.
+    0x40223C28: {"name": "Catastrophe", "slots": {"all": 1}, "inputs": {"hpAtMost": 4}},
+    0x1E1CECCE: {"name": "Catastrophe Nova", "slots": {"all": 1}, "inputs": {"hpAtMost": 4}},
+    # "While at {2}% HP or more" — a percentage of max HP (75 at every level).
+    0xA7726190: {"name": "Celestial Lumen", "slots": {"all": 1}, "inputs": {"hpPercentAtLeast": 2}},
+    0x0DE887A0: {"name": "Celestial Nyx", "slots": {"all": 1}, "inputs": {"hpPercentAtMost": 2}},
+    # A band, not a gate: the cap-up ramps from `capMin` at `critMin` crit rate
+    # to the emitted maximum at `critMax`.
+    0xAEFEB1BC: {
+        "name": "DMG Cap Cobalt",
+        "slots": {"all": 3},
+        "inputs": {"capMin": 2, "critMin": 4, "critMax": 5},
+    },
+    0x3B71AF12: {
+        "name": "DMG Cap Ecru",
+        "slots": {"all": 3},
+        "inputs": {"capMin": 2, "maxHpMin": 4, "maxHpMax": 5},
+    },
+    # Stack-gated (Cardinal/Sage I-V). Only the value AT V is in the text, so no
+    # per-stack curve is emitted — the frontend reports an intermediate stack as
+    # unresolved rather than inventing an interpolation.
+    0x0151CF9E: {"name": "DMG Cap Cardinal", "slots": {"all": 6}, "inputs": {}},
+    0xFFF8CF64: {"name": "DMG Cap Sage", "slots": {"all": 6}, "inputs": {}},
+    0x30773197: {"name": "Enchantress's Rhythm", "slots": {"all": 0}, "inputs": {}},
+    0xED8D8AD8: {"name": "The Black's Impulse", "slots": {"all": 1}, "inputs": {}},
+    0x46EE3116: {"name": "In a Pinch", "slots": {"all": 3}, "inputs": {}},
+    0x51C115D2: {"name": "Super Ultimate Perfect Dodge", "slots": {"all": 0}, "inputs": {}},
+    0x461A8E07: {"name": "Ultramarine's Adversity", "slots": {"all": 0}, "inputs": {}},
     # Action-scoped, not class-scoped: per-charge-grade shot caps. Attributing
     # them to every normal hit would overstate, so they stay conditional; the
-    # emitted value is the Grade IV (largest) column.
-    0xBE3404B9: {"name": "Thunderwolf's Acuity", "slots": {"all": 2}},
+    # emitted value is the Grade IV (largest) column, with the two lower grades
+    # as inputs so the frontend can pick the one the shot actually was.
+    0xBE3404B9: {
+        "name": "Thunderwolf's Acuity",
+        "slots": {"all": 2},
+        "inputs": {"gradeII": 0, "gradeIII": 1},
+    },
     # "+15% per active pet" — the 15 is literal in the text and the pet count is
     # runtime state. Slot 0 holds a different number, so no slot is emitted; the
     # card names it with no magnitude rather than a wrong one.
-    0x7351D602: {"name": "Phantasm's Harmony", "slots": {}},
+    0x7351D602: {"name": "Phantasm's Harmony", "slots": {}, "inputs": {}},
 }
 
 # Substrings whose presence marks an EXPLAIN as conditional. Validated both
@@ -236,6 +265,14 @@ def validate_classification(explains: dict[int, str]) -> None:
                     f"{spec['name']} ({h:08x}) claims {cls} cap in slot {slot}, "
                     f"but the text names no such placeholder: {explain!r}"
                 )
+        # Gate columns are placeholders in the same text, and a moved column is
+        # exactly as silent as a moved value column — check them the same way.
+        for name, slot in spec.get("inputs", {}).items():
+            if not re.search(rf"{{{slot}[:}}]", explain):
+                sys.exit(
+                    f"{spec['name']} ({h:08x}) claims input {name!r} in slot {slot}, "
+                    f"but the text names no such placeholder: {explain!r}"
+                )
         transcended = spec.get("transcended")
         if transcended is not None:
             clause = explain.partition(TRANSCENDENCE_CLAUSE)[2]
@@ -278,14 +315,28 @@ def per_level_values(spec: dict, levels: dict[int, tuple], slot_key: str | None 
     return out
 
 
-def trait_values(by_trait: dict[int, dict[int, tuple]]) -> dict[str, dict[str, list[list[float]]]]:
-    """The three per-level trait maps: unconditional, conditional, transcended."""
-    out: dict[str, dict[str, list[list[float]]]] = {"traits": {}, "conditionalTraits": {}, "transcendedTraits": {}}
+def input_values(spec: dict, levels: dict[int, tuple]) -> dict[str, list[float]]:
+    """{input name: [value per level]} — a conditional trait's gate columns."""
+    top = max(levels)
+    return {name: [levels[level][slot] for level in range(1, top + 1)] for name, slot in spec["inputs"].items()}
+
+
+def trait_values(by_trait: dict[int, dict[int, tuple]]) -> dict[str, dict]:
+    """The per-level trait maps: unconditional, conditional, transcended, and
+    the conditional traits' gate inputs."""
+    out: dict[str, dict] = {
+        "traits": {},
+        "conditionalTraits": {},
+        "transcendedTraits": {},
+        "conditionalTraitInputs": {},
+    }
     for family, table in (("traits", UNCONDITIONAL_TRAITS), ("conditionalTraits", CONDITIONAL_TRAITS)):
         for h, spec in table.items():
             levels = by_trait.get(h)
             if not levels:
                 sys.exit(f"{spec['name']} ({h:08x}) has no rows in skill_status.tbl — the Key column moved")
+            if spec.get("inputs"):
+                out["conditionalTraitInputs"][f"{h:08x}"] = input_values(spec, levels)
             if not spec["slots"]:
                 continue  # Phantasm's Harmony: magnitude is not in the table
             out[family][f"{h:08x}"] = per_level_values(spec, levels)
@@ -328,7 +379,8 @@ def main() -> None:
     out_path = ROOT / "src" / "assets" / "cap-up-sources.json"
     out_path.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(
-        f"{len(out['traits'])} traits, {len(out['conditionalTraits'])} conditional, "
+        f"{len(out['traits'])} traits, {len(out['conditionalTraits'])} conditional "
+        f"({len(out['conditionalTraitInputs'])} with gate inputs), "
         f"{len(out['transcendedTraits'])} transcended, {len(out['overmasteries'])} overmasteries, "
         f"{len(out['summonBonuses'])} summon bonuses -> {out_path}"
     )
