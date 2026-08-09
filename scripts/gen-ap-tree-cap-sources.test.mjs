@@ -3,13 +3,16 @@ import { describe, expect, it } from "vitest";
 import { gameXxhash32 } from "./gbfr-hash.mjs";
 import {
   AP_TREE,
+  BONUS_PARAM_COLUMNS,
   CAP_CLASS_BY_TYPE,
   CAP_TYPE_TEXT,
   CHARACTER_BY_HASH,
   buildTrees,
   capEffectsOf,
   potentialsOf,
+  readBonuses,
   readRows,
+  unresolvedParams,
   verifyAgainstText,
 } from "./gen-ap-tree-cap-sources.mjs";
 
@@ -174,6 +177,49 @@ describe("verifyAgainstText", () => {
 
   it("fails a cap type no row confirms at all", () => {
     expect(verifyAgainstText(new Map(), textFor()).unconfirmedTypes).toEqual([103, 104, 105, 106]);
+  });
+});
+
+/** One raw limit_bonus table: `IconId` is a 32-byte raw_string, so ParamId1
+ * starts at 0x20 — the column whose being read as 0x24 dropped every bonus that
+ * sets only its first param. */
+const bonusTable = (rows) => {
+  const buffer = Buffer.alloc(8 + rows.length * 100);
+  buffer.writeBigInt64LE(BigInt(rows.length), 0);
+  rows.forEach((row, index) => {
+    const at = 8 + index * 100;
+    BONUS_PARAM_COLUMNS.forEach((column, slot) => {
+      buffer.writeUInt32LE(row.paramKeys?.[slot] ?? EMPTY, at + column);
+    });
+    // The int right after the three ParamIds. The old off-by-one column read
+    // this as a param key; it is -1 in every shipped row.
+    buffer.writeInt32LE(-1, at + 0x2c);
+    buffer.writeUInt32LE(row.key ?? 0, at + 0x34);
+  });
+  return buffer;
+};
+
+describe("readBonuses", () => {
+  it("reads ParamId1 at 0x20 — a bonus that sets only its first param is not empty", () => {
+    const bonuses = readBonuses(bonusTable([{ key: 7, paramKeys: [0xabc] }]));
+    expect(bonuses.get(7)?.paramKeys).toEqual([0xabc]);
+  });
+
+  it("never reads the -1 column past the three ParamIds as a param key", () => {
+    const bonuses = readBonuses(bonusTable([{ key: 7, paramKeys: [0xabc, 0xdef, 0x123] }]));
+    expect(bonuses.get(7)?.paramKeys).toEqual([0xabc, 0xdef, 0x123]);
+  });
+});
+
+describe("unresolvedParams", () => {
+  it("is zero when every ParamId names a row", () => {
+    const bonuses = readBonuses(bonusTable([{ key: 7, paramKeys: [0xabc] }]));
+    expect(unresolvedParams(bonuses, new Map([[0xabc, param(104, [5])]]))).toBe(0);
+  });
+
+  it("counts ParamIds that resolve to nothing — the guard the column bug lacked", () => {
+    const bonuses = readBonuses(bonusTable([{ key: 7, paramKeys: [0xabc, 0xdef] }]));
+    expect(unresolvedParams(bonuses, new Map([[0xabc, param(104, [5])]]))).toBe(1);
   });
 });
 

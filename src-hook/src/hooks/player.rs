@@ -2227,40 +2227,56 @@ fn log_progress_probe(record: *const usize) {
     }
 }
 
-/// hookdiag: dump the record's inline unlock array in FULL, to settle where the
-/// AP-tree (Mastery) unlock state lives.
+/// hookdiag: read the record's inline 400 × 0x38 array as the RESOLVED
+/// limit-bonus store it turned out to be.
 ///
-/// [`read_record_skillboard`] reads only the first two words of each 0x38-byte
-/// entry — `{u32 id, u32 bits}` — and the other 0x30 bytes have never been
-/// looked at. The AP trees value out exactly in the game's tables
-/// (`ap_tree_* -> limit_bonus -> limit_bonus_param`, shipped as
-/// `src/assets/ap-tree-cap-sources.json`) but nothing on the log says which
-/// nodes a player unlocked, and this array is the standing hypothesis for where
-/// those bits already are: 400 entries is far more than the ~100 skillboard
-/// nodes a character has.
+/// The first pass of this probe dumped raw words, and the 2026-08-09 live run
+/// decoded the whole stride from what came back. An entry is one `limit_bonus`
+/// the player has unlocked, followed by THREE param slots of four words each —
+/// 2 + 3 × 4 = 14 words = 0x38, with nothing left over:
 ///
-/// Three questions, all answered by one live line:
-/// 1. `words>0` — do entries carry ANY non-zero word past `bits`? If every
-///    entry is `{id, bits, 0...}`, the array is skillboard-only and the AP-tree
-///    state is somewhere else entirely.
-/// 2. `unclaimed` — entries whose id the skillboard walk never matched to a node
-///    row. Those ids are the AP-tree candidates; cross-check them against the
-///    `Key` column of `ap_tree_*.tbl` (the asset ships those hashes).
-/// 3. `used` — how much of the 400 is populated at all.
+/// ```text
+///   w0        limit_bonus.Key            (64/64 matched the table, live)
+///   w1        unlock mask (0x0101, 0x0303, 0x1f1f ... a bit run per byte)
+///   w2+4k     limit_bonus_param.Key      EMPTY_SIGIL_HASH when the slot is unused
+///   w3+4k     the slot's own level mask  (matches w1's low byte)
+///   w4+4k     limit_bonus_param's TYPE ID — 103/104/105/106 are the damage caps
+///   w5+4k     the value, as f32          (type 100 + 2.0 = "Skill Damage +2%")
+/// ```
 ///
-/// Guarded reads throughout; bounded output. Prints nothing when the array is
-/// empty, so a pre-load call costs one line, not four hundred.
+/// That w4 equals the type id this repo reads at table row `+0x48` is an
+/// independent, live confirmation of that column — the shipped `.headers` puts
+/// it elsewhere.
+///
+/// **The game has already done the summation.** If a cap-typed slot appears
+/// here, the Mastery term can be READ rather than reconstructed from which
+/// nodes are unlocked, and `src/assets/ap-tree-cap-sources.json` drops back to
+/// being the ceiling this can be checked against.
+///
+/// So the only open question is whether cap slots are in here at all. The first
+/// run could not say: it printed the first 64 entries of 360 and every one of
+/// them was an `ap_tree_atk` bonus, which is a truncated sample, NOT an absence.
+/// This version answers it over all 400 — a histogram of every type id seen
+/// (small, complete) plus the full detail of only the cap-typed slots (few).
+///
+/// Guarded reads throughout. One line per player load.
 #[cfg(feature = "hookdiag")]
 fn log_record_node_array(record: *const usize, skillboard: &[u32]) {
     use crate::hooks::diag::read_u32_guarded;
 
+    /// `limit_bonus_param` type ids for the three per-class damage caps and the
+    /// all-class one. 107 is the HEALING cap and is deliberately not here.
+    const CAP_TYPE_IDS: [u32; 4] = [103, 104, 105, 106];
+    /// Param slots per entry, and the words each slot spans.
+    const PARAM_SLOTS: usize = 3;
+    const SLOT_WORDS: usize = 4;
+
     let base = record as usize;
     let mut used = 0usize;
-    let mut with_extra_words = 0usize;
-    // Entries carrying something past `bits`, and entries at all — both capped,
-    // because a misread pointer would otherwise dump 400 lines of noise.
-    let mut extras: Vec<String> = Vec::new();
-    let mut ids: Vec<String> = Vec::new();
+    // type id -> how many slots carry it. A histogram is what makes this
+    // complete over all 400 without dumping 400 lines.
+    let mut types: Vec<(u32, u32)> = Vec::new();
+    let mut caps: Vec<String> = Vec::new();
 
     for n in 0..RECORD_NODE_ARRAY_COUNT {
         let entry = RECORD_NODE_ARRAY_OFFSET + n * RECORD_NODE_ARRAY_STRIDE;
@@ -2269,24 +2285,25 @@ fn log_record_node_array(record: *const usize, skillboard: &[u32]) {
             continue;
         }
         used += 1;
-        // Words 2.. are the unexamined 0x30. Word 1 is the skillboard's `bits`.
-        let extra: Vec<String> = (2..RECORD_NODE_ARRAY_STRIDE / 4)
-            .filter_map(|w| {
-                let value = read_u32_guarded(base, entry + w * 4);
-                (value != 0).then(|| format!("w{w}={value:#010x}"))
-            })
-            .collect();
-        if !extra.is_empty() {
-            with_extra_words += 1;
-            if extras.len() < 24 {
-                extras.push(format!("{id:#010x}[{}]", extra.join(",")));
+        let unlock = read_u32_guarded(base, entry + 4);
+
+        for slot in 0..PARAM_SLOTS {
+            let at = entry + (2 + slot * SLOT_WORDS) * 4;
+            let param = read_u32_guarded(base, at);
+            if param == 0 || param == EMPTY_SIGIL_HASH {
+                continue;
             }
-        }
-        if ids.len() < 64 {
-            ids.push(format!(
-                "{id:#010x}/{:#010x}",
-                read_u32_guarded(base, entry + 4)
-            ));
+            let type_id = read_u32_guarded(base, at + 8);
+            match types.iter_mut().find(|(id, _)| *id == type_id) {
+                Some((_, count)) => *count += 1,
+                None => types.push((type_id, 1)),
+            }
+            if CAP_TYPE_IDS.contains(&type_id) {
+                caps.push(format!(
+                    "{id:#010x}/{unlock:#06x} p={param:#010x} t={type_id} v={}",
+                    f32::from_bits(read_u32_guarded(base, at + 12))
+                ));
+            }
         }
     }
 
@@ -2294,12 +2311,18 @@ fn log_record_node_array(record: *const usize, skillboard: &[u32]) {
         log::info!("APDIAG record={base:#x} array empty (record not loaded yet)");
         return;
     }
+    types.sort_unstable();
     log::info!(
-        "APDIAG record={base:#x} used={used}/{RECORD_NODE_ARRAY_COUNT} withExtraWords={with_extra_words} \
-         sbNodes={} ids={} extras={}",
+        "APDIAG record={base:#x} used={used}/{RECORD_NODE_ARRAY_COUNT} sbNodes={} capSlots={} \
+         types=[{}] caps=[{}]",
         skillboard.len(),
-        ids.join(" "),
-        extras.join(" ")
+        caps.len(),
+        types
+            .iter()
+            .map(|(id, count)| format!("{id}x{count}"))
+            .collect::<Vec<_>>()
+            .join(" "),
+        caps.join(" ")
     );
 }
 

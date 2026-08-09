@@ -163,6 +163,21 @@ export const readParams = (buffer) => {
   return byKey;
 };
 
+/** `limit_bonus`'s three ParamId columns. They start at 0x20, right after the
+ * 32-byte `IconId` raw_string — NOT at 0x24.
+ *
+ * An earlier pass read `[0x24, 0x28, 0x2c]`, i.e. every bonus's ParamId2 and
+ * ParamId3 plus the int past them, and it failed SILENTLY: most bonuses set only
+ * ParamId1, so they read as two empty hashes and were dropped as "grants no
+ * cap". The asset still built, still passed its text check (the params it DID
+ * read were real ones), and was simply missing most of the trees. Live memory is
+ * what caught it — the record's own store pairs a `limit_bonus.Key` with the
+ * `limit_bonus_param.Key` it resolved to, and that key sits at 0x20.
+ *
+ * [`unresolvedParams`] now counts what does not resolve, so the same mistake
+ * cannot be silent twice. */
+export const BONUS_PARAM_COLUMNS = [0x20, 0x24, 0x28];
+
 /** Every `limit_bonus` row, by its key hash. */
 export const readBonuses = (buffer) => {
   const { rowCount, offsetOf } = readRows(buffer, TABLES.bonus.rowSize, TABLES.bonus.file);
@@ -170,13 +185,30 @@ export const readBonuses = (buffer) => {
   for (let index = 0; index < rowCount; index += 1) {
     const at = offsetOf(index);
     byKey.set(buffer.readUInt32LE(at + 0x34), {
-      paramKeys: [0x24, 0x28, 0x2c]
-        .map((column) => buffer.readUInt32LE(at + column))
-        .filter((key) => key !== HASH_NONE),
+      paramKeys: BONUS_PARAM_COLUMNS.map((column) => buffer.readUInt32LE(at + column)).filter(
+        (key) => key !== HASH_NONE
+      ),
       titleId: buffer.readUInt32LE(at + 0x44),
     });
   }
   return byKey;
+};
+
+/**
+ * How many of the bonuses' ParamId columns name a row `limit_bonus_param` does
+ * not have.
+ *
+ * The check the column bug needed and did not have. A ParamId that resolves to
+ * nothing is either a shifted column or a table that moved; either way every
+ * number downstream is suspect, so the generator refuses to write on a non-zero
+ * count rather than shipping a quietly thinner asset.
+ */
+export const unresolvedParams = (bonuses, params) => {
+  let count = 0;
+  for (const bonus of bonuses.values()) {
+    for (const key of bonus.paramKeys) if (!params.has(key)) count += 1;
+  }
+  return count;
 };
 
 /** Text id hash -> the English string, across the given .msg files. */
@@ -341,6 +373,20 @@ const main = () => {
 
   const params = readParams(read("param"));
   const bonuses = readBonuses(read("bonus"));
+
+  // Before anything is written: a ParamId that names no param row means the
+  // column moved, and every value below it would then be quietly thinner rather
+  // than wrong-looking. Refuse instead.
+  const orphanParams = unresolvedParams(bonuses, params);
+  if (orphanParams > 0) {
+    console.error(
+      `FAIL: ${orphanParams} limit_bonus ParamId(s) name no limit_bonus_param row — ` +
+        `the columns at ${BONUS_PARAM_COLUMNS.map((column) => `0x${column.toString(16)}`).join("/")} have moved; ` +
+        "re-derive them before trusting any value"
+    );
+    process.exit(1);
+  }
+
   const built = buildTrees({
     buffers: { atk: read("atk"), def: read("def"), wep: read("wep"), rebuild: read("rebuild") },
     bonuses,

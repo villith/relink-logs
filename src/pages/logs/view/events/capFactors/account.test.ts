@@ -59,9 +59,8 @@ describe("master trait rank bonus", () => {
   });
 });
 
-/** A weapon whose only AP tree is the weapon tree, worth +10% to skill and to
- * Skybound Art caps — small enough that a total cannot be confused with the
- * character's. */
+/** A weapon whose only AP tree is the weapon tree, worth +20% to every class —
+ * small enough that a total cannot be confused with the character's. */
 const weapon = (weaponId: number) => ({
   weaponId,
   starLevel: 0,
@@ -91,12 +90,12 @@ describe("mastery / collection", () => {
   });
 
   it("carries the completed character trees as its potential, so the row names a size", () => {
-    expect(factorResult("account-mastery", player, "skill").potential).toBe(150);
-    expect(factorResult("account-mastery", player, "sba").potential).toBe(150);
+    expect(factorResult("account-mastery", player, "skill").potential).toBe(254);
+    expect(factorResult("account-mastery", player, "sba").potential).toBe(254);
   });
 
-  it("offers nothing to a normal attack — no AP-tree node raises that cap", () => {
-    expect(factorResult("account-mastery", player, "normal").potential).toBe(0);
+  it("raises the normal-attack cap too, which the trees genuinely do", () => {
+    expect(factorResult("account-mastery", player, "normal").potential).toBe(254);
   });
 
   it("says nothing at all when the class or the character is unknown", () => {
@@ -110,7 +109,7 @@ describe("weapon mastery trees", () => {
     const player = loadout(50, { characterType: "Pl0000", weaponInfo: weapon(0x10180036) });
     expect(factorResult("account-weapon-trees", player, "skill")).toMatchObject({
       state: "unknown",
-      potential: 10,
+      potential: 20,
       reason: "unlocks-unrecorded",
     });
   });
