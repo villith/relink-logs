@@ -22,7 +22,6 @@ use super::{
 mod ability_charts;
 #[cfg(any(test, feature = "diag"))]
 pub mod audit;
-pub mod cap;
 mod cap_detection;
 mod chart_scope;
 mod filters;
