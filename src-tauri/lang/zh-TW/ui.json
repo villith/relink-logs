@@ -29,7 +29,7 @@
       "expand-menu": "展開選單"
     },
     "logs-tab": "日誌",
-    "new-chip": "新",
+    "new-chip": "New",
     "github": "GitHub",
     "columns-btn": "顯示欄位",
     "overlay-columns-section": "懸浮窗顯示欄位",
@@ -115,15 +115,15 @@
       "tier": "{{tier}}階",
       "ex": "EX階",
       "category": {
-        "atk": "真諦",
+        "atk": "精隨",
         "def": "覺醒",
-        "lim": "秘義",
+        "lim": "奧秘",
         "other": "其他"
       },
       "initial": {
-        "atk": "真諦",
+        "atk": "精隨",
         "def": "覺醒",
-        "lim": "秘義"
+        "lim": "奧秘"
       }
     },
     "show-all": "顯示全部",
@@ -423,7 +423,7 @@
       "delete-selected-logs-confirmation_other": "這將從資料庫中刪除 {{count}} 條日誌。此操作無法撤銷。",
       "quest-name": "任務名稱",
       "quests-tab": "任務",
-      "conflux-tab": "極沌空處",
+      "conflux-tab": "極沌空所",
       "filter-all": "全部",
       "filter-completed": "成功",
       "filter-failed": "失敗",
@@ -432,7 +432,7 @@
       "conflux-room-number": "區域 #{{number}}",
       "conflux-run": "挑戰",
       "conflux-rooms-count": "x{{count}}",
-      "no-conflux-runs": "暫無極沌空處紀錄",
+      "no-conflux-runs": "暫無極沌空所紀錄",
       "conflux-runs-saved_zero": "未儲存任何紀錄",
       "conflux-runs-saved_one": "已儲存 {{count}} 條紀錄",
       "conflux-runs-saved_other": "已儲存 {{count}} 條紀錄",
@@ -589,7 +589,7 @@
       "hook-state": "Hook 狀態",
       "encounter-state": "戰鬥狀態",
       "hook-note": "這些操作直接作用於真實 Hook：彈出與 Hello 覆蓋指令透過開發控制通道傳輸，重新注入則透過應用的真實注入迴圈執行。上方顯示的版本與狀態是 Hook 在上次握手時回報的資訊。",
-      "encounter-note": "這些操作會將事件寫入 Hook 事件流，戰鬥中觸發會影響當前紀錄。結束和重置都會結束戰鬥並儲存傷害日誌；結束還會附加虛構任務ID和計時器。極沌空處中，重置會結算挑戰，結束僅標記完成。",
+      "encounter-note": "這些操作會將事件寫入 Hook 事件流，戰鬥中觸發會影響當前紀錄。結束和重置都會結束戰鬥並儲存傷害日誌；結束還會附加虛構任務ID和計時器。極沌空所中，重置會結算挑戰，結束僅標記完成。",
       "action-failed": "{{action}} 失敗: {{error}}",
       "stale-hook-note": "需要已注入且為最新版本的開發版 Hook：過期的 hook-dbg.dll 無法解析這些請求。如果連線失敗，請先重新建置 Hook 並使用工作列圖示選單中的 \"重新載入 Hook (dev)\"。",
       "hold-out-active": "Hook 已掛起 — 重新注入已暫停，因此即使遊戲正在執行，狀態也會顯示為 \"未找到遊戲程序\"。使用 \"允許重新注入\" (或重新整理) 來解除暫停。",
@@ -1513,7 +1513,6 @@
       "1010": "(龍人化) 眾神意志．重連刃連擊",
       "1100": "(龍人化) 召禍",
       "1200": "(龍人化) 永欲",
-      "1300": "(龍人化) 下能力",
       "1400": "(龍人化) 神能解放",
       "1500": "諸神黃昏．型態",
       "skill-groups": {
