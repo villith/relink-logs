@@ -26,6 +26,24 @@ describe("cap factor results", () => {
   });
 
   it("a factor for another attack class contributes nothing and has no potential", () => {
-    expect(notApplicableResult()).toEqual({ percent: 0, potential: 0, state: "not-applicable", missing: [] });
+    expect(notApplicableResult("other-class")).toEqual({
+      percent: 0,
+      potential: 0,
+      state: "not-applicable",
+      missing: [],
+      reason: "other-class",
+    });
+  });
+
+  it("an unknown with no missing params is the model's own limit, not the caller's", () => {
+    // Nothing the caller could have passed would settle this one — the row
+    // marks where the reconstruction ends, and must not read as a caller error.
+    expect(unknownResult(30, [], "scaling-unknown")).toEqual({
+      percent: 0,
+      potential: 30,
+      state: "unknown",
+      missing: [],
+      reason: "scaling-unknown",
+    });
   });
 });
