@@ -1,21 +1,25 @@
+import apTreeSources from "@/assets/ap-tree-cap-sources.json";
 import boardSources from "@/assets/skillboard-cap-sources.json";
+import { toHashString } from "@/utils";
 
-import type { CapLoadout } from "../capSources";
+import type { CapClass, CapLoadout } from "../capSources";
 import { activeResult, unknownResult, type CapFactor } from "./types";
 
 /**
  * The account-wide cap-up terms — the ones that come from progression rather
  * than from anything equipped.
  *
- * The master trait RANK bonus is derived here. The rest of the Masteries screen
- * (the AP trees, which the game's UI labels Offense / Defense / Collection) is
- * valued exactly in the game's tables but its input — which tree nodes a player
- * unlocked — is not on the log, so it stays named and unresolved until a hook
- * capture exists.
+ * The master trait RANK bonus is derived here. The AP trees (the game's Mastery
+ * screens) are valued exactly in the game's tables but their input — which tree
+ * nodes a player unlocked — is not on the log, so they stay named and
+ * unresolved. What they CAN say is what a completed set is worth, which is the
+ * `potential` these rows carry: a ceiling on the term, not a claim about this
+ * player.
  *
- * Both belong INSIDE the captured record channel, as sub-rows itemizing a total
- * the model already attributes. Adding them to the attributed sum would
- * double-count them.
+ * All of these belong INSIDE the captured record channel, as sub-rows itemizing
+ * a total the model already attributes. Adding them to the attributed sum would
+ * double-count them — which is also why an unresolved potential here is safe:
+ * `evaluateCapFactors` never adds a potential to `attributed`.
  */
 
 /** Not a real id — these terms have no game entity behind them. The renderer
@@ -27,6 +31,28 @@ const NO_ID = 0;
  * 11 levels grant anything) and already summed here. */
 const MASTER_LEVEL_CAP = boardSources.masterLevelCap as number[];
 
+/** Per owner, what a fully completed set of trees grants, by cap class. Built by
+ * `gen-ap-tree-cap-sources.mjs` out of `ap_tree_*` → `limit_bonus` →
+ * `limit_bonus_param`. Characters own the Offense/Defense trees; weapons own the
+ * weapon and rebuild trees, so the two are keyed separately — summing them into
+ * one number would price every weapon a character owns at once. */
+type CapPotential = Partial<Record<CapClass | "all", number>>;
+const CHARACTER_POTENTIAL = apTreeSources.characterPotential as Record<string, CapPotential>;
+const WEAPON_POTENTIAL = apTreeSources.weaponPotential as Record<string, CapPotential>;
+
+/**
+ * The cap a completed tree set would grant a hit of this class.
+ *
+ * `all` is added on top of the class's own total because a node typed 106 raises
+ * every class. No AP-tree node is typed 106 on v2.0.4 — every one is skill or
+ * Skybound Art — but reading the class out rather than assuming it keeps a game
+ * update from silently dropping a term.
+ */
+const potentialFor = (potential: CapPotential | undefined, capClass: CapClass | null): number => {
+  if (potential === undefined || capClass === null) return 0;
+  return (potential[capClass] ?? 0) + (potential.all ?? 0);
+};
+
 /**
  * The cap a master level has accumulated, as an integer percent.
  *
@@ -37,8 +63,10 @@ const MASTER_LEVEL_CAP = boardSources.masterLevelCap as number[];
 export const masterRankCapUp = (masterLevel: number): number =>
   MASTER_LEVEL_CAP[Math.min(Math.max(masterLevel, 0), MASTER_LEVEL_CAP.length - 1)] ?? 0;
 
-export const accountFactors = (player: CapLoadout | undefined): CapFactor[] => {
+export const accountFactors = (player: CapLoadout | undefined, capClass: CapClass | null): CapFactor[] => {
   const masterLevel = player?.masterLevel ?? 0;
+  const character = typeof player?.characterType === "string" ? player.characterType.toLowerCase() : null;
+  const weaponId = player?.weaponInfo?.weaponId;
 
   return [
     {
@@ -61,9 +89,28 @@ export const accountFactors = (player: CapLoadout | undefined): CapFactor[] => {
       label: "ui.debug.cap-mastery-collection",
       level: null,
       params: [],
-      // The AP trees give an exact integer percent per node in the game's own
-      // tables; what the log lacks is the set of nodes a player unlocked.
-      evaluate: () => unknownResult(0, [], "value-unrecorded"),
+      evaluate: () =>
+        unknownResult(
+          potentialFor(character === null ? undefined : CHARACTER_POTENTIAL[character], capClass),
+          [],
+          "unlocks-unrecorded"
+        ),
+    },
+    {
+      // The weapon's own two trees are a different owner, not more of the same:
+      // they follow the EQUIPPED weapon, so they change when the weapon does.
+      key: "account-weapon-trees",
+      kind: "account",
+      id: NO_ID,
+      label: "ui.debug.cap-weapon-trees",
+      level: null,
+      params: [],
+      evaluate: () =>
+        unknownResult(
+          potentialFor(weaponId === undefined ? undefined : WEAPON_POTENTIAL[toHashString(weaponId)], capClass),
+          [],
+          "unlocks-unrecorded"
+        ),
     },
   ];
 };

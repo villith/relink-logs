@@ -3,18 +3,25 @@ import { describe, expect, it } from "vitest";
 import type { CapLoadout } from "../capSources";
 import { accountFactors } from "./account";
 
-const loadout = (masterLevel: number | undefined): CapLoadout => ({
+const loadout = (masterLevel: number | undefined, overrides: Partial<CapLoadout> = {}): CapLoadout => ({
   sigils: [],
   summons: [],
   weaponState: null,
   weaponInfo: null,
   overmasteryInfo: null,
   masterLevel,
+  ...overrides,
 });
 
 const rank = (masterLevel: number | undefined) => {
-  const factor = accountFactors(loadout(masterLevel)).find((entry) => entry.key === "account-master-rank");
+  const factor = accountFactors(loadout(masterLevel), "skill").find((entry) => entry.key === "account-master-rank");
   if (factor === undefined) throw new Error("no master-rank factor");
+  return factor.evaluate({});
+};
+
+const factorResult = (key: string, player: CapLoadout, capClass: Parameters<typeof accountFactors>[1]) => {
+  const factor = accountFactors(player, capClass).find((entry) => entry.key === key);
+  if (factor === undefined) throw new Error(`no ${key} factor`);
   return factor.evaluate({});
 };
 
@@ -52,9 +59,64 @@ describe("master trait rank bonus", () => {
   });
 });
 
+/** A weapon whose only AP tree is the weapon tree, worth +10% to skill and to
+ * Skybound Art caps — small enough that a total cannot be confused with the
+ * character's. */
+const weapon = (weaponId: number) => ({
+  weaponId,
+  starLevel: 0,
+  plusMarks: 0,
+  awakeningLevel: 0,
+  trait1Id: 0,
+  trait1Level: 0,
+  trait2Id: 0,
+  trait2Level: 0,
+  trait3Id: 0,
+  trait3Level: 0,
+  wrightstoneId: 0,
+  weaponLevel: 0,
+  weaponHp: 0,
+  weaponAttack: 0,
+});
+
 describe("mastery / collection", () => {
-  it("stays unresolved — the tables value it but the log has no node set", () => {
-    const factor = accountFactors(loadout(50)).find((entry) => entry.key === "account-mastery");
-    expect(factor?.evaluate({})).toMatchObject({ state: "unknown" });
+  const player = loadout(50, { characterType: "Pl0000", weaponInfo: weapon(0x10180036) });
+
+  it("stays unresolved — the tables value it, but the log has no unlocked-node set", () => {
+    expect(factorResult("account-mastery", player, "skill")).toMatchObject({
+      state: "unknown",
+      percent: 0,
+      reason: "unlocks-unrecorded",
+    });
+  });
+
+  it("carries the completed character trees as its potential, so the row names a size", () => {
+    expect(factorResult("account-mastery", player, "skill").potential).toBe(150);
+    expect(factorResult("account-mastery", player, "sba").potential).toBe(150);
+  });
+
+  it("offers nothing to a normal attack — no AP-tree node raises that cap", () => {
+    expect(factorResult("account-mastery", player, "normal").potential).toBe(0);
+  });
+
+  it("says nothing at all when the class or the character is unknown", () => {
+    expect(factorResult("account-mastery", player, null).potential).toBe(0);
+    expect(factorResult("account-mastery", loadout(50), "skill").potential).toBe(0);
+  });
+});
+
+describe("weapon mastery trees", () => {
+  it("follows the EQUIPPED weapon rather than the character", () => {
+    const player = loadout(50, { characterType: "Pl0000", weaponInfo: weapon(0x10180036) });
+    expect(factorResult("account-weapon-trees", player, "skill")).toMatchObject({
+      state: "unknown",
+      potential: 10,
+      reason: "unlocks-unrecorded",
+    });
+  });
+
+  it("is zero for a log with no stored weapon, not the character's number", () => {
+    const player = loadout(50, { characterType: "Pl0000" });
+    expect(factorResult("account-weapon-trees", player, "skill").potential).toBe(0);
   });
 });

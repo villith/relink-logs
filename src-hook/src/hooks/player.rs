@@ -766,6 +766,9 @@ impl OnLoadPlayerIdentityHook {
             identity.cap_ups.2,
         );
 
+        #[cfg(feature = "hookdiag")]
+        log_record_node_array(record, &identity.skillboard);
+
         // Companion lines for the stat/weapon-state labeling run: STDIAG dumps
         // the whole candidate window around the record stat block (0x5B38..0x5B88)
         // so each field can be matched against the in-game status screen, and
@@ -2222,6 +2225,82 @@ fn log_progress_probe(record: *const usize) {
             }
         }
     }
+}
+
+/// hookdiag: dump the record's inline unlock array in FULL, to settle where the
+/// AP-tree (Mastery) unlock state lives.
+///
+/// [`read_record_skillboard`] reads only the first two words of each 0x38-byte
+/// entry — `{u32 id, u32 bits}` — and the other 0x30 bytes have never been
+/// looked at. The AP trees value out exactly in the game's tables
+/// (`ap_tree_* -> limit_bonus -> limit_bonus_param`, shipped as
+/// `src/assets/ap-tree-cap-sources.json`) but nothing on the log says which
+/// nodes a player unlocked, and this array is the standing hypothesis for where
+/// those bits already are: 400 entries is far more than the ~100 skillboard
+/// nodes a character has.
+///
+/// Three questions, all answered by one live line:
+/// 1. `words>0` — do entries carry ANY non-zero word past `bits`? If every
+///    entry is `{id, bits, 0...}`, the array is skillboard-only and the AP-tree
+///    state is somewhere else entirely.
+/// 2. `unclaimed` — entries whose id the skillboard walk never matched to a node
+///    row. Those ids are the AP-tree candidates; cross-check them against the
+///    `Key` column of `ap_tree_*.tbl` (the asset ships those hashes).
+/// 3. `used` — how much of the 400 is populated at all.
+///
+/// Guarded reads throughout; bounded output. Prints nothing when the array is
+/// empty, so a pre-load call costs one line, not four hundred.
+#[cfg(feature = "hookdiag")]
+fn log_record_node_array(record: *const usize, skillboard: &[u32]) {
+    use crate::hooks::diag::read_u32_guarded;
+
+    let base = record as usize;
+    let mut used = 0usize;
+    let mut with_extra_words = 0usize;
+    // Entries carrying something past `bits`, and entries at all — both capped,
+    // because a misread pointer would otherwise dump 400 lines of noise.
+    let mut extras: Vec<String> = Vec::new();
+    let mut ids: Vec<String> = Vec::new();
+
+    for n in 0..RECORD_NODE_ARRAY_COUNT {
+        let entry = RECORD_NODE_ARRAY_OFFSET + n * RECORD_NODE_ARRAY_STRIDE;
+        let id = read_u32_guarded(base, entry);
+        if id == 0 || id == EMPTY_SIGIL_HASH {
+            continue;
+        }
+        used += 1;
+        // Words 2.. are the unexamined 0x30. Word 1 is the skillboard's `bits`.
+        let extra: Vec<String> = (2..RECORD_NODE_ARRAY_STRIDE / 4)
+            .filter_map(|w| {
+                let value = read_u32_guarded(base, entry + w * 4);
+                (value != 0).then(|| format!("w{w}={value:#010x}"))
+            })
+            .collect();
+        if !extra.is_empty() {
+            with_extra_words += 1;
+            if extras.len() < 24 {
+                extras.push(format!("{id:#010x}[{}]", extra.join(",")));
+            }
+        }
+        if ids.len() < 64 {
+            ids.push(format!(
+                "{id:#010x}/{:#010x}",
+                read_u32_guarded(base, entry + 4)
+            ));
+        }
+    }
+
+    if used == 0 {
+        log::info!("APDIAG record={base:#x} array empty (record not loaded yet)");
+        return;
+    }
+    log::info!(
+        "APDIAG record={base:#x} used={used}/{RECORD_NODE_ARRAY_COUNT} withExtraWords={with_extra_words} \
+         sbNodes={} ids={} extras={}",
+        skillboard.len(),
+        ids.join(" "),
+        extras.join(" ")
+    );
 }
 
 /// hookdiag: resolve a save-instance id through the FNV-1a(u32) instance map

@@ -48,6 +48,7 @@ const EXCLUSION_KEY: Record<ExplainReason, string> = {
   "other-class": "ui.debug.cap-excl-other-class",
   "zero-at-level": "ui.debug.cap-excl-zero-at-level",
   "value-unrecorded": "ui.debug.cap-excl-unrecorded",
+  "unlocks-unrecorded": "ui.debug.cap-excl-unlocks-unrecorded",
   // Where the reconstruction ends, rather than where the caller fell short.
   "stack-curve-unknown": "ui.debug.cap-excl-stack-curve",
   "scaling-unknown": "ui.debug.cap-excl-scaling",

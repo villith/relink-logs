@@ -85,6 +85,11 @@ export type CapFactorReason =
   | "zero-at-level"
   /** A magnitude the log never captured (a v2.0.2 town-loadout recovery). */
   | "value-unrecorded"
+  /** The opposite of `value-unrecorded`: every magnitude is known from the
+   * game's tables, but WHICH of them the player has unlocked is not on the log.
+   * The AP trees are the case — their potential is exact, their actual is not
+   * capturable until a hook reads the unlock state. */
+  | "unlocks-unrecorded"
   /** Stack-gated, and only the value at full stacks is in the game's text — an
    * intermediate stack has no quoted number to report. */
   | "stack-curve-unknown"
