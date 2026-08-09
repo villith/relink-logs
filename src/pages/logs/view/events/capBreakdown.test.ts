@@ -1,12 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import { capCardRows } from "./capBreakdown";
+import { capCardRows, selectCapUp } from "./capBreakdown";
+
+describe("selectCapUp", () => {
+  const capUp = { normal: 13.13, skill: 15.18, sba: 12.16 };
+
+  it("picks the cap-up for the hit's attack class", () => {
+    expect(selectCapUp(capUp, 0x1)).toBe(13.13);
+    expect(selectCapUp(capUp, 0x10008)).toBe(15.18);
+  });
+
+  // The builder tests 0x10000 first, but the 0x40000 branch jumps past the
+  // skill assignment — so a hit carrying both is a Skybound Art.
+  it("lets Skybound Art win over Skill", () => {
+    expect(selectCapUp(capUp, 0x50000)).toBe(12.16);
+  });
+
+  it("has no answer without a class or without a captured cap-up", () => {
+    expect(selectCapUp(capUp, null)).toBeNull();
+    expect(selectCapUp(undefined, 0x1)).toBeNull();
+    // The class resolved, but THAT class was never captured. Falling back to
+    // another class's number would attribute the wrong total.
+    expect(selectCapUp({ normal: null, skill: 15.18, sba: null }, 0x1)).toBeNull();
+  });
+});
 
 const hit = {
   damage: 1_500_000,
   damage_cap: 1_000_000,
   base_damage: 4_000_000,
   attack_rate: 2.5,
+  class_flags: 0x1,
 };
 
 describe("capCardRows", () => {

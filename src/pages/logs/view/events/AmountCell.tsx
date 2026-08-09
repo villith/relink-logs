@@ -6,7 +6,7 @@ import { CursorCard } from "@/components/CursorCard";
 import { Label } from "@/components/ui/Label";
 
 import { HOVER_PANEL_CLASS } from "../analysis/HoverCard";
-import { capCardRows, type CapHit, type CapRow } from "./capBreakdown";
+import { capCardRows, selectCapUp, type CapHit, type CapRow, type PlayerCapUp } from "./capBreakdown";
 
 const format = (row: CapRow, locale: string): string => {
   switch (row.kind) {
@@ -31,14 +31,25 @@ const format = (row: CapRow, locale: string): string => {
 export const AmountCell = ({
   amount,
   capHit,
+  playerCapUp,
   width,
 }: {
   amount: number | null;
   capHit: CapHit | null;
+  /** The acting player's cap-up totals, or undefined when the log predates the
+   * capture — in which case the card falls back to its Stage-1 rows rather than
+   * showing a cap-up block it cannot fill. */
+  playerCapUp?: PlayerCapUp;
   width: number;
 }) => {
   const { t, i18n } = useTranslation();
-  const rows = useMemo(() => (capHit === null ? [] : capCardRows(capHit)), [capHit]);
+  const rows = useMemo(() => {
+    if (capHit === null) return [];
+    const total = selectCapUp(playerCapUp, capHit.class_flags);
+    // No derived sources yet, so the whole total reports as unaccounted. That
+    // is the honest starting point, and every source that lands shrinks it.
+    return capCardRows(capHit, total === null ? undefined : { totalCapUp: total, terms: [] });
+  }, [capHit, playerCapUp]);
   const shows = rows.length > 1;
 
   // Memoized because `CursorCard` re-renders on every committed cursor frame

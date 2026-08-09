@@ -146,6 +146,7 @@ export const toEventRow = (event: LogEvent): EventRow => {
         damage_cap: hit.damage_cap,
         base_damage: hit.base_damage,
         attack_rate: hit.attack_rate,
+        class_flags: hit.class_flags,
       },
     };
   }

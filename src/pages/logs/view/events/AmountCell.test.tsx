@@ -10,7 +10,7 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
 
-const capHit = { damage: 1_500_000, damage_cap: 1_000_000, base_damage: 4_000_000, attack_rate: 2.5 };
+const capHit = { damage: 1_500_000, damage_cap: 1_000_000, base_damage: 4_000_000, attack_rate: 2.5, class_flags: 0x1 };
 
 const renderCell = (props: Parameters<typeof AmountCell>[0]) =>
   render(
@@ -50,11 +50,41 @@ describe("AmountCell", () => {
     expect(screen.queryByTestId("cap-card")).toBeNull();
   });
 
+  // The whole point of the card: the game's own total, and how much of it the
+  // model can account for. With no source derived yet, that is all of it.
+  it("shows the game's cap-up total and the unaccounted remainder", () => {
+    renderCell({
+      amount: 1_500_000,
+      capHit,
+      playerCapUp: { normal: 13.13, skill: 15.18, sba: 12.16 },
+      width: 78,
+    });
+    hover("1,500,000");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="capup"]')?.textContent).toContain("1,313%");
+    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,313%");
+    // 1,000,000 / 14.13
+    expect(card.querySelector('[data-cap-row="basecap"]')?.textContent).toContain("70,771");
+  });
+
+  // Selection is by the hit's OWN class. A Skybound Art must not be explained
+  // with the Normal total, which is a different number entirely.
+  it("picks the cap-up matching the hit's attack class", () => {
+    renderCell({
+      amount: 1_500_000,
+      capHit: { ...capHit, class_flags: 0x40000 },
+      playerCapUp: { normal: 13.13, skill: 15.18, sba: 12.16 },
+      width: 78,
+    });
+    hover("1,500,000");
+    expect(screen.getByTestId("cap-card").querySelector('[data-cap-row="capup"]')?.textContent).toContain("1,216%");
+  });
+
   // A damage row from a log recorded before the cap capture carries the shape
   // with null members. `capCardRows` returns its lone `damage` row for that, and
   // a one-row card would only restate the number already in the cell.
   it("shows no card for a damage row whose log predates the cap fields", () => {
-    const old = { damage: 12, damage_cap: null, base_damage: null, attack_rate: null };
+    const old = { damage: 12, damage_cap: null, base_damage: null, attack_rate: null, class_flags: null };
     renderCell({ amount: 12, capHit: old, width: 78 });
     hover("12");
     expect(screen.queryByTestId("cap-card")).toBeNull();

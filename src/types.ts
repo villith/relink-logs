@@ -934,6 +934,10 @@ export type LogEventPayload =
         stun_value: number | null;
         target_current_hp: number | null;
         target_max_hp: number | null;
+        /** Attack-class bits. `0x40000` Skybound Art beats `0x10000` Skill;
+         * neither means Normal. Picks which of the player's three cap-ups
+         * applied. `null` on old logs. */
+        class_flags: number | null;
       };
     }
   | { OnDeathEvent: { actor_index: number; death_counter: number } }
@@ -974,7 +978,18 @@ export type LogEvent = [number, LogEventPayload];
 /** Mirrors the Rust `EventPage`. `total` can exceed `events.length` — the
  * frontend asks for a capped page, and a log past the cap is truncated VISIBLY
  * (see EventsTab), never silently. */
-export type EventPage = { events: LogEvent[]; total: number };
+export type EventPage = { events: LogEvent[]; total: number; capUp: Record<string, PlayerCapUp> };
+
+/** Mirrors the Rust `PlayerCapUp`: the game's OWN cap-up total per attack class,
+ * not a decomposition. Every field is independently optional — a record read
+ * that resolved two classes must not claim zero for the third. Keyed in
+ * `EventPage.capUp` by the slot key a damage row carries as
+ * `source.parent_index`; a player absent from that map predates the capture. */
+export type PlayerCapUp = {
+  normal: number | null;
+  skill: number | null;
+  sba: number | null;
+};
 
 /** Toolbox / Synthesis Helper — mirrors src-tauri/src/synthesis/mod.rs. */
 export type SynthesisSigil = {

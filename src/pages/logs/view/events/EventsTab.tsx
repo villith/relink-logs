@@ -17,6 +17,7 @@ import {
 } from "../analysis/chipAnatomy";
 import type { StreamContext } from "../analysis/model/bodyContext";
 import { AmountCell } from "./AmountCell";
+import type { PlayerCapUp } from "./capBreakdown";
 import { toEventRow, type ActorSpace, type EventKind, type EventRow } from "./eventRows";
 import { defaultScopeKinds, narrowStream, scopeFor, scopeKinds } from "./eventScope";
 import { useEvents } from "./useEvents";
@@ -156,6 +157,7 @@ export const EventRowsTable = ({
   startIndex,
   totalRows,
   labels,
+  capUp,
 }: {
   /** The visible slice only. */
   rows: EventRow[];
@@ -166,6 +168,9 @@ export const EventRowsTable = ({
    * scrollbar, is sized by. */
   totalRows: number;
   labels: EventLabels;
+  /** The party's cap-up totals, keyed by the slot key a damage row carries as
+   * its `sourceIndex`. Absent for a log recorded before the capture. */
+  capUp?: Record<string, PlayerCapUp>;
 }) => {
   const { t } = useTranslation();
 
@@ -244,7 +249,12 @@ export const EventRowsTable = ({
                     apart. Every other kind has one or the other, never both. */}
                 <CellText name="ability" flex cell={action} suffix={row.statusKey === null ? null : detail} />
                 <CellText name="target" cell={target} width={COLUMNS.target} />
-                <AmountCell amount={row.amount} capHit={row.capHit} width={COLUMNS.amount} />
+                <AmountCell
+                  amount={row.amount}
+                  capHit={row.capHit}
+                  playerCapUp={row.sourceIndex === null ? undefined : capUp?.[String(row.sourceIndex)]}
+                  width={COLUMNS.amount}
+                />
               </Group>
             </Box>
           );
@@ -273,7 +283,7 @@ export type EventsTabProps = {
 export const EventsTab = ({ stream, labels }: EventsTabProps) => {
   const { id, metric, hostility, pins, probes } = stream;
   const { t } = useTranslation();
-  const { events, total } = useEvents(id);
+  const { events, total, capUp } = useEvents(id);
 
   const scope = scopeFor(metric);
   const offered = scopeKinds(scope);
@@ -376,6 +386,7 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
             startIndex={slice.start}
             totalRows={shown.length}
             labels={labels}
+            capUp={capUp}
           />
         )}
       </Box>

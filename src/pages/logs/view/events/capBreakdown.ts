@@ -17,6 +17,9 @@ export type CapHit = {
   damage_cap: number | null;
   base_damage: number | null;
   attack_rate: number | null;
+  /** Which of the player's three cap-ups applied. Read by the CALLER to pick
+   * one, not by `capCardRows`, which is handed the already-selected total. */
+  class_flags: number | null;
 };
 
 /** One cap-up contribution reconstructed from the stored loadout, as the
@@ -38,6 +41,29 @@ export type CapSource = {
 export type CapUp = {
   totalCapUp: number;
   terms: CapSource[];
+};
+
+/** Mirrors the Rust `PlayerCapUp`. */
+export type PlayerCapUp = {
+  normal: number | null;
+  skill: number | null;
+  sba: number | null;
+};
+
+/** The cap-up total that applied to a hit of this attack class.
+ *
+ * Mirrors the Rust `selected_cap_up`, and the order is the game builder's own:
+ * it tests `0x10000` first, but the `0x40000` branch jumps past the skill
+ * assignment, so a hit carrying both is a Skybound Art.
+ *
+ * `null` rather than a fallback when the hit's own class was never captured —
+ * substituting another class's total would attribute a number the formula did
+ * not use. */
+export const selectCapUp = (capUp: PlayerCapUp | undefined, classFlags: number | null): number | null => {
+  if (capUp === undefined || classFlags === null) return null;
+  if (classFlags & 0x40000) return capUp.sba;
+  if (classFlags & 0x10000) return capUp.skill;
+  return capUp.normal;
 };
 
 const round = (value: number, places: number): number => {

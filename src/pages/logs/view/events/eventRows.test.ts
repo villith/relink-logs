@@ -14,6 +14,7 @@ const actor = (index: number) => ({
 /** The cap half of a damage payload, absent. Old logs carry every one of these
  * as null, so it is the shape a fixture must default to. */
 const noCap = {
+  class_flags: null,
   damage_cap: null,
   base_damage: null,
   attack_rate: null,

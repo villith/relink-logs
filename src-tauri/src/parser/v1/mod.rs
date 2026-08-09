@@ -459,6 +459,18 @@ pub struct PlayerData {
     /// them readable.
     #[serde(default)]
     weapon_state: Option<WeaponState>,
+    /// The game's own damage-cap-up total for this player, per attack class
+    /// (Normal / Skill / Skybound Art), already in the units the cap formula
+    /// adds. The game sums every sigil, trait, node and bonus into these before
+    /// the hook ever sees them, so they are the TOTAL a derived breakdown is
+    /// reconciled against — not a decomposition. `None` on logs recorded before
+    /// the capture shipped; `#[serde(default)]` keeps those readable.
+    #[serde(default)]
+    cap_up_normal: Option<f32>,
+    #[serde(default)]
+    cap_up_skill: Option<f32>,
+    #[serde(default)]
+    cap_up_sba: Option<f32>,
     /// Whether this player was an online player or not
     is_online: bool,
     /// Weapon info for this player
@@ -487,6 +499,9 @@ impl Default for PlayerData {
             skillboard: Vec::new(),
             stats: None,
             weapon_state: None,
+            cap_up_normal: None,
+            cap_up_skill: None,
+            cap_up_sba: None,
             is_online: false,
             weapon_info: None,
             overmastery_info: None,
@@ -1925,6 +1940,51 @@ pub fn selection_facts(
     facts
 }
 
+/// The game's own damage-cap-up totals for one player, by attack class.
+///
+/// These are TOTALS, not contributions: the game has already summed every
+/// sigil, trait, node and bonus into each one before the hook sees it. A
+/// breakdown derived from the stored loadout is reconciled against them, and
+/// whatever it cannot account for is reported rather than hidden.
+///
+/// Every field is optional and independently so — a record read that resolved
+/// two classes must not claim zero for the third, which would render as a base
+/// cap equal to the logged cap and a confident 0% unaccounted.
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerCapUp {
+    pub normal: Option<f32>,
+    pub skill: Option<f32>,
+    pub sba: Option<f32>,
+}
+
+impl PlayerCapUp {
+    fn is_empty(&self) -> bool {
+        self.normal.is_none() && self.skill.is_none() && self.sba.is_none()
+    }
+}
+
+/// Cap-up totals keyed by the slot key a damage row already carries as
+/// `source.parent_index`, so the events table can join without a second lookup.
+///
+/// Players with nothing captured are OMITTED rather than mapped to an empty
+/// entry: absent means "this log predates the capture", and the card must show
+/// its Stage-1 rows for those instead of a cap-up block full of zeroes.
+pub fn cap_up_by_source(player_data: &[Option<PlayerData>]) -> BTreeMap<u32, PlayerCapUp> {
+    player_data
+        .iter()
+        .flatten()
+        .filter_map(|player| {
+            let cap_up = PlayerCapUp {
+                normal: player.cap_up_normal,
+                skill: player.cap_up_skill,
+                sba: player.cap_up_sba,
+            };
+            (!cap_up.is_empty()).then_some((player.actor_index, cap_up))
+        })
+        .collect()
+}
+
 /// One page of the raw event stream, with timestamps rebased to the fight start.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1936,6 +1996,14 @@ pub struct EventPage {
     /// How many events exist in total, so the frontend can tell a full answer
     /// from a truncated one.
     pub total: usize,
+    /// [`cap_up_by_source`] for this encounter's party.
+    ///
+    /// Rides the page rather than the event stream because identity events never
+    /// reach `raw_event_log` — only damage, stun, status, SBA, link and enemy
+    /// mode do — so the loadout is not in the stream to read. This is the one
+    /// fetch the events table already makes, and its only consumer.
+    #[serde(default)]
+    pub cap_up: BTreeMap<u32, PlayerCapUp>,
 }
 
 /// `count` events starting at `offset`, rebased to `start_time`.
@@ -1945,6 +2013,7 @@ pub struct EventPage {
 /// frame after a filter change.
 pub fn event_page(
     events: &[(i64, Message)],
+    player_data: &[Option<PlayerData>],
     start_time: i64,
     offset: usize,
     count: usize,
@@ -1963,6 +2032,7 @@ pub fn event_page(
             .map(|(ts, event)| (ts - start_time, event.clone()))
             .collect(),
         total,
+        cap_up: cap_up_by_source(player_data),
     }
 }
 
@@ -3356,6 +3426,9 @@ impl Parser {
             skillboard: Vec::new(),
             stats: None,
             weapon_state: None,
+            cap_up_normal: None,
+            cap_up_skill: None,
+            cap_up_sba: None,
             weapon_info: Some(event.weapon_info.into()),
             overmastery_info: Some(event.overmastery_info.into()),
             player_stats: Some(event.player_stats.into()),
@@ -3402,6 +3475,9 @@ impl Parser {
                 skillboard: Vec::new(),
                 stats: None,
                 weapon_state: None,
+                cap_up_normal: None,
+                cap_up_skill: None,
+                cap_up_sba: None,
                 is_online: event.is_online,
                 weapon_info: None,
                 overmastery_info: None,
@@ -3475,6 +3551,17 @@ impl Parser {
                 Some(known) => merge_weapon_state(known, fresh),
                 None => fresh,
             });
+        }
+        // Same only-overwrite-when-present rule. Each class independently: a
+        // record read that resolved two of the three must not blank the third.
+        if let Some(cap_up) = event.cap_up_normal {
+            player_data.cap_up_normal = Some(cap_up);
+        }
+        if let Some(cap_up) = event.cap_up_skill {
+            player_data.cap_up_skill = Some(cap_up);
+        }
+        if let Some(cap_up) = event.cap_up_sba {
+            player_data.cap_up_sba = Some(cap_up);
         }
 
         // Character level, also town-loadout-only. Fold it into player_stats without
@@ -4784,7 +4871,13 @@ mod tests {
                 .push_event(base + offset, Message::DamageEvent(a_damage_event()));
         }
 
-        let page = event_page(&parser.encounter.raw_event_log, base, 2, 3);
+        let page = event_page(
+            &parser.encounter.raw_event_log,
+            &parser.encounter.player_data,
+            base,
+            2,
+            3,
+        );
 
         assert_eq!(
             page.total, 10,
@@ -4794,6 +4887,45 @@ mod tests {
         assert_eq!(page.events[0].0, 2, "timestamps are relative to start_time");
     }
 
+    /// The card reconciles derived sources against the game's OWN total, so the
+    /// events page has to carry that total per player. It is keyed by the same
+    /// slot key a damage event reports as `source.parent_index`, because that is
+    /// what the row already holds.
+    #[test]
+    fn cap_up_is_keyed_by_the_slot_key_a_damage_row_carries() {
+        let mut parser = Parser::default();
+        let mut event = identity_event("Gran", 0x26A4848A, 0, protocol::player_slot_key(0), false);
+        event.cap_up_normal = Some(13.13);
+        event.cap_up_skill = Some(15.18);
+        event.cap_up_sba = Some(12.16);
+        parser.on_player_identity_event(event);
+
+        let map = cap_up_by_source(&parser.encounter.player_data);
+        let entry = map
+            .get(&protocol::player_slot_key(0))
+            .expect("the player's slot key is the row's source index");
+        assert_eq!(entry.normal, Some(13.13));
+        assert_eq!(entry.skill, Some(15.18));
+        assert_eq!(entry.sba, Some(12.16));
+    }
+
+    /// A log recorded before the capture must not report a cap-up of zero — the
+    /// card would then show a base cap equal to the logged cap and an
+    /// unaccounted row of 0%, which is a confident wrong answer.
+    #[test]
+    fn a_player_without_captured_cap_ups_is_absent_rather_than_zero() {
+        let mut parser = Parser::default();
+        parser.on_player_identity_event(identity_event(
+            "Gran",
+            0x26A4848A,
+            0,
+            protocol::player_slot_key(0),
+            false,
+        ));
+
+        assert!(cap_up_by_source(&parser.encounter.player_data).is_empty());
+    }
+
     #[test]
     fn event_page_clamps_an_offset_past_the_end() {
         let mut parser = Parser::default();
@@ -4801,7 +4933,13 @@ mod tests {
             .encounter
             .push_event(1_000, Message::DamageEvent(a_damage_event()));
 
-        let page = event_page(&parser.encounter.raw_event_log, 1_000, 500, 10);
+        let page = event_page(
+            &parser.encounter.raw_event_log,
+            &parser.encounter.player_data,
+            1_000,
+            500,
+            10,
+        );
 
         assert_eq!(page.events.len(), 0, "past the end is empty, not a panic");
         assert_eq!(page.total, 1);
