@@ -93,6 +93,9 @@ export type CapFactorReason =
   /** A timed buff whose status id this model cannot yet name, so an active
    * buff list cannot settle it. */
   | "no-status-mapping"
+  /** A board node scoped to a move named only in prose, so the hit's action id
+   * cannot be matched against it yet. */
+  | "no-action-mapping"
   /** A board node whose effect text the generator could not classify. */
   | "unparsed";
 
