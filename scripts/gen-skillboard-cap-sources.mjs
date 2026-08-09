@@ -32,8 +32,8 @@
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SOURCE = join(ROOT, "src-tauri", "lang", "en", "skillboard.json");
@@ -155,9 +155,9 @@ const main = () => {
 };
 
 // Only when run as a script — the classifier is imported by the test.
-// `pathToFileURL` rather than string-building the URL: on Windows the argv path
-// is `C:\...`, whose file URL carries a third slash the naive form drops, and
-// the comparison then silently never matches.
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Compared as resolved PATHS rather than as URLs, which is what clean-target.mjs
+// does: string-building a file:// URL from the Windows argv path drops a slash
+// and the comparison then silently never matches.
+if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   main();
 }
