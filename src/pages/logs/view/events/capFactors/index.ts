@@ -27,7 +27,7 @@ export const collectCapFactors = ({ loadout, capClass }: CapFactorInput): CapFac
   ...overmasteryFactors(loadout, capClass),
   ...summonFactors(loadout, capClass),
   ...boardFactors(loadout, capClass),
-  ...accountFactors(),
+  ...accountFactors(loadout),
 ];
 
 export type CapFactorRow = { factor: CapFactor; result: CapFactorResult };

@@ -1,30 +1,36 @@
 import { describe, expect, it } from "vitest";
 
-import boardSources from "@/assets/skillboard-cap-sources.json";
 import type { Sigil } from "@/types";
 
 import type { CapLoadout } from "../capSources";
 import { boardFactors } from "./board";
 
-const nodes = boardSources.nodes as Record<string, { scope: string; capClass: string; percent: number }>;
+/**
+ * Node ids are the low half of the shipped `pl####_####` keys. These are real
+ * Captain (pl0000) nodes, picked one per scope, so the fixtures exercise the
+ * data that actually ships rather than an invented shape.
+ */
+/** `DMG Cap +20%`, unconditional. */
+const ALWAYS = 0x000c;
+/** +45%, scoped to attack group 4 — a per-character group, so no class claimed. */
+const ATTACK_GROUP = 0x0016;
+/** +45% skill-class, scoped to one named ability (`6fd0843a`) in group 10. */
+const ABILITY_SCOPED = 0x0033;
+/** +100% while status 1000 (Poison) is on the attacker. */
+const STATUS_GATED = 0x001b;
+/** +20% per Basic Stats sigil, ceiling 5. */
+const SIGIL_COUNTED = 0x0023;
+/** Grants the cap-up status (56) for 30s rather than applying directly. */
+const GRANTS_STATUS = 0x00e7;
+/** Chain Burst cap — real, but not one of the three hit classes. */
+const CHAIN_BURST = 0x00ec;
+/** An engine-defined keystone: the table holds values, the exe holds meaning. */
+const ENGINE_DEFINED = 0x0002;
+/** "Skill Cooldown -2%" — a node that touches no cap at all. */
+const NOT_A_CAP_NODE = 0x000b;
 
-/** The first node of `scope` on Captain's board (`pl0000_…`), so the fixtures
- * describe real shipped data rather than invented ids. */
-const nodeOf = (scope: string, capClass = "all"): { id: number; percent: number } => {
-  const found = Object.entries(nodes).find(
-    ([key, value]) => key.startsWith("pl0000_") && value.scope === scope && value.capClass === capClass
-  );
-  if (found === undefined) throw new Error(`no ${scope}/${capClass} node on pl0000`);
-  return { id: parseInt(found[0].slice("pl0000_".length), 16), percent: found[1].percent };
-};
-
-const UNPARSED_ID = parseInt(
-  (Object.keys(boardSources.unparsed).find((key) => key.startsWith("pl0000_")) ?? "pl0000_0000").slice(7),
-  16
-);
-
+/** ATK — a Basic Stats-type trait, which is what the per-sigil node counts. */
 const basicStatsSigil = (): Sigil => ({
-  // ATK — a Basic Stats-type trait, which is what the per-sigil node counts.
   firstTraitId: 0x50079a1c,
   firstTraitLevel: 1,
   secondTraitId: 0,
@@ -47,67 +53,111 @@ const loadout = (over: Partial<CapLoadout> = {}): CapLoadout => ({
   ...over,
 });
 
+/** The single factor produced for `nodeId`, evaluated under `conditions`. */
+const factorFor = (nodeId: number, capClass: "normal" | "skill" | "sba" = "normal", over: Partial<CapLoadout> = {}) =>
+  boardFactors(loadout({ skillboard: [nodeId], ...over }), capClass)[0];
+
 describe("boardFactors", () => {
   it("produces nothing for a log that never captured the board", () => {
     expect(boardFactors(loadout({ skillboard: [] }), "normal")).toEqual([]);
     expect(boardFactors(loadout({ skillboard: undefined }), "normal")).toEqual([]);
   });
 
-  it("only values nodes the player actually unlocked", () => {
-    const node = nodeOf("always");
-    expect(boardFactors(loadout({ skillboard: [node.id] }), "normal")).toHaveLength(1);
-    // A board full of nodes, none of them unlocked, contributes nothing.
-    expect(boardFactors(loadout({ skillboard: [] }), "normal")).toHaveLength(0);
+  it("ignores an unlocked node that grants no damage cap", () => {
+    expect(boardFactors(loadout({ skillboard: [NOT_A_CAP_NODE] }), "normal")).toEqual([]);
   });
 
-  it("applies a flat node at its own percent, with no params", () => {
-    const node = nodeOf("always");
-    const [factor] = boardFactors(loadout({ skillboard: [node.id] }), "normal");
+  it("ignores the Chain Burst cap, which is not one of the three hit classes", () => {
+    expect(boardFactors(loadout({ skillboard: [CHAIN_BURST] }), "normal")).toEqual([]);
+  });
+});
+
+describe("unconditional board nodes", () => {
+  it("applies at its own percent with no params", () => {
+    const factor = factorFor(ALWAYS);
     expect(factor.params).toEqual([]);
-    expect(factor.evaluate({})).toMatchObject({ percent: node.percent, state: "active" });
+    expect(factor.evaluate({})).toMatchObject({ percent: 20, state: "active" });
   });
+});
 
-  it("rejects a node that raises a different attack class", () => {
-    const node = nodeOf("always", "skill");
-    const [factor] = boardFactors(loadout({ skillboard: [node.id] }), "normal");
-    expect(factor.evaluate({})).toMatchObject({ state: "not-applicable", reason: "other-class" });
-  });
-
-  it("counts the Basic Stats sigils actually equipped, up to the game's own cap", () => {
-    const node = nodeOf("sigil-count");
-    const withSigils = (count: number) =>
-      boardFactors(
-        loadout({ skillboard: [node.id], sigils: Array.from({ length: count }, basicStatsSigil) }),
-        "normal"
-      )[0].evaluate({});
-
-    expect(withSigils(3)).toMatchObject({ percent: node.percent * 3, state: "active" });
-    // "max sigils: 5" is the game's own ceiling; a sixth adds nothing.
-    expect(withSigils(6)).toMatchObject({ percent: node.percent * 5, state: "active" });
-    expect(withSigils(0)).toMatchObject({ percent: 0, state: "inactive" });
-  });
-
-  it("leaves a move-scoped node unresolved, naming the hit's action as what it needs", () => {
-    const node = nodeOf("action");
-    const [factor] = boardFactors(loadout({ skillboard: [node.id] }), "normal");
+describe("attack-scoped board nodes", () => {
+  it("asks for the hit's action id", () => {
+    const factor = factorFor(ATTACK_GROUP);
     expect(factor.params).toEqual(["actionId"]);
-    expect(factor.evaluate({})).toMatchObject({
-      percent: 0,
-      potential: node.percent,
+    expect(factor.evaluate({})).toMatchObject({ potential: 45, state: "unknown", missing: ["actionId"] });
+  });
+
+  it("stays unresolved for a group the table names by character rather than by ability", () => {
+    // Group 4 carries no ability ids, so there is nothing to match an action
+    // id against — supplying one cannot settle it, and saying so is the point.
+    expect(factorFor(ATTACK_GROUP).evaluate({ actionId: 123 })).toMatchObject({
       state: "unknown",
-      missing: ["actionId"],
+      reason: "no-action-mapping",
     });
   });
 
-  it("keeps an unparsed node visible with no magnitude, rather than dropping it", () => {
-    // A dropped node is silent under-counting: the breakdown would read as
-    // complete while quietly missing a source.
-    const [factor] = boardFactors(loadout({ skillboard: [UNPARSED_ID] }), "normal");
-    expect(factor.evaluate({})).toMatchObject({ percent: 0, potential: 0, state: "unknown", reason: "unparsed" });
+  it("never claims a node did NOT apply just because the ids do not compare", () => {
+    // The table's ability ids are xxhash32 of ability.tbl keys; a hit's
+    // ActionType is a small per-character integer ({ Normal: 200 }). They are
+    // different id spaces, so comparing them yields "no match" for every hit —
+    // which as `inactive` would be a confident, wrong claim that the node
+    // contributed nothing. Unresolved is the truthful answer until the two
+    // spaces are bridged.
+    const factor = boardFactors(loadout({ skillboard: [ABILITY_SCOPED] }), "skill")[0];
+    const result = factor.evaluate({ actionId: 200 });
+    expect(result.state).not.toBe("inactive");
+    expect(result).toMatchObject({ state: "unknown", reason: "no-action-mapping", potential: 45 });
+  });
+});
+
+describe("status-gated board nodes", () => {
+  it("asks for the attacker's active statuses", () => {
+    const factor = factorFor(STATUS_GATED);
+    expect(factor.params).toEqual(["buffs"]);
+    expect(factor.evaluate({})).toMatchObject({ potential: 100, state: "unknown", missing: ["buffs"] });
   });
 
-  it("ignores an unlocked node that grants no damage cap at all", () => {
-    // 0x000b is Captain's "Skill Cooldown -2%".
-    expect(boardFactors(loadout({ skillboard: [0x000b] }), "normal")).toEqual([]);
+  it("applies when the gating status is active", () => {
+    // The gate is a numeric status id off the game's own table, so an active
+    // buff list settles it outright — no prose matching anywhere.
+    expect(factorFor(STATUS_GATED).evaluate({ buffs: [1000] })).toMatchObject({ percent: 100, state: "active" });
+  });
+
+  it("does not apply when the gating status is absent", () => {
+    expect(factorFor(STATUS_GATED).evaluate({ buffs: [1, 2] })).toMatchObject({ percent: 0, state: "inactive" });
+  });
+});
+
+describe("counted board nodes", () => {
+  it("counts the Basic Stats sigils equipped, up to the game's own ceiling", () => {
+    const withSigils = (count: number) =>
+      factorFor(SIGIL_COUNTED, "normal", { sigils: Array.from({ length: count }, basicStatsSigil) }).evaluate({});
+
+    expect(withSigils(3)).toMatchObject({ percent: 60, state: "active" });
+    expect(withSigils(6)).toMatchObject({ percent: 100, state: "active" });
+    expect(withSigils(0)).toMatchObject({ percent: 0, state: "inactive" });
+  });
+});
+
+describe("board nodes this model cannot settle", () => {
+  it("reports a status-granting node as unresolved rather than applying it directly", () => {
+    // The node grants a cap-up buff; whether that buff was up at this hit is a
+    // different question from whether the node is unlocked.
+    expect(factorFor(GRANTS_STATUS).evaluate({})).toMatchObject({ state: "unknown", potential: 10 });
+  });
+
+  it("keeps an engine-defined node visible with no magnitude", () => {
+    // Its values are in the table but which slot is the cap lives in the exe.
+    // Dropping it would let the breakdown read as complete while missing it.
+    const factor = factorFor(ENGINE_DEFINED);
+    expect(factor.evaluate({})).toMatchObject({ percent: 0, potential: 0, state: "unknown", reason: "unparsed" });
+  });
+});
+
+describe("attack class", () => {
+  it("applies an all-class node to every class", () => {
+    for (const capClass of ["normal", "skill", "sba"] as const) {
+      expect(factorFor(ALWAYS, capClass).evaluate({})).toMatchObject({ percent: 20, state: "active" });
+    }
   });
 });
