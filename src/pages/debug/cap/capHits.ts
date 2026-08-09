@@ -1,5 +1,6 @@
 import { abilityKey, supplementaryCause } from "@/pages/logs/view/abilityKey";
 import type { ExplainHit } from "@/pages/logs/view/events/capExplain";
+import type { AttackerState } from "@/pages/logs/view/events/capFactors/conditions";
 import type { ActionType, LogEvent } from "@/types";
 
 /** One damage event, projected to what the cap debugger browses and explains.
@@ -18,6 +19,10 @@ export type CapDebugHit = {
   actionId: ActionType;
   abilityKey: string;
   hit: ExplainHit;
+  /** The attacker's own state at the moment of the hit, read PRE-CALL — before
+   * the game's damage function ran, which is when the cap was computed. What
+   * the HP-gated and status-gated cap sources are judged against. */
+  attacker: AttackerState;
 };
 
 /** Every damage event in the stream, in order. Nothing is filtered out — a hit
@@ -42,6 +47,11 @@ export const damageHits = (events: LogEvent[]): CapDebugHit[] => {
         attack_rate: event.attack_rate,
         class_flags: event.class_flags,
         flags: event.flags,
+      },
+      attacker: {
+        source_current_hp: event.source_current_hp,
+        source_max_hp: event.source_max_hp,
+        source_statuses: event.source_statuses,
       },
     });
   });

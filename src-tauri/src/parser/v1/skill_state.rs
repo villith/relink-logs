@@ -249,6 +249,9 @@ mod tests {
             target_current_hp: None,
             target_max_hp: None,
             class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         let damage_event_two = DamageEvent {
@@ -274,6 +277,9 @@ mod tests {
             target_current_hp: None,
             target_max_hp: None,
             class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         skill_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -315,6 +321,9 @@ mod tests {
             target_current_hp: None,
             target_max_hp: None,
             class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 

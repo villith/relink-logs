@@ -912,6 +912,9 @@ mod data_coverage_tests {
             target_current_hp: target_hp,
             target_max_hp: target_hp,
             class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         })
     }
 
@@ -4500,6 +4503,9 @@ mod tests {
             target_current_hp: None,
             target_max_hp: None,
             class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 
@@ -4530,6 +4536,9 @@ mod tests {
             target_current_hp: Some(9_500),
             target_max_hp: Some(10_000),
             class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 
@@ -6133,6 +6142,9 @@ mod tests {
             target_current_hp: None,
             target_max_hp: None,
             class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 
@@ -9030,6 +9042,9 @@ mod tests {
                 target_current_hp: None,
                 target_max_hp: None,
                 class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         ));
 
@@ -9065,6 +9080,9 @@ mod tests {
                 target_current_hp: None,
                 target_max_hp: None,
                 class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         ));
 
@@ -9093,6 +9111,9 @@ mod tests {
                 target_current_hp: None,
                 target_max_hp: None,
                 class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         ));
 
@@ -9133,6 +9154,9 @@ mod tests {
                 target_current_hp: None,
                 target_max_hp: None,
                 class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         ));
 
@@ -9161,6 +9185,9 @@ mod tests {
                 target_current_hp: None,
                 target_max_hp: None,
                 class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         ));
 
@@ -9203,6 +9230,9 @@ mod tests {
                 target_current_hp: None,
                 target_max_hp: None,
                 class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }
         }
 
@@ -9445,6 +9475,15 @@ mod stored_log_compat {
         assert_eq!(event.base_damage, None);
         assert_eq!(event.target_current_hp, None);
         assert_eq!(event.target_max_hp, None);
+        // ...and the attacker-state fields added for the damage-cap breakdown
+        // (2026-08-09), which are `Option` for exactly this reason. The status
+        // list in particular: `None` here is "this log predates the capture",
+        // NOT "the attacker held nothing", and a consumer that conflated the
+        // two would report every conditional cap source as inactive for every
+        // log ever recorded before today.
+        assert_eq!(event.source_current_hp, None);
+        assert_eq!(event.source_max_hp, None);
+        assert_eq!(event.source_statuses, None);
     }
 
     /// The same, through the real entry point and via BOTH routes a stored

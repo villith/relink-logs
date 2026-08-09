@@ -929,6 +929,104 @@ const EX_STATUS_LIST_BEGIN: usize = 0x18;
 /// End of that vector; see [`EX_STATUS_LIST_BEGIN`].
 const EX_STATUS_LIST_END: usize = 0x20;
 
+/// Where the `ExStatus` component is EMBEDDED in a player-family actor
+/// instance, so a caller holding only the actor (the damage detours do) can
+/// reach the same list [`OnStatusUpdateHook`] is handed directly.
+///
+/// Statically derived against v2.0.4, not guessed. MSVC RTTI records every base
+/// subobject's offset, and the whole image defines exactly five
+/// `ExStatus::RTTI_Base_Class_Descriptor_at_(N)` — N = 0, 1872, 2784, 3320,
+/// 3328 — so the embed offset is CLASS-DEPENDENT and a single constant is only
+/// safe for a named family. Reading each class's
+/// `RTTI_Base_Class_Array` for the descriptor it lists:
+///
+/// * 2784 (`0xAE0`) — every playable class checked: `Pl0000`, `Pl0100`,
+///   `Pl0200`, `Pl0300`, `Pl0400`, `Pl0500`, `Pl0600`, `Pl0700`, `Pl0800`,
+///   `Pl0900`, `Pl1000`, `Pl1100`, `Pl1200`, `Pl1300`, `Pl1400`, `Pl1500`,
+///   `Pl1600`, `Pl1700`, `Pl1800`, `Pl1900`, `Pl2000`, `Pl2100`, `Pl2200`,
+///   `Pl2300`, `Pl2400`, `Pl2500`, `Pl2600`, `Pl2700`, `Pl2800`, `Pl2900`, and
+///   the crew-NPC class `Np0000`. Thirty-one for thirty-one.
+/// * 3320 (`0xCF8`) — the enemy classes checked (`Em1200`, `Em2700`), which is
+///   why [`snapshot_player_statuses`] refuses anything that is not a player.
+///
+/// The game's own cap code agrees: the DamageInstance builder
+/// (`FUN_1409c1cf0`) reads the attacker's status vector as `holder[0x15f]` /
+/// `holder[0x160]` — byte offsets `0xAF8`/`0xB00`, which is exactly this embed
+/// plus [`EX_STATUS_LIST_BEGIN`]/[`EX_STATUS_LIST_END`]. Two independent
+/// derivations, one number.
+const PLAYER_EX_STATUS_OFFSET: usize = 0xAE0;
+
+/// Largest snapshot [`snapshot_player_statuses`] will publish.
+///
+/// Lower than [`MAX_PLAUSIBLE_STATUSES`] on purpose: that bound protects a
+/// per-frame walk from stepping through unrelated memory, while this one also
+/// bounds what a per-HIT capture writes into every stored log. A party member
+/// carrying more than this many effects at once is not a state any cap
+/// condition needs resolved to the last entry, and the list is stored per
+/// damage event.
+const MAX_SNAPSHOT_STATUSES: usize = 64;
+
+/// Every status a PLAYER actor is carrying right now, as the per-hit snapshot
+/// [`protocol::DamageEvent::source_statuses`] publishes.
+///
+/// `None` — never an empty list — for anything this cannot vouch for: a null
+/// actor, an unreadable component, or list bounds that are not a plausible
+/// description of a vector. The caller's `Option` then reads as "not captured"
+/// rather than "the attacker held nothing", which are different claims.
+///
+/// The caller is responsible for proving the actor is player-family before
+/// calling; see [`PLAYER_EX_STATUS_OFFSET`] for why an enemy would read the
+/// wrong component.
+pub(crate) fn snapshot_player_statuses(actor: *const usize) -> Option<Vec<protocol::SourceStatus>> {
+    if actor.is_null() {
+        return None;
+    }
+    let ex_status = (actor as usize).checked_add(PLAYER_EX_STATUS_OFFSET)?;
+    let (begin, end) = (
+        diag::read_ptr_guarded(ex_status, EX_STATUS_LIST_BEGIN)?,
+        diag::read_ptr_guarded(ex_status, EX_STATUS_LIST_END)?,
+    );
+    let count = live_count(begin, end)?;
+    if count == 0 {
+        return Some(Vec::new());
+    }
+    // ONE probe for the whole array, for the reason `live_keys` documents:
+    // `IsBadReadPtr` takes an exception path on unmapped memory, and this runs
+    // on a game thread inside the damage call.
+    if !readable(begin, count * std::mem::size_of::<usize>()) {
+        return None;
+    }
+
+    let mut out = Vec::with_capacity(count.min(MAX_SNAPSHOT_STATUSES));
+    for index in 0..count.min(MAX_SNAPSHOT_STATUSES) {
+        let status =
+            unsafe { ((begin + index * std::mem::size_of::<usize>()) as *const usize).read() };
+        if status == 0 {
+            continue;
+        }
+        // ONE probe of the object, then two direct field reads — both fields sit
+        // inside the span it covers. Going through `status_id_of` /
+        // `raw_stacks_of` would probe twice per status, and this walk runs
+        // inside the game's own damage call rather than once a frame. A slot
+        // pointing at freed memory is skipped rather than abandoning the
+        // snapshot: the rest of the list is still good information.
+        if !readable(status, STATUS_STACKS_OFFSET + std::mem::size_of::<i32>()) {
+            continue;
+        }
+        // Exactly the fields, and exactly the rules, the apply path publishes —
+        // a snapshot that disagreed with the event stream about an effect's id
+        // or its stack count would make the two impossible to reconcile.
+        let status_id = unsafe { ((status + STATUS_ID_OFFSET) as *const u32).read_unaligned() };
+        let raw_stacks =
+            unsafe { ((status + STATUS_STACKS_OFFSET) as *const i32).read_unaligned() };
+        out.push(protocol::SourceStatus {
+            status_id,
+            stacks: stacks_for(status_id, Some(raw_stacks)),
+        });
+    }
+    Some(out)
+}
+
 type StatusUpdateFunc = unsafe extern "system" fn(*const usize, f32);
 
 static_detour! {
@@ -1184,6 +1282,145 @@ fn observe_holder(tx: &event::Tx, ex_status: *const usize) {
         #[cfg(feature = "hookdiag")]
         walk_stats::note_emitted();
         emit_apply(tx, status as *const usize);
+    }
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+    use super::{
+        snapshot_player_statuses, EX_STATUS_LIST_BEGIN, EX_STATUS_LIST_END, MAX_SNAPSHOT_STATUSES,
+        PLAYER_EX_STATUS_OFFSET, STATUS_ID_OFFSET, STATUS_STACKS_OFFSET,
+    };
+
+    /// A stand-in for the parts of game memory the walk touches.
+    ///
+    /// The guarded readers probe REAL process memory (`IsBadReadPtr`), so a
+    /// heap buffer is a faithful fake: it exercises the actual pointer walk,
+    /// the actual bounds arithmetic and the actual field offsets, and only the
+    /// game's own allocation is replaced. Everything except the values the game
+    /// would have written is the shipping code path.
+    struct FakeActor {
+        actor: Vec<u64>,
+        _statuses: Vec<Vec<u64>>,
+        _slots: Vec<usize>,
+    }
+
+    impl FakeActor {
+        /// An actor whose `ExStatus` list holds one entry per `(status_id, raw
+        /// +0xb0)` pair given.
+        fn with_statuses(entries: &[(u32, i32)]) -> Self {
+            // Big enough for the embed plus the vector that lives inside it.
+            let mut actor = vec![0u64; (PLAYER_EX_STATUS_OFFSET + 0x40) / 8];
+            let mut statuses = Vec::new();
+            let mut slots = Vec::new();
+
+            for (status_id, raw_stacks) in entries {
+                // Past +0xb0, the deepest field either reader touches.
+                let mut object = vec![0u64; 0x20];
+                let base = object.as_mut_ptr() as usize;
+                unsafe {
+                    ((base + STATUS_ID_OFFSET) as *mut u32).write(*status_id);
+                    ((base + STATUS_STACKS_OFFSET) as *mut i32).write(*raw_stacks);
+                }
+                slots.push(base);
+                statuses.push(object);
+            }
+
+            let list_base = PLAYER_EX_STATUS_OFFSET / 8;
+            let (begin, end) = if slots.is_empty() {
+                // An empty `std::vector` is a valid, equal begin/end pair —
+                // exactly what a player carrying nothing looks like.
+                (0x1000usize, 0x1000usize)
+            } else {
+                (
+                    slots.as_ptr() as usize,
+                    slots.as_ptr() as usize + slots.len() * std::mem::size_of::<usize>(),
+                )
+            };
+            actor[list_base + EX_STATUS_LIST_BEGIN / 8] = begin as u64;
+            actor[list_base + EX_STATUS_LIST_END / 8] = end as u64;
+
+            Self {
+                actor,
+                _statuses: statuses,
+                _slots: slots,
+            }
+        }
+
+        fn ptr(&self) -> *const usize {
+            self.actor.as_ptr() as *const usize
+        }
+    }
+
+    #[test]
+    fn a_snapshot_reports_every_status_the_actor_holds() {
+        // damagecut (4) is `HasLevels`, so its +0xb0 is a real count; atkup (0)
+        // is not, so whatever sits there is not one.
+        let fake = FakeActor::with_statuses(&[(4, 3), (0, 7)]);
+
+        let snapshot = snapshot_player_statuses(fake.ptr()).expect("captured");
+
+        assert_eq!(snapshot.len(), 2);
+        assert_eq!(snapshot[0].status_id, 4);
+        assert_eq!(snapshot[0].stacks, 3);
+        assert_eq!(snapshot[1].status_id, 0);
+        assert_eq!(snapshot[1].stacks, 1);
+    }
+
+    /// "Captured, and the attacker held nothing" is `Some(vec![])`. A consumer
+    /// that read this as `None` would treat a genuinely buff-less hit as
+    /// unresolvable instead of as evidence the buff was absent.
+    #[test]
+    fn an_actor_holding_nothing_captures_an_empty_list() {
+        let fake = FakeActor::with_statuses(&[]);
+        assert_eq!(snapshot_player_statuses(fake.ptr()), Some(Vec::new()));
+    }
+
+    /// Bounds that do not describe a `std::vector<StatusBase*>` — a torn read,
+    /// or a layout that shifted under a game patch — must publish nothing
+    /// rather than walk unrelated memory on a game thread.
+    #[test]
+    fn implausible_list_bounds_capture_nothing() {
+        let mut fake = FakeActor::with_statuses(&[(4, 1)]);
+        let list_base = PLAYER_EX_STATUS_OFFSET / 8;
+
+        // end < begin.
+        let begin = fake.actor[list_base + EX_STATUS_LIST_BEGIN / 8];
+        fake.actor[list_base + EX_STATUS_LIST_END / 8] = begin - 8;
+        assert_eq!(snapshot_player_statuses(fake.ptr()), None);
+
+        // A span that is not a whole number of pointers.
+        fake.actor[list_base + EX_STATUS_LIST_END / 8] = begin + 5;
+        assert_eq!(snapshot_player_statuses(fake.ptr()), None);
+
+        // More entries than any holder plausibly carries.
+        fake.actor[list_base + EX_STATUS_LIST_END / 8] = begin + 8 * 4096;
+        assert_eq!(snapshot_player_statuses(fake.ptr()), None);
+
+        // An unmapped array.
+        fake.actor[list_base + EX_STATUS_LIST_BEGIN / 8] = 0x10;
+        fake.actor[list_base + EX_STATUS_LIST_END / 8] = 0x10 + 8 * 4;
+        assert_eq!(snapshot_player_statuses(fake.ptr()), None);
+    }
+
+    /// The per-hit snapshot is written into every stored damage event, so the
+    /// list it publishes is bounded independently of the per-frame walk's own
+    /// plausibility cap.
+    #[test]
+    fn a_snapshot_is_bounded() {
+        let entries: Vec<(u32, i32)> = (0..MAX_SNAPSHOT_STATUSES + 20)
+            .map(|index| (index as u32, 1))
+            .collect();
+        let fake = FakeActor::with_statuses(&entries);
+
+        let snapshot = snapshot_player_statuses(fake.ptr()).expect("captured");
+
+        assert_eq!(snapshot.len(), MAX_SNAPSHOT_STATUSES);
+    }
+
+    #[test]
+    fn a_null_actor_captures_nothing() {
+        assert_eq!(snapshot_player_statuses(std::ptr::null()), None);
     }
 }
 

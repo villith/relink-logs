@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 
 import { abilityLabelFor } from "@/pages/logs/view/analysis/abilityLabel";
 import { explainCapHit } from "@/pages/logs/view/events/capExplain";
+import { conditionsForHit } from "@/pages/logs/view/events/capFactors/conditions";
 import { getSkillName, millisecondsToPreciseElapsedFormat, translateCharacterType } from "@/utils";
 
 import { CapDetailPanel } from "./CapDetailPanel";
@@ -121,17 +122,16 @@ export const CapTab = () => {
   const sections = useMemo(() => {
     if (selected === null) return null;
     const player = playersByActor.get(selected.sourceIndex);
-    // The two conditions the log genuinely carries. Crit rate and max HP are
-    // stored per player, and they are exactly what DMG Cap Cobalt and Ecru ramp
-    // across — so those two resolve to real numbers rather than sitting
-    // unresolved next to the ones that need moment-to-moment state.
-    const stats = player?.playerStats;
     return explainCapHit({
       hit: selected.hit,
       capUp: capUp[String(selected.sourceIndex)],
       loadout: player,
       characterType: player?.characterType,
-      conditions: stats === null || stats === undefined ? {} : { critRate: stats.criticalRate, maxHp: stats.totalHp },
+      // The attacker's own state at the moment of the hit, plus the stored stat
+      // block the banded traits ramp across. A hit recorded before that capture
+      // existed supplies neither, and the factors that need them say so rather
+      // than reading as inactive.
+      conditions: conditionsForHit(selected.attacker, player?.playerStats ?? null),
     });
   }, [selected, playersByActor, capUp]);
 

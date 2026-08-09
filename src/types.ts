@@ -895,6 +895,19 @@ export type SBAEvent = [
 
 export type DeathEvent = [number, { OnDeathEvent: { actor_index: number; death_counter: number } }];
 
+/** One status the attacker was carrying when a hit landed, as
+ * `DamageEvent.source_statuses` reports it. Mirrors `protocol::SourceStatus`,
+ * so — like the rest of a `Message` payload — the fields stay snake_case.
+ *
+ * `status_id` is the same `status.tbl` id the `StatusApply`/`StatusRemove`
+ * stream carries, so a snapshot entry and an interval name the same effect.
+ * `stacks` follows the same rule as `StatusApply.stacks`: a real count for the
+ * effects the game marks as levelled, 1 for everything else. */
+export type SourceStatus = {
+  status_id: number;
+  stacks: number;
+};
+
 /** One actor as a damage event reports it. `parent_index` is what an attribution
  * reads — a summon's hit belongs to the player who called it. */
 type LogEventActor = {
@@ -938,6 +951,23 @@ export type LogEventPayload =
          * neither means Normal. Picks which of the player's three cap-ups
          * applied. `null` on old logs. */
         class_flags: number | null;
+        /** The ATTACKER's own HP when the hit was registered — read from the
+         * same `ExHp` component the target pair comes from, and read BEFORE the
+         * game's damage call, because that is when the hit's cap was computed.
+         * What an HP-gated cap trait ("while at 75% HP or more", "when at 45000
+         * HP or less") has to be judged against. `null` on old logs, on
+         * non-player attackers, and when the read fails its sanity checks. */
+        source_current_hp: number | null;
+        /** The attacker's max HP, for the fraction. `null` alongside
+         * `source_current_hp` — the two are read as one pair. */
+        source_max_hp: number | null;
+        /** Every status the attacker held at that moment, with its stack count.
+         *
+         * `null` and `[]` are DIFFERENT: `null` is "not captured" (an old log,
+         * a summon or enemy attacker), `[]` is "captured, and the attacker held
+         * nothing". A conditional cap source may only be reported as inactive
+         * on the second — on the first it is unresolved. */
+        source_statuses: SourceStatus[] | null;
       };
     }
   | { OnDeathEvent: { actor_index: number; death_counter: number } }

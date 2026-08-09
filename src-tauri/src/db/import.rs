@@ -676,6 +676,9 @@ mod tests {
                         target_current_hp: Some(1_000_000),
                         target_max_hp: Some(1_000_000),
                         class_flags: None,
+                        source_current_hp: None,
+                        source_max_hp: None,
+                        source_statuses: None,
                     }),
                 ),
                 (
@@ -873,6 +876,9 @@ mod tests {
                         target_current_hp: None,
                         target_max_hp: None,
                         class_flags: None,
+                        source_current_hp: None,
+                        source_max_hp: None,
+                        source_statuses: None,
                     }),
                 )
             })

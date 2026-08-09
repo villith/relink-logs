@@ -212,6 +212,59 @@ pub struct DamageEvent {
     /// Normal, and `0x40000` wins over `0x10000`. `None` on old logs.
     #[serde(default)]
     pub class_flags: Option<u32>,
+    /// The ATTACKER's own remaining HP when the hit was registered, read from
+    /// its `ExHp` component — the same `instance+0x150` embed
+    /// [`DamageEvent::target_current_hp`] is read from, against the source actor
+    /// instead of the target. `ExHp` has exactly one non-zero base-class-descriptor
+    /// offset in the whole v2.0.4 image (336 = 0x150), and every player and enemy
+    /// class checked carries it there, so this is the same component read, not a
+    /// second offset that could drift independently.
+    ///
+    /// Read BEFORE the game's own damage call, unlike the target pair, which is
+    /// read after so a killing blow reports 0: the hit's cap was computed by the
+    /// DamageInstance builder before that call, so an HP-gated cap trait
+    /// ("while at 75% HP or more") has to be judged against the HP the builder
+    /// saw. `None` on old logs, on hits from an actor whose HP read fails its
+    /// sanity checks, and on the damage-TAKEN stream (the attacker there is an
+    /// enemy, whose HP is not a cap input).
+    #[serde(default)]
+    pub source_current_hp: Option<u64>,
+    /// The attacker's maximum HP (`ExHp` +0x18). `None` alongside
+    /// [`DamageEvent::source_current_hp`]; the two are read as one guarded pair.
+    #[serde(default)]
+    pub source_max_hp: Option<u64>,
+    /// Every status the attacker was carrying when the hit was registered.
+    ///
+    /// Captured only for hits whose SOURCE actor resolves to a party slot on its
+    /// own record — i.e. a player's own body. A summon, pet or transformed body
+    /// carries `None` rather than a guess: those actors are a different class
+    /// family and their component layout is not the one this read was verified
+    /// against.
+    ///
+    /// `None` means "not captured" (an old log, a non-player source, an
+    /// unreadable list); `Some(vec![])` means "captured, and the attacker held
+    /// nothing". The distinction is load-bearing for any consumer that treats a
+    /// missing buff as evidence a conditional cap source did NOT apply.
+    #[serde(default)]
+    pub source_statuses: Option<Vec<SourceStatus>>,
+}
+
+/// One status held by the attacker at the moment of a hit, as
+/// [`DamageEvent::source_statuses`] reports it.
+///
+/// Deliberately just the effect and its count: this is a per-hit snapshot on a
+/// stream that carries thousands of events per fight, and everything else about
+/// a status (its caster, its cause, its class, its window) is already on the
+/// [`StatusApplyEvent`] / [`StatusRemoveEvent`] pair, keyed by the same
+/// `status_id`.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct SourceStatus {
+    /// `status.tbl` StatusId — the same id [`StatusApplyEvent::status_id`] carries.
+    pub status_id: u32,
+    /// Effect level, by the same rule [`StatusApplyEvent::stacks`] uses: the
+    /// object's `+0xb0` count for the classes `status.tbl` marks `HasLevels`,
+    /// and 1 for everything else.
+    pub stacks: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -972,6 +1025,118 @@ mod sba_gain_tests {
         let blob = cbor4ii::serde::to_vec(Vec::new(), &event).expect("encode");
         let back: SbaGainEvent = cbor4ii::serde::from_slice(&blob).expect("decode");
         assert_eq!(back.cause, Some(SbaGainCause::PerfectDodge));
+    }
+}
+
+#[cfg(test)]
+mod source_state_tests {
+    use super::{DamageEvent, SourceStatus};
+
+    /// A stored log written before the source-state fields existed still
+    /// decodes, and reads them back as `None` — the crate's own rule for what an
+    /// `Option` field costs on disk, re-proven for this addition.
+    #[test]
+    fn a_log_without_source_state_still_decodes() {
+        #[derive(serde::Serialize)]
+        struct OldDamageEvent {
+            source: super::Actor,
+            target: super::Actor,
+            damage: i32,
+            flags: u64,
+            action_id: super::ActionType,
+            attack_rate: Option<f32>,
+            stun_value: Option<f32>,
+            damage_cap: Option<i32>,
+            base_damage: Option<f32>,
+            target_current_hp: Option<u64>,
+            target_max_hp: Option<u64>,
+            class_flags: Option<u32>,
+        }
+
+        let old = OldDamageEvent {
+            source: super::Actor::default(),
+            target: super::Actor::default(),
+            damage: 500,
+            flags: 0,
+            action_id: super::ActionType::Normal(1),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: Some(1_000),
+            base_damage: Some(2_000.0),
+            target_current_hp: Some(90),
+            target_max_hp: Some(100),
+            class_flags: Some(0x10000),
+        };
+        let blob = cbor4ii::serde::to_vec(Vec::new(), &old).expect("encode");
+        let new: DamageEvent = cbor4ii::serde::from_slice(&blob).expect("decode");
+
+        assert_eq!(new.damage, 500);
+        assert_eq!(new.class_flags, Some(0x10000));
+        assert_eq!(new.source_current_hp, None);
+        assert_eq!(new.source_max_hp, None);
+        assert_eq!(new.source_statuses, None);
+    }
+
+    /// "Captured, and the attacker held nothing" must survive a round trip as
+    /// something other than "not captured" — a consumer that cannot tell the two
+    /// apart would read an empty list as proof a buff was absent.
+    #[test]
+    fn an_empty_snapshot_is_distinct_from_an_absent_one() {
+        let mut event = DamageEvent {
+            source: super::Actor::default(),
+            target: super::Actor::default(),
+            damage: 1,
+            flags: 0,
+            action_id: super::ActionType::Normal(1),
+            attack_rate: None,
+            stun_value: None,
+            damage_cap: None,
+            base_damage: None,
+            target_current_hp: None,
+            target_max_hp: None,
+            class_flags: None,
+            source_current_hp: Some(4_200),
+            source_max_hp: Some(10_000),
+            source_statuses: Some(Vec::new()),
+        };
+
+        let round_trip = |e: &DamageEvent| -> DamageEvent {
+            let blob = cbor4ii::serde::to_vec(Vec::new(), e).expect("encode");
+            cbor4ii::serde::from_slice(&blob).expect("decode")
+        };
+
+        let back = round_trip(&event);
+        assert_eq!(back.source_statuses, Some(Vec::new()));
+        assert_eq!(back.source_current_hp, Some(4_200));
+        assert_eq!(back.source_max_hp, Some(10_000));
+
+        event.source_statuses = Some(vec![
+            SourceStatus {
+                status_id: 4,
+                stacks: 3,
+            },
+            SourceStatus {
+                status_id: 0,
+                stacks: 1,
+            },
+        ]);
+        let back = round_trip(&event);
+        assert_eq!(
+            back.source_statuses,
+            Some(vec![
+                SourceStatus {
+                    status_id: 4,
+                    stacks: 3
+                },
+                SourceStatus {
+                    status_id: 0,
+                    stacks: 1
+                },
+            ])
+        );
+
+        event.source_statuses = None;
+        assert_eq!(round_trip(&event).source_statuses, None);
     }
 }
 

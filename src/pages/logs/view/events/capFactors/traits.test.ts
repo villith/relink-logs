@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import type { Sigil } from "@/types";
-import { toHashString } from "@/utils";
 
 import type { CapLoadout } from "../capSources";
 import { traitFactors } from "./traits";
@@ -177,19 +176,21 @@ describe("count-scaled trait factors", () => {
 });
 
 describe("factors this model cannot settle", () => {
-  it("Cardinal reports an intermediate stack rather than inventing a curve", () => {
-    const key = toHashString(CARDINAL);
-    expect(evaluate([[CARDINAL, 15]], CARDINAL, "normal", { stacks: { [key]: 5 } }).result).toMatchObject({
-      percent: 310,
-      state: "active",
-    });
-    // Only the value AT V is in the game's text, so 3 stacks has no quoted
-    // number — reported as unresolved, not interpolated.
-    expect(evaluate([[CARDINAL, 15]], CARDINAL, "normal", { stacks: { [key]: 3 } }).result).toMatchObject({
+  it("Cardinal asks for stacks but cannot yet read them", () => {
+    // `stacks` is keyed by the STATUS id the hook emits. Nothing links the
+    // Cardinal trait to the status carrying its stacks, so a supplied list
+    // cannot settle it — and guessing a key would read 0 and report a trait
+    // worth +310% as contributing nothing.
+    expect(evaluate([[CARDINAL, 15]], CARDINAL, "normal", {}).result).toMatchObject({
       state: "unknown",
-      reason: "stack-curve-unknown",
+      missing: ["stacks"],
+      potential: 310,
     });
-    expect(evaluate([[CARDINAL, 15]], CARDINAL, "normal", { stacks: {} }).result).toMatchObject({ state: "inactive" });
+    expect(evaluate([[CARDINAL, 15]], CARDINAL, "normal", { stacks: { "56": 5 } }).result).toMatchObject({
+      state: "unknown",
+      reason: "no-status-mapping",
+      potential: 310,
+    });
   });
 
   it("a timed buff stays unresolved even when the buff list IS supplied", () => {

@@ -21,6 +21,9 @@ const noCap = {
   stun_value: null,
   target_current_hp: null,
   target_max_hp: null,
+  source_current_hp: null,
+  source_max_hp: null,
+  source_statuses: null,
 };
 
 const damage: LogEvent = [

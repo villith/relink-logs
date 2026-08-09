@@ -37,9 +37,6 @@ import {
  * lookup keyed by this hash, so it attributes as its own term. */
 export const DMG_CAP_TRAIT = 0xdc584f60;
 
-/** Cardinal V / Sage V — the only stack count either trait's text quotes. */
-const MAX_STACK = 5;
-
 /** "DMG Cap +15% per active pet". The 15 is literal in the game's own text, not
  * a table column, which is why Phantasm's Harmony ships no magnitude. */
 const PHANTASM_PER_PET = 15;
@@ -98,22 +95,24 @@ const timedBuff = () => (): Evaluator => ({
     conditions.buffs === undefined ? unknownResult(max, ["buffs"]) : unknownResult(max, [], "no-status-mapping"),
 });
 
-/** Stack-gated, with only the full-stack value quoted anywhere. */
-const stackGated =
-  () =>
-  (id: number): Evaluator => ({
-    params: ["stacks"],
-    evaluate: (_level, max) => (conditions) => {
-      const stacks = conditions.stacks;
-      if (stacks === undefined) return unknownResult(max, ["stacks"]);
-      const count = stacks[toHashString(id)] ?? 0;
-      if (count >= MAX_STACK) return activeResult(max);
-      if (count <= 0) return inactiveResult(max);
-      // Between 1 and 4 the game quotes no number, and interpolating one would
-      // put a value on screen the game never stated.
-      return unknownResult(max, [], "stack-curve-unknown");
-    },
-  });
+/**
+ * Stack-gated (Cardinal I-V, Sage I-V), and blocked on two separate things.
+ *
+ * `conditions.stacks` is keyed by the STATUS id the hook emits, and nothing
+ * links either trait to the status that carries its stacks — so a supplied
+ * stack list cannot be read. Keying the lookup by trait id instead would find
+ * nothing, count it as zero, and report a trait worth +310% as contributing
+ * nothing: a confident wrong answer where there should be an admitted gap.
+ *
+ * Even once that link exists, only the value AT full stacks is quoted anywhere
+ * in the game's text ("Max boost ... At Cardinal V"), so an intermediate stack
+ * would still have no stated number to report.
+ */
+const stackGated = () => (): Evaluator => ({
+  params: ["stacks"],
+  evaluate: (_level, max) => (conditions) =>
+    conditions.stacks === undefined ? unknownResult(max, ["stacks"]) : unknownResult(max, [], "no-status-mapping"),
+});
 
 /** Per-charge-grade columns: the two lower grades are shipped as inputs, the
  * top grade IS the emitted maximum. */
