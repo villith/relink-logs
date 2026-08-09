@@ -8,6 +8,9 @@ const SLOT: Record<CapClass, number> = { normal: 0, skill: 1, sba: 2 };
 
 export const traitTable = capUpSources.traits as Record<string, number[][]>;
 export const conditionalTraitTable = capUpSources.conditionalTraits as Record<string, number[][]>;
+/** The extra cap-up block the three boundary weapon traits carry, which applies
+ * only while the equipped weapon is transcended. */
+export const transcendedTraitTable = capUpSources.transcendedTraits as Record<string, number[][]>;
 export const overmasteryClass = capUpSources.overmasteries as Record<string, CapClass>;
 export const summonBonusClass = capUpSources.summonBonuses as Record<string, CapClass>;
 

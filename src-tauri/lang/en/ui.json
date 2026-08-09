@@ -337,7 +337,8 @@
       "cap-excl-no-status": "buff not mapped to a status id yet",
       "cap-excl-no-action": "move named in prose, not by action id",
       "cap-excl-unparsed": "effect text not classified",
-      "cap-excl-needs-params": "unresolved; runtime state unknown"
+      "cap-excl-needs-params": "unresolved; runtime state unknown",
+      "cap-transcended-source": "transcended weapon block (adds to the base)"
     },
     "legality": {
       "title": "Cheat Audit",

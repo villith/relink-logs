@@ -181,6 +181,11 @@ export type CapFactor = {
   label: string | null;
   /** Combined trait level or summon bonus level; `null` where there is none. */
   level: number | null;
+  /** An i18n key naming what this factor IS, when its own name is not enough to
+   * tell it apart from a sibling. A boundary trait contributes two rows under
+   * one translated name, and two rows that read identically but hold different
+   * numbers are the exact failure this breakdown exists to prevent. */
+  sourceKey?: string;
   params: readonly CapParamKey[];
   evaluate: (conditions: CapConditions) => CapFactorResult;
 };

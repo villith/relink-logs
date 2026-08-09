@@ -1,7 +1,14 @@
-import { computeCombinedTraits, toHashString } from "@/utils";
+import { computeCombinedTraits, deriveTranscendence, toHashString } from "@/utils";
 
 import type { CapClass, CapLoadout } from "../capSources";
-import { conditionalTraitTable, traitInput, traitRow, traitRowValue, traitTable } from "./tables";
+import {
+  conditionalTraitTable,
+  traitInput,
+  traitRow,
+  traitRowValue,
+  traitTable,
+  transcendedTraitTable,
+} from "./tables";
 import {
   activeResult,
   inactiveResult,
@@ -211,30 +218,83 @@ const unconditionalFactor = (id: number, level: number, capClass: CapClass): Cap
 };
 
 /**
+ * Whether the equipped weapon is transcended, which is what the three boundary
+ * traits' second block turns on.
+ *
+ * Derived rather than stored: the player record carries no transcendence field,
+ * so `deriveTranscendence` locates the live innate skill levels inside the
+ * weapon's own rebuild curves. `null` means the weapon is not on those curves
+ * at all; stage 0 means it sits at the base of one, not yet transcended.
+ */
+const isTranscended = (player: CapLoadout): boolean => {
+  const weapon = player.weaponState;
+  if (!weapon) return false;
+  const stage = deriveTranscendence(weapon.weaponId, weapon.innateTraits);
+  return stage !== null && stage > 0;
+};
+
+/**
+ * The transcended half of a boundary trait, as its own row.
+ *
+ * Separate from the base block rather than folded into it, because the reader
+ * has to be able to see which half each percent came from — and because the two
+ * halves turn on different things.
+ *
+ * It ADDS to the base block. A replacement reading would have transcending a
+ * weapon CUT its cap contribution from +100% to +20%, and the game's own text
+ * puts the second block behind its own "If equipped weapon is transcended:"
+ * clause rather than restating the first.
+ */
+const transcendedFactor = (player: CapLoadout, id: number, level: number, capClass: CapClass): CapFactor | null => {
+  const extra = traitRowValue(transcendedTraitTable, id, level, capClass);
+  if (extra === 0) return null;
+  const result = isTranscended(player) ? activeResult(extra) : inactiveResult(extra);
+  return {
+    key: `trait-${toHashString(id)}-transcended`,
+    kind: "trait",
+    id,
+    label: null,
+    level,
+    sourceKey: "ui.debug.cap-transcended-source",
+    params: [],
+    evaluate: () => result,
+  };
+};
+
+/**
  * Every combined trait the player carries, as a factor.
  *
  * One entry per trait, never filtered — a source that was weighed and dismissed
  * has to stay visible, or it is indistinguishable from one the model never knew
- * about.
+ * about. A boundary trait yields TWO, its base block and its transcended one.
  */
 export const traitFactors = (player: CapLoadout | undefined, capClass: CapClass | null): CapFactor[] => {
   if (player === undefined || capClass === null) return [];
 
-  return computeCombinedTraits(player).map(({ id, level }): CapFactor => {
-    const base = { key: `trait-${toHashString(id)}`, kind: "trait" as const, id, label: null, level };
+  const factors: CapFactor[] = [];
+  for (const { id, level } of computeCombinedTraits(player)) {
+    factors.push(baseTraitFactor(id, level, capClass));
+    const transcended = transcendedFactor(player, id, level, capClass);
+    if (transcended !== null) factors.push(transcended);
+  }
+  return factors;
+};
 
-    const conditional = CONDITIONAL_EVALUATORS[id];
-    if (conditional !== undefined) {
-      const max = MAGNITUDE_IN_TEXT[id] ?? traitRowValue(conditionalTraitTable, id, level, capClass);
-      const { params, evaluate } = conditional(id);
-      // A conditional trait whose row is all zeroes at this level cannot fire
-      // whatever the runtime state is, so it is rejected outright rather than
-      // rendered as forever-unresolved.
-      if (max === 0) return { ...base, params: [], evaluate: () => notApplicableResult("zero-at-level") };
-      return { ...base, params, evaluate: evaluate(level, max) };
-    }
+/** One trait's own block — conditional if the game gates it, plain otherwise. */
+const baseTraitFactor = (id: number, level: number, capClass: CapClass): CapFactor => {
+  const base = { key: `trait-${toHashString(id)}`, kind: "trait" as const, id, label: null, level };
 
-    const result = unconditionalFactor(id, level, capClass);
-    return { ...base, params: [], evaluate: () => result };
-  });
+  const conditional = CONDITIONAL_EVALUATORS[id];
+  if (conditional !== undefined) {
+    const max = MAGNITUDE_IN_TEXT[id] ?? traitRowValue(conditionalTraitTable, id, level, capClass);
+    const { params, evaluate } = conditional(id);
+    // A conditional trait whose row is all zeroes at this level cannot fire
+    // whatever the runtime state is, so it is rejected outright rather than
+    // rendered as forever-unresolved.
+    if (max === 0) return { ...base, params: [], evaluate: () => notApplicableResult("zero-at-level") };
+    return { ...base, params, evaluate: evaluate(level, max) };
+  }
+
+  const result = unconditionalFactor(id, level, capClass);
+  return { ...base, params: [], evaluate: () => result };
 };

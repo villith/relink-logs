@@ -361,6 +361,9 @@ const factorName = (factor: CapFactor, characterType: CharacterType | undefined)
 
 /** The provenance column for a factor: what would settle it, or why nothing can. */
 const factorSource = (factor: CapFactor, result: CapFactorResult): ExplainName | undefined => {
+  // What the factor IS wins over what it needs: a boundary trait's two blocks
+  // share one translated name, and without this they read as a duplicated row.
+  if (factor.sourceKey !== undefined) return key(factor.sourceKey);
   if (result.state === "unknown" && result.missing.length > 0) return { kind: "params", values: result.missing };
   if (factor.kind === "overmastery" && result.state === "active") return key("ui.debug.cap-om-source");
   if (factor.kind === "board-node") return key("ui.debug.cap-board-source");
