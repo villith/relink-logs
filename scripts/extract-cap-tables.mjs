@@ -5,18 +5,24 @@
  *
  * Run: `node scripts/extract-cap-tables.mjs`
  *
- * ## What is derivable here, and what is not
+ * ## Where the curves come from, and why they are trustworthy
  *
  * The formula and the curve SCHEMA were reverse-engineered against
- * `gbfr204fast` (v2.0.4) and are encoded below. The curve VALUES are not in the
- * exe: `FUN_1409c1cf0` looks a curve up by id in a hash map hanging off the
- * save root `DAT_147c22bc0`, populated at load from the game's data tables. So
- * this script emits a schema-correct file whose `curves` and `terms` are filled
- * in from observation, not from the binary — and emits them EMPTY until that
- * observation exists, because a guessed coefficient on a damage breakdown is
- * worse than an honest "unaccounted" row.
+ * `gbfr204fast` (v2.0.4). The curve VALUES are not in the exe —
+ * `FUN_1409c1cf0` looks them up in a hash map off the save root
+ * `DAT_147c22bc0`, populated at load from the game's own data tables — but
+ * they ARE in those tables: `chara_damage_limit.tbl` and
+ * `chara_arts_damage_limit.tbl`, which the CLI below parses. The extraction
+ * was verified against the running game on 2026-08-09: every row of both
+ * runtime maps (32 + 31 keys x 30 rows, dumped by
+ * `src-tauri/examples/cap_ladder_dump.rs`) agrees with this file exactly.
+ *
+ * Three keys are not characters. `58f4dbd4` is `xxhash32("SO0000")`, the curve
+ * the builder uses for any hit whose class flags carry bit 7 (summons) —
+ * looked up in the NORMAL map regardless of attack class. `28a87c8a` and
+ * `3529cc90` are unidentified (likely NPC allies).
  */
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -51,12 +57,53 @@ export const interpolateCurve = (points, rate) => {
   return points[points.length - 1].y;
 };
 
+/** Bytes per row of the two damage-limit tables: u32 key, f32 x, f32 y. */
+const CURVE_ROW_SIZE = 12;
+
 /**
- * Base-cap curves, keyed by the id the game hashes to find them.
+ * One curve per character from a `chara_damage_limit`-shaped table.
  *
- * Empty until a runtime dump provides them. Until then the parser derives
- * `trunc(baseCap)` by division — `logged_cap / (1 + Σ terms)` — which costs the
- * independent cross-check and nothing else.
+ * The table is `Character | AttackRate | DamageCap` (GBFRDataTools' headers),
+ * which is exactly the `(key, x, y)` triple `FUN_1409c1cf0` walks — the RE read
+ * x at `+4` and y at `+8` off each row, and those are the two floats here.
+ *
+ * Rows are sorted by rate because [`interpolateCurve`] mirrors the game's walk,
+ * which exits at the FIRST point exceeding the rate; an unsorted curve would
+ * bracket against the wrong pair and return a plausible wrong base.
+ */
+export const parseCurveTable = (buffer) => {
+  const rowCount = Number(buffer.readBigInt64LE(0));
+  if (8 + rowCount * CURVE_ROW_SIZE !== buffer.length) {
+    throw new Error(`damage-limit row size is no longer ${CURVE_ROW_SIZE} bytes — re-derive the columns`);
+  }
+
+  const curves = {};
+  for (let i = 0; i < rowCount; i += 1) {
+    const offset = 8 + i * CURVE_ROW_SIZE;
+    const key = buffer.readUInt32LE(offset).toString(16).padStart(8, "0");
+    (curves[key] ??= []).push({
+      x: buffer.readFloatLE(offset + 4),
+      y: buffer.readFloatLE(offset + 8),
+    });
+  }
+  for (const points of Object.values(curves)) points.sort((a, b) => a.x - b.x);
+  return curves;
+};
+
+/**
+ * Base-cap curves, keyed by attack class and then by the character hash the
+ * game looks them up with (`actor+0x5ea8`, the xxhash32 of `PL####`).
+ *
+ * Filled from the game's own tables by the CLI below. `normal` is
+ * `chara_damage_limit`, `arts` is `chara_arts_damage_limit` — the same pair the
+ * builder selects between on `class_flags & 0x40000`, which is why there are
+ * exactly two.
+ *
+ * This is what makes the breakdown falsifiable. Deriving the base by division
+ * instead (`logged_cap / (1 + Σ terms)`) makes `base × multiplier == logged_cap`
+ * an identity, so the model can never disagree with the game; with a real base
+ * the game's own total cap-up is `logged_cap / base - 1`, and any term set can
+ * be checked against it.
  */
 export const CURVES = {};
 
@@ -102,15 +149,28 @@ const OUTPUT = resolve(
 );
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  // The curve tables, when a directory of extracted tables is given:
+  //   GBFRDataTools.exe extract -i <data.i> -f system/table/chara_damage_limit.tbl -o <dir>
+  //   GBFRDataTools.exe extract -i <data.i> -f system/table/chara_arts_damage_limit.tbl -o <dir>
+  //   node scripts/extract-cap-tables.mjs <dir>/system/table
+  const tableDir = process.argv[2];
+  if (tableDir) {
+    for (const [cls, file] of [
+      ["normal", "chara_damage_limit.tbl"],
+      ["arts", "chara_arts_damage_limit.tbl"],
+    ]) {
+      CURVES[cls] = parseCurveTable(readFileSync(resolve(tableDir, file)));
+    }
+  }
+
   writeFileSync(OUTPUT, `${JSON.stringify(buildTables(), null, 2)}\n`);
   const curves = Object.keys(CURVES).length;
   const terms = Object.keys(TERMS).length;
-  console.log(`wrote ${OUTPUT} (${curves} curves, ${terms} terms)`);
-  const empty = [curves === 0 && "curves", terms === 0 && "terms"].filter(Boolean);
-  if (empty.length > 0) {
+  console.log(`wrote ${OUTPUT} (${curves} curve tables, ${terms} terms)`);
+  if (curves === 0) {
     console.log(
-      `${empty.join(" and ")} empty by design — they come from a runtime dump ` +
-        "and the live cap-oracle capture, not from the exe. See the header comment.",
+      "curves EMPTY — run with the extracted table directory, or the card " +
+        "loses its independent base cap. See the header comment.",
     );
   }
 }
