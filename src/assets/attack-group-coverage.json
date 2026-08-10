@@ -22,7 +22,7 @@
       "groups": {
         "0": {
           "actionIds": [100, 105],
-          "evidence": "caporacle join, logs 2557,2558,2559"
+          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559"
         }
       }
     },
@@ -62,11 +62,11 @@
       "groups": {
         "1": {
           "actionIds": [200],
-          "evidence": "caporacle join, logs 2557,2558,2559"
+          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559"
         },
         "4": {
           "actionIds": [200],
-          "evidence": "caporacle join, logs 2557,2558,2559"
+          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559"
         }
       }
     },
@@ -147,15 +147,19 @@
     },
     "pl2700": {
       "status": "partial",
-      "neededGroups": [0, 15, 17],
+      "neededGroups": [0, 15],
       "groups": {
         "16": {
           "actionIds": [115, 125],
-          "evidence": "caporacle join, logs 2557,2558,2559"
+          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559"
+        },
+        "17": {
+          "actionIds": [130, 140],
+          "evidence": "caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559"
         },
         "20": {
-          "actionIds": [110, 112, 115],
-          "evidence": "caporacle join, logs 2557,2558,2559"
+          "actionIds": [110, 112, 115, 140],
+          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559"
         }
       }
     },

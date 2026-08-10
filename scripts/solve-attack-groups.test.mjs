@@ -187,6 +187,108 @@ describe("explainAction", () => {
   });
 });
 
+describe("confounder refinement in solve", () => {
+  // Eustace's real shape: a counted "+20% per Basic sigil" node is worth 40
+  // with two sigils equipped — but a sigil count is STATIC for the whole
+  // fight, so it sits in the baseline and can never explain an action-scoped
+  // delta. It must not block the +40 group node.
+  const oracleText = [
+    "[X] CAPORACLE t=1000 inst=0x1 action=100 rate=1.000 class_flags=0x0 cap=100000 floor=1 terms=[0x61418d8:0x2:0.400000] buffs=[]",
+    "[X] CAPORACLE t=2000 inst=0x1 action=100 rate=1.100 class_flags=0x0 cap=100000 floor=1 terms=[0x61418d8:0x2:0.400000] buffs=[]",
+    "[X] CAPORACLE t=3000 inst=0x1 action=130 rate=3.000 class_flags=0x0 cap=300000 floor=1 terms=[0x61418d8:0x2:0.400000,0x61418d8:0x2:0.400000] buffs=[]",
+    "[X] CAPORACLE t=4000 inst=0x1 action=130 rate=3.100 class_flags=0x0 cap=300000 floor=1 terms=[0x61418d8:0x2:0.400000,0x61418d8:0x2:0.400000] buffs=[]",
+  ].join("\n");
+
+  const hits = (statuses) => [
+    { t: 501_000, actor: 1, action: 100, cap: 100000, rate: 1, classFlags: 0, summon: false, statuses },
+    { t: 502_000, actor: 1, action: 100, cap: 100000, rate: 1.1, classFlags: 0, summon: false, statuses },
+    { t: 503_000, actor: 1, action: 130, cap: 300000, rate: 3, classFlags: 0, summon: false, statuses },
+    { t: 504_000, actor: 1, action: 130, cap: 300000, rate: 3.1, classFlags: 0, summon: false, statuses },
+  ];
+  const evidenceWith = (nodeIds, statuses) => ({
+    logs: [
+      {
+        id: 43,
+        players: [
+          { actorIndex: 1, characterType: "Pl2700", skillboard: nodeIds, sigils: [], summons: [] },
+          null,
+          null,
+          null,
+        ],
+        hits: hits(statuses),
+      },
+    ],
+  });
+  const baseAssets = (extraNodes) => ({
+    nodes: {
+      pl2700_0032: {
+        effects: [{ stat: "cap", percent: 40, capClass: null, scope: "attack-group", targetAttackGroup: 17, abilityIds: [] }],
+      },
+      ...extraNodes,
+    },
+    skillNameSources: {},
+    capUpSources: { conditionalTraits: {}, conditionalTraitInputs: {}, traits: {}, transcendedTraits: {} },
+  });
+
+  it("a sigil-counted node does not confound an action-scoped residual", () => {
+    const assets = baseAssets({
+      pl2700_0023: {
+        effects: [{ stat: "cap", percent: 20, capClass: "all", scope: "counted", countKind: "basic-sigil", maxCount: 5 }],
+      },
+    });
+    const result = solve(oracleText, evidenceWith([0x32, 0x23], []), assets, { minSupport: 2 });
+    expect(result.assignments).toEqual({ pl2700: { 17: [130] } });
+  });
+
+  it("a quest-counter counted node still confounds", () => {
+    const assets = baseAssets({
+      pl2700_0023: {
+        effects: [{ stat: "cap", percent: 40, capClass: "all", scope: "counted", countKind: "quest-counter", maxCount: 1 }],
+      },
+    });
+    const result = solve(oracleText, evidenceWith([0x32, 0x23], []), assets, { minSupport: 2 });
+    expect(result.assignments).toEqual({});
+    expect(result.flags.some((f) => f.flag === "confounded-value")).toBe(true);
+  });
+
+  it("a gated node whose status the snapshot never shows does not confound", () => {
+    const assets = baseAssets({
+      pl2700_0040: {
+        effects: [{ stat: "cap", percent: 40, capClass: null, scope: "gated", gateKind: "status", gateStatusId: 77 }],
+      },
+    });
+    // Snapshots captured on every hit, status 77 never up.
+    const result = solve(oracleText, evidenceWith([0x32, 0x40], [{ statusId: 25, stacks: 1 }]), assets, {
+      minSupport: 2,
+    });
+    expect(result.assignments).toEqual({ pl2700: { 17: [130] } });
+  });
+
+  it("a gated node stays a confounder when its status was up on every hit", () => {
+    const assets = baseAssets({
+      pl2700_0040: {
+        effects: [{ stat: "cap", percent: 40, capClass: null, scope: "gated", gateKind: "status", gateStatusId: 77 }],
+      },
+    });
+    const result = solve(oracleText, evidenceWith([0x32, 0x40], [{ statusId: 77, stacks: 1 }]), assets, {
+      minSupport: 2,
+    });
+    expect(result.assignments).toEqual({});
+    expect(result.flags.some((f) => f.flag === "confounded-value")).toBe(true);
+  });
+
+  it("a gated node stays a confounder when snapshots were not captured", () => {
+    const assets = baseAssets({
+      pl2700_0040: {
+        effects: [{ stat: "cap", percent: 40, capClass: null, scope: "gated", gateKind: "status", gateStatusId: 77 }],
+      },
+    });
+    const result = solve(oracleText, evidenceWith([0x32, 0x40], null), assets, { minSupport: 2 });
+    expect(result.assignments).toEqual({});
+    expect(result.flags.some((f) => f.flag === "confounded-value")).toBe(true);
+  });
+});
+
 describe("solve", () => {
   // Two actions of one character: 2000 carries the group-20 +35 on top of the
   // shared baseline {15}; 1000 is baseline only. The move-scoped +45 on 1700

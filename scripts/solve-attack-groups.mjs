@@ -283,11 +283,20 @@ const combinedTraits = (player) => {
 /**
  * Every value a NON-group conditional source could inject into this class's
  * channel: conditional traits at the player's combined level, gated /
- * status-granting / counted board nodes, and Phantasm's per-pet steps. A
- * residual value in this set cannot be attributed to a group without a way to
- * rule the other source out, so it flags.
+ * status-granting board nodes, quest counters, and Phantasm's per-pet steps.
+ * A residual value in this set cannot be attributed to a group without a way
+ * to rule the other source out, so it flags.
+ *
+ * Two refinements keep this from over-flagging:
+ *  - a sigil-counted node is STATIC for the whole fight (the count is the
+ *    loadout), so it sits in the class baseline and can never explain an
+ *    action-scoped delta — it is not a confounder at all;
+ *  - a status-gated node is ruled out when the per-hit snapshot was captured
+ *    on every joined hit of the action and never showed the gating status.
+ *    (Present-on-every-hit stays a confounder: a buff the action itself
+ *    sustains is indistinguishable from membership without more evidence.)
  */
-const confounderValuesFor = (player, characterType, capClass, assets) => {
+const confounderValuesFor = (player, characterType, capClass, assets, statusSetsPerHit = []) => {
   const values = new Set();
   const conditional = assets.capUpSources.conditionalTraits ?? {};
   for (const [id, level] of combinedTraits(player)) {
@@ -301,15 +310,19 @@ const confounderValuesFor = (player, characterType, capClass, assets) => {
     const value = row?.[CLASS_SLOT[capClass]] ?? 0;
     if (value !== 0) values.add(Math.round(value));
   }
+  const decidedAbsent = (statusId) =>
+    statusId !== undefined &&
+    statusSetsPerHit.length > 0 &&
+    statusSetsPerHit.every((set) => set !== null && !set.has(statusId));
   for (const id of player.skillboard ?? []) {
     const node = assets.nodes[nodeKey(characterType, id)];
     for (const effect of node?.effects ?? []) {
       if (effect.stat !== "cap" || !effectAppliesTo(effect, capClass)) continue;
       if (effect.scope === "gated" || effect.scope === "grants-status") {
+        if (decidedAbsent(effect.gateStatusId ?? effect.grantsStatusId)) continue;
         if (effect.percent) values.add(Math.round(effect.percent));
-      } else if (effect.scope === "counted") {
-        const max = effect.maxCount ?? 8;
-        for (let count = 1; count <= max; count += 1) values.add(Math.round((effect.percent ?? 0) * count));
+      } else if (effect.scope === "counted" && effect.countKind === "quest-counter") {
+        if (effect.percent) values.add(Math.round(effect.percent));
       }
     }
   }
@@ -415,8 +428,14 @@ export const solve = (oracleText, evidence, assets, options = {}) => {
       const key = `${player.characterType}|${capClass}`;
       if (!perAction.has(key)) perAction.set(key, new Map());
       const actions = perAction.get(key);
-      if (!actions.has(event.action)) actions.set(event.action, { player, hits: [] });
-      actions.get(event.action).hits.push(termPercents(oracle));
+      if (!actions.has(event.action)) actions.set(event.action, { player, hits: [], statusSets: [] });
+      const entry = actions.get(event.action);
+      entry.hits.push(termPercents(oracle));
+      entry.statusSets.push(
+        event.statuses === null || event.statuses === undefined
+          ? null
+          : new Set(event.statuses.map((status) => status.statusId))
+      );
     }
 
     for (const [key, actions] of perAction) {
@@ -444,12 +463,12 @@ export const solve = (oracleText, evidence, assets, options = {}) => {
       }
 
       for (const [action, stable] of stables) {
-        const { player } = actions.get(action);
+        const { player, statusSets } = actions.get(action);
         const bridged = bridgedValuesFor(player, characterType, capClass, action, assets);
         const residual = subtractCounts(subtractCounts(stable, baseline), countsOf(bridged));
         if (residual.size === 0) continue;
         const groupValues = groupValuesFor(player, characterType, capClass, assets);
-        const confounders = confounderValuesFor(player, characterType, capClass, assets);
+        const confounders = confounderValuesFor(player, characterType, capClass, assets, statusSets);
         const { groups, flags: actionFlags } = explainAction(residual, groupValues, confounders);
         if (groups === null) {
           for (const flag of actionFlags) {
