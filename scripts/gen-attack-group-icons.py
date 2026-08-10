@@ -81,11 +81,21 @@ def main() -> None:
     if conflicts:
         sys.exit(f"icon conflicts within a group: {conflicts}")
 
-    OUT_PATH.write_text(
-        json.dumps({"version": "2.0.4", "characters": characters}, indent=2) + "\n",
-        encoding="utf8",
-        newline="\n",
-    )
+    # Hand-rolled layout matching what Prettier produces for this shape (short
+    # arrays inline), so `npm run format` never rewrites a fresh regeneration.
+    lines = ['{', '  "version": "2.0.4",', '  "characters": {']
+    character_items = sorted(characters.items())
+    for character_index, (character, groups) in enumerate(character_items):
+        lines.append(f'    "{character}": {{')
+        group_items = sorted(groups.items(), key=lambda item: int(item[0]))
+        for group_index, (group, icons) in enumerate(group_items):
+            comma = "," if group_index < len(group_items) - 1 else ""
+            rendered = ", ".join(str(icon) for icon in icons)
+            lines.append(f'      "{group}": [{rendered}]{comma}')
+        comma = "," if character_index < len(character_items) - 1 else ""
+        lines.append(f"    }}{comma}")
+    lines += ["  }", "}", ""]
+    OUT_PATH.write_text("\n".join(lines), encoding="utf8", newline="\n")
     with_icons = sum(1 for groups in characters.values() for icons in groups.values() if icons)
     total = sum(len(groups) for groups in characters.values())
     print(f"{len(characters)} characters, {total} groups ({with_icons} icon-tagged) -> {OUT_PATH}")
