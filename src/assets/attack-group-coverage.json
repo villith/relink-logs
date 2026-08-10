@@ -96,9 +96,26 @@
       "groups": {}
     },
     "pl1600": {
-      "status": "underived",
-      "neededGroups": [0, 1, 15, 16, 17],
-      "groups": {}
+      "status": "partial",
+      "neededGroups": [1],
+      "groups": {
+        "0": {
+          "actionIds": [212],
+          "evidence": "caporacle join, logs 2560"
+        },
+        "15": {
+          "actionIds": [111, 210],
+          "evidence": "caporacle join, logs 2560"
+        },
+        "16": {
+          "actionIds": [212],
+          "evidence": "caporacle join, logs 2560"
+        },
+        "17": {
+          "actionIds": [212],
+          "evidence": "caporacle join, logs 2560"
+        }
+      }
     },
     "pl1700": {
       "status": "underived",

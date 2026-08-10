@@ -111,25 +111,9 @@ export const hitKey = (action, cap, rate) =>
 
 const median = (sorted) => sorted[Math.floor(sorted.length / 2)];
 
-/**
- * The clock offset (event unix ms − oracle process ms) from hits whose key is
- * unique on BOTH sides, clustered so a coincidental cross-fight key collision
- * cannot drag the estimate. Null when fewer than `minSupport` votes agree.
- */
-export const alignOffset = (oracle, events, { minSupport = 5, clusterMs = 2000 } = {}) => {
-  const countBy = (items) => {
-    const counts = new Map();
-    for (const item of items) counts.set(item.key, (counts.get(item.key) ?? 0) + 1);
-    return counts;
-  };
-  const oracleCounts = countBy(oracle);
-  const eventCounts = countBy(events);
-  const oracleByKey = new Map(oracle.map((item) => [item.key, item]));
-  const offsets = [];
-  for (const event of events) {
-    if (eventCounts.get(event.key) !== 1 || oracleCounts.get(event.key) !== 1) continue;
-    offsets.push(event.t - oracleByKey.get(event.key).t);
-  }
+/** The densest cluster of offset votes: the largest window of width
+ * `clusterMs`, its median as the estimate. Null under `minSupport` votes. */
+const clusterOffsets = (offsets, minSupport, clusterMs) => {
   offsets.sort((a, b) => a - b);
   let best = { start: 0, size: 0 };
   for (let i = 0, j = 0; i < offsets.length; i += 1) {
@@ -139,6 +123,54 @@ export const alignOffset = (oracle, events, { minSupport = 5, clusterMs = 2000 }
   }
   if (best.size < minSupport) return null;
   return { offset: median(offsets.slice(best.start, best.start + best.size)), support: best.size };
+};
+
+/**
+ * The clock offset (event unix ms − oracle process ms).
+ *
+ * First choice: hits whose key is unique on BOTH sides — each is a certain
+ * pairing, so few votes suffice. A combo-heavy fight can have NO unique keys
+ * at all, so the fallback votes with EVERY same-key (event, oracle) pair:
+ * each event contributes one true-partner vote at the real offset, while
+ * mispairings scatter across the fight's duration — the densest cluster is
+ * the offset. Hyper-common keys are skipped to bound the noise floor, unless
+ * nothing rarer exists. Downstream, `solve` accepts an offset by JOIN RATE,
+ * so a spurious cluster from a capture that never saw the log still dies.
+ */
+export const alignOffset = (oracle, events, { minSupport = 5, clusterMs = 2000 } = {}) => {
+  const countBy = (items) => {
+    const counts = new Map();
+    for (const item of items) counts.set(item.key, (counts.get(item.key) ?? 0) + 1);
+    return counts;
+  };
+  const oracleCounts = countBy(oracle);
+  const eventCounts = countBy(events);
+  const oracleByKey = new Map();
+  for (const record of oracle) {
+    if (!oracleByKey.has(record.key)) oracleByKey.set(record.key, []);
+    oracleByKey.get(record.key).push(record);
+  }
+
+  const unique = [];
+  for (const event of events) {
+    if (eventCounts.get(event.key) !== 1 || oracleCounts.get(event.key) !== 1) continue;
+    unique.push(event.t - oracleByKey.get(event.key)[0].t);
+  }
+  const fromUnique = clusterOffsets(unique, minSupport, clusterMs);
+  if (fromUnique !== null) return fromUnique;
+
+  for (const maxPairsPerKey of [64, Infinity]) {
+    const votes = [];
+    for (const event of events) {
+      const partners = oracleByKey.get(event.key);
+      if (partners === undefined) continue;
+      if (partners.length * eventCounts.get(event.key) > maxPairsPerKey) continue;
+      for (const partner of partners) votes.push(event.t - partner.t);
+    }
+    const fromPairs = clusterOffsets(votes, Math.max(minSupport, events.length / 4), clusterMs);
+    if (fromPairs !== null) return fromPairs;
+  }
+  return null;
 };
 
 /**

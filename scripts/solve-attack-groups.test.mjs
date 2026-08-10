@@ -88,6 +88,24 @@ describe("alignOffset", () => {
     const events = [{ t: 100, key: "a" }];
     expect(alignOffset(oracle, events, { minSupport: 3 })).toBeNull();
   });
+
+  it("recovers the offset when no key is unique, via the pair histogram", () => {
+    // A combo-heavy fight: every key repeats, so unique-key voting has zero
+    // votes — but each event still has its true partner at a constant offset,
+    // and mispairings scatter across the fight instead of clustering.
+    const oracle = [
+      { t: 1000, key: "a" },
+      { t: 41_000, key: "a" },
+      { t: 90_000, key: "a" },
+      { t: 2000, key: "b" },
+      { t: 55_000, key: "b" },
+      { t: 130_000, key: "b" },
+    ];
+    const events = oracle.map(({ t, key }) => ({ t: t + 500_000, key }));
+    const aligned = alignOffset(oracle, events, { minSupport: 3 });
+    expect(aligned).not.toBeNull();
+    expect(aligned.offset).toBe(500_000);
+  });
 });
 
 describe("joinHits", () => {
