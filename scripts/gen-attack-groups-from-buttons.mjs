@@ -48,7 +48,22 @@ const CHARGE_FAMILY =
 
 /** Words in a group phrase that carry no identity ("Attacks" would match
  * every basic swing; "DMG"/"Cap" are the stat, not the mechanic). */
-const GENERIC_WORDS = new Set(["dmg", "cap", "attack", "attacks", "gains", "gain", "upon", "with", "by", "a", "the"]);
+const GENERIC_WORDS = new Set([
+  "dmg",
+  "cap",
+  "attack",
+  "attacks",
+  "gains",
+  "gain",
+  "upon",
+  "with",
+  "by",
+  "a",
+  "the",
+  "and",
+  "or",
+  "per",
+]);
 
 const ROMAN = { i: "1", ii: "2", iii: "3", iv: "4", v: "5", vi: "6" };
 
@@ -65,7 +80,11 @@ const normalize = (text) =>
  * colon), or null when nothing identifying remains. */
 const phraseWords = (text) => {
   const phrase = text.split(":")[0];
-  const words = normalize(phrase).filter((word) => !GENERIC_WORDS.has(word));
+  const words = normalize(phrase)
+    .filter((word) => !GENERIC_WORDS.has(word))
+    // Percent magnitudes leak into colon-less texts ("Turbine DMG Cap +35%");
+    // grade/tier numerals (1-9) are identity, big numbers are values.
+    .filter((word) => !/^\d+$/.test(word) || Number(word) <= 9);
   return words.length > 0 ? words : null;
 };
 
@@ -124,28 +143,68 @@ export const deriveButtonMemberships = ({ buttonMap, icons, nodes, lang, skillNa
     }
 
     // The character's word-named groups, resolved first: their matches are
-    // excluded from the button groups (see module doc).
-    const namedActionIds = new Set();
-    const named = [];
+    // excluded from the button groups (see module doc). A charged group whose
+    // nodes render no input icon ("Power Raise") resolves by name too.
+    const matchIds = (words, excluded) =>
+      Object.entries(names)
+        // Ability/skill ids live at 1000+ and are scoped by ability HASH, not
+        // by attack group — only normal-range actions are group members.
+        .filter(
+          ([id, name]) =>
+            Number(id) < 1000 &&
+            typeof name === "string" &&
+            !excluded.has(Number(id)) &&
+            actionMatches(words, name)
+        )
+        .map(([id]) => Number(id))
+        .sort((a, b) => a - b);
+
+    const candidates = [];
     for (const [group, groupNodeTexts] of texts) {
-      const { kind, words } = groupKind(groupNodeTexts);
-      if (kind !== "named") continue;
+      const { kind } = groupKind(groupNodeTexts);
+      const iconList = (icons[character] ?? {})[String(group)] ?? [];
+      const chargedNoIcon =
+        kind === "charged" && !iconList.includes(ATTACK_ICON_LEFT) && !iconList.includes(ATTACK_ICON_RIGHT);
+      // A group rendering BOTH input icons ("/ Attacks") is a button group,
+      // not a named mechanic — the attacks path banks it from both sides.
+      if (iconList.includes(ATTACK_ICON_LEFT) && iconList.includes(ATTACK_ICON_RIGHT)) continue;
+      if (kind !== "named" && !chargedNoIcon) continue;
+      const words = phraseWords(groupNodeTexts[0] ?? "");
       if (words === null) {
         unmatchedGroups.push({ character, group, reason: "no-identifying-words" });
         continue;
       }
-      const matched = Object.entries(names)
-        // Ability/skill ids live at 1000+ and are scoped by ability HASH, not
-        // by attack group — only normal-range actions are group members.
-        .filter(([id, name]) => Number(id) < 1000 && typeof name === "string" && actionMatches(words, name))
-        .map(([id]) => Number(id))
-        .sort((a, b) => a - b);
+      candidates.push({ group, words, kind });
+    }
+    const namedActionIds = new Set();
+    const named = [];
+    const misses = [];
+    for (const candidate of candidates) {
+      const matched = matchIds(candidate.words, new Set());
       if (matched.length === 0) {
-        unmatchedGroups.push({ character, group, reason: "no-action-matches", words });
+        misses.push(candidate);
         continue;
       }
-      named.push({ group, matched });
-      for (const id of matched) namedActionIds.add(id);
+      named.push({ group: candidate.group, matched });
+      if (candidate.kind === "named") for (const id of matched) namedActionIds.add(id);
+    }
+    // Fallback ONLY for the known "Combo Finishers" naming mismatch (some
+    // characters name the actions just "Finisher 1") — minus every action a
+    // full-phrase group already claimed, so a "Power Finisher" never leaks in.
+    // It must NOT generalize: "Turbine Finishers" falling back to bare
+    // "finisher" would swallow a character's basic combo finishers.
+    for (const candidate of misses) {
+      if (candidate.words.join(" ") !== "combo finisher") {
+        unmatchedGroups.push({ character, group: candidate.group, reason: "no-action-matches", words: candidate.words });
+        continue;
+      }
+      const matched = matchIds([candidate.words.at(-1)], namedActionIds);
+      if (matched.length === 0) {
+        unmatchedGroups.push({ character, group: candidate.group, reason: "no-action-matches", words: candidate.words });
+        continue;
+      }
+      named.push({ group: candidate.group, matched });
+      if (candidate.kind === "named") for (const id of matched) namedActionIds.add(id);
     }
 
     const sided = (side) => families.filter((family) => family.button === side);
@@ -165,12 +224,15 @@ export const deriveButtonMemberships = ({ buttonMap, icons, nodes, lang, skillNa
     for (const [group, groupNodeTexts] of texts) {
       const { kind } = groupKind(groupNodeTexts);
       const iconList = characterIcons[String(group)] ?? [];
-      const side = iconList.includes(ATTACK_ICON_LEFT)
-        ? "left"
-        : iconList.includes(ATTACK_ICON_RIGHT)
-          ? "right"
-          : null;
-      if (kind === "attacks") {
+      const hasLeft = iconList.includes(ATTACK_ICON_LEFT);
+      const hasRight = iconList.includes(ATTACK_ICON_RIGHT);
+      const side = hasLeft ? "left" : hasRight ? "right" : null;
+      if (hasLeft && hasRight) {
+        // Both icons: the group spans both buttons ("/ Attacks").
+        const familyList = [...sided("left"), ...sided("right")];
+        const ids = familyList.flatMap((family) => family.ids).filter((id) => !namedActionIds.has(id));
+        bankGroup(group, ids, familyList);
+      } else if (kind === "attacks") {
         if (side === null) continue;
         const familyList = sided(side);
         const ids = familyList.flatMap((family) => family.ids).filter((id) => !namedActionIds.has(id));
