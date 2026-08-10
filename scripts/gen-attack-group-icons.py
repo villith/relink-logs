@@ -84,6 +84,7 @@ def main() -> None:
     OUT_PATH.write_text(
         json.dumps({"version": "2.0.4", "characters": characters}, indent=2) + "\n",
         encoding="utf8",
+        newline="\n",
     )
     with_icons = sum(1 for groups in characters.values() for icons in groups.values() if icons)
     total = sum(len(groups) for groups in characters.values())
