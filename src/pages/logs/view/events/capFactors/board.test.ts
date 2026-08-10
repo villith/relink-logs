@@ -90,9 +90,12 @@ describe("attack-scoped board nodes", () => {
     expect(factor.evaluate({})).toMatchObject({ potential: 45, state: "unknown", missing: ["actionId"] });
   });
 
-  it("stays unresolved for a group the table names by character rather than by ability", () => {
-    // Group 4 carries no ability ids, so there is nothing to match an action
-    // id against — supplying one cannot settle it, and saying so is the point.
+  it("stays unresolved for a group whose membership is underived", () => {
+    // Group 4 carries no ability ids, so an action id can only settle it
+    // through a derived membership. The SHIPPED registry now carries one for
+    // this group (the button map derived it), so an explicitly-empty registry
+    // pins down what this test is about: underived stays unknown.
+    setAttackGroupCoverage({});
     expect(factorFor(ATTACK_GROUP).evaluate({ actionId: 123 })).toMatchObject({
       state: "unknown",
       reason: "no-action-mapping",
