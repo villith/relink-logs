@@ -1,4 +1,4 @@
-import type { PlayerStats, SourceStatus } from "@/types";
+import type { ActionType, PlayerStats, SourceStatus } from "@/types";
 
 import type { CapConditions } from "./types";
 
@@ -30,8 +30,20 @@ export type AttackerState = {
  * here would make every gated cap source read as definitively inactive on every
  * log recorded before the capture existed.
  */
-export const conditionsForHit = (attacker: AttackerState, stats: PlayerStats | null): CapConditions => {
+export const conditionsForHit = (
+  attacker: AttackerState,
+  stats: PlayerStats | null,
+  action?: ActionType
+): CapConditions => {
   const conditions: CapConditions = {};
+
+  // Only a `Normal` payload IS the hit's own per-character action id — the id
+  // the move-scoped board nodes are bridged against. A link attack or SBA has
+  // none, and an echo/DoT payload names its CAUSE, which would match a
+  // move-scoped node against an id that does not mean "this move".
+  if (action !== undefined && typeof action === "object" && "Normal" in action) {
+    conditions.actionId = action.Normal;
+  }
 
   const current = attacker.source_current_hp;
   const max = attacker.source_max_hp;

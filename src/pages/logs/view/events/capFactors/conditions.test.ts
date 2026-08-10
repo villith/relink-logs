@@ -56,6 +56,21 @@ describe("conditionsForHit", () => {
     expect(conditions.stacks).toEqual({ "1000": 1, "56": 3 });
   });
 
+  it("supplies the hit's own action id for move-scoped sources", () => {
+    // The one condition that was always on the log and never passed: a skill
+    // hit's action id, which is what settles ability-scoped board nodes.
+    expect(conditionsForHit(attacker(), null, { Normal: 1700 }).actionId).toBe(1700);
+  });
+
+  it("omits the action id for hit kinds that carry none", () => {
+    // A link attack or SBA has no per-character action id, and an echo's
+    // payload names its CAUSE, not itself — passing either would match a
+    // move-scoped node against an id that does not mean "this move".
+    expect(conditionsForHit(attacker(), null, "LinkAttack").actionId).toBeUndefined();
+    expect(conditionsForHit(attacker(), null, { SupplementaryDamage: 1700 }).actionId).toBeUndefined();
+    expect(conditionsForHit(attacker(), null).actionId).toBeUndefined();
+  });
+
   it("carries the stored per-player stats the banded traits ramp across", () => {
     const conditions = conditionsForHit(attacker(), stats);
     expect(conditions.critRate).toBe(150);

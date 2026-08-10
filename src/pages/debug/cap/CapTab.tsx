@@ -128,10 +128,11 @@ export const CapTab = () => {
       loadout: player,
       characterType: player?.characterType,
       // The attacker's own state at the moment of the hit, plus the stored stat
-      // block the banded traits ramp across. A hit recorded before that capture
+      // block the banded traits ramp across, plus the hit's own action id for
+      // the move-scoped board nodes. A hit recorded before that capture
       // existed supplies neither, and the factors that need them say so rather
       // than reading as inactive.
-      conditions: conditionsForHit(selected.attacker, player?.playerStats ?? null),
+      conditions: conditionsForHit(selected.attacker, player?.playerStats ?? null, selected.actionId),
     });
   }, [selected, playersByActor, capUp]);
 

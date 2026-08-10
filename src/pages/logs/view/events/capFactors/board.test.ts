@@ -1,8 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
+import shippedCoverage from "@/assets/attack-group-coverage.json";
+import { setSkillNameSources } from "@/skillNameSources";
 import type { Sigil } from "@/types";
 
 import type { CapLoadout } from "../capSources";
+import { setAttackGroupCoverage } from "./attackGroups";
 import { boardFactors } from "./board";
 
 /**
@@ -98,15 +101,88 @@ describe("attack-scoped board nodes", () => {
 
   it("never claims a node did NOT apply just because the ids do not compare", () => {
     // The table's ability ids are xxhash32 of ability.tbl keys; a hit's
-    // ActionType is a small per-character integer ({ Normal: 200 }). They are
-    // different id spaces, so comparing them yields "no match" for every hit —
-    // which as `inactive` would be a confident, wrong claim that the node
-    // contributed nothing. Unresolved is the truthful answer until the two
-    // spaces are bridged.
+    // ActionType is a small per-character integer ({ Normal: 200 }). The
+    // skill-name-sources bridge connects the two — but for an action it does
+    // not cover (a normal attack, a patch-added move), "no match" as
+    // `inactive` would be a confident, wrong claim that the node contributed
+    // nothing. Unresolved is the truthful answer for an unbridged action.
     const factor = boardFactors(loadout({ skillboard: [ABILITY_SCOPED] }), "skill")[0];
     const result = factor.evaluate({ actionId: 200 });
     expect(result.state).not.toBe("inactive");
     expect(result).toMatchObject({ state: "unknown", reason: "no-action-mapping", potential: 45 });
+  });
+});
+
+afterEach(() => setAttackGroupCoverage(shippedCoverage.characters as Parameters<typeof setAttackGroupCoverage>[0]));
+
+describe("ability-scoped nodes with a bridged action id", () => {
+  afterEach(() => setSkillNameSources({}));
+
+  /** The real Captain node 0x0033 targets ability `6fd0843a`; give the bridge
+   * one action that IS that ability and one that is a different one. */
+  const bridge = () =>
+    setSkillNameSources({
+      Pl0000: {
+        "2600": { ns: "abilities", hash: "6fd0843a", key: "AB_PL0000_05" },
+        "2700": { ns: "abilities", hash: "aaaaaaaa", key: "AB_PL0000_06" },
+      },
+    });
+
+  it("applies when the hit's action resolves to an ability the node names", () => {
+    bridge();
+    const factor = boardFactors(loadout({ skillboard: [ABILITY_SCOPED] }), "skill")[0];
+    expect(factor.evaluate({ actionId: 2600 })).toMatchObject({ percent: 45, state: "active" });
+  });
+
+  it("does not apply when the hit resolves to a DIFFERENT ability", () => {
+    // The bridge covers this action and it is genuinely another move —
+    // `inactive` is now a claim the data supports, not a failed comparison.
+    bridge();
+    const factor = boardFactors(loadout({ skillboard: [ABILITY_SCOPED] }), "skill")[0];
+    expect(factor.evaluate({ actionId: 2700 })).toMatchObject({ percent: 0, state: "inactive" });
+  });
+
+  it("stays unresolved for an action the bridge does not cover", () => {
+    bridge();
+    const factor = boardFactors(loadout({ skillboard: [ABILITY_SCOPED] }), "skill")[0];
+    expect(factor.evaluate({ actionId: 120 })).toMatchObject({ state: "unknown", reason: "no-action-mapping" });
+  });
+
+  it("resolves a group-scoped node through a derived group membership", () => {
+    // The Captain node 0x0016 is scoped to attack group 4 with no ability ids.
+    // Once the coverage registry carries an empirically derived membership for
+    // that group, an action id settles the row both ways.
+    setAttackGroupCoverage({
+      pl0000: {
+        status: "partial",
+        neededGroups: [1],
+        groups: { "4": { actionIds: [210, 220, 230], evidence: "test" } },
+      },
+    });
+    const factor = factorFor(ATTACK_GROUP);
+    expect(factor.evaluate({ actionId: 220 })).toMatchObject({ percent: 45, state: "active" });
+    expect(factor.evaluate({ actionId: 100 })).toMatchObject({ percent: 0, state: "inactive" });
+  });
+
+  it("stays unresolved for a group the registry has not derived", () => {
+    setAttackGroupCoverage({
+      pl0000: { status: "partial", neededGroups: [4], groups: { "1": { actionIds: [999], evidence: "test" } } },
+    });
+    expect(factorFor(ATTACK_GROUP).evaluate({ actionId: 220 })).toMatchObject({
+      state: "unknown",
+      reason: "no-action-mapping",
+    });
+  });
+
+  it("resolves Eustace's Heaven Comes Down node against the SHIPPED bridge", async () => {
+    // End to end through the real assets: node pl2700_0097 names ability
+    // aea6d151, and the shipped skill-name-sources maps Eustace action 1700 to
+    // exactly that hash — the row that motivated the bridge (log 2559).
+    const shipped = await import("../../../../../../src-tauri/assets/skill-name-sources.json");
+    setSkillNameSources(shipped.default as Parameters<typeof setSkillNameSources>[0]);
+    const factor = boardFactors(loadout({ characterType: "Pl2700", skillboard: [0x0097] }), "skill")[0];
+    expect(factor.evaluate({ actionId: 1700 })).toMatchObject({ percent: 45, state: "active" });
+    expect(factor.evaluate({ actionId: 1100 })).toMatchObject({ percent: 0, state: "inactive" });
   });
 });
 

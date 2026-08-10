@@ -1,7 +1,9 @@
 import boardSources from "@/assets/skillboard-cap-sources.json";
+import { getSkillNameSources } from "@/skillNameSources";
 import { collectSigilsByCategory, skillboardNodeKey, type SigilCategory } from "@/utils";
 
 import type { CapClass, CapLoadout } from "../capSources";
+import { groupActionIds } from "./attackGroups";
 import {
   activeResult,
   inactiveResult,
@@ -80,6 +82,7 @@ const paramsFor = (effect: BoardEffect): readonly CapParamKey[] => {
 const evaluateEffect = (
   effect: BoardEffect,
   player: CapLoadout,
+  characterType: string,
   capClass: CapClass,
   conditions: CapConditions
 ): CapFactorResult => {
@@ -90,19 +93,36 @@ const evaluateEffect = (
     case "always":
       return activeResult(percent);
 
-    case "attack-group":
-      // Two different id spaces, and they must NOT be compared. The table's
-      // `abilityIds` are xxhash32 of `ability.tbl` keys; a hit's `ActionType`
-      // is a small per-character integer (`{ Normal: 200 }`). Comparing them
-      // yields "no match" for every hit alive, which as `inactive` would be a
-      // confident and wrong claim that the node contributed nothing.
+    case "attack-group": {
+      // Two different id spaces, never compared raw: the table's `abilityIds`
+      // are xxhash32 of `ability.tbl` keys; a hit's action id is a small
+      // per-character integer. `skill-name-sources` is the bridge — the same
+      // per-character action-id → ability-hash map the meter already names
+      // skills through, generated off the game's own action tags.
       //
-      // So the action id is still declared as what this NEEDS — a resolver that
-      // bridges the two spaces is the remaining work — but until that exists,
-      // an id in hand does not settle it, and the row says exactly that.
-      return conditions.actionId === undefined
-        ? unknownResult(percent, ["actionId"])
-        : unknownResult(percent, [], "no-action-mapping");
+      // Resolution requires BOTH ends: an action the bridge covers, matched
+      // against a node that names its abilities. A raw "no match" as
+      // `inactive` would be a confident, wrong claim that the node
+      // contributed nothing — so a group-only node (empty `abilityIds`) and
+      // an unbridged action (a normal attack, a patch-added move) both stay
+      // unresolved and say why.
+      if (conditions.actionId === undefined) return unknownResult(percent, ["actionId"]);
+      const abilityIds = effect.abilityIds ?? [];
+      if (abilityIds.length === 0) {
+        // A group-only node: the coverage registry may carry an empirically
+        // derived membership for this character's group (see attackGroups.ts).
+        // Underived stays unresolved — a missing membership is a question, not
+        // an empty set.
+        const members = groupActionIds(characterType, effect.targetAttackGroup ?? -1);
+        if (members === null) return unknownResult(percent, [], "no-action-mapping");
+        return members.includes(conditions.actionId) ? activeResult(percent) : inactiveResult(percent);
+      }
+      const source = getSkillNameSources()[characterType]?.[String(conditions.actionId)];
+      if (source === undefined || source.ns !== "abilities") {
+        return unknownResult(percent, [], "no-action-mapping");
+      }
+      return abilityIds.includes(source.hash) ? activeResult(percent) : inactiveResult(percent);
+    }
 
     case "gated": {
       // An engine-state gate is a per-character mode or gauge tier with no
@@ -171,7 +191,7 @@ export const boardFactors = (player: CapLoadout | undefined, capClass: CapClass 
           ...base,
           key: `board-${key}-${index}`,
           params: paramsFor(effect),
-          evaluate: (conditions) => evaluateEffect(effect, player, capClass, conditions),
+          evaluate: (conditions) => evaluateEffect(effect, player, characterType, capClass, conditions),
         });
       });
       continue;
