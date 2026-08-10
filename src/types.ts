@@ -637,6 +637,13 @@ export type PlayerData = {
   stats: RecordStats | null;
   /** Equipped weapon save-row snapshot (v2.0.2 identity recovery); null on older logs. */
   weaponState: WeaponState | null;
+  /** The Mastery (AP-tree) damage-cap total per attack class, read from the
+   * game's own resolved limit-bonus store — table units (684 = +684%). Already
+   * fused inside the record cap-up totals, so it itemizes them, never adds to
+   * them. Null on logs recorded before the capture shipped. */
+  limitBonusCapNormal: number | null;
+  limitBonusCapSkill: number | null;
+  limitBonusCapSba: number | null;
   isOnline: boolean;
   weaponInfo: WeaponInfo | null;
   overmasteryInfo: OvermasteryInfo | null;

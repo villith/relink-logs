@@ -2,7 +2,7 @@ import apTreeSources from "@/assets/ap-tree-cap-sources.json";
 import boardSources from "@/assets/skillboard-cap-sources.json";
 import { toHashString } from "@/utils";
 
-import type { CapClass, CapLoadout } from "../capSources";
+import { limitBonusCapOf, type CapClass, type CapLoadout } from "../capSources";
 import { activeResult, unknownResult, type CapFactor } from "./types";
 
 /**
@@ -67,21 +67,42 @@ export const accountFactors = (player: CapLoadout | undefined, capClass: CapClas
   const masterLevel = player?.masterLevel ?? 0;
   const character = typeof player?.characterType === "string" ? player.characterType.toLowerCase() : null;
   const weaponId = player?.weaponInfo?.weaponId;
+  const masteryTotal = limitBonusCapOf(player, capClass);
+
+  const masterRank: CapFactor = {
+    key: "account-master-rank",
+    kind: "account",
+    id: NO_ID,
+    label: "ui.debug.cap-master-rank",
+    level: masterLevel > 0 ? masterLevel : null,
+    params: [],
+    // An AI companion's record reads 0. Valuing that as +0% would claim they
+    // have no rank bonus, which is a stronger statement than "this log
+    // cannot say".
+    evaluate: () =>
+      masterLevel > 0 ? activeResult(masterRankCapUp(masterLevel)) : unknownResult(0, [], "value-unrecorded"),
+  };
+
+  // The captured total answers what the two potential rows ask, so it REPLACES
+  // them: keeping them alongside would report an open question that is closed.
+  // (The master rank bonus is not in the store — it stays its own row.)
+  if (masteryTotal !== null) {
+    return [
+      masterRank,
+      {
+        key: "account-mastery-total",
+        kind: "account",
+        id: NO_ID,
+        label: "ui.debug.cap-mastery-total",
+        level: null,
+        params: [],
+        evaluate: () => activeResult(masteryTotal),
+      },
+    ];
+  }
 
   return [
-    {
-      key: "account-master-rank",
-      kind: "account",
-      id: NO_ID,
-      label: "ui.debug.cap-master-rank",
-      level: masterLevel > 0 ? masterLevel : null,
-      params: [],
-      // An AI companion's record reads 0. Valuing that as +0% would claim they
-      // have no rank bonus, which is a stronger statement than "this log
-      // cannot say".
-      evaluate: () =>
-        masterLevel > 0 ? activeResult(masterRankCapUp(masterLevel)) : unknownResult(0, [], "value-unrecorded"),
-    },
+    masterRank,
     {
       key: "account-mastery",
       kind: "account",

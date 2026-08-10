@@ -470,6 +470,18 @@ pub struct PlayerData {
     cap_up_skill: Option<f32>,
     #[serde(default)]
     cap_up_sba: Option<f32>,
+    /// The Mastery (AP-tree) slice of the fused cap-up totals above, summed by
+    /// the game itself in its resolved limit-bonus store and read per attack
+    /// class. In TABLE units (684.0 = +684%), unlike the builder-unit triple —
+    /// it itemizes the record total, it is never added to it. `None` on logs
+    /// recorded before the capture shipped; `#[serde(default)]` keeps those
+    /// readable.
+    #[serde(default)]
+    limit_bonus_cap_normal: Option<f32>,
+    #[serde(default)]
+    limit_bonus_cap_skill: Option<f32>,
+    #[serde(default)]
+    limit_bonus_cap_sba: Option<f32>,
     /// Whether this player was an online player or not
     is_online: bool,
     /// Weapon info for this player
@@ -501,6 +513,9 @@ impl Default for PlayerData {
             cap_up_normal: None,
             cap_up_skill: None,
             cap_up_sba: None,
+            limit_bonus_cap_normal: None,
+            limit_bonus_cap_skill: None,
+            limit_bonus_cap_sba: None,
             is_online: false,
             weapon_info: None,
             overmastery_info: None,
@@ -3431,6 +3446,9 @@ impl Parser {
             cap_up_normal: None,
             cap_up_skill: None,
             cap_up_sba: None,
+            limit_bonus_cap_normal: None,
+            limit_bonus_cap_skill: None,
+            limit_bonus_cap_sba: None,
             weapon_info: Some(event.weapon_info.into()),
             overmastery_info: Some(event.overmastery_info.into()),
             player_stats: Some(event.player_stats.into()),
@@ -3480,6 +3498,9 @@ impl Parser {
                 cap_up_normal: None,
                 cap_up_skill: None,
                 cap_up_sba: None,
+                limit_bonus_cap_normal: None,
+                limit_bonus_cap_skill: None,
+                limit_bonus_cap_sba: None,
                 is_online: event.is_online,
                 weapon_info: None,
                 overmastery_info: None,
@@ -3564,6 +3585,15 @@ impl Parser {
         }
         if let Some(cap_up) = event.cap_up_sba {
             player_data.cap_up_sba = Some(cap_up);
+        }
+        if let Some(caps) = event.limit_bonus_cap_normal {
+            player_data.limit_bonus_cap_normal = Some(caps);
+        }
+        if let Some(caps) = event.limit_bonus_cap_skill {
+            player_data.limit_bonus_cap_skill = Some(caps);
+        }
+        if let Some(caps) = event.limit_bonus_cap_sba {
+            player_data.limit_bonus_cap_sba = Some(caps);
         }
 
         // Character level, also town-loadout-only. Fold it into player_stats without
@@ -4915,6 +4945,30 @@ mod tests {
         assert_eq!(entry.normal, Some(13.13));
         assert_eq!(entry.skill, Some(15.18));
         assert_eq!(entry.sba, Some(12.16));
+    }
+
+    /// The Mastery (limit-bonus store) sums ride the identity event into the
+    /// player's stored loadout, and an identity refresh whose store read failed
+    /// must not blank a previously learned value — each class independently,
+    /// like the record cap-ups above.
+    #[test]
+    fn limit_bonus_caps_land_on_player_data_and_survive_a_sparse_refresh() {
+        let mut parser = Parser::default();
+        let mut event = identity_event("Gran", 0x26A4848A, 0, protocol::player_slot_key(0), false);
+        event.limit_bonus_cap_normal = Some(684.0);
+        event.limit_bonus_cap_skill = Some(684.0);
+        event.limit_bonus_cap_sba = Some(680.0);
+        parser.on_player_identity_event(event);
+
+        let refresh = identity_event("Gran", 0x26A4848A, 0, protocol::player_slot_key(0), false);
+        parser.on_player_identity_event(refresh);
+
+        let player = parser.encounter.player_data[0]
+            .as_ref()
+            .expect("slot 0 holds the player");
+        assert_eq!(player.limit_bonus_cap_normal, Some(684.0));
+        assert_eq!(player.limit_bonus_cap_skill, Some(684.0));
+        assert_eq!(player.limit_bonus_cap_sba, Some(680.0));
     }
 
     /// A log recorded before the capture must not report a cap-up of zero — the
@@ -8319,6 +8373,9 @@ mod tests {
             cap_up_normal: None,
             cap_up_skill: None,
             cap_up_sba: None,
+            limit_bonus_cap_normal: None,
+            limit_bonus_cap_skill: None,
+            limit_bonus_cap_sba: None,
         }
     }
 

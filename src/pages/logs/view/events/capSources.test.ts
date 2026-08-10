@@ -128,6 +128,21 @@ describe("deriveRecordComponents", () => {
     expect(deriveRecordComponents(player, "normal")).toEqual([]);
   });
 
+  it("renders the captured Mastery total as its own record sub-row", () => {
+    // The game's resolved limit-bonus store, per class in table units — a
+    // component of the fused record like the families above, so it renders as
+    // a sub-row and never adds to the attributed total.
+    const player = loadout({ limitBonusCapNormal: 684, limitBonusCapSkill: 600 });
+    expect(deriveRecordComponents(player, "normal")).toEqual([
+      { key: "mastery", labelKey: "ui.logs.cap-source-mastery", value: 6.84 },
+    ]);
+    expect(deriveRecordComponents(player, "skill")[0].value).toBeCloseTo(6.0, 6);
+  });
+
+  it("omits the Mastery sub-row on a log without the capture", () => {
+    expect(deriveRecordComponents(loadout(), "normal")).toEqual([]);
+  });
+
   it("counts a summon equip bonus at its own level's magnitude", () => {
     const player = loadout({
       summons: [{ summonId: 1, mainTraitId: 0, mainTraitLevel: 0, bonusId: SUMMON_BONUS_NORMAL, bonusLevel: 0 }],

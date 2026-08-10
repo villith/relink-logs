@@ -477,6 +477,21 @@ pub struct PlayerIdentityEvent {
     /// class flags have `0x40000` (which wins over `0x10000`).
     #[serde(default)]
     pub cap_up_sba: Option<f32>,
+    /// The Mastery (AP-tree) damage-cap total for NORMAL attacks, summed from
+    /// the record's resolved limit-bonus store (the 400 × 0x38 array at
+    /// `record+0x138`; cap-typed param slots 103/104/105, 106 folded into all
+    /// three). In TABLE units (684.0 = +684%), NOT the builder units the
+    /// `cap_up_*` triple uses — this term is already fused inside that triple,
+    /// so it itemizes the record, it never adds to it. `None` on old logs and
+    /// while the store is still empty.
+    #[serde(default)]
+    pub limit_bonus_cap_normal: Option<f32>,
+    /// The same for SKILL attacks (store type 104 + 106).
+    #[serde(default)]
+    pub limit_bonus_cap_skill: Option<f32>,
+    /// The same for Skybound Arts (store type 105 + 106).
+    #[serde(default)]
+    pub limit_bonus_cap_sba: Option<f32>,
 }
 
 /// Training-room ("Trial") lifecycle. The training room has no flow object and

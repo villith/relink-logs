@@ -15,7 +15,12 @@ export type CapClass = "normal" | "skill" | "sba";
  * itemization stays valid, so a test asserting trait behaviour does not have to
  * pretend to own a skillboard. */
 export type CapLoadout = Pick<PlayerData, "sigils" | "summons" | "weaponState" | "weaponInfo" | "overmasteryInfo"> &
-  Partial<Pick<PlayerData, "skillboard" | "characterType" | "masterLevel">>;
+  Partial<
+    Pick<
+      PlayerData,
+      "skillboard" | "characterType" | "masterLevel" | "limitBonusCapNormal" | "limitBonusCapSkill" | "limitBonusCapSba"
+    >
+  >;
 
 /** The attack class of a hit, from its `class_flags` (`instance+0xF0`).
  *
@@ -205,11 +210,33 @@ const overmasteryPercent = (player: CapLoadout, capClass: CapClass): number =>
 const summonPercent = (player: CapLoadout, capClass: CapClass): number =>
   sumPercents(enumerateSummons(player, capClass));
 
+/**
+ * The captured Mastery (AP-tree) total for the hit's class, in table units, or
+ * `null` when this log never carried one.
+ *
+ * Read from the game's own resolved limit-bonus store — every cap-typed entry
+ * in it is an `ap_tree_*` bonus (verified against the tables 2026-08-10), so
+ * it is the fused character-plus-weapon-trees answer, not another derivation.
+ * A component of the captured record like the families above: it itemizes that
+ * total and is never added to it.
+ */
+export const limitBonusCapOf = (player: CapLoadout | undefined, capClass: CapClass | null): number | null => {
+  if (player === undefined || capClass === null) return null;
+  const value =
+    capClass === "normal"
+      ? player.limitBonusCapNormal
+      : capClass === "skill"
+        ? player.limitBonusCapSkill
+        : player.limitBonusCapSba;
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+};
+
 /** One row per source family, in a stable order, dropping the empty ones. */
 const FAMILIES: { key: string; labelKey: string; percent: (p: CapLoadout, c: CapClass) => number }[] = [
   { key: "trait", labelKey: "ui.logs.cap-source-trait", percent: traitPercent },
   { key: "overmastery", labelKey: "ui.logs.cap-source-overmastery", percent: overmasteryPercent },
   { key: "summon", labelKey: "ui.logs.cap-source-summon", percent: summonPercent },
+  { key: "mastery", labelKey: "ui.logs.cap-source-mastery", percent: (p, c) => limitBonusCapOf(p, c) ?? 0 },
 ];
 
 /**

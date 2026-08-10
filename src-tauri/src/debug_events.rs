@@ -68,6 +68,9 @@ pub fn identity_event(slot: u8, character_type: u32, name: &str) -> PlayerIdenti
         cap_up_normal: None,
         cap_up_skill: None,
         cap_up_sba: None,
+        limit_bonus_cap_normal: None,
+        limit_bonus_cap_skill: None,
+        limit_bonus_cap_sba: None,
     }
 }
 

@@ -104,6 +104,55 @@ describe("mastery / collection", () => {
   });
 });
 
+describe("mastery total read from the record store", () => {
+  // The game's own resolved limit-bonus store, captured per player since
+  // 2026-08-10 — per-class sums in table units, weapon and character trees
+  // already fused by the game.
+  const captured = loadout(50, {
+    characterType: "Pl0000",
+    weaponInfo: weapon(0x10180036),
+    limitBonusCapNormal: 684,
+    limitBonusCapSkill: 684,
+    limitBonusCapSba: 680,
+  });
+
+  it("renders as one active row valued at the game's own sum for the hit's class", () => {
+    expect(factorResult("account-mastery-total", captured, "skill")).toMatchObject({
+      state: "active",
+      percent: 684,
+    });
+    expect(factorResult("account-mastery-total", captured, "sba")).toMatchObject({
+      state: "active",
+      percent: 680,
+    });
+  });
+
+  it("replaces the two per-owner unresolved rows it answers", () => {
+    const keys = accountFactors(captured, "skill").map((factor) => factor.key);
+    expect(keys).not.toContain("account-mastery");
+    expect(keys).not.toContain("account-weapon-trees");
+  });
+
+  it("keeps the master rank row, which the store does not carry", () => {
+    const keys = accountFactors(captured, "skill").map((factor) => factor.key);
+    expect(keys).toContain("account-master-rank");
+  });
+
+  it("falls back to the unresolved rows when the hit's class is unknown", () => {
+    // With no class there is no sum to pick, and inventing one would attribute
+    // a number the formula did not necessarily use.
+    const keys = accountFactors(captured, null).map((factor) => factor.key);
+    expect(keys).toContain("account-mastery");
+    expect(keys).not.toContain("account-mastery-total");
+  });
+
+  it("falls back to the unresolved rows on a log without the capture", () => {
+    const keys = accountFactors(loadout(50, { characterType: "Pl0000" }), "skill").map((factor) => factor.key);
+    expect(keys).toContain("account-mastery");
+    expect(keys).not.toContain("account-mastery-total");
+  });
+});
+
 describe("weapon mastery trees", () => {
   it("follows the EQUIPPED weapon rather than the character", () => {
     const player = loadout(50, { characterType: "Pl0000", weaponInfo: weapon(0x10180036) });
