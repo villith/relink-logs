@@ -17,9 +17,14 @@
       "groups": {}
     },
     "pl0300": {
-      "status": "underived",
-      "neededGroups": [0, 1, 18],
-      "groups": {}
+      "status": "partial",
+      "neededGroups": [1, 18],
+      "groups": {
+        "0": {
+          "actionIds": [100, 105],
+          "evidence": "caporacle join, logs 2557,2558,2559"
+        }
+      }
     },
     "pl0400": {
       "status": "underived",
@@ -52,9 +57,18 @@
       "groups": {}
     },
     "pl1000": {
-      "status": "underived",
-      "neededGroups": [1, 4],
-      "groups": {}
+      "status": "derived",
+      "neededGroups": [],
+      "groups": {
+        "1": {
+          "actionIds": [200],
+          "evidence": "caporacle join, logs 2557,2558,2559"
+        },
+        "4": {
+          "actionIds": [200],
+          "evidence": "caporacle join, logs 2557,2558,2559"
+        }
+      }
     },
     "pl1100": {
       "status": "underived",
@@ -132,9 +146,18 @@
       "groups": {}
     },
     "pl2700": {
-      "status": "underived",
-      "neededGroups": [0, 15, 16, 17, 20],
-      "groups": {}
+      "status": "partial",
+      "neededGroups": [0, 15, 17],
+      "groups": {
+        "16": {
+          "actionIds": [115, 125],
+          "evidence": "caporacle join, logs 2557,2558,2559"
+        },
+        "20": {
+          "actionIds": [110, 112, 115],
+          "evidence": "caporacle join, logs 2557,2558,2559"
+        }
+      }
     },
     "pl2800": {
       "status": "underived",
