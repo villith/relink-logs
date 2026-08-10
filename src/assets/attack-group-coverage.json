@@ -1,0 +1,150 @@
+{
+  "version": "2.0.4",
+  "characters": {
+    "pl0000": {
+      "status": "underived",
+      "neededGroups": [1, 4],
+      "groups": {}
+    },
+    "pl0100": {
+      "status": "underived",
+      "neededGroups": [1, 4],
+      "groups": {}
+    },
+    "pl0200": {
+      "status": "underived",
+      "neededGroups": [8],
+      "groups": {}
+    },
+    "pl0300": {
+      "status": "underived",
+      "neededGroups": [0, 1, 18],
+      "groups": {}
+    },
+    "pl0400": {
+      "status": "underived",
+      "neededGroups": [0, 1],
+      "groups": {}
+    },
+    "pl0500": {
+      "status": "underived",
+      "neededGroups": [0, 1],
+      "groups": {}
+    },
+    "pl0600": {
+      "status": "underived",
+      "neededGroups": [0, 1],
+      "groups": {}
+    },
+    "pl0700": {
+      "status": "underived",
+      "neededGroups": [0, 1, 15],
+      "groups": {}
+    },
+    "pl0800": {
+      "status": "underived",
+      "neededGroups": [0, 1, 8, 15, 16],
+      "groups": {}
+    },
+    "pl0900": {
+      "status": "underived",
+      "neededGroups": [0, 1, 8],
+      "groups": {}
+    },
+    "pl1000": {
+      "status": "underived",
+      "neededGroups": [1, 4],
+      "groups": {}
+    },
+    "pl1100": {
+      "status": "underived",
+      "neededGroups": [0, 1, 6, 19],
+      "groups": {}
+    },
+    "pl1200": {
+      "status": "underived",
+      "neededGroups": [0, 1, 16],
+      "groups": {}
+    },
+    "pl1300": {
+      "status": "underived",
+      "neededGroups": [0, 1, 8, 15],
+      "groups": {}
+    },
+    "pl1400": {
+      "status": "underived",
+      "neededGroups": [0, 1],
+      "groups": {}
+    },
+    "pl1500": {
+      "status": "underived",
+      "neededGroups": [0, 1],
+      "groups": {}
+    },
+    "pl1600": {
+      "status": "underived",
+      "neededGroups": [0, 1, 15, 16, 17],
+      "groups": {}
+    },
+    "pl1700": {
+      "status": "underived",
+      "neededGroups": [1, 4],
+      "groups": {}
+    },
+    "pl1800": {
+      "status": "underived",
+      "neededGroups": [0, 1, 4],
+      "groups": {}
+    },
+    "pl1900": {
+      "status": "underived",
+      "neededGroups": [0, 1],
+      "groups": {}
+    },
+    "pl2100": {
+      "status": "underived",
+      "neededGroups": [0, 1, 5, 8],
+      "groups": {}
+    },
+    "pl2200": {
+      "status": "underived",
+      "neededGroups": [0, 1, 8, 15],
+      "groups": {}
+    },
+    "pl2300": {
+      "status": "underived",
+      "neededGroups": [0, 1, 3, 4, 8, 15, 16],
+      "groups": {}
+    },
+    "pl2400": {
+      "status": "underived",
+      "neededGroups": [0, 1, 15, 16],
+      "groups": {}
+    },
+    "pl2500": {
+      "status": "underived",
+      "neededGroups": [0, 1, 15],
+      "groups": {}
+    },
+    "pl2600": {
+      "status": "underived",
+      "neededGroups": [0, 1, 15],
+      "groups": {}
+    },
+    "pl2700": {
+      "status": "underived",
+      "neededGroups": [0, 15, 16, 17, 20],
+      "groups": {}
+    },
+    "pl2800": {
+      "status": "underived",
+      "neededGroups": [0, 1],
+      "groups": {}
+    },
+    "pl2900": {
+      "status": "underived",
+      "neededGroups": [0, 1, 15, 16],
+      "groups": {}
+    }
+  }
+}
