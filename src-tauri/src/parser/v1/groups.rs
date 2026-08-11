@@ -453,6 +453,21 @@ fn fold_landings(aggregates: &mut [GroupAggregate], walked: &[Walked], pairing: 
         // contributes only what rode along with it.
         merged.supplementary += if is_echo { landing } else { attached };
     }
+
+    // The two views describe the same walk: a claim MOVES damage between rows,
+    // it never creates or drops any. This catches strictly less here than in
+    // the `skill_breakdown` twin — a misroute through a stale `aggregate_index`
+    // preserves the total, as this function's own doc concedes — but the filter
+    // gate above is the identical logic in both, and its failures are silent in
+    // both. Kept for that half, and so the two folds stay comparable.
+    debug_assert_eq!(
+        aggregates
+            .iter()
+            .map(|aggregate| aggregate.merged.amount)
+            .sum::<i64>(),
+        walked.iter().map(|entry| entry.damage).sum::<i64>(),
+        "the landing view must move damage between rows, never add or drop it"
+    );
 }
 
 /// Aggregates the analysis view's generic group query into rows and bands
@@ -2698,5 +2713,92 @@ mod tests {
         assert_eq!(aggregates[0].merged.hits, 1);
         assert_eq!(aggregates[0].merged.amount, 70);
         assert_eq!(aggregates[0].merged.supplementary, 70);
+    }
+
+    /// A CLAIMED echo whose trigger the scrub window excluded stands alone as
+    /// its own landing. The pairing is learned from the whole log and never
+    /// narrows, so this gate is the only thing keeping the two views summing to
+    /// the same total under a filter — the `mod.rs` landing pass has the twin
+    /// of this test.
+    #[test]
+    fn a_claimed_echo_whose_trigger_the_window_excluded_lands_on_its_own() {
+        let events = vec![
+            (0, Message::DamageEvent(player_hit(0, 9, 9001, 154_500))),
+            (151, Message::DamageEvent(player_echo(0, 9, 9001, 92_681))),
+        ];
+        // Pinned so this cannot quietly degrade into the orphan case: the echo
+        // must really have a trigger for the gate under test to be the one
+        // that fires.
+        assert_eq!(
+            SuppPairing::learned_from(&events).trigger_of(1),
+            Some(0),
+            "the echo is claimed by the hit before it"
+        );
+
+        // Opens after the trigger (relative 0) and before the echo (151).
+        let mut query = friendly_damage_query(Dimension::Ability);
+        query.from_ms = Some(100);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by ability is supported");
+
+        assert_eq!(aggregates.len(), 1, "the trigger is outside the window");
+        assert_eq!(aggregates[0].merged.hits, 1);
+        assert_eq!(aggregates[0].merged.amount, 92_681);
+        assert_eq!(aggregates[0].merged.supplementary, 92_681);
+
+        let raw: i64 = aggregates.iter().map(|a| a.measure.amount).sum();
+        let merged: i64 = aggregates.iter().map(|a| a.merged.amount).sum();
+        assert_eq!(raw, merged, "the two views still sum to one total");
+    }
+
+    /// The same gate the other way round: a trigger absorbs only the echoes
+    /// that survived alongside it, or the merged view would carry damage the
+    /// raw view does not have.
+    #[test]
+    fn a_trigger_does_not_attach_an_echo_the_window_excluded() {
+        let events = vec![
+            (0, Message::DamageEvent(player_hit(0, 9, 9001, 154_500))),
+            (151, Message::DamageEvent(player_echo(0, 9, 9001, 92_681))),
+        ];
+
+        // Closes after the trigger (relative 0) and before the echo (151).
+        let mut query = friendly_damage_query(Dimension::Ability);
+        query.up_to_ms = Some(100);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by ability is supported");
+
+        assert_eq!(aggregates.len(), 1, "the echo is outside the window");
+        assert_eq!(aggregates[0].merged.hits, 1);
+        assert_eq!(
+            aggregates[0].merged.amount, 154_500,
+            "the excluded echo rode along with nothing"
+        );
+        assert_eq!(aggregates[0].merged.supplementary, 0);
+
+        let raw: i64 = aggregates.iter().map(|a| a.measure.amount).sum();
+        let merged: i64 = aggregates.iter().map(|a| a.merged.amount).sum();
+        assert_eq!(raw, merged, "the two views still sum to one total");
     }
 }

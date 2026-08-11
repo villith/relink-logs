@@ -1278,16 +1278,22 @@ impl DerivedEncounterState {
     }
 
     /// Returns the breakdown row this hit landed in: the party slot plus the
-    /// `(action, child character)` key its [`player_state::BreakdownKeying`]
-    /// assigned. Carried out rather than recomputed — see
+    /// [`BreakdownKey`] its [`player_state::BreakdownKeying`] assigned. Carried
+    /// out rather than recomputed — see
     /// [`PlayerState::update_from_damage_event`] — so the reparse's landing
     /// pass can address the very row the walk fed. Every other caller ignores
     /// it.
+    ///
+    /// The party slot is returned for the same reason, though it looks like a
+    /// field read the caller could do itself: `remap_dragon_form` rewrites
+    /// `source.parent_index`, so only the POST-remap index is the one
+    /// `party.get_mut` used here. A caller re-deriving it from its own event
+    /// would file Id's dragonform damage against the wrong player.
     fn process_damage_event(
         &mut self,
         now: i64,
         damage_instance: &AdjustedDamageInstance,
-    ) -> (u32, ActionType, CharacterType) {
+    ) -> (u32, BreakdownKey) {
         self.extend_window(now);
         self.total_damage += damage_instance.event.damage as u64;
         self.dps = self.total_damage as f64 / self.duration_secs();
@@ -1345,8 +1351,7 @@ impl DerivedEncounterState {
 
         (
             damage_instance.event.source.parent_index,
-            action,
-            child_character_type,
+            (action, child_character_type),
         )
     }
 
@@ -2465,6 +2470,10 @@ fn bucket_for(
     (bucket < chart_len).then_some(bucket)
 }
 
+/// The identity of a breakdown row: `(action, child character)`, the pair
+/// [`player_state::BreakdownKeying`] assigns and `skill_breakdown` files by.
+type BreakdownKey = (ActionType, CharacterType);
+
 /// One damage event that survived every gate in [`Parser::reparse_with_options`]'s
 /// walk, and the breakdown row it fed there.
 ///
@@ -2476,22 +2485,21 @@ fn bucket_for(
 /// Recorded because a landing's amount depends on echoes that arrive LATER in
 /// the stream, and a running min/max cannot be revised once written — so the
 /// merged view cannot be accumulated in the walk itself.
-struct Landed {
+struct Walked {
     /// Index into the raw event log the walk enumerated — the same base
     /// [`supp_pairing::SuppPairing`] keys its links by.
     position: usize,
     /// Party slot the hit was filed under (`source.parent_index`, post-remap).
     player_index: u32,
-    /// The `(action, child character)` breakdown key the walk's
-    /// [`player_state::BreakdownKeying`] assigned, carried out of the walk
-    /// rather than recomputed: that keying is stateful and order-dependent, so
-    /// a second `key_for` would advance it and file hits against rows the walk
-    /// never opened.
+    /// The breakdown key the walk's [`player_state::BreakdownKeying`] assigned,
+    /// carried out of the walk rather than recomputed: that keying is stateful
+    /// and order-dependent, so a second `key_for` would advance it and file
+    /// hits against rows the walk never opened.
     ///
     /// A KEY rather than the aggregates' row INDEX, because `skill_breakdown`
     /// grows during the walk (a Perfect Guard opens a hits-only row) and is
     /// free to be reordered afterwards — there is no position to hold onto.
-    key: (ActionType, CharacterType),
+    key: BreakdownKey,
     /// The damage the walk filed for this event — the single source of truth
     /// for what it contributed, so the raw and landing views cannot drift.
     damage: u64,
@@ -2506,43 +2514,43 @@ struct Landed {
 /// The `skill_breakdown` twin of the group aggregates' `fold_landings`, and it
 /// should stay readable against it: same gate, same accumulation, same orphan
 /// rule. The one deliberate difference is how a row is addressed — see
-/// [`Landed::key`].
+/// [`Walked::key`].
 ///
 /// Gated on what SURVIVED the reparse's filters, both directions: a claimed
 /// echo whose trigger was windowed or filtered out stands alone rather than
 /// letting its damage vanish, and a trigger only absorbs echoes that survived
-/// alongside it. That is what keeps `Σ merged_damage == Σ total_damage` over a
+/// alongside it. That is what keeps `Σ merged.damage == Σ total_damage` over a
 /// player's rows under any scrub window, target span or mask.
 fn fold_skill_landings(
     party: &mut HashMap<u32, PlayerState>,
-    landed: &[Landed],
+    walked: &[Walked],
     pairing: &supp_pairing::SuppPairing,
 ) {
-    // The walk pushes in event order and at most once per position, so `landed`
+    // The walk pushes in event order and at most once per position, so `walked`
     // is strictly ascending by `position` — membership is a binary search
     // rather than a set built for one pass. Asserted rather than assumed: a
     // walk that ever pushed twice for one event would make the search pick
     // between them arbitrarily.
     debug_assert!(
-        landed
+        walked
             .windows(2)
             .all(|pair| pair[0].position < pair[1].position),
         "fold_skill_landings needs the walk's records strictly ascending by position"
     );
-    let survivor = |position: usize| -> Option<&Landed> {
-        landed
+    let survivor = |position: usize| -> Option<&Walked> {
+        walked
             .binary_search_by_key(&position, |entry| entry.position)
             .ok()
-            .map(|at| &landed[at])
+            .map(|at| &walked[at])
     };
 
-    for &Landed {
+    for &Walked {
         position,
         player_index,
         key: (action, child_character_type),
         damage,
         is_echo,
-    } in landed
+    } in walked
     {
         if pairing
             .trigger_of(position)
@@ -2551,9 +2559,12 @@ fn fold_skill_landings(
             continue;
         }
         // The echo's damage as the WALK filed it, never as the pairing stored
-        // it: one number, one source. Any future gate that transformed the
-        // filed amount would otherwise break the sum invariant with nothing to
-        // catch it.
+        // it: one number, one source. The two are not even the same number
+        // here — `supp_pairing` clamps a negative with `.max(0)` while this
+        // walk stores `damage as u64` unclamped, exactly as
+        // `SkillState::update_from_damage_event` does. Taking the walk's is
+        // what keeps the sum invariant below true; taking the pairing's would
+        // break it silently on any hit the two disagree about.
         let attached: u64 = pairing
             .echoes_of(position)
             .iter()
@@ -2567,16 +2578,26 @@ fn fold_skill_landings(
                 skill.action_type == action && skill.child_character_type == child_character_type
             })
         }) else {
+            // Unreachable: the walk opened this very row through
+            // `breakdown_row_mut` before recording it, and nothing removes
+            // rows. Named anyway — in release this arm drops the landing's
+            // damage, and the aggregate assert below would then report two
+            // mismatched totals without saying which row went missing.
+            debug_assert!(
+                false,
+                "the walk recorded position {position} against player {player_index}'s \
+                 {action:?}/{child_character_type:?} row, which no longer exists"
+            );
             continue;
         };
 
-        row.merged_damage += landing;
-        row.merged_hits += 1;
-        row.merged_min = Some(row.merged_min.map_or(landing, |min| min.min(landing)));
-        row.merged_max = Some(row.merged_max.map_or(landing, |max| max.max(landing)));
+        row.merged.damage += landing;
+        row.merged.hits += 1;
+        row.merged.min = Some(row.merged.min.map_or(landing, |min| min.min(landing)));
+        row.merged.max = Some(row.merged.max.map_or(landing, |max| max.max(landing)));
         // An orphan echo is supplementary all the way across; a direct hit
         // contributes only what rode along with it.
-        row.merged_supplementary += if is_echo { landing } else { attached };
+        row.merged.supplementary += if is_echo { landing } else { attached };
     }
 
     // The two views describe the same damage: a claim MOVES it between rows,
@@ -2590,9 +2611,9 @@ fn fold_skill_landings(
         party
             .values()
             .flat_map(|player| &player.skill_breakdown)
-            .map(|skill| skill.merged_damage)
+            .map(|skill| skill.merged.damage)
             .sum::<u64>(),
-        landed.iter().map(|entry| entry.damage).sum::<u64>(),
+        walked.iter().map(|entry| entry.damage).sum::<u64>(),
         "the landing view must move damage between rows, never add or drop it"
     );
 }
@@ -2858,8 +2879,8 @@ impl Parser {
         // selected.
         let pairing = supp_pairing::SuppPairing::learned_from(&self.encounter.raw_event_log);
         // What the walk actually fed the breakdown, for the landing pass after
-        // it (see [`Landed`]).
-        let mut landed: Vec<Landed> = Vec::new();
+        // it (see [`Walked`]).
+        let mut walked: Vec<Walked> = Vec::new();
         // The shared spawn segmentation — the SAME `segment_targets_indexed`
         // over the SAME unwindowed raw log that `fetch_encounter_state` uses
         // for `target_entries` and the groups path's assignment, so a
@@ -2962,14 +2983,14 @@ impl Parser {
                                     target_assignment.get(event_index).copied().flatten(),
                                 );
 
-                        let (player_index, action, child_character_type) = self
+                        let (player_index, key) = self
                             .derived_state
                             .process_damage_event(*timestamp, &damage_instance);
 
-                        landed.push(Landed {
+                        walked.push(Walked {
                             position: event_index,
                             player_index,
-                            key: (action, child_character_type),
+                            key,
                             // Exactly what `SkillState::update_from_damage_event`
                             // just added, so the two views cannot drift.
                             damage: damage_instance.event.damage as u64,
@@ -3053,7 +3074,7 @@ impl Parser {
         // (unlike the aggregates' twin), so it does not matter that the walk
         // itself appends to `skill_breakdown` — a Perfect Guard mid-fight opens
         // a row of its own — nor that anything downstream reorders it.
-        fold_skill_landings(&mut self.derived_state.party, &landed, &pairing);
+        fold_skill_landings(&mut self.derived_state.party, &walked, &pairing);
     }
 
     /// Duration of the FULL raw event log (first event → last event, ms, min 1),
@@ -5051,11 +5072,11 @@ mod tests {
 
         assert_eq!(direct.hits, 1, "raw view unchanged");
         assert_eq!(direct.total_damage, 154_500);
-        assert_eq!(direct.merged_hits, 1, "one landing");
-        assert_eq!(direct.merged_damage, 247_181);
-        assert_eq!(direct.merged_min, Some(247_181));
-        assert_eq!(direct.merged_max, Some(247_181));
-        assert_eq!(direct.merged_supplementary, 92_681);
+        assert_eq!(direct.merged.hits, 1, "one landing");
+        assert_eq!(direct.merged.damage, 247_181);
+        assert_eq!(direct.merged.min, Some(247_181));
+        assert_eq!(direct.merged.max, Some(247_181));
+        assert_eq!(direct.merged.supplementary, 92_681);
 
         let echo = player
             .skill_breakdown
@@ -5064,8 +5085,8 @@ mod tests {
             .expect("the echo row");
         assert_eq!(echo.hits, 1, "raw view unchanged");
         assert_eq!(echo.total_damage, 92_681);
-        assert_eq!(echo.merged_hits, 0, "its damage moved to the trigger");
-        assert_eq!(echo.merged_damage, 0);
+        assert_eq!(echo.merged.hits, 0, "its damage moved to the trigger");
+        assert_eq!(echo.merged.damage, 0);
 
         // The two views describe the same damage, so they sum to the same
         // number however the claims moved it between rows.
@@ -5077,7 +5098,7 @@ mod tests {
         let merged: u64 = player
             .skill_breakdown
             .iter()
-            .map(|skill| skill.merged_damage)
+            .map(|skill| skill.merged.damage)
             .sum();
         assert_eq!(raw, merged, "the landing view moves damage, never adds it");
     }
@@ -5109,11 +5130,150 @@ mod tests {
             .find(|skill| skill.action_type == ActionType::SupplementaryDamage(4242))
             .expect("the echo row");
 
-        assert_eq!(echo.merged_hits, 1);
-        assert_eq!(echo.merged_damage, 70);
-        assert_eq!(echo.merged_min, Some(70));
-        assert_eq!(echo.merged_max, Some(70));
-        assert_eq!(echo.merged_supplementary, 70);
+        assert_eq!(echo.merged.hits, 1);
+        assert_eq!(echo.merged.damage, 70);
+        assert_eq!(echo.merged.min, Some(70));
+        assert_eq!(echo.merged.max, Some(70));
+        assert_eq!(echo.merged.supplementary, 70);
+    }
+
+    /// A CLAIMED echo whose trigger the scrub window excluded stands alone as
+    /// its own landing. Without this the echo's damage would appear in the raw
+    /// view and nowhere in the merged one, because the hit it was told to fold
+    /// into is not in this derived state at all.
+    ///
+    /// The pairing is learned from the whole log and never narrows, so this is
+    /// the only thing keeping the two views summing to the same total under a
+    /// window — and it is the one branch the unwindowed tests cannot reach.
+    #[test]
+    fn reparse_frees_a_claimed_echo_whose_trigger_the_window_excluded() {
+        let mut parser = Parser::default();
+
+        // Inside `PAIRING_WINDOW_MS` of each other, so the two really are
+        // linked; the scrub bound then falls between them.
+        let base = 1_900;
+        let trigger = damage_from(PLAYER_HASH, 9001, 154_500);
+        let mut echo = damage_from(PLAYER_HASH, 9001, 92_681);
+        echo.action_id = ActionType::SupplementaryDamage(9001);
+
+        parser
+            .encounter
+            .raw_event_log
+            .push((base, Message::DamageEvent(trigger)));
+        parser
+            .encounter
+            .raw_event_log
+            .push((base + 151, Message::DamageEvent(echo)));
+
+        // Pinned, so this test cannot quietly degrade into the orphan case if
+        // the pairing rule or its window ever changes: the echo must really
+        // have a trigger for the gate under test to be the one that fires.
+        assert_eq!(
+            supp_pairing::SuppPairing::learned_from(&parser.encounter.raw_event_log).trigger_of(1),
+            Some(0),
+            "the echo is claimed by the hit before it"
+        );
+
+        // Opens after the trigger (relative 0) and before the echo (151).
+        parser.reparse_with_options_window(&[], Some(100), None);
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0)
+            .expect("the dealing player's row");
+
+        assert!(
+            player
+                .skill_breakdown
+                .iter()
+                .all(|skill| skill.action_type != ActionType::Normal(9001)),
+            "the trigger is outside the window entirely"
+        );
+
+        let echo = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::SupplementaryDamage(9001))
+            .expect("the echo row");
+
+        assert_eq!(echo.hits, 1, "raw view unchanged");
+        assert_eq!(echo.total_damage, 92_681);
+        assert_eq!(
+            echo.merged.hits, 1,
+            "its trigger is not here, so it lands on its own"
+        );
+        assert_eq!(echo.merged.damage, 92_681);
+        assert_eq!(echo.merged.min, Some(92_681));
+        assert_eq!(echo.merged.max, Some(92_681));
+        assert_eq!(echo.merged.supplementary, 92_681);
+
+        let raw: u64 = player
+            .skill_breakdown
+            .iter()
+            .map(|skill| skill.total_damage)
+            .sum();
+        let merged: u64 = player
+            .skill_breakdown
+            .iter()
+            .map(|skill| skill.merged.damage)
+            .sum();
+        assert_eq!(raw, merged, "the two views still sum to the same total");
+    }
+
+    /// The same gate the other way round: a trigger absorbs only the echoes
+    /// that survived alongside it. Attaching an echo the window excluded would
+    /// put damage in the merged view that the raw view does not have.
+    #[test]
+    fn reparse_does_not_attach_an_echo_the_window_excluded() {
+        let mut parser = Parser::default();
+
+        let base = 1_900;
+        let trigger = damage_from(PLAYER_HASH, 9001, 154_500);
+        let mut echo = damage_from(PLAYER_HASH, 9001, 92_681);
+        echo.action_id = ActionType::SupplementaryDamage(9001);
+
+        parser
+            .encounter
+            .raw_event_log
+            .push((base, Message::DamageEvent(trigger)));
+        parser
+            .encounter
+            .raw_event_log
+            .push((base + 151, Message::DamageEvent(echo)));
+
+        // Closes after the trigger (relative 0) and before the echo (151).
+        parser.reparse_with_options_window(&[], None, Some(100));
+
+        let player = parser
+            .derived_state
+            .party
+            .get(&0)
+            .expect("the dealing player's row");
+        let direct = player
+            .skill_breakdown
+            .iter()
+            .find(|skill| skill.action_type == ActionType::Normal(9001))
+            .expect("the direct row");
+
+        assert_eq!(direct.merged.hits, 1);
+        assert_eq!(
+            direct.merged.damage, 154_500,
+            "the excluded echo rode along with nothing"
+        );
+        assert_eq!(direct.merged.supplementary, 0);
+
+        let raw: u64 = player
+            .skill_breakdown
+            .iter()
+            .map(|skill| skill.total_damage)
+            .sum();
+        let merged: u64 = player
+            .skill_breakdown
+            .iter()
+            .map(|skill| skill.merged.damage)
+            .sum();
+        assert_eq!(raw, merged, "the two views still sum to the same total");
     }
 
     #[test]

@@ -27,6 +27,36 @@ pub struct SkillTargetState {
     pub total_damage: u64,
 }
 
+/// The LANDING view of one breakdown row: an echo counted as part of the hit
+/// that caused it rather than as a hit of its own (see
+/// [`super::supp_pairing`]).
+///
+/// The per-row twin of the group aggregates' `MergedMeasure`, carried so a
+/// nested child row and the merged parent above it can never disagree. A local
+/// type rather than that one reused: `MergedMeasure` is `Serialize`-only and
+/// `i64`, while a stored breakdown row must round-trip and counts in `u64`.
+///
+/// Filled by the reparse walk's landing pass, not by
+/// [`SkillState::update_from_damage_event`] — a landing's amount depends on
+/// echoes later in the stream, and a running min/max cannot be revised once
+/// written.
+///
+/// All zero on an echo row whose every hit was claimed: that damage now sits on
+/// the triggers. Also all zero on a payload from a backend older than this
+/// field (hence `#[serde(default)]` on the owning field), which the frontend
+/// reads as "nothing to merge".
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergedSkillMeasure {
+    pub hits: u32,
+    pub damage: u64,
+    pub min: Option<u64>,
+    pub max: Option<u64>,
+    /// The echo damage inside `damage` — attached echoes for a direct action,
+    /// the whole amount for an orphan echo.
+    pub supplementary: u64,
+}
+
 /// Derived stat breakdown of a particular skill
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,32 +73,9 @@ pub struct SkillState {
     pub max_damage: Option<u64>,
     /// Total damage done by this skill
     pub total_damage: u64,
-    /// The LANDING view of this skill: an echo counted as part of the hit that
-    /// caused it rather than a hit of its own (see [`super::supp_pairing`]).
-    /// The per-row twin of the group
-    /// aggregates' `MergedMeasure`, so a nested child row and the merged parent
-    /// above it can never disagree.
-    ///
-    /// Filled by the reparse walk's landing pass, not by
-    /// [`Self::update_from_damage_event`] — a landing's amount depends on
-    /// echoes later in the stream, and a running min/max cannot be revised once
-    /// written.
-    ///
-    /// Zero on an echo row whose every hit was claimed. `#[serde(default)]`
-    /// throughout: a cached payload from an older backend has none, and the
-    /// frontend reads a zero merged view as "nothing to merge".
+    /// The landing view of this skill. See [`MergedSkillMeasure`].
     #[serde(default)]
-    pub merged_hits: u32,
-    #[serde(default)]
-    pub merged_damage: u64,
-    #[serde(default)]
-    pub merged_min: Option<u64>,
-    #[serde(default)]
-    pub merged_max: Option<u64>,
-    /// The echo damage inside `merged_damage` — attached echoes for a direct
-    /// action, the whole amount for an orphan echo.
-    #[serde(default)]
-    pub merged_supplementary: u64,
+    pub merged: MergedSkillMeasure,
     /// Maximum stun value done by this skill
     pub max_stun_value: f64,
     /// Total stun value done by this skill
@@ -139,11 +146,7 @@ impl SkillState {
             min_damage: None,
             max_damage: None,
             total_damage: 0,
-            merged_hits: 0,
-            merged_damage: 0,
-            merged_min: None,
-            merged_max: None,
-            merged_supplementary: 0,
+            merged: MergedSkillMeasure::default(),
             max_stun_value: 0.0,
             total_stun_value: 0.0,
             stun_delta_sum: 0.0,
