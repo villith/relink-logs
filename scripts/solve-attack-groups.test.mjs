@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   alignOffset,
+  auditBankedMemberships,
   bank,
   explainAction,
   joinHits,
@@ -143,12 +144,32 @@ describe("multiset helpers", () => {
       [10, 15, 30, 30],
       [15, 30, 30],
     ]);
-    expect(stable).toEqual(new Map([[15, 1], [30, 2]]));
+    expect(stable).toEqual(
+      new Map([
+        [15, 1],
+        [30, 2],
+      ])
+    );
   });
 
   it("subtractCounts removes the baseline, keeping multiplicity", () => {
-    const delta = subtractCounts(new Map([[15, 1], [30, 2], [45, 1]]), new Map([[15, 1], [30, 1]]));
-    expect(delta).toEqual(new Map([[30, 1], [45, 1]]));
+    const delta = subtractCounts(
+      new Map([
+        [15, 1],
+        [30, 2],
+        [45, 1],
+      ]),
+      new Map([
+        [15, 1],
+        [30, 1],
+      ])
+    );
+    expect(delta).toEqual(
+      new Map([
+        [30, 1],
+        [45, 1],
+      ])
+    );
   });
 });
 
@@ -169,7 +190,14 @@ describe("explainAction", () => {
   });
 
   it("assigns a multi-group subset when only that union fits", () => {
-    const result = explainAction(new Map([[30, 3], [40, 1]]), groupValues, new Set());
+    const result = explainAction(
+      new Map([
+        [30, 3],
+        [40, 1],
+      ]),
+      groupValues,
+      new Set()
+    );
     expect(result.groups).toEqual([15, 16, 17]);
   });
 
@@ -240,7 +268,9 @@ describe("confounder refinement in solve", () => {
   const baseAssets = (extraNodes) => ({
     nodes: {
       pl2700_0032: {
-        effects: [{ stat: "cap", percent: 40, capClass: null, scope: "attack-group", targetAttackGroup: 17, abilityIds: [] }],
+        effects: [
+          { stat: "cap", percent: 40, capClass: null, scope: "attack-group", targetAttackGroup: 17, abilityIds: [] },
+        ],
       },
       ...extraNodes,
     },
@@ -251,7 +281,9 @@ describe("confounder refinement in solve", () => {
   it("a sigil-counted node does not confound an action-scoped residual", () => {
     const assets = baseAssets({
       pl2700_0023: {
-        effects: [{ stat: "cap", percent: 20, capClass: "all", scope: "counted", countKind: "basic-sigil", maxCount: 5 }],
+        effects: [
+          { stat: "cap", percent: 20, capClass: "all", scope: "counted", countKind: "basic-sigil", maxCount: 5 },
+        ],
       },
     });
     const result = solve(oracleText, evidenceWith([0x32, 0x23], []), assets, { minSupport: 2 });
@@ -261,7 +293,9 @@ describe("confounder refinement in solve", () => {
   it("a quest-counter counted node still confounds", () => {
     const assets = baseAssets({
       pl2700_0023: {
-        effects: [{ stat: "cap", percent: 40, capClass: "all", scope: "counted", countKind: "quest-counter", maxCount: 1 }],
+        effects: [
+          { stat: "cap", percent: 40, capClass: "all", scope: "counted", countKind: "quest-counter", maxCount: 1 },
+        ],
       },
     });
     const result = solve(oracleText, evidenceWith([0x32, 0x23], []), assets, { minSupport: 2 });
@@ -348,14 +382,23 @@ describe("solve", () => {
     nodes: {
       // group-scoped, group 20, +35
       pl2700_0085: {
-        effects: [{ stat: "cap", percent: 35, capClass: null, scope: "attack-group", targetAttackGroup: 20, abilityIds: [] }],
+        effects: [
+          { stat: "cap", percent: 35, capClass: null, scope: "attack-group", targetAttackGroup: 20, abilityIds: [] },
+        ],
       },
       // always-on +15: the baseline every action carries
       pl2700_0001: { effects: [{ stat: "cap", percent: 15, capClass: null, scope: "always" }] },
       // move-scoped +45 bridged to action 1700
       pl2700_0097: {
         effects: [
-          { stat: "cap", percent: 45, capClass: "skill", scope: "attack-group", targetAttackGroup: 10, abilityIds: ["aea6d151"] },
+          {
+            stat: "cap",
+            percent: 45,
+            capClass: "skill",
+            scope: "attack-group",
+            targetAttackGroup: 10,
+            abilityIds: ["aea6d151"],
+          },
         ],
       },
     },
@@ -387,13 +430,162 @@ describe("solve", () => {
   });
 });
 
+describe("auditBankedMemberships", () => {
+  // Eustace's real shape again: group 15 carries [30, 30], 16 [30], 17 [40].
+  const groupValues = new Map([
+    [15, [30, 30]],
+    [16, [30]],
+    [17, [40]],
+  ]);
+
+  it("passes when the stable multiset carries every banked group's values", () => {
+    const stable = new Map([
+      [30, 3],
+      [40, 1],
+    ]);
+    const { checked, missing } = auditBankedMemberships(stable, [15, 16, 17], groupValues);
+    expect(checked).toEqual([15, 16, 17]);
+    expect(missing).toEqual([]);
+  });
+
+  it("demands the SUM across banked groups, not each individually", () => {
+    // 15 [30,30] and 16 [30] together need 30×3; 30×2 satisfies each alone,
+    // but the groups fire together, so 30×2 contradicts the pair.
+    const { missing } = auditBankedMemberships(new Map([[30, 2]]), [15, 16], groupValues);
+    expect(missing).toEqual([{ value: 30, shortfall: 1 }]);
+  });
+
+  it("skips banked groups with no unlocked node — absence is not evidence", () => {
+    // The Tweyen lesson: 4 of her 7 group nodes were locked; a banked group
+    // whose node is absent from this loadout predicts nothing.
+    const { checked, missing } = auditBankedMemberships(new Map(), [19], groupValues);
+    expect(checked).toEqual([]);
+    expect(missing).toEqual([]);
+  });
+});
+
+describe("contradiction audit in solve", () => {
+  // Character with one group-only node: group 17, +40 (pl2700_0032).
+  const assets = {
+    nodes: {
+      pl2700_0032: {
+        effects: [
+          { stat: "cap", percent: 40, capClass: null, scope: "attack-group", targetAttackGroup: 17, abilityIds: [] },
+        ],
+      },
+    },
+    skillNameSources: {},
+    capUpSources: { conditionalTraits: {}, conditionalTraitInputs: {}, traits: {}, transcendedTraits: {} },
+  };
+  const evidenceWith = (nodeIds, hits) => ({
+    logs: [
+      {
+        id: 77,
+        players: [
+          { actorIndex: 1, characterType: "Pl2700", skillboard: nodeIds, sigils: [], summons: [] },
+          null,
+          null,
+          null,
+        ],
+        hits,
+      },
+    ],
+  });
+  const line = (t, action, rate, cap, terms) =>
+    `[X] CAPORACLE t=${t} inst=0x1 action=${action} rate=${rate} class_flags=0x0 cap=${cap} floor=1 terms=[${terms}] buffs=[]`;
+
+  it("flags banked-but-absent when an unlocked banked group's value never fires", () => {
+    // Bank claims action 100 ∈ group 17, node unlocked — yet no hit of 100
+    // carried the +40. A single observed action suffices: the check is on the
+    // raw stable multiset, no baseline needed.
+    const oracleText = [line(1000, 100, "1.000", 100000, ""), line(2000, 100, "1.100", 100000, "")].join("\n");
+    const hits = [
+      { t: 501_000, actor: 1, action: 100, cap: 100000, rate: 1, classFlags: 0, summon: false },
+      { t: 502_000, actor: 1, action: 100, cap: 100000, rate: 1.1, classFlags: 0, summon: false },
+    ];
+    const banked = { pl2700: { groups: { 17: { actionIds: [100], evidence: "manual:button-map 2026-08-10" } } } };
+    const result = solve(oracleText, evidenceWith([0x32], hits), assets, { minSupport: 2, banked });
+    expect(result.flags).toContainEqual({
+      log: 77,
+      character: "pl2700",
+      action: 100,
+      capClass: "normal",
+      flag: "banked-but-absent",
+      groups: [17],
+      missing: [{ value: 40, shortfall: 1 }],
+    });
+  });
+
+  it("does not flag a banked group whose node is locked in this loadout", () => {
+    const oracleText = [line(1000, 100, "1.000", 100000, ""), line(2000, 100, "1.100", 100000, "")].join("\n");
+    const hits = [
+      { t: 501_000, actor: 1, action: 100, cap: 100000, rate: 1, classFlags: 0, summon: false },
+      { t: 502_000, actor: 1, action: 100, cap: 100000, rate: 1.1, classFlags: 0, summon: false },
+    ];
+    const banked = { pl2700: { groups: { 17: { actionIds: [100], evidence: "manual:button-map 2026-08-10" } } } };
+    const result = solve(oracleText, evidenceWith([], hits), assets, { minSupport: 2, banked });
+    expect(result.flags.filter((f) => f.flag === "banked-but-absent")).toEqual([]);
+  });
+
+  const twoActionOracle = [
+    line(1000, 100, "1.000", 100000, ""),
+    line(2000, 100, "1.100", 100000, ""),
+    line(3000, 130, "3.000", 300000, "0x61418d8:0x2:0.400000"),
+    line(4000, 130, "3.100", 300000, "0x61418d8:0x2:0.400000"),
+  ].join("\n");
+  const twoActionHits = [
+    { t: 501_000, actor: 1, action: 100, cap: 100000, rate: 1, classFlags: 0, summon: false },
+    { t: 502_000, actor: 1, action: 100, cap: 100000, rate: 1.1, classFlags: 0, summon: false },
+    { t: 503_000, actor: 1, action: 130, cap: 300000, rate: 3, classFlags: 0, summon: false },
+    { t: 504_000, actor: 1, action: 130, cap: 300000, rate: 3.1, classFlags: 0, summon: false },
+  ];
+
+  it("flags observed-but-unbanked when the residual matches a group the bank denies", () => {
+    // The bank has group 17 with OTHER actions only; observation derives 130
+    // into it. The membership still banks (evidence accumulates) — the flag is
+    // the safety net for the inferred button-map entries.
+    const banked = {
+      pl2700: { groups: { 17: { actionIds: [999], evidence: "manual:button-map 2026-08-10 (partly inferred)" } } },
+    };
+    const result = solve(twoActionOracle, evidenceWith([0x32], twoActionHits), assets, { minSupport: 2, banked });
+    expect(result.assignments).toEqual({ pl2700: { 17: [130] } });
+    expect(result.flags).toContainEqual({
+      log: 77,
+      character: "pl2700",
+      action: 130,
+      capClass: "normal",
+      flag: "observed-but-unbanked",
+      group: 17,
+      evidence: "manual:button-map 2026-08-10 (partly inferred)",
+    });
+  });
+
+  it("stays silent when observation and bank agree", () => {
+    const banked = { pl2700: { groups: { 17: { actionIds: [130], evidence: "manual:button-map 2026-08-10" } } } };
+    const result = solve(twoActionOracle, evidenceWith([0x32], twoActionHits), assets, { minSupport: 2, banked });
+    expect(result.assignments).toEqual({ pl2700: { 17: [130] } });
+    expect(result.flags).toEqual([]);
+  });
+
+  it("does not flag a derived group the bank has never seen — that is discovery, not disagreement", () => {
+    const banked = { pl2700: { groups: { 15: { actionIds: [200], evidence: "manual:button-map 2026-08-10" } } } };
+    const result = solve(twoActionOracle, evidenceWith([0x32], twoActionHits), assets, { minSupport: 2, banked });
+    expect(result.assignments).toEqual({ pl2700: { 17: [130] } });
+    expect(result.flags.filter((f) => f.flag === "observed-but-unbanked")).toEqual([]);
+  });
+});
+
 describe("bank", () => {
   const nodes = {
     pl2700_0085: {
-      effects: [{ stat: "cap", percent: 35, capClass: null, scope: "attack-group", targetAttackGroup: 20, abilityIds: [] }],
+      effects: [
+        { stat: "cap", percent: 35, capClass: null, scope: "attack-group", targetAttackGroup: 20, abilityIds: [] },
+      ],
     },
     pl2700_0015: {
-      effects: [{ stat: "cap", percent: 30, capClass: null, scope: "attack-group", targetAttackGroup: 15, abilityIds: [] }],
+      effects: [
+        { stat: "cap", percent: 30, capClass: null, scope: "attack-group", targetAttackGroup: 15, abilityIds: [] },
+      ],
     },
   };
 

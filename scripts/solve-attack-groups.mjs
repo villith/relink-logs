@@ -27,6 +27,12 @@
  * shares a residual value and could masquerade as the group node — is FLAGGED,
  * never guessed (the handoff's ambiguity rule).
  *
+ * Every joined action is also AUDITED against the already-banked coverage
+ * (the safety net for the manual button-map layer): a banked membership whose
+ * unlocked group values never fired flags `banked-but-absent`, and a derived
+ * membership an existing banked group entry lacks flags `observed-but-unbanked`.
+ * Both are advisory — banking still unions.
+ *
  * ## Run
  *
  *   cargo run -p gbfr-logs --example cap_evidence -- --log 2559 > evidence.json
@@ -279,6 +285,28 @@ export const explainAction = (residual, groupValues, confounderValues) => {
   };
 };
 
+/**
+ * The contradiction audit: a banked membership predicts its group's values in
+ * the action's stable multiset. Groups fire all-or-nothing and together, so
+ * the requirement is the SUM of every banked group's unlocked value multiset —
+ * a shortfall on any value contradicts the bank (30×2 observed satisfies
+ * [30,30] or [30] alone, but not both banked at once). A banked group with no
+ * unlocked node in this loadout predicts nothing and is skipped: an absent
+ * value is only evidence when the node is unlocked (4 of Tweyen's 7 group
+ * nodes were locked). Same-valued always-on terms can mask a genuine absence,
+ * so the check under-flags, never over-flags.
+ */
+export const auditBankedMemberships = (stable, bankedGroupIds, groupValues) => {
+  const checked = bankedGroupIds.filter((group) => (groupValues.get(group) ?? []).length > 0);
+  const required = countsOf(checked.flatMap((group) => groupValues.get(group)));
+  const missing = [];
+  for (const [value, count] of required) {
+    const shortfall = count - (stable.get(value) ?? 0);
+    if (shortfall > 0) missing.push({ value, shortfall });
+  }
+  return { checked, missing };
+};
+
 const nodeKey = (characterType, id) => `${characterType.toLowerCase()}_${id.toString(16).padStart(4, "0")}`;
 const toHashString = (id) => (id ? id.toString(16).padStart(8, "0") : "");
 const classOf = (classFlags) => (classFlags & 0x40000 ? "sba" : classFlags & 0x10000 ? "skill" : "normal");
@@ -400,7 +428,7 @@ const bridgedValuesFor = (player, characterType, capClass, action, assets) => {
  * that silently drops what it cannot explain reads as complete when it isn't.
  */
 export const solve = (oracleText, evidence, assets, options = {}) => {
-  const { tolerance = 750, minHitsPerAction = 2, minJoinRate = 0.5 } = options;
+  const { tolerance = 750, minHitsPerAction = 2, minJoinRate = 0.5, banked = null } = options;
   const records = oracleText
     .split(/\r?\n/)
     .map(parseOracleLine)
@@ -482,6 +510,33 @@ export const solve = (oracleText, evidence, assets, options = {}) => {
         }
         stables.set(action, stableCounts(hits));
       }
+
+      // The contradiction audit runs on the RAW stable multiset — it needs no
+      // baseline, so even a single observed action can refute the bank.
+      const bankedGroups = banked?.[character]?.groups;
+      if (bankedGroups !== undefined) {
+        for (const [action, stable] of stables) {
+          const { player } = actions.get(action);
+          const bankedIds = Object.entries(bankedGroups)
+            .filter(([, entry]) => entry.actionIds.includes(action))
+            .map(([group]) => Number(group));
+          if (bankedIds.length === 0) continue;
+          const groupValues = groupValuesFor(player, characterType, capClass, assets);
+          const { checked, missing } = auditBankedMemberships(stable, bankedIds, groupValues);
+          if (missing.length > 0) {
+            flags.push({
+              log: log.id,
+              character,
+              action,
+              capClass,
+              flag: "banked-but-absent",
+              groups: checked,
+              missing,
+            });
+          }
+        }
+      }
+
       // One action tells nothing apart from itself: the baseline IS its
       // stable set and every residual is empty.
       if (stables.size < 2) continue;
@@ -509,6 +564,21 @@ export const solve = (oracleText, evidence, assets, options = {}) => {
           continue;
         }
         for (const group of groups) {
+          // A derived membership the bank's existing entry for this group
+          // denies is a disagreement worth eyes — the safety net the inferred
+          // button-map entries rely on. It still banks (evidence accumulates).
+          const bankedEntry = bankedGroups?.[group];
+          if (bankedEntry !== undefined && !bankedEntry.actionIds.includes(action)) {
+            flags.push({
+              log: log.id,
+              character,
+              action,
+              capClass,
+              flag: "observed-but-unbanked",
+              group,
+              evidence: bankedEntry.evidence,
+            });
+          }
           assignments[character] ??= {};
           assignments[character][group] ??= new Set();
           assignments[character][group].add(action);
@@ -566,14 +636,19 @@ const main = () => {
 
   const assets = {
     nodes: JSON.parse(readFileSync(path.join(ROOT, "src", "assets", "skillboard-cap-sources.json"), "utf8")).nodes,
-    skillNameSources: JSON.parse(readFileSync(path.join(ROOT, "src-tauri", "assets", "skill-name-sources.json"), "utf8")),
+    skillNameSources: JSON.parse(
+      readFileSync(path.join(ROOT, "src-tauri", "assets", "skill-name-sources.json"), "utf8")
+    ),
     capUpSources: JSON.parse(readFileSync(path.join(ROOT, "src", "assets", "cap-up-sources.json"), "utf8")),
   };
   const oracleText = readFileSync(oraclePath, "utf8");
   const evidence = JSON.parse(readFileSync(evidencePath, "utf8"));
+  const coveragePath = path.join(ROOT, "src", "assets", "attack-group-coverage.json");
+  const coverage = JSON.parse(readFileSync(coveragePath, "utf8"));
 
   const { assignments, flags, stats } = solve(oracleText, evidence, assets, {
     minSupport: Number(readArg("--min-support") ?? 5),
+    banked: coverage.characters,
   });
 
   for (const log of stats.logs) {
@@ -596,10 +671,14 @@ const main = () => {
   console.log(`\nflags (${flags.length}):`);
   for (const flag of flags.slice(0, 40)) console.log(`  ${JSON.stringify(flag)}`);
   if (flags.length > 40) console.log(`  ... ${flags.length - 40} more`);
+  const contradictions = flags.filter((f) => f.flag === "banked-but-absent" || f.flag === "observed-but-unbanked");
+  if (contradictions.length > 0) {
+    console.log(
+      `\nWARNING: ${contradictions.length} disagreement(s) with banked coverage — review the flags above before trusting the bank (banked-but-absent refutes a banked membership; observed-but-unbanked derives one the bank lacks).`
+    );
+  }
 
   if (args.includes("--write") && Object.keys(assignments).length > 0) {
-    const coveragePath = path.join(ROOT, "src", "assets", "attack-group-coverage.json");
-    const coverage = JSON.parse(readFileSync(coveragePath, "utf8"));
     const logIds = evidence.logs.map((log) => log.id).join(",");
     const banked = bank(coverage, assets.nodes, assignments, `caporacle join, logs ${logIds}`);
     writeFileSync(coveragePath, `${JSON.stringify(banked, null, 2)}\n`);
