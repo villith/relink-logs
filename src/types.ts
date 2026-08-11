@@ -237,6 +237,23 @@ export type SkillTargetState = {
   totalDamage: number;
 };
 
+/** The LANDING view of one skill: an echo counted as part of the hit that
+ * caused it rather than a hit of its own (mirrors the Rust
+ * `MergedSkillMeasure`).
+ *
+ * For a direct action, `hits` counts landings and the amounts include their
+ * echoes. For an echo action, this describes its UNCLAIMED residue only — a
+ * claimed echo's damage already sits on its trigger, so a fully-claimed echo
+ * row is all zeros. */
+export type MergedSkillMeasure = {
+  hits: number;
+  damage: number;
+  min: number | null;
+  max: number | null;
+  /** The echo damage inside `damage`. */
+  supplementary: number;
+};
+
 export type SkillState = {
   /** ActionType of the skill */
   actionType: ActionType;
@@ -250,6 +267,10 @@ export type SkillState = {
   maxDamage: number | null;
   /** Total damage of the skill */
   totalDamage: number;
+  /** The landing view of this skill — see `MergedSkillMeasure`. Optional: a
+   * backend older than the field sends nothing (dev HMR skew), which reads as
+   * "nothing to merge" rather than as a row of zeros. */
+  merged?: MergedSkillMeasure;
   /** Skybound Arts gauge this skill generated. Local player only — a remote
    * member's gauge is synced rather than granted by a hit the hook can see, so
    * their rows are 0 and the table must say so rather than ranking them.
