@@ -5,8 +5,11 @@
 //! trigger field. The link is inferred from order.
 //!
 //! Measured over 227 logs and 189,356 echoes (`examples/supp_pair_probe.rs`).
-//! The rule below leaves 0.54% of echoes unpaired and never picks a trigger on
-//! a different target. Its evidence is the variant that ignores targets
+//! The rule below leaves 0.54% of echoes unpaired and never picked a trigger
+//! on a different target in the measured corpus — a property of that data, not
+//! an invariant the code enforces (see
+//! `falls_back_across_targets_when_no_candidate_shares_the_echos_target`).
+//! Its evidence is the variant that ignores targets
 //! entirely: pairing on order alone still lands on the echo's own target 99.29%
 //! of the time, so ordering is finding the real hit rather than a plausible
 //! one. Paired ratios then concentrate on clean multiples of 0.05 — 56,172 at
@@ -56,6 +59,16 @@ impl SuppPairing {
     /// Learned from the WHOLE log, ignoring every query filter. A pairing that
     /// changed with the scrub window would make a landing's amount depend on
     /// what the reader happened to have selected.
+    ///
+    /// Positional contract: every position returned by [`Self::trigger_of`] and
+    /// [`Self::echoes_of`] indexes the slice passed in here. Pass the full
+    /// `raw_event_log` — a caller that pairs over `&events[offset..end]` gets
+    /// positions relative to that sub-slice and must add `offset` back. Getting
+    /// this wrong attributes echoes to the wrong hits silently; nothing panics.
+    ///
+    /// Takes a slice rather than an iterator (unlike the sibling
+    /// `PhantomTargets::learned_from`) precisely because positions need a
+    /// stable base. Do not "unify" the two signatures.
     pub fn learned_from(events: &[(i64, Message)]) -> Self {
         let mut pairing = Self::default();
         let mut queues: HashMap<(u32, u32, u32), VecDeque<Candidate>> = HashMap::new();
@@ -108,6 +121,12 @@ impl SuppPairing {
 
                     if let Some(trigger) = picked {
                         pairing.trigger_of.insert(position, trigger.position);
+                        // `damage` is signed and the wire can carry a negative
+                        // (a heal or an absorb routed through the damage path),
+                        // which would subtract from the landing it rides. Clamp
+                        // so a merged total never falls below the real hit.
+                        // Note the asymmetry: a consumer summing `echoes_of`
+                        // sees the clamp, one reading the raw event does not.
                         pairing
                             .echoes_of
                             .entry(trigger.position)
@@ -143,7 +162,7 @@ impl SuppPairing {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use protocol::{Actor, DamageEvent};
+    use protocol::{Actor, DamageEvent, OnPlayerStunEvent};
 
     fn actor(index: u32) -> Actor {
         Actor {
@@ -219,6 +238,76 @@ mod tests {
             Some(1),
             "target 8's hit, not the older one"
         );
+    }
+
+    /// No same-target candidate in window, so the fallback takes the queue
+    /// front — which pairs ACROSS targets. The corpus never exercised this
+    /// (strategy C measured 0.00% cross-target pairs), so it is behaviour the
+    /// rule permits rather than behaviour it was chosen for. Pinned so a
+    /// future edit cannot change it silently.
+    #[test]
+    fn falls_back_across_targets_when_no_candidate_shares_the_echos_target() {
+        let events = [
+            event(0, ActionType::Normal(9001), 100, 7),
+            event(150, ActionType::SupplementaryDamage(9001), 60, 8),
+        ];
+        let pairing = SuppPairing::learned_from(&events);
+
+        assert_eq!(pairing.trigger_of(1), Some(0));
+    }
+
+    /// Exactly at the window is still claimable — the comparison is `>`, not
+    /// `>=`. Pinned because the boundary is invisible to a test that uses a
+    /// gap ten times the window.
+    #[test]
+    fn a_candidate_exactly_at_the_window_is_still_claimable() {
+        let events = [
+            event(0, ActionType::Normal(9001), 100, 7),
+            event(
+                PAIRING_WINDOW_MS,
+                ActionType::SupplementaryDamage(9001),
+                60,
+                7,
+            ),
+        ];
+        assert_eq!(SuppPairing::learned_from(&events).trigger_of(1), Some(0));
+    }
+
+    #[test]
+    fn a_candidate_one_millisecond_past_the_window_has_expired() {
+        let events = [
+            event(0, ActionType::Normal(9001), 100, 7),
+            event(
+                PAIRING_WINDOW_MS + 1,
+                ActionType::SupplementaryDamage(9001),
+                60,
+                7,
+            ),
+        ];
+        assert_eq!(SuppPairing::learned_from(&events).trigger_of(1), None);
+    }
+
+    /// Positions enumerate over ALL messages, not just damage ones. The probe
+    /// that validated the rule walked a damage-only Vec, so this is the one
+    /// place the implementation and its evidence legitimately diverge — and
+    /// every real consumer walks a mixed stream.
+    #[test]
+    fn a_non_damage_message_still_occupies_a_position() {
+        let events = [
+            event(0, ActionType::Normal(9001), 100, 7),
+            (
+                75,
+                Message::OnPlayerStun(OnPlayerStunEvent {
+                    actor_index: 0,
+                    stun_amount: 12.5,
+                }),
+            ),
+            event(150, ActionType::SupplementaryDamage(9001), 60, 7),
+        ];
+        let pairing = SuppPairing::learned_from(&events);
+
+        assert_eq!(pairing.trigger_of(2), Some(0));
+        assert_eq!(pairing.echoes_of(0), &[(2, 60)]);
     }
 
     /// A trigger hosts at most ONE echo; a surplus echo orphans.
