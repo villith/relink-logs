@@ -2,12 +2,36 @@ import { MantineProvider } from "@mantine/core";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { EventRowsTable, KIND_COLORS } from "./EventsTab";
-import { EVENT_KINDS, type EventRow } from "./eventRows";
+import type { LogEvent } from "@/types";
 
+import { EventRowsTable, EventsTab, KIND_COLORS } from "./EventsTab";
+import { EVENT_KINDS, type EventPins, type EventRow } from "./eventRows";
+import type { NestedEventRow } from "./nestSupplementary";
+
+/** The real `t` interpolates; a mock that returned the bare key could not tell
+ * "+151ms" from an absolute stamp, which is the whole of what these rows say.
+ * A call with no params still returns the key alone, so every older assertion
+ * here reads as it did. */
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
+  useTranslation: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params === undefined
+        ? key
+        : `${key}(${Object.entries(params)
+            .map(([name, value]) => `${name}=${value}`)
+            .join(",")})`,
+    i18n: { language: "en" },
+  }),
 }));
+
+/** What the stubbed fetch hands the tab. Reassigned per test; the factory below
+ * only reads it at render time, long after this initialises. */
+let page: { events: LogEvent[]; total: number; suppPairs: Record<number, number> } = {
+  events: [],
+  total: 0,
+  suppPairs: {},
+};
+vi.mock("./useEvents", () => ({ useEvents: () => page }));
 
 const ROWS: EventRow[] = [
   {
@@ -59,7 +83,7 @@ const LABELS = {
   status: (key: string) => ({ name: `effect(${key})`, iconUrl: "/effect.png" }),
 };
 
-const renderTable = (rows = ROWS, startIndex = 0) =>
+const renderTable = (rows: NestedEventRow[] = ROWS, startIndex = 0) =>
   render(
     <MantineProvider>
       <EventRowsTable rows={rows} rowHeight={22} startIndex={startIndex} totalRows={rows.length} labels={LABELS} />
@@ -197,5 +221,159 @@ describe("EventRowsTable", () => {
       </MantineProvider>
     );
     expect(container.querySelector<HTMLElement>("[data-event-body]")?.style.height).toBe("22000px");
+  });
+});
+
+const TRIGGER: EventRow = {
+  timeMs: 5_000,
+  kind: "damage",
+  sourceIndex: 0,
+  targetIndex: 9,
+  targetSpace: "spawn",
+  abilityKey: "Normal:9001",
+  statusKey: null,
+  statusId: null,
+  detailKey: null,
+  amount: 154_500,
+};
+
+/** The echo, as `nestSupplementary` hands it over: still its own real `timeMs`,
+ * plus the offset and the share it is drawn with. */
+const ECHO: NestedEventRow = {
+  ...TRIGGER,
+  timeMs: 5_151,
+  abilityKey: "SupplementaryDamage:9001",
+  amount: 92_700,
+  parent: { deltaMs: 151, sharePercent: 60 },
+};
+
+const cellsOf = (container: HTMLElement, name: string) =>
+  [...container.querySelectorAll(`[data-cell="${name}"]`)].map((cell) => cell.textContent ?? "");
+
+describe("EventRowsTable, supplementary nesting", () => {
+  it("draws the echo directly beneath the hit that caused it", () => {
+    const { container } = renderTable([TRIGGER, ECHO]);
+    expect(cellsOf(container, "ability")).toEqual(["skill(Normal:9001)", "└─skill(SupplementaryDamage:9001)"]);
+  });
+
+  // An echo lands 151ms after its trigger, which in a real fight is several rows
+  // later — printed absolutely, the moved row would make the time column read
+  // backwards, and an unsorted column is not scannable at all.
+  it("shows the child's offset rather than an absolute stamp", () => {
+    const { container } = renderTable([TRIGGER, ECHO]);
+    const [trigger, echo] = cellsOf(container, "time");
+    expect(trigger).toBe("00:05.000");
+    expect(echo).toBe("ui.logs.events-echo-delta(ms=151)");
+    expect(echo).not.toContain("00:05.151");
+  });
+
+  // Nothing is actually hidden: the stamp the column gave up is on the hover,
+  // along with the share the whole pairing rests on.
+  it("keeps the real timestamp and the share on the hover", () => {
+    const { container } = renderTable([ECHO]);
+    const title = container.querySelector('[data-cell="time"] span')?.getAttribute("title") ?? "";
+    expect(title).toContain("ui.logs.events-echo-delta-title");
+    expect(title).toContain("time=00:05.151");
+    expect(title).toContain("percent=60.0");
+  });
+
+  it("prints the echo's share of its trigger beside the amount", () => {
+    const { container } = renderTable([ECHO]);
+    expect(cellsOf(container, "amount")[0]).toBe("92,700ui.logs.events-echo-share(percent=60.0)");
+  });
+
+  // A trigger with no amount gives no share to read; "0.0%" would read as a
+  // measurement rather than the absence of one.
+  it("prints no percentage where there is no share to measure", () => {
+    const { container } = renderTable([{ ...ECHO, parent: { deltaMs: 151, sharePercent: 0 } }]);
+    expect(cellsOf(container, "amount")[0]).toBe("92,700");
+  });
+
+  // A trigger pulled back past a filter is context, not a match.
+  it("dims a re-admitted trigger and says why", () => {
+    const { container } = renderTable([{ ...TRIGGER, context: true }, ECHO]);
+    const [context, echo] = container.querySelectorAll<HTMLElement>("[data-event-row]");
+    expect(context.style.opacity).toBe("0.45");
+    expect(context.getAttribute("title")).toBe("ui.logs.events-echo-context-title");
+    expect(echo.style.opacity).toBe("");
+    expect(echo.getAttribute("title")).toBeNull();
+  });
+
+  // Every log without a paired echo — most of them — must render exactly as it
+  // did before nesting existed.
+  it("leaves an unpaired row untouched", () => {
+    const { container } = renderTable([TRIGGER]);
+    expect(cellsOf(container, "time")).toEqual(["00:05.000"]);
+    expect(cellsOf(container, "ability")).toEqual(["skill(Normal:9001)"]);
+    expect(cellsOf(container, "amount")).toEqual(["154,500"]);
+    expect(container.querySelector<HTMLElement>("[data-event-row]")?.style.opacity).toBe("");
+    expect(container.querySelector('[data-cell="time"] span')).toBeNull();
+  });
+});
+
+const hit = (timeMs: number, actionId: number, damage: number, supplementary = false): LogEvent => [
+  timeMs,
+  {
+    DamageEvent: {
+      source: { index: 0, actor_type: 0, parent_index: 0, parent_actor_type: 0 },
+      target: { index: 9, actor_type: 0, parent_index: 9, parent_actor_type: 0 },
+      damage,
+      flags: 0,
+      action_id: supplementary ? { SupplementaryDamage: actionId } : { Normal: actionId },
+    },
+  },
+];
+
+const NO_PINS: EventPins = { source: null, targetSpans: [], abilityKeys: null };
+/** Pinned to the echo's own ability, which its trigger cannot answer — so the
+ * trigger only ever appears if its echo pulled it back in. */
+const ECHO_PIN: EventPins = { ...NO_PINS, abilityKeys: new Set(["SupplementaryDamage:9001"]) };
+
+const STREAM = {
+  id: "1",
+  metric: "damage" as const,
+  hostility: "friendly" as const,
+  probes: { isPartyMember: (index: number) => index < 2, isHarmful: () => false },
+  pins: NO_PINS,
+};
+
+const renderTab = (pins: EventPins = NO_PINS) =>
+  render(
+    <MantineProvider>
+      <EventsTab stream={{ ...STREAM, pins }} labels={LABELS} />
+    </MantineProvider>
+  );
+
+describe("EventsTab", () => {
+  const events = [hit(5_000, 9_001, 154_500), hit(5_151, 9_001, 92_700, true)];
+
+  it("nests AFTER the filters, so a surviving echo pulls its trigger back in", () => {
+    page = { events, total: events.length, suppPairs: { 1: 0 } };
+    // A pin the trigger cannot answer: on its own merits it is filtered out.
+    const { container } = renderTab(ECHO_PIN);
+    expect(cellsOf(container, "ability")).toEqual(["skill(Normal:9001)", "└─skill(SupplementaryDamage:9001)"]);
+    expect(container.querySelectorAll<HTMLElement>("[data-event-row]")[0].style.opacity).toBe("0.45");
+  });
+
+  // The spacer sizes the scrollbar. Sized by the FILTERED list while the NESTED
+  // one is what renders, the re-admitted trigger would have no scroll of its own
+  // and the last row of a long page would be unreachable.
+  it("sizes the spacer by the nested list, context rows included", () => {
+    page = { events, total: events.length, suppPairs: { 1: 0 } };
+    const { container } = renderTab(ECHO_PIN);
+    expect(container.querySelector<HTMLElement>("[data-event-body]")?.style.height).toBe("52px");
+  });
+
+  it("counts the matches rather than the context drawn around them", () => {
+    page = { events, total: events.length, suppPairs: { 1: 0 } };
+    renderTab(ECHO_PIN);
+    expect(screen.getByText("ui.logs.events-count(shown=1,total=2)")).toBeTruthy();
+  });
+
+  it("renders a page with no pairs flat", () => {
+    page = { events, total: events.length, suppPairs: {} };
+    const { container } = renderTab();
+    expect(cellsOf(container, "time")).toEqual(["00:05.000", "00:05.151"]);
+    expect(container.querySelector('[data-cell="time"] span')).toBeNull();
   });
 });

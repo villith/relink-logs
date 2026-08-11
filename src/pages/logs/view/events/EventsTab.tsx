@@ -16,8 +16,9 @@ import {
   CHIP_SWATCH_CLASS,
 } from "../analysis/chipAnatomy";
 import type { StreamContext } from "../analysis/model/bodyContext";
-import { toEventRow, type ActorSpace, type EventKind, type EventRow } from "./eventRows";
+import { toEventRow, type ActorSpace, type EventKind } from "./eventRows";
 import { defaultScopeKinds, narrowStream, scopeFor, scopeKinds } from "./eventScope";
+import { nestSupplementary, type NestedEventRow } from "./nestSupplementary";
 import { useEvents } from "./useEvents";
 import { visibleSlice } from "./windowSlice";
 
@@ -99,8 +100,18 @@ const VIEWPORT_HEIGHT = 460;
  *
  * Target is the widest of the named columns: a spawn is named "<Enemy> #2" off
  * the full translated enemy name, which is routinely longer than a player's
- * label — "Vulkan Bolla Nihilla #2" against "Narmaya". */
-const COLUMNS = { time: 74, source: 160, target: 230, amount: 78 };
+ * label — "Vulkan Bolla Nihilla #2" against "Narmaya".
+ *
+ * Amount is wider than the digits need because a nested echo prints its share
+ * of its trigger beside them. Widened for EVERY row rather than only the ones
+ * that carry a share: the cells are flex items, so a cell that grew to fit its
+ * own content would drag the target and ability columns left on that row alone,
+ * and columns that move per row are not columns. */
+const COLUMNS = { time: 74, source: 160, target: 230, amount: 118 };
+
+/** How far a nested child's time is indented, in px. Inside the column's own
+ * width, so the column does not change size and the numbers below it stay put. */
+const CHILD_INDENT = 10;
 
 /** One named-and-pictured cell. The art is 16px rather than the analysis
  * table's 22: these rows are 22px tall, so the table's own size would leave no
@@ -115,6 +126,7 @@ const CellText = ({
   width,
   flex,
   suffix,
+  connector,
 }: {
   cell: EventCell;
   /** The column, as `data-cell` — what the tests address a cell by. */
@@ -124,6 +136,8 @@ const CellText = ({
   /** A dimmed qualifier after the name, for a cell whose name alone does not
    * say the whole thing (an effect landing vs the same effect ending). */
   suffix?: string | null;
+  /** Draw the elbow that says this row hangs from the one above it. */
+  connector?: boolean;
 }) => (
   <Group
     gap={5}
@@ -132,6 +146,12 @@ const CellText = ({
     data-cell={name}
     style={flex ? { flex: 1, minWidth: 0 } : { minWidth: 0, flexShrink: 0 }}
   >
+    {connector && (
+      // eslint-disable-next-line i18next/no-literal-string -- tree connector glyph, not prose
+      <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
+        └─
+      </Text>
+    )}
     {/* Smaller than the table's: the events rows are shorter, and the table's
         own icon would fill one edge to edge. */}
     {cell.iconUrl !== undefined && <EntityIcon size="card" src={cell.iconUrl} alt="" />}
@@ -157,7 +177,7 @@ export const EventRowsTable = ({
   labels,
 }: {
   /** The visible slice only. */
-  rows: EventRow[];
+  rows: NestedEventRow[];
   rowHeight: number;
   /** Absolute index of `rows[0]`, so positions survive scrolling. */
   startIndex: number;
@@ -220,20 +240,53 @@ export const EventRowsTable = ({
           const source = row.sourceIndex === null ? { name: "" } : labels.actor(row.sourceIndex, row.timeMs, "actor");
           const target =
             row.targetIndex === null ? { name: "" } : labels.actor(row.targetIndex, row.timeMs, row.targetSpace);
+          // An echo's share of the hit that caused it — the quantity the whole
+          // pairing rests on. Suppressed at zero, which is what a trigger with
+          // no readable amount yields: "0.0%" would read as a measurement
+          // rather than the absence of one.
+          const share =
+            row.parent === undefined || row.parent.sharePercent === 0 ? null : row.parent.sharePercent.toFixed(1);
           return (
             <Box
               key={`${row.timeMs}:${startIndex + offset}`}
               data-event-row
+              // A trigger pulled back past a filter is context, not a match:
+              // dimmed, and it says so on hover rather than looking like a
+              // filter that failed to apply.
+              title={row.context ? t("ui.logs.events-echo-context-title") : undefined}
               style={{
                 position: "absolute",
                 top: (startIndex + offset) * rowHeight,
                 height: rowHeight,
                 width: "100%",
+                opacity: row.context ? 0.45 : undefined,
               }}
             >
               <Group gap="xs" px="xs" wrap="nowrap" style={{ color: KIND_COLORS[row.kind], height: rowHeight }}>
-                <Text size="xs" w={COLUMNS.time} style={{ fontVariantNumeric: "tabular-nums" }}>
-                  {millisecondsToPreciseElapsedFormat(row.timeMs)}
+                <Text
+                  size="xs"
+                  w={COLUMNS.time}
+                  data-cell="time"
+                  // Padded INSIDE the column, so the indent that marks a child
+                  // does not push the column itself out of line.
+                  style={{ fontVariantNumeric: "tabular-nums", paddingLeft: row.parent ? CHILD_INDENT : undefined }}
+                >
+                  {row.parent ? (
+                    // Its offset from the row above, not a stamp of its own:
+                    // the child was MOVED here, and an absolute time would make
+                    // the column read backwards. The real one is on the hover,
+                    // so nothing is actually hidden.
+                    <span
+                      title={t("ui.logs.events-echo-delta-title", {
+                        time: millisecondsToPreciseElapsedFormat(row.timeMs),
+                        percent: row.parent.sharePercent.toFixed(1),
+                      })}
+                    >
+                      {t("ui.logs.events-echo-delta", { ms: row.parent.deltaMs })}
+                    </span>
+                  ) : (
+                    millisecondsToPreciseElapsedFormat(row.timeMs)
+                  )}
                 </Text>
                 <CellText name="source" cell={source} width={COLUMNS.source} />
                 {/* An effect row carries BOTH: the effect is what it was, the
@@ -241,16 +294,27 @@ export const EventRowsTable = ({
                     apply and its matching remove rendered identically — same
                     effect, same holder, same colour, nothing to tell them
                     apart. Every other kind has one or the other, never both. */}
-                <CellText name="ability" flex cell={action} suffix={row.statusKey === null ? null : detail} />
+                <CellText
+                  name="ability"
+                  flex
+                  cell={action}
+                  suffix={row.statusKey === null ? null : detail}
+                  connector={row.parent !== undefined}
+                />
                 <CellText name="target" cell={target} width={COLUMNS.target} />
                 <Text
                   size="xs"
                   w={COLUMNS.amount}
                   ta="right"
                   data-cell="amount"
-                  style={{ fontVariantNumeric: "tabular-nums" }}
+                  style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
                 >
                   {row.amount === null ? "" : row.amount.toLocaleString()}
+                  {share !== null && (
+                    <Text span size="xs" c="dimmed" ml={4}>
+                      {t("ui.logs.events-echo-share", { percent: share })}
+                    </Text>
+                  )}
                 </Text>
               </Group>
             </Box>
@@ -280,7 +344,7 @@ export type EventsTabProps = {
 export const EventsTab = ({ stream, labels }: EventsTabProps) => {
   const { id, metric, hostility, pins, probes } = stream;
   const { t } = useTranslation();
-  const { events, total } = useEvents(id);
+  const { events, total, suppPairs } = useEvents(id);
 
   const scope = scopeFor(metric);
   const offered = scopeKinds(scope);
@@ -300,6 +364,12 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
     () => narrowStream(allRows, { scope, hostility, probes, kinds, pins }),
     [allRows, scope, probes, hostility, kinds, pins]
   );
+  // Filters first, THEN nesting: an echo that survived the filter pulls its
+  // trigger back in, so nesting has to see what the filter left rather than the
+  // other way round. This — not `shown` — is what renders, so it is also what
+  // the spacer and the slice are measured from; sized by the shorter list, the
+  // re-admitted context rows would have no scroll of their own.
+  const nested = useMemo(() => nestSupplementary(shown, allRows, suppPairs), [shown, allRows, suppPairs]);
 
   // A shorter list can leave the container scrolled past its own end, where it
   // renders nothing at all — so a filter change that shrinks the list has to
@@ -307,13 +377,13 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     setScrollTop(0);
-  }, [shown.length]);
+  }, [nested.length]);
 
   const slice = visibleSlice({
     scrollTop,
     viewportHeight: VIEWPORT_HEIGHT,
     rowHeight: ROW_HEIGHT,
-    total: shown.length,
+    total: nested.length,
     overscan: OVERSCAN,
   });
 
@@ -354,6 +424,10 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
         </Strip>
       )}
 
+      {/* The MATCHES, not the rows drawn: a trigger re-admitted to hold up its
+          echo is context the filter did not ask for, and counting it would say
+          the filter matched more than it did. It is visibly dimmed, so the two
+          numbers cannot be confused for one another. */}
       <Text size="xs" c="dimmed" mb={4}>
         {truncated
           ? t("ui.logs.events-truncated", { shown: allRows.length, total })
@@ -372,16 +446,16 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
           borderRadius: 4,
         }}
       >
-        {shown.length === 0 ? (
+        {nested.length === 0 ? (
           <Text size="xs" c="dimmed" p="sm">
             {t("ui.logs.events-empty")}
           </Text>
         ) : (
           <EventRowsTable
-            rows={shown.slice(slice.start, slice.end)}
+            rows={nested.slice(slice.start, slice.end)}
             rowHeight={ROW_HEIGHT}
             startIndex={slice.start}
-            totalRows={shown.length}
+            totalRows={nested.length}
             labels={labels}
           />
         )}
