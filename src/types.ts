@@ -458,7 +458,14 @@ export type MergedMeasure = GroupMeasure & { supplementary: number };
  * disagree. `series` is a whole-fight per-bucket band, same buckets as
  * `dpsChart` — the view slices it client-side, and it stays the RAW view.
  * `merged` is the same totals under the supplementary collapse; the toggle
- * picks between them, which is what keeps flipping it free of a refetch. */
+ * picks between them, which is what keeps flipping it free of a refetch.
+ *
+ * REQUIRED, unlike `SkillState.merged`, which is optional with a raw fallback
+ * behind it. Both mirror non-`Option` Rust fields, so the same backend skew
+ * would reach both — but they fail differently. An aggregate arriving without
+ * it throws in `addSplit` on the first `+=`, loudly, at the version boundary
+ * where the skew belongs; a `SkillState` without it would sum to zero and draw
+ * a row of confident zeros. Only the quiet failure earns a guard. */
 export type GroupAggregate = {
   key: GroupKey;
   measure: GroupMeasure;

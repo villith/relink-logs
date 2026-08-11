@@ -795,7 +795,11 @@ describe("abilityRows — supplementary collapse", () => {
     });
     const rows = rowsWith(true, legacy);
     expect(rows[0].value).toBe(1300);
-    expect(rows[0].columns.slice(0, 2)).toEqual(["1.3k", "7"]);
+    // Events, and extremes spanning BOTH halves: min 90 is an echo tick, which
+    // the old direct-only narrowing would have hidden. Accepted on this
+    // degraded path and pinned here so it reads as a decision, not an
+    // oversight — see the raw branch's comment in `damageCells`.
+    expect(rows[0].columns.slice(0, 5)).toEqual(["1.3k", "7", "90", "300", "186"]);
   });
 
   it("keeps the echo as its own row without collapsing", () => {

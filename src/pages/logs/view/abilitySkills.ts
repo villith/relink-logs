@@ -26,11 +26,23 @@ const isSupplementary = (actionType: ActionType): boolean =>
  * the residue a collapse leaves behind — is already described by its own
  * label, and painting the whole bar in the fainter shade would say nothing.
  *
- * The one author of that rule for the RAW view. The LANDING view does not use
- * it: once an echo folds onto the hit that caused it there is no echo row left
- * in the set to find, so the backend reports the share directly
- * (`MergedMeasure.supplementary`, `MergedSkillMeasure.supplementary`) and the
- * consumers read that instead.
+ * The one author of that rule for the RAW view. Four surfaces draw the same
+ * split and must agree — a bar that split where the row beside it did not is
+ * exactly what a second spelling buys:
+ *
+ * - the table's ability rows (`damageCells`),
+ * - their per-player children (`damageCells` again, one grain down),
+ * - the groups path's rows and members (`subValueOf`),
+ * - the hover card's sections (`entrySplit`).
+ *
+ * The first three read the LANDING view's own figure under the collapse and
+ * consult this only for the raw view: once an echo folds onto the hit that
+ * caused it there is no echo row left in the set to find, so the backend
+ * reports the share directly (`MergedMeasure.supplementary`,
+ * `MergedSkillMeasure.supplementary`). The card has NOT moved — it still
+ * computes its split from the raw totals here, which differs from the row
+ * under the cursor wherever a filter or window orphans an echo. Recorded
+ * rather than fixed in passing.
  *
  * No `direct` half any more. It existed to narrow a row's min and max to the
  * named skill's own hits, a rule the landing model replaces: under it an

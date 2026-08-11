@@ -1,4 +1,4 @@
-import type { ComputedPlayerState, EnemyType, SkillState } from "@/types";
+import type { ComputedPlayerState, EnemyType, MergedSkillMeasure, SkillState } from "@/types";
 import { humanizeNumber, ratePerSecond, share } from "@/utils";
 
 import {
@@ -66,9 +66,15 @@ const damageCells = (
   // skew, and a row silently reporting 0 is worse than one reporting unmerged
   // figures. Only where something behind the row carries a landing view is
   // there a landing view to report.
+  //
+  // PRESENCE, not meaning: the parser's landing pass walks damage events only,
+  // so a row opened by something else (`PerfectGuard`, `StunEffect(0)`) carries
+  // an all-zero measure beside a non-zero `hits` and would report Hits 0 here.
+  // Sufficient today because no such row reaches this fold — each keys to its
+  // own ability row, and none is a merged parent.
   const landings = skills
     .map((skill) => skill.merged)
-    .filter((measure): measure is NonNullable<SkillState["merged"]> => measure !== undefined);
+    .filter((measure): measure is MergedSkillMeasure => measure !== undefined);
 
   if (merged && landings.length > 0) {
     const damage = landings.reduce((sum, measure) => sum + measure.damage, 0);
@@ -116,9 +122,16 @@ const damageCells = (
     columns: damageColumns(
       damage,
       hits,
-      // Across every skill behind the row. With the collapse off a bucket is
-      // never mixed — an echo keys to the echo row — so this is the same set
-      // the direct half used to be.
+      // Across every skill behind the row. On the collapse-OFF path that is
+      // the same set the old direct half was: an echo keys to the echo row, so
+      // no bucket is mixed.
+      //
+      // This branch also serves the absent-`merged` FALLBACK, where the
+      // collapse is on and the bucket is mixed, so these extremes do span both
+      // halves — a row there can report an echo tick as its minimum (200 → 90
+      // on the fixture below). Accepted: the fallback is a degraded skew path,
+      // and the narrowing that would prevent it is the very rule the landing
+      // model replaces. Pinned by "falls back to the raw figures…".
       extreme(
         skills.map((skill) => skill.minDamage),
         (values) => Math.min(...values)
@@ -156,7 +169,12 @@ export const playersColumns = (amount: number, total: number, fightDurationMs?: 
  * rather than inferred so a display rule never has to be read out of a keying
  * rule.
  *
- * Exported for its own tests; the descriptor below is its only other caller. */
+ * Exported for its own tests; the descriptor below is its only other caller —
+ * and damage declares `dataPath: "groups"`, so the analysis view builds its
+ * parent rows in `groupRows.ts` and never reaches `rows` at all. Only
+ * `children` is live here, which makes `merged` test-only on this path. It is
+ * carried anyway: the two paths fill one table, and a fold that could not
+ * report landings would be a trap the day the data path moves. */
 export const abilityRows = (
   groups: AbilitySkills[],
   total: number,
@@ -381,6 +399,9 @@ export const damageDone: MetricDescriptor = {
     const key = skillKeyPayload(row.key);
     if (key === null) return null;
     const total = players.reduce((sum, player) => sum + player.totalDamage, 0);
+    // The same flag `rows` derives, spelled the same way — the parent above
+    // these children reads the landing view off this one toggle.
+    const merged = keying?.collapseSupplementary === true;
     return players
       .map((player) => ({ player, skills: skillsForAbilityKey(player.skillBreakdown, key, keying) }))
       .filter(({ skills }) => skills.length > 0)
@@ -392,7 +413,7 @@ export const damageDone: MetricDescriptor = {
           // A child is a table bar too, so it reads the same cells its parent
           // does — over THIS player's skills, which is what makes the section a
           // split of the row rather than a restatement of it.
-          ...damageCells(skills, total, keying?.collapseSupplementary === true),
+          ...damageCells(skills, total, merged),
           // Clicking a player child pins that player — the machine keeps the
           // ability free, so the next state is that player's drill.
           pinOnClick: { source: player.index },
