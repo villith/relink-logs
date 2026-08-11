@@ -114,14 +114,27 @@ const stackGated = () => (): Evaluator => ({
     conditions.stacks === undefined ? unknownResult(max, ["stacks"]) : unknownResult(max, [], "no-status-mapping"),
 });
 
+/** Eustace's grade-shot actions by charge grade — ground and the "Grade N"
+ * named aerial variants. The magnitudes were proven by the log 2574/2575
+ * sigil A/B: with the sigil, caps moved by exactly +10/15/20% on grade
+ * II/III/IV shots through the runtime-extras path (neither the captured
+ * record nor the FreeWork channel carries a term). Keying by bare action id
+ * is safe ONLY because the trait rides a character-bound sigil, so no other
+ * character's ids can reach this evaluator. */
+const GRADE_BY_ACTION: Record<number, number> = { 120: 1, 121: 2, 122: 2, 301: 2, 125: 3, 304: 3, 130: 4 };
+
 /** Per-charge-grade columns: the two lower grades are shipped as inputs, the
- * top grade IS the emitted maximum. */
+ * top grade IS the emitted maximum. The grade comes off the hit's action id
+ * (an explicit `chargeGrade` overrides); an unmapped action is no grade shot
+ * and gets nothing. */
 const chargeGraded =
   () =>
   (id: number): Evaluator => ({
-    params: ["chargeGrade"],
+    params: ["chargeGrade", "actionId"],
     evaluate: (level, max) => (conditions) => {
-      const grade = conditions.chargeGrade;
+      const grade =
+        conditions.chargeGrade ??
+        (conditions.actionId === undefined ? undefined : GRADE_BY_ACTION[conditions.actionId] ?? 0);
       if (grade === undefined) return unknownResult(max, ["chargeGrade"]);
       if (grade >= 4) return activeResult(max);
       const column = grade === 3 ? "gradeIII" : grade === 2 ? "gradeII" : null;

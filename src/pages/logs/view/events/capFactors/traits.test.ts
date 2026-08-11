@@ -168,6 +168,24 @@ describe("count-scaled trait factors", () => {
     expect(at(1)).toMatchObject({ percent: 0, state: "inactive" });
   });
 
+  it("Thunderwolf derives the grade from the hit's action id", () => {
+    // Proven by the log 2574/2575 sigil A/B: caps moved by exactly +10/15/20%
+    // on grade II/III/IV shots through the runtime-extras path.
+    const at = (actionId: number) => evaluate([[THUNDERWOLF, 15]], THUNDERWOLF, "normal", { actionId }).result;
+    expect(at(121)).toMatchObject({ percent: 10, state: "active" });
+    expect(at(122)).toMatchObject({ percent: 10, state: "active" });
+    expect(at(125)).toMatchObject({ percent: 15, state: "active" });
+    expect(at(130)).toMatchObject({ percent: 20, state: "active" });
+    // A strafe is no grade shot: the trait sits out.
+    expect(at(110)).toMatchObject({ percent: 0, state: "inactive" });
+  });
+
+  it("Thunderwolf stays unresolved when the hit carries no action id", () => {
+    expect(evaluate([[THUNDERWOLF, 15]], THUNDERWOLF, "normal", {}).result).toMatchObject({
+      state: "unknown",
+    });
+  });
+
   it("Phantasm's Harmony multiplies the game's own literal 15% by the pet count", () => {
     const { factor, result } = evaluate([[PHANTASM, 15]], PHANTASM, "normal", { petCount: 2 });
     expect(factor.params).toEqual(["petCount"]);
