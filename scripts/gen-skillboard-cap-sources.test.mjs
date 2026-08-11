@@ -101,6 +101,34 @@ describe("classifyPart", () => {
     expect(scoped(8)).toMatchObject({ capClass: null, targetAttackGroup: 8, abilityIds: [] });
   });
 
+  it("widens an EMPTY ability group to every skill", () => {
+    // ability_group.tbl on v2.0.4: group 819ee45b has ZERO members for every
+    // character, and log 2573's oracle shows the node scoped to it riding
+    // EVERY skill hit — the engine reads an empty group as "all". Emitted as
+    // an unconditional skill-class effect, because keeping the raw group key
+    // as an abilityId makes the bridge judge it confidently inactive on every
+    // real ability.
+    const resolve = (id) => (id === 0x819ee45b ? [] : null);
+    expect(
+      classifyPart(
+        part({ mainType: 2, subType: 1, targetAttackGroup: 10, abilityIds: [0x819ee45b], values: [35, 0, 0, 0, 0, 0, 0, 0, 0, 0] }),
+        new Map(),
+        resolve
+      )
+    ).toEqual({ stat: "cap", percent: 35, capClass: "skill", scope: "always" });
+  });
+
+  it("expands an ability group with members into those members", () => {
+    const resolve = (id) => (id === 0x11111111 ? [0x22222222, 0x33333333] : null);
+    expect(
+      classifyPart(
+        part({ mainType: 2, subType: 1, targetAttackGroup: 10, abilityIds: [0x11111111], values: [45, 0, 0, 0, 0, 0, 0, 0, 0, 0] }),
+        new Map(),
+        resolve
+      )
+    ).toMatchObject({ scope: "attack-group", targetAttackGroup: 10, abilityIds: ["22222222", "33333333"] });
+  });
+
   it("resolves a status gate to the id the hook emits", () => {
     const poison = Number.parseInt(gameXxhash32("STATUS_POISONAILMENT"), 16);
     expect(

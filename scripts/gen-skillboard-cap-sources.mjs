@@ -79,7 +79,7 @@
  *
  *   GBFRDataTools.exe extract -i <game>/data.i -f system/table/skillboard_layout.tbl -o <tmp>
  *   ...also skillboard_effect, skillboard_effect_action_parts,
- *      skillboard_unlock, status
+ *      skillboard_unlock, status, ability_group
  *   node scripts/gen-skillboard-cap-sources.mjs <tmp>/system/table
  *
  * The .tbl files are read RAW rather than through GBFRDataTools' sqlite export,
@@ -114,6 +114,7 @@ export const TABLES = {
   parts: { file: "skillboard_effect_action_parts.tbl", rowSize: 136 },
   unlock: { file: "skillboard_unlock.tbl", rowSize: 32 },
   status: { file: "status.tbl", rowSize: 140 },
+  abilityGroup: { file: "ability_group.tbl", rowSize: 56 },
 };
 
 /** Row count and row base offsets for one raw .tbl. */
@@ -187,7 +188,7 @@ export const CHARACTER_BY_HASH = (() => {
  * caller has already established that the owning node is EffectKind 5, which is
  * what makes `SubType` readable as a stat at all.
  */
-export const classifyPart = (part, statusIdByHash = new Map()) => {
+export const classifyPart = (part, statusIdByHash = new Map(), resolveAbilityGroup = () => null) => {
   const {
     mainType,
     subType,
@@ -250,7 +251,22 @@ export const classifyPart = (part, statusIdByHash = new Map()) => {
     percent: values[0],
     capClass: scoped ? (targetAttackGroup === TARGET_GROUP_ABILITY ? "skill" : null) : "all",
   };
-  const attack = scoped ? { targetAttackGroup, abilityIds: abilityIds.map(hex) } : {};
+
+  // An AbilityId1 can be an ability_group.tbl key rather than an ability. A
+  // group with members stands for those members; a group with NONE is the
+  // engine's "every skill" (group 819ee45b is empty for every character, and
+  // the oracle shows its node riding every skill hit — log 2573). Widened
+  // here because a group key kept as an abilityId would make the bridge judge
+  // the node confidently inactive against every real ability hash.
+  let everySkill = false;
+  const memberIds = [];
+  for (const id of abilityIds) {
+    const members = resolveAbilityGroup(id);
+    if (members === null) memberIds.push(id);
+    else if (members.length === 0) everySkill = true;
+    else memberIds.push(...members);
+  }
+  const attack = scoped && !everySkill ? { targetAttackGroup, abilityIds: memberIds.map(hex) } : {};
 
   // Gated on runtime state. `Conditional 1` names a status; every other gate is
   // a per-character engine state, kept as its raw id so a caller can at least
@@ -264,7 +280,7 @@ export const classifyPart = (part, statusIdByHash = new Map()) => {
   }
 
   if (conditionBehavior !== CONDITION_BEHAVIOR.always) return null;
-  return { ...base, scope: scoped ? "attack-group" : "always", ...attack };
+  return { ...base, scope: scoped && !everySkill ? "attack-group" : "always", ...attack };
 };
 
 const hex = (value) => (value === HASH_NONE ? null : value.toString(16).padStart(8, "0"));
@@ -293,6 +309,28 @@ export const readParts = (buffer) => {
     });
   }
   return byKey;
+};
+
+/** ability_group.tbl: 12 member-ability slots, the owning character's id hash,
+ * and the group key — one row per (character, group). Returned as
+ * characterHash -> groupKey -> member ids (numbers; empty array = an empty
+ * group, which the engine reads as "every skill"). */
+export const readAbilityGroups = (buffer) => {
+  const { rowCount, offsetOf } = readRows(buffer, TABLES.abilityGroup.rowSize, TABLES.abilityGroup.file);
+  const byCharacter = new Map();
+  for (let index = 0; index < rowCount; index += 1) {
+    const at = offsetOf(index);
+    const members = [];
+    for (let slot = 0; slot < 12; slot += 1) {
+      const id = buffer.readUInt32LE(at + slot * 4);
+      if (id !== HASH_NONE) members.push(id);
+    }
+    const characterHash = buffer.readUInt32LE(at + 0x30);
+    const groupKey = buffer.readUInt32LE(at + 0x34);
+    if (!byCharacter.has(characterHash)) byCharacter.set(characterHash, new Map());
+    byCharacter.get(characterHash).set(groupKey, members);
+  }
+  return byCharacter;
 };
 
 /** Every row of skillboard_effect, by its key hash. */
@@ -356,9 +394,10 @@ export const readMasterLevelCap = (buffer) => {
  * breakdown does not even name reads as "complete but wrong", which is the one
  * failure mode this whole file exists to avoid.
  */
-export const buildNodes = ({ layoutBuffer, effectBuffer, partsBuffer, statusIdByHash }) => {
+export const buildNodes = ({ layoutBuffer, effectBuffer, partsBuffer, statusIdByHash, abilityGroupBuffer }) => {
   const effects = readEffects(effectBuffer);
   const parts = readParts(partsBuffer);
+  const abilityGroups = abilityGroupBuffer === undefined ? new Map() : readAbilityGroups(abilityGroupBuffer);
   const { rowCount, offsetOf } = readRows(layoutBuffer, TABLES.layout.rowSize, TABLES.layout.file);
 
   const nodes = {};
@@ -370,12 +409,16 @@ export const buildNodes = ({ layoutBuffer, effectBuffer, partsBuffer, statusIdBy
 
   for (let index = 0; index < rowCount; index += 1) {
     const at = offsetOf(index);
-    const characterHash = hex(buffer32(layoutBuffer, at + 0x58));
+    const characterHashValue = buffer32(layoutBuffer, at + 0x58);
+    const characterHash = hex(characterHashValue);
     const character = CHARACTER_BY_HASH.get(characterHash);
     if (character === undefined) {
       unknownCharacters.add(characterHash);
       continue;
     }
+    // The ability-group resolver is character-bound: the same group key holds
+    // a different member list per character (one table row per pair).
+    const resolveAbilityGroup = (id) => abilityGroups.get(characterHashValue)?.get(id) ?? null;
     const uiId = layoutBuffer.readInt32LE(at + 0x74);
     const key = `${character}_${uiId.toString(16).padStart(4, "0")}`;
 
@@ -403,7 +446,7 @@ export const buildNodes = ({ layoutBuffer, effectBuffer, partsBuffer, statusIdBy
 
     const capEffects = rows
       .filter(Boolean)
-      .map((row) => classifyPart(row, statusIdByHash))
+      .map((row) => classifyPart(row, statusIdByHash, resolveAbilityGroup))
       .filter((effectRow) => effectRow !== null);
     if (capEffects.length > 0) nodes[key] = { effects: capEffects };
   }
@@ -447,6 +490,7 @@ const main = () => {
     effectBuffer: read("effect"),
     partsBuffer: read("parts"),
     statusIdByHash,
+    abilityGroupBuffer: read("abilityGroup"),
   });
   const masterLevelCap = readMasterLevelCap(read("unlock"));
 
