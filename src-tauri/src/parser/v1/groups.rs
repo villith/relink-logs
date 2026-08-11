@@ -198,6 +198,13 @@ pub struct GroupMeasure {
 /// echoes. For an echo action, everything here describes its UNCLAIMED residue
 /// only — a claimed echo's damage already sits on its trigger, and counting it
 /// twice is the whole thing this type exists to avoid.
+///
+/// [`GroupAggregate::series`] stays the RAW view: a claim moves damage between
+/// rows, so under this model a row's series no longer sums to its `amount`.
+/// That is deliberate. The frontend's band fold already sums an echo's series
+/// into its cause's band, so the drawn buckets total the same either way, and
+/// re-cutting the series per view would need a bucket for damage that was
+/// aggregated under a different row.
 #[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MergedMeasure {
@@ -257,6 +264,12 @@ pub struct GroupReference {
 /// Keys the mask excludes ENTIRELY are the point of this: they never appear as
 /// aggregates, and without them the surviving bands' ranks compact and the
 /// colours shift anyway — which is the bug.
+///
+/// It reads only `amount`, so the [`MergedMeasure`] the inner call folds is paid
+/// for and thrown away — a second [`SuppPairing`] over the whole log on every
+/// scrub. Left alone deliberately: the fixes are a tenth parameter on an already
+/// nine-argument function or a restructuring of this path, and that call wants a
+/// measurement rather than a guess. Start here if profiling points at scrubbing.
 pub fn aggregate_group_reference(
     events: &[(i64, Message)],
     player_data: &[Option<PlayerData>; 4],
@@ -340,6 +353,107 @@ impl std::fmt::Display for GroupQueryError {
 }
 
 impl std::error::Error for GroupQueryError {}
+
+/// One event that survived every gate in [`aggregate_groups`]'s walk, and what
+/// it fed there.
+///
+/// Named for the walk, not for the landing model: this holds every survivor,
+/// INCLUDING claimed echoes, which are precisely the events that never become
+/// landings of their own.
+///
+/// Recorded because a landing's amount depends on echoes that arrive LATER in
+/// the stream, and a running min/max cannot be revised once written — so
+/// [`MergedMeasure`] cannot be accumulated in the walk itself.
+struct Walked {
+    /// Index into the event slice the walk enumerated — the same base
+    /// [`SuppPairing`] keys its links by.
+    position: usize,
+    /// Index into the `aggregates` vec. Positional, so it survives only until
+    /// that vec is reordered; see [`fold_landings`].
+    aggregate_index: usize,
+    /// The amount the walk aggregated for this event, past every gate and
+    /// clamp — the single source of truth for what this event contributed.
+    damage: i64,
+    /// Whether the EVENT is supplementary. Not the same question as "was it
+    /// claimed": an orphan echo is supplementary and unclaimed, and it must
+    /// still report its whole amount as the echo share.
+    is_echo: bool,
+}
+
+/// Folds the landing view into `aggregates` from what the walk recorded.
+///
+/// MUST run before `aggregates` is sorted or appended to: [`Walked`] addresses
+/// rows by position, and reordering that vec silently reroutes every merged
+/// figure onto the wrong row. The sum invariant cannot see that — misrouting
+/// preserves the total — which is why this is a call in a visible sequence
+/// rather than thirty lines relying on adjacency to the sort.
+///
+/// Gated on what SURVIVED the query, both directions: a claimed echo whose
+/// trigger was filtered out stands alone rather than letting its damage vanish,
+/// and a trigger only absorbs echoes that survived alongside it, so the two
+/// views always sum to the same total.
+///
+/// Runs on the taken stream too. `SupplementaryDamage` is classified from the
+/// event's own action id with no regard to its source, so an enemy echo would
+/// merge into the enemy hit that caused it. Expected to be a no-op — echoes are
+/// believed to be a player trait mechanic, and the pairing rule's whole evidence
+/// base is player-side — but nothing here enforces that, and no capture has
+/// confirmed it.
+fn fold_landings(aggregates: &mut [GroupAggregate], walked: &[Walked], pairing: &SuppPairing) {
+    // The walk pushes in `events.iter().enumerate()` order and at most once per
+    // position, so `walked` is strictly ascending by `position` — membership is
+    // a binary search rather than a set built for one pass. Asserted rather
+    // than assumed: a walk that ever pushed twice for one event would make the
+    // search pick between them arbitrarily.
+    debug_assert!(
+        walked
+            .windows(2)
+            .all(|pair| pair[0].position < pair[1].position),
+        "fold_landings needs the walk's records strictly ascending by position"
+    );
+    let survivor = |position: usize| -> Option<&Walked> {
+        walked
+            .binary_search_by_key(&position, |entry| entry.position)
+            .ok()
+            .map(|at| &walked[at])
+    };
+
+    for &Walked {
+        position,
+        aggregate_index,
+        damage,
+        is_echo,
+    } in walked
+    {
+        if pairing
+            .trigger_of(position)
+            .is_some_and(|trigger| survivor(trigger).is_some())
+        {
+            continue;
+        }
+        // The echo's damage as the WALK aggregated it, never as the pairing
+        // stored it: one number, one source. The two agree today only because
+        // both clamp a negative at zero — an asymmetry `supp_pairing` flags on
+        // its own side — and any future gate that transformed the aggregated
+        // amount would break the sum invariant with nothing to catch it.
+        let attached: i64 = pairing
+            .echoes_of(position)
+            .iter()
+            .filter_map(|(echo, _)| survivor(*echo))
+            .map(|echo| echo.damage)
+            .sum();
+        let landing = damage + attached;
+
+        let merged = &mut aggregates[aggregate_index].merged;
+        merged.amount += landing;
+        merged.hits += 1;
+        merged.min = Some(merged.min.map_or(landing, |min| min.min(landing)));
+        merged.max = Some(merged.max.map_or(landing, |max| max.max(landing)));
+        // An orphan echo is supplementary all the way across; a direct hit
+        // contributes only what rode along with it.
+        merged.supplementary += if is_echo { landing } else { attached };
+    }
+}
 
 /// Aggregates the analysis view's generic group query into rows and bands
 /// that can never disagree: the table (`key` + `measure`) and the chart
@@ -523,20 +637,7 @@ pub fn aggregate_groups(
     // The echo/trigger links, learned from the WHOLE log so a scrub window
     // cannot change which hit an echo belongs to.
     let pairing = SuppPairing::learned_from(events);
-    // What each surviving event fed, for the landing pass below. A landing's
-    // amount depends on echoes that arrive LATER in the stream, and a running
-    // min/max cannot be revised once written — so the merged view cannot be
-    // accumulated in this loop.
-    struct Landed {
-        position: usize,
-        entry: usize,
-        damage: i64,
-        /// Whether the EVENT is supplementary. Not the same question as
-        /// "was it claimed": an orphan echo is supplementary and unclaimed,
-        /// and it must still report its whole amount as the echo share.
-        is_echo: bool,
-    }
-    let mut landed: Vec<Landed> = Vec::new();
+    let mut walked: Vec<Walked> = Vec::new();
     let mut aggregates: Vec<GroupAggregate> = Vec::new();
     // One `BreakdownKeying` per (remapped) source index, fed that source's
     // hits in log order — it is stateful (Ferry's pet remap, the
@@ -560,11 +661,6 @@ pub fn aggregate_groups(
         let Message::DamageEvent(damage_event) = message else {
             continue;
         };
-        // Read before the dealt branch remaps the event. This asks what the
-        // EVENT is, not whether the pairing claimed it — an orphan echo is
-        // supplementary and unclaimed, and still owes its whole amount to the
-        // echo share.
-        let is_echo = matches!(damage_event.action_id, ActionType::SupplementaryDamage(_));
         let rel_ts = timestamp - start_time;
 
         // `dealt_stream` wants dealt hits; the taken stream wants the
@@ -726,7 +822,7 @@ pub fn aggregate_groups(
             (key, damage_event.damage.max(0) as i64, bucket)
         };
 
-        let entry_index = match aggregates.iter().position(|aggregate| aggregate.key == key) {
+        let aggregate_index = match aggregates.iter().position(|aggregate| aggregate.key == key) {
             Some(position) => position,
             None => {
                 aggregates.push(GroupAggregate {
@@ -738,7 +834,7 @@ pub fn aggregate_groups(
                 aggregates.len() - 1
             }
         };
-        let entry = &mut aggregates[entry_index];
+        let entry = &mut aggregates[aggregate_index];
 
         entry.measure.amount += damage;
         entry.measure.hits += 1;
@@ -746,51 +842,22 @@ pub fn aggregate_groups(
         entry.measure.max = Some(entry.measure.max.map_or(damage, |max| max.max(damage)));
         entry.series[bucket] += damage;
 
-        landed.push(Landed {
+        walked.push(Walked {
             position,
-            entry: entry_index,
+            aggregate_index,
             damage,
-            is_echo,
+            is_echo: matches!(damage_event.action_id, ActionType::SupplementaryDamage(_)),
         });
     }
 
-    // The landing pass. Gated on what SURVIVED the query, both directions: a
-    // claimed echo whose trigger was filtered out stands alone rather than
-    // letting its damage vanish, and a trigger only absorbs echoes that
-    // survived alongside it, so the two views always sum to the same total.
-    let survived: std::collections::HashSet<usize> =
-        landed.iter().map(|entry| entry.position).collect();
-    for Landed {
-        position,
-        entry,
-        damage,
-        is_echo,
-    } in &landed
-    {
-        if let Some(trigger) = pairing.trigger_of(*position) {
-            if survived.contains(&trigger) {
-                continue;
-            }
-        }
-        let attached: i64 = pairing
-            .echoes_of(*position)
-            .iter()
-            .filter(|(echo, _)| survived.contains(echo))
-            .map(|(_, echo_damage)| *echo_damage)
-            .sum();
-        let landing = damage + attached;
-
-        let merged = &mut aggregates[*entry].merged;
-        merged.amount += landing;
-        merged.hits += 1;
-        merged.min = Some(merged.min.map_or(landing, |min| min.min(landing)));
-        merged.max = Some(merged.max.map_or(landing, |max| max.max(landing)));
-        // An orphan echo is supplementary all the way across; a direct hit
-        // contributes only what rode along with it.
-        merged.supplementary += if *is_echo { landing } else { attached };
-    }
+    // Before the sort, which invalidates the row indices it reads.
+    fold_landings(&mut aggregates, &walked, &pairing);
 
     // Largest first: the table's own order, and what a chart's legend expects.
+    // Ranked by the RAW measure even though the merged table reads
+    // `merged.amount`, for the reason `GroupReference` exists: one order for
+    // both views is what stops the bands repainting when a reader flips the
+    // collapse toggle.
     aggregates.sort_by_key(|aggregate| std::cmp::Reverse(aggregate.measure.amount));
 
     // `top_n` never removes a row — the table wants all of them. It only
@@ -800,8 +867,9 @@ pub fn aggregate_groups(
     if let Some(top_n) = query.top_n {
         if aggregates.len() > top_n {
             let mut other_measure = GroupMeasure::default();
-            // The landing view rolls up by the same rule, or the merged chart's
-            // `Other` band would read zero while its table row did not.
+            // The landing view rolls up by the same rule: a table reading the
+            // merged view still shows this row for the tail, and leaving it at
+            // zero would make it disagree with the rows it summarises.
             let mut other_merged = MergedMeasure::default();
             let mut other_series = vec![0i64; chart_len];
             for aggregate in &aggregates[top_n..] {
@@ -1210,6 +1278,16 @@ mod tests {
             assert_eq!(
                 series_sum, aggregate.measure.amount,
                 "series must sum to the measure for {:?}",
+                aggregate.key
+            );
+            // The echo share is part of the landing, never more than it: a
+            // trigger's attached sum is a subset of its own amount, and an
+            // orphan echo's is the whole of it. A `supplementary`
+            // double-count is invisible to the totals below, which never
+            // read it.
+            assert!(
+                aggregate.merged.supplementary <= aggregate.merged.amount,
+                "the echo share cannot exceed the landing total for {:?}",
                 aggregate.key
             );
         }
