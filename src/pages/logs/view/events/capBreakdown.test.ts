@@ -137,6 +137,37 @@ describe("capCardRows", () => {
       const rows = capCardRows(real, context({ ladderBase: 5399, consistent: true }));
       expect(rows.find((r) => r.key === "unaccounted")?.value).toBeCloseTo(2729, 0);
     });
+
+    it("credits derived channel sources against the game total", () => {
+      // The per-hit FreeWork channel (board cap nodes) is NOT inside the
+      // captured record — log 2573's oracle reconciliation — so a derived
+      // channel total is attributed as its own term beside the record.
+      const rows = capCardRows(
+        real,
+        context({
+          ladderBase: 5399,
+          consistent: true,
+          record: 18.96,
+          channel: [{ key: "channel", labelKey: "ui.logs.cap-term-channel", value: 4.35 }],
+        })
+      );
+      const byKey = Object.fromEntries(rows.map((r) => [r.key, r]));
+      expect(byKey["channel"].value).toBeCloseTo(435, 0);
+      expect(byKey["channel"].variant).toBeUndefined();
+      // 27.29… − 18.96 − 4.35 = 3.98…
+      expect(byKey["unaccounted"].value).toBeCloseTo(398, 0);
+    });
+
+    it("never credits channel sources against the bare record fallback", () => {
+      // Without the ladder the card's total IS the record, and the channel is
+      // not part of the record — crediting it there would subtract a term from
+      // a total that never contained it.
+      const rows = capCardRows(
+        real,
+        context({ record: 18.96, channel: [{ key: "channel", labelKey: "ui.logs.cap-term-channel", value: 4.35 }] })
+      );
+      expect(rows.find((r) => r.key === "channel")).toBeUndefined();
+    });
   });
 
   // Old logs carry the captured record but predate the fields the ladder needs

@@ -79,6 +79,15 @@ const paramsFor = (effect: BoardEffect): readonly CapParamKey[] => {
   return [];
 };
 
+/** Where the effect's value lives (see `CapFactor.placement`). Counted-sigil
+ * totals are static per fight and the game fuses them into the captured
+ * record at load — they never appear in a hit's channel terms (log 2573
+ * oracle: the two pl2700 basic-sigil nodes are exactly the +200% the record
+ * holds beyond its other components). Everything per-hit — always, group,
+ * gated, granted — IS the FreeWork channel the oracle itemizes. */
+const placementFor = (effect: BoardEffect): "record" | "channel" =>
+  effect.scope === "counted" && effect.countKind !== "quest-counter" ? "record" : "channel";
+
 const evaluateEffect = (
   effect: BoardEffect,
   player: CapLoadout,
@@ -190,6 +199,7 @@ export const boardFactors = (player: CapLoadout | undefined, capClass: CapClass 
         factors.push({
           ...base,
           key: `board-${key}-${index}`,
+          placement: placementFor(effect),
           params: paramsFor(effect),
           evaluate: (conditions) => evaluateEffect(effect, player, characterType, capClass, conditions),
         });
@@ -200,8 +210,16 @@ export const boardFactors = (player: CapLoadout | undefined, capClass: CapClass 
     // Engine-defined: the table holds this node's values, but which slot is the
     // cap lives in the exe. Named with no magnitude rather than dropped — a
     // dropped node lets the breakdown read as complete while missing a source.
+    // Channel placement: what little is known of these (Eustace's per-action
+    // flats) rides the per-hit paths, not the load-time record.
     if (ENGINE_DEFINED[key] !== undefined) {
-      factors.push({ ...base, key: `board-${key}`, params: [], evaluate: () => unknownResult(0, [], "unparsed") });
+      factors.push({
+        ...base,
+        key: `board-${key}`,
+        placement: "channel",
+        params: [],
+        evaluate: () => unknownResult(0, [], "unparsed"),
+      });
     }
   }
   return factors;

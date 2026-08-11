@@ -9,6 +9,7 @@ import { translateTraitId } from "@/utils";
 
 import { HOVER_PANEL_CLASS } from "../analysis/HoverCard";
 import { capCardRows, selectCapUp, type CapContext, type CapHit, type CapRow, type PlayerCapUp } from "./capBreakdown";
+import { deriveChannelTotal, type CapConditions } from "./capFactors";
 import { capConsistent, gameLadderBase, ladderCurveFor } from "./capLadder";
 import {
   capClassOf,
@@ -51,6 +52,10 @@ export type AmountCellCapFacts = {
    * by. Undefined (an old log, an unnamed actor) drops the independent base
    * and the card falls back to the captured record as its total. */
   characterType?: CharacterType;
+  /** What the hit knew about the moment it landed (see `EventRow
+   * .capConditions`) — what the channel derivation resolves board nodes
+   * against. Undefined leaves the channel underived, never zero. */
+  conditions?: CapConditions;
 };
 
 /** The Amount cell. A damage row's amount is the END of a calculation the log
@@ -66,6 +71,7 @@ export const AmountCell = ({
   playerCapUp,
   loadout,
   characterType,
+  conditions,
   width,
 }: {
   amount: number | null;
@@ -82,6 +88,10 @@ export const AmountCell = ({
     const curve = ladderCurveFor(characterType, capHit.class_flags);
     const ladderBase = curve !== null && capHit.attack_rate !== null ? gameLadderBase(curve, capHit.attack_rate) : 0;
     const hasLadder = ladderBase > 0 && capHit.damage_cap !== null && capHit.damage_cap > 0;
+    // The derived per-hit channel: one aggregate row here, itemized in the
+    // debug panel. Zero renders nothing — an underived channel stays part of
+    // the unaccounted remainder rather than reading as "nothing applied".
+    const channel = conditions === undefined ? 0 : deriveChannelTotal(loadout, capClass, conditions);
     const context: CapContext = {
       ladderBase: hasLadder ? ladderBase : null,
       consistent: hasLadder ? capConsistent(capHit.damage_cap!, ladderBase) : null,
@@ -89,9 +99,10 @@ export const AmountCell = ({
       recordComponents: deriveRecordComponents(loadout, capClass),
       dmgCapTrait: dmgCapTraitValue(loadout, capClass),
       conditional: deriveConditionalSources(loadout, capClass),
+      ...(channel > 0 ? { channel: [{ key: "channel", labelKey: "ui.logs.cap-term-channel", value: channel }] } : {}),
     };
     return capCardRows(capHit, context);
-  }, [capHit, playerCapUp, loadout, characterType]);
+  }, [capHit, playerCapUp, loadout, characterType, conditions]);
   const shows = rows.length > 1;
 
   // Memoized because `CursorCard` re-renders on every committed cursor frame

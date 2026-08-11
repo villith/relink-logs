@@ -163,6 +163,27 @@ describe("AmountCell", () => {
     expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,415.99%");
   });
 
+  // The per-hit channel: board cap nodes the conditions resolved. pl0300_000c
+  // is "+15%, always" — active with no conditions at all — and it is NOT
+  // inside the captured record (log 2573 reconciliation), so its derived
+  // total attributes as its own row beside the record.
+  it("credits the derived channel total against the game total", () => {
+    renderCell({
+      amount: 152_737,
+      capHit: { ...capHit, damage_cap: 152_737, attack_rate: 0.54 },
+      playerCapUp: { normal: 13.13, skill: 15.18, sba: 12.16 },
+      loadout: { ...sigilLoadout(0xd029fe08, 15), characterType: "Pl0300", skillboard: [0x0c] },
+      characterType: "Pl0300",
+      conditions: {},
+      width: 78,
+    });
+    hover("152,737");
+    const card = screen.getByTestId("cap-card");
+    expect(card.querySelector('[data-cap-row="channel"]')?.textContent).toContain("15%");
+    // 27.2899… − 13.13 − 0.15
+    expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,400.99%");
+  });
+
   // A damage row from a log recorded before the cap capture carries the shape
   // with null members. `capCardRows` returns its lone `damage` row for that, and
   // a one-row card would only restate the number already in the cell.

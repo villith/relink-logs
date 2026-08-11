@@ -191,6 +191,13 @@ export type CapFactor = {
    * one translated name, and two rows that read identically but hold different
    * numbers are the exact failure this breakdown exists to prevent. */
   sourceKey?: string;
+  /** Which of the game's two cap stores this factor lives in. `record` factors
+   * are fused into the captured per-class record at load and can only ever be
+   * sub-rows of that number; `channel` factors ride the per-hit FreeWork
+   * conditional channel OUTSIDE the record, so an active one attributes
+   * against the game total on its own (log 2573 oracle reconciliation).
+   * Absent means `record`. */
+  placement?: "record" | "channel";
   params: readonly CapParamKey[];
   evaluate: (conditions: CapConditions) => CapFactorResult;
 };

@@ -29,6 +29,7 @@ const row = (over: Partial<EventRow>): EventRow => ({
   detailKey: null,
   amount: null,
   capHit: null,
+  capConditions: null,
   ...over,
 });
 

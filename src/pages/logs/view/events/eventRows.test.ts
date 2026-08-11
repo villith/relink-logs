@@ -105,6 +105,34 @@ describe("toEventRow", () => {
     expect(row.detailKey).toBeNull();
   });
 
+  it("carries the hit's cap conditions for the card's channel derivation", () => {
+    const withState: LogEvent = [
+      1_500,
+      {
+        DamageEvent: {
+          source: actor(0),
+          target: actor(9),
+          damage: 18204,
+          flags: 0,
+          action_id: { Normal: 100 },
+          ...noCap,
+          damage_cap: 1_000_000,
+          base_damage: 4_000_000,
+          attack_rate: 2.5,
+          source_current_hp: 45_000,
+          source_max_hp: 90_000,
+          source_statuses: [{ status_id: 56, stacks: 2 }],
+        },
+      },
+    ];
+    const row = toEventRow(withState);
+    expect(row.capConditions).toMatchObject({ actionId: 100, hp: 45_000, hpRatio: 0.5, buffs: [56] });
+    // Old logs: nothing captured, no conditions claimed.
+    expect(toEventRow(damage).capConditions).toMatchObject({ actionId: 100 });
+    expect(toEventRow(damage).capConditions?.buffs).toBeUndefined();
+    expect(toEventRow(death).capConditions).toBeNull();
+  });
+
   // The damage path keys a spawn by the folded INSTANCE POINTER; every other
   // path reports the game's actor index. Nothing about the number says which,
   // so the row has to — see `ActorSpace`.

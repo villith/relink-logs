@@ -64,6 +64,11 @@ export type CapContext = {
   dmgCapTrait: number;
   /** Conditional traits at their maximum; rendered, never summed. */
   conditional: CapSource[];
+  /** Derived ACTIVE per-hit channel terms (board cap nodes the conditions
+   * resolved) — outside the record like the DMG Cap trait, so they attribute
+   * against the game total. Only meaningful with `ladderBase`: the record
+   * fallback total never contained them. */
+  channel?: CapSource[];
 };
 
 /** Mirrors the Rust `PlayerCapUp`. */
@@ -147,6 +152,17 @@ const capUpRows = (cap: number, context: CapContext): CapRow[] => {
   if (gameTotal !== null && context.dmgCapTrait > 0) {
     rows.push(asPercent("dmgcap", "ui.logs.cap-source-dmg-cap", context.dmgCapTrait));
     attributed += context.dmgCapTrait;
+  }
+  // Derived channel terms are real per-hit contributions outside the record —
+  // but only the ladder total contains them, so against the bare record
+  // fallback they are neither rendered nor summed.
+  if (gameTotal !== null) {
+    for (const source of context.channel ?? []) {
+      rows.push(
+        asPercent(source.key, source.labelKey, source.value, source.traitId ? { traitId: source.traitId } : {})
+      );
+      attributed += source.value;
+    }
   }
   for (const source of context.conditional) {
     rows.push(

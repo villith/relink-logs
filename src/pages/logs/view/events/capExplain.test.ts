@@ -201,6 +201,36 @@ describe("the cap-up section", () => {
     expect(line(sections, "capup", "unaccounted").value).toEqual({ kind: "percent", value: 1177.99 });
   });
 
+  it("credits an active channel board node against the game total", () => {
+    // pl0300_000c: "DMG Cap +15%", scope always — a FreeWork channel term the
+    // oracle sees on every hit, so it is NOT inside the captured record and
+    // counts against the game total on its own (log 2573 reconciliation).
+    const sections = explainCapHit(
+      input({ loadout: loadout({ characterType: "Pl0300", skillboard: [0x0c] }), conditions: {} })
+    );
+    // game 2728.99% − channel 15% = 2713.99%
+    expect(line(sections, "capup", "unaccounted").value).toEqual({ kind: "percent", value: 2713.99 });
+    // Rendered beside the record, not as a sub-row of it.
+    expect(line(sections, "capup", "board-pl0300_000c-0").depth).toBe(1);
+  });
+
+  it("keeps a counted-sigil board node inside the record", () => {
+    // pl0300_0023: "+20% per Basic sigil" — static per fight, fused into the
+    // captured record at load; it never rides the per-hit channel, so crediting
+    // it would double-count. It stays a sub-row OF the record.
+    const basic = { ...sigil(0x50079a1c, 1) };
+    const sections = explainCapHit(
+      input({
+        capUp: { normal: 13.13, skill: null, sba: null },
+        loadout: loadout({ characterType: "Pl0300", skillboard: [0x23], sigils: [basic, basic, basic] }),
+        conditions: {},
+      })
+    );
+    // game 2728.99% − record 1313% only: the counted node's 60% is not credited.
+    expect(line(sections, "capup", "unaccounted").value).toEqual({ kind: "percent", value: 1415.99 });
+    expect(line(sections, "capup", "board-pl0300_0023-0").depth).toBe(2);
+  });
+
   it("says the record was never captured rather than counting it as zero", () => {
     const sections = explainCapHit(input({ loadout: loadout() }));
     expect(line(sections, "capup", "record").value).toEqual({ kind: "absent" });

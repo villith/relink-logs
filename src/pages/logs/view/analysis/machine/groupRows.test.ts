@@ -31,6 +31,7 @@ const EVENT = (abilityKey: string): EventRow => ({
   detailKey: null,
   amount: null,
   capHit: null,
+  capConditions: null,
 });
 
 const measure = (amount: number, hits = 1, min: number | null = null, max: number | null = null): GroupMeasure => ({

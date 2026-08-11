@@ -66,5 +66,24 @@ export const evaluateCapFactors = (factors: CapFactor[], conditions: CapConditio
   return { rows, attributed, unresolved, missing: [...missing].sort() };
 };
 
+/** The derived per-hit channel total, as the fraction the formula adds (0.35 =
+ * +35%): the sum of the ACTIVE channel-placement factors under these
+ * conditions. Record-side factors never count here — the captured record
+ * already holds them — and an unresolved factor contributes nothing rather
+ * than its potential. This is the one number the hover card credits; the
+ * debug panel itemizes the same rows. */
+export const deriveChannelTotal = (
+  loadout: CapLoadout | undefined,
+  capClass: CapClass | null,
+  conditions: CapConditions
+): number => {
+  if (loadout === undefined || capClass === null) return 0;
+  let total = 0;
+  for (const { factor, result } of evaluateCapFactors(collectCapFactors({ loadout, capClass }), conditions).rows) {
+    if (factor.placement === "channel" && result.state === "active") total += result.percent;
+  }
+  return total / 100;
+};
+
 export { DMG_CAP_TRAIT } from "./traits";
 export type { CapConditions, CapFactor, CapFactorReason, CapFactorResult, CapFactorState, CapParamKey } from "./types";

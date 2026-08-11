@@ -481,12 +481,12 @@ const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
   const rows = evaluateCapFactors(collectCapFactors({ loadout, capClass }), conditions);
 
   // Everything the game fused into the record at load: the other cap traits,
-  // the overmastery rolls, the summon bonuses, and — the term this panel used
-  // to write off entirely — every unlocked master-board node. These are
-  // sub-rows OF the number above and never add to the attributed total; the
-  // record already contains them.
+  // the overmastery rolls, the summon bonuses, and the record-side board nodes
+  // (counted-sigil totals). These are sub-rows OF the number above and never
+  // add to the attributed total; the record already contains them.
   let explained = 0;
   for (const { factor, result } of rows.rows) {
+    if (factor.placement === "channel") continue;
     // The plain DMG Cap trait renders here with the others because it IS a
     // trait the player equipped, but the game reads it through its own second
     // lookup, so it is not inside the record and is attributed separately.
@@ -523,6 +523,17 @@ const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
   // Attributed even though it renders up in the trait list: the record does not
   // contain it, so the remainder below has to account for it separately.
   attributed += dmgCapTrait;
+
+  // The channel-side factors, beside the record: the per-hit FreeWork terms
+  // the record never contained. An ACTIVE one is a derived fact about this
+  // hit (an always-on node, a group membership the coverage registry banked)
+  // and attributes against the game total; an unresolved or inactive one
+  // renders its potential and reason like any other rejected source.
+  for (const { factor, result } of rows.rows) {
+    if (factor.placement !== "channel") continue;
+    if (result.state === "active") attributed += result.percent / 100;
+    lines.push(factorLine(factor, result, characterType, 1));
+  }
 
   // The conditional traits, beside the record rather than inside it. Rendered
   // at their potential, never summed: counting a maximum the runtime state may

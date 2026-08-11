@@ -240,3 +240,19 @@ describe("attack class", () => {
     }
   });
 });
+
+describe("factor placement", () => {
+  it("marks counted-sigil nodes record-side and the per-hit scopes channel-side", () => {
+    // Log 2573's oracle reconciliation: a counted-sigil total never appears in
+    // a hit's FreeWork terms — the game fuses it into the captured record at
+    // load, like an unconditional trait — while always/group/gated nodes are
+    // exactly the per-hit channel terms. Crediting a record-side node against
+    // the game total would double-count it.
+    expect(factorFor(SIGIL_COUNTED).placement).toBe("record");
+    expect(factorFor(ALWAYS).placement).toBe("channel");
+    expect(factorFor(ATTACK_GROUP).placement).toBe("channel");
+    expect(factorFor(STATUS_GATED).placement).toBe("channel");
+    expect(factorFor(GRANTS_STATUS).placement).toBe("channel");
+    expect(factorFor(ENGINE_DEFINED).placement).toBe("channel");
+  });
+});

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Sigil } from "@/types";
 
 import type { CapLoadout } from "../capSources";
-import { collectCapFactors, evaluateCapFactors } from "./index";
+import { collectCapFactors, deriveChannelTotal, evaluateCapFactors } from "./index";
 
 /** Unconditional, +50% to every class at level 15. */
 const FATEBREAKER = 0xd029fe08;
@@ -88,5 +88,26 @@ describe("evaluateCapFactors", () => {
     const totals = evaluateCapFactors(collectCapFactors({ loadout: player, capClass: "normal" }));
     // Both traits gate on the HP fraction; the caller is asked for it once.
     expect(totals.missing).toEqual(["hpRatio"]);
+  });
+});
+
+describe("deriveChannelTotal", () => {
+  it("sums only the ACTIVE channel-side factors, as a fraction", () => {
+    // pl0300_000c (+15, always) resolves active with no conditions;
+    // pl0300_0016-style group nodes stay unresolved and contribute nothing;
+    // pl0300_0023 (counted-sigil) is record-side and never counts here even
+    // while active. Log 2573: the channel is exactly the FreeWork terms.
+    const player = loadout({
+      sigils: [sigil(0x50079a1c, 1), sigil(0x50079a1c, 1), sigil(0x50079a1c, 1)],
+      characterType: "Pl0300",
+      skillboard: [0x0c, 0x23],
+    });
+    expect(deriveChannelTotal(player, "normal", {})).toBeCloseTo(0.15, 6);
+  });
+
+  it("is zero with nothing derivable", () => {
+    expect(deriveChannelTotal(loadout(), "normal", {})).toBe(0);
+    expect(deriveChannelTotal(undefined, "normal", {})).toBe(0);
+    expect(deriveChannelTotal(loadout(), null, {})).toBe(0);
   });
 });

@@ -262,6 +262,7 @@ export const EventRowsTable = ({
                   playerCapUp={row.sourceIndex === null ? undefined : capUp?.[String(row.sourceIndex)]}
                   loadout={row.sourceIndex === null ? undefined : loadout?.get(row.sourceIndex)}
                   characterType={row.sourceIndex === null ? undefined : loadout?.get(row.sourceIndex)?.characterType}
+                  conditions={row.capConditions ?? undefined}
                   width={COLUMNS.amount}
                 />
               </Group>

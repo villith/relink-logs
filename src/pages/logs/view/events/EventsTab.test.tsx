@@ -22,6 +22,7 @@ const ROWS: EventRow[] = [
     detailKey: null,
     amount: 18204,
     capHit: { damage: 18204, damage_cap: 1_000_000, base_damage: 4_000_000, attack_rate: 2.5, class_flags: 0x1 },
+    capConditions: null,
   },
   {
     timeMs: 41880,
@@ -35,6 +36,7 @@ const ROWS: EventRow[] = [
     detailKey: "ui.logs.events-died",
     amount: null,
     capHit: null,
+    capConditions: null,
   },
   {
     timeMs: 4000,
@@ -48,6 +50,7 @@ const ROWS: EventRow[] = [
     detailKey: null,
     amount: 2,
     capHit: null,
+    capConditions: null,
   },
 ];
 
