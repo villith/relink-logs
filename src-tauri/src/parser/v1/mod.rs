@@ -1909,6 +1909,14 @@ pub struct EventPage {
     /// How many events exist in total, so the frontend can tell a full answer
     /// from a truncated one.
     pub total: usize,
+    /// Echo row -> the row that triggered it, both as indices into
+    /// [`Self::events`].
+    ///
+    /// PAGE indices, not log positions: the panel joins rows it was handed, and
+    /// a log position would address a row this page may not contain. A pair
+    /// with either end off the page is omitted entirely — the echo then renders
+    /// flat, which is what it did before nesting existed.
+    pub supp_pairs: BTreeMap<usize, usize>,
 }
 
 /// `count` events starting at `offset`, rebased to `start_time`.
@@ -1930,12 +1938,27 @@ pub fn event_page(
         &events[offset..end]
     };
 
+    // Learned from the WHOLE log, then projected onto this page: which hit
+    // caused an echo is a property of the fight, not of the window being read.
+    // `checked_sub` drops a pair whose trigger sits before the page; the range
+    // itself excludes an echo past its end, and a trigger always precedes its
+    // echo, so a trigger can never be the end that overruns.
+    let pairing = supp_pairing::SuppPairing::learned_from(events);
+    let supp_pairs = (offset..end)
+        .filter_map(|position| {
+            let trigger = pairing.trigger_of(position)?;
+            let trigger_row = trigger.checked_sub(offset)?;
+            Some((position - offset, trigger_row))
+        })
+        .collect();
+
     EventPage {
         events: slice
             .iter()
             .map(|(ts, event)| (ts - start_time, event.clone()))
             .collect(),
         total,
+        supp_pairs,
     }
 }
 
@@ -4944,6 +4967,63 @@ mod tests {
 
         assert_eq!(page.events.len(), 0, "past the end is empty, not a panic");
         assert_eq!(page.total, 1);
+    }
+
+    /// A trigger, an unrelated hit, and the echo 151ms later — the median lag
+    /// `supp_pairing` documents, and well inside its window. The hit between
+    /// them means a page that paired adjacent rows would get this wrong.
+    fn log_with_an_echo() -> Vec<(i64, Message)> {
+        let mut echo = damage_from(PLAYER_HASH, 9001, 92_681);
+        echo.action_id = ActionType::SupplementaryDamage(9001);
+
+        vec![
+            (
+                100,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 9001, 154_500)),
+            ),
+            (
+                150,
+                Message::DamageEvent(damage_from(PLAYER_HASH, 100, 1_000)),
+            ),
+            (251, Message::DamageEvent(echo)),
+        ]
+    }
+
+    /// The panel nests an echo under its trigger, so the page must say which is
+    /// which — in the PAGE's own index space, not the log's, or an offset page
+    /// would point at the wrong rows.
+    #[test]
+    fn event_page_carries_supplementary_pairs_in_page_indices() {
+        let events = log_with_an_echo();
+
+        // Pinned so this cannot degrade into "no pairs, assertions still pass"
+        // if the rule or its window is ever re-derived.
+        assert_eq!(
+            supp_pairing::SuppPairing::learned_from(&events).trigger_of(2),
+            Some(0),
+            "the echo really is claimed by the first hit"
+        );
+
+        let page = event_page(&events, 100, 0, 10);
+        assert_eq!(page.supp_pairs.get(&2), Some(&0));
+
+        // An offset page renumbers, and a pair whose trigger fell off the page
+        // is dropped entirely rather than left pointing at whatever now sits at
+        // that index.
+        let offset = event_page(&events, 100, 2, 10);
+        assert!(offset.supp_pairs.is_empty());
+    }
+
+    /// The other end of the same rule: the trigger is on the page but the echo
+    /// is past its last row, so there is nothing to nest and no pair.
+    #[test]
+    fn event_page_drops_a_supplementary_pair_whose_echo_falls_off_the_end() {
+        let events = log_with_an_echo();
+
+        let page = event_page(&events, 100, 0, 2);
+
+        assert_eq!(page.events.len(), 2, "the echo is past the page");
+        assert!(page.supp_pairs.is_empty());
     }
 
     #[test]

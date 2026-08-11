@@ -23,6 +23,7 @@ export const EVENT_FETCH_CAP = 50_000;
 export const useEvents = (id: string | undefined) => {
   const [events, setEvents] = useState<LogEvent[]>([]);
   const [total, setTotal] = useState(0);
+  const [suppPairs, setSuppPairs] = useState<Record<number, number>>({});
   const generation = useRef(0);
 
   useEffect(() => {
@@ -35,6 +36,7 @@ export const useEvents = (id: string | undefined) => {
         const page = result as EventPage;
         setEvents(page.events);
         setTotal(page.total);
+        setSuppPairs(page.suppPairs ?? {});
       })
       .catch(() => {
         // No toast: the analysis view already reports its own fetch failures for
@@ -43,8 +45,9 @@ export const useEvents = (id: string | undefined) => {
         if (mine !== generation.current) return;
         setEvents([]);
         setTotal(0);
+        setSuppPairs({});
       });
   }, [id]);
 
-  return { events, total };
+  return { events, total, suppPairs };
 };

@@ -996,7 +996,13 @@ export type LogEvent = [number, LogEventPayload];
 /** Mirrors the Rust `EventPage`. `total` can exceed `events.length` — the
  * frontend asks for a capped page, and a log past the cap is truncated VISIBLY
  * (see EventsTab), never silently. */
-export type EventPage = { events: LogEvent[]; total: number };
+export type EventPage = {
+  events: LogEvent[];
+  total: number;
+  /** Echo row index -> trigger row index, both into `events`. A pair with
+   * either end off the page is absent, and that echo renders flat. */
+  suppPairs: Record<number, number>;
+};
 
 /** Toolbox / Synthesis Helper — mirrors src-tauri/src/synthesis/mod.rs. */
 export type SynthesisSigil = {
