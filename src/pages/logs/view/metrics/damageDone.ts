@@ -1,11 +1,12 @@
 import type { ComputedPlayerState, EnemyType, MergedSkillMeasure, SkillState } from "@/types";
-import { humanizeNumber, ratePerSecond, share } from "@/utils";
+import { humanizeNumber, isSupplementaryAction, ratePerSecond, share } from "@/utils";
 
 import {
   groupSkillsForRows,
   mergeSkillsByAction,
   skillsForAbilityKey,
   splitSupplementary,
+  supplementarySubValue,
   type AbilitySkills,
 } from "../abilitySkills";
 import { enemyRowKey, playerRowKey, skillKey, skillKeyPayload } from "../rowKey";
@@ -40,6 +41,12 @@ export const damageColumns = (damage: number, hits: number, min: string, max: st
   share(damage, total),
 ];
 
+/** The landing views behind a set of breakdown rows, skipping any row that
+ * carries none — a backend older than the field sends nothing, and a missing
+ * measure is "nothing to merge" rather than a row of zeros. */
+const measuresOf = (skills: SkillState[]): MergedSkillMeasure[] =>
+  skills.map((skill) => skill.merged).filter((measure): measure is MergedSkillMeasure => measure !== undefined);
+
 /** Everything a damage BAR reads off one set of breakdown rows: its length,
  * its supplementary split, and the numeric columns beside it.
  *
@@ -67,18 +74,37 @@ const damageCells = (
   // figures. Only where something behind the row carries a landing view is
   // there a landing view to report.
   //
-  // PRESENCE, not meaning: the parser's landing pass walks damage events only,
-  // so a row opened by something else (`PerfectGuard`, `StunEffect(0)`) carries
-  // an all-zero measure beside a non-zero `hits` and would report Hits 0 here.
-  // Sufficient today because no such row reaches this fold — each keys to its
-  // own ability row, and none is a merged parent.
-  const landings = skills
-    .map((skill) => skill.merged)
-    .filter((measure): measure is MergedSkillMeasure => measure !== undefined);
+  const landings = measuresOf(skills);
 
-  if (merged && landings.length > 0) {
+  // Only a MIXED set has a split to report — `splitSupplementary` owns both
+  // that rule and the direct/echo partition, so every bar in the view splits
+  // the same way. Read here rather than in the raw branch alone because the
+  // landing gate below turns on the same question.
+  const { echoes, mixed } = splitSupplementary(skills);
+
+  // A MIXED bucket under the collapse is a cause row holding the echoes it
+  // claimed, so those echo rows are FOLDED ones: their landing view is the
+  // residue the pairing could not attach (`MergedSkillMeasure`), and the
+  // backend counts each of those as a landing — right where the residue stands
+  // as the echo row (all-echo, not mixed), wrong here. Its damage belongs to
+  // this row, but the trigger it rode is already one of the hits counted here;
+  // the pairing just could not say which. Counting it read Eustace's 360 normal
+  // attacks as 361 with the merge on (log 2586), and let a fragment of a
+  // landing stand as the row's minimum.
+  const landed =
+    merged && mixed ? measuresOf(skills.filter((skill) => !isSupplementaryAction(skill.actionType))) : landings;
+  const hits = landed.reduce((sum, measure) => sum + measure.hits, 0);
+
+  // Present AND meaningful. The landing pass walks damage events only, so a row
+  // opened by something else (`PerfectGuard`, `StunEffect(0)`) carries an
+  // all-zero measure beside real hits — reporting it verbatim says the thing
+  // never happened. Zero landings only DESCRIBE a row when an echo could have
+  // folded them away: a fully claimed echo is legitimately empty here, and
+  // sending it to the raw branch instead would draw its damage a second time
+  // under the trigger already reporting it. Every direct damage event is a
+  // landing of its own, so no bucket with damage in it reaches the fallback.
+  if (merged && landings.length > 0 && (hits > 0 || echoes.length > 0)) {
     const damage = landings.reduce((sum, measure) => sum + measure.damage, 0);
-    const hits = landings.reduce((sum, measure) => sum + measure.hits, 0);
     const supplementary = landings.reduce((sum, measure) => sum + measure.supplementary, 0);
     return {
       value: damage,
@@ -86,22 +112,22 @@ const damageCells = (
       // the raw view does. Once every echo folds onto its trigger, the echo row
       // contributes `merged.damage === 0`, so looking for an echo among these
       // skills finds nothing and a row with a real echo share would draw one
-      // flat bar. `supplementary < damage` is the "mixed" rule both views still
-      // need: a row that is supplementary all the way across is already
-      // described by its own label.
-      ...(supplementary > 0 && supplementary < damage ? { subValue: supplementary } : {}),
+      // flat bar.
+      ...supplementarySubValue(supplementary, damage),
       columns: damageColumns(
         damage,
         hits,
         // Verbatim from the backend, never re-derived: under the landing model
         // an extreme IS a whole landing, echo included, and only the parser
-        // still holds the per-hit identity that would take to compute.
+        // still holds the per-hit identity that would take to compute. Over the
+        // same set the hits come from — a residue is a fragment of a landing,
+        // not one of its own, and the two columns describe one population.
         extreme(
-          landings.map((measure) => measure.min),
+          landed.map((measure) => measure.min),
           (values) => Math.min(...values)
         ),
         extreme(
-          landings.map((measure) => measure.max),
+          landed.map((measure) => measure.max),
           (values) => Math.max(...values)
         ),
         total
@@ -109,19 +135,15 @@ const damageCells = (
     };
   }
 
-  const damage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
-  const hits = skills.reduce((sum, skill) => sum + skill.hits, 0);
-  // Only a MIXED set has a split to report — `splitSupplementary` owns both
-  // that rule and the direct/echo partition, so every bar in the view splits
-  // the same way.
-  const { echoes, mixed } = splitSupplementary(skills);
+  const rawDamage = skills.reduce((sum, skill) => sum + skill.totalDamage, 0);
+  const rawHits = skills.reduce((sum, skill) => sum + skill.hits, 0);
   const supplementary = mixed ? echoes.reduce((sum, skill) => sum + skill.totalDamage, 0) : 0;
   return {
-    value: damage,
+    value: rawDamage,
     ...(supplementary > 0 ? { subValue: supplementary } : {}),
     columns: damageColumns(
-      damage,
-      hits,
+      rawDamage,
+      rawHits,
       // Across every skill behind the row. On the collapse-OFF path that is
       // the same set the old direct half was: an echo keys to the echo row, so
       // no bucket is mixed.

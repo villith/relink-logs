@@ -160,10 +160,9 @@ export const useRowModel = ({
         // this is what makes the collapse toggle reach the table at all — and
         // what keeps the timeline's lane join (which expands a row's label
         // through the same keying) from listing an echo row it can never fill.
+        // It also carries which view the rows report: landings only when the
+        // reader asked for echoes to be merged.
         keying: rowKeying,
-        // The same toggle the keying carries. Rows report landings only when
-        // the reader asked for echoes to be merged.
-        merged: rowKeying.collapseSupplementary,
       });
     }
     return shownEncounter
