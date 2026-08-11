@@ -348,6 +348,19 @@ fn resolve_source_parent_ptr(source_type_id: u32, source: *const usize) -> Optio
     Some(parent)
 }
 
+/// The HUMAN (`Pl1900`) body behind Id's dragon form, when `source` is the
+/// `Pl2000` body — the same parent link [`get_source_parent`]'s dragon case
+/// resolves. `None` for every other actor type: this is deliberately NOT a
+/// generic owner walk, it exists so the per-hit source-state snapshot can read
+/// the one owned body whose owner is a verified `Pl####` layout.
+#[inline(always)]
+pub(crate) fn dragon_form_owner(source_type_id: u32, source: *const usize) -> Option<*const usize> {
+    if source_type_id != ID_DRAGON_TYPE {
+        return None;
+    }
+    parent_specified_instance_at(source, ID_DRAGON_PARENT_ENTITY_OFFSET)
+}
+
 /// The parent actor to credit a damage source to: `(type id, index, instance)`.
 ///
 /// `Pl2000` is handled ahead of the generic path because Id's dragon form

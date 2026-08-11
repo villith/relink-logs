@@ -1608,23 +1608,39 @@ struct SourceState {
 }
 
 impl SourceState {
-    /// Snapshot `actor` if — and only if — it carries a party slot on its OWN
-    /// embedded record.
+    /// Snapshot `actor` if — and only if — the body being read carries a party
+    /// slot on its OWN embedded record.
     ///
     /// That test is the gate, not a convenience: it is true exactly for a
     /// player's own `Pl####` body, which is the family both component offsets
     /// were verified against. A summon, a pet, or an owned body resolves its
     /// slot through the owner walk instead and is deliberately left uncaptured
     /// rather than read at offsets nothing proved apply to it.
+    ///
+    /// The ONE owner-walked exception is Id's dragon form: a transformed Id
+    /// deals every hit from the `Pl2000` body (whole fights, not a burst
+    /// window — logs 2571/2573 show ~92% of Id's hits with no capturable
+    /// state), and the body this then reads is the walked-to HUMAN `Pl1900`
+    /// instance — a verified player layout, gated by the same slot test as
+    /// everything else. The dragon body itself is never read.
     fn capture(actor: usize) -> Self {
-        if actor == 0 || super::player::player_slot_key_for_actor(actor as *const usize).is_none() {
+        if actor == 0 {
             return Self::default();
         }
-        let (current_hp, max_hp) = read_actor_hp_pair(actor).unzip();
+        let ptr = actor as *const usize;
+        let body = if super::player::player_slot_key_for_actor(ptr).is_some() {
+            ptr
+        } else {
+            match super::summon::dragon_form_owner(super::actor_type_id(ptr), ptr) {
+                Some(owner) if super::player::player_slot_key_for_actor(owner).is_some() => owner,
+                _ => return Self::default(),
+            }
+        };
+        let (current_hp, max_hp) = read_actor_hp_pair(body as usize).unzip();
         Self {
             current_hp,
             max_hp,
-            statuses: super::status::snapshot_player_statuses(actor as *const usize),
+            statuses: super::status::snapshot_player_statuses(body),
         }
     }
 }
