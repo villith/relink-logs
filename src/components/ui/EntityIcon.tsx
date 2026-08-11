@@ -1,3 +1,5 @@
+import { cn } from "./cn";
+
 export type EntityIconSize = "row" | "control" | "card";
 
 export type EntityIconProps = {
@@ -29,6 +31,6 @@ export const EntityIcon = ({ src, alt, size = "row", className }: EntityIconProp
     src={src}
     alt={alt}
     aria-hidden={alt === "" || undefined}
-    className={["shrink-0 object-contain", SIZE_CLASS[size], className].filter(Boolean).join(" ")}
+    className={cn("shrink-0 object-contain", SIZE_CLASS[size], className)}
   />
 );

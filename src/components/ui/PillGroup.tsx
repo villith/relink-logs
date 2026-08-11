@@ -1,6 +1,7 @@
 import { Box, UnstyledButton } from "@mantine/core";
 import type { ReactNode } from "react";
 
+import { cn } from "./cn";
 import { Label } from "./Label";
 import { onArrowKeys } from "./rovingKeys";
 
@@ -60,9 +61,7 @@ export const PillGroup = <T extends string>({
       role="radiogroup"
       aria-label={ariaLabel}
       aria-disabled={disabled || undefined}
-      className={["inline-flex gap-0.5 rounded border border-line bg-panel p-0.5", disabled ? "opacity-40" : ""]
-        .filter(Boolean)
-        .join(" ")}
+      className={cn("inline-flex gap-0.5 rounded border border-line bg-panel p-0.5", disabled && "opacity-40")}
       // With a caption the whole field carries the tooltip instead, so hovering
       // the word in front of the pills explains them too.
       title={caption === undefined ? title : undefined}
@@ -79,13 +78,11 @@ export const PillGroup = <T extends string>({
             // Out of the tab order entirely while disabled: a roving tabindex
             // would still hand focus to a control that cannot be operated.
             tabIndex={disabled ? -1 : active ? 0 : -1}
-            className={[
+            className={cn(
               "whitespace-nowrap rounded-sm px-2.5 py-0.5 text-sm font-semibold",
               active ? "bg-raised text-ink" : "text-ink-3",
-              disabled ? "cursor-default" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
+              disabled && "cursor-default"
+            )}
             // Guarded here as well as by the dimming: a class is a look, not a
             // lock, and a dimmed control that still reports a change is the
             // same defect as an undimmed one.
