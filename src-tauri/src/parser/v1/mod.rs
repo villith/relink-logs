@@ -31,6 +31,7 @@ pub mod phantom_targets;
 mod player_state;
 mod skill_state;
 mod status;
+mod supp_pairing;
 mod windows;
 
 pub use ability_charts::{build_ability_sba_chart, build_ability_stun_chart, AbilitySeries};
