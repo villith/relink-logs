@@ -311,12 +311,12 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 103, 300, 301, 302, 400, 503, 510, 515],
-          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 300, 301, 302, 400, 503, 510, 515],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10; caporacle join, logs 2571,2573 (manual multiset diff; solver confounded by status-gated 40)"
         },
         "1": {
-          "actionIds": [110, 120, 200, 201, 202, 203, 204, 410, 503, 505, 506, 507, 508, 509],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
+          "actionIds": [110, 120, 200, 201, 202, 203, 204, 220, 410, 503, 505, 506, 507, 508, 509],
+          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10; caporacle join, logs 2571,2573 (manual multiset diff; solver confounded by status-gated 40)"
         }
       }
     },
