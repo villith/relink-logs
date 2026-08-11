@@ -31,7 +31,10 @@ pub mod phantom_targets;
 mod player_state;
 mod skill_state;
 mod status;
-mod supp_pairing;
+/// Public for `examples/supp_pair_probe.rs`, which measures this exact rule
+/// after a game patch — see [`supp_pairing::PAIRING_WINDOW_MS`]. Same reason
+/// [`phantom_targets`] is public.
+pub mod supp_pairing;
 mod windows;
 
 pub use ability_charts::{build_ability_sba_chart, build_ability_stun_chart, AbilitySeries};
@@ -1277,23 +1280,22 @@ impl DerivedEncounterState {
             .insert(event.source.parent_index);
     }
 
-    /// Returns the breakdown row this hit landed in: the party slot plus the
-    /// [`BreakdownKey`] its [`player_state::BreakdownKeying`] assigned. Carried
-    /// out rather than recomputed — see
-    /// [`PlayerState::update_from_damage_event`] — so the reparse's landing
-    /// pass can address the very row the walk fed. Every other caller ignores
-    /// it.
+    /// Returns the [`BreakdownKey`] this hit landed under, as its
+    /// [`player_state::BreakdownKeying`] assigned it. Carried out rather than
+    /// recomputed — see [`PlayerState::update_from_damage_event`] — because
+    /// that keying is stateful and order-dependent, so a second `key_for` would
+    /// advance it and name a row the walk never opened. The reparse's landing
+    /// pass needs the very row the walk fed; every other caller ignores this.
     ///
-    /// The party slot is returned for the same reason, though it looks like a
-    /// field read the caller could do itself: `remap_dragon_form` rewrites
-    /// `source.parent_index`, so only the POST-remap index is the one
-    /// `party.get_mut` used here. A caller re-deriving it from its own event
-    /// would file Id's dragonform damage against the wrong player.
+    /// The party slot is NOT returned with it: it is
+    /// `damage_instance.event.source.parent_index`, and `damage_instance` is
+    /// already built from the post-`remap_dragon_form` event, so the caller
+    /// reading that field gets the same slot `party.get_mut` used here.
     fn process_damage_event(
         &mut self,
         now: i64,
         damage_instance: &AdjustedDamageInstance,
-    ) -> (u32, BreakdownKey) {
+    ) -> BreakdownKey {
         self.extend_window(now);
         self.total_damage += damage_instance.event.damage as u64;
         self.dps = self.total_damage as f64 / self.duration_secs();
@@ -1349,10 +1351,7 @@ impl DerivedEncounterState {
             player.update_rates(duration_secs);
         }
 
-        (
-            damage_instance.event.source.parent_index,
-            (action, child_character_type),
-        )
+        (action, child_character_type)
     }
 
     /// Folds one network stun-apply message (`OnPlayerStun`) into the encounter.
@@ -2532,75 +2531,54 @@ struct Walked {
     is_echo: bool,
 }
 
+impl supp_pairing::Walked for Walked {
+    type Amount = u64;
+
+    fn position(&self) -> usize {
+        self.position
+    }
+
+    fn amount(&self) -> u64 {
+        self.damage
+    }
+}
+
 /// Folds the landing view into every breakdown row from what the walk recorded.
 ///
-/// The `skill_breakdown` twin of the group aggregates' `fold_landings`, and it
-/// should stay readable against it: same gate, same accumulation, same orphan
-/// rule. The one deliberate difference is how a row is addressed — see
-/// [`Walked::key`].
-///
-/// Gated on what SURVIVED the reparse's filters, both directions: a claimed
-/// echo whose trigger was windowed or filtered out stands alone rather than
-/// letting its damage vanish, and a trigger only absorbs echoes that survived
-/// alongside it. That is what keeps `Σ merged.damage == Σ total_damage` over a
-/// player's rows under any scrub window, target span or mask.
+/// The `skill_breakdown` twin of the group aggregates' `fold_landings`. Both
+/// take the gate deciding what IS a landing from
+/// [`supp_pairing::SuppPairing::for_each_landing`] — that is what keeps
+/// `Σ merged.damage == Σ total_damage` over a player's rows under any scrub
+/// window, target span or mask, and it is written once because its failures are
+/// silent on both sides. What differs here is only how a row is addressed (see
+/// [`Walked::key`]) and the width of the amounts.
 fn fold_skill_landings(
     party: &mut HashMap<u32, PlayerState>,
     walked: &[Walked],
     pairing: &supp_pairing::SuppPairing,
 ) {
-    // The walk pushes in event order and at most once per position, so `walked`
-    // is strictly ascending by `position` — membership is a binary search
-    // rather than a set built for one pass. Asserted rather than assumed: a
-    // walk that ever pushed twice for one event would make the search pick
-    // between them arbitrarily.
-    debug_assert!(
-        walked
-            .windows(2)
-            .all(|pair| pair[0].position < pair[1].position),
-        "fold_skill_landings needs the walk's records strictly ascending by position"
-    );
-    let survivor = |position: usize| -> Option<&Walked> {
-        walked
-            .binary_search_by_key(&position, |entry| entry.position)
-            .ok()
-            .map(|at| &walked[at])
-    };
-
-    for &Walked {
-        position,
-        player_index,
-        key: (action, child_character_type),
-        damage,
-        is_echo,
-    } in walked
-    {
-        if pairing
-            .trigger_of(position)
-            .is_some_and(|trigger| survivor(trigger).is_some())
-        {
-            continue;
+    // Where each recorded key sits in its player's `skill_breakdown`, built
+    // once. Rows are final by now — the walk has closed — so a position holds
+    // for the whole fold, and the alternative is a linear scan of that vec per
+    // surviving event, on every reparse.
+    let mut row_at: HashMap<(u32, BreakdownKey), usize> = HashMap::new();
+    for (&player_index, player) in party.iter() {
+        for (at, skill) in player.skill_breakdown.iter().enumerate() {
+            row_at
+                .entry((
+                    player_index,
+                    (skill.action_type, skill.child_character_type),
+                ))
+                .or_insert(at);
         }
-        // The echo's damage as the WALK filed it, never as the pairing stored
-        // it: one number, one source. The two are not even the same number
-        // here — `supp_pairing` clamps a negative with `.max(0)` while this
-        // walk stores `damage as u64` unclamped, exactly as
-        // `SkillState::update_from_damage_event` does. Taking the walk's is
-        // what keeps the sum invariant below true; taking the pairing's would
-        // break it silently on any hit the two disagree about.
-        let attached: u64 = pairing
-            .echoes_of(position)
-            .iter()
-            .filter_map(|(echo, _)| survivor(*echo))
-            .map(|echo| echo.damage)
-            .sum();
-        let landing = damage + attached;
+    }
 
-        let Some(row) = party.get_mut(&player_index).and_then(|player| {
-            player.skill_breakdown.iter_mut().find(|skill| {
-                skill.action_type == action && skill.child_character_type == child_character_type
-            })
-        }) else {
+    pairing.for_each_landing(walked, |record, landing, attached| {
+        let Some(row) = party
+            .get_mut(&record.player_index)
+            .zip(row_at.get(&(record.player_index, record.key)))
+            .and_then(|(player, &at)| player.skill_breakdown.get_mut(at))
+        else {
             // Unreachable: the walk opened this very row through
             // `breakdown_row_mut` before recording it, and nothing removes
             // rows. Named anyway — in release this arm drops the landing's
@@ -2608,10 +2586,10 @@ fn fold_skill_landings(
             // mismatched totals without saying which row went missing.
             debug_assert!(
                 false,
-                "the walk recorded position {position} against player {player_index}'s \
-                 {action:?}/{child_character_type:?} row, which no longer exists"
+                "the walk recorded position {} against player {}'s {:?} row, which no longer exists",
+                record.position, record.player_index, record.key
             );
-            continue;
+            return;
         };
 
         row.merged.damage += landing;
@@ -2620,8 +2598,8 @@ fn fold_skill_landings(
         row.merged.max = Some(row.merged.max.map_or(landing, |max| max.max(landing)));
         // An orphan echo is supplementary all the way across; a direct hit
         // contributes only what rode along with it.
-        row.merged.supplementary += if is_echo { landing } else { attached };
-    }
+        row.merged.supplementary += if record.is_echo { landing } else { attached };
+    });
 
     // The two views describe the same damage: a claim MOVES it between rows,
     // it never creates or drops any. Checked here rather than in one test
@@ -3006,13 +2984,15 @@ impl Parser {
                                     target_assignment.get(event_index).copied().flatten(),
                                 );
 
-                        let (player_index, key) = self
+                        let key = self
                             .derived_state
                             .process_damage_event(*timestamp, &damage_instance);
 
                         walked.push(Walked {
                             position: event_index,
-                            player_index,
+                            // Post-remap, like the two fields below it: this is
+                            // the event `process_damage_event` just filed.
+                            player_index: damage_instance.event.source.parent_index,
                             key,
                             // Exactly what `SkillState::update_from_damage_event`
                             // just added, so the two views cannot drift.

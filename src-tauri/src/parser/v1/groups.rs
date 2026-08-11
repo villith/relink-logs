@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::parser::constants::{CharacterType, EnemyType};
 
-use super::supp_pairing::SuppPairing;
+use super::supp_pairing::{self, SuppPairing};
 use super::{
     bucket_for, is_damage_taken_event, player_state, remap_dragon_form, survives_shared_gates,
     MeterFilters, PhantomTargets, PlayerData, TargetSegment, TargetSpan,
@@ -380,6 +380,18 @@ struct Walked {
     is_echo: bool,
 }
 
+impl supp_pairing::Walked for Walked {
+    type Amount = i64;
+
+    fn position(&self) -> usize {
+        self.position
+    }
+
+    fn amount(&self) -> i64 {
+        self.damage
+    }
+}
+
 /// Folds the landing view into `aggregates` from what the walk recorded.
 ///
 /// MUST run before `aggregates` is sorted or appended to: [`Walked`] addresses
@@ -388,10 +400,10 @@ struct Walked {
 /// preserves the total — which is why this is a call in a visible sequence
 /// rather than thirty lines relying on adjacency to the sort.
 ///
-/// Gated on what SURVIVED the query, both directions: a claimed echo whose
-/// trigger was filtered out stands alone rather than letting its damage vanish,
-/// and a trigger only absorbs echoes that survived alongside it, so the two
-/// views always sum to the same total.
+/// The gate deciding what IS a landing lives in
+/// [`SuppPairing::for_each_landing`], shared with the derived state's twin
+/// (`fold_skill_landings`); everything below it is this caller's own row
+/// addressing and accumulation.
 ///
 /// Runs on the taken stream too. `SupplementaryDamage` is classified from the
 /// event's own action id with no regard to its source, so an enemy echo would
@@ -400,59 +412,16 @@ struct Walked {
 /// base is player-side — but nothing here enforces that, and no capture has
 /// confirmed it.
 fn fold_landings(aggregates: &mut [GroupAggregate], walked: &[Walked], pairing: &SuppPairing) {
-    // The walk pushes in `events.iter().enumerate()` order and at most once per
-    // position, so `walked` is strictly ascending by `position` — membership is
-    // a binary search rather than a set built for one pass. Asserted rather
-    // than assumed: a walk that ever pushed twice for one event would make the
-    // search pick between them arbitrarily.
-    debug_assert!(
-        walked
-            .windows(2)
-            .all(|pair| pair[0].position < pair[1].position),
-        "fold_landings needs the walk's records strictly ascending by position"
-    );
-    let survivor = |position: usize| -> Option<&Walked> {
-        walked
-            .binary_search_by_key(&position, |entry| entry.position)
-            .ok()
-            .map(|at| &walked[at])
-    };
-
-    for &Walked {
-        position,
-        aggregate_index,
-        damage,
-        is_echo,
-    } in walked
-    {
-        if pairing
-            .trigger_of(position)
-            .is_some_and(|trigger| survivor(trigger).is_some())
-        {
-            continue;
-        }
-        // The echo's damage as the WALK aggregated it, never as the pairing
-        // stored it: one number, one source. The two agree today only because
-        // both clamp a negative at zero — an asymmetry `supp_pairing` flags on
-        // its own side — and any future gate that transformed the aggregated
-        // amount would break the sum invariant with nothing to catch it.
-        let attached: i64 = pairing
-            .echoes_of(position)
-            .iter()
-            .filter_map(|(echo, _)| survivor(*echo))
-            .map(|echo| echo.damage)
-            .sum();
-        let landing = damage + attached;
-
-        let merged = &mut aggregates[aggregate_index].merged;
+    pairing.for_each_landing(walked, |record, landing, attached| {
+        let merged = &mut aggregates[record.aggregate_index].merged;
         merged.amount += landing;
         merged.hits += 1;
         merged.min = Some(merged.min.map_or(landing, |min| min.min(landing)));
         merged.max = Some(merged.max.map_or(landing, |max| max.max(landing)));
         // An orphan echo is supplementary all the way across; a direct hit
         // contributes only what rode along with it.
-        merged.supplementary += if is_echo { landing } else { attached };
-    }
+        merged.supplementary += if record.is_echo { landing } else { attached };
+    });
 
     // The two views describe the same walk: a claim MOVES damage between rows,
     // it never creates or drops any. This catches strictly less here than in

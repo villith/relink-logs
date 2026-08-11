@@ -2,9 +2,11 @@
 //! supplementary-damage event be paired to the hit that triggered it, purely
 //! from event ORDER?
 //!
-//! Strategy C is what `supp_pairing` implements, line for line. Re-run this
-//! after a game patch: a shifted echo lag shows up as a rising ORPHAN%, and the
-//! window constant is re-derived from the reported time gaps.
+//! Strategy C IS `supp_pairing` — it calls `SuppPairing::learned_from` rather
+//! than reproducing it, so this can never end up measuring a rule the parser no
+//! longer runs. Re-run after a game patch: a shifted echo lag shows up as a
+//! rising ORPHAN%, and `PAIRING_WINDOW_MS` is re-derived from the reported time
+//! gaps.
 //!
 //! Deliberately assumes NOTHING about the supp/trigger damage ratio — the older
 //! `supp_scan` scored pairings against a 0.2/0.4 hypothesis that later work
@@ -15,7 +17,7 @@
 //!   A  (source, aid) FIFO, no expiry          — the naive "in order" reading
 //!   B  (source, aid) FIFO, expire > WINDOW ms — same, but a trigger that never
 //!                                               procs stops poisoning the queue
-//!   C  B + prefer a candidate on the SAME TARGET
+//!   C  the shipped rule: B + prefer a candidate on the SAME TARGET
 //!   D  (source, target, aid) FIFO, expiry     — target folded into the key
 //!
 //! Judged by three signals, none of which assumes a ratio:
@@ -33,14 +35,10 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use gbfr_logs::parser::v1::supp_pairing::{SuppPairing, PAIRING_WINDOW_MS};
 use gbfr_logs::parser::v1::Encounter;
 use protocol::{ActionType, Message};
 use rusqlite::Connection;
-
-/// How long a trigger stays claimable. Chosen from the measured lag, not
-/// guessed: log 2573 puts the echo p50 at 151ms and p99 at 169ms behind its
-/// trigger, so 500ms is ~3x the observed tail.
-const WINDOW_MS: i64 = 500;
 
 #[derive(Clone, Copy)]
 struct Pending {
@@ -50,11 +48,12 @@ struct Pending {
     target_actor_type: u32,
 }
 
+/// The variants strategy C is judged AGAINST. C itself is not here — it is the
+/// shipped rule, run through `run_shipped`.
 #[derive(Clone, Copy, PartialEq)]
 enum Strategy {
     FifoNoExpiry,
     Fifo,
-    PreferTarget,
     TargetKeyed,
 }
 
@@ -74,6 +73,25 @@ struct Stats {
 /// care WHICH multiple, only that the population is not a smear.
 fn is_quantized(ratio: f64) -> bool {
     (ratio / 0.05 - (ratio / 0.05).round()).abs() * 0.05 < 0.001
+}
+
+impl Stats {
+    /// Scores one echo that found a trigger. Shared by every strategy so the
+    /// three reported signals cannot be computed differently for the shipped
+    /// rule than for the variants it is judged against.
+    fn record_pair(&mut self, echo_damage: i32, trigger_damage: i32, same_target: bool) {
+        self.paired += 1;
+        if same_target {
+            self.target_hit += 1;
+        } else {
+            self.target_miss += 1;
+        }
+        let ratio = echo_damage as f64 / trigger_damage as f64;
+        if is_quantized(ratio) {
+            self.quantized += 1;
+        }
+        *self.ratios.entry(format!("{ratio:.3}")).or_default() += 1;
+    }
 }
 
 fn run(strategy: Strategy, events: &[(i64, protocol::DamageEvent)]) -> Stats {
@@ -113,37 +131,18 @@ fn run(strategy: Strategy, events: &[(i64, protocol::DamageEvent)]) -> Stats {
                 if strategy != Strategy::FifoNoExpiry {
                     while queue
                         .front()
-                        .is_some_and(|p| timestamp - p.timestamp > WINDOW_MS)
+                        .is_some_and(|p| timestamp - p.timestamp > PAIRING_WINDOW_MS)
                     {
                         queue.pop_front();
                     }
                 }
 
-                let picked = if strategy == Strategy::PreferTarget {
-                    queue
-                        .iter()
-                        .position(|p| p.target_index == target.0 && p.target_actor_type == target.1)
-                        .and_then(|at| queue.remove(at))
-                        .or_else(|| queue.pop_front())
-                } else {
-                    queue.pop_front()
-                };
-
-                match picked {
-                    Some(trigger) => {
-                        stats.paired += 1;
-                        if trigger.target_index == target.0 && trigger.target_actor_type == target.1
-                        {
-                            stats.target_hit += 1;
-                        } else {
-                            stats.target_miss += 1;
-                        }
-                        let ratio = event.damage as f64 / trigger.damage as f64;
-                        if is_quantized(ratio) {
-                            stats.quantized += 1;
-                        }
-                        *stats.ratios.entry(format!("{ratio:.3}")).or_default() += 1;
-                    }
+                match queue.pop_front() {
+                    Some(trigger) => stats.record_pair(
+                        event.damage,
+                        trigger.damage,
+                        (trigger.target_index, trigger.target_actor_type) == target,
+                    ),
                     None => stats.orphans += 1,
                 }
             }
@@ -151,6 +150,57 @@ fn run(strategy: Strategy, events: &[(i64, protocol::DamageEvent)]) -> Stats {
         }
     }
     stats
+}
+
+/// Strategy C: the SHIPPED rule, called rather than reproduced.
+///
+/// The probe's job after a game patch is to say whether what the parser does
+/// still holds. A local copy of the rule — however faithful the day it was
+/// written — would keep reporting on a rule that had since moved, and the
+/// numbers would still print, so the drift would be invisible.
+fn run_shipped(events: &[(i64, protocol::DamageEvent)]) -> Stats {
+    // `learned_from` keys its links by position in the slice it walks, so it is
+    // handed exactly the events the other strategies walk — same order, same
+    // indexes — and the four columns stay comparable. (The parser itself pairs
+    // over the MIXED message stream, where non-damage messages take positions
+    // too; that changes which index a hit has, never which hit an echo picks.)
+    let stream: Vec<(i64, Message)> = events
+        .iter()
+        .map(|(timestamp, event)| (*timestamp, Message::DamageEvent(event.clone())))
+        .collect();
+    let pairing = SuppPairing::learned_from(&stream);
+
+    let mut stats = Stats::default();
+    for (position, (_, event)) in events.iter().enumerate() {
+        if !matches!(event.action_id, ActionType::SupplementaryDamage(_)) {
+            continue;
+        }
+        stats.echoes += 1;
+        match pairing.trigger_of(position) {
+            Some(at) => {
+                let trigger = &events[at].1;
+                stats.record_pair(
+                    event.damage,
+                    trigger.damage,
+                    (trigger.target.index, trigger.target.actor_type)
+                        == (event.target.index, event.target.actor_type),
+                );
+            }
+            None => stats.orphans += 1,
+        }
+    }
+    stats
+}
+
+/// The four strategies in report order — the order `names` and the histogram's
+/// `totals[2]` both read.
+fn run_at(slot: usize, events: &[(i64, protocol::DamageEvent)]) -> Stats {
+    match slot {
+        0 => run(Strategy::FifoNoExpiry, events),
+        1 => run(Strategy::Fifo, events),
+        2 => run_shipped(events),
+        _ => run(Strategy::TargetKeyed, events),
+    }
 }
 
 fn main() -> Result<()> {
@@ -184,12 +234,6 @@ fn main() -> Result<()> {
         "C prefer-target",
         "D target-keyed",
     ];
-    let strategies = [
-        Strategy::FifoNoExpiry,
-        Strategy::Fifo,
-        Strategy::PreferTarget,
-        Strategy::TargetKeyed,
-    ];
     let mut totals: Vec<Stats> = (0..4).map(|_| Stats::default()).collect();
     let mut logs = 0u64;
 
@@ -215,8 +259,8 @@ fn main() -> Result<()> {
         }
         logs += 1;
 
-        for (slot, strategy) in strategies.iter().enumerate() {
-            let s = run(*strategy, &events);
+        for slot in 0..4 {
+            let s = run_at(slot, &events);
             let t = &mut totals[slot];
             t.echoes += s.echoes;
             t.orphans += s.orphans;
