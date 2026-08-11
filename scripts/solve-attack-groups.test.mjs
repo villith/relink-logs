@@ -313,7 +313,10 @@ describe("confounder refinement in solve", () => {
     const result = solve(oracleText, evidenceWith([0x32, 0x40], [{ statusId: 25, stacks: 1 }]), assets, {
       minSupport: 2,
     });
-    expect(result.assignments).toEqual({ pl2700: { 17: [130] } });
+    // 130's membership comes from its residual; 100's from baseline
+    // attribution — its every hit carried the 40 with no always-node or
+    // unruled confounder to explain it, so the group holds it too.
+    expect(result.assignments).toEqual({ pl2700: { 17: [100, 130] } });
   });
 
   it("a gated node stays a confounder when its status was up on every hit", () => {
@@ -572,6 +575,143 @@ describe("contradiction audit in solve", () => {
     const result = solve(twoActionOracle, evidenceWith([0x32], twoActionHits), assets, { minSupport: 2, banked });
     expect(result.assignments).toEqual({ pl2700: { 17: [130] } });
     expect(result.flags.filter((f) => f.flag === "observed-but-unbanked")).toEqual([]);
+  });
+});
+
+describe("baseline attribution in solve", () => {
+  // Eustace's log-2571 shape, miniaturized: EVERY observed action carries the
+  // group pair [35,35] plus an always-on 15, so the pair lands in the class
+  // BASELINE and residual analysis never sees it. After subtracting the
+  // loadout's always-on channel nodes, the leftover [35,35] must be explained
+  // by exactly one unlocked group subset — and that group then holds every
+  // observed action.
+  const line = (t, action, rate, cap, terms) =>
+    `[X] CAPORACLE t=${t} inst=0x1 action=${action} rate=${rate} class_flags=0x0 cap=${cap} floor=1 terms=[${terms}] buffs=[]`;
+  const PAIR = "0x61418d8:0x2:0.150000,0x61418d8:0x2:0.350000,0x61418d8:0x2:0.350000";
+  const oracleText = [
+    line(1000, 100, "1.000", 100000, PAIR),
+    line(2000, 100, "1.100", 100000, PAIR),
+    line(3000, 130, "3.000", 300000, PAIR),
+    line(4000, 130, "3.100", 300000, PAIR),
+  ].join("\n");
+  const hits = [
+    { t: 501_000, actor: 1, action: 100, cap: 100000, rate: 1, classFlags: 0, summon: false, statuses: [] },
+    { t: 502_000, actor: 1, action: 100, cap: 100000, rate: 1.1, classFlags: 0, summon: false, statuses: [] },
+    { t: 503_000, actor: 1, action: 130, cap: 300000, rate: 3, classFlags: 0, summon: false, statuses: [] },
+    { t: 504_000, actor: 1, action: 130, cap: 300000, rate: 3.1, classFlags: 0, summon: false, statuses: [] },
+  ];
+  const evidenceWith = (nodeIds, sigils = []) => ({
+    logs: [
+      {
+        id: 88,
+        players: [
+          { actorIndex: 1, characterType: "Pl2700", skillboard: nodeIds, sigils, summons: [] },
+          null,
+          null,
+          null,
+        ],
+        hits,
+      },
+    ],
+  });
+  const assetsWith = (extraNodes, conditionalTraits = {}) => ({
+    nodes: {
+      pl2700_0001: { effects: [{ stat: "cap", percent: 15, capClass: "all", scope: "always" }] },
+      pl2700_0085: {
+        effects: [
+          { stat: "cap", percent: 35, capClass: null, scope: "attack-group", targetAttackGroup: 0, abilityIds: [] },
+        ],
+      },
+      pl2700_00e1: {
+        effects: [
+          { stat: "cap", percent: 35, capClass: null, scope: "attack-group", targetAttackGroup: 0, abilityIds: [] },
+        ],
+      },
+      ...extraNodes,
+    },
+    skillNameSources: {},
+    capUpSources: { conditionalTraits, conditionalTraitInputs: {}, traits: {}, transcendedTraits: {} },
+  });
+
+  it("banks a group hiding in the class baseline once always-nodes are subtracted", () => {
+    const result = solve(oracleText, evidenceWith([0x01, 0x85, 0xe1]), assetsWith({}), { minSupport: 2 });
+    expect(result.assignments).toEqual({ pl2700: { 0: [100, 130] } });
+    expect(result.flags).toEqual([]);
+  });
+
+  it("flags an ambiguous baseline residue instead of guessing", () => {
+    // Two single-node [35] groups: the [35,35] leftover is their union, but a
+    // two-node group 0 would also fit — make BOTH shapes available.
+    const assets = assetsWith({
+      pl2700_0050: {
+        effects: [
+          { stat: "cap", percent: 35, capClass: null, scope: "attack-group", targetAttackGroup: 5, abilityIds: [] },
+        ],
+      },
+      pl2700_0051: {
+        effects: [
+          { stat: "cap", percent: 35, capClass: null, scope: "attack-group", targetAttackGroup: 6, abilityIds: [] },
+        ],
+      },
+    });
+    const result = solve(oracleText, evidenceWith([0x01, 0x85, 0xe1, 0x50, 0x51]), assets, { minSupport: 2 });
+    expect(result.assignments).toEqual({});
+    expect(result.flags.some((f) => f.flag === "baseline-ambiguous-subset")).toBe(true);
+  });
+
+  it("a sigil-counted node's possible totals confound the baseline residue", () => {
+    // Unlike an action-scoped delta (where a static count can never explain a
+    // difference BETWEEN actions), the baseline is exactly where a static
+    // sigil-counted contribution lives — so here it IS a confounder.
+    const assets = assetsWith({
+      pl2700_0023: {
+        effects: [
+          { stat: "cap", percent: 35, capClass: "all", scope: "counted", countKind: "basic-sigil", maxCount: 5 },
+        ],
+      },
+    });
+    const result = solve(oracleText, evidenceWith([0x01, 0x85, 0xe1, 0x23]), assets, { minSupport: 2 });
+    expect(result.assignments).toEqual({});
+    expect(result.flags.some((f) => f.flag === "baseline-confounded-value")).toBe(true);
+  });
+
+  it("a flat conditional trait value confounds the baseline residue", () => {
+    const sigils = [{ sigilId: 1, firstTraitId: 0x1111, firstTraitLevel: 1, secondTraitId: 0, secondTraitLevel: 0 }];
+    const assets = assetsWith({}, { "00001111": [[35, 35, 35]] });
+    const result = solve(oracleText, evidenceWith([0x01, 0x85, 0xe1], sigils), assets, { minSupport: 2 });
+    expect(result.assignments).toEqual({});
+    expect(result.flags.some((f) => f.flag === "baseline-confounded-value")).toBe(true);
+  });
+
+  it("skips attribution when two players share the character — merged loadouts prove nothing", () => {
+    // Log 2571's party had TWO Ids: the solver pools same-character hits, so
+    // a "baseline" across two different loadouts is meaningless and banking
+    // from it would write fiction. It must flag and refuse.
+    const evidence = {
+      logs: [
+        {
+          id: 89,
+          players: [
+            { actorIndex: 1, characterType: "Pl2700", skillboard: [0x01, 0x85, 0xe1], sigils: [], summons: [] },
+            { actorIndex: 2, characterType: "Pl2700", skillboard: [0x01, 0x85, 0xe1], sigils: [], summons: [] },
+            null,
+            null,
+          ],
+          hits: hits.map((hit, index) => ({ ...hit, actor: index < 2 ? 1 : 2 })),
+        },
+      ],
+    };
+    const result = solve(oracleText, evidence, assetsWith({}), { minSupport: 2 });
+    expect(result.assignments).toEqual({});
+    expect(result.flags.some((f) => f.flag === "baseline-multiple-players")).toBe(true);
+  });
+
+  it("flags a baseline residue no group subset reproduces", () => {
+    // Only ONE of the pair's nodes unlocked: the [35,35] leftover matches no
+    // subset (the group fires [35] alone), so it must flag, not half-bank.
+    const result = solve(oracleText, evidenceWith([0x01, 0x85]), assetsWith({}), { minSupport: 2 });
+    expect(result.assignments).toEqual({});
+    expect(result.flags.some((f) => f.flag === "baseline-unexplained-residual")).toBe(true);
   });
 });
 

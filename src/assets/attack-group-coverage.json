@@ -445,8 +445,8 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [120, 300, 400],
-          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
+          "actionIds": [110, 115, 120, 121, 125, 130, 140, 300, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10; caporacle join, logs 2571"
         },
         "15": {
           "actionIds": [121, 122, 301],
@@ -454,15 +454,15 @@
         },
         "16": {
           "actionIds": [115, 125, 304],
-          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; manual:button-map 2026-08-10"
+          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; manual:button-map 2026-08-10; caporacle join, logs 2571"
         },
         "17": {
           "actionIds": [130, 140],
-          "evidence": "caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; manual:button-map 2026-08-10"
+          "evidence": "caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; manual:button-map 2026-08-10; caporacle join, logs 2571"
         },
         "20": {
           "actionIds": [110, 111, 112, 115, 140],
-          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; manual:button-map 2026-08-10"
+          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; manual:button-map 2026-08-10; caporacle join, logs 2571"
         }
       }
     },

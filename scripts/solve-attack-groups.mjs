@@ -27,6 +27,15 @@
  * shares a residual value and could masquerade as the group node — is FLAGGED,
  * never guessed (the handoff's ambiguity rule).
  *
+ * The class BASELINE itself is attributed too: after subtracting the
+ * loadout's always-on channel nodes, a leftover must equal exactly ONE
+ * unlocked group subset — that group then holds EVERY observed action (log
+ * 2571: Eustace's Attacks pair rode every normal hit, invisible to
+ * residuals). Static sources the residual path rightly ignores (sigil
+ * counts, flat conditional traits, transcended blocks) are confounders
+ * here, and a character two players share in one log refuses attribution
+ * outright — a merged baseline proves nothing.
+ *
  * Every joined action is also AUDITED against the already-banked coverage
  * (the safety net for the manual button-map layer): a banked membership whose
  * unlocked group values never fired flags `banked-but-absent`, and a derived
@@ -390,6 +399,50 @@ const confounderValuesFor = (player, characterType, capClass, assets, statusSets
   return values;
 };
 
+/** The unlocked always-on channel-node values for this class — what the class
+ * baseline should contain before any group is suspected of hiding in it. */
+const alwaysValuesFor = (player, characterType, capClass, assets) => {
+  const values = [];
+  for (const id of player.skillboard ?? []) {
+    const node = assets.nodes[nodeKey(characterType, id)];
+    for (const effect of node?.effects ?? []) {
+      if (effect.stat !== "cap" || effect.scope !== "always" || !effectAppliesTo(effect, capClass)) continue;
+      if (effect.percent) values.push(Math.round(effect.percent));
+    }
+  }
+  return values;
+};
+
+/**
+ * Confounders for the BASELINE residue. The action-scoped refinements invert
+ * here: a sigil-counted node can never explain a delta BETWEEN actions, but
+ * the baseline is exactly where its static contribution lives — so its
+ * possible totals confound, as do transcended weapon blocks and every value
+ * the ordinary per-hit confounders carry.
+ */
+const baselineConfounderValuesFor = (player, characterType, capClass, assets, statusSetsPerHit) => {
+  const values = confounderValuesFor(player, characterType, capClass, assets, statusSetsPerHit);
+  for (const id of player.skillboard ?? []) {
+    const node = assets.nodes[nodeKey(characterType, id)];
+    for (const effect of node?.effects ?? []) {
+      if (effect.stat !== "cap" || !effectAppliesTo(effect, capClass)) continue;
+      if (effect.scope === "counted" && effect.countKind !== "quest-counter" && effect.percent) {
+        for (let count = 1; count <= (effect.maxCount ?? 5); count += 1) values.add(Math.round(effect.percent * count));
+      }
+    }
+  }
+  const transcended = assets.capUpSources.transcendedTraits ?? {};
+  for (const [id] of combinedTraits(player)) {
+    const rows = transcended[toHashString(id)];
+    if (rows === undefined) continue;
+    for (const row of rows) {
+      const value = row?.[CLASS_SLOT[capClass]] ?? 0;
+      if (value !== 0) values.add(Math.round(value));
+    }
+  }
+  return values;
+};
+
 /** group id → the value multiset its unlocked group-only cap nodes fire with. */
 const groupValuesFor = (player, characterType, capClass, assets) => {
   const groups = new Map();
@@ -475,6 +528,7 @@ export const solve = (oracleText, evidence, assets, options = {}) => {
 
     // (character, class, action) → per-hit percent arrays.
     const perAction = new Map();
+    const actorsByKey = new Map();
     for (const { oracle, event } of pairs) {
       if (event.summon) continue;
       const player = playersByActor.get(event.actor);
@@ -487,6 +541,8 @@ export const solve = (oracleText, evidence, assets, options = {}) => {
       const capClass = classOf(oracle.classFlags);
       const key = `${player.characterType}|${capClass}`;
       if (!perAction.has(key)) perAction.set(key, new Map());
+      if (!actorsByKey.has(key)) actorsByKey.set(key, new Set());
+      actorsByKey.get(key).add(event.actor);
       const actions = perAction.get(key);
       if (!actions.has(event.action)) actions.set(event.action, { player, hits: [], statusSets: [] });
       const entry = actions.get(event.action);
@@ -547,6 +603,58 @@ export const solve = (oracleText, evidence, assets, options = {}) => {
       for (const value of allValues) {
         const minimum = Math.min(...[...stables.values()].map((stable) => stable.get(value) ?? 0));
         if (minimum > 0) baseline.set(value, minimum);
+      }
+
+      // Baseline attribution: a group firing on EVERY observed action hides in
+      // the baseline, invisible to residuals (log 2571 proved it — Eustace's
+      // Attacks pair rode every hit). Subtract the loadout's always-on channel
+      // nodes; a leftover must equal exactly ONE unlocked group subset, and
+      // that subset then holds every observed action.
+      if ((actorsByKey.get(key)?.size ?? 0) > 1) {
+        // Two players of one character pool into one "baseline" here — a mix
+        // of different loadouts proves nothing, so attribution refuses.
+        flags.push({ log: log.id, character, capClass, flag: "baseline-multiple-players" });
+      } else {
+        const basePlayer = [...actions.values()][0].player;
+        const residue = subtractCounts(
+          baseline,
+          countsOf(alwaysValuesFor(basePlayer, characterType, capClass, assets))
+        );
+        if (residue.size > 0) {
+          const allStatusSets = [...actions.values()].flatMap((entry) => entry.statusSets);
+          const groupValues = groupValuesFor(basePlayer, characterType, capClass, assets);
+          const confounders = baselineConfounderValuesFor(basePlayer, characterType, capClass, assets, allStatusSets);
+          const { groups, flags: residueFlags } = explainAction(residue, groupValues, confounders);
+          if (groups === null) {
+            flags.push({
+              log: log.id,
+              character,
+              capClass,
+              flag: `baseline-${residueFlags[0]}`,
+              residue: [...residue],
+            });
+          } else {
+            for (const group of groups) {
+              const bankedEntry = bankedGroups?.[group];
+              for (const action of stables.keys()) {
+                if (bankedEntry !== undefined && !bankedEntry.actionIds.includes(action)) {
+                  flags.push({
+                    log: log.id,
+                    character,
+                    action,
+                    capClass,
+                    flag: "observed-but-unbanked",
+                    group,
+                    evidence: bankedEntry.evidence,
+                  });
+                }
+                assignments[character] ??= {};
+                assignments[character][group] ??= new Set();
+                assignments[character][group].add(action);
+              }
+            }
+          }
+        }
       }
 
       for (const [action, stable] of stables) {
