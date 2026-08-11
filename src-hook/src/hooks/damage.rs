@@ -729,6 +729,35 @@ impl OnProcessDamageHook {
             b90_check_unattributed("src", src, pre);
         }
 
+        // Runtime-extras evaluator resolution: the cap builder's one remaining
+        // unidentified additive term is a virtual `+0x70` on the object at
+        // `attacker+0x22F0` (the per-action flat extras — Eustace 115/130/140,
+        // Id's +5/+20). The object's class could not be pinned statically, so
+        // log its vtable and the slot target once per distinct vtable; feeding
+        // the RVAs back through SymbolAt/Decompile closes the term.
+        #[cfg(feature = "hookdiag")]
+        if let Some(src) = pre_call_source_ptr {
+            if super::player::player_slot_key_for_actor(src as *const usize).is_some() {
+                use crate::hooks::diag::{read_ptr_guarded, MODULE_BASE};
+                static SEEN: std::sync::Mutex<Vec<(usize, u32)>> =
+                    std::sync::Mutex::new(Vec::new());
+                if let Some((obj, vtable, slot70)) = read_ptr_guarded(src, 0x22f0)
+                    .filter(|obj| *obj != 0)
+                    .and_then(|obj| Some((obj, read_ptr_guarded(obj, 0)?)))
+                    .and_then(|(obj, vt)| Some((obj, vt, read_ptr_guarded(vt, 0x70)?)))
+                {
+                    if crate::hooks::diag::first_n_per_key(&SEEN, vtable, 1) {
+                        let base = MODULE_BASE.load(std::sync::atomic::Ordering::Relaxed);
+                        log::info!(
+                            "CAPEXTRAS src={src:#x} obj={obj:#x} vtable_rva={:#x} slot70_rva={:#x}",
+                            vtable.wrapping_sub(base),
+                            slot70.wrapping_sub(base),
+                        );
+                    }
+                }
+            }
+        }
+
         // Cross-event PG watch: if a prior enemy→player hit armed a window on this
         // event's source or target, diff it NOW (pre-call) — an async apply since
         // the arming shows up here.
