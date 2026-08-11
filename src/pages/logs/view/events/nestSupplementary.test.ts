@@ -80,6 +80,23 @@ describe("nestSupplementary", () => {
     expect(nested[0].context).toBeUndefined();
   });
 
+  // Nesting is a presentation nicety; SHOWING WHAT THE FILTERS KEPT is the job.
+  // Resolving `shown` against `all` leans on the two sharing row identities, so
+  // if that ever stops holding — a stage of `narrowStream` mapping instead of
+  // filtering — the page must lose the nesting, never the rows.
+  it("emits every shown row flat when the rows are not the page's own objects", () => {
+    const copies = all.map((r) => ({ ...r }));
+    const nested = nestSupplementary(copies, all, pairs);
+    expect(keys(nested)).toEqual(["Normal:9001", "Normal:9002", "SupplementaryDamage:9001"]);
+    expect(nested.some((r) => r.context)).toBe(false);
+  });
+
+  // A partial break is still a break: half the page resolved is not a page.
+  it("keeps the whole page when only some rows are the page's own objects", () => {
+    const nested = nestSupplementary([all[0], { ...all[1] }, all[2]], all, pairs);
+    expect(keys(nested)).toEqual(["Normal:9001", "Normal:9002", "SupplementaryDamage:9001"]);
+  });
+
   // The trigger is reachable twice — once on its own pass through the page, once
   // as the anchor its echo asks for — and both paths emit.
   it("emits a visible trigger exactly once", () => {

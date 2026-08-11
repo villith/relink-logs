@@ -1,5 +1,5 @@
 import { MantineProvider } from "@mantine/core";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { LogEvent } from "@/types";
@@ -169,8 +169,8 @@ describe("EventRowsTable", () => {
   // glance — and neither is the row's own kind colour.
   it("colours each actor in its own colour", () => {
     const { container } = renderTable([ROWS[0]]);
-    const source = container.querySelector<HTMLElement>('[data-cell="source"] .mantine-Text-root');
-    const target = container.querySelector<HTMLElement>('[data-cell="target"] .mantine-Text-root');
+    const source = container.querySelector<HTMLElement>('[data-cell="source"] [data-name]');
+    const target = container.querySelector<HTMLElement>('[data-cell="target"] [data-name]');
     expect(source?.style.color).toBe("rgb(54, 179, 126)");
     expect(target?.style.color).toBe("rgb(240, 101, 149)");
   });
@@ -180,8 +180,42 @@ describe("EventRowsTable", () => {
   // sort of event it is.
   it("leaves the non-actor cells uncoloured", () => {
     const { container } = renderTable([ROWS[0]]);
-    const ability = container.querySelector<HTMLElement>('[data-cell="ability"] .mantine-Text-root');
+    const ability = container.querySelector<HTMLElement>('[data-cell="ability"] [data-name]');
     expect(ability?.style.color).toBe("");
+  });
+
+  // The stream is a body of the analysis view, so it draws its rows through the
+  // same shell the metric table and the timeline lanes do — one height, one
+  // hover, one focus ring. It used to hand-roll all three a size smaller.
+  it("draws its rows through the shared analysis row shell", () => {
+    const { container } = renderTable([ROWS[0]]);
+    const row = container.querySelector<HTMLElement>("[data-event-row]");
+    expect(row?.getAttribute("role")).toBe("row");
+    expect(row?.className).toContain("h-row");
+  });
+
+  it("highlights the whole row under the pointer", () => {
+    const { container } = renderTable([ROWS[0]]);
+    const row = container.querySelector<HTMLElement>("[data-event-row]");
+    // The ring comes from the shared shell; the fill is the stream's own —
+    // these rows carry no magnitude bar behind them, so the ring alone reads
+    // thinner here than it does on a table row.
+    expect(row?.className).toContain("hover:outline");
+    expect(row?.className).toContain("hover:bg-raised");
+  });
+
+  it("draws its art at the table's own icon size", () => {
+    const { container } = renderTable([ROWS[0]]);
+    expect(container.querySelector('[data-cell="source"] img')?.className).toMatch(/\bsize-icon\b/);
+  });
+
+  // The heads name the columns you filter FROM, so they are doing real work now
+  // — the caption voice's default 10px was too quiet to read at a glance.
+  it("gives the column heads a size the eye can actually read", () => {
+    const { container } = renderTable([ROWS[0]]);
+    const head = container.querySelector("[data-head-label]");
+    expect(head?.className).toContain("text-sm");
+    expect(head?.className).not.toContain("text-label");
   });
 
   // The two columns ask the same question. Resolved separately, an enemy in the
@@ -263,15 +297,34 @@ describe("EventRowsTable, supplementary nesting", () => {
     const { container } = renderTable([TRIGGER, ECHO]);
     const [trigger, echo] = cellsOf(container, "time");
     expect(trigger).toBe("00:05.000");
-    expect(echo).toBe("ui.logs.events-echo-delta(ms=151)");
+    expect(echo).toBe("└─ui.logs.events-echo-delta(ms=151)");
     expect(echo).not.toContain("00:05.151");
+  });
+
+  // One elbow per cell that carries the child's own data. Drawn on the ability
+  // alone, the nesting was legible in the middle of the row and invisible at
+  // either end — which is where the two numbers the pairing rests on live.
+  it("marks every cell the child owns with the same elbow", () => {
+    const { container } = renderTable([TRIGGER, ECHO]);
+    for (const column of ["time", "ability", "amount"]) {
+      expect(cellsOf(container, column)[1].startsWith("└─")).toBe(true);
+    }
+  });
+
+  // The two columns that name an ACTOR are not the child's own: an echo has the
+  // same source and the same target as the hit that caused it, so an elbow
+  // there would claim a subordination that is not there.
+  it("leaves the actor columns unmarked", () => {
+    const { container } = renderTable([TRIGGER, ECHO]);
+    expect(cellsOf(container, "source")[1]).toBe("player-0");
+    expect(cellsOf(container, "target")[1]).toBe("enemy-9-spawn");
   });
 
   // Nothing is actually hidden: the stamp the column gave up is on the hover,
   // along with the share the whole pairing rests on.
   it("keeps the real timestamp and the share on the hover", () => {
     const { container } = renderTable([ECHO]);
-    const title = container.querySelector('[data-cell="time"] span')?.getAttribute("title") ?? "";
+    const title = container.querySelector('[data-cell="time"] [title]')?.getAttribute("title") ?? "";
     expect(title).toContain("ui.logs.events-echo-delta-title");
     expect(title).toContain("time=00:05.151");
     expect(title).toContain("percent=60.0");
@@ -279,14 +332,14 @@ describe("EventRowsTable, supplementary nesting", () => {
 
   it("prints the echo's share of its trigger beside the amount", () => {
     const { container } = renderTable([ECHO]);
-    expect(cellsOf(container, "amount")[0]).toBe("92,700ui.logs.events-echo-share(percent=60.0)");
+    expect(cellsOf(container, "amount")[0]).toBe("└─92,700ui.logs.events-echo-share(percent=60.0)");
   });
 
   // A trigger with no amount gives no share to read; "0.0%" would read as a
   // measurement rather than the absence of one.
   it("prints no percentage where there is no share to measure", () => {
     const { container } = renderTable([{ ...ECHO, parent: { deltaMs: 151, sharePercent: 0 } }]);
-    expect(cellsOf(container, "amount")[0]).toBe("92,700");
+    expect(cellsOf(container, "amount")[0]).toBe("└─92,700");
   });
 
   // A trigger pulled back past a filter is context, not a match.
@@ -310,6 +363,21 @@ describe("EventRowsTable, supplementary nesting", () => {
     expect(container.querySelector('[data-cell="time"] span')).toBeNull();
   });
 });
+
+/** The same hit, from a nominated player — for the cases that need more than
+ * one source in the stream. */
+const hitBy = (timeMs: number, sourceIndex: number, actionId: number, damage: number): LogEvent => [
+  timeMs,
+  {
+    DamageEvent: {
+      source: { index: sourceIndex, actor_type: 0, parent_index: sourceIndex, parent_actor_type: 0 },
+      target: { index: 9, actor_type: 0, parent_index: 9, parent_actor_type: 0 },
+      damage,
+      flags: 0,
+      action_id: { Normal: actionId },
+    },
+  },
+];
 
 const hit = (timeMs: number, actionId: number, damage: number, supplementary = false): LogEvent => [
   timeMs,
@@ -360,8 +428,11 @@ describe("EventsTab", () => {
   // and the last row of a long page would be unreachable.
   it("sizes the spacer by the nested list, context rows included", () => {
     page = { events, total: events.length, suppPairs: { 1: 0 } };
+    // Two rows at the analysis view's own row height — the stream draws through
+    // the same `AnalysisRow` the metric table does, so the virtualiser's number
+    // has to be that shell's height and not one of its own.
     const { container } = renderTab(ECHO_PIN);
-    expect(container.querySelector<HTMLElement>("[data-event-body]")?.style.height).toBe("52px");
+    expect(container.querySelector<HTMLElement>("[data-event-body]")?.style.height).toBe("60px");
   });
 
   it("counts the matches rather than the context drawn around them", () => {
@@ -375,5 +446,232 @@ describe("EventsTab", () => {
     const { container } = renderTab();
     expect(cellsOf(container, "time")).toEqual(["00:05.000", "00:05.151"]);
     expect(container.querySelector('[data-cell="time"] span')).toBeNull();
+  });
+});
+
+/** A long enough stream to scroll: sixty hits a second apart, alternating
+ * between two abilities, so a jump has somewhere to go. */
+const LONG = Array.from({ length: 60 }, (_, index) => hit(index * 1_000, index % 2 === 0 ? 100 : 200, 1_000 + index));
+
+const tops = (container: HTMLElement) =>
+  [...container.querySelectorAll<HTMLElement>("[data-event-row]")].map((row) => row.style.top);
+
+const jumpInput = () => screen.getByLabelText("ui.logs.events-jump-label");
+
+const commit = (text: string) => {
+  fireEvent.change(jumpInput(), { target: { value: text } });
+  fireEvent.keyDown(jumpInput(), { key: "Enter" });
+};
+
+describe("EventsTab, jump to a time", () => {
+  it("scrolls the list to the first row at or past a typed time", () => {
+    page = { events: LONG, total: LONG.length, suppPairs: {} };
+    const { container } = renderTab();
+    // Row 40 is far below the first screenful, so it is not even rendered yet.
+    expect(tops(container)).not.toContain("1200px");
+
+    commit("0:40");
+    expect(tops(container)).toContain("1200px");
+  });
+
+  it("marks the row it landed on, so the eye finds it without hunting", () => {
+    page = { events: LONG, total: LONG.length, suppPairs: {} };
+    const { container } = renderTab();
+    commit("0:40");
+    expect(container.querySelector<HTMLElement>("[data-jump-current]")?.style.top).toBe("1200px");
+  });
+
+  it("moves the mark when a second time is typed", () => {
+    page = { events: LONG, total: LONG.length, suppPairs: {} };
+    const { container } = renderTab();
+    commit("0:40");
+    commit("0:20");
+    const marked = [...container.querySelectorAll<HTMLElement>("[data-jump-current]")].map((row) => row.style.top);
+    expect(marked).toEqual(["600px"]);
+  });
+
+  // A jump that lands where the eye already was looks like nothing happened at
+  // all. The mark replays per landing, which is what makes the arrival visible.
+  it("replays its arrival mark on every landing", () => {
+    page = { events: LONG, total: LONG.length, suppPairs: {} };
+    const { container } = renderTab();
+    commit("0:40");
+    const first = container.querySelector("[data-arrival]")?.getAttribute("data-arrival");
+
+    commit("0:41");
+    expect(container.querySelector("[data-arrival]")?.getAttribute("data-arrival")).not.toBe(first);
+  });
+
+  // A time names a MOMENT, not an ability — tinting the name of whatever
+  // happened to be there would say the ability was what was searched for.
+  it("leaves the ability name alone on the row it landed on", () => {
+    page = { events: LONG, total: LONG.length, suppPairs: {} };
+    const { container } = renderTab();
+    commit("0:40");
+    const current = container.querySelector<HTMLElement>("[data-jump-current]");
+    expect(current?.querySelector('[data-cell="ability"] [data-name]')?.className).not.toContain("text-accent");
+  });
+
+  // An ability name is a NAME, not a control. Making it clickable put a second,
+  // undiscoverable way to jump on every row of the table.
+  it("leaves ability names as plain text", () => {
+    page = { events: LONG, total: LONG.length, suppPairs: {} };
+    const { container } = renderTab();
+    expect(container.querySelector('[data-cell="ability"] button')).toBeNull();
+  });
+
+  it("says nothing landed when the text names no time", () => {
+    page = { events: LONG, total: LONG.length, suppPairs: {} };
+    const { container } = renderTab();
+    commit("no such thing");
+    expect(container.querySelector("[data-jump-none]")?.textContent).toBe("ui.logs.events-jump-none");
+    expect(container.querySelector("[data-jump-current]")).toBeNull();
+  });
+
+  // Past the end of the fight there is nothing to scroll to — the view stays
+  // where it was rather than being pinned to the last row.
+  it("says nothing landed for a time past the last event", () => {
+    page = { events: LONG, total: LONG.length, suppPairs: {} };
+    const { container } = renderTab();
+    commit("9:00");
+    expect(container.querySelector("[data-jump-none]")?.textContent).toBe("ui.logs.events-jump-none");
+    expect(container.querySelector("[data-jump-current]")).toBeNull();
+  });
+});
+
+/** Three hits across two abilities, so the ability column has more than one
+ * value to narrow to and one of them keeps more than a single row. */
+const MIXED = [hit(1_000, 100, 500), hit(2_000, 200, 600), hit(3_000, 100, 700)];
+
+const openFilter = (container: HTMLElement, column: string) => {
+  fireEvent.click(container.querySelector<HTMLElement>(`[data-column-filter="${column}"]`) as HTMLElement);
+};
+
+/** Mantine puts unrecognised props on the checkbox INPUT rather than its
+ * wrapper, so the marked node may be either — take whichever is really there. */
+const tick = (container: HTMLElement, label: string) => {
+  const marked = container.querySelector<HTMLElement>(`[data-filter-option="${label}"]`);
+  const input = marked instanceof HTMLInputElement ? marked : marked?.querySelector("input");
+  fireEvent.click(input as HTMLInputElement);
+};
+
+describe("EventsTab, column filters", () => {
+  it("offers a filter on the source, ability and target columns", () => {
+    page = { events: MIXED, total: MIXED.length, suppPairs: {} };
+    const { container } = renderTab();
+    expect(container.querySelectorAll("[data-column-filter]").length).toBe(3);
+    for (const column of ["source", "ability", "target"]) {
+      expect(container.querySelector(`[data-column-filter="${column}"]`)).not.toBeNull();
+    }
+  });
+
+  // Time is a moment and amount is a measurement — neither is a value you tick
+  // off a list, so neither grows a funnel.
+  it("offers no filter on the time or amount columns", () => {
+    page = { events: MIXED, total: MIXED.length, suppPairs: {} };
+    const { container } = renderTab();
+    expect(container.querySelector('[data-column-filter="time"]')).toBeNull();
+    expect(container.querySelector('[data-column-filter="amount"]')).toBeNull();
+  });
+
+  // Building a column's values walks the whole stream, so the menu only does it
+  // once opened — a closed funnel must cost nothing.
+  it("builds a column's values only once its menu is opened", () => {
+    page = { events: MIXED, total: MIXED.length, suppPairs: {} };
+    const { container } = renderTab();
+    expect(container.querySelector("[data-filter-option]")).toBeNull();
+
+    openFilter(container, "ability");
+    expect(container.querySelectorAll("[data-filter-option]").length).toBe(2);
+  });
+
+  it("narrows the rows to a ticked value", () => {
+    page = { events: MIXED, total: MIXED.length, suppPairs: {} };
+    const { container } = renderTab();
+    expect(container.querySelectorAll("[data-event-row]").length).toBe(3);
+
+    openFilter(container, "ability");
+    tick(container, "skill(Normal:100)");
+    expect(cellsOf(container, "ability")).toEqual(["skill(Normal:100)", "skill(Normal:100)"]);
+  });
+
+  it("counts the filtered rows rather than the whole stream", () => {
+    page = { events: MIXED, total: MIXED.length, suppPairs: {} };
+    const { container } = renderTab();
+    openFilter(container, "ability");
+    tick(container, "skill(Normal:100)");
+    expect(screen.getByText("ui.logs.events-count(shown=2,total=3)")).toBeTruthy();
+  });
+
+  it("lights the funnel of a column that is narrowing something", () => {
+    page = { events: MIXED, total: MIXED.length, suppPairs: {} };
+    const { container } = renderTab();
+    openFilter(container, "ability");
+    tick(container, "skill(Normal:100)");
+    expect(container.querySelector('[data-column-filter="ability"]')?.className).toContain("text-accent");
+    expect(container.querySelector('[data-column-filter="source"]')?.className).not.toContain("text-accent");
+  });
+
+  // Ticking one value must not delete the other boxes from the menu that was
+  // just used to tick it — the list comes from the rows the OTHER filters left.
+  it("keeps a column's other values offered after one of them is ticked", () => {
+    page = { events: MIXED, total: MIXED.length, suppPairs: {} };
+    const { container } = renderTab();
+    openFilter(container, "ability");
+    tick(container, "skill(Normal:100)");
+    expect(container.querySelectorAll("[data-filter-option]").length).toBe(2);
+  });
+
+  it("gives every filtered row back when the filter is cleared", () => {
+    page = { events: MIXED, total: MIXED.length, suppPairs: {} };
+    const { container } = renderTab();
+    openFilter(container, "ability");
+    tick(container, "skill(Normal:100)");
+
+    fireEvent.click(container.querySelector<HTMLElement>("[data-filter-clear]") as HTMLElement);
+    expect(container.querySelectorAll("[data-event-row]").length).toBe(3);
+  });
+});
+
+/** One ability used by both players and one used by only the second, so
+ * narrowing the source really does change what the ability column would keep. */
+const TWO_SOURCES: LogEvent[] = [hitBy(1_000, 0, 100, 500), hitBy(2_000, 1, 100, 600), hitBy(3_000, 1, 200, 700)];
+
+const countOf = (container: HTMLElement, label: string) =>
+  container.querySelector(`[data-filter-count="${label}"]`)?.textContent;
+
+describe("EventsTab, column filter counts", () => {
+  it("counts every row of the stream when nothing else is narrowed", () => {
+    page = { events: TWO_SOURCES, total: TWO_SOURCES.length, suppPairs: {} };
+    const { container } = renderTab();
+    openFilter(container, "ability");
+    expect(countOf(container, "skill(Normal:100)")).toBe("ui.logs.events-filter-option-count(count=2)");
+    expect(countOf(container, "skill(Normal:200)")).toBe("ui.logs.events-filter-option-count(count=1)");
+  });
+
+  // The number beside a value has to answer "how many would I get", and once
+  // another column is narrowing, the stream's own total is not that answer.
+  it("recounts a column against what the other columns left", () => {
+    page = { events: TWO_SOURCES, total: TWO_SOURCES.length, suppPairs: {} };
+    const { container } = renderTab();
+    openFilter(container, "source");
+    tick(container, "player-1");
+    fireEvent.click(container.querySelector<HTMLElement>('[data-column-filter="source"]') as HTMLElement);
+
+    openFilter(container, "ability");
+    // Player 1 used Normal:100 once, not twice.
+    expect(countOf(container, "skill(Normal:100)")).toBe("ui.logs.events-filter-option-count(count=1)");
+    expect(countOf(container, "skill(Normal:200)")).toBe("ui.logs.events-filter-option-count(count=1)");
+  });
+
+  // A column must NOT count against its own ticks, or ticking one value would
+  // zero every other box in the very menu you were about to tick them in.
+  it("leaves a column's own counts alone when that column is the one ticked", () => {
+    page = { events: TWO_SOURCES, total: TWO_SOURCES.length, suppPairs: {} };
+    const { container } = renderTab();
+    openFilter(container, "ability");
+    tick(container, "skill(Normal:100)");
+    expect(countOf(container, "skill(Normal:100)")).toBe("ui.logs.events-filter-option-count(count=2)");
+    expect(countOf(container, "skill(Normal:200)")).toBe("ui.logs.events-filter-option-count(count=1)");
   });
 });

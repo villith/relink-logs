@@ -1,5 +1,7 @@
 import { Box, Text } from "@mantine/core";
 
+import { cn } from "@/components/ui/cn";
+
 export type AnalysisRowProps = {
   /** The row's name cell, already resolved to a node — this component never
    * looks a label up. Both bodies pass the view's own `renderLabel` output,
@@ -26,10 +28,18 @@ export type AnalysisRowProps = {
   onMouseEnter?: (event: React.MouseEvent) => void;
   onMouseMove?: (event: React.MouseEvent) => void;
   onMouseLeave?: (event: React.MouseEvent) => void;
-  /** Marks a child row behind an expanded parent. An attribute rather than a
-   * styling class, so a test can tell a subrow from its parent without reading
-   * how either is painted. */
-  "data-subrow"?: boolean;
+  /** Forwarded to the row's own element. The events stream virtualises its
+   * rows, so it positions each one absolutely — geometry only the caller can
+   * know, on the element that owns the row's box. */
+  style?: React.CSSProperties;
+  /** The row's own hover text, for a row that has something to explain about
+   * itself as a whole — the events stream's re-admitted context rows. */
+  title?: string;
+  /** Any `data-*` the caller marks its rows with — `data-subrow` for a child
+   * behind an expanded parent, `data-event-row` for a row of the stream.
+   * Attributes rather than styling classes, so a test can tell one row from
+   * another without reading how either is painted. */
+  [dataAttribute: `data-${string}`]: unknown;
 };
 
 /** The one row shell the analysis view draws, in the table and on the timeline.
@@ -63,7 +73,7 @@ export const AnalysisRow = ({
   <Box
     {...rest}
     role="row"
-    className={[
+    className={cn(
       // 30px tall with NO margin, the bar inset 1px top and bottom, rather than
       // 28px with a 2px margin. It draws identically — a 28px bar every 30px —
       // but the separation now belongs to the row instead of sitting between
@@ -77,11 +87,9 @@ export const AnalysisRow = ({
       // row's own 1px inset so the ring lands on the bar's edge.
       "hover:outline hover:outline-1 hover:-outline-offset-2 hover:outline-line-strong",
       "focus-visible:-outline-offset-[3px]",
-      onClick ? "cursor-pointer" : "",
-      className,
-    ]
-      .filter(Boolean)
-      .join(" ")}
+      onClick && "cursor-pointer",
+      className
+    )}
     tabIndex={onClick ? 0 : undefined}
     onClick={onClick}
     onKeyDown={
@@ -100,11 +108,11 @@ export const AnalysisRow = ({
     {leading}
     <Text
       role="gridcell"
-      className={[
+      className={cn(
         "relative min-w-0 truncate text-lg font-semibold tracking-[-0.01em]",
         // Timeline rows bound the name so the track gets the rest of the row.
-        nameFixed ? "flex-none basis-name" : "flex-1",
-      ].join(" ")}
+        nameFixed ? "flex-none basis-name" : "flex-1"
+      )}
     >
       {name}
     </Text>

@@ -10,3 +10,24 @@
 .analysis .recharts-cartesian-axis-tick-value {
   font-size: var(--text-sm);
 }
+
+@keyframes events-jump-arrive {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.events-jump-arrive {
+  background-color: var(--color-accent);
+  opacity: 0;
+  animation: events-jump-arrive 700ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .events-jump-arrive {
+    animation: none;
+  }
+}
