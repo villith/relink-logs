@@ -312,10 +312,14 @@ mod tests {
 
     /// A trigger hosts at most ONE echo; a surplus echo orphans.
     ///
-    /// Not a limitation of the rule but a property of the data. Log 2573 has
-    /// 1,801 hits, 1,778 echoes and 23 hits that never procced — and
-    /// 1,778 + 23 = 1,801 exactly, with no orphans, so every trigger took one
-    /// echo or none. A second echo on one hit takes the orphan path, where its
+    /// Not a limitation of the rule but a property of the data. Paired WITHOUT
+    /// the expiry, log 2573 resolves 1,778 echoes against 1,801 hits with zero
+    /// orphans, leaving 23 hits that never procced — and 1,778 + 23 = 1,801
+    /// exactly, so every trigger took one echo or none. (The rule as
+    /// implemented adds expiry and orphans 7 of those echoes, whose trigger
+    /// aged out; that narrows the pairing, it does not create second echoes.)
+    ///
+    /// A second echo on one hit therefore takes the orphan path, where its
     /// damage still counts as its own landing rather than being lost.
     #[test]
     fn a_trigger_hosts_one_echo_and_the_surplus_orphans() {
