@@ -423,12 +423,27 @@ export type WireGroupQuery = {
 /** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`). */
 export type GroupMeasure = { amount: number; hits: number; min: number | null; max: number | null };
 
+/** The same row under the LANDING model, where an echo is part of the hit that
+ * caused it rather than a hit of its own (mirrors the Rust `MergedMeasure`).
+ *
+ * For a direct action, `hits` counts landings and the amounts include their
+ * echoes. For an echo action, this describes its UNCLAIMED residue only —
+ * a claimed echo's damage already sits on its trigger. */
+export type MergedMeasure = GroupMeasure & { supplementary: number };
+
 /** One (filters × groupBy) row/band pair from `aggregate_groups` (mirrors the
  * Rust `GroupAggregate`): the table (`key` + `measure`) and the chart
  * (`key` + `series`) come from the same grouping, so the two can never
  * disagree. `series` is a whole-fight per-bucket band, same buckets as
- * `dpsChart` — the view slices it client-side. */
-export type GroupAggregate = { key: GroupKey; measure: GroupMeasure; series: number[] };
+ * `dpsChart` — the view slices it client-side, and it stays the RAW view.
+ * `merged` is the same totals under the supplementary collapse; the toggle
+ * picks between them, which is what keeps flipping it free of a refetch. */
+export type GroupAggregate = {
+  key: GroupKey;
+  measure: GroupMeasure;
+  merged: MergedMeasure;
+  series: number[];
+};
 
 /** One key's WHOLE-FIGHT total, ignoring everything the query narrows in time
  * (mirrors the Rust `GroupReference`).

@@ -1,4 +1,4 @@
-import type { ActionType, CharacterType, GroupAggregate, GroupKey, GroupMeasure } from "@/types";
+import type { ActionType, CharacterType, GroupAggregate, GroupKey, GroupMeasure, MergedMeasure } from "@/types";
 import { humanizeNumber, isSupplementaryAction } from "@/utils";
 
 import { abilityKey, skillKey } from "../../abilityKey";
@@ -28,6 +28,11 @@ export type GroupRowsContext = {
    * agree about which row an echo is on, and deriving it three times is how
    * they would come to differ. Absent = the uncollapsed fold. */
   keying?: RowKeying;
+  /** Whether rows report LANDINGS (an echo folded into the hit that caused it)
+   * or raw events. Follows the same toggle `keying.collapseSupplementary`
+   * carries, passed explicitly so this fold never has to infer a display rule
+   * from a keying rule. */
+  merged?: boolean;
 };
 
 /** Shown where a measure never recorded an extreme (a walk with no per-hit
@@ -81,57 +86,58 @@ const emptyMeasure = (): GroupMeasure => ({ amount: 0, hits: 0, min: null, max: 
 
 type FriendlyAbilityKey = Extract<GroupKey, { kind: "friendlyAbility" }>;
 
-/** One row's totals kept as the whole AND its direct half.
+/** One row's totals in BOTH views, plus each view's echo share.
  *
- * The two answer different questions. Damage and hits are the ROW's — with the
- * collapse on it reports both sources — while min and max are the named
- * skill's own per-hit extremes: folding an echo tick in would make a skill's
- * smallest hit read as an echo (`abilityRows`'s rule, kept identical here so
- * the two paths cannot disagree).
+ * The two are folded side by side rather than one being derived from the other:
+ * they answer different questions — events versus landings — and only the
+ * backend can compute the second, because a `GroupMeasure` has already lost the
+ * per-hit identity an echo would have to be attached to.
  *
- * `hasDirect`/`hasEcho` are `splitSupplementary`'s `mixed` test at aggregate
- * grain: a bucket that is echo ALL THE WAY ACROSS — the echo row itself, or
- * the residue a collapse leaves behind — has no split to report, and painting
- * the whole bar in the fainter shade would say nothing its label does not. */
+ * `rawSupplementary` is `splitSupplementary`'s `mixed` test at aggregate grain:
+ * the echo aggregates that landed in this bucket because a collapse keyed them
+ * here. `merged.supplementary` is the backend's own figure and needs no such
+ * test — see `subValueOf`. */
 type SplitMeasure = {
-  measure: GroupMeasure;
-  direct: GroupMeasure;
-  supplementary: number;
-  hasDirect: boolean;
-  hasEcho: boolean;
+  raw: GroupMeasure;
+  merged: MergedMeasure;
+  /** Echo damage in the RAW view's bucket. */
+  rawSupplementary: number;
 };
 
 const emptySplit = (): SplitMeasure => ({
-  measure: emptyMeasure(),
-  direct: emptyMeasure(),
-  supplementary: 0,
-  hasDirect: false,
-  hasEcho: false,
+  raw: emptyMeasure(),
+  merged: { ...emptyMeasure(), supplementary: 0 },
+  rawSupplementary: 0,
 });
 
-const addSplit = (into: SplitMeasure, measure: GroupMeasure, echo: boolean): void => {
-  addMeasure(into.measure, measure);
-  if (echo) {
-    into.hasEcho = true;
-    into.supplementary += measure.amount;
-  } else {
-    into.hasDirect = true;
-    addMeasure(into.direct, measure);
-  }
+const addSplit = (into: SplitMeasure, aggregate: Pick<GroupAggregate, "measure" | "merged">, echo: boolean): void => {
+  addMeasure(into.raw, aggregate.measure);
+  addMeasure(into.merged, aggregate.merged);
+  into.merged.supplementary += aggregate.merged.supplementary;
+  if (echo) into.rawSupplementary += aggregate.measure.amount;
 };
 
-const isMixed = (split: SplitMeasure): boolean => split.hasDirect && split.hasEcho;
-
-/** What the columns are filled from: the whole amount and hits, with the
- * extremes narrowed to the direct half only where there IS a direct half to
- * narrow to. */
-const reportedMeasure = (split: SplitMeasure): GroupMeasure =>
-  isMixed(split) ? { ...split.measure, min: split.direct.min, max: split.direct.max } : split.measure;
+/** Which view's figures the columns are filled from. */
+const reportedMeasure = (ctx: GroupRowsContext, split: SplitMeasure): GroupMeasure =>
+  ctx.merged === true ? split.merged : split.raw;
 
 /** The echo share to draw as the fainter bar segment, or undefined where there
- * is no split — absent rather than 0, which would mount an empty segment. */
-const subValueOf = (split: SplitMeasure): { subValue?: number } =>
-  isMixed(split) && split.supplementary > 0 ? { subValue: split.supplementary } : {};
+ * is none — absent rather than 0, which would mount an empty segment.
+ *
+ * The merged view reads the backend's figure and CANNOT infer it the way the
+ * raw view does. Once every echo folds onto its trigger, no echo aggregate
+ * reaches the bucket at all, so a bucket test finds nothing and a row with a
+ * real 92.7k echo share would draw one flat bar.
+ *
+ * `echo < amount` is the "mixed" rule both views still need: a row that is
+ * supplementary ALL the way across — the echo row, or the residue a collapse
+ * leaves behind — is already described by its own label, and painting the whole
+ * bar in the fainter shade would say nothing. */
+const subValueOf = (ctx: GroupRowsContext, split: SplitMeasure): { subValue?: number } => {
+  const amount = reportedMeasure(ctx, split).amount;
+  const echo = ctx.merged === true ? split.merged.supplementary : split.rawSupplementary;
+  return echo > 0 && echo < amount ? { subValue: echo } : {};
+};
 
 /** One ability row in the making: the row's own split plus the member
  * aggregates behind it, kept so a skill-group parent can list them. */
@@ -169,7 +175,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
   // backend keys, one row), so they collect here and materialize after.
   const abilityBuckets = new Map<string, AbilityBucket>();
 
-  for (const { key, measure } of aggregates) {
+  for (const { key, measure, merged } of aggregates) {
     switch (key.kind) {
       case "player":
         rows.push({
@@ -177,7 +183,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           label: String(key.index),
           kind: "player",
           value: measure.amount,
-          columns: columnsFor(ctx, measure, total),
+          columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
           pinOnClick: pinFor(ctx, key.index),
           colorSlot: ctx.partySlots.get(key.index) ?? -1,
         });
@@ -189,7 +195,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           label: spawnRowKey(key.segment),
           kind: "target",
           value: measure.amount,
-          columns: columnsFor(ctx, measure, total),
+          columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
           pinOnClick: pinFor(ctx, key.segment),
           colorSlot: -1,
         });
@@ -203,7 +209,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           label,
           kind: "enemy",
           value: measure.amount,
-          columns: columnsFor(ctx, measure, total),
+          columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
           pinOnClick: null,
           colorSlot: -1,
         });
@@ -219,7 +225,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           label,
           kind: "takenAttack",
           value: measure.amount,
-          columns: columnsFor(ctx, measure, total),
+          columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
           pinOnClick: ctx.groupBy === "ability" ? { ability: label } : null,
           colorSlot: -1,
         });
@@ -233,7 +239,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
         // mixed — every echo keys to the echo row — so this costs nothing there
         // and the row comes out exactly as it always has.
         const echo = isSupplementaryAction(key.actionType);
-        addSplit(bucket, measure, echo);
+        addSplit(bucket, { measure, merged }, echo);
 
         // An echo joins the member that CAUSED it rather than standing as a
         // member of its own: a skill group holds skills, and "Supplementary
@@ -253,7 +259,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
         const memberAction = cause ?? key.actionType;
         const memberKey = abilityKey(memberAction);
         const member = bucket.members.get(memberKey) ?? { actionType: memberAction, split: emptySplit() };
-        addSplit(member.split, measure, echo);
+        addSplit(member.split, { measure, merged }, echo);
         bucket.members.set(memberKey, member);
         abilityBuckets.set(rowKey, bucket);
         break;
@@ -283,9 +289,9 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
                 key: skillKey(memberKey),
                 label: memberKey,
                 kind: "ability",
-                value: member.split.measure.amount,
-                ...subValueOf(member.split),
-                columns: columnsFor(ctx, reportedMeasure(member.split), total),
+                value: ctx.merged === true ? member.split.merged.amount : member.split.raw.amount,
+                ...subValueOf(ctx, member.split),
+                columns: columnsFor(ctx, reportedMeasure(ctx, member.split), total),
                 pinOnClick: { ability: memberKey },
                 colorSlot: abilitySlot,
               })
@@ -296,9 +302,9 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
       key: skillKey(rowKey),
       label: rowKey,
       kind: "ability",
-      value: bucket.measure.amount,
-      ...subValueOf(bucket),
-      columns: columnsFor(ctx, reportedMeasure(bucket), total),
+      value: ctx.merged === true ? bucket.merged.amount : bucket.raw.amount,
+      ...subValueOf(ctx, bucket),
+      columns: columnsFor(ctx, reportedMeasure(ctx, bucket), total),
       pinOnClick: { ability: rowKey },
       colorSlot: abilitySlot,
       ...(children === undefined ? {} : { children }),

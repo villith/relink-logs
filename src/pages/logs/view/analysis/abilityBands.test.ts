@@ -126,6 +126,7 @@ describe("abilityBands vs groupBandsFor", () => {
       {
         key: { kind: "friendlyAbility", actionType: { Normal: 100 }, childCharacterType: "Pl0000" },
         measure: { amount: 300, hits: 1, min: null, max: null },
+        merged: { amount: 300, hits: 1, min: null, max: null, supplementary: 0 },
         series: [100, 200],
       },
     ]);

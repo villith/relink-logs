@@ -9,7 +9,7 @@ vi.mock("@/assets/skill-groups", () => ({
   },
 }));
 
-import type { ActionType, GroupAggregate, GroupKey, GroupMeasure } from "@/types";
+import type { ActionType, GroupAggregate, GroupKey, GroupMeasure, MergedMeasure } from "@/types";
 import { humanizeNumber, ratePerSecond, share } from "@/utils";
 
 import { rowKeyingFor } from "../../abilitySkills";
@@ -39,7 +39,28 @@ const measure = (amount: number, hits = 1, min: number | null = null, max: numbe
   max,
 });
 
-const agg = (key: GroupKey, m: GroupMeasure): GroupAggregate => ({ key, measure: m, series: [] });
+/** A `MergedMeasure` — the landing view of one aggregate key. */
+const merged = (
+  amount: number,
+  hits: number,
+  min: number | null = null,
+  max: number | null = null,
+  supplementary = 0
+): MergedMeasure => ({ amount, hits, min, max, supplementary });
+
+const agg = (key: GroupKey, m: GroupMeasure, mergedMeasure?: MergedMeasure): GroupAggregate => ({
+  key,
+  measure: m,
+  merged: mergedMeasure ?? { ...m, supplementary: 0 },
+  series: [],
+});
+
+/** A band fixture: `groupBandsFor` reads only `key` and `series`, so both
+ * measures ride along at the raw amount. */
+const bandAgg = (key: GroupKey, amount: number, series: number[]): GroupAggregate => ({
+  ...agg(key, measure(amount)),
+  series,
+});
 
 const ctx = (over: Partial<GroupRowsContext>): GroupRowsContext => ({
   metric: "damage",
@@ -192,17 +213,9 @@ describe("groupRowsFor — enemy rows", () => {
 describe("groupBandsFor", () => {
   it("keys bands by the same grammar as the rows and folds skill-group members' series", () => {
     const bands = groupBandsFor([
-      {
-        key: { kind: "friendlyAbility", actionType: { Normal: 100 }, childCharacterType: "Pl0000" },
-        measure: measure(300),
-        series: [100, 200],
-      },
-      {
-        key: { kind: "friendlyAbility", actionType: { Normal: 110 }, childCharacterType: "Pl0000" },
-        measure: measure(100),
-        series: [0, 100],
-      },
-      { key: { kind: "player", index: 2 }, measure: measure(50), series: [50] },
+      bandAgg({ kind: "friendlyAbility", actionType: { Normal: 100 }, childCharacterType: "Pl0000" }, 300, [100, 200]),
+      bandAgg({ kind: "friendlyAbility", actionType: { Normal: 110 }, childCharacterType: "Pl0000" }, 100, [0, 100]),
+      bandAgg({ kind: "player", index: 2 }, 50, [50]),
     ]);
 
     expect(bands.map((band) => band.key)).toEqual(['skill:Group:normal-attack@"Pl0000"', "player:2"]);
@@ -216,17 +229,17 @@ describe("groupBandsFor", () => {
     // tail up itself now (from whichever bands are hidden), which is what lets
     // one be switched on without the stack standing that band too tall.
     const bands = groupBandsFor([
-      { key: { kind: "other" }, measure: measure(9000), series: [9000] },
-      { key: { kind: "player", index: 0 }, measure: measure(10), series: [10] },
+      bandAgg({ kind: "other" }, 9000, [9000]),
+      bandAgg({ kind: "player", index: 0 }, 10, [10]),
     ]);
     expect(bands.map((band) => band.key)).toEqual(["player:0"]);
   });
 
   const RANKED = [
-    { key: { kind: "player" as const, index: 0 }, measure: measure(100), series: [100] },
-    { key: { kind: "player" as const, index: 1 }, measure: measure(60), series: [60] },
-    { key: { kind: "player" as const, index: 2 }, measure: measure(30), series: [30] },
-    { key: { kind: "other" as const }, measure: measure(30), series: [30] },
+    bandAgg({ kind: "player", index: 0 }, 100, [100]),
+    bandAgg({ kind: "player", index: 1 }, 60, [60]),
+    bandAgg({ kind: "player", index: 2 }, 30, [30]),
+    bandAgg({ kind: "other" }, 30, [30]),
   ];
 
   it("keeps every band and marks the ones past topN as the tail", () => {
@@ -250,18 +263,10 @@ describe("groupBandsFor", () => {
     // top-8 cap came to show six abilities.
     const bands = groupBandsFor(
       [
-        {
-          key: { kind: "friendlyAbility" as const, actionType: { Normal: 100 }, childCharacterType: "Pl0000" as const },
-          measure: measure(30),
-          series: [30],
-        },
-        {
-          key: { kind: "friendlyAbility" as const, actionType: { Normal: 110 }, childCharacterType: "Pl0000" as const },
-          measure: measure(30),
-          series: [30],
-        },
-        { key: { kind: "player" as const, index: 0 }, measure: measure(50), series: [50] },
-        { key: { kind: "player" as const, index: 1 }, measure: measure(40), series: [40] },
+        bandAgg({ kind: "friendlyAbility", actionType: { Normal: 100 }, childCharacterType: "Pl0000" }, 30, [30]),
+        bandAgg({ kind: "friendlyAbility", actionType: { Normal: 110 }, childCharacterType: "Pl0000" }, 30, [30]),
+        bandAgg({ kind: "player", index: 0 }, 50, [50]),
+        bandAgg({ kind: "player", index: 1 }, 40, [40]),
       ],
       2
     );
@@ -325,7 +330,13 @@ describe("groupRowsFor — collapse supplementary", () => {
     { actionType: CAUSE.actionType, childCharacterType: "Pl0000" as const },
     { actionType: ECHO.actionType, childCharacterType: "Pl0000" as const },
   ];
-  const aggregates = [agg(CAUSE, measure(300, 3, 50, 150)), agg(ECHO, measure(100, 4, 5, 40))];
+  // The landing view of the same pair: the cause's three landings carry the
+  // four echo ticks, so its extremes are whole landings (55..190, neither raw
+  // half) and the echo's own aggregate is left with nothing.
+  const aggregates = [
+    agg(CAUSE, measure(300, 3, 50, 150), merged(400, 3, 55, 190, 100)),
+    agg(ECHO, measure(100, 4, 5, 40), merged(0, 0, null, null, 0)),
+  ];
 
   it("keeps the echo on its own row with the collapse off", () => {
     const rows = groupRowsFor(aggregates, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, false) }));
@@ -346,12 +357,17 @@ describe("groupRowsFor — collapse supplementary", () => {
     expect(rows[0].subValue).toBe(100);
   });
 
-  it("keeps min and max over the DIRECT aggregates only", () => {
-    // An echo tick is a different damage source; folding it in would make the
-    // named skill's smallest hit read as an echo tick (damageDone's own rule).
-    const rows = groupRowsFor(aggregates, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true) }));
-    expect(rows[0].columns[2]).toBe(humanizeNumber(50));
-    expect(rows[0].columns[3]).toBe(humanizeNumber(150));
+  it("takes the merged view's extremes from the backend, never from the raw halves", () => {
+    // Under the landing model an extreme IS a whole landing, echo included, so
+    // only the backend can compute it — a `GroupMeasure` has already lost the
+    // per-hit identity. This fold reports what it was sent and derives nothing:
+    // 55..190 is neither the direct half's 50..150 nor the echo's 5..40.
+    const rows = groupRowsFor(
+      aggregates,
+      ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true), merged: true })
+    );
+    expect(rows[0].columns[2]).toBe(humanizeNumber(55));
+    expect(rows[0].columns[3]).toBe(humanizeNumber(190));
   });
 
   it("mounts no subValue on an all-echo row — the residue has no split to show", () => {
@@ -390,26 +406,85 @@ describe("groupRowsFor — collapse supplementary", () => {
   });
 });
 
+describe("groupRowsFor — the landing view", () => {
+  const CAUSE = { kind: "friendlyAbility" as const, actionType: { Normal: 9001 }, childCharacterType: "Pl0000" };
+  const ECHO = {
+    kind: "friendlyAbility" as const,
+    actionType: { SupplementaryDamage: 9001 },
+    childCharacterType: "Pl0000",
+  };
+  const everySkill = [
+    { actionType: CAUSE.actionType, childCharacterType: "Pl0000" as const },
+    { actionType: ECHO.actionType, childCharacterType: "Pl0000" as const },
+  ];
+  // One landing of 154,500 with a 92,681 echo — log 2573's Grade 1 Shot.
+  const aggregates = [
+    agg(CAUSE, measure(154_500, 1, 154_500, 154_500), merged(247_181, 1, 247_181, 247_181, 92_681)),
+    agg(ECHO, measure(92_681, 1, 92_681, 92_681), merged(0, 0, null, null, 0)),
+  ];
+  // `merged` and `keying` move together — the view passes both off the one
+  // toggle, and a test that set only the keying would silently exercise the
+  // raw view while claiming to test the merged one.
+  const rowsWith = (collapse: boolean) =>
+    groupRowsFor(aggregates, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, collapse), merged: collapse }));
+
+  it("counts landings, not events, with the collapse on", () => {
+    const [row] = rowsWith(true);
+    // total, hits, min, max, average, share
+    expect(row.columns.slice(0, 5)).toEqual([
+      humanizeNumber(247_181),
+      "1",
+      humanizeNumber(247_181),
+      humanizeNumber(247_181),
+      humanizeNumber(247_181),
+    ]);
+  });
+
+  it("keeps Avg inside Min..Max and equal to Total over Hits", () => {
+    // The two invariants log 2573 broke: it read Min 154.5k, Max 154.5k,
+    // Avg 123.6k over 2 hits.
+    const [row] = rowsWith(true);
+    const [total, hits, min, max, avg] = row.columns;
+    expect(Number(hits)).toBe(1);
+    expect(avg).toBe(humanizeNumber(Math.round(247_181 / 1)));
+    expect(avg).toBe(min);
+    expect(avg).toBe(max);
+    expect(total).toBe(humanizeNumber(247_181));
+  });
+
+  it("still draws the echo split when every echo was claimed", () => {
+    // The trap: no echo AGGREGATE reaches the bucket once its damage moved to
+    // the trigger, so the old `isMixed` test would find nothing to split and a
+    // row with a real 92.7k echo share would draw one flat bar.
+    expect(rowsWith(true)[0].subValue).toBe(92_681);
+  });
+
+  it("is inert with the collapse off", () => {
+    const rows = rowsWith(false);
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:9001", "skill:SupplementaryDamage:0"]);
+    expect(rows[0].columns.slice(0, 5)).toEqual([
+      humanizeNumber(154_500),
+      "1",
+      humanizeNumber(154_500),
+      humanizeNumber(154_500),
+      humanizeNumber(154_500),
+    ]);
+    expect(rows[0].subValue).toBeUndefined();
+  });
+});
+
 describe("groupBandsFor — collapse supplementary", () => {
   const everySkill = [
     { actionType: { Normal: 999 } as ActionType, childCharacterType: "Pl0000" as const },
     { actionType: { SupplementaryDamage: 999 } as ActionType, childCharacterType: "Pl0000" as const },
   ];
   const aggregates = [
-    {
-      key: { kind: "friendlyAbility" as const, actionType: { Normal: 999 }, childCharacterType: "Pl0000" as const },
-      measure: measure(300),
-      series: [100, 200],
-    },
-    {
-      key: {
-        kind: "friendlyAbility" as const,
-        actionType: { SupplementaryDamage: 999 },
-        childCharacterType: "Pl0000" as const,
-      },
-      measure: measure(100),
-      series: [40, 60],
-    },
+    bandAgg({ kind: "friendlyAbility", actionType: { Normal: 999 }, childCharacterType: "Pl0000" }, 300, [100, 200]),
+    bandAgg(
+      { kind: "friendlyAbility", actionType: { SupplementaryDamage: 999 }, childCharacterType: "Pl0000" },
+      100,
+      [40, 60]
+    ),
   ];
 
   it("merges an echo band into its cause's band, so a band and its row stay one thing", () => {
@@ -478,15 +553,18 @@ describe("groupRowsFor — echo members of a grouped cause", () => {
   const grouped = [
     agg(
       { kind: "friendlyAbility", actionType: { Normal: 100 }, childCharacterType: "Pl0000" },
-      measure(300, 3, 50, 150)
+      measure(300, 3, 50, 150),
+      merged(400, 3, 55, 190, 100)
     ),
     agg(
       { kind: "friendlyAbility", actionType: { Normal: 110 }, childCharacterType: "Pl0000" },
-      measure(200, 2, 90, 110)
+      measure(200, 2, 90, 110),
+      merged(200, 2, 90, 110)
     ),
     agg(
       { kind: "friendlyAbility", actionType: { SupplementaryDamage: 100 }, childCharacterType: "Pl0000" },
-      measure(100, 4, 5, 40)
+      measure(100, 4, 5, 40),
+      merged(0, 0, null, null, 0)
     ),
   ];
   const everySkill = [
@@ -515,10 +593,15 @@ describe("groupRowsFor — echo members of a grouped cause", () => {
     expect(children.find((child) => child.key === "skill:Normal:110")?.subValue).toBeUndefined();
   });
 
-  it("keeps a member's extremes over its DIRECT hits only", () => {
-    const child = collapsed()[0].children?.find((entry) => entry.key === "skill:Normal:100");
-    expect(child?.columns[2]).toBe(humanizeNumber(50));
-    expect(child?.columns[3]).toBe(humanizeNumber(150));
+  it("takes a member's merged extremes from the backend too", () => {
+    // Same rule as the parent row's: under the landing model an extreme is a
+    // whole landing, and this fold reports the figure it was sent.
+    const child = groupRowsFor(
+      grouped,
+      ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true), merged: true })
+    )[0].children?.find((entry) => entry.key === "skill:Normal:100");
+    expect(child?.columns[2]).toBe(humanizeNumber(55));
+    expect(child?.columns[3]).toBe(humanizeNumber(190));
   });
 
   it("still lists the echo as its own member with the collapse off", () => {

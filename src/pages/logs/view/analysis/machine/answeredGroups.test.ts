@@ -7,12 +7,14 @@ import { answeredGroups } from "./answeredGroups";
 const player = (index: number): GroupAggregate => ({
   key: { kind: "player", index },
   measure: { amount: 100, hits: 1, min: null, max: null },
+  merged: { amount: 100, hits: 1, min: null, max: null, supplementary: 0 },
   series: [100],
 });
 
 const ability = (id: number): GroupAggregate => ({
   key: { kind: "friendlyAbility", actionType: { Normal: id }, childCharacterType: "Pl0000" },
   measure: { amount: 50, hits: 1, min: null, max: null },
+  merged: { amount: 50, hits: 1, min: null, max: null, supplementary: 0 },
   series: [50],
 });
 
