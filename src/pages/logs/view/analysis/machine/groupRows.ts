@@ -182,7 +182,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           key: playerRowKey(key.index),
           label: String(key.index),
           kind: "player",
-          value: measure.amount,
+          value: ctx.merged === true ? merged.amount : measure.amount,
           columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
           pinOnClick: pinFor(ctx, key.index),
           colorSlot: ctx.partySlots.get(key.index) ?? -1,
@@ -194,7 +194,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           key: spawnRowKey(key.segment),
           label: spawnRowKey(key.segment),
           kind: "target",
-          value: measure.amount,
+          value: ctx.merged === true ? merged.amount : measure.amount,
           columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
           pinOnClick: pinFor(ctx, key.segment),
           colorSlot: -1,
@@ -208,7 +208,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           key: enemyRowKey(key.enemyType),
           label,
           kind: "enemy",
-          value: measure.amount,
+          value: ctx.merged === true ? merged.amount : measure.amount,
           columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
           pinOnClick: null,
           colorSlot: -1,
@@ -219,12 +219,18 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
       case "enemyAttack": {
         // The takenAttack grammar: the label IS the JSON `takenAttackRowParts`
         // reads, and the pin carries it on the ability axis.
+        //
+        // Reading `merged` is not a formality on this key, or on the two enemy
+        // ones: a trigger and its echo carry DIFFERENT action ids, and the
+        // pairing can claim across targets, so a claim really does move damage
+        // between these rows. Both the value and the columns follow one view,
+        // or the bar's length contradicts the total printed beside it.
         const label = takenAttackRowLabel(key.enemyType, key.actionId);
         rows.push({
           key: takenRowKey(label),
           label,
           kind: "takenAttack",
-          value: measure.amount,
+          value: ctx.merged === true ? merged.amount : measure.amount,
           columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
           pinOnClick: ctx.groupBy === "ability" ? { ability: label } : null,
           colorSlot: -1,
