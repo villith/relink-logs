@@ -6,8 +6,8 @@
       "neededGroups": [],
       "groups": {
         "1": {
-          "actionIds": [200, 201, 202, 203, 204, 205, 210, 220, 221, 230, 240, 330],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [200, 201, 202, 203, 204, 205, 210, 211, 220, 221, 230, 240, 330, 410],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "4": {
           "actionIds": [200, 201, 202, 203, 204, 205],
@@ -20,8 +20,8 @@
       "neededGroups": [],
       "groups": {
         "1": {
-          "actionIds": [200, 201, 202, 203, 204, 205, 210, 220, 221, 230, 240, 330],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [200, 201, 202, 203, 204, 205, 210, 211, 220, 221, 230, 240, 330, 410],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "4": {
           "actionIds": [200, 201, 202, 203, 204, 205],
@@ -44,8 +44,8 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 105, 300, 301, 302, 400, 410],
-          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; manual:button-map 2026-08-10"
+          "actionIds": [100, 105, 300, 301, 302, 400],
+          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
           "actionIds": [200, 201, 202, 203, 204],
@@ -53,7 +53,7 @@
         },
         "18": {
           "actionIds": [100, 105, 300, 301, 302, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         }
       }
     },
@@ -62,12 +62,12 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 110, 120, 300, 301, 302, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 110, 120, 300, 301, 302, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [210, 211, 212, 213, 214],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [210, 211, 212, 213, 214, 410],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         }
       }
     },
@@ -76,8 +76,8 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 105, 110, 111, 112, 300, 301, 302, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 105, 110, 111, 112, 300, 301, 302, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
           "actionIds": [210, 220, 221],
@@ -86,12 +86,16 @@
       }
     },
     "pl0600": {
-      "status": "partial",
-      "neededGroups": [1],
+      "status": "derived",
+      "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 103, 210, 220, 230, 240, 300, 301, 302, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 300, 301, 302],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
+        },
+        "1": {
+          "actionIds": [200, 210, 220, 230, 240, 410],
+          "evidence": "engine:action-branch 2026-08-10"
         }
       }
     },
@@ -100,12 +104,12 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 110, 111, 112, 120, 121, 122, 300, 301, 302, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 110, 111, 112, 120, 121, 122, 300, 301, 302, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [200],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [200, 410],
+          "evidence": "engine:action-branch 2026-08-10"
         },
         "15": {
           "actionIds": [65],
@@ -118,12 +122,12 @@
       "neededGroups": [15, 16],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 300, 301, 302, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 300, 301, 302, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [103, 104, 105, 106, 107, 108, 109, 200],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [200, 410],
+          "evidence": "engine:action-branch 2026-08-10"
         },
         "8": {
           "actionIds": [150, 151],
@@ -136,12 +140,12 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 204, 300, 301, 310, 320, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 300, 301, 310, 320, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [103, 110, 120, 200, 201, 202, 203],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [103, 110, 120, 200, 201, 202, 203, 204, 410],
+          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
         },
         "8": {
           "actionIds": [104, 111, 121],
@@ -154,12 +158,12 @@
       "neededGroups": [],
       "groups": {
         "1": {
-          "actionIds": [200, 201],
-          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [200, 201, 410],
+          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; engine:action-branch 2026-08-10"
         },
         "4": {
           "actionIds": [200, 201],
-          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; manual:button-map 2026-08-10 (partly inferred)"
+          "evidence": "caporacle join, logs 2557,2558,2559; caporacle join, logs 2549,2550,2551,2552,2553,2554,2555,2556,2557,2558,2559; engine:action-branch 2026-08-10"
         }
       }
     },
@@ -170,13 +174,13 @@
         "0": {
           "actionIds": [
             100, 101, 102, 103, 104, 111, 112, 113, 114, 122, 123, 124, 150, 162, 163, 164, 300, 301, 302, 311, 312,
-            313, 400, 410
+            313, 400
           ],
-          "evidence": "manual:button-map 2026-08-10"
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [200, 201, 202, 203],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [200, 201, 202, 203, 410],
+          "evidence": "engine:action-branch 2026-08-10"
         },
         "6": {
           "actionIds": [170],
@@ -189,12 +193,12 @@
       "neededGroups": [16],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 110, 300, 301, 302, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 104, 105, 106, 107, 120, 201, 300, 301, 302, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [103, 104, 105, 106, 107, 120, 130, 200, 201, 202],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [110, 130, 200, 202, 410],
+          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
         }
       }
     },
@@ -203,12 +207,12 @@
       "neededGroups": [15],
       "groups": {
         "0": {
-          "actionIds": [18, 100, 110, 120, 130, 140, 300, 301, 302, 303, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [17, 18, 100, 110, 111, 120, 121, 130, 131, 140, 141, 300, 301, 302, 303, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [111, 121, 131, 141, 201],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [201, 410],
+          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
         },
         "8": {
           "actionIds": [150, 151, 152, 153, 154],
@@ -217,12 +221,16 @@
       }
     },
     "pl1400": {
-      "status": "partial",
-      "neededGroups": [1],
+      "status": "derived",
+      "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 110, 111, 112, 113, 114, 120, 300, 310, 320, 400, 410, 411],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [11, 100, 101, 102, 110, 111, 112, 113, 114, 120, 300, 310, 320, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
+        },
+        "1": {
+          "actionIds": [200, 410, 411],
+          "evidence": "engine:action-branch 2026-08-10"
         }
       }
     },
@@ -231,24 +239,26 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [
-            100, 101, 102, 103, 104, 111, 112, 113, 114, 122, 123, 124, 300, 301, 302, 303, 310, 311, 400, 410
-          ],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 104, 111, 112, 113, 114, 122, 123, 124, 300, 301, 302, 303, 310, 311, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [200],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [200, 410],
+          "evidence": "engine:action-branch 2026-08-10"
         }
       }
     },
     "pl1600": {
-      "status": "partial",
-      "neededGroups": [1],
+      "status": "derived",
+      "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 211, 212, 213, 300, 301, 302, 400, 410],
-          "evidence": "caporacle join, logs 2560; manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [100, 101, 102, 212, 213, 300, 301, 302, 400],
+          "evidence": "caporacle join, logs 2560; manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
+        },
+        "1": {
+          "actionIds": [211, 410],
+          "evidence": "engine:action-branch 2026-08-10"
         },
         "15": {
           "actionIds": [110, 111, 210, 303],
@@ -269,12 +279,12 @@
       "neededGroups": [],
       "groups": {
         "1": {
-          "actionIds": [113, 121, 130, 200],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [113, 121, 130, 200, 251, 252, 260, 266, 270, 410],
+          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
         },
         "4": {
           "actionIds": [113, 121, 130],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
         }
       }
     },
@@ -283,16 +293,16 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 103, 105, 111, 121, 131, 300, 301, 302, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 300, 301, 302, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [104, 110, 120, 130, 200, 210, 220, 230],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [104, 105, 110, 111, 120, 121, 130, 131, 200, 210, 220, 230, 410],
+          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
         },
         "4": {
           "actionIds": [104, 110, 120, 130, 200, 220, 230],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
         }
       }
     },
@@ -301,24 +311,28 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 103, 110, 300, 301, 302, 400, 410, 510, 515],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 300, 301, 302, 400, 503, 510, 515],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [120, 200, 201, 202, 203, 204, 503, 505, 506, 507, 508, 509],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [110, 120, 200, 201, 202, 203, 204, 410, 503, 505, 506, 507, 508, 509],
+          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
         }
       }
     },
     "pl2100": {
       "status": "partial",
-      "neededGroups": [1, 5],
+      "neededGroups": [5],
       "groups": {
         "0": {
           "actionIds": [
-            100, 101, 102, 111, 112, 114, 115, 122, 160, 161, 162, 170, 171, 172, 173, 174, 175, 300, 310, 320, 400, 410
+            100, 101, 102, 111, 112, 114, 115, 122, 140, 160, 161, 162, 170, 171, 172, 173, 174, 175, 300, 310, 320, 400
           ],
-          "evidence": "manual:button-map 2026-08-10"
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
+        },
+        "1": {
+          "actionIds": [200, 210, 220, 410],
+          "evidence": "engine:action-branch 2026-08-10"
         },
         "8": {
           "actionIds": [116, 117, 150, 165, 166],
@@ -332,11 +346,11 @@
       "groups": {
         "0": {
           "actionIds": [100, 101, 102, 103, 140, 141, 300, 301, 302, 400, 410, 900, 901, 902, 903, 940, 941],
-          "evidence": "manual:button-map 2026-08-10"
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
           "actionIds": [110, 120, 130, 910, 920, 930],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "evidence": "engine:action-branch 2026-08-10"
         },
         "8": {
           "actionIds": [104, 111, 121, 131, 303, 904, 911, 921, 931],
@@ -350,11 +364,15 @@
     },
     "pl2300": {
       "status": "partial",
-      "neededGroups": [1, 4],
+      "neededGroups": [4],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 110, 111, 120, 121, 300, 310, 320, 400, 410],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [100, 101, 110, 111, 120, 121, 300, 310, 320, 400],
+          "evidence": "manual:button-map 2026-08-10 (partly inferred); engine:action-branch 2026-08-10"
+        },
+        "1": {
+          "actionIds": [410],
+          "evidence": "engine:action-branch 2026-08-10"
         },
         "3": {
           "actionIds": [101, 111, 121],
@@ -379,12 +397,12 @@
       "neededGroups": [16],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 103, 104, 111, 116, 121, 232, 233, 300, 301, 302, 310, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 115, 125, 140, 141, 142, 232, 233, 300, 301, 302, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [110, 115, 120, 125, 130],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [104, 110, 111, 116, 120, 121, 130, 310, 410],
+          "evidence": "engine:action-branch 2026-08-10"
         },
         "15": {
           "actionIds": [200, 201, 202, 210, 211, 212, 220, 230],
@@ -397,12 +415,12 @@
       "neededGroups": [15],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 103, 210, 220, 230, 300, 301, 302, 400, 410],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 300, 301, 302, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [200],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [200, 210, 220, 230, 410],
+          "evidence": "engine:action-branch 2026-08-10"
         }
       }
     },
@@ -411,15 +429,14 @@
       "neededGroups": [15],
       "groups": {
         "0": {
-          "actionIds": [
-            100, 101, 102, 103, 111, 121, 131, 140, 300, 301, 302, 310, 400, 410, 900, 901, 902, 903, 911, 921, 931,
-            940, 950, 960, 970, 980
-          ],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 300, 301, 302, 400, 900, 901, 902, 903],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [110, 120, 130, 910, 920, 930],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [
+            110, 111, 120, 121, 130, 131, 140, 310, 410, 870, 910, 911, 920, 921, 930, 931, 940, 950, 960, 970, 980
+          ],
+          "evidence": "engine:action-branch 2026-08-10"
         }
       }
     },
@@ -429,7 +446,7 @@
       "groups": {
         "0": {
           "actionIds": [120, 300, 400],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "15": {
           "actionIds": [121, 122, 301],
@@ -454,25 +471,28 @@
       "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [
-            100, 101, 102, 111, 116, 121, 131, 141, 151, 170, 300, 301, 302, 305, 310, 311, 312, 315, 400, 401, 410,
-            411, 900, 901, 902, 910, 931, 941, 951, 970
-          ],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 111, 116, 121, 300, 301, 302, 310, 311, 312, 400, 401, 900, 901, 902, 910],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
         },
         "1": {
-          "actionIds": [120, 130, 140, 150, 920, 930, 940, 950],
-          "evidence": "manual:button-map 2026-08-10 (partly inferred)"
+          "actionIds": [
+            120, 130, 131, 140, 141, 150, 151, 170, 305, 315, 410, 411, 920, 930, 931, 940, 941, 950, 951, 970
+          ],
+          "evidence": "engine:action-branch 2026-08-10"
         }
       }
     },
     "pl2900": {
-      "status": "partial",
-      "neededGroups": [1],
+      "status": "derived",
+      "neededGroups": [],
       "groups": {
         "0": {
-          "actionIds": [100, 101, 102, 103, 300, 301, 302, 310, 400, 410, 950, 951, 952, 953, 954],
-          "evidence": "manual:button-map 2026-08-10"
+          "actionIds": [100, 101, 102, 103, 300, 301, 302, 310, 400],
+          "evidence": "manual:button-map 2026-08-10; engine:action-branch 2026-08-10"
+        },
+        "1": {
+          "actionIds": [250, 410, 950, 951, 952, 953, 954],
+          "evidence": "engine:action-branch 2026-08-10"
         },
         "15": {
           "actionIds": [150, 151, 152, 153],

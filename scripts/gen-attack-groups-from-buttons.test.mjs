@@ -85,8 +85,12 @@ describe("deriveButtonMemberships", () => {
     // just "Finisher 1". The fallback must still NOT steal actions claimed by
     // another named group (a "Power Finisher" belongs to Power Finishers).
     const kataNodes = {
-      pl9800_0001: { effects: [{ stat: "cap", percent: 35, scope: "attack-group", targetAttackGroup: 8, abilityIds: [] }] },
-      pl9800_0002: { effects: [{ stat: "cap", percent: 30, scope: "attack-group", targetAttackGroup: 16, abilityIds: [] }] },
+      pl9800_0001: {
+        effects: [{ stat: "cap", percent: 35, scope: "attack-group", targetAttackGroup: 8, abilityIds: [] }],
+      },
+      pl9800_0002: {
+        effects: [{ stat: "cap", percent: 30, scope: "attack-group", targetAttackGroup: 16, abilityIds: [] }],
+      },
     };
     const kataLang = {
       pl9800_0001: { text: "Combo Finishers: DMG Cap +35%" },
@@ -105,7 +109,9 @@ describe("deriveButtonMemberships", () => {
 
   it("name-matches a charged group that renders no icon (Gran's Power Raise)", () => {
     const granNodes = {
-      pl9700_0001: { effects: [{ stat: "cap", percent: 45, scope: "attack-group", targetAttackGroup: 4, abilityIds: [] }] },
+      pl9700_0001: {
+        effects: [{ stat: "cap", percent: 45, scope: "attack-group", targetAttackGroup: 4, abilityIds: [] }],
+      },
     };
     const { memberships } = deriveButtonMemberships({
       buttonMap: { pl9700: { families: [{ name: "Power Raise", ids: [200, 201], button: "right", source: "scott" }] } },
@@ -124,7 +130,9 @@ describe("deriveButtonMemberships", () => {
       buttonMap: { pl9500: { families: [] } },
       icons: { pl9500: { 16: [] } },
       nodes: {
-        pl9500_0001: { effects: [{ stat: "cap", percent: 30, scope: "attack-group", targetAttackGroup: 16, abilityIds: [] }] },
+        pl9500_0001: {
+          effects: [{ stat: "cap", percent: 30, scope: "attack-group", targetAttackGroup: 16, abilityIds: [] }],
+        },
       },
       lang: { pl9500_0001: { text: "Turbine Finishers: DMG Cap +30%" } },
       skillNames: { Pl9500: { 104: "Combo Finisher 1" } },
@@ -145,7 +153,9 @@ describe("deriveButtonMemberships", () => {
       },
       icons: { pl9600: { 18: [4, 3] } },
       nodes: {
-        pl9600_0001: { effects: [{ stat: "cap", percent: 20, scope: "attack-group", targetAttackGroup: 18, abilityIds: [] }] },
+        pl9600_0001: {
+          effects: [{ stat: "cap", percent: 20, scope: "attack-group", targetAttackGroup: 18, abilityIds: [] }],
+        },
       },
       lang: { pl9600_0001: { text: "/ Attacks: DMG Cap +20%" } },
       skillNames: { Pl9600: { 100: "Attack", 200: "Bull's Eye Blast" } },
@@ -158,5 +168,59 @@ describe("deriveButtonMemberships", () => {
     expect(memberships.pl9900[0].evidence).toContain("manual:button-map");
     expect(memberships.pl9900[0].evidence).toContain("inferred");
     expect(memberships.pl9900[16].evidence).not.toContain("inferred");
+  });
+});
+
+describe("engine input precedence", () => {
+  const runWith = (engineInputs) =>
+    deriveButtonMemberships({ buttonMap, icons, nodes, lang, skillNames, engineInputs });
+
+  it("moves an action to the engine's button when it disagrees with the family", () => {
+    // The universal 410 shape: the family says left, the branch graph says the
+    // action is Y-reached. Scott's ruling: the engine wins.
+    const { memberships } = runWith({ pl9900: { 300: ["right"] } });
+    expect(memberships.pl9900[0].actionIds).toEqual([100, 101, 152]);
+    expect(memberships.pl9900[1].actionIds).toEqual([200, 300]);
+  });
+
+  it("banks a null-button family's action once the engine answers it", () => {
+    const { memberships, unresolved } = runWith({ pl9900: { 400: ["right"] } });
+    expect(memberships.pl9900[1].actionIds).toEqual([200, 400]);
+    expect(unresolved.some((u) => u.family === "Mystery Stance")).toBe(false);
+  });
+
+  it("banks a both-button engine action on both sides", () => {
+    const { memberships } = runWith({ pl9900: { 100: ["left", "right"] } });
+    expect(memberships.pl9900[0].actionIds).toContain(100);
+    expect(memberships.pl9900[1].actionIds).toEqual([100, 200]);
+  });
+
+  it("flips a charge family's actions into the other side's charged group", () => {
+    // Stiller Glanz shape: a charge-family action inferred right is engine-X,
+    // so it belongs to the LEFT charged group, not the right one.
+    const { memberships } = runWith({ pl9900: { 200: ["left"] } });
+    expect(memberships.pl9900[3].actionIds).toEqual([101, 200]);
+    expect(memberships.pl9900[1]).toBeUndefined();
+  });
+
+  it("tags engine-decided memberships and keeps pure-manual ones untagged", () => {
+    const { memberships } = runWith({ pl9900: { 300: ["right"] } });
+    expect(memberships.pl9900[1].evidence).toContain("engine:action-branch");
+    expect(memberships.pl9900[3].evidence).not.toContain("engine:action-branch");
+  });
+
+  it("drops the inferred marker when the engine decided every inferred action", () => {
+    // g1's only manual contribution was the inferred Schlacht; once the engine
+    // decides it, the membership no longer rests on inference.
+    const { memberships } = runWith({ pl9900: { 200: ["right"] } });
+    expect(memberships.pl9900[1].evidence).toContain("engine:action-branch");
+    expect(memberships.pl9900[1].evidence).not.toContain("inferred");
+    expect(memberships.pl9900[1].evidence).not.toContain("manual:button-map");
+  });
+
+  it("reports engine evidence for actions outside every family instead of banking it", () => {
+    const { memberships, engineOnly } = runWith({ pl9900: { 555: ["right"] } });
+    expect(memberships.pl9900[1].actionIds).toEqual([200]);
+    expect(engineOnly).toContainEqual({ character: "pl9900", action: 555, buttons: ["right"] });
   });
 });

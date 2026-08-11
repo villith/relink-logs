@@ -1798,29 +1798,29 @@
           "name": "Grade 1 Shot",
           "ids": [120],
           "button": "left",
-          "source": "inferred",
-          "note": "hold-left charge; his oracle data shows no Attacks-group step between strafes and grade shots, so both sides of his kit share the left group"
+          "source": "scott",
+          "note": "hold-left charge; confirmed by Scott 2026-08-10 (grades are all left-click)"
         },
         {
           "name": "Grade 2 Shot",
           "ids": [121, 122],
           "button": "left",
-          "source": "inferred",
-          "note": "hold-left charge; his oracle data shows no Attacks-group step between strafes and grade shots, so both sides of his kit share the left group"
+          "source": "scott",
+          "note": "hold-left charge; confirmed by Scott 2026-08-10 (grades are all left-click)"
         },
         {
           "name": "Grade 3 Shot",
           "ids": [125],
           "button": "left",
-          "source": "inferred",
-          "note": "hold-left charge; his oracle data shows no Attacks-group step between strafes and grade shots, so both sides of his kit share the left group"
+          "source": "scott",
+          "note": "hold-left charge; confirmed by Scott 2026-08-10 (grades are all left-click)"
         },
         {
           "name": "Grade 4 Shot",
           "ids": [130],
           "button": "left",
-          "source": "inferred",
-          "note": "hold-left charge; his oracle data shows no Attacks-group step between strafes and grade shots, so both sides of his kit share the left group"
+          "source": "scott",
+          "note": "hold-left charge; confirmed by Scott 2026-08-10 (grades are all left-click)"
         },
         {
           "name": "Strafe Finish Shot",

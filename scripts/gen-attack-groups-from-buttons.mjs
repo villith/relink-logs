@@ -28,6 +28,12 @@
  * these entries. Unresolved families and unmatched groups are printed, never
  * guessed.
  *
+ * The ENGINE layer (src/assets/action-input-map.json, from the combo-branch
+ * graph — see gen-action-input-map.py) overrides the family button per
+ * action, per Scott's 2026-08-10 ruling; such contributions are tagged
+ * `engine:action-branch`. Family buttons still decide the engine-silent
+ * actions (charge releases, stance entries, the launcher).
+ *
  * Run: node scripts/gen-attack-groups-from-buttons.mjs [--write]
  */
 import { readFileSync, writeFileSync } from "node:fs";
@@ -106,10 +112,15 @@ const groupKind = (texts) => {
 
 /**
  * Pure derivation: per character, the memberships the button map supports.
- * Returns { memberships, unresolved, unmatchedGroups } — the latter two are
- * report material, not errors.
+ * `engineInputs` (per character, action id → ["left"|"right"...], from the
+ * combo-branch graph) OVERRIDES the family's button per action — Scott's
+ * ruling — so a family button only decides engine-silent actions (charge
+ * releases, stance entries, the launcher). Engine evidence for actions no
+ * family curates is reported, never banked. Returns { memberships,
+ * unresolved, unmatchedGroups, engineOnly } — all but the first are report
+ * material, not errors.
  */
-export const deriveButtonMemberships = ({ buttonMap, icons, nodes, lang, skillNames }) => {
+export const deriveButtonMemberships = ({ buttonMap, icons, nodes, lang, skillNames, engineInputs = {} }) => {
   // character -> group -> [node texts]
   const groupTexts = new Map();
   for (const [key, node] of Object.entries(nodes)) {
@@ -129,6 +140,7 @@ export const deriveButtonMemberships = ({ buttonMap, icons, nodes, lang, skillNa
   const memberships = {};
   const unresolved = [];
   const unmatchedGroups = [];
+  const engineOnly = [];
 
   for (const [character, { families }] of Object.entries(buttonMap)) {
     const texts = groupTexts.get(character);
@@ -136,9 +148,39 @@ export const deriveButtonMemberships = ({ buttonMap, icons, nodes, lang, skillNa
     const characterIcons = icons[character] ?? {};
     const names = skillNames[character[0].toUpperCase() + character.slice(1)] ?? {};
 
+    const engine = engineInputs[character] ?? {};
+    const engineOf = (id) => {
+      const buttons = engine[id] ?? engine[String(id)];
+      return Array.isArray(buttons) && buttons.length > 0 ? buttons : null;
+    };
+
+    // Per-action side resolution: engine evidence wins over the family's
+    // button; a both-button action genuinely belongs to both sides.
+    const perAction = [];
+    const familyIds = new Set();
+    for (const family of families) {
+      for (const id of family.ids) {
+        familyIds.add(id);
+        const engineButtons = engineOf(id);
+        perAction.push({
+          id,
+          sides: engineButtons ?? (family.button ? [family.button] : []),
+          engineDecided: engineButtons !== null,
+          family,
+        });
+      }
+    }
+
     for (const family of families) {
       if (family.button === null || family.button === undefined) {
-        if (family.note === "unresolved") unresolved.push({ character, family: family.name, ids: family.ids });
+        if (family.note !== "unresolved") continue;
+        const remaining = family.ids.filter((id) => engineOf(id) === null);
+        if (remaining.length > 0) unresolved.push({ character, family: family.name, ids: remaining });
+      }
+    }
+    for (const [id, buttons] of Object.entries(engine)) {
+      if (!familyIds.has(Number(id)) && Array.isArray(buttons) && buttons.length > 0) {
+        engineOnly.push({ character, action: Number(id), buttons });
       }
     }
 
@@ -151,10 +193,7 @@ export const deriveButtonMemberships = ({ buttonMap, icons, nodes, lang, skillNa
         // by attack group — only normal-range actions are group members.
         .filter(
           ([id, name]) =>
-            Number(id) < 1000 &&
-            typeof name === "string" &&
-            !excluded.has(Number(id)) &&
-            actionMatches(words, name)
+            Number(id) < 1000 && typeof name === "string" && !excluded.has(Number(id)) && actionMatches(words, name)
         )
         .map(([id]) => Number(id))
         .sort((a, b) => a - b);
@@ -195,29 +234,48 @@ export const deriveButtonMemberships = ({ buttonMap, icons, nodes, lang, skillNa
     // "finisher" would swallow a character's basic combo finishers.
     for (const candidate of misses) {
       if (candidate.words.join(" ") !== "combo finisher") {
-        unmatchedGroups.push({ character, group: candidate.group, reason: "no-action-matches", words: candidate.words });
+        unmatchedGroups.push({
+          character,
+          group: candidate.group,
+          reason: "no-action-matches",
+          words: candidate.words,
+        });
         continue;
       }
       const matched = matchIds([candidate.words.at(-1)], namedActionIds);
       if (matched.length === 0) {
-        unmatchedGroups.push({ character, group: candidate.group, reason: "no-action-matches", words: candidate.words });
+        unmatchedGroups.push({
+          character,
+          group: candidate.group,
+          reason: "no-action-matches",
+          words: candidate.words,
+        });
         continue;
       }
       named.push({ group: candidate.group, matched });
       if (candidate.kind === "named") for (const id of matched) namedActionIds.add(id);
     }
 
-    const sided = (side) => families.filter((family) => family.button === side);
-    const sources = (list) => [...new Set(list.map((family) => family.source ?? "inferred"))];
-    const evidenceFor = (familyList) =>
-      `manual:button-map 2026-08-10${sources(familyList).includes("inferred") ? " (partly inferred)" : ""}`;
+    const entriesOn = (side) => perAction.filter((entry) => entry.sides.includes(side));
+    const evidenceFor = (entries) => {
+      const manual = entries.filter((entry) => !entry.engineDecided);
+      const parts = [];
+      if (manual.length > 0) {
+        const inferred = manual.some((entry) => (entry.family.source ?? "inferred") === "inferred");
+        parts.push(`manual:button-map 2026-08-10${inferred ? " (partly inferred)" : ""}`);
+      }
+      if (entries.some((entry) => entry.engineDecided)) parts.push("engine:action-branch 2026-08-10");
+      return parts.join("; ");
+    };
 
-    const bankGroup = (group, actionIds, familyList) => {
-      if (actionIds.length === 0) return;
+    const bankGroup = (group, entries) => {
+      if (entries.length === 0) return;
       memberships[character] ??= {};
       memberships[character][group] = {
-        actionIds: [...new Set(actionIds)].sort((a, b) => a - b),
-        evidence: familyList === null ? "manual:button-map 2026-08-10" : evidenceFor(familyList),
+        actionIds: [...new Set(entries.map((entry) => entry.id))].sort((a, b) => a - b),
+        evidence: entries.some((entry) => entry.family !== undefined)
+          ? evidenceFor(entries)
+          : "manual:button-map 2026-08-10",
       };
     };
 
@@ -229,28 +287,35 @@ export const deriveButtonMemberships = ({ buttonMap, icons, nodes, lang, skillNa
       const side = hasLeft ? "left" : hasRight ? "right" : null;
       if (hasLeft && hasRight) {
         // Both icons: the group spans both buttons ("/ Attacks").
-        const familyList = [...sided("left"), ...sided("right")];
-        const ids = familyList.flatMap((family) => family.ids).filter((id) => !namedActionIds.has(id));
-        bankGroup(group, ids, familyList);
+        bankGroup(
+          group,
+          perAction.filter((entry) => entry.sides.length > 0 && !namedActionIds.has(entry.id))
+        );
       } else if (kind === "attacks") {
         if (side === null) continue;
-        const familyList = sided(side);
-        const ids = familyList.flatMap((family) => family.ids).filter((id) => !namedActionIds.has(id));
-        bankGroup(group, ids, familyList);
+        bankGroup(
+          group,
+          entriesOn(side).filter((entry) => !namedActionIds.has(entry.id))
+        );
       } else if (kind === "charged") {
         if (side === null) continue;
-        const familyList = sided(side).filter((family) => CHARGE_FAMILY.test(family.name));
-        const ids = familyList
-          .flatMap((family) => family.ids)
-          .filter((id) => !namedActionIds.has(id))
-          .filter((id) => !/finisher/i.test(names[String(id)] ?? ""));
-        bankGroup(group, ids, familyList);
+        bankGroup(
+          group,
+          entriesOn(side)
+            .filter((entry) => CHARGE_FAMILY.test(entry.family.name))
+            .filter((entry) => !namedActionIds.has(entry.id))
+            .filter((entry) => !/finisher/i.test(names[String(entry.id)] ?? ""))
+        );
       }
     }
-    for (const { group, matched } of named) bankGroup(group, matched, null);
+    for (const { group, matched } of named)
+      bankGroup(
+        group,
+        matched.map((id) => ({ id }))
+      );
   }
 
-  return { memberships, unresolved, unmatchedGroups };
+  return { memberships, unresolved, unmatchedGroups, engineOnly };
 };
 
 const main = () => {
@@ -258,15 +323,17 @@ const main = () => {
   const buttonMap = asset("action-button-map.json").characters;
   const icons = asset("attack-group-icons.json").characters;
   const nodes = asset("skillboard-cap-sources.json").nodes;
+  const engineInputs = asset("action-input-map.json").characters;
   const lang = JSON.parse(readFileSync(path.join(ROOT, "src-tauri", "lang", "en", "skillboard.json"), "utf8"));
   const skillNames = JSON.parse(readFileSync(path.join(ROOT, "src-tauri", "lang", "en", "ui.json"), "utf8")).skills;
 
-  const { memberships, unresolved, unmatchedGroups } = deriveButtonMemberships({
+  const { memberships, unresolved, unmatchedGroups, engineOnly } = deriveButtonMemberships({
     buttonMap,
     icons,
     nodes,
     lang,
     skillNames,
+    engineInputs,
   });
 
   for (const [character, groups] of Object.entries(memberships)) {
@@ -278,6 +345,8 @@ const main = () => {
   for (const item of unresolved) console.log(`  ${item.character} ${item.family} [${item.ids.join(",")}]`);
   console.log(`unmatched word-named groups (${unmatchedGroups.length}):`);
   for (const item of unmatchedGroups) console.log(`  ${item.character} g${item.group} (${item.reason})`);
+  console.log(`engine evidence outside every family — NOT banked (${engineOnly.length}):`);
+  for (const item of engineOnly) console.log(`  ${item.character} ${item.action} ${item.buttons.join("+")}`);
 
   if (process.argv.includes("--write")) {
     const coveragePath = path.join(ROOT, "src", "assets", "attack-group-coverage.json");
