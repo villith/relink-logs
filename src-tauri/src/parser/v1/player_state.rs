@@ -519,7 +519,18 @@ impl PlayerState {
         self.stun_per_second = self.total_stun_value / duration_secs;
     }
 
-    pub fn update_from_damage_event(&mut self, damage_instance: &AdjustedDamageInstance) {
+    /// Returns the breakdown row this hit landed in — the `(action, child
+    /// character)` key [`BreakdownKeying`] assigned it.
+    ///
+    /// Returned rather than recomputed by anyone who needs it: that keying is
+    /// stateful and order-dependent (Ferry's pet remap, the raw-action memo),
+    /// so a second `key_for` for the same event would advance its state and
+    /// mis-key everything after it. The reparse's landing pass is the caller
+    /// that needs it; every other caller ignores it.
+    pub fn update_from_damage_event(
+        &mut self,
+        damage_instance: &AdjustedDamageInstance,
+    ) -> (ActionType, CharacterType) {
         if damage_instance.is_cappable {
             self.cappable_hits += 1;
         }
@@ -567,6 +578,8 @@ impl PlayerState {
         if let Some(amount) = held {
             row.sba_generated += amount;
         }
+
+        (action, child_character_type)
     }
 }
 
