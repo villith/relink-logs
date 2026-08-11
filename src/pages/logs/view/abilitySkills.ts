@@ -19,21 +19,26 @@ const ANY_CHILD = "*";
 const isSupplementary = (actionType: ActionType): boolean =>
   typeof actionType === "object" && Object.hasOwn(actionType, "SupplementaryDamage");
 
-/** A set of breakdown rows split into its direct and echo halves.
+/** A set of breakdown rows' echo half, and whether the set holds both halves.
  *
  * `mixed` is the whole point: only a set holding BOTH has a split to report.
  * One that is echo all the way across — the echo row with the toggle off, or
  * the residue a collapse leaves behind — is already described by its own
  * label, and painting the whole bar in the fainter shade would say nothing.
  *
- * The one author of that rule. Four surfaces draw the same split (the table's
- * ability rows, their per-player children, the groups path's rows and members,
- * and the hover card's sections), and a bar that split where the row beside it
- * did not is exactly what a second spelling buys. */
-export const splitSupplementary = <T extends SkillRow>(rows: T[]): { direct: T[]; echoes: T[]; mixed: boolean } => {
+ * The one author of that rule for the RAW view. The LANDING view does not use
+ * it: once an echo folds onto the hit that caused it there is no echo row left
+ * in the set to find, so the backend reports the share directly
+ * (`MergedMeasure.supplementary`, `MergedSkillMeasure.supplementary`) and the
+ * consumers read that instead.
+ *
+ * No `direct` half any more. It existed to narrow a row's min and max to the
+ * named skill's own hits, a rule the landing model replaces: under it an
+ * extreme IS a whole landing, echo included, and only the backend can compute
+ * one. */
+export const splitSupplementary = <T extends SkillRow>(rows: T[]): { echoes: T[]; mixed: boolean } => {
   const echoes = rows.filter((row) => isSupplementary(row.actionType));
-  const mixed = echoes.length > 0 && echoes.length < rows.length;
-  return { direct: mixed ? rows.filter((row) => !isSupplementary(row.actionType)) : rows, echoes, mixed };
+  return { echoes, mixed: echoes.length > 0 && echoes.length < rows.length };
 };
 
 /** How rows are keyed for one view.
