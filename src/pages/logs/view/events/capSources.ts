@@ -1,6 +1,6 @@
 import capUpSources from "@/assets/cap-up-sources.json";
 import type { PlayerData } from "@/types";
-import { computeCombinedTraits, summonBonusValue, toHashString } from "@/utils";
+import { computeCombinedTraits, isEmptyId, summonBonusValue, toHashString } from "@/utils";
 
 import type { CapSource } from "./capBreakdown";
 
@@ -174,17 +174,45 @@ export const enumerateSummons = (player: CapLoadout | undefined, capClass: CapCl
   });
 };
 
+/** Sigil Booster, the terminus-weapon innate that raises every equipped
+ * sigil's trait levels by its own level. The base skill id and the
+ * upgrade-resolved variant the hook captures live are both listed — a live
+ * innate block carries the variant. */
+const SIGIL_BOOSTER_TRAITS = [0x57e8a93f, 0x57e92e3f];
+
+const sigilBoosterLevel = (player: CapLoadout): number =>
+  (player.weaponState?.innateTraits ?? []).reduce(
+    (total, trait) => total + (SIGIL_BOOSTER_TRAITS.includes(trait.id) ? trait.level : 0),
+    0
+  );
+
+/** How many equipped sigil trait slots carry the trait — the multiplier on the
+ * booster, which raises each SLOT by its level, not the combined total once. */
+const sigilInstanceCount = (player: CapLoadout, traitId: number): number => {
+  let count = 0;
+  for (const sigil of player.sigils ?? []) {
+    if (isEmptyId(sigil.sigilId)) continue;
+    if (sigil.firstTraitId === traitId && sigil.firstTraitLevel > 0) count += 1;
+    if (sigil.secondTraitId === traitId && sigil.secondTraitLevel > 0) count += 1;
+  }
+  return count;
+};
+
 /** The plain DMG Cap trait's contribution, as the fraction the formula adds.
  *
  * Traits stack into ONE combined level across sigils, summon main traits,
  * wrightstone traits and weapon innates, and the value is looked up once at
  * that total — summing a per-sigil lookup instead multiplies the contribution
- * by the number of sigils carrying it. */
+ * by the number of sigils carrying it. Sigil Booster raises each sigil-sourced
+ * level before the combine: log 2573's oracle reconciliation had every local
+ * player's cap exactly one +3-level row (3 sigils x booster 1) above the raw
+ * combined level, on every hit, in every class. */
 export const dmgCapTraitValue = (player: CapLoadout | undefined, capClass: CapClass | null): number => {
   if (player === undefined || capClass === null) return 0;
   const combined = computeCombinedTraits(player).find((trait) => trait.id === DMG_CAP_TRAIT);
   if (combined === undefined) return 0;
-  return traitRowValue(traits, DMG_CAP_TRAIT, combined.level, capClass) / 100;
+  const level = combined.level + sigilBoosterLevel(player) * sigilInstanceCount(player, DMG_CAP_TRAIT);
+  return traitRowValue(traits, DMG_CAP_TRAIT, level, capClass) / 100;
 };
 
 /** Every OTHER unconditional cap trait's contribution — the ones the game

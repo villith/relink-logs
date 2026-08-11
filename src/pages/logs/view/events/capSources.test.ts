@@ -50,6 +50,20 @@ const loadout = (over: Partial<CapLoadout> = {}): CapLoadout => ({
   ...over,
 });
 
+/** The live (upgrade-resolved) id of the terminus Sigil Booster innate. */
+const SIGIL_BOOSTER_LIVE = 0x57e92e3f;
+
+const weaponStateWith = (innateTraits: { id: number; level: number }[]) => ({
+  weaponId: 1,
+  exp: 0,
+  starLevel: 6,
+  plusMarks: 0,
+  awakeningLevel: 10,
+  wrightstoneId: 0,
+  wrightstoneTraits: [],
+  innateTraits,
+});
+
 describe("capClassOf", () => {
   it("reads the class the game's own builder would select", () => {
     expect(capClassOf(0x1)).toBe("normal");
@@ -81,6 +95,33 @@ describe("dmgCapTraitValue", () => {
   it("is zero without the trait or without a loadout", () => {
     expect(dmgCapTraitValue(loadout(), "normal")).toBe(0);
     expect(dmgCapTraitValue(undefined, "normal")).toBe(0);
+  });
+
+  it("raises each SIGIL-sourced level by the Sigil Booster level", () => {
+    // Log 2573's oracle reconciliation: every local player ran 3 DMG Cap
+    // sigils (45) + the terminus innate (15) = combined 60 (+220%), yet every
+    // hit's cap demanded level 63 (+238%) — Sigil Booster 1 raises each
+    // equipped sigil trait by its level, and DMG Cap sits on three sigils.
+    const player = loadout({
+      sigils: [sigil(DMG_CAP_TRAIT, 15), sigil(DMG_CAP_TRAIT, 15), sigil(DMG_CAP_TRAIT, 15)],
+      weaponState: weaponStateWith([
+        { id: DMG_CAP_TRAIT, level: 15 },
+        { id: SIGIL_BOOSTER_LIVE, level: 1 },
+      ]),
+    });
+    expect(dmgCapTraitValue(player, "normal")).toBeCloseTo(2.38, 6);
+  });
+
+  it("does not boost non-sigil DMG Cap sources", () => {
+    // The booster reads "sigils' trait levels": a weapon-innate DMG Cap with
+    // no sigil instances stays at its own level.
+    const player = loadout({
+      weaponState: weaponStateWith([
+        { id: DMG_CAP_TRAIT, level: 15 },
+        { id: SIGIL_BOOSTER_LIVE, level: 1 },
+      ]),
+    });
+    expect(dmgCapTraitValue(player, "normal")).toBeCloseTo(0.45, 6);
   });
 });
 
