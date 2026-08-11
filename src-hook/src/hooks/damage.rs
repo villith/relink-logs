@@ -737,7 +737,20 @@ impl OnProcessDamageHook {
         // the RVAs back through SymbolAt/Decompile closes the term.
         #[cfg(feature = "hookdiag")]
         if let Some(src) = pre_call_source_ptr {
-            if super::player::player_slot_key_for_actor(src as *const usize).is_some() {
+            use std::sync::atomic::{AtomicU32, Ordering};
+            // Bounded, because everything below it is per-hit work on a game
+            // thread: a snapshot lookup plus three guarded reads (each an
+            // `IsBadReadPtr` probe) before `first_n_per_key` gets to decide it
+            // has nothing to log. The distinct vtables here number in the
+            // handful and all of them appear within seconds of a fight
+            // starting, so past this budget the walk could only ever discard
+            // its own result. One relaxed load ends it.
+            static PROBES: AtomicU32 = AtomicU32::new(0);
+            const PROBE_BUDGET: u32 = 20_000;
+            if PROBES.load(Ordering::Relaxed) < PROBE_BUDGET
+                && super::player::player_slot_key_for_actor(src as *const usize).is_some()
+            {
+                PROBES.fetch_add(1, Ordering::Relaxed);
                 use crate::hooks::diag::{read_ptr_guarded, MODULE_BASE};
                 static SEEN: std::sync::Mutex<Vec<(usize, u32)>> =
                     std::sync::Mutex::new(Vec::new());
