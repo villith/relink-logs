@@ -2,7 +2,7 @@ import type React from "react";
 
 import type { EventPins } from "../../events/eventRows";
 import type { ScopeProbes } from "../../events/eventScope";
-import type { Hostility, MetricRow } from "../../metrics/types";
+import type { Hostility, LabelKind, MetricRow } from "../../metrics/types";
 import type { SelectorPins } from "../../selectorOptions";
 import type { CardAmount, CardSection } from "../HoverCard";
 import type { MetricKey } from "../machine/state";
@@ -33,6 +33,20 @@ export type StreamContext = {
  * effect level applies, so neither body has to know that rule. */
 export type RowPresentation = {
   rows: MetricRow[];
+  /** What KIND of thing the view's rows are — players, abilities, statuses.
+   * The view's own (see `useRowModel`), for the rows that declare no `kind` of
+   * their own: the derived metrics leave `MetricRow.kind` undefined and lean on
+   * the table-wide one. Both bodies read this single value, so a lane and its
+   * table row cannot disagree about what they are drawing. */
+  rowKind: LabelKind;
+  /** A row's name and a row's art, separately — what the TABLE takes, because
+   * it draws the art at the height of the bar behind it rather than inline
+   * beside the words. */
+  rowName: (row: MetricRow) => React.ReactNode;
+  rowArt: (row: MetricRow) => string | undefined;
+  /** The two above composed into one node, for a body that wants the art
+   * inline — the timeline's lane names. Never resolved separately from them,
+   * so a lane and its table row cannot disagree. */
   renderLabel: (row: MetricRow) => React.ReactNode;
   rowColor: (row: MetricRow) => string;
   onPin: (pins: Partial<SelectorPins>) => void;

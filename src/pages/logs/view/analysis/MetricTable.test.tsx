@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { MetricRow } from "../metrics/types";
 
 import { MetricTable } from "./MetricTable";
+import type { RowPresentation } from "./model/bodyContext";
 
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
@@ -161,9 +162,105 @@ describe("MetricTable", () => {
     expect(bars[0].style.width).toBe("0%");
   });
 
-  it("uses the caller's label renderer when one is given", () => {
-    renderTable({ renderLabel: (row: MetricRow) => `<${row.key}>` });
+  it("uses the caller's name renderer when one is given", () => {
+    renderTable({ rowName: (row: MetricRow) => `<${row.key}>` });
     expect(screen.getByText("<a>")).toBeTruthy();
+  });
+
+  it("names its rows off a whole RowPresentation, the way the view hands it one", () => {
+    // The view renders `<MetricTable {...presentation} />`, and a spread is
+    // checked only for the props the table DECLARES: when this table read the
+    // presentation's namer under a name of its own (`renderName`), nothing
+    // failed to compile — every row silently fell back to its raw `label` and
+    // the table drew "Normal:1100" where a skill name belongs. Typing the
+    // fixture as the contract is what makes a future rename fail HERE.
+    const presentation: RowPresentation = {
+      rows: ROWS,
+      rowKind: "player",
+      rowName: (row) => `name(${row.key})`,
+      rowArt: () => undefined,
+      renderLabel: (row) => `label(${row.key})`,
+      rowColor: () => "#36B37E",
+      onPin: () => {},
+    };
+    render(
+      <MantineProvider>
+        <MetricTable {...presentation} columnKeys={[]} />
+      </MantineProvider>
+    );
+    expect(screen.getByText("name(a)")).toBeTruthy();
+    expect(screen.queryByText("Narmaya")).toBeNull();
+  });
+
+  it("draws a row's art at bar height, and notches the bar it nests into", () => {
+    const { container } = renderTable({ rowArt: (row) => (row.key === "a" ? "/art/a.png" : undefined) });
+
+    const art = container.querySelectorAll<HTMLImageElement>("img");
+    expect(art).toHaveLength(1);
+    expect(art[0].getAttribute("src")).toBe("/art/a.png");
+    expect(art[0].className).toContain("size-art");
+
+    // The row the game draws no picture for still holds the box, so the name
+    // column's left edge does not move from row to row — and so the bite the
+    // bar has taken out of itself is not left standing empty.
+    expect(container.querySelectorAll("[data-row-art-empty]")).toHaveLength(1);
+
+    // Every bar is bitten and anchored to the art's centre, art or none.
+    const bars = container.querySelectorAll<HTMLElement>("[data-testid='metric-bar-segment']");
+    expect(bars).toHaveLength(2);
+    for (const bar of bars) expect(bar.style.clipPath).toContain("polygon");
+  });
+
+  it("heads an actor's bar itself rather than biting a notch for art that cannot fill it", () => {
+    // A character bust is not a diamond: a bite cut for one would open a hole
+    // around the bust instead of seating it, and would put the page's ground
+    // behind the character where the row's own colour belongs. The bar draws
+    // the diamond's head instead and the bust stands on it — same silhouette.
+    const { container } = renderTable({ rowKind: "player", rowArt: () => "/art/gran.png" });
+    const bars = container.querySelectorAll<HTMLElement>("[data-testid='metric-bar-segment']");
+    for (const bar of bars) expect(bar.style.clipPath).toContain("polygon");
+    // Reaching back to the art's LEFT EDGE, not its centre: the head has to
+    // cover the box the bust stands in.
+    expect(container.querySelector<HTMLElement>("[data-bar-track]")?.className).toContain("left-[var(--row-pad)]");
+    // The art is still drawn at the bar's own height.
+    expect(container.querySelector("img")?.className).toContain("size-art");
+  });
+
+  it("takes a row's own kind over the table's when deciding how the bar meets it", () => {
+    const mixed: MetricRow[] = [
+      { ...ROWS[0], kind: "player" },
+      { ...ROWS[1], kind: "ability" },
+    ];
+    const { container } = renderTable({ rows: mixed, rowKind: "player", rowArt: () => "/art/a.png" });
+    const tracks = container.querySelectorAll<HTMLElement>("[data-bar-track]");
+    expect(tracks[0].className).toContain("left-[var(--row-pad)]");
+    expect(tracks[1].className).toContain("left-[calc(var(--row-pad)_+_var(--spacing-art)/2)]");
+  });
+
+  it("stands the row's rectangular outline down where the bar draws a shaped ring", () => {
+    const { container } = renderTable({ rowArt: () => "/art/a.png" });
+    const row = container.querySelector<HTMLElement>("[role='row']:not([data-head])");
+    expect(row?.className).toContain("group");
+    expect(row?.className).not.toContain("hover:outline");
+    expect(container.querySelectorAll("[data-bar-ring]")).toHaveLength(2);
+  });
+
+  it("leaves the bar square when the caller draws no art", () => {
+    const { container } = renderTable();
+    expect(container.querySelectorAll("img")).toHaveLength(0);
+    const bar = container.querySelector<HTMLElement>("[data-testid='metric-bar-segment']");
+    expect(bar?.style.clipPath).toBe("");
+  });
+
+  it("moves an indented row's own padding, so its art and its bar's bite travel together", () => {
+    // The bar's notch is anchored to `--row-pad` (see `MetricBar`); a subrow
+    // that indented with a `pl-*` of its own would leave the bite behind at the
+    // row's edge, a whole indent to the left of the diamond it is cut for.
+    const parent: MetricRow = { ...ROWS[0], children: [ROWS[1], { ...ROWS[1], key: "c" }] };
+    const { container } = renderTable({ rows: [parent] });
+    fireEvent.click(container.querySelector("[data-expand]")!);
+    const subrow = container.querySelector<HTMLElement>("[data-subrow]");
+    expect(subrow?.className).toContain("[--row-pad:calc(28px*var(--density))]");
   });
 
   it("names what the rows are", () => {

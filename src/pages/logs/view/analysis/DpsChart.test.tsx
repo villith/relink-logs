@@ -241,20 +241,27 @@ describe("ChartTooltip — art and a card that holds still", () => {
     { name: "1", label: "Manmoth", partySlotIndex: 1, color: "#0f0" },
   ];
 
-  it("draws a series' art beside its name", () => {
+  it("draws a series' art beside its name, at the height of its bar", () => {
     // The tooltip's rows ARE the table's rows one level in, and the table has
     // shown this art all along — the breakdown listed bare text beside it.
+    // In its own box rather than inside the name cell, for the reason the
+    // table's rows draw it that way: at bar height it cannot sit inside a
+    // one-line truncating text.
     const { container } = renderTooltip([{ dataKey: "0", name: "0", value: 1000, color: "#f00" }], WITH_ART);
 
-    expect(container.querySelector<HTMLImageElement>("[data-card-name] img")?.src).toContain("rain.png");
+    const art = container.querySelector<HTMLImageElement>("[data-card-row] img");
+    expect(art?.src).toContain("rain.png");
+    expect(art?.className).toContain("size-art-card");
   });
 
   it("leaves a series with no art text-only", () => {
     // Undefined is data: a combo action, a rollup remainder and a gauge cause
-    // depict nothing, and a blank box says less than no box.
+    // depict nothing, and a blank box says less than no box — a card's rows are
+    // not a column of names to line up, so nothing is reserved.
     const { container } = renderTooltip([{ dataKey: "1", name: "1", value: 1000, color: "#0f0" }], WITH_ART);
 
-    expect(container.querySelector("[data-card-name] img")).toBeNull();
+    expect(container.querySelector("[data-card-row] img")).toBeNull();
+    expect(container.querySelector("[data-row-art-empty]")).toBeNull();
     expect(screen.getByText("Manmoth")).toBeTruthy();
   });
 

@@ -1,8 +1,9 @@
 import { Box, Text } from "@mantine/core";
-import { useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CursorCard } from "@/components/CursorCard";
+import { Figure } from "@/components/ui/Figure";
 import { Label } from "@/components/ui/Label";
 import type { CharacterType } from "@/types";
 import { translateTraitId } from "@/utils";
@@ -73,10 +74,21 @@ export const AmountCell = ({
   characterType,
   conditions,
   width,
+  connector,
+  share,
 }: {
   amount: number | null;
   capHit: CapHit | null;
-  width: number;
+  /** The column's width: a raw px number on its own, or the events table's
+   * density calc when that table places it. */
+  width: number | string;
+  /** The elbow marking a row that hangs from the one above it, drawn before the
+   * digits. A slot rather than the caller's own wrapper, because the cell is
+   * one grid cell — the connector, the number and the share are its contents,
+   * and only the number opens the card. */
+  connector?: ReactNode;
+  /** An echo's share of the hit that caused it, drawn after the digits. */
+  share?: ReactNode;
 } & AmountCellCapFacts) => {
   const { t, i18n } = useTranslation();
   const rows = useMemo(() => {
@@ -130,13 +142,22 @@ export const AmountCell = ({
   );
 
   const cell = (
-    <Text size="xs" ta="right" data-cell="amount" style={{ fontVariantNumeric: "tabular-nums" }}>
+    <Text size="xs" ta="right" style={{ fontVariantNumeric: "tabular-nums" }}>
       {amount === null ? "" : amount.toLocaleString(i18n.language)}
     </Text>
   );
 
   return (
-    <Box w={width}>
+    // The grid cell itself, `data-cell` and all: one component owns the whole
+    // Amount column, so the hover target cannot drift away from the number it
+    // explains. `relative` because the connector is positioned against it.
+    <Figure
+      data-cell="amount"
+      role="gridcell"
+      className="relative flex shrink-0 items-center justify-end"
+      style={{ width }}
+    >
+      {connector}
       {shows ? (
         // The same surface as the metric and aura cards (`HOVER_PANEL_CLASS`):
         // one view must not teach two kinds of tooltip. Sized to its content
@@ -158,6 +179,7 @@ export const AmountCell = ({
       ) : (
         cell
       )}
-    </Box>
+      {share}
+    </Figure>
   );
 };

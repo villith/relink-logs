@@ -1,10 +1,26 @@
 import type { Hostility } from "../../metrics/types";
+import type { SelectorPins } from "../../selectorOptions";
 import { isStatusPin } from "../../statusUptime";
 import type { MetricCapabilities } from "./capabilities";
 import { resolveGroupBy } from "./resolve";
 import { auraAnchorOf, type AnalysisState, type Dimension, type MetricKey } from "./state";
 
 export type PinValue = { dim: "source" | "target"; value: number } | { dim: "ability"; value: string };
+
+/** Which dimension a pin payload names, and at what value — read out of the
+ * legacy `SelectorPins` wire shape that both a row click (`MetricRow.pinOnClick`)
+ * and the selector bar report in. Null where the payload pins nothing.
+ *
+ * ONE reader, because a row click and the auto-drill that follows it must agree
+ * about which dimension a payload names: two spellings of this priority order is
+ * how a click could pin the target while the drill rule read it as a source. */
+export const pinValueOf = (pins: Partial<SelectorPins> | null | undefined): PinValue | null => {
+  if (!pins) return null;
+  if (pins.source !== undefined && pins.source !== null) return { dim: "source", value: pins.source };
+  if (pins.targets !== undefined && pins.targets.length > 0) return { dim: "target", value: pins.targets[0] };
+  if (pins.ability !== undefined && pins.ability !== null) return { dim: "ability", value: pins.ability };
+  return null;
+};
 
 /** Drops the auras anchored to an actor pin that is about to change or clear —
  * those chips belong to that actor, and a window mask computed for the old one

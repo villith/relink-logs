@@ -5,6 +5,7 @@
 
 :root {
   --density: 1;
+  --row-pad: 0.5rem;
 }
 
 @theme static {
@@ -37,9 +38,13 @@
   --text-2xl--line-height: inherit;
 
   --spacing-row: calc(30px * var(--density));
+  --spacing-lane: calc(42px * var(--density));
   --spacing-head: calc(22px * var(--density));
   --spacing-control: calc(28px * var(--density));
   --spacing-chip: calc(24px * var(--density));
+  --spacing-card-row: calc(23px * var(--density));
+  --spacing-art: calc(var(--spacing-row) - 2px);
+  --spacing-art-card: var(--spacing-card-row);
   --spacing-icon: calc(22px * var(--density));
   --spacing-icon-sm: calc(18px * var(--density));
   --spacing-icon-xs: calc(15px * var(--density));

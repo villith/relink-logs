@@ -22,6 +22,12 @@ describe("EntityIcon", () => {
     expect(classesOf(screen.getByAltText("Io"))).toContain("size-icon");
   });
 
+  it("takes the bar size, which is the height of the bar it nests into", () => {
+    render(<EntityIcon src="/a.png" alt="a" size="bar" />);
+    expect(classesOf(screen.getByAltText("a"))).toContain("size-art");
+    expect(classesOf(screen.getByAltText("a"))).not.toContain("size-icon");
+  });
+
   it("takes the control and card sizes", () => {
     const { rerender } = render(<EntityIcon src="/a.png" alt="a" size="control" />);
     expect(classesOf(screen.getByAltText("a"))).toContain("size-icon-sm");

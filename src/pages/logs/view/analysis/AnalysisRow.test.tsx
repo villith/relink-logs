@@ -24,6 +24,20 @@ describe("AnalysisRow", () => {
     expect(container.querySelector("[role='row']")).toBeTruthy();
   });
 
+  it("stands the art at the head of the row, before its controls", () => {
+    // The order is the geometry: the bar's notch is cut where this box starts
+    // (see `MetricBar`), so a control drawn before the art would push the
+    // diamond off the point the bite comes to.
+    const { container } = renderRow({
+      art: <span data-testid="art" />,
+      leading: <span data-testid="lead" />,
+    });
+    const marks = Array.from(container.querySelectorAll("[data-testid]")).map((node) =>
+      node.getAttribute("data-testid")
+    );
+    expect(marks).toEqual(["art", "lead"]);
+  });
+
   it("renders leading and trailing slots around the name", () => {
     const { container } = renderRow({
       leading: <span data-testid="lead" />,

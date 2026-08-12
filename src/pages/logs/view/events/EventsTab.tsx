@@ -11,6 +11,7 @@ import { millisecondsToPreciseElapsedFormat } from "@/utils";
 
 import "../analysis/analysis.css";
 
+import { Figure } from "../../../../components/ui/Figure";
 import { AnalysisRow } from "../analysis/AnalysisRow";
 import {
   CHIP_BUTTON_CLASS,
@@ -40,7 +41,6 @@ import { defaultScopeKinds, narrowStream, scopeFor, scopeKinds } from "./eventSc
 import { nestSupplementary, type NestedEventRow } from "./nestSupplementary";
 import { useEvents } from "./useEvents";
 import { visibleSlice } from "./windowSlice";
-import { Figure } from "../../../../components/ui/Figure";
 
 /** One resolved cell: what to call the thing, and what it looks like. `iconUrl`
  * is absent far more often than not — trash mobs have no portrait, and bare
@@ -231,6 +231,8 @@ export const EventRowsTable = ({
   startIndex,
   totalRows,
   labels,
+  capUp,
+  loadout,
   marks,
   filters,
 }: {
@@ -339,6 +341,12 @@ export const EventRowsTable = ({
             row.parent === undefined || row.parent.sharePercent === 0 ? null : row.parent.sharePercent.toFixed(1);
           const child = row.parent !== undefined;
           const current = marks?.current === rowIndex;
+          // Who dealt this hit, and what they were carrying. Both keyed by
+          // `sourceIndex` — the same actor index the loadouts are stored under
+          // — so a hit's captured cap-up total and the build it is itemized
+          // against can never describe two different players.
+          const actor = row.sourceIndex;
+          const build = actor === null ? undefined : loadout?.get(actor);
 
           return (
             <AnalysisRow
@@ -423,21 +431,31 @@ export const EventRowsTable = ({
                 />
               }
               trailing={<CellText name="target" cell={target} width={COLUMNS.target} />}
+              /* The amount is the END of a calculation this log records the
+                 inputs to, so the cell explains itself on hover. The facts are
+                 resolved per row against the ACTING player: a hit's cap-up
+                 total and the loadout it is itemized against must describe one
+                 player, and `sourceIndex` is the key both are stored under. */
               columns={
-                <Figure
-                  data-cell="amount"
-                  role="gridcell"
-                  className="relative flex shrink-0 items-center justify-end"
-                  style={{ width: widthOf(COLUMNS.amount) }}
-                >
-                  {child && <Connector />}
-                  {row.amount === null ? "" : row.amount.toLocaleString()}
-                  {share !== null && (
-                    <Figure size="sm" tone="dim" className="ml-1">
-                      {t("ui.logs.events-echo-share", { percent: share })}
-                    </Figure>
-                  )}
-                </Figure>
+                <AmountCell
+                  amount={row.amount}
+                  capHit={row.capHit}
+                  playerCapUp={actor === null ? undefined : capUp?.[String(actor)]}
+                  loadout={build}
+                  characterType={build?.characterType}
+                  // `null` is "this row has no cap to explain"; the card wants
+                  // "nothing known", and the two degrade the same way.
+                  conditions={row.capConditions ?? undefined}
+                  width={widthOf(COLUMNS.amount)}
+                  connector={child ? <Connector /> : undefined}
+                  share={
+                    share === null ? undefined : (
+                      <Figure size="sm" tone="dim" className="ml-1">
+                        {t("ui.logs.events-echo-share", { percent: share })}
+                      </Figure>
+                    )
+                  }
+                />
               }
             />
           );

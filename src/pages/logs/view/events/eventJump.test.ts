@@ -14,6 +14,9 @@ const row = (over: Partial<EventRow> & { timeMs: number }): NestedEventRow => ({
   statusId: null,
   detailKey: null,
   amount: null,
+  // Jumping is about time, not caps; these rows carry nothing to explain.
+  capHit: null,
+  capConditions: null,
   ...over,
 });
 

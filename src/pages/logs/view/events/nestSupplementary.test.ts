@@ -14,6 +14,10 @@ const row = (timeMs: number, amount: number, abilityKey: string): EventRow => ({
   statusId: null,
   detailKey: null,
   amount,
+  // Nesting pairs an echo with its cause by time and ability; the cap fields
+  // ride along untouched, so these rows need none.
+  capHit: null,
+  capConditions: null,
 });
 
 const keys = (rows: NestedEventRow[]) => rows.map((r) => `${r.abilityKey}${r.parent ? "*" : ""}`);

@@ -42,12 +42,14 @@ import {
   setHostility as hostilityTransition,
   setMetric as metricTransition,
   pinRow,
+  pinValueOf,
   regroup,
   toggleWindowFilter as windowFilterTransition,
   toggleWindowKind as windowKindTransition,
   setWindow as windowTransition,
 } from "./machine/transitions";
 import { useAnalysisState } from "./machine/useAnalysisState";
+import { useAutoDrill } from "./machine/useAutoDrill";
 import type { RowPresentation, StreamContext } from "./model/bodyContext";
 import { useActorIdentity } from "./model/useActorIdentity";
 import { useChartModel } from "./model/useChartModel";
@@ -334,12 +336,15 @@ export const AnalysisView = () => {
     metric,
     shownRows,
     rowChildren,
+    rowName,
+    rowArt,
     renderLabel,
     rowColor,
     rowSections,
     sectionLabelOf,
     isStatusMetric,
     effectLevel,
+    tableKind,
   } = useRowModel({
     metricKey,
     caps,
@@ -363,6 +368,24 @@ export const AnalysisView = () => {
     classOfRowKey,
   });
 
+  // The drill's last step, taken for the user: a pin that leaves the table with
+  // ONE row pins that row too (see `useAutoDrill`). Armed by the pin handlers
+  // below rather than standing over the rows, so the pin it applies stays
+  // clearable.
+  //
+  // `settled` is what keeps it off the rows folded between a regroup and its
+  // response — the groups path draws the PREVIOUS grouping's aggregates until
+  // its own arrive (see `answeredGroups`), and one of those is not this drill's
+  // answer. The other two data paths build their rows synchronously from the
+  // pins, so their rows always answer the grouping in hand.
+  const { armDrill } = useAutoDrill({
+    rows: shownRows,
+    state,
+    setState,
+    settled: caps.dataPath !== "groups" || chartGroupBy === spec.groupBy,
+    enabled: body === TABLE_TAB,
+  });
+
   // Bound once against the spawn table rather than inline in the timeline's
   // props: it is in that body's lane memo's dependencies, and a fresh arrow
   // each render re-folds the whole event stream on every unrelated change.
@@ -373,40 +396,48 @@ export const AnalysisView = () => {
 
   // A row click pins its dimension through the machine's transition, so the
   // `by` override drops and the derived default advances — WCL's behavior.
-  // The payload still arrives in the legacy `SelectorPins` wire shape.
+  // The payload still arrives in the legacy `SelectorPins` wire shape, read by
+  // the same `pinValueOf` the auto-drill rule reads a row's payload with.
   const handlePin = useCallback(
     (next: Partial<SelectorPins>) => {
-      if (next.source !== undefined && next.source !== null) {
-        setState(pinRow(state, { dim: "source", value: next.source }));
-      } else if (next.targets !== undefined && next.targets.length > 0) {
-        setState(pinRow(state, { dim: "target", value: next.targets[0] }));
-      } else if (next.ability !== undefined && next.ability !== null) {
-        setState(pinRow(state, { dim: "ability", value: next.ability }));
-      }
+      const pin = pinValueOf(next);
+      if (pin === null) return;
+      armDrill();
+      setState(pinRow(state, pin));
     },
-    [state, setState]
+    [state, setState, armDrill]
   );
 
   // The selector bar hands back whole pin sets. A change per dimension routes
   // through the same transitions a row click uses: an addition pins (and
   // advances the default), a removal only clears its own dimension.
+  //
+  // An addition arms the auto-drill for the same reason a row click does — it
+  // IS a drill, only spelled through a dropdown. A removal deliberately does
+  // not: re-drilling what was just cleared is how the ✕ would undo itself.
   const handlePinsChange = useCallback(
     (next: SelectorPins) => {
       const target = next.targets.length > 0 ? next.targets[0] : null;
       let draft = state;
+      let pinned = false;
       if (next.source !== state.source) {
         draft = next.source === null ? clearPin(draft, "source") : pinRow(draft, { dim: "source", value: next.source });
+        pinned = pinned || next.source !== null;
       }
       if (target !== state.target) {
         draft = target === null ? clearPin(draft, "target") : pinRow(draft, { dim: "target", value: target });
+        pinned = pinned || target !== null;
       }
       if (next.ability !== state.ability) {
         draft =
           next.ability === null ? clearPin(draft, "ability") : pinRow(draft, { dim: "ability", value: next.ability });
+        pinned = pinned || next.ability !== null;
       }
-      if (draft !== state) setState(draft);
+      if (draft === state) return;
+      if (pinned) armDrill();
+      setState(draft);
     },
-    [state, setState]
+    [state, setState, armDrill]
   );
 
   // Everything the plot is: which of the five series builders won, how that
@@ -505,6 +536,9 @@ export const AnalysisView = () => {
   const stream: StreamContext = { id, metric: metricKey, hostility, pins: eventPins, probes: eventProbes };
   const presentation: RowPresentation = {
     rows: shownRows,
+    rowKind: tableKind,
+    rowName,
+    rowArt,
     renderLabel,
     rowColor,
     onPin: handlePin,

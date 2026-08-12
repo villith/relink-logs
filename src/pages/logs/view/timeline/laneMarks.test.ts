@@ -3,8 +3,19 @@ import { describe, expect, it } from "vitest";
 import type { EventRow } from "../events/eventRows";
 import type { MetricRow } from "../metrics/types";
 
-import { CAST_MAX_MS, lanesFor, markGapMs, marksByLane, mergeCasts, mergeMarks, type LaneMark } from "./laneMarks";
+import {
+  CAST_MAX_MS,
+  lanesFor,
+  markGapMs,
+  marksByLane,
+  mergeCasts,
+  mergeMarks,
+  shownHits,
+  type LaneMark,
+  type MarkHit,
+} from "./laneMarks";
 import type { LaneMatcher } from "./laneMatch";
+import { laneShapeOf } from "./laneShape";
 
 const event = (over: Partial<EventRow>): EventRow => ({
   timeMs: 0,
@@ -35,6 +46,10 @@ const metricRow = (over: Partial<MetricRow>): MetricRow => ({
 /** Every event lands on lane "a". */
 const ALL_TO_A: LaneMatcher = { laneOf: () => "a" };
 
+/** The real classifier, so these cases cannot drift from the shape a row would
+ * actually be drawn with. */
+const shapes = (row: MetricRow) => laneShapeOf(row);
+
 /** A mark with the fields a case is not about already filled in. Written once
  * so adding a field to `LaneMark` does not mean editing twenty literals — and
  * so a case that IS about `hits`/`casts`/`castKey` states them visibly. */
@@ -61,7 +76,7 @@ describe("marksByLane", () => {
         endMs: 2000,
         amount: 100,
         by: [{ key: "", count: 1, amount: 100 }],
-        hits: [{ atMs: 2000, echo: false }],
+        hits: [{ atMs: 2000, echo: false, amount: 100, key: "" }],
         // The kind is always part of a cast identity, even for an event that
         // names no ability at all — see `castKeyOf`.
         castKey: "damage|",
@@ -139,8 +154,8 @@ describe("lanesFor", () => {
   // rather than re-deriving anything.
   it("draws a row's own timeline spans when it has them", () => {
     const rows = [metricRow({ key: "status:77:210", kind: "status", timeline: [{ startMs: 0, endMs: 4000 }] })];
-    const lanes = lanesFor(rows, new Map(), 100);
-    expect(lanes[0]?.spans).toBe(true);
+    const lanes = lanesFor(rows, new Map(), 100, shapes);
+    expect(lanes[0]?.shape).toBe("spans");
     expect(lanes[0]?.marks).toEqual([mark({ startMs: 0, endMs: 4000 })]);
   });
 
@@ -149,25 +164,53 @@ describe("lanesFor", () => {
     const byLane = new Map([
       ["skill:Normal:100", [mark({ startMs: 0, endMs: 0, amount: 10 }), mark({ startMs: 50, endMs: 50, amount: 20 })]],
     ]);
-    const lanes = lanesFor(rows, byLane, 100);
-    expect(lanes[0]?.spans).toBe(false);
+    const lanes = lanesFor(rows, byLane, 100, shapes);
+    expect(lanes[0]?.shape).toBe("icons");
     // ONE cast, not two: the cast fold runs first and two same-identity hits
     // 50ms apart are one cast, so the density fold has nothing left to merge.
     expect(lanes[0]?.marks).toEqual([mark({ startMs: 0, endMs: 50, count: 2, amount: 30, casts: 1 })]);
+  });
+
+  // Both drawn shapes read the SAME fold — an actor lane buckets by ability
+  // exactly as an ability lane does, or a player's row would show every hit
+  // loose while the drilled-in row grouped them.
+  it("buckets an actor lane by the same fold as an ability lane", () => {
+    const rows = [metricRow({ key: "player:1", kind: "player" })];
+    const byLane = new Map([
+      ["player:1", [mark({ startMs: 0, endMs: 0, amount: 10 }), mark({ startMs: 50, endMs: 50, amount: 20 })]],
+    ]);
+    const lanes = lanesFor(rows, byLane, 10, shapes);
+    expect(lanes[0]?.shape).toBe("buckets");
+    expect(lanes[0]?.marks).toEqual([mark({ startMs: 0, endMs: 50, count: 2, amount: 30, casts: 1 })]);
+  });
+
+  // Two hits of DIFFERENT abilities are not one bucket, however close.
+  it("keeps two abilities apart even when they land together", () => {
+    const rows = [metricRow({ key: "player:1", kind: "player" })];
+    const byLane = new Map([
+      [
+        "player:1",
+        [
+          mark({ startMs: 0, endMs: 0, amount: 10, castKey: "damage|A" }),
+          mark({ startMs: 50, endMs: 50, amount: 20, castKey: "damage|B" }),
+        ],
+      ],
+    ]);
+    expect(lanesFor(rows, byLane, 10, shapes)[0]?.marks).toHaveLength(2);
   });
 
   // A row the join could not place still gets a lane. Dropping it would make
   // the timeline disagree with the table about which rows exist.
   it("keeps a lane for a row with nothing to draw", () => {
     const rows = [metricRow({ key: "skill:Normal:100", kind: "ability" })];
-    const lanes = lanesFor(rows, new Map(), 100);
+    const lanes = lanesFor(rows, new Map(), 100, shapes);
     expect(lanes).toHaveLength(1);
     expect(lanes[0]?.marks).toEqual([]);
   });
 
   it("keeps the rows in the order it was given them", () => {
     const rows = [metricRow({ key: "a", kind: "ability" }), metricRow({ key: "b", kind: "ability" })];
-    expect(lanesFor(rows, new Map(), 100).map((lane) => lane.row.key)).toEqual(["a", "b"]);
+    expect(lanesFor(rows, new Map(), 100, shapes).map((lane) => lane.row.key)).toEqual(["a", "b"]);
   });
 });
 
@@ -217,7 +260,7 @@ describe("mark contributions", () => {
   // A row's own timeline spans are not an event fold and have nothing to list.
   it("gives a span mark no contributions", () => {
     const rows = [metricRow({ key: "s", kind: "status", timeline: [{ startMs: 0, endMs: 4000 }] })];
-    expect(lanesFor(rows, new Map(), 100)[0]?.marks[0]?.by).toEqual([]);
+    expect(lanesFor(rows, new Map(), 100, shapes)[0]?.marks[0]?.by).toEqual([]);
   });
 });
 
@@ -228,7 +271,7 @@ describe("mergeCasts", () => {
     count: 1,
     amount: 100,
     by: [{ key: "Normal:100", count: 1, amount: 100 }],
-    hits: [{ atMs: startMs, echo: false }],
+    hits: [{ atMs: startMs, echo: false, amount: 100, key: "Normal:100" }],
     casts: 1,
     castKey,
   });
@@ -261,6 +304,23 @@ describe("mergeCasts", () => {
   it("is independent of the zoom-derived gap", () => {
     // The whole point: a cast must not split when you zoom in.
     expect(mergeMarks(mergeCasts([hit(0), hit(400)]), 0)).toHaveLength(1);
+  });
+});
+
+describe("shownHits", () => {
+  const hits = (times: number[]): MarkHit[] =>
+    times.map((atMs) => ({ atMs, echo: false, amount: 1, key: "Normal:100" }));
+
+  it("drops a hit whose marker would overlap the one before it", () => {
+    // gapMs 100 is three pixels' worth of time, so a 12px marker needs 400ms
+    // of clearance: the middle hit cannot be told apart from the first.
+    expect(shownHits(hits([0, 100, 500]), 100, 12)).toHaveLength(2);
+  });
+
+  it("claims nothing at an unmeasured scale", () => {
+    // `gapMs` is zero until the container has been measured, and a zero
+    // clearance admits EVERY hit — one hoverable node per event in the window.
+    expect(shownHits(hits([0, 1, 2, 3]), 0, 12)).toEqual([]);
   });
 });
 

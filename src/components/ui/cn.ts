@@ -14,7 +14,22 @@ import { extendTailwindMerge } from "tailwind-merge";
  * are ours alone need declaring. */
 const THEME = {
   text: ["label", "md"],
-  spacing: ["row", "head", "control", "chip", "icon", "icon-sm", "icon-xs", "swatch", "cell", "name"],
+  spacing: [
+    "row",
+    "lane",
+    "head",
+    "control",
+    "chip",
+    "icon",
+    "icon-sm",
+    "icon-xs",
+    "art",
+    "art-card",
+    "card-row",
+    "swatch",
+    "cell",
+    "name",
+  ],
 };
 
 const twMerge = extendTailwindMerge({ extend: { theme: THEME } });

@@ -9,6 +9,11 @@ export type AnalysisRowProps = {
   name: React.ReactNode;
   /** Behind the name: the magnitude bar, where the caller draws one. */
   background?: React.ReactNode;
+  /** The row's entity art, at the head of the row and before its controls.
+   * Its own slot rather than a piece of `name`, because a row that draws art at
+   * BAR height cannot carry it inside a one-line truncating text cell — and
+   * because the bar's notch is anchored to where this box starts. */
+  art?: React.ReactNode;
   /** Controls before the name — the band toggle, the expand caret. */
   leading?: React.ReactNode;
   /** Between the name and the columns: the table's uptime track, or the
@@ -22,6 +27,14 @@ export type AnalysisRowProps = {
   /** Fixes the name cell's width, for rows whose trailing slot is positional
    * and must therefore start at the same x on every row. */
   nameFixed?: boolean;
+  /** Whether the shell draws the hover ring itself, as a rectangle around the
+   * whole row. Off for a row whose BAR draws one in its own silhouette — a
+   * headed bar is not a rectangle, and framing it with one states a shape the
+   * row does not have. The row still carries `group`, which is what lets the
+   * bar's ring see the hover. Focus is untouched either way: a focus ring is an
+   * accessibility affordance, and the rectangle is the honest bound of what
+   * takes the key. */
+  hoverOutline?: boolean;
   className?: string;
   /** Forwarded to the row's own element. `CursorCard` clones the row to attach
    * these, so a row that dropped them would leave the hover card unopenable. */
@@ -51,11 +64,13 @@ export type AnalysisRowProps = {
 export const AnalysisRow = ({
   name,
   background,
+  art,
   leading,
   trailing,
   columns,
   onClick,
   nameFixed,
+  hoverOutline = true,
   className,
   onMouseEnter,
   onMouseMove,
@@ -81,11 +96,15 @@ export const AnalysisRow = ({
       // exact midpoint between two rows, elementFromPoint returned a bare DIV
       // inside neither row, so a cursor crossing it fired mouseleave and tore
       // the hover card down before the next row built it again.
-      "relative flex h-row w-full items-center rounded-xs px-2 text-left",
+      // The left padding is a variable, not `px-2`: an indented row overrides
+      // `--row-pad` alone and the bar's notch — anchored to the same token —
+      // moves with the art instead of being left behind at the row's edge.
+      // `group` so a bar inside can draw the hover ring in its own shape.
+      "group relative flex h-row w-full items-center rounded-xs pl-[var(--row-pad)] pr-2 text-left",
       // Rows touch, so an outline drawn OUTSIDE the box would overlap its
       // neighbour's. Both states draw their ring inside instead, offset by the
       // row's own 1px inset so the ring lands on the bar's edge.
-      "hover:outline hover:outline-1 hover:-outline-offset-2 hover:outline-line-strong",
+      hoverOutline && "hover:outline hover:outline-1 hover:-outline-offset-2 hover:outline-line-strong",
       "focus-visible:-outline-offset-[3px]",
       onClick && "cursor-pointer",
       className
@@ -105,6 +124,7 @@ export const AnalysisRow = ({
     onMouseLeave={onMouseLeave}
   >
     {background}
+    {art}
     {leading}
     <Text
       role="gridcell"

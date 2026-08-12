@@ -275,6 +275,10 @@ const TRIGGER: EventRow = {
   statusId: null,
   detailKey: null,
   amount: 154_500,
+  // Nothing to explain: these rows exercise nesting and the echo share, not the
+  // Amount cell's cap card.
+  capHit: null,
+  capConditions: null,
 };
 
 /** The echo, as `nestSupplementary` hands it over: still its own real `timeMs`,
@@ -370,6 +374,22 @@ describe("EventRowsTable, supplementary nesting", () => {
   });
 });
 
+/** What a hit recorded before the cap capture carries: every cap field null.
+ * These cases are about filtering, nesting and jumping, and a fixture that
+ * invented cap numbers would be claiming a capture the log never had. */
+const NO_CAPTURE = {
+  damage_cap: null,
+  base_damage: null,
+  attack_rate: null,
+  stun_value: null,
+  target_current_hp: null,
+  target_max_hp: null,
+  class_flags: null,
+  source_current_hp: null,
+  source_max_hp: null,
+  source_statuses: null,
+};
+
 /** The same hit, from a nominated player — for the cases that need more than
  * one source in the stream. */
 const hitBy = (timeMs: number, sourceIndex: number, actionId: number, damage: number): LogEvent => [
@@ -381,6 +401,7 @@ const hitBy = (timeMs: number, sourceIndex: number, actionId: number, damage: nu
       damage,
       flags: 0,
       action_id: { Normal: actionId },
+      ...NO_CAPTURE,
     },
   },
 ];
@@ -394,6 +415,7 @@ const hit = (timeMs: number, actionId: number, damage: number, supplementary = f
       damage,
       flags: 0,
       action_id: supplementary ? { SupplementaryDamage: actionId } : { Normal: actionId },
+      ...NO_CAPTURE,
     },
   },
 ];
@@ -414,7 +436,9 @@ const STREAM = {
 const renderTab = (pins: EventPins = NO_PINS) =>
   render(
     <MantineProvider>
-      <EventsTab stream={{ ...STREAM, pins }} labels={LABELS} />
+      {/* No party data: these cases read the stream, and a log with no stored
+          loadouts is a real case the cap card degrades for. */}
+      <EventsTab stream={{ ...STREAM, pins }} labels={LABELS} playerData={[]} />
     </MantineProvider>
   );
 

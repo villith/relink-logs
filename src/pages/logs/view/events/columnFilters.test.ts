@@ -13,6 +13,10 @@ const row = (over: Partial<EventRow> & { timeMs: number }): EventRow => ({
   statusId: null,
   detailKey: null,
   amount: null,
+  // A row with no cap to explain, which is what every non-damage kind is and
+  // what a damage row from a log predating the capture degrades to.
+  capHit: null,
+  capConditions: null,
   ...over,
 });
 
