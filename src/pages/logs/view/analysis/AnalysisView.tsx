@@ -32,6 +32,7 @@ import { RegroupStrip } from "./RegroupStrip";
 import { WindowStrip } from "./WindowStrip";
 import "./analysis.css";
 import { selectedChartWindows, windowFilterScrubRange } from "./chartWindowFilter";
+import { buildDebugReadout } from "./debugReadout";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { resolveViewSpec } from "./machine/resolve";
 import type { AnalysisState, MetricKey } from "./machine/state";
@@ -48,6 +49,7 @@ import {
   toggleWindowKind as windowKindTransition,
   setWindow as windowTransition,
 } from "./machine/transitions";
+import { useActionLog } from "./machine/useActionLog";
 import { useAnalysisState } from "./machine/useAnalysisState";
 import { useAutoDrill } from "./machine/useAutoDrill";
 import type { RowPresentation, StreamContext } from "./model/bodyContext";
@@ -490,13 +492,50 @@ export const AnalysisView = () => {
     playerLabelTemplate: player_label_template,
   });
 
-  // The dev-only readout: the whole machine state plus what the spec resolved
-  // it to — one JSON line a report can paste, replacing the hand-kept
-  // key=value formatter the machine made redundant.
-  const debugChart = useMemo(
-    () => JSON.stringify({ state, groupBy: spec.groupBy, chart: spec.chart.source, fetch: spec.fetch !== null }),
-    [state, spec]
+  // The dev-only readout: the state, what the machine resolved it INTO, and the
+  // stored settings that colour the reading. Built even in a release build —
+  // it is a handful of string joins, and gating it would mean gating the memo
+  // and every value feeding it, which is more machinery than the strings cost.
+  const debugReadout = useMemo(
+    () =>
+      buildDebugReadout({
+        state,
+        spec,
+        caps,
+        body,
+        // The rows answer the CURRENT grouping only once the fetch that asked
+        // for it has landed; the same test `useAutoDrill` gates itself on.
+        settled: caps.dataPath !== "groups" || chartGroupBy === spec.groupBy,
+        chartFormat: format,
+        smoothing,
+        merge: collapseSupplementary,
+        streamer: streamer_mode,
+        displayNames: show_display_names,
+        rows: shownRows.length,
+        mask: maskWindows,
+        windows: chartWindows,
+      }),
+    [
+      state,
+      spec,
+      caps,
+      body,
+      chartGroupBy,
+      format,
+      smoothing,
+      collapseSupplementary,
+      streamer_mode,
+      show_display_names,
+      shownRows,
+      maskWindows,
+      chartWindows,
+    ]
   );
+
+  // What the user DID to get here, this mount. Recorded from the URL state
+  // rather than from the controls: every pin, metric, side, regroup, zoom and
+  // filter lands there, so one watcher covers the lot.
+  const actions = useActionLog(state, tab);
 
   // A window-filter change, with the chart's zoom brought along: the scrub
   // commits to the bucket hull of everything the NEW selection admits.
@@ -680,7 +719,7 @@ export const AnalysisView = () => {
       />
 
       {/* Dev builds only, the same guard the Debug tab uses. */}
-      {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
+      {import.meta.env.DEV && <DebugBar search={search} readout={debugReadout} actions={actions} />}
 
       {/* The Windows strip: the battle-window filter's UI, on every tab —
           unlike the aura strips it needs no pin to anchor it. Changing the
