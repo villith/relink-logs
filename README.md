@@ -48,7 +48,7 @@ Notes:
 - The overlay uses X11 (via XWayland on Wayland desktops). Always-on-top and
   clickthrough behavior can vary by compositor; X11 sessions are the most
   reliable. If the overlay hides behind the game, see the FAQ entry
-- The hook file installed into the game folder is the same Authenticode-signed `hook.dll` Windows uses, renamed to `dinput8.dll`.
+- The hook file installed into the game folder is the `hook.dll` bundled with the AppImage, renamed to `dinput8.dll`. It is a Proton-specific build: it carries the `DirectInput8Create` proxy export and the localhost socket that Wine needs, neither of which ships in the Windows build.
   - Use **Remove hook** in Settings to delete it
 
 ## Found a translation problem or a bug?

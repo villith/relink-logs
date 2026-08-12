@@ -18,7 +18,7 @@ use log::warn;
 use pelite::pe64::PeView;
 use protocol::control::HelloOverride;
 use protocol::toolbox::{
-    ToolboxRequest, ToolboxResponse, TOOLBOX_PIPE_NAME, TOOLBOX_PROTOCOL_VERSION, TOOLBOX_TCP_ADDR,
+    ToolboxRequest, ToolboxResponse, TOOLBOX_PIPE_NAME, TOOLBOX_PROTOCOL_VERSION,
 };
 use std::sync::{OnceLock, RwLock};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
@@ -173,18 +173,22 @@ async fn serve(stream: BoxStream) {
     }
 }
 
+/// The TCP fallback address for this channel. Without `proton` the real
+/// constant is deliberately never NAMED, and that is not pedantry: gating
+/// only the TCP code and leaving `TOOLBOX_TCP_ADDR` as a now-dead argument
+/// still left `127.0.0.1:39372` in the built DLL's string table (measured by
+/// byte-scanning the artifact), where a scanner reads it as an embedded
+/// endpoint. Not referencing the const is what actually removes it.
+#[cfg(feature = "proton")]
+const TCP_ADDR: &str = protocol::toolbox::TOOLBOX_TCP_ADDR;
+#[cfg(not(feature = "proton"))]
+const TCP_ADDR: &str = "";
+
 /// `ready` fires once the channel is connectable — the event server waits on
 /// it so the app can never accept the event stream (and immediately fire its
 /// `Hello`) before this listener exists.
 pub async fn run(ready: tokio::sync::oneshot::Sender<()>) {
-    transport::serve_rpc(
-        TOOLBOX_PIPE_NAME,
-        TOOLBOX_TCP_ADDR,
-        "toolbox",
-        serve,
-        Some(ready),
-    )
-    .await;
+    transport::serve_rpc(TOOLBOX_PIPE_NAME, TCP_ADDR, "toolbox", serve, Some(ready)).await;
 }
 
 /// Every test that touches `HELLO_OVERRIDE` takes this: the store is

@@ -132,6 +132,12 @@ jobs:
       # No separate `cargo build`: cargo test compiles the same lib/bin
       # targets itself, so a build step only duplicates the work.
       - run: cargo test --verbose
+      # The default build is the Windows hook; `proton` is only ever enabled
+      # for the Linux/Proton artifact, so nothing above compiles it. Without
+      # this it can rot behind a #[cfg] and the breakage surfaces in a release
+      # run instead of a PR. Feature set matches release.yaml's Proton build.
+      - name: Check the Proton hook build
+        run: cargo test -p hook --features eject,proton
   cargo_check_linux:
     name: Rust - Linux check
     runs-on: ubuntu-22.04

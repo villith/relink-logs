@@ -1,14 +1,24 @@
 //! Which transport the event server should expose.
 //!
-//! Native Windows: the named pipe (unchanged). Under Wine/Proton a native
-//! Linux app cannot open Wine named pipes, so the server listens on
-//! localhost TCP instead. `GBFR_LOGS_FORCE_TCP=1` in the game process
-//! environment forces TCP so the path can be soak-tested on Windows.
-//! Note: winecfg's "Hide Wine version" setting (HideWineExports) removes
-//! the export we probe, silently falling back to the pipe —
-//! GBFR_LOGS_FORCE_TCP=1 is the escape hatch.
+//! Native Windows: the named pipe, and only ever the named pipe. Under
+//! Wine/Proton a native Linux app cannot open Wine named pipes, so the
+//! server listens on localhost TCP instead — that entire path is behind the
+//! `proton` feature and is absent from the Windows DLL.
+//!
+//! Why it is gated rather than just runtime-skipped: the Windows build is
+//! injected into the game process, and a listening socket in an injected DLL
+//! is a backdoor signature to AV heuristics. `is_wine()` is false on Windows,
+//! so the code never executed there — it only ever sat in the binary being
+//! read by scanners. See also `proxy.rs`.
+//!
+//! Under `proton`, `GBFR_LOGS_FORCE_TCP=1` in the game process environment
+//! forces TCP so the path can be soak-tested on Windows. Note: winecfg's
+//! "Hide Wine version" setting (HideWineExports) removes the export we probe,
+//! silently falling back to the pipe — GBFR_LOGS_FORCE_TCP=1 is the escape
+//! hatch.
 
 use std::future::Future;
+#[cfg(feature = "proton")]
 use std::time::Duration;
 
 use interprocess::os::windows::named_pipe::tokio::PipeListenerOptionsExt;
@@ -18,6 +28,7 @@ use log::{info, warn};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Transport {
     NamedPipe,
+    #[cfg(feature = "proton")]
     Tcp,
 }
 
@@ -38,6 +49,10 @@ pub type BoxStream = std::pin::Pin<Box<dyn RpcStream>>;
 /// — never merely once this task has started. Dropping it (a listener that
 /// could not be created) wakes the waiter too, so nobody blocks on a channel
 /// that will never exist.
+///
+/// `tcp_addr` is unused without `proton`; callers pass the constant either
+/// way so the two builds share one call site.
+#[cfg_attr(not(feature = "proton"), allow(unused_variables))]
 pub async fn serve_rpc<F, Fut>(
     pipe_name: &str,
     tcp_addr: &str,
@@ -50,6 +65,7 @@ pub async fn serve_rpc<F, Fut>(
 {
     match select_transport() {
         Transport::NamedPipe => run_pipe(pipe_name, label, serve, ready).await,
+        #[cfg(feature = "proton")]
         Transport::Tcp => run_tcp(tcp_addr, label, serve, ready).await,
     }
 }
@@ -94,6 +110,7 @@ async fn run_pipe<F, Fut>(
 
 // Same bind-retry rationale as the event listener: a taken port must not
 // permanently disable the channel for the session.
+#[cfg(feature = "proton")]
 async fn run_tcp<F, Fut>(
     tcp_addr: &str,
     label: &str,
@@ -130,6 +147,7 @@ async fn run_tcp<F, Fut>(
     }
 }
 
+#[cfg(feature = "proton")]
 pub fn select_transport() -> Transport {
     select(
         is_wine(),
@@ -137,6 +155,14 @@ pub fn select_transport() -> Transport {
     )
 }
 
+/// No wine probe and no env override: without `proton` there is no TCP
+/// transport for either to select, so neither is compiled in.
+#[cfg(not(feature = "proton"))]
+pub fn select_transport() -> Transport {
+    select(false, None)
+}
+
+#[cfg(feature = "proton")]
 fn select(wine: bool, force_tcp: Option<&str>) -> Transport {
     if wine || force_tcp == Some("1") {
         Transport::Tcp
@@ -145,7 +171,13 @@ fn select(wine: bool, force_tcp: Option<&str>) -> Transport {
     }
 }
 
+#[cfg(not(feature = "proton"))]
+fn select(_wine: bool, _force_tcp: Option<&str>) -> Transport {
+    Transport::NamedPipe
+}
+
 /// Wine/Proton exports `wine_get_version` from ntdll; real Windows never does.
+#[cfg(feature = "proton")]
 fn is_wine() -> bool {
     use windows::core::s;
     use windows::Win32::System::LibraryLoader::{GetModuleHandleA, GetProcAddress};
@@ -165,11 +197,23 @@ mod tests {
         assert_eq!(select(false, None), Transport::NamedPipe);
     }
 
+    /// The Windows DLL must carry NO TCP path at all. A listening socket
+    /// inside a DLL injected into a game process is one of the strongest
+    /// AV heuristics we present, and it exists solely for Proton — so
+    /// without the `proton` feature even a forced answer stays on the pipe.
+    #[cfg(not(feature = "proton"))]
+    #[test]
+    fn windows_build_never_selects_tcp() {
+        assert_eq!(select(true, Some("1")), Transport::NamedPipe);
+    }
+
+    #[cfg(feature = "proton")]
     #[test]
     fn wine_selects_tcp() {
         assert_eq!(select(true, None), Transport::Tcp);
     }
 
+    #[cfg(feature = "proton")]
     #[test]
     fn force_env_selects_tcp_even_on_native_windows() {
         assert_eq!(select(false, Some("1")), Transport::Tcp);
@@ -183,6 +227,7 @@ mod tests {
 
     /// This test suite runs on real Windows in CI and dev — Wine must not be
     /// detected there.
+    #[cfg(feature = "proton")]
     #[test]
     fn is_wine_is_false_on_real_windows() {
         assert!(!is_wine());
