@@ -1,12 +1,19 @@
-//! dinput8 proxy export.
+//! dinput8 proxy export. Proton only — built behind the `proton` feature.
 //!
 //! Under Proton the hook is deployed into the game directory as
 //! `dinput8.dll` and loaded at game start via
 //! `WINEDLLOVERRIDES="dinput8=n,b"` — the game statically imports
 //! DirectInput8Create, which we forward to the real system dinput8 (loaded
-//! by explicit system32 path, so Wine resolves its builtin). On Windows the
-//! DLL is injected as hook.dll and this export is never called. Loading is
+//! by explicit system32 path, so Wine resolves its builtin). Loading is
 //! all `#[ctor]` needs, so no other change is required for the proxy path.
+//!
+//! On Windows the DLL is injected as `hook.dll` and this export was never
+//! called, so the whole module is compiled out there. That is deliberate and
+//! load-bearing rather than tidiness: `DirectInput8Create` is the ONLY
+//! `#[no_mangle]` export in the crate, and an injected DLL that exports a
+//! system-DLL entrypoint and calls `LoadLibraryW` on a hardcoded system32
+//! path is the textbook DLL-hijack pattern AV scanners are built to find.
+//! Do not make this module unconditional again.
 
 use std::ffi::c_void;
 use std::sync::OnceLock;

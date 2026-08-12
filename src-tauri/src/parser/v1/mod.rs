@@ -5245,13 +5245,15 @@ mod tests {
             "the echo really is claimed by the first hit"
         );
 
-        let page = event_page(&events, 100, 0, 10);
+        // No player data: this log is a bare event list, and these assertions
+        // are about supp_pairs, not the cap-up map player_data feeds.
+        let page = event_page(&events, &[], 100, 0, 10);
         assert_eq!(page.supp_pairs.get(&2), Some(&0));
 
         // An offset page renumbers, and a pair whose trigger fell off the page
         // is dropped entirely rather than left pointing at whatever now sits at
         // that index.
-        let offset = event_page(&events, 100, 2, 10);
+        let offset = event_page(&events, &[], 100, 2, 10);
         assert!(offset.supp_pairs.is_empty());
     }
 
@@ -5261,7 +5263,7 @@ mod tests {
     fn event_page_drops_a_supplementary_pair_whose_echo_falls_off_the_end() {
         let events = log_with_an_echo();
 
-        let page = event_page(&events, 100, 0, 2);
+        let page = event_page(&events, &[], 100, 0, 2);
 
         assert_eq!(page.events.len(), 2, "the echo is past the page");
         assert!(page.supp_pairs.is_empty());

@@ -15,6 +15,9 @@ mod control;
 mod event;
 mod hooks;
 mod process;
+// Proton only: the dinput8 proxy export. Absent from the Windows DLL, which
+// is injected and needs no export at all — see proxy.rs.
+#[cfg(feature = "proton")]
 mod proxy;
 #[cfg(any(feature = "eject", test))]
 mod teardown;
@@ -90,6 +93,7 @@ impl Server {
 
         match transport::select_transport() {
             transport::Transport::NamedPipe => self.run_pipe().await,
+            #[cfg(feature = "proton")]
             transport::Transport::Tcp => self.run_tcp().await,
         }
     }
@@ -124,6 +128,7 @@ impl Server {
     // Under Wine/Proton: a native Linux app connects to this directly (Wine
     // sockets are real Linux sockets). Bind failures (port taken) retry
     // rather than killing event delivery for the whole session.
+    #[cfg(feature = "proton")]
     async fn run_tcp(&self) {
         let listener = loop {
             match tokio::net::TcpListener::bind(protocol::TCP_ADDR).await {

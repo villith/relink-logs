@@ -9,9 +9,7 @@
 
 use futures::{SinkExt, StreamExt};
 use log::{info, warn};
-use protocol::control::{
-    HookControlRequest, HookControlResponse, HOOK_CONTROL_PIPE_NAME, HOOK_CONTROL_TCP_ADDR,
-};
+use protocol::control::{HookControlRequest, HookControlResponse, HOOK_CONTROL_PIPE_NAME};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
 use crate::transport::{self, BoxStream};
@@ -82,10 +80,18 @@ async fn serve(tx: crate::event::Tx, stream: BoxStream) {
     }
 }
 
+/// See the identical constant in `toolbox.rs` for why the real address is not
+/// merely unused without `proton` but never named: a dead argument still
+/// leaves the literal in the shipped DLL.
+#[cfg(feature = "proton")]
+const TCP_ADDR: &str = protocol::control::HOOK_CONTROL_TCP_ADDR;
+#[cfg(not(feature = "proton"))]
+const TCP_ADDR: &str = "";
+
 pub async fn run(tx: crate::event::Tx) {
     transport::serve_rpc(
         HOOK_CONTROL_PIPE_NAME,
-        HOOK_CONTROL_TCP_ADDR,
+        TCP_ADDR,
         "control",
         move |stream| serve(tx.clone(), stream),
         // Nothing waits on this one: the app only reaches for the control

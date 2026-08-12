@@ -2,20 +2,38 @@ name: Release
 
 # Branch model (versions are managed by CI — do not hand-bump them):
 #
-#   PRs target dev (the default branch). Every push to dev auto-bumps to the
-#   next RC version (X.Y.Z-N), commits the bump to the five version files, and
-#   publishes a fully signed GitHub *prerelease* — downloadable for testing,
-#   but invisible to installed apps, because GitHub never serves prereleases
-#   from releases/latest (the updater endpoint).
+#   PRs target dev (the default branch). A push to dev BUILDS the full
+#   two-platform bundle and leaves it as GitHub Actions artifacts on the run.
+#   It does NOT publish a release. Testers take dev builds from the run's
+#   artifacts.
 #
-#   Releasing = pressing "Run workflow" on this workflow (from dev). CI strips
-#   the RC suffix ON dev, requires the human-written CHANGELOG.md section for
-#   that version (it becomes the release body and the in-app update prompt),
-#   builds and publishes the stable release from that commit, then
-#   FAST-FORWARDS main to it. main is a pointer to the last released state of
-#   dev — always an ancestor of dev, so the branches cannot diverge and
-#   nothing ever needs merging back. Never push to main directly: the promote
-#   job's plain (non-force) push will refuse to move a diverged main.
+#   Publishing is always the "Run workflow" button, whose `publish` input
+#   picks what comes out:
+#     stable — strip the RC suffix, require the human-written CHANGELOG.md
+#              section for that version (it becomes the release body and the
+#              in-app update prompt), publish the release, fast-forward main.
+#     rc     — publish the next X.Y.Z-N as a GitHub *prerelease*: downloadable
+#              for testing, but invisible to installed apps, because GitHub
+#              never serves prereleases from releases/latest (the updater
+#              endpoint).
+#     none   — build only, same as a push. Useful to re-check a build.
+#
+#   Why publishing is opt-in rather than automatic on every push: each
+#   published build puts a brand-new, zero-prevalence hook.dll hash in front
+#   of every AV engine's telemetry, and low prevalence is precisely what the
+#   generic ML detections score on. Publishing a release per dev merge kept
+#   the file permanently un-established. The RC channel still exists — it is
+#   just deliberate now.
+#
+#   Because RC numbers are derived from the TAG list and only a publish
+#   creates a tag, several dev pushes in a row compute the same X.Y.Z-N, the
+#   version files already carry it, and no bump commit is made. That is
+#   intended: the RC number advances when an RC is actually published.
+#
+#   main is a pointer to the last released state of dev — always an ancestor
+#   of dev, so the branches cannot diverge and nothing ever needs merging
+#   back. Never push to main directly: the promote job's plain (non-force)
+#   push will refuse to move a diverged main.
 #
 #   Version choice on dev: the base is whatever the files carry when it is
 #   ahead of the newest stable tag — set e.g. 1.13.0 in a PR to make the next
@@ -33,30 +51,50 @@ name: Release
 #   release (gh release create --target), so a failed build strands nothing;
 #   pushing again (or re-dispatching) retries.
 #
-# Two independent signatures are applied, and the ORDER MATTERS:
-#   1. Authenticode (Azure Artifact Signing) — what Windows/SmartScreen/UAC check.
-#   2. minisign (TAURI_PRIVATE_KEY) — what the in-app updater checks.
-# minisign covers the *bytes* of the updater artifact, so Authenticode must be
-# applied first. The bundler enforces this itself via
-# bundle.windows.signCommand (Tauri >= 1.7): it signs the exe and MSI with
-# scripts/ci-sign.ps1 during bundling, then zips the SIGNED MSI and minisigns
-# it. Only hook.dll is signed separately — it is a resource, and the bundler
-# does not sign resources. Linux artifacts carry no Authenticode; the AppImage
-# updater tar.gz gets only the minisign signature.
+# Signing: minisign (TAURI_PRIVATE_KEY) ONLY — what the in-app updater
+# checks. The bundler applies it to the updater artifacts.
 #
-# The build fans out across jobs: build-hook builds and Authenticode-signs
-# hook.dll ONCE, and both platform builds bundle that same signed DLL — on
-# Windows it is the injected DLL; on Linux the app deploys the identical file
-# into the Proton game folder as the dinput8 proxy, and the Authenticode
-# signature is what AV checks in both cases (Wine included). build-windows and
-# build-linux run in parallel, publish assembles the two-platform latest.json
-# and creates the GitHub release, then promote fast-forwards main on stables.
+# There is deliberately NO Authenticode signing here. The Azure Trusted
+# Signing account was suspended and its certificate revoked, and a signature
+# from a revoked certificate is worse than none at all: Windows resolves it to
+# CERT_E_REVOKED, which SmartScreen and Defender both treat as a hard fail,
+# whereas an unsigned binary is merely unknown. Do NOT re-add signing with a
+# replacement certificate until the Microsoft malware determination on
+# hook.dll is reversed — a new certificate issued to the same publisher
+# identity is liable to be revoked again, and each attempt burns the identity
+# further. The removed steps are recoverable from git history (the
+# azure/trusted-signing-action step here and scripts/ci-sign.ps1).
+#
+# The build fans out across jobs. build-hook builds hook.dll TWICE, because
+# the two platforms need genuinely different binaries:
+#   hook-dll-windows — injected into the game process on Windows.
+#   hook-dll-proton  — `--features proton`, deployed by the Linux app into the
+#                      Proton game folder as the dinput8 proxy.
+# The proton feature adds a DirectInput8Create export, a LoadLibraryW on a
+# hardcoded system32 path, and a localhost TCP listener. On Windows that code
+# never ran (is_wine() is false) but still shipped, and it is the exact triad
+# AV heuristics read as a DLL-hijack backdoor — so the Windows DLL no longer
+# contains it. Both artifacts are still named hook.dll, which is what the app
+# resolves as a Tauri resource on both platforms.
+#
+# build-windows and build-linux run in parallel, publish assembles the
+# two-platform latest.json and creates the GitHub release (only when the
+# dispatch asked for one), then promote fast-forwards main on stables.
 
 on:
   push:
     branches:
       - dev
-  workflow_dispatch: # the release button — publishes a stable from dev
+  workflow_dispatch: # the release button
+    inputs:
+      publish:
+        description: "What to publish (build-only otherwise)"
+        type: choice
+        default: stable
+        options:
+          - stable
+          - rc
+          - none
 
 # Rapid merges must not race the version computation or publish the same
 # version twice.
@@ -82,6 +120,7 @@ jobs:
       version: ${{ steps.v.outputs.version }}
       sha: ${{ steps.v.outputs.sha }}
       prerelease: ${{ steps.v.outputs.prerelease }}
+      publish: ${{ steps.v.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -114,12 +153,20 @@ jobs:
         run: |
           file_version="$(node -p "require('./package.json').version")"
 
+          # A push is always build-only; a dispatch says what it wants.
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            mode="${{ inputs.publish }}"
             if [[ "$GITHUB_REF_NAME" != "dev" ]]; then
               echo "::error::Releases are dispatched from the dev branch, not $GITHUB_REF_NAME."
               exit 1
             fi
+          else
+            mode=none
+          fi
+
+          if [[ "$mode" == "stable" ]]; then
             prerelease=false
+            publish=true
             next="$(node scripts/next-version.mjs main "$file_version")"
             if git rev-parse -q --verify "refs/tags/$next" >/dev/null; then
               echo "::error::$next is already released - merge new work into dev before dispatching a release."
@@ -131,10 +178,15 @@ jobs:
             node scripts/extract-changelog.mjs "$next" > /dev/null
           else
             prerelease=true
+            if [[ "$mode" == "rc" ]]; then publish=true; else publish=false; fi
             next="$(git tag | node scripts/next-version.mjs dev "$file_version")"
           fi
 
-          echo "Releasing $next (files carried $file_version)"
+          if [[ "$publish" == "true" ]]; then
+            echo "Releasing $next (files carried $file_version)"
+          else
+            echo "Build-only run for $next (files carried $file_version); nothing will be published"
+          fi
           # Run unconditionally, even when $next already equals $file_version:
           # set-version.mjs verifies that ALL five files carry the version, so
           # this is the only thing that enforces the "they must always agree"
@@ -168,13 +220,16 @@ jobs:
           {
             echo "version=$next"
             echo "prerelease=$prerelease"
+            echo "publish=$publish"
             echo "sha=$(git rev-parse HEAD)"
           } >> "$GITHUB_OUTPUT"
 
-  # hook.dll is built and signed once, then bundled by BOTH platform builds:
-  # it is a *resource*, and the Tauri v1 bundler does not sign resources. It
-  # is also the file AV cares about most, since it gets injected into the
-  # game process (natively on Windows, via Proton's dinput8 load on Linux).
+  # hook.dll is built twice — once per platform — because the Proton build
+  # carries a dinput8 proxy export and a TCP transport that must NOT ship in
+  # the injected Windows DLL. See the header comment. Both artifacts keep the
+  # name hook.dll: that is the Tauri resource name the app resolves on both
+  # platforms (on Linux it is then copied into the game folder as
+  # dinput8.dll).
   build-hook:
     needs: version
     runs-on: windows-latest
@@ -184,6 +239,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.version.outputs.sha }} # the version-bump commit
+
+      # For the surface check below. No npm cache: this job never installs
+      # dependencies, and the check script has none.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
 
       # Install exactly the toolchain pinned in rust-toolchain.toml. No
       # `rustup update nightly`: that installs the day's latest nightly, which
@@ -200,32 +261,46 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: Build hook DLL
+      # Both builds write the same target/release/hook.dll, so each is copied
+      # aside immediately after it is produced.
+      - name: Build hook DLL (Windows — no proton)
         env:
           # The hook reports this via Hello so the app can detect a stale
           # (pre-update) hook; `eject` ships the control channel that lets the
           # app graceful-refresh the hook without a game restart.
           HOOK_VERSION: ${{ needs.version.outputs.version }}
         run: cargo build --release --package hook --features eject
+      - name: Stage the Windows hook
+        shell: bash
+        run: mkdir -p out/windows && cp target/release/hook.dll out/windows/hook.dll
 
-      - name: Sign hook.dll
-        uses: azure/trusted-signing-action@v2
-        with:
-          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
-          endpoint: ${{ vars.AZURE_SIGNING_ENDPOINT }}
-          trusted-signing-account-name: ${{ vars.AZURE_SIGNING_ACCOUNT }}
-          certificate-profile-name: ${{ vars.AZURE_CERT_PROFILE }}
-          files: ${{ github.workspace }}\target\release\hook.dll
-          file-digest: SHA256
-          timestamp-rfc3161: http://timestamp.acs.microsoft.com
-          timestamp-digest: SHA256
+      - name: Build hook DLL (Proton)
+        env:
+          HOOK_VERSION: ${{ needs.version.outputs.version }}
+        run: cargo build --release --package hook --features eject,proton
+      - name: Stage the Proton hook
+        shell: bash
+        run: mkdir -p out/proton && cp target/release/hook.dll out/proton/hook.dll
+
+      # Guard the whole point of the split: if the Windows DLL ever regains
+      # the Proton surface (someone drops a #[cfg], or a call site names a TCP
+      # constant again and leaves the literal in the string table), fail here
+      # rather than shipping it and discovering it in a VirusTotal score.
+      # Byte-scan, not a source grep: what matters is what is IN the artifact.
+      - name: Assert the Windows hook carries no Proton surface
+        shell: bash
+        run: node scripts/check-hook-surface.mjs out/windows/hook.dll out/proton/hook.dll
 
       - uses: actions/upload-artifact@v4
         with:
-          name: hook-dll
-          path: target/release/hook.dll
+          name: hook-dll-windows
+          path: out/windows/hook.dll
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hook-dll-proton
+          path: out/proton/hook.dll
           if-no-files-found: error
 
   build-windows:
@@ -233,9 +308,6 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: read
-    env:
-      # productName in tauri.conf.json. Drives the artifact filenames below.
-      PRODUCT: GBFR Logs
     steps:
       - uses: actions/checkout@v4
         with:
@@ -271,47 +343,34 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      # The signed hook goes to BOTH paths: src-tauri/hook.dll is the bundled
+      # The hook goes to BOTH paths: src-tauri/hook.dll is the bundled
       # resource, and target/release/hook.dll is what build.rs copies over it
       # during `tauri build` — rust-cache could otherwise restore a stale
-      # UNSIGNED hook.dll there and build.rs would clobber the signed one.
-      - name: Stage signed hook.dll
+      # hook.dll there (possibly a Proton-feature one from an earlier run) and
+      # build.rs would clobber the correct one with it.
+      - name: Stage hook.dll (Windows build)
         uses: actions/download-artifact@v4
         with:
-          name: hook-dll
+          name: hook-dll-windows
           path: src-tauri
-      - name: Mirror signed hook.dll to the cargo output path
+      - name: Mirror hook.dll to the cargo output path
         shell: bash
         run: mkdir -p target/release && cp src-tauri/hook.dll target/release/hook.dll
 
       # The frontend is built here for clearer failure attribution; the
       # overlay config disables beforeBuildCommand so the bundler doesn't
-      # rebuild it. The overlay also carries bundle.windows.signCommand
-      # (Tauri >= 1.7 / npm CLI >= 1.6), pointing the bundler at
-      # scripts/ci-sign.ps1 — the bundler then signs the exe and the MSI
-      # itself, at the right points in its own sequence, and produces the
-      # updater zip FROM the signed MSI. signCommand lives only in this
-      # CI-written overlay, never in tauri.conf.json, so local builds stay
-      # unsigned and need no Azure credentials.
+      # rebuild it. There is no bundle.windows.signCommand any more — see the
+      # header comment on why Authenticode signing is gone.
       - name: Build frontend and write CI build config
-        shell: pwsh
+        shell: bash
         run: |
           npm run build
-          $cfg = [ordered]@{
-            build = @{ beforeBuildCommand = "" }
-            tauri = @{ bundle = @{ windows = @{
-              signCommand = "pwsh -NoProfile -ExecutionPolicy Bypass -File $env:GITHUB_WORKSPACE\scripts\ci-sign.ps1 %1"
-            } } }
-          }
-          $cfg | ConvertTo-Json -Depth 6 | Set-Content -Path .tauri-release-config.json -Encoding utf8
-          Get-Content .tauri-release-config.json
+          echo '{"build":{"beforeBuildCommand":""}}' > .tauri-release-config.json
 
-      # One pass: compile → sign exe (signCommand) → bundle MSI → sign MSI
-      # (signCommand) → zip the signed MSI as the updater artifact → minisign
-      # it with TAURI_PRIVATE_KEY. The ordering constraint (Authenticode
-      # before minisign) is satisfied inside the bundler itself. The updater
-      # key is unencrypted, hence the empty TAURI_KEY_PASSWORD.
-      - name: Build, sign, and bundle app
+      # One pass: compile → bundle MSI → zip the MSI as the updater artifact →
+      # minisign it with TAURI_PRIVATE_KEY. The updater key is unencrypted,
+      # hence the empty TAURI_KEY_PASSWORD.
+      - name: Build and bundle app
         run: npx tauri build -b msi,updater --config .tauri-release-config.json
         env:
           TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
@@ -319,30 +378,15 @@ jobs:
           # exist), but routing it through a secret means rotating to a
           # passphrase-protected key is a secrets change, not a workflow edit.
           TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
-          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
-          AZURE_CERT_PROFILE: ${{ vars.AZURE_CERT_PROFILE }}
 
-      - name: Verify exe and MSI signatures
+      # Authenticode is gone, so the only signature left to check is the
+      # updater's minisign. The MSI count is still asserted explicitly: an
+      # empty glob must not let this step pass without checking anything.
+      - name: Verify the bundle and its updater signature
         shell: pwsh
         run: |
-          # src-tauri/hook.dll is the copy that actually ships inside the MSI,
-          # and it is signed over in the build-hook job — verify it here too,
-          # so the bundled resource is covered by the same check as the exe
-          # and MSI.
           $msi = @(Get-ChildItem "target/release/bundle/msi/*.msi")
-          # Assert explicitly: an empty glob would otherwise shrink $files and
-          # let the loop "pass" without ever checking an MSI.
           if ($msi.Count -ne 1) { throw "expected exactly 1 MSI, found $($msi.Count)" }
-          $files = @("target/release/$env:PRODUCT.exe", "src-tauri/hook.dll") + $msi.FullName
-          foreach ($f in $files) {
-            $sig = Get-AuthenticodeSignature $f
-            Write-Host "$f -> $($sig.Status): $($sig.SignerCertificate.Subject)"
-            if ($sig.Status -ne 'Valid') { throw "$f is not validly signed." }
-          }
           $zip = Get-ChildItem "target/release/bundle/msi/*.msi.zip" | Select-Object -First 1
           if (-not $zip) { throw "bundler did not produce the updater .msi.zip" }
           if (-not (Test-Path "$($zip.FullName).sig")) { throw "bundler did not minisign the updater artifact" }
@@ -407,18 +451,19 @@ jobs:
         run: npm ci
 
       # The bundle's hook.dll resource — the app deploys it into the Proton
-      # game folder as the dinput8 proxy. Same signed DLL as the Windows
-      # bundle; there is no cargo-output mirror here because the hook crate
-      # never builds on Linux, so nothing can clobber it.
-      - name: Stage signed hook.dll
+      # game folder as the dinput8 proxy, so this is the `--features proton`
+      # build, NOT the one the Windows bundle ships. It keeps the name
+      # hook.dll because that is the resource name the app resolves. There is
+      # no cargo-output mirror here because the hook crate never builds on
+      # Linux, so nothing can clobber it.
+      - name: Stage hook.dll (Proton build)
         uses: actions/download-artifact@v4
         with:
-          name: hook-dll
+          name: hook-dll-proton
           path: src-tauri
 
-      # Same failure-attribution split as build-windows, but no signCommand:
-      # Linux artifacts get no Authenticode, only the bundler's minisign on
-      # the updater tar.gz.
+      # Same failure-attribution split as build-windows. The only signature on
+      # any artifact is the bundler's minisign on the updater tar.gz.
       - name: Build frontend and write CI build config
         run: |
           npm run build
@@ -458,8 +503,12 @@ jobs:
             target/release/bundle/appimage/*.AppImage.tar.gz.sig
           if-no-files-found: error
 
+  # Only runs when the dispatch asked for a release. A push to dev builds
+  # everything and stops here, leaving the bundles as run artifacts — see the
+  # header comment on why publishing is opt-in.
   publish:
     needs: [version, build-windows, build-linux]
+    if: needs.version.outputs.publish == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write # creates the GitHub Release (and its tag)
