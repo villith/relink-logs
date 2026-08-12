@@ -81,6 +81,27 @@ describe("CursorCard", () => {
     expect(card.style.backgroundColor).toBe("rgb(1, 2, 3)");
   });
 
+  // A card on the RIGHTMOST column has no room to its right, so growing that way
+  // only feeds the viewport clamp and lands the panel wherever the clamp allows
+  // rather than where the cursor is. `top-left` grows the other way instead.
+  it("grows left of the cursor when placed top-left", () => {
+    withMantine(
+      <CursorCard content={<div>breakdown</div>} testId="cursor-card" placement="top-left">
+        <button>row</button>
+      </CursorCard>
+    );
+    fireEvent.mouseEnter(screen.getByText("row"), { clientX: 100, clientY: 100 });
+    // jsdom measures a zero-width box, so the offset alone separates the two:
+    // right of the cursor would be 106.
+    expect(screen.getByTestId("cursor-card").style.left).toBe("94px");
+  });
+
+  it("grows right of the cursor by default", () => {
+    renderIt();
+    fireEvent.mouseEnter(screen.getByText("row"), { clientX: 100, clientY: 100 });
+    expect(screen.getByTestId("cursor-card").style.left).toBe("106px");
+  });
+
   it("stays hidden until it has been measured", () => {
     // jsdom reports a zero-size box, which is the same state as the first real
     // frame — the panel must not paint before the grow-up offset is known, or

@@ -3,28 +3,51 @@ import { CaretDown, CaretUp, Eye, EyeSlash } from "@phosphor-icons/react";
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { cn } from "@/components/ui/cn";
 import { Figure } from "@/components/ui/Figure";
 import { Label } from "@/components/ui/Label";
 
-import type { MetricRow } from "../metrics/types";
+import { isActorKind } from "../actorKind";
+import type { LabelKind, MetricRow } from "../metrics/types";
 import { sectionHeadings } from "../sectionRuns";
 import type { SelectorPins } from "../selectorOptions";
 
+import "./analysis.css";
 import { AnalysisRow } from "./AnalysisRow";
 import { HoverCard, type CardAmount, type CardSection } from "./HoverCard";
 import { MetricBar } from "./MetricBar";
-import "./analysis.css";
+import { RowArt } from "./RowArt";
 
 export type MetricTableProps = {
   rows: MetricRow[];
   /** i18next keys for the numeric columns, from the active descriptor. */
   columnKeys: string[];
   onPin: (pins: Partial<SelectorPins>) => void;
-  /** Turns a row's raw `label` into what is drawn — a player name honouring
-   * streamer mode, or a translated skill name. Injected because that lookup
-   * needs i18n and the settings store, which would otherwise make this table
-   * untestable without both. Defaults to the raw label. */
-  renderLabel?: (row: MetricRow) => React.ReactNode;
+  /** Turns a row's raw `label` into the NAME that is drawn — a player name
+   * honouring streamer mode, or a translated skill name. Injected because that
+   * lookup needs i18n and the settings store, which would otherwise make this
+   * table untestable without both. Defaults to the raw label.
+   *
+   * The art is NOT in here: this table draws it at bar height in its own slot,
+   * where the timeline's lane names still take it inline (`renderLabel`). Both
+   * are composed from this one namer and `rowArt`, so no body can name or
+   * illustrate a row differently from another.
+   *
+   * NAMED for the field `RowPresentation` carries, and it must stay that way:
+   * the view hands this table the whole presentation with a spread, which is
+   * checked for the props it does declare and silent about the ones it does
+   * not. Renaming it here to `renderName` did not fail the build — every row
+   * simply fell back to its raw `label` and the table drew "Normal:1100". */
+  rowName?: (row: MetricRow) => React.ReactNode;
+  /** A row's art, resolved through the same entity ladder as its name. Absent,
+   * no row grows an art box and no bar is headed — the shape a table with
+   * nothing to illustrate should have. Named for `RowPresentation`'s field, for
+   * the reason `rowName` states. */
+  rowArt?: (row: MetricRow) => string | undefined;
+  /** What KIND of thing the rows are, for the rows that declare none of their
+   * own. It decides how the bar meets the art: an ability's diamond nests into
+   * a bite cut for it, an actor's bust stands on a head the bar draws. */
+  rowKind?: LabelKind;
   /** Resolves a row's bar colour from its `colorSlot`. Injected for the same
    * reason as `renderLabel`: the palette lives in the settings store. */
   rowColor?: (row: MetricRow) => string;
@@ -87,7 +110,9 @@ export const MetricTable = ({
   rows,
   columnKeys,
   onPin,
-  renderLabel,
+  rowName,
+  rowArt,
+  rowKind,
   rowColor,
   rowsLabelKey,
   rowSections,
@@ -197,6 +222,17 @@ export const MetricTable = ({
           const hasChildren = !nested && childRows.length >= 2;
           const isExpanded = expanded.has(rowData.key);
           const pinOnClick = rowData.pinOnClick;
+          // An actor wears a bust, an ability a diamond — the same reading the
+          // timeline picks a lane's shape by. Only a diamond has a corner for
+          // a bite to come to a point on, so an actor's bar draws the head
+          // ITSELF and the bust stands on it: same silhouette, and the row's
+          // own colour behind the character rather than the page's ground.
+          const artShape = isActorKind(rowData.kind ?? rowKind) ? "actor" : "diamond";
+          // Whether the bar meets art at all — asked by the head it is cut to
+          // AND by the hover outline the shell must then suppress, so it is
+          // answered once. Spelled two different ways, a row could grow both
+          // outlines or neither.
+          const headed = Boolean(rowArt) && !positional;
           return (
             // The row shell — a focusable div, its geometry and its name cell —
             // is `AnalysisRow`, shared with the timeline's lanes so the two can
@@ -207,10 +243,30 @@ export const MetricTable = ({
               // indented and on a muted panel so the hierarchy reads at a glance
               // without stealing the parents' contrast.
               data-subrow={nested || undefined}
-              className={nested ? "bg-panel pl-[calc(28px*var(--density))]" : undefined}
+              // The row's own padding token rather than a `pl-*` of its own, so
+              // the art, the name and the bar's head all move together — a head
+              // anchored to the row's edge would sit a whole indent to the left
+              // of the diamond it is cut for.
+              //
+              // A row that carries ART has NO left padding: the bar already
+              // runs under the row's right padding (a full-bleed right edge is
+              // what makes the longest bar reach the figures), and an inset on
+              // the left alone left a gap on one side of an otherwise
+              // edge-to-edge bar. The art stands in that space instead.
+              className={cn(
+                nested && "bg-panel [--row-pad:calc(28px*var(--density))]",
+                !nested && rowArt && "[--row-pad:0px]"
+              )}
               onClick={pinOnClick ? () => onPin(pinOnClick) : undefined}
               nameFixed={positional}
-              name={renderLabel ? renderLabel(rowData) : rowData.label}
+              // A headed bar draws the hover ring in its own silhouette, so the
+              // shell must not also frame the row with a rectangle.
+              hoverOutline={!headed}
+              name={rowName ? rowName(rowData) : rowData.label}
+              // At the bar's own height, with the bar bitten to nest it where
+              // it is a diamond. A positional row has no bar to nest into, so
+              // its art keeps the box but the notch has nothing to cut.
+              art={rowArt && <RowArt src={rowArt(rowData)} shape={artShape} />}
               background={
                 !positional && (
                   <MetricBar
@@ -219,6 +275,7 @@ export const MetricTable = ({
                     largest={largest}
                     color={rowColor ? rowColor(rowData) : FALLBACK_COLOR}
                     variant="row"
+                    head={headed ? (artShape === "actor" ? "point" : "notch") : undefined}
                   />
                 )
               }

@@ -29,9 +29,13 @@ mod groups;
 mod live_emit;
 pub mod phantom_targets;
 mod player_state;
+mod sba_inference;
 mod skill_state;
 mod status;
-mod supp_pairing;
+/// Public for `examples/supp_pair_probe.rs`, which measures this exact rule
+/// after a game patch — see [`supp_pairing::PAIRING_WINDOW_MS`]. Same reason
+/// [`phantom_targets`] is public.
+pub mod supp_pairing;
 mod windows;
 
 pub use ability_charts::{build_ability_sba_chart, build_ability_stun_chart, AbilitySeries};
@@ -458,6 +462,30 @@ pub struct PlayerData {
     /// them readable.
     #[serde(default)]
     weapon_state: Option<WeaponState>,
+    /// The game's own damage-cap-up total for this player, per attack class
+    /// (Normal / Skill / Skybound Art), already in the units the cap formula
+    /// adds. The game sums every sigil, trait, node and bonus into these before
+    /// the hook ever sees them, so they are the TOTAL a derived breakdown is
+    /// reconciled against — not a decomposition. `None` on logs recorded before
+    /// the capture shipped; `#[serde(default)]` keeps those readable.
+    #[serde(default)]
+    cap_up_normal: Option<f32>,
+    #[serde(default)]
+    cap_up_skill: Option<f32>,
+    #[serde(default)]
+    cap_up_sba: Option<f32>,
+    /// The Mastery (AP-tree) slice of the fused cap-up totals above, summed by
+    /// the game itself in its resolved limit-bonus store and read per attack
+    /// class. In TABLE units (684.0 = +684%), unlike the builder-unit triple —
+    /// it itemizes the record total, it is never added to it. `None` on logs
+    /// recorded before the capture shipped; `#[serde(default)]` keeps those
+    /// readable.
+    #[serde(default)]
+    limit_bonus_cap_normal: Option<f32>,
+    #[serde(default)]
+    limit_bonus_cap_skill: Option<f32>,
+    #[serde(default)]
+    limit_bonus_cap_sba: Option<f32>,
     /// Whether this player was an online player or not
     is_online: bool,
     /// Weapon info for this player
@@ -486,6 +514,12 @@ impl Default for PlayerData {
             skillboard: Vec::new(),
             stats: None,
             weapon_state: None,
+            cap_up_normal: None,
+            cap_up_skill: None,
+            cap_up_sba: None,
+            limit_bonus_cap_normal: None,
+            limit_bonus_cap_skill: None,
+            limit_bonus_cap_sba: None,
             is_online: false,
             weapon_info: None,
             overmastery_info: None,
@@ -896,6 +930,10 @@ mod data_coverage_tests {
             base_damage,
             target_current_hp: target_hp,
             target_max_hp: target_hp,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         })
     }
 
@@ -1277,23 +1315,22 @@ impl DerivedEncounterState {
             .insert(event.source.parent_index);
     }
 
-    /// Returns the breakdown row this hit landed in: the party slot plus the
-    /// [`BreakdownKey`] its [`player_state::BreakdownKeying`] assigned. Carried
-    /// out rather than recomputed — see
-    /// [`PlayerState::update_from_damage_event`] — so the reparse's landing
-    /// pass can address the very row the walk fed. Every other caller ignores
-    /// it.
+    /// Returns the [`BreakdownKey`] this hit landed under, as its
+    /// [`player_state::BreakdownKeying`] assigned it. Carried out rather than
+    /// recomputed — see [`PlayerState::update_from_damage_event`] — because
+    /// that keying is stateful and order-dependent, so a second `key_for` would
+    /// advance it and name a row the walk never opened. The reparse's landing
+    /// pass needs the very row the walk fed; every other caller ignores this.
     ///
-    /// The party slot is returned for the same reason, though it looks like a
-    /// field read the caller could do itself: `remap_dragon_form` rewrites
-    /// `source.parent_index`, so only the POST-remap index is the one
-    /// `party.get_mut` used here. A caller re-deriving it from its own event
-    /// would file Id's dragonform damage against the wrong player.
+    /// The party slot is NOT returned with it: it is
+    /// `damage_instance.event.source.parent_index`, and `damage_instance` is
+    /// already built from the post-`remap_dragon_form` event, so the caller
+    /// reading that field gets the same slot `party.get_mut` used here.
     fn process_damage_event(
         &mut self,
         now: i64,
         damage_instance: &AdjustedDamageInstance,
-    ) -> (u32, BreakdownKey) {
+    ) -> BreakdownKey {
         self.extend_window(now);
         self.total_damage += damage_instance.event.damage as u64;
         self.dps = self.total_damage as f64 / self.duration_secs();
@@ -1349,10 +1386,7 @@ impl DerivedEncounterState {
             player.update_rates(duration_secs);
         }
 
-        (
-            damage_instance.event.source.parent_index,
-            (action, child_character_type),
-        )
+        (action, child_character_type)
     }
 
     /// Folds one network stun-apply message (`OnPlayerStun`) into the encounter.
@@ -1445,6 +1479,24 @@ impl DerivedEncounterState {
             SbaGainCause::PerfectDodge => (SbaSourceKind::PerfectDodge, None),
             SbaGainCause::Site(tag) => (SbaSourceKind::Site, Some(tag)),
             SbaGainCause::Unknown => (SbaSourceKind::Unknown, None),
+            // Deduced causes (see `sba_inference`). A move verdict routes to
+            // the same breakdown row a read `Skill` would — it is keyed off a
+            // hit that exists — but through `add_inferred_sba_gain`, which
+            // tallies it separately so the UI can always say how much of a row
+            // is measured and how much is concluded.
+            SbaGainCause::Inferred(action) => {
+                // Dropped rather than held when the player has no row: unlike a
+                // read gain, this arrives after the whole log has been folded,
+                // so a missing row means no hit of theirs was ever counted and
+                // nothing will open one later. The held path also folds through
+                // `add_sba_gain`, which would quietly re-file it as measured.
+                if let Some(player) = self.party.get_mut(&actor_index) {
+                    player.add_inferred_sba_gain(action, amount);
+                }
+                return;
+            }
+            SbaGainCause::InferredChainGrant => (SbaSourceKind::InferredChainGrant, None),
+            SbaGainCause::InferredDamageTaken => (SbaSourceKind::InferredDamageTaken, None),
         };
 
         match self.party.get_mut(&actor_index) {
@@ -1838,6 +1890,35 @@ pub struct SelectionFact {
 /// slot-keys player victims the same way it keys player sources) and the
 /// source's parent is no known player character. A player-sourced hit on a
 /// player keeps flowing through the dealt pipeline unchanged.
+/// Does this event exist for a reparse run with these bounds?
+///
+/// The scrub range and the window-filter mask, in one place. `reparse_with_options`'s
+/// main loop and the SBA inference pass that follows it both decide through
+/// this, because inference joins against the very events the derived state was
+/// built from — if it saw an event the loop excluded, it could name gauge that
+/// is not in the polled total it is meant to be splitting.
+fn admits_event(
+    timestamp: i64,
+    from: Option<i64>,
+    cutoff: Option<i64>,
+    windows: Option<&[TimeWindow]>,
+    log_start: i64,
+) -> bool {
+    if cutoff.is_some_and(|cutoff| timestamp > cutoff) {
+        return false;
+    }
+    if from.is_some_and(|from| timestamp < from) {
+        return false;
+    }
+    match windows {
+        Some(windows) => {
+            let rel_ts = timestamp - log_start;
+            windows.iter().any(|window| window.admits(rel_ts))
+        }
+        None => true,
+    }
+}
+
 pub fn is_damage_taken_event(event: &DamageEvent) -> bool {
     protocol::is_player_slot_key(event.target.parent_index)
         && matches!(
@@ -1898,6 +1979,51 @@ pub fn selection_facts(
     facts
 }
 
+/// The game's own damage-cap-up totals for one player, by attack class.
+///
+/// These are TOTALS, not contributions: the game has already summed every
+/// sigil, trait, node and bonus into each one before the hook sees it. A
+/// breakdown derived from the stored loadout is reconciled against them, and
+/// whatever it cannot account for is reported rather than hidden.
+///
+/// Every field is optional and independently so — a record read that resolved
+/// two classes must not claim zero for the third, which would render as a base
+/// cap equal to the logged cap and a confident 0% unaccounted.
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerCapUp {
+    pub normal: Option<f32>,
+    pub skill: Option<f32>,
+    pub sba: Option<f32>,
+}
+
+impl PlayerCapUp {
+    fn is_empty(&self) -> bool {
+        self.normal.is_none() && self.skill.is_none() && self.sba.is_none()
+    }
+}
+
+/// Cap-up totals keyed by the slot key a damage row already carries as
+/// `source.parent_index`, so the events table can join without a second lookup.
+///
+/// Players with nothing captured are OMITTED rather than mapped to an empty
+/// entry: absent means "this log predates the capture", and the card must show
+/// its Stage-1 rows for those instead of a cap-up block full of zeroes.
+pub fn cap_up_by_source(player_data: &[Option<PlayerData>]) -> BTreeMap<u32, PlayerCapUp> {
+    player_data
+        .iter()
+        .flatten()
+        .filter_map(|player| {
+            let cap_up = PlayerCapUp {
+                normal: player.cap_up_normal,
+                skill: player.cap_up_skill,
+                sba: player.cap_up_sba,
+            };
+            (!cap_up.is_empty()).then_some((player.actor_index, cap_up))
+        })
+        .collect()
+}
+
 /// One page of the raw event stream, with timestamps rebased to the fight start.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1909,6 +2035,14 @@ pub struct EventPage {
     /// How many events exist in total, so the frontend can tell a full answer
     /// from a truncated one.
     pub total: usize,
+    /// [`cap_up_by_source`] for this encounter's party.
+    ///
+    /// Rides the page rather than the event stream because identity events never
+    /// reach `raw_event_log` — only damage, stun, status, SBA, link and enemy
+    /// mode do — so the loadout is not in the stream to read. This is the one
+    /// fetch the events table already makes, and its only consumer.
+    #[serde(default)]
+    pub cap_up: BTreeMap<u32, PlayerCapUp>,
     /// Echo row -> the row that triggered it, both as indices into
     /// [`Self::events`].
     ///
@@ -1926,6 +2060,7 @@ pub struct EventPage {
 /// frame after a filter change.
 pub fn event_page(
     events: &[(i64, Message)],
+    player_data: &[Option<PlayerData>],
     start_time: i64,
     offset: usize,
     count: usize,
@@ -1958,6 +2093,7 @@ pub fn event_page(
             .map(|(ts, event)| (ts - start_time, event.clone()))
             .collect(),
         total,
+        cap_up: cap_up_by_source(player_data),
         supp_pairs,
     }
 }
@@ -2532,75 +2668,54 @@ struct Walked {
     is_echo: bool,
 }
 
+impl supp_pairing::Walked for Walked {
+    type Amount = u64;
+
+    fn position(&self) -> usize {
+        self.position
+    }
+
+    fn amount(&self) -> u64 {
+        self.damage
+    }
+}
+
 /// Folds the landing view into every breakdown row from what the walk recorded.
 ///
-/// The `skill_breakdown` twin of the group aggregates' `fold_landings`, and it
-/// should stay readable against it: same gate, same accumulation, same orphan
-/// rule. The one deliberate difference is how a row is addressed — see
-/// [`Walked::key`].
-///
-/// Gated on what SURVIVED the reparse's filters, both directions: a claimed
-/// echo whose trigger was windowed or filtered out stands alone rather than
-/// letting its damage vanish, and a trigger only absorbs echoes that survived
-/// alongside it. That is what keeps `Σ merged.damage == Σ total_damage` over a
-/// player's rows under any scrub window, target span or mask.
+/// The `skill_breakdown` twin of the group aggregates' `fold_landings`. Both
+/// take the gate deciding what IS a landing from
+/// [`supp_pairing::SuppPairing::for_each_landing`] — that is what keeps
+/// `Σ merged.damage == Σ total_damage` over a player's rows under any scrub
+/// window, target span or mask, and it is written once because its failures are
+/// silent on both sides. What differs here is only how a row is addressed (see
+/// [`Walked::key`]) and the width of the amounts.
 fn fold_skill_landings(
     party: &mut HashMap<u32, PlayerState>,
     walked: &[Walked],
     pairing: &supp_pairing::SuppPairing,
 ) {
-    // The walk pushes in event order and at most once per position, so `walked`
-    // is strictly ascending by `position` — membership is a binary search
-    // rather than a set built for one pass. Asserted rather than assumed: a
-    // walk that ever pushed twice for one event would make the search pick
-    // between them arbitrarily.
-    debug_assert!(
-        walked
-            .windows(2)
-            .all(|pair| pair[0].position < pair[1].position),
-        "fold_skill_landings needs the walk's records strictly ascending by position"
-    );
-    let survivor = |position: usize| -> Option<&Walked> {
-        walked
-            .binary_search_by_key(&position, |entry| entry.position)
-            .ok()
-            .map(|at| &walked[at])
-    };
-
-    for &Walked {
-        position,
-        player_index,
-        key: (action, child_character_type),
-        damage,
-        is_echo,
-    } in walked
-    {
-        if pairing
-            .trigger_of(position)
-            .is_some_and(|trigger| survivor(trigger).is_some())
-        {
-            continue;
+    // Where each recorded key sits in its player's `skill_breakdown`, built
+    // once. Rows are final by now — the walk has closed — so a position holds
+    // for the whole fold, and the alternative is a linear scan of that vec per
+    // surviving event, on every reparse.
+    let mut row_at: HashMap<(u32, BreakdownKey), usize> = HashMap::new();
+    for (&player_index, player) in party.iter() {
+        for (at, skill) in player.skill_breakdown.iter().enumerate() {
+            row_at
+                .entry((
+                    player_index,
+                    (skill.action_type, skill.child_character_type),
+                ))
+                .or_insert(at);
         }
-        // The echo's damage as the WALK filed it, never as the pairing stored
-        // it: one number, one source. The two are not even the same number
-        // here — `supp_pairing` clamps a negative with `.max(0)` while this
-        // walk stores `damage as u64` unclamped, exactly as
-        // `SkillState::update_from_damage_event` does. Taking the walk's is
-        // what keeps the sum invariant below true; taking the pairing's would
-        // break it silently on any hit the two disagree about.
-        let attached: u64 = pairing
-            .echoes_of(position)
-            .iter()
-            .filter_map(|(echo, _)| survivor(*echo))
-            .map(|echo| echo.damage)
-            .sum();
-        let landing = damage + attached;
+    }
 
-        let Some(row) = party.get_mut(&player_index).and_then(|player| {
-            player.skill_breakdown.iter_mut().find(|skill| {
-                skill.action_type == action && skill.child_character_type == child_character_type
-            })
-        }) else {
+    pairing.for_each_landing(walked, |record, landing, attached| {
+        let Some(row) = party
+            .get_mut(&record.player_index)
+            .zip(row_at.get(&(record.player_index, record.key)))
+            .and_then(|(player, &at)| player.skill_breakdown.get_mut(at))
+        else {
             // Unreachable: the walk opened this very row through
             // `breakdown_row_mut` before recording it, and nothing removes
             // rows. Named anyway — in release this arm drops the landing's
@@ -2608,10 +2723,10 @@ fn fold_skill_landings(
             // mismatched totals without saying which row went missing.
             debug_assert!(
                 false,
-                "the walk recorded position {position} against player {player_index}'s \
-                 {action:?}/{child_character_type:?} row, which no longer exists"
+                "the walk recorded position {} against player {}'s {:?} row, which no longer exists",
+                record.position, record.player_index, record.key
             );
-            continue;
+            return;
         };
 
         row.merged.damage += landing;
@@ -2620,8 +2735,8 @@ fn fold_skill_landings(
         row.merged.max = Some(row.merged.max.map_or(landing, |max| max.max(landing)));
         // An orphan echo is supplementary all the way across; a direct hit
         // contributes only what rode along with it.
-        row.merged.supplementary += if is_echo { landing } else { attached };
-    }
+        row.merged.supplementary += if record.is_echo { landing } else { attached };
+    });
 
     // The two views describe the same damage: a claim MOVES it between rows,
     // it never creates or drops any. Checked here rather than in one test
@@ -2933,18 +3048,14 @@ impl Parser {
             if cutoff.is_some_and(|cutoff| *timestamp > cutoff) {
                 break;
             }
-            if from.is_some_and(|from| *timestamp < from) {
+            // The scrub bounds and the window-filter mask: outside them the
+            // event does not exist for this derived state, so every
+            // accumulation path downstream (damage, taken, stun, SBA
+            // gauge/gains, statuses) narrows identically. Shared with the SBA
+            // inference pass below through `admits_event`, so the two can never
+            // disagree about which events are real.
+            if !admits_event(*timestamp, from, cutoff, windows, log_start) {
                 continue;
-            }
-            // The window-filter mask: outside every admitted span, the event
-            // does not exist for this derived state — the same `continue` the
-            // scrub bounds use, so every accumulation path downstream (damage,
-            // taken, stun, SBA gauge/gains, statuses) narrows identically.
-            if let Some(windows) = windows {
-                let rel_ts = *timestamp - log_start;
-                if !windows.iter().any(|window| window.admits(rel_ts)) {
-                    continue;
-                }
             }
             // Ahead of the window extension in the DamageEvent arm below: an
             // excluded hit must not stretch the encounter window either, or a
@@ -3006,13 +3117,15 @@ impl Parser {
                                     target_assignment.get(event_index).copied().flatten(),
                                 );
 
-                        let (player_index, key) = self
+                        let key = self
                             .derived_state
                             .process_damage_event(*timestamp, &damage_instance);
 
                         walked.push(Walked {
                             position: event_index,
-                            player_index,
+                            // Post-remap, like the two fields below it: this is
+                            // the event `process_damage_event` just filed.
+                            player_index: damage_instance.event.source.parent_index,
                             key,
                             // Exactly what `SkillState::update_from_damage_event`
                             // just added, so the two views cannot drift.
@@ -3092,6 +3205,19 @@ impl Parser {
             }
         }
 
+        // Gauge the hook could not caption — a remote party member's, which
+        // arrives as a bare level from the four-slot poll — gets whatever name
+        // the log itself can support. AFTER the loop, for two reasons: the
+        // rules join rises against hits on BOTH sides of them in time, and
+        // every breakdown row is open by now, so an inferred move gain lands in
+        // the row its hit opened instead of waiting on the pending list.
+        let inferred = sba_inference::infer(&self.encounter.raw_event_log, &|timestamp| {
+            admits_event(timestamp, from, cutoff, windows, log_start)
+        });
+        for gain in inferred {
+            self.derived_state
+                .process_sba_gain(gain.actor_index, gain.cause, gain.amount);
+        }
         // After the walk, because a landing's amount depends on echoes that
         // arrive later in it. Rows are addressed by KEY rather than by index
         // (unlike the aggregates' twin), so it does not matter that the walk
@@ -3520,6 +3646,12 @@ impl Parser {
             skillboard: Vec::new(),
             stats: None,
             weapon_state: None,
+            cap_up_normal: None,
+            cap_up_skill: None,
+            cap_up_sba: None,
+            limit_bonus_cap_normal: None,
+            limit_bonus_cap_skill: None,
+            limit_bonus_cap_sba: None,
             weapon_info: Some(event.weapon_info.into()),
             overmastery_info: Some(event.overmastery_info.into()),
             player_stats: Some(event.player_stats.into()),
@@ -3566,6 +3698,12 @@ impl Parser {
                 skillboard: Vec::new(),
                 stats: None,
                 weapon_state: None,
+                cap_up_normal: None,
+                cap_up_skill: None,
+                cap_up_sba: None,
+                limit_bonus_cap_normal: None,
+                limit_bonus_cap_skill: None,
+                limit_bonus_cap_sba: None,
                 is_online: event.is_online,
                 weapon_info: None,
                 overmastery_info: None,
@@ -3639,6 +3777,26 @@ impl Parser {
                 Some(known) => merge_weapon_state(known, fresh),
                 None => fresh,
             });
+        }
+        // Same only-overwrite-when-present rule. Each class independently: a
+        // record read that resolved two of the three must not blank the third.
+        if let Some(cap_up) = event.cap_up_normal {
+            player_data.cap_up_normal = Some(cap_up);
+        }
+        if let Some(cap_up) = event.cap_up_skill {
+            player_data.cap_up_skill = Some(cap_up);
+        }
+        if let Some(cap_up) = event.cap_up_sba {
+            player_data.cap_up_sba = Some(cap_up);
+        }
+        if let Some(caps) = event.limit_bonus_cap_normal {
+            player_data.limit_bonus_cap_normal = Some(caps);
+        }
+        if let Some(caps) = event.limit_bonus_cap_skill {
+            player_data.limit_bonus_cap_skill = Some(caps);
+        }
+        if let Some(caps) = event.limit_bonus_cap_sba {
+            player_data.limit_bonus_cap_sba = Some(caps);
         }
 
         // Character level, also town-loadout-only. Fold it into player_stats without
@@ -4577,6 +4735,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 
@@ -4606,6 +4768,10 @@ mod tests {
             base_damage: None,
             target_current_hp: Some(9_500),
             target_max_hp: Some(10_000),
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 
@@ -4946,7 +5112,13 @@ mod tests {
                 .push_event(base + offset, Message::DamageEvent(a_damage_event()));
         }
 
-        let page = event_page(&parser.encounter.raw_event_log, base, 2, 3);
+        let page = event_page(
+            &parser.encounter.raw_event_log,
+            &parser.encounter.player_data,
+            base,
+            2,
+            3,
+        );
 
         assert_eq!(
             page.total, 10,
@@ -4956,6 +5128,69 @@ mod tests {
         assert_eq!(page.events[0].0, 2, "timestamps are relative to start_time");
     }
 
+    /// The card reconciles derived sources against the game's OWN total, so the
+    /// events page has to carry that total per player. It is keyed by the same
+    /// slot key a damage event reports as `source.parent_index`, because that is
+    /// what the row already holds.
+    #[test]
+    fn cap_up_is_keyed_by_the_slot_key_a_damage_row_carries() {
+        let mut parser = Parser::default();
+        let mut event = identity_event("Gran", 0x26A4848A, 0, protocol::player_slot_key(0), false);
+        event.cap_up_normal = Some(13.13);
+        event.cap_up_skill = Some(15.18);
+        event.cap_up_sba = Some(12.16);
+        parser.on_player_identity_event(event);
+
+        let map = cap_up_by_source(&parser.encounter.player_data);
+        let entry = map
+            .get(&protocol::player_slot_key(0))
+            .expect("the player's slot key is the row's source index");
+        assert_eq!(entry.normal, Some(13.13));
+        assert_eq!(entry.skill, Some(15.18));
+        assert_eq!(entry.sba, Some(12.16));
+    }
+
+    /// The Mastery (limit-bonus store) sums ride the identity event into the
+    /// player's stored loadout, and an identity refresh whose store read failed
+    /// must not blank a previously learned value — each class independently,
+    /// like the record cap-ups above.
+    #[test]
+    fn limit_bonus_caps_land_on_player_data_and_survive_a_sparse_refresh() {
+        let mut parser = Parser::default();
+        let mut event = identity_event("Gran", 0x26A4848A, 0, protocol::player_slot_key(0), false);
+        event.limit_bonus_cap_normal = Some(684.0);
+        event.limit_bonus_cap_skill = Some(684.0);
+        event.limit_bonus_cap_sba = Some(680.0);
+        parser.on_player_identity_event(event);
+
+        let refresh = identity_event("Gran", 0x26A4848A, 0, protocol::player_slot_key(0), false);
+        parser.on_player_identity_event(refresh);
+
+        let player = parser.encounter.player_data[0]
+            .as_ref()
+            .expect("slot 0 holds the player");
+        assert_eq!(player.limit_bonus_cap_normal, Some(684.0));
+        assert_eq!(player.limit_bonus_cap_skill, Some(684.0));
+        assert_eq!(player.limit_bonus_cap_sba, Some(680.0));
+    }
+
+    /// A log recorded before the capture must not report a cap-up of zero — the
+    /// card would then show a base cap equal to the logged cap and an
+    /// unaccounted row of 0%, which is a confident wrong answer.
+    #[test]
+    fn a_player_without_captured_cap_ups_is_absent_rather_than_zero() {
+        let mut parser = Parser::default();
+        parser.on_player_identity_event(identity_event(
+            "Gran",
+            0x26A4848A,
+            0,
+            protocol::player_slot_key(0),
+            false,
+        ));
+
+        assert!(cap_up_by_source(&parser.encounter.player_data).is_empty());
+    }
+
     #[test]
     fn event_page_clamps_an_offset_past_the_end() {
         let mut parser = Parser::default();
@@ -4963,7 +5198,13 @@ mod tests {
             .encounter
             .push_event(1_000, Message::DamageEvent(a_damage_event()));
 
-        let page = event_page(&parser.encounter.raw_event_log, 1_000, 500, 10);
+        let page = event_page(
+            &parser.encounter.raw_event_log,
+            &parser.encounter.player_data,
+            1_000,
+            500,
+            10,
+        );
 
         assert_eq!(page.events.len(), 0, "past the end is empty, not a panic");
         assert_eq!(page.total, 1);
@@ -5004,13 +5245,15 @@ mod tests {
             "the echo really is claimed by the first hit"
         );
 
-        let page = event_page(&events, 100, 0, 10);
+        // No player data: this log is a bare event list, and these assertions
+        // are about supp_pairs, not the cap-up map player_data feeds.
+        let page = event_page(&events, &[], 100, 0, 10);
         assert_eq!(page.supp_pairs.get(&2), Some(&0));
 
         // An offset page renumbers, and a pair whose trigger fell off the page
         // is dropped entirely rather than left pointing at whatever now sits at
         // that index.
-        let offset = event_page(&events, 100, 2, 10);
+        let offset = event_page(&events, &[], 100, 2, 10);
         assert!(offset.supp_pairs.is_empty());
     }
 
@@ -5020,7 +5263,7 @@ mod tests {
     fn event_page_drops_a_supplementary_pair_whose_echo_falls_off_the_end() {
         let events = log_with_an_echo();
 
-        let page = event_page(&events, 100, 0, 2);
+        let page = event_page(&events, &[], 100, 0, 2);
 
         assert_eq!(page.events.len(), 2, "the echo is past the page");
         assert!(page.supp_pairs.is_empty());
@@ -6453,6 +6696,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 
@@ -8624,6 +8871,12 @@ mod tests {
             skillboard: Vec::new(),
             stats: None,
             weapon_state: None,
+            cap_up_normal: None,
+            cap_up_skill: None,
+            cap_up_sba: None,
+            limit_bonus_cap_normal: None,
+            limit_bonus_cap_skill: None,
+            limit_bonus_cap_sba: None,
         }
     }
 
@@ -9346,6 +9599,10 @@ mod tests {
                 base_damage: None,
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         ));
 
@@ -9380,6 +9637,10 @@ mod tests {
                 base_damage: None,
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         ));
 
@@ -9407,6 +9668,10 @@ mod tests {
                 base_damage: None,
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         ));
 
@@ -9446,6 +9711,10 @@ mod tests {
                 base_damage: Some(200_000.0), // base > cap -> capped
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         ));
 
@@ -9473,6 +9742,10 @@ mod tests {
                 base_damage: Some(100.0), // base < cap -> not capped
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         ));
 
@@ -9514,6 +9787,10 @@ mod tests {
                 base_damage: Some(base),
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }
         }
 
@@ -9756,6 +10033,15 @@ mod stored_log_compat {
         assert_eq!(event.base_damage, None);
         assert_eq!(event.target_current_hp, None);
         assert_eq!(event.target_max_hp, None);
+        // ...and the attacker-state fields added for the damage-cap breakdown
+        // (2026-08-09), which are `Option` for exactly this reason. The status
+        // list in particular: `None` here is "this log predates the capture",
+        // NOT "the attacker held nothing", and a consumer that conflated the
+        // two would report every conditional cap source as inactive for every
+        // log ever recorded before today.
+        assert_eq!(event.source_current_hp, None);
+        assert_eq!(event.source_max_hp, None);
+        assert_eq!(event.source_statuses, None);
     }
 
     /// The same, through the real entry point and via BOTH routes a stored

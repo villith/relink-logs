@@ -17,6 +17,10 @@ use self::{
 
 mod area;
 mod battle;
+// Damage-cap ORACLE — verification only, never in a release hook. See
+// hooks/cap_oracle.rs for why it is gated rather than always compiled.
+#[cfg(feature = "hookdiag")]
+pub(crate) mod cap_oracle;
 // Compiled under `cfg(test)` too, so a plain `cargo test` type-checks and exercises the
 // quest-classification logic. The hook itself is still only INSTALLED behind the feature
 // (see `setup_hooks`), so a release `hook.dll` contains none of this.
@@ -137,6 +141,15 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
     // hookdiag-only: CreateFileW/A open tracing to verify which loose external files
     // the game actually reads (see filediag.rs). No-op without the feature.
     try_step("filediag", filediag::setup());
+
+    // hookdiag-only: the damage-cap ORACLE (see cap_oracle.rs). Emits the game's
+    // own per-term cap contributions so the pure reproduction can be diffed
+    // against ground truth. No-op without the feature.
+    #[cfg(feature = "hookdiag")]
+    try_step(
+        "cap_oracle",
+        cap_oracle::CapOracleHook::new().setup(&process),
+    );
 
     try_step(
         "loadprobe",
@@ -291,6 +304,14 @@ pub fn setup_hooks(tx: event::Tx) -> Result<()> {
         "sba_vtable_grant_33bc050",
         sba::OnVtableGrant33bc050Hook::new().setup(&process),
     );
+    // The NETWORK gauge grant (v2.0.4 entry 0xb957a0): the one route into the
+    // gauge that comes off the wire rather than from local simulation. Parks a
+    // numbered site so those rises stop landing in the generic Effect(0)
+    // bucket — see the block comment in sba.rs for what is still open.
+    try_step(
+        "sba_net_gauge_grant",
+        sba::OnNetGaugeGrantHook::new().setup(&process),
+    );
     // The per-hit gauge-grant virtual (0x9b41b0): the taken-side grant path —
     // hits players RECEIVE grant a flat award through it with nothing parked
     // on the thread, which is what the Unknown rises were (see
@@ -328,6 +349,8 @@ pub fn teardown_hooks() {
     sba::disable();
     #[cfg(feature = "hookdiag")]
     loadprobe::disable();
+    #[cfg(feature = "hookdiag")]
+    cap_oracle::disable();
     status::disable();
     #[cfg(any(feature = "fullassist", test))]
     assist::disable();

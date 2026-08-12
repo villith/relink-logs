@@ -1615,6 +1615,7 @@ fn fetch_encounter_events(id: u64, offset: usize, count: usize) -> Result<v1::Ev
 
     Ok(v1::event_page(
         &encounter.raw_event_log,
+        &encounter.player_data,
         start_time,
         offset,
         count,

@@ -766,6 +766,29 @@ describe("abilityRows — supplementary collapse", () => {
     expect(rowsWith(true, claimedNothing)[0].subValue).toBeUndefined();
   });
 
+  it("adds an unpaired echo's residue as damage, never as a landing of its own", () => {
+    // One of the four ticks never found its trigger (`supp_pairing` leaves
+    // 0.54% unpaired), so the backend reports it as a landing — right for the
+    // echo ROW, wrong once the collapse moves it onto its cause. Its damage
+    // belongs to the row; its hit does not, and Eustace's 360 normal attacks
+    // read 361 with the merge on (log 2586).
+    const partly = [
+      breakdown[0],
+      {
+        ...breakdown[1],
+        totalDamage: 330,
+        hits: 4,
+        merged: { hits: 1, damage: 30, min: 30, max: 30, supplementary: 30 },
+      },
+    ] as unknown as SkillState[];
+    const [row] = rowsWith(true, partly);
+    expect(row.value).toBe(1330);
+    // total, hits, min, max, average. Four landings — and 250 rather than the
+    // residue's 30, which is a fragment of a landing already counted here.
+    expect(row.columns.slice(0, 5)).toEqual(["1.3k", "4", "250", "400", String(Math.round(1330 / 4))]);
+    expect(row.subValue).toBe(330);
+  });
+
   it("mounts no split on a row that is echo all the way across", () => {
     // An unclaimed echo: the backend reports the whole of it as supplementary,
     // and painting the entire bar in the fainter shade would say nothing its
@@ -782,6 +805,9 @@ describe("abilityRows — supplementary collapse", () => {
       },
     ] as unknown as SkillState[];
     expect(rowsWith(true, orphan)[0].subValue).toBeUndefined();
+    // And it keeps its own landings: there is no cause row here reporting them
+    // already, so a row of damage over no hits would divide by nothing.
+    expect(rowsWith(true, orphan)[0].columns[1]).toBe("3");
   });
 
   it("falls back to the raw figures when the payload carries no merged measure", () => {
@@ -800,6 +826,35 @@ describe("abilityRows — supplementary collapse", () => {
     // degraded path and pinned here so it reads as a decision, not an
     // oversight — see the raw branch's comment in `damageCells`.
     expect(rows[0].columns.slice(0, 5)).toEqual(["1.3k", "7", "90", "300", "186"]);
+  });
+
+  it("reports raw hits for a row the landing pass never walked", () => {
+    // The landing pass walks DAMAGE events, so a row opened by something else
+    // carries an all-zero landing view beside real hits. Reporting that view
+    // verbatim would say the guard never happened; only an ECHO row is
+    // legitimately empty here, and this one has no echo to have folded away.
+    const guarded = [
+      {
+        actionType: "PerfectGuard",
+        childCharacterType: "Pl1900",
+        totalDamage: 0,
+        hits: 3,
+        minDamage: 0,
+        maxDamage: 0,
+        merged: { hits: 0, damage: 0, min: null, max: null, supplementary: 0 },
+      },
+    ] as unknown as SkillState[];
+    expect(rowsWith(true, guarded)[0].columns[1]).toBe("3");
+  });
+
+  it("still reports the empty landing view of a fully claimed echo row", () => {
+    // The discriminating companion: same all-zero measure, but its damage was
+    // claimed by a trigger that is already reporting it. Falling back to the raw
+    // figures here would draw 300 twice under the collapse.
+    const claimed = [breakdown[1]];
+    const [row] = rowsWith(true, claimed);
+    expect(row.value).toBe(0);
+    expect(row.columns[1]).toBe("0");
   });
 
   it("keeps the echo as its own row without collapsing", () => {

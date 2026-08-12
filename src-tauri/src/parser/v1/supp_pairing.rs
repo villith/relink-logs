@@ -46,6 +46,18 @@ struct Candidate {
     target_actor_type: u32,
 }
 
+/// Drops the candidates at the front of `queue` that are too old to have caused
+/// anything landing at `now`. Front-to-back is sufficient because the walk
+/// pushes in timestamp order, so the queue is sorted.
+fn expire(queue: &mut VecDeque<Candidate>, now: i64) {
+    while queue
+        .front()
+        .is_some_and(|c| now - c.timestamp > PAIRING_WINDOW_MS)
+    {
+        queue.pop_front();
+    }
+}
+
 /// Echo/trigger links for one event log, keyed by position in that log.
 #[derive(Debug, Default)]
 pub struct SuppPairing {
@@ -85,15 +97,23 @@ impl SuppPairing {
                 // orphan rather than a guess, and orphans keep today's
                 // behaviour.
                 ActionType::Normal(aid) if event.damage > 0 => {
-                    queues
+                    let queue = queues
                         .entry((event.source.index, event.source.actor_type, aid))
-                        .or_default()
-                        .push_back(Candidate {
-                            position,
-                            timestamp,
-                            target_index: event.target.index,
-                            target_actor_type: event.target.actor_type,
-                        });
+                        .or_default();
+                    // Same expiry the echo arm applies, paid here too. An
+                    // action that never procs is never otherwise drained, so
+                    // without this its queue retains every hit of the fight;
+                    // with it each queue holds one window's worth. Nothing
+                    // moves: an echo arrives no earlier than this hit, so a
+                    // candidate already expired against `timestamp` could not
+                    // have been claimed later either.
+                    expire(queue, timestamp);
+                    queue.push_back(Candidate {
+                        position,
+                        timestamp,
+                        target_index: event.target.index,
+                        target_actor_type: event.target.actor_type,
+                    });
                 }
                 ActionType::SupplementaryDamage(aid) => {
                     let queue = queues
@@ -103,12 +123,7 @@ impl SuppPairing {
                     // Drop candidates too old to have caused this. Without
                     // this, a hit that never procced shifts every later echo
                     // for its action by one, and the desync never corrects.
-                    while queue
-                        .front()
-                        .is_some_and(|c| timestamp - c.timestamp > PAIRING_WINDOW_MS)
-                    {
-                        queue.pop_front();
-                    }
+                    expire(queue, timestamp);
 
                     let picked = queue
                         .iter()
@@ -157,6 +172,89 @@ impl SuppPairing {
             .get(&position)
             .map_or(&[][..], |echoes| echoes.as_slice())
     }
+
+    /// Visits every LANDING among `walked`, in stream order.
+    ///
+    /// Calls `landing(record, amount, attached)` once per event that stands as
+    /// a landing of its own: `amount` is the record's own amount plus every
+    /// echo that rode it, and `attached` is that echo part alone. An event
+    /// whose trigger also survived is not a landing and is skipped — its
+    /// damage is already inside its trigger's `amount`.
+    ///
+    /// Gated on what SURVIVED the caller's query, both directions: a claimed
+    /// echo whose trigger was filtered out stands alone rather than letting its
+    /// damage vanish, and a trigger only absorbs echoes that survived alongside
+    /// it. That is what keeps the raw and landing views summing to one total
+    /// under any window, span or mask.
+    ///
+    /// Written here rather than at each caller because both walks — the group
+    /// aggregates' and the derived state's — need this exact gate, and its
+    /// failures are silent in both: a mis-gated claim moves damage onto a row
+    /// nobody checks. The callers differ only in how they ADDRESS a row and in
+    /// the width of their amounts, neither of which this looks at.
+    pub fn for_each_landing<W: Walked>(
+        &self,
+        walked: &[W],
+        mut landing: impl FnMut(&W, W::Amount, W::Amount),
+    ) {
+        // Callers push in `events.iter().enumerate()` order and at most once
+        // per position, so `walked` is strictly ascending by position —
+        // membership is a binary search rather than a set built for one pass.
+        // Asserted rather than assumed: a walk that ever pushed twice for one
+        // event would make the search pick between them arbitrarily.
+        debug_assert!(
+            walked
+                .windows(2)
+                .all(|pair| pair[0].position() < pair[1].position()),
+            "the landing fold needs the walk's records strictly ascending by position"
+        );
+        let survivor = |position: usize| -> Option<&W> {
+            walked
+                .binary_search_by_key(&position, |entry| entry.position())
+                .ok()
+                .map(|at| &walked[at])
+        };
+
+        for record in walked {
+            let position = record.position();
+            if self
+                .trigger_of(position)
+                .is_some_and(|trigger| survivor(trigger).is_some())
+            {
+                continue;
+            }
+            // The echo's amount as the WALK recorded it, never as the pairing
+            // stored it: one number, one source. The two need not even be the
+            // same number — this module clamps a negative with `.max(0)` while
+            // a walk may store the raw figure — and taking the walk's is what
+            // keeps each caller's sum invariant true.
+            let attached: W::Amount = self
+                .echoes_of(position)
+                .iter()
+                .filter_map(|(echo, _)| survivor(*echo))
+                .map(|echo| echo.amount())
+                .sum();
+            landing(record, record.amount() + attached, attached);
+        }
+    }
+}
+
+/// One event a caller's walk kept, as [`SuppPairing::for_each_landing`] needs to
+/// see it. Everything else a walk records — which row the event fed, whether it
+/// was an echo — belongs to the caller and is read back off `&W` in the
+/// callback.
+pub trait Walked {
+    /// `i64` for the group aggregates, `u64` for the breakdown rows.
+    type Amount: Copy + std::ops::Add<Output = Self::Amount> + std::iter::Sum<Self::Amount>;
+
+    /// Index into the SAME slice [`SuppPairing::learned_from`] walked. Pairing
+    /// positions are meaningless against any other base — see that method's
+    /// positional contract.
+    fn position(&self) -> usize;
+
+    /// What the walk aggregated for this event, past every gate and clamp — the
+    /// single source of truth for what it contributed.
+    fn amount(&self) -> Self::Amount;
 }
 
 #[cfg(test)]
@@ -189,6 +287,10 @@ mod tests {
                 base_damage: None,
                 target_current_hp: None,
                 target_max_hp: None,
+                class_flags: None,
+                source_current_hp: None,
+                source_max_hp: None,
+                source_statuses: None,
             }),
         )
     }

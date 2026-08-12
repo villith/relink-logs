@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 
 import { CursorCard } from "@/components/CursorCard";
+import { cn } from "@/components/ui/cn";
 import { EntityIcon } from "@/components/ui/EntityIcon";
 import { Figure } from "@/components/ui/Figure";
 import { Label } from "@/components/ui/Label";
@@ -10,6 +11,7 @@ import { useCtrlHeld } from "@/components/useCtrlHeld";
 import { share } from "@/utils";
 
 import { MetricBar } from "./MetricBar";
+import { RowArt } from "./RowArt";
 
 import "./analysis.css";
 
@@ -25,7 +27,15 @@ export const HOVER_PANEL_CLASS = "overflow-hidden rounded-sm border border-line-
  * `CardNotes`), so neither knows whether it is the first. */
 const SECTION_CLASS = "[&+&]:border-t [&+&]:border-line-strong";
 
-const CARD_ROW_CLASS = "relative mx-1 my-0.5 flex h-[calc(23px*var(--density))] items-center rounded-xs px-2";
+// `h-card-row` rather than a literal: `--spacing-art-card` reads the same token,
+// so a card entry's art is always exactly as tall as the bar it stands at.
+const CARD_ROW_CLASS = "relative mx-1 my-0.5 flex h-card-row items-center rounded-xs pl-[var(--row-pad)] pr-2";
+
+/** An entry with ART gives its left padding up to it: the bar runs edge to edge
+ * under the figures on the right, and an inset on the left alone leaves a gap
+ * on one side of a bar that has none on the other. Text-only entries keep the
+ * padding, having nothing to stand in it. */
+const CARD_ROW_ART_CLASS = "[--row-pad:0px]";
 
 /** The two fixed cells at the end of a row, scaled like everything else — the
  * heads read the same widths, which is what keeps the columns stacked. */
@@ -150,16 +160,31 @@ const Section = ({
       )}
       {shown.map((entry) => {
         return (
-          <Box key={entry.key} data-card-row className={CARD_ROW_CLASS}>
+          <Box key={entry.key} data-card-row className={cn(CARD_ROW_CLASS, entry.icon && CARD_ROW_ART_CLASS)}>
             <MetricBar
               value={entry.value}
               subValue={entry.subValue}
               largest={largest}
               color={entry.color ?? color}
               variant="card"
+              // Only an entry that HAS art gets a headed bar: an entry without
+              // draws no art box either (a card's rows are not a column of
+              // names to line up), so a head would be cut for nothing.
+              //
+              // ONE head for every card entry, where a table row picks between
+              // two. A card's entries are not typed — a chart tooltip's section
+              // is whatever the plot is grouped by, so player rows and ability
+              // rows arrive through the same list — and `point` is the reading
+              // that holds for both: the bar draws the diamond's head itself
+              // and the art stands on it, whether that art is a diamond or a
+              // bust. The silhouette is the table's either way.
+              head={entry.icon ? "point" : undefined}
             />
+            {/* Out of the name cell and into a box of its own, exactly as a
+                table row draws it: at the bar's height it cannot sit inside a
+                one-line truncating text. */}
+            {entry.icon && <RowArt src={entry.icon} scale="card" />}
             <Text data-card-name className="relative min-w-0 flex-1 truncate text-md">
-              {entry.icon && <EntityIcon size="card" src={entry.icon} alt="" className="mr-[5px] align-[-3px]" />}
               {entry.label}
             </Text>
             <Figure data-card-amount size="sm" className={`relative ${AMOUNT_W} text-right`}>

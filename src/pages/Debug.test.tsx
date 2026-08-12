@@ -1,5 +1,6 @@
 import { MantineProvider } from "@mantine/core";
 import { act, fireEvent, render, screen } from "@testing-library/react";
+import { NuqsAdapter } from "nuqs/adapters/react-router/v6";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,11 +39,14 @@ let failures: Record<string, string> = {};
 
 // MemoryRouter because the page links out to the dev-only legality audit; a
 // bare render has no router context for that link to resolve against.
+// NuqsAdapter because the page's tab selection lives in the URL as `?tab=`.
 const renderPage = () =>
   render(
     <MantineProvider>
       <MemoryRouter>
-        <DebugPage />
+        <NuqsAdapter>
+          <DebugPage />
+        </NuqsAdapter>
       </MemoryRouter>
     </MantineProvider>
   );

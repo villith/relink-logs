@@ -36,6 +36,7 @@
     "@tiptap/extensions": "3.28.0",
     "@tiptap/pm": "3.28.0",
     "@tiptap/react": "3.28.0",
+    "clsx": "^2.1.1",
     "html2canvas": "^1.4.1",
     "i18next": "^23.10.0",
     "i18next-browser-languagedetector": "^7.2.0",
@@ -48,6 +49,7 @@
     "react-i18next": "^14.0.5",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.22.1",
+    "tailwind-merge": "^3.6.0",
     "zustand": "^4.5.2"
   },
   "devDependencies": {

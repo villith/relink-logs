@@ -1,13 +1,18 @@
-import { Box, Group, Text, UnstyledButton } from "@mantine/core";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Box, Text, UnstyledButton } from "@mantine/core";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
+import { cn } from "@/components/ui/cn";
 import { EntityIcon } from "@/components/ui/EntityIcon";
+import { Label } from "@/components/ui/Label";
 import { Strip } from "@/components/ui/Strip";
+import type { PlayerData } from "@/types";
 import { millisecondsToPreciseElapsedFormat } from "@/utils";
 
 import "../analysis/analysis.css";
 
+import { Figure } from "../../../../components/ui/Figure";
+import { AnalysisRow } from "../analysis/AnalysisRow";
 import {
   CHIP_BUTTON_CLASS,
   CHIP_BUTTON_SELECTED_CLASS,
@@ -16,6 +21,21 @@ import {
   CHIP_SWATCH_CLASS,
 } from "../analysis/chipAnatomy";
 import type { StreamContext } from "../analysis/model/bodyContext";
+import { AmountCell } from "./AmountCell";
+import type { PlayerCapUp } from "./capBreakdown";
+import type { CapLoadout } from "./capSources";
+import { ColumnFilterMenu } from "./ColumnFilterMenu";
+import {
+  applyColumnFilters,
+  columnOptions,
+  facetFor,
+  filteredColumns,
+  type ColumnFilters,
+  type ColumnOption,
+  type EventColumn,
+} from "./columnFilters";
+import { parseTimeInput, rowAtTime, scrollTopFor } from "./eventJump";
+import { EventJumpBar } from "./EventJumpBar";
 import { toEventRow, type ActorSpace, type EventKind } from "./eventRows";
 import { defaultScopeKinds, narrowStream, scopeFor, scopeKinds } from "./eventScope";
 import { nestSupplementary, type NestedEventRow } from "./nestSupplementary";
@@ -81,19 +101,30 @@ const KIND_LABEL_KEY: Record<EventKind, string> = {
   other: "ui.logs.events-kind-other",
 };
 
-/** Row height in px. Fixed, which is what makes `visibleSlice` pure arithmetic
- * — so it is a NUMBER here and not `--spacing-row`, which the virtualiser could
- * not do division with. Kept a step under a table row, as it always was, but
- * moved with the rest of the view's scale: the stream's art is now
- * `--spacing-icon-xs`, which at 22px left no air above or below it. */
-const ROW_HEIGHT = 26;
+/** Row height in px, and the analysis view's own — `--spacing-row` is
+ * `calc(30px * var(--density))` and this is its base. The stream is a body of
+ * that view and draws its rows through the same `AnalysisRow` the metric table
+ * and the timeline lanes do, so it cannot be a size smaller than they are.
+ *
+ * A NUMBER and not the token, because `visibleSlice` divides by it and cannot
+ * divide by a CSS custom property. It agrees with the token at the only density
+ * that exists: `--density` is a static 1 on `:root` with no runtime setter. If
+ * a density knob ever ships, this stops tracking the rows it measures and the
+ * virtualiser needs a measuring probe instead — there is no way to read the
+ * token here, because `@theme inline` emits the unresolved `calc()` and
+ * `getComputedStyle` hands back the string. */
+const ROW_HEIGHT = 30;
+/** The sticky header's height. Subtracted when jumping, because it overlays the
+ * top of the list — a row placed without it lands underneath the column names. */
+const HEAD_HEIGHT = 28;
 /** Rows rendered beyond each edge of the viewport, so a fast scroll does not
  * outrun the render. */
 const OVERSCAN = 10;
 /** The scroll container's height in px. A constant rather than a measurement:
  * the height is ours to choose, and choosing it means `visibleSlice` needs no
- * ref-measuring dance and no resize observer. */
-const VIEWPORT_HEIGHT = 460;
+ * ref-measuring dance and no resize observer. Raised with the row height, so
+ * the same count of rows fits as before. */
+const VIEWPORT_HEIGHT = 540;
 
 /** The five column widths, shared by the header and the rows so the two cannot
  * drift apart. The ability column takes the slack.
@@ -102,21 +133,32 @@ const VIEWPORT_HEIGHT = 460;
  * the full translated enemy name, which is routinely longer than a player's
  * label — "Vulkan Bolla Nihilla #2" against "Narmaya".
  *
- * Amount is wider than the digits need because a nested echo prints its share
- * of its trigger beside them. Widened for EVERY row rather than only the ones
- * that carry a share: the cells are flex items, so a cell that grew to fit its
- * own content would drag the target and ability columns left on that row alone,
- * and columns that move per row are not columns. */
-const COLUMNS = { time: 74, source: 160, target: 230, amount: 118 };
+ * Time and amount both carry a child's elbow as well as their own figure, and
+ * amount carries an echo's share beside its digits. Widened for EVERY row
+ * rather than only the ones that carry those: the cells are flex items, so a
+ * cell that grew to fit its own content would drag the columns beside it left
+ * on that row alone, and columns that move per row are not columns. */
+const COLUMNS = { time: 92, source: 176, target: 236, amount: 140 };
 
-/** How far a nested child's time is indented, in px. Inside the column's own
- * width, so the column does not change size and the numbers below it stay put. */
-const CHILD_INDENT = 10;
+/** A column's width, in the view's own scale so it grows with everything else. */
+const widthOf = (px: number) => `calc(${px}px * var(--density))`;
 
-/** One named-and-pictured cell. The art is 16px rather than the analysis
- * table's 22: these rows are 22px tall, so the table's own size would leave no
- * air at all. `alt=""` because the name is right beside it — a screen reader
- * reading both would say every actor twice.
+/** The elbow that says a row hangs from the one above it.
+ *
+ * ONE declaration for the three cells that wear it. Drawn on the ability alone,
+ * the nesting was legible in the middle of the row and invisible at both ends —
+ * which is where the two numbers the whole pairing rests on live. */
+const Connector = () => (
+  // eslint-disable-next-line i18next/no-literal-string -- tree connector glyph, not prose
+  <span aria-hidden className="mr-1 shrink-0 text-ink-3">
+    └─
+  </span>
+);
+
+/** One named-and-pictured cell.
+ *
+ * Inline throughout — spans and an `img`, never a `div` — because the ability
+ * cell is rendered inside `AnalysisRow`'s name slot, which is a `<p>`.
  *
  * `title` because these columns are narrow and a name past them ellipsises;
  * hovering is then the only way left to read the rest of it. */
@@ -124,50 +166,64 @@ const CellText = ({
   cell,
   name,
   width,
-  flex,
   suffix,
   connector,
 }: {
   cell: EventCell;
   /** The column, as `data-cell` — what the tests address a cell by. */
   name: string;
+  /** Absent for the ability cell, which takes whatever the row has left. */
   width?: number;
-  flex?: boolean;
   /** A dimmed qualifier after the name, for a cell whose name alone does not
    * say the whole thing (an effect landing vs the same effect ending). */
   suffix?: string | null;
-  /** Draw the elbow that says this row hangs from the one above it. */
   connector?: boolean;
-}) => (
-  <Group
-    gap={5}
-    wrap="nowrap"
-    w={width}
-    data-cell={name}
-    style={flex ? { flex: 1, minWidth: 0 } : { minWidth: 0, flexShrink: 0 }}
-  >
-    {connector && (
-      // eslint-disable-next-line i18next/no-literal-string -- tree connector glyph, not prose
-      <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-        └─
-      </Text>
-    )}
-    {/* Smaller than the table's: the events rows are shorter, and the table's
-        own icon would fill one edge to edge. */}
-    {cell.iconUrl !== undefined && <EntityIcon size="card" src={cell.iconUrl} alt="" />}
-    {/* Only a cell that HAS a colour takes one — an actor. Everything else
-        (the time, the ability, the amount) inherits the row's kind colour,
-        which is what still says at a glance what sort of event this is. */}
-    <Text size="xs" truncate title={cell.name} style={cell.color === undefined ? undefined : { color: cell.color }}>
-      {cell.name}
-    </Text>
-    {suffix !== undefined && suffix !== null && suffix !== "" && (
-      <Text size="xs" c="dimmed" style={{ flexShrink: 0 }}>
-        {suffix}
-      </Text>
-    )}
-  </Group>
-);
+}) => {
+  // Only a cell that HAS a colour takes one — an actor. Everything else (the
+  // time, the ability, the amount) inherits the row's kind colour, which is
+  // what still says at a glance what sort of event this is.
+  const painted = cell.color === undefined ? undefined : { color: cell.color };
+
+  return (
+    <span
+      data-cell={name}
+      className={cn("relative flex min-w-0 items-center gap-[5px]", width === undefined ? "flex-1" : "shrink-0")}
+      style={width === undefined ? undefined : { width: widthOf(width) }}
+    >
+      {connector === true && <Connector />}
+      {cell.iconUrl !== undefined && <EntityIcon src={cell.iconUrl} alt="" />}
+      <span data-name className="truncate" title={cell.name} style={painted}>
+        {cell.name}
+      </span>
+      {suffix !== undefined && suffix !== null && suffix !== "" && (
+        <Text span size="xs" c="dimmed" className="shrink-0">
+          {suffix}
+        </Text>
+      )}
+    </span>
+  );
+};
+
+/** Nothing ticked. A shared frozen empty set rather than a fresh one per render
+ * — a new `Set` every time is a new prop identity every time. */
+const EMPTY_PICKED: ReadonlySet<string> = new Set();
+
+/** The per-column funnels, as the table needs them. */
+export type ColumnFilterControl = {
+  /** Called only when a menu opens — see `ColumnFilterMenu`. */
+  options: (column: EventColumn) => ColumnOption[];
+  picked: ColumnFilters;
+  onChange: (column: EventColumn, picked: ReadonlySet<string>) => void;
+};
+
+export type JumpMarks = {
+  /** The row the last jump landed on, or null where nothing has been jumped
+   * to. */
+  current: number | null;
+  /** Bumped on every landing, so the arrival mark replays even when the jump
+   * ends on a row that was already on screen. */
+  arrival: number;
+};
 
 export const EventRowsTable = ({
   rows,
@@ -175,6 +231,10 @@ export const EventRowsTable = ({
   startIndex,
   totalRows,
   labels,
+  capUp,
+  loadout,
+  marks,
+  filters,
 }: {
   /** The visible slice only. */
   rows: NestedEventRow[];
@@ -185,44 +245,77 @@ export const EventRowsTable = ({
    * scrollbar, is sized by. */
   totalRows: number;
   labels: EventLabels;
+  /** The party's cap-up totals, keyed by the slot key a damage row carries as
+   * its `sourceIndex`. Absent for a log recorded before the capture. */
+  capUp?: Record<string, PlayerCapUp>;
+  /** The party's stored loadouts, on the same key — what the cap card itemizes
+   * the totals against. The character is along for the ride because it keys
+   * the base-cap ladder the card's independent total comes from. */
+  loadout?: Map<number, CapLoadout & Pick<PlayerData, "characterType">>;
+  /** How the current jump target paints the rows. Absent, nothing is marked. */
+  marks?: JumpMarks;
+  /** The per-column funnels. Absent, the heads carry no controls at all — which
+   * is what the standalone table tests render. */
+  filters?: ColumnFilterControl;
 }) => {
   const { t } = useTranslation();
+
+  /** One column head: its name, and the funnel for the three columns that hold
+   * values worth ticking off a list. */
+  const head = (labelKey: string, width?: number, column?: EventColumn) => (
+    <span
+      role="columnheader"
+      className={cn("flex items-center gap-1", width === undefined ? "flex-1" : "shrink-0")}
+      style={width === undefined ? undefined : { width: widthOf(width) }}
+    >
+      {/* Bigger than the app's default caption voice: these name the columns you
+          filter FROM, so they are doing real work rather than captioning. */}
+      <Label data-head-label className="truncate text-sm">
+        {t(labelKey)}
+      </Label>
+      {column !== undefined && filters !== undefined && (
+        <ColumnFilterMenu
+          column={column}
+          name={t(labelKey)}
+          options={filters.options}
+          picked={filters.picked[column] ?? EMPTY_PICKED}
+          onChange={(picked) => filters.onChange(column, picked)}
+        />
+      )}
+    </span>
+  );
 
   return (
     <>
       {/* Sticky, and a sibling of the row container rather than inside it: the
           rows are absolutely positioned against that container's own origin, so
           a header within it would sit under row 0. */}
+      {/* Flat, with the column heads as its direct children: a wrapper between
+          the row and its cells breaks the grid relationship that says these
+          five name the five columns below. `data-head` rather than a styling
+          class, as in the metric table — the heads and the data rows share
+          role="row", so tests need something to tell them apart that survives
+          either being restyled. */}
       <Box
-        style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 1,
-          background: "var(--mantine-color-body)",
-          borderBottom: "1px solid var(--color-line)",
-        }}
+        className="sticky top-0 z-10 flex items-center gap-2 border-b border-line bg-bg px-2"
+        role="row"
+        data-head
+        style={{ height: `calc(${HEAD_HEIGHT}px * var(--density))` }}
       >
-        <Group gap="xs" px="xs" wrap="nowrap" style={{ height: rowHeight }}>
-          <Text size="xs" c="dimmed" w={COLUMNS.time}>
-            {t("ui.logs.events-time")}
-          </Text>
-          <Text size="xs" c="dimmed" w={COLUMNS.source}>
-            {t("ui.logs.events-source")}
-          </Text>
-          <Text size="xs" c="dimmed" style={{ flex: 1 }}>
-            {t("ui.logs.events-ability")}
-          </Text>
-          <Text size="xs" c="dimmed" w={COLUMNS.target}>
-            {t("ui.logs.events-target")}
-          </Text>
-          <Text size="xs" c="dimmed" w={COLUMNS.amount} ta="right">
-            {t("ui.logs.events-amount")}
-          </Text>
-        </Group>
+        {head("ui.logs.events-time", COLUMNS.time)}
+        {head("ui.logs.events-source", COLUMNS.source, "source")}
+        {head("ui.logs.events-ability", undefined, "ability")}
+        {head("ui.logs.events-target", COLUMNS.target, "target")}
+        {/* Amount is a MEASUREMENT and time is a moment — neither is a value you
+            tick off a list, so neither grows a funnel. */}
+        <span role="columnheader" className="flex shrink-0 justify-end" style={{ width: widthOf(COLUMNS.amount) }}>
+          <Label className="text-sm">{t("ui.logs.events-amount")}</Label>
+        </span>
       </Box>
 
       <Box data-event-body style={{ position: "relative", height: totalRows * rowHeight }}>
         {rows.map((row, offset) => {
+          const rowIndex = startIndex + offset;
           // What the row DID. An ability names itself; an effect is named
           // through the `status:` grammar; a kind with neither has only its
           // descriptor.
@@ -246,78 +339,125 @@ export const EventRowsTable = ({
           // rather than the absence of one.
           const share =
             row.parent === undefined || row.parent.sharePercent === 0 ? null : row.parent.sharePercent.toFixed(1);
+          const child = row.parent !== undefined;
+          const current = marks?.current === rowIndex;
+          // Who dealt this hit, and what they were carrying. Both keyed by
+          // `sourceIndex` — the same actor index the loadouts are stored under
+          // — so a hit's captured cap-up total and the build it is itemized
+          // against can never describe two different players.
+          const actor = row.sourceIndex;
+          const build = actor === null ? undefined : loadout?.get(actor);
+
           return (
-            <Box
-              key={`${row.timeMs}:${startIndex + offset}`}
+            <AnalysisRow
+              key={`${row.timeMs}:${rowIndex}`}
               data-event-row
+              data-jump-current={current ? true : undefined}
               // A trigger pulled back past a filter is context, not a match:
               // dimmed, and it says so on hover rather than looking like a
               // filter that failed to apply.
-              title={row.context ? t("ui.logs.events-echo-context-title") : undefined}
+              title={row.context === true ? t("ui.logs.events-echo-context-title") : undefined}
+              className={[
+                // The stream's rows carry no magnitude bar behind them, so the
+                // shell's hover ring alone reads thinner here than it does on a
+                // table row — it takes a fill as well.
+                "gap-2 hover:bg-raised",
+                // The row the jump landed on, tinted and ringed — it stays
+                // marked after the arrival flash fades, so the reader can look
+                // away and still find their place.
+                current ? "bg-accent-soft outline outline-1 -outline-offset-2 outline-accent" : "",
+              ]
+                .filter(Boolean)
+                .join(" ")}
               style={{
                 position: "absolute",
-                top: (startIndex + offset) * rowHeight,
-                height: rowHeight,
-                width: "100%",
-                opacity: row.context ? 0.45 : undefined,
+                top: rowIndex * rowHeight,
+                opacity: row.context === true ? 0.45 : undefined,
+                color: KIND_COLORS[row.kind],
               }}
-            >
-              <Group gap="xs" px="xs" wrap="nowrap" style={{ color: KIND_COLORS[row.kind], height: rowHeight }}>
-                <Text
-                  size="xs"
-                  w={COLUMNS.time}
-                  data-cell="time"
-                  // Padded INSIDE the column, so the indent that marks a child
-                  // does not push the column itself out of line.
-                  style={{ fontVariantNumeric: "tabular-nums", paddingLeft: row.parent ? CHILD_INDENT : undefined }}
-                >
-                  {row.parent ? (
-                    // Its offset from the row above, not a stamp of its own:
-                    // the child was MOVED here, and an absolute time would make
-                    // the column read backwards. The real one is on the hover,
-                    // so nothing is actually hidden.
-                    <span
-                      title={t("ui.logs.events-echo-delta-title", {
-                        time: millisecondsToPreciseElapsedFormat(row.timeMs),
-                        percent: row.parent.sharePercent.toFixed(1),
-                      })}
-                    >
-                      {t("ui.logs.events-echo-delta", { ms: row.parent.deltaMs })}
-                    </span>
-                  ) : (
-                    millisecondsToPreciseElapsedFormat(row.timeMs)
-                  )}
-                </Text>
-                <CellText name="source" cell={source} width={COLUMNS.source} />
-                {/* An effect row carries BOTH: the effect is what it was, the
-                    descriptor is whether it landed or ended. Named alone, an
-                    apply and its matching remove rendered identically — same
-                    effect, same holder, same colour, nothing to tell them
-                    apart. Every other kind has one or the other, never both. */}
+              // Remounted per landing — the `key` is the arrival count — so the
+              // animation restarts even when the jump ended on a row that was
+              // already on screen and nothing else about it changed.
+              background={
+                current && marks !== undefined ? (
+                  <Box
+                    key={marks.arrival}
+                    data-arrival={marks.arrival}
+                    aria-hidden
+                    className="events-jump-arrive pointer-events-none absolute inset-0 rounded-xs"
+                  />
+                ) : undefined
+              }
+              leading={
+                <>
+                  <Figure
+                    data-cell="time"
+                    role="gridcell"
+                    className="relative shrink-0"
+                    style={{ width: widthOf(COLUMNS.time) }}
+                  >
+                    {child && <Connector />}
+                    {row.parent ? (
+                      // Its offset from the row above, not a stamp of its own:
+                      // the child was MOVED here, and an absolute time would make
+                      // the column read backwards. The real one is on the hover,
+                      // so nothing is actually hidden.
+                      <span
+                        title={t("ui.logs.events-echo-delta-title", {
+                          time: millisecondsToPreciseElapsedFormat(row.timeMs),
+                          percent: row.parent.sharePercent.toFixed(1),
+                        })}
+                      >
+                        {t("ui.logs.events-echo-delta", { ms: row.parent.deltaMs })}
+                      </span>
+                    ) : (
+                      millisecondsToPreciseElapsedFormat(row.timeMs)
+                    )}
+                  </Figure>
+                  <CellText name="source" cell={source} width={COLUMNS.source} />
+                </>
+              }
+              /* An effect row carries BOTH: the effect is what it was, the
+                 descriptor is whether it landed or ended. Named alone, an apply
+                 and its matching remove rendered identically — same effect, same
+                 holder, same colour, nothing to tell them apart. Every other
+                 kind has one or the other, never both. */
+              name={
                 <CellText
                   name="ability"
-                  flex
                   cell={action}
                   suffix={row.statusKey === null ? null : detail}
-                  connector={row.parent !== undefined}
+                  connector={child}
                 />
-                <CellText name="target" cell={target} width={COLUMNS.target} />
-                <Text
-                  size="xs"
-                  w={COLUMNS.amount}
-                  ta="right"
-                  data-cell="amount"
-                  style={{ fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
-                >
-                  {row.amount === null ? "" : row.amount.toLocaleString()}
-                  {share !== null && (
-                    <Text span size="xs" c="dimmed" ml={4}>
-                      {t("ui.logs.events-echo-share", { percent: share })}
-                    </Text>
-                  )}
-                </Text>
-              </Group>
-            </Box>
+              }
+              trailing={<CellText name="target" cell={target} width={COLUMNS.target} />}
+              /* The amount is the END of a calculation this log records the
+                 inputs to, so the cell explains itself on hover. The facts are
+                 resolved per row against the ACTING player: a hit's cap-up
+                 total and the loadout it is itemized against must describe one
+                 player, and `sourceIndex` is the key both are stored under. */
+              columns={
+                <AmountCell
+                  amount={row.amount}
+                  capHit={row.capHit}
+                  playerCapUp={actor === null ? undefined : capUp?.[String(actor)]}
+                  loadout={build}
+                  characterType={build?.characterType}
+                  // `null` is "this row has no cap to explain"; the card wants
+                  // "nothing known", and the two degrade the same way.
+                  conditions={row.capConditions ?? undefined}
+                  width={widthOf(COLUMNS.amount)}
+                  connector={child ? <Connector /> : undefined}
+                  share={
+                    share === null ? undefined : (
+                      <Figure size="sm" tone="dim" className="ml-1">
+                        {t("ui.logs.events-echo-share", { percent: share })}
+                      </Figure>
+                    )
+                  }
+                />
+              }
+            />
           );
         })}
       </Box>
@@ -331,6 +471,9 @@ export type EventsTabProps = {
    * which reads the same stream through the same filters. */
   stream: StreamContext;
   labels: EventLabels;
+  /** The party's stored loadouts, which the Amount cell's cap card itemizes a
+   * hit's cap-up total against. Empty for a log with no party data. */
+  playerData: PlayerData[];
 };
 
 /** The metric's raw event stream: the same events its table counts, listed
@@ -341,10 +484,15 @@ export type EventsTabProps = {
  * table would. So it answers to all of them: the metric picks the kinds (see
  * `eventScope`), the side picks the holders where that means anything, and the
  * pins narrow what is left. */
-export const EventsTab = ({ stream, labels }: EventsTabProps) => {
+export const EventsTab = ({ stream, labels, playerData }: EventsTabProps) => {
   const { id, metric, hostility, pins, probes } = stream;
   const { t } = useTranslation();
-  const { events, total, suppPairs } = useEvents(id);
+  const { events, total, capUp, suppPairs } = useEvents(id);
+
+  // Keyed by `actorIndex` — the same key `cap_up_by_source` uses and the same
+  // one a damage row carries as its `sourceIndex`, so a hit's total and the
+  // loadout it is itemized against always describe one player.
+  const loadout = useMemo(() => new Map(playerData.map((player) => [player.actorIndex, player])), [playerData]);
 
   const scope = scopeFor(metric);
   const offered = scopeKinds(scope);
@@ -357,13 +505,25 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
   // the old one means nothing under the new. Reset rather than intersected: an
   // intersection can be empty, and an empty strip renders an empty table with
   // every toggle off and no way to tell that from "this fight had none".
-  useEffect(() => setKinds(defaultScopeKinds(scopeFor(metric))), [metric]);
+  // The column filters go with them, and for the same reason: they name
+  // abilities and actors this metric's stream may not carry at all, and a
+  // filter you cannot see is a filter you cannot undo.
+  useEffect(() => {
+    setKinds(defaultScopeKinds(scopeFor(metric)));
+    setColumnFilters({});
+  }, [metric]);
+
+  const [columnFilters, setColumnFilters] = useState<ColumnFilters>({});
 
   const allRows = useMemo(() => events.map(toEventRow), [events]);
-  const shown = useMemo(
+  // What the metric, the side, the kinds and the pins left. The column funnels
+  // read their values from THIS — before their own narrowing — so ticking one
+  // value does not delete every other box from the menu that ticked it.
+  const narrowed = useMemo(
     () => narrowStream(allRows, { scope, hostility, probes, kinds, pins }),
     [allRows, scope, probes, hostility, kinds, pins]
   );
+  const shown = useMemo(() => applyColumnFilters(narrowed, columnFilters), [narrowed, columnFilters]);
   // Filters first, THEN nesting: an echo that survived the filter pulls its
   // trigger back in, so nesting has to see what the filter left rather than the
   // other way round. This — not `shown` — is what renders, so it is also what
@@ -371,13 +531,71 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
   // re-admitted context rows would have no scroll of their own.
   const nested = useMemo(() => nestSupplementary(shown, allRows, suppPairs), [shown, allRows, suppPairs]);
 
+  const [jumpText, setJumpText] = useState("");
+  /** The row the last jump landed on, or null where nothing has been jumped
+   * to. */
+  const [landed, setLanded] = useState<number | null>(null);
+  /** Set by a commit that found nothing, so the control can say so rather than
+   * sitting silent as if nothing had been asked. */
+  const [missed, setMissed] = useState(false);
+  /** How many landings have happened. Nothing reads its value — only that it
+   * CHANGED, which is what replays the arrival mark on a jump that ended where
+   * the reader was already looking. */
+  const [arrival, setArrival] = useState(0);
+
   // A shorter list can leave the container scrolled past its own end, where it
   // renders nothing at all — so a filter change that shrinks the list has to
-  // take the scroll position back with it.
+  // take the scroll position back with it. The landing goes with it: the row
+  // that index named is not the row it names in the new list.
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
     setScrollTop(0);
+    setLanded(null);
+    setMissed(false);
   }, [nested.length]);
+
+  /** Put the view on a row. Drives the scroll BOTH ways — the element, so the
+   * container really moves, and the state, so the virtualiser renders what the
+   * move brought into view. jsdom fires no scroll event for a programmatic set,
+   * and neither does a smooth scroll in time. */
+  const land = useCallback(
+    (rowIndex: number) => {
+      const top = scrollTopFor({
+        index: rowIndex,
+        rowHeight: ROW_HEIGHT,
+        viewportHeight: VIEWPORT_HEIGHT,
+        headHeight: HEAD_HEIGHT,
+        total: nested.length,
+      });
+      if (scrollRef.current) scrollRef.current.scrollTop = top;
+      setScrollTop(top);
+      setArrival((count) => count + 1);
+    },
+    [nested.length]
+  );
+
+  const commit = (text: string) => {
+    const ms = parseTimeInput(text);
+    const rowIndex = ms === null ? null : rowAtTime(nested, ms);
+    setLanded(rowIndex);
+    setMissed(rowIndex === null);
+    if (rowIndex !== null) land(rowIndex);
+  };
+
+  const columnControl = useMemo(
+    () => ({
+      // Counted against what the OTHER columns left, so the number beside each
+      // value tracks the filters already applied — but never against the
+      // column's own ticks, which would empty its own menu (see `facetFor`).
+      // Only called once a menu opens.
+      options: (column: EventColumn): ColumnOption[] =>
+        columnOptions(facetFor(narrowed, columnFilters, column), labels, column),
+      picked: columnFilters,
+      onChange: (column: EventColumn, picked: ReadonlySet<string>) =>
+        setColumnFilters((previous) => ({ ...previous, [column]: picked })),
+    }),
+    [narrowed, labels, columnFilters]
+  );
 
   const slice = visibleSlice({
     scrollTop,
@@ -400,6 +618,8 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
 
   return (
     <Box style={{ padding: "4px 16px 14px" }}>
+      <EventJumpBar text={jumpText} onTextChange={setJumpText} onCommit={commit} missed={missed} />
+
       {/* The metric's own sub-filters, the way each Warcraft Logs tab carries
           its own row of them. Only the kinds THIS metric's stream is made of,
           and only when there is more than one — a strip of one offers no choice
@@ -428,14 +648,28 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
           echo is context the filter did not ask for, and counting it would say
           the filter matched more than it did. It is visibly dimmed, so the two
           numbers cannot be confused for one another. */}
-      <Text size="xs" c="dimmed" mb={4}>
-        {truncated
-          ? t("ui.logs.events-truncated", { shown: allRows.length, total })
-          : t("ui.logs.events-count", { shown: shown.length, total: allRows.length })}
-      </Text>
+      <Box className="mb-1 flex items-center gap-2">
+        <Text size="xs" c="dimmed">
+          {truncated
+            ? t("ui.logs.events-truncated", { shown: allRows.length, total })
+            : t("ui.logs.events-count", { shown: shown.length, total: allRows.length })}
+        </Text>
+        {/* One way out of every funnel at once. A reader who narrowed three
+            columns should not have to remember which three. */}
+        {filteredColumns(columnFilters) > 0 && (
+          <UnstyledButton
+            data-filters-clear-all
+            className="rounded-xs px-1 text-xs text-ink-3 hover:bg-raised hover:text-ink"
+            onClick={() => setColumnFilters({})}
+          >
+            {t("ui.logs.events-filters-clear-all")}
+          </UnstyledButton>
+        )}
+      </Box>
 
       <Box
         ref={scrollRef}
+        role="grid"
         aria-label={t("ui.logs.events-table-label")}
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
         style={{
@@ -457,6 +691,10 @@ export const EventsTab = ({ stream, labels }: EventsTabProps) => {
             startIndex={slice.start}
             totalRows={nested.length}
             labels={labels}
+            capUp={capUp}
+            loadout={loadout}
+            marks={{ current: landed, arrival }}
+            filters={columnControl}
           />
         )}
       </Box>

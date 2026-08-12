@@ -2,6 +2,9 @@ import { statusPinKey } from "@/pages/logs/view/statusUptime";
 import type { LogEvent } from "@/types";
 
 import { abilityKey } from "../abilityKey";
+import type { CapHit } from "./capBreakdown";
+import { conditionsForHit } from "./capFactors/conditions";
+import type { CapConditions } from "./capFactors/types";
 
 /** What the colour coding and the kind toggles key on. */
 export type EventKind = "damage" | "stun" | "perfectGuard" | "sba" | "sbaTick" | "death" | "status" | "other";
@@ -54,6 +57,16 @@ export type EventRow = {
   detailKey: string | null;
   detailParams?: Record<string, number | string>;
   amount: number | null;
+  /** The cap fields of a damage row, for the Amount hover card. `null` on every
+   * non-damage kind — those rows have no cap to explain. A damage row from a log
+   * predating the capture carries the shape with null members, which
+   * `capCardRows` degrades to the one row it can honestly show. */
+  capHit: CapHit | null;
+  /** What the hit knew about the moment it landed — action id, attacker HP and
+   * statuses — in the shape the cap factors ask for. What lets the card derive
+   * the hit's channel terms. `null` on non-damage kinds; a damage row from an
+   * old log carries whatever facts it has, absent keys left unclaimed. */
+  capConditions: CapConditions | null;
 };
 
 /** The `Message` variant tag. Externally tagged, so the payload is a one-key
@@ -135,6 +148,25 @@ export const toEventRow = (event: LogEvent): EventRow => {
       statusId: null,
       detailKey: null,
       amount: hit.damage,
+      capHit: {
+        damage: hit.damage,
+        damage_cap: hit.damage_cap,
+        base_damage: hit.base_damage,
+        attack_rate: hit.attack_rate,
+        class_flags: hit.class_flags,
+      },
+      // Normalized: a log stored before these fields existed deserializes with
+      // the keys ABSENT, not null, and the conditions builder tells the two
+      // apart on purpose.
+      capConditions: conditionsForHit(
+        {
+          source_current_hp: hit.source_current_hp ?? null,
+          source_max_hp: hit.source_max_hp ?? null,
+          source_statuses: hit.source_statuses ?? null,
+        },
+        null,
+        hit.action_id
+      ),
     };
   }
 
@@ -164,6 +196,8 @@ export const toEventRow = (event: LogEvent): EventRow => {
       // the same effect on the same holder in the same colour.
       detailKey: "ui.logs.events-status-applied",
       amount: status.stacks,
+      capHit: null,
+      capConditions: null,
     };
   }
 
@@ -188,6 +222,8 @@ export const toEventRow = (event: LogEvent): EventRow => {
       statusId: status.status_id,
       detailKey: "ui.logs.events-status-removed",
       amount: null,
+      capHit: null,
+      capConditions: null,
     };
   }
 
@@ -208,6 +244,8 @@ export const toEventRow = (event: LogEvent): EventRow => {
       statusId: null,
       detailKey: gain.action_id === 0 ? "ui.logs.events-sba-gain" : null,
       amount: Math.round(gain.amount),
+      capHit: null,
+      capConditions: null,
     };
   }
 
@@ -224,6 +262,8 @@ export const toEventRow = (event: LogEvent): EventRow => {
       statusId: null,
       detailKey: payload.LinkTime.active ? "ui.logs.events-link-start" : "ui.logs.events-link-end",
       amount: null,
+      capHit: null,
+      capConditions: null,
     };
   }
 
@@ -240,6 +280,8 @@ export const toEventRow = (event: LogEvent): EventRow => {
       detailKey: "ui.logs.events-enemy-mode",
       detailParams: { mode: payload.EnemyMode.mode },
       amount: null,
+      capHit: null,
+      capConditions: null,
     };
   }
 
@@ -266,6 +308,8 @@ export const toEventRow = (event: LogEvent): EventRow => {
       rounded(numberAt(body, "sba_value")) ??
       rounded(numberAt(body, "amount")) ??
       numberAt(body, "stacks"),
+    capHit: null,
+    capConditions: null,
   };
 };
 

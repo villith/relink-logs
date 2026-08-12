@@ -346,6 +346,13 @@ fn cause_key(cause: &SbaGainCause) -> Option<String> {
         SbaGainCause::PerfectDodge => ("perfectDodge", None),
         SbaGainCause::Site(tag) => ("site", Some(*tag)),
         SbaGainCause::Unknown => ("unknown", None),
+        // Deduced causes (see `sba_inference`). Their own band keys, so a
+        // stack never blends a correlation into a measured one.
+        SbaGainCause::InferredChainGrant => ("inferredChainGrant", None),
+        SbaGainCause::InferredDamageTaken => ("inferredDamageTaken", None),
+        // Handled by the caller's skill arm — an inferred move belongs to the
+        // ability band its hit opened, not to a cause band.
+        SbaGainCause::Inferred(_) => return None,
     };
     Some(match id {
         Some(id) => format!("source:{kind}:{id}"),
@@ -432,7 +439,12 @@ pub fn build_ability_sba_chart(
                     .unwrap_or(SbaGainCause::Skill(ActionType::Normal(gain.action_id)));
 
                 match cause {
-                    SbaGainCause::Skill(raw_action) => {
+                    // An inferred move rides in the same band as a read one:
+                    // this chart plots WHERE a player's gauge came from, and
+                    // both answers name the same ability. The measured/deduced
+                    // split is carried per row in the table, which is where a
+                    // reader can act on it.
+                    SbaGainCause::Skill(raw_action) | SbaGainCause::Inferred(raw_action) => {
                         let Some(key) = keying
                             .get(&gain.actor_index)
                             .and_then(|keying| keying.row_for_raw_action(raw_action))
@@ -468,6 +480,41 @@ pub fn build_ability_sba_chart(
                     (update.sba_added as f64).max(0.0);
             }
             _ => {}
+        }
+    }
+
+    // The deduced half, folded in on the same terms as the read half. Without
+    // this the chart and the SBA table would disagree about the same fight: the
+    // table lists a remote member's inferred ability rows while the chart, which
+    // only ever saw `SbaGain` events, would still draw all of it as remainder.
+    // Keying goes through the same memo, so an inferred gain lands in the band
+    // its own hit opened or in none at all.
+    for gain in super::sba_inference::infer(events, &|_| true) {
+        if !skills.contains_key(&gain.actor_index) {
+            continue;
+        }
+        let bucket = ((gain.at - start_time) / interval) as usize;
+        if bucket >= chart_len {
+            continue;
+        }
+        match gain.cause {
+            SbaGainCause::Inferred(raw_action) => {
+                let Some(key) = keying
+                    .get(&gain.actor_index)
+                    .and_then(|keying| keying.row_for_raw_action(raw_action))
+                else {
+                    continue;
+                };
+                let rows = skills.get_mut(&gain.actor_index).expect("checked above");
+                add_at(rows, key, bucket, chart_len, gain.amount);
+            }
+            other => {
+                let Some(key) = cause_key(&other) else {
+                    continue;
+                };
+                let rows = causes.get_mut(&gain.actor_index).expect("checked above");
+                rows.entry(key).or_insert_with(|| vec![0.0; chart_len])[bucket] += gain.amount;
+            }
         }
     }
 
@@ -556,6 +603,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 
@@ -874,13 +925,16 @@ mod tests {
 
     #[test]
     fn the_remainder_is_the_poll_total_minus_everything_named() {
+        // The poll sits 200 ms after the hit so the 70 it leaves over stays
+        // genuinely unexplained: inside the inference move window it would be
+        // correlated with that hit and there would be no remainder to measure.
         let events = vec![
             (0, stun_hit(0, ActionType::Normal(1), 0.0)),
             (
                 10,
                 sba_gain(0, SbaGainCause::Skill(ActionType::Normal(1)), 30.0),
             ),
-            (20, sba_poll(0, 100.0, 100.0)),
+            (200, sba_poll(0, 100.0, 100.0)),
         ];
         let bands = sba_bands(&events, 1);
 
@@ -936,14 +990,20 @@ mod tests {
     fn a_discharge_does_not_lower_the_denominator() {
         // Performing an SBA drops the gauge; `sba_added` must not go negative
         // and eat into the remainder.
+        //
+        // The rise is 90 rather than a round 100, and sits 200 ms after the only
+        // hit rather than 10: both keep SBA INFERENCE out of a test that is not
+        // about it. 100.00 is exactly the flat chain-grant value it recognises,
+        // and 10 ms is inside its move window — either would name this gauge and
+        // leave no remainder to assert on.
         let events = vec![
             (0, stun_hit(0, ActionType::Normal(1), 0.0)),
-            (10, sba_poll(0, 100.0, 100.0)),
-            (1_010, sba_poll(0, 0.0, -100.0)),
+            (200, sba_poll(0, 90.0, 90.0)),
+            (1_210, sba_poll(0, 0.0, -90.0)),
         ];
         let bands = sba_bands(&events, 2);
 
-        assert_eq!(cause_values(&bands, UNATTRIBUTED_KEY), vec![100.0, 0.0]);
+        assert_eq!(cause_values(&bands, UNATTRIBUTED_KEY), vec![90.0, 0.0]);
     }
 
     #[test]

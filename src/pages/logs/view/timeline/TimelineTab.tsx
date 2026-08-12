@@ -14,18 +14,17 @@ import { useEvents } from "../events/useEvents";
 import type { Span } from "../spans";
 
 import { TimelineTracks } from "./TimelineTracks";
-import { lanesFor, markGapMs, marksByLane } from "./laneMarks";
+import { MARK_GAP_PX, lanesFor, markGapMs, marksByLane } from "./laneMarks";
 import { laneMatcherFor } from "./laneMatch";
+import { laneShapeOf } from "./laneShape";
 
-/** How much time one viewport width shows. Warcraft Logs' own timeline is far
- * tighter than this (fifteen seconds of a six-minute fight); thirty keeps a
- * whole rotation on screen without the marks smearing together. */
-export const TIMELINE_VIEWPORT_MS = 30_000;
-
-/** How close two marks may come before they are drawn as one. Three pixels:
- * below that the gap between two ticks is not visible anyway, so drawing them
- * separately just makes a smear that pretends to be two readable marks. */
-const MARK_GAP_PX = 3;
+/** How much time one viewport width shows — Warcraft Logs' own scale, fifteen
+ * seconds of a six-minute fight. Thirty fitted a whole rotation on screen but
+ * pressed a cast's hits into a few pixels; at this zoom the individual hits
+ * inside a cast are far enough apart to be read as rhythm, and the fight is
+ * panned rather than taken in at a glance. It also halves `markGapMs`, so two
+ * marks a screen-pixel apart now survive as two. */
+export const TIMELINE_VIEWPORT_MS = 15_000;
 
 /** Which end of a damage event a metric's lanes are keyed by — read off the
  * scope's own `direction` rather than re-tested against the metric name, so a
@@ -74,7 +73,7 @@ export const TimelineTab = ({
   markEntry,
 }: TimelineTabProps) => {
   const { id, metric, hostility, pins, probes } = stream;
-  const { rows, renderLabel, rowColor, onPin, sectionLabel, emptyKey, rowSections, cardAmount } = presentation;
+  const { rows, rowKind, renderLabel, rowColor, onPin, sectionLabel, emptyKey, rowSections, cardAmount } = presentation;
   const { t } = useTranslation();
   const { events, total } = useEvents(id);
   // Measured so the merge threshold tracks the real scale. `useElementSize`
@@ -94,12 +93,16 @@ export const TimelineTab = ({
 
   const domainMs = Math.max(0, window.endMs - window.startMs);
 
+  // The fold's threshold serves twice: it decides which marks merge, and it is
+  // the unit every width `TimelineTracks` draws is a multiple of. Lifted out of
+  // the lane memo so both can read the one value.
+  const gapMs = markGapMs({ widthPx: width, viewportMs: TIMELINE_VIEWPORT_MS, gapPx: MARK_GAP_PX });
+
   const lanes = useMemo(() => {
     const matcher = laneMatcherFor(rows, { everySkill, end: laneEndFor(scope), segmentAt, enemyTypeAt, keying });
     const byLane = marksByLane(shown, matcher, window, keying?.collapseSupplementary ?? false);
-    const gapMs = markGapMs({ widthPx: width, viewportMs: TIMELINE_VIEWPORT_MS, gapPx: MARK_GAP_PX });
-    return lanesFor(rows, byLane, gapMs);
-  }, [rows, everySkill, keying, scope, segmentAt, enemyTypeAt, shown, window, width]);
+    return lanesFor(rows, byLane, gapMs, (row) => laneShapeOf(row, rowKind));
+  }, [rows, everySkill, keying, scope, segmentAt, enemyTypeAt, shown, window, gapMs, rowKind]);
 
   // The cap is the frontend's, not the log's. Said out loud for the same
   // reason the Events tab says it: a fight cut off at 50,000 events would
@@ -118,6 +121,7 @@ export const TimelineTab = ({
         domainMs={domainMs}
         startMs={window.startMs}
         viewportMs={TIMELINE_VIEWPORT_MS}
+        gapMs={gapMs}
         renderLabel={renderLabel}
         rowColor={rowColor}
         onPin={onPin}

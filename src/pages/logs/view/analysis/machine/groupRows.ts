@@ -2,7 +2,7 @@ import type { ActionType, CharacterType, GroupAggregate, GroupKey, GroupMeasure,
 import { humanizeNumber, isSupplementaryAction } from "@/utils";
 
 import { abilityKey, skillKey } from "../../abilityKey";
-import { abilityRowKey, groupOfPin, type RowKeying } from "../../abilitySkills";
+import { abilityRowKey, groupOfPin, supplementarySubValue, type RowKeying } from "../../abilitySkills";
 import { damageColumns, playersColumns } from "../../metrics/damageDone";
 import { drilldownColumns } from "../../metrics/damageTaken";
 import type { Hostility, MetricRow } from "../../metrics/types";
@@ -28,11 +28,6 @@ export type GroupRowsContext = {
    * agree about which row an echo is on, and deriving it three times is how
    * they would come to differ. Absent = the uncollapsed fold. */
   keying?: RowKeying;
-  /** Whether rows report LANDINGS (an echo folded into the hit that caused it)
-   * or raw events. Follows the same toggle `keying.collapseSupplementary`
-   * carries, passed explicitly so this fold never has to infer a display rule
-   * from a keying rule. */
-  merged?: boolean;
 };
 
 /** Shown where a measure never recorded an extreme (a walk with no per-hit
@@ -110,16 +105,44 @@ const emptySplit = (): SplitMeasure => ({
   rawSupplementary: 0,
 });
 
-const addSplit = (into: SplitMeasure, aggregate: Pick<GroupAggregate, "measure" | "merged">, echo: boolean): void => {
+/** `folded` — this aggregate is an echo the collapse moved onto the row of the
+ * hit that caused it, which makes its landing view a RESIDUE rather than a
+ * measure of its own.
+ *
+ * An echo aggregate's merged half holds only what the pairing left unclaimed
+ * (`MergedMeasure`), and the backend counts each of those as a landing —
+ * correct where the residue stands as its own row, wrong here. The echo's
+ * payload IS its cause's action id, so the damage belongs on this row; the hit
+ * does not, because the trigger it rode is already one of the hits counted here
+ * — the pairing simply could not say which. Counting it read Eustace's 360
+ * normal attacks as 361 the moment the merge was switched on (log 2586), and
+ * let a fragment of a landing stand as the row's minimum. */
+const addSplit = (
+  into: SplitMeasure,
+  aggregate: Pick<GroupAggregate, "measure" | "merged">,
+  echo: boolean,
+  folded: boolean
+): void => {
   addMeasure(into.raw, aggregate.measure);
-  addMeasure(into.merged, aggregate.merged);
+  if (folded) into.merged.amount += aggregate.merged.amount;
+  else addMeasure(into.merged, aggregate.merged);
   into.merged.supplementary += aggregate.merged.supplementary;
   if (echo) into.rawSupplementary += aggregate.measure.amount;
 };
 
+/** Whether rows report LANDINGS (an echo folded into the hit that caused it) or
+ * raw events.
+ *
+ * Read off the row keying rather than carried beside it: an echo sits on its
+ * cause's row exactly when its damage is counted there, so the two are one
+ * decision. Held as two knobs they can be set out of step, and a merged keying
+ * filled with raw figures is a table whose rows list abilities the numbers
+ * beside them do not describe. */
+const reportsLandings = (ctx: GroupRowsContext): boolean => ctx.keying?.collapseSupplementary === true;
+
 /** Which view's figures the columns are filled from. */
 const reportedMeasure = (ctx: GroupRowsContext, split: SplitMeasure): GroupMeasure =>
-  ctx.merged === true ? split.merged : split.raw;
+  reportsLandings(ctx) ? split.merged : split.raw;
 
 /** The echo share to draw as the fainter bar segment, or undefined where there
  * is none — absent rather than 0, which would mount an empty segment.
@@ -129,15 +152,13 @@ const reportedMeasure = (ctx: GroupRowsContext, split: SplitMeasure): GroupMeasu
  * reaches the bucket at all, so a bucket test finds nothing and a row with a
  * real 92.7k echo share would draw one flat bar.
  *
- * `echo < amount` is the "mixed" rule both views still need: a row that is
- * supplementary ALL the way across — the echo row, or the residue a collapse
- * leaves behind — is already described by its own label, and painting the whole
- * bar in the fainter shade would say nothing. */
-const subValueOf = (ctx: GroupRowsContext, split: SplitMeasure): { subValue?: number } => {
-  const amount = reportedMeasure(ctx, split).amount;
-  const echo = ctx.merged === true ? split.merged.supplementary : split.rawSupplementary;
-  return echo > 0 && echo < amount ? { subValue: echo } : {};
-};
+ * Which echo figure that is differs by view; the test applied to it does not,
+ * so `supplementarySubValue` owns that half for every bar in the app. */
+const subValueOf = (ctx: GroupRowsContext, split: SplitMeasure): { subValue?: number } =>
+  supplementarySubValue(
+    reportsLandings(ctx) ? split.merged.supplementary : split.rawSupplementary,
+    reportedMeasure(ctx, split).amount
+  );
 
 /** One ability row in the making: the row's own split plus the member
  * aggregates behind it, kept so a skill-group parent can list them. */
@@ -176,14 +197,17 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
   const abilityBuckets = new Map<string, AbilityBucket>();
 
   for (const { key, measure, merged } of aggregates) {
+    // ONE view per row, read once: the bar's length and the total printed
+    // beside it come from the same measure or they contradict each other.
+    const view = reportsLandings(ctx) ? merged : measure;
     switch (key.kind) {
       case "player":
         rows.push({
           key: playerRowKey(key.index),
           label: String(key.index),
           kind: "player",
-          value: ctx.merged === true ? merged.amount : measure.amount,
-          columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
+          value: view.amount,
+          columns: columnsFor(ctx, view, total),
           pinOnClick: pinFor(ctx, key.index),
           colorSlot: ctx.partySlots.get(key.index) ?? -1,
         });
@@ -194,8 +218,8 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           key: spawnRowKey(key.segment),
           label: spawnRowKey(key.segment),
           kind: "target",
-          value: ctx.merged === true ? merged.amount : measure.amount,
-          columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
+          value: view.amount,
+          columns: columnsFor(ctx, view, total),
           pinOnClick: pinFor(ctx, key.segment),
           colorSlot: -1,
         });
@@ -208,8 +232,8 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
           key: enemyRowKey(key.enemyType),
           label,
           kind: "enemy",
-          value: ctx.merged === true ? merged.amount : measure.amount,
-          columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
+          value: view.amount,
+          columns: columnsFor(ctx, view, total),
           pinOnClick: null,
           colorSlot: -1,
         });
@@ -220,18 +244,17 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
         // The takenAttack grammar: the label IS the JSON `takenAttackRowParts`
         // reads, and the pin carries it on the ability axis.
         //
-        // Reading `merged` is not a formality on this key, or on the two enemy
-        // ones: a trigger and its echo carry DIFFERENT action ids, and the
-        // pairing can claim across targets, so a claim really does move damage
-        // between these rows. Both the value and the columns follow one view,
-        // or the bar's length contradicts the total printed beside it.
+        // Reading the landing view is not a formality on this key, or on the
+        // two enemy ones: a trigger and its echo carry DIFFERENT action ids,
+        // and the pairing can claim across targets, so a claim really does
+        // move damage between these rows.
         const label = takenAttackRowLabel(key.enemyType, key.actionId);
         rows.push({
           key: takenRowKey(label),
           label,
           kind: "takenAttack",
-          value: ctx.merged === true ? merged.amount : measure.amount,
-          columns: columnsFor(ctx, ctx.merged === true ? merged : measure, total),
+          value: view.amount,
+          columns: columnsFor(ctx, view, total),
           pinOnClick: ctx.groupBy === "ability" ? { ability: label } : null,
           colorSlot: -1,
         });
@@ -245,7 +268,6 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
         // mixed — every echo keys to the echo row — so this costs nothing there
         // and the row comes out exactly as it always has.
         const echo = isSupplementaryAction(key.actionType);
-        addSplit(bucket, { measure, merged }, echo);
 
         // An echo joins the member that CAUSED it rather than standing as a
         // member of its own: a skill group holds skills, and "Supplementary
@@ -253,19 +275,27 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
         // stop the children summing to the parent they expand. Unresolvable
         // (or uncollapsed), the echo is its own member, which is also its own
         // row, so nothing is folded anywhere it does not belong.
+        //
+        // Read before either `addSplit` below rather than after: a resolved
+        // cause is exactly what makes this aggregate a folded one at BOTH
+        // grains, and `abilityRowOf` above reached the same answer through
+        // `causeRow` — one map, so the row and the member cannot disagree about
+        // whether the echo moved.
         const cause = echo
           ? ctx.keying?.causeAction(
               (key.actionType as { SupplementaryDamage: number }).SupplementaryDamage,
               key.childCharacterType
             ) ?? null
           : null;
+        const folded = cause !== null;
+        addSplit(bucket, { measure, merged }, echo, folded);
         // Members merge by action ALONE (`mergeSkillsByAction`'s rule): a
         // player and their summon on one action id are one member skill, and
         // Primal Burst's three bodies share one id on purpose.
         const memberAction = cause ?? key.actionType;
         const memberKey = abilityKey(memberAction);
         const member = bucket.members.get(memberKey) ?? { actionType: memberAction, split: emptySplit() };
-        addSplit(member.split, { measure, merged }, echo);
+        addSplit(member.split, { measure, merged }, echo, folded);
         bucket.members.set(memberKey, member);
         abilityBuckets.set(rowKey, bucket);
         break;
@@ -295,7 +325,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
                 key: skillKey(memberKey),
                 label: memberKey,
                 kind: "ability",
-                value: ctx.merged === true ? member.split.merged.amount : member.split.raw.amount,
+                value: reportedMeasure(ctx, member.split).amount,
                 ...subValueOf(ctx, member.split),
                 columns: columnsFor(ctx, reportedMeasure(ctx, member.split), total),
                 pinOnClick: { ability: memberKey },
@@ -308,7 +338,7 @@ export const groupRowsFor = (aggregates: GroupAggregate[], ctx: GroupRowsContext
       key: skillKey(rowKey),
       label: rowKey,
       kind: "ability",
-      value: ctx.merged === true ? bucket.merged.amount : bucket.raw.amount,
+      value: reportedMeasure(ctx, bucket).amount,
       ...subValueOf(ctx, bucket),
       columns: columnsFor(ctx, reportedMeasure(ctx, bucket), total),
       pinOnClick: { ability: rowKey },

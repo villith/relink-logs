@@ -6,3 +6,6 @@
 # Note CI's format-check checks JSON under src/ too: the `--ext js,jsx,ts,tsx`
 # in the npm script is not a real Prettier flag and is ignored.
 src/assets/transmarvel-pool.json
+# JSON.stringify keeps `masterLevelCap`'s 51 numbers one per line; Prettier
+# wants them packed. Regenerating must not need a format pass to stay green.
+src/assets/skillboard-cap-sources.json

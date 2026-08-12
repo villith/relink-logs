@@ -85,7 +85,27 @@ Data flows **game → hook → pipe → parser → frontend**:
   the same Windows exe under Proton, so all RE'd signatures/offsets are shared.
   The hook doubles as a `dinput8.dll` proxy (`src-hook/src/proxy.rs`) and
   serves events over localhost TCP (`protocol::TCP_ADDR`) when it detects
-  Wine; the app deploys it via `src-tauri/src/linux_support/`. The hook crate
+  Wine; the app deploys it via `src-tauri/src/linux_support/`.
+  **Both of those live behind the `proton` cargo feature and are absent from
+  the Windows `hook.dll`** — an injected DLL that exports `DirectInput8Create`,
+  calls `LoadLibraryW` on a hardcoded system32 path and opens a listening
+  socket is the triad AV heuristics read as a DLL-hijack backdoor, and it was
+  dead code on Windows anyway (`is_wine()` is false). So release CI builds the
+  hook twice, and `scripts/check-hook-surface.mjs` byte-scans both artifacts to
+  prove the split held. Source gating alone is NOT enough: leaving
+  `TOOLBOX_TCP_ADDR` named at a dead call site still put `127.0.0.1:39372` in
+  the shipped DLL's string table. If you add a Proton-only code path, gate it
+  and add its marker to that script.
+- **Releases are not Authenticode-signed.** The signing certificate was
+  revoked; a signature from a revoked cert resolves to `CERT_E_REVOKED`, which
+  Defender and SmartScreen treat as worse than unsigned. minisign on the
+  updater artifacts is the only signature left. Read the header comment in
+  `release.yaml` before re-adding code signing.
+- **Publishing a release is opt-in.** A push to `dev` builds both platforms and
+  leaves them as Actions artifacts; releases come from the "Run workflow"
+  button's `publish` input (`stable` / `rc` / `none`). Every published build is
+  a new zero-prevalence `hook.dll` hash in AV telemetry, and low prevalence is
+  what the generic ML detections score on. The hook crate
   itself only compiles on Windows — Linux CI (`cargo_check_linux` in ci.yaml)
   builds `-p gbfr-logs` with `--lib --bins` (the examples are Windows diag
   tools; don't "fix" them to build on Linux). `npm run dev` on a non-Windows

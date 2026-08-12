@@ -65,6 +65,12 @@ pub fn identity_event(slot: u8, character_type: u32, name: &str) -> PlayerIdenti
         skillboard: Vec::new(),
         stats: None,
         weapon_state: None,
+        cap_up_normal: None,
+        cap_up_skill: None,
+        cap_up_sba: None,
+        limit_bonus_cap_normal: None,
+        limit_bonus_cap_skill: None,
+        limit_bonus_cap_sba: None,
     }
 }
 
@@ -98,6 +104,10 @@ pub fn damage_event(slot: u8, character_type: u32, amount: i32, skill_id: u32) -
         base_damage: None,
         target_current_hp: None,
         target_max_hp: None,
+        class_flags: None,
+        source_current_hp: None,
+        source_max_hp: None,
+        source_statuses: None,
     }
 }
 

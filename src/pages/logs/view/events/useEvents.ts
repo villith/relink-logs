@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api";
 import { useEffect, useRef, useState } from "react";
 
-import type { EventPage, LogEvent } from "@/types";
+import type { EventPage, LogEvent, PlayerCapUp } from "@/types";
 
 /** How many events one fetch asks for.
  *
@@ -23,6 +23,9 @@ export const EVENT_FETCH_CAP = 50_000;
 export const useEvents = (id: string | undefined) => {
   const [events, setEvents] = useState<LogEvent[]>([]);
   const [total, setTotal] = useState(0);
+  // Keyed by slot key; empty for a log recorded before the cap-up capture, which
+  // the card reads as "show the Stage-1 rows" rather than "the cap-up was zero".
+  const [capUp, setCapUp] = useState<Record<string, PlayerCapUp>>({});
   const [suppPairs, setSuppPairs] = useState<Record<number, number>>({});
   const generation = useRef(0);
 
@@ -36,6 +39,7 @@ export const useEvents = (id: string | undefined) => {
         const page = result as EventPage;
         setEvents(page.events);
         setTotal(page.total);
+        setCapUp(page.capUp ?? {});
         setSuppPairs(page.suppPairs ?? {});
       })
       .catch(() => {
@@ -45,9 +49,10 @@ export const useEvents = (id: string | undefined) => {
         if (mine !== generation.current) return;
         setEvents([]);
         setTotal(0);
+        setCapUp({});
         setSuppPairs({});
       });
   }, [id]);
 
-  return { events, total, suppPairs };
+  return { events, total, capUp, suppPairs };
 };

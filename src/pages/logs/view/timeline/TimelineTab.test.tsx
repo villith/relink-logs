@@ -58,6 +58,9 @@ const STREAM = {
  * what stops a lane and its table row being drawn two different ways. */
 const PRESENTATION = {
   rows: ROWS,
+  rowKind: "ability" as const,
+  rowName: (row: MetricRow) => `label(${row.key})`,
+  rowArt: () => undefined,
   renderLabel: (row: MetricRow) => `label(${row.key})`,
   rowColor: () => "#36B37E",
   onPin: () => {},

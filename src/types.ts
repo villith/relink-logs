@@ -267,15 +267,9 @@ export type SkillState = {
   maxDamage: number | null;
   /** Total damage of the skill */
   totalDamage: number;
-  /** The landing view of this skill — see `MergedSkillMeasure`. Optional: a
-   * backend older than the field sends nothing (dev HMR skew), which reads as
-   * "nothing to merge" rather than as a row of zeros. */
   merged?: MergedSkillMeasure;
-  /** Skybound Arts gauge this skill generated. Local player only — a remote
-   * member's gauge is synced rather than granted by a hit the hook can see, so
-   * their rows are 0 and the table must say so rather than ranking them.
-   * Optional: a backend older than the field sends nothing (dev HMR skew). */
   sbaGenerated?: number;
+  sbaInferred?: number;
   /** Total stun value of the skill hits */
   totalStunValue: number;
   /** Maximum recorded stun value of the skill */
@@ -496,7 +490,12 @@ export type SbaSourceState = {
     | "questStart"
     | "perfectDodge"
     | "site"
-    | "unknown";
+    | "unknown"
+    // Deduced by the parser from the log rather than read by the hook — the
+    // only causes available for a remote member, whose grant frames never run
+    // on this machine.
+    | "inferredChainGrant"
+    | "inferredDamageTaken";
   id: number | null;
   generated: number;
 };
@@ -668,6 +667,13 @@ export type PlayerData = {
   stats: RecordStats | null;
   /** Equipped weapon save-row snapshot (v2.0.2 identity recovery); null on older logs. */
   weaponState: WeaponState | null;
+  /** The Mastery (AP-tree) damage-cap total per attack class, read from the
+   * game's own resolved limit-bonus store — table units (684 = +684%). Already
+   * fused inside the record cap-up totals, so it itemizes them, never adds to
+   * them. Null on logs recorded before the capture shipped. */
+  limitBonusCapNormal: number | null;
+  limitBonusCapSkill: number | null;
+  limitBonusCapSba: number | null;
   isOnline: boolean;
   weaponInfo: WeaponInfo | null;
   overmasteryInfo: OvermasteryInfo | null;
@@ -926,6 +932,19 @@ export type SBAEvent = [
 
 export type DeathEvent = [number, { OnDeathEvent: { actor_index: number; death_counter: number } }];
 
+/** One status the attacker was carrying when a hit landed, as
+ * `DamageEvent.source_statuses` reports it. Mirrors `protocol::SourceStatus`,
+ * so — like the rest of a `Message` payload — the fields stay snake_case.
+ *
+ * `status_id` is the same `status.tbl` id the `StatusApply`/`StatusRemove`
+ * stream carries, so a snapshot entry and an interval name the same effect.
+ * `stacks` follows the same rule as `StatusApply.stacks`: a real count for the
+ * effects the game marks as levelled, 1 for everything else. */
+export type SourceStatus = {
+  status_id: number;
+  stacks: number;
+};
+
 /** One actor as a damage event reports it. `parent_index` is what an attribution
  * reads — a summon's hit belongs to the player who called it. */
 type LogEventActor = {
@@ -956,6 +975,36 @@ export type LogEventPayload =
         damage: number;
         flags: number;
         action_id: ActionType;
+        /** The game's own cap for this hit. `null` on old logs. */
+        damage_cap: number | null;
+        /** Pre-cap base damage, before `min(base, cap)` clamps it. */
+        base_damage: number | null;
+        /** The move's attack rate — what community sheets call MV. */
+        attack_rate: number | null;
+        stun_value: number | null;
+        target_current_hp: number | null;
+        target_max_hp: number | null;
+        /** Attack-class bits. `0x40000` Skybound Art beats `0x10000` Skill;
+         * neither means Normal. Picks which of the player's three cap-ups
+         * applied. `null` on old logs. */
+        class_flags: number | null;
+        /** The ATTACKER's own HP when the hit was registered — read from the
+         * same `ExHp` component the target pair comes from, and read BEFORE the
+         * game's damage call, because that is when the hit's cap was computed.
+         * What an HP-gated cap trait ("while at 75% HP or more", "when at 45000
+         * HP or less") has to be judged against. `null` on old logs, on
+         * non-player attackers, and when the read fails its sanity checks. */
+        source_current_hp: number | null;
+        /** The attacker's max HP, for the fraction. `null` alongside
+         * `source_current_hp` — the two are read as one pair. */
+        source_max_hp: number | null;
+        /** Every status the attacker held at that moment, with its stack count.
+         *
+         * `null` and `[]` are DIFFERENT: `null` is "not captured" (an old log,
+         * a summon or enemy attacker), `[]` is "captured, and the attacker held
+         * nothing". A conditional cap source may only be reported as inactive
+         * on the second — on the first it is unresolved. */
+        source_statuses: SourceStatus[] | null;
       };
     }
   | { OnDeathEvent: { actor_index: number; death_counter: number } }
@@ -999,9 +1048,14 @@ export type LogEvent = [number, LogEventPayload];
 export type EventPage = {
   events: LogEvent[];
   total: number;
-  /** Echo row index -> trigger row index, both into `events`. A pair with
-   * either end off the page is absent, and that echo renders flat. */
+  capUp: Record<string, PlayerCapUp>;
   suppPairs: Record<number, number>;
+};
+
+export type PlayerCapUp = {
+  normal: number | null;
+  skill: number | null;
+  sba: number | null;
 };
 
 /** Toolbox / Synthesis Helper — mirrors src-tauri/src/synthesis/mod.rs. */

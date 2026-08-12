@@ -17,13 +17,14 @@ import { translateCharacterType } from "@/utils";
 
 import { childOfPin, type RowKeying } from "../../abilitySkills";
 import { keyColor } from "../../actorColor";
+import type { EntityCell } from "../../entity";
 import { buffs } from "../../metrics/buffs";
 import { damageDone } from "../../metrics/damageDone";
 import { damageTaken } from "../../metrics/damageTaken";
 import { debuffs } from "../../metrics/debuffs";
 import { sba } from "../../metrics/sba";
 import { stun } from "../../metrics/stun";
-import type { Hostility, MetricDescriptor, MetricRow, RowLevel } from "../../metrics/types";
+import type { Hostility, LabelKind, MetricDescriptor, MetricRow, RowLevel } from "../../metrics/types";
 import { playerRowIndex } from "../../rowKey";
 import type { SelectorPins } from "../../selectorOptions";
 import { isStatusPin } from "../../statusUptime";
@@ -68,6 +69,12 @@ export type RowModel = {
   /** The rows as DRAWN — with provenance cells prepended at the effect level. */
   shownRows: MetricRow[];
   rowChildren: (row: MetricRow) => MetricRow[] | null;
+  /** A row's name, without its art. */
+  rowName: (row: MetricRow) => React.ReactNode;
+  /** A row's art, or nothing where the game draws the thing no picture. */
+  rowArt: (row: MetricRow) => string | undefined;
+  /** The two above together, for a body that draws art INLINE beside the name.
+   * Composed from them, never resolved separately. */
   renderLabel: (row: MetricRow) => React.ReactNode;
   rowColor: (row: MetricRow) => string;
   rowSections: (row: MetricRow) => CardSection[] | null;
@@ -77,6 +84,11 @@ export type RowModel = {
   /** Whether the rows are EFFECTS rather than one effect's holders — the
    * condition the provenance cells and the SOURCE header both ride. */
   effectLevel: boolean;
+  /** What KIND of thing this tab's rows are, for every consumer that has to
+   * branch on it — the names and art resolve through it, and the timeline
+   * chooses a lane's shape by it. Rows that declare their own `kind` override
+   * it; this is the answer for the ones that do not. */
+  tableKind: LabelKind;
 };
 
 export type RowModelInput = {
@@ -160,10 +172,9 @@ export const useRowModel = ({
         // this is what makes the collapse toggle reach the table at all — and
         // what keeps the timeline's lane join (which expands a row's label
         // through the same keying) from listing an echo row it can never fill.
+        // It also carries which view the rows report: landings only when the
+        // reader asked for echoes to be merged.
         keying: rowKeying,
-        // The same toggle the keying carries. Rows report landings only when
-        // the reader asked for echoes to be merged.
-        merged: rowKeying.collapseSupplementary,
       });
     }
     return shownEncounter
@@ -287,24 +298,50 @@ export const useRowModel = ({
   // ~90 internal statuses the game never names answer empty and fall back to
   // "Effect <id>". The cause resolves through `causeSkillName`, which bridges
   // the effect-entry id at `+0x4c` to the acting skill.
-  const rowCellOf = useCallback((row: MetricRow) => rowCell(row, tableKind), [rowCell, tableKind]);
+  // Resolved once per row, though `rowName` and `rowArt` each ask for it — and
+  // `renderLabel` asks for both. Keyed by the row OBJECT rather than its key:
+  // rows are rebuilt whenever anything behind them moves, so identity is a
+  // cache that cannot go stale, where a key could be reused by a later row set
+  // carrying a different label. Thrown away with the resolvers themselves.
+  const rowCells = useMemo(() => new WeakMap<MetricRow, EntityCell>(), [rowCell, tableKind]);
+  const rowCellOf = useCallback(
+    (row: MetricRow) => {
+      const found = rowCells.get(row);
+      if (found) return found;
+      const cell = rowCell(row, tableKind);
+      rowCells.set(row, cell);
+      return cell;
+    },
+    [rowCells, rowCell, tableKind]
+  );
 
+  // The qualified label wins where the table computed one: two same-named
+  // parent rows carry their owner's character, which the entity ladder — naming
+  // one row at a time — cannot know about.
+  const rowName = useCallback(
+    (row: MetricRow) => abilityRowLabels.get(row.key) ?? rowCellOf(row).name,
+    [rowCellOf, abilityRowLabels]
+  );
+
+  const rowArt = useCallback((row: MetricRow) => rowCellOf(row).iconUrl, [rowCellOf]);
+
+  // The two above, side by side. COMPOSED rather than resolved again, because
+  // the table draws the art at bar height in a slot of its own while the
+  // timeline's lane names carry it inline beside the words: one namer and one
+  // illustrator serve both, so no body can name or picture a row differently.
   const renderLabel = useCallback(
     (row: MetricRow) => {
-      const cell = rowCellOf(row);
-      // The qualified label wins where the table computed one: two same-named
-      // parent rows carry their owner's character, which the entity ladder —
-      // naming one row at a time — cannot know about.
-      const name = abilityRowLabels.get(row.key) ?? cell.name;
-      if (!cell.iconUrl) return name;
+      const iconUrl = rowArt(row);
+      const name = rowName(row);
+      if (!iconUrl) return name;
       return (
         <>
-          <EntityIcon src={cell.iconUrl} alt="" className="mr-[7px] align-[-6px]" />
+          <EntityIcon src={iconUrl} alt="" className="mr-[7px] align-[-6px]" />
           {name}
         </>
       );
     },
-    [rowCellOf, abilityRowLabels]
+    [rowArt, rowName]
   );
 
   const rowColor = useCallback(
@@ -405,11 +442,14 @@ export const useRowModel = ({
     rows,
     shownRows,
     rowChildren,
+    rowName,
+    rowArt,
     renderLabel,
     rowColor,
     rowSections,
     sectionLabelOf,
     isStatusMetric,
     effectLevel,
+    tableKind,
   };
 };

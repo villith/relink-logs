@@ -32,6 +32,7 @@ import { RegroupStrip } from "./RegroupStrip";
 import { WindowStrip } from "./WindowStrip";
 import "./analysis.css";
 import { selectedChartWindows, windowFilterScrubRange } from "./chartWindowFilter";
+import { buildDebugReadout } from "./debugReadout";
 import { CAPABILITIES, levelFor } from "./machine/capabilities";
 import { resolveViewSpec } from "./machine/resolve";
 import type { AnalysisState, MetricKey } from "./machine/state";
@@ -42,12 +43,15 @@ import {
   setHostility as hostilityTransition,
   setMetric as metricTransition,
   pinRow,
+  pinValueOf,
   regroup,
   toggleWindowFilter as windowFilterTransition,
   toggleWindowKind as windowKindTransition,
   setWindow as windowTransition,
 } from "./machine/transitions";
+import { useActionLog } from "./machine/useActionLog";
 import { useAnalysisState } from "./machine/useAnalysisState";
+import { useAutoDrill } from "./machine/useAutoDrill";
 import type { RowPresentation, StreamContext } from "./model/bodyContext";
 import { useActorIdentity } from "./model/useActorIdentity";
 import { useChartModel } from "./model/useChartModel";
@@ -334,12 +338,15 @@ export const AnalysisView = () => {
     metric,
     shownRows,
     rowChildren,
+    rowName,
+    rowArt,
     renderLabel,
     rowColor,
     rowSections,
     sectionLabelOf,
     isStatusMetric,
     effectLevel,
+    tableKind,
   } = useRowModel({
     metricKey,
     caps,
@@ -363,6 +370,24 @@ export const AnalysisView = () => {
     classOfRowKey,
   });
 
+  // The drill's last step, taken for the user: a pin that leaves the table with
+  // ONE row pins that row too (see `useAutoDrill`). Armed by the pin handlers
+  // below rather than standing over the rows, so the pin it applies stays
+  // clearable.
+  //
+  // `settled` is what keeps it off the rows folded between a regroup and its
+  // response — the groups path draws the PREVIOUS grouping's aggregates until
+  // its own arrive (see `answeredGroups`), and one of those is not this drill's
+  // answer. The other two data paths build their rows synchronously from the
+  // pins, so their rows always answer the grouping in hand.
+  const { armDrill } = useAutoDrill({
+    rows: shownRows,
+    state,
+    setState,
+    settled: caps.dataPath !== "groups" || chartGroupBy === spec.groupBy,
+    enabled: body === TABLE_TAB,
+  });
+
   // Bound once against the spawn table rather than inline in the timeline's
   // props: it is in that body's lane memo's dependencies, and a fresh arrow
   // each render re-folds the whole event stream on every unrelated change.
@@ -373,40 +398,48 @@ export const AnalysisView = () => {
 
   // A row click pins its dimension through the machine's transition, so the
   // `by` override drops and the derived default advances — WCL's behavior.
-  // The payload still arrives in the legacy `SelectorPins` wire shape.
+  // The payload still arrives in the legacy `SelectorPins` wire shape, read by
+  // the same `pinValueOf` the auto-drill rule reads a row's payload with.
   const handlePin = useCallback(
     (next: Partial<SelectorPins>) => {
-      if (next.source !== undefined && next.source !== null) {
-        setState(pinRow(state, { dim: "source", value: next.source }));
-      } else if (next.targets !== undefined && next.targets.length > 0) {
-        setState(pinRow(state, { dim: "target", value: next.targets[0] }));
-      } else if (next.ability !== undefined && next.ability !== null) {
-        setState(pinRow(state, { dim: "ability", value: next.ability }));
-      }
+      const pin = pinValueOf(next);
+      if (pin === null) return;
+      armDrill();
+      setState(pinRow(state, pin));
     },
-    [state, setState]
+    [state, setState, armDrill]
   );
 
   // The selector bar hands back whole pin sets. A change per dimension routes
   // through the same transitions a row click uses: an addition pins (and
   // advances the default), a removal only clears its own dimension.
+  //
+  // An addition arms the auto-drill for the same reason a row click does — it
+  // IS a drill, only spelled through a dropdown. A removal deliberately does
+  // not: re-drilling what was just cleared is how the ✕ would undo itself.
   const handlePinsChange = useCallback(
     (next: SelectorPins) => {
       const target = next.targets.length > 0 ? next.targets[0] : null;
       let draft = state;
+      let pinned = false;
       if (next.source !== state.source) {
         draft = next.source === null ? clearPin(draft, "source") : pinRow(draft, { dim: "source", value: next.source });
+        pinned = pinned || next.source !== null;
       }
       if (target !== state.target) {
         draft = target === null ? clearPin(draft, "target") : pinRow(draft, { dim: "target", value: target });
+        pinned = pinned || target !== null;
       }
       if (next.ability !== state.ability) {
         draft =
           next.ability === null ? clearPin(draft, "ability") : pinRow(draft, { dim: "ability", value: next.ability });
+        pinned = pinned || next.ability !== null;
       }
-      if (draft !== state) setState(draft);
+      if (draft === state) return;
+      if (pinned) armDrill();
+      setState(draft);
     },
-    [state, setState]
+    [state, setState, armDrill]
   );
 
   // Everything the plot is: which of the five series builders won, how that
@@ -459,13 +492,50 @@ export const AnalysisView = () => {
     playerLabelTemplate: player_label_template,
   });
 
-  // The dev-only readout: the whole machine state plus what the spec resolved
-  // it to — one JSON line a report can paste, replacing the hand-kept
-  // key=value formatter the machine made redundant.
-  const debugChart = useMemo(
-    () => JSON.stringify({ state, groupBy: spec.groupBy, chart: spec.chart.source, fetch: spec.fetch !== null }),
-    [state, spec]
+  // The dev-only readout: the state, what the machine resolved it INTO, and the
+  // stored settings that colour the reading. Built even in a release build —
+  // it is a handful of string joins, and gating it would mean gating the memo
+  // and every value feeding it, which is more machinery than the strings cost.
+  const debugReadout = useMemo(
+    () =>
+      buildDebugReadout({
+        state,
+        spec,
+        caps,
+        body,
+        // The rows answer the CURRENT grouping only once the fetch that asked
+        // for it has landed; the same test `useAutoDrill` gates itself on.
+        settled: caps.dataPath !== "groups" || chartGroupBy === spec.groupBy,
+        chartFormat: format,
+        smoothing,
+        merge: collapseSupplementary,
+        streamer: streamer_mode,
+        displayNames: show_display_names,
+        rows: shownRows.length,
+        mask: maskWindows,
+        windows: chartWindows,
+      }),
+    [
+      state,
+      spec,
+      caps,
+      body,
+      chartGroupBy,
+      format,
+      smoothing,
+      collapseSupplementary,
+      streamer_mode,
+      show_display_names,
+      shownRows,
+      maskWindows,
+      chartWindows,
+    ]
   );
+
+  // What the user DID to get here, this mount. Recorded from the URL state
+  // rather than from the controls: every pin, metric, side, regroup, zoom and
+  // filter lands there, so one watcher covers the lot.
+  const actions = useActionLog(state, tab);
 
   // A window-filter change, with the chart's zoom brought along: the scrub
   // commits to the bucket hull of everything the NEW selection admits.
@@ -505,6 +575,9 @@ export const AnalysisView = () => {
   const stream: StreamContext = { id, metric: metricKey, hostility, pins: eventPins, probes: eventProbes };
   const presentation: RowPresentation = {
     rows: shownRows,
+    rowKind: tableKind,
+    rowName,
+    rowArt,
     renderLabel,
     rowColor,
     onPin: handlePin,
@@ -646,7 +719,7 @@ export const AnalysisView = () => {
       />
 
       {/* Dev builds only, the same guard the Debug tab uses. */}
-      {import.meta.env.DEV && <DebugBar search={search} chart={debugChart} />}
+      {import.meta.env.DEV && <DebugBar search={search} readout={debugReadout} actions={actions} />}
 
       {/* The Windows strip: the battle-window filter's UI, on every tab —
           unlike the aura strips it needs no pin to anchor it. Changing the
@@ -693,7 +766,7 @@ export const AnalysisView = () => {
           rows drawn against time, or the raw events behind them. Everything
           above is the same in all three. */}
       {body === EVENTS_TAB ? (
-        <EventsTab stream={stream} labels={eventLabels} />
+        <EventsTab stream={stream} labels={eventLabels} playerData={playerData} />
       ) : body === TIMELINE_TAB ? (
         <TimelineTab
           stream={stream}

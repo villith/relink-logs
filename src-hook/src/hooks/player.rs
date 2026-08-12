@@ -500,6 +500,12 @@ struct StoredPlayerIdentity {
     skillboard: Vec<u32>,
     stats: Option<protocol::RecordStats>,
     weapon_state: Option<protocol::WeaponState>,
+    /// The record's three damage-cap-up fields, already in builder units. See
+    /// [`read_record_cap_ups`].
+    cap_ups: (Option<f32>, Option<f32>, Option<f32>),
+    /// The Mastery (AP-tree) slice of those totals, in table units. See
+    /// [`read_record_limit_bonus_caps`].
+    limit_bonus_caps: (Option<f32>, Option<f32>, Option<f32>),
 }
 
 /// One player's cached identity, paired with the id its record most recently
@@ -735,13 +741,18 @@ impl OnLoadPlayerIdentityHook {
         identity.skillboard = read_record_skillboard(record);
         identity.stats = read_record_stats(record);
         identity.weapon_state = read_weapon_state(record);
+        identity.cap_ups = read_record_cap_ups(record as usize);
+        identity.limit_bonus_caps = read_record_limit_bonus_caps(record as usize);
 
         // One line per claim summarizing what the NEW production readers
         // resolved, so a single live run verifies overmasteries/abilities/
         // weapon/master-level/skillboard against the in-game equip screens.
         #[cfg(feature = "hookdiag")]
         log::info!(
-            "EQDIAG key={player_key:#010x} party={} om={} ab={:x?} weapon={:?} mlvl={} sb={} lvl={}",
+            // capup is printed in the SAME units and order as the oracle's
+            // `om=[...,n:,s:,b:]`, so the live gate is one diff of two log lines
+            // rather than a walk through a stored log.
+            "EQDIAG key={player_key:#010x} party={} om={} ab={:x?} weapon={:?} mlvl={} sb={} lvl={} capup=[n:{:?},s:{:?},b:{:?}] lbcap=[n:{:?},s:{:?},b:{:?}]",
             identity.party_index,
             identity
                 .overmasteries
@@ -754,7 +765,16 @@ impl OnLoadPlayerIdentityHook {
             identity.master_level,
             identity.skillboard.len(),
             identity.player_level,
+            identity.cap_ups.0,
+            identity.cap_ups.1,
+            identity.cap_ups.2,
+            identity.limit_bonus_caps.0,
+            identity.limit_bonus_caps.1,
+            identity.limit_bonus_caps.2,
         );
+
+        #[cfg(feature = "hookdiag")]
+        log_record_node_array(record, &identity.skillboard);
 
         // Companion lines for the stat/weapon-state labeling run: STDIAG dumps
         // the whole candidate window around the record stat block (0x5B38..0x5B88)
@@ -995,6 +1015,12 @@ pub fn identity_event_for_actor(
         skillboard: identity.skillboard,
         stats: identity.stats,
         weapon_state: identity.weapon_state,
+        cap_up_normal: identity.cap_ups.0,
+        cap_up_skill: identity.cap_ups.1,
+        cap_up_sba: identity.cap_ups.2,
+        limit_bonus_cap_normal: identity.limit_bonus_caps.0,
+        limit_bonus_cap_skill: identity.limit_bonus_caps.1,
+        limit_bonus_cap_sba: identity.limit_bonus_caps.2,
     })
 }
 
@@ -1037,6 +1063,15 @@ fn embedded_identity_event(
         skillboard: equip.skillboard,
         stats: equip.stats,
         weapon_state: equip.weapon_state,
+        // From the equipment donor, like every other record-sourced field: the
+        // cap-ups belong to whichever record the loadout came off, not to the
+        // actor's own half-filled snapshot.
+        cap_up_normal: equip.cap_ups.0,
+        cap_up_skill: equip.cap_ups.1,
+        cap_up_sba: equip.cap_ups.2,
+        limit_bonus_cap_normal: equip.limit_bonus_caps.0,
+        limit_bonus_cap_skill: equip.limit_bonus_caps.1,
+        limit_bonus_cap_sba: equip.limit_bonus_caps.2,
     }
 }
 
@@ -1049,6 +1084,94 @@ fn sanity_u32(value: u32, max: u32) -> u32 {
     } else {
         value
     }
+}
+
+/// The record's three damage-cap-up fields, in the builder's own units.
+///
+/// The builder reads these at `record+0x28/+0x30/+0x34` and scales by 0.01
+/// (`FUN_1409c1cf0`), so the scaling is applied HERE and the parser stores what
+/// the formula actually adds. A non-finite value reads `None`: it would
+/// serialize to JSON null and poison every downstream sum.
+///
+/// The record reached here is the one the identity path already holds. Whether
+/// it is the SAME object the builder reaches through `holder->vfn+0x9f0` is a
+/// hypothesis, not a fact — `cap_oracle.rs` prints the builder's own values for
+/// the same three fields, and the two agreeing on a live run is what settles it.
+/// v2.0.4 offsets; a patch that moves them cannot be caught by any test here.
+fn read_record_cap_ups(record: usize) -> (Option<f32>, Option<f32>, Option<f32>) {
+    let read = |offset: usize| {
+        crate::hooks::diag::read_f32_guarded(record, offset)
+            .filter(|v| v.is_finite())
+            .map(|v| v * 0.01)
+    };
+    (read(0x28), read(0x30), read(0x34))
+}
+
+/// Sums the record's resolved limit-bonus store (the 400 × 0x38 array at
+/// [`RECORD_NODE_ARRAY_OFFSET`]) per damage-cap class — the Mastery/AP-tree
+/// term, already resolved to the account's unlock state by the game.
+///
+/// Every cap-typed entry in this store is an `ap_tree_*` limit-bonus
+/// (live-verified 2026-08-10: all 56 distinct cap entry ids across a full
+/// party resolve to `ap_tree_*.LimitBonusId`, none to board nodes), so these
+/// sums itemize exactly the "Mastery / Collection" slice of the fused record
+/// cap-up — the one input `PlayerData` could not carry before.
+///
+/// Units are the TABLE's percent (684.0 = +684%), NOT [`read_record_cap_ups`]'s
+/// builder units: the account rows in the breakdown render table units, and the
+/// record channel already fuses this term, so nothing downstream ever adds the
+/// two together.
+///
+/// Each entry holds up to three param slots of `{key, level mask, type, f32
+/// value}`; type 106 raises every class and 107 is the healing cap, excluded
+/// for the reason `gen-ap-tree-cap-sources.mjs` spells out. An EMPTY store
+/// reads `None` — a record that has not loaded yet is "unknown", not an
+/// account with nothing unlocked.
+fn read_record_limit_bonus_caps(record: usize) -> (Option<f32>, Option<f32>, Option<f32>) {
+    use crate::hooks::diag::{read_f32_guarded, read_u32_guarded};
+
+    const PARAM_SLOTS: usize = 3;
+    const SLOT_WORDS: usize = 4;
+    const TYPE_NORMAL: u32 = 103;
+    const TYPE_SKILL: u32 = 104;
+    const TYPE_SBA: u32 = 105;
+    const TYPE_ALL: u32 = 106;
+
+    let mut used = false;
+    let (mut normal, mut skill, mut sba) = (0f32, 0f32, 0f32);
+    for n in 0..RECORD_NODE_ARRAY_COUNT {
+        let entry = RECORD_NODE_ARRAY_OFFSET + n * RECORD_NODE_ARRAY_STRIDE;
+        let id = read_u32_guarded(record, entry);
+        if id == 0 || id == EMPTY_SIGIL_HASH {
+            continue;
+        }
+        used = true;
+        for slot in 0..PARAM_SLOTS {
+            let at = entry + (2 + slot * SLOT_WORDS) * 4;
+            let param = read_u32_guarded(record, at);
+            if param == 0 || param == EMPTY_SIGIL_HASH {
+                continue;
+            }
+            let Some(value) = read_f32_guarded(record, at + 12).filter(|v| v.is_finite()) else {
+                continue;
+            };
+            match read_u32_guarded(record, at + 8) {
+                TYPE_NORMAL => normal += value,
+                TYPE_SKILL => skill += value,
+                TYPE_SBA => sba += value,
+                TYPE_ALL => {
+                    normal += value;
+                    skill += value;
+                    sba += value;
+                }
+                _ => {}
+            }
+        }
+    }
+    if !used {
+        return (None, None, None);
+    }
+    (Some(normal), Some(skill), Some(sba))
 }
 
 /// Reads the 4 equipped overmasteries inline in the player record (see
@@ -1664,6 +1787,8 @@ unsafe fn read_player_identity(snapshot: *const u8) -> Option<StoredPlayerIdenti
         skillboard: Vec::new(),
         stats: None,
         weapon_state: None,
+        cap_ups: (None, None, None),
+        limit_bonus_caps: (None, None, None),
     })
 }
 
@@ -2181,6 +2306,105 @@ fn log_progress_probe(record: *const usize) {
             }
         }
     }
+}
+
+/// hookdiag: read the record's inline 400 × 0x38 array as the RESOLVED
+/// limit-bonus store it turned out to be.
+///
+/// The first pass of this probe dumped raw words, and the 2026-08-09 live run
+/// decoded the whole stride from what came back. An entry is one `limit_bonus`
+/// the player has unlocked, followed by THREE param slots of four words each —
+/// 2 + 3 × 4 = 14 words = 0x38, with nothing left over:
+///
+/// ```text
+///   w0        limit_bonus.Key            (64/64 matched the table, live)
+///   w1        unlock mask (0x0101, 0x0303, 0x1f1f ... a bit run per byte)
+///   w2+4k     limit_bonus_param.Key      EMPTY_SIGIL_HASH when the slot is unused
+///   w3+4k     the slot's own level mask  (matches w1's low byte)
+///   w4+4k     limit_bonus_param's TYPE ID — 103/104/105/106 are the damage caps
+///   w5+4k     the value, as f32          (type 100 + 2.0 = "Skill Damage +2%")
+/// ```
+///
+/// That w4 equals the type id this repo reads at table row `+0x48` is an
+/// independent, live confirmation of that column — the shipped `.headers` puts
+/// it elsewhere.
+///
+/// **The game has already done the summation.** If a cap-typed slot appears
+/// here, the Mastery term can be READ rather than reconstructed from which
+/// nodes are unlocked, and `src/assets/ap-tree-cap-sources.json` drops back to
+/// being the ceiling this can be checked against.
+///
+/// So the only open question is whether cap slots are in here at all. The first
+/// run could not say: it printed the first 64 entries of 360 and every one of
+/// them was an `ap_tree_atk` bonus, which is a truncated sample, NOT an absence.
+/// This version answers it over all 400 — a histogram of every type id seen
+/// (small, complete) plus the full detail of only the cap-typed slots (few).
+///
+/// Guarded reads throughout. One line per player load.
+#[cfg(feature = "hookdiag")]
+fn log_record_node_array(record: *const usize, skillboard: &[u32]) {
+    use crate::hooks::diag::read_u32_guarded;
+
+    /// `limit_bonus_param` type ids for the three per-class damage caps and the
+    /// all-class one. 107 is the HEALING cap and is deliberately not here.
+    const CAP_TYPE_IDS: [u32; 4] = [103, 104, 105, 106];
+    /// Param slots per entry, and the words each slot spans.
+    const PARAM_SLOTS: usize = 3;
+    const SLOT_WORDS: usize = 4;
+
+    let base = record as usize;
+    let mut used = 0usize;
+    // type id -> how many slots carry it. A histogram is what makes this
+    // complete over all 400 without dumping 400 lines.
+    let mut types: Vec<(u32, u32)> = Vec::new();
+    let mut caps: Vec<String> = Vec::new();
+
+    for n in 0..RECORD_NODE_ARRAY_COUNT {
+        let entry = RECORD_NODE_ARRAY_OFFSET + n * RECORD_NODE_ARRAY_STRIDE;
+        let id = read_u32_guarded(base, entry);
+        if id == 0 || id == EMPTY_SIGIL_HASH {
+            continue;
+        }
+        used += 1;
+        let unlock = read_u32_guarded(base, entry + 4);
+
+        for slot in 0..PARAM_SLOTS {
+            let at = entry + (2 + slot * SLOT_WORDS) * 4;
+            let param = read_u32_guarded(base, at);
+            if param == 0 || param == EMPTY_SIGIL_HASH {
+                continue;
+            }
+            let type_id = read_u32_guarded(base, at + 8);
+            match types.iter_mut().find(|(id, _)| *id == type_id) {
+                Some((_, count)) => *count += 1,
+                None => types.push((type_id, 1)),
+            }
+            if CAP_TYPE_IDS.contains(&type_id) {
+                caps.push(format!(
+                    "{id:#010x}/{unlock:#06x} p={param:#010x} t={type_id} v={}",
+                    f32::from_bits(read_u32_guarded(base, at + 12))
+                ));
+            }
+        }
+    }
+
+    if used == 0 {
+        log::info!("APDIAG record={base:#x} array empty (record not loaded yet)");
+        return;
+    }
+    types.sort_unstable();
+    log::info!(
+        "APDIAG record={base:#x} used={used}/{RECORD_NODE_ARRAY_COUNT} sbNodes={} capSlots={} \
+         types=[{}] caps=[{}]",
+        skillboard.len(),
+        caps.len(),
+        types
+            .iter()
+            .map(|(id, count)| format!("{id}x{count}"))
+            .collect::<Vec<_>>()
+            .join(" "),
+        caps.join(" ")
+    );
 }
 
 /// hookdiag: resolve a save-instance id through the FNV-1a(u32) instance map
@@ -2706,6 +2930,80 @@ mod tests {
         );
     }
 
+    /// A full-size fake record whose resolved limit-bonus store holds the given
+    /// entries. Full size matters: the reader walks all 400 entry slots, so a
+    /// short buffer would have it reading neighbouring heap memory as entries.
+    fn limit_bonus_record(entries: &[(u32, &[(u32, u32, f32)])]) -> Vec<u8> {
+        let mut buf = vec![
+            0u8;
+            RECORD_NODE_ARRAY_OFFSET
+                + RECORD_NODE_ARRAY_COUNT * RECORD_NODE_ARRAY_STRIDE
+        ];
+        for (n, (id, slots)) in entries.iter().enumerate() {
+            let entry = RECORD_NODE_ARRAY_OFFSET + n * RECORD_NODE_ARRAY_STRIDE;
+            buf[entry..entry + 4].copy_from_slice(&id.to_le_bytes());
+            for (slot, (param, type_id, value)) in slots.iter().enumerate() {
+                let at = entry + (2 + slot * 4) * 4;
+                buf[at..at + 4].copy_from_slice(&param.to_le_bytes());
+                buf[at + 8..at + 12].copy_from_slice(&type_id.to_le_bytes());
+                buf[at + 12..at + 16].copy_from_slice(&value.to_le_bytes());
+            }
+        }
+        buf
+    }
+
+    #[test]
+    fn read_record_limit_bonus_caps_sums_the_cap_typed_slots_per_class() {
+        // Two entries; the "all classes" type 106 raises every class, the
+        // healing cap 107 and the untyped ATK-style slot are ignored.
+        let buf = limit_bonus_record(&[
+            (0x11111111, &[(0xA1, 103, 2.0), (0xA2, 104, 3.0)]),
+            (
+                0x22222222,
+                &[(0xA3, 105, 5.0), (0xA4, 106, 1.5), (0xA5, 107, 9.0)],
+            ),
+            (0x33333333, &[(0xA6, 1, 40.0)]),
+        ]);
+        assert_eq!(
+            read_record_limit_bonus_caps(buf.as_ptr() as usize),
+            (Some(3.5), Some(4.5), Some(6.5))
+        );
+    }
+
+    #[test]
+    fn read_record_limit_bonus_caps_reads_none_from_an_empty_store() {
+        // An empty array is a record that has not loaded yet, not an account
+        // with nothing unlocked — it must read "unknown", never +0%.
+        let buf = limit_bonus_record(&[]);
+        assert_eq!(
+            read_record_limit_bonus_caps(buf.as_ptr() as usize),
+            (None, None, None)
+        );
+    }
+
+    #[test]
+    fn read_record_limit_bonus_caps_skips_sentinels_and_garbage_values() {
+        // Sentinel entry ids and param keys are empty slots; a non-finite value
+        // is a misread that must not poison the sum. A store that holds only
+        // such entries still counts as loaded (used > 0), so the sums are a
+        // genuine zero rather than unknown.
+        let buf = limit_bonus_record(&[
+            (EMPTY_SIGIL_HASH, &[(0xA1, 103, 50.0)]),
+            (
+                0x44444444,
+                &[
+                    (EMPTY_SIGIL_HASH, 103, 50.0),
+                    (0, 104, 50.0),
+                    (0xA2, 105, f32::NAN),
+                ],
+            ),
+        ]);
+        assert_eq!(
+            read_record_limit_bonus_caps(buf.as_ptr() as usize),
+            (Some(0.0), Some(0.0), Some(0.0))
+        );
+    }
+
     #[test]
     fn read_innate_traits_keeps_level_zero_when_pair_ids_do_not_match() {
         // Layout drift (pair array holding different ids) must never attach a
@@ -2738,6 +3036,8 @@ mod tests {
             skillboard: Vec::new(),
             stats: None,
             weapon_state: None,
+            cap_ups: (None, None, None),
+            limit_bonus_caps: (None, None, None),
         }
     }
 

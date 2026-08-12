@@ -1,5 +1,6 @@
 import { skillGroupFor } from "@/components/skillGrouping";
 import type { ActionType, CharacterType, SkillRow, SkillState } from "@/types";
+import { isSupplementaryAction } from "@/utils";
 
 import { abilityKey, parseAbilityKey, SUPPLEMENTARY_KEY } from "./abilityKey";
 import { groupBy } from "./groupBy";
@@ -14,10 +15,6 @@ const CHILD_SEPARATOR = "@";
 /** The sentinel child for a group that deliberately spans body classes — only
  * Primal Burst, whose three classes share one action id. */
 const ANY_CHILD = "*";
-
-/** Whether an action is a supplementary-damage (echo) hit. */
-const isSupplementary = (actionType: ActionType): boolean =>
-  typeof actionType === "object" && Object.hasOwn(actionType, "SupplementaryDamage");
 
 /** A set of breakdown rows' echo half, and whether the set holds both halves.
  *
@@ -49,9 +46,22 @@ const isSupplementary = (actionType: ActionType): boolean =>
  * extreme IS a whole landing, echo included, and only the backend can compute
  * one. */
 export const splitSupplementary = <T extends SkillRow>(rows: T[]): { echoes: T[]; mixed: boolean } => {
-  const echoes = rows.filter((row) => isSupplementary(row.actionType));
+  const echoes = rows.filter((row) => isSupplementaryAction(row.actionType));
   return { echoes, mixed: echoes.length > 0 && echoes.length < rows.length };
 };
+
+/** The echo share to draw as a bar's fainter segment, or nothing where there is
+ * none — ABSENT rather than 0, so a row with no echoes mounts a single segment
+ * instead of an empty second one.
+ *
+ * The LANDING view's spelling of the `mixed` test above, and its one author for
+ * the same reason: the merged view reads the backend's own `supplementary`
+ * figure, so it has no echo ROW to count and cannot ask `splitSupplementary`.
+ * `supplementary < amount` is the part both views still share — a row that is
+ * supplementary all the way across is already described by its own label, and
+ * painting the whole bar fainter would say nothing. */
+export const supplementarySubValue = (supplementary: number, amount: number): { subValue?: number } =>
+  supplementary > 0 && supplementary < amount ? { subValue: supplementary } : {};
 
 /** How rows are keyed for one view.
  *
@@ -138,7 +148,7 @@ export const abilityRowKey = (skill: SkillRow, keying?: RowKeying): string => {
   // one of them is the same row (see `SUPPLEMENTARY_KEY`). With it, an echo
   // rides the row of the skill that caused it — and falls back to the echo row
   // when that cause names nothing the party used.
-  if (isSupplementary(skill.actionType)) {
+  if (isSupplementaryAction(skill.actionType)) {
     if (keying?.collapseSupplementary !== true) return SUPPLEMENTARY_KEY;
     const causeId = (skill.actionType as { SupplementaryDamage: number }).SupplementaryDamage;
     return keying.causeRow(causeId, skill.childCharacterType) ?? SUPPLEMENTARY_KEY;

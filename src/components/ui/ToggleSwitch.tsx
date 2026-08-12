@@ -1,5 +1,7 @@
 import { UnstyledButton } from "@mantine/core";
 
+import { cn } from "./cn";
+
 export type ToggleSwitchProps = {
   checked: boolean;
   onChange: (next: boolean) => void;
@@ -54,18 +56,18 @@ export const ToggleSwitch = ({ checked, onChange, label, disabled = false, title
   >
     <span
       aria-hidden
-      className={[
+      className={cn(
         "relative h-[calc(var(--text-sm)*1.05)] w-[calc(var(--text-sm)*1.9)] flex-none rounded-full",
         "transition-colors duration-100",
-        checked ? "bg-accent" : "bg-line-strong",
-      ].join(" ")}
+        checked ? "bg-accent" : "bg-line-strong"
+      )}
     >
       <span
-        className={[
+        className={cn(
           "absolute left-0.5 top-1/2 size-[calc(var(--text-sm)*0.75)] rounded-full",
           "transition-transform duration-100",
-          checked ? "translate-x-[calc(var(--text-sm)*0.85)] -translate-y-1/2 bg-bg" : "-translate-y-1/2 bg-ink",
-        ].join(" ")}
+          checked ? "translate-x-[calc(var(--text-sm)*0.85)] -translate-y-1/2 bg-bg" : "-translate-y-1/2 bg-ink"
+        )}
       />
     </span>
     <span>{label}</span>

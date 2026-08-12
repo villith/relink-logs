@@ -1,0 +1,170 @@
+import { describe, expect, it } from "vitest";
+
+import type { CapLoadout } from "../capSources";
+import { accountFactors } from "./account";
+
+const loadout = (masterLevel: number | undefined, overrides: Partial<CapLoadout> = {}): CapLoadout => ({
+  sigils: [],
+  summons: [],
+  weaponState: null,
+  weaponInfo: null,
+  overmasteryInfo: null,
+  masterLevel,
+  ...overrides,
+});
+
+const rank = (masterLevel: number | undefined) => {
+  const factor = accountFactors(loadout(masterLevel), "skill").find((entry) => entry.key === "account-master-rank");
+  if (factor === undefined) throw new Error("no master-rank factor");
+  return factor.evaluate({});
+};
+
+const factorResult = (key: string, player: CapLoadout, capClass: Parameters<typeof accountFactors>[1]) => {
+  const factor = accountFactors(player, capClass).find((entry) => entry.key === key);
+  if (factor === undefined) throw new Error(`no ${key} factor`);
+  return factor.evaluate({});
+};
+
+describe("master trait rank bonus", () => {
+  it("is the running sum of every level's increment", () => {
+    // The table grants at levels 2,5,10,15,20,25,30,35,40,45,50 —
+    // 5,5,6,6,7,7,10,10,12,12,20 — so the totals ladder up like this.
+    expect(rank(10)).toMatchObject({ percent: 16, state: "active" });
+    expect(rank(20)).toMatchObject({ percent: 29, state: "active" });
+    expect(rank(30)).toMatchObject({ percent: 46, state: "active" });
+    expect(rank(40)).toMatchObject({ percent: 68, state: "active" });
+    expect(rank(50)).toMatchObject({ percent: 100, state: "active" });
+  });
+
+  it("grants nothing before the first breakpoint", () => {
+    expect(rank(1)).toMatchObject({ percent: 0, state: "active" });
+  });
+
+  it("does not count a partial level toward the next breakpoint", () => {
+    // Level 4 has not reached the level-5 increment.
+    expect(rank(4)).toMatchObject({ percent: 5, state: "active" });
+  });
+
+  it("clamps master-break stars, which grant no further cap", () => {
+    // masterLevel is level and stars COMBINED (55 = level 50 + 5 stars), and
+    // the table stops at 50 — reading past it would walk off the end.
+    expect(rank(55)).toMatchObject({ percent: 100, state: "active" });
+  });
+
+  it("stays unresolved for a record that never captured a master level", () => {
+    // AI companions read 0. Valuing that as +0% would claim they have no rank
+    // bonus, which is a stronger statement than "this log cannot say".
+    expect(rank(0)).toMatchObject({ state: "unknown", reason: "value-unrecorded" });
+    expect(rank(undefined)).toMatchObject({ state: "unknown", reason: "value-unrecorded" });
+  });
+});
+
+/** A weapon whose only AP tree is the weapon tree, worth +20% to every class —
+ * small enough that a total cannot be confused with the character's. */
+const weapon = (weaponId: number) => ({
+  weaponId,
+  starLevel: 0,
+  plusMarks: 0,
+  awakeningLevel: 0,
+  trait1Id: 0,
+  trait1Level: 0,
+  trait2Id: 0,
+  trait2Level: 0,
+  trait3Id: 0,
+  trait3Level: 0,
+  wrightstoneId: 0,
+  weaponLevel: 0,
+  weaponHp: 0,
+  weaponAttack: 0,
+});
+
+describe("mastery / collection", () => {
+  const player = loadout(50, { characterType: "Pl0000", weaponInfo: weapon(0x10180036) });
+
+  it("stays unresolved — the tables value it, but the log has no unlocked-node set", () => {
+    expect(factorResult("account-mastery", player, "skill")).toMatchObject({
+      state: "unknown",
+      percent: 0,
+      reason: "unlocks-unrecorded",
+    });
+  });
+
+  it("carries the completed character trees as its potential, so the row names a size", () => {
+    expect(factorResult("account-mastery", player, "skill").potential).toBe(254);
+    expect(factorResult("account-mastery", player, "sba").potential).toBe(254);
+  });
+
+  it("raises the normal-attack cap too, which the trees genuinely do", () => {
+    expect(factorResult("account-mastery", player, "normal").potential).toBe(254);
+  });
+
+  it("says nothing at all when the class or the character is unknown", () => {
+    expect(factorResult("account-mastery", player, null).potential).toBe(0);
+    expect(factorResult("account-mastery", loadout(50), "skill").potential).toBe(0);
+  });
+});
+
+describe("mastery total read from the record store", () => {
+  // The game's own resolved limit-bonus store, captured per player since
+  // 2026-08-10 — per-class sums in table units, weapon and character trees
+  // already fused by the game.
+  const captured = loadout(50, {
+    characterType: "Pl0000",
+    weaponInfo: weapon(0x10180036),
+    limitBonusCapNormal: 684,
+    limitBonusCapSkill: 684,
+    limitBonusCapSba: 680,
+  });
+
+  it("renders as one active row valued at the game's own sum for the hit's class", () => {
+    expect(factorResult("account-mastery-total", captured, "skill")).toMatchObject({
+      state: "active",
+      percent: 684,
+    });
+    expect(factorResult("account-mastery-total", captured, "sba")).toMatchObject({
+      state: "active",
+      percent: 680,
+    });
+  });
+
+  it("replaces the two per-owner unresolved rows it answers", () => {
+    const keys = accountFactors(captured, "skill").map((factor) => factor.key);
+    expect(keys).not.toContain("account-mastery");
+    expect(keys).not.toContain("account-weapon-trees");
+  });
+
+  it("keeps the master rank row, which the store does not carry", () => {
+    const keys = accountFactors(captured, "skill").map((factor) => factor.key);
+    expect(keys).toContain("account-master-rank");
+  });
+
+  it("falls back to the unresolved rows when the hit's class is unknown", () => {
+    // With no class there is no sum to pick, and inventing one would attribute
+    // a number the formula did not necessarily use.
+    const keys = accountFactors(captured, null).map((factor) => factor.key);
+    expect(keys).toContain("account-mastery");
+    expect(keys).not.toContain("account-mastery-total");
+  });
+
+  it("falls back to the unresolved rows on a log without the capture", () => {
+    const keys = accountFactors(loadout(50, { characterType: "Pl0000" }), "skill").map((factor) => factor.key);
+    expect(keys).toContain("account-mastery");
+    expect(keys).not.toContain("account-mastery-total");
+  });
+});
+
+describe("weapon mastery trees", () => {
+  it("follows the EQUIPPED weapon rather than the character", () => {
+    const player = loadout(50, { characterType: "Pl0000", weaponInfo: weapon(0x10180036) });
+    expect(factorResult("account-weapon-trees", player, "skill")).toMatchObject({
+      state: "unknown",
+      potential: 20,
+      reason: "unlocks-unrecorded",
+    });
+  });
+
+  it("is zero for a log with no stored weapon, not the character's number", () => {
+    const player = loadout(50, { characterType: "Pl0000" });
+    expect(factorResult("account-weapon-trees", player, "skill").potential).toBe(0);
+  });
+});

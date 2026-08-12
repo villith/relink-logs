@@ -8,7 +8,7 @@ import { laneRows } from "./laneRows";
 const lane = (key: string, kind?: MetricRow["kind"]): Lane => ({
   row: { key, label: key, value: 0, columns: [], pinOnClick: null, colorSlot: -1, ...(kind ? { kind } : {}) },
   marks: [],
-  spans: false,
+  shape: "buckets",
 });
 
 describe("laneRows", () => {

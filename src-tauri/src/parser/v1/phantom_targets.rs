@@ -160,6 +160,10 @@ mod tests {
             base_damage: None,
             target_current_hp: max_hp.map(|_| 0),
             target_max_hp: max_hp,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 

@@ -8,6 +8,7 @@ import {
   clearPin,
   clearWindowFilters,
   pinRow,
+  pinValueOf,
   regroup,
   setHostility,
   setMetric,
@@ -46,6 +47,20 @@ describe("pinRow", () => {
     expect(resolveGroupBy(s, CAPABILITIES.buffs)).toBe("source");
     expect(s.ability).toBe("status:10:500");
     expect(s.source).toBe(1);
+  });
+});
+
+describe("pinValueOf", () => {
+  it("reads each dimension out of the legacy wire shape", () => {
+    expect(pinValueOf({ source: 2 })).toEqual({ dim: "source", value: 2 });
+    expect(pinValueOf({ targets: [3] })).toEqual({ dim: "target", value: 3 });
+    expect(pinValueOf({ ability: "skill:9" })).toEqual({ dim: "ability", value: "skill:9" });
+  });
+
+  it("answers null where nothing is being pinned", () => {
+    expect(pinValueOf(null)).toBeNull();
+    expect(pinValueOf({})).toBeNull();
+    expect(pinValueOf({ source: null, targets: [], ability: null })).toBeNull();
   });
 });
 

@@ -29,7 +29,7 @@ const LANES: Lane[] = [
       kind: "ability",
       pinOnClick: { ability: "Normal:100" },
     }),
-    spans: false,
+    shape: "icons",
     marks: [
       {
         startMs: 0,
@@ -37,7 +37,7 @@ const LANES: Lane[] = [
         count: 1,
         amount: 500,
         by: [{ key: "Normal:100", count: 1, amount: 500 }],
-        hits: [{ atMs: 0, echo: false }],
+        hits: [{ atMs: 0, echo: false, amount: 500, key: "Normal:100" }],
         casts: 1,
         castKey: "damage|Normal:100",
       },
@@ -45,7 +45,7 @@ const LANES: Lane[] = [
   },
   {
     row: metricRow({ key: "status:77:210", label: "status:77:210", kind: "status" }),
-    spans: true,
+    shape: "spans",
     // A real span is not an event fold, so it has no parts to decompose.
     marks: [{ startMs: 5000, endMs: 15_000, count: 1, amount: null, by: [], hits: [], casts: 1, castKey: "" }],
   },
@@ -59,6 +59,7 @@ const renderTracks = (lanes = LANES, over: Partial<React.ComponentProps<typeof T
         domainMs={30_000}
         startMs={0}
         viewportMs={30_000}
+        gapMs={100}
         renderLabel={(row) => `label(${row.key})`}
         rowColor={() => "#36B37E"}
         onPin={() => {}}
@@ -145,11 +146,11 @@ describe("TimelineTracks", () => {
     expect(spanMark.style.width).toBe("33.3333%");
   });
 
-  // The two mark shapes must be distinguishable, or a folded burst of hits
-  // reads as a buff that was up for that whole time.
-  it("marks a real span and a folded instant with different classes", () => {
+  // The mark shapes must be distinguishable, or a burst of hits reads as a
+  // buff that was up for that whole time.
+  it("marks a real span and a bucket with different kinds", () => {
     const { container } = renderTracks();
-    expect(container.querySelectorAll('[data-mark-kind="instant"]')).toHaveLength(1);
+    expect(container.querySelectorAll('[data-mark-kind="bucket"]')).toHaveLength(1);
     expect(container.querySelectorAll('[data-mark-kind="span"]')).toHaveLength(1);
   });
 
@@ -187,11 +188,11 @@ describe("TimelineTracks", () => {
   });
 });
 
-describe("cast ticks", () => {
-  /** One cast holding `hits` hits, every third of them an echo. */
-  const castLane = (hits: number): Lane => ({
-    row: metricRow({ key: "a", label: "A", value: 1, colorSlot: 0 }),
-    spans: false,
+describe("buckets and their hit arrows", () => {
+  /** One 2s bucket holding `hits` evenly spread hits, every third an echo. */
+  const bucketLane = (hits: number, shape: Lane["shape"] = "buckets"): Lane => ({
+    row: metricRow({ key: "a", label: "A", value: 1, colorSlot: 0, kind: "player" }),
+    shape,
     marks: [
       {
         startMs: 0,
@@ -199,26 +200,102 @@ describe("cast ticks", () => {
         count: hits,
         amount: 100 * hits,
         by: [{ key: "Normal:100", count: hits, amount: 100 * hits }],
-        hits: Array.from({ length: hits }, (_, index) => ({ atMs: index * 100, echo: index % 3 === 0 })),
+        hits: Array.from({ length: hits }, (_, index) => ({
+          atMs: (index * 2000) / (hits - 1),
+          echo: index % 3 === 0,
+          amount: 100,
+          key: "Normal:100",
+        })),
         casts: 1,
         castKey: "damage|Normal:100",
       },
     ],
   });
 
-  it("draws a tick per hit inside a cast", () => {
-    renderTracks([castLane(5)]);
-    expect(screen.getAllByTestId("timeline-tick")).toHaveLength(5);
+  // ONE bar for the run, however many hits it holds — nothing about the bucket
+  // varies with what it contains.
+  it("draws one bar per bucket, not per hit", () => {
+    const { container } = renderTracks([bucketLane(5)], { gapMs: 100 });
+    expect(container.querySelectorAll('[data-mark-kind="bucket"]')).toHaveLength(1);
   });
 
-  it("marks an echo tick so it can read fainter", () => {
-    renderTracks([castLane(5)]);
-    const echoes = screen.getAllByTestId("timeline-tick").filter((tick) => tick.hasAttribute("data-echo"));
-    expect(echoes).toHaveLength(2);
+  it("points an arrow at every hit that can be told apart", () => {
+    const { container } = renderTracks([bucketLane(5)], { gapMs: 100 });
+    expect(container.querySelectorAll("[data-hit]")).toHaveLength(5);
   });
 
-  it("draws a dense cast solid rather than as mush", () => {
-    renderTracks([castLane(60)]);
-    expect(screen.queryAllByTestId("timeline-tick")).toHaveLength(0);
+  // The wedges failed because a 7px marker was drawn in a 3px gap. An arrow is
+  // thinned by its OWN width, so a burst too dense to separate simply claims
+  // fewer hits rather than drawing a barcode.
+  it("thins arrows that would overlap rather than stacking them", () => {
+    const { container } = renderTracks([bucketLane(60)], { gapMs: 100 });
+    const arrows = container.querySelectorAll("[data-hit]");
+    expect(arrows.length).toBeGreaterThan(1);
+    expect(arrows.length).toBeLessThan(10);
+  });
+
+  // `gapMs` is zero until the tracks have been measured. A zero clearance tells
+  // every hit apart, so the first commit of a long fight mounted one hoverable
+  // node per damage event in the window.
+  it("draws no arrows until the tracks have been measured", () => {
+    const { container } = renderTracks([bucketLane(60)], { gapMs: 0 });
+    expect(container.querySelectorAll("[data-hit]")).toHaveLength(0);
+  });
+
+  // An arrow is drawn ABOVE its own lane, over the neighbour's bar. Clipped to
+  // its own silhouette it takes the pointer only where it is actually drawn; as
+  // a rectangle its corners stole the hover from the bucket beside it, which
+  // both showed the wrong tooltip and tore down that bucket's own card.
+  it("takes the pointer only where the arrow itself is drawn", () => {
+    const { container } = renderTracks([bucketLane(5)], { gapMs: 100 });
+    const arrow = container.querySelector<HTMLElement>("[data-hit]");
+    expect(arrow?.style.clipPath).toContain("polygon");
+  });
+
+  it("marks an echo's arrow so it can read fainter", () => {
+    const { container } = renderTracks([bucketLane(5)], { gapMs: 100 });
+    expect(container.querySelectorAll("[data-hit][data-echo]")).toHaveLength(2);
+  });
+
+  // The arrows sit in a layer over the whole lane; if that layer took pointer
+  // events it would swallow every bucket's own hover.
+  it("keeps the arrow layer from swallowing the bucket's hover", () => {
+    const { container } = renderTracks([bucketLane(5)], { gapMs: 100 });
+    const layer = container.querySelector("[data-hit]")?.parentElement;
+    expect(layer?.className).toContain("pointer-events-none");
+    expect((container.querySelector("[data-hit]") as HTMLElement).className).toContain("pointer-events-auto");
+  });
+
+  // Only an ability lane can name its marks with art: every bucket in a
+  // player's lane is a different skill.
+  it("draws the skill's own art on an ability lane and not on an actor lane", () => {
+    const markEntry = () => ({ name: "Sword Strike", iconUrl: "sword.png" });
+    const withArt = renderTracks([bucketLane(3, "icons")], { gapMs: 100, markEntry });
+    expect(withArt.container.querySelectorAll("[data-mark-icon]")).toHaveLength(1);
+    withArt.unmount();
+    const withoutArt = renderTracks([bucketLane(3, "buckets")], { gapMs: 100, markEntry });
+    expect(withoutArt.container.querySelectorAll("[data-mark-icon]")).toHaveLength(0);
+  });
+
+  // The notch used to be capped at a share of the bar so a stub could not be
+  // eaten, which is the same trade `MetricBar` made and undid: at a stub depth
+  // the bite no longer matches the diamond that nests in it, and the bar's
+  // colour shows through the art's transparent corners. Floor the bar instead.
+  it("keeps a bucket that carries art wide enough for its whole notch", () => {
+    const markEntry = () => ({ name: "Sword Strike", iconUrl: "sword.png" });
+    const { container } = renderTracks([bucketLane(3, "icons")], { gapMs: 100, markEntry });
+    const mark = container.querySelector<HTMLElement>('[data-mark-kind="bucket"]');
+    expect(parseFloat(mark!.style.minWidth)).toBeGreaterThanOrEqual(24);
+    const bar = mark!.firstElementChild as HTMLElement;
+    expect(bar.style.clipPath).toContain("20px");
+    expect(bar.style.clipPath).not.toContain("35%");
+  });
+
+  // A bar with nothing standing at it is square-ended, so it has no head to
+  // protect and keeps the readable minimum a single hit has always drawn at.
+  it("leaves a headless bucket at its own minimum", () => {
+    const { container } = renderTracks([bucketLane(3)], { gapMs: 100 });
+    const mark = container.querySelector<HTMLElement>('[data-mark-kind="bucket"]');
+    expect(mark!.style.minWidth).toBe("4px");
   });
 });

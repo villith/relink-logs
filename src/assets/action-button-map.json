@@ -1,0 +1,2046 @@
+{
+  "version": "2.0.4",
+  "provenance": "Button assignments by Scott, 2026-08-10 (docs/superpowers/2026-08-10-action-button-draft.md). source:inferred entries extend the pattern of his explicit answers (named charge/special mechanics = right button; charged/strafe/loop strings = left) and are auditable against oracle captures.",
+  "characters": {
+    "pl0000": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 110, 120, 121, 130, 131],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Raise",
+          "ids": [200, 201, 202, 203, 204, 205],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 1",
+          "ids": [210],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [211, 400],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 2",
+          "ids": [220],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [221, 240, 330],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 3",
+          "ids": [230],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 310, 320, 410],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl0100": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 110, 120, 121, 130, 131],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Raise",
+          "ids": [200, 201, 202, 203, 204, 205],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 1",
+          "ids": [210],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [211, 400],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 2",
+          "ids": [220],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [221, 240, 330],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 3",
+          "ids": [230],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 310, 320, 410],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl0200": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 103, 104],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [110, 120, 130, 140, 303],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Oathsworn Blade 1",
+          "ids": [200],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Oathsworn Blade 2",
+          "ids": [201],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Oathsworn Blade 3",
+          "ids": [202],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 1 (A)",
+          "ids": [240],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 1 (B)",
+          "ids": [241],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 1 (C)",
+          "ids": [242],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 1 (D)",
+          "ids": [243],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 1 (E)",
+          "ids": [244],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 1 (Aerial)",
+          "ids": [245],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 2",
+          "ids": [250],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike (Unknown)",
+          "ids": [251],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 3",
+          "ids": [252],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 4",
+          "ids": [253],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 5",
+          "ids": [254],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 6",
+          "ids": [255],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Pactstrike 7",
+          "ids": [259],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl0300": {
+      "families": [
+        {
+          "name": "Attack",
+          "ids": [100],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Attack (Burst-fire)",
+          "ids": [105],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Bull's Eye Blast",
+          "ids": [200],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Bull's Eye Blast II",
+          "ids": [201],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Bull's Eye Blast III",
+          "ids": [202],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Bull's Eye Blast IV",
+          "ids": [203],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Bull's Eye Blast V",
+          "ids": [204],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl0400": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 110, 120],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Stargaze I",
+          "ids": [210],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Stargaze II",
+          "ids": [211],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Stargaze III",
+          "ids": [212],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Stargaze IV",
+          "ids": [213],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Stargaze V",
+          "ids": [214],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl0500": {
+      "families": [
+        {
+          "name": "Detonator (No Charge)",
+          "ids": [2],
+          "button": null,
+          "source": null,
+          "note": "ability, not a button attack"
+        },
+        {
+          "name": "Detonator (Half Charge)",
+          "ids": [22],
+          "button": null,
+          "source": null,
+          "note": "ability, not a button attack"
+        },
+        {
+          "name": "Detonator (Full Charge)",
+          "ids": [32],
+          "button": null,
+          "source": null,
+          "note": "ability, not a button attack"
+        },
+        {
+          "name": "Attack",
+          "ids": [100],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Attack (Sniper Stance)",
+          "ids": [105],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "basic string",
+          "ids": [110, 111, 112],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Grenade",
+          "ids": [210],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "GrenadeOverkill2",
+          "ids": [215],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Chain Grenade (Close-Range Detonation)",
+          "ids": [220],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "Chain Grenade (Intercept Detonation)",
+          "ids": [221],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl0600": {
+      "families": [
+        {
+          "name": "Sillage (Rose Attack)",
+          "ids": [1],
+          "button": null,
+          "source": null,
+          "note": "unknown, roses are basically pets"
+        },
+        {
+          "name": "Spiral Rose Lvl 2",
+          "ids": [14],
+          "button": null,
+          "source": null,
+          "note": "ability, not a button attack"
+        },
+        {
+          "name": "Lost Love Lvl 2",
+          "ids": [16],
+          "button": null,
+          "source": null,
+          "note": "ability, not a button attack"
+        },
+        {
+          "name": "Spiral Rose Lvl 3",
+          "ids": [24],
+          "button": null,
+          "source": null,
+          "note": "ability, not a button attack"
+        },
+        {
+          "name": "Lost Love Lvl 3",
+          "ids": [26],
+          "button": null,
+          "source": null,
+          "note": "ability, not a button attack"
+        },
+        {
+          "name": "Spiral Rose Lvl 4",
+          "ids": [34],
+          "button": null,
+          "source": null,
+          "note": "ability, not a button attack"
+        },
+        {
+          "name": "Lost Love Lvl 4",
+          "ids": [36],
+          "button": null,
+          "source": null,
+          "note": "ability, not a button attack"
+        },
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 103],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Rose (Normal Attack)",
+          "ids": [200],
+          "button": null,
+          "source": null,
+          "note": "unknown, roses are basically pets"
+        },
+        {
+          "name": "Rose Lvl 1 (Attack)",
+          "ids": [201],
+          "button": null,
+          "source": null,
+          "note": "unknown, roses are basically pets"
+        },
+        {
+          "name": "Rose Lvl 2 (Attack)",
+          "ids": [202],
+          "button": null,
+          "source": null,
+          "note": "unknown, roses are basically pets"
+        },
+        {
+          "name": "Rose Lvl 3 (Attack)",
+          "ids": [203],
+          "button": null,
+          "source": null,
+          "note": "unknown, roses are basically pets"
+        },
+        {
+          "name": "Rose Lvl 4 (Attack)",
+          "ids": [204],
+          "button": null,
+          "source": null,
+          "note": "unknown, roses are basically pets"
+        },
+        {
+          "name": "finishers",
+          "ids": [210, 220, 230, 240, 302],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 410],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl0700": {
+      "families": [
+        {
+          "name": "Pets",
+          "ids": [65],
+          "button": null,
+          "source": null,
+          "note": "unknown"
+        },
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 110, 111, 112, 120, 122],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Attack (Hold after A-3)",
+          "ids": [121],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Onslaught",
+          "ids": [200],
+          "button": "right",
+          "source": "scott"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl0800": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Stiller Glanz Opening",
+          "ids": [103],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stiller Glanz 1",
+          "ids": [104],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stiller Glanz 2",
+          "ids": [105],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stiller Glanz 3",
+          "ids": [106],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stiller Glanz 4",
+          "ids": [107],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stiller Glanz 5",
+          "ids": [108],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stiller Glanz 6",
+          "ids": [109],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "finishers",
+          "ids": [150, 151, 302],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Twin Blade Dance",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl0900": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 3",
+          "ids": [103],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "finishers",
+          "ids": [104, 111, 121, 204],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 1",
+          "ids": [110],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2",
+          "ids": [120],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Heavy Swing 1",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Heavy Swing 2",
+          "ids": [201],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Heavy Swing 3",
+          "ids": [202],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Heavy Swing 4",
+          "ids": [203],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 310, 320, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl1000": {
+      "families": [
+        {
+          "name": "Zerreissen (Empowered)",
+          "ids": [40],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "basic string",
+          "ids": [100, 110, 120],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [130],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Schlacht",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Schlacht 2",
+          "ids": [201],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 310, 320, 410, 510],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl1100": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 103, 111, 112, 113, 122, 123, 162, 163],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [104, 114, 124, 150, 164, 302, 312, 313],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Perfect Execution",
+          "ids": [170],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Lunge 1",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Lunge 2",
+          "ids": [201],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Lunge 3",
+          "ids": [202],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Lunge 4",
+          "ids": [203],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 311, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl1200": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Noble Stance Opening",
+          "ids": [103],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Noble Stance 1",
+          "ids": [104],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Noble Stance 2",
+          "ids": [105],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Noble Stance 3",
+          "ids": [106],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Noble Stance 4",
+          "ids": [107],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "finishers",
+          "ids": [110],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Yellow Power Strike (Lunge)",
+          "ids": [120],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Yellow Power Strike (Dive)",
+          "ids": [130],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Noble Strategy",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike (Lunge)",
+          "ids": [201],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike (Dive)",
+          "ids": [202],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl1300": {
+      "families": [
+        {
+          "name": "Flashing Void (Multi-Hit)",
+          "ids": [17],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "finishers",
+          "ids": [18, 150, 151, 152, 153, 154],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "basic string",
+          "ids": [100, 110, 120, 130, 140],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Sharpened Focus 1",
+          "ids": [111],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Sharpened Focus 2",
+          "ids": [121],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Sharpened Focus 3",
+          "ids": [131],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Sharpened Focus 4",
+          "ids": [141],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Lunge/Counter",
+          "ids": [201],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 303, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl1400": {
+      "families": [
+        {
+          "name": "Apex of Nothingness (No Counter)",
+          "ids": [3],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Transient (Freeflutter/Blue)",
+          "ids": [5],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Apex of Nothingness Counter 1",
+          "ids": [10],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Apex of Nothingness Counter 2",
+          "ids": [11],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 110, 111, 112, 113, 114],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [120, 411],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Dawnfly Stance (Stance shift: Blue-to-pink)",
+          "ids": [200],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 310, 320, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl1500": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 103, 111, 112, 113, 122, 123],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [104, 114, 124, 302, 303, 311],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Raging Fist",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 310, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl1600": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Loop Combo Opening",
+          "ids": [110],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "Loop Combo (Dive)",
+          "ids": [111],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "Loop Combo",
+          "ids": [210],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "finishers",
+          "ids": [211],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Arvess Hammer",
+          "ids": [212],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "Rhapsody",
+          "ids": [213],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 303, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl1700": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 110, 114, 120, 122],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "charged string",
+          "ids": [112, 280],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 1",
+          "ids": [113],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2",
+          "ids": [121],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 3",
+          "ids": [130],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Melas Unleashed",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "finishers",
+          "ids": [251, 252, 260, 266, 270, 281, 302],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl1800": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 103],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 4 (Maces)",
+          "ids": [104],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "finishers",
+          "ids": [105, 111, 121, 131],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 1 (Spears)",
+          "ids": [110],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2 (Scissors)",
+          "ids": [120],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 3 (Saws)",
+          "ids": [130],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Collapse (Uncharged)",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Enhanced Collapse",
+          "ids": [210, 220, 230],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl1900": {
+      "families": [
+        {
+          "name": "Ragnarok Form (Enter Godmight)",
+          "ids": [4],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Reginleiv Recidive (Godmight)",
+          "ids": [10],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [103, 110, 510, 515],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike (Godmight)",
+          "ids": [120],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Lunge 1",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Lunge 2",
+          "ids": [201],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Lunge 3",
+          "ids": [202],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Lunge 4",
+          "ids": [203],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Sword Flurry",
+          "ids": [204],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 1 (Godmight)",
+          "ids": [503],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2 (Godmight)",
+          "ids": [505],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 3 (Godmight)",
+          "ids": [506],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 4 (Godmight)",
+          "ids": [507],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 5 (Godmight)",
+          "ids": [508],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 6 (Godmight)",
+          "ids": [509],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Transformation",
+          "ids": [900],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        }
+      ]
+    },
+    "pl2100": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 111, 112, 114, 115, 122, 160, 161, 162, 170, 171, 172, 173, 174],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [116, 117, 150, 165, 166, 175],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Attack",
+          "ids": [140, 141],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Lightstep (Chromatic Wings)",
+          "ids": [200],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Chromatic Wings (Transformation)",
+          "ids": [210],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Zohar Strike (End Transformation)",
+          "ids": [220],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 310, 320, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl2200": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 103, 140, 141, 900, 901, 902, 903, 940, 941],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [104, 111, 121, 131, 303, 904, 905, 911, 921, 931],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 1",
+          "ids": [110],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2",
+          "ids": [120],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 3",
+          "ids": [130],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 1 (Avatar)",
+          "ids": [910],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2 (Avatar)",
+          "ids": [920],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 3 (Avatar)",
+          "ids": [930],
+          "button": "right",
+          "source": "inferred"
+        }
+      ]
+    },
+    "pl2300": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 110, 120],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "charged string",
+          "ids": [101, 111, 121, 152, 171],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "finishers",
+          "ids": [151, 155, 156, 160, 165, 170, 175, 176],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Multilock Hail",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 310, 320, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl2400": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 103],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [104, 111, 116, 121, 232, 233, 310],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 1",
+          "ids": [110],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 1 Follow-up",
+          "ids": [115],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2",
+          "ids": [120],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2 Follow-up",
+          "ids": [125],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 3",
+          "ids": [130],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Opening Attack (Deathmatch Finale)",
+          "ids": [140],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Imperfect Attack (Deathmatch Finale)",
+          "ids": [141],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Perfect Attack (Deathmatch Finale)",
+          "ids": [142],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Dodge Continuation (Deathmatch Finale)",
+          "ids": [150],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Turbine (Start)",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Turbine (Start, Interrupted)",
+          "ids": [201],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Turbine (Start) (Deathmatch Finale)",
+          "ids": [202],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Turbine",
+          "ids": [210],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Turbine (Interrupted)",
+          "ids": [211],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Turbine (SP Interrupted)",
+          "ids": [212],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Turbine+",
+          "ids": [220],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Turbine++",
+          "ids": [230],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl2500": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 103],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Blade Dance",
+          "ids": [200],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "finishers",
+          "ids": [210, 220, 230],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl2600": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 103, 900, 901, 902, 903],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 1",
+          "ids": [110],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "finishers",
+          "ids": [111, 121, 131, 140, 310, 911, 921, 931, 940, 950, 960, 970, 980],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 2",
+          "ids": [120],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 3",
+          "ids": [130],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Accelerated Falling Attack",
+          "ids": [870],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Power Strike 1 (Empowered)",
+          "ids": [910],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2 (Empowered)",
+          "ids": [920],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 3 (Empowered)",
+          "ids": [930],
+          "button": "right",
+          "source": "inferred"
+        }
+      ]
+    },
+    "pl2700": {
+      "families": [
+        {
+          "name": "Strafe Shot",
+          "ids": [110],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "charged string",
+          "ids": [111],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "Strafe Shot (Final Round)",
+          "ids": [112],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "Strafe Shot (Empowered)",
+          "ids": [115],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "Grade 1 Shot",
+          "ids": [120],
+          "button": "left",
+          "source": "scott",
+          "note": "hold-left charge; confirmed by Scott 2026-08-10 (grades are all left-click)"
+        },
+        {
+          "name": "Grade 2 Shot",
+          "ids": [121, 122],
+          "button": "left",
+          "source": "scott",
+          "note": "hold-left charge; confirmed by Scott 2026-08-10 (grades are all left-click)"
+        },
+        {
+          "name": "Grade 3 Shot",
+          "ids": [125],
+          "button": "left",
+          "source": "scott",
+          "note": "hold-left charge; confirmed by Scott 2026-08-10 (grades are all left-click)"
+        },
+        {
+          "name": "Grade 4 Shot",
+          "ids": [130],
+          "button": "left",
+          "source": "scott",
+          "note": "hold-left charge; confirmed by Scott 2026-08-10 (grades are all left-click)"
+        },
+        {
+          "name": "Strafe Finish Shot",
+          "ids": [140],
+          "button": "left",
+          "source": "inferred"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 304],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    },
+    "pl2800": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 111, 116, 170, 900, 901, 902, 910, 970],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 4 (Upright)",
+          "ids": [120],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "finishers",
+          "ids": [121, 131, 141, 151, 305, 315, 931, 941, 951],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 1 (Upright)",
+          "ids": [130],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2 (Upright)",
+          "ids": [140],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 3 (Upright)",
+          "ids": [150],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stance Flip (Upright)",
+          "ids": [200],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Stance Flip (Reversed)",
+          "ids": [201],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 310, 311, 312, 410, 411],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400, 401],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Power Strike 4 (Reversed)",
+          "ids": [920],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 1 (Reversed)",
+          "ids": [930],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 2 (Reversed)",
+          "ids": [940],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Power Strike 3 (Reversed)",
+          "ids": [950],
+          "button": "right",
+          "source": "inferred"
+        }
+      ]
+    },
+    "pl2900": {
+      "families": [
+        {
+          "name": "basic string",
+          "ids": [100, 101, 102, 103],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "Stomp 1",
+          "ids": [110],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stomp 2",
+          "ids": [111],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stomp 3",
+          "ids": [112],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stomp 4",
+          "ids": [113],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Stomp Start (Aerial)",
+          "ids": [120],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Miasma Hands 1",
+          "ids": [150],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Miasma Hands 2",
+          "ids": [151],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Miasma Hands 3",
+          "ids": [152],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Miasma Hands 4",
+          "ids": [153],
+          "button": "right",
+          "source": "inferred"
+        },
+        {
+          "name": "Voidskip",
+          "ids": [210],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Blackflash",
+          "ids": [220],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Blackflash (Instant)",
+          "ids": [250],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "Blackflash (Link Attack)",
+          "ids": [260],
+          "button": null,
+          "source": null,
+          "note": "unresolved"
+        },
+        {
+          "name": "aerials",
+          "ids": [300, 301, 302, 310, 410],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "launch",
+          "ids": [400],
+          "button": "left",
+          "source": "scott"
+        },
+        {
+          "name": "finishers",
+          "ids": [950, 951, 952, 953, 954],
+          "button": "left",
+          "source": "scott"
+        }
+      ]
+    }
+  }
+}

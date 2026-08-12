@@ -52,6 +52,25 @@ pub fn overcap_display_percent(base: Option<f32>, cap: Option<i32>) -> Option<f6
     Some((base as f64 / cap as f64 * 100.0).max(0.0))
 }
 
+/// The multiplier the game applied AFTER clamping to the cap.
+///
+/// The clamp writes `min(base, cap)` and only then applies the post-cap chain
+/// (two multiplicative virtuals and one ADDITIVE term), so the final damage
+/// legitimately exceeds the cap. Dividing by the clamped value recovers the
+/// whole chain as one number with no new capture.
+///
+/// `None` when the inputs cannot support the division: a missing base or cap, a
+/// non-finite base, or a non-positive clamp bound.
+pub fn post_cap_multiplier(base: Option<f32>, cap: Option<i32>, damage: i32) -> Option<f64> {
+    let base = base.filter(|b| b.is_finite() && *b > 0.0)? as f64;
+    let cap = cap.filter(|c| *c > 0)? as f64;
+    let clamped = base.min(cap);
+    if clamped <= 0.0 {
+        return None;
+    }
+    Some(damage as f64 / clamped)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -108,5 +127,27 @@ mod tests {
         assert_eq!(overcap_display_percent(Some(1500.0), None), None);
         assert_eq!(overcap_display_percent(Some(1500.0), Some(0)), None);
         assert_eq!(overcap_display_percent(Some(f32::NAN), Some(1000)), None);
+    }
+
+    #[test]
+    fn post_cap_multiplier_divides_by_the_clamped_value() {
+        // Capped: the clamp bound is the cap.
+        assert_eq!(
+            post_cap_multiplier(Some(3000.0), Some(1000), 1500),
+            Some(1.5)
+        );
+        // Uncapped: the clamp never bound, so the divisor is the base.
+        assert_eq!(
+            post_cap_multiplier(Some(800.0), Some(1000), 1200),
+            Some(1.5)
+        );
+    }
+
+    #[test]
+    fn post_cap_multiplier_none_without_usable_inputs() {
+        assert_eq!(post_cap_multiplier(None, Some(1000), 1500), None);
+        assert_eq!(post_cap_multiplier(Some(3000.0), None, 1500), None);
+        assert_eq!(post_cap_multiplier(Some(3000.0), Some(0), 1500), None);
+        assert_eq!(post_cap_multiplier(Some(f32::NAN), Some(1000), 1500), None);
     }
 }

@@ -30,6 +30,8 @@ const EVENT = (abilityKey: string): EventRow => ({
   statusId: null,
   detailKey: null,
   amount: null,
+  capHit: null,
+  capConditions: null,
 });
 
 const measure = (amount: number, hits = 1, min: number | null = null, max: number | null = null): GroupMeasure => ({
@@ -345,10 +347,7 @@ describe("groupRowsFor — collapse supplementary", () => {
   });
 
   it("folds the echo onto its cause's row with the collapse on", () => {
-    const rows = groupRowsFor(
-      aggregates,
-      ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true), merged: true })
-    );
+    const rows = groupRowsFor(aggregates, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true) }));
     expect(rows.map((row) => row.key)).toEqual(["skill:Normal:999"]);
     expect(rows[0].value).toBe(400);
     // The damage sums; the HITS do not. Three landings each carried an echo
@@ -357,10 +356,7 @@ describe("groupRowsFor — collapse supplementary", () => {
   });
 
   it("reports the echo's share as subValue, so the bar can draw the split", () => {
-    const rows = groupRowsFor(
-      aggregates,
-      ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true), merged: true })
-    );
+    const rows = groupRowsFor(aggregates, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true) }));
     expect(rows[0].subValue).toBe(100);
   });
 
@@ -369,12 +365,43 @@ describe("groupRowsFor — collapse supplementary", () => {
     // only the backend can compute it — a `GroupMeasure` has already lost the
     // per-hit identity. This fold reports what it was sent and derives nothing:
     // 55..190 is neither the direct half's 50..150 nor the echo's 5..40.
-    const rows = groupRowsFor(
-      aggregates,
-      ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true), merged: true })
-    );
+    const rows = groupRowsFor(aggregates, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true) }));
     expect(rows[0].columns[2]).toBe(humanizeNumber(55));
     expect(rows[0].columns[3]).toBe(humanizeNumber(190));
+  });
+
+  it("folds an unpaired echo's residue as damage on its cause's row, never as a landing", () => {
+    // 0.54% of echoes never find their trigger (`supp_pairing`), and the
+    // backend reports each as a landing of its own — correct for the echo ROW,
+    // wrong the moment the collapse moves it onto its cause. The echo's payload
+    // IS the cause's action id, so the damage belongs here; the hit does not.
+    // Eustace's 360 normal attacks read 361 with the merge on (log 2586: one
+    // orphan among 359 echoes of Normal 121/125/130).
+    const partly = [
+      agg(CAUSE, measure(300, 3, 50, 150), merged(400, 3, 55, 190, 100)),
+      agg(ECHO, measure(130, 4, 5, 40), merged(30, 1, 30, 30, 30)),
+    ];
+    const [row] = groupRowsFor(partly, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true) }));
+    expect(row.value).toBe(430);
+    expect(row.columns[1]).toBe("3");
+    // Nor an extreme: the residue is a fragment of a landing this row already
+    // counted, so admitting its 30 would report a minimum no hit of this
+    // ability ever dealt.
+    expect(row.columns[2]).toBe(humanizeNumber(55));
+    expect(row.columns[3]).toBe(humanizeNumber(190));
+    expect(row.subValue).toBe(130);
+  });
+
+  it("keeps the residue's own landing where it stays on the echo row", () => {
+    // The discriminating companion: same unclaimed residue, but its cause named
+    // no row to fold onto, so this row IS the echo — and a row reporting damage
+    // over no hits at all would divide its own average by nothing.
+    const stranded = [
+      agg({ ...ECHO, actionType: { SupplementaryDamage: 4242 } }, measure(130, 4, 5, 40), merged(30, 1, 30, 30, 30)),
+    ];
+    const [row] = groupRowsFor(stranded, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true) }));
+    expect(row.key).toBe("skill:SupplementaryDamage:0");
+    expect(row.columns[1]).toBe("1");
   });
 
   it("mounts no subValue on an all-echo row — the residue has no split to show", () => {
@@ -385,12 +412,33 @@ describe("groupRowsFor — collapse supplementary", () => {
     const orphan = [
       agg({ ...ECHO, actionType: { SupplementaryDamage: 4242 } }, measure(70, 2), merged(70, 2, null, null, 70)),
     ];
-    const rows = groupRowsFor(
-      orphan,
-      ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true), merged: true })
-    );
+    const rows = groupRowsFor(orphan, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true) }));
     expect(rows.map((row) => row.key)).toEqual(["skill:SupplementaryDamage:0"]);
     expect(rows[0].subValue).toBeUndefined();
+  });
+
+  // The one state where a row and its chart band can disagree, pinned so the
+  // choice reads as one. The keying resolves a cause against the actions the
+  // party used; the backend claims an echo against the trigger EVENTS it holds.
+  // Nothing today can leave the second ahead of the first — `everySkill` comes
+  // from the unscoped breakdown, so it is a superset of anything a query can
+  // leave surviving — but if it ever did, the claimed echo strands on the echo
+  // row carrying the empty landing view its trigger already absorbed.
+  it("leaves a claimed echo at zero when its cause resolves to no row", () => {
+    const stranded = [
+      agg({ ...CAUSE, actionType: { Normal: 4242 } }, measure(300, 3, 50, 150), merged(400, 3, 55, 190, 100)),
+      agg({ ...ECHO, actionType: { SupplementaryDamage: 4242 } }, measure(100, 4, 5, 40), merged(0, 0, null, null, 0)),
+    ];
+    // `everySkill` names Normal:999, never Normal:4242 — so `causeRow` finds
+    // nothing to fold onto.
+    const rows = groupRowsFor(stranded, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true) }));
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:4242", "skill:SupplementaryDamage:0"]);
+    // Zero, NOT its raw 100: the cause's row is already reporting that damage
+    // inside its own 400, and the table summing to more than the fight is a
+    // worse failure than a row that reads empty beside a band that does not.
+    expect(rows[1].value).toBe(0);
+    expect(rows[0].value).toBe(400);
+    expect(rows.reduce((sum, row) => sum + row.value, 0)).toBe(400);
   });
 
   it("folds an echo onto a GROUPED cause, into the member that caused it", () => {
@@ -413,7 +461,7 @@ describe("groupRowsFor — collapse supplementary", () => {
       actionType: (aggregate.key as { actionType: ActionType }).actionType,
       childCharacterType: "Pl0000" as const,
     }));
-    const rows = groupRowsFor(grouped, ctx({ groupBy: "ability", keying: rowKeyingFor(skills, true), merged: true }));
+    const rows = groupRowsFor(grouped, ctx({ groupBy: "ability", keying: rowKeyingFor(skills, true) }));
 
     expect(rows).toHaveLength(1);
     expect(rows[0].key).toBe('skill:Group:normal-attack@"Pl0000"');
@@ -445,7 +493,7 @@ describe("groupRowsFor — the landing view", () => {
   // toggle, and a test that set only the keying would silently exercise the
   // raw view while claiming to test the merged one.
   const rowsWith = (collapse: boolean) =>
-    groupRowsFor(aggregates, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, collapse), merged: collapse }));
+    groupRowsFor(aggregates, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, collapse) }));
 
   it("counts landings, not events, with the collapse on", () => {
     const [row] = rowsWith(true);
@@ -488,10 +536,7 @@ describe("groupRowsFor — the landing view", () => {
       agg(CAUSE, measure(154_500, 1, 154_500, 154_500), merged(247_181, 1, 247_181, 247_181, 0)),
       agg(ECHO, measure(92_681, 1, 92_681, 92_681), merged(0, 0, null, null, 0)),
     ];
-    const rows = groupRowsFor(
-      claimedNothing,
-      ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true), merged: true })
-    );
+    const rows = groupRowsFor(claimedNothing, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true) }));
     expect(rows[0].subValue).toBeUndefined();
   });
 
@@ -608,19 +653,17 @@ describe("groupRowsFor — echo members of a grouped cause", () => {
     { actionType: { Normal: 110 } as ActionType, childCharacterType: "Pl0000" as const },
     { actionType: { SupplementaryDamage: 100 } as ActionType, childCharacterType: "Pl0000" as const },
   ];
-  // Membership alone, for the tests that ask which rows exist rather than what
-  // they report — the keying is what decides that, either way.
+  // The state the toggle actually produces. One keying drives BOTH which rows
+  // exist and which view they report, so there is no half-collapsed fixture to
+  // set up — and no way for a test to exercise the raw view by accident.
   const collapsed = () => groupRowsFor(grouped, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true) }));
-  // The state the toggle actually produces: the view drives both off it.
-  const collapsedMerged = () =>
-    groupRowsFor(grouped, ctx({ groupBy: "ability", keying: rowKeyingFor(everySkill, true), merged: true }));
 
   it("lists no echo among the members — a group contains no skill called Supplementary Damage", () => {
     expect(collapsed()[0].children?.map((child) => child.key)).toEqual(["skill:Normal:100", "skill:Normal:110"]);
   });
 
   it("folds the echo onto the MEMBER that caused it, so the children still sum to the parent", () => {
-    const [parent] = collapsedMerged();
+    const [parent] = collapsed();
     const children = parent.children ?? [];
     expect(children.reduce((sum, child) => sum + child.value, 0)).toBe(parent.value);
     // Normal:100 caused the echo, so it carries it; its sibling does not.
@@ -629,7 +672,7 @@ describe("groupRowsFor — echo members of a grouped cause", () => {
   });
 
   it("gives the causing member its own split, and its sibling none", () => {
-    const children = collapsedMerged()[0].children ?? [];
+    const children = collapsed()[0].children ?? [];
     expect(children.find((child) => child.key === "skill:Normal:100")?.subValue).toBe(100);
     expect(children.find((child) => child.key === "skill:Normal:110")?.subValue).toBeUndefined();
   });
@@ -637,7 +680,7 @@ describe("groupRowsFor — echo members of a grouped cause", () => {
   it("takes a member's merged extremes from the backend too", () => {
     // Same rule as the parent row's: under the landing model an extreme is a
     // whole landing, and this fold reports the figure it was sent.
-    const child = collapsedMerged()[0].children?.find((entry) => entry.key === "skill:Normal:100");
+    const child = collapsed()[0].children?.find((entry) => entry.key === "skill:Normal:100");
     expect(child?.columns[2]).toBe(humanizeNumber(55));
     expect(child?.columns[3]).toBe(humanizeNumber(190));
   });

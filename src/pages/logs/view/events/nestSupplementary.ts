@@ -62,18 +62,27 @@ export const nestSupplementary = (
   pairs: Record<number, number>
 ): NestedEventRow[] => {
   // `pairs` speaks in indexes into `all`, so visibility has to be answered in
-  // the same terms. The filters are `.filter` chains over this very array (see
-  // `narrowStream`), so a shown row IS its row in `all` and identity resolves
-  // the index; a row that somehow is not from `all` simply pairs with nothing.
-  const indexIn = new Map<EventRow, number>();
-  all.forEach((row, index) => {
-    if (!indexIn.has(row)) indexIn.set(row, index);
-  });
+  // the same terms. `shown` is a SUBSEQUENCE of `all` — `narrowStream` is a
+  // chain of `.filter`s over this very array, which keeps both the identities
+  // and the order — so one forward walk resolves every index without hashing
+  // 50,000 rows on each filter toggle.
   const visible = new Set<number>();
-  for (const row of shown) {
-    const index = indexIn.get(row);
-    if (index !== undefined) visible.add(index);
+  let at = 0;
+  for (let index = 0; index < all.length && at < shown.length; index++) {
+    if (all[index] === shown[at]) {
+      visible.add(index);
+      at++;
+    }
   }
+
+  // Every shown row has to have been found, or the walk was resolving against
+  // the wrong array and its answers mean nothing: one row that is not `all`'s
+  // own object stalls the cursor, and every row after it reads as filtered out.
+  // Nesting is the nicety here and the rows are the job, so a broken assumption
+  // costs the page its nesting rather than its contents. It cannot happen while
+  // `narrowStream` only ever filters — which is why this is a guard and not a
+  // slower lookup.
+  if (at < shown.length) return shown;
 
   // Which echoes nest, and under whom. Only a VISIBLE echo nests — and only it
   // can conscript a trigger.

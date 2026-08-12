@@ -1,5 +1,7 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 
+import { cn } from "./cn";
+
 export type FigureSize = "xs" | "sm" | "md" | "lg" | "2xl";
 export type FigureTone = "default" | "muted" | "dim";
 
@@ -33,7 +35,7 @@ export const Figure = ({ children, size = "lg", tone = "default", className, ...
   // Anything else the caller passed rides through to the span — a `data-*` hook,
   // a title. Without it a figure could not be told apart from its neighbours
   // once the class names became utilities shared by half the view.
-  <span {...rest} className={["tabular-nums", SIZE_CLASS[size], TONE_CLASS[tone], className].filter(Boolean).join(" ")}>
+  <span {...rest} className={cn("tabular-nums", SIZE_CLASS[size], TONE_CLASS[tone], className)}>
     {children}
   </span>
 );

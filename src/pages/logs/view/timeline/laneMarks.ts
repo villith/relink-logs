@@ -5,6 +5,7 @@ import type { Span } from "../spans";
 
 import { castKeyOf } from "./castKey";
 import type { LaneMatcher } from "./laneMatch";
+import type { LaneShape } from "./laneShape";
 
 /** One action's share of a mark. `amount` is 0 rather than null for a kind
  * that carries none (a stun, a death, an effect landing): these are summed and
@@ -12,10 +13,16 @@ import type { LaneMatcher } from "./laneMatch";
  * `amount` still says null when nothing carried one. */
 export type MarkPart = { key: string; count: number; amount: number };
 
-/** One event inside a mark, at its real time. `echo` splits the tick colour so
- * supplementary damage reads as part of the cast but plainly not the skill's
- * own swing — the timeline's half of `MetricBar`'s fainter segment. */
-export type MarkHit = { atMs: number; echo: boolean };
+/** One event inside a mark, at its real time.
+ *
+ * `echo` marks supplementary damage — part of the cast, but plainly not the
+ * skill's own swing.
+ *
+ * `amount` and `key` are what the hit's OWN marker says when you point at it.
+ * A bucket's tooltip can only report the run; the arrow over one hit has to be
+ * able to name that hit and what it landed for, and neither is recoverable
+ * from the fold once the events are summed. */
+export type MarkHit = { atMs: number; echo: boolean; amount: number | null; key: string };
 
 /** One drawn mark. Times are milliseconds FROM THE START OF THE WINDOW, the
  * same base `MetricRow.timeline` uses — so a status bar and a damage tick on
@@ -23,7 +30,7 @@ export type MarkHit = { atMs: number; echo: boolean };
  *
  * A mark of zero width is an instant (one hit). A wider one is either a real
  * span (a status row) or several instants folded because they would have
- * overlapped at the current scale; `Lane.spans` says which. */
+ * overlapped at the current scale; `Lane.shape` says which. */
 export type LaneMark = {
   startMs: number;
   endMs: number;
@@ -49,15 +56,29 @@ export type LaneMark = {
   castKey: string;
 };
 
-/** One table row plus what it draws. */
+/** One table row plus what it draws.
+ *
+ * `shape` is not decoration: it says which FOLD produced `marks`, and the two
+ * cannot be chosen separately. A silhouette's marks are single hits, a cast
+ * lane's are whole casts, and a span lane's are not an event fold at all — so
+ * the hover card branches on it too (a span reports a duration, a fold a
+ * count). */
 export type Lane = {
   row: MetricRow;
   marks: LaneMark[];
-  /** True when the marks are REAL spans off the row's own `timeline`, false
-   * when they are instants folded by pixel density. The hover card branches on
-   * this: a span reports a duration, a fold reports a count. */
-  spans: boolean;
+  shape: LaneShape;
 };
+
+/** How close two marks may come before they are drawn as one. Three pixels:
+ * below that the gap between two ticks is not visible anyway, so drawing them
+ * separately just makes a smear that pretends to be two readable marks.
+ *
+ * The unit `markGapMs` measures in, and so the unit every caller has to divide
+ * back out to read a `gapMs` in pixels again (see `shownHits`). Stated once
+ * here, beside the function that gives it its meaning: declared separately by
+ * the producer and the consumer, tuning the fold in one silently mis-scales
+ * the other. */
+export const MARK_GAP_PX = 3;
 
 /** The gap, in milliseconds, below which two marks would collide on screen.
  *
@@ -113,7 +134,7 @@ export const marksByLane = (
       count: 1,
       amount: event.amount,
       by: [{ key: partKey, count: 1, amount: event.amount ?? 0 }],
-      hits: [{ atMs: at, echo }],
+      hits: [{ atMs: at, echo, amount: event.amount, key: partKey }],
       casts: 1,
       castKey: castKeyOf(event, collapseEchoes),
     };
@@ -214,19 +235,54 @@ export const mergeMarks = (marks: LaneMark[], gapMs: number): LaneMark[] =>
     }
   );
 
+/** The hits of a mark that can be told APART at this scale.
+ *
+ * The same greedy min-gap sweep `mergeMarks` runs, at the grain of one hit and
+ * against the MARKER's own width rather than the fold's three pixels.
+ * Seven-pixel markers spaced three pixels apart overlap into exactly the
+ * barcode this view had when each hit drew a wedge — the marker was wider than
+ * the gap it was drawn in. What cannot be separated here is not claimed; zoom
+ * in and the rest appear.
+ *
+ * `markerPx` is the caller's, because the marker is the caller's: `gapMs` is
+ * `MARK_GAP_PX` worth of milliseconds, so dividing it back out is what turns
+ * any pixel width into the time it covers at the current scale.
+ *
+ * At an unmeasured scale NOTHING is claimed. `gapMs` is zero until the
+ * container has been measured, and zero is not the harmless direction here the
+ * way it is for `mergeMarks`: a zero clearance tells every hit apart, so the
+ * first commit of a long fight would mount a marker — and a hover target — for
+ * every event in the window. */
+export const shownHits = (hits: MarkHit[], gapMs: number, markerPx: number): MarkHit[] => {
+  if (gapMs <= 0) return [];
+  const clearMs = (gapMs * markerPx) / MARK_GAP_PX;
+  const out: MarkHit[] = [];
+  for (const hit of hits) {
+    const last = out[out.length - 1];
+    if (last === undefined || hit.atMs - last.atMs >= clearMs) out.push(hit);
+  }
+  return out;
+};
+
 /** The lanes, in the rows' own order.
  *
  * EVERY row becomes a lane, including one with nothing to draw. Dropping the
  * empty ones would leave the timeline and the table disagreeing about which
  * rows the fight has — and the empty lane is itself the finding on a metric
  * whose events carry no action id to place (stun, grouped by ability). */
-export const lanesFor = (rows: MetricRow[], byLane: Map<string, LaneMark[]>, gapMs: number): Lane[] =>
+export const lanesFor = (
+  rows: MetricRow[],
+  byLane: Map<string, LaneMark[]>,
+  gapMs: number,
+  shapeOf: (row: MetricRow) => LaneShape
+): Lane[] =>
   rows.map((row) => {
-    if (row.timeline !== undefined) {
+    const shape = shapeOf(row);
+    if (shape === "spans") {
       return {
         row,
-        spans: true,
-        marks: row.timeline.map((span) => ({
+        shape,
+        marks: (row.timeline ?? []).map((span) => ({
           startMs: span.startMs,
           endMs: span.endMs,
           count: 1,
@@ -238,7 +294,9 @@ export const lanesFor = (rows: MetricRow[], byLane: Map<string, LaneMark[]>, gap
         })),
       };
     }
-    // Casts first, then the screen: the fold that MEANS something must not
-    // depend on the one that is only about pixels.
-    return { row, spans: false, marks: mergeMarks(mergeCasts(byLane.get(row.key) ?? []), gapMs) };
+    // Casts first, then the screen: the fold that MEANS something — a run of
+    // one ability — must not depend on the one that is only about pixels. Both
+    // drawn shapes want the same fold; they differ only in what they draw on
+    // top of it, so neither may reach for a fold of its own.
+    return { row, shape, marks: mergeMarks(mergeCasts(byLane.get(row.key) ?? []), gapMs) };
   });
