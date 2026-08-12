@@ -53,15 +53,30 @@ fn main() -> Result<()> {
                 .iter()
                 .map(|skill| skill.sba_generated)
                 .sum();
+            // Deduced per-ability gauge (`sba_inference`) is tallied separately
+            // from the measured kind, so it has to be counted separately too —
+            // summing only `sba_generated` reports a remote member's rows as
+            // empty however much of their bar the inference named.
+            let by_inferred: f64 = player
+                .skill_breakdown
+                .iter()
+                .map(|skill| skill.sba_inferred)
+                .sum();
+            let inferred_rows = player
+                .skill_breakdown
+                .iter()
+                .filter(|skill| skill.sba_inferred > 0.0)
+                .count();
             let by_cause: f64 = player.sba_sources.iter().map(|s| s.generated).sum();
             let total = player.sba_generated;
-            let residual = (total - by_skill - by_cause).max(0.0);
+            let residual = (total - by_skill - by_inferred - by_cause).max(0.0);
             println!(
                 "player {index:#010x} {:?} generated={total:.1} skill={by_skill:.1} \
+                 inferred={by_inferred:.1} (rows={inferred_rows}) \
                  cause={by_cause:.1} residual={residual:.1} ({:.0}% explained)",
                 player.character_type,
                 if total > 0.0 {
-                    100.0 * (by_skill + by_cause) / total
+                    100.0 * (by_skill + by_inferred + by_cause) / total
                 } else {
                     0.0
                 }

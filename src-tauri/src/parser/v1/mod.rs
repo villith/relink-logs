@@ -30,6 +30,7 @@ mod live_emit;
 pub mod phantom_targets;
 mod player_state;
 mod sba_inference;
+mod sba_weights;
 mod skill_state;
 mod status;
 /// Public for `examples/supp_pair_probe.rs`, which measures this exact rule
@@ -1479,7 +1480,7 @@ impl DerivedEncounterState {
             SbaGainCause::PerfectDodge => (SbaSourceKind::PerfectDodge, None),
             SbaGainCause::Site(tag) => (SbaSourceKind::Site, Some(tag)),
             SbaGainCause::Unknown => (SbaSourceKind::Unknown, None),
-            // Deduced causes (see `sba_inference`). A move verdict routes to
+            // Deduced causes (see `sba_inference`). A share verdict routes to
             // the same breakdown row a read `Skill` would — it is keyed off a
             // hit that exists — but through `add_inferred_sba_gain`, which
             // tallies it separately so the UI can always say how much of a row
@@ -3211,9 +3212,12 @@ impl Parser {
         // rules join rises against hits on BOTH sides of them in time, and
         // every breakdown row is open by now, so an inferred move gain lands in
         // the row its hit opened instead of waiting on the pending list.
-        let inferred = sba_inference::infer(&self.encounter.raw_event_log, &|timestamp| {
-            admits_event(timestamp, from, cutoff, windows, log_start)
-        });
+        let characters = sba_inference::character_aliases(&self.encounter.player_data);
+        let inferred = sba_inference::infer(
+            &self.encounter.raw_event_log,
+            &|timestamp| admits_event(timestamp, from, cutoff, windows, log_start),
+            &characters,
+        );
         for gain in inferred {
             self.derived_state
                 .process_sba_gain(gain.actor_index, gain.cause, gain.amount);
