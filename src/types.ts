@@ -1045,7 +1045,12 @@ export type LogEvent = [number, LogEventPayload];
 /** Mirrors the Rust `EventPage`. `total` can exceed `events.length` — the
  * frontend asks for a capped page, and a log past the cap is truncated VISIBLY
  * (see EventsTab), never silently. */
-export type EventPage = { events: LogEvent[]; total: number; capUp: Record<string, PlayerCapUp>;   suppPairs: Record<number, number>; };
+export type EventPage = {
+  events: LogEvent[];
+  total: number;
+  capUp: Record<string, PlayerCapUp>;
+  suppPairs: Record<number, number>;
+};
 
 export type PlayerCapUp = {
   normal: number | null;
