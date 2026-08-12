@@ -26,6 +26,7 @@ export const useEvents = (id: string | undefined) => {
   // Keyed by slot key; empty for a log recorded before the cap-up capture, which
   // the card reads as "show the Stage-1 rows" rather than "the cap-up was zero".
   const [capUp, setCapUp] = useState<Record<string, PlayerCapUp>>({});
+  const [suppPairs, setSuppPairs] = useState<Record<number, number>>({});
   const generation = useRef(0);
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export const useEvents = (id: string | undefined) => {
         setEvents(page.events);
         setTotal(page.total);
         setCapUp(page.capUp ?? {});
+        setSuppPairs(page.suppPairs ?? {});
       })
       .catch(() => {
         // No toast: the analysis view already reports its own fetch failures for
@@ -48,8 +50,9 @@ export const useEvents = (id: string | undefined) => {
         setEvents([]);
         setTotal(0);
         setCapUp({});
+        setSuppPairs({});
       });
   }, [id]);
 
-  return { events, total, capUp };
+  return { events, total, capUp, suppPairs };
 };

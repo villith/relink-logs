@@ -592,6 +592,63 @@ describe("damageDone.children — party-wide per-source split", () => {
     expect(children[0].columns[3]).toBe("150");
   });
 
+  it("makes a nested child count landings, like the merged parent above it", () => {
+    // The parent rows come from the group aggregates and the children from the
+    // derived state, so a child still counting events contradicts the very row
+    // that was expanded.
+    const landed = [
+      {
+        ...party[0],
+        skillBreakdown: [
+          {
+            ...party[0].skillBreakdown[0],
+            merged: { hits: 2, damage: 260, min: 55, max: 205, supplementary: 60 },
+          },
+          party[0].skillBreakdown[1],
+          {
+            ...party[0].skillBreakdown[0],
+            actionType: { SupplementaryDamage: 9001 },
+            totalDamage: 60,
+            hits: 3,
+            // Claimed by the landings above, so this row's landing view is empty.
+            merged: { hits: 0, damage: 0, min: null, max: null, supplementary: 0 },
+          },
+        ],
+      } as ComputedPlayerState,
+      {
+        ...party[1],
+        skillBreakdown: [
+          {
+            ...party[1].skillBreakdown[0],
+            merged: { hits: 1, damage: 100, min: 100, max: 100, supplementary: 0 },
+          },
+        ],
+      } as ComputedPlayerState,
+    ];
+    const keying = rowKeyingFor(
+      landed.flatMap((entry) => entry.skillBreakdown),
+      true
+    );
+    const children = damageDone.children!({
+      row: abilityRow("skill:Normal:9001"),
+      players: landed,
+      level: "abilities",
+      pins: NO_PINS,
+      fightDurationMs: 100_000,
+      keying,
+    })!;
+
+    // Two landings worth 260, not five events — and 55..205 is neither the
+    // direct half's 50..150 nor the echo's, so a locally re-derived extreme
+    // fails here.
+    expect(children[0].value).toBe(260);
+    expect(children[0].columns.slice(0, 5)).toEqual(["260", "2", "55", "205", "130"]);
+    expect(children[0].subValue).toBe(60);
+    // The player who dealt no echo has no split to draw.
+    expect(children[1].columns.slice(0, 5)).toEqual(["100", "1", "100", "100", "100"]);
+    expect(children[1].subValue).toBeUndefined();
+  });
+
   it("sums a group parent's members per player", () => {
     // Against the REAL table: Gran's 100/110/120 are all "normal-attack".
     const grouped = [
@@ -637,6 +694,11 @@ describe("abilityRows — supplementary collapse", () => {
       hits: 4,
       minDamage: 200,
       maxDamage: 300,
+      // The LANDING view of the same hits: four landings carrying the three
+      // echo ticks, so its extremes are whole landings — 250..400 is neither
+      // the direct half's 200..300 nor the echo's 90..110, which is what makes
+      // a fold that re-derived them locally fail here.
+      merged: { hits: 4, damage: 1300, min: 250, max: 400, supplementary: 300 },
     },
     {
       actionType: { SupplementaryDamage: 100 },
@@ -645,11 +707,19 @@ describe("abilityRows — supplementary collapse", () => {
       hits: 3,
       minDamage: 90,
       maxDamage: 110,
+      // Every tick claimed: that damage now sits on the trigger above, so the
+      // echo row's own landing view is empty.
+      merged: { hits: 0, damage: 0, min: null, max: null, supplementary: 0 },
     },
   ] as unknown as SkillState[];
 
+  const rowsWith = (collapse: boolean, rows: SkillState[] = breakdown) =>
+    abilityRows(groupSkillsForRows(rows, rowKeyingFor(rows, collapse)), 1300, 0, true, collapse);
+
   it("adds the echo's damage and hits to its cause, and reports the split", () => {
-    const rows = abilityRows(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, true)), 1300, 0, true);
+    // The KEYING fold alone, with the landing view off: both halves land on one
+    // row and the row still counts events.
+    const rows = abilityRows(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, true)), 1300, 0, true, false);
     expect(rows).toHaveLength(1);
     expect(rows[0].value).toBe(1300);
     expect(rows[0].subValue).toBe(300);
@@ -657,17 +727,149 @@ describe("abilityRows — supplementary collapse", () => {
     expect(rows[0].columns[1]).toBe("7");
   });
 
-  it("leaves min and max reporting direct hits only", () => {
-    const rows = abilityRows(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, true)), 1300, 0, true);
-    // An echo is a different damage source; folding it in would make the
-    // skill's "min hit" read as a 90-damage echo tick.
-    expect(rows[0].columns[2]).toBe("200");
-    expect(rows[0].columns[3]).toBe("300");
+  it("counts landings, not events, with the merge on", () => {
+    const rows = rowsWith(true);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].value).toBe(1300);
+    // total, hits, min, max, average. Four landings, not seven events — and
+    // the extremes are the backend's own, verbatim.
+    expect(rows[0].columns.slice(0, 5)).toEqual(["1.3k", "4", "250", "400", "325"]);
+  });
+
+  it("keeps Avg inside Min..Max and equal to Total over Hits", () => {
+    // The two invariants the event count broke: a row read Total 247.2k over
+    // 2 hits with Min = Max = 154.5k, an average below its own minimum.
+    const [total, hits, min, max, avg] = rowsWith(true)[0].columns;
+    expect(total).toBe("1.3k");
+    expect(Number(hits)).toBe(4);
+    expect(avg).toBe(String(Math.round(1300 / 4)));
+    expect(Number(min)).toBeLessThanOrEqual(Number(avg));
+    expect(Number(avg)).toBeLessThanOrEqual(Number(max));
+  });
+
+  it("draws the echo split from the backend's own figure", () => {
+    // Read, never inferred from bucket membership: the echo row's landing view
+    // is empty, so a fold that looked for an echo among these skills would find
+    // no damage at all and draw one flat bar over a row that is 300 echo.
+    expect(rowsWith(true)[0].subValue).toBe(300);
+  });
+
+  it("draws no split when the backend reports no echo inside the landing", () => {
+    // The companion the test above needs to discriminate: the one fixture
+    // change is the cause's `supplementary`, zeroed. A membership test would
+    // still find the echo row's raw 300 sitting in this bucket and paint a
+    // segment for damage the backend says is not there.
+    const claimedNothing = [
+      { ...breakdown[0], merged: { hits: 4, damage: 1300, min: 250, max: 400, supplementary: 0 } },
+      breakdown[1],
+    ] as unknown as SkillState[];
+    expect(rowsWith(true, claimedNothing)[0].subValue).toBeUndefined();
+  });
+
+  it("adds an unpaired echo's residue as damage, never as a landing of its own", () => {
+    // One of the four ticks never found its trigger (`supp_pairing` leaves
+    // 0.54% unpaired), so the backend reports it as a landing — right for the
+    // echo ROW, wrong once the collapse moves it onto its cause. Its damage
+    // belongs to the row; its hit does not, and Eustace's 360 normal attacks
+    // read 361 with the merge on (log 2586).
+    const partly = [
+      breakdown[0],
+      {
+        ...breakdown[1],
+        totalDamage: 330,
+        hits: 4,
+        merged: { hits: 1, damage: 30, min: 30, max: 30, supplementary: 30 },
+      },
+    ] as unknown as SkillState[];
+    const [row] = rowsWith(true, partly);
+    expect(row.value).toBe(1330);
+    // total, hits, min, max, average. Four landings — and 250 rather than the
+    // residue's 30, which is a fragment of a landing already counted here.
+    expect(row.columns.slice(0, 5)).toEqual(["1.3k", "4", "250", "400", String(Math.round(1330 / 4))]);
+    expect(row.subValue).toBe(330);
+  });
+
+  it("mounts no split on a row that is echo all the way across", () => {
+    // An unclaimed echo: the backend reports the whole of it as supplementary,
+    // and painting the entire bar in the fainter shade would say nothing its
+    // own label does not.
+    const orphan = [
+      {
+        actionType: { SupplementaryDamage: 4242 },
+        childCharacterType: "Pl1900",
+        totalDamage: 300,
+        hits: 3,
+        minDamage: 90,
+        maxDamage: 110,
+        merged: { hits: 3, damage: 300, min: 90, max: 110, supplementary: 300 },
+      },
+    ] as unknown as SkillState[];
+    expect(rowsWith(true, orphan)[0].subValue).toBeUndefined();
+    // And it keeps its own landings: there is no cause row here reporting them
+    // already, so a row of damage over no hits would divide by nothing.
+    expect(rowsWith(true, orphan)[0].columns[1]).toBe("3");
+  });
+
+  it("falls back to the raw figures when the payload carries no merged measure", () => {
+    // A backend older than the field sends none. Summing what is not there
+    // would report a row of zeros, which is worse than reporting unmerged
+    // figures.
+    const legacy = breakdown.map((skill) => {
+      const copy = { ...skill };
+      delete copy.merged;
+      return copy;
+    });
+    const rows = rowsWith(true, legacy);
+    expect(rows[0].value).toBe(1300);
+    // Events, and extremes spanning BOTH halves: min 90 is an echo tick, which
+    // the old direct-only narrowing would have hidden. Accepted on this
+    // degraded path and pinned here so it reads as a decision, not an
+    // oversight — see the raw branch's comment in `damageCells`.
+    expect(rows[0].columns.slice(0, 5)).toEqual(["1.3k", "7", "90", "300", "186"]);
+  });
+
+  it("reports raw hits for a row the landing pass never walked", () => {
+    // The landing pass walks DAMAGE events, so a row opened by something else
+    // carries an all-zero landing view beside real hits. Reporting that view
+    // verbatim would say the guard never happened; only an ECHO row is
+    // legitimately empty here, and this one has no echo to have folded away.
+    const guarded = [
+      {
+        actionType: "PerfectGuard",
+        childCharacterType: "Pl1900",
+        totalDamage: 0,
+        hits: 3,
+        minDamage: 0,
+        maxDamage: 0,
+        merged: { hits: 0, damage: 0, min: null, max: null, supplementary: 0 },
+      },
+    ] as unknown as SkillState[];
+    expect(rowsWith(true, guarded)[0].columns[1]).toBe("3");
+  });
+
+  it("still reports the empty landing view of a fully claimed echo row", () => {
+    // The discriminating companion: same all-zero measure, but its damage was
+    // claimed by a trigger that is already reporting it. Falling back to the raw
+    // figures here would draw 300 twice under the collapse.
+    const claimed = [breakdown[1]];
+    const [row] = rowsWith(true, claimed);
+    expect(row.value).toBe(0);
+    expect(row.columns[1]).toBe("0");
   });
 
   it("keeps the echo as its own row without collapsing", () => {
-    const rows = abilityRows(groupSkillsForRows(breakdown, rowKeyingFor(breakdown, false)), 1300, 0, true);
+    const rows = rowsWith(false);
     expect(rows).toHaveLength(2);
     expect(rows.every((row) => row.subValue === undefined)).toBe(true);
+  });
+
+  it("is inert with the merge off", () => {
+    // Every figure exactly as before: the toggle moves both the keying and the
+    // view together, so with it off each row is one homogeneous half and the
+    // landing measures are never read.
+    const rows = rowsWith(false);
+    expect(rows.map((row) => row.value)).toEqual([1000, 300]);
+    expect(rows[0].columns.slice(0, 5)).toEqual(["1.0k", "4", "200", "300", "250"]);
+    expect(rows[1].columns.slice(0, 5)).toEqual(["300", "3", "90", "110", "100"]);
   });
 });

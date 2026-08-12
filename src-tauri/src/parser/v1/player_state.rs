@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::parser::constants::{CharacterType, EnemyType, FerrySkillId};
 
-use super::{skill_state::SkillState, AdjustedDamageInstance};
+use super::{skill_state::SkillState, AdjustedDamageInstance, BreakdownKey};
 
 /// How long a Perfect Guard may claim a trailing network stun message. The
 /// captured guard messages arrived at +100/+100/+101ms, and ordinary hits'
@@ -41,7 +41,7 @@ pub struct BreakdownKeying {
 }
 
 impl BreakdownKeying {
-    pub fn key_for(&mut self, event: &DamageEvent) -> (ActionType, CharacterType) {
+    pub fn key_for(&mut self, event: &DamageEvent) -> BreakdownKey {
         let key = self.resolve(event);
         // Remembered under the RAW id, which is what an SBA gain carries: the
         // resolved key can differ in BOTH halves (Ferry's pet remap rewrites the
@@ -543,7 +543,18 @@ impl PlayerState {
         self.stun_per_second = self.total_stun_value / duration_secs;
     }
 
-    pub fn update_from_damage_event(&mut self, damage_instance: &AdjustedDamageInstance) {
+    /// Returns the breakdown row this hit landed in — the [`BreakdownKey`]
+    /// [`BreakdownKeying`] assigned it.
+    ///
+    /// Returned rather than recomputed by anyone who needs it: that keying is
+    /// stateful and order-dependent (Ferry's pet remap, the raw-action memo),
+    /// so a second `key_for` for the same event would advance its state and
+    /// mis-key everything after it. The reparse's landing pass is the caller
+    /// that needs it; every other caller ignores it.
+    pub fn update_from_damage_event(
+        &mut self,
+        damage_instance: &AdjustedDamageInstance,
+    ) -> BreakdownKey {
         if damage_instance.is_cappable {
             self.cappable_hits += 1;
         }
@@ -591,6 +602,8 @@ impl PlayerState {
         if let Some(amount) = held {
             row.sba_generated += amount;
         }
+
+        (action, child_character_type)
     }
 }
 

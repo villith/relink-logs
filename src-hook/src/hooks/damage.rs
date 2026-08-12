@@ -740,6 +740,48 @@ impl OnProcessDamageHook {
             b90_check_unattributed("src", src, pre);
         }
 
+        // Runtime-extras evaluator resolution: the cap builder's one remaining
+        // unidentified additive term is a virtual `+0x70` on the object at
+        // `attacker+0x22F0` (the per-action flat extras — Eustace 115/130/140,
+        // Id's +5/+20). The object's class could not be pinned statically, so
+        // log its vtable and the slot target once per distinct vtable; feeding
+        // the RVAs back through SymbolAt/Decompile closes the term.
+        #[cfg(feature = "hookdiag")]
+        if let Some(src) = pre_call_source_ptr {
+            use std::sync::atomic::{AtomicU32, Ordering};
+            // Bounded, because everything below it is per-hit work on a game
+            // thread: a snapshot lookup plus three guarded reads (each an
+            // `IsBadReadPtr` probe) before `first_n_per_key` gets to decide it
+            // has nothing to log. The distinct vtables here number in the
+            // handful and all of them appear within seconds of a fight
+            // starting, so past this budget the walk could only ever discard
+            // its own result. One relaxed load ends it.
+            static PROBES: AtomicU32 = AtomicU32::new(0);
+            const PROBE_BUDGET: u32 = 20_000;
+            if PROBES.load(Ordering::Relaxed) < PROBE_BUDGET
+                && super::player::player_slot_key_for_actor(src as *const usize).is_some()
+            {
+                PROBES.fetch_add(1, Ordering::Relaxed);
+                use crate::hooks::diag::{read_ptr_guarded, MODULE_BASE};
+                static SEEN: std::sync::Mutex<Vec<(usize, u32)>> =
+                    std::sync::Mutex::new(Vec::new());
+                if let Some((obj, vtable, slot70)) = read_ptr_guarded(src, 0x22f0)
+                    .filter(|obj| *obj != 0)
+                    .and_then(|obj| Some((obj, read_ptr_guarded(obj, 0)?)))
+                    .and_then(|(obj, vt)| Some((obj, vt, read_ptr_guarded(vt, 0x70)?)))
+                {
+                    if crate::hooks::diag::first_n_per_key(&SEEN, vtable, 1) {
+                        let base = MODULE_BASE.load(std::sync::atomic::Ordering::Relaxed);
+                        log::info!(
+                            "CAPEXTRAS src={src:#x} obj={obj:#x} vtable_rva={:#x} slot70_rva={:#x}",
+                            vtable.wrapping_sub(base),
+                            slot70.wrapping_sub(base),
+                        );
+                    }
+                }
+            }
+        }
+
         // Cross-event PG watch: if a prior enemy→player hit armed a window on this
         // event's source or target, diff it NOW (pre-call) — an async apply since
         // the arming shows up here.

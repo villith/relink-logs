@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::parser::constants::{CharacterType, EnemyType};
 
+use super::supp_pairing::{self, SuppPairing};
 use super::{
     bucket_for, is_damage_taken_event, player_state, remap_dragon_form, survives_shared_gates,
     MeterFilters, PhantomTargets, PlayerData, TargetSegment, TargetSpan,
@@ -185,11 +186,44 @@ pub struct GroupMeasure {
     pub max: Option<i64>,
 }
 
+/// One row's totals under the LANDING model, where an echo is part of the hit
+/// that caused it rather than a hit of its own (see [`super::supp_pairing`]).
+///
+/// Carried alongside [`GroupMeasure`] rather than replacing it, and computed on
+/// every walk: the collapse is a display toggle, and making it a query
+/// parameter would force a refetch and a reparse on every flip while baking a
+/// reader's preference into a walk this parser deliberately keeps neutral.
+///
+/// For a direct action, `hits` counts landings and the amounts include their
+/// echoes. For an echo action, everything here describes its UNCLAIMED residue
+/// only — a claimed echo's damage already sits on its trigger, and counting it
+/// twice is the whole thing this type exists to avoid.
+///
+/// [`GroupAggregate::series`] stays the RAW view: a claim moves damage between
+/// rows, so under this model a row's series no longer sums to its `amount`.
+/// That is deliberate. The frontend's band fold already sums an echo's series
+/// into its cause's band, so the drawn buckets total the same either way, and
+/// re-cutting the series per view would need a bucket for damage that was
+/// aggregated under a different row.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergedMeasure {
+    pub amount: i64,
+    pub hits: u32,
+    pub min: Option<i64>,
+    pub max: Option<i64>,
+    /// The echo damage inside `amount` — attached echoes for a direct action,
+    /// the whole amount for an orphan echo. The bar's split segment reads this.
+    pub supplementary: i64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GroupAggregate {
     pub key: GroupKey,
     pub measure: GroupMeasure,
+    /// The landing view of the same key. See [`MergedMeasure`].
+    pub merged: MergedMeasure,
     /// Whole-fight per-bucket band (same buckets as dps_chart) — the view
     /// slices client-side, exactly like the drill charts it replaces.
     pub series: Vec<i64>,
@@ -230,6 +264,12 @@ pub struct GroupReference {
 /// Keys the mask excludes ENTIRELY are the point of this: they never appear as
 /// aggregates, and without them the surviving bands' ranks compact and the
 /// colours shift anyway — which is the bug.
+///
+/// It reads only `amount`, so the [`MergedMeasure`] the inner call folds is paid
+/// for and thrown away — a second [`SuppPairing`] over the whole log on every
+/// scrub. Left alone deliberately: the fixes are a tenth parameter on an already
+/// nine-argument function or a restructuring of this path, and that call wants a
+/// measurement rather than a guess. Start here if profiling points at scrubbing.
 pub fn aggregate_group_reference(
     events: &[(i64, Message)],
     player_data: &[Option<PlayerData>; 4],
@@ -313,6 +353,91 @@ impl std::fmt::Display for GroupQueryError {
 }
 
 impl std::error::Error for GroupQueryError {}
+
+/// One event that survived every gate in [`aggregate_groups`]'s walk, and what
+/// it fed there.
+///
+/// Named for the walk, not for the landing model: this holds every survivor,
+/// INCLUDING claimed echoes, which are precisely the events that never become
+/// landings of their own.
+///
+/// Recorded because a landing's amount depends on echoes that arrive LATER in
+/// the stream, and a running min/max cannot be revised once written — so
+/// [`MergedMeasure`] cannot be accumulated in the walk itself.
+struct Walked {
+    /// Index into the event slice the walk enumerated — the same base
+    /// [`SuppPairing`] keys its links by.
+    position: usize,
+    /// Index into the `aggregates` vec. Positional, so it survives only until
+    /// that vec is reordered; see [`fold_landings`].
+    aggregate_index: usize,
+    /// The amount the walk aggregated for this event, past every gate and
+    /// clamp — the single source of truth for what this event contributed.
+    damage: i64,
+    /// Whether the EVENT is supplementary. Not the same question as "was it
+    /// claimed": an orphan echo is supplementary and unclaimed, and it must
+    /// still report its whole amount as the echo share.
+    is_echo: bool,
+}
+
+impl supp_pairing::Walked for Walked {
+    type Amount = i64;
+
+    fn position(&self) -> usize {
+        self.position
+    }
+
+    fn amount(&self) -> i64 {
+        self.damage
+    }
+}
+
+/// Folds the landing view into `aggregates` from what the walk recorded.
+///
+/// MUST run before `aggregates` is sorted or appended to: [`Walked`] addresses
+/// rows by position, and reordering that vec silently reroutes every merged
+/// figure onto the wrong row. The sum invariant cannot see that — misrouting
+/// preserves the total — which is why this is a call in a visible sequence
+/// rather than thirty lines relying on adjacency to the sort.
+///
+/// The gate deciding what IS a landing lives in
+/// [`SuppPairing::for_each_landing`], shared with the derived state's twin
+/// (`fold_skill_landings`); everything below it is this caller's own row
+/// addressing and accumulation.
+///
+/// Runs on the taken stream too. `SupplementaryDamage` is classified from the
+/// event's own action id with no regard to its source, so an enemy echo would
+/// merge into the enemy hit that caused it. Expected to be a no-op — echoes are
+/// believed to be a player trait mechanic, and the pairing rule's whole evidence
+/// base is player-side — but nothing here enforces that, and no capture has
+/// confirmed it.
+fn fold_landings(aggregates: &mut [GroupAggregate], walked: &[Walked], pairing: &SuppPairing) {
+    pairing.for_each_landing(walked, |record, landing, attached| {
+        let merged = &mut aggregates[record.aggregate_index].merged;
+        merged.amount += landing;
+        merged.hits += 1;
+        merged.min = Some(merged.min.map_or(landing, |min| min.min(landing)));
+        merged.max = Some(merged.max.map_or(landing, |max| max.max(landing)));
+        // An orphan echo is supplementary all the way across; a direct hit
+        // contributes only what rode along with it.
+        merged.supplementary += if record.is_echo { landing } else { attached };
+    });
+
+    // The two views describe the same walk: a claim MOVES damage between rows,
+    // it never creates or drops any. This catches strictly less here than in
+    // the `skill_breakdown` twin — a misroute through a stale `aggregate_index`
+    // preserves the total, as this function's own doc concedes — but the filter
+    // gate above is the identical logic in both, and its failures are silent in
+    // both. Kept for that half, and so the two folds stay comparable.
+    debug_assert_eq!(
+        aggregates
+            .iter()
+            .map(|aggregate| aggregate.merged.amount)
+            .sum::<i64>(),
+        walked.iter().map(|entry| entry.damage).sum::<i64>(),
+        "the landing view must move damage between rows, never add or drop it"
+    );
+}
 
 /// Aggregates the analysis view's generic group query into rows and bands
 /// that can never disagree: the table (`key` + `measure`) and the chart
@@ -493,6 +618,10 @@ pub fn aggregate_groups(
     };
 
     let phantoms = PhantomTargets::learned_from(events.iter());
+    // The echo/trigger links, learned from the WHOLE log so a scrub window
+    // cannot change which hit an echo belongs to.
+    let pairing = SuppPairing::learned_from(events);
+    let mut walked: Vec<Walked> = Vec::new();
     let mut aggregates: Vec<GroupAggregate> = Vec::new();
     // One `BreakdownKeying` per (remapped) source index, fed that source's
     // hits in log order — it is stateful (Ferry's pet remap, the
@@ -677,26 +806,42 @@ pub fn aggregate_groups(
             (key, damage_event.damage.max(0) as i64, bucket)
         };
 
-        let entry = match aggregates.iter().position(|aggregate| aggregate.key == key) {
-            Some(position) => &mut aggregates[position],
+        let aggregate_index = match aggregates.iter().position(|aggregate| aggregate.key == key) {
+            Some(position) => position,
             None => {
                 aggregates.push(GroupAggregate {
                     key,
                     measure: GroupMeasure::default(),
+                    merged: MergedMeasure::default(),
                     series: vec![0; chart_len],
                 });
-                aggregates.last_mut().expect("just pushed")
+                aggregates.len() - 1
             }
         };
+        let entry = &mut aggregates[aggregate_index];
 
         entry.measure.amount += damage;
         entry.measure.hits += 1;
         entry.measure.min = Some(entry.measure.min.map_or(damage, |min| min.min(damage)));
         entry.measure.max = Some(entry.measure.max.map_or(damage, |max| max.max(damage)));
         entry.series[bucket] += damage;
+
+        walked.push(Walked {
+            position,
+            aggregate_index,
+            damage,
+            is_echo: matches!(damage_event.action_id, ActionType::SupplementaryDamage(_)),
+        });
     }
 
+    // Before the sort, which invalidates the row indices it reads.
+    fold_landings(&mut aggregates, &walked, &pairing);
+
     // Largest first: the table's own order, and what a chart's legend expects.
+    // Ranked by the RAW measure even though the merged table reads
+    // `merged.amount`, for the reason `GroupReference` exists: one order for
+    // both views is what stops the bands repainting when a reader flips the
+    // collapse toggle.
     aggregates.sort_by_key(|aggregate| std::cmp::Reverse(aggregate.measure.amount));
 
     // `top_n` never removes a row — the table wants all of them. It only
@@ -706,6 +851,10 @@ pub fn aggregate_groups(
     if let Some(top_n) = query.top_n {
         if aggregates.len() > top_n {
             let mut other_measure = GroupMeasure::default();
+            // The landing view rolls up by the same rule: a table reading the
+            // merged view still shows this row for the tail, and leaving it at
+            // zero would make it disagree with the rows it summarises.
+            let mut other_merged = MergedMeasure::default();
             let mut other_series = vec![0i64; chart_len];
             for aggregate in &aggregates[top_n..] {
                 other_measure.amount += aggregate.measure.amount;
@@ -716,6 +865,15 @@ pub fn aggregate_groups(
                 if let Some(max) = aggregate.measure.max {
                     other_measure.max = Some(other_measure.max.map_or(max, |other| other.max(max)));
                 }
+                other_merged.amount += aggregate.merged.amount;
+                other_merged.hits += aggregate.merged.hits;
+                other_merged.supplementary += aggregate.merged.supplementary;
+                if let Some(min) = aggregate.merged.min {
+                    other_merged.min = Some(other_merged.min.map_or(min, |other| other.min(min)));
+                }
+                if let Some(max) = aggregate.merged.max {
+                    other_merged.max = Some(other_merged.max.map_or(max, |other| other.max(max)));
+                }
                 for (bucket, value) in aggregate.series.iter().enumerate() {
                     other_series[bucket] += value;
                 }
@@ -723,6 +881,7 @@ pub fn aggregate_groups(
             aggregates.push(GroupAggregate {
                 key: GroupKey::Other,
                 measure: other_measure,
+                merged: other_merged,
                 series: other_series,
             });
         }
@@ -807,6 +966,13 @@ mod tests {
                 min: None,
                 max: None,
             },
+            merged: MergedMeasure {
+                amount: 10,
+                hits: 1,
+                min: Some(10),
+                max: Some(10),
+                supplementary: 4,
+            },
             series: vec![1, 2],
         };
 
@@ -815,6 +981,9 @@ mod tests {
             json!({
                 "key": { "kind": "player", "index": 3 },
                 "measure": { "amount": 10, "hits": 2, "min": null, "max": null },
+                "merged": {
+                    "amount": 10, "hits": 1, "min": 10, "max": 10, "supplementary": 4
+                },
                 "series": [1, 2]
             })
         );
@@ -965,6 +1134,16 @@ mod tests {
         }
     }
 
+    /// [`player_hit`], but classified as the supplementary echo of `cause` —
+    /// the payload names the action that triggered it.
+    fn player_echo(player_index: u32, target_index: u32, cause: u32, damage: i32) -> DamageEvent {
+        DamageEvent {
+            action_id: ActionType::SupplementaryDamage(cause),
+            stun_value: None,
+            ..player_hit(player_index, target_index, cause, damage)
+        }
+    }
+
     /// A hit landing on party slot `victim_slot` (0..=3) from an enemy of
     /// `attacker_hash`, for `action`/`damage` — same shape as `mod.rs`'s own
     /// `damage_taken_by_slot0`, generalized so tests can distinguish
@@ -1093,11 +1272,29 @@ mod tests {
                 "series must sum to the measure for {:?}",
                 aggregate.key
             );
+            // The echo share is part of the landing, never more than it: a
+            // trigger's attached sum is a subset of its own amount, and an
+            // orphan echo's is the whole of it. A `supplementary`
+            // double-count is invisible to the totals below, which never
+            // read it.
+            assert!(
+                aggregate.merged.supplementary <= aggregate.merged.amount,
+                "the echo share cannot exceed the landing total for {:?}",
+                aggregate.key
+            );
         }
         let total: i64 = aggregates.iter().map(|a| a.measure.amount).sum();
         assert_eq!(
             total, expected_total,
             "aggregates must sum to the filtered total"
+        );
+        // The landing view redistributes damage between rows; it never creates
+        // or loses any. A merged total that drifts from the raw one means an
+        // echo was either double-counted or dropped.
+        let merged_total: i64 = aggregates.iter().map(|a| a.merged.amount).sum();
+        assert_eq!(
+            merged_total, total,
+            "the landing view must describe the same fight as the raw one"
         );
     }
 
@@ -2399,5 +2596,190 @@ mod tests {
 
         assert_eq!(reference.len(), 3, "every action in the whole fight");
         assert!(reference.iter().all(|row| row.key != GroupKey::Other));
+    }
+
+    /// The landing view: one Grade 1 Shot and its echo is ONE hit worth the
+    /// sum, not two hits averaging below the smaller of them. Log 2573's
+    /// defect, at the grain the table reads.
+    #[test]
+    fn merged_counts_landings_while_measure_counts_events() {
+        let events = vec![
+            (0, Message::DamageEvent(player_hit(0, 9, 9001, 154_500))),
+            (151, Message::DamageEvent(player_echo(0, 9, 9001, 92_681))),
+        ];
+        let query = friendly_damage_query(Dimension::Ability);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by ability is supported");
+
+        let direct = aggregates
+            .iter()
+            .find(|a| {
+                matches!(
+                    a.key,
+                    GroupKey::FriendlyAbility {
+                        action_type: ActionType::Normal(9001),
+                        ..
+                    }
+                )
+            })
+            .expect("the direct row");
+
+        // Raw view unchanged: the hit alone.
+        assert_eq!(direct.measure.hits, 1);
+        assert_eq!(direct.measure.amount, 154_500);
+
+        // Landing view: one hit, both damages, and the echo share for the bar.
+        assert_eq!(direct.merged.hits, 1);
+        assert_eq!(direct.merged.amount, 247_181);
+        assert_eq!(direct.merged.min, Some(247_181));
+        assert_eq!(direct.merged.max, Some(247_181));
+        assert_eq!(direct.merged.supplementary, 92_681);
+
+        // The echo's own aggregate contributes nothing to the landing view —
+        // its damage already sits on the trigger, and counting it here is the
+        // double-count the whole model exists to avoid.
+        let echo = aggregates
+            .iter()
+            .find(|a| {
+                matches!(
+                    a.key,
+                    GroupKey::FriendlyAbility {
+                        action_type: ActionType::SupplementaryDamage(_),
+                        ..
+                    }
+                )
+            })
+            .expect("the echo row");
+        assert_eq!(echo.measure.hits, 1);
+        assert_eq!(echo.merged.hits, 0);
+        assert_eq!(echo.merged.amount, 0);
+
+        // Both views describe the same fight.
+        let raw: i64 = aggregates.iter().map(|a| a.measure.amount).sum();
+        let merged: i64 = aggregates.iter().map(|a| a.merged.amount).sum();
+        assert_eq!(raw, merged, "the two views must sum to one total");
+    }
+
+    /// An orphan keeps today's behaviour in BOTH views, or its damage vanishes
+    /// from the merged total.
+    #[test]
+    fn an_orphan_echo_stays_its_own_landing() {
+        let events = vec![(0, Message::DamageEvent(player_echo(0, 9, 4242, 70)))];
+        let query = friendly_damage_query(Dimension::Ability);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by ability is supported");
+
+        assert_eq!(aggregates[0].merged.hits, 1);
+        assert_eq!(aggregates[0].merged.amount, 70);
+        assert_eq!(aggregates[0].merged.supplementary, 70);
+    }
+
+    /// A CLAIMED echo whose trigger the scrub window excluded stands alone as
+    /// its own landing. The pairing is learned from the whole log and never
+    /// narrows, so this gate is the only thing keeping the two views summing to
+    /// the same total under a filter — the `mod.rs` landing pass has the twin
+    /// of this test.
+    #[test]
+    fn a_claimed_echo_whose_trigger_the_window_excluded_lands_on_its_own() {
+        let events = vec![
+            (0, Message::DamageEvent(player_hit(0, 9, 9001, 154_500))),
+            (151, Message::DamageEvent(player_echo(0, 9, 9001, 92_681))),
+        ];
+        // Pinned so this cannot quietly degrade into the orphan case: the echo
+        // must really have a trigger for the gate under test to be the one
+        // that fires.
+        assert_eq!(
+            SuppPairing::learned_from(&events).trigger_of(1),
+            Some(0),
+            "the echo is claimed by the hit before it"
+        );
+
+        // Opens after the trigger (relative 0) and before the echo (151).
+        let mut query = friendly_damage_query(Dimension::Ability);
+        query.from_ms = Some(100);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by ability is supported");
+
+        assert_eq!(aggregates.len(), 1, "the trigger is outside the window");
+        assert_eq!(aggregates[0].merged.hits, 1);
+        assert_eq!(aggregates[0].merged.amount, 92_681);
+        assert_eq!(aggregates[0].merged.supplementary, 92_681);
+
+        let raw: i64 = aggregates.iter().map(|a| a.measure.amount).sum();
+        let merged: i64 = aggregates.iter().map(|a| a.merged.amount).sum();
+        assert_eq!(raw, merged, "the two views still sum to one total");
+    }
+
+    /// The same gate the other way round: a trigger absorbs only the echoes
+    /// that survived alongside it, or the merged view would carry damage the
+    /// raw view does not have.
+    #[test]
+    fn a_trigger_does_not_attach_an_echo_the_window_excluded() {
+        let events = vec![
+            (0, Message::DamageEvent(player_hit(0, 9, 9001, 154_500))),
+            (151, Message::DamageEvent(player_echo(0, 9, 9001, 92_681))),
+        ];
+
+        // Closes after the trigger (relative 0) and before the echo (151).
+        let mut query = friendly_damage_query(Dimension::Ability);
+        query.up_to_ms = Some(100);
+
+        let aggregates = aggregate_groups(
+            &events,
+            &Default::default(),
+            &[],
+            &[],
+            &query,
+            0,
+            1_000,
+            1,
+            MeterFilters::default(),
+        )
+        .expect("friendly damage grouped by ability is supported");
+
+        assert_eq!(aggregates.len(), 1, "the echo is outside the window");
+        assert_eq!(aggregates[0].merged.hits, 1);
+        assert_eq!(
+            aggregates[0].merged.amount, 154_500,
+            "the excluded echo rode along with nothing"
+        );
+        assert_eq!(aggregates[0].merged.supplementary, 0);
+
+        let raw: i64 = aggregates.iter().map(|a| a.measure.amount).sum();
+        let merged: i64 = aggregates.iter().map(|a| a.merged.amount).sum();
+        assert_eq!(raw, merged, "the two views still sum to one total");
     }
 }

@@ -237,6 +237,23 @@ export type SkillTargetState = {
   totalDamage: number;
 };
 
+/** The LANDING view of one skill: an echo counted as part of the hit that
+ * caused it rather than a hit of its own (mirrors the Rust
+ * `MergedSkillMeasure`).
+ *
+ * For a direct action, `hits` counts landings and the amounts include their
+ * echoes. For an echo action, this describes its UNCLAIMED residue only — a
+ * claimed echo's damage already sits on its trigger, so a fully-claimed echo
+ * row is all zeros. */
+export type MergedSkillMeasure = {
+  hits: number;
+  damage: number;
+  min: number | null;
+  max: number | null;
+  /** The echo damage inside `damage`. */
+  supplementary: number;
+};
+
 export type SkillState = {
   /** ActionType of the skill */
   actionType: ActionType;
@@ -250,17 +267,8 @@ export type SkillState = {
   maxDamage: number | null;
   /** Total damage of the skill */
   totalDamage: number;
-  /** Skybound Arts gauge MEASURED on this skill, in a grant frame the hook
-   * could read a cause from. Locally simulated players only — a remote member's
-   * gauge is synced rather than granted by a hit the hook can see, so this is 0
-   * for them and `sbaInferred` carries what could be deduced instead.
-   * Optional: a backend older than the field sends nothing (dev HMR skew). */
+  merged?: MergedSkillMeasure;
   sbaGenerated?: number;
-  /** Skybound Arts gauge CORRELATED with this skill by the parser rather than
-   * measured on it — how a remote member's rows get filled at all. Kept apart
-   * from `sbaGenerated` so the table can always distinguish a deduction from a
-   * reading; summed, the two are the row's best estimate.
-   * Optional: a backend older than the field sends nothing. */
   sbaInferred?: number;
   /** Total stun value of the skill hits */
   totalStunValue: number;
@@ -430,12 +438,34 @@ export type WireGroupQuery = {
 /** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`). */
 export type GroupMeasure = { amount: number; hits: number; min: number | null; max: number | null };
 
+/** The same row under the LANDING model, where an echo is part of the hit that
+ * caused it rather than a hit of its own (mirrors the Rust `MergedMeasure`).
+ *
+ * For a direct action, `hits` counts landings and the amounts include their
+ * echoes. For an echo action, this describes its UNCLAIMED residue only —
+ * a claimed echo's damage already sits on its trigger. */
+export type MergedMeasure = GroupMeasure & { supplementary: number };
+
 /** One (filters × groupBy) row/band pair from `aggregate_groups` (mirrors the
  * Rust `GroupAggregate`): the table (`key` + `measure`) and the chart
  * (`key` + `series`) come from the same grouping, so the two can never
  * disagree. `series` is a whole-fight per-bucket band, same buckets as
- * `dpsChart` — the view slices it client-side. */
-export type GroupAggregate = { key: GroupKey; measure: GroupMeasure; series: number[] };
+ * `dpsChart` — the view slices it client-side, and it stays the RAW view.
+ * `merged` is the same totals under the supplementary collapse; the toggle
+ * picks between them, which is what keeps flipping it free of a refetch.
+ *
+ * REQUIRED, unlike `SkillState.merged`, which is optional with a raw fallback
+ * behind it. Both mirror non-`Option` Rust fields, so the same backend skew
+ * would reach both — but they fail differently. An aggregate arriving without
+ * it throws in `addSplit` on the first `+=`, loudly, at the version boundary
+ * where the skew belongs; a `SkillState` without it would sum to zero and draw
+ * a row of confident zeros. Only the quiet failure earns a guard. */
+export type GroupAggregate = {
+  key: GroupKey;
+  measure: GroupMeasure;
+  merged: MergedMeasure;
+  series: number[];
+};
 
 /** One key's WHOLE-FIGHT total, ignoring everything the query narrows in time
  * (mirrors the Rust `GroupReference`).
@@ -1015,13 +1045,8 @@ export type LogEvent = [number, LogEventPayload];
 /** Mirrors the Rust `EventPage`. `total` can exceed `events.length` — the
  * frontend asks for a capped page, and a log past the cap is truncated VISIBLY
  * (see EventsTab), never silently. */
-export type EventPage = { events: LogEvent[]; total: number; capUp: Record<string, PlayerCapUp> };
+export type EventPage = { events: LogEvent[]; total: number; capUp: Record<string, PlayerCapUp>;   suppPairs: Record<number, number>; };
 
-/** Mirrors the Rust `PlayerCapUp`: the game's OWN cap-up total per attack class,
- * not a decomposition. Every field is independently optional — a record read
- * that resolved two classes must not claim zero for the third. Keyed in
- * `EventPage.capUp` by the slot key a damage row carries as
- * `source.parent_index`; a player absent from that map predates the capture. */
 export type PlayerCapUp = {
   normal: number | null;
   skill: number | null;
