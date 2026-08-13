@@ -4,6 +4,14 @@
 [![GitHub Downloads](https://img.shields.io/github/downloads/villith/relink-logs/total)](https://github.com/villith/relink-logs/releases)
 [![GitHub License](https://img.shields.io/github/license/villith/relink-logs)](./LICENSE)
 
+# Windows Defender / Virus
+
+**There is no virus**, it is an issue with some of the modules used for Linux support that were incorrectly included in the Windows bundle
+
+If Windows Defender is flagging relink-logs as a virus, you likely are running version 1.12.12. Updating to version 1.12.13 should solve your issue
+
+## Description
+
 Overlay DPS parser/meter for Granblue Fantasy: Relink.
 
 Relink Logs was built upon [false-spring/gbfr-logs](https://github.com/false-spring/gbfr-logs), which is no longer maintained. This project is an independent continuation and is **not affiliated with** the original gbfr-logs project. The original work was based on the reverse engineering from [nyaoouo/GBFR-ACT](https://github.com/nyaoouo/GBFR-ACT).
