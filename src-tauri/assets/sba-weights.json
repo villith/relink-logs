@@ -2456,6 +2456,26 @@
     "conf": "med",
     "src": "re(2026-08-13): ghost volley wp0791/2/3 seq 3411 (9.77) x spartsGageRate_Wp079x {0.1539,0.1539,0.0244}; wp0794 1.0854 if 4th ghost participates. Volley sum 3.25 matches log-solved 3.3 (n=1, sba_share_check)",
     "name": "ヒン・リヒテンLv4"
+   },
+   "9995": {
+    "w": 0.1385,
+    "weights": [
+     0.0439,
+     0.1385,
+     0.2
+    ],
+    "conf": "verified",
+    "src": "measured (sba_grant_scan logs 2523/2524: 69 captioned grants, K link-anchored; exact clusters) = ghost auto-attack, authored base {0.9 ghosts1/2, 1.8 ghosts3/4} x spartsGageRate_Wp079x {0.1539,0.0244,0.1111}; base rate file not located (not wp seq, not wp FSM)",
+    "name": ""
+   },
+   "4294967295": {
+    "w": 0.1385,
+    "weights": [
+     0.1385
+    ],
+    "conf": "low",
+    "src": "remote-only: damage-carrying hits with no action id (log 2517 n=14, median dmg 13.6K; local Ferry logs never produce the id, so it is a remote-read artifact of some ghost/pet attack) — priced at the dominant measured ghost-attack weight pending a targeted round",
+    "name": ""
    }
   }
  },
@@ -6338,12 +6358,12 @@
     "name": "【空中】連打 4段目"
    },
    "175": {
-    "w": 0.9,
+    "w": 3.0,
     "weights": [
-     0.9
+     3.0
     ],
-    "conf": "high",
-    "src": "seq_edit_attack",
+    "conf": "verified",
+    "src": "measured exactly 3.0 (sba_grant_scan log 2561 n=9) = seq motion 3183 (Chromatic Wings finisher); the mechanical layer bound only base motion 3065 (0.9) but the id belongs to the transformed finisher (lang: 'Attack Finisher (Chromatic Wings)')",
     "name": "【空中】連打 フィニッシュ"
    },
    "210": {
@@ -7164,6 +7184,15 @@
     "src": "measured 2.8 (sba_share_check n=17, high spread)",
     "name": "□□□△ 溜めあり(ダメージ上限設定用)"
    },
+   "175": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "low",
+    "src": "fsm:move_shot_3fin_lvN (Power Finisher 3); remote-implicated gauge only 10.0, no local logs to verify",
+    "name": "□□□△△（単体DPSフィニッシュ）"
+   },
    "176": {
     "w": 1.8,
     "weights": [
@@ -7877,6 +7906,15 @@
     "conf": "high",
     "src": "seq_edit_attack",
     "name": "アビリティ 移動式ランパート(終了)"
+   },
+   "9999": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "system-spawned Enhanced Etude of Devotion (not in action msg -> no authored rate -> attack-record ctor default 1.0, same mechanism as Fliegerkugel); remote solve w~1.09 (sba_share_check n=7) agrees",
+    "name": ""
    }
   }
  },
