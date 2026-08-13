@@ -54,7 +54,11 @@ describe("AmountCell", () => {
     expect(container.querySelector('[data-cell="amount"]')?.textContent).toBe("");
   });
 
-  it("shows the cap card on hover of a damage row", () => {
+  // Every test below asserts the cap card's contents, and the card is
+  // temporarily disabled in `AmountCell` (`shows`). They are skipped rather
+  // than deleted: the derivation they cover is untouched, so restoring the
+  // card restores its coverage by dropping the `.skip`s.
+  it.skip("shows the cap card on hover of a damage row", () => {
     renderCell({ amount: 1_500_000, capHit, width: 78 });
     hover("1,500,000");
     const card = screen.getByTestId("cap-card");
@@ -74,7 +78,7 @@ describe("AmountCell", () => {
   // model can account for. With no loadout to reconstruct from, that is all of
   // it — the alternative, reporting zero unaccounted, would claim a
   // reconstruction that never ran.
-  it("shows the game's cap-up total and the unaccounted remainder", () => {
+  it.skip("shows the game's cap-up total and the unaccounted remainder", () => {
     renderCell({
       amount: 1_500_000,
       capHit,
@@ -91,7 +95,7 @@ describe("AmountCell", () => {
 
   // Selection is by the hit's OWN class. A Skybound Art must not be explained
   // with the Normal total, which is a different number entirely.
-  it("picks the cap-up matching the hit's attack class", () => {
+  it.skip("picks the cap-up matching the hit's attack class", () => {
     renderCell({
       amount: 1_500_000,
       capHit: { ...capHit, class_flags: 0x40000 },
@@ -105,7 +109,7 @@ describe("AmountCell", () => {
   // Without the ladder the record IS the total, and its components itemize it:
   // Fatebreaker L15 (+50%, fused into the record at load) shows as a sub-row
   // and comes off the record's own remainder.
-  it("itemizes the record's components and shrinks the unaccounted row", () => {
+  it.skip("itemizes the record's components and shrinks the unaccounted row", () => {
     renderCell({
       amount: 1_500_000,
       capHit,
@@ -124,7 +128,7 @@ describe("AmountCell", () => {
   // ladder, the total becomes per-hit (cap / base − 1), and the plain DMG Cap
   // trait — the one derived term the record does NOT contain — attributes
   // against it alongside the record.
-  it("uses the ladder base and the formula verdict when the character is known", () => {
+  it.skip("uses the ladder base and the formula verdict when the character is known", () => {
     renderCell({
       amount: 152_737,
       capHit: { ...capHit, damage_cap: 152_737, attack_rate: 0.54 },
@@ -143,7 +147,7 @@ describe("AmountCell", () => {
     expect(card.querySelector('[data-cap-row="unaccounted"]')?.textContent).toContain("1,165.99%");
   });
 
-  it("marks a conditional trait's row as a potential, outside the sum", () => {
+  it.skip("marks a conditional trait's row as a potential, outside the sum", () => {
     renderCell({
       amount: 152_737,
       capHit: { ...capHit, damage_cap: 152_737, attack_rate: 0.54 },
@@ -167,7 +171,7 @@ describe("AmountCell", () => {
   // is "+15%, always" — active with no conditions at all — and it is NOT
   // inside the captured record (log 2573 reconciliation), so its derived
   // total attributes as its own row beside the record.
-  it("credits the derived channel total against the game total", () => {
+  it.skip("credits the derived channel total against the game total", () => {
     renderCell({
       amount: 152_737,
       capHit: { ...capHit, damage_cap: 152_737, attack_rate: 0.54 },

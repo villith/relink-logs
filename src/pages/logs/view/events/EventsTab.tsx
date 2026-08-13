@@ -117,6 +117,9 @@ const ROW_HEIGHT = 30;
 /** The sticky header's height. Subtracted when jumping, because it overlays the
  * top of the list — a row placed without it lands underneath the column names. */
 const HEAD_HEIGHT = 28;
+/** Whether the jump-to-time control is drawn. Off for now — the jump machinery
+ * itself stays wired up, so this is the only line to flip to get it back. */
+const SHOWS_JUMP_BAR = false;
 /** Rows rendered beyond each edge of the viewport, so a fast scroll does not
  * outrun the render. */
 const OVERSCAN = 10;
@@ -618,7 +621,9 @@ export const EventsTab = ({ stream, labels, playerData }: EventsTabProps) => {
 
   return (
     <Box style={{ padding: "4px 16px 14px" }}>
-      <EventJumpBar text={jumpText} onTextChange={setJumpText} onCommit={commit} missed={missed} />
+      {/* Jump to a moment in the stream — temporarily hidden. The control and
+          its wiring are left intact; drop the guard to bring it back. */}
+      {SHOWS_JUMP_BAR && <EventJumpBar text={jumpText} onTextChange={setJumpText} onCommit={commit} missed={missed} />}
 
       {/* The metric's own sub-filters, the way each Warcraft Logs tab carries
           its own row of them. Only the kinds THIS metric's stream is made of,

@@ -115,7 +115,11 @@ export const AmountCell = ({
     };
     return capCardRows(capHit, context);
   }, [capHit, playerCapUp, loadout, characterType, conditions]);
-  const shows = rows.length > 1;
+  // The cap breakdown card is temporarily off — the Amount cell renders the
+  // bare number and opens nothing. The derivation below is left intact and
+  // still runs; restore the card by putting `rows.length > 1` back.
+  // const shows = rows.length > 1;
+  const shows = false;
 
   // Memoized because `CursorCard` re-renders on every committed cursor frame
   // and only its own position should change; see its `content` prop.

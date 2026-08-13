@@ -493,7 +493,10 @@ const commit = (text: string) => {
   fireEvent.keyDown(jumpInput(), { key: "Enter" });
 };
 
-describe("EventsTab, jump to a time", () => {
+// Skipped while the jump-to-time control is hidden (`SHOWS_JUMP_BAR` in
+// `EventsTab`): every case here drives the input, which is no longer rendered.
+// The jump machinery itself is untouched, so unskipping restores the coverage.
+describe.skip("EventsTab, jump to a time", () => {
   it("scrolls the list to the first row at or past a typed time", () => {
     page = { events: LONG, total: LONG.length, suppPairs: {} };
     const { container } = renderTab();
