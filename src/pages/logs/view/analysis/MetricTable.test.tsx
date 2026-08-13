@@ -205,10 +205,12 @@ describe("MetricTable", () => {
     // bar has taken out of itself is not left standing empty.
     expect(container.querySelectorAll("[data-row-art-empty]")).toHaveLength(1);
 
-    // Every bar is bitten and anchored to the art's centre, art or none.
-    const bars = container.querySelectorAll<HTMLElement>("[data-testid='metric-bar-segment']");
-    expect(bars).toHaveLength(2);
-    for (const bar of bars) expect(bar.style.clipPath).toContain("polygon");
+    // Every bar draws the fixed head at the art's centre, art or none, and
+    // measures its fill from the art box's right edge.
+    const heads = container.querySelectorAll<HTMLElement>("[data-bar-head]");
+    expect(heads).toHaveLength(2);
+    for (const head of heads) expect(head.style.clipPath).toContain("polygon");
+    expect(container.querySelectorAll("[data-testid='metric-bar-segment']")).toHaveLength(2);
   });
 
   it("heads an actor's bar itself rather than biting a notch for art that cannot fill it", () => {
@@ -217,11 +219,11 @@ describe("MetricTable", () => {
     // behind the character where the row's own colour belongs. The bar draws
     // the diamond's head instead and the bust stands on it — same silhouette.
     const { container } = renderTable({ rowKind: "player", rowArt: () => "/art/gran.png" });
-    const bars = container.querySelectorAll<HTMLElement>("[data-testid='metric-bar-segment']");
-    for (const bar of bars) expect(bar.style.clipPath).toContain("polygon");
+    const heads = container.querySelectorAll<HTMLElement>("[data-bar-head]");
+    for (const head of heads) expect(head.style.clipPath).toContain("polygon");
     // Reaching back to the art's LEFT EDGE, not its centre: the head has to
     // cover the box the bust stands in.
-    expect(container.querySelector<HTMLElement>("[data-bar-track]")?.className).toContain("left-[var(--row-pad)]");
+    expect(heads[0].className).toContain("left-[var(--row-pad)]");
     // The art is still drawn at the bar's own height.
     expect(container.querySelector("img")?.className).toContain("size-art");
   });
@@ -232,9 +234,9 @@ describe("MetricTable", () => {
       { ...ROWS[1], kind: "ability" },
     ];
     const { container } = renderTable({ rows: mixed, rowKind: "player", rowArt: () => "/art/a.png" });
-    const tracks = container.querySelectorAll<HTMLElement>("[data-bar-track]");
-    expect(tracks[0].className).toContain("left-[var(--row-pad)]");
-    expect(tracks[1].className).toContain("left-[calc(var(--row-pad)_+_var(--spacing-art)/2)]");
+    const heads = container.querySelectorAll<HTMLElement>("[data-bar-head]");
+    expect(heads[0].className).toContain("left-[var(--row-pad)]");
+    expect(heads[1].className).toContain("left-[calc(var(--row-pad)_+_var(--spacing-art)/2)]");
   });
 
   it("stands the row's rectangular outline down where the bar draws a shaped ring", () => {

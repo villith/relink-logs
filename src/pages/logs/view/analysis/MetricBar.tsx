@@ -1,13 +1,13 @@
 import { Box } from "@mantine/core";
 
-/** How a bar's left end meets the art standing at it.
+/** How a bar's head meets the art standing at it.
  *
- * `notch` — a concave bite, which an ability's DIAMOND fills exactly: the bar
- *           starts at the art's centre and the bite's point lands on the art's
- *           right corner.
+ * `notch` — a concave bite, which an ability's DIAMOND fills exactly: the head
+ *           is the art box's right half with the bite cut through it, so the
+ *           diamond drops in and the two corner slivers frame it.
  * `point` — the same silhouette drawn the other way round, for art that is not
- *           a diamond. The bar starts at the art's left edge and its head IS
- *           the diamond's left half, so a character bust stands on the row's
+ *           a diamond. The head covers the art's whole box with its left end
+ *           cut to the diamond's point, so a character bust stands on the row's
  *           own colour instead of on the page's ground.
  *
  * Either way the art and the bar together read as ONE shape — a diamond drawn
@@ -40,57 +40,79 @@ export type MetricBarProps = {
  * matches the diamond it is cut for. */
 const ART = { row: "var(--spacing-art)", card: "var(--spacing-art-card)" } as const;
 
-/** Half the art, which is what makes a head's slope 45° — the diamond's own,
- * and what makes the bite the diamond's own RIGHT HALF, so the art covers it
- * exactly.
- *
- * Never a share of the fill. Capping it at 35% (so a short bar could not be
- * eaten) is what made short bars bleed into the art: at a stub depth the fill
- * keeps its square left edge and stands as a block inside the art's box, where
- * at full depth every pixel of it is under opaque art. A floor on the fill is
- * the honest fix — see `MIN_FILL`. */
+/** Half the art, which is what makes a head's slope 45° — the diamond's own. */
 const depth = (art: string) => `calc(${art} / 2)`;
 
-/** How short a headed fill may draw: its head, and a little body behind it.
+/** The proportional track's left edge on a HEADED bar: the art box's RIGHT
+ * edge, whichever way the head meets the art. The fill's zero starts where the
+ * icon ends and its hundred at the row's right edge — the head is identity,
+ * drawn in full whatever the value, and the fill alone states the magnitude.
+ * When the head rode the fill inside the measured track, the icon's width was
+ * counted into every proportion and a short bar was mostly head.
  *
- * At exactly the head's depth a bar is two corner slivers meeting at a point
- * with nothing joining them — the head with no prism behind it. The floor costs
- * a few pixels of proportion on the smallest rows and is what keeps every bar
- * the same figure. */
-const MIN_FILL = (art: string) => `calc(${art} / 2 + 4px)`;
-
-/** The fill's left edge. A notch starts at the art's CENTRE, so its point lands
- * on the art's right corner; a point starts at the art's left edge, so the head
- * fills the art's box behind it. Reading `--row-pad` rather than restating
- * `px-2` is what keeps an INDENTED row's head under its own art (see
- * `MetricTable`'s subrows).
+ * Less one pixel, tucked back UNDER the head: two pieces abutting at a
+ * fractional coordinate rasterize separately, and antialiasing opened a
+ * hairline of the page between them. The overlap is invisible because head and
+ * fill are opaque inside one shared-opacity group (see the render) — the same
+ * reason the overlap could not simply be painted before, when each piece
+ * carried the opacity itself and any overlap composited darker.
  *
- * Classes, not inline styles: `calc()` over custom properties is exactly what
- * jsdom's style parser drops, so the geometry would be invisible to a test. */
-const NOTCH_LEFT: Record<BarVariant, string> = {
-  row: "left-[calc(var(--row-pad)_+_var(--spacing-art)/2)] right-0",
-  card: "left-[calc(var(--row-pad)_+_var(--spacing-art-card)/2)] right-0",
+ * Reading `--row-pad` rather than restating `px-2` is what keeps an INDENTED
+ * row's geometry under its own art (see `MetricTable`'s subrows).
+ *
+ * Classes, not inline styles, here and in `HEAD_POS`: `calc()` over custom
+ * properties is exactly what jsdom's style parser drops, so the geometry would
+ * be invisible to a test. */
+const TRACK_LEFT: Record<BarVariant, string> = {
+  row: "left-[calc(var(--row-pad)_+_var(--spacing-art)_-_1px)] right-0",
+  card: "left-[calc(var(--row-pad)_+_var(--spacing-art-card)_-_1px)] right-0",
 };
 
-/** A POINTED head starts at the art's left edge whatever the geometry, so it
- * does not vary by variant the way the notch's inset does. */
-const POINT_LEFT = "left-[var(--row-pad)] right-0";
+/** Where the fixed head stands and how wide it is. A POINTED head covers the
+ * art's whole box, back to its left edge; a NOTCHED head is the box's right
+ * half alone — the bite consumes the rest, and the diamond's own left half
+ * covers the box's left half in art. */
+const HEAD_POS: Record<BarVariant, Record<BarHead, string>> = {
+  row: {
+    notch: "left-[calc(var(--row-pad)_+_var(--spacing-art)/2)] w-[calc(var(--spacing-art)/2)]",
+    point: "left-[var(--row-pad)] w-[var(--spacing-art)]",
+  },
+  card: {
+    notch: "left-[calc(var(--row-pad)_+_var(--spacing-art-card)/2)] w-[calc(var(--spacing-art-card)/2)]",
+    point: "left-[var(--row-pad)] w-[var(--spacing-art-card)]",
+  },
+};
 
-const leftOf = (variant: BarVariant, head: BarHead) => (head === "point" ? POINT_LEFT : NOTCH_LEFT[variant]);
-
-/** The bar's silhouette, as the corners of its clip polygon, clockwise from the
- * one that sits at the head.
+/** The head's silhouette, in shares of its own box — the box is sized to the
+ * art (see `HEAD_POS`), so percentages land the 45° slopes exactly.
  *
- * Written ONCE. Both the fill's clip and the hover ring trace this same figure
- * — the ring twice, outer then inset — so stating it per consumer is how the
- * notch's slope comes to differ from the ring drawn around it. */
+ * `point` — the box with its left end cut to the diamond's point.
+ * `notch` — the box's left edge notched through to its right edge, leaving the
+ *           two corner slivers the nested diamond stands between. */
+const HEAD_CLIP: Record<BarHead, string> = {
+  point: "polygon(50% 0, 100% 0, 100% 100%, 50% 100%, 0 50%)",
+  notch: "polygon(0 0, 100% 0, 100% 100%, 0 100%, 100% 50%)",
+};
+
+/** The hover ring's left edge: the whole silhouette's own start, which is the
+ * head's — a notch begins at the art's centre, a point at the art's left edge. */
+const RING_LEFT: Record<BarVariant, Record<BarHead, string>> = {
+  row: {
+    notch: "left-[calc(var(--row-pad)_+_var(--spacing-art)/2)] right-0",
+    point: "left-[var(--row-pad)] right-0",
+  },
+  card: {
+    notch: "left-[calc(var(--row-pad)_+_var(--spacing-art-card)/2)] right-0",
+    point: "left-[var(--row-pad)] right-0",
+  },
+};
+
+/** The bar's whole silhouette, as the corners of its clip polygon, clockwise
+ * from the one that sits at the head — what the hover ring traces. */
 const outline = (head: BarHead, d: string): string[] =>
   head === "notch"
     ? ["0 0", "100% 0", "100% 100%", "0 100%", `${d} 50%`]
     : [`${d} 0`, "100% 0", "100% 100%", `${d} 100%`, "0 50%"];
-
-/** The head, cut out of the segment that stands at the fill's left edge. */
-const clipOf = (head: BarHead, art: string) => `polygon(${outline(head, depth(art)).join(", ")})`;
 
 /** The hover ring, as a ONE-PIECE outline of the bar's own silhouette.
  *
@@ -103,10 +125,7 @@ const clipOf = (head: BarHead, art: string) => `polygon(${outline(head, depth(ar
  *
  * The 1.415px and 2.415px are not arbitrary: insetting a 45° corner by a pixel
  * moves it √2 along its bisector, and an inset horizontal edge meets an inset
- * 45° diagonal one further pixel along.
- *
- * The ring spans the whole row, so its head is measured against the art alone —
- * no 35% cap, which only exists to keep a SHORT FILL from being eaten. */
+ * 45° diagonal one further pixel along. */
 const ringClip = (head: BarHead, art: string) => {
   const d = depth(art);
   const far = "calc(100% - 1px)";
@@ -120,21 +139,12 @@ const ringClip = (head: BarHead, art: string) => {
   return `polygon(${points.join(", ")})`;
 };
 
-/** Every shape a bar can take, resolved at module load.
- *
- * There are exactly two variants and two heads, so there are four answers — and
- * a bar was rebuilding all of them, seven string allocations for the ring
- * alone, on every render of every row. The same reason `NOTCH_LEFT` above is a
- * table rather than a function. */
-const SHAPE: Record<BarVariant, Record<BarHead, { clip: string; ring: string; minWidth: string }>> = {
-  row: {
-    notch: { clip: clipOf("notch", ART.row), ring: ringClip("notch", ART.row), minWidth: MIN_FILL(ART.row) },
-    point: { clip: clipOf("point", ART.row), ring: ringClip("point", ART.row), minWidth: MIN_FILL(ART.row) },
-  },
-  card: {
-    notch: { clip: clipOf("notch", ART.card), ring: ringClip("notch", ART.card), minWidth: MIN_FILL(ART.card) },
-    point: { clip: clipOf("point", ART.card), ring: ringClip("point", ART.card), minWidth: MIN_FILL(ART.card) },
-  },
+/** Every ring a bar can wear, resolved at module load — two variants and two
+ * heads, so four answers, rather than seven string allocations per render of
+ * every row. */
+const RING: Record<BarVariant, Record<BarHead, string>> = {
+  row: { notch: ringClip("notch", ART.row), point: ringClip("point", ART.row) },
+  card: { notch: ringClip("notch", ART.card), point: ringClip("point", ART.card) },
 };
 
 /** The proportional fill behind a row, a card entry or a chart tooltip entry.
@@ -142,9 +152,16 @@ const SHAPE: Record<BarVariant, Record<BarHead, { clip: string; ring: string; mi
  * ONE bar wherever a magnitude is drawn, so the three cannot disagree about how
  * long a number looks.
  *
+ * A headed bar is TWO pieces: a fixed head in the art's box, drawn in full
+ * whatever the value, and the proportional fill starting at the box's right
+ * edge. The head is the row's identity — the icon standing on its own colour —
+ * and the fill alone states the magnitude, so two rows of one value always
+ * draw the same length past their icons.
+ *
  * The supplementary split is two SIBLING segments rather than a nested one:
- * the track already carries an opacity, so a child of the same colour inside
- * it paints identically to its parent and no split would appear.
+ * the bar already renders under a group opacity, so a child of the same colour
+ * inside the direct segment would paint identically to it and no split would
+ * appear.
  *
  * Hover deliberately does NOT raise the fill's opacity. Taking it to 0.62 put
  * three of four row names below 4.5:1 — the row got harder to read at the exact
@@ -156,16 +173,6 @@ export const MetricBar = ({ value, subValue, largest, color, variant, head }: Me
   const supplementary = subValue !== undefined && subValue > 0 ? Math.min(subValue, value) : 0;
   const direct = value - supplementary;
 
-  const shape = head ? SHAPE[variant][head] : undefined;
-  // The head belongs to whichever segment stands at the fill's left edge, and
-  // that is the supplementary one on a row that is supplementary in full.
-  // Clipping the TRACK instead would measure the head against the whole row
-  // rather than against the fill, and eat a short bar entirely.
-  const headOn = (segment: "direct" | "supplementary") =>
-    shape && segment === (direct > 0 ? "direct" : "supplementary")
-      ? { clipPath: shape.clip, minWidth: shape.minWidth }
-      : undefined;
-
   // The row's own separation, so the pixels between two bars still belong to a
   // row and the hover card survives the crossing. The card draws edge to edge;
   // only the row insets.
@@ -173,63 +180,81 @@ export const MetricBar = ({ value, subValue, largest, color, variant, head }: Me
 
   return (
     <>
-      <Box
-        aria-hidden
-        // Named, because everything else on a row is aria-hidden too — the art,
-        // the ring — and a test picking the track out by that alone finds
-        // whichever comes first.
-        data-bar-track
-        className={[
-          // background-color, never the `background` shorthand: the shorthand
-          // resets background-size and has broken full-width bars here before.
-          // A horizontal inset is what makes the track's width real — the
-          // segments are absolute and contribute nothing, so without one every
-          // bar renders at zero pixels.
-          //
-          // ONE opacity for the row and the card. The card used to override it
-          // to 0.38, which was never a reasoned difference, only an unshared
-          // literal. Over --color-panel the worst palette entry (#9BCF53)
-          // composites to L=0.122, which is 6.1:1 against the card's white
-          // label.
-          "pointer-events-none absolute rounded-xs opacity-[0.42]",
-          // A headed bar starts at its art and still reaches the row's right
-          // edge; an unheaded one is full-bleed.
-          head ? leftOf(variant, head) : "inset-x-0",
-          insetY,
-        ].join(" ")}
-      >
-        <Box
-          data-testid="metric-bar-segment"
-          className="pointer-events-none absolute inset-y-0 rounded-xs"
-          style={{ left: "0%", width: `${pct(direct)}%`, backgroundColor: color, ...headOn("direct") }}
-        />
-        {supplementary > 0 && (
+      {/* Head and fill inside ONE opacity group. Each piece painting the 0.42
+          itself is what drew a seam: two abutting translucent edges antialias
+          against the page between them, and overlapping them instead
+          composites darker. Opaque pieces under one group opacity can overlap
+          freely — which is what lets the fill tuck a pixel back under the head
+          (see `TRACK_LEFT`) and the join disappear. */}
+      <Box aria-hidden className={["pointer-events-none absolute inset-x-0 opacity-[0.42]", insetY].join(" ")}>
+        {/* The fixed head. OUTSIDE the track so the track's width — which the
+            segment percentages measure against — is the fill's alone. */}
+        {head && (
           <Box
-            data-testid="metric-bar-segment"
-            className="pointer-events-none absolute inset-y-0 rounded-xs opacity-45"
-            style={{
-              left: `${pct(direct)}%`,
-              width: `${pct(supplementary)}%`,
-              backgroundColor: color,
-              ...headOn("supplementary"),
-            }}
+            aria-hidden
+            data-bar-head
+            className={["pointer-events-none absolute inset-y-0", HEAD_POS[variant][head]].join(" ")}
+            style={{ backgroundColor: color, clipPath: HEAD_CLIP[head] }}
           />
         )}
+        <Box
+          aria-hidden
+          // Named, because everything else on a row is aria-hidden too — the art,
+          // the ring — and a test picking the track out by that alone finds
+          // whichever comes first.
+          data-bar-track
+          className={[
+            // background-color, never the `background` shorthand: the shorthand
+            // resets background-size and has broken full-width bars here before.
+            // A horizontal inset is what makes the track's width real — the
+            // segments are absolute and contribute nothing, so without one every
+            // bar renders at zero pixels.
+            //
+            // The 0.42 lives on the group above — ONE opacity for the row and
+            // the card. The card used to override it to 0.38, which was never
+            // a reasoned difference, only an unshared literal. Over
+            // --color-panel the worst palette entry (#9BCF53) composites to
+            // L=0.122, which is 6.1:1 against the card's white label.
+            "pointer-events-none absolute inset-y-0 rounded-xs",
+            // A headed bar's fill starts where its art box ends and reaches the
+            // row's right edge; an unheaded one is full-bleed.
+            head ? TRACK_LEFT[variant] : "inset-x-0",
+          ].join(" ")}
+        >
+          <Box
+            data-testid="metric-bar-segment"
+            // Square left corners against a head: a rounded start cut two dark
+            // notches into the very seam the overlap exists to close.
+            className={["pointer-events-none absolute inset-y-0", head ? "rounded-r-xs" : "rounded-xs"].join(" ")}
+            style={{ left: "0%", width: `${pct(direct)}%`, backgroundColor: color }}
+          />
+          {supplementary > 0 && (
+            <Box
+              data-testid="metric-bar-segment"
+              className="pointer-events-none absolute inset-y-0 rounded-xs opacity-45"
+              style={{
+                left: `${pct(direct)}%`,
+                width: `${pct(supplementary)}%`,
+                backgroundColor: color,
+              }}
+            />
+          )}
+        </Box>
       </Box>
       {/* OUTSIDE the track, whose 0.42 opacity would fade it, and only on a row
           — a card entry is not a hover target of its own. The row it sits in
           carries the `group`, and suppresses its own rectangular outline in
           favour of this (see `AnalysisRow`). */}
-      {head && shape && variant === "row" && (
+      {head && variant === "row" && (
         <Box
           aria-hidden
           data-bar-ring
           className={[
             "pointer-events-none absolute opacity-0 group-hover:opacity-100",
-            leftOf(variant, head),
+            RING_LEFT[variant][head],
             insetY,
           ].join(" ")}
-          style={{ backgroundColor: "var(--color-line-strong)", clipPath: shape.ring }}
+          style={{ backgroundColor: "var(--color-line-strong)", clipPath: RING[variant][head] }}
         />
       )}
     </>
