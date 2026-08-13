@@ -4,14 +4,16 @@
 //! ## Why
 //!
 //! An enlisted character (another player's character running as a local AI)
-//! carries a full locally-simulated record — sigils, overmasteries, the
-//! resolved limit-bonus store — so it proves nothing about what a live co-op
-//! remote provides. The two are told apart by the LOCAL player's own online
-//! flag: in a real lobby the local player is flagged online too, while a
-//! solo-with-enlist log flags only the enlisted slot. This census sweeps the
-//! corpus, classifies each log (solo / enlist / lobby), and reports per-slot
-//! data completeness so "what do remotes not provide" is answered from
-//! storage instead of assumption.
+//! and a live co-op remote both read as ONLINE party slots with a fully
+//! locally-simulated record — measured on the real matchmade lobbies 2619
+//! and 2654 (JP/KR/CN rosters), a remote's slot carries their OWN account
+//! values (masterLevel, distinct limit-bonus stores 424/199/367/586, capUp),
+//! exactly like a local. Storage does NOT distinguish the two cases (the
+//! local player's own online flag stays false in real lobbies), so the
+//! census reports online-slot COUNT and leaves lobby-vs-enlist to the
+//! reader; what it answers mechanically is per-slot capture completeness
+//! per capture era. Old-era logs (raw actor indices, pre-identity-recovery)
+//! are thin for EVERYONE — that is capture age, not remoteness.
 //!
 //! Run: cargo run --release -p gbfr-logs --example roster_census -- [--db path] [--last N] [--dump]
 //!   --dump prints every player row; default prints only lobby logs plus the
@@ -74,29 +76,27 @@ fn main() -> Result<()> {
             continue;
         }
 
-        // The local player owns the first party slot; a lobby flags them
-        // online alongside the actual remotes.
-        let local_online = players
-            .iter()
-            .find(|p| p["actorIndex"].as_u64() == Some(0xF000_0000))
-            .is_some_and(|p| p["isOnline"].as_bool() == Some(true));
         let online_others = players
             .iter()
-            .filter(|p| {
-                p["actorIndex"].as_u64() != Some(0xF000_0000)
-                    && p["isOnline"].as_bool() == Some(true)
-            })
+            .filter(|p| p["isOnline"].as_bool() == Some(true))
             .count();
-        let kind = if local_online && online_others > 0 {
-            n_lobby += 1;
-            lobby_ids.push(id);
-            "lobby"
-        } else if online_others > 0 {
-            n_enlist += 1;
-            "enlist"
-        } else {
-            n_solo += 1;
-            "solo"
+        // >= 2 online slots means matchmade co-op OR multiple enlisted
+        // characters — storage cannot tell them apart, so the label claims
+        // only the count.
+        let kind = match online_others {
+            0 => {
+                n_solo += 1;
+                "solo"
+            }
+            1 => {
+                n_enlist += 1;
+                "online-x1"
+            }
+            _ => {
+                n_lobby += 1;
+                lobby_ids.push(id);
+                "online-multi"
+            }
         };
 
         for player in &players {
@@ -132,7 +132,7 @@ fn main() -> Result<()> {
                     .entry(format!("[{kind}] {signature}"))
                     .or_default() += 1;
             }
-            if dump || kind == "lobby" {
+            if dump || kind == "online-multi" {
                 println!(
                     "log {id} [{kind}] actor {:#x} {} \"{}\"{}: {signature}",
                     player["actorIndex"].as_u64().unwrap_or(0),
@@ -146,7 +146,7 @@ fn main() -> Result<()> {
 
     println!("\nlogs: {n_solo} solo, {n_enlist} with enlisted characters, {n_lobby} true lobbies");
     if !lobby_ids.is_empty() {
-        println!("lobby log ids: {lobby_ids:?}");
+        println!("multi-online log ids: {lobby_ids:?}");
     }
     println!("\nonline-slot completeness signatures:");
     for (signature, count) in &online_signatures {
