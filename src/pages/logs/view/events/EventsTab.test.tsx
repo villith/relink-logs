@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { LogEvent } from "@/types";
 
-import { EventRowsTable, EventsTab, KIND_COLORS } from "./EventsTab";
+import { EventRowsTable, EventsTab, KIND_COLORS, SHOWS_JUMP_BAR } from "./EventsTab";
 import { EVENT_KINDS, type EventPins, type EventRow } from "./eventRows";
 import type { NestedEventRow } from "./nestSupplementary";
 
@@ -495,8 +495,9 @@ const commit = (text: string) => {
 
 // Skipped while the jump-to-time control is hidden (`SHOWS_JUMP_BAR` in
 // `EventsTab`): every case here drives the input, which is no longer rendered.
-// The jump machinery itself is untouched, so unskipping restores the coverage.
-describe.skip("EventsTab, jump to a time", () => {
+// Gated on the switch itself, so flipping it back restores the control and
+// this coverage in the same edit.
+describe.skipIf(!SHOWS_JUMP_BAR)("EventsTab, jump to a time", () => {
   it("scrolls the list to the first row at or past a typed time", () => {
     page = { events: LONG, total: LONG.length, suppPairs: {} };
     const { container } = renderTab();

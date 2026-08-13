@@ -66,9 +66,11 @@ fn nearest_hit_gap(hits: &[(i64, ActionType)], at: i64) -> Option<i64> {
 fn main() -> Result<()> {
     let mut db_path = PathBuf::from("src-tauri/logs.db");
     let mut log_id: Option<i64> = None;
-    // The share replay's windows, overridable to probe the shipped defaults.
-    let mut lookback: i64 = 500;
-    let mut lag: i64 = 64;
+    // The share replay's windows, overridable — defaulting to the SHIPPED
+    // values themselves, so a retune cannot leave this probing stale ones.
+    let shipped = Windows::default();
+    let mut lookback: i64 = shipped.move_lookback_ms;
+    let mut lag: i64 = shipped.move_ms;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -126,19 +128,6 @@ fn main() -> Result<()> {
     // the attack rate, gauge becomes derivable for EVERY player from what the
     // damage event already carries, which is the whole question.
     let mut rates: HashMap<ActionType, Vec<f64>> = HashMap::new();
-
-    // Who each slot is, for the share-formula replay's weight tables. Identity
-    // lives in the stored roster, not the event log — the live path folds
-    // identity events into `player_data` without storing them.
-    let mut characters: HashMap<u32, String> = HashMap::new();
-    for (slot, data) in encounter.player_data.iter().enumerate() {
-        if let Some(data) = data {
-            characters.insert(
-                protocol::player_slot_key(slot as u8),
-                data.character_type().to_string(),
-            );
-        }
-    }
 
     for (timestamp, event) in encounter.event_log() {
         match event {
@@ -324,7 +313,7 @@ fn main() -> Result<()> {
                 }
             }
         }
-        let character = characters.get(index);
+        let character = aliases.get(index);
         let replay_events: Vec<(i64, Message)> = events
             .iter()
             .filter(
@@ -363,7 +352,7 @@ fn main() -> Result<()> {
         let polled: f64 = evidence.rises.iter().map(|(_, amount)| amount).sum();
         println!(
             "share replay for {index:#010x} ({}):",
-            character.map(String::as_str).unwrap_or("unknown character")
+            character.map_or_else(|| "unknown character".to_string(), |c| c.to_string())
         );
         let mut actions: Vec<ActionType> = truth
             .keys()

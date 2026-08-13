@@ -1,8 +1,10 @@
+import type { AbilitySeries, ComputedPlayerState } from "@/types";
+
 import { buffs } from "../../metrics/buffs";
 import { damageDone } from "../../metrics/damageDone";
 import { damageTaken } from "../../metrics/damageTaken";
 import { debuffs } from "../../metrics/debuffs";
-import { sba } from "../../metrics/sba";
+import { sba, suppressedSbaBands } from "../../metrics/sba";
 import { stun } from "../../metrics/stun";
 import type { Hostility, RowLevel } from "../../metrics/types";
 import type { Dimension, MetricKey } from "./state";
@@ -69,6 +71,15 @@ export type MetricCapabilities = {
    * rather than branched on `metricKey` in the view, which is what made adding
    * a metric with its own series a view edit rather than a declaration. */
   chart: ChartDecl;
+  /** Display policy over one player's drilled ability bands, applied before
+   * they are folded into the table's rows. Declared for the same reason as
+   * `chart`: the policy belongs to the metric's own module, not to a
+   * `metricKey` branch in the chart model. Absent, bands pass through. */
+  filterAbilitySeries?: (
+    player: Pick<ComputedPlayerState, "skillBreakdown">,
+    series: AbilitySeries[],
+    abilityPinned: boolean
+  ) => AbilitySeries[];
   /** Whether this metric records supplementary (echo) damage.
    *
    * Only Damage Done does, so the collapse toggle is inert everywhere else —
@@ -201,6 +212,9 @@ export const CAPABILITIES: Record<MetricKey, MetricCapabilities> = {
     // A gauge LEVEL, not a rate: smoothing would round off the discharge that
     // IS the reading. Stored in tenths of a percent.
     chart: { labelKey: "ui.logs.chart-sba-label", series: "sba", smoothing: "none", scale: 0.1, format: "percent" },
+    // A suppressed player's deduced bands fold back into the unattributed
+    // remainder, mirroring the table (see `suppressedSbaBands`).
+    filterAbilitySeries: suppressedSbaBands,
     recordsSupplementary: false,
   },
 

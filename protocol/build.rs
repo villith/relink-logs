@@ -18,5 +18,17 @@ fn main() {
     println!("cargo:rerun-if-changed=Cargo.toml");
 
     let fingerprint = fingerprint::wire_fingerprint(&fingerprint::crate_sources(root));
-    println!("cargo:rustc-env=WIRE_FINGERPRINT={fingerprint:08x}");
+    // A generated source file rather than a `rustc-env` string: the constant is
+    // a `u32`, and emitting it as one spares lib.rs a const-fn hex parser
+    // (`u32::from_str_radix` is not const-stable).
+    let out_dir = std::env::var("OUT_DIR").expect("cargo sets OUT_DIR");
+    std::fs::write(
+        std::path::Path::new(&out_dir).join("wire_fingerprint.rs"),
+        format!(
+            "/// Content hash of this crate, computed by `build.rs`. See\n\
+             /// [`toolbox::TOOLBOX_PROTOCOL_VERSION`], which is what actually travels.\n\
+             pub const WIRE_FINGERPRINT: u32 = {fingerprint:#010x};\n"
+        ),
+    )
+    .expect("OUT_DIR is writable");
 }

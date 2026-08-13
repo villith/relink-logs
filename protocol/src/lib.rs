@@ -65,27 +65,10 @@ pub mod control;
 pub mod fingerprint;
 pub mod toolbox;
 
-/// Content hash of this crate, computed by `build.rs`. See
-/// [`toolbox::TOOLBOX_PROTOCOL_VERSION`], which is what actually travels.
-pub const WIRE_FINGERPRINT: u32 = parse_hex_u32(env!("WIRE_FINGERPRINT"));
-
-/// `u32::from_str_radix` is not const-stable, and this has to be a `const` —
-/// it is the initializer of the version constant the wire carries.
-const fn parse_hex_u32(hex: &str) -> u32 {
-    let bytes = hex.as_bytes();
-    let mut value: u32 = 0;
-    let mut i = 0;
-    while i < bytes.len() {
-        let digit = match bytes[i] {
-            b'0'..=b'9' => bytes[i] - b'0',
-            b'a'..=b'f' => bytes[i] - b'a' + 10,
-            _ => panic!("WIRE_FINGERPRINT must be lowercase hex"),
-        };
-        value = (value << 4) | digit as u32;
-        i += 1;
-    }
-    value
-}
+// `WIRE_FINGERPRINT`, written by `build.rs` as a `u32` literal with its doc
+// comment. Its value is pinned end-to-end by
+// `fingerprint::tests::shipped_wire_version_is_the_hash_of_this_crates_sources`.
+include!(concat!(env!("OUT_DIR"), "/wire_fingerprint.rs"));
 
 use serde::{Deserialize, Serialize};
 
@@ -1184,28 +1167,5 @@ mod transport_constants {
     #[test]
     fn tcp_addr_and_port_agree() {
         assert_eq!(super::TCP_ADDR, format!("127.0.0.1:{}", super::TCP_PORT));
-    }
-}
-
-#[cfg(test)]
-mod wire_fingerprint_constant {
-    /// The const parser exists only because std's is not const-stable, so its
-    /// whole contract is "agrees with std's". Pinned against the real value
-    /// `build.rs` emitted, not a literal: a hand-picked sample would keep
-    /// passing while the value that actually ships is misparsed.
-    #[test]
-    fn const_hex_parse_agrees_with_std() {
-        assert_eq!(
-            super::WIRE_FINGERPRINT,
-            u32::from_str_radix(env!("WIRE_FINGERPRINT"), 16).unwrap(),
-        );
-    }
-
-    /// Leading zeroes are the normal case (`build.rs` emits `{:08x}`) and a
-    /// full-width value must not overflow.
-    #[test]
-    fn const_hex_parse_handles_padding_and_the_top_bit() {
-        assert_eq!(super::parse_hex_u32("0000002a"), 42);
-        assert_eq!(super::parse_hex_u32("ffffffff"), u32::MAX);
     }
 }

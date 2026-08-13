@@ -139,6 +139,7 @@ struct PlayerEvidence {
     /// exist here only to be SUBTRACTED from the rises they explain.
     read_gains: Vec<(i64, f64)>,
     /// The player's own damaging hits: (timestamp, raw classified action).
+    /// Gauge-eligible variants only — see the filter in [`gather`].
     hits: Vec<(i64, ActionType)>,
     /// Timestamps of hits the player received.
     taken: Vec<i64>,
@@ -207,7 +208,15 @@ fn gather(
                         .or_default()
                         .taken
                         .push(*timestamp);
-                } else {
+                } else if matches!(
+                    damage.action_id,
+                    ActionType::Normal(_) | ActionType::LinkAttack
+                ) {
+                    // Only the variants that can price above zero. Everything
+                    // else — echoes, DoT ticks, SBA hits — weighs exactly 0.0
+                    // (see `sba_weights::hit_weight`), so admitting them only
+                    // grows the walk `HitShares::consume` discards them from,
+                    // and roughly half an online log's damage events are echoes.
                     by_player
                         .entry(damage.source.parent_index)
                         .or_default()
@@ -408,20 +417,24 @@ pub fn infer_tagged(
                 continue;
             }
 
+            let mut push = |cause: SbaGainCause, rule: Rule, amount: f64| {
+                verdicts.push((
+                    InferredGain {
+                        at,
+                        actor_index,
+                        cause,
+                        amount,
+                    },
+                    rule,
+                ));
+            };
+
             // Rule order is a precision order, not a preference. The flat grant
             // is an exact value match and goes first: a chain contribution that
             // happens to land beside the recipient's own swing would otherwise
             // be read as that swing's output and inflate the move's row.
             if is_flat_grant(residual) {
-                verdicts.push((
-                    InferredGain {
-                        at,
-                        actor_index,
-                        cause: SbaGainCause::InferredChainGrant,
-                        amount: residual,
-                    },
-                    Rule::FlatGrant,
-                ));
+                push(SbaGainCause::InferredChainGrant, Rule::FlatGrant, residual);
             } else {
                 // A residual with no weighted hit of its own may reach up to
                 // `move_ms` FORWARD — network replay can log a remote's hit
@@ -435,15 +448,11 @@ pub fn infer_tagged(
                     // The share formula: each action's slice of the residual is
                     // its authored weight over the tick's total. K cancels.
                     for (action, weight) in shares {
-                        verdicts.push((
-                            InferredGain {
-                                at,
-                                actor_index,
-                                cause: SbaGainCause::Inferred(action),
-                                amount: residual * weight / total_weight,
-                            },
+                        push(
+                            SbaGainCause::Inferred(action),
                             Rule::Share,
-                        ));
+                            residual * weight / total_weight,
+                        );
                     }
                     continue;
                 }
@@ -452,15 +461,11 @@ pub fn infer_tagged(
                     .iter()
                     .any(|taken_at| (taken_at - at).abs() <= windows.taken_ms)
                 {
-                    verdicts.push((
-                        InferredGain {
-                            at,
-                            actor_index,
-                            cause: SbaGainCause::InferredDamageTaken,
-                            amount: residual,
-                        },
+                    push(
+                        SbaGainCause::InferredDamageTaken,
                         Rule::DamageTaken,
-                    ));
+                        residual,
+                    );
                 }
                 // Nothing explains it: the remainder keeps it, which is the
                 // honest outcome — this module's job is to shrink that band

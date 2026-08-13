@@ -1,7 +1,7 @@
 import type { ComputedPlayerState } from "@/types";
 
 import { groupSkillsForRows, type RowKeying } from "../abilitySkills";
-import { rowGaugeFor, sbaCauseLabel, shownSources } from "../metrics/sba";
+import { rowGaugeFor, sbaCauseLabel, sbaInferenceSuppressed, shownSources } from "../metrics/sba";
 import { playerRowKey, SBA_UNATTRIBUTED_KEY, sbaCauseRowKey } from "../rowKey";
 
 import type { CardLabels } from "./cardLabels";
@@ -71,7 +71,8 @@ export const sbaCardSectionsFor = ({
   // The table's own valuation (`rowGaugeFor`): measured + inferred where the
   // measurements anchor the rows, measured alone where the inference is
   // suppressed. The card must agree with the table row by row.
-  const gaugeOf = rowGaugeFor(player);
+  const suppressed = sbaInferenceSuppressed(player);
+  const gaugeOf = rowGaugeFor(suppressed);
 
   const abilities: BreakdownEntry[] = groupSkillsForRows(player.skillBreakdown, keying)
     .map(({ key, skills }) => ({
@@ -84,7 +85,7 @@ export const sbaCardSectionsFor = ({
     .filter((entry) => entry.value !== 0)
     .sort((a, b) => b.value - a.value);
 
-  const causes: BreakdownEntry[] = shownSources(player)
+  const causes: BreakdownEntry[] = shownSources(player, suppressed)
     .map((source) => {
       const key = sbaCauseRowKey(source.kind, source.id);
       // Never null: the key was just built in the `source:` grammar it parses.

@@ -60,7 +60,7 @@ const depth = (art: string) => `calc(${art} / 2)`;
  * Reading `--row-pad` rather than restating `px-2` is what keeps an INDENTED
  * row's geometry under its own art (see `MetricTable`'s subrows).
  *
- * Classes, not inline styles, here and in `HEAD_POS`: `calc()` over custom
+ * Classes, not inline styles, here and in the head tables below: `calc()` over custom
  * properties is exactly what jsdom's style parser drops, so the geometry would
  * be invisible to a test. */
 const TRACK_LEFT: Record<BarVariant, string> = {
@@ -68,23 +68,31 @@ const TRACK_LEFT: Record<BarVariant, string> = {
   card: "left-[calc(var(--row-pad)_+_var(--spacing-art-card)_-_1px)] right-0",
 };
 
-/** Where the fixed head stands and how wide it is. A POINTED head covers the
- * art's whole box, back to its left edge; a NOTCHED head is the box's right
- * half alone — the bite consumes the rest, and the diamond's own left half
- * covers the box's left half in art. */
-const HEAD_POS: Record<BarVariant, Record<BarHead, string>> = {
+/** The head box's left edge — where the whole silhouette starts, so the hover
+ * ring shares it: a notch begins at the art's centre, a point at the art's
+ * left edge. */
+const HEAD_LEFT: Record<BarVariant, Record<BarHead, string>> = {
   row: {
-    notch: "left-[calc(var(--row-pad)_+_var(--spacing-art)/2)] w-[calc(var(--spacing-art)/2)]",
-    point: "left-[var(--row-pad)] w-[var(--spacing-art)]",
+    notch: "left-[calc(var(--row-pad)_+_var(--spacing-art)/2)]",
+    point: "left-[var(--row-pad)]",
   },
   card: {
-    notch: "left-[calc(var(--row-pad)_+_var(--spacing-art-card)/2)] w-[calc(var(--spacing-art-card)/2)]",
-    point: "left-[var(--row-pad)] w-[var(--spacing-art-card)]",
+    notch: "left-[calc(var(--row-pad)_+_var(--spacing-art-card)/2)]",
+    point: "left-[var(--row-pad)]",
   },
 };
 
+/** How wide the fixed head is. A POINTED head covers the art's whole box, back
+ * to its left edge; a NOTCHED head is the box's right half alone — the bite
+ * consumes the rest, and the diamond's own left half covers the box's left
+ * half in art. */
+const HEAD_WIDTH: Record<BarVariant, Record<BarHead, string>> = {
+  row: { notch: "w-[calc(var(--spacing-art)/2)]", point: "w-[var(--spacing-art)]" },
+  card: { notch: "w-[calc(var(--spacing-art-card)/2)]", point: "w-[var(--spacing-art-card)]" },
+};
+
 /** The head's silhouette, in shares of its own box — the box is sized to the
- * art (see `HEAD_POS`), so percentages land the 45° slopes exactly.
+ * art (see `HEAD_WIDTH`), so percentages land the 45° slopes exactly.
  *
  * `point` — the box with its left end cut to the diamond's point.
  * `notch` — the box's left edge notched through to its right edge, leaving the
@@ -92,19 +100,6 @@ const HEAD_POS: Record<BarVariant, Record<BarHead, string>> = {
 const HEAD_CLIP: Record<BarHead, string> = {
   point: "polygon(50% 0, 100% 0, 100% 100%, 50% 100%, 0 50%)",
   notch: "polygon(0 0, 100% 0, 100% 100%, 0 100%, 100% 50%)",
-};
-
-/** The hover ring's left edge: the whole silhouette's own start, which is the
- * head's — a notch begins at the art's centre, a point at the art's left edge. */
-const RING_LEFT: Record<BarVariant, Record<BarHead, string>> = {
-  row: {
-    notch: "left-[calc(var(--row-pad)_+_var(--spacing-art)/2)] right-0",
-    point: "left-[var(--row-pad)] right-0",
-  },
-  card: {
-    notch: "left-[calc(var(--row-pad)_+_var(--spacing-art-card)/2)] right-0",
-    point: "left-[var(--row-pad)] right-0",
-  },
 };
 
 /** The bar's whole silhouette, as the corners of its clip polygon, clockwise
@@ -139,12 +134,12 @@ const ringClip = (head: BarHead, art: string) => {
   return `polygon(${points.join(", ")})`;
 };
 
-/** Every ring a bar can wear, resolved at module load — two variants and two
- * heads, so four answers, rather than seven string allocations per render of
- * every row. */
-const RING: Record<BarVariant, Record<BarHead, string>> = {
-  row: { notch: ringClip("notch", ART.row), point: ringClip("point", ART.row) },
-  card: { notch: ringClip("notch", ART.card), point: ringClip("point", ART.card) },
+/** Every ring a bar can wear, resolved at module load rather than per render
+ * of every row. ROW geometry only: the ring renders only under
+ * `variant === "row"` (see the render) — a card entry is not a hover target. */
+const RING: Record<BarHead, string> = {
+  notch: ringClip("notch", ART.row),
+  point: ringClip("point", ART.row),
 };
 
 /** The proportional fill behind a row, a card entry or a chart tooltip entry.
@@ -193,7 +188,11 @@ export const MetricBar = ({ value, subValue, largest, color, variant, head }: Me
           <Box
             aria-hidden
             data-bar-head
-            className={["pointer-events-none absolute inset-y-0", HEAD_POS[variant][head]].join(" ")}
+            className={[
+              "pointer-events-none absolute inset-y-0",
+              HEAD_LEFT[variant][head],
+              HEAD_WIDTH[variant][head],
+            ].join(" ")}
             style={{ backgroundColor: color, clipPath: HEAD_CLIP[head] }}
           />
         )}
@@ -251,10 +250,11 @@ export const MetricBar = ({ value, subValue, largest, color, variant, head }: Me
           data-bar-ring
           className={[
             "pointer-events-none absolute opacity-0 group-hover:opacity-100",
-            RING_LEFT[variant][head],
+            HEAD_LEFT.row[head],
+            "right-0",
             insetY,
           ].join(" ")}
-          style={{ backgroundColor: "var(--color-line-strong)", clipPath: RING[variant][head] }}
+          style={{ backgroundColor: "var(--color-line-strong)", clipPath: RING[head] }}
         />
       )}
     </>

@@ -21,11 +21,11 @@ import {
 } from "./capSources";
 
 /** Whether the cap breakdown card is drawn. Off for now — the derivation and
- * its tests are untouched (the tests `.skip` against this same switch), so
- * restoring the card is flipping this back. Mirrors `SHOWS_JUMP_BAR` in
- * `EventsTab`: a named, greppable switch, and the memo below short-circuits on
- * it so the hidden card costs nothing per rendered row. */
-const SHOWS_CAP_CARD = false;
+ * its tests are untouched (the tests `skipIf` this same switch, so flipping it
+ * back restores the card and its coverage together). Mirrors `SHOWS_JUMP_BAR`
+ * in `EventsTab`: a named, greppable switch, and the memo below
+ * short-circuits on it so the hidden card costs nothing per rendered row. */
+export const SHOWS_CAP_CARD = false;
 
 const format = (row: CapRow, locale: string): string => {
   switch (row.kind) {

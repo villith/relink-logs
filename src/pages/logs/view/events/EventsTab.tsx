@@ -118,8 +118,9 @@ const ROW_HEIGHT = 30;
  * top of the list — a row placed without it lands underneath the column names. */
 const HEAD_HEIGHT = 28;
 /** Whether the jump-to-time control is drawn. Off for now — the jump machinery
- * itself stays wired up, so this is the only line to flip to get it back. */
-const SHOWS_JUMP_BAR = false;
+ * itself stays wired up (and its tests `skipIf` this same switch), so this is
+ * the only line to flip to get it back, coverage included. */
+export const SHOWS_JUMP_BAR = false;
 /** Rows rendered beyond each edge of the viewport, so a fast scroll does not
  * outrun the render. */
 const OVERSCAN = 10;

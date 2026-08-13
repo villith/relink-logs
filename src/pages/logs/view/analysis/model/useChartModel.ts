@@ -16,9 +16,8 @@ import { DPS_SMOOTHING_WINDOW, type ChartDatapoint, type Label } from "../../Det
 import type { RowKeying } from "../../abilitySkills";
 import { keyColor } from "../../actorColor";
 import { enemyHolderKey, heldByRoster, narrowedByPins, slotsOf } from "../../metrics/buffs";
-import { isInferredSbaCauseKey, sbaInferenceSuppressed } from "../../metrics/sba";
 import type { Hostility } from "../../metrics/types";
-import { SBA_UNATTRIBUTED_KEY, playerRowKey } from "../../rowKey";
+import { playerRowKey } from "../../rowKey";
 import type { SelectorPins } from "../../selectorOptions";
 import type { Band } from "../../statusBands";
 import type { StackMode } from "../DpsChart";
@@ -323,31 +322,15 @@ export const useChartModel = ({
     // for one render. Gated on the same condition `abilityQuery` requests under,
     // so the chart can only draw bands this tab actually asked for.
     if (caps.dataPath !== "derived" || spec.groupBy !== "ability") return null;
-    // A remote member's SBA skill bands are the parser's deductions end to
-    // end, and the table beside this chart suppresses that split until the
-    // inference is verified live (see `sbaInferenceSuppressed`). Folding those
-    // bands — the skill bands and the inferred-cause bands — back into the
-    // unattributed remainder keeps the two agreeing: the measured cause bands
-    // survive, and the remainder grows by exactly what the table's remainder
-    // row reabsorbed. A suppressed player with nothing measured loses all
-    // bands, and the chart falls back to the per-player gauge lines, matching
-    // the table's empty state. Under an ability pin the backend serves skill
-    // bands only, so there is no remainder to fold into — a suppressed
-    // player's bands simply drop. Stun bands are all measured, pass through.
+    // The metric's own display policy over a player's bands, where it declares
+    // one — SBA folds a suppressed player's deduced bands back into the
+    // unattributed remainder (see `suppressedSbaBands`). Stun declares none:
+    // its bands are all measured and pass through.
     const shown = (index: number, series: AbilitySeries[]): AbilitySeries[] => {
-      if (metricKey !== "sba") return series;
+      const filter = caps.filterAbilitySeries;
       const player = playerByIndex.get(index)?.player;
-      if (player === undefined || !sbaInferenceSuppressed(player)) return series;
-      if (pins.ability !== null) return [];
-      const measured = series.filter(
-        (band) => band.kind === "cause" && band.key !== SBA_UNATTRIBUTED_KEY && !isInferredSbaCauseKey(band.key)
-      );
-      if (measured.length === 0) return [];
-      const folded = series.filter((band) => !measured.includes(band));
-      if (folded.length === 0) return measured;
-      const remainder = new Array<number>(Math.max(...series.map((band) => band.values.length))).fill(0);
-      for (const band of folded) band.values.forEach((value, bucket) => (remainder[bucket] += value));
-      return [...measured, { kind: "cause", key: SBA_UNATTRIBUTED_KEY, values: remainder }];
+      if (filter === undefined || player === undefined) return series;
+      return filter(player, series, pins.ability !== null);
     };
     const bands =
       pins.source === null
@@ -360,8 +343,8 @@ export const useChartModel = ({
     return abilityBands(bands, GROUP_TOP_N, bandLabelFor, pins.ability === null ? "group" : "action", rowKeying);
   }, [
     caps.dataPath,
+    caps.filterAbilitySeries,
     spec.groupBy,
-    metricKey,
     pins.source,
     pins.ability,
     scopedAbilitySeries,

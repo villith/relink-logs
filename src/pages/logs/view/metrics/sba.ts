@@ -1,4 +1,4 @@
-import type { ComputedPlayerState, SbaSourceState } from "@/types";
+import type { AbilitySeries, ComputedPlayerState, SbaSourceState } from "@/types";
 import { share } from "@/utils";
 
 import { groupSkillsForRows, mergeSkillsByAction } from "../abilitySkills";
@@ -21,11 +21,8 @@ const APPROXIMATE = "≈";
 /** A breakdown row's gauge: what was measured on it plus what was correlated
  * with it. Summed because they answer the same question — this row's share of
  * the player's bar — and a remote member has only the second kind, so ranking
- * on the first alone leaves their whole table at zero.
- *
- * Exported for the hover card (`sbaCardSectionsFor`), which must value an
- * ability exactly as the drilled table does or the two disagree about one row. */
-export const rowGauge = (skill: { sbaGenerated?: number; sbaInferred?: number }): number =>
+ * on the first alone leaves their whole table at zero. */
+const rowGauge = (skill: { sbaGenerated?: number; sbaInferred?: number }): number =>
   (skill.sbaGenerated ?? 0) + (skill.sbaInferred ?? 0);
 
 /** The parser's deduced cause kinds (the Rust `sba_inference` module) — the
@@ -50,29 +47,71 @@ const INFERRED_CAUSE_KINDS = new Set<SbaSourceState["kind"]>(["inferredChainGran
 export const sbaInferenceSuppressed = (player: Pick<ComputedPlayerState, "skillBreakdown">): boolean =>
   !player.skillBreakdown.some((skill) => (skill.sbaGenerated ?? 0) !== 0);
 
-/** How this player's breakdown rows are valued: measured + inferred where the
- * measurements anchor the table, measured alone where the inference is
- * suppressed. Shared with the hover card so the two value one row alike. */
+/** How a player's breakdown rows are valued under the given suppression
+ * verdict (`sbaInferenceSuppressed`, computed once per player by the caller):
+ * measured + inferred where the measurements anchor the table, measured alone
+ * where the inference is suppressed. Shared with the hover card so the two
+ * value one row alike. */
 export const rowGaugeFor = (
-  player: Pick<ComputedPlayerState, "skillBreakdown">
+  suppressed: boolean
 ): ((skill: { sbaGenerated?: number; sbaInferred?: number }) => number) =>
-  sbaInferenceSuppressed(player) ? (skill) => skill.sbaGenerated ?? 0 : rowGauge;
+  suppressed ? (skill) => skill.sbaGenerated ?? 0 : rowGauge;
 
 /** Whether a `source:` row/band key names a DEDUCED cause. False for skill
- * keys and for the measured causes — the chart uses this to decide which of a
- * suppressed player's bands are the inference's to hide. */
-export const isInferredSbaCauseKey = (rowKey: string): boolean => {
+ * keys and for the measured causes — `suppressedSbaBands` uses this to decide
+ * which of a suppressed player's bands are the inference's to hide. */
+const isInferredSbaCauseKey = (rowKey: string): boolean => {
   const payload = sbaCausePayload(rowKey);
   return payload !== null && INFERRED_CAUSE_KINDS.has(payload.split(":")[0] as SbaSourceState["kind"]);
 };
 
 /** The cause rows a player's breakdown may show: everything measured, plus the
- * inferred kinds only where the inference is shown at all. Shared with the
- * hover card (`sbaCardSectionsFor`) so the two list the same causes. */
-export const shownSources = (player: Pick<ComputedPlayerState, "skillBreakdown" | "sbaSources">): SbaSourceState[] =>
+ * inferred kinds only where the inference is shown at all (`suppressed` is the
+ * caller's one `sbaInferenceSuppressed` verdict). Shared with the hover card
+ * (`sbaCardSectionsFor`) so the two list the same causes. */
+export const shownSources = (player: Pick<ComputedPlayerState, "sbaSources">, suppressed: boolean): SbaSourceState[] =>
   (player.sbaSources ?? []).filter(
-    (source) => source.generated !== 0 && !(sbaInferenceSuppressed(player) && INFERRED_CAUSE_KINDS.has(source.kind))
+    (source) => source.generated !== 0 && !(suppressed && INFERRED_CAUSE_KINDS.has(source.kind))
   );
+
+/** The drilled SBA chart's view of a suppressed player's bands — the chart
+ * half of the suppression policy this module owns for the table and the hover
+ * card, declared as `filterAbilitySeries` on the metric's capabilities so the
+ * chart model stays metric-agnostic.
+ *
+ * A remote member's SBA skill bands are the parser's deductions end to end,
+ * and the table suppresses that split until the inference is verified live
+ * (see `sbaInferenceSuppressed`). Folding those bands — the skill bands and
+ * the inferred-cause bands — back into the unattributed remainder keeps the
+ * two agreeing: the measured cause bands survive, and the remainder grows by
+ * exactly what the table's remainder row reabsorbed. A suppressed player with
+ * nothing measured loses all bands, and the chart falls back to the per-player
+ * gauge lines, matching the table's empty state. Under an ability pin the
+ * backend serves skill bands only, so there is no remainder to fold into — a
+ * suppressed player's bands simply drop.
+ *
+ * The folded bands are relabelled rather than summed here: `abilityBands`, the
+ * fold immediately downstream, already merges same-key cause bands zero-padded
+ * to the longest series. */
+export const suppressedSbaBands = (
+  player: Pick<ComputedPlayerState, "skillBreakdown">,
+  series: AbilitySeries[],
+  abilityPinned: boolean
+): AbilitySeries[] => {
+  if (!sbaInferenceSuppressed(player)) return series;
+  if (abilityPinned) return [];
+  const measured: AbilitySeries[] = [];
+  const folded: AbilitySeries[] = [];
+  for (const band of series) {
+    const isMeasured = band.kind === "cause" && band.key !== SBA_UNATTRIBUTED_KEY && !isInferredSbaCauseKey(band.key);
+    (isMeasured ? measured : folded).push(band);
+  }
+  if (measured.length === 0) return [];
+  return [
+    ...measured,
+    ...folded.map((band) => ({ kind: "cause" as const, key: SBA_UNATTRIBUTED_KEY, values: band.values })),
+  ];
+};
 
 /** Cause → i18n key. Exhaustive by construction: a kind with no entry here is a
  * backend that shipped a cause the UI has not been taught, which reads as
@@ -149,8 +188,8 @@ export const sbaCauseLabel = (
 
 /** Rows for the causes no skill row can hold. Keyed by cause (plus id where one
  * discriminates), so they never collide with `skill:` keys. */
-const sourceRows = (owner: ComputedPlayerState, total: number): MetricRow[] =>
-  shownSources(owner).map((source) => {
+const sourceRows = (owner: ComputedPlayerState, total: number, suppressed: boolean): MetricRow[] =>
+  shownSources(owner, suppressed).map((source) => {
     const key = sbaCauseRowKey(source.kind, source.id);
     // Named through the shared namer rather than inline, so the row and the
     // chart band above it cannot be labelled differently. Never null here:
@@ -231,8 +270,8 @@ export const sba: MetricDescriptor = {
     // hook read — plus the remainder — renders, same as before the inference
     // existed. With nothing measured at all, the empty state
     // (`ui.logs.sba-no-breakdown`) is the honest reading.
-    const gaugeOf = rowGaugeFor(owner);
     const suppressed = sbaInferenceSuppressed(owner);
+    const gaugeOf = rowGaugeFor(suppressed);
 
     const total = owner.sbaGenerated ?? 0;
 
@@ -274,7 +313,7 @@ export const sba: MetricDescriptor = {
     // drops them for the same reason (see `build_ability_sba_chart`).
     if (pinnedAbility) return [...attributed].sort((a, b) => b.value - a.value);
 
-    const sources = sourceRows(owner, total);
+    const sources = sourceRows(owner, total, suppressed);
 
     return [...attributed, ...sources, ...unattributedRow([...attributed, ...sources], total, owner.sbaGenerated)].sort(
       (a, b) => b.value - a.value
