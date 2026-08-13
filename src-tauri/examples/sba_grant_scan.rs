@@ -19,6 +19,10 @@
 //! hit count and damage distribution — for identifying WHAT an unknown id
 //! physically is (a ghost auto-attack, a proc, a marker) from its damage
 //! signature and company.
+//!
+//! `--taken-lag` instead measures, corpus-wide, how long after a hit the
+//! player RECEIVED the hook reads the damage-taken gauge grant — the window
+//! the share pipeline's taken-contamination exclusion has to cover.
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -26,7 +30,7 @@ use std::path::PathBuf;
 use anyhow::{Context, Result};
 use gbfr_logs::parser::constants::CharacterType;
 use gbfr_logs::parser::v1::sba_inference::{self, authored_hit_weight};
-use gbfr_logs::parser::v1::Encounter;
+use gbfr_logs::parser::v1::{is_damage_taken_event, Encounter};
 use protocol::{ActionType, Message, SbaGainCause};
 use rusqlite::{Connection, OpenFlags};
 
@@ -141,11 +145,107 @@ fn dump_one_log(db_path: &PathBuf, id: i64) -> Result<()> {
     Ok(())
 }
 
+/// Corpus-wide: how long after a received hit does the hook read the
+/// damage-taken gauge grant? Each `DamageTaken`-captioned gain is matched to
+/// the most recent received hit at or before it.
+fn scan_taken_lag(db_path: &PathBuf) -> Result<()> {
+    let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let mut stmt = conn.prepare("SELECT id, data FROM logs ORDER BY id")?;
+    let rows: Vec<(i64, Vec<u8>)> = stmt
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?
+        .collect::<std::result::Result<_, _>>()?;
+
+    let mut deltas: Vec<i64> = Vec::new();
+    // Gauge amounts: grants a taken event explains (within the pipeline's
+    // 500 ms lookback) vs grants with no visible received hit — the taken
+    // contamination the share pipeline cannot exclude.
+    let (mut covered_gauge, mut invisible_gauge) = (0.0f64, 0.0f64);
+    let mut orphans = 0usize;
+    for (_, blob) in rows {
+        let Ok(mut encounter) = Encounter::from_blob(&blob) else {
+            continue;
+        };
+        encounter.repopulate_event_log();
+        let mut taken: HashMap<u32, Vec<i64>> = HashMap::new();
+        let mut gains: HashMap<u32, Vec<(i64, f64)>> = HashMap::new();
+        for (timestamp, event) in encounter.event_log() {
+            match event {
+                Message::DamageEvent(damage) if is_damage_taken_event(damage) => {
+                    taken
+                        .entry(damage.target.parent_index)
+                        .or_default()
+                        .push(*timestamp);
+                }
+                Message::SbaGain(gain) if gain.cause == Some(SbaGainCause::DamageTaken) => {
+                    gains
+                        .entry(gain.actor_index)
+                        .or_default()
+                        .push((*timestamp, gain.amount as f64));
+                }
+                _ => {}
+            }
+        }
+        for (index, gain_samples) in &gains {
+            let taken_times = taken.get(index);
+            for (gain_at, amount) in gain_samples {
+                let delta = taken_times.and_then(|times| {
+                    let before = times.partition_point(|at| at <= gain_at);
+                    (before > 0).then(|| gain_at - times[before - 1])
+                });
+                match delta {
+                    Some(delta) => {
+                        deltas.push(delta);
+                        if delta <= 500 {
+                            covered_gauge += amount;
+                        } else {
+                            invisible_gauge += amount;
+                        }
+                    }
+                    None => {
+                        orphans += 1;
+                        invisible_gauge += amount;
+                    }
+                }
+            }
+        }
+    }
+
+    deltas.sort_unstable();
+    println!(
+        "{} damage-taken captioned gains matched to a received hit, {} orphans \
+         (no received hit before the gain)",
+        deltas.len(),
+        orphans
+    );
+    println!(
+        "gauge amounts: {covered_gauge:.1} within 500 ms of a visible received hit, \
+         {invisible_gauge:.1} with none ({:.1}% invisible to the taken exclusion)",
+        invisible_gauge / (covered_gauge + invisible_gauge).max(f64::MIN_POSITIVE) * 100.0
+    );
+    if deltas.is_empty() {
+        return Ok(());
+    }
+    for quantile in [0.5, 0.9, 0.95, 0.99, 0.999, 1.0] {
+        let idx = ((deltas.len() - 1) as f64 * quantile) as usize;
+        println!("  p{:<5} {} ms", quantile * 100.0, deltas[idx]);
+    }
+    let buckets: [i64; 8] = [0, 16, 32, 64, 128, 250, 500, 1000];
+    for window in buckets {
+        let within = deltas.partition_point(|delta| *delta <= window);
+        println!(
+            "  <= {window:>4} ms: {:.2}%",
+            within as f64 / deltas.len() as f64 * 100.0
+        );
+    }
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let mut db_path = PathBuf::from("src-tauri/logs.db");
     let mut targets: Vec<u32> = vec![9995, 9999, 80000, 175, u32::MAX];
     let mut verbose = false;
     let mut dump_log: Option<i64> = None;
+    let mut taken_lag = false;
 
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -163,12 +263,16 @@ fn main() -> Result<()> {
             "--dump-log" => {
                 dump_log = Some(args.next().context("--dump-log needs an id")?.parse()?)
             }
+            "--taken-lag" => taken_lag = true,
             other => anyhow::bail!("unknown arg: {other}"),
         }
     }
 
     if let Some(id) = dump_log {
         return dump_one_log(&db_path, id);
+    }
+    if taken_lag {
+        return scan_taken_lag(&db_path);
     }
 
     let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
