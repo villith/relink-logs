@@ -2314,21 +2314,24 @@
     "name": "X攻撃３段目（繋ぎ）"
    },
    "200": {
-    "w": 1.5,
+    "w": 0.2144,
     "weights": [
+     0.0471,
      0.2,
-     1.5,
-     1.93
+     0.2144,
+     0.297,
+     1.5
     ],
     "conf": "med",
     "src": "seq_edit_attack",
     "name": "幽霊招集"
    },
    "300": {
-    "w": 0.2,
+    "w": 0.0188,
     "weights": [
-     0.1,
-     0.2,
+     0.0049,
+     0.0154,
+     0.0222,
      0.7
     ],
     "conf": "med",
@@ -2381,6 +2384,17 @@
     "src": "seq_edit_attack",
     "name": "スペクトルパージ"
    },
+   "1100": {
+    "w": 1.0854,
+    "weights": [
+     0.2384,
+     1.0854,
+     1.5036
+    ],
+    "conf": "low",
+    "src": "re(2026-08-13): Gespenst — same ghost 3411 volley as Hinrichten; re(2026-08-13): ghost volley wp0791/2/3 seq 3411 (9.77) x spartsGageRate_Wp079x {0.1539,0.1539,0.0244}; wp0794 1.0854 if 4th ghost participates. Volley sum 3.25 matches log-solved 3.3 (n=1, sba_share_check)",
+    "name": "ゲシュペンスト"
+   },
    "1210": {
     "w": 1.0,
     "weights": [
@@ -2391,22 +2405,57 @@
     "name": "足止めだ！ジジ　発動"
    },
    "1400": {
-    "w": 8.4,
+    "w": 0.205,
     "weights": [
-     8.4
+     0.205
     ],
     "conf": "high",
     "src": "seq_edit_attack",
     "name": "ベンデル"
    },
    "1500": {
-    "w": 1.19,
+    "w": 0.1322,
     "weights": [
-     1.19
+     0.029,
+     0.1322,
+     0.1831
     ],
-    "conf": "high",
+    "conf": "med",
     "src": "seq_edit_attack",
     "name": "シュトラーフェ"
+   },
+   "1620": {
+    "w": 1.0854,
+    "weights": [
+     0.2384,
+     1.0854,
+     1.5036
+    ],
+    "conf": "low",
+    "src": "re(2026-08-13): ghost volley wp0791/2/3 seq 3411 (9.77) x spartsGageRate_Wp079x {0.1539,0.1539,0.0244}; wp0794 1.0854 if 4th ghost participates. Volley sum 3.25 matches log-solved 3.3 (n=1, sba_share_check)",
+    "name": "ヒン・リヒテンLv1・Lv2"
+   },
+   "1630": {
+    "w": 1.0854,
+    "weights": [
+     0.2384,
+     1.0854,
+     1.5036
+    ],
+    "conf": "low",
+    "src": "re(2026-08-13): ghost volley wp0791/2/3 seq 3411 (9.77) x spartsGageRate_Wp079x {0.1539,0.1539,0.0244}; wp0794 1.0854 if 4th ghost participates. Volley sum 3.25 matches log-solved 3.3 (n=1, sba_share_check)",
+    "name": "ヒン・リヒテンLv3"
+   },
+   "1640": {
+    "w": 1.0854,
+    "weights": [
+     0.2384,
+     1.0854,
+     1.5036
+    ],
+    "conf": "med",
+    "src": "re(2026-08-13): ghost volley wp0791/2/3 seq 3411 (9.77) x spartsGageRate_Wp079x {0.1539,0.1539,0.0244}; wp0794 1.0854 if 4th ghost participates. Volley sum 3.25 matches log-solved 3.3 (n=1, sba_share_check)",
+    "name": "ヒン・リヒテンLv4"
    }
   }
  },
@@ -7810,6 +7859,15 @@
     "conf": "med",
     "src": "seq_edit_attack",
     "name": "ミョルニル召喚"
+   },
+   "1200": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "re(2026-08-13): Fliegerkugel = SoAhrimanBaseLaser; LaserParam authors no spArtsRate, no correction case for action 1200 -> attack-record ctor default 1.0",
+    "name": "フライクーゲル召喚"
    },
    "1401": {
     "w": 0.5,
