@@ -7061,6 +7061,69 @@
     "src": "fsm:ab_avoidshot_N",
     "name": "バクステ射撃・溜めあり"
    },
+   "155": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "med",
+    "src": "fsm:finish_shot; measured 1.56 (sba_share_check n=5 dev 0%)",
+    "name": "□△△（バクステフィニッシュ）"
+   },
+   "156": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "med",
+    "src": "same motions as 155 (damage-cap charge variant)",
+    "name": "□△△ 溜めあり(ダメージ上限設定用)"
+   },
+   "160": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "med",
+    "src": "measured 0.50 (sba_share_check n=6); fsm:move_shot_1_lv1 agrees",
+    "name": "□□△（周囲ショット）"
+   },
+   "165": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "med",
+    "src": "measured 0.31 (sba_share_check n=3 dev 11%)",
+    "name": "□□△△（周囲フィニッシュ）"
+   },
+   "170": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "low",
+    "src": "fsm:move_shot_1fin_lv1; measured 1.09 (n=1)",
+    "name": "□□□△（単体DPS）"
+   },
+   "171": {
+    "w": 2.8,
+    "weights": [
+     2.8
+    ],
+    "conf": "low",
+    "src": "measured 2.8 (sba_share_check n=17, high spread)",
+    "name": "□□□△ 溜めあり(ダメージ上限設定用)"
+   },
+   "176": {
+    "w": 1.8,
+    "weights": [
+     1.8
+    ],
+    "conf": "low",
+    "src": "fsm:move_shot_3_lv2; measured 1.87 (n=13)",
+    "name": "□□□△△ 溜めあり(ダメージ上限設定用)"
+   },
    "200": {
     "w": 0.2,
     "weights": [
@@ -7133,6 +7196,15 @@
     "conf": "med",
     "src": "fsm:ab_straight_shot",
     "name": "クリンチャー"
+   },
+   "1300": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "low",
+    "src": "measured 0.78 (sba_share_check n=5, high spread)",
+    "name": "ヴェリエンス"
    },
    "1400": {
     "w": 1.15,
@@ -7505,6 +7577,15 @@
     "conf": "med",
     "src": "seq_edit_attack",
     "name": "アビ2 急降華"
+   },
+   "1300": {
+    "w": 1.3,
+    "weights": [
+     1.3
+    ],
+    "conf": "med",
+    "src": "fsm:ability3 (name match); measured 2.1 (n=20) higher - unlogged orb hits suspected, verify live",
+    "name": "アビ3 槍玉"
    },
    "1400": {
     "w": 0.2,
@@ -8840,6 +8921,42 @@
     "src": "fsm:normalshot_3_N",
     "name": "XXX"
    },
+   "103": {
+    "w": 0.48,
+    "weights": [
+     0.48
+    ],
+    "conf": "low",
+    "src": "measured 0.48 (sba_share_check n=7, high spread)",
+    "name": "踏みつけ開始"
+   },
+   "110": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "low",
+    "src": "measured 0.70 (sba_share_check n=4)",
+    "name": "踏みつけループA"
+   },
+   "111": {
+    "w": 0.48,
+    "weights": [
+     0.48
+    ],
+    "conf": "low",
+    "src": "measured 0.48 (sba_share_check n=5)",
+    "name": "踏みつけループB"
+   },
+   "112": {
+    "w": 0.48,
+    "weights": [
+     0.48
+    ],
+    "conf": "low",
+    "src": "measured 0.48 (sba_share_check n=3)",
+    "name": "踏みつけループC"
+   },
    "150": {
     "w": 0.3,
     "weights": [
@@ -8932,6 +9049,33 @@
     "conf": "high",
     "src": "seq_edit_attack",
     "name": "非戦闘時 ワープ移動（溜め）"
+   },
+   "300": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "low",
+    "src": "measured 0.32 (sba_share_check); aerial X",
+    "name": "【空中】X"
+   },
+   "301": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "low",
+    "src": "measured 0.32 (sba_share_check); aerial XX",
+    "name": "【空中】XX"
+   },
+   "302": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "low",
+    "src": "measured 0.32 (sba_share_check); aerial XXX",
+    "name": "【空中】XXX"
    },
    "400": {
     "w": 0.25,
