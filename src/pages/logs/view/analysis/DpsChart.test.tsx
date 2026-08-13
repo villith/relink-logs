@@ -254,14 +254,15 @@ describe("ChartTooltip — art and a card that holds still", () => {
     expect(art?.className).toContain("size-art-card");
   });
 
-  it("leaves a series with no art text-only", () => {
-    // Undefined is data: a combo action, a rollup remainder and a gauge cause
-    // depict nothing, and a blank box says less than no box — a card's rows are
-    // not a column of names to line up, so nothing is reserved.
+  it("draws the placeholder box on a series with no art, like a table row", () => {
+    // A combo action, a rollup remainder and a gauge cause depict nothing, but
+    // the box still draws — the same faint diamond an artless table row gets —
+    // so a mixed section's names hold one left edge instead of zigzagging
+    // against the table the card explains.
     const { container } = renderTooltip([{ dataKey: "1", name: "1", value: 1000, color: "#0f0" }], WITH_ART);
 
     expect(container.querySelector("[data-card-row] img")).toBeNull();
-    expect(container.querySelector("[data-row-art-empty]")).toBeNull();
+    expect(container.querySelector("[data-row-art-empty]")).toBeTruthy();
     expect(screen.getByText("Manmoth")).toBeTruthy();
   });
 
