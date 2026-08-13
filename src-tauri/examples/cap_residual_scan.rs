@@ -6,8 +6,8 @@
 //! `cap_curve_check` proves ~99% of capped hits satisfy
 //! `cap == trunc(base * K/100)` for an integer K. The rejects cluster on
 //! actors with a state-gated cap term — measured on Id (dragon form: human
-//! K 2417, transformed 2487, pre-first-transform 2357) and Katalina (Ares
-//! states) — and the term does not SWITCH, it EASES: on every state flip the
+//! K 2417, transformed 2487, pre-first-transform 2357) and Rackam (his
+//! Duration/overheat windows) — and the term does not SWITCH, it EASES: on every state flip the
 //! game ramps the +70 in near-linearly over ~1.3s (equal per-frame steps; the
 //! rapid dragon combo samples it at exactly +14.4714 K per 267 ms hit), then
 //! an asymptotic tail creeps the last ~0.07 K over several more seconds
@@ -22,7 +22,7 @@
 //! (trait `aefeb1bc`, a linear band over crit rate — the only loadout trait
 //! whose value is continuous; no violator in this corpus carries it) and its
 //! max-HP sibling "Fjord" (`3b71af12`). Network sync was also ruled out: the
-//! violating slots include a local AI Katalina and exclude a local AI Id in
+//! violating slots include a local AI Rackam and exclude a local AI Id in
 //! the same party as a violating remote Id — the discriminator is the state
 //! term, not locality.
 //!
@@ -39,6 +39,8 @@
 //!   K, excess, snapshot statuses) plus per-actor grid states.
 //! - `--trace 0xf000000N`: TSV time series of one actor's every capped hit
 //!   and status transitions, for fitting the easing dynamics offline.
+//! - `--markdown`: emit `docs/damage-cap-coverage.md` (per-character coverage
+//!   table + the unaccounted list) instead of the per-log report.
 //!
 //! Run: cargo run --release -p gbfr-logs --example cap_residual_scan -- [--db path] [--last N] [--log N ...] [--dump]
 
@@ -116,7 +118,7 @@ fn cap_consistent(cap: i64, base: i64) -> bool {
 }
 
 /// Half-percent point test: K within the same tolerance of an odd multiple of
-/// 0.5 (an even one is the integer grid). Ferry's log 2567 measured K exactly
+/// 0.5 (an even one is the integer grid). Rosetta's log 2567 measured K exactly
 /// at 849.500 / 879.5 / 884.5 across every action all fight — some builds
 /// carry a half-percent cap source the integer grid cannot represent, so this
 /// is a named class, never folded into `cap_consistent`.
@@ -228,6 +230,7 @@ fn main() -> Result<()> {
     let mut last = 200usize;
     let mut only_logs: Vec<i64> = Vec::new();
     let mut dump = false;
+    let mut markdown = false;
     let mut trace: Option<u32> = None;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -236,6 +239,9 @@ fn main() -> Result<()> {
             "--last" => last = args.next().context("--last needs N")?.parse()?,
             "--log" => only_logs.push(args.next().context("--log needs an id")?.parse()?),
             "--dump" => dump = true,
+            // Print ONLY the per-character coverage doc (the body of
+            // docs/damage-cap-coverage.md) instead of the per-log report.
+            "--markdown" => markdown = true,
             // Machine-readable time series for ONE actor: every capped hit's
             // implied K plus the actor's status apply/remove events, for
             // fitting the transition dynamics offline.
@@ -284,9 +290,14 @@ fn main() -> Result<()> {
         only_logs
     };
 
+    let char_names: BTreeMap<String, String> =
+        serde_json::from_str(include_str!("../lang/en/characters.json"))?;
+
     // worklist entries: (n_bad, description)
     let mut worklist: Vec<(usize, String)> = Vec::new();
     let (mut total_hits, mut total_bad, mut total_explained) = (0usize, 0usize, 0usize);
+    // character -> [total, on-grid, transition, settling, half-grid, cobalt, unexplained]
+    let mut by_char: BTreeMap<String, [usize; 7]> = BTreeMap::new();
 
     for id in log_ids {
         let Ok((blob, version)) = conn.query_row(
@@ -416,16 +427,19 @@ fn main() -> Result<()> {
 
         for (actor, stats) in &actors {
             total_bad += stats.bad.len();
+            let character = parsed
+                .derived_state
+                .party
+                .get(actor)
+                .map(|p| format!("{:?}", p.character_type))
+                .unwrap_or_else(|| "?".into());
+            let tally = by_char.entry(character.clone()).or_default();
+            tally[0] += stats.good + stats.bad.len();
+            tally[1] += stats.good;
             if stats.bad.is_empty() {
                 if dump && stats.good > 0 {
                     // Clean actors' K distributions are the comparison baseline
                     // for a violating actor of the same character in the party.
-                    let character = parsed
-                        .derived_state
-                        .party
-                        .get(actor)
-                        .map(|p| format!("{:?}", p.character_type))
-                        .unwrap_or_else(|| "?".into());
                     let ks: Vec<String> = stats
                         .good_k
                         .iter()
@@ -448,12 +462,6 @@ fn main() -> Result<()> {
                 }
                 continue;
             }
-            let character = parsed
-                .derived_state
-                .party
-                .get(actor)
-                .map(|p| format!("{:?}", p.character_type))
-                .unwrap_or_else(|| "?".into());
             let loadout = loadouts.get(actor);
             let cobalt = loadout
                 .map(|p| trait_level(p, COBALT, &transcendence))
@@ -524,13 +532,20 @@ fn main() -> Result<()> {
                 }
             }
             total_explained += n_transition + n_settling + n_half + n_cobalt;
+            let tally = by_char.entry(character.clone()).or_default();
+            tally[2] += n_transition;
+            tally[3] += n_settling;
+            tally[4] += n_half;
+            tally[5] += n_cobalt;
+            tally[6] += n_unexplained;
 
             let (min_e, max_e) = excesses
                 .iter()
                 .fold((f64::MAX, f64::MIN), |(lo, hi), (e, _, _, _)| {
                     (lo.min(*e), hi.max(*e))
                 });
-            println!(
+            if !markdown {
+                println!(
                 "log {id} actor {actor:#x} {character}: {} bad / {} hits | transition {n_transition} settling {n_settling} half-grid {n_half} cobalt {n_cobalt} unexplained {n_unexplained} | cobalt lv{cobalt}{} crit {} | excess {:.3}..{:.3}",
                 stats.bad.len(),
                 stats.bad.len() + stats.good,
@@ -544,95 +559,96 @@ fn main() -> Result<()> {
                 if max_e == f64::MIN { f64::NAN } else { max_e },
             );
 
-            if dump {
-                let ks: Vec<String> = stats
-                    .good_k
-                    .iter()
-                    .map(|(bucket, dist)| {
-                        let mut top: Vec<(&i64, &usize)> = dist.iter().collect();
-                        top.sort_by(|a, b| b.1.cmp(a.1));
-                        let entries: Vec<String> = top
-                            .iter()
-                            .take(5)
-                            .map(|(k, n)| format!("{k}x{n}"))
-                            .collect();
-                        format!("{bucket}[{}]", entries.join(" "))
-                    })
-                    .collect();
-                println!("    consistent K: {}", ks.join(" "));
-            }
+                if dump {
+                    let ks: Vec<String> = stats
+                        .good_k
+                        .iter()
+                        .map(|(bucket, dist)| {
+                            let mut top: Vec<(&i64, &usize)> = dist.iter().collect();
+                            top.sort_by(|a, b| b.1.cmp(a.1));
+                            let entries: Vec<String> = top
+                                .iter()
+                                .take(5)
+                                .map(|(k, n)| format!("{k}x{n}"))
+                                .collect();
+                            format!("{bucket}[{}]", entries.join(" "))
+                        })
+                        .collect();
+                    println!("    consistent K: {}", ks.join(" "));
+                }
 
-            // Which statuses track the ramp: for each status on bad hits, the
-            // mean excess with it present vs absent (bad hits only — a
-            // consistent hit's excess is zero by construction).
-            if dump && !excesses.is_empty() {
-                let ids: std::collections::BTreeSet<u32> = excesses
-                    .iter()
-                    .filter_map(|(_, hit, _, _)| hit.statuses.as_ref())
-                    .flat_map(|s| s.iter().map(|(id, _)| *id))
-                    .collect();
-                for status in ids {
-                    let (mut with, mut without): (Vec<f64>, Vec<f64>) = (Vec::new(), Vec::new());
-                    for (excess, hit, _, _) in &excesses {
-                        let Some(statuses) = hit.statuses.as_ref() else {
-                            continue;
-                        };
-                        if statuses.iter().any(|(id, _)| id == &status) {
-                            with.push(*excess);
-                        } else {
-                            without.push(*excess);
+                // Which statuses track the ramp: for each status on bad hits, the
+                // mean excess with it present vs absent (bad hits only — a
+                // consistent hit's excess is zero by construction).
+                if dump && !excesses.is_empty() {
+                    let ids: std::collections::BTreeSet<u32> = excesses
+                        .iter()
+                        .filter_map(|(_, hit, _, _)| hit.statuses.as_ref())
+                        .flat_map(|s| s.iter().map(|(id, _)| *id))
+                        .collect();
+                    for status in ids {
+                        let (mut with, mut without): (Vec<f64>, Vec<f64>) =
+                            (Vec::new(), Vec::new());
+                        for (excess, hit, _, _) in &excesses {
+                            let Some(statuses) = hit.statuses.as_ref() else {
+                                continue;
+                            };
+                            if statuses.iter().any(|(id, _)| id == &status) {
+                                with.push(*excess);
+                            } else {
+                                without.push(*excess);
+                            }
                         }
-                    }
-                    if with.len() >= 3 && !without.is_empty() {
-                        let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
-                        println!(
+                        if with.len() >= 3 && !without.is_empty() {
+                            let mean = |v: &[f64]| v.iter().sum::<f64>() / v.len() as f64;
+                            println!(
                             "    status {status}: mean excess {:+.2} with (n={}) vs {:+.2} without (n={})",
                             mean(&with),
                             with.len(),
                             mean(&without),
                             without.len()
                         );
+                        }
                     }
                 }
-            }
 
-            // Status correlation: presence rate among bad vs good snapshots.
-            if stats.bad_snapshots > 0 && stats.good_snapshots > 0 {
-                let mut diffs: Vec<(f64, u32, f64, f64)> = Vec::new();
-                let ids: std::collections::BTreeSet<u32> = stats
-                    .bad_status
-                    .keys()
-                    .chain(stats.good_status.keys())
-                    .copied()
-                    .collect();
-                for status in ids {
-                    let p_bad = *stats.bad_status.get(&status).unwrap_or(&0) as f64
-                        / stats.bad_snapshots as f64;
-                    let p_good = *stats.good_status.get(&status).unwrap_or(&0) as f64
-                        / stats.good_snapshots as f64;
-                    diffs.push(((p_bad - p_good).abs(), status, p_bad, p_good));
+                // Status correlation: presence rate among bad vs good snapshots.
+                if stats.bad_snapshots > 0 && stats.good_snapshots > 0 {
+                    let mut diffs: Vec<(f64, u32, f64, f64)> = Vec::new();
+                    let ids: std::collections::BTreeSet<u32> = stats
+                        .bad_status
+                        .keys()
+                        .chain(stats.good_status.keys())
+                        .copied()
+                        .collect();
+                    for status in ids {
+                        let p_bad = *stats.bad_status.get(&status).unwrap_or(&0) as f64
+                            / stats.bad_snapshots as f64;
+                        let p_good = *stats.good_status.get(&status).unwrap_or(&0) as f64
+                            / stats.good_snapshots as f64;
+                        diffs.push(((p_bad - p_good).abs(), status, p_bad, p_good));
+                    }
+                    diffs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+                    let top: Vec<String> = diffs
+                        .iter()
+                        .take(4)
+                        .filter(|(d, _, _, _)| *d > 0.05)
+                        .map(|(_, status, p_bad, p_good)| {
+                            format!(
+                                "status {status}: bad {:.0}% vs good {:.0}%",
+                                p_bad * 100.0,
+                                p_good * 100.0
+                            )
+                        })
+                        .collect();
+                    if !top.is_empty() {
+                        println!("    status correlates: {}", top.join(", "));
+                    }
                 }
-                diffs.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-                let top: Vec<String> = diffs
-                    .iter()
-                    .take(4)
-                    .filter(|(d, _, _, _)| *d > 0.05)
-                    .map(|(_, status, p_bad, p_good)| {
-                        format!(
-                            "status {status}: bad {:.0}% vs good {:.0}%",
-                            p_bad * 100.0,
-                            p_good * 100.0
-                        )
-                    })
-                    .collect();
-                if !top.is_empty() {
-                    println!("    status correlates: {}", top.join(", "));
-                }
-            }
 
-            if dump {
-                for (excess, hit, modal, class) in &excesses {
-                    println!(
+                if dump {
+                    for (excess, hit, modal, class) in &excesses {
+                        println!(
                         "    t={} {} [{}] rate {:.4} cap {} base {} K {:.4} modal {} excess {:+.4} {class} statuses {}",
                         hit.time,
                         hit.action,
@@ -653,6 +669,7 @@ fn main() -> Result<()> {
                             })
                             .unwrap_or_else(|| "-".into()),
                     );
+                    }
                 }
             }
 
@@ -670,12 +687,13 @@ fn main() -> Result<()> {
                 let constant = unexplained_k
                     .iter()
                     .all(|k| (k - median).abs() <= 0.02 * (1.0 + median.abs() / 1000.0));
+                let friendly = char_names.get(&character).unwrap_or(&character);
                 worklist.push((
                     n_unexplained,
                     format!(
-                        "log {id} {character} actor {actor:#x}: {n_unexplained} unexplained (max dev {max_dev:+.3}){}",
+                        "log {id}, {friendly} ({character}, actor {actor:#x}): {n_unexplained} unexplained hits (max dev {max_dev:+.3}){}",
                         if constant && unexplained_k.len() > 2 {
-                            format!(" — constant K≈{median:.3}")
+                            format!(" — constant K≈{median:.3}, one stable unknown source all fight")
                         } else {
                             String::new()
                         }
@@ -683,6 +701,57 @@ fn main() -> Result<()> {
                 ));
             }
         }
+    }
+    worklist.sort_by(|a, b| b.0.cmp(&a.0));
+
+    if markdown {
+        println!("# Damage-cap model coverage");
+        println!();
+        println!("How much of every character's logged damage caps the model explains.");
+        println!("A hit is **verified** when its cap sits exactly where the formula");
+        println!("puts it (`cap = trunc(base × K/100)`, integer K); **explained** hits");
+        println!("are off that grid for a known, named reason (a state buff easing");
+        println!("in/out, a half-percent build, the Cobalt crit band). Coverage =");
+        println!("verified + explained.");
+        println!();
+        println!("Regenerate after new logs with:");
+        println!();
+        println!("```sh");
+        println!("cargo run --release -p gbfr-logs --example cap_residual_scan -- --last 5000 --markdown > docs/damage-cap-coverage.md");
+        println!("```");
+        println!();
+        println!("| Character | Capped hits | Verified | Explained | Unaccounted | Coverage |");
+        println!("|---|---:|---:|---:|---:|---:|");
+        let mut rows: Vec<(&String, &[usize; 7])> = by_char.iter().collect();
+        rows.sort_by(|a, b| b.1[0].cmp(&a.1[0]));
+        for (character, t) in rows {
+            let [total, ongrid, transition, settling, half, cobalt, unexplained] = *t;
+            if total == 0 {
+                continue;
+            }
+            let friendly = char_names.get(character).unwrap_or(character);
+            let explained = transition + settling + half + cobalt;
+            println!(
+                "| {friendly} | {total} | {ongrid} | {explained} | {unexplained} | {:.2}% |",
+                (ongrid + explained) as f64 / total as f64 * 100.0
+            );
+        }
+        println!();
+        println!(
+            "Corpus total: {total_hits} capped hits, {:.2}% covered.",
+            (total_hits - (total_bad - total_explained)) as f64 / total_hits.max(1) as f64 * 100.0
+        );
+        println!();
+        println!("## Unaccounted");
+        println!();
+        if worklist.is_empty() {
+            println!("Nothing — every capped hit is verified or explained.");
+        } else {
+            for (_, line) in &worklist {
+                println!("- {line}");
+            }
+        }
+        return Ok(());
     }
 
     println!(
@@ -692,7 +761,6 @@ fn main() -> Result<()> {
     if worklist.is_empty() {
         println!("worklist: EMPTY — every off-grid hit has a named mechanism");
     } else {
-        worklist.sort_by(|a, b| b.0.cmp(&a.0));
         println!("worklist ({} entries):", worklist.len());
         for (n, line) in &worklist {
             println!("  [{n:>4}] {line}");
