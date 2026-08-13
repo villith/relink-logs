@@ -5,6 +5,29 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.13
+
+### Notes
+
+- Split out the modules required for Linux support from the Windows release. These were unnecessary
+  and were causing Windows Defender to sometimes flag the application as malware
+- Due to the increase reports of the application being malware, Microsoft suspended the signing certificate.
+  Releases will be unsigned until the suspension is lifted
+
+### Features
+
+- Supplementary damage is now linked to its damage event in the event view in the beta log viewer
+- The event view in the beta log viewer can be filtered by column
+- **SBA generation is now attributed per ability for the rest of the party.** A remote
+  member's gauge is synced rather than granted by a hit the hook can observe, so their
+  whole bar used to land in the unattributed row; the finished log now names most of it.
+
+### Bug Fixes
+
+- Hit counts and Sup% now agree with the Merge Sup DMG switch. With merging on, an echo
+  counts as part of the hit that caused it rather than as a hit of its own.
+- An unpaired echo no longer counts as an extra hit on its cause's row.
+
 ## 1.12.12
 
 ### Language
