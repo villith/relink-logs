@@ -5,7 +5,7 @@ name = "hook"
 # different version as OutOfDate even on a matching wire, and this is the
 # version stamped into the DLL's resource block — so an unbumped change ships
 # a hook indistinguishable from the previous one.
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 
 [lib]
@@ -62,7 +62,6 @@ tokio = { version = "1.0", features = ["full"] }
 windows = { version = "0.52.0", features = [
   "Win32_Foundation",
   "Win32_System_Diagnostics_Debug",
-  "Win32_System_Diagnostics_ToolHelp",
   "Win32_System_Console",
   "Win32_System_Memory",
   "Win32_System_LibraryLoader",
