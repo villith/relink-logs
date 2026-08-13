@@ -263,20 +263,20 @@ jobs:
 
       # Both builds write the same target/release/hook.dll, so each is copied
       # aside immediately after it is produced.
+      # Deliberately NO version env: nothing about the release version reaches
+      # hook.dll, so a release that did not touch the hook ships a byte-
+      # identical DLL and keeps the antivirus prevalence the last one earned.
+      # Staleness is detected by protocol::TOOLBOX_PROTOCOL_VERSION (a content
+      # hash of the wire crate), not by comparing versions — see
+      # src-hook/build.rs. `eject` ships the control channel that lets the app
+      # graceful-refresh the hook without a game restart.
       - name: Build hook DLL (Windows — no proton)
-        env:
-          # The hook reports this via Hello so the app can detect a stale
-          # (pre-update) hook; `eject` ships the control channel that lets the
-          # app graceful-refresh the hook without a game restart.
-          HOOK_VERSION: ${{ needs.version.outputs.version }}
         run: cargo build --release --package hook --features eject
       - name: Stage the Windows hook
         shell: bash
         run: mkdir -p out/windows && cp target/release/hook.dll out/windows/hook.dll
 
       - name: Build hook DLL (Proton)
-        env:
-          HOOK_VERSION: ${{ needs.version.outputs.version }}
         run: cargo build --release --package hook --features eject,proton
       - name: Stage the Proton hook
         shell: bash

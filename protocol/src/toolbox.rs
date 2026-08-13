@@ -18,17 +18,22 @@ pub const TOOLBOX_PIPE_NAME: &str = r"\\.\pipe\gbfr-logs-toolbox";
 pub const TOOLBOX_TCP_PORT: u16 = super::TCP_PORT + 1;
 pub const TOOLBOX_TCP_ADDR: &str = "127.0.0.1:39372";
 
-/// Bumped on ANY change to the RPC wire shape. The app checks it via `Hello`
-/// each time the event stream connects: on Linux the deployed dinput8 proxy
-/// can be older than the app until the game restarts, and a bincode mismatch
-/// is silent garbage — better "restart the game" than wrong predictions.
-pub const TOOLBOX_PROTOCOL_VERSION: u32 = 4;
-
-/// Version a hook reports when built outside a release (no `HOOK_VERSION`
-/// build env). The app treats this as a dev hook and never flags it as
-/// out of date on version difference. Kept in sync with the default in
-/// `src-hook/build.rs`.
-pub const HOOK_DEV_VERSION: &str = "0.1.0-dev";
+/// Identifies the wire this binary speaks — BOTH this RPC and the event
+/// stream, since `protocol` is the whole of both. Computed by `build.rs` as a
+/// content hash of this crate (see [`crate::fingerprint`]) rather than bumped
+/// by hand, so it moves exactly when the wire moves and never when it doesn't.
+///
+/// The app checks it via `Hello` each time the event stream connects: on Linux
+/// the deployed dinput8 proxy can be older than the app until the game
+/// restarts, and a bincode mismatch is silent garbage — better "restart the
+/// game" than wrong predictions.
+///
+/// It is also the ONLY compatibility verdict. The app used to additionally
+/// require the hook's reported version to equal its own, which forced
+/// `hook.dll` to be rebuilt with a new version string — and so a new hash —
+/// for every release, handing antivirus ML a zero-prevalence file each time.
+/// A content hash decides the same question without that cost.
+pub const TOOLBOX_PROTOCOL_VERSION: u32 = crate::WIRE_FINGERPRINT;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToolboxRequest {

@@ -68,12 +68,14 @@ pub struct HookStatus {
 #[derive(Serialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum HookState {
-    /// Pipe up, Hello OK, hook version matches the app.
+    /// Pipe up, Hello OK, hook speaks our wire.
     Connected,
     /// A refresh/reload is in flight.
     Reconnecting,
-    /// The hook answered on another protocol version, or reported a release
-    /// version differing from the app's.
+    /// The hook answered on another wire version. Its reported *version* is
+    /// not consulted: the hook crate is versioned separately from the app so
+    /// that an unchanged hook ships unchanged bytes, so a differing version
+    /// string is normal and says nothing about compatibility.
     OutOfDate,
     /// Event stream up, but the hook is not answering the toolbox channel.
     /// Its version is UNKNOWN here — deliberately not folded into
@@ -148,13 +150,6 @@ impl HookStatus {
         let hook_version = self.hook_version.lock().unwrap().clone();
         let supports_eject = self.supports_eject.load(Ordering::Relaxed);
 
-        // A dev hook (or not-yet-known version) is never flagged on version
-        // difference alone; only a real, differing release version is.
-        let version_mismatch = match hook_version.as_deref() {
-            None | Some(protocol::toolbox::HOOK_DEV_VERSION) => false,
-            Some(v) => v != app_version,
-        };
-
         // `outdated` outranks `unresponsive`: a version verdict came from the
         // hook itself and stays true even once it stops answering, whereas
         // `unresponsive` only ever means "unknown".
@@ -170,7 +165,7 @@ impl HookStatus {
             } else {
                 HookState::Disconnected
             }
-        } else if self.outdated.load(Ordering::Relaxed) || version_mismatch {
+        } else if self.outdated.load(Ordering::Relaxed) {
             HookState::OutOfDate
         } else if self.unresponsive.load(Ordering::Relaxed) {
             HookState::Unresponsive
@@ -493,10 +488,20 @@ mod tests {
         assert_eq!(hook.snapshot().state, HookState::Connected);
     }
 
+    /// The hook's reported version is INFORMATIONAL — it names the hook crate,
+    /// which is versioned independently of the app so that a release that did
+    /// not touch `src-hook/` ships a byte-identical `hook.dll`. Compatibility
+    /// is decided by the wire fingerprint alone (`outdated`), so a hook whose
+    /// version merely differs from the app's is a healthy hook.
+    ///
+    /// The deleted `snapshot_out_of_date_on_version_difference` asserted the
+    /// opposite. That rule rotated the DLL's hash on every release — every
+    /// published build a zero-prevalence file to antivirus ML — while catching
+    /// nothing the fingerprint does not catch.
     #[test]
-    fn snapshot_out_of_date_on_version_difference() {
+    fn snapshot_connected_when_only_the_reported_version_differs() {
         let hook = connected_hook(Some("0.0.1-old"), true);
-        assert_eq!(hook.snapshot().state, HookState::OutOfDate);
+        assert_eq!(hook.snapshot().state, HookState::Connected);
     }
 
     #[test]
@@ -504,12 +509,6 @@ mod tests {
         let hook = connected_hook(Some(env!("CARGO_PKG_VERSION")), true);
         hook.outdated.store(true, Ordering::Relaxed);
         assert_eq!(hook.snapshot().state, HookState::OutOfDate);
-    }
-
-    #[test]
-    fn snapshot_dev_hook_never_flagged_on_version() {
-        let hook = connected_hook(Some(protocol::toolbox::HOOK_DEV_VERSION), true);
-        assert_eq!(hook.snapshot().state, HookState::Connected);
     }
 
     /// A hook that answered, either on our protocol version or on another one.
