@@ -47,6 +47,14 @@ pub fn wire_fingerprint(files: &[(String, String)]) -> u32 {
 /// every `.rs` under `src/`, plus `Cargo.toml` — a bincode or serde major bump
 /// reshapes the wire without touching a line of our own source.
 ///
+/// Deliberately an over-approximation: comments and `#[cfg(test)]` modules
+/// hash too, so a non-wire edit in this crate still rotates the version (and
+/// with it `hook.dll`'s bytes). Distinguishing wire-shaping tokens from inert
+/// ones would take a parser this build-script-shared, std-only module cannot
+/// afford, and a hasher that misses a real wire change fails silent where
+/// this one fails loud. See `TOOLBOX_PROTOCOL_VERSION`'s doc for the rule
+/// that follows: keep non-wire churn out of `protocol/`.
+///
 /// Shared by `build.rs` and the test that checks the shipped constant, so the
 /// two cannot disagree about what "this crate's sources" means.
 pub fn crate_sources(crate_root: &std::path::Path) -> Vec<(String, String)> {

@@ -1,7 +1,7 @@
 import type { ComputedPlayerState } from "@/types";
 
 import { groupSkillsForRows, type RowKeying } from "../abilitySkills";
-import { rowGauge, sbaAttributionIsInferredOnly, sbaCauseLabel } from "../metrics/sba";
+import { rowGaugeFor, sbaCauseLabel, shownSources } from "../metrics/sba";
 import { playerRowKey, SBA_UNATTRIBUTED_KEY, sbaCauseRowKey } from "../rowKey";
 
 import type { CardLabels } from "./cardLabels";
@@ -40,9 +40,10 @@ const CAUSE_COLOR = "var(--color-ink-3)";
  * was never attributed — a remote member's is synced rather than granted by a
  * hit the hook can see, and their honest empty state is the table's
  * (`ui.logs.sba-no-breakdown`), not a card with one 100% row in it. A remote
- * member whose split the parser DEDUCED gets the same null: the inference is
- * suppressed until verified live (see `sbaAttributionIsInferredOnly`), and the
- * card must vanish with the table rows it mirrors. */
+ * member's DEDUCED split is likewise invisible here: the inference is
+ * suppressed until verified live (see `sbaInferenceSuppressed`), so this card
+ * values rows and lists causes exactly as the table does — measured figures
+ * only for such a player — and vanishes when nothing measured remains. */
 export const sbaCardSectionsFor = ({
   row,
   players,
@@ -61,29 +62,29 @@ export const sbaCardSectionsFor = ({
   const player = players.find((candidate) => playerRowKey(candidate.index) === row.key);
   if (!player) return null;
 
-  if (sbaAttributionIsInferredOnly(player)) return null;
-
   // Undefined means the log predates the field — there is no denominator, and
   // the "gap" below would be the negative of what is attributed. The table
   // draws no remainder row in that case either.
   const total = player.sbaGenerated;
   if (total === undefined) return null;
 
+  // The table's own valuation (`rowGaugeFor`): measured + inferred where the
+  // measurements anchor the rows, measured alone where the inference is
+  // suppressed. The card must agree with the table row by row.
+  const gaugeOf = rowGaugeFor(player);
+
   const abilities: BreakdownEntry[] = groupSkillsForRows(player.skillBreakdown, keying)
     .map(({ key, skills }) => ({
       key,
       label: labels.ability(key, player),
-      // `rowGauge`, not the measured figure alone: the drilled table values a
-      // row as measured + inferred, and the card must agree with it.
-      value: skills.reduce((sum, skill) => sum + rowGauge(skill), 0),
+      value: skills.reduce((sum, skill) => sum + gaugeOf(skill), 0),
       icon: labels.abilityIcon?.(key, player),
     }))
     // A wall of honest zeros is what the table filters out, so the card does too.
     .filter((entry) => entry.value !== 0)
     .sort((a, b) => b.value - a.value);
 
-  const causes: BreakdownEntry[] = (player.sbaSources ?? [])
-    .filter((source) => source.generated !== 0)
+  const causes: BreakdownEntry[] = shownSources(player)
     .map((source) => {
       const key = sbaCauseRowKey(source.kind, source.id);
       // Never null: the key was just built in the `source:` grammar it parses.

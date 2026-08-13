@@ -1246,25 +1246,56 @@ mod summon_string_tests {
 #[cfg(feature = "hookdiag")]
 pub fn probe_sba_hit_weight(instance: usize, parent_index: u32, action_id: u32, damage: i32) {
     use std::sync::Mutex;
-    static SEEN: Mutex<Vec<(u32, u32)>> = Mutex::new(Vec::new());
+    // (slot, action) -> unreadable attempts so far; `u8::MAX` = settled by a
+    // real reading. A transient unreadable must NOT settle the key — one bad
+    // sample would permanently consume the move's single probe slot and the
+    // "is gauge/weight constant across moves" question would silently lose
+    // that move for the whole session. Bounded retries, so a persistently
+    // unreadable field logs a handful of lines rather than one per swing.
+    static SEEN: Mutex<Vec<((u32, u32), u8)>> = Mutex::new(Vec::new());
+    const UNREADABLE_RETRIES: u8 = 3;
 
     if instance == 0 {
         return;
     }
+    let key = (parent_index, action_id);
     {
-        let Ok(mut seen) = SEEN.try_lock() else {
+        let Ok(seen) = SEEN.try_lock() else {
             return;
         };
-        let key = (parent_index, action_id);
-        if seen.contains(&key) || seen.len() >= 512 {
+        if seen.len() >= 512 {
             return;
         }
-        seen.push(key);
+        if let Some((_, attempts)) = seen.iter().find(|(existing, _)| *existing == key) {
+            if *attempts >= UNREADABLE_RETRIES {
+                return;
+            }
+        }
     }
 
     let addr = instance.wrapping_add(0x100);
     let weight = readable(addr, std::mem::size_of::<f32>())
         .then(|| unsafe { (addr as *const f32).read_unaligned() });
+
+    // Settle (or count the miss) only now that the read verdict exists. Two
+    // hits of one move can race between the check above and here; the cost is
+    // a duplicate log line, which beats a lock held across the probe.
+    {
+        let Ok(mut seen) = SEEN.try_lock() else {
+            return;
+        };
+        let settled = if weight.is_none() { 1 } else { u8::MAX };
+        match seen.iter_mut().find(|(existing, _)| *existing == key) {
+            Some((_, attempts)) => {
+                *attempts = if weight.is_none() {
+                    attempts.saturating_add(1)
+                } else {
+                    u8::MAX
+                }
+            }
+            None => seen.push((key, settled)),
+        }
+    }
 
     // Stated per line so a negative result is unmistakable rather than a
     // judgement call about floats. `zero` is the outcome the gate itself treats

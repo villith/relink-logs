@@ -59,8 +59,9 @@ const VALUE_EPSILON: f64 = 0.01;
 
 /// Rises smaller than this are not worth a verdict — poll quantisation and
 /// float slop live down here, and naming noise only makes a breakdown wrong in
-/// small increments instead of large ones.
-const MIN_RESIDUAL: f64 = 0.5;
+/// small increments instead of large ones. Public so the scoring example
+/// filters the same population this module verdicts on.
+pub const MIN_RESIDUAL: f64 = 0.5;
 
 /// The correlation windows every rule decides at.
 ///
@@ -68,7 +69,7 @@ const MIN_RESIDUAL: f64 = 0.5;
 /// `Default` IS the shipped configuration and is the only thing the parser
 /// uses.
 #[derive(Debug, Clone, Copy)]
-pub(super) struct Windows {
+pub struct Windows {
     /// How late a hook-read gain may arrive and still belong to the poll tick
     /// it precedes.
     ///
@@ -107,7 +108,7 @@ impl Default for Windows {
 
 /// One verdict: gauge this module decided it can name.
 #[derive(Debug, Clone, PartialEq)]
-pub(super) struct InferredGain {
+pub struct InferredGain {
     /// When the rise happened, so the SBA chart can bucket a verdict exactly
     /// where the poll saw it. The derived-state fold ignores this.
     pub at: i64,
@@ -119,7 +120,7 @@ pub(super) struct InferredGain {
 /// Which rule produced a verdict. Carried for tests and future scoring — the
 /// cause alone cannot say, because two rules can reach the same cause.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum Rule {
+pub enum Rule {
     /// A flat chain grant, recognised by its exact value.
     FlatGrant,
     /// Split across the actor's own hits by their authored gauge weights
@@ -151,7 +152,7 @@ struct PlayerEvidence {
 /// and player-keyed hits arrive under `player_slot_key(slot)`. Both keys map
 /// here so the evidence walk can look a player up by whichever key the event
 /// carried.
-pub(super) fn character_aliases(
+pub fn character_aliases(
     player_data: &[Option<super::PlayerData>; 4],
 ) -> HashMap<u32, CharacterType> {
     let mut aliases = HashMap::new();
@@ -236,7 +237,11 @@ fn gather(
 /// reports it. Gains after the last tick are simply never spent.
 ///
 /// Both inputs are in log order, which the event walk guarantees.
-fn residuals(rises: &[(i64, f64)], read_gains: &[(i64, f64)], lag: i64) -> Vec<(i64, f64)> {
+///
+/// Public for `examples/sba_infer_score.rs`, which reports the residual
+/// population alongside the verdicts — the walk must be THIS one, or the
+/// example scores a fight the parser never saw.
+pub fn residuals(rises: &[(i64, f64)], read_gains: &[(i64, f64)], lag: i64) -> Vec<(i64, f64)> {
     let mut out = Vec::with_capacity(rises.len());
     let mut next_gain = 0;
     let mut credit = 0.0;
@@ -257,14 +262,21 @@ fn residuals(rises: &[(i64, f64)], read_gains: &[(i64, f64)], lag: i64) -> Vec<(
 /// Walks a player's hits tick by tick, handing each tick the weighted actions
 /// that pay into it.
 ///
-/// A hit belongs to the FIRST tick at or after it (within `move_ms` of lag —
-/// network replay can log a remote's hit just behind the rise it paid into),
-/// mirroring how [`residuals`] spends read gains: its grant surfaced at the
-/// first poll emission after its sync landed, and counting it again for a
-/// later tick would name new gauge after the hit's own rise already did. A hit
-/// staler than `move_lookback_ms` is discarded instead — had it granted, a
-/// rise would have surfaced within a poll cadence, so whatever rose now is not
-/// it.
+/// A hit belongs to the FIRST tick at or after it, mirroring how
+/// [`residuals`] spends read gains: its grant surfaced at the first poll
+/// emission after its sync landed, and counting it again for a later tick
+/// would name new gauge after the hit's own rise already did. A hit staler
+/// than `move_lookback_ms` is discarded instead — had it granted, a rise
+/// would have surfaced within a poll cadence, so whatever rose now is not it.
+///
+/// A hit may also be pulled from up to `move_ms` AFTER a tick — network
+/// replay can log a remote's hit just behind the rise it paid into — but only
+/// by [`Self::take_reordered`], which the caller invokes for a tick that is
+/// actually about to split a residual and has no weighted hit of its own.
+/// Reaching forward unconditionally spent post-tick hits on ticks that
+/// predate them: a hit landing just after a sub-threshold (or flat-grant, or
+/// fully-read-explained) tick was consumed with no verdict, and its own gauge
+/// then surfaced at the next poll with nothing left to name it.
 struct HitShares<'a> {
     hits: &'a [(i64, ActionType)],
     weights: Option<&'a sba_weights::CharacterWeights>,
@@ -282,12 +294,41 @@ impl<'a> HitShares<'a> {
 
     /// The actions paying into the tick at `at`, each with its summed weight
     /// (in first-hit order, so verdicts are log-ordered), plus the tick's
-    /// total. Zero-weight hits are consumed but contribute nothing.
+    /// total. Consumes every hit at or before the tick — their grant surfaced
+    /// here whether or not the tick earns a verdict. Zero-weight hits are
+    /// consumed but contribute nothing.
     fn for_tick(&mut self, at: i64, windows: &Windows) -> (Vec<(ActionType, f64)>, f64) {
         let mut shares: Vec<(ActionType, f64)> = Vec::new();
         let mut total = 0.0;
+        self.consume(at, at, windows, &mut shares, &mut total);
+        (shares, total)
+    }
 
-        while self.next < self.hits.len() && self.hits[self.next].0 <= at + windows.move_ms {
+    /// The reorder rescue: pull hits from the `move_ms` window after `at`
+    /// into this tick's shares. Only for a tick with an unexplained residual
+    /// and no weighted hit of its own — everywhere else a post-tick hit is
+    /// simply the next swing, and belongs to its own tick.
+    fn take_reordered(
+        &mut self,
+        at: i64,
+        windows: &Windows,
+        shares: &mut Vec<(ActionType, f64)>,
+        total: &mut f64,
+    ) {
+        self.consume(at + windows.move_ms, at, windows, shares, total);
+    }
+
+    /// Advance over the hits up to `until`, folding the weighted ones into
+    /// `shares`/`total`. `at` is the tick the lookback is measured from.
+    fn consume(
+        &mut self,
+        until: i64,
+        at: i64,
+        windows: &Windows,
+        shares: &mut Vec<(ActionType, f64)>,
+        total: &mut f64,
+    ) {
+        while self.next < self.hits.len() && self.hits[self.next].0 <= until {
             let (hit_at, action) = self.hits[self.next];
             self.next += 1;
             if hit_at < at - windows.move_lookback_ms {
@@ -305,14 +346,12 @@ impl<'a> HitShares<'a> {
             if weight <= 0.0 {
                 continue;
             }
-            total += weight;
+            *total += weight;
             match shares.iter_mut().find(|(existing, _)| *existing == action) {
                 Some((_, sum)) => *sum += weight,
                 None => shares.push((action, weight)),
             }
         }
-
-        (shares, total)
     }
 }
 
@@ -338,7 +377,7 @@ pub(super) fn infer(
 /// [`infer`], plus which rule decided each verdict and with the windows
 /// overridable. Tests and future scoring tooling use this; the parser takes the
 /// projection above so there is exactly one shipped configuration.
-pub(super) fn infer_tagged(
+pub fn infer_tagged(
     events: &[(i64, Message)],
     admitted: &dyn Fn(i64) -> bool,
     characters: &HashMap<u32, CharacterType>,
@@ -358,10 +397,12 @@ pub(super) fn infer_tagged(
 
         for (at, residual) in residuals(&evidence.rises, &evidence.read_gains, windows.poll_lag_ms)
         {
-            // EVERY tick consumes its hits, even one that gets no verdict —
-            // a hit's grant surfaced at its own tick, and leaving it unspent
-            // would let a later residual claim it.
-            let (shares, total_weight) = hit_shares.for_tick(at, &windows);
+            // EVERY tick consumes the hits at or before it, even one that gets
+            // no verdict — a hit's grant surfaced at its own tick, and leaving
+            // it unspent would let a later residual claim it. Hits AFTER the
+            // tick are not touched here: their grant surfaces at the NEXT
+            // tick, and only the reorder rescue below may claim one early.
+            let (mut shares, mut total_weight) = hit_shares.for_tick(at, &windows);
 
             if residual < MIN_RESIDUAL {
                 continue;
@@ -381,38 +422,50 @@ pub(super) fn infer_tagged(
                     },
                     Rule::FlatGrant,
                 ));
-            } else if total_weight > 0.0 {
-                // The share formula: each action's slice of the residual is
-                // its authored weight over the tick's total. K cancels.
-                for (action, weight) in shares {
+            } else {
+                // A residual with no weighted hit of its own may reach up to
+                // `move_ms` FORWARD — network replay can log a remote's hit
+                // just behind the rise it paid into. Only then: a tick that is
+                // already explained by its own hits must not dilute them with
+                // (and spend) what is most likely just the next swing.
+                if total_weight <= 0.0 {
+                    hit_shares.take_reordered(at, &windows, &mut shares, &mut total_weight);
+                }
+                if total_weight > 0.0 {
+                    // The share formula: each action's slice of the residual is
+                    // its authored weight over the tick's total. K cancels.
+                    for (action, weight) in shares {
+                        verdicts.push((
+                            InferredGain {
+                                at,
+                                actor_index,
+                                cause: SbaGainCause::Inferred(action),
+                                amount: residual * weight / total_weight,
+                            },
+                            Rule::Share,
+                        ));
+                    }
+                    continue;
+                }
+                if evidence
+                    .taken
+                    .iter()
+                    .any(|taken_at| (taken_at - at).abs() <= windows.taken_ms)
+                {
                     verdicts.push((
                         InferredGain {
                             at,
                             actor_index,
-                            cause: SbaGainCause::Inferred(action),
-                            amount: residual * weight / total_weight,
+                            cause: SbaGainCause::InferredDamageTaken,
+                            amount: residual,
                         },
-                        Rule::Share,
+                        Rule::DamageTaken,
                     ));
                 }
-            } else if evidence
-                .taken
-                .iter()
-                .any(|taken_at| (taken_at - at).abs() <= windows.taken_ms)
-            {
-                verdicts.push((
-                    InferredGain {
-                        at,
-                        actor_index,
-                        cause: SbaGainCause::InferredDamageTaken,
-                        amount: residual,
-                    },
-                    Rule::DamageTaken,
-                ));
+                // Nothing explains it: the remainder keeps it, which is the
+                // honest outcome — this module's job is to shrink that band
+                // only where it can say why.
             }
-            // Nothing explains it: the remainder keeps it, which is the honest
-            // outcome — this module's job is to shrink that band only where it
-            // can say why.
         }
     }
 
@@ -789,6 +842,94 @@ mod tests {
                 cause: SbaGainCause::Inferred(ActionType::Normal(42)),
                 amount: 12.5,
             }]
+        );
+    }
+
+    /// The reorder rescue: network replay can log a remote's hit just behind
+    /// the rise it paid into, so an otherwise-unexplained residual may claim a
+    /// hit from up to `move_ms` after itself.
+    #[test]
+    fn a_reordered_hit_rescues_an_otherwise_unexplained_rise() {
+        let events = vec![(100, rise(PLAYER, 12.5)), (130, hit(PLAYER, ENEMY, 42))];
+
+        assert_eq!(
+            causes(&events),
+            vec![SbaGainCause::Inferred(ActionType::Normal(42))]
+        );
+    }
+
+    /// A hit just after a SUB-THRESHOLD tick is not spent by it: that tick has
+    /// nothing to explain, so the hit still pays into its own tick — the next
+    /// one. Reaching forward unconditionally consumed the hit with no verdict
+    /// and left its own rise unnameable.
+    #[test]
+    fn a_hit_after_a_subthreshold_tick_still_pays_into_its_own_tick() {
+        let events = vec![
+            (100, rise(PLAYER, 0.2)),
+            (150, hit(PLAYER, ENEMY, 42)),
+            (360, rise(PLAYER, 12.5)),
+        ];
+
+        assert_eq!(
+            infer(&events, &always, &no_party()),
+            vec![InferredGain {
+                at: 360,
+                actor_index: PLAYER,
+                cause: SbaGainCause::Inferred(ActionType::Normal(42)),
+                amount: 12.5,
+            }]
+        );
+    }
+
+    /// Same for a flat-grant tick: the chain grant claims the whole residual
+    /// by value, so a hit just behind that tick granted nothing INTO it and
+    /// must stay available for its own rise.
+    #[test]
+    fn a_hit_after_a_flat_grant_tick_still_pays_into_its_own_tick() {
+        let events = vec![
+            (100, rise(PLAYER, 100.0)),
+            (150, hit(PLAYER, ENEMY, 42)),
+            (360, rise(PLAYER, 12.5)),
+        ];
+
+        assert_eq!(
+            causes(&events),
+            vec![
+                SbaGainCause::InferredChainGrant,
+                SbaGainCause::Inferred(ActionType::Normal(42)),
+            ]
+        );
+    }
+
+    /// A tick already explained by its own hits does not reach forward: the
+    /// hit just after it is most likely the next swing, and pulling it in
+    /// would both dilute the real shares and spend the hit before its own
+    /// tick reports it.
+    #[test]
+    fn a_forward_hit_does_not_dilute_a_tick_explained_by_its_own_hits() {
+        let events = vec![
+            (100, hit(PLAYER, ENEMY, 42)),
+            (104, rise(PLAYER, 12.5)),
+            (150, hit(PLAYER, ENEMY, 77)),
+            (360, rise(PLAYER, 9.0)),
+        ];
+
+        assert_eq!(
+            infer(&events, &always, &no_party()),
+            vec![
+                InferredGain {
+                    at: 104,
+                    actor_index: PLAYER,
+                    cause: SbaGainCause::Inferred(ActionType::Normal(42)),
+                    amount: 12.5,
+                },
+                InferredGain {
+                    at: 360,
+                    actor_index: PLAYER,
+                    cause: SbaGainCause::Inferred(ActionType::Normal(77)),
+                    amount: 9.0,
+                },
+            ]
         );
     }
 

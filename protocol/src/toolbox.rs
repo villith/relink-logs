@@ -21,18 +21,26 @@ pub const TOOLBOX_TCP_ADDR: &str = "127.0.0.1:39372";
 /// Identifies the wire this binary speaks — BOTH this RPC and the event
 /// stream, since `protocol` is the whole of both. Computed by `build.rs` as a
 /// content hash of this crate (see [`crate::fingerprint`]) rather than bumped
-/// by hand, so it moves exactly when the wire moves and never when it doesn't.
+/// by hand, so a wire change can never ship unversioned. The hash reads every
+/// byte of this crate's sources — comments and test modules included — so the
+/// converse does NOT hold: a non-wire edit here still rotates the value,
+/// flags every deployed hook out of date, and rotates `hook.dll`'s bytes.
+/// Keep non-wire churn out of this crate, and batch any doc cleanup into a
+/// change that moves the wire anyway.
 ///
 /// The app checks it via `Hello` each time the event stream connects: on Linux
 /// the deployed dinput8 proxy can be older than the app until the game
 /// restarts, and a bincode mismatch is silent garbage — better "restart the
 /// game" than wrong predictions.
 ///
-/// It is also the ONLY compatibility verdict. The app used to additionally
+/// It is the WIRE verdict, not the whole staleness story. The app used to
 /// require the hook's reported version to equal its own, which forced
 /// `hook.dll` to be rebuilt with a new version string — and so a new hash —
 /// for every release, handing antivirus ML a zero-prevalence file each time.
-/// A content hash decides the same question without that cost.
+/// The fingerprint decides wire skew without that cost; wire-compatible
+/// staleness (a fix confined to `src-hook/` or `game-reader/`) is caught by
+/// the app comparing `hook_version` below against the hook crate version it
+/// bundled, which moves only when the hook is hand-bumped.
 pub const TOOLBOX_PROTOCOL_VERSION: u32 = crate::WIRE_FINGERPRINT;
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
@@ -55,8 +63,10 @@ pub enum ToolboxRequest {
 pub enum ToolboxResponse {
     Hello {
         protocol_version: u32,
-        /// The hook crate's build version — its release version, or
-        /// `HOOK_DEV_VERSION` for a dev build. See `src-hook/build.rs`.
+        /// The hook crate's OWN version (`CARGO_PKG_VERSION`, hand-bumped in
+        /// `src-hook/Cargo.toml` when the hook changes) — deliberately not
+        /// the app's. The app flags a hook whose version differs from the one
+        /// it bundles as out of date: same wire, different `src-hook/`.
         hook_version: String,
         /// True when the hook was built with the `eject` control channel,
         /// so the app may graceful-eject and re-inject it.

@@ -19,7 +19,9 @@ pub const HOOK_CONTROL_TCP_ADDR: &str = "127.0.0.1:39373";
 
 /// A dev override of the hook's `Hello` answer. A `None` field keeps the
 /// hook's real value. Lets the app reach `outOfDate` against a dev hook,
-/// which reports `HOOK_DEV_VERSION` and is never flagged on version alone.
+/// whose real answers always match (built from the same tree, it reports the
+/// expected crate version on the expected wire): overriding `hook_version`
+/// alone trips the version rule, `protocol_version` the wire rule.
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct HelloOverride {
     pub hook_version: Option<String>,

@@ -55,9 +55,9 @@ describe("AmountCell", () => {
   });
 
   // Every test below asserts the cap card's contents, and the card is
-  // temporarily disabled in `AmountCell` (`shows`). They are skipped rather
-  // than deleted: the derivation they cover is untouched, so restoring the
-  // card restores its coverage by dropping the `.skip`s.
+  // temporarily disabled in `AmountCell` (`SHOWS_CAP_CARD`). They are skipped
+  // rather than deleted: the derivation they cover is untouched, so flipping
+  // the switch back restores its coverage by dropping the `.skip`s.
   it.skip("shows the cap card on hover of a damage row", () => {
     renderCell({ amount: 1_500_000, capHit, width: 78 });
     hover("1,500,000");

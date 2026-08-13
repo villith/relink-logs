@@ -29,7 +29,10 @@ mod groups;
 mod live_emit;
 pub mod phantom_targets;
 mod player_state;
-mod sba_inference;
+/// Public for `examples/sba_infer_score.rs`, which scores this exact pipeline
+/// against a log's captioned truth — same reason [`supp_pairing`] is public.
+/// The parser itself only ever calls [`sba_inference::infer`].
+pub mod sba_inference;
 mod sba_weights;
 mod skill_state;
 mod status;

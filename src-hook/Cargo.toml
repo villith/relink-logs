@@ -1,6 +1,11 @@
 [package]
 name = "hook"
-version = "0.1.0"
+# Hand-bumped whenever the shipped hook's behavior changes (src-hook/ or the
+# game-reader/ code it compiles in). The app treats a mapped hook reporting a
+# different version as OutOfDate even on a matching wire, and this is the
+# version stamped into the DLL's resource block — so an unbumped change ships
+# a hook indistinguishable from the previous one.
+version = "0.2.0"
 edition = "2021"
 
 [lib]

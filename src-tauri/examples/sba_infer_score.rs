@@ -9,9 +9,10 @@
 //! the sole-action window sweep below it predate the share formula and are kept
 //! for comparing against the historical rule.
 //!
-//! The residual walk and hit-consumption walk here mirror
-//! `sba_inference::residuals` / `HitShares` (that module is private to the
-//! parser). Keep them in step, or this scores a fight the parser never saw.
+//! The replay and the leftover report call the parser's own `sba_inference`
+//! (public for this example, the way `supp_pairing` is public for its probe),
+//! so what is scored here is the pipeline that actually ships — nothing is
+//! mirrored, and a rule change scores itself.
 //!
 //! Run: cargo run -p gbfr-logs --example sba_infer_score -- [--db <path>]
 //!      [--log <id>] [--lookback <ms>] [--lag <ms>]
@@ -20,15 +21,12 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
+use gbfr_logs::parser::v1::sba_inference::{self, Windows, MIN_RESIDUAL};
 use gbfr_logs::parser::v1::{is_damage_taken_event, Encounter};
-use protocol::{ActionType, Message};
+use protocol::{ActionType, Message, SbaGainCause};
 use rusqlite::{Connection, OpenFlags};
 
-/// The shipped tolerance for a hook-read gain arriving behind its own tick.
-const POLL_LAG_MS: i64 = 16;
-/// Rises below this get no verdict, so they are not worth scoring either.
-const MIN_RESIDUAL: f64 = 0.5;
-/// The move windows to sweep. 64 is what ships.
+/// The move windows to sweep. 64 is what ships as `Windows::move_ms`.
 const SWEEP: [i64; 8] = [16, 32, 64, 128, 250, 500, 1000, 2000];
 
 #[derive(Default)]
@@ -39,32 +37,6 @@ struct Evidence {
     /// Timestamps of hits this player RECEIVED — the damage-taken rule's
     /// evidence, and the third thing the shipped pipeline tries.
     taken: Vec<i64>,
-}
-
-/// The flat-grant values the shipped rule recognises, for classifying what is
-/// left over rather than for deciding anything.
-fn is_flat_grant(amount: f64) -> bool {
-    (amount - 100.0).abs() < 0.01 || (amount - 130.0).abs() < 0.01
-}
-
-/// Mirrors `sba_inference::residuals`: each read gain is consumed by the first
-/// tick at or after it, surplus carried forward.
-fn residuals(rises: &[(i64, f64)], read_gains: &[(i64, f64)]) -> Vec<(i64, f64)> {
-    let mut out = Vec::with_capacity(rises.len());
-    let mut next_gain = 0;
-    let mut credit = 0.0;
-
-    for (at, amount) in rises {
-        while next_gain < read_gains.len() && read_gains[next_gain].0 <= at + POLL_LAG_MS {
-            credit += read_gains[next_gain].1;
-            next_gain += 1;
-        }
-        let explained = credit.min(*amount);
-        credit -= explained;
-        out.push((*at, amount - explained));
-    }
-
-    out
 }
 
 /// An echo is caused BY the skill it names, so it is not a second candidate for
@@ -130,6 +102,13 @@ fn main() -> Result<()> {
         .next()
         .map(|(timestamp, _)| *timestamp)
         .context("empty log")?;
+
+    // Owned copy for the pipeline calls below — `infer_tagged` takes a slice,
+    // and the replay filters per-player variants out of it.
+    let events: Vec<(i64, Message)> = encounter
+        .event_log()
+        .map(|(timestamp, event)| (*timestamp, event.clone()))
+        .collect();
 
     let mut by_player: HashMap<u32, Evidence> = HashMap::new();
     // Every captioned gain in the log, whoever it belongs to. The shipped rules
@@ -318,30 +297,19 @@ fn main() -> Result<()> {
     let mut players: Vec<_> = by_player.into_iter().collect();
     players.sort_by_key(|(index, _)| *index);
 
-    // SHARE-FORMULA REPLAY. The shipped rule now splits a rise across the hits
-    // it reports by their authored weights (assets/sba-weights.json). The
-    // local slot is the only place truth exists — the hook read both cause and
-    // amount — so replay the pipeline over its rises AS IF they were
-    // uncaptioned and compare per-action totals against the captioned truth.
-    // Overattribution from non-hit gauge (awards, effects, damage taken) that
-    // the flat rule does not catch is part of what this measures.
-    let weight_tables: serde_json::Value =
-        serde_json::from_str(include_str!("../assets/sba-weights.json"))?;
-    let hit_weight = |character: Option<&String>, action: &ActionType| -> f64 {
-        let table = character.and_then(|character| weight_tables.get(character));
-        match action {
-            ActionType::LinkAttack => table
-                .and_then(|table| table.get("link_attack"))
-                .and_then(|value| value.as_f64())
-                .unwrap_or(5.0),
-            ActionType::Normal(id) => table
-                .and_then(|table| table.get("actions"))
-                .and_then(|actions| actions.get(id.to_string()))
-                .and_then(|entry| entry.get("w"))
-                .and_then(|weight| weight.as_f64())
-                .unwrap_or(1.0),
-            _ => 0.0,
-        }
+    // SHARE-FORMULA REPLAY. The shipped rule splits a rise across the hits it
+    // reports by their authored weights (assets/sba-weights.json). The local
+    // slot is the only place truth exists — the hook read both cause and
+    // amount — so run the SHIPPED pipeline over its rises AS IF they were
+    // uncaptioned (this player's `SbaGain` events filtered out) and compare
+    // per-action totals against the captioned truth. Overattribution from
+    // non-hit gauge (awards, effects, damage taken) that the flat rule does
+    // not catch is part of what this measures.
+    let aliases = sba_inference::character_aliases(&encounter.player_data);
+    let replay_windows = Windows {
+        move_ms: lag,
+        move_lookback_ms: lookback,
+        ..Windows::default()
     };
     for (index, evidence) in &players {
         // Only slots with captioned gains have truth to score against.
@@ -351,56 +319,47 @@ fn main() -> Result<()> {
         let mut truth: HashMap<ActionType, f64> = HashMap::new();
         for (_, gain_index, cause, amount) in &captioned {
             if gain_index == index {
-                if let protocol::SbaGainCause::Skill(action) = cause {
+                if let SbaGainCause::Skill(action) = cause {
                     *truth.entry(*action).or_default() += amount;
                 }
             }
         }
         let character = characters.get(index);
+        let replay_events: Vec<(i64, Message)> = events
+            .iter()
+            .filter(
+                |(_, event)| !matches!(event, Message::SbaGain(gain) if gain.actor_index == *index),
+            )
+            .cloned()
+            .collect();
         let mut predicted: HashMap<ActionType, f64> = HashMap::new();
-        let (mut flat, mut taken_gauge, mut unnamed) = (0.0f64, 0.0f64, 0.0f64);
-        let mut next_hit = 0usize;
-        for (at, amount) in &evidence.rises {
-            // Mirrors sba_inference::HitShares: a hit pays into the first tick
-            // at or after it (within `lag`), staler than `lookback` is
-            // discarded.
-            let mut shares: Vec<(ActionType, f64)> = Vec::new();
-            let mut total = 0.0f64;
-            while next_hit < evidence.hits.len() && evidence.hits[next_hit].0 <= *at + lag {
-                let (hit_at, action) = evidence.hits[next_hit];
-                next_hit += 1;
-                if hit_at < *at - lookback {
-                    continue;
-                }
-                let weight = hit_weight(character, &action);
-                if weight <= 0.0 {
-                    continue;
-                }
-                total += weight;
-                match shares.iter_mut().find(|(existing, _)| *existing == action) {
-                    Some((_, sum)) => *sum += weight,
-                    None => shares.push((action, weight)),
-                }
-            }
-            if *amount < MIN_RESIDUAL {
+        let (mut flat, mut taken_gauge, mut named) = (0.0f64, 0.0f64, 0.0f64);
+        for (gain, _) in
+            sba_inference::infer_tagged(&replay_events, &|_| true, &aliases, replay_windows)
+        {
+            if gain.actor_index != *index {
                 continue;
             }
-            if is_flat_grant(*amount) {
-                flat += amount;
-            } else if total > 0.0 {
-                for (action, weight) in shares {
-                    *predicted.entry(action).or_default() += amount * weight / total;
+            named += gain.amount;
+            match gain.cause {
+                SbaGainCause::Inferred(action) => {
+                    *predicted.entry(action).or_default() += gain.amount;
                 }
-            } else if evidence
-                .taken
-                .iter()
-                .any(|taken_at| (taken_at - at).abs() <= 250)
-            {
-                taken_gauge += amount;
-            } else {
-                unnamed += amount;
+                SbaGainCause::InferredChainGrant => flat += gain.amount,
+                SbaGainCause::InferredDamageTaken => taken_gauge += gain.amount,
+                _ => {}
             }
         }
+        // With this player's read gains filtered out, every rise IS its own
+        // residual — so the unnamed remainder is what the pipeline declined
+        // to verdict of the scoreable rises.
+        let scoreable: f64 = evidence
+            .rises
+            .iter()
+            .map(|(_, amount)| amount)
+            .filter(|amount| **amount >= MIN_RESIDUAL)
+            .sum();
+        let unnamed = (scoreable - named).max(0.0);
         let polled: f64 = evidence.rises.iter().map(|(_, amount)| amount).sum();
         println!(
             "share replay for {index:#010x} ({}):",
@@ -442,6 +401,22 @@ fn main() -> Result<()> {
         );
     }
 
+    // The SHIPPED pipeline over the log AS-IS (read gains and all): which
+    // ticks it names, and which of those were chain grants — the leftover
+    // report and the quantum learner below key off these instead of
+    // re-deriving any rule.
+    let shipped_verdicts =
+        sba_inference::infer_tagged(&events, &|_| true, &aliases, Windows::default());
+    let named_ticks: HashSet<(u32, i64)> = shipped_verdicts
+        .iter()
+        .map(|(gain, _)| (gain.actor_index, gain.at))
+        .collect();
+    let chain_ticks: HashSet<(u32, i64)> = shipped_verdicts
+        .iter()
+        .filter(|(gain, _)| gain.cause == SbaGainCause::InferredChainGrant)
+        .map(|(gain, _)| (gain.actor_index, gain.at))
+        .collect();
+
     for (index, evidence) in players {
         if evidence.rises.is_empty() {
             continue;
@@ -476,10 +451,14 @@ fn main() -> Result<()> {
             evidence.hits.len(),
         );
 
-        let scored: Vec<(i64, f64)> = residuals(&evidence.rises, &evidence.read_gains)
-            .into_iter()
-            .filter(|(_, residual)| *residual >= MIN_RESIDUAL)
-            .collect();
+        let scored: Vec<(i64, f64)> = sba_inference::residuals(
+            &evidence.rises,
+            &evidence.read_gains,
+            Windows::default().poll_lag_ms,
+        )
+        .into_iter()
+        .filter(|(_, residual)| *residual >= MIN_RESIDUAL)
+        .collect();
         let unexplained: f64 = scored.iter().map(|(_, amount)| amount).sum();
         println!(
             "  residual after read gains: {unexplained:.1} over {} rises",
@@ -553,20 +532,15 @@ fn main() -> Result<()> {
             distinct.last().copied().unwrap_or(0),
         );
 
-        // What the SHIPPED pipeline actually leaves behind: everything no rule
-        // claims, in rule order. This is the band the SBA tab shows as
-        // unattributed, and the only thing worth explaining further.
+        // What the SHIPPED pipeline actually leaves behind: the residual ticks
+        // its own run verdicts nothing for — read straight off `infer_tagged`'s
+        // output rather than re-deriving any rule. This is the band the SBA
+        // tab shows as unattributed, and the only thing worth explaining
+        // further.
         let leftover: Vec<(i64, f64)> = scored
             .iter()
             .copied()
-            .filter(|(at, residual)| {
-                !is_flat_grant(*residual)
-                    && actions_near(&evidence.hits, *at, 64, true) != 1
-                    && !evidence
-                        .taken
-                        .iter()
-                        .any(|taken_at| (taken_at - at).abs() <= 250)
-            })
+            .filter(|(at, _)| !named_ticks.contains(&(index, *at)))
             .collect();
         let leftover_gauge: f64 = leftover.iter().map(|(_, amount)| amount).sum();
         println!(
@@ -658,7 +632,9 @@ fn main() -> Result<()> {
 
         let mut learned: HashMap<ActionType, Vec<f64>> = HashMap::new();
         for (at, residual) in &scored {
-            if is_flat_grant(*residual) {
+            // A tick the pipeline read as a chain grant is a flat award, not a
+            // per-hit quantum to learn from.
+            if chain_ticks.contains(&(index, *at)) {
                 continue;
             }
             let hits = interval_hits(*at);
@@ -779,9 +755,12 @@ fn main() -> Result<()> {
             );
         }
 
-        // The sweep. Named = exactly one distinct action in the window;
-        // ambiguous = two or more (evidence exists but does not decide);
-        // empty = no hit at all in reach.
+        // The sweep — the RETIRED sole-action rule, kept only to compare the
+        // shipped share formula against its predecessor. Named = exactly one
+        // distinct action in the window; ambiguous = two or more (evidence
+        // exists but does not decide); empty = no hit at all in reach. What
+        // the SHIPPED pipeline leaves unnamed is the leftover figure above,
+        // not any row of this table.
         for (window, fold) in SWEEP.into_iter().flat_map(|w| [(w, false), (w, true)]) {
             let (mut named, mut named_gauge) = (0usize, 0.0);
             let (mut ambiguous, mut ambiguous_gauge) = (0usize, 0.0);
@@ -808,7 +787,7 @@ fn main() -> Result<()> {
                 0.0
             };
             let marker = match (window, fold) {
-                (64, false) => " <- shipped",
+                (64, false) => " <- retired rule @ shipped window",
                 _ => "",
             };
             let echoes = if fold { "echo-folded" } else { "raw        " };

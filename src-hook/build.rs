@@ -8,10 +8,12 @@ fn main() {
     //
     // The version string used to be baked in here from CI's HOOK_VERSION, which
     // auto-bumps on every push to dev — so the DLL got a new hash per release
-    // even when src-hook/ was untouched. The app no longer compares versions at
-    // all (it checks protocol::TOOLBOX_PROTOCOL_VERSION, a content hash of the
-    // wire crate), so the hook now reports its own crate version and the
-    // resource block below is static.
+    // even when src-hook/ was untouched. The hook now reports its own crate
+    // version, hand-bumped in Cargo.toml only when the hook itself changes.
+    // The app compares that against the version it bundled (wire skew is
+    // caught separately by protocol::TOOLBOX_PROTOCOL_VERSION), so both
+    // staleness signals move with the hook, never with the release cadence,
+    // and the resource block below stays static.
     println!("cargo:rerun-if-changed=Cargo.toml");
 
     // /Brepro replaces the two per-link nonces MSVC would otherwise stamp in:
