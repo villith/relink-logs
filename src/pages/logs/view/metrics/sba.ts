@@ -21,9 +21,38 @@ const APPROXIMATE = "≈";
 /** A breakdown row's gauge: what was measured on it plus what was correlated
  * with it. Summed because they answer the same question — this row's share of
  * the player's bar — and a remote member has only the second kind, so ranking
- * on the first alone leaves their whole table at zero. */
-const rowGauge = (skill: { sbaGenerated?: number; sbaInferred?: number }): number =>
+ * on the first alone leaves their whole table at zero.
+ *
+ * Exported for the hover card (`sbaCardSectionsFor`), which must value an
+ * ability exactly as the drilled table does or the two disagree about one row. */
+export const rowGauge = (skill: { sbaGenerated?: number; sbaInferred?: number }): number =>
   (skill.sbaGenerated ?? 0) + (skill.sbaInferred ?? 0);
+
+/** The parser's deduced cause kinds (the Rust `sba_inference` module) — the
+ * only non-hit attribution a remote member can carry. */
+const INFERRED_CAUSE_KINDS = new Set<SbaSourceState["kind"]>(["inferredChainGrant", "inferredDamageTaken"]);
+
+/** Whether a player's SBA attribution is deduction end to end — no per-hit
+ * gauge the hook measured, only `sbaInferred` shares and `inferred*` causes.
+ *
+ * That is a remote party member: per-hit gauge exists only where the grant
+ * frame runs, so a local (or locally simulated) player's rows are measured
+ * whenever they are attributed at all. The analysis view shows such a player
+ * NO breakdown — not the drilled table (this module), not the hover card
+ * (`sbaCardSectionsFor`), not the drilled chart's bands (`useChartModel`) —
+ * because the inference has not yet survived a live online round, and an
+ * unverified deduction filling a whole breakdown reads as a measurement no
+ * matter how each row is marked. A local player's mixed rows keep their
+ * inferred shares (marked `≈`): there the measurements anchor the table. */
+export const sbaAttributionIsInferredOnly = (
+  player: Pick<ComputedPlayerState, "skillBreakdown" | "sbaSources">
+): boolean => {
+  if (player.skillBreakdown.some((skill) => (skill.sbaGenerated ?? 0) !== 0)) return false;
+  return (
+    player.skillBreakdown.some((skill) => (skill.sbaInferred ?? 0) !== 0) ||
+    (player.sbaSources ?? []).some((source) => INFERRED_CAUSE_KINDS.has(source.kind) && source.generated !== 0)
+  );
+};
 
 /** Cause → i18n key. Exhaustive by construction: a kind with no entry here is a
  * backend that shipped a cause the UI has not been taught, which reads as
@@ -129,7 +158,9 @@ const sourceRows = (owner: ComputedPlayerState, total: number): MetricRow[] =>
  *
  * Only the local player has a split: a remote member's gauge is synced rather
  * than granted by a hit the hook can see, so their breakdown is empty and their
- * player row still carries the poll-derived total. */
+ * player row still carries the poll-derived total. The parser's inference does
+ * deduce a remote split, but it is suppressed here until verified live (see
+ * `sbaAttributionIsInferredOnly`). */
 export const sba: MetricDescriptor = {
   labelKey: "ui.logs.metric-sba",
 
@@ -174,6 +205,11 @@ export const sba: MetricDescriptor = {
     // one absent from the scoped party) means there is nothing to show.
     const owner = pins.source === null ? null : players.find((p) => p.index === pins.source);
     if (!owner) return [];
+
+    // A remote member's split is inference-only and stays hidden until the
+    // inference is verified live — the empty state (`ui.logs.sba-no-breakdown`)
+    // is the honest reading, same as before the inference existed.
+    if (sbaAttributionIsInferredOnly(owner)) return [];
 
     const total = owner.sbaGenerated ?? 0;
 

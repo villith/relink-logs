@@ -1,7 +1,7 @@
 import type { ComputedPlayerState } from "@/types";
 
 import { groupSkillsForRows, type RowKeying } from "../abilitySkills";
-import { sbaCauseLabel } from "../metrics/sba";
+import { rowGauge, sbaAttributionIsInferredOnly, sbaCauseLabel } from "../metrics/sba";
 import { playerRowKey, SBA_UNATTRIBUTED_KEY, sbaCauseRowKey } from "../rowKey";
 
 import type { CardLabels } from "./cardLabels";
@@ -39,7 +39,10 @@ const CAUSE_COLOR = "var(--color-ink-3)";
  * restating one line of itself says nothing. Null too for a player whose gauge
  * was never attributed — a remote member's is synced rather than granted by a
  * hit the hook can see, and their honest empty state is the table's
- * (`ui.logs.sba-no-breakdown`), not a card with one 100% row in it. */
+ * (`ui.logs.sba-no-breakdown`), not a card with one 100% row in it. A remote
+ * member whose split the parser DEDUCED gets the same null: the inference is
+ * suppressed until verified live (see `sbaAttributionIsInferredOnly`), and the
+ * card must vanish with the table rows it mirrors. */
 export const sbaCardSectionsFor = ({
   row,
   players,
@@ -58,6 +61,8 @@ export const sbaCardSectionsFor = ({
   const player = players.find((candidate) => playerRowKey(candidate.index) === row.key);
   if (!player) return null;
 
+  if (sbaAttributionIsInferredOnly(player)) return null;
+
   // Undefined means the log predates the field — there is no denominator, and
   // the "gap" below would be the negative of what is attributed. The table
   // draws no remainder row in that case either.
@@ -68,7 +73,9 @@ export const sbaCardSectionsFor = ({
     .map(({ key, skills }) => ({
       key,
       label: labels.ability(key, player),
-      value: skills.reduce((sum, skill) => sum + (skill.sbaGenerated ?? 0), 0),
+      // `rowGauge`, not the measured figure alone: the drilled table values a
+      // row as measured + inferred, and the card must agree with it.
+      value: skills.reduce((sum, skill) => sum + rowGauge(skill), 0),
       icon: labels.abilityIcon?.(key, player),
     }))
     // A wall of honest zeros is what the table filters out, so the card does too.

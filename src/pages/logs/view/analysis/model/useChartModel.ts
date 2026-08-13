@@ -16,6 +16,7 @@ import { DPS_SMOOTHING_WINDOW, type ChartDatapoint, type Label } from "../../Det
 import type { RowKeying } from "../../abilitySkills";
 import { keyColor } from "../../actorColor";
 import { enemyHolderKey, heldByRoster, narrowedByPins, slotsOf } from "../../metrics/buffs";
+import { sbaAttributionIsInferredOnly } from "../../metrics/sba";
 import type { Hostility } from "../../metrics/types";
 import { playerRowKey } from "../../rowKey";
 import type { SelectorPins } from "../../selectorOptions";
@@ -322,14 +323,40 @@ export const useChartModel = ({
     // for one render. Gated on the same condition `abilityQuery` requests under,
     // so the chart can only draw bands this tab actually asked for.
     if (caps.dataPath !== "derived" || spec.groupBy !== "ability") return null;
+    // A remote member's SBA bands are the parser's deductions end to end, and
+    // the table beside this chart suppresses that split until the inference is
+    // verified live (see `sbaAttributionIsInferredOnly`). Dropping their bands
+    // here keeps the two agreeing — with nothing left, the chart falls back to
+    // the per-player gauge lines. Stun bands are all measured and pass through.
+    const shown = (index: number) => {
+      if (metricKey !== "sba") return true;
+      const player = playerByIndex.get(index)?.player;
+      return player === undefined || !sbaAttributionIsInferredOnly(player);
+    };
     const bands =
-      pins.source === null ? Object.values(scopedAbilitySeries).flat() : scopedAbilitySeries[pins.source] ?? [];
+      pins.source === null
+        ? Object.entries(scopedAbilitySeries)
+            .filter(([index]) => shown(Number(index)))
+            .flatMap(([, series]) => series)
+        : shown(pins.source)
+          ? scopedAbilitySeries[pins.source] ?? []
+          : [];
     if (bands.length === 0) return null;
     // Same cap as the group bands — both feed the eight-colour palette. The
     // fold follows the table's: a PINNED group's rows are its members, so the
     // bands must be too, or the chart redraws the band that was just clicked.
     return abilityBands(bands, GROUP_TOP_N, bandLabelFor, pins.ability === null ? "group" : "action", rowKeying);
-  }, [caps.dataPath, spec.groupBy, pins.source, pins.ability, scopedAbilitySeries, bandLabelFor, rowKeying]);
+  }, [
+    caps.dataPath,
+    spec.groupBy,
+    metricKey,
+    pins.source,
+    pins.ability,
+    scopedAbilitySeries,
+    playerByIndex,
+    bandLabelFor,
+    rowKeying,
+  ]);
 
   // Which series the per-player chart draws — identityPlayers, not players,
   // so a pin cannot drop the curves the pinned one is compared against. See
