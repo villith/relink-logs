@@ -1,0 +1,9094 @@
+{
+ "Pl0000": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "□"
+   },
+   "110": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "□□"
+   },
+   "120": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□□□"
+   },
+   "121": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "□□□（□▲からの繋ぎ）"
+   },
+   "130": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "□□□□"
+   },
+   "131": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "□□□□（□□▲からの繋ぎ）"
+   },
+   "200": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△攻撃"
+   },
+   "201": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△攻撃(XYYから）"
+   },
+   "202": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△攻撃(XXYYから）"
+   },
+   "203": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "△攻撃(XXXYから）"
+   },
+   "204": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "△攻撃(XXXXYから）"
+   },
+   "205": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "△攻撃(リンクアタックから）"
+   },
+   "210": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "□△"
+   },
+   "211": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□△△"
+   },
+   "220": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "□□△"
+   },
+   "221": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□□△△"
+   },
+   "230": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "□□□△"
+   },
+   "240": {
+    "w": 0.35,
+    "weights": [
+     0.3,
+     0.4
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "□□□□△"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃１段目"
+   },
+   "310": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃２段目"
+   },
+   "320": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃３段目"
+   },
+   "330": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△フィニッシュ"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△落下攻撃"
+   },
+   "1000": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ドライブバースト 分岐"
+   },
+   "1001": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ドライブバースト I"
+   },
+   "1002": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ドライブバースト II"
+   },
+   "1003": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ドライブバースト III"
+   },
+   "1004": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ドライブバースト IV"
+   },
+   "1201": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "verified",
+    "src": "fsm:destream_lv1",
+    "name": "ディストリーム I"
+   },
+   "1202": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "verified",
+    "src": "fsm:destream_lv2",
+    "name": "ディストリーム II"
+   },
+   "1203": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "verified",
+    "src": "fsm:destream_lv3",
+    "name": "ディストリーム III"
+   },
+   "1204": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "verified",
+    "src": "fsm:destream_lv4",
+    "name": "ディストリーム IV"
+   },
+   "1301": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "verified",
+    "src": "fsm:allowrainlv1",
+    "name": "アローレイン I"
+   },
+   "1302": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "verified",
+    "src": "fsm:allowrainlv2",
+    "name": "アローレイン II"
+   },
+   "1303": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "verified",
+    "src": "fsm:allowrainlv3",
+    "name": "アローレイン III"
+   },
+   "1304": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "verified",
+    "src": "fsm:allowrainlv4",
+    "name": "アローレイン IV"
+   },
+   "1501": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "アーマーブレイク I"
+   },
+   "1502": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アーマーブレイク II"
+   },
+   "1503": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アーマーブレイク III"
+   },
+   "1504": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "アーマーブレイク IV"
+   },
+   "1601": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_misera_lv1",
+    "name": "ミゼラブルミストLv1"
+   },
+   "1602": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_misera_lv2",
+    "name": "ミゼラブルミストLv2"
+   },
+   "1603": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_misera_lv3",
+    "name": "ミゼラブルミストLv3"
+   },
+   "1604": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_misera_lv4",
+    "name": "ミゼラブルミストLv4"
+   },
+   "2001": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "verified",
+    "src": "fsm:regin_lv1",
+    "name": "レギンレイブ I"
+   },
+   "2002": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "verified",
+    "src": "fsm:regin_lv2",
+    "name": "レギンレイブ II"
+   },
+   "2003": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "verified",
+    "src": "fsm:regin_lv3",
+    "name": "レギンレイブ III"
+   },
+   "2004": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "verified",
+    "src": "fsm:regin_lv4",
+    "name": "レギンレイブ IV"
+   },
+   "2110": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_delay_lv1",
+    "name": "ディレイ I"
+   },
+   "2111": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_delay_lv2",
+    "name": "ディレイ II"
+   },
+   "2112": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_delay_lv3",
+    "name": "ディレイ III"
+   },
+   "2113": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_delay_lv4",
+    "name": "ディレイ IV"
+   },
+   "2410": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_dispel_lv1",
+    "name": "ディスペル I 発動"
+   },
+   "2411": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_dispel_lv2",
+    "name": "ディスペル II 発動"
+   },
+   "2412": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_dispel_lv3",
+    "name": "ディスペル III 発動"
+   },
+   "2413": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_dispel_lv4",
+    "name": "ディスペル IV 発動"
+   }
+  }
+ },
+ "Pl0100": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□"
+   },
+   "110": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□□"
+   },
+   "120": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□□□"
+   },
+   "121": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□□□（□▲からの繋ぎ）"
+   },
+   "130": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□□□□"
+   },
+   "131": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□□□□（□□▲からの繋ぎ）"
+   },
+   "200": {
+    "w": 0.9,
+    "weights": [
+     0.8,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△攻撃"
+   },
+   "201": {
+    "w": 0.9,
+    "weights": [
+     0.8,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△攻撃(XYYから）"
+   },
+   "202": {
+    "w": 0.9,
+    "weights": [
+     0.8,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△攻撃(XXYYから）"
+   },
+   "203": {
+    "w": 0.9,
+    "weights": [
+     0.8,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△攻撃(XXXYから）"
+   },
+   "204": {
+    "w": 0.9,
+    "weights": [
+     0.8,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△攻撃(XXXXYから）"
+   },
+   "205": {
+    "w": 0.9,
+    "weights": [
+     0.8,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△攻撃(リンクアタックから）"
+   },
+   "210": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□△"
+   },
+   "211": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□△△"
+   },
+   "220": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□□△"
+   },
+   "221": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□□△△"
+   },
+   "230": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□□□△"
+   },
+   "240": {
+    "w": 0.35,
+    "weights": [
+     0.3,
+     0.4
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□□□□△"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃１段目"
+   },
+   "310": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃２段目"
+   },
+   "320": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃３段目"
+   },
+   "330": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△フィニッシュ"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△落下攻撃"
+   },
+   "1000": {
+    "w": 1.25,
+    "weights": [
+     1.0,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ドライブバースト 分岐"
+   },
+   "1001": {
+    "w": 1.25,
+    "weights": [
+     1.0,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ドライブバースト I"
+   },
+   "1002": {
+    "w": 1.25,
+    "weights": [
+     1.0,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ドライブバースト II"
+   },
+   "1003": {
+    "w": 1.25,
+    "weights": [
+     1.0,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ドライブバースト III"
+   },
+   "1004": {
+    "w": 1.25,
+    "weights": [
+     1.0,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ドライブバースト IV"
+   },
+   "1201": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "high",
+    "src": "fsm:destream_lv1",
+    "name": "ディストリーム I"
+   },
+   "1202": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "high",
+    "src": "fsm:destream_lv2",
+    "name": "ディストリーム II"
+   },
+   "1203": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "high",
+    "src": "fsm:destream_lv3",
+    "name": "ディストリーム III"
+   },
+   "1204": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "high",
+    "src": "fsm:destream_lv4",
+    "name": "ディストリーム IV"
+   },
+   "1301": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "fsm:allowrainlv1",
+    "name": "アローレイン I"
+   },
+   "1302": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "fsm:allowrainlv2",
+    "name": "アローレイン II"
+   },
+   "1303": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "fsm:allowrainlv3",
+    "name": "アローレイン III"
+   },
+   "1304": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "fsm:allowrainlv4",
+    "name": "アローレイン IV"
+   },
+   "1501": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アーマーブレイク I"
+   },
+   "1502": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アーマーブレイク II"
+   },
+   "1503": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アーマーブレイク III"
+   },
+   "1504": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アーマーブレイク IV"
+   },
+   "1601": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_misera_lv1",
+    "name": "ミゼラブルミストLv1"
+   },
+   "1602": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_misera_lv2",
+    "name": "ミゼラブルミストLv2"
+   },
+   "1603": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_misera_lv3",
+    "name": "ミゼラブルミストLv3"
+   },
+   "1604": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_misera_lv4",
+    "name": "ミゼラブルミストLv4"
+   },
+   "2001": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "fsm:regin_lv1",
+    "name": "レギンレイブ I"
+   },
+   "2002": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "fsm:regin_lv2",
+    "name": "レギンレイブ II"
+   },
+   "2003": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "fsm:regin_lv3",
+    "name": "レギンレイブ III"
+   },
+   "2004": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "fsm:regin_lv4",
+    "name": "レギンレイブ IV"
+   },
+   "2110": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_delay_lv1",
+    "name": "ディレイ I"
+   },
+   "2111": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_delay_lv2",
+    "name": "ディレイ II"
+   },
+   "2112": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_delay_lv3",
+    "name": "ディレイ III"
+   },
+   "2113": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_delay_lv4",
+    "name": "ディレイ IV"
+   },
+   "2410": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_dispel_lv1",
+    "name": "ディスペル I 発動"
+   },
+   "2411": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_dispel_lv2",
+    "name": "ディスペル II 発動"
+   },
+   "2412": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_dispel_lv3",
+    "name": "ディスペル III 発動"
+   },
+   "2413": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_dispel_lv4",
+    "name": "ディスペル IV 発動"
+   }
+  }
+ },
+ "Pl0200": {
+  "link_attack": 5.0,
+  "actions": {
+   "1": {
+    "w": 1.0,
+    "weights": [
+     0.2,
+     1.0,
+     1.2
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "エンチャントランズ"
+   },
+   "2": {
+    "w": 0.5,
+    "weights": [
+     0.2,
+     0.5,
+     1.0
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "ウィンターズ・レイン"
+   },
+   "4": {
+    "w": 0.0,
+    "weights": [
+     0.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "セイクリッド・ウィンズ"
+   },
+   "5": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "蒼天の剣"
+   },
+   "100": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "P"
+   },
+   "101": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "PP"
+   },
+   "102": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "PPP"
+   },
+   "103": {
+    "w": 0.6,
+    "weights": [
+     0.1,
+     0.2,
+     1.0,
+     1.2
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "PPPP連打"
+   },
+   "104": {
+    "w": 1.05,
+    "weights": [
+     0.2,
+     1.0,
+     1.1,
+     1.2
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "PPPP連打フィニッシュ"
+   },
+   "110": {
+    "w": 0.75,
+    "weights": [
+     0.2,
+     0.5,
+     1.0,
+     1.2
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "PK"
+   },
+   "120": {
+    "w": 0.75,
+    "weights": [
+     0.2,
+     0.5,
+     1.0,
+     1.2
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "PPK"
+   },
+   "130": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "PPPK"
+   },
+   "140": {
+    "w": 0.4,
+    "weights": [
+     0.2,
+     0.4,
+     1.0
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "PPPP連打→K"
+   },
+   "200": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "K"
+   },
+   "201": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "KK"
+   },
+   "202": {
+    "w": 0.5,
+    "weights": [
+     0.3,
+     0.5,
+     1.0
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "KKK"
+   },
+   "240": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打・繋ぎ(PK)"
+   },
+   "241": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打・繋ぎ(PPK)"
+   },
+   "242": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打・繋ぎ(PPPK)"
+   },
+   "243": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     1.0,
+     2.0
+    ],
+    "conf": "verified",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打・繋ぎ(PPPPK)"
+   },
+   "244": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打・繋ぎ(KKK)"
+   },
+   "245": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打・繋ぎ(落下攻撃)"
+   },
+   "246": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打・繋ぎ(蒼天の剣)"
+   },
+   "250": {
+    "w": 0.55,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     2.0
+    ],
+    "conf": "verified",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打攻撃・開始"
+   },
+   "251": {
+    "w": 0.55,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打攻撃・1"
+   },
+   "252": {
+    "w": 0.55,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     2.0
+    ],
+    "conf": "verified",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打攻撃・2"
+   },
+   "253": {
+    "w": 0.4,
+    "weights": [
+     0.2,
+     0.3,
+     0.4,
+     0.8,
+     2.0
+    ],
+    "conf": "verified",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打攻撃・3"
+   },
+   "254": {
+    "w": 0.4,
+    "weights": [
+     0.2,
+     0.3,
+     0.4,
+     0.8,
+     2.0
+    ],
+    "conf": "verified",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打攻撃・4"
+   },
+   "255": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.4,
+     0.8,
+     1.0,
+     2.0
+    ],
+    "conf": "verified",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打攻撃・5"
+   },
+   "256": {
+    "w": 0.55,
+    "weights": [
+     0.2,
+     0.3,
+     0.8,
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:abilityshot_ares_subN",
+    "name": "アレス連打攻撃・6"
+   },
+   "259": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.8,
+     2.0
+    ],
+    "conf": "verified",
+    "src": "seq_edit_attack",
+    "name": "アレス連打攻撃フィニッシュ"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ1段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ2段目"
+   },
+   "302": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ3段目"
+   },
+   "303": {
+    "w": 0.65,
+    "weights": [
+     0.5,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ4段目"
+   },
+   "400": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中□打ち上げ"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△落下攻撃"
+   }
+  }
+ },
+ "Pl0300": {
+  "link_attack": 5.0,
+  "actions": {
+   "1": {
+    "w": 1.5,
+    "weights": [
+     1.0,
+     1.5,
+     4.0
+    ],
+    "conf": "med",
+    "src": "fsm:spitfire+spit_fire",
+    "name": "スピットファイア"
+   },
+   "2": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "verified",
+    "src": "fsm:plunging_fire",
+    "name": "バレットヘイル"
+   },
+   "4": {
+    "w": 0.55,
+    "weights": [
+     0.1,
+     1.0
+    ],
+    "conf": "low",
+    "src": "fsm:fullfire family (duration?)",
+    "name": "デュレーション"
+   },
+   "8": {
+    "w": 2.0,
+    "weights": [
+     0.5,
+     3.5
+    ],
+    "conf": "high",
+    "src": "fsm:collateral",
+    "name": "コラテラルダメージ"
+   },
+   "100": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "verified",
+    "src": "fsm:shot",
+    "name": "歩き射撃"
+   },
+   "105": {
+    "w": 0.15,
+    "weights": [
+     0.15
+    ],
+    "conf": "verified",
+    "src": "fsm:just_shot",
+    "name": "※ 歩きジャスト射撃（ダメージ上限タイプ用）"
+   },
+   "200": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "med",
+    "src": "fsm:charge_lv_1",
+    "name": "チャージショットガン"
+   },
+   "201": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "med",
+    "src": "fsm:charge_lv_2",
+    "name": "チャージショットガン Lv2（ダメージ上限タイプ用）"
+   },
+   "202": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "med",
+    "src": "fsm:charge_lv_3",
+    "name": "チャージショットガン Lv3（ダメージ上限タイプ用）"
+   },
+   "203": {
+    "w": 0.15,
+    "weights": [
+     0.15
+    ],
+    "conf": "verified",
+    "src": "fsm:charge_lv_4",
+    "name": "チャージショットガン Lv4（ダメージ上限タイプ用）"
+   },
+   "204": {
+    "w": 1.25,
+    "weights": [
+     1.0,
+     1.5
+    ],
+    "conf": "med",
+    "src": "fsm:charge_lv_max",
+    "name": "チャージショットガン Lv5（ダメージ上限タイプ用）"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中打ち上げ攻撃"
+   },
+   "410": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "med",
+    "src": "fsm:air_pow_shot",
+    "name": "空中△チャージショット"
+   }
+  }
+ },
+ "Pl0400": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 1.25,
+    "weights": [
+     0.5,
+     2.0
+    ],
+    "conf": "verified",
+    "src": "fsm:normalshot_N/chargeshot_N (uncharged vs charged)",
+    "name": "□コンボ1段目"
+   },
+   "110": {
+    "w": 1.25,
+    "weights": [
+     0.5,
+     2.0
+    ],
+    "conf": "verified",
+    "src": "fsm:normalshot_N/chargeshot_N",
+    "name": "□コンボ2段目"
+   },
+   "120": {
+    "w": 1.25,
+    "weights": [
+     0.5,
+     2.0
+    ],
+    "conf": "verified",
+    "src": "fsm:normalshot_N/chargeshot_N",
+    "name": "□コンボ3段目"
+   },
+   "210": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "fsm:areaeffect_lv0",
+    "name": "範囲魔法 Lv0"
+   },
+   "211": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "high",
+    "src": "fsm:areaeffect_lv1",
+    "name": "範囲魔法 Lv1"
+   },
+   "212": {
+    "w": 4.0,
+    "weights": [
+     4.0
+    ],
+    "conf": "verified",
+    "src": "fsm:areaeffect_lv2",
+    "name": "範囲魔法 Lv2"
+   },
+   "213": {
+    "w": 5.0,
+    "weights": [
+     5.0
+    ],
+    "conf": "verified",
+    "src": "fsm:areaeffect_lv3",
+    "name": "範囲魔法 Lv3"
+   },
+   "214": {
+    "w": 7.0,
+    "weights": [
+     7.0
+    ],
+    "conf": "verified",
+    "src": "fsm:areaeffect_lv4",
+    "name": "範囲魔法 Lv4"
+   },
+   "300": {
+    "w": 1.25,
+    "weights": [
+     0.5,
+     2.0
+    ],
+    "conf": "high",
+    "src": "fsm:airnormalshot_N/chargeshot_N",
+    "name": "空中■攻撃 1段目"
+   },
+   "301": {
+    "w": 1.25,
+    "weights": [
+     0.5,
+     2.0
+    ],
+    "conf": "high",
+    "src": "fsm:airnormalshot_N/chargeshot_N",
+    "name": "空中■攻撃 2段目"
+   },
+   "302": {
+    "w": 1.25,
+    "weights": [
+     0.5,
+     2.0
+    ],
+    "conf": "high",
+    "src": "fsm:airnormalshot_N/chargeshot_N",
+    "name": "空中■攻撃 3段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "2000": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "measurement log 2609 (no static source identified for ice)",
+    "name": "【アビリティ】アイス"
+   },
+   "3000": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.5
+    ],
+    "conf": "verified",
+    "src": "fsm:fireball",
+    "name": "【アビリティ】ファイア"
+   },
+   "5000": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_gravity",
+    "name": "【アビリティ】魔力の渦"
+   },
+   "7200": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "fsm:orb",
+    "name": "【アビリティ】オーブ発動Lv0"
+   },
+   "7201": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "verified",
+    "src": "fsm:orb",
+    "name": "【アビリティ】オーブ発動Lv1"
+   },
+   "7202": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "verified",
+    "src": "fsm:orb",
+    "name": "【アビリティ】オーブ発動Lv2"
+   },
+   "7203": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "verified",
+    "src": "fsm:orb",
+    "name": "【アビリティ】オーブ発動Lv3"
+   },
+   "8200": {
+    "w": 4.0,
+    "weights": [
+     4.0
+    ],
+    "conf": "verified",
+    "src": "fsm:lightning",
+    "name": "【アビリティ】ライトニング発生Lv0"
+   },
+   "8201": {
+    "w": 4.0,
+    "weights": [
+     4.0
+    ],
+    "conf": "verified",
+    "src": "fsm:lightning",
+    "name": "【アビリティ】ライトニング発生Lv1"
+   },
+   "8202": {
+    "w": 4.0,
+    "weights": [
+     4.0
+    ],
+    "conf": "verified",
+    "src": "fsm:lightning",
+    "name": "【アビリティ】ライトニング発生Lv2"
+   },
+   "8203": {
+    "w": 4.0,
+    "weights": [
+     4.0
+    ],
+    "conf": "verified",
+    "src": "fsm:lightning",
+    "name": "【アビリティ】ライトニング発生Lv3"
+   },
+   "13010": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "verified",
+    "src": "fsm:meteorite (runtime sub-action id, absent from action msg)",
+    "name": ""
+   }
+  }
+ },
+ "Pl0500": {
+  "link_attack": 5.0,
+  "actions": {
+   "2": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:ab_charge_lv1",
+    "name": "デトネーター"
+   },
+   "5": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "fsm:ab_poison",
+    "name": "ヴェノムグレネード"
+   },
+   "6": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "fsm:ab_paralysis",
+    "name": "パラライズショット"
+   },
+   "8": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "verified",
+    "src": "fsm:ab_dispel",
+    "name": "ディスラプター"
+   },
+   "22": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:ab_charge_lv2",
+    "name": "デトネーター 溜め1（ダメージ上限タイプ用）"
+   },
+   "32": {
+    "w": 2.0,
+    "weights": [
+     1.5,
+     2.5
+    ],
+    "conf": "verified",
+    "src": "fsm:ab_charge_max",
+    "name": "デトネーター 溜め2（ダメージ上限タイプ用）"
+   },
+   "100": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "fsm:normalshot",
+    "name": "射撃"
+   },
+   "101": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "fsm:normalshot",
+    "name": "射撃（2回目以降）"
+   },
+   "105": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "verified",
+    "src": "fsm:aimshot",
+    "name": "しゃがみエイム射撃"
+   },
+   "110": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "近接コンボ1"
+   },
+   "111": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "近接コンボ2"
+   },
+   "112": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "近接コンボ3"
+   },
+   "200": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:ab_back_step_bomb_shot/just",
+    "name": "爆弾バックショット"
+   },
+   "210": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "verified",
+    "src": "fsm:area_big_bomb",
+    "name": "くっつき爆弾投げ"
+   },
+   "215": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "verified",
+    "src": "fsm:area_big_bomb_*",
+    "name": "くっつき爆弾投げ(キャラ固有ジーン03)"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ□打ち上げ攻撃"
+   }
+  }
+ },
+ "Pl0600": {
+  "link_attack": 5.0,
+  "actions": {
+   "2": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "fsm:tycoon_lvN",
+    "name": "タイクーン"
+   },
+   "4": {
+    "w": 0.6,
+    "weights": [
+     0.2,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "スパイラルローズ"
+   },
+   "6": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "fsm:lostlove_bomb_lv1",
+    "name": "ロスト・ラヴ"
+   },
+   "14": {
+    "w": 0.6,
+    "weights": [
+     0.2,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "スパイラルローズ Lv2（ダメージ上限タイプ用）"
+   },
+   "16": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "fsm:lostlove_bomb_lv2",
+    "name": "ロスト・ラヴ Lv2（ダメージ上限タイプ用）"
+   },
+   "24": {
+    "w": 0.6,
+    "weights": [
+     0.2,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "スパイラルローズ Lv3（ダメージ上限タイプ用）"
+   },
+   "26": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "fsm:lostlove_bomb_lv3",
+    "name": "ロスト・ラヴ Lv3（ダメージ上限タイプ用）"
+   },
+   "34": {
+    "w": 0.6,
+    "weights": [
+     0.2,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "スパイラルローズ Lv4（ダメージ上限タイプ用）"
+   },
+   "36": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "fsm:lostlove_bomb_lv4",
+    "name": "ロスト・ラヴ Lv4（ダメージ上限タイプ用）"
+   },
+   "100": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "101": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目"
+   },
+   "102": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目"
+   },
+   "103": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目"
+   },
+   "201": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:rose_finish",
+    "name": "設置薔薇：追撃 Lv1（ダメージ上限タイプ用）"
+   },
+   "202": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:rose_finish",
+    "name": "設置薔薇：追撃 Lv2（ダメージ上限タイプ用）"
+   },
+   "203": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:rose_finish",
+    "name": "設置薔薇：追撃 Lv3（ダメージ上限タイプ用）"
+   },
+   "204": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:rose_finish",
+    "name": "設置薔薇：追撃 Lv4（ダメージ上限タイプ用）"
+   },
+   "210": {
+    "w": 1.1,
+    "weights": [
+     1.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□△フィニッシュ(防御バフ)"
+   },
+   "220": {
+    "w": 0.875,
+    "weights": [
+     0.75,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□□△フィニッシュ(再生バフ)"
+   },
+   "230": {
+    "w": 0.9,
+    "weights": [
+     0.6,
+     1.2
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□□□△フィニッシュ(攻撃バフ)"
+   },
+   "240": {
+    "w": 0.55,
+    "weights": [
+     0.45,
+     0.5,
+     0.6,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□□□□△フィニッシュ(薔薇追撃)"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ1段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ2段目"
+   },
+   "302": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ3段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□打ち上げ"
+   },
+   "410": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△打ちおろし"
+   }
+  }
+ },
+ "Pl0700": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X攻撃１段目"
+   },
+   "101": {
+    "w": 0.55,
+    "weights": [
+     0.2,
+     0.5,
+     0.6,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "X攻撃1段目長押し"
+   },
+   "102": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X攻撃１段目（繋ぎ）"
+   },
+   "110": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X攻撃２段目"
+   },
+   "111": {
+    "w": 0.5,
+    "weights": [
+     0.2,
+     0.4,
+     0.5,
+     0.6,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "X攻撃2段目長押し"
+   },
+   "112": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X攻撃２段目（繋ぎ）"
+   },
+   "120": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X攻撃３段目"
+   },
+   "121": {
+    "w": 0.7,
+    "weights": [
+     0.2,
+     0.6,
+     0.8,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "X攻撃3段目長押し"
+   },
+   "122": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X攻撃３段目（繋ぎ）"
+   },
+   "200": {
+    "w": 1.5,
+    "weights": [
+     0.2,
+     1.5,
+     1.93
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "幽霊招集"
+   },
+   "300": {
+    "w": 0.2,
+    "weights": [
+     0.1,
+     0.2,
+     0.7
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃1段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃2段目"
+   },
+   "302": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃3段目"
+   },
+   "400": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 0.4,
+    "weights": [
+     0.3,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中△落下攻撃"
+   },
+   "1000": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "スペクトルパージ"
+   },
+   "1210": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:areaeffect_slow",
+    "name": "足止めだ！ジジ　発動"
+   },
+   "1400": {
+    "w": 8.4,
+    "weights": [
+     8.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ベンデル"
+   },
+   "1500": {
+    "w": 1.19,
+    "weights": [
+     1.19
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "シュトラーフェ"
+   }
+  }
+ },
+ "Pl0800": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃1段目"
+   },
+   "101": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃2段目"
+   },
+   "102": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃3段目"
+   },
+   "103": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃4段目開始"
+   },
+   "104": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃4段目_連打1"
+   },
+   "105": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃4段目_連打2"
+   },
+   "106": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃4段目_連打3"
+   },
+   "107": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃4段目_連打4"
+   },
+   "108": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃4段目_連打5"
+   },
+   "109": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃4段目_連打6"
+   },
+   "150": {
+    "w": 0.6,
+    "weights": [
+     0.4,
+     0.6,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■連打フィニッシュ△攻撃"
+   },
+   "151": {
+    "w": 0.6,
+    "weights": [
+     0.4,
+     0.6,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■連打フィニッシュ△攻撃 (A系統ジャスト)"
+   },
+   "152": {
+    "w": 0.6,
+    "weights": [
+     0.4,
+     0.6,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■連打フィニッシュ△攻撃 (B系統ジャスト)"
+   },
+   "200": {
+    "w": 0.6,
+    "weights": [
+     0.4,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△ステップ"
+   },
+   "300": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃1段目"
+   },
+   "301": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃2段目"
+   },
+   "302": {
+    "w": 0.35,
+    "weights": [
+     0.35
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃3段目"
+   },
+   "400": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△落下攻撃"
+   },
+   "1000": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】ブレードインパルス"
+   },
+   "1100": {
+    "w": 0.0,
+    "weights": [
+     0.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】カルツヴィンガー"
+   },
+   "1200": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】ラヴィーナシュトローム"
+   },
+   "1400": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】トゥルブレンツ"
+   },
+   "1500": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】サザンクロス"
+   }
+  }
+ },
+ "Pl0900": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X"
+   },
+   "101": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XX"
+   },
+   "102": {
+    "w": 1.3,
+    "weights": [
+     1.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXX"
+   },
+   "103": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXXY"
+   },
+   "104": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXXYY"
+   },
+   "110": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XY"
+   },
+   "111": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XYY"
+   },
+   "120": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXY"
+   },
+   "121": {
+    "w": 0.75,
+    "weights": [
+     0.3,
+     1.2
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXYY"
+   },
+   "200": {
+    "w": 0.75,
+    "weights": [
+     0.7,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△攻撃1段目"
+   },
+   "201": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△攻撃2段目"
+   },
+   "202": {
+    "w": 1.05,
+    "weights": [
+     0.9,
+     1.2
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△攻撃3段目"
+   },
+   "203": {
+    "w": 1.3,
+    "weights": [
+     1.1,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△攻撃4段目"
+   },
+   "204": {
+    "w": 4.2,
+    "weights": [
+     4.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△攻撃5段目"
+   },
+   "210": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "クイック範囲攻撃"
+   },
+   "212": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "クイック範囲攻撃"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ1段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ2段目"
+   },
+   "302": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ3段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△落下攻撃"
+   },
+   "1100": {
+    "w": 0.35,
+    "weights": [
+     0.2,
+     0.25,
+     0.3,
+     0.35,
+     0.4,
+     0.7,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】リフトディバイダー"
+   },
+   "1300": {
+    "w": 2.5,
+    "weights": [
+     2.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】アームゲイン"
+   },
+   "1400": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】ヒロイックビート"
+   },
+   "1600": {
+    "w": 3.0,
+    "weights": [
+     3.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】エナジーディストラクション"
+   }
+  }
+ },
+ "Pl1000": {
+  "link_attack": 5.0,
+  "actions": {
+   "1": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     0.7,
+     0.8,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】溜め連撃"
+   },
+   "3": {
+    "w": 0.0,
+    "weights": [
+     0.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】イクスゼーレ"
+   },
+   "4": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】ツェアライセン"
+   },
+   "6": {
+    "w": 0.65,
+    "weights": [
+     0.3,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】アーマー突進＋強Break"
+   },
+   "7": {
+    "w": 1.5,
+    "weights": [
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】打ち上げ爆発"
+   },
+   "8": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】縮小版ローエン"
+   },
+   "40": {
+    "w": 0.5,
+    "weights": [
+     0.1,
+     0.5,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】ツェアライセン強化版"
+   },
+   "100": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "110": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目"
+   },
+   "120": {
+    "w": 0.9,
+    "weights": [
+     0.5,
+     1.3
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目"
+   },
+   "130": {
+    "w": 2.5,
+    "weights": [
+     2.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目"
+   },
+   "200": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△攻撃溜め左足前"
+   },
+   "201": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△攻撃溜め右足前"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ1段目"
+   },
+   "310": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ2段目"
+   },
+   "320": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ3段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.0,
+     1.3
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中△溜め攻撃"
+   },
+   "510": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△着地溜め攻撃"
+   }
+  }
+ },
+ "Pl1100": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "101": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目"
+   },
+   "102": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目"
+   },
+   "103": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目"
+   },
+   "104": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ5段目"
+   },
+   "111": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■コンボ2段目ジャスト"
+   },
+   "112": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■コンボ3段目ジャスト"
+   },
+   "113": {
+    "w": 1.1,
+    "weights": [
+     1.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■コンボ4段目ジャスト"
+   },
+   "114": {
+    "w": 0.7,
+    "weights": [
+     0.5,
+     0.7,
+     0.9
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■コンボ5段目ジャスト"
+   },
+   "122": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■コンボ3段目＿ジャストからのつなぎ"
+   },
+   "123": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■コンボ4段目＿ジャストからのつなぎ"
+   },
+   "124": {
+    "w": 1.05,
+    "weights": [
+     0.8,
+     1.3
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■コンボ5段目＿ジャストからのつなぎ"
+   },
+   "150": {
+    "w": 0.85,
+    "weights": [
+     0.5,
+     1.2
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■コンボ5段目全ジャスト"
+   },
+   "162": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■コンボ3段目ジャスト＿ノーマルからのつなぎ"
+   },
+   "163": {
+    "w": 1.1,
+    "weights": [
+     1.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■コンボ4段目ジャスト＿ノーマルからのつなぎ"
+   },
+   "164": {
+    "w": 0.7,
+    "weights": [
+     0.5,
+     0.7,
+     0.9
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■コンボ5段目ジャスト＿ノーマルからのつなぎ"
+   },
+   "170": {
+    "w": 1.25,
+    "weights": [
+     0.5,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■コンボファイナルフィニッシュ"
+   },
+   "200": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "移動攻撃 ニュートラル"
+   },
+   "201": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "移動攻撃 2段目から"
+   },
+   "202": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "移動攻撃 3段目から"
+   },
+   "203": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "移動攻撃 4段目から"
+   },
+   "300": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ1段目"
+   },
+   "301": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ2段目"
+   },
+   "302": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ3段目"
+   },
+   "311": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボジャスト2段目"
+   },
+   "312": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボジャスト3段目"
+   },
+   "313": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□ジャスト3段目ノーマルからの繋ぎ"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△攻撃"
+   },
+   "1000": {
+    "w": 0.65,
+    "weights": [
+     0.5,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】ウーヴェ"
+   },
+   "1100": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】ロンブルディエール"
+   },
+   "1300": {
+    "w": 1.8,
+    "weights": [
+     1.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】ネラナブ"
+   },
+   "1600": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ】フェアドレーゲン"
+   }
+  }
+ },
+ "Pl1200": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "101": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目"
+   },
+   "102": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目"
+   },
+   "103": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目_初段"
+   },
+   "104": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目_1段"
+   },
+   "105": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目_2段"
+   },
+   "106": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目_3段"
+   },
+   "107": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目_4段"
+   },
+   "110": {
+    "w": 0.7,
+    "weights": [
+     0.5,
+     0.7,
+     1.3
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュジャンプ"
+   },
+   "120": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     1.4
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ派生X"
+   },
+   "130": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ派生Y"
+   },
+   "200": {
+    "w": 0.3,
+    "weights": [
+     0.2,
+     0.3,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "飛び上がり"
+   },
+   "201": {
+    "w": 0.4,
+    "weights": [
+     0.1,
+     0.7
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ派生X"
+   },
+   "202": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ派生Y"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃1段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃2段目"
+   },
+   "302": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃3段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△落下攻撃"
+   },
+   "1100": {
+    "w": 0.9,
+    "weights": [
+     0.4,
+     1.4
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ブルームーン"
+   },
+   "1200": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ライジングカット"
+   },
+   "1210": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ライジングカット成功派生"
+   },
+   "1600": {
+    "w": 0.25,
+    "weights": [
+     0.2,
+     0.25,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "(St→Loop)ソード・オブ・リュミエール"
+   },
+   "1610": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "(Fin)ソード・オブ・リュミエール"
+   }
+  }
+ },
+ "Pl1300": {
+  "link_attack": 5.0,
+  "actions": {
+   "1": {
+    "w": 0.35,
+    "weights": [
+     0.2,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "十起（突進斬り＆攻撃Down）"
+   },
+   "2": {
+    "w": 0.55,
+    "weights": [
+     0.1,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空空漠漠（範囲攻撃）"
+   },
+   "3": {
+    "w": 0.55,
+    "weights": [
+     0.1,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "刀逡巡（ダメージ受けるまで攻撃UP）"
+   },
+   "4": {
+    "w": 0.55,
+    "weights": [
+     0.1,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "千転（三幕回復）"
+   },
+   "5": {
+    "w": 0.35,
+    "weights": [
+     0.1,
+     0.2,
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "カウンター"
+   },
+   "6": {
+    "w": 0.35,
+    "weights": [
+     0.1,
+     0.2,
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "百承（幻影付与）"
+   },
+   "7": {
+    "w": 0.375,
+    "weights": [
+     0.25,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "閃空"
+   },
+   "8": {
+    "w": 0.2,
+    "weights": [
+     0.1,
+     0.2,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "突き刺し打ち上げ攻撃"
+   },
+   "17": {
+    "w": 0.375,
+    "weights": [
+     0.25,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "真ジャストコンボ（継続）"
+   },
+   "18": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "真ジャストコンボ（フィニッシュ）"
+   },
+   "100": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "110": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目"
+   },
+   "111": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目（Finから繋ぎ）"
+   },
+   "120": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目"
+   },
+   "121": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目（Finから繋ぎ）"
+   },
+   "130": {
+    "w": 0.25,
+    "weights": [
+     0.2,
+     0.3
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目"
+   },
+   "131": {
+    "w": 0.25,
+    "weights": [
+     0.2,
+     0.3
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目（Finから繋ぎ）"
+   },
+   "140": {
+    "w": 0.3,
+    "weights": [
+     0.1,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□コンボ5段目"
+   },
+   "141": {
+    "w": 0.3,
+    "weights": [
+     0.1,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□コンボ5段目（Finから繋ぎ）"
+   },
+   "150": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボFin1回目"
+   },
+   "151": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:ab_just_combo_shot_lvN",
+    "name": "□コンボFin2回目"
+   },
+   "152": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:ab_just_combo_shot_lvN",
+    "name": "□コンボFin3回目"
+   },
+   "153": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:ab_just_combo_shot_lvN",
+    "name": "□コンボFin4回目"
+   },
+   "154": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:ab_just_combo_shot_lvN",
+    "name": "□コンボFin5回目"
+   },
+   "201": {
+    "w": 1.25,
+    "weights": [
+     1.0,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "▲カウンター突進斬り：攻撃"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ1段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ2段目"
+   },
+   "302": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ3段目"
+   },
+   "303": {
+    "w": 0.5,
+    "weights": [
+     0.2,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ4段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ打ち上げ攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△落下攻撃"
+   }
+  }
+ },
+ "Pl1400": {
+  "link_attack": 5.0,
+  "actions": {
+   "1": {
+    "w": 1.2,
+    "weights": [
+     0.3,
+     1.2,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "鏡花水月(突進斬り)"
+   },
+   "2": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "刹那(チャージ斬り)"
+   },
+   "3": {
+    "w": 1.25,
+    "weights": [
+     0.5,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "至人己無(カウンター)"
+   },
+   "4": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:ab_step_shot_N",
+    "name": "繊月(回避→斬撃飛ばし)"
+   },
+   "5": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.3,
+     0.4,
+     1.2,
+     1.4,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "泡沫夢幻(神楽・Break特攻)"
+   },
+   "6": {
+    "w": 1.2,
+    "weights": [
+     0.3,
+     1.2,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "花風・薄紅舞(攻撃系バフ)"
+   },
+   "7": {
+    "w": 1.2,
+    "weights": [
+     0.3,
+     1.2,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "花風・水縹舞(防御系バフ)"
+   },
+   "8": {
+    "w": 1.2,
+    "weights": [
+     0.3,
+     1.2,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "無二無三(敵対心UP)"
+   },
+   "9": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.3,
+     0.4,
+     1.2,
+     1.4,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "(確認中)泡沫夢幻(源氏・範囲攻撃)"
+   },
+   "10": {
+    "w": 1.25,
+    "weights": [
+     0.5,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "至人己無(カウンター)：ワープ"
+   },
+   "11": {
+    "w": 2.5,
+    "weights": [
+     2.0,
+     3.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "至人己無(カウンター)：攻撃"
+   },
+   "12": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "刹那Lv2(チャージ斬り)（ダメージ上限設定対応）"
+   },
+   "22": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "刹那Lv3(チャージ斬り)（ダメージ上限設定対応）"
+   },
+   "100": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "101": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目"
+   },
+   "102": {
+    "w": 0.65,
+    "weights": [
+     0.5,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目"
+   },
+   "105": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目（源氏ジャスト派生）"
+   },
+   "110": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□神楽連打1"
+   },
+   "111": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□神楽連打2"
+   },
+   "112": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□神楽連打3"
+   },
+   "113": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□神楽連打4"
+   },
+   "114": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□神楽連打1（2週目以降）"
+   },
+   "120": {
+    "w": 0.65,
+    "weights": [
+     0.3,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□神楽連打フィニッシュ"
+   },
+   "200": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "構え変更・神楽→源氏"
+   },
+   "201": {
+    "w": 0.5,
+    "weights": [
+     0.2,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "構え変更・コンボ1段目・神楽→源氏"
+   },
+   "202": {
+    "w": 0.5,
+    "weights": [
+     0.2,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "構え変更・コンボ2段目・神楽→源氏"
+   },
+   "203": {
+    "w": 0.5,
+    "weights": [
+     0.2,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "構え変更・コンボ3段目・神楽→源氏"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ 1段目(神楽)"
+   },
+   "310": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ 2段目(神楽)"
+   },
+   "320": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ 3段目(神楽)"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ□ 打ち上げ攻撃(神楽)"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△ 落下攻撃(神楽)"
+   },
+   "411": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中△ 落下攻撃・コンボ派生ver.(神楽)"
+   },
+   "1000": {
+    "w": 0.5,
+    "weights": [
+     0.2,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "神楽ジャスト△"
+   },
+   "1005": {
+    "w": 0.8,
+    "weights": [
+     0.2,
+     0.3,
+     0.4,
+     1.2,
+     1.4,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "泡沫夢幻(源氏・範囲攻撃)"
+   },
+   "1100": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□源氏チャージ：1段目"
+   },
+   "1103": {
+    "w": 1.3,
+    "weights": [
+     1.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□源氏チャージ：2段目"
+   },
+   "1106": {
+    "w": 0.75,
+    "weights": [
+     0.7,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□源氏チャージ：3段目"
+   },
+   "1108": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□源氏チャージ：4段目"
+   },
+   "1109": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□源氏チャージ：神楽ジャスト派生"
+   },
+   "1150": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "fsm:genzi_slash",
+    "name": "※源氏チャージ攻撃連続ヒット部分（ダメージ上限設定対応）"
+   },
+   "1151": {
+    "w": 0.375,
+    "weights": [
+     0.15,
+     0.6
+    ],
+    "conf": "high",
+    "src": "fsm:genzi_slash_last(+full_charge)",
+    "name": "※源氏チャージ攻撃ラストヒット部分（ダメージ上限設定対応）"
+   },
+   "1200": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "構え変更・源氏→神楽"
+   },
+   "1201": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "構え変更・コンボ1段目・源氏→神楽"
+   },
+   "1202": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "構え変更・コンボ2段目・源氏→神楽"
+   },
+   "1203": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "構え変更・コンボ3段目・源氏→神楽"
+   },
+   "1300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ 1段目(源氏)"
+   },
+   "1310": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ 2段目(源氏)"
+   },
+   "1320": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ 3段目(源氏)"
+   },
+   "1400": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ□ 打ち上げ攻撃(源氏)"
+   },
+   "1410": {
+    "w": 0.5,
+    "weights": [
+     0.3,
+     0.7
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中△ 落下攻撃(源氏)"
+   },
+   "1411": {
+    "w": 0.55,
+    "weights": [
+     0.3,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中△ 落下攻撃・コンボ派生ver.(源氏)"
+   },
+   "2000": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "源氏ジャスト△"
+   },
+   "2001": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "源氏ジャスト△(斬撃飛ばし、蝶追撃)(ダメージ上限設定用)"
+   },
+   "3000": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "神楽→神楽ジャスト□"
+   },
+   "4000": {
+    "w": 0.5,
+    "weights": [
+     0.2,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "源氏→源氏ジャスト□"
+   }
+  }
+ },
+ "Pl1500": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "101": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目"
+   },
+   "102": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目"
+   },
+   "103": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目"
+   },
+   "104": {
+    "w": 1.3,
+    "weights": [
+     1.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ5段目"
+   },
+   "111": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ ジャスト 2段目"
+   },
+   "112": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ ジャスト 3段目"
+   },
+   "113": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ ジャスト 4段目"
+   },
+   "114": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ ジャスト 5段目"
+   },
+   "122": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目 ジャストから"
+   },
+   "123": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目 ジャストから"
+   },
+   "124": {
+    "w": 1.3,
+    "weights": [
+     1.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ5段目 ジャストから"
+   },
+   "200": {
+    "w": 2.0,
+    "weights": [
+     1.0,
+     1.5,
+     2.0,
+     2.5,
+     5.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "正拳突き"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃１段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃２段目"
+   },
+   "302": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃３段目"
+   },
+   "303": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃３段目 ジャストから"
+   },
+   "310": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃 ジャスト2段目"
+   },
+   "311": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃 ジャスト3段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△攻撃"
+   },
+   "1000": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "羅漢天降撃"
+   },
+   "1100": {
+    "w": 0.8,
+    "weights": [
+     0.6,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "印可掌"
+   },
+   "1110": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "印可掌　成功攻撃"
+   },
+   "1200": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "激震鉄山"
+   },
+   "1500": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "四股舞"
+   }
+  }
+ },
+ "Pl1600": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "101": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目"
+   },
+   "102": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目"
+   },
+   "110": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□派生バックステップ"
+   },
+   "111": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□派生空中突撃"
+   },
+   "200": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "カウンター"
+   },
+   "210": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△派生バックステップ"
+   },
+   "211": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△派生空中突撃"
+   },
+   "212": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△派生空中突撃(強化版)"
+   },
+   "213": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "カウンター派生バックステップ"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ1段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ2段目"
+   },
+   "302": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ3段目"
+   },
+   "303": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□コンボ4段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "仮　空中落下攻撃"
+   },
+   "1000": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "インフィニット・ワンダーズ"
+   },
+   "1100": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "fsm:rainoffury",
+    "name": "レインオブフューリー"
+   },
+   "1200": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アルベスの槍"
+   },
+   "1210": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アルベスの槍(空)"
+   },
+   "1400": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.0,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "範囲麻痺"
+   },
+   "1610": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "med",
+    "src": "fsm:ability_laser",
+    "name": "サウザンドフレイム発動"
+   },
+   "1700": {
+    "w": 1.75,
+    "weights": [
+     0.5,
+     3.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "カウンターアビリティ"
+   },
+   "1701": {
+    "w": 2.25,
+    "weights": [
+     0.5,
+     4.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "カウンター攻撃"
+   },
+   "1702": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "カウンターバックステ"
+   },
+   "1703": {
+    "w": 2.25,
+    "weights": [
+     0.5,
+     4.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "カウンター攻撃(近)"
+   },
+   "1800": {
+    "w": 0.65,
+    "weights": [
+     0.3,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "シグノ・ドライブ"
+   },
+   "5000": {
+    "w": 4.0,
+    "weights": [
+     4.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "スキボカウンター攻撃"
+   },
+   "5001": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "スキボカウンターバクステ"
+   }
+  }
+ },
+ "Pl1700": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "110": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目"
+   },
+   "112": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "タックル"
+   },
+   "113": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "タックル(即放し)"
+   },
+   "114": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目(チャージから)"
+   },
+   "120": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目"
+   },
+   "121": {
+    "w": 1.5,
+    "weights": [
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目チャージ"
+   },
+   "122": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目(チャージから)"
+   },
+   "130": {
+    "w": 1.5,
+    "weights": [
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段目チャージ"
+   },
+   "200": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アーマー付与1段目"
+   },
+   "251": {
+    "w": 2.25,
+    "weights": [
+     1.5,
+     3.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ2段目"
+   },
+   "252": {
+    "w": 4.5,
+    "weights": [
+     3.0,
+     6.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ3段目"
+   },
+   "260": {
+    "w": 4.5,
+    "weights": [
+     3.0,
+     6.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ3段目（バタリアンズ・オブ・フィアから）"
+   },
+   "262": {
+    "w": 4.5,
+    "weights": [
+     3.0,
+     6.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ3段目（ヴァイオレントシャドウズから）"
+   },
+   "264": {
+    "w": 4.5,
+    "weights": [
+     3.0,
+     6.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ3段目（ダムネイションから）"
+   },
+   "266": {
+    "w": 4.5,
+    "weights": [
+     3.0,
+     6.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ3段目（アンブラルエクリプスから）"
+   },
+   "268": {
+    "w": 4.5,
+    "weights": [
+     3.0,
+     6.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ3段目（ネザーラースから）"
+   },
+   "270": {
+    "w": 4.5,
+    "weights": [
+     3.0,
+     6.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ3段目（大鎌グロウノスから）"
+   },
+   "280": {
+    "w": 2.25,
+    "weights": [
+     1.5,
+     3.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ１段目移動攻撃"
+   },
+   "281": {
+    "w": 2.25,
+    "weights": [
+     1.5,
+     3.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "フィニッシュ１段目移動攻撃(即放し)"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中コンボ１段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中コンボ２段目"
+   },
+   "302": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中コンボ３段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "落下攻撃"
+   },
+   "1000": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "バタリアンズ・オブ・フィア"
+   },
+   "1100": {
+    "w": 0.9,
+    "weights": [
+     0.3,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ヴァイオレント・シャドウズ"
+   },
+   "1200": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "大鎌グロウノス"
+   },
+   "1500": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ダムネイション"
+   },
+   "1600": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アンブラル・エクリプス"
+   },
+   "1700": {
+    "w": 2.5,
+    "weights": [
+     2.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ネザーラース"
+   }
+  }
+ },
+ "Pl1800": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X メイス"
+   },
+   "101": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XX メイス"
+   },
+   "102": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXX メイス"
+   },
+   "103": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXXX メイス"
+   },
+   "104": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXXXY メイス"
+   },
+   "105": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXXXY メイス"
+   },
+   "110": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XY 槍"
+   },
+   "111": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XYY 槍"
+   },
+   "120": {
+    "w": 0.4,
+    "weights": [
+     0.3,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXY ハサミ"
+   },
+   "121": {
+    "w": 0.45,
+    "weights": [
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXYY ハサミ"
+   },
+   "130": {
+    "w": 0.3,
+    "weights": [
+     0.1,
+     0.3,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXXY 歯車"
+   },
+   "131": {
+    "w": 0.4,
+    "weights": [
+     0.07,
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXXYY 歯車"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃1段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃2段目"
+   },
+   "302": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃3段目"
+   },
+   "400": {
+    "w": 0.15,
+    "weights": [
+     0.15
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "打ち上げ攻撃"
+   },
+   "1000": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "med",
+    "src": "fsm:spare_body (mimic doll)",
+    "name": "ミミックドール発動"
+   },
+   "1100": {
+    "w": 1.5,
+    "weights": [
+     1.0,
+     2.0
+    ],
+    "conf": "high",
+    "src": "fsm:mehen",
+    "name": "メヘン詠唱"
+   },
+   "1110": {
+    "w": 1.5,
+    "weights": [
+     1.0,
+     2.0
+    ],
+    "conf": "high",
+    "src": "fsm:mehen",
+    "name": "メヘン発動"
+   },
+   "1410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "fsm:disraption",
+    "name": "ディスラプション発動"
+   },
+   "1700": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アレクサンドリア"
+   },
+   "1800": {
+    "w": 0.6,
+    "weights": [
+     0.2,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "テジェヴェ"
+   },
+   "10000": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "med",
+    "src": "fsm:spare_body (mimic doll)",
+    "name": "ミミックドール"
+   }
+  }
+ },
+ "Pl1900": {
+  "link_attack": 5.0,
+  "actions": {
+   "1": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "fsm:regin",
+    "name": "レギンレイヴ・レシディーヴ"
+   },
+   "2": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アンバウンド"
+   },
+   "4": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ラグナロク・フォーム"
+   },
+   "5": {
+    "w": 1.5,
+    "weights": [
+     1.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "スカージ"
+   },
+   "6": {
+    "w": 1.75,
+    "weights": [
+     1.0,
+     1.5,
+     2.0,
+     3.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ディア・ゴッド"
+   },
+   "7": {
+    "w": 0.8,
+    "weights": [
+     0.5,
+     0.8,
+     1.2
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ネヴァーイナフ"
+   },
+   "8": {
+    "w": 0.0,
+    "weights": [
+     0.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アルカディア"
+   },
+   "10": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "fsm:regin_super",
+    "name": "レギンレイヴ・レシディーヴ(スーパー版)(ダメージ上限タイプ用)"
+   },
+   "100": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "101": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段"
+   },
+   "102": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ3段"
+   },
+   "103": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段"
+   },
+   "110": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャスト入力フィニッシュ"
+   },
+   "120": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャスト入力フィニッシュ(スーパー版)"
+   },
+   "200": {
+    "w": 0.8,
+    "weights": [
+     0.6,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△チャージ突進"
+   },
+   "201": {
+    "w": 0.8,
+    "weights": [
+     0.6,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△チャージ突進(□1段目派生)"
+   },
+   "202": {
+    "w": 0.8,
+    "weights": [
+     0.6,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△チャージ突進(□2段目派生)"
+   },
+   "203": {
+    "w": 0.8,
+    "weights": [
+     0.6,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△チャージ突進(□3段目派生)"
+   },
+   "204": {
+    "w": 0.8,
+    "weights": [
+     0.6,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△チャージ突進(□4段目派生)"
+   },
+   "210": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△チャージ突進Fin_Lv1"
+   },
+   "211": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "△チャージ突進Fin_Lv2"
+   },
+   "212": {
+    "w": 0.8,
+    "weights": [
+     0.6,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "△チャージ突進Fin_Lv3"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中コンボ1段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中コンボ2段目"
+   },
+   "302": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中コンボ3段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ□上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△打ち下ろし"
+   },
+   "503": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目・連打開始(スーパーイド)"
+   },
+   "505": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目・連打2(スーパーイド)"
+   },
+   "506": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目・連打3(スーパーイド)"
+   },
+   "507": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目・連打4(スーパーイド)"
+   },
+   "508": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目・連打5(スーパーイド)"
+   },
+   "509": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ4段目・連打6(スーパーイド)"
+   },
+   "510": {
+    "w": 0.7,
+    "weights": [
+     0.4,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□コンボFin・パターン1(スーパーイド)"
+   },
+   "511": {
+    "w": 0.7,
+    "weights": [
+     0.4,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□コンボFin・パターン2(スーパーイド)"
+   },
+   "515": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "fsm:super_finish_fire",
+    "name": "□コンボFin火柱（ダメージ上限設定用）"
+   },
+   "610": {
+    "w": 0.7,
+    "weights": [
+     0.4,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "▲コンボFin・パターン1(スーパーイド)"
+   },
+   "611": {
+    "w": 0.7,
+    "weights": [
+     0.4,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "▲コンボFin・パターン2(スーパーイド)"
+   }
+  }
+ },
+ "Pl2000": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ1段目"
+   },
+   "101": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ2段目"
+   },
+   "102": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ連打1段目"
+   },
+   "103": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ連打2段目"
+   },
+   "104": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ連打3段目"
+   },
+   "105": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ連打4段目"
+   },
+   "106": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ連打5段目"
+   },
+   "107": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ連打6段目"
+   },
+   "108": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ連打7段目"
+   },
+   "109": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ連打8段目"
+   },
+   "120": {
+    "w": 1.2,
+    "weights": [
+     1.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボフィニッシュ"
+   },
+   "225": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□コンボ連打1段目(△連打後)"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中コンボ1段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中コンボ2段目"
+   },
+   "302": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中コンボ3段目"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ□上昇攻撃"
+   },
+   "410": {
+    "w": 0.5,
+    "weights": [
+     0.3,
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中△打ち下ろし"
+   },
+   "1000": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "fsm:regin family",
+    "name": "レギンレイヴ"
+   },
+   "1010": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "レギンレイブから□連打1段目"
+   },
+   "1200": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ネヴァーイナフ"
+   },
+   "1300": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アルカディア"
+   },
+   "1400": {
+    "w": 1.5,
+    "weights": [
+     1.0,
+     1.5,
+     3.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ディア・ゴッド"
+   }
+  }
+ },
+ "Pl2100": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃1段目"
+   },
+   "101": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃2段目"
+   },
+   "102": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃3段目"
+   },
+   "111": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャスト□攻撃2段目"
+   },
+   "112": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャスト□攻撃3段目"
+   },
+   "114": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャスト□攻撃5段目"
+   },
+   "115": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャスト□攻撃6段目"
+   },
+   "116": {
+    "w": 1.3,
+    "weights": [
+     1.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャスト□攻撃7段目"
+   },
+   "117": {
+    "w": 1.1,
+    "weights": [
+     1.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャスト中断フィニッシュ"
+   },
+   "122": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "□攻撃3段目ジャストから"
+   },
+   "140": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "バクステ後□突進"
+   },
+   "141": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "バクステ後□突進(変身後)"
+   },
+   "150": {
+    "w": 1.7,
+    "weights": [
+     1.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "全ジャスト成功フィニッシュ"
+   },
+   "151": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャストミスフィニッシュ"
+   },
+   "160": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】□1段目"
+   },
+   "161": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】□2段目"
+   },
+   "162": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】□3段目"
+   },
+   "165": {
+    "w": 3.0,
+    "weights": [
+     3.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】フィニッシュ"
+   },
+   "166": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】フィニッシュ失敗"
+   },
+   "170": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】連打 開始"
+   },
+   "171": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】連打 1段目"
+   },
+   "172": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】連打 2段目"
+   },
+   "173": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】連打 3段目"
+   },
+   "174": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】連打 4段目"
+   },
+   "175": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】連打 フィニッシュ"
+   },
+   "210": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ゲージ溜め/変身"
+   },
+   "220": {
+    "w": 1.7,
+    "weights": [
+     0.9,
+     2.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "変身後△攻撃"
+   },
+   "300": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃1段目"
+   },
+   "310": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃2段目"
+   },
+   "320": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃3段目"
+   },
+   "400": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△落下攻撃"
+   },
+   "1000": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "NPCアビリティ：近距離"
+   },
+   "2100": {
+    "w": 0.25,
+    "weights": [
+     0.2,
+     0.3
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アビリティ：突進"
+   },
+   "2200": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:straight_shot_lvN",
+    "name": "アビリティ：飛び道具"
+   },
+   "2400": {
+    "w": 2.4,
+    "weights": [
+     2.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビリティ：単発高火力"
+   },
+   "2410": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビリティ：キャンセル突進"
+   },
+   "2500": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビリティ：カウンター"
+   },
+   "2520": {
+    "w": 2.1,
+    "weights": [
+     2.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "カウンター：攻撃"
+   },
+   "2600": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビリティ：閃空"
+   },
+   "2601": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビリティ：閃空(継続)"
+   },
+   "2603": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビリティ：閃空(フィニッシュ)"
+   },
+   "2604": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビリティ：閃空(魔法剣)(ダメージ上限設定用)"
+   },
+   "3100": {
+    "w": 0.3,
+    "weights": [
+     0.2,
+     0.4
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "変身後アビリティ：突進"
+   },
+   "3400": {
+    "w": 3.0,
+    "weights": [
+     3.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "変身後アビリティ：高火力"
+   },
+   "6000": {
+    "w": 1.7,
+    "weights": [
+     1.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "魔法剣(ダメージ上限設定用)"
+   },
+   "6001": {
+    "w": 3.0,
+    "weights": [
+     3.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "魔法剣(変身後)(ダメージ上限設定用)"
+   }
+  }
+ },
+ "Pl2200": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X"
+   },
+   "101": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XX"
+   },
+   "102": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXX"
+   },
+   "103": {
+    "w": 0.6,
+    "weights": [
+     0.5,
+     0.7
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXXX"
+   },
+   "104": {
+    "w": 0.9,
+    "weights": [
+     0.8,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXXXY"
+   },
+   "110": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XY"
+   },
+   "111": {
+    "w": 0.7,
+    "weights": [
+     0.6,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XYY"
+   },
+   "120": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXY"
+   },
+   "121": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXYY"
+   },
+   "130": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXXY"
+   },
+   "131": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXXYY"
+   },
+   "140": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XYX"
+   },
+   "141": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXYX"
+   },
+   "300": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃１段目"
+   },
+   "301": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃２段目"
+   },
+   "302": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□攻撃３段目"
+   },
+   "303": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中フィニッシュ"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中△落下攻撃"
+   },
+   "900": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 X"
+   },
+   "901": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 XX"
+   },
+   "902": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 XXX"
+   },
+   "903": {
+    "w": 0.7,
+    "weights": [
+     0.6,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "剣神 XXXX"
+   },
+   "904": {
+    "w": 0.65,
+    "weights": [
+     0.5,
+     0.8
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "剣神 XXXXY"
+   },
+   "910": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 XY"
+   },
+   "911": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 XYY"
+   },
+   "920": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 XXY"
+   },
+   "921": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 XXYY"
+   },
+   "930": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 XXXY"
+   },
+   "931": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 XXXYY"
+   },
+   "940": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 XYX"
+   },
+   "941": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "剣神 XXYX"
+   },
+   "1000": {
+    "w": 0.4,
+    "weights": [
+     0.1,
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:ability01_explosion + mechanical",
+    "name": "パリード"
+   },
+   "1001": {
+    "w": 0.45,
+    "weights": [
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "パリード 剣神(ダメージ上限設定用)"
+   },
+   "2000": {
+    "w": 0.35,
+    "weights": [
+     0.25,
+     0.3,
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:ability02 + mechanical",
+    "name": "インフィニット・クレアーレ"
+   },
+   "2001": {
+    "w": 0.35,
+    "weights": [
+     0.25,
+     0.3,
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:ability02_god + mechanical",
+    "name": "インフィニット・クレアーレ 剣神(ダメージ上限設定用)"
+   },
+   "2100": {
+    "w": 0.275,
+    "weights": [
+     0.25,
+     0.3
+    ],
+    "conf": "med",
+    "src": "fsm:ability02_enhanced + mechanical",
+    "name": "インフィニット・クレアーレ(強化版)"
+   },
+   "2110": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "インフィニット・クレアーレ(強化版FIN)"
+   },
+   "3000": {
+    "w": 1.1,
+    "weights": [
+     0.7,
+     1.5
+    ],
+    "conf": "med",
+    "src": "fsm:ability03 + mechanical",
+    "name": "ロンピエンド"
+   },
+   "3001": {
+    "w": 1.1,
+    "weights": [
+     0.7,
+     1.5
+    ],
+    "conf": "med",
+    "src": "fsm:ability03_god + mechanical",
+    "name": "ロンピエンド 剣神(ダメージ上限設定用)"
+   },
+   "4001": {
+    "w": 0.45,
+    "weights": [
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "イスピラツィオーネ 通常"
+   },
+   "4002": {
+    "w": 0.45,
+    "weights": [
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "イスピラツィオーネ 剣神"
+   },
+   "5000": {
+    "w": 1.0,
+    "weights": [
+     0.4,
+     0.5,
+     1.5,
+     2.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "プリジオン・デ・アルマス"
+   },
+   "5001": {
+    "w": 1.0,
+    "weights": [
+     0.4,
+     0.5,
+     1.5,
+     2.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "プリジオン・デ・アルマス 剣神(ダメージ上限設定用)"
+   },
+   "6000": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.5
+    ],
+    "conf": "med",
+    "src": "fsm:ability06 + mechanical",
+    "name": "デスぺダザール"
+   },
+   "6001": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.5
+    ],
+    "conf": "med",
+    "src": "fsm:ability06_god + mechanical",
+    "name": "デスぺダザール 剣神(ダメージ上限設定用)"
+   },
+   "7001": {
+    "w": 0.45,
+    "weights": [
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "テンペスターレ 通常"
+   },
+   "7002": {
+    "w": 0.45,
+    "weights": [
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "テンペスターレ 剣神"
+   },
+   "10000": {
+    "w": 0.3,
+    "weights": [
+     0.1,
+     0.5
+    ],
+    "conf": "high",
+    "src": "fsm:kentaku_0N + mechanical",
+    "name": "剣拓(ダメージ上限設定用)"
+   }
+  }
+ },
+ "Pl2300": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "fsm:shot_1",
+    "name": "□"
+   },
+   "101": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "fsm:shot_1_charge",
+    "name": "□ 溜めあり(ダメージ上限設定用)"
+   },
+   "110": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "fsm:shot_2_N",
+    "name": "□□"
+   },
+   "111": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "fsm:shot_2_charge_N",
+    "name": "□□ 溜めあり(ダメージ上限設定用)"
+   },
+   "120": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "fsm:shot_3_N",
+    "name": "□□□"
+   },
+   "121": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "fsm:shot_3_charge_N",
+    "name": "□□□ 溜めあり(ダメージ上限設定用)"
+   },
+   "150": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:ab_avoidshot_N",
+    "name": "□△（バクステ射撃）"
+   },
+   "151": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:ab_avoidshot_N",
+    "name": "バクステ射撃・溜めなし"
+   },
+   "152": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:ab_avoidshot_N",
+    "name": "バクステ射撃・溜めあり"
+   },
+   "200": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "fsm:multilock_lvN",
+    "name": "△（マルチロックオン）"
+   },
+   "300": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "fsm:shot_air_1",
+    "name": "空中□"
+   },
+   "310": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "fsm:shot_air_2_N",
+    "name": "空中□□"
+   },
+   "320": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "fsm:shot_air_3_N",
+    "name": "空中□□□"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ打ち上げ"
+   },
+   "410": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:air_fall_shot",
+    "name": "空中△"
+   },
+   "1100": {
+    "w": 0.55,
+    "weights": [
+     0.1,
+     1.0
+    ],
+    "conf": "low",
+    "src": "fsm:ab_debuff_shot family",
+    "name": "ディプラヴィティ"
+   },
+   "1200": {
+    "w": 3.0,
+    "weights": [
+     3.0
+    ],
+    "conf": "med",
+    "src": "fsm:ab_straight_shot",
+    "name": "クリンチャー"
+   },
+   "1400": {
+    "w": 1.15,
+    "weights": [
+     0.3,
+     2.0
+    ],
+    "conf": "med",
+    "src": "fsm:ab_time_extend_shot(+big)",
+    "name": "フェアタイレン"
+   },
+   "1510": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "med",
+    "src": "fsm:ab_arrow_area",
+    "name": "キリングレイン(発射)"
+   },
+   "1600": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ピアレス"
+   }
+  }
+ },
+ "Pl2400": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.49,
+    "weights": [
+     0.49
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X"
+   },
+   "101": {
+    "w": 0.56,
+    "weights": [
+     0.56
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XX"
+   },
+   "102": {
+    "w": 0.77,
+    "weights": [
+     0.77
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXX"
+   },
+   "103": {
+    "w": 0.455,
+    "weights": [
+     0.35,
+     0.56
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXXX"
+   },
+   "104": {
+    "w": 0.77,
+    "weights": [
+     0.35,
+     1.19
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXXXY"
+   },
+   "110": {
+    "w": 0.56,
+    "weights": [
+     0.56
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XY"
+   },
+   "111": {
+    "w": 0.77,
+    "weights": [
+     0.77
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XYY"
+   },
+   "115": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XYX"
+   },
+   "116": {
+    "w": 0.91,
+    "weights": [
+     0.91
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XYXY"
+   },
+   "120": {
+    "w": 0.28,
+    "weights": [
+     0.14,
+     0.42
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXY"
+   },
+   "121": {
+    "w": 0.91,
+    "weights": [
+     0.91
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXYY"
+   },
+   "125": {
+    "w": 0.455,
+    "weights": [
+     0.35,
+     0.56
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXYX"
+   },
+   "130": {
+    "w": 0.91,
+    "weights": [
+     0.91
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXXY"
+   },
+   "140": {
+    "w": 0.63,
+    "weights": [
+     0.49,
+     0.77
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "無限ガラコン初段"
+   },
+   "141": {
+    "w": 0.77,
+    "weights": [
+     0.77
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "無限ガラコンループ"
+   },
+   "142": {
+    "w": 0.77,
+    "weights": [
+     0.77
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "無限ガラコンループJUST"
+   },
+   "150": {
+    "w": 0.77,
+    "weights": [
+     0.77
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ガラコン空中回避継続"
+   },
+   "200": {
+    "w": 0.595,
+    "weights": [
+     0.28,
+     0.49,
+     0.7,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "Y (N△)"
+   },
+   "201": {
+    "w": 0.7,
+    "weights": [
+     0.28,
+     0.7,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "Y (N△ 中断)"
+   },
+   "202": {
+    "w": 0.14,
+    "weights": [
+     0.14
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "Y (N△1SP)"
+   },
+   "205": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "Y (N△ XXXYからの繋ぎ)"
+   },
+   "210": {
+    "w": 0.28,
+    "weights": [
+     0.28
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "Y (N△2)"
+   },
+   "211": {
+    "w": 0.85,
+    "weights": [
+     0.7,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "Y (N△2 中断)"
+   },
+   "212": {
+    "w": 0.745,
+    "weights": [
+     0.49,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "Y (N△2 SP中断)"
+   },
+   "220": {
+    "w": 0.28,
+    "weights": [
+     0.28
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "Y (N△3)"
+   },
+   "230": {
+    "w": 0.28,
+    "weights": [
+     0.28
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "Y (N△4)"
+   },
+   "232": {
+    "w": 0.385,
+    "weights": [
+     0.28,
+     0.49
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "Y (N△4 Finish)"
+   },
+   "233": {
+    "w": 0.885,
+    "weights": [
+     0.77,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "Y (N△4 SPFinish)"
+   },
+   "300": {
+    "w": 0.77,
+    "weights": [
+     0.77
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプX"
+   },
+   "301": {
+    "w": 0.84,
+    "weights": [
+     0.84
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ XX"
+   },
+   "302": {
+    "w": 0.91,
+    "weights": [
+     0.91
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ XXX"
+   },
+   "310": {
+    "w": 0.77,
+    "weights": [
+     0.77
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ XXXY"
+   },
+   "400": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "打ち上げ (昇りX)"
+   },
+   "410": {
+    "w": 0.77,
+    "weights": [
+     0.77
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプY (落下攻撃)"
+   },
+   "1000": {
+    "w": 0.0,
+    "weights": [
+     0.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "スーパーモード開始"
+   },
+   "1200": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アビ2 急降華"
+   },
+   "1400": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビ4 武刹槍"
+   },
+   "1410": {
+    "w": 0.6,
+    "weights": [
+     0.2,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アビ4 武刹槍Finish(成功)"
+   },
+   "1500": {
+    "w": 0.65,
+    "weights": [
+     0.3,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アビ5 凪祓い"
+   },
+   "1600": {
+    "w": 1.6,
+    "weights": [
+     0.6,
+     2.6
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アビ6 一直閃"
+   },
+   "1700": {
+    "w": 2.7,
+    "weights": [
+     0.2,
+     2.7,
+     5.3
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アビ7 禍武斗割"
+   },
+   "1800": {
+    "w": 0.0,
+    "weights": [
+     0.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビ8 鎧散牙"
+   },
+   "1900": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビSP 大牙閃"
+   }
+  }
+ },
+ "Pl2500": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.1,
+    "weights": [
+     0.08,
+     0.1,
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:neutral_shot(+horming)",
+    "name": "□攻撃1段目"
+   },
+   "101": {
+    "w": 0.15,
+    "weights": [
+     0.1,
+     0.15,
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:neutral_shot(+horming)",
+    "name": "□攻撃2段目"
+   },
+   "102": {
+    "w": 0.1,
+    "weights": [
+     0.08,
+     0.1,
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:neutral_shot(+horming)",
+    "name": "□攻撃3段目"
+   },
+   "103": {
+    "w": 0.2,
+    "weights": [
+     0.1,
+     0.2,
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:neutral_shot(+horming)",
+    "name": "□攻撃1段目(3段目から)"
+   },
+   "200": {
+    "w": 0.3,
+    "weights": [
+     0.2,
+     0.23,
+     0.3,
+     0.38,
+     0.75
+    ],
+    "conf": "med",
+    "src": "fsm:aimshot_homing/gun_shot_normal",
+    "name": "エイム射撃"
+   },
+   "210": {
+    "w": 0.515,
+    "weights": [
+     0.5,
+     0.53
+    ],
+    "conf": "med",
+    "src": "fsm:backstep_shot",
+    "name": "□△"
+   },
+   "220": {
+    "w": 0.34,
+    "weights": [
+     0.15,
+     0.23,
+     0.3,
+     0.38,
+     0.5,
+     0.75
+    ],
+    "conf": "med",
+    "src": "fsm:backstep_shot/turnshot",
+    "name": "□□△"
+   },
+   "230": {
+    "w": 0.2,
+    "weights": [
+     0.15,
+     0.2,
+     0.5
+    ],
+    "conf": "med",
+    "src": "fsm:backstep_shot/turnshot",
+    "name": "□□□△"
+   },
+   "300": {
+    "w": 0.02,
+    "weights": [
+     0.02
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□1段目"
+   },
+   "301": {
+    "w": 0.03,
+    "weights": [
+     0.03
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□2段目"
+   },
+   "302": {
+    "w": 0.02,
+    "weights": [
+     0.02
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中□3段目"
+   },
+   "400": {
+    "w": 0.12,
+    "weights": [
+     0.12
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "打ち上げ攻撃"
+   },
+   "999": {
+    "w": 0.34,
+    "weights": [
+     0.23,
+     0.3,
+     0.38,
+     0.75
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "□□△：行動終了"
+   },
+   "1101": {
+    "w": 1.0,
+    "weights": [
+     0.5,
+     1.0,
+     2.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "ミョルニル召喚"
+   },
+   "1401": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "アビリティ 移動式ランパート(終了)"
+   }
+  }
+ },
+ "Pl2600": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.34,
+    "weights": [
+     0.34
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "X"
+   },
+   "101": {
+    "w": 0.43,
+    "weights": [
+     0.43
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XX"
+   },
+   "102": {
+    "w": 0.26,
+    "weights": [
+     0.26
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXX"
+   },
+   "103": {
+    "w": 0.94,
+    "weights": [
+     0.94
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXXX"
+   },
+   "110": {
+    "w": 0.43,
+    "weights": [
+     0.43
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XY"
+   },
+   "111": {
+    "w": 0.3,
+    "weights": [
+     0.17,
+     0.43
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XYY"
+   },
+   "120": {
+    "w": 0.51,
+    "weights": [
+     0.51
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXY"
+   },
+   "121": {
+    "w": 1.02,
+    "weights": [
+     1.02
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXYY"
+   },
+   "130": {
+    "w": 0.385,
+    "weights": [
+     0.26,
+     0.51
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXXY"
+   },
+   "131": {
+    "w": 1.28,
+    "weights": [
+     1.28
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "XXXYY"
+   },
+   "140": {
+    "w": 0.725,
+    "weights": [
+     0.43,
+     1.02
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "XXXXY"
+   },
+   "300": {
+    "w": 0.34,
+    "weights": [
+     0.34
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中X"
+   },
+   "301": {
+    "w": 0.43,
+    "weights": [
+     0.43
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中XX"
+   },
+   "302": {
+    "w": 0.51,
+    "weights": [
+     0.51
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中XXX"
+   },
+   "310": {
+    "w": 0.77,
+    "weights": [
+     0.6,
+     0.94
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "空中XXXY"
+   },
+   "400": {
+    "w": 0.34,
+    "weights": [
+     0.34
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "切り上げ"
+   },
+   "410": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "落下攻撃"
+   },
+   "850": {
+    "w": 0.34,
+    "weights": [
+     0.34
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速空中X"
+   },
+   "851": {
+    "w": 0.43,
+    "weights": [
+     0.43
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 空中XX"
+   },
+   "852": {
+    "w": 0.51,
+    "weights": [
+     0.51
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 空中XXX"
+   },
+   "855": {
+    "w": 0.94,
+    "weights": [
+     0.94
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 空中XXXY"
+   },
+   "860": {
+    "w": 0.34,
+    "weights": [
+     0.34
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 切り上げ"
+   },
+   "870": {
+    "w": 0.6,
+    "weights": [
+     0.6
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 落下攻撃"
+   },
+   "900": {
+    "w": 0.34,
+    "weights": [
+     0.34
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 X"
+   },
+   "901": {
+    "w": 0.43,
+    "weights": [
+     0.43
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 XX"
+   },
+   "902": {
+    "w": 0.26,
+    "weights": [
+     0.26
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 XXX"
+   },
+   "903": {
+    "w": 0.94,
+    "weights": [
+     0.94
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 XXXX"
+   },
+   "910": {
+    "w": 0.43,
+    "weights": [
+     0.43
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 XY"
+   },
+   "911": {
+    "w": 0.3,
+    "weights": [
+     0.17,
+     0.43
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "加速 XYY"
+   },
+   "920": {
+    "w": 0.51,
+    "weights": [
+     0.51
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 XXY"
+   },
+   "921": {
+    "w": 1.02,
+    "weights": [
+     1.02
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 XXYY"
+   },
+   "930": {
+    "w": 0.385,
+    "weights": [
+     0.26,
+     0.51
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "加速 XXXY"
+   },
+   "931": {
+    "w": 1.28,
+    "weights": [
+     1.28
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 XXXYY"
+   },
+   "940": {
+    "w": 0.725,
+    "weights": [
+     0.43,
+     1.02
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "加速 XXXXY"
+   },
+   "950": {
+    "w": 0.26,
+    "weights": [
+     0.26
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 フィニッシュ1段目"
+   },
+   "960": {
+    "w": 0.26,
+    "weights": [
+     0.26
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 フィニッシュ2段目"
+   },
+   "970": {
+    "w": 0.3,
+    "weights": [
+     0.26,
+     0.34
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "加速 フィニッシュ3段目"
+   },
+   "980": {
+    "w": 0.26,
+    "weights": [
+     0.26
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "加速 フィニッシュ4段目"
+   },
+   "1000": {
+    "w": 0.4,
+    "weights": [
+     0.2,
+     0.6
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ01】突進"
+   },
+   "2000": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ02】遠距離攻撃"
+   },
+   "3000": {
+    "w": 1.3,
+    "weights": [
+     0.8,
+     1.3,
+     1.6
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ03】範囲攻撃"
+   },
+   "4000": {
+    "w": 0.8,
+    "weights": [
+     0.8
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ02】スロウ攻撃"
+   },
+   "5000": {
+    "w": 0.6,
+    "weights": [
+     0.4,
+     0.5,
+     0.6,
+     0.7,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ05】連続攻撃"
+   },
+   "6000": {
+    "w": 1.85,
+    "weights": [
+     0.3,
+     3.4
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビリティ06】ブレイク攻撃"
+   }
+  }
+ },
+ "Pl2700": {
+  "link_attack": 5.0,
+  "actions": {
+   "110": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "verified",
+    "src": "fsm:shot_nocharge_step",
+    "name": "□ 射撃 ステップ"
+   },
+   "111": {
+    "w": 0.51,
+    "weights": [
+     0.51
+    ],
+    "conf": "high",
+    "src": "fsm:shot_charge_step",
+    "name": "□ 射撃 ステップ チャージ済"
+   },
+   "112": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "med",
+    "src": "fsm:shot_nocharge_step (last bullet)",
+    "name": "□ 射撃 ステップ (最終弾)"
+   },
+   "113": {
+    "w": 0.51,
+    "weights": [
+     0.51
+    ],
+    "conf": "med",
+    "src": "fsm:shot_charge_step (last bullet)",
+    "name": "□ 射撃 ステップ チャージ済 (最終弾)"
+   },
+   "115": {
+    "w": 0.22,
+    "weights": [
+     0.22
+    ],
+    "conf": "verified",
+    "src": "fsm:shot_overpressurehit_step",
+    "name": "□ 射撃 ステップ 強化中 (ヒット部分)"
+   },
+   "120": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "high",
+    "src": "fsm:shot_nocharge",
+    "name": "□ 射撃 未チャージ"
+   },
+   "121": {
+    "w": 0.77,
+    "weights": [
+     0.77
+    ],
+    "conf": "verified",
+    "src": "fsm:shot_charge",
+    "name": "□ 射撃 チャージ済"
+   },
+   "122": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:shot_nocharge (last bullet)",
+    "name": "□ 射撃 未チャージ (最終弾)"
+   },
+   "123": {
+    "w": 0.77,
+    "weights": [
+     0.77
+    ],
+    "conf": "med",
+    "src": "fsm:shot_charge (last bullet)",
+    "name": "□ 射撃 チャージ済 (最終弾)"
+   },
+   "125": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "verified",
+    "src": "fsm:shot_overpressurehit",
+    "name": "□ 射撃 強化中 (ヒット部分)"
+   },
+   "130": {
+    "w": 0.325,
+    "weights": [
+     0.29,
+     0.36
+    ],
+    "conf": "verified",
+    "src": "fsm:shot_finish(+rush)",
+    "name": "□ 射撃 フィニッシュ"
+   },
+   "140": {
+    "w": 0.215,
+    "weights": [
+     0.19,
+     0.24
+    ],
+    "conf": "verified",
+    "src": "fsm:shot_finish_step(+rush)",
+    "name": "□ 射撃 フィニッシュ ステップ"
+   },
+   "400": {
+    "w": 0.5,
+    "weights": [
+     0.5
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "1000": {
+    "w": 0.25,
+    "weights": [
+     0.2,
+     0.25,
+     1.5
+    ],
+    "conf": "low",
+    "src": "fsm:ability_wideshotlvN",
+    "name": "アビ 扇撃ち"
+   },
+   "1010": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "low",
+    "src": "fsm:ability_wideshotrootlvN",
+    "name": "アビ 扇撃ち 拡散部分"
+   },
+   "1100": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "med",
+    "src": "fsm:ability_diffusionself",
+    "name": "アビ 伝播ショット"
+   },
+   "1110": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "fsm:ability_diffusionchain",
+    "name": "アビ 伝播ショット チェイン部分"
+   },
+   "1300": {
+    "w": 0.45,
+    "weights": [
+     0.3,
+     0.6
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アビ カウンター"
+   },
+   "1310": {
+    "w": 0.35,
+    "weights": [
+     0.2,
+     0.3,
+     0.4,
+     0.9
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アビ カウンター 成功"
+   },
+   "1600": {
+    "w": 0.9,
+    "weights": [
+     0.9
+    ],
+    "conf": "high",
+    "src": "fsm:ability_aimlv0",
+    "name": "アビ エイムショット Lv1"
+   },
+   "1601": {
+    "w": 1.8,
+    "weights": [
+     1.8
+    ],
+    "conf": "high",
+    "src": "fsm:ability_aimlv1",
+    "name": "アビ エイムショット Lv2"
+   },
+   "1602": {
+    "w": 2.8,
+    "weights": [
+     2.8
+    ],
+    "conf": "verified",
+    "src": "fsm:ability_aimlv2",
+    "name": "アビ エイムショット Lv3"
+   },
+   "1700": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "verified",
+    "src": "param:satelliteParamList[].spArtsRate_",
+    "name": "アビ サンダー"
+   }
+  }
+ },
+ "Pl2800": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■"
+   },
+   "101": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■■"
+   },
+   "102": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■■■"
+   },
+   "111": {
+    "w": 0.16,
+    "weights": [
+     0.16
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■■■■連打"
+   },
+   "116": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■■■■連打FINISH"
+   },
+   "120": {
+    "w": 0.28,
+    "weights": [
+     0.24,
+     0.32
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■■■■▲ 連打"
+   },
+   "121": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■■■■▲ FINISH"
+   },
+   "130": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■▲"
+   },
+   "131": {
+    "w": 0.28,
+    "weights": [
+     0.24,
+     0.32
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■▲▲ 正位置"
+   },
+   "140": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■■▲"
+   },
+   "141": {
+    "w": 0.52,
+    "weights": [
+     0.32,
+     0.72
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■■▲▲ 正位置"
+   },
+   "150": {
+    "w": 0.48,
+    "weights": [
+     0.4,
+     0.56
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "■■■▲"
+   },
+   "151": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■■■▲▲ 正位置"
+   },
+   "170": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "■ 逆位置から"
+   },
+   "200": {
+    "w": 0.56,
+    "weights": [
+     0.56
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "スタンスチェンジ 逆から正"
+   },
+   "201": {
+    "w": 0.56,
+    "weights": [
+     0.56
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "スタンスチェンジ 正から逆"
+   },
+   "300": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中 ■"
+   },
+   "301": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中 ■■"
+   },
+   "302": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中 ■■■"
+   },
+   "305": {
+    "w": 0.56,
+    "weights": [
+     0.56
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "空中 ■■■▲"
+   },
+   "310": {
+    "w": 0.48,
+    "weights": [
+     0.48
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】空中 ■"
+   },
+   "311": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】空中 ■■"
+   },
+   "312": {
+    "w": 0.36,
+    "weights": [
+     0.32,
+     0.4
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】空中 ■■■"
+   },
+   "315": {
+    "w": 0.64,
+    "weights": [
+     0.64
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】空中 ■■■▲"
+   },
+   "400": {
+    "w": 0.2,
+    "weights": [
+     0.16,
+     0.24
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "アッパー攻撃"
+   },
+   "401": {
+    "w": 0.48,
+    "weights": [
+     0.48
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】アッパー攻撃"
+   },
+   "410": {
+    "w": 0.64,
+    "weights": [
+     0.64
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "落下攻撃"
+   },
+   "411": {
+    "w": 0.64,
+    "weights": [
+     0.64
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】落下攻撃"
+   },
+   "900": {
+    "w": 0.48,
+    "weights": [
+     0.48
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■"
+   },
+   "901": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■■"
+   },
+   "902": {
+    "w": 0.44,
+    "weights": [
+     0.4,
+     0.48
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■■■"
+   },
+   "910": {
+    "w": 0.96,
+    "weights": [
+     0.96
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■■■■"
+   },
+   "920": {
+    "w": 0.48,
+    "weights": [
+     0.48
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■■■■▲"
+   },
+   "930": {
+    "w": 0.32,
+    "weights": [
+     0.32
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■▲"
+   },
+   "931": {
+    "w": 0.52,
+    "weights": [
+     0.32,
+     0.72
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■▲▲"
+   },
+   "940": {
+    "w": 0.56,
+    "weights": [
+     0.56
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■■▲"
+   },
+   "941": {
+    "w": 0.36,
+    "weights": [
+     0.32,
+     0.4
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■■▲▲"
+   },
+   "950": {
+    "w": 0.96,
+    "weights": [
+     0.96
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■■■▲"
+   },
+   "951": {
+    "w": 0.36,
+    "weights": [
+     0.32,
+     0.4
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■■■▲▲"
+   },
+   "970": {
+    "w": 0.4,
+    "weights": [
+     0.4
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【逆位置】■ 正位置から"
+   },
+   "4000": {
+    "w": 0.35,
+    "weights": [
+     0.1,
+     0.6
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "オポチュニティ"
+   },
+   "5000": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "デッドランズ"
+   },
+   "5010": {
+    "w": 0.1,
+    "weights": [
+     0.1
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "デッドランズ FINISH"
+   },
+   "6000": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "キックフェイス"
+   },
+   "6002": {
+    "w": 0.75,
+    "weights": [
+     0.5,
+     1.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "キックフェイス：ワープ後攻撃"
+   },
+   "7000": {
+    "w": 2.0,
+    "weights": [
+     2.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "スプレンドル"
+   }
+  }
+ },
+ "Pl2900": {
+  "link_attack": 5.0,
+  "actions": {
+   "100": {
+    "w": 0.15,
+    "weights": [
+     0.1,
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:normalshot(_1_1)",
+    "name": "X"
+   },
+   "101": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:normalshot_2_1",
+    "name": "XX"
+   },
+   "102": {
+    "w": 0.2,
+    "weights": [
+     0.2
+    ],
+    "conf": "med",
+    "src": "fsm:normalshot_3_N",
+    "name": "XXX"
+   },
+   "150": {
+    "w": 0.3,
+    "weights": [
+     0.3
+    ],
+    "conf": "high",
+    "src": "fsm:dive_combo_0",
+    "name": "ダイブコンボ1段目"
+   },
+   "151": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "fsm:dive_combo_1",
+    "name": "ダイブコンボ2段目"
+   },
+   "152": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "fsm:dive_combo_2",
+    "name": "ダイブコンボ3段目"
+   },
+   "153": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "fsm:dive_combo_3",
+    "name": "ダイブコンボ4段目"
+   },
+   "210": {
+    "w": 0.0,
+    "weights": [
+     0.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "移動攻撃"
+   },
+   "220": {
+    "w": 0.45,
+    "weights": [
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "移動攻撃（溜め）"
+   },
+   "250": {
+    "w": 0.45,
+    "weights": [
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "移動攻撃（即時発動）"
+   },
+   "260": {
+    "w": 0.45,
+    "weights": [
+     0.4,
+     0.5
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "移動攻撃（リンクアタック）"
+   },
+   "281": {
+    "w": 0.0,
+    "weights": [
+     0.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "非戦闘時 ワープ移動"
+   },
+   "282": {
+    "w": 0.0,
+    "weights": [
+     0.0
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "非戦闘時 ワープ移動（溜め）"
+   },
+   "400": {
+    "w": 0.25,
+    "weights": [
+     0.25
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "ジャンプ上昇攻撃"
+   },
+   "410": {
+    "w": 0.7,
+    "weights": [
+     0.7
+    ],
+    "conf": "high",
+    "src": "seq_edit_attack",
+    "name": "【空中】落下攻撃"
+   },
+   "950": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:normalfinish",
+    "name": "デンプシーフィニッシュ"
+   },
+   "951": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:normalfinish",
+    "name": "デンプシーフィニッシュ2段目"
+   },
+   "952": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:normalfinish",
+    "name": "デンプシーフィニッシュ3段目"
+   },
+   "953": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:normalfinish",
+    "name": "デンプシーフィニッシュ4段目"
+   },
+   "954": {
+    "w": 1.0,
+    "weights": [
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:normalfinish",
+    "name": "デンプシーフィニッシュ5段目"
+   },
+   "1000": {
+    "w": 0.5,
+    "weights": [
+     0.2,
+     0.8
+    ],
+    "conf": "med",
+    "src": "fsm:ability01",
+    "name": "【アビ01】バクステ"
+   },
+   "2000": {
+    "w": 1.8,
+    "weights": [
+     0.6,
+     3.0
+    ],
+    "conf": "med",
+    "src": "seq_edit_attack",
+    "name": "【アビ02】カウンター"
+   },
+   "2010": {
+    "w": 3.0,
+    "weights": [
+     3.0
+    ],
+    "conf": "high",
+    "src": "fsm:ability02_02 + mechanical agree",
+    "name": "【アビ02】カウンター成功"
+   },
+   "2020": {
+    "w": 0.8,
+    "weights": [
+     0.6,
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:ability02 + mechanical",
+    "name": "【アビ02】カウンター失敗"
+   },
+   "5000": {
+    "w": 1.25,
+    "weights": [
+     0.2,
+     0.3,
+     0.5,
+     2.0,
+     3.0,
+     4.5
+    ],
+    "conf": "med",
+    "src": "fsm:ability05",
+    "name": "【アビ05】弱体攻撃"
+   },
+   "7000": {
+    "w": 0.6,
+    "weights": [
+     0.4,
+     0.8
+    ],
+    "conf": "med",
+    "src": "fsm:ability07(+add)",
+    "name": "【アビ07】周囲攻撃"
+   },
+   "8010": {
+    "w": 0.65,
+    "weights": [
+     0.3,
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:finish_ball family",
+    "name": "【アビ08】デスボール通常"
+   },
+   "8020": {
+    "w": 0.65,
+    "weights": [
+     0.3,
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:finish_ball family",
+    "name": "【アビ08】デスボール高速"
+   },
+   "8030": {
+    "w": 0.65,
+    "weights": [
+     0.3,
+     1.0
+    ],
+    "conf": "med",
+    "src": "fsm:finish_ball family",
+    "name": "【アビ08】デスボール発射"
+   }
+  }
+ }
+}

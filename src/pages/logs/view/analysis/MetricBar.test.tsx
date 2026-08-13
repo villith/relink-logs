@@ -34,8 +34,9 @@ describe("MetricBar", () => {
   });
 
   const track = (container: HTMLElement) => container.querySelector<HTMLElement>("[data-bar-track]");
+  const headOf = (container: HTMLElement) => container.querySelector<HTMLElement>("[data-bar-head]");
 
-  it("bites a notch out of the segment standing at the fill's left edge", () => {
+  it("draws a notched head as its own fixed piece and starts the fill at the art's right edge", () => {
     const { container } = renderBar({
       value: 50,
       subValue: 20,
@@ -44,36 +45,47 @@ describe("MetricBar", () => {
       variant: "row",
       head: "notch",
     });
-    // The direct part is what the diamond meets; the supplementary one picks up
-    // further along the bar and keeps a square edge.
-    expect(segments()[0].style.clipPath).toContain("polygon");
-    expect(segments()[1].style.clipPath).toBe("");
-    // And the whole fill starts at the art's centre, so the notch's own point
-    // lands on the art's right corner.
-    expect(track(container)?.className).toContain("left-[calc(var(--row-pad)_+_var(--spacing-art)/2)]");
+    // The head stands at the art's centre — the diamond's own right half fills
+    // its bite — and is exactly half an art wide, ending where the box does.
+    const head = headOf(container);
+    expect(head).toBeTruthy();
+    expect(head!.style.clipPath).toContain("polygon");
+    expect(head!.style.backgroundColor).toBe("red");
+    expect(head!.className).toContain("left-[calc(var(--row-pad)_+_var(--spacing-art)/2)]");
+    // The fill's zero is the art box's right edge: the head is identity, drawn
+    // in full whatever the value, and the fill alone states the magnitude. The
+    // 1px rides back under the head so the seam cannot open (see TRACK_LEFT).
+    expect(track(container)?.className).toContain("left-[calc(var(--row-pad)_+_var(--spacing-art)_-_1px)]");
     expect(track(container)?.className).not.toContain("inset-x-0");
+    // The segments are plain rectangles now — no head rides the fill.
+    expect(segments()[0].style.clipPath).toBe("");
+    expect(segments()[1].style.clipPath).toBe("");
   });
 
-  it("heads the bar at the art's left edge where nothing nests into it", () => {
-    // A bust is not a diamond: the bar draws the head ITSELF and the art stands
-    // on it, so the fill has to reach back to where the art starts.
+  it("covers the art's whole box with the head where nothing nests into it", () => {
+    // A bust is not a diamond: the head reaches back to the art's left edge so
+    // the bust stands on the row's own colour, and the fill still starts at
+    // the box's right edge like every other bar's.
     const { container } = renderBar({ value: 50, largest: 100, color: "red", variant: "row", head: "point" });
-    expect(segments()[0].style.clipPath).toContain("polygon");
-    expect(track(container)?.className).toContain("left-[var(--row-pad)]");
+    const head = headOf(container);
+    expect(head!.className).toContain("left-[var(--row-pad)]");
+    expect(head!.className).toContain("w-[var(--spacing-art)]");
+    expect(track(container)?.className).toContain("left-[calc(var(--row-pad)_+_var(--spacing-art)_-_1px)]");
   });
 
-  it("heads the supplementary segment when a row is supplementary in full", () => {
-    // Direct is zero here, so the supplementary segment IS the fill's left end.
-    // Heading the empty one would leave the visible bar square-edged and the
-    // diamond nesting into nothing.
-    renderBar({ value: 50, subValue: 50, largest: 100, color: "red", variant: "row", head: "notch" });
-    expect(segments()[1].style.clipPath).toContain("polygon");
+  it("draws the head even at zero value — identity, not magnitude", () => {
+    // The icon's area wears the row's colour whatever the number says; only
+    // the fill is proportional, and at zero there is simply none of it.
+    const { container } = renderBar({ value: 0, largest: 100, color: "red", variant: "row", head: "notch" });
+    expect(headOf(container)).toBeTruthy();
+    expect(segments()[0].style.width).toBe("0%");
   });
 
   it("keeps a square edge and a full-bleed track when nothing stands at it", () => {
     const { container } = renderBar({ value: 50, largest: 100, color: "red", variant: "row" });
     expect(segments()[0].style.clipPath).toBe("");
     expect(track(container)?.className).toContain("inset-x-0");
+    expect(headOf(container)).toBeNull();
   });
 
   it("draws the hover ring in the bar's own silhouette, not as a rectangle", () => {
@@ -87,8 +99,8 @@ describe("MetricBar", () => {
     // the hole that leaves is the stroke.
     expect(ring!.style.clipPath).toContain("1.415px");
     expect(ring!.className).toContain("group-hover:opacity-100");
-    // The ring reads the SAME left offset as the fill, or it would frame a bar
-    // standing somewhere else.
+    // The ring starts where the SILHOUETTE does — the head's own left edge —
+    // or it would frame a bar standing somewhere else.
     expect(ring!.className).toContain("left-[calc(var(--row-pad)_+_var(--spacing-art)/2)]");
   });
 
@@ -97,8 +109,8 @@ describe("MetricBar", () => {
     expect(container.querySelector("[data-bar-ring]")).toBeNull();
     // A card row measures its head against the CARD's art, which is its own
     // row height — not the table's.
-    expect(track(container)?.className).toContain("left-[var(--row-pad)]");
-    expect(segments()[0].style.clipPath).toContain("--spacing-art-card");
+    expect(headOf(container)?.className).toContain("w-[var(--spacing-art-card)]");
+    expect(track(container)?.className).toContain("left-[calc(var(--row-pad)_+_var(--spacing-art-card)_-_1px)]");
   });
 
   it("renders at zero width rather than NaN when every peer is zero", () => {

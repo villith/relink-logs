@@ -62,7 +62,13 @@ use std::{
 pub use bincode;
 
 pub mod control;
+pub mod fingerprint;
 pub mod toolbox;
+
+// `WIRE_FINGERPRINT`, written by `build.rs` as a `u32` literal with its doc
+// comment. Its value is pinned end-to-end by
+// `fingerprint::tests::shipped_wire_version_is_the_hash_of_this_crates_sources`.
+include!(concat!(env!("OUT_DIR"), "/wire_fingerprint.rs"));
 
 use serde::{Deserialize, Serialize};
 
@@ -694,9 +700,10 @@ pub enum SbaGainCause {
     // They are separate variants rather than a flag on the existing ones on
     // purpose: a deduction must never be indistinguishable from a measurement,
     // in the stored log or in the UI. Nothing in the hook ever emits these.
-    /// The action a remote player's gauge rise was correlated with, carrying
-    /// the same CLASSIFIED action a hook-read `Skill` cause would, so it routes
-    /// to the identical breakdown row. Appended last per the append-only rule.
+    /// An action's share of a remote player's gauge rise — split across the
+    /// rise's hits by their authored per-action weights. Carries the same
+    /// CLASSIFIED action a hook-read `Skill` cause would, so it routes to the
+    /// identical breakdown row. Appended last per the append-only rule.
     Inferred(ActionType),
     /// A rise matching the flat SBA-chain contribution exactly. Appended last
     /// per the append-only rule.

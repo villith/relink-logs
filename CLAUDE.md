@@ -30,7 +30,7 @@ Data flows **game → hook → pipe → parser → frontend**:
 
 1. **`src-hook/`** (crate `hook`, builds `hook.dll`) — Injected into `granblue_fantasy_relink.exe`. Sets up function hooks (`src/hooks/`: damage, death, player load, quest/area, SBA) that read game memory via raw pointers and vtable offsets. Broadcasts `protocol::Message` events over the named pipe `\\.\pipe\gbfr-logs`. Entry is a `#[ctor]` that spawns the server. **The memory offsets and actor-type hashes here (e.g. `get_source_parent` in `hooks/mod.rs`) are reverse-engineered and break on game patches.** The hook also serves the Toolbox RPC channel (see game-reader below).
 
-2. **`protocol/`** (crate `protocol`) — Shared message types (`Message` enum, `DamageEvent`, `PlayerLoadEvent`, etc.). Wire format between hook and parser is **bincode**, so the hook and parser must be compiled together. Read the crate-level doc comment in `src/lib.rs` before changing any message type — adding fields/variants is safe, but the parser's own on-disk format is separate and must stay backward-compatible. The toolbox module carries the request/response channel for the Toolbox tools (`\\.\pipe\gbfr-logs-toolbox` on Windows, TCP 127.0.0.1:39372 under Wine; one request per connection; `TOOLBOX_PROTOCOL_VERSION` guards hook/app skew).
+2. **`protocol/`** (crate `protocol`) — Shared message types (`Message` enum, `DamageEvent`, `PlayerLoadEvent`, etc.). Wire format between hook and parser is **bincode**, so the hook and parser must be compiled together. Read the crate-level doc comment in `src/lib.rs` before changing any message type — adding fields/variants is safe, but the parser's own on-disk format is separate and must stay backward-compatible. The toolbox module carries the request/response channel for the Toolbox tools (`\\.\pipe\gbfr-logs-toolbox` on Windows, TCP 127.0.0.1:39372 under Wine; one request per connection; `TOOLBOX_PROTOCOL_VERSION` guards hook/app wire skew and is a content hash of this crate computed by `protocol/build.rs` — do NOT hand-bump it, it moves itself whenever this crate's sources change. That hash reads every byte here, comments and tests included, so a non-wire edit still flags every deployed hook out of date and rotates `hook.dll` — keep non-wire churn out of `protocol/`).
 
 3. **`game-reader/`** (crate `game-reader`) — Platform-independent snapshot
    walkers plus the RE'd signatures/offsets behind the Toolbox tools
@@ -78,9 +78,10 @@ Data flows **game → hook → pipe → parser → frontend**:
   and click tray → "Reload hook (dev)". The app tells the hook to tear itself
   down over a dedicated dev control channel (`protocol::control`, separate from
   the toolbox RPC), ejects the old DLL, refreshes `hook-dbg.dll` from
-  `target/release/hook.dll`, and re-injects — no game or app restart. Dev-only:
-  a release hook has no control channel (feature `eject`), so the reload just
-  reports a connection error.
+  `target/release/hook.dll`, and re-injects — no game or app restart. The tray
+  item is dev-only (`cfg(all(windows, debug_assertions))`), but the hook's
+  control channel is NOT: release CI builds with `--features eject` too, which
+  is what lets the badge's user-facing "Refresh hook" work in place.
 - **Linux (Proton) build:** the game has no Linux version; Linux support runs
   the same Windows exe under Proton, so all RE'd signatures/offsets are shared.
   The hook doubles as a `dinput8.dll` proxy (`src-hook/src/proxy.rs`) and
@@ -96,6 +97,19 @@ Data flows **game → hook → pipe → parser → frontend**:
   `TOOLBOX_TCP_ADDR` named at a dead call site still put `127.0.0.1:39372` in
   the shipped DLL's string table. If you add a Proton-only code path, gate it
   and add its marker to that script.
+- **`hook.dll` is byte-reproducible, on purpose.** Nothing that varies per
+  build may reach it: no timestamp, no PDB GUID (both killed by `/Brepro` in
+  `src-hook/build.rs`), and no app version — the hook reports its OWN crate
+  version — hand-bump it in `src-hook/Cargo.toml` whenever the shipped hook's
+  behavior changes (including via `game-reader/`). A release that did not
+  touch the hook ships an identical DLL and keeps the AV prevalence the last
+  one earned; re-adding a per-release version stamp resets it to zero every
+  release. Staleness has two signals, both of which move only with the hook:
+  `TOOLBOX_PROTOCOL_VERSION` catches wire skew, and the app compares the
+  reported hook crate version against the one it bundled, which catches
+  wire-compatible staleness (a fix confined to `src-hook/`/`game-reader/`) —
+  never the app version. Verify with two builds of one commit: `cargo build --release -p
+  hook --features eject`, `touch src-hook/src/lib.rs`, rebuild, compare hashes.
 - **Releases are not Authenticode-signed.** The signing certificate was
   revoked; a signature from a revoked cert resolves to `CERT_E_REVOKED`, which
   Defender and SmartScreen treat as worse than unsigned. minisign on the
@@ -104,8 +118,9 @@ Data flows **game → hook → pipe → parser → frontend**:
 - **Publishing a release is opt-in.** A push to `dev` builds both platforms and
   leaves them as Actions artifacts; releases come from the "Run workflow"
   button's `publish` input (`stable` / `rc` / `none`). Every published build is
-  a new zero-prevalence `hook.dll` hash in AV telemetry, and low prevalence is
-  what the generic ML detections score on. The hook crate
+  a new zero-prevalence hash for the app exe/installer in AV telemetry, and low
+  prevalence is what the generic ML detections score on (`hook.dll` itself is
+  reproducible — see above). The hook crate
   itself only compiles on Windows — Linux CI (`cargo_check_linux` in ci.yaml)
   builds `-p gbfr-logs` with `--lib --bins` (the examples are Windows diag
   tools; don't "fix" them to build on Linux). `npm run dev` on a non-Windows

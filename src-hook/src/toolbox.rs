@@ -113,10 +113,14 @@ fn handle_request(req: ToolboxRequest) -> ToolboxResponse {
                     .as_ref()
                     .and_then(|o| o.protocol_version)
                     .unwrap_or(TOOLBOX_PROTOCOL_VERSION),
+                // The hook crate's OWN version, hand-bumped in
+                // `src-hook/Cargo.toml` when the hook changes — deliberately
+                // not the app's. Informational only; compatibility is
+                // `protocol_version` above. See `build.rs`.
                 hook_version: o
                     .as_ref()
                     .and_then(|o| o.hook_version.clone())
-                    .unwrap_or_else(|| env!("HOOK_VERSION").to_string()),
+                    .unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string()),
                 supports_eject: o
                     .as_ref()
                     .and_then(|o| o.supports_eject)
@@ -245,7 +249,7 @@ mod tests {
             panic!("expected Hello variant");
         };
         assert_eq!(protocol_version, TOOLBOX_PROTOCOL_VERSION);
-        assert_eq!(hook_version, env!("HOOK_VERSION"));
+        assert_eq!(hook_version, env!("CARGO_PKG_VERSION"));
         // The deleted `hello_reports_version_and_eject_support` test owned this
         // assertion. Without it the field is unpinned: the override block above
         // sets `Some(false)` and the real value is ALSO false under a plain
@@ -258,7 +262,7 @@ mod tests {
         else {
             panic!("expected Hello variant");
         };
-        assert_eq!(hook_version, env!("HOOK_VERSION"));
+        assert_eq!(hook_version, env!("CARGO_PKG_VERSION"));
     }
 
     /// In the test binary the sigscan finds nothing — the handler must turn

@@ -5,6 +5,18 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.13
+
+### Notes
+
+- Split out the modules required for Linux support from the Windows release. These were unnecessary
+  for the Windows version and were one of the reasons Windows Defender would sometimes flag the application as malware
+
+### Features
+
+- Supplementary damage is now linked to its damage event in the event view in the beta log viewer
+- The event view in the beta log viewer can be filtered by column
+
 ## 1.12.12
 
 ### Language

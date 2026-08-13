@@ -24,11 +24,12 @@ use std::time::Duration;
 pub struct HookStatus {
     /// True while the event stream is connected (the hook is alive).
     pub connected: AtomicBool,
-    /// True when the hook ANSWERED a Hello on a different protocol version.
-    /// Set only by an answer — an undelivered handshake leaves it alone (see
-    /// `unresponsive`), because "I could not ask" is not evidence of a
-    /// version, and treating it as one is what pinned healthy hooks at
-    /// "out of date" for a whole session.
+    /// True when the hook ANSWERED a Hello on a different protocol version,
+    /// or reporting a hook crate version other than the bundled DLL's
+    /// ([`EXPECTED_HOOK_VERSION`]). Set only by an answer — an undelivered
+    /// handshake leaves it alone (see `unresponsive`), because "I could not
+    /// ask" is not evidence of a version, and treating it as one is what
+    /// pinned healthy hooks at "out of date" for a whole session.
     pub outdated: AtomicBool,
     /// True when the last handshake could not be delivered at all: the toolbox
     /// pipe was missing/busy, the RPC timed out, or the reply was undecodable.
@@ -68,12 +69,16 @@ pub struct HookStatus {
 #[derive(Serialize, Clone, Copy, PartialEq, Eq, Debug)]
 #[serde(rename_all = "camelCase")]
 pub enum HookState {
-    /// Pipe up, Hello OK, hook version matches the app.
+    /// Pipe up, Hello OK, hook speaks our wire.
     Connected,
     /// A refresh/reload is in flight.
     Reconnecting,
-    /// The hook answered on another protocol version, or reported a release
-    /// version differing from the app's.
+    /// The hook answered on another wire version, or reported a hook CRATE
+    /// version other than the bundled DLL's — a wire-compatible but stale
+    /// hook, e.g. a signature repair that never touched `protocol/`. The
+    /// crate is versioned separately from the app so that an unchanged hook
+    /// ships unchanged bytes; a version differing from the APP's is normal
+    /// and is not consulted.
     OutOfDate,
     /// Event stream up, but the hook is not answering the toolbox channel.
     /// Its version is UNKNOWN here — deliberately not folded into
@@ -148,13 +153,6 @@ impl HookStatus {
         let hook_version = self.hook_version.lock().unwrap().clone();
         let supports_eject = self.supports_eject.load(Ordering::Relaxed);
 
-        // A dev hook (or not-yet-known version) is never flagged on version
-        // difference alone; only a real, differing release version is.
-        let version_mismatch = match hook_version.as_deref() {
-            None | Some(protocol::toolbox::HOOK_DEV_VERSION) => false,
-            Some(v) => v != app_version,
-        };
-
         // `outdated` outranks `unresponsive`: a version verdict came from the
         // hook itself and stays true even once it stops answering, whereas
         // `unresponsive` only ever means "unknown".
@@ -170,7 +168,7 @@ impl HookStatus {
             } else {
                 HookState::Disconnected
             }
-        } else if self.outdated.load(Ordering::Relaxed) || version_mismatch {
+        } else if self.outdated.load(Ordering::Relaxed) {
             HookState::OutOfDate
         } else if self.unresponsive.load(Ordering::Relaxed) {
             HookState::Unresponsive
@@ -248,20 +246,40 @@ impl HookStatus {
             }
         };
 
-        let outdated = protocol_version != TOOLBOX_PROTOCOL_VERSION;
-        if outdated {
+        let wire_mismatch = protocol_version != TOOLBOX_PROTOCOL_VERSION;
+        // The second, independent staleness signal: same wire, different
+        // src-hook/. Without it a hook-only fix leaves the old mapped hook
+        // reading Connected until the game happens to restart.
+        let version_mismatch = hook_version != EXPECTED_HOOK_VERSION;
+        if wire_mismatch {
             log::warn!(
                 "hook toolbox protocol {protocol_version} != ours {TOOLBOX_PROTOCOL_VERSION} \
                  (hook {hook_version}): the mapped hook is out of date"
             );
+        } else if version_mismatch {
+            log::warn!(
+                "hook {hook_version} != bundled {EXPECTED_HOOK_VERSION} on a matching wire: \
+                 the mapped hook is stale (a src-hook/-only change)"
+            );
         }
 
-        self.outdated.store(outdated, Ordering::Relaxed);
+        self.outdated
+            .store(wire_mismatch || version_mismatch, Ordering::Relaxed);
         self.unresponsive.store(false, Ordering::Relaxed);
         *self.hook_version.lock().unwrap() = Some(hook_version);
         self.supports_eject.store(supports_eject, Ordering::Relaxed);
     }
 }
+
+/// The hook crate version the app expects: the one baked into the DLL it
+/// bundles (`build.rs` reads it from `../src-hook/Cargo.toml`). A mapped hook
+/// reporting anything else was built from a DIFFERENT `src-hook/` — stale
+/// even when the wire fingerprint still matches, which is exactly what a fix
+/// confined to `src-hook/` or `game-reader/` looks like. Comparing CRATE
+/// versions keeps the reproducibility story intact: this value moves only
+/// when the hook is hand-bumped, never per app release, so an untouched hook
+/// still ships byte-identical.
+pub const EXPECTED_HOOK_VERSION: &str = env!("EXPECTED_HOOK_VERSION");
 
 /// A wedged hook (or frozen game) must not hang a Tauri command.
 const RPC_TIMEOUT: Duration = Duration::from_secs(2);
@@ -493,9 +511,24 @@ mod tests {
         assert_eq!(hook.snapshot().state, HookState::Connected);
     }
 
+    /// The reported version names the hook CRATE — versioned independently of
+    /// the app so that a release that did not touch `src-hook/` ships a
+    /// byte-identical `hook.dll` — and is compared against the version of the
+    /// DLL the app bundles. A mismatch on a MATCHING wire is a hook built
+    /// from a different `src-hook/`: staleness the fingerprint cannot see
+    /// (e.g. a signature repair confined to `src-hook/` or `game-reader/`),
+    /// which without this rule left the user running the broken hook with no
+    /// "restart the game" signal. Unlike the deleted app-version rule, this
+    /// rotates nothing per release: the crate version moves only when the
+    /// hook is hand-bumped.
     #[test]
-    fn snapshot_out_of_date_on_version_difference() {
-        let hook = connected_hook(Some("0.0.1-old"), true);
+    fn a_hook_built_from_a_different_src_hook_reads_out_of_date() {
+        let hook = connected_hook(None, true);
+        hook.apply_hello(HelloOutcome::Answered {
+            hook_version: "0.0.1-old".into(),
+            supports_eject: true,
+            protocol_version: TOOLBOX_PROTOCOL_VERSION,
+        });
         assert_eq!(hook.snapshot().state, HookState::OutOfDate);
     }
 
@@ -506,16 +539,12 @@ mod tests {
         assert_eq!(hook.snapshot().state, HookState::OutOfDate);
     }
 
-    #[test]
-    fn snapshot_dev_hook_never_flagged_on_version() {
-        let hook = connected_hook(Some(protocol::toolbox::HOOK_DEV_VERSION), true);
-        assert_eq!(hook.snapshot().state, HookState::Connected);
-    }
-
-    /// A hook that answered, either on our protocol version or on another one.
+    /// A hook that answered, either on our protocol version or on another
+    /// one. Reports the EXPECTED crate version, so these outcomes isolate the
+    /// wire verdict from the version rule tested separately above.
     fn answered(ok: bool) -> HelloOutcome {
         HelloOutcome::Answered {
-            hook_version: env!("CARGO_PKG_VERSION").to_string(),
+            hook_version: EXPECTED_HOOK_VERSION.to_string(),
             supports_eject: true,
             protocol_version: if ok {
                 TOOLBOX_PROTOCOL_VERSION
@@ -540,7 +569,7 @@ mod tests {
         assert_eq!(snapshot.state, HookState::Connected);
         assert_eq!(
             snapshot.hook_version.as_deref(),
-            Some(env!("CARGO_PKG_VERSION"))
+            Some(EXPECTED_HOOK_VERSION)
         );
         assert!(snapshot.supports_eject);
     }
@@ -567,7 +596,7 @@ mod tests {
         let snapshot = hook.snapshot();
         assert_eq!(
             snapshot.hook_version.as_deref(),
-            Some(env!("CARGO_PKG_VERSION"))
+            Some(EXPECTED_HOOK_VERSION)
         );
         assert!(snapshot.supports_eject);
     }

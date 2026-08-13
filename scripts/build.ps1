@@ -64,7 +64,6 @@ if (-not $SkipInstall) {
 #    This is the step missing from `npm run tauri build`; without it the release
 #    build cannot find the bundled resource.
 Invoke-Step "cargo build --release --package hook --features eject" {
-    $env:HOOK_VERSION = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).package.version
     cargo build --release --package hook --features eject
 }
 

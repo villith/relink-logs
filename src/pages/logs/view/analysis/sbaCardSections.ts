@@ -1,7 +1,7 @@
 import type { ComputedPlayerState } from "@/types";
 
 import { groupSkillsForRows, type RowKeying } from "../abilitySkills";
-import { sbaCauseLabel } from "../metrics/sba";
+import { rowGaugeFor, sbaCauseLabel, sbaInferenceSuppressed, shownSources } from "../metrics/sba";
 import { playerRowKey, SBA_UNATTRIBUTED_KEY, sbaCauseRowKey } from "../rowKey";
 
 import type { CardLabels } from "./cardLabels";
@@ -39,7 +39,11 @@ const CAUSE_COLOR = "var(--color-ink-3)";
  * restating one line of itself says nothing. Null too for a player whose gauge
  * was never attributed — a remote member's is synced rather than granted by a
  * hit the hook can see, and their honest empty state is the table's
- * (`ui.logs.sba-no-breakdown`), not a card with one 100% row in it. */
+ * (`ui.logs.sba-no-breakdown`), not a card with one 100% row in it. A remote
+ * member's DEDUCED split is likewise invisible here: the inference is
+ * suppressed until verified live (see `sbaInferenceSuppressed`), so this card
+ * values rows and lists causes exactly as the table does — measured figures
+ * only for such a player — and vanishes when nothing measured remains. */
 export const sbaCardSectionsFor = ({
   row,
   players,
@@ -64,19 +68,24 @@ export const sbaCardSectionsFor = ({
   const total = player.sbaGenerated;
   if (total === undefined) return null;
 
+  // The table's own valuation (`rowGaugeFor`): measured + inferred where the
+  // measurements anchor the rows, measured alone where the inference is
+  // suppressed. The card must agree with the table row by row.
+  const suppressed = sbaInferenceSuppressed(player);
+  const gaugeOf = rowGaugeFor(suppressed);
+
   const abilities: BreakdownEntry[] = groupSkillsForRows(player.skillBreakdown, keying)
     .map(({ key, skills }) => ({
       key,
       label: labels.ability(key, player),
-      value: skills.reduce((sum, skill) => sum + (skill.sbaGenerated ?? 0), 0),
+      value: skills.reduce((sum, skill) => sum + gaugeOf(skill), 0),
       icon: labels.abilityIcon?.(key, player),
     }))
     // A wall of honest zeros is what the table filters out, so the card does too.
     .filter((entry) => entry.value !== 0)
     .sort((a, b) => b.value - a.value);
 
-  const causes: BreakdownEntry[] = (player.sbaSources ?? [])
-    .filter((source) => source.generated !== 0)
+  const causes: BreakdownEntry[] = shownSources(player, suppressed)
     .map((source) => {
       const key = sbaCauseRowKey(source.kind, source.id);
       // Never null: the key was just built in the `source:` grammar it parses.

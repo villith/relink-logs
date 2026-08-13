@@ -50,6 +50,10 @@ const HOOK_ROWS: HookAction[][] = [
     },
   ],
   [
+    // Overriding hookVersion alone trips the app's crate-version rule (a dev
+    // hook's real answers always match — same tree, same version, same wire),
+    // so these two reach OutOfDate without faking a protocol mismatch;
+    // supportsEject picks which recovery the badge offers.
     {
       key: "force-out-of-date",
       color: "yellow",

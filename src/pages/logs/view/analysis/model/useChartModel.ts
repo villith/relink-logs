@@ -322,14 +322,36 @@ export const useChartModel = ({
     // for one render. Gated on the same condition `abilityQuery` requests under,
     // so the chart can only draw bands this tab actually asked for.
     if (caps.dataPath !== "derived" || spec.groupBy !== "ability") return null;
+    // The metric's own display policy over a player's bands, where it declares
+    // one — SBA folds a suppressed player's deduced bands back into the
+    // unattributed remainder (see `suppressedSbaBands`). Stun declares none:
+    // its bands are all measured and pass through.
+    const shown = (index: number, series: AbilitySeries[]): AbilitySeries[] => {
+      const filter = caps.filterAbilitySeries;
+      const player = playerByIndex.get(index)?.player;
+      if (filter === undefined || player === undefined) return series;
+      return filter(player, series, pins.ability !== null);
+    };
     const bands =
-      pins.source === null ? Object.values(scopedAbilitySeries).flat() : scopedAbilitySeries[pins.source] ?? [];
+      pins.source === null
+        ? Object.entries(scopedAbilitySeries).flatMap(([index, series]) => shown(Number(index), series))
+        : shown(pins.source, scopedAbilitySeries[pins.source] ?? []);
     if (bands.length === 0) return null;
     // Same cap as the group bands — both feed the eight-colour palette. The
     // fold follows the table's: a PINNED group's rows are its members, so the
     // bands must be too, or the chart redraws the band that was just clicked.
     return abilityBands(bands, GROUP_TOP_N, bandLabelFor, pins.ability === null ? "group" : "action", rowKeying);
-  }, [caps.dataPath, spec.groupBy, pins.source, pins.ability, scopedAbilitySeries, bandLabelFor, rowKeying]);
+  }, [
+    caps.dataPath,
+    caps.filterAbilitySeries,
+    spec.groupBy,
+    pins.source,
+    pins.ability,
+    scopedAbilitySeries,
+    playerByIndex,
+    bandLabelFor,
+    rowKeying,
+  ]);
 
   // Which series the per-player chart draws — identityPlayers, not players,
   // so a pin cannot drop the curves the pinned one is compared against. See

@@ -489,7 +489,8 @@ pub fn build_ability_sba_chart(
     // only ever saw `SbaGain` events, would still draw all of it as remainder.
     // Keying goes through the same memo, so an inferred gain lands in the band
     // its own hit opened or in none at all.
-    for gain in super::sba_inference::infer(events, &|_| true) {
+    let characters = super::sba_inference::character_aliases(player_data);
+    for gain in super::sba_inference::infer(events, &|_| true, &characters) {
         if !skills.contains_key(&gain.actor_index) {
             continue;
         }
@@ -925,16 +926,17 @@ mod tests {
 
     #[test]
     fn the_remainder_is_the_poll_total_minus_everything_named() {
-        // The poll sits 200 ms after the hit so the 70 it leaves over stays
-        // genuinely unexplained: inside the inference move window it would be
-        // correlated with that hit and there would be no remainder to measure.
+        // The poll sits 800 ms after the hit so the 70 it leaves over stays
+        // genuinely unexplained: inside the inference lookback the hit's
+        // weight share would name that gauge and there would be no remainder
+        // to measure.
         let events = vec![
             (0, stun_hit(0, ActionType::Normal(1), 0.0)),
             (
                 10,
                 sba_gain(0, SbaGainCause::Skill(ActionType::Normal(1)), 30.0),
             ),
-            (200, sba_poll(0, 100.0, 100.0)),
+            (800, sba_poll(0, 100.0, 100.0)),
         ];
         let bands = sba_bands(&events, 1);
 
@@ -991,13 +993,14 @@ mod tests {
         // Performing an SBA drops the gauge; `sba_added` must not go negative
         // and eat into the remainder.
         //
-        // The rise is 90 rather than a round 100, and sits 200 ms after the only
-        // hit rather than 10: both keep SBA INFERENCE out of a test that is not
-        // about it. 100.00 is exactly the flat chain-grant value it recognises,
-        // and 10 ms is inside its move window — either would name this gauge and
-        // leave no remainder to assert on.
+        // The rise is 90 rather than a round 100, and the only hit is an SBA
+        // hit: both keep SBA INFERENCE out of a test that is not about it.
+        // 100.00 is exactly the flat chain-grant value it recognises, and an
+        // ordinary hit weighs into the share rule — either would name this
+        // gauge and leave no remainder to assert on. (SBA hits are authored at
+        // weight zero: they grant no gauge.)
         let events = vec![
-            (0, stun_hit(0, ActionType::Normal(1), 0.0)),
+            (0, stun_hit(0, ActionType::SBA, 0.0)),
             (200, sba_poll(0, 90.0, 90.0)),
             (1_210, sba_poll(0, 0.0, -90.0)),
         ];
@@ -1056,7 +1059,10 @@ mod tests {
                 sba_gain(0, SbaGainCause::Skill(ActionType::Normal(2)), 50.0),
             ),
             (20, sba_gain(0, SbaGainCause::PartyAward, 10.0)),
-            (25, sba_poll(0, 200.0, 200.0)),
+            // Beyond the inference lookback of both hits, so the polled excess
+            // stays a remainder instead of being shared onto the skill rows —
+            // this test is about the pin, not inference.
+            (800, sba_poll(0, 200.0, 200.0)),
         ];
         let bands =
             build_ability_sba_chart(&events, &[0], 0, 1_000, 1, &scope(&[ActionType::Normal(1)]))

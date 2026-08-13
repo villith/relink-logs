@@ -1129,6 +1129,17 @@ impl OnProcessDamageHook {
             source_specified_instance_ptr as *const usize,
         );
 
+        // SBAWEIGHT (hookdiag): the per-hit gauge weight at instance+0x100. Read
+        // here because this is the one path that runs for EVERY player — a
+        // remote's gauge is never computed locally, but their damage is.
+        #[cfg(feature = "hookdiag")]
+        crate::hooks::diag::probe_sba_hit_weight(
+            damage_instance as *const _ as usize,
+            source_parent_idx,
+            damage_instance.action_id,
+            damage_instance.damage,
+        );
+
         // Post-hit target HP from the ExHp component. Read AFTER the original call so
         // the killing blow reports 0. Guarded read + plausibility checks: an actor
         // class without the +0x150 embed, or a future patch shifting it, yields None

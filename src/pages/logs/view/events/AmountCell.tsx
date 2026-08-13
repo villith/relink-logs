@@ -20,6 +20,13 @@ import {
   type CapLoadout,
 } from "./capSources";
 
+/** Whether the cap breakdown card is drawn. Off for now — the derivation and
+ * its tests are untouched (the tests `skipIf` this same switch, so flipping it
+ * back restores the card and its coverage together). Mirrors `SHOWS_JUMP_BAR`
+ * in `EventsTab`: a named, greppable switch, and the memo below
+ * short-circuits on it so the hidden card costs nothing per rendered row. */
+export const SHOWS_CAP_CARD = false;
+
 const format = (row: CapRow, locale: string): string => {
   switch (row.kind) {
     case "count":
@@ -92,7 +99,10 @@ export const AmountCell = ({
 } & AmountCellCapFacts) => {
   const { t, i18n } = useTranslation();
   const rows = useMemo(() => {
-    if (capHit === null) return [];
+    // The virtualized events table remounts this cell continuously while
+    // scrolling; a hidden card must not pay for ladder curves and record
+    // decomposition on every one of them.
+    if (!SHOWS_CAP_CARD || capHit === null) return [];
     const capClass = capClassOf(capHit.class_flags);
     // The independent base, from the game's own shipped ladder. Zero means the
     // curve had nothing to say (no curve for this character, no rate) — the
@@ -115,6 +125,7 @@ export const AmountCell = ({
     };
     return capCardRows(capHit, context);
   }, [capHit, playerCapUp, loadout, characterType, conditions]);
+  // A card needs more than the one row that restates the cell.
   const shows = rows.length > 1;
 
   // Memoized because `CursorCard` re-renders on every committed cursor frame

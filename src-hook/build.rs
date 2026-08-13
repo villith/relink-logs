@@ -1,31 +1,46 @@
 fn main() {
-    // Report a version the app can compare against its own. CI's release
-    // hook-build step sets HOOK_VERSION to the release version; dev/local
-    // builds leave it unset and fall back to the dev sentinel (kept in sync
-    // with protocol::toolbox::HOOK_DEV_VERSION), which the app never flags
-    // as out of date on version difference.
-    let version = std::env::var("HOOK_VERSION").unwrap_or_else(|_| "0.1.0-dev".to_string());
-    println!("cargo:rustc-env=HOOK_VERSION={version}");
-    println!("cargo:rerun-if-env-changed=HOOK_VERSION");
+    // Everything below exists to make hook.dll BYTE-IDENTICAL across builds of
+    // unchanged sources, and it is an antivirus measure rather than a tidiness
+    // one. Every distinct hash is a zero-prevalence file to the cloud ML
+    // classifiers, and low prevalence is most of what the generic detections
+    // (Wacatac/Wacapew and friends) actually score on. A hook that is rebuilt
+    // but unchanged should keep the reputation the last one earned.
+    //
+    // The version string used to be baked in here from CI's HOOK_VERSION, which
+    // auto-bumps on every push to dev — so the DLL got a new hash per release
+    // even when src-hook/ was untouched. The hook now reports its own crate
+    // version, hand-bumped in Cargo.toml only when the hook itself changes.
+    // The app compares that against the version it bundled (wire skew is
+    // caught separately by protocol::TOOLBOX_PROTOCOL_VERSION), so both
+    // staleness signals move with the hook, never with the release cadence,
+    // and the resource block below stays static.
     println!("cargo:rerun-if-changed=Cargo.toml");
 
-    // The static strings come from `[package.metadata.winres]`. The version
-    // cannot: the crate version is a permanent 0.1.0, so without this the DLL
-    // ships claiming to be 0.1.0 forever. Set the strings *and* the binary
-    // VS_FIXEDFILEINFO fields — they are separate, and tools read both.
+    // /Brepro replaces the two per-link nonces MSVC would otherwise stamp in:
+    // the PE TimeDateStamp (wall clock) and the CodeView RSDS GUID that pairs
+    // the image with its PDB. Both are content-derived under this flag, so
+    // relinking identical input reproduces identical bytes. `strip = true` in
+    // the workspace profile does NOT cover them — it drops symbols and leaves
+    // the debug directory in place.
+    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+        println!("cargo:rustc-link-arg=/Brepro");
+    }
+
+    // The static strings come from `[package.metadata.winres]`; the version
+    // fields are set here because winres does not read the crate version.
     let mut res = winres::WindowsResource::new();
-    res.set("FileVersion", &version);
-    res.set("ProductVersion", &version);
-    let packed = packed_version(&version);
+    let version = env!("CARGO_PKG_VERSION");
+    res.set("FileVersion", version);
+    res.set("ProductVersion", version);
+    let packed = packed_version(version);
     res.set_version_info(winres::VersionInfo::FILEVERSION, packed);
     res.set_version_info(winres::VersionInfo::PRODUCTVERSION, packed);
     res.compile().unwrap();
 }
 
-/// `X.Y.Z` or `X.Y.Z-N` packed into the u64 VS_FIXEDFILEINFO wants: four
-/// 16-bit fields, most significant first. Anything unparseable — notably the
-/// `0.1.0-dev` local fallback — contributes 0 rather than failing the build,
-/// because a dev hook's numeric version is never compared against anything.
+/// `X.Y.Z` packed into the u64 VS_FIXEDFILEINFO wants: four 16-bit fields, most
+/// significant first. Anything unparseable contributes 0 rather than failing
+/// the build.
 fn packed_version(version: &str) -> u64 {
     let (core, build) = version.split_once('-').unwrap_or((version, "0"));
     let mut fields = core.split('.').map(|f| f.parse::<u64>().unwrap_or(0));

@@ -10,7 +10,7 @@ const player = (
   values: {
     sba: number;
     sbaGenerated?: number;
-    skillBreakdown?: { action: number; damage?: number; sbaGenerated?: number }[];
+    skillBreakdown?: { action: number; damage?: number; sbaGenerated?: number; sbaInferred?: number }[];
     sbaSources?: { kind: string; id?: number; generated: number }[];
   }
 ) =>
@@ -39,6 +39,7 @@ const player = (
       maxDamage: s.damage ?? 0,
       totalDamage: s.damage ?? 0,
       sbaGenerated: s.sbaGenerated,
+      sbaInferred: s.sbaInferred,
       totalStunValue: 0,
       maxStunValue: 0,
       cappedHits: 0,
@@ -184,6 +185,79 @@ describe("sba drill-down", () => {
     const remote = player(1, { sba: 0, sbaGenerated: 500, skillBreakdown: [] });
     const rows = sba.rows(input("abilities", [remote], { source: 1, targets: [], ability: null }));
     expect(rows).toEqual([]);
+  });
+
+  it("hides a remote member's inference-only split until it is verified live", () => {
+    // The parser deduces a remote split (`sbaInferred`, `inferred*` causes),
+    // but nothing in it was measured — so the drilled table keeps the empty
+    // state rather than presenting a wall of deductions as a breakdown.
+    const remote = player(1, {
+      sba: 0,
+      sbaGenerated: 500,
+      skillBreakdown: [{ action: 9001, sbaInferred: 300 }],
+      sbaSources: [{ kind: "inferredChainGrant", generated: 100 }],
+    });
+    const rows = sba.rows(input("abilities", [remote], { source: 1, targets: [], ability: null }));
+    expect(rows).toEqual([]);
+  });
+
+  it("hides an inference-only split even when only causes were deduced", () => {
+    const remote = player(1, {
+      sba: 0,
+      sbaGenerated: 500,
+      sbaSources: [{ kind: "inferredDamageTaken", generated: 80 }],
+    });
+    const rows = sba.rows(input("abilities", [remote], { source: 1, targets: [], ability: null }));
+    expect(rows).toEqual([]);
+  });
+
+  it("keeps a remote member's measured cause rows while the deduction stays hidden", () => {
+    // The hook MEASURES some of a remote's gauge — the quest-start grant is
+    // per slot, party awards and network `site` grants arrive on the wire —
+    // and those rows rendered before the inference existed. Suppressing the
+    // deduction must not take them down with it: the inferred figures fold
+    // back into the remainder instead.
+    const remote = player(1, {
+      sba: 0,
+      sbaGenerated: 500,
+      skillBreakdown: [{ action: 9001, sbaInferred: 300 }],
+      sbaSources: [
+        { kind: "questStart", generated: 50 },
+        { kind: "inferredChainGrant", generated: 100 },
+      ],
+    });
+    const rows = sba.rows(input("abilities", [remote], { source: 1, targets: [], ability: null }));
+    expect(rows.map((row) => row.key)).toEqual(["skill:unattributed", "source:questStart"]);
+    expect(rows.find((row) => row.key === "skill:unattributed")?.value).toBe(450);
+  });
+
+  it("keeps an anchored player's inferred cause rows beside their measured ones", () => {
+    // Suppression is about a table with no measured anchor — a player whose
+    // skill split IS measured keeps the deduced causes, labelled as deduced.
+    const local = player(0, {
+      sba: 0,
+      sbaGenerated: 400,
+      skillBreakdown: [{ action: 9001, sbaGenerated: 200 }],
+      sbaSources: [{ kind: "inferredChainGrant", generated: 100 }],
+    });
+    const rows = sba.rows(input("abilities", [local], { source: 0, targets: [], ability: null }));
+    expect(rows.map((row) => row.key)).toContain("source:inferredChainGrant");
+  });
+
+  it("keeps a local player's split when inferred shares ride beside measured rows", () => {
+    // A measured row anchors the table, so the deduced share stays — marked
+    // approximate in its column rather than suppressed.
+    const local = player(0, {
+      sba: 0,
+      sbaGenerated: 400,
+      skillBreakdown: [
+        { action: 9001, sbaGenerated: 200 },
+        { action: 9002, sbaInferred: 100 },
+      ],
+    });
+    const rows = sba.rows(input("abilities", [local], { source: 0, targets: [], ability: null }));
+    expect(rows.map((row) => row.key)).toEqual(["skill:Normal:9001", "skill:Normal:9002", "skill:unattributed"]);
+    expect(rows.find((row) => row.key === "skill:Normal:9002")?.columns[0]).toBe("≈100");
   });
 
   it("names the gauge no ability accounts for, so the shares add up", () => {

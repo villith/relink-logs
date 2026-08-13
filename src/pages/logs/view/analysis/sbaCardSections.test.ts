@@ -12,7 +12,7 @@ const player = (
   index: number,
   values: {
     sbaGenerated?: number;
-    skillBreakdown?: { action: number; sbaGenerated?: number }[];
+    skillBreakdown?: { action: number; sbaGenerated?: number; sbaInferred?: number }[];
     sbaSources?: { kind: string; id?: number; generated: number }[];
   }
 ) =>
@@ -31,6 +31,7 @@ const player = (
       maxDamage: 0,
       totalDamage: 0,
       sbaGenerated: s.sbaGenerated,
+      sbaInferred: s.sbaInferred,
       totalStunValue: 0,
       maxStunValue: 0,
       cappedHits: 0,
@@ -150,5 +151,36 @@ describe("sbaCardSectionsFor", () => {
     // A remote member's gauge is synced rather than granted by a hit the hook
     // can see, so a card here would be an empty panel over a real row.
     expect(sectionsFor([player(0, { sbaGenerated: 800 })], "player:0")).toBeNull();
+  });
+
+  it("no card for a remote member whose split is inference-only", () => {
+    // The parser's deduced split is suppressed until verified live (see
+    // `sbaInferenceSuppressed`); the card vanishes with the table rows it
+    // mirrors, rather than showing a breakdown built entirely of guesses.
+    const remote = player(1, {
+      sbaGenerated: 600,
+      skillBreakdown: [{ action: 1, sbaInferred: 350 }],
+      sbaSources: [{ kind: "inferredChainGrant", generated: 100 }],
+    });
+    expect(sectionsFor([remote], "player:1")).toBeNull();
+  });
+
+  it("keeps a remote member's measured causes; the deduction folds into the remainder", () => {
+    // Same rule as the table: hook-measured cause rows render, the suppressed
+    // inference (skill shares and inferred causes alike) grows the remainder.
+    const remote = player(1, {
+      sbaGenerated: 600,
+      skillBreakdown: [{ action: 1, sbaInferred: 350 }],
+      sbaSources: [
+        { kind: "partyAward", generated: 100 },
+        { kind: "inferredChainGrant", generated: 100 },
+      ],
+    });
+    const sections = sectionsFor([remote], "player:1");
+    expect(sections?.map((section) => section.headingKey)).toEqual(["ui.logs.hover-by-sba-cause"]);
+    expect(sections?.[0].entries.map((entry) => [entry.key, entry.value])).toEqual([
+      ["source:partyAward", 100],
+      [SBA_UNATTRIBUTED_KEY, 500],
+    ]);
   });
 });

@@ -124,6 +124,33 @@ describe("HoverCardBody", () => {
     expect(screen.queryByText("ui.logs.hover-by-ability")).toBeNull();
     expect(screen.getByText("ui.logs.hover-by-target")).toBeTruthy();
   });
+
+  it("draws an art box on every entry — the placeholder where there is no art, like the table", () => {
+    // A table row without art still draws the faint diamond box, which holds
+    // the name column's left edge steady. Card entries used to go text-only
+    // instead, so a mixed section's names zigzagged against the table above.
+    const { container } = renderBody([
+      {
+        headingKey: "ui.logs.hover-by-ability",
+        color: "red",
+        entries: [
+          { key: "a", label: "with art", value: 2, icon: "art.png" },
+          { key: "b", label: "without art", value: 1 },
+        ],
+      },
+    ]);
+
+    const rows = [...container.querySelectorAll("[data-card-row]")];
+    expect(rows[0].querySelector("[data-row-art-ground]")).toBeTruthy();
+    expect(rows[1].querySelector("[data-row-art-empty]")).toBeTruthy();
+  });
+
+  it("leaves a reserved blank slot bare — it is a layout floor, not a row", () => {
+    const { container } = renderBody([{ ...section("ui.logs.hover-by-ability", 1), reserve: 2 }]);
+    const rows = [...container.querySelectorAll("[data-card-row]")];
+    expect(rows).toHaveLength(2);
+    expect(rows[1].querySelector("[data-row-art-empty]")).toBeNull();
+  });
 });
 
 describe("HoverCardBody — a section that states no shares", () => {

@@ -1206,7 +1206,119 @@ mod summon_string_tests {
     }
 }
 
+/// The per-hit SBA gauge weight the game reads off the `DamageInstance`.
+///
+/// The OUTGOING per-hit grant (v2.0.4 `FUN_1409aecd0`, reached from the
+/// register-hit gate `0x9aea40`) ends:
+///
+/// ```text
+/// FUN_140bb2ba0(actor + 0x3230, gauge * *(f32*)(instance + 0x100) * factor, ...)
+/// ```
+///
+/// and the gate refuses to grant anything at all when that same field is below
+/// epsilon. So `+0x100` is a per-hit weight on the gauge, and it lives in the
+/// struct this hook ALREADY receives for every damage event — a remote party
+/// member's hits included, because their damage is processed locally even
+/// though their gauge computation is not.
+///
+/// That is the whole reason this exists. If gauge is proportional to this
+/// weight, a player's per-ability split is `Σweight(ability) / Σweight(all)`
+/// applied to their polled total — exact, with no per-move table, no
+/// cross-log learning and no correlation window.
+///
+/// WHY +0x100 IS BELIEVED TO BE IN THIS STRUCT (the last probe died of a wrong
+/// base, so this is spelled out): the gate's other guard reads
+/// `*(u64*)(param_2 + 0xE8) & 0x4000003000`, and `0xE8` is
+/// [`super::ffi::DamageInstance::flags`]; the gate and the grant read `+0x100`
+/// as the same float; and `OnSBARegisterHitHook` already treats this same
+/// argument as the damage instance in live-proven code.
+///
+/// VALIDATE ON THE LOCAL SLOT FIRST. Its gauge per move is known exactly from
+/// the hook's own captioned gains (Pl2700: action 125 grants 2.699 every time).
+/// If `gauge / weight` is constant across that character's moves, the
+/// proportionality holds and the remote case follows. If it is not constant,
+/// the vtable+0x840 virtual is carrying per-move information that this field
+/// does not, and the idea is dead — which is equally worth knowing.
+///
+/// One line per (party slot, action id), for the same reason as any other
+/// per-hit probe: a fight lands thousands of hits and this question needs one
+/// sample per move, not per swing.
+#[cfg(feature = "hookdiag")]
+pub fn probe_sba_hit_weight(instance: usize, parent_index: u32, action_id: u32, damage: i32) {
+    use std::sync::Mutex;
+    // (slot, action) -> unreadable attempts so far; `u8::MAX` = settled by a
+    // real reading. A transient unreadable must NOT settle the key — one bad
+    // sample would permanently consume the move's single probe slot and the
+    // "is gauge/weight constant across moves" question would silently lose
+    // that move for the whole session. Bounded retries, so a persistently
+    // unreadable field logs a handful of lines rather than one per swing.
+    static SEEN: Mutex<Vec<((u32, u32), u8)>> = Mutex::new(Vec::new());
+    const UNREADABLE_RETRIES: u8 = 3;
+
+    if instance == 0 {
+        return;
+    }
+    let key = (parent_index, action_id);
+    {
+        let Ok(seen) = SEEN.try_lock() else {
+            return;
+        };
+        if seen.len() >= 512 {
+            return;
+        }
+        if let Some((_, attempts)) = seen.iter().find(|(existing, _)| *existing == key) {
+            if *attempts >= UNREADABLE_RETRIES {
+                return;
+            }
+        }
+    }
+
+    let addr = instance.wrapping_add(0x100);
+    let weight = readable(addr, std::mem::size_of::<f32>())
+        .then(|| unsafe { (addr as *const f32).read_unaligned() });
+
+    // Settle (or count the miss) only now that the read verdict exists. Two
+    // hits of one move can race between the check above and here; the cost is
+    // a duplicate log line, which beats a lock held across the probe.
+    {
+        let Ok(mut seen) = SEEN.try_lock() else {
+            return;
+        };
+        let settled = if weight.is_none() { 1 } else { u8::MAX };
+        match seen.iter_mut().find(|(existing, _)| *existing == key) {
+            Some((_, attempts)) => {
+                *attempts = if weight.is_none() {
+                    attempts.saturating_add(1)
+                } else {
+                    u8::MAX
+                }
+            }
+            None => seen.push((key, settled)),
+        }
+    }
+
+    // Stated per line so a negative result is unmistakable rather than a
+    // judgement call about floats. `zero` is the outcome the gate itself treats
+    // as "no gauge from this hit", so it is a real reading, not a failure.
+    let verdict = match weight {
+        None => "unreadable",
+        Some(value) if !value.is_finite() => "garbage",
+        Some(value) if value == 0.0 => "zero",
+        Some(value) if !(0.0..=1000.0).contains(&value) => "implausible",
+        Some(_) => "populated",
+    };
+
+    log::info!(
+        "SBAWEIGHT slot={parent_index:#x} action={action_id} verdict={verdict} \
+         weight={weight:?} dmg={damage}"
+    );
+}
+
 // No-op shims so call sites don't need their own cfg guards.
+#[cfg(not(feature = "hookdiag"))]
+#[inline(always)]
+#[allow(dead_code)]
+pub fn probe_sba_hit_weight(_instance: usize, _parent_index: u32, _action_id: u32, _damage: i32) {}
 #[cfg(not(feature = "hookdiag"))]
 #[inline(always)]
 #[allow(dead_code)]
