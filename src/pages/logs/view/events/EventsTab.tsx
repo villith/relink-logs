@@ -23,6 +23,7 @@ import {
 import type { StreamContext } from "../analysis/model/bodyContext";
 import { AmountCell } from "./AmountCell";
 import type { PlayerCapUp } from "./capBreakdown";
+import { buildGridStates, type GridStateMap } from "./capGridStates";
 import type { CapLoadout } from "./capSources";
 import { ColumnFilterMenu } from "./ColumnFilterMenu";
 import {
@@ -237,6 +238,7 @@ export const EventRowsTable = ({
   labels,
   capUp,
   loadout,
+  gridStates,
   marks,
   filters,
 }: {
@@ -256,6 +258,9 @@ export const EventRowsTable = ({
    * the totals against. The character is along for the ride because it keys
    * the base-cap ladder the card's independent total comes from. */
   loadout?: Map<number, CapLoadout & Pick<PlayerData, "characterType">>;
+  /** The party's observed on-grid K sets (`capGridStates`), on the same key —
+   * what refines a hit's failed grid check into the transition verdict. */
+  gridStates?: GridStateMap;
   /** How the current jump target paints the rows. Absent, nothing is marked. */
   marks?: JumpMarks;
   /** The per-column funnels. Absent, the heads carry no controls at all — which
@@ -446,6 +451,7 @@ export const EventRowsTable = ({
                   capHit={row.capHit}
                   playerCapUp={actor === null ? undefined : capUp?.[String(actor)]}
                   loadout={build}
+                  gridStates={actor === null ? undefined : gridStates?.get(actor)}
                   characterType={build?.characterType}
                   // `null` is "this row has no cap to explain"; the card wants
                   // "nothing known", and the two degrade the same way.
@@ -520,6 +526,12 @@ export const EventsTab = ({ stream, labels, playerData }: EventsTabProps) => {
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>({});
 
   const allRows = useMemo(() => events.map(toEventRow), [events]);
+  // The party's observed on-grid K sets, from the UNFILTERED stream — a
+  // filter must not change what counts as an actor's known grid states.
+  const gridStates = useMemo(
+    () => buildGridStates(allRows, (actor) => loadout.get(actor)?.characterType),
+    [allRows, loadout]
+  );
   // What the metric, the side, the kinds and the pins left. The column funnels
   // read their values from THIS — before their own narrowing — so ticking one
   // value does not delete every other box from the menu that ticked it.
@@ -699,6 +711,7 @@ export const EventsTab = ({ stream, labels, playerData }: EventsTabProps) => {
             labels={labels}
             capUp={capUp}
             loadout={loadout}
+            gridStates={gridStates}
             marks={{ current: landed, arrival }}
             filters={columnControl}
           />

@@ -37,7 +37,7 @@ export type GridStateMap = Map<number, Map<CapBucket, GridKStates>>;
 /** What the registry needs from one event row — the Amount cell's own
  * `capHit` plus the acting player's index, so any surface that renders the
  * card can also feed the registry. */
-export type GridSourceRow = { sourceIndex: number | null; hit: CapHit | null };
+export type GridSourceRow = { sourceIndex: number | null; capHit: CapHit | null };
 
 /** The ease tail parks within ~0.1 of its target for seconds (measured
  * 69.93 → 69.999); 0.15 is the residual scan's own tolerance. */
@@ -48,9 +48,9 @@ export const buildGridStates = (
   characterOf: (actorIndex: number) => CharacterType | undefined
 ): GridStateMap => {
   const states: GridStateMap = new Map();
-  for (const { sourceIndex, hit } of rows) {
-    if (sourceIndex === null || hit === null) continue;
-    const { damage_cap: cap, attack_rate: rate, class_flags: flags } = hit;
+  for (const { sourceIndex, capHit } of rows) {
+    if (sourceIndex === null || capHit === null) continue;
+    const { damage_cap: cap, attack_rate: rate, class_flags: flags } = capHit;
     const bucket = capBucketOf(flags);
     if (cap === null || cap <= 0 || rate === null || bucket === null) continue;
     const curve = ladderCurveFor(characterOf(sourceIndex), flags);

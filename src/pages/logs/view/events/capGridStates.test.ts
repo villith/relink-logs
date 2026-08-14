@@ -13,7 +13,7 @@ const onGrid = (k: number) => Math.trunc((BASE * k) / 100);
 
 const HIT = (k: number): GridSourceRow => ({
   sourceIndex: 1,
-  hit: { damage: 1, damage_cap: onGrid(k), base_damage: 1, attack_rate: 0.5, class_flags: 0 },
+  capHit: { damage: 1, damage_cap: onGrid(k), base_damage: 1, attack_rate: 0.5, class_flags: 0 },
 });
 
 describe("capBucketOf", () => {
@@ -36,12 +36,12 @@ describe("buildGridStates", () => {
       HIT(2401),
       HIT(2426),
       // Off-grid: parked mid-way between two grid points.
-      { sourceIndex: 1, hit: { ...HIT(2401).hit!, damage_cap: Math.trunc(BASE * 24.115) } },
+      { sourceIndex: 1, capHit: { ...HIT(2401).capHit!, damage_cap: Math.trunc(BASE * 24.115) } },
       // Rows without a judgeable hit contribute nothing.
-      { sourceIndex: 1, hit: null },
-      { sourceIndex: null, hit: HIT(2401).hit },
-      { sourceIndex: 1, hit: { ...HIT(2401).hit!, attack_rate: null } },
-      { sourceIndex: 1, hit: { ...HIT(2401).hit!, class_flags: null } },
+      { sourceIndex: 1, capHit: null },
+      { sourceIndex: null, capHit: HIT(2401).capHit },
+      { sourceIndex: 1, capHit: { ...HIT(2401).capHit!, attack_rate: null } },
+      { sourceIndex: 1, capHit: { ...HIT(2401).capHit!, class_flags: null } },
     ];
     const states = buildGridStates(rows, characterOf);
     expect(states.get(1)?.get("normal")).toEqual(
@@ -55,7 +55,7 @@ describe("buildGridStates", () => {
   it("keeps buckets apart: a skill hit never lands in the normal set", () => {
     const skill: GridSourceRow = {
       sourceIndex: 1,
-      hit: { ...HIT(2401).hit!, class_flags: 0x10000 },
+      capHit: { ...HIT(2401).capHit!, class_flags: 0x10000 },
     };
     const states = buildGridStates([HIT(2401), skill], characterOf);
     expect(states.get(1)?.get("normal")?.get(2401)).toBe(1);
