@@ -12,6 +12,7 @@ EXPLAIN placeholders; textless internal traits are pinned by SKILL key
 (recovered by hash preimage) and exempt.
 
 Pipeline (re-run after a game update):
+  0. Bump GAME_VERSION below to the new game version.
   1. GBFRDataTools extract -i <data.i> -f system/table/skill_status.tbl -o <dir>
      GBFRDataTools extract -i <data.i> -f system/table/text/en/text.msg -o <dir>
   2. python scripts/gen-damage-trait-values.py <dir>/system/table
@@ -28,7 +29,9 @@ Output shape:
       }
     }
   }
-Values are percentages exactly as the game tables ship them.
+Values are raw f32 table values widened to f64 (so e.g. 3.2 appears as
+3.200000047683716), exactly as skill_status.tbl ships them — percentages,
+unrounded. Display formatting/rounding is the consumer's job.
 """
 
 import json
@@ -41,7 +44,7 @@ import msgpack
 
 ROOT = Path(__file__).resolve().parent.parent
 
-GAME_VERSION = "2.0.4"
+GAME_VERSION = "2.0.4"  # hand-bump when regenerating after a game update
 ROW_SIZE = 52
 KEY_OFFSET = 0x28
 LEVEL_OFFSET = 0x30
@@ -131,6 +134,10 @@ def validate(explains: dict[int, str], traits_json: dict[str, dict]) -> None:
             sys.exit(f"{hex8} is pinned textless but traits.json now names it — drop the pin")
         if pinned_key is None and not in_json:
             sys.exit(f"{hex8} has no traits.json entry and no pinned key — pin its SKILL key")
+        if pinned_key is None and spec.get("noExplain"):
+            explain = explains.get(h)
+            if explain and re.search(r"\{\d", explain):
+                sys.exit(f"{hex8} is noExplain but its text now names placeholders — validate the pins and drop noExplain")
         if pinned_key is None and not spec.get("noExplain"):
             explain = explains.get(h)
             if not explain:
@@ -186,9 +193,9 @@ def emit(by_trait: dict[int, dict[int, tuple]], traits_json: dict[str, dict]) ->
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
-        sys.exit("usage: gen-damage-trait-values.py <dir>/system/table")
-    table_dir = Path(sys.argv[1])
+    table_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else None
+    if table_dir is None or not (table_dir / "skill_status.tbl").exists():
+        sys.exit("usage: gen-damage-trait-values.py <dir with skill_status.tbl and text/en/text.msg>")
     traits_json = load_traits_json()
     explains = read_explains(table_dir / "text" / "en" / "text.msg", traits_json)
     validate(explains, traits_json)
