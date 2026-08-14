@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
+import type { LogEvent } from "@/types";
+
 import type { ExplainHit } from "./capExplain";
 import type { CapConditions } from "./capFactors";
-import { explainDamageHit, type DamageTraitTable } from "./damageExplain";
+import { amplifyStatusIds, explainDamageHit, type DamageTraitTable } from "./damageExplain";
 
 /** A tiny fake value table so tests never depend on the generated asset. */
 const TABLE: DamageTraitTable = {
@@ -198,5 +200,87 @@ describe("taken/variance section", () => {
   it("degrades to absent on an old log, never to zero", () => {
     expect(section("dmg-taken", { base_damage: null }).substituted).toBeNull();
     expect(line("dmg-taken", "variance-band", { base_damage: null }).value).toEqual({ kind: "absent" });
+  });
+});
+
+describe("postcap section", () => {
+  it("substitutes the observed ratio final / min(base, cap)", () => {
+    // 1,470,000 / 1,000,000 = 1.47
+    expect(section("dmg-postcap").substituted).toContain("1.47");
+  });
+
+  it("renders the overflow row only on capped hits", () => {
+    expect(section("dmg-postcap").lines.some((l) => l.key === "overflow")).toBe(true);
+    expect(section("dmg-postcap", { base_damage: 900_000 }).lines.some((l) => l.key === "overflow")).toBe(false);
+  });
+
+  it("lists held amplify statuses by id", () => {
+    const out = explainDamageHit(
+      {
+        hit: HIT,
+        loadout: LOADOUT,
+        conditions: { buffs: [111, 222], stacks: { "111": 1, "222": 3 } },
+        amplifyStatusIds: new Set([222]),
+      },
+      TABLE
+    );
+    const postcap = out.find((s) => s.key === "dmg-postcap")!;
+    const held = postcap.lines.filter((l) => l.key.startsWith("amplify-status-"));
+    expect(held).toHaveLength(1);
+    expect(held[0].key).toBe("amplify-status-222");
+  });
+});
+
+describe("amplifyStatusIds", () => {
+  it("collects status ids whose applied class name contains Amplify", () => {
+    const classTable = {
+      "12345": { class: "StatusAmplifyDamageBuff", name: "Amp" },
+      "9": { class: "StatusAtkUp", name: "Atk" },
+    };
+    const events = [
+      [
+        0,
+        {
+          StatusApply: {
+            actor_index: 0,
+            caster_index: null,
+            status_id: 222,
+            ability_id: null,
+            stacks: 1,
+            status_class: 12345,
+            caster_action_id: null,
+          },
+        },
+      ],
+      [
+        1,
+        {
+          StatusApply: {
+            actor_index: 0,
+            caster_index: null,
+            status_id: 333,
+            ability_id: null,
+            stacks: 1,
+            status_class: 9,
+            caster_action_id: null,
+          },
+        },
+      ],
+      [
+        2,
+        {
+          StatusApply: {
+            actor_index: 0,
+            caster_index: null,
+            status_id: 444,
+            ability_id: null,
+            stacks: 1,
+            status_class: null,
+            caster_action_id: null,
+          },
+        },
+      ],
+    ] as unknown as LogEvent[];
+    expect([...amplifyStatusIds(events, classTable)]).toEqual([222]);
   });
 });

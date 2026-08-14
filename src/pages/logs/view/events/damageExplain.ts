@@ -1,6 +1,8 @@
 import damageTraitValues from "@/assets/damage-trait-values.json";
+import type { LogEvent } from "@/types";
 import { computeCombinedTraits } from "@/utils";
 
+import statusClasses from "../../../../../src-tauri/assets/status-classes.json";
 import type { ExplainHit, ExplainLine, ExplainSection, ExplainValue } from "./capExplain";
 import type { CapConditions } from "./capFactors";
 import { capClassOf, type CapLoadout } from "./capSources";
@@ -381,17 +383,95 @@ const takenSection = (hit: ExplainHit): ExplainSection => {
   };
 };
 
+type StatusClassTable = Record<string, { class: string; name: string }>;
+
+/** Status ids this log applied with an IStatusAmplifyBuff-derived class —
+ * the concrete classes all carry "Amplify" in their RTTI name. */
+export const amplifyStatusIds = (
+  events: LogEvent[],
+  table: StatusClassTable = statusClasses as StatusClassTable
+): Set<number> => {
+  const out = new Set<number>();
+  for (const [, payload] of events) {
+    if (!("StatusApply" in payload)) continue;
+    const apply = payload.StatusApply;
+    if (apply.status_class === null) continue;
+    const entry = table[String(apply.status_class)];
+    if (entry !== undefined && entry.class.includes("Amplify")) out.add(apply.status_id);
+  }
+  return out;
+};
+
+const postcapSection = (
+  hit: ExplainHit,
+  loadout: CapLoadout | undefined,
+  conditions: CapConditions,
+  amplifyIds: ReadonlySet<number>,
+  table: DamageTraitTable
+): ExplainSection => {
+  const clamped = clampedPrecap(hit);
+  const capped = hit.base_damage !== null && hit.damage_cap !== null && hit.base_damage >= hit.damage_cap;
+  const ratio = clamped !== null && clamped > 0 ? hit.damage / clamped : null;
+  const heldAmplify = (conditions.buffs ?? []).filter((id) => amplifyIds.has(id));
+  const lines: ExplainLine[] = [
+    {
+      key: "ratio",
+      name: { kind: "key", value: "ui.debug.dmg-line-postcap-ratio" },
+      value: ratio === null ? absent : { kind: "multiplier", value: ratio },
+      source: { kind: "literal", value: "damage / min(base_damage, damage_cap)" },
+      emphasis: "total",
+    },
+    {
+      key: "elemental",
+      name: { kind: "key", value: "ui.debug.dmg-line-elemental" },
+      value: absent,
+      source: { kind: "literal", value: "vfn+0xA0: 1 + base + agg(0x1A) + record+0x5964%" },
+      excluded: "value-unrecorded",
+    },
+    ...heldAmplify.map(
+      (id): ExplainLine => ({
+        key: `amplify-status-${id}`,
+        name: { kind: "key", value: "ui.debug.dmg-held-amplify" },
+        value: { kind: "text", value: `#${id} x${conditions.stacks?.[String(id)] ?? 1}` },
+        source: { kind: "literal", value: "IStatusAmplifyBuff walk (vfn+0xA8)" },
+        depth: 1,
+      })
+    ),
+    ...traitLines("postcap", hit, loadout, conditions, table),
+  ];
+  if (capped) {
+    lines.push({
+      key: "overflow",
+      name: { kind: "key", value: "ui.debug.dmg-line-overflow" },
+      value: absent,
+      source: { kind: "literal", value: "vfn+0xB0: cap x k@+0x249C x (atkChain - 1), at-cap only" },
+      excluded: "value-unrecorded",
+    });
+  }
+  return {
+    key: "dmg-postcap",
+    titleKey: "ui.debug.dmg-sec-postcap",
+    formula: "final = elemMult x amplify x clamped (+ overflow at cap) x syncClamp",
+    substituted:
+      ratio === null ? null : `${hit.damage.toLocaleString()} = x${ratio.toFixed(3)} x ${clamped!.toLocaleString()}`,
+    unavailableKey: null,
+    noteKey: "ui.debug.dmg-note-postcap",
+    lines,
+  };
+};
+
 export const explainDamageHit = (
   input: DamageExplainInput,
   table: DamageTraitTable = DEFAULT_TABLE
 ): ExplainSection[] => {
   const conditions = input.conditions ?? {};
+  const amplifyIds = input.amplifyStatusIds ?? new Set<number>();
   return [
     hitSection(input.hit),
     chainSection(input.hit, input.loadout, conditions, table),
     critSection(input.hit, input.loadout, conditions, table),
     classSection(input.hit),
     takenSection(input.hit),
-    // Later tasks append: postcap.
+    postcapSection(input.hit, input.loadout, conditions, amplifyIds, table),
   ];
 };
