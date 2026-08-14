@@ -11,6 +11,7 @@ import {
   type CapFactorReason,
   type CapFactorResult,
 } from "./capFactors";
+import { capBucketOf, classifyOffGrid, type CapBucket, type GridKStates } from "./capGridStates";
 import { capConsistent, gameLadderTrace, ladderCurveFor, type LadderRow } from "./capLadder";
 import { capClassOf, dmgCapTraitValue, type CapClass, type CapExclusion, type CapLoadout } from "./capSources";
 
@@ -118,6 +119,10 @@ export type ExplainInput = {
   /** What the caller knows about the moment the hit landed. Absent fields leave
    * the factors that need them unresolved rather than assumed. */
   conditions?: CapConditions;
+  /** The acting player's observed on-grid K sets per attack-class bucket
+   * (`capGridStates`), which name a failed grid check that is really the
+   * game's own ease. Absent, a failed check stays a bare ✗. */
+  gridStates?: ReadonlyMap<CapBucket, GridKStates>;
 };
 
 /** `"Pl0300"` -> `"079df0cc"`. The ladder maps are keyed by the hash, and the
@@ -451,6 +456,7 @@ const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
   // game's own cap must be trunc(base x K/100) for some integer K. A cap
   // between grid points is one this base cannot have produced.
   const k = Math.round((100 * cap) / base);
+  const consistent = capConsistent(cap, base);
   lines.push(
     { key: "grid-k", name: literal("K = round(100 x cap / base)"), value: count(k), depth: 1 },
     {
@@ -462,11 +468,21 @@ const capUpSection = (input: ExplainInput, base: number): ExplainSection => {
     {
       key: "grid-verdict",
       name: key("ui.debug.cap-grid-check"),
-      value: verdict(capConsistent(cap, base)),
+      value: verdict(consistent),
       source: key("ui.debug.cap-grid-check-source"),
       depth: 1,
     }
   );
+  // A failed check judged against the actor's own observed grid states: a K
+  // strictly inside their bracket (or on the settling tail) is a state-gated
+  // term's EASE — the game's own arithmetic, not a formula violation.
+  if (!consistent) {
+    const bucket = capBucketOf(hit.class_flags);
+    const eased = classifyOffGrid((100 * cap) / base, bucket === null ? undefined : input.gridStates?.get(bucket));
+    if (eased !== null) {
+      lines.push({ key: "grid-transition", name: key("ui.debug.cap-grid-transition"), value: text(eased), depth: 1 });
+    }
+  }
 
   let attributed = 0;
   lines.push({

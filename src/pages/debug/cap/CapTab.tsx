@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { abilityLabelFor } from "@/pages/logs/view/analysis/abilityLabel";
 import { explainCapHit } from "@/pages/logs/view/events/capExplain";
 import { conditionsForHit } from "@/pages/logs/view/events/capFactors/conditions";
+import { buildGridStates } from "@/pages/logs/view/events/capGridStates";
 import { getSkillName, millisecondsToPreciseElapsedFormat, translateCharacterType } from "@/utils";
 
 import { CapDetailPanel } from "./CapDetailPanel";
@@ -119,6 +120,17 @@ export const CapTab = () => {
 
   const selected = useMemo(() => shown.find((hit) => hit.eventIndex === eventIndex) ?? null, [shown, eventIndex]);
 
+  // The party's observed on-grid K sets, from every hit in the log — what
+  // refines a failed grid check into the transition/settling naming.
+  const gridStates = useMemo(
+    () =>
+      buildGridStates(
+        hits.map((hit) => ({ sourceIndex: hit.sourceIndex, capHit: hit.hit })),
+        (actor) => playersByActor.get(actor)?.characterType
+      ),
+    [hits, playersByActor]
+  );
+
   const sections = useMemo(() => {
     if (selected === null) return null;
     const player = playersByActor.get(selected.sourceIndex);
@@ -127,6 +139,7 @@ export const CapTab = () => {
       capUp: capUp[String(selected.sourceIndex)],
       loadout: player,
       characterType: player?.characterType,
+      gridStates: gridStates.get(selected.sourceIndex),
       // The attacker's own state at the moment of the hit, plus the stored stat
       // block the banded traits ramp across, plus the hit's own action id for
       // the move-scoped board nodes. A hit recorded before that capture
@@ -134,7 +147,7 @@ export const CapTab = () => {
       // than reading as inactive.
       conditions: conditionsForHit(selected.attacker, player?.playerStats ?? null, selected.actionId),
     });
-  }, [selected, playersByActor, capUp]);
+  }, [selected, playersByActor, capUp, gridStates]);
 
   const logOptions = recent.map((log) => ({
     value: String(log.id),
